@@ -1,6 +1,7 @@
 import { hivecodeProductConfig } from '../../shared/generated/product-config'
 
 export type ProductExternalServiceEndpoints = {
+  artifacts: string | null
   feedback: string | null
   pluginKillList: string | null
   pluginMarketplace: string | null
@@ -24,6 +25,7 @@ export function getProductExternalServiceEndpoints(
   config: ProductEndpointConfig = hivecodeProductConfig
 ): ProductExternalServiceEndpoints {
   return {
+    artifacts: config.endpoints.artifacts,
     feedback: config.endpoints.feedback,
     pluginKillList: config.endpoints.pluginKillList,
     pluginMarketplace: config.endpoints.pluginMarketplace,

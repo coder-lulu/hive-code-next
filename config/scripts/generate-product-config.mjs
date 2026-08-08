@@ -8,6 +8,7 @@ const GENERATED_RELATIVE_PATHS = [
   path.join('mobile', 'src', 'generated', 'product-config.ts')
 ]
 const ENDPOINT_KEYS = [
+  'artifacts',
   'cloud',
   'relay',
   'update',
@@ -26,7 +27,8 @@ const SLUG_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const GITHUB_REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/
 const PRODUCT_UPDATE_CHANNELS = new Set(['stable', 'rc'])
-const STRICT_HTTPS_ENDPOINTS = new Set(['pluginMarketplace', 'changelog', 'nudge'])
+const STRICT_HTTPS_ENDPOINTS = new Set(['artifacts', 'pluginMarketplace', 'changelog', 'nudge'])
+const ORIGIN_ONLY_ENDPOINTS = new Set(['artifacts'])
 
 const REQUIRED_ROOT_KEYS = [
   'schemaVersion',
@@ -124,7 +126,7 @@ function assertOptionalString(value, label) {
   }
 }
 
-function assertEndpoint(value, label, requireHttps = false) {
+function assertEndpoint(value, label, requireHttps = false, requireOrigin = false) {
   if (value === null || value === undefined || value === '') {
     return
   }
@@ -145,6 +147,9 @@ function assertEndpoint(value, label, requireHttps = false) {
   }
   if (requireHttps && parsed.protocol !== 'https:') {
     throw new Error(`${label} must use HTTPS`)
+  }
+  if (requireOrigin && parsed.pathname !== '/') {
+    throw new Error(`${label} must be an origin without a path`)
   }
   if (
     parsed.protocol !== 'https:' &&
@@ -208,7 +213,12 @@ function assertManifestShape(manifest) {
   assertKnownKeys(manifest.endpoints, new Set(ENDPOINT_KEYS), 'endpoints')
   assertRequiredKeys(manifest.endpoints, ENDPOINT_KEYS, 'endpoints')
   for (const key of ENDPOINT_KEYS) {
-    assertEndpoint(manifest.endpoints[key], `endpoints.${key}`, STRICT_HTTPS_ENDPOINTS.has(key))
+    assertEndpoint(
+      manifest.endpoints[key],
+      `endpoints.${key}`,
+      STRICT_HTTPS_ENDPOINTS.has(key),
+      ORIGIN_ONLY_ENDPOINTS.has(key)
+    )
   }
 }
 

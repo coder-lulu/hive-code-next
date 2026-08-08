@@ -21,15 +21,12 @@ import {
 import type { PluginKillListEntry } from '../../shared/plugins/plugin-kill-list'
 import { validateMarketplaceProvenance } from './plugin-marketplace-provenance'
 import { pluginMarketplaceErrorMessage } from './plugin-marketplace-error-message'
-import type {
-  PluginMarketplaceListing,
-  PluginMarketplaceSourceState
+import {
+  type PluginMarketplaceListing,
+  type PluginMarketplaceSourceState,
+  projectMarketplaceSourceState
 } from './plugin-marketplace-projection'
-import { projectMarketplaceSourceState } from './plugin-marketplace-projection'
-export type {
-  PluginMarketplaceListing,
-  PluginMarketplaceSourceState
-} from './plugin-marketplace-projection'
+export type { PluginMarketplaceListing, PluginMarketplaceSourceState }
 
 type MarketplaceFetcher = (
   source: PluginMarketplaceRegisteredSource

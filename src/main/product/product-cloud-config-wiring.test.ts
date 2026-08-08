@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest'
 
 const MAIN_ROOT = path.resolve(import.meta.dirname, '..')
 const GENERIC_CONFIG_PATH = path.join(MAIN_ROOT, 'orca-profiles', 'profile-cloud-auth-config.ts')
+const GENERIC_ARTIFACT_CONFIG_PATH = path.join(MAIN_ROOT, 'artifacts', 'artifact-cloud-config.ts')
 const PRODUCT_ADAPTER_PATH = path.join(MAIN_ROOT, 'product', 'product-cloud-config.ts')
+const ARTIFACT_PRODUCT_ADAPTER_PATH = path.join(
+  MAIN_ROOT,
+  'product',
+  'product-artifact-cloud-config.ts'
+)
 
 function collectRuntimeTypeScriptFiles(directory: string): string[] {
   const files: string[] = []
@@ -37,6 +43,7 @@ describe('product cloud config wiring', () => {
 
   it('routes every cloud service entry point through the product adapter', () => {
     const expectedConsumers = [
+      'artifacts/artifact-cloud-service.ts',
       'index.ts',
       'orca-profiles/profile-cloud-auth-status.ts',
       'orca-profiles/profile-cloud-capability-refresh.ts',
@@ -48,5 +55,26 @@ describe('product cloud config wiring', () => {
       const source = readFileSync(path.join(MAIN_ROOT, relativePath), 'utf8')
       expect(source, relativePath).toContain('getProductCloudAuthConfig')
     }
+  })
+
+  it('routes artifact endpoints through the product adapter', () => {
+    const serviceSource = readFileSync(
+      path.join(MAIN_ROOT, 'artifacts', 'artifact-cloud-service.ts'),
+      'utf8'
+    )
+    const adapterSource = readFileSync(ARTIFACT_PRODUCT_ADAPTER_PATH, 'utf8')
+
+    expect(serviceSource).toContain('getProductArtifactCloudConfig')
+    expect(serviceSource).not.toContain('resolveArtifactCloudApiUrl')
+    expect(adapterSource).toContain('getProductExternalServiceEndpoints().artifacts')
+  })
+
+  it('prevents runtime modules from using the upstream artifact resolver directly', () => {
+    const violations = collectRuntimeTypeScriptFiles(MAIN_ROOT)
+      .filter((filePath) => filePath !== GENERIC_ARTIFACT_CONFIG_PATH)
+      .filter((filePath) => readFileSync(filePath, 'utf8').includes('resolveArtifactCloudApiUrl('))
+      .map((filePath) => path.relative(MAIN_ROOT, filePath).replaceAll('\\', '/'))
+
+    expect(violations).toEqual([])
   })
 })

@@ -26,6 +26,7 @@ export const hivecodeProductConfig = {
     packageId: 'com.hivekernel.hivecode.mobile'
   },
   endpoints: {
+    artifacts: null,
     cloud: null,
     relay: null,
     update: null,

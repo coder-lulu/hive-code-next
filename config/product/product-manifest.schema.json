@@ -78,6 +78,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "artifacts",
         "cloud",
         "relay",
         "update",
@@ -90,6 +91,7 @@
         "nudge"
       ],
       "properties": {
+        "artifacts": { "$ref": "#/$defs/nullableUrl" },
         "cloud": { "$ref": "#/$defs/nullableUrl" },
         "relay": { "$ref": "#/$defs/nullableUrl" },
         "update": { "$ref": "#/$defs/nullableUrl" },

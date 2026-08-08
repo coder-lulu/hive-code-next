@@ -8,6 +8,7 @@ import {
 describe('product external service endpoints', () => {
   it('keeps every unapproved HiveCode service disabled', () => {
     expect(getProductExternalServiceEndpoints()).toEqual({
+      artifacts: null,
       feedback: null,
       pluginKillList: null,
       pluginMarketplace: null,
@@ -22,6 +23,7 @@ describe('product external service endpoints', () => {
     expect(
       getProductExternalServiceEndpoints({
         endpoints: {
+          artifacts: 'https://artifacts.example.test',
           feedback: 'https://feedback.example.test',
           pluginKillList: 'https://plugins.example.test/kill-list.json',
           pluginMarketplace: 'https://github.example.test/hive/plugins.git',
@@ -32,6 +34,7 @@ describe('product external service endpoints', () => {
         }
       })
     ).toEqual({
+      artifacts: 'https://artifacts.example.test',
       feedback: 'https://feedback.example.test',
       pluginKillList: 'https://plugins.example.test/kill-list.json',
       pluginMarketplace: 'https://github.example.test/hive/plugins.git',

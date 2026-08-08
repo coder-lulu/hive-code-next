@@ -27,6 +27,7 @@ const validManifest = {
   },
   mobile: { bundleId: '', packageId: '' },
   endpoints: {
+    artifacts: null,
     cloud: '',
     relay: null,
     update: '',
@@ -47,6 +48,7 @@ describe('validateProductManifest', () => {
       cli: { primary: 'hivecode', aliases: ['orca', 'orca-ide'] },
       schemes: { primary: 'hivecode', aliases: ['orca'] },
       endpoints: {
+        artifacts: null,
         cloud: null,
         relay: null,
         update: null,
@@ -91,16 +93,31 @@ describe('validateProductManifest', () => {
     ).toThrow('desktop.updateChannel must be stable, rc, or null')
   })
 
-  it.each(['changelog', 'nudge'])('requires HTTPS for the remote-content %s endpoint', (key) => {
+  it.each(['artifacts', 'changelog', 'nudge'])(
+    'requires HTTPS for the remote-content %s endpoint',
+    (key) => {
+      expect(() =>
+        validateProductManifest({
+          ...validManifest,
+          endpoints: {
+            ...validManifest.endpoints,
+            [key]: 'http://127.0.0.1:49152/content.json'
+          }
+        })
+      ).toThrow(`endpoints.${key} must use HTTPS`)
+    }
+  )
+
+  it('requires the artifact endpoint to be an origin', () => {
     expect(() =>
       validateProductManifest({
         ...validManifest,
         endpoints: {
           ...validManifest.endpoints,
-          [key]: 'http://127.0.0.1:49152/content.json'
+          artifacts: 'https://artifacts.example.test/api'
         }
       })
-    ).toThrow(`endpoints.${key} must use HTTPS`)
+    ).toThrow('endpoints.artifacts must be an origin')
   })
 
   it.each([
@@ -111,6 +128,7 @@ describe('validateProductManifest', () => {
     ['desktop', 'updateRepository'],
     ['desktop', 'starRepository'],
     ['mobile', 'bundleId'],
+    ['endpoints', 'artifacts'],
     ['endpoints', 'update'],
     ['endpoints', 'pluginMarketplace']
   ])('rejects a missing required %s.%s key', (group, key) => {

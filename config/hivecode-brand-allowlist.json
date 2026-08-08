@@ -91,7 +91,7 @@
     "src/shared/product-update-source.ts"
   ],
   "protectedFileHashes": {
-    ".gitignore": "d99ff9e25e6868a455b94028795de03928e66f0c842266e240edc6a181530185",
-    ".gitattributes": "1f969a3716031ad8e140887998840865df4a43425de17656e5278547ca2423b6"
+    ".gitignore": "fc23ab6459455b9801547dd16432c880dcbdf054cc22047aad3c5df1094af55c",
+    ".gitattributes": "3c0d78467831f7ffd7a7e9705f48140b1b96bb8013225abb081c187a70cf4149"
   }
 }

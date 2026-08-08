@@ -8,13 +8,11 @@ import type {
   ArtifactWriteRequest
 } from '../../shared/artifacts'
 import { ensureActiveOrcaProfile } from '../orca-profiles/profile-index-store'
-import { getOrcaCloudAuthConfig } from '../orca-profiles/profile-cloud-auth-config'
 import { OrcaCloudRequestError } from '../orca-profiles/profile-cloud-client'
 import { runWithFreshOrcaCloudSession } from '../orca-profiles/profile-cloud-session-refresh'
-import {
-  allowsArtifactCloudAuthOverride,
-  resolveArtifactCloudApiUrl
-} from './artifact-cloud-config'
+import { getProductArtifactCloudConfig } from '../product/product-artifact-cloud-config'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
+import { allowsArtifactCloudAuthOverride } from './artifact-cloud-config'
 import {
   type ArtifactShareScope,
   captureArtifactShareLifecycle,
@@ -206,7 +204,11 @@ export class ArtifactCloudService {
     options: ArtifactCloudOptions,
     operation: (token: string, apiUrl: string, auth: ArtifactAuthContext) => Promise<T>
   ): Promise<ArtifactCloudOperation<T>> {
-    const apiUrl = resolveArtifactCloudApiUrl(options.apiUrl)
+    const endpoint = getProductArtifactCloudConfig(options.apiUrl)
+    if (!endpoint.configured) {
+      return { status: 'unconfigured', message: endpoint.setupMessage }
+    }
+    const apiUrl = endpoint.apiUrl
     const active = ensureActiveOrcaProfile(this.userDataPath)
     if (options.authToken?.trim()) {
       if (!allowsArtifactCloudAuthOverride()) {
@@ -223,7 +225,7 @@ export class ArtifactCloudService {
         value
       }
     }
-    const config = getOrcaCloudAuthConfig()
+    const config = getProductCloudAuthConfig()
     if (!config.configured) {
       return { status: 'unconfigured', message: config.setupMessage }
     }

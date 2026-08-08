@@ -141,6 +141,7 @@ describe('ArtifactCloudService record authorization', () => {
     const { service, profileId, userDataPath } = await setup()
     vi.stubEnv('ORCA_CLOUD_API_URL', 'http://localhost:4100')
     vi.stubEnv('ORCA_CLOUD_CLIENT_ID', 'desktop-client')
+    vi.stubEnv('ORCA_RELAY_URL', 'http://localhost:4200')
     saveOrcaCloudSession(profileId, userDataPath, {
       accessToken: 'access-old',
       refreshToken: 'refresh-old',
