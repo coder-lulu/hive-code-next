@@ -8,6 +8,49 @@ import type * as UpdaterModule from './updater'
 import type * as RecoveryModule from './linux-package-update-recovery'
 import type { UpdateStatus } from '../shared/types'
 
+const productUpdatePolicy = vi.hoisted(() => ({ configured: true }))
+const productUpdateSourceState = vi.hoisted(() => ({
+  value: {
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  } as unknown
+}))
+
+function setConfiguredProductUpdateChannel(channel: 'stable' | 'rc'): void {
+  const source = productUpdateSourceState.value as { channel: 'stable' | 'rc' } | null
+  if (!source) {
+    throw new Error('Expected a configured product update source')
+  }
+  productUpdateSourceState.value = { ...source, channel }
+}
+
+vi.mock('../shared/product-update-policy', () => ({
+  hasConfiguredProductUpdateChannel: () => productUpdatePolicy.configured
+}))
+
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => productUpdateSourceState.value
+}))
+
+const installProductUpdaterNetworkBoundaryMock = vi.hoisted(() => vi.fn())
+const linuxRootPackageInstallPolicy = vi.hoisted(() => ({ manual: false }))
+
+vi.mock('./product/product-updater-network-boundary', () => ({
+  installProductUpdaterNetworkBoundary: installProductUpdaterNetworkBoundaryMock
+}))
+
+// Most tests below retain coverage for the native failure classifier. The dedicated fail-closed
+// test enables the production manual policy and proves no privileged sink is reached.
+vi.mock('./linux-root-package-install-policy', () => ({
+  requiresManualLinuxRootPackageInstall: () => linuxRootPackageInstallPolicy.manual
+}))
+
 type RevalidationVerdict = Awaited<
   ReturnType<typeof RecoveryModule.revalidateLinuxPackageForInstall>
 >
@@ -114,6 +157,7 @@ const {
     disableDifferentialDownload: false,
     // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
     logger: undefined as { error: (message: unknown) => void } | undefined,
+    httpExecutor: { request: vi.fn(), doApiRequest: vi.fn(), doDownload: vi.fn() },
     on,
     checkForUpdates: vi.fn(),
     downloadUpdate: vi.fn(),
@@ -233,12 +277,30 @@ const { chooseLocalBuildMock, startLocalBuildFeedMock, closeLocalBuildFeedMock }
 vi.mock('./updater-prerelease-feed', () => ({
   fetchNewerReleaseTagsWithReadiness: async (...args: unknown[]) => {
     const result = await fetchNewerReleaseTagsMock(...args)
+    const currentVersion = typeof args[0] === 'string' ? args[0] : null
+    const options = args[2] as { includePrerelease?: boolean; releaseFilter?: string } | undefined
+    const currentMatchesFilter =
+      currentVersion !== null &&
+      (options?.releaseFilter === 'perf'
+        ? currentVersion.includes('.perf')
+        : options?.includePrerelease || !currentVersion.includes('-'))
+    const noNewerResult = currentMatchesFilter
+      ? { tags: [], state: 'no-newer', currentTag: `v${currentVersion}` }
+      : { tags: [], state: 'no-newer' }
     return Array.isArray(result)
-      ? { tags: result, state: result.length > 0 ? 'ready' : 'no-newer' }
-      : result
+      ? result.length > 0
+        ? { tags: result, state: 'ready' }
+        : noNewerResult
+      : result?.state === 'no-newer' && !result.currentTag
+        ? { ...result, ...noNewerResult }
+        : result
   },
-  getReleaseDownloadUrl: (tag: string) =>
-    `https://github.com/stablyai/orca/releases/download/${tag}`
+  getReleaseDownloadUrl: (tag: string) => {
+    const source = productUpdateSourceState.value as {
+      github?: { releasesDownloadBase: string } | null
+    } | null
+    return source?.github ? `${source.github.releasesDownloadBase}/${tag}` : null
+  }
 }))
 
 vi.mock('./local-builds/local-build-switch', () => ({
@@ -252,6 +314,42 @@ vi.mock('./local-builds/local-build-feed-server', () => ({
 /** Mirrors AUTO_UPDATE_CHECK_INTERVAL_MS in updater.ts. */
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 
+async function reachVerifiedAvailableUpdate(
+  updater: typeof UpdaterModule,
+  version: string
+): Promise<void> {
+  fetchNewerReleaseTagsMock.mockResolvedValue({ tags: [`v${version}`], state: 'ready' })
+  autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+  autoUpdaterMock.checkForUpdates.mockImplementationOnce(() => {
+    autoUpdaterMock.emit('checking-for-update')
+    queueMicrotask(() => autoUpdaterMock.emit('update-available', { version }))
+    return Promise.resolve(undefined)
+  })
+  updater.checkForUpdatesFromMenu()
+  await vi.waitFor(() => {
+    expect(updater.getUpdateStatus()).toEqual(
+      expect.objectContaining({ state: 'available', version })
+    )
+  })
+}
+
+async function reachVerifiedDownloadedUpdate(version: string): Promise<void> {
+  const updater = await import('./updater')
+  if (updater.getUpdateStatus().state !== 'available') {
+    await reachVerifiedAvailableUpdate(updater, version)
+  }
+  autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+  updater.downloadUpdate()
+  autoUpdaterMock.emit('update-downloaded', { version })
+  if (process.platform === 'darwin') {
+    const ready = nativeUpdaterMock.on.mock.calls.find(
+      ([eventName]) => eventName === 'update-downloaded'
+    )?.[1] as (() => void) | undefined
+    ready?.()
+  }
+  await Promise.resolve()
+}
+
 describe('updater', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -263,6 +361,19 @@ describe('updater', () => {
     appMock.getVersion.mockReturnValue('1.0.51')
     appMock.quit.mockReset()
     appMock.isPackaged = true
+    productUpdatePolicy.configured = true
+    productUpdateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+      github: {
+        repo: 'stablyai/orca',
+        atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+        releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+      }
+    }
+    installProductUpdaterNetworkBoundaryMock.mockReset()
+    linuxRootPackageInstallPolicy.manual = false
     isMock.dev = false
     killAllPtyMock.mockReset()
     armExitWatchdogMock.mockReset()
@@ -297,6 +408,161 @@ describe('updater', () => {
     expect(autoUpdaterMock.setFeedURL).not.toHaveBeenCalled()
     expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
     expect(powerMonitorOnMock).not.toHaveBeenCalled()
+  })
+
+  it('configures the release feed from the product update source', async () => {
+    productUpdateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      github: {
+        repo: 'coder-lulu/hive-code',
+        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
+        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
+      }
+    }
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://github.com/coder-lulu/hive-code/releases/latest/download'
+    })
+    expect(autoUpdaterMock.disableDifferentialDownload).toBe(true)
+  })
+
+  it('installs the product updater network boundary before configuring the feed', async () => {
+    productUpdateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      github: {
+        repo: 'coder-lulu/hive-code',
+        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
+        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
+      }
+    }
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+
+    expect(installProductUpdaterNetworkBoundaryMock).toHaveBeenCalledWith(
+      'coder-lulu/hive-code',
+      expect.any(Function),
+      autoUpdaterMock.httpExecutor,
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function)
+    )
+    expect(installProductUpdaterNetworkBoundaryMock.mock.invocationCallOrder[0]).toBeLessThan(
+      autoUpdaterMock.setFeedURL.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('does not launch a pinned check without an approved tag download base', async () => {
+    productUpdateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://downloads.example.com/product-update/stable/',
+      github: null
+    }
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.52'])
+    const { checkForUpdatesFromMenu, setupAutoUpdater } = await import('./updater')
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    autoUpdaterMock.setFeedURL.mockClear()
+
+    checkForUpdatesFromMenu()
+
+    await new Promise<void>((resolve) => realSetTimeout(resolve, 0))
+    expect(installProductUpdaterNetworkBoundaryMock).toHaveBeenCalledWith(
+      null,
+      expect.any(Function),
+      autoUpdaterMock.httpExecutor,
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function)
+    )
+    expect(fetchNewerReleaseTagsMock).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.setFeedURL).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('keeps local-only updater initialization isolated from upstream release services', async () => {
+    const send = vi.fn()
+    const { getRemoteServerUpdateSupport, setupAutoUpdater, checkForRemoteServerUpdate } =
+      await import('./updater')
+    setupAutoUpdater({ webContents: { send } } as never, {
+      getLastUpdateCheckAt: () => null,
+      localOnly: true
+    })
+
+    const snapshot = checkForRemoteServerUpdate('runtime-1')
+
+    expect(snapshot.status).toEqual({ state: 'disabled', reason: 'not-configured' })
+    expect(getRemoteServerUpdateSupport()).toEqual({
+      installMode: 'interactive',
+      automatic: false,
+      reason: 'updater-unavailable'
+    })
+    expect(installProductUpdaterNetworkBoundaryMock).toHaveBeenCalledWith(
+      null,
+      expect.any(Function),
+      autoUpdaterMock.httpExecutor,
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function)
+    )
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.setFeedURL).not.toHaveBeenCalled()
+    expect(fetchNewerReleaseTagsMock).not.toHaveBeenCalled()
+    expect(fetchNudgeMock).not.toHaveBeenCalled()
+    expect(powerMonitorOnMock).not.toHaveBeenCalled()
+  })
+
+  it('denies online update entrypoints at the updater boundary when policy is null', async () => {
+    productUpdatePolicy.configured = false
+    const send = vi.fn()
+    const {
+      checkForUpdates,
+      checkForUpdatesFromMenu,
+      listAvailableReleaseBuilds,
+      setupAutoUpdater
+    } = await import('./updater')
+    setupAutoUpdater({ webContents: { send } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+
+    checkForUpdates()
+    checkForUpdatesFromMenu()
+    checkForUpdatesFromMenu()
+    await expect(listAvailableReleaseBuilds('stable')).resolves.toEqual([])
+
+    expect(installProductUpdaterNetworkBoundaryMock).toHaveBeenCalledWith(
+      null,
+      expect.any(Function),
+      autoUpdaterMock.httpExecutor,
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function)
+    )
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.setFeedURL).not.toHaveBeenCalled()
+    expect(fetchNewerReleaseTagsMock).not.toHaveBeenCalled()
+    expect(send).toHaveBeenCalledWith('updater:status', {
+      state: 'disabled',
+      reason: 'not-configured'
+    })
+    expect(send).toHaveBeenCalledTimes(1)
   })
 
   it.each([
@@ -343,7 +609,8 @@ describe('updater', () => {
       const send = vi.fn()
       const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
       setupAutoUpdater({ webContents: { send } } as never, {
-        getLastUpdateCheckAt: () => Date.now()
+        getLastUpdateCheckAt: () => Date.now(),
+        localOnly: true
       })
 
       checkForUpdatesFromMenu({ localBuild: true })
@@ -651,6 +918,7 @@ describe('updater', () => {
   )
 
   it('leaves a dismissed release update on the release source', async () => {
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v2.0.0'])
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
       autoUpdaterMock.emit('update-available', { version: '2.0.0' })
@@ -1723,7 +1991,7 @@ describe('updater', () => {
     expect(autoUpdaterMock.downloadUpdate).toHaveBeenCalledTimes(2)
   })
 
-  it('defers quitAndInstall through the shared main-process entrypoint', async () => {
+  it('rejects quitAndInstall when no downloaded update or recovery exists', async () => {
     vi.useFakeTimers()
 
     const mainWindow = { webContents: { send: vi.fn() } }
@@ -1738,8 +2006,8 @@ describe('updater', () => {
     expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(1)
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1)
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true)
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+    expect(killAllPtyMock).not.toHaveBeenCalled()
   })
 
   it('runs pre-quit cleanup before local PTY cleanup during update install', async () => {
@@ -1749,7 +2017,11 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never, { onBeforeQuit })
+    setupAutoUpdater(mainWindow as never, {
+      onBeforeQuit,
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -1767,7 +2039,8 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
     quitAndInstall()
 
@@ -1789,7 +2062,11 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never, { onBeforeQuit })
+    setupAutoUpdater(mainWindow as never, {
+      onBeforeQuit,
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -1820,7 +2097,8 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: sendMock } }
     const { setupAutoUpdater, quitAndInstall, isQuittingForUpdate } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -1868,7 +2146,7 @@ describe('updater', () => {
       })
     })
 
-    autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
+    await reachVerifiedDownloadedUpdate('1.0.61')
 
     // Why: on macOS install commits only once Squirrel is ready; mark it ready so this test covers the post-commit path on all platforms.
     if (process.platform === 'darwin') {
@@ -1926,7 +2204,7 @@ describe('updater', () => {
       })
     })
 
-    autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     // Why: on macOS install commits only once Squirrel is ready; mark it ready so this test covers the committed path on all platforms.
     if (process.platform === 'darwin') {
       const nativeDownloadedHandler = nativeUpdaterMock.on.mock.calls.find(
@@ -1960,7 +2238,8 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall, isQuittingForUpdate } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -1989,6 +2268,7 @@ describe('updater', () => {
       onBeforeQuit,
       getLastUpdateCheckAt: () => Date.now()
     })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
     await vi.advanceTimersByTimeAsync(100)
 
@@ -2166,6 +2446,7 @@ describe('updater', () => {
   it('reschedules the next automatic check 24 hours after finding an available update', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.61'])
 
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
@@ -2213,6 +2494,7 @@ describe('updater', () => {
 
     fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })
     shouldApplyNudgeMock.mockReturnValue(true)
+    fetchNewerReleaseTagsMock.mockResolvedValueOnce(['v1.0.61']).mockResolvedValue(['v1.0.62'])
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
       return Promise.resolve(undefined)
@@ -2265,6 +2547,7 @@ describe('updater', () => {
   it('preserves the pending nudge marker across a later background check', async () => {
     const sendMock = vi.fn()
     const mainWindow = { webContents: { send: sendMock } }
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.61'])
 
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
@@ -2558,8 +2841,67 @@ describe('updater', () => {
   })
 
   // Why: native github provider + allowPrerelease traps RC users on the RC channel, so resolve the newest tag ourselves and pin the generic feed to it.
+  it('uses the configured RC product channel for an unmodified check', async () => {
+    productUpdateSourceState.value = {
+      channel: 'rc',
+      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      github: {
+        repo: 'coder-lulu/hive-code',
+        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
+        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
+      }
+    }
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.52-rc.1'])
+
+    const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+
+    checkForUpdatesFromMenu()
+
+    await vi.waitFor(() => {
+      expect(fetchNewerReleaseTagsMock).toHaveBeenCalledWith('1.0.51', 2, {
+        includePrerelease: true
+      })
+    })
+    expect(autoUpdaterMock.allowPrerelease).toBe(true)
+  })
+
+  it('resets prerelease acceptance when an RC override changes to stable', async () => {
+    let channel: 'stable' | 'rc' = 'rc'
+    fetchNewerReleaseTagsMock
+      .mockResolvedValueOnce(['v1.0.52-rc.1'])
+      .mockResolvedValueOnce({ tags: [], state: 'no-newer' })
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      queueMicrotask(() => autoUpdaterMock.emit('update-not-available'))
+      return Promise.resolve(undefined)
+    })
+
+    const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now(),
+      getReleaseChannelOverride: () => channel
+    })
+
+    checkForUpdatesFromMenu()
+    await vi.waitFor(() => expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1))
+
+    channel = 'stable'
+    checkForUpdatesFromMenu()
+    await vi.waitFor(() => expect(fetchNewerReleaseTagsMock).toHaveBeenCalledTimes(2))
+
+    expect(fetchNewerReleaseTagsMock).toHaveBeenLastCalledWith('1.0.51', 1, {
+      includePrerelease: false
+    })
+    expect(autoUpdaterMock.allowPrerelease).toBe(false)
+  })
+
   it('repins the generic feed to the newest RC tag for a prerelease user', async () => {
     appMock.getVersion.mockReturnValue('1.3.17-rc.1')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.17-rc.2'])
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
 
@@ -2611,8 +2953,17 @@ describe('updater', () => {
     expect(autoUpdaterMock.allowPrerelease).not.toBe(true)
   })
 
-  // Why: if the atom resolver fails or finds nothing newer, fall back to /releases/latest/download so the check completes as "not-available" instead of erroring.
-  it('falls back to /releases/latest/download when the atom resolver returns null', async () => {
+  it('does not launch a moving product feed when the atom resolver finds no stable tag', async () => {
+    productUpdateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      github: {
+        repo: 'coder-lulu/hive-code',
+        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
+        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
+      }
+    }
     appMock.getVersion.mockReturnValue('1.3.19-rc.6')
     fetchNewerReleaseTagsMock.mockResolvedValue([])
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
@@ -2621,16 +2972,18 @@ describe('updater', () => {
 
     const mainWindow = { webContents: { send: vi.fn() } }
     setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    const feedCallsBeforeCheck = autoUpdaterMock.setFeedURL.mock.calls.length
 
     checkForUpdatesFromMenu()
 
     await vi.waitFor(() => {
-      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('updater:status', {
+        state: 'not-available',
+        userInitiated: true
+      })
     })
-    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
-      provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
-    })
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.setFeedURL.mock.calls.length).toBe(feedCallsBeforeCheck)
   })
 
   it('keeps unavailable release probes on generic copy without launching a moving feed', async () => {
@@ -2665,7 +3018,7 @@ describe('updater', () => {
     ])
   })
 
-  it('keeps Atom feed outages on the existing moving-feed fallback', async () => {
+  it('fails closed when the Atom feed is unavailable instead of using a moving feed', async () => {
     appMock.getVersion.mockReturnValue('1.4.141')
     fetchNewerReleaseTagsMock.mockResolvedValue({
       tags: [],
@@ -2677,19 +3030,51 @@ describe('updater', () => {
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
 
     setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    const feedCallsBeforeCheck = autoUpdaterMock.setFeedURL.mock.calls.length
     checkForUpdatesFromMenu()
 
     await vi.waitFor(() => {
-      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+      expect(sendMock).toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message: "Couldn't reach the update server. Try again in a few minutes.",
+        userInitiated: true
+      })
     })
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.setFeedURL.mock.calls).toHaveLength(feedCallsBeforeCheck)
+  })
+
+  it('does not let a stale release preflight overwrite a newer pinned feed', async () => {
+    let resolveBackgroundTags: (value: { tags: string[]; state: 'ready' }) => void = () => {}
+    fetchNewerReleaseTagsMock.mockImplementationOnce(
+      () =>
+        new Promise<{ tags: string[]; state: 'ready' }>((resolve) => {
+          resolveBackgroundTags = resolve
+        })
+    )
+    autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
+
+    const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => null
+    })
+    await vi.waitFor(() => expect(fetchNewerReleaseTagsMock).toHaveBeenCalledTimes(1))
+
+    checkForUpdatesFromMenu({ channel: 'stable', targetTag: 'v1.0.60' })
+    await vi.waitFor(() => {
+      expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
+        provider: 'generic',
+        url: 'https://github.com/stablyai/orca/releases/download/v1.0.60'
+      })
+    })
+
+    resolveBackgroundTags({ tags: ['v1.0.61'], state: 'ready' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
       provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
+      url: 'https://github.com/stablyai/orca/releases/download/v1.0.60'
     })
-    expect(sendMock).not.toHaveBeenCalledWith(
-      'updater:status',
-      expect.objectContaining({ state: 'error' })
-    )
   })
 
   it('uses last-good concrete feed when a user-initiated check lands during publishing', async () => {
@@ -2954,6 +3339,9 @@ describe('updater', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-05-24T21:40:00Z'))
       appMock.getVersion.mockReturnValue(version)
+      if (includePrerelease) {
+        setConfiguredProductUpdateChannel('rc')
+      }
       fetchNudgeMock.mockResolvedValueOnce({ id: 'campaign-1', minVersion: '1.0.0' })
       fetchNudgeMock.mockResolvedValue(null)
       shouldApplyNudgeMock.mockReturnValue(true)
@@ -3023,7 +3411,7 @@ describe('updater', () => {
         state: 'not-ready',
         lastGoodTag: 'v1.4.26'
       })
-      .mockResolvedValueOnce(['v1.4.27'])
+      .mockResolvedValue(['v1.4.27'])
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
       if (autoUpdaterMock.checkForUpdates.mock.calls.length === 1) {
@@ -3158,6 +3546,7 @@ describe('updater', () => {
 
   it('retries a prerelease check once against the previous feed tag when the manifest is missing', async () => {
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3205,6 +3594,7 @@ describe('updater', () => {
 
   it('surfaces a promise-only prerelease fallback failure after the primary error event', async () => {
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3245,6 +3635,7 @@ describe('updater', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3289,6 +3680,7 @@ describe('updater', () => {
   it('does not let user-initiated promise-only fallback failures taint the next background check', async () => {
     let lastUpdateCheckAt = Date.now()
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3349,6 +3741,7 @@ describe('updater', () => {
   it('preserves user-initiated state for delayed prerelease fallback not-available', async () => {
     vi.useFakeTimers()
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3391,6 +3784,7 @@ describe('updater', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3445,6 +3839,7 @@ describe('updater', () => {
 
   it('handles an event-only fallback error after a promise-only primary failure', async () => {
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifestMessage =
@@ -3487,6 +3882,7 @@ describe('updater', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3544,6 +3940,7 @@ describe('updater', () => {
   it('suppresses a delayed user fallback error after the fallback promise handled it', async () => {
     vi.useFakeTimers()
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3597,6 +3994,7 @@ describe('updater', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3650,6 +4048,7 @@ describe('updater', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3705,6 +4104,7 @@ describe('updater', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
     appMock.getVersion.mockReturnValue('1.3.51-rc.5')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3762,6 +4162,7 @@ describe('updater', () => {
 
   it('surfaces the failure when the bounded prerelease fallback also misses its manifest', async () => {
     appMock.getVersion.mockReturnValue('1.3.51-rc.6')
+    setConfiguredProductUpdateChannel('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.51-rc.7', 'v1.3.51-rc.6'])
 
     const missingManifest = new Error(
@@ -3822,7 +4223,110 @@ describe('updater', () => {
     })
   })
 
-  // Why: native GitHub provider can pick cancelled prerelease tags with missing manifests, so keep the manifest-probed generic feed.
+  it('rejects an update offer whose version differs from the verified concrete tag', async () => {
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.52'])
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      autoUpdaterMock.emit('update-available', { version: '9.9.9' })
+      return Promise.resolve(undefined)
+    })
+    const send = vi.fn()
+    const { checkForUpdatesFromMenu, setupAutoUpdater } = await import('./updater')
+    setupAutoUpdater({ webContents: { send } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+
+    checkForUpdatesFromMenu()
+
+    await vi.waitFor(() => {
+      expect(send).toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message: 'Update metadata did not match the verified release tag.',
+        userInitiated: true
+      })
+    })
+    expect(send).not.toHaveBeenCalledWith(
+      'updater:status',
+      expect.objectContaining({ state: 'available' })
+    )
+  })
+
+  it('revokes an available candidate when its repository or channel changes', async () => {
+    const updater = await import('./updater')
+    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedAvailableUpdate(updater, '1.0.52')
+
+    productUpdateSourceState.value = {
+      channel: 'rc',
+      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      github: {
+        repo: 'coder-lulu/hive-code',
+        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
+        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
+      }
+    }
+    updater.downloadUpdate()
+
+    expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled()
+  })
+
+  it('rejects a downloaded version that differs from the verified available candidate', async () => {
+    const updater = await import('./updater')
+    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedAvailableUpdate(updater, '1.0.52')
+    updater.downloadUpdate()
+    autoUpdaterMock.emit('update-downloaded', { version: '9.9.9' })
+
+    vi.useFakeTimers()
+    updater.quitAndInstall()
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+  })
+
+  it('does not let a late downloaded event from an older generation arm install', async () => {
+    const updater = await import('./updater')
+    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedAvailableUpdate(updater, '1.0.52')
+    updater.downloadUpdate()
+
+    fetchNewerReleaseTagsMock.mockImplementationOnce(() => new Promise(() => undefined))
+    updater.checkForUpdatesFromMenu()
+    expect(updater.getUpdateStatus()).toEqual(expect.objectContaining({ state: 'checking' }))
+    autoUpdaterMock.emit('update-downloaded', { version: '1.0.52' })
+
+    vi.useFakeTimers()
+    updater.quitAndInstall()
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+  })
+
+  it('does not install a downloaded candidate after its source is revoked', async () => {
+    const updater = await import('./updater')
+    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedAvailableUpdate(updater, '1.0.52')
+    updater.downloadUpdate()
+    autoUpdaterMock.emit('update-downloaded', { version: '1.0.52' })
+
+    productUpdatePolicy.configured = false
+    productUpdateSourceState.value = null
+    vi.useFakeTimers()
+    updater.quitAndInstall()
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+  })
+
   it('uses the manifest-probed generic feed after a Shift-click RC opt-in', async () => {
     appMock.getVersion.mockReturnValue('1.3.17')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.18-rc.1'])
@@ -3938,6 +4442,7 @@ describe('updater', () => {
       getLinuxRootPackageTypeMock.mockReturnValue(packageType)
       vi.useFakeTimers()
       fetchNewerReleaseTagsMock.mockResolvedValue({ tags: ['v1.0.61'], state: 'ready' })
+      autoUpdaterMock.downloadUpdate.mockResolvedValue([])
       autoUpdaterMock.checkForUpdates.mockImplementation(() => {
         autoUpdaterMock.emit('checking-for-update')
         queueMicrotask(() => autoUpdaterMock.emit('update-available', { version: '1.0.61' }))
@@ -3957,6 +4462,7 @@ describe('updater', () => {
     ): Promise<void> => {
       updater.checkForUpdatesFromMenu()
       await vi.advanceTimersByTimeAsync(0)
+      updater.downloadUpdate()
       autoUpdaterMock.emit('update-downloaded', event)
       if (process.platform === 'darwin') {
         const nativeReady = nativeUpdaterMock.on.mock.calls.find(
@@ -3983,6 +4489,53 @@ describe('updater', () => {
       }
     })
 
+    it('routes root packages to manual recovery without invoking the privileged native sink', async () => {
+      linuxRootPackageInstallPolicy.manual = true
+      const { send, updater } = await startUpdater('deb')
+      await reachDownloaded(updater, downloadedEvent())
+
+      expect(updater.quitAndInstall()).toBe(false)
+      await settleQuitAndInstall()
+
+      expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+      expect(killAllPtyMock).not.toHaveBeenCalled()
+      expect(updater.isQuittingForUpdate()).toBe(false)
+      expect(updater.getRemoteServerUpdateSupport()).toMatchObject({
+        automatic: false,
+        reason: 'manual-service-update-required'
+      })
+      expect(send).toHaveBeenCalledWith('updater:quitAndInstallAborted')
+      expect(send).toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message:
+          'Automatic installation is disabled for Linux system packages. Copy the verified install command or show the package to install it manually.',
+        recovery: {
+          kind: 'linux-package-install',
+          packageType: 'deb',
+          reason: 'manual-install-required',
+          version: '1.0.61'
+        }
+      })
+    })
+
+    it('fails closed before the privileged sink when the root package was not retained', async () => {
+      linuxRootPackageInstallPolicy.manual = true
+      const { send, updater } = await startUpdater('deb')
+      await reachDownloaded(updater, downloadedEvent({ downloadedFile: undefined, files: [] }))
+
+      expect(updater.quitAndInstall()).toBe(false)
+      await settleQuitAndInstall()
+
+      expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+      expect(killAllPtyMock).not.toHaveBeenCalled()
+      expect(lastStatus(send)).toEqual({
+        state: 'error',
+        message: expect.stringContaining(
+          'Automatic installation is disabled for Linux system packages'
+        )
+      })
+    })
+
     it('keeps interactive install-on-quit when no root-package marker is present', async () => {
       autoUpdaterMock.autoInstallOnAppQuit = false
       const { setupAutoUpdater } = await import('./updater')
@@ -3992,7 +4545,7 @@ describe('updater', () => {
         installMode: 'interactive'
       })
 
-      expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(true)
+      expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(false)
     })
 
     it('leaves headless serve installs supervisor-controlled', async () => {
@@ -4152,6 +4705,7 @@ describe('updater', () => {
     it('retries the automatic install without redownloading the package', async () => {
       const { send, updater } = await startUpdater('deb')
       await reachDownloaded(updater, downloadedEvent())
+      autoUpdaterMock.downloadUpdate.mockClear()
       autoUpdaterMock.quitAndInstall.mockImplementation(() => {
         autoUpdaterMock.emit('error', new Error(EXIT_127))
       })

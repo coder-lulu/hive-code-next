@@ -11,6 +11,8 @@ import { app } from 'electron'
 import { PostHog } from 'posthog-node'
 import type { CommonProps, EventName, EventProps, OptInVia } from '../../shared/telemetry-events'
 import type { Store } from '../persistence'
+import { getProductExternalServiceEndpoints } from '../product/product-external-service-endpoints'
+import { resolveProductTelemetryTransport } from '../product/product-telemetry-config'
 import { consumeBurstToken, resetBurstCapsForSession } from './burst-cap'
 import { getCohortAtEmit } from './cohort-classifier'
 import { resolveConsent, type ConsentState } from './consent'
@@ -30,10 +32,12 @@ const WRITE_KEY: string | null =
   typeof ORCA_POSTHOG_WRITE_KEY !== 'undefined'
     ? ORCA_POSTHOG_WRITE_KEY
     : ((globalThis as { ORCA_POSTHOG_WRITE_KEY?: string | null }).ORCA_POSTHOG_WRITE_KEY ?? null)
-const IS_OFFICIAL_BUILD: boolean =
-  (BUILD_IDENTITY === 'stable' || BUILD_IDENTITY === 'rc') &&
-  typeof WRITE_KEY === 'string' &&
-  WRITE_KEY.length > 0
+const telemetryTransport = resolveProductTelemetryTransport({
+  enabled: TELEMETRY_ENABLED,
+  buildIdentity: BUILD_IDENTITY,
+  writeKey: WRITE_KEY,
+  endpoint: getProductExternalServiceEndpoints().telemetry
+})
 
 // Module-level singletons — one Store / process / telemetry session; threading `store` everywhere buys nothing.
 let posthog: PostHog | null = null
@@ -71,7 +75,7 @@ export function initTelemetry(store: Store): void {
   // Reset per session: the "no app_opened until banner resolution" invariant is per-launch, not per-install.
   appOpenedTrackedThisSession = false
 
-  if (!TELEMETRY_ENABLED || !IS_OFFICIAL_BUILD) {
+  if (!telemetryTransport) {
     return
   }
 
@@ -84,12 +88,7 @@ export function initTelemetry(store: Store): void {
   }
 
   sessionId = randomUUID()
-  commonProps = buildCommonProps(
-    installId,
-    sessionId,
-    // Non-null here: `IS_OFFICIAL_BUILD` gated this branch to the `'stable' | 'rc'` arm.
-    BUILD_IDENTITY as 'stable' | 'rc'
-  )
+  commonProps = buildCommonProps(installId, sessionId, telemetryTransport.channel)
 
   // Fail-closed: a bad `install_id` (e.g. empty from a migration bug) would collapse all events into one distinct_id.
   // Validated once here (not per `track()`): `commonProps` is a session-lifetime singleton that can't drift.
@@ -100,8 +99,8 @@ export function initTelemetry(store: Store): void {
     return
   }
 
-  posthog = new PostHog(WRITE_KEY as string, {
-    host: 'https://us.i.posthog.com',
+  posthog = new PostHog(telemetryTransport.writeKey, {
+    host: telemetryTransport.host,
     flushAt: 20,
     flushInterval: 10_000,
     // Strip SDK-auto GeoIP / client-IP enrichment; our wire is exactly CommonProps ∪ EventProps ∪ a small allow-list.
@@ -162,7 +161,7 @@ function waitForCaptureEnqueue(client: PostHog, event: EventName, uuid: string):
 
 // No-op in contributor / non-official builds; only official stable/rc builds (CI-injected `ORCA_BUILD_IDENTITY` + `ORCA_POSTHOG_WRITE_KEY`) transmit.
 export function track<N extends EventName>(name: N, props: EventProps<N>): void {
-  if (!testTransportEnabled && (!IS_OFFICIAL_BUILD || !TELEMETRY_ENABLED)) {
+  if (!testTransportEnabled && !telemetryTransport) {
     return
   }
 

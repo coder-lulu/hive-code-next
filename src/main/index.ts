@@ -13,7 +13,11 @@ import {
 } from './persistence'
 import { initSessionParseCachePersistence } from './ai-vault/session-parse-cache-persistence'
 import { ensureActiveOrcaProfile, initOrcaProfilePaths } from './orca-profiles/profile-index-store'
-import { getOrcaCloudAuthConfig } from './orca-profiles/profile-cloud-auth-config'
+import { getProductCloudAuthConfig } from './product/product-cloud-config'
+import {
+  getProductExternalServiceEndpoints,
+  getProductStarRepository
+} from './product/product-external-service-endpoints'
 import { getProfileUserDataPath } from './orca-profiles/profile-storage-paths'
 import { applyAppIcon } from './app-icon'
 import { relaunchApp } from './app-relaunch'
@@ -101,10 +105,12 @@ import {
   getRemoteServerUpdaterSnapshot,
   installRemoteServerUpdate,
   isQuittingForUpdate,
+  reportReleaseUpdatesDisabled,
   resolveUpdateInstallMode
 } from './updater'
 import { configureRemoteServerUpdater } from './runtime/remote-server-updater'
 import type { UpdateCheckOptions } from '../shared/types'
+import { hasConfiguredProductUpdateChannel } from '../shared/product-update-policy'
 import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
 import {
   installServeSupervisorDisconnectQuit,
@@ -155,6 +161,11 @@ import { startFirstWindowStartupServices } from './startup/first-window-startup-
 import { recoverLegacyWorkerTerminalsForRendererStartup } from './startup/legacy-worker-renderer-recovery'
 import { createWslCliReconciliationStartupBarrier } from './startup/wsl-cli-reconciliation-startup-barrier'
 import { getDevInstanceIdentity } from './startup/dev-instance-identity'
+import {
+  completeUserDataMigration,
+  migrateUserDataFromOrca,
+  validateUserDataMigration
+} from './startup/hivecode-user-data-migration'
 import { hydrateShellPath, mergePathSegments } from './startup/hydrate-shell-path'
 import {
   acquireSingleInstanceLock,
@@ -165,6 +176,7 @@ import {
   shouldSkipSingleInstanceLock,
   SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE
 } from './startup/single-instance-lock'
+import { registerProtocolHandlers, extractProtocolUrlFromArgv } from './startup/protocol-handler'
 import { startEventLoopStallProbe } from './startup/event-loop-stall-probe'
 import { startMainThreadChurnProbe } from './diagnostics/main-thread-churn-probe'
 import {
@@ -331,8 +343,23 @@ const serveReadinessPublisher = new ServeReadinessPublisher()
 let desktopRelayService: DesktopRelayService | null = null
 let desktopRelayStatus: RelayBrokerStatus = 'offline'
 let pendingUnpairedDeviceAuthFailure = false
+let userDataMigrationNeedsValidation = false
+let userDataMigrationNeedsCompletion = false
 // Why: gates whether headless serve installs the offscreen browser backend (and advertises browser pane support).
 let headlessBrowserDisplayAvailable = false
+
+function completePendingUserDataMigration(): void {
+  if (!userDataMigrationNeedsCompletion) {
+    return
+  }
+  if (completeUserDataMigration(getCanonicalUserDataPath())) {
+    userDataMigrationNeedsCompletion = false
+    return
+  }
+  // Why: target data is already Store-validated. Keep the validated marker so
+  // the next launch can retry completion without restoring old bytes.
+  console.warn('[hivecode] User data migration completion remains pending')
+}
 
 let starNag: StarNagService | null = null
 let agentAwakeService: AgentAwakeService | null = null
@@ -566,7 +593,12 @@ installUnhandledRejectionLogging()
 process.env.ORCA_APP_VERSION = app.getVersion()
 configureRemoteServerUpdater({
   getSnapshot: getRemoteServerUpdaterSnapshot,
-  check: checkForRemoteServerUpdate,
+  check: (runtimeId, options) => {
+    if (options?.localBuild || hasConfiguredProductUpdateChannel()) {
+      ensureAutoUpdaterConfigured({ localOnly: options?.localBuild === true })
+    }
+    return checkForRemoteServerUpdate(runtimeId, options)
+  },
   download: downloadRemoteServerUpdate,
   install: installRemoteServerUpdate
 })
@@ -615,8 +647,53 @@ function requestDesktopActivation(argv: readonly string[] = []): void {
   if (!shouldActivateDesktopForSecondInstance(argv)) {
     return
   }
+  // Why: extract and route protocol URLs (hivecode://, orca://) from
+  // second-instance argv before activating the desktop window.
+  const protocolUrl = extractProtocolUrlFromArgv(argv)
+  if (protocolUrl) {
+    handleProtocolUrl(protocolUrl)
+  }
   desktopActivationGate.requestActivation()
 }
+
+/**
+ * Route a deep-link URL (hivecode:// or orca://) to the appropriate consumer.
+ * Currently forwards pairing URLs to the renderer; future URL types
+ * (e.g. workspace open, settings navigation) can be added here.
+ */
+function handleProtocolUrl(url: string): void {
+  // Why: validate the URL has a supported scheme before processing.
+  try {
+    const parsed = new URL(url)
+    const protocol = parsed.protocol.replace(/:$/, '')
+    const ALL_SCHEMES: readonly string[] = ['hivecode', 'orca']
+    if (!ALL_SCHEMES.includes(protocol)) {
+      console.warn(`[protocol] Ignoring unsupported scheme: ${protocol}`)
+      return
+    }
+  } catch {
+    console.warn(`[protocol] Ignoring malformed URL: ${url.slice(0, 128)}`)
+    return
+  }
+
+  // Route pairing URLs (hivecode://pair?code=...) to the renderer for consumption.
+  if (url.includes('://pair')) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('protocol:pairing-url', url)
+    } else {
+      // Why: the window may not exist yet (cold launch from a protocol link).
+      // Store the URL for delivery when the renderer is ready.
+      pendingProtocolUrl = url
+    }
+    return
+  }
+
+  // Unknown URL type — log but don't error; new URL patterns are expected over time.
+  console.log(`[protocol] Unrecognised URL pattern: ${url.slice(0, 128)}`)
+}
+
+/** Deep-link URL that arrived before the renderer was ready. Delivered on first window load. */
+let pendingProtocolUrl: string | null = null
 
 const handleMacAppActivation = createMacAppActivationHandler({
   getWindow: () => mainWindow,
@@ -758,6 +835,35 @@ if (hasSingleInstanceLock) {
   initClaudeUsagePath()
   initCodexUsagePath()
   initOpenCodeUsagePath()
+  // Why: build a sanitized, copy-only profile snapshot before Store loads. The
+  // prepared marker is validated after Store construction and completed only
+  // after startup services initialize, so interrupted starts remain recoverable.
+  if (app.isPackaged) {
+    const migrationResult = migrateUserDataFromOrca({
+      hiveCodeUserData: getCanonicalUserDataPath()
+    })
+    if (migrationResult.migrated) {
+      userDataMigrationNeedsValidation = true
+      userDataMigrationNeedsCompletion = true
+      console.log(`[hivecode] Prepared ${migrationResult.copiedCount} sanitized migration files`)
+    } else if (migrationResult.reason === 'awaiting-validation') {
+      userDataMigrationNeedsValidation = true
+      userDataMigrationNeedsCompletion = true
+    } else if (migrationResult.reason === 'awaiting-completion') {
+      userDataMigrationNeedsCompletion = true
+    } else if (
+      migrationResult.reason === 'migration-in-progress' ||
+      migrationResult.reason === 'migration-conflict' ||
+      migrationResult.reason === 'unsafe-source' ||
+      migrationResult.reason === 'error'
+    ) {
+      // Why: continuing would create or mutate target profile data and could
+      // make a safe retry impossible. Do not expose filesystem paths in errors.
+      throw new Error(
+        `[hivecode] User data migration blocked startup: ${migrationResult.reason}:${migrationResult.errorCode ?? 'none'}`
+      )
+    }
+  }
   crashReports = CrashReportStore.fromUserData()
   recordCrashBreadcrumb('app_started', {
     packaged: app.isPackaged,
@@ -1125,7 +1231,11 @@ function quitFromSystemTray(): void {
 
 // Why: menu/tray are clickable before anything else configures the updater.
 function runUserInitiatedUpdateCheck(options?: UpdateCheckOptions): void {
-  ensureAutoUpdaterConfigured()
+  if (!options?.localBuild && !hasConfiguredProductUpdateChannel()) {
+    reportReleaseUpdatesDisabled()
+    return
+  }
+  ensureAutoUpdaterConfigured({ localOnly: options?.localBuild === true })
   checkForUpdatesFromMenu(options)
 }
 
@@ -1293,6 +1403,12 @@ function openMainWindow(): BrowserWindow {
     clearExpectedRendererReload(rendererWebContentsId)
     recordCrashBreadcrumb('main_window_loaded')
     logStartupMilestone('did-finish-load')
+    // Why: deliver any protocol URL that arrived before the renderer was ready
+    // (e.g. cold-launch from hivecode:// link on macOS).
+    if (pendingProtocolUrl) {
+      window.webContents.send('protocol:pairing-url', pendingProtocolUrl)
+      pendingProtocolUrl = null
+    }
     if (!store) {
       return
     }
@@ -2019,6 +2135,12 @@ void app.whenReady().then(async () => {
   electronApp.setAppUserModelId(devInstanceIdentity.appUserModelId)
   // Why: setName drives the macOS safeStorage Keychain item name; use the stable appName (not per-branch `name`) so dev branches share one key and don't re-prompt.
   app.setName(devInstanceIdentity.appName)
+  // Why: register hivecode:// and orca:// protocol handlers AFTER setName so
+  // Electron ties the scheme to the correct app identity on macOS/Windows.
+  registerProtocolHandlers({
+    app,
+    onUrl: handleProtocolUrl
+  })
   updateGpuAccelerationAboutPanel()
 
   // Why: managed WSL launchers live outside the Windows app bundle, so keep their launcher/bridge contract synced across app updates.
@@ -2053,6 +2175,12 @@ void app.whenReady().then(async () => {
 
   const activeOrcaProfile = ensureActiveOrcaProfile()
   store = new Store({ dataFile: activeOrcaProfile.dataFile })
+  if (userDataMigrationNeedsValidation) {
+    if (!validateUserDataMigration(getCanonicalUserDataPath())) {
+      throw new Error('[hivecode] Could not validate prepared user data migration')
+    }
+    userDataMigrationNeedsValidation = false
+  }
   wslHookRelayManager.setManagedHookSettingsResolver(() => store?.getSettings() ?? null)
   logStartupMilestone('store-loaded')
   // Why: apply initial fallback WSL distro from store settings for global git/CLI calls.
@@ -2488,12 +2616,17 @@ void app.whenReady().then(async () => {
     pluginsDataDir: getPluginsDataDir(app.getPath('userData'))
   })
   await pluginKillListService.initialize()
+  const officialMarketplaceUrl = getProductExternalServiceEndpoints().pluginMarketplace
+  const officialMarketplaceSource = officialMarketplaceUrl
+    ? ({ kind: 'git', url: officialMarketplaceUrl, ref: 'main' } as const)
+    : null
   pluginMarketplaceService = new PluginMarketplaceService({
     pluginsDataDir: getPluginsDataDir(app.getPath('userData')),
-    getKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null
+    getKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null,
+    officialSource: officialMarketplaceSource
   })
   const requestOfficialMarketplaceSeed = (): void => {
-    if (store?.getSettings().pluginSystemEnabled !== true) {
+    if (!officialMarketplaceSource || store?.getSettings().pluginSystemEnabled !== true) {
       return
     }
     void pluginMarketplaceService?.seedOfficialSource().catch((error) => {
@@ -2614,9 +2747,11 @@ void app.whenReady().then(async () => {
   runtimeService.onWorktreeLifecycle((event) => {
     emitPluginWorktreeLifecycle(event)
   })
-  starNag = new StarNagService(store, stats)
-  starNag.start()
-  starNag.registerIpcHandlers()
+  if (getProductStarRepository()) {
+    starNag = new StarNagService(store, stats)
+    starNag.start()
+    starNag.registerIpcHandlers()
+  }
   runtimeService.setAgentBrowserBridge(
     new AgentBrowserBridge(browserManager, {
       onTabsChanged: (worktreeId) => runtimeService.notifyMobileSessionTabsChanged(worktreeId)
@@ -2891,6 +3026,7 @@ void app.whenReady().then(async () => {
     // armed from the main window — without this, a quit mid-removal leaks the tree until a desktop launch.
     scheduleAllPendingHistoryTreeRemovals()
     await printServeReady(serveOptions)
+    completePendingUserDataMigration()
     return
   }
 
@@ -2909,7 +3045,7 @@ void app.whenReady().then(async () => {
     void showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
   }
 
-  const cloudAuth = getOrcaCloudAuthConfig()
+  const cloudAuth = getProductCloudAuthConfig()
   if (cloudAuth.configured) {
     try {
       const relayService = new DesktopRelayService({
@@ -2953,6 +3089,7 @@ void app.whenReady().then(async () => {
       triggerStartupNotificationRegistration(store)
     }
   })
+  completePendingUserDataMigration()
 })
 
 // Why: app.exit() skips Electron quit events, so keep its log child from surviving forced exits.

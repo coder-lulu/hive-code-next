@@ -31,6 +31,7 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
   } else if (
     updateStatus.state === 'checking' ||
     updateStatus.state === 'idle' ||
+    updateStatus.state === 'disabled' ||
     updateStatus.state === 'not-available'
   ) {
     // Why: a new check cycle has started or completed cleanly. Clear the
@@ -65,6 +66,12 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
     // the app didn't restart and can retry.
     void window.api.updater.quitAndInstall().catch(console.error)
   }
+
+  const releaseNotesUrl =
+    (updateStatus.state === 'available' || updateStatus.state === 'downloaded') &&
+    updateStatus.source !== 'local'
+      ? (updateStatus.releaseUrl ?? getReleaseNotesUrlForVersion(updateStatus.version))
+      : null
 
   return (
     <section key="updates" className="space-y-4">
@@ -166,6 +173,11 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
               'auto.components.settings.GeneralUpdateSettingsSection.d69a09b672',
               'Updates are checked automatically on launch.'
             )}
+          {updateStatus.state === 'disabled' &&
+            translate(
+              'auto.components.settings.GeneralUpdateSettingsSection.updatesNotConfigured',
+              'Online updates are not configured. Option/Alt-click to install a local build.'
+            )}
           {updateStatus.state === 'checking' &&
             translate(
               'auto.components.settings.GeneralUpdateSettingsSection.31fd7150cf',
@@ -182,11 +194,9 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
                 'auto.components.settings.GeneralUpdateSettingsSection.8311da27ba',
                 'is available. Click "Install Update" to download and install it.'
               )}{' '}
-              {updateStatus.source !== 'local' && (
+              {releaseNotesUrl && (
                 <a
-                  href={
-                    updateStatus.releaseUrl ?? getReleaseNotesUrlForVersion(updateStatus.version)
-                  }
+                  href={releaseNotesUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline hover:text-foreground"
@@ -221,11 +231,9 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
                 'auto.components.settings.GeneralUpdateSettingsSection.d89806cc89',
                 'is ready to install.'
               )}{' '}
-              {updateStatus.source !== 'local' && (
+              {releaseNotesUrl && (
                 <a
-                  href={
-                    updateStatus.releaseUrl ?? getReleaseNotesUrlForVersion(updateStatus.version)
-                  }
+                  href={releaseNotesUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline hover:text-foreground"

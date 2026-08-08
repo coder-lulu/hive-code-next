@@ -2586,6 +2586,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       update.updateChangelog = status.changelog ?? null
     } else if (
       status.state === 'idle' ||
+      status.state === 'disabled' ||
       status.state === 'checking' ||
       status.state === 'not-available'
     ) {

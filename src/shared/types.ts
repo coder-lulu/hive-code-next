@@ -2404,6 +2404,7 @@ export type LinuxPackageInstallFailureReason =
   | 'authentication-agent-unavailable'
   | 'authentication-denied'
   | 'package-install-failed'
+  | 'manual-install-required'
 
 // Why: the renderer must not infer "no polkit agent" from copy alone — main classifies and the card branches on this discriminant.
 export type LinuxPackageInstallRecovery = {
@@ -2422,6 +2423,7 @@ export type LinuxPackageInstallInstructions =
 
 export type UpdateStatus = (
   | { state: 'idle' }
+  | { state: 'disabled'; reason: 'not-configured' }
   | { state: 'checking'; userInitiated?: boolean }
   | {
       state: 'available'

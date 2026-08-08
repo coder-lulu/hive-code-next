@@ -17,6 +17,7 @@ const {
   registerPtyHandlersMock,
   hydrateLocalPtyRegistryAtBootMock,
   setupAutoUpdaterMock,
+  releaseUpdatesConfiguredMock,
   browserManagerUnregisterAllMock,
   runWorktreeChangeInvalidatorsMock,
   acknowledgePendingTccPromptNoticeMock,
@@ -39,6 +40,7 @@ const {
   registerPtyHandlersMock: vi.fn(),
   hydrateLocalPtyRegistryAtBootMock: vi.fn(),
   setupAutoUpdaterMock: vi.fn(),
+  releaseUpdatesConfiguredMock: vi.fn(),
   browserManagerUnregisterAllMock: vi.fn(),
   runWorktreeChangeInvalidatorsMock: vi.fn(),
   acknowledgePendingTccPromptNoticeMock: vi.fn(),
@@ -101,6 +103,10 @@ vi.mock('../updater', () => ({
   quitAndInstall: vi.fn(),
   dismissNudge: vi.fn(),
   setupAutoUpdater: setupAutoUpdaterMock
+}))
+
+vi.mock('../../shared/product-update-policy', () => ({
+  hasConfiguredProductUpdateChannel: releaseUpdatesConfiguredMock
 }))
 
 vi.mock('../macos-tcc-prompt-notice', () => ({
@@ -221,6 +227,8 @@ describe('attachMainWindowServices', () => {
     registerPtyHandlersMock.mockReset()
     hydrateLocalPtyRegistryAtBootMock.mockReset()
     setupAutoUpdaterMock.mockReset()
+    releaseUpdatesConfiguredMock.mockReset()
+    releaseUpdatesConfiguredMock.mockReturnValue(true)
     browserManagerUnregisterAllMock.mockReset()
     acknowledgePendingTccPromptNoticeMock.mockReset()
     consumePendingTccPromptNoticeMock.mockReset()
@@ -327,6 +335,16 @@ describe('attachMainWindowServices', () => {
     await setupAutoUpdaterMock.mock.calls[0][1].onBeforeQuit()
 
     expect(store.flushPendingAsync).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not initialize the online updater when HiveCode has no configured channel', async () => {
+    releaseUpdatesConfiguredMock.mockReturnValue(false)
+    const mainWindow = createMainWindow()
+
+    attachMainWindowServices(mainWindow as never, createStore(), createRuntime() as never)
+    await fireReadyToShow(mainWindow)
+
+    expect(setupAutoUpdaterMock).not.toHaveBeenCalled()
   })
 
   it('replaces the TCC handlers when the main window is reattached', () => {

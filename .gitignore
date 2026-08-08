@@ -101,6 +101,8 @@ docs/**
 !docs/reference/linux-glibc-compatibility.md
 !docs/reference/relay-grace-time-reconfiguration.md
 !docs/reference/windows-setup-shell.md
+!docs/engineering/
+!docs/engineering/**
 
 # Stably CLI (only docs/ are tracked)
 .stably/*

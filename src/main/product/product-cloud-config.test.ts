@@ -1,0 +1,97 @@
+import { describe, expect, it, vi } from 'vitest'
+import { getProductCloudAuthConfig } from './product-cloud-config'
+
+vi.mock('electron', () => ({
+  app: {
+    isPackaged: false
+  }
+}))
+
+describe('HiveCode cloud auth config', () => {
+  it('returns unconfigured in packaged HiveCode builds when no cloud endpoint is set', () => {
+    const result = getProductCloudAuthConfig({}, true)
+
+    expect(result.configured).toBe(false)
+    if (!result.configured) {
+      expect(result.setupMessage).toContain('HiveCode Cloud')
+      expect(result.setupMessage).toContain('not configured')
+    }
+  })
+
+  it('does not fall back to Orca production endpoints in packaged HiveCode builds', () => {
+    const result = getProductCloudAuthConfig({}, true)
+
+    expect(result.configured).toBe(false)
+    // Safety: the setup message must NOT mention Orca Cloud
+    if (!result.configured) {
+      expect(result.setupMessage).not.toMatch(/orca/i)
+    }
+  })
+
+  it('ignores ORCA_CLOUD_* env overrides in packaged HiveCode builds', () => {
+    const result = getProductCloudAuthConfig(
+      {
+        ORCA_CLOUD_API_URL: 'https://hivecode-cloud.example',
+        ORCA_CLOUD_CLIENT_ID: 'desktop-client',
+        ORCA_RELAY_URL: 'https://hivecode-relay.example'
+      },
+      true
+    )
+
+    expect(result.configured).toBe(false)
+  })
+
+  it('allows ORCA_CLOUD_* env vars in dev / unpackaged builds', () => {
+    const result = getProductCloudAuthConfig({
+      ORCA_CLOUD_API_URL: 'https://orca-cloud.example/',
+      ORCA_CLOUD_CLIENT_ID: 'desktop-client',
+      ORCA_RELAY_URL: 'https://orca-relay.example'
+    })
+
+    expect(result.configured).toBe(true)
+    if (result.configured) {
+      expect(result.config.authorizeEndpoint).toContain('/v1/desktop/auth/authorize')
+    }
+  })
+
+  it('reports unconfigured in dev without env vars (no production fallback)', () => {
+    const result = getProductCloudAuthConfig({})
+
+    expect(result.configured).toBe(false)
+    if (!result.configured) {
+      expect(result.setupMessage).toContain('not configured')
+    }
+  })
+
+  it('allows loopback HTTP endpoints in dev', () => {
+    const result = getProductCloudAuthConfig({
+      ORCA_CLOUD_API_URL: 'http://localhost:4100',
+      ORCA_CLOUD_CLIENT_ID: 'desktop-client',
+      ORCA_RELAY_URL: 'http://localhost:4101'
+    })
+
+    expect(result.configured).toBe(true)
+  })
+
+  it('rejects loopback HTTP endpoints in packaged HiveCode builds', () => {
+    const result = getProductCloudAuthConfig(
+      {
+        ORCA_CLOUD_API_URL: 'http://localhost:4100',
+        ORCA_CLOUD_CLIENT_ID: 'desktop-client',
+        ORCA_RELAY_URL: 'http://localhost:4101'
+      },
+      true
+    )
+
+    expect(result.configured).toBe(false)
+  })
+
+  it('fails closed when API and client are configured without a relay endpoint', () => {
+    const result = getProductCloudAuthConfig({
+      ORCA_CLOUD_API_URL: 'https://hivecode-cloud.example',
+      ORCA_CLOUD_CLIENT_ID: 'desktop-client'
+    })
+
+    expect(result.configured).toBe(false)
+  })
+})

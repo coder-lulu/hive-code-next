@@ -102,9 +102,8 @@ describe('UpdateCard Windows signature failures', () => {
     expect(screen.getByText(/Don't install this download/)).toBeTruthy()
     expect(screen.queryByText(message)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Check official releases' }))
-    expect(openUrl).toHaveBeenCalledWith('https://github.com/stablyai/orca/releases')
-    expect(openUrl).not.toHaveBeenCalledWith(expect.stringContaining('/tag/'))
+    expect(screen.queryByRole('button', { name: 'Check official releases' })).toBeNull()
+    expect(openUrl).not.toHaveBeenCalled()
   })
 
   it('keeps the blocked-check error collapsed while preserving retry and details', () => {
@@ -143,7 +142,7 @@ describe('UpdateCard Windows signature failures', () => {
 })
 
 describe('UpdateCard hourly builds', () => {
-  it('links a pinned hourly build to its own repo instead of a 404 main-repo tag', () => {
+  it('does not expose upstream release notes while the product release endpoint is disabled', () => {
     useAppStore.setState({
       updateStatus: {
         state: 'available',
@@ -158,10 +157,8 @@ describe('UpdateCard hourly builds', () => {
     })
     render(<UpdateCard />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Release notes' }))
-    expect(openUrl).toHaveBeenCalledWith(
-      'https://github.com/stablyai/orca-hourly/releases/tag/v1.4.160-hourly.202607281400'
-    )
+    expect(screen.queryByRole('button', { name: 'Release notes' })).toBeNull()
+    expect(openUrl).not.toHaveBeenCalled()
   })
 })
 
@@ -246,7 +243,7 @@ describe('UpdateCard Linux package-install recovery', () => {
     )
   })
 
-  it('offers the version release fallback once no command can be built', async () => {
+  it('does not offer an upstream release fallback once no command can be built', async () => {
     getInstructions.mockResolvedValue({
       ok: false,
       reason: 'no-package-manager',
@@ -258,8 +255,8 @@ describe('UpdateCard Linux package-install recovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy Install Command' }))
     await flushActions()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Download Manually' }))
-    expect(openUrl).toHaveBeenCalledWith('https://github.com/stablyai/orca/releases/tag/v1.4.200')
+    expect(screen.queryByRole('button', { name: 'Download Manually' })).toBeNull()
+    expect(openUrl).not.toHaveBeenCalled()
   })
 
   it('keeps generic errors on the generic card when no recovery is attached', () => {

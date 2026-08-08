@@ -165,6 +165,21 @@ describe('LinuxPackageInstallRecoveryCard copy', () => {
     expect(screen.queryByRole('button', { name: 'Download Manually' })).toBeNull()
   })
 
+  it('presents a manual-only system-package flow without an automatic retry', () => {
+    renderCard({ recovery: makeRecovery({ reason: 'manual-install-required' }) })
+
+    expect(screen.getByText('Manual Install Required')).toBeTruthy()
+    expect(
+      screen.getByText(/automatic installation is disabled for Linux system packages/i)
+    ).toBeTruthy()
+    expect(screen.getByText(/inode-pinned command.*POSIX shell/)).toBeTruthy()
+    fireEvent.click(button('Show details'))
+    expect(screen.getByText(/verifies SHA-512 through that file descriptor/)).toBeTruthy()
+    expect(button('Copy Install Command')).toBeTruthy()
+    expect(button('Show Package')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Try Automatic Install Again' })).toBeNull()
+  })
+
   it('minimizes to the status bar from the header control', () => {
     renderCard()
 

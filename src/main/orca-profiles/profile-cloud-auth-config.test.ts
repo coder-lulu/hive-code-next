@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   allowsPlaintextOrcaCloudSession,
   getOrcaCloudAuthConfig,
-  isOrcaCloudDevAuthEnabled
+  isOrcaCloudDevAuthEnabled,
+  type ProductCloudDefaults
 } from './profile-cloud-auth-config'
 
 vi.mock('electron', () => ({
@@ -11,19 +12,30 @@ vi.mock('electron', () => ({
   }
 }))
 
+const TEST_PRODUCT_DEFAULTS: ProductCloudDefaults = {
+  apiBaseUrl: 'https://login.example.test',
+  clientId: 'desktop-client',
+  relayDirectorUrl: 'https://relay.example.test',
+  productLabel: 'Test Cloud'
+}
+
 describe('Orca cloud auth config', () => {
   it('reports unconfigured without both API URL and client ID', () => {
-    expect(getOrcaCloudAuthConfig({})).toEqual({
+    expect(getOrcaCloudAuthConfig({}, undefined, TEST_PRODUCT_DEFAULTS)).toEqual({
       configured: false,
-      setupMessage: 'Orca Cloud sign-in is not configured for this build.'
+      setupMessage: 'Test Cloud sign-in is not configured for this build.'
     })
   })
 
   it('builds default desktop auth endpoints from the API URL', () => {
-    const state = getOrcaCloudAuthConfig({
-      ORCA_CLOUD_API_URL: 'https://orca-cloud.example/',
-      ORCA_CLOUD_CLIENT_ID: 'desktop-client'
-    })
+    const state = getOrcaCloudAuthConfig(
+      {
+        ORCA_CLOUD_API_URL: 'https://orca-cloud.example/',
+        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
+      },
+      undefined,
+      TEST_PRODUCT_DEFAULTS
+    )
 
     expect(state).toEqual({
       configured: true,
@@ -37,7 +49,7 @@ describe('Orca cloud auth config', () => {
         orgEndpoint: 'https://orca-cloud.example/v1/desktop/auth/org',
         logoutEndpoint: 'https://orca-cloud.example/v1/desktop/auth/logout',
         relayTokenEndpoint: 'https://orca-cloud.example/v1/desktop/auth/relay-token',
-        relayDirectorUrl: 'https://relay.onorca.dev',
+        relayDirectorUrl: 'https://relay.example.test',
         clientId: 'desktop-client',
         scope: 'openid profile email offline_access'
       }
@@ -45,61 +57,68 @@ describe('Orca cloud auth config', () => {
   })
 
   it('uses first-party production endpoints without runtime env in packaged builds', () => {
-    expect(getOrcaCloudAuthConfig({}, true)).toEqual({
+    expect(getOrcaCloudAuthConfig({}, true, TEST_PRODUCT_DEFAULTS)).toEqual({
       configured: true,
       config: {
-        apiBaseUrl: 'https://login.onorca.dev',
-        authorizeEndpoint: 'https://login.onorca.dev/v1/desktop/auth/authorize',
-        sessionEndpoint: 'https://login.onorca.dev/v1/desktop/auth/session',
-        refreshEndpoint: 'https://login.onorca.dev/v1/desktop/auth/refresh',
-        capabilitiesEndpoint: 'https://login.onorca.dev/v1/desktop/auth/capabilities',
-        profileEndpoint: 'https://login.onorca.dev/v1/desktop/auth/profile',
-        orgEndpoint: 'https://login.onorca.dev/v1/desktop/auth/org',
-        logoutEndpoint: 'https://login.onorca.dev/v1/desktop/auth/logout',
-        relayTokenEndpoint: 'https://login.onorca.dev/v1/desktop/auth/relay-token',
-        relayDirectorUrl: 'https://relay.onorca.dev',
-        clientId: 'orca-desktop',
+        apiBaseUrl: 'https://login.example.test',
+        authorizeEndpoint: 'https://login.example.test/v1/desktop/auth/authorize',
+        sessionEndpoint: 'https://login.example.test/v1/desktop/auth/session',
+        refreshEndpoint: 'https://login.example.test/v1/desktop/auth/refresh',
+        capabilitiesEndpoint: 'https://login.example.test/v1/desktop/auth/capabilities',
+        profileEndpoint: 'https://login.example.test/v1/desktop/auth/profile',
+        orgEndpoint: 'https://login.example.test/v1/desktop/auth/org',
+        logoutEndpoint: 'https://login.example.test/v1/desktop/auth/logout',
+        relayTokenEndpoint: 'https://login.example.test/v1/desktop/auth/relay-token',
+        relayDirectorUrl: 'https://relay.example.test',
+        clientId: 'desktop-client',
         scope: 'openid profile email offline_access'
       }
     })
   })
 
   it('allows loopback HTTP endpoints for local desktop auth development', () => {
-    const state = getOrcaCloudAuthConfig({
-      ORCA_CLOUD_API_URL: 'http://localhost:4100',
-      ORCA_CLOUD_CLIENT_ID: 'desktop-client'
-    })
+    const state = getOrcaCloudAuthConfig(
+      {
+        ORCA_CLOUD_API_URL: 'http://localhost:4100',
+        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
+      },
+      undefined,
+      TEST_PRODUCT_DEFAULTS
+    )
 
     expect(state.configured).toBe(true)
   })
 
-  it('rejects loopback HTTP endpoints in packaged builds', () => {
-    expect(
-      getOrcaCloudAuthConfig(
-        {
-          ORCA_CLOUD_API_URL: 'http://localhost:4100',
-          ORCA_CLOUD_CLIENT_ID: 'desktop-client'
-        },
-        true
-      )
-    ).toMatchObject({ configured: false })
-
-    const httpsState = getOrcaCloudAuthConfig(
+  it('ignores all endpoint environment overrides in packaged builds', () => {
+    const state = getOrcaCloudAuthConfig(
       {
-        ORCA_CLOUD_API_URL: 'https://orca-cloud.example',
-        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
+        ORCA_CLOUD_API_URL: 'http://localhost:4100',
+        ORCA_CLOUD_CLIENT_ID: 'overridden-client',
+        ORCA_RELAY_URL: 'http://localhost:4101'
       },
-      true
+      true,
+      TEST_PRODUCT_DEFAULTS
     )
-    expect(httpsState.configured).toBe(true)
+    expect(state).toMatchObject({
+      configured: true,
+      config: {
+        apiBaseUrl: 'https://login.example.test',
+        clientId: 'desktop-client',
+        relayDirectorUrl: 'https://relay.example.test'
+      }
+    })
   })
 
   it('rejects non-HTTPS non-loopback API URLs', () => {
     expect(
-      getOrcaCloudAuthConfig({
-        ORCA_CLOUD_API_URL: 'http://orca-cloud.example',
-        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
-      })
+      getOrcaCloudAuthConfig(
+        {
+          ORCA_CLOUD_API_URL: 'http://orca-cloud.example',
+          ORCA_CLOUD_CLIENT_ID: 'desktop-client'
+        },
+        undefined,
+        TEST_PRODUCT_DEFAULTS
+      )
     ).toMatchObject({ configured: false })
   })
 

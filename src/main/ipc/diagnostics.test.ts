@@ -15,7 +15,8 @@ const {
   collectDiagnosticBundleMock,
   deleteDiagnosticBundleMock,
   getDiagnosticsStatusMock,
-  uploadDiagnosticBundleMock
+  uploadDiagnosticBundleMock,
+  productDiagnosticsEndpoint
 } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   mkdirSyncMock: vi.fn(),
@@ -26,7 +27,16 @@ const {
   collectDiagnosticBundleMock: vi.fn(),
   deleteDiagnosticBundleMock: vi.fn(),
   getDiagnosticsStatusMock: vi.fn(),
-  uploadDiagnosticBundleMock: vi.fn()
+  uploadDiagnosticBundleMock: vi.fn(),
+  productDiagnosticsEndpoint: {
+    value: 'https://diagnostics.example.com/diagnostics/token' as string | null
+  }
+}))
+
+vi.mock('../product/product-external-service-endpoints', () => ({
+  getProductExternalServiceEndpoints: () => ({
+    diagnostics: productDiagnosticsEndpoint.value
+  })
 }))
 
 vi.mock('node:fs', async () => {
@@ -92,7 +102,7 @@ describe('diagnostics IPC handlers', () => {
     uploadDiagnosticBundleMock.mockReset()
     delete (globalThis as { ORCA_BUILD_IDENTITY?: unknown }).ORCA_BUILD_IDENTITY
     delete (globalThis as { ORCA_DIAGNOSTICS_TOKEN_URL?: unknown }).ORCA_DIAGNOSTICS_TOKEN_URL
-    process.env.ORCA_DIAGNOSTICS_TOKEN_URL = 'https://diagnostics.example.com/diagnostics/token'
+    productDiagnosticsEndpoint.value = 'https://diagnostics.example.com/diagnostics/token'
     getDiagnosticsStatusMock.mockReturnValue({
       localFileEnabled: true,
       bundleEnabled: true,
@@ -135,7 +145,7 @@ describe('diagnostics IPC handlers', () => {
     })
   })
 
-  it('pins official builds to the compile-time diagnostics endpoint', async () => {
+  it('pins official builds to the product diagnostics endpoint', async () => {
     const bundle = makeBundle({
       bundleSubmissionId: 'bundleabcdefghijklmnop',
       payload: '{"type":"bundle-header"}\n{"safe":true}\n'
@@ -158,7 +168,7 @@ describe('diagnostics IPC handlers', () => {
     await upload({}, bundle.bundleSubmissionId)
 
     expect(uploadDiagnosticBundleMock).toHaveBeenCalledWith({
-      tokenEndpoint: 'https://official.example.com/diagnostics/token',
+      tokenEndpoint: 'https://diagnostics.example.com/diagnostics/token',
       payload: bundle.payload,
       bundleSubmissionId: bundle.bundleSubmissionId
     })

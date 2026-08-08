@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  OFFICIAL_MARKETPLACE_REPOSITORY,
   PLUGIN_MARKETPLACE_CATEGORY_LIMIT,
   PLUGIN_MARKETPLACE_ENTRY_LIMIT,
   isMarketplaceListingSupported,
-  isOfficialMarketplaceGitSource,
+  isConfiguredMarketplaceGitSource,
   isOfficialOrganizationGitSource,
   isOfficialPluginIdentity,
   isReservedPluginIdentity,
@@ -150,13 +149,15 @@ describe('marketplace provenance contracts', () => {
     expect(isOfficialOrganizationGitSource('https://gitlab.com/stablyai/orca-skills')).toBe(false)
   })
 
-  it('recognizes only the canonical official marketplace repository', () => {
+  it('recognizes only the marketplace repository selected by product configuration', () => {
+    const configured = 'https://github.com/acme/product-plugins.git'
     expect(
-      isOfficialMarketplaceGitSource(
-        `git@github.com:stablyai/${OFFICIAL_MARKETPLACE_REPOSITORY}.git`
-      )
+      isConfiguredMarketplaceGitSource('git@github.com:acme/product-plugins.git', configured)
     ).toBe(true)
-    expect(isOfficialMarketplaceGitSource('git@github.com:stablyai/plugins.git')).toBe(false)
+    expect(isConfiguredMarketplaceGitSource(configured, null)).toBe(false)
+    expect(isConfiguredMarketplaceGitSource('git@github.com:acme/plugins.git', configured)).toBe(
+      false
+    )
   })
 
   it('parses nested repository paths without confusing the repository name', () => {

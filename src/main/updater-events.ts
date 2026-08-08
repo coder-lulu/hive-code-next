@@ -1,7 +1,8 @@
 import { app, autoUpdater as nativeUpdater } from 'electron'
-import type { UpdateStatus } from '../shared/types'
 import {
+  captureMacDownloadGenerationForNativeReady,
   consumeMacInstallGuardBypass,
+  consumePendingMacNativeReadyGeneration,
   deferMacQuitUntilInstallerReady,
   handleMacInstallerReady,
   isMacInstallerReady,
@@ -10,60 +11,17 @@ import {
 } from './updater-mac-install'
 import { compareVersions } from './updater-fallback'
 import { fetchChangelog } from './updater-changelog'
-import type { ElectronAutoUpdater } from './electron-updater-loader'
+import {
+  AUTO_UPDATE_CHECK_INTERVAL_MS,
+  AUTO_UPDATE_RETRY_INTERVAL_MS,
+  type UpdaterHandlerContext
+} from './updater-events-context'
 import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
 import {
   captureLinuxPackageArtifact,
   clearTrackedLinuxPackageArtifact,
   clearTrackedLinuxPackageArtifactForOtherVersion
 } from './linux-package-update-recovery'
-
-const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
-const AUTO_UPDATE_RETRY_INTERVAL_MS = 60 * 60 * 1000
-
-type UpdaterHandlerContext = {
-  autoUpdater: ElectronAutoUpdater
-  clearBackgroundCheckLaunchPending: () => void
-  clearAvailableUpdateContext: () => void
-  consumeMissingManifestPrereleaseFallbackResult: () => { userInitiated: boolean } | null
-  getPublishingWindowLastGoodCheck: () => { lastGoodTag: string } | null
-  getMissingManifestPrereleaseFallbackUserInitiated: () => boolean | null
-  getCurrentStatus: () => UpdateStatus
-  getActiveUpdateCheckEventAttemptId: () => number | null
-  getKnownReleaseUrl: () => string | undefined
-  getPendingInstallVersion: () => string
-  getUserInitiatedCheck: () => boolean
-  handleQuitAndInstallFailure: (error?: unknown) => boolean
-  isQuitAndInstallHandoffActive: () => boolean
-  hasInstallableDownloadedVersion: () => boolean
-  isLocalBuildCheck: () => boolean
-  isPinnedBuildCheck: () => boolean
-  shouldHandleUpdaterErrorEvent: () => boolean
-  clearUpdateAvailableEventPending: (attemptId: number | null) => void
-  isActiveUpdateCheckAttempt: (attemptId: number) => boolean
-  markUpdateCheckEventAttempt: () => boolean
-  markUpdateAvailableEventPending: (attemptId: number | null) => void
-  markMissingManifestPrereleaseFallbackChecking: () => void
-  performQuitAndInstall: () => void | Promise<void>
-  shouldDeferMacQuitForInstall: () => boolean
-  recordCompletedUpdateCheck: () => void
-  restoreReleaseUpdateSource: () => void
-  sendCheckFailureStatus: (
-    message: string,
-    userInitiated?: boolean,
-    source?: 'event' | 'promise' | 'fallback-promise',
-    sourceError?: unknown
-  ) => Promise<void>
-  sendErrorStatus: (message: string, userInitiated?: boolean) => void
-  sendStatus: (status: UpdateStatus) => void
-  scheduleAutomaticUpdateCheck: (delayMs: number) => void
-  shouldSuppressMissingManifestPrereleaseFallbackEvent: (message: string, error: unknown) => boolean
-  suppressMissingManifestPrereleaseFallbackPromiseFailure: (message: string) => void
-  setAvailableReleaseUrl: (releaseUrl: string | null) => void
-  setAvailableVersion: (version: string | null) => void
-  setUserInitiatedCheck: (value: boolean) => void
-}
-
 export function registerAutoUpdaterHandlers({
   autoUpdater,
   clearBackgroundCheckLaunchPending,
@@ -81,6 +39,9 @@ export function registerAutoUpdaterHandlers({
   hasInstallableDownloadedVersion,
   isLocalBuildCheck,
   isPinnedBuildCheck,
+  isExpectedUpdateOffer,
+  rejectUnexpectedUpdateOffer,
+  acceptDownloadedUpdateCandidate,
   shouldHandleUpdaterErrorEvent,
   clearUpdateAvailableEventPending,
   isActiveUpdateCheckAttempt,
@@ -103,9 +64,17 @@ export function registerAutoUpdaterHandlers({
 }: UpdaterHandlerContext): void {
   // Why: electron-updater fires 'update-downloaded' before Squirrel.Mac finishes; track readiness to avoid a premature "ready".
   if (process.platform === 'darwin') {
+    // Why: the native-ready signal from Squirrel.Mac arrives asynchronously.
+    // The generation captured in the JS handler must match the one consumed here.
     nativeUpdater.on('update-downloaded', () => {
+      // Consume the generation captured when the JS handler processed this download.
+      // If a new download has since started, the native handler should not act on a stale cycle.
+      const generation = consumePendingMacNativeReadyGeneration()
+      if (generation === null) {
+        return
+      }
       const hasInstallableVersion = hasInstallableDownloadedVersion()
-      handleMacInstallerReady(hasInstallableVersion, performQuitAndInstall, () => {
+      handleMacInstallerReady(generation, hasInstallableVersion, performQuitAndInstall, () => {
         // Send the held status only while its staged build is still installable.
         sendStatus({
           state: 'downloaded',
@@ -169,6 +138,11 @@ export function registerAutoUpdaterHandlers({
     const wasUserInitiated = missingManifestFallback?.userInitiated ?? getUserInitiatedCheck()
     setUserInitiatedCheck(false)
 
+    if (!isExpectedUpdateOffer(attemptId, info.version)) {
+      rejectUnexpectedUpdateOffer(attemptId, info.version, wasUserInitiated)
+      return
+    }
+
     // Release checks remain newer-only; validated local builds and pinned dev jumps may intentionally downgrade.
     if (
       !isLocalBuildCheck() &&
@@ -193,7 +167,7 @@ export function registerAutoUpdaterHandlers({
     // momentarily resolves an older tag must not destroy a still-valid recovery path.
     clearTrackedLinuxPackageArtifactForOtherVersion(info.version)
 
-    // Why: fetch the changelog in main to avoid renderer-side CORS on onorca.dev.
+    // Why: fetch the changelog in main so the renderer never needs direct cross-origin access.
     markUpdateAvailableEventPending(attemptId)
     void (async () => {
       try {
@@ -281,6 +255,14 @@ export function registerAutoUpdaterHandlers({
 
   autoUpdater.on('update-downloaded', (info) => {
     clearBackgroundCheckLaunchPending()
+    if (!acceptDownloadedUpdateCandidate(info.version)) {
+      clearTrackedLinuxPackageArtifact()
+      sendErrorStatus('Downloaded update did not match the verified candidate.', true)
+      if (isLocalBuildCheck() || isPinnedBuildCheck()) {
+        restoreReleaseUpdateSource()
+      }
+      return
+    }
     // Release downloads remain newer-only; the local source was validated before checking, and a pinned jump is explicit.
     if (
       !isLocalBuildCheck() &&
@@ -294,6 +276,11 @@ export function registerAutoUpdaterHandlers({
     }
     // Why: retain the verified artifact now — the 'error' event after a failed install no longer carries it.
     captureLinuxPackageArtifact(info)
+    if (process.platform === 'darwin') {
+      // Why: bind the current download generation so the late native-ready signal
+      // from Squirrel.Mac can verify it still belongs to this download cycle.
+      captureMacDownloadGenerationForNativeReady()
+    }
     const macInstallerReady = process.platform === 'darwin' ? isMacInstallerReady() : true
     recordUpdaterLifecycle('update_downloaded', { version: info.version, macInstallerReady })
     // On macOS, defer 'downloaded' until Squirrel.Mac finishes processing; other platforms are ready immediately.

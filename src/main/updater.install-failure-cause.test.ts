@@ -84,6 +84,22 @@ vi.mock('electron', () => ({
   net: { fetch: vi.fn() }
 }))
 
+vi.mock('./product/product-updater-network-boundary', () => ({
+  installProductUpdaterNetworkBoundary: vi.fn()
+}))
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  })
+}))
+
 vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))
 vi.mock('./electron-updater-loader', () => ({
   loadElectronAutoUpdater: () => autoUpdaterMock
@@ -96,6 +112,15 @@ vi.mock('./updater-changelog', () => ({
 vi.mock('./updater-nudge', () => ({
   fetchNudge: vi.fn().mockResolvedValue(null),
   shouldApplyNudge: vi.fn().mockReturnValue(false)
+}))
+vi.mock('./updater-prerelease-feed', () => ({
+  fetchNewerReleaseTagsWithReadiness: vi.fn().mockResolvedValue({
+    tags: ['v1.4.163'],
+    state: 'ready'
+  }),
+  getReleaseDownloadUrl: vi.fn(
+    (tag: string) => `https://github.com/stablyai/orca/releases/download/${tag}`
+  )
 }))
 vi.mock('./updater-lifecycle-diagnostics', () => ({
   recordUpdaterLifecycle: recordUpdaterLifecycleMock
@@ -154,6 +179,8 @@ async function reachDownloaded(): Promise<typeof UpdaterModule> {
   autoUpdaterMock.emit('checking-for-update')
   autoUpdaterMock.emit('update-available', { version: '1.4.163' })
   await new Promise((resolve) => setTimeout(resolve, 0))
+  autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+  updater.downloadUpdate()
   autoUpdaterMock.emit('update-downloaded', { version: '1.4.163' })
   expect(updater.getUpdateStatus().state).toBe('downloaded')
   return updater

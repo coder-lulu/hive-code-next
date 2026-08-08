@@ -11,11 +11,12 @@ import {
   type LocalBuildCompatibility
 } from '../../shared/local-build-compatibility'
 import { isValidAppVersion } from '../../shared/app-version'
+import { isBoundedUpdaterArtifactSize } from '../updater-artifact-size-policy'
 
 const MAX_MANIFEST_BYTES = 256 * 1024
 const MAX_COMPATIBILITY_BYTES = 64 * 1024
 const MAX_UPDATE_FILES = 8
-const MAX_ZIP_BYTES = 8 * 1024 * 1024 * 1024
+
 const SAFE_ARTIFACT_NAME = /^[A-Za-z0-9][A-Za-z0-9._ ()+-]*\.zip$/
 
 type ManifestFile = {
@@ -183,7 +184,7 @@ async function validateArtifact(
   )
   try {
     const fileStats = await file.stat()
-    if (!fileStats.isFile() || fileStats.size <= 0 || fileStats.size > MAX_ZIP_BYTES) {
+    if (!fileStats.isFile() || !isBoundedUpdaterArtifactSize(fileStats.size)) {
       throw new Error('The selected local build ZIP has an invalid size.')
     }
     if (manifestFile.size !== undefined && fileStats.size !== manifestFile.size) {

@@ -426,7 +426,7 @@ function applyRemoteWorkspacePatchStatus(
 }
 
 function shouldMountUpdateCardForStatus(status: UpdateStatus): boolean {
-  if (status.state === 'idle') {
+  if (status.state === 'idle' || status.state === 'disabled') {
     return false
   }
   if (status.state === 'checking' || status.state === 'not-available') {

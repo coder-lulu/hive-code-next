@@ -2,6 +2,10 @@ import type {
   PluginMarketplaceEntry,
   PluginMarketplaceGitSource
 } from '../../shared/plugins/plugin-marketplace'
+import type {
+  PluginMarketplaceCachedSnapshot,
+  PluginMarketplaceRegisteredSource
+} from './plugin-marketplace-store'
 
 export type PluginMarketplaceSourceState = {
   id: string
@@ -30,4 +34,29 @@ export type PluginMarketplaceListing = {
   official: boolean
   bundled: boolean
   blockedByKillList?: { reason: string; advisoryUrl?: string }
+}
+
+export function projectMarketplaceSourceState(
+  source: PluginMarketplaceRegisteredSource,
+  snapshot: PluginMarketplaceCachedSnapshot | null,
+  stale: boolean,
+  official: boolean,
+  error?: string
+): PluginMarketplaceSourceState {
+  return {
+    id: source.id,
+    source: source.source,
+    addedAt: source.addedAt,
+    marketplace: snapshot
+      ? {
+          name: snapshot.marketplace.name,
+          owner: snapshot.marketplace.owner,
+          resolvedCommit: snapshot.marketplaceCommit,
+          fetchedAt: snapshot.fetchedAt
+        }
+      : null,
+    stale,
+    official,
+    ...(error ? { error } : {})
+  }
 }

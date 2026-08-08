@@ -1,13 +1,14 @@
 import type { OrcaProfileAuthStatus } from '../../shared/orca-profiles'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
 import type { ActiveOrcaProfileState } from './profile-index-store'
-import { getOrcaCloudAuthConfig, isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
+import { isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
 import { readOrcaCloudSession } from './profile-cloud-session-store'
 
 export function getOrcaProfileAuthStatusFromProfile(
   active: ActiveOrcaProfileState,
   userDataPath: string
 ): OrcaProfileAuthStatus {
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   const devAuthEnabled = isOrcaCloudDevAuthEnabled()
   const configured = configState.configured || devAuthEnabled
   const cloud = active.profile.cloud

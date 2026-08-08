@@ -218,16 +218,17 @@ describe('electron-builder config', () => {
   })
 
   it('matches the Linux desktop entry to Electron window class', () => {
-    expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca')
+    expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('hivecode')
   })
 
-  it('uses AppImage and deb as local Linux targets without changing existing artifact names', () => {
+  it('uses HiveCode artifact and package names for Linux targets', () => {
     expect(electronBuilderConfig.linux.target).toEqual(['AppImage', 'deb'])
-    expect(electronBuilderConfig.appImage.artifactName).toBe('orca-linux.${ext}')
-    expect(electronBuilderConfig.deb.artifactName).toBe('orca-ide_${version}_${arch}.${ext}')
+    expect(electronBuilderConfig.linux.executableName).toBe('hivecode')
+    expect(electronBuilderConfig.appImage.artifactName).toBe('hivecode-linux.${ext}')
+    expect(electronBuilderConfig.deb.artifactName).toBe('hivecode_${version}_${arch}.${ext}')
     expect(electronBuilderConfig.rpm).toMatchObject({
-      packageName: 'orca-ide',
-      artifactName: 'orca-ide-${version}.${arch}.${ext}'
+      packageName: 'hivecode',
+      artifactName: 'hivecode-${version}.${arch}.${ext}'
     })
   })
 
@@ -238,7 +239,7 @@ describe('electron-builder config', () => {
       delete require.cache[configPath]
       process.env.ORCA_LINUX_ARM64_RELEASE = '1'
       expect(require('../electron-builder.config.cjs').appImage.artifactName).toBe(
-        'orca-linux-arm64.${ext}'
+        'hivecode-linux-arm64.${ext}'
       )
     } finally {
       if (original === undefined) {
@@ -304,13 +305,11 @@ describe('electron-builder config', () => {
   })
 
   // Why: Squirrel.Mac swaps the .app in place only when the replacement carries the
-  // same bundle id and a valid Developer ID signature. A hourly built on the local
-  // (com.stablyai.orca.local, ad-hoc) identity would be un-installable over a real
-  // Orca — the whole point of the channel.
+  // same bundle id and a valid Developer ID signature.
   it('builds hourly artifacts with the release signing identity', () => {
     withHourlyEnv((config) => {
       expect(config.mac.appId).toBeUndefined()
-      expect(config.appId).toBe('com.stablyai.orca')
+      expect(config.appId).toBe('com.hivekernel.hivecode.desktop')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
     })
@@ -330,17 +329,16 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.mac.notarize).toBe(false)
   })
 
-  // Why: the main repo's releases atom feed exposes only its 10 newest entries.
-  // Publishing 24 hourly tags a day there would evict every stable/RC entry and
-  // break update checks for every real user.
-  it('publishes hourly builds to the separate hourly repo', () => {
+  // Why: no HiveCode release repository or update channel has been approved yet.
+  // Every build mode must remain local-only instead of falling back to upstream Orca.
+  it('does not publish any build mode without an approved HiveCode update channel', () => {
     withHourlyEnv((config) => {
-      expect(config.publish).toMatchObject({ repo: 'orca-hourly', releaseType: 'prerelease' })
+      expect(config.publish).toBeUndefined()
     })
-    expect(electronBuilderConfig.publish).toMatchObject({
-      repo: 'orca',
-      releaseType: 'release'
+    withAdhocEnv((config) => {
+      expect(config.publish).toBeUndefined()
     })
+    expect(electronBuilderConfig.publish).toBeUndefined()
   })
 
   it('stamps hourly packages with the hourly version', () => {
@@ -352,16 +350,15 @@ describe('electron-builder config', () => {
     )
   })
 
-  // Why adhoc carries the identical mac identity to hourly: it installs over a
-  // real Orca through the same updater path, so the same signing and the same TCC
-  // argument apply. Only the destination repo differs.
-  it('builds adhoc artifacts with the release identity and its own repo', () => {
+  // Why adhoc carries the identical mac identity to hourly so its TCC grants
+  // remain stable; publishing remains disabled until HiveCode owns a channel.
+  it('builds adhoc artifacts with the HiveCode release identity', () => {
     withAdhocEnv((config) => {
-      expect(config.appId).toBe('com.stablyai.orca')
+      expect(config.appId).toBe('com.hivekernel.hivecode.desktop')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toMatchObject({ repo: 'orca-adhoc', releaseType: 'prerelease' })
+      expect(config.publish).toBeUndefined()
     })
   })
 
@@ -372,18 +369,6 @@ describe('electron-builder config', () => {
         expect(config.extraMetadata).toEqual({ version: '1.4.160-adhoc.20260728140533' })
       }
     )
-  })
-
-  // Why: the two dev channels share every packaging decision except where they
-  // publish, so a future edit that collapses them must not also collapse the
-  // repos — a branch build landing in orca-hourly would be offered to everyone
-  // riding main.
-  it('keeps the two dev channels on separate repos', () => {
-    withHourlyEnv((hourly) => {
-      withAdhocEnv((adhoc) => {
-        expect(hourly.publish.repo).not.toBe(adhoc.publish.repo)
-      })
-    })
   })
 
   it('uses Orca native rebuild hook instead of electron-builder default rebuild', () => {

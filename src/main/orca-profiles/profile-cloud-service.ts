@@ -6,8 +6,9 @@ import type {
   SelectOrcaProfileOrgResult,
   SignOutCurrentOrcaProfileResult
 } from '../../shared/orca-profiles'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
 import { ensureActiveOrcaProfile } from './profile-index-store'
-import { getOrcaCloudAuthConfig, isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
+import { isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
 import {
   clearOrcaCloudSession,
   readOrcaCloudSession,
@@ -65,7 +66,7 @@ export async function connectCurrentOrcaProfile(
     }
   }
 
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return {
       status: 'unconfigured',
@@ -107,7 +108,7 @@ export async function signOutCurrentOrcaProfile(
   userDataPath: string
 ): Promise<SignOutCurrentOrcaProfileResult> {
   const active = ensureActiveOrcaProfile(userDataPath)
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   const session = readOrcaCloudSession(active.profile.id, userDataPath)
   if (active.profile.cloud) {
     // Why: persist the destructive fence before logout network I/O so a
@@ -149,7 +150,7 @@ export async function createCloudLinkedOrcaProfile(
     }
   }
 
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured', auth: activeAuth(active, userDataPath) }
   }
@@ -204,7 +205,7 @@ export async function selectCurrentOrcaProfileOrg(
     }
   }
 
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured', auth: activeAuth(active, userDataPath) }
   }

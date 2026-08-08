@@ -117,6 +117,35 @@ vi.mock('./updater-nudge', () => ({
   shouldApplyNudge: vi.fn().mockReturnValue(false)
 }))
 
+vi.mock('./updater-prerelease-feed', () => ({
+  fetchNewerReleaseTagsWithReadiness: vi
+    .fn()
+    .mockResolvedValue({ tags: ['v1.0.61'], state: 'ready' }),
+  getReleaseDownloadUrl: (tag: string) =>
+    `https://github.com/stablyai/orca/releases/download/${tag}`
+}))
+
+vi.mock('./product/product-updater-network-boundary', () => ({
+  installProductUpdaterNetworkBoundary: vi.fn()
+}))
+
+vi.mock('../shared/product-update-policy', () => ({
+  hasConfiguredProductUpdateChannel: () => true
+}))
+
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  })
+}))
+
 describe('updater mac install handoff', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -133,6 +162,125 @@ describe('updater mac install handoff', () => {
     killAllPtyMock.mockReset()
     vi.unstubAllGlobals()
     vi.useRealTimers()
+  })
+
+  it('poisons identity-free native readiness when a second physical generation starts', async () => {
+    const macInstall = await import('./updater-mac-install')
+
+    macInstall.beginMacUpdateDownload()
+    expect(macInstall.captureMacDownloadGenerationForNativeReady()).toBe(1)
+    macInstall.beginMacUpdateDownload()
+    expect(macInstall.captureMacDownloadGenerationForNativeReady()).toBe(2)
+
+    // Squirrel supplies no request identity, so either next signal could belong to either download.
+    // The process must stay poisoned until restart rather than guessing FIFO order.
+    const reportDownloaded = vi.fn()
+    expect(macInstall.consumePendingMacNativeReadyGeneration()).toBeNull()
+    expect(macInstall.isMacInstallerReady()).toBe(false)
+    expect(reportDownloaded).not.toHaveBeenCalled()
+    expect(macInstall.consumePendingMacNativeReadyGeneration()).toBeNull()
+  })
+
+  it('revokes readiness when an unexpected duplicate native signal arrives', async () => {
+    const macInstall = await import('./updater-mac-install')
+    vi.stubGlobal('process', { ...process, platform: 'darwin' })
+    macInstall.beginMacUpdateDownload()
+    const generation = macInstall.captureMacDownloadGenerationForNativeReady()
+    expect(macInstall.consumePendingMacNativeReadyGeneration()).toBe(generation)
+
+    macInstall.handleMacInstallerReady(generation, true, vi.fn(), vi.fn())
+    expect(macInstall.isMacInstallerReady()).toBe(true)
+    expect(macInstall.hasMacInstallAuthority()).toBe(true)
+
+    expect(macInstall.consumePendingMacNativeReadyGeneration()).toBeNull()
+    expect(macInstall.isMacInstallerReady()).toBe(false)
+    expect(macInstall.hasMacInstallAuthority()).toBe(false)
+  })
+
+  it('invalidates a queued native-ready signal when mac install state is reset', async () => {
+    const macInstall = await import('./updater-mac-install')
+    macInstall.beginMacUpdateDownload()
+    const generation = macInstall.captureMacDownloadGenerationForNativeReady()
+
+    macInstall.resetMacInstallState()
+    expect(macInstall.consumePendingMacNativeReadyGeneration()).toBeNull()
+    const reportDownloaded = vi.fn()
+    macInstall.handleMacInstallerReady(generation, true, vi.fn(), reportDownloaded)
+    expect(macInstall.isMacInstallerReady()).toBe(false)
+    expect(reportDownloaded).not.toHaveBeenCalled()
+  })
+
+  it('coalesces duplicate downloaded events for the same mac generation', async () => {
+    const macInstall = await import('./updater-mac-install')
+    macInstall.beginMacUpdateDownload()
+
+    const generation = macInstall.captureMacDownloadGenerationForNativeReady()
+    expect(macInstall.captureMacDownloadGenerationForNativeReady()).toBe(generation)
+    expect(macInstall.consumePendingMacNativeReadyGeneration()).toBe(generation)
+    expect(macInstall.consumePendingMacNativeReadyGeneration()).toBeNull()
+  })
+
+  it('reports downloaded before invoking a deferred native install handoff', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'darwin' })
+
+    const macInstall = await import('./updater-mac-install')
+    macInstall.beginMacUpdateDownload()
+    const generation = macInstall.captureMacDownloadGenerationForNativeReady()
+
+    const onReadyToInstall = vi.fn()
+    const onReadyToReportDownloaded = vi.fn()
+
+    macInstall.deferMacQuitUntilInstallerReady(
+      { state: 'downloading', percent: 100, version: '1.0.61' },
+      true,
+      () => '1.0.61',
+      vi.fn()
+    )
+
+    macInstall.handleMacInstallerReady(
+      generation,
+      true,
+      onReadyToInstall,
+      onReadyToReportDownloaded
+    )
+
+    await vi.waitFor(() => {
+      expect(onReadyToReportDownloaded).toHaveBeenCalled()
+    })
+    expect(onReadyToInstall).toHaveBeenCalled()
+    expect(onReadyToReportDownloaded.mock.invocationCallOrder[0]).toBeLessThan(
+      onReadyToInstall.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('accepts a public install request that is durably deferred until native readiness', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'darwin' })
+
+    const mainWindow = { webContents: { send: vi.fn() } }
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => new Promise(() => {}))
+    autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+    const { downloadUpdate, getUpdateStatus, installRemoteServerUpdate, setupAutoUpdater } =
+      await import('./updater')
+
+    setupAutoUpdater(mainWindow as never)
+    await vi.waitFor(() => {
+      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+    })
+    autoUpdaterMock.emit('checking-for-update')
+    autoUpdaterMock.emit('update-available', { version: '1.0.61' })
+    await vi.waitFor(() => {
+      expect(getUpdateStatus()).toMatchObject({ state: 'available', version: '1.0.61' })
+    })
+    downloadUpdate()
+    autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
+
+    expect(installRemoteServerUpdate('runtime-rpc')).toMatchObject({
+      accepted: true,
+      fromVersion: '1.0.51',
+      targetVersion: '1.0.61',
+      runtimeId: 'runtime-rpc'
+    })
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
   })
 
   it.runIf(process.platform === 'darwin')(
@@ -235,8 +383,15 @@ describe('updater mac install handoff', () => {
     async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const reportDownloaded = vi.fn()
-      const { deferMacQuitUntilInstallerReady, handleMacInstallerReady } =
-        await import('./updater-mac-install')
+      const {
+        beginMacUpdateDownload,
+        captureMacDownloadGenerationForNativeReady,
+        deferMacQuitUntilInstallerReady,
+        handleMacInstallerReady
+      } = await import('./updater-mac-install')
+
+      beginMacUpdateDownload()
+      const generation = captureMacDownloadGenerationForNativeReady()
 
       expect(
         deferMacQuitUntilInstallerReady(
@@ -248,6 +403,7 @@ describe('updater mac install handoff', () => {
       ).toBe(true)
 
       handleMacInstallerReady(
+        generation,
         true,
         async () => {
           throw new Error('handoff-secret')
@@ -256,7 +412,7 @@ describe('updater mac install handoff', () => {
       )
       await Promise.resolve()
 
-      expect(reportDownloaded).not.toHaveBeenCalled()
+      expect(reportDownloaded).toHaveBeenCalledTimes(1)
       await vi.waitFor(() => {
         // Why: recordUpdaterLifecycle packs metadata into one console line.
         expect(warn).toHaveBeenCalledWith(

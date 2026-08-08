@@ -1,0 +1,95 @@
+import { describe, expect, it } from 'vitest'
+import { resolveProductUpdateSource } from './product-update-source'
+
+const config = (
+  updateChannel: string | null,
+  updateEndpoint: string | null,
+  updateRepository: string | null = 'coder-lulu/hive-code'
+): Parameters<typeof resolveProductUpdateSource>[0] => ({
+  desktop: { updateChannel, updateRepository },
+  endpoints: { update: updateEndpoint }
+})
+
+describe('resolveProductUpdateSource', () => {
+  it.each([
+    [
+      null,
+      'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      'coder-lulu/hive-code'
+    ],
+    ['stable', null, 'coder-lulu/hive-code'],
+    [
+      '',
+      'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      'coder-lulu/hive-code'
+    ],
+    ['stable', 'https://github.com/coder-lulu/hive-code/releases/latest/download', null]
+  ])(
+    'fails closed when channel, endpoint, or repository is not configured',
+    (channel, endpoint, repository) => {
+      expect(resolveProductUpdateSource(config(channel, endpoint, repository))).toBeNull()
+    }
+  )
+
+  it('derives every GitHub release URL from the configured product repository', () => {
+    expect(
+      resolveProductUpdateSource(
+        config('stable', 'https://github.com/coder-lulu/hive-code/releases/latest/download')
+      )
+    ).toEqual({
+      channel: 'stable',
+      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      github: {
+        repo: 'coder-lulu/hive-code',
+        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
+        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
+      }
+    })
+  })
+
+  it.each([
+    'https://downloads.example.com/product-update/stable/',
+    'https://github.com:444/coder-lulu/hive-code/releases/latest/download',
+    'https://github.com/coder-lulu/hive-code/releases/latest/%64ownload',
+    'https://github.com/coder%2Flulu/hive-code/releases/latest/download',
+    'https://github.com/coder-lulu/hive%2Fcode/releases/latest/download'
+  ])('fails closed for unsupported or non-canonical update endpoint %s', (endpoint) => {
+    expect(resolveProductUpdateSource(config('stable', endpoint))).toBeNull()
+  })
+
+  it.each([
+    'http://downloads.example.com/product-update/stable/',
+    'https://user:secret@downloads.example.com/product-update/stable/',
+    'https://downloads.example.com/product-update/stable/?token=secret',
+    'https://downloads.example.com/product-update/stable/#fragment'
+  ])('fails closed for unsafe update endpoint %s', (endpoint) => {
+    expect(resolveProductUpdateSource(config('stable', endpoint))).toBeNull()
+  })
+
+  it.each(['beta', 'hourly', 'adhoc', 'STABLE'])(
+    'fails closed for unsupported product update channel %s',
+    (channel) => {
+      expect(
+        resolveProductUpdateSource(
+          config(channel, 'https://github.com/coder-lulu/hive-code/releases/latest/download')
+        )
+      ).toBeNull()
+    }
+  )
+
+  it.each([
+    ['https://github.com/stablyai/orca/releases/latest/download', 'coder-lulu/hive-code'],
+    ['https://github.com/coder-lulu/hive-code/releases/latest/download', 'coder-lulu/other-repo'],
+    [
+      'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      'coder-lulu/hive-code/releases'
+    ],
+    ['https://github.com/coder-lulu/hive-code/releases/latest/download', 'https://github.com/x/y']
+  ])(
+    'fails closed when endpoint %s does not match approved repository %s',
+    (endpoint, repository) => {
+      expect(resolveProductUpdateSource(config('stable', endpoint, repository))).toBeNull()
+    }
+  )
+})

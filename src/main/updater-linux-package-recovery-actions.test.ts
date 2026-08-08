@@ -11,6 +11,7 @@ const {
   resolveLinuxPackageInstallInstructionsMock,
   revalidateLinuxPackageForInstallMock,
   revealLinuxPackageMock,
+  fetchNewerReleaseTagsMock,
   resetHandlers
 } = vi.hoisted(() => {
   const updaterHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
@@ -45,6 +46,7 @@ const {
     resolveLinuxPackageInstallInstructionsMock: vi.fn(),
     revalidateLinuxPackageForInstallMock: vi.fn(),
     revealLinuxPackageMock: vi.fn(),
+    fetchNewerReleaseTagsMock: vi.fn(),
     resetHandlers: () => updaterHandlers.clear()
   }
 })
@@ -57,6 +59,22 @@ vi.mock('electron', () => ({
   net: { fetch: vi.fn() }
 }))
 
+vi.mock('./product/product-updater-network-boundary', () => ({
+  installProductUpdaterNetworkBoundary: vi.fn()
+}))
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  })
+}))
+
 vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))
 vi.mock('./electron-updater-loader', () => ({ loadElectronAutoUpdater: () => autoUpdaterMock }))
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
@@ -67,7 +85,7 @@ vi.mock('./updater-nudge', () => ({
   shouldApplyNudge: vi.fn().mockReturnValue(false)
 }))
 vi.mock('./updater-prerelease-feed', () => ({
-  fetchNewerReleaseTagsWithReadiness: vi.fn().mockResolvedValue({ tags: [], state: 'no-newer' }),
+  fetchNewerReleaseTagsWithReadiness: fetchNewerReleaseTagsMock,
   getReleaseDownloadUrl: vi.fn(() => 'https://example.invalid/download')
 }))
 vi.mock('./update-install-exit-watchdog', () => ({
@@ -118,6 +136,7 @@ describe('linux package recovery actions', () => {
       .mockResolvedValue({ ok: true, command: "sudo apt install -- '<pkg>'", packageFileName: 'p' })
     revalidateLinuxPackageForInstallMock.mockReset().mockResolvedValue({ ok: true })
     revealLinuxPackageMock.mockReset().mockResolvedValue({ ok: true })
+    fetchNewerReleaseTagsMock.mockReset()
   })
 
   const startUpdater = async (): Promise<{
@@ -134,6 +153,19 @@ describe('linux package recovery actions', () => {
 
   /** Drives a pre-commit install failure so the status carries the recovery discriminant. */
   const failInstall = async (updater: typeof UpdaterModule): Promise<void> => {
+    const version = getTrackedLinuxPackageArtifactMock()?.version ?? '1.0.61'
+    fetchNewerReleaseTagsMock.mockResolvedValue({ tags: [`v${version}`], state: 'ready' })
+    autoUpdaterMock.checkForUpdates.mockImplementationOnce(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      queueMicrotask(() => autoUpdaterMock.emit('update-available', { version }))
+      return Promise.resolve(null)
+    })
+    updater.checkForUpdatesFromMenu()
+    await vi.advanceTimersByTimeAsync(0)
+    autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+    updater.downloadUpdate()
+    autoUpdaterMock.emit('update-downloaded', { version })
+    await vi.advanceTimersByTimeAsync(0)
     autoUpdaterMock.quitAndInstall.mockImplementation(() => {
       autoUpdaterMock.emit('error', new Error('Command failed, exited with code 127'))
     })
@@ -178,7 +210,7 @@ describe('linux package recovery actions', () => {
     const recovery = {
       kind: 'linux-package-install',
       packageType: 'deb',
-      reason: 'package-install-failed',
+      reason: 'manual-install-required',
       version: '1.0.61'
     }
     expect(resolveLinuxPackageInstallInstructionsMock.mock.calls).toEqual([[recovery], [recovery]])

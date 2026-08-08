@@ -23,7 +23,13 @@ function makeProjectWithCli(
   mkdirSync(path.dirname(cliPath), { recursive: true })
   writeFileSync(
     path.join(projectDir, 'package.json'),
-    JSON.stringify({ bin: { orca: './out/cli/index.js' }, type: rootPackageType }),
+    JSON.stringify({
+      bin: {
+        hivecode: './out/cli/index.js',
+        'orca-ide': './out/cli/index.js'
+      },
+      type: rootPackageType
+    }),
     'utf8'
   )
   if (writeOutPackageJson) {
@@ -43,14 +49,45 @@ describe('verifyPackageCliBin', () => {
     )
 
     expect(verifyPackageCliBin({ projectDir, runHelp: true })).toMatchObject({
-      binPath: cliPath
+      binPath: cliPath,
+      commandNames: ['hivecode', 'orca-ide']
     })
+  })
+
+  it('rejects a missing compatibility alias', () => {
+    const { projectDir } = makeProjectWithCli('#!/usr/bin/env node\n')
+    const packageJsonPath = path.join(projectDir, 'package.json')
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    delete packageJson.bin['orca-ide']
+    writeFileSync(packageJsonPath, JSON.stringify(packageJson), 'utf8')
+
+    expect(() => verifyPackageCliBin({ projectDir })).toThrow('bin.orca-ide')
+  })
+
+  it('rejects aliases that point to different entrypoints', () => {
+    const { projectDir } = makeProjectWithCli('#!/usr/bin/env node\n')
+    const packageJsonPath = path.join(projectDir, 'package.json')
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    packageJson.bin['orca-ide'] = './out/cli/legacy.js'
+    writeFileSync(packageJsonPath, JSON.stringify(packageJson), 'utf8')
+
+    expect(() => verifyPackageCliBin({ projectDir })).toThrow('same target')
+  })
+
+  it('rejects the platform-reserved bare orca npm bin', () => {
+    const { projectDir } = makeProjectWithCli('#!/usr/bin/env node\n')
+    const packageJsonPath = path.join(projectDir, 'package.json')
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    packageJson.bin.orca = './out/cli/index.js'
+    writeFileSync(packageJsonPath, JSON.stringify(packageJson), 'utf8')
+
+    expect(() => verifyPackageCliBin({ projectDir })).toThrow('conflicts with GNOME Orca')
   })
 
   it('rejects an empty package bin target', () => {
     const { projectDir } = makeProjectWithCli('')
 
-    expect(() => verifyPackageCliBin({ projectDir })).toThrow('bin.orca target is empty')
+    expect(() => verifyPackageCliBin({ projectDir })).toThrow('bin.hivecode target is empty')
   })
 
   it('rejects package bin targets without a Node shebang', () => {

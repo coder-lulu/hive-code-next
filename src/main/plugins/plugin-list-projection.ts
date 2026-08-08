@@ -10,11 +10,12 @@ import type { PluginService } from './plugin-service'
 import { listPluginVmRecipeCommands } from '../../shared/plugins/plugin-vm-recipe-artifact'
 import type { PluginCommandAliasActionId } from '../../shared/plugins/plugin-command-actions'
 import {
-  isOfficialMarketplaceGitSource,
+  isConfiguredMarketplaceGitSource,
   isOfficialOrganizationGitSource,
   isOfficialPluginIdentity
 } from '../../shared/plugins/plugin-marketplace'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
+import { getProductExternalServiceEndpoints } from '../product/product-external-service-endpoints'
 
 const PLUGIN_LIST_PROJECTION_CONCURRENCY = 4
 
@@ -150,7 +151,10 @@ export async function buildPluginList(
         bundled ||
         (lockEntry?.source.kind === 'marketplace' &&
           isOfficialPluginIdentity(plugin.pluginKey) &&
-          isOfficialMarketplaceGitSource(lockEntry.source.marketplace.url) &&
+          isConfiguredMarketplaceGitSource(
+            lockEntry.source.marketplace.url,
+            getProductExternalServiceEndpoints().pluginMarketplace
+          ) &&
           isOfficialOrganizationGitSource(lockEntry.source.plugin.url))
       return {
         pluginKey: plugin.pluginKey,

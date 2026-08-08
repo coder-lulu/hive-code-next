@@ -6,7 +6,6 @@ import type {
   PluginMarketplace,
   PluginMarketplaceGitSource
 } from '../../shared/plugins/plugin-marketplace'
-import { OFFICIAL_MARKETPLACE_GIT_SOURCE } from '../../shared/plugins/plugin-marketplace'
 import type { PluginMarketplaceFetchResult } from './plugin-marketplace-fetch'
 import { PluginMarketplaceService } from './plugin-marketplace-service'
 import {
@@ -27,6 +26,8 @@ async function tempRoot(): Promise<string> {
 function source(url = 'https://github.com/community/plugins.git'): PluginMarketplaceGitSource {
   return { kind: 'git', url, ref: 'main' }
 }
+
+const OFFICIAL_MARKETPLACE_GIT_SOURCE = source('https://github.com/stablyai/orca-plugins.git')
 
 function marketplace(
   name = 'Community',
@@ -56,6 +57,19 @@ afterEach(async () => {
 })
 
 describe('PluginMarketplaceService', () => {
+  it('does not seed, fetch, or persist an official source when product authority is null', async () => {
+    const fetcher = vi.fn(async () => fetched())
+    const service = new PluginMarketplaceService({
+      pluginsDataDir: await tempRoot(),
+      fetcher,
+      officialSource: null
+    })
+
+    await expect(service.seedOfficialSource()).resolves.toBeNull()
+    await expect(service.listSources()).resolves.toEqual([])
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
   it('fetches before registration, then serves browse data from the local snapshot', async () => {
     const fetcher = vi
       .fn<
@@ -165,7 +179,8 @@ describe('PluginMarketplaceService', () => {
     }
     const service = new PluginMarketplaceService({
       pluginsDataDir: await tempRoot(),
-      fetcher: async () => fetched(officialMarketplace)
+      fetcher: async () => fetched(officialMarketplace),
+      officialSource: OFFICIAL_MARKETPLACE_GIT_SOURCE
     })
 
     await service.addSource(source('https://github.com/stablyai/orca-plugins.git'))
@@ -221,7 +236,11 @@ describe('PluginMarketplaceService', () => {
     )
     officialMarketplace.owner = 'stablyai'
     const fetcher = vi.fn(async () => fetched(officialMarketplace))
-    const first = new PluginMarketplaceService({ pluginsDataDir: root, fetcher })
+    const first = new PluginMarketplaceService({
+      pluginsDataDir: root,
+      fetcher,
+      officialSource: OFFICIAL_MARKETPLACE_GIT_SOURCE
+    })
 
     await expect(first.seedOfficialSource()).resolves.toMatchObject({
       official: true,
@@ -230,7 +249,11 @@ describe('PluginMarketplaceService', () => {
     await expect(first.seedOfficialSource()).resolves.toMatchObject({ official: true })
     expect(fetcher).toHaveBeenCalledTimes(1)
 
-    const restarted = new PluginMarketplaceService({ pluginsDataDir: root, fetcher })
+    const restarted = new PluginMarketplaceService({
+      pluginsDataDir: root,
+      fetcher,
+      officialSource: OFFICIAL_MARKETPLACE_GIT_SOURCE
+    })
     await expect(restarted.seedOfficialSource()).resolves.toMatchObject({ official: true })
     expect(fetcher).toHaveBeenCalledTimes(1)
     await expect(restarted.listSources()).resolves.toHaveLength(1)
@@ -241,12 +264,16 @@ describe('PluginMarketplaceService', () => {
       pluginsDataDir: await tempRoot(),
       fetcher: async () => {
         throw new Error('offline')
-      }
+      },
+      officialSource: OFFICIAL_MARKETPLACE_GIT_SOURCE
     })
 
     const seeded = await service.seedOfficialSource()
 
     expect(seeded).toMatchObject({ official: true, stale: true, marketplace: null })
+    if (!seeded) {
+      throw new Error('Expected configured official marketplace source to be seeded')
+    }
     await expect(service.removeSource(seeded.id)).rejects.toThrow('cannot be removed')
     await expect(service.listSources()).resolves.toEqual([seeded])
   })
@@ -281,7 +308,8 @@ describe('PluginMarketplaceService', () => {
     const service = new PluginMarketplaceService({
       pluginsDataDir: await tempRoot(),
       store,
-      fetcher: async () => fetched(officialMarketplace)
+      fetcher: async () => fetched(officialMarketplace),
+      officialSource: OFFICIAL_MARKETPLACE_GIT_SOURCE
     })
 
     await expect(service.seedOfficialSource()).rejects.toThrow('temporarily unavailable')
@@ -311,7 +339,8 @@ describe('PluginMarketplaceService', () => {
     const service = new PluginMarketplaceService({
       pluginsDataDir: root,
       store,
-      fetcher: async () => fetched(officialMarketplace)
+      fetcher: async () => fetched(officialMarketplace),
+      officialSource: OFFICIAL_MARKETPLACE_GIT_SOURCE
     })
 
     await expect(service.seedOfficialSource()).rejects.toThrow('source limit')

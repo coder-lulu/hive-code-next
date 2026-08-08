@@ -6012,7 +6012,8 @@
           "31fd7150cf": "Checking for updates...",
           "3394d1f663": "checking",
           "d69a09b672": "Updates are checked automatically on launch.",
-          "7173352632": "idle"
+          "7173352632": "idle",
+          "updatesNotConfigured": "Online updates are not configured. Option/Alt-click to install a local build."
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "Choose apps available from a workspace's Open in menu.",
@@ -14598,7 +14599,11 @@
         "53c4b8e148": "No usable authentication agent answered the privileged install request.",
         "c732bcbf8f": "Checking package...",
         "aa57fa4f80": "Command copied. Run it in a system terminal to install {{value0}}, then quit and reopen Orca.",
-        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point."
+        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point.",
+        "manualTitle": "Manual Install Required",
+        "manualSummary": "Automatic installation is disabled for Linux system packages because the privileged installer cannot preserve the verified file identity.",
+        "manualExplainer": "Copy the inode-pinned command and run it in a POSIX shell. After it finishes, quit and reopen the app to run the new version.",
+        "manualTrustNote": "The copied command opens the package first, verifies SHA-512 through that file descriptor, and installs the same descriptor-backed file."
       },
       "pr-check-counts": {
         "passingChip": "{{value0}} passing",

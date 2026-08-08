@@ -1,8 +1,12 @@
 import { compareAppVersions, isValidAppVersion } from './app-version'
+import { resolveProductUpdateSource } from './product-update-source'
 
 export type ReleaseChannel = 'stable' | 'rc' | 'hourly' | 'adhoc'
 
-export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'rc', 'hourly', 'adhoc']
+// Why: hourly/adhoc are retained as historical version kinds, but their upstream
+// workflows publish to repositories that the product manifest does not
+// configure. They must remain unavailable until dedicated product sources exist.
+export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'rc']
 
 export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = {
   stable: 'Stable',
@@ -11,34 +15,19 @@ export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = 
   adhoc: 'Adhoc'
 }
 
-/** Dev builds live in their own repos so their tags never enter the main
- *  releases atom feed, which only exposes the 10 newest entries — 24 hourly
- *  tags a day would evict every stable/RC entry and strand real users. */
-export const HOURLY_RELEASE_REPO = 'stablyai/orca-hourly'
-export const ADHOC_RELEASE_REPO = 'stablyai/orca-adhoc'
-export const MAIN_RELEASE_REPO = 'stablyai/orca'
-
 export const HOURLY_PRERELEASE_IDENTIFIER = 'hourly'
 export const ADHOC_PRERELEASE_IDENTIFIER = 'adhoc'
 
-/** The dev channels, each published to its own repo rather than the main one. */
+/** Historical dev channels whose upstream workflows publish outside the main repo. */
 const DEDICATED_REPO_CHANNELS = ['hourly', 'adhoc'] as const
 
 export type DedicatedRepoChannel = (typeof DEDICATED_REPO_CHANNELS)[number]
-
-const CHANNEL_RELEASE_REPOS: Record<ReleaseChannel, string> = {
-  stable: MAIN_RELEASE_REPO,
-  rc: MAIN_RELEASE_REPO,
-  hourly: HOURLY_RELEASE_REPO,
-  adhoc: ADHOC_RELEASE_REPO
-}
 
 export function isReleaseChannel(value: unknown): value is ReleaseChannel {
   return typeof value === 'string' && RELEASE_CHANNELS.includes(value as ReleaseChannel)
 }
 
-/** True for channels published outside the main repo. The updater reports these
- *  as a distinct source so a pinned dev build is never mistaken for a release. */
+/** Historical source classification only; this does not mean the channel is configured. */
 export function hasDedicatedReleaseRepo(channel: ReleaseChannel): channel is DedicatedRepoChannel {
   return (DEDICATED_REPO_CHANNELS as readonly ReleaseChannel[]).includes(channel)
 }
@@ -47,21 +36,22 @@ export function hasDedicatedReleaseRepo(channel: ReleaseChannel): channel is Ded
  * Shared so the picker, the main-process check, and any future surface cannot
  * drift on where a channel is available.
  *
- * Why this rides on the dev-channel list: both dev channels are produced only by
- * macOS workflows, so neither has an artifact to offer elsewhere. If one ever
- * gains a Windows or Linux job, split the two concepts apart — they coincide
- * today, but "published to its own repo" and "built for macOS only" are not the
- * same claim.
+ * The platform parameter remains part of the boundary for future product
+ * manifests. Today every configured channel is cross-platform, while unconfigured
+ * dev channels fail closed before platform-specific logic can make them visible.
  */
 export function isChannelSupportedOnPlatform(
   channel: ReleaseChannel,
-  platform: NodeJS.Platform
+  _platform: NodeJS.Platform
 ): boolean {
-  return !hasDedicatedReleaseRepo(channel) || platform === 'darwin'
+  return isReleaseChannel(channel)
 }
 
-export function getReleaseRepoForChannel(channel: ReleaseChannel): string {
-  return CHANNEL_RELEASE_REPOS[channel]
+export function getReleaseRepoForChannel(channel: ReleaseChannel): string | null {
+  if (!isReleaseChannel(channel)) {
+    return null
+  }
+  return resolveProductUpdateSource()?.github?.repo ?? null
 }
 
 export function normalizeTagToVersion(tag: string): string {
@@ -163,9 +153,12 @@ export function getVersionChannel(version: string): ReleaseChannel | null {
  * A null version falls back to the plain releases listing (not /releases/latest
  * — /latest also breaks when GitHub's API is degraded).
  */
-export function getReleaseNotesUrlForVersion(version: string | null): string {
+export function getReleaseNotesUrlForVersion(version: string | null): string | null {
   const channel = version ? getVersionChannel(version) : null
-  const repo = channel ? getReleaseRepoForChannel(channel) : MAIN_RELEASE_REPO
+  const repo = getReleaseRepoForChannel(channel ?? 'stable')
+  if (!repo) {
+    return null
+  }
   return version
     ? `https://github.com/${repo}/releases/tag/v${normalizeTagToVersion(version)}`
     : `https://github.com/${repo}/releases`

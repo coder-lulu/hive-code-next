@@ -11,6 +11,7 @@ import type {
   WorktreeStartupLaunch
 } from '../../shared/types'
 import { RELEASE_CHANNELS, type ReleaseChannel } from '../../shared/release-channel'
+import { hasConfiguredProductUpdateChannel } from '../../shared/product-update-policy'
 import {
   acknowledgePendingTccPromptNotice,
   consumePendingTccPromptNotice,
@@ -43,6 +44,7 @@ import {
   dismissAvailableUpdate,
   dismissNudge,
   listAvailableReleaseBuilds,
+  reportReleaseUpdatesDisabled,
   type UpdateInstallMode
 } from '../updater'
 import { isTrustedUIRenderer } from '../ipc/ui'
@@ -70,10 +72,11 @@ import { logStartupMilestone } from '../startup/startup-diagnostics'
 const UPDATER_SETUP_FALLBACK_MS = 15_000
 
 // Why: a manual check can arrive before deferred setup runs, so entry points force this pending setup to configure the updater first.
-let pendingAutoUpdaterSetup: (() => void) | null = null
+type UpdaterSetupMode = 'local' | 'release'
+let pendingAutoUpdaterSetup: ((mode?: UpdaterSetupMode) => void) | null = null
 
-export function ensureAutoUpdaterConfigured(): void {
-  pendingAutoUpdaterSetup?.()
+export function ensureAutoUpdaterConfigured(options?: { localOnly?: boolean }): void {
+  pendingAutoUpdaterSetup?.(options?.localOnly ? 'local' : 'release')
 }
 
 let appReloadHandlerTokenCounter = 0
@@ -152,12 +155,16 @@ export function attachMainWindowServices(
   registerFileDropRelay(mainWindow)
   registerTccPromptNoticeHandlers(mainWindow)
   // Why: setupAutoUpdater sync-require()s electron-updater (slow on cold Windows w/ Defender, #7225), so defer past first paint; timer fallback covers crash-looping renderers.
-  let updaterSetupDone = false
-  const setupAutoUpdaterDeferred = (): void => {
-    if (updaterSetupDone || mainWindow.isDestroyed()) {
+  let updaterSetupMode: UpdaterSetupMode | null = null
+  const setupAutoUpdaterDeferred = (requestedMode: UpdaterSetupMode = 'release'): void => {
+    if (
+      mainWindow.isDestroyed() ||
+      updaterSetupMode === 'release' ||
+      updaterSetupMode === requestedMode
+    ) {
       return
     }
-    updaterSetupDone = true
+    updaterSetupMode = requestedMode
     setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => store.getUI().lastUpdateCheckAt,
       onBeforeQuit: async () => {
@@ -184,14 +191,17 @@ export function attachMainWindowServices(
         store.updateUI({ dismissedUpdateNudgeId: id })
       },
       getReleaseChannelOverride: () => store.getUI().releaseChannelOverride ?? null,
-      installMode: options?.updateInstallMode
+      installMode: options?.updateInstallMode,
+      localOnly: requestedMode === 'local'
     })
     logStartupMilestone('updater-setup-done')
   }
   pendingAutoUpdaterSetup = setupAutoUpdaterDeferred
-  mainWindow.once('ready-to-show', () => setImmediate(setupAutoUpdaterDeferred))
-  const updaterSetupFallback = setTimeout(setupAutoUpdaterDeferred, UPDATER_SETUP_FALLBACK_MS)
-  updaterSetupFallback.unref?.()
+  if (hasConfiguredProductUpdateChannel()) {
+    mainWindow.once('ready-to-show', () => setImmediate(setupAutoUpdaterDeferred))
+    const updaterSetupFallback = setTimeout(setupAutoUpdaterDeferred, UPDATER_SETUP_FALLBACK_MS)
+    updaterSetupFallback.unref?.()
+  }
   registerRuntimeWindowLifecycle(mainWindow, runtime)
 
   const allowedPermissions = new Set(['media', 'fullscreen', 'pointerLock'])
@@ -539,29 +549,60 @@ export function registerUpdaterHandlers(_store: Store): void {
   ipcMain.removeHandler('updater:showLinuxPackage')
   ipcMain.removeHandler('updater:listBuilds')
 
-  ipcMain.handle('updater:getStatus', () => getUpdateStatus())
-  ipcMain.handle('updater:getVersion', () => app.getVersion())
-  ipcMain.handle('updater:check', (_event, options?: UpdateCheckOptions) => {
-    ensureAutoUpdaterConfigured()
+  ipcMain.handle('updater:getStatus', (event) => {
+    assertTrustedUpdaterSender(event)
+    return getUpdateStatus()
+  })
+  ipcMain.handle('updater:getVersion', (event) => {
+    assertTrustedUpdaterSender(event)
+    return app.getVersion()
+  })
+  ipcMain.handle('updater:check', (event, options?: UpdateCheckOptions) => {
+    assertTrustedUpdaterSender(event)
+    if (!options?.localBuild && !hasConfiguredProductUpdateChannel()) {
+      reportReleaseUpdatesDisabled()
+      return
+    }
+    ensureAutoUpdaterConfigured({ localOnly: options?.localBuild === true })
     return checkForUpdatesFromMenu(options)
   })
-  ipcMain.handle('updater:download', () => downloadUpdate())
-  ipcMain.handle('updater:quitAndInstall', () => quitAndInstall())
-  ipcMain.handle('updater:dismissNudge', () => dismissNudge())
-  ipcMain.handle('updater:dismissAvailableUpdate', () => dismissAvailableUpdate())
+  ipcMain.handle('updater:download', (event) => {
+    assertTrustedUpdaterSender(event)
+    return downloadUpdate()
+  })
+  ipcMain.handle('updater:quitAndInstall', (event) => {
+    assertTrustedUpdaterSender(event)
+    return quitAndInstall()
+  })
+  ipcMain.handle('updater:dismissNudge', (event) => {
+    assertTrustedUpdaterSender(event)
+    return dismissNudge()
+  })
+  ipcMain.handle('updater:dismissAvailableUpdate', (event) => {
+    assertTrustedUpdaterSender(event)
+    return dismissAvailableUpdate()
+  })
   // Why: the response carries a local package path and the reveal touches the native desktop, so
   // neither may be reached from a guest, dashboard popout, stale window, or utility renderer.
   ipcMain.handle('updater:getLinuxPackageInstallInstructions', (event) => {
-    assertTrustedUpdaterRecoverySender(event)
+    assertTrustedUpdaterSender(event)
     return getLinuxPackageInstallInstructions()
   })
   ipcMain.handle('updater:showLinuxPackage', (event) => {
-    assertTrustedUpdaterRecoverySender(event)
+    assertTrustedUpdaterSender(event)
     return showLinuxPackage()
   })
   ipcMain.handle(
     'updater:listBuilds',
-    async (_event, channel: ReleaseChannel): Promise<ReleaseBuildListResult> => {
+    async (event, channel: ReleaseChannel): Promise<ReleaseBuildListResult> => {
+      assertTrustedUpdaterSender(event)
+      if (!hasConfiguredProductUpdateChannel()) {
+        return {
+          ok: false,
+          channel,
+          message: 'HiveCode release updates are not configured for this build.'
+        }
+      }
       if (!RELEASE_CHANNELS.includes(channel)) {
         return { ok: false, channel, message: `Unknown release channel "${channel}".` }
       }
@@ -576,8 +617,8 @@ export function registerUpdaterHandlers(_store: Store): void {
   )
 }
 
-function assertTrustedUpdaterRecoverySender(event: IpcMainInvokeEvent): void {
+function assertTrustedUpdaterSender(event: IpcMainInvokeEvent): void {
   if (!isTrustedUIRenderer(event.sender)) {
-    throw new Error('Unauthorized updater package recovery sender')
+    throw new Error('Unauthorized updater IPC sender')
   }
 }

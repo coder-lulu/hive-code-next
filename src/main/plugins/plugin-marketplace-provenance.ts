@@ -1,6 +1,6 @@
 import {
   OFFICIAL_MARKETPLACE_OWNER,
-  isOfficialMarketplaceGitSource,
+  isConfiguredMarketplaceGitSource,
   isOfficialOrganizationGitSource,
   isReservedPluginIdentity
 } from '../../shared/plugins/plugin-marketplace'
@@ -9,10 +9,11 @@ import type { PluginMarketplaceRegisteredSource } from './plugin-marketplace-sto
 
 export function validateMarketplaceProvenance(
   source: PluginMarketplaceRegisteredSource,
-  fetched: PluginMarketplaceFetchResult
+  fetched: PluginMarketplaceFetchResult,
+  configuredOfficialUrl: string | null
 ): void {
   if (
-    isOfficialMarketplaceGitSource(source.source.url) &&
+    isConfiguredMarketplaceGitSource(source.source.url, configuredOfficialUrl) &&
     fetched.marketplace.owner.toLowerCase() !== OFFICIAL_MARKETPLACE_OWNER
   ) {
     throw new Error('official marketplace metadata has an unexpected owner')

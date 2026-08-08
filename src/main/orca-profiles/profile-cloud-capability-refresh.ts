@@ -1,5 +1,6 @@
 import type { RefreshCurrentOrcaProfileAuthResult } from '../../shared/orca-profiles'
-import { getOrcaCloudAuthConfig, isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
+import { isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
 import { getOrcaProfileAuthStatusFromProfile } from './profile-cloud-auth-status'
 import { refreshOrcaCloudCapabilities } from './profile-cloud-client'
 import { linkOrcaProfileToCloud } from './profile-cloud-index'
@@ -33,7 +34,7 @@ export async function refreshCurrentOrcaProfileAuth(
       profiles: result.list.profiles
     }
   }
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured', auth: auth() }
   }

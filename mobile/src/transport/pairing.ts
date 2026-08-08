@@ -1,4 +1,10 @@
+import { hivecodeProductConfig } from '../generated/product-config'
 import { PairingOfferSchema, type PairingOffer } from './types'
+
+const SUPPORTED_PAIRING_SCHEMES = new Set<string>([
+  hivecodeProductConfig.schemes.primary,
+  ...hivecodeProductConfig.schemes.aliases
+])
 
 // Why: this file mirrors src/shared/pairing.ts (which is covered by CI
 // vitest) but uses atob/btoa because Metro/Hermes don't ship Node's
@@ -22,12 +28,12 @@ export function decodePairingUrl(url: string): PairingOffer | null {
 // accept the same URL shapes.
 export function extractPairingCodeFromUrl(url: string): string | null {
   const trimmed = url.trim()
-  const match = /^orca:\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
-  if (!match) {
+  const match = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
+  if (!match || !SUPPORTED_PAIRING_SCHEMES.has(match[1]?.toLowerCase() ?? '')) {
     return null
   }
-  const host = match[1]?.toLowerCase()
-  const pathname = match[2] ?? ''
+  const host = match[2]?.toLowerCase()
+  const pathname = match[3] ?? ''
   if (host !== 'pair' || (pathname !== '' && pathname !== '/')) {
     return null
   }
@@ -49,7 +55,7 @@ export function extractPairingCodeFromUrl(url: string): string | null {
   return null
 }
 
-// Why: accept either an `orca://pair?...` URL or the bare base64
+// Why: accept either a supported custom-scheme URL or the bare base64
 // string so the paste-pair flow can take whichever the user actually
 // copied from desktop.
 export function parsePairingCode(input: string): PairingOffer | null {
@@ -58,13 +64,18 @@ export function parsePairingCode(input: string): PairingOffer | null {
     return null
   }
   try {
-    if (/^orca:\/\//i.test(trimmed)) {
+    if (hasSupportedPairingScheme(trimmed)) {
       return decodePairingUrl(trimmed)
     }
     return decodePairingBase64(trimmed)
   } catch {
     return null
   }
+}
+
+function hasSupportedPairingScheme(value: string): boolean {
+  const match = /^([a-z][a-z0-9+.-]*):\/\//i.exec(value)
+  return match ? SUPPORTED_PAIRING_SCHEMES.has(match[1]?.toLowerCase() ?? '') : false
 }
 
 function decodePairingBase64(base64url: string): PairingOffer {

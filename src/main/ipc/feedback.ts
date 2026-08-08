@@ -6,6 +6,7 @@ import {
   validateFeedbackImages,
   type FeedbackImageAttachment
 } from './feedback-image-attachments'
+import { getProductExternalServiceEndpoints } from '../product/product-external-service-endpoints'
 
 export type { FeedbackImageAttachment }
 
@@ -14,7 +15,6 @@ export type { FeedbackImageAttachment }
 // endpoint rejects. Electron's net module runs in the main process and is not
 // subject to CORS, so we proxy the submission through IPC. This mirrors the
 // same pattern used by updater-changelog.ts and updater-nudge.ts.
-const FEEDBACK_API_URL = 'https://www.onorca.dev/v1/feedback'
 const FEEDBACK_REQUEST_TIMEOUT_MS = 10_000
 const FEEDBACK_ATTACHMENT_REQUEST_TIMEOUT_MS = 60_000
 const DIAGNOSTIC_BUNDLE_CONTENT_TYPE = 'application/x-ndjson'
@@ -104,11 +104,14 @@ function buildSubmitBody(args: InternalFeedbackSubmitArgs): FeedbackSubmitBody {
 }
 
 async function postFeedback(
-  url: string,
   body: FeedbackSubmitBody,
   timeoutMs = FEEDBACK_REQUEST_TIMEOUT_MS,
   readResponse?: (response: Response) => Promise<void>
 ): Promise<Response> {
+  const url = getProductExternalServiceEndpoints().feedback
+  if (!url) {
+    throw new Error('HiveCode feedback is not configured for this build.')
+  }
   const controller = new AbortController()
   // Why: a silent endpoint must not leave feedback IPC pending forever.
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
@@ -171,7 +174,7 @@ function feedbackRequestBodyInit(body: FeedbackSubmitBody): Pick<RequestInit, 'b
     formData.append(
       'diagnosticBundleFile',
       new Blob([body.diagnosticBundle.content], { type: DIAGNOSTIC_BUNDLE_CONTENT_TYPE }),
-      `orca-diagnostics-${body.diagnosticBundle.bundleSubmissionId}.ndjson`
+      `hivecode-diagnostics-${body.diagnosticBundle.bundleSubmissionId}.ndjson`
     )
   }
   appendFeedbackImagesToFormData(formData, body.images ?? [])
@@ -204,7 +207,7 @@ async function retryFeedbackOnPrimary(
   primaryError?: unknown
 ): Promise<FeedbackSubmitResult> {
   try {
-    const retry = await postFeedback(FEEDBACK_API_URL, body)
+    const retry = await postFeedback(body)
     if (retry.ok) {
       return { ok: true }
     }
@@ -241,7 +244,7 @@ async function submitFeedbackWithoutDiagnosticBundle(
   diagnosticBundleFailure: FeedbackRequestFailure
 ): Promise<FeedbackSubmitResult> {
   try {
-    const response = await postFeedback(FEEDBACK_API_URL, body)
+    const response = await postFeedback(body)
     if (response.ok) {
       return { ok: true, diagnosticBundleFailure }
     }
@@ -258,11 +261,7 @@ async function submitFeedbackWithDiagnosticBundle(
   try {
     // Why: diagnostic bundles can approach 4 MiB and need more upload time than
     // the small JSON report-only path, especially on constrained connections.
-    const response = await postFeedback(
-      FEEDBACK_API_URL,
-      body,
-      FEEDBACK_ATTACHMENT_REQUEST_TIMEOUT_MS
-    )
+    const response = await postFeedback(body, FEEDBACK_ATTACHMENT_REQUEST_TIMEOUT_MS)
     if (response.ok) {
       return { ok: true }
     }
@@ -295,7 +294,6 @@ export async function submitFeedback(
     try {
       let imagesDelivered = true
       const response = await postFeedback(
-        FEEDBACK_API_URL,
         body,
         FEEDBACK_ATTACHMENT_REQUEST_TIMEOUT_MS,
         async (nextResponse) => {
@@ -325,12 +323,12 @@ export async function submitFeedback(
     return submitFeedbackWithDiagnosticBundle(body, bodyWithoutDiagnosticBundle)
   }
   try {
-    const res = await postFeedback(FEEDBACK_API_URL, body)
+    const res = await postFeedback(body)
     if (res.ok) {
       return { ok: true }
     }
-    // Why: api.onorca.dev serves a different product, so transient failures
-    // retry the endpoint that owns feedback and crash delivery.
+    // Why: transient failures retry the configured endpoint that owns feedback
+    // and crash delivery.
     if (res.status >= 500) {
       return retryFeedbackOnPrimary(body, new Error(`status ${res.status}`))
     }

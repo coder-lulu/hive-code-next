@@ -333,7 +333,7 @@ function computeVisibility(input: VisibilityInput): VisibilityResult {
   if (status.state === 'not-available' && !isUserInitiated) {
     return 'hidden'
   }
-  if (status.state === 'idle') {
+  if (status.state === 'idle' || status.state === 'disabled') {
     return 'hidden'
   }
   if (status.state === 'error' && !shouldShowDetailedErrorCard && !isUserInitiated) {
@@ -355,6 +355,17 @@ describe('UpdateCard visibility gates', () => {
     expect(
       computeVisibility({
         status: { state: 'idle' },
+        dismissedVersion: null,
+        cachedVersion: null,
+        hasStartedDownload: false
+      })
+    ).toBe('hidden')
+  })
+
+  it('hides when online updates are not configured', () => {
+    expect(
+      computeVisibility({
+        status: { state: 'disabled', reason: 'not-configured' },
         dismissedVersion: null,
         cachedVersion: null,
         hasStartedDownload: false

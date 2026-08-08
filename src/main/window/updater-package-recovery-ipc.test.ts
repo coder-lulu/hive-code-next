@@ -74,7 +74,7 @@ const RECOVERY_CHANNELS = [
 ] as const
 
 const TRUSTED_ID = 7
-const UNAUTHORIZED = 'Unauthorized updater package recovery sender'
+const UNAUTHORIZED = 'Unauthorized updater IPC sender'
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
 

@@ -1,5 +1,23 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const updateSourceState = vi.hoisted(() => ({
+  value: {
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  } as unknown
+}))
+
+vi.mock('./product-update-source', () => ({
+  resolveProductUpdateSource: () => updateSourceState.value
+}))
 import {
+  RELEASE_CHANNELS,
   formatAdhocVersion,
   formatHourlyVersion,
   getReleaseNotesUrlForVersion,
@@ -19,6 +37,27 @@ import {
 import { compareAppVersions } from './app-version'
 
 describe('release channel', () => {
+  beforeEach(() => {
+    updateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+      github: {
+        repo: 'stablyai/orca',
+        atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+        releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+      }
+    }
+  })
+
+  it('returns no repository or release-notes URL when product updates are disabled', () => {
+    updateSourceState.value = null
+
+    expect(getReleaseRepoForChannel('stable')).toBeNull()
+    expect(getReleaseNotesUrlForVersion('1.4.160')).toBeNull()
+    expect(getReleaseNotesUrlForVersion(null)).toBeNull()
+  })
+
   it('classifies versions by channel', () => {
     expect(getVersionChannel('1.4.160')).toBe('stable')
     expect(getVersionChannel('v1.4.160')).toBe('stable')
@@ -28,14 +67,12 @@ describe('release channel', () => {
     expect(getVersionChannel('not-a-version')).toBeNull()
   })
 
-  // Why: hourly tags must never resolve to the main repo — the releases atom feed
-  // exposes only 10 entries, so 24 hourly tags a day would evict every stable/RC
-  // entry and leave real users with nothing to update to.
-  it('keeps dev builds out of the main release repo, and apart from each other', () => {
-    expect(getReleaseRepoForChannel('hourly')).toBe('stablyai/orca-hourly')
-    // Why adhoc gets a third repo rather than sharing hourly's: an unlanded
-    // branch build must never surface to someone who only meant to ride main.
-    expect(getReleaseRepoForChannel('adhoc')).toBe('stablyai/orca-adhoc')
+  // Why: the product manifest currently approves only the main release repository.
+  // Dev-channel workflows publish elsewhere, so mapping them to the main repo would
+  // expose a selectable channel that cannot actually be produced by this product.
+  it('fails closed for channels without a configured product repository', () => {
+    expect(getReleaseRepoForChannel('hourly')).toBeNull()
+    expect(getReleaseRepoForChannel('adhoc')).toBeNull()
     expect(getReleaseRepoForChannel('stable')).toBe('stablyai/orca')
     expect(getReleaseRepoForChannel('rc')).toBe('stablyai/orca')
   })
@@ -47,21 +84,15 @@ describe('release channel', () => {
     expect(hasDedicatedReleaseRepo('rc')).toBe(false)
   })
 
-  // Why: an hourly tag linked against the main repo 404s — the tag only exists
-  // in the hourly repo.
-  it('builds release-notes links against the repo that published the version', () => {
-    expect(getReleaseNotesUrlForVersion('1.4.160-hourly.202607281400')).toBe(
-      'https://github.com/stablyai/orca-hourly/releases/tag/v1.4.160-hourly.202607281400'
-    )
+  it('builds release-notes links only against the configured product repo', () => {
+    expect(getReleaseNotesUrlForVersion('1.4.160-hourly.202607281400')).toBeNull()
     expect(getReleaseNotesUrlForVersion('1.4.160')).toBe(
       'https://github.com/stablyai/orca/releases/tag/v1.4.160'
     )
     expect(getReleaseNotesUrlForVersion('v1.4.160-rc.3')).toBe(
       'https://github.com/stablyai/orca/releases/tag/v1.4.160-rc.3'
     )
-    expect(getReleaseNotesUrlForVersion('1.4.160-adhoc.20260728140533')).toBe(
-      'https://github.com/stablyai/orca-adhoc/releases/tag/v1.4.160-adhoc.20260728140533'
-    )
+    expect(getReleaseNotesUrlForVersion('1.4.160-adhoc.20260728140533')).toBeNull()
     expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/stablyai/orca/releases')
   })
 
@@ -132,12 +163,11 @@ describe('release channel', () => {
     expect(parseDevBuildStamp('1.4.160')).toBeNull()
   })
 
-  // Why: both dev workflows are macOS-only, so the channels have no artifact to
-  // offer elsewhere. Both the picker and the main-process check read this, so a
-  // regression here would silently re-expose an uninstallable channel.
-  it('offers the dev channels only on macOS', () => {
+  // Why: the retained upstream workflows do not run in the product repository and
+  // their dedicated repositories are not represented by the product manifest.
+  it('does not offer unconfigured dev channels on any platform', () => {
     for (const channel of ['hourly', 'adhoc'] as const) {
-      expect(isChannelSupportedOnPlatform(channel, 'darwin')).toBe(true)
+      expect(isChannelSupportedOnPlatform(channel, 'darwin')).toBe(false)
       expect(isChannelSupportedOnPlatform(channel, 'linux')).toBe(false)
       expect(isChannelSupportedOnPlatform(channel, 'win32')).toBe(false)
     }
@@ -150,9 +180,10 @@ describe('release channel', () => {
     }
   })
 
-  it('accepts only known channels', () => {
-    expect(isReleaseChannel('hourly')).toBe(true)
-    expect(isReleaseChannel('adhoc')).toBe(true)
+  it('accepts only configured product channels at runtime', () => {
+    expect(RELEASE_CHANNELS).toEqual(['stable', 'rc'])
+    expect(isReleaseChannel('hourly')).toBe(false)
+    expect(isReleaseChannel('adhoc')).toBe(false)
     expect(isReleaseChannel('stable')).toBe(true)
     expect(isReleaseChannel('nightly')).toBe(false)
     expect(isReleaseChannel(null)).toBe(false)
