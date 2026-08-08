@@ -23,11 +23,11 @@ describe('pairing deep links', () => {
   })
 
   it('extracts the pairing code from a query param', () => {
-    expect(extractPairingCodeFromUrl('orca://pair?code=abc123')).toBe('abc123')
+    expect(extractPairingCodeFromUrl('hivecode://pair?code=abc123')).toBe('abc123')
   })
 
   it('accepts scanner casing and surrounding whitespace', () => {
-    expect(extractPairingCodeFromUrl('  ORCA://PAIR?code=abc123\n')).toBe('abc123')
+    expect(extractPairingCodeFromUrl('  HIVECODE://PAIR?code=abc123\n')).toBe('abc123')
   })
 
   it('rejects lookalike routes', () => {
@@ -59,8 +59,13 @@ describe('pairing deep links', () => {
   it('parses a full pairing URL and a bare copied code', () => {
     const code = encodeOffer()
 
-    expect(parsePairingCode(`orca://pair?code=${code}`)).toEqual(offer)
+    expect(parsePairingCode(`hivecode://pair?code=${code}`)).toEqual(offer)
     expect(parsePairingCode(code)).toEqual(offer)
+  })
+
+  it('accepts legacy orca URLs during the compatibility window', () => {
+    const code = encodeOffer()
+    expect(parsePairingCode(`orca://pair?code=${code}`)).toEqual(offer)
   })
 
   it('preserves a TLS reverse-proxy endpoint with an explicit port and path', () => {

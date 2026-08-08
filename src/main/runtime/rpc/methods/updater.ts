@@ -17,7 +17,8 @@ export const UPDATER_METHODS: RpcMethod[] = [
     name: 'updater.check',
     params: z.object({
       includePrerelease: z.boolean().optional(),
-      includePerfPrerelease: z.boolean().optional()
+      includePerfPrerelease: z.boolean().optional(),
+      localBuild: z.boolean().optional()
     }),
     handler: (params, { runtime }) => checkRemoteServerUpdater(runtime.getRuntimeId(), params)
   }),

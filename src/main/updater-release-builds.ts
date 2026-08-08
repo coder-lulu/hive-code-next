@@ -1,4 +1,4 @@
-import { net } from 'electron'
+import { resolveProductUpdateSource } from '../shared/product-update-source'
 import {
   getReleaseRepoForChannel,
   getVersionChannel,
@@ -7,13 +7,17 @@ import {
   type ReleaseBuild,
   type ReleaseChannel
 } from '../shared/release-channel'
+import { cancelUnreadResponseBody } from './lib/unread-response-body'
 import { isValidVersion } from './updater-fallback'
+import { fetchWithProductUpdaterSession } from './product/product-updater-session'
+import { readResponseTextWithLimit } from './updater-response-body'
 
 const FETCH_TIMEOUT_MS = 8000
 const MAX_LISTED_BUILDS = 100
+const MAX_RELEASE_API_BYTES = 1024 * 1024
 
-function getReleasesApiUrl(repo: string): string {
-  return `https://api.github.com/repos/${repo}/releases?per_page=${MAX_LISTED_BUILDS}`
+function getReleasesApiUrl(releasesApiUrl: string): string {
+  return `${releasesApiUrl}?per_page=${MAX_LISTED_BUILDS}`
 }
 
 export function getReleaseDownloadUrlForRepo(repo: string, tag: string): string {
@@ -25,7 +29,6 @@ type GitHubReleaseEntry = {
   name?: unknown
   draft?: unknown
   published_at?: unknown
-  html_url?: unknown
 }
 
 function parseReleaseEntry(entry: GitHubReleaseEntry, repo: string): ReleaseBuild | null {
@@ -48,10 +51,7 @@ function parseReleaseEntry(entry: GitHubReleaseEntry, repo: string): ReleaseBuil
     channel,
     name: name && name !== tag ? name : null,
     publishedAt: typeof entry.published_at === 'string' ? entry.published_at : null,
-    releaseUrl:
-      typeof entry.html_url === 'string'
-        ? entry.html_url
-        : `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}`
+    releaseUrl: `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}`
   }
 }
 
@@ -65,12 +65,18 @@ function parseReleaseEntry(entry: GitHubReleaseEntry, repo: string): ReleaseBuil
  * unauthenticated rate limit never touches background checks.
  */
 export async function listReleaseBuilds(channel: ReleaseChannel): Promise<ReleaseBuild[]> {
+  const github = resolveProductUpdateSource()?.github
   const repo = getReleaseRepoForChannel(channel)
-  const res = await net.fetch(getReleasesApiUrl(repo), {
+  if (!github || !repo || github.repo !== repo) {
+    return []
+  }
+  const res = await fetchWithProductUpdaterSession(getReleasesApiUrl(github.releasesApiUrl), {
     headers: { Accept: 'application/vnd.github+json' },
+    redirect: 'error',
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
   })
   if (!res.ok) {
+    await cancelUnreadResponseBody(res)
     if (res.status === 404) {
       throw new Error(`No releases repository found at ${repo}.`)
     }
@@ -79,7 +85,16 @@ export async function listReleaseBuilds(channel: ReleaseChannel): Promise<Releas
     }
     throw new Error(`Could not list ${channel} builds (HTTP ${res.status}).`)
   }
-  const payload: unknown = await res.json()
+  const body = await readResponseTextWithLimit(res, MAX_RELEASE_API_BYTES)
+  if (body === null) {
+    throw new Error(`The ${channel} release list is too large.`)
+  }
+  let payload: unknown
+  try {
+    payload = JSON.parse(body)
+  } catch {
+    throw new Error(`Could not read the ${channel} release list.`)
+  }
   if (!Array.isArray(payload)) {
     throw new Error(`Could not read the ${channel} release list.`)
   }
@@ -103,6 +118,18 @@ export function resolveTargetBuild(channel: ReleaseChannel, tag: string): Resolv
   if (!isValidVersion(version)) {
     throw new Error(`"${tag}" is not a valid release tag.`)
   }
+  const targetChannel = getVersionChannel(version)
+  if (targetChannel !== channel) {
+    throw new Error(`"${tag}" does not belong to the ${channel} channel.`)
+  }
+  const github = resolveProductUpdateSource()?.github
   const repo = getReleaseRepoForChannel(channel)
-  return { tag, version, feedUrl: getReleaseDownloadUrlForRepo(repo, tag) }
+  if (!github || !repo || github.repo !== repo) {
+    throw new Error(`The ${channel} product release repository is not configured.`)
+  }
+  return {
+    tag,
+    version,
+    feedUrl: `${github.releasesDownloadBase}/${encodeURIComponent(tag)}`
+  }
 }

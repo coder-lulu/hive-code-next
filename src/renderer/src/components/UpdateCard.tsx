@@ -334,7 +334,7 @@ export function UpdateCard() {
                 'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
               ),
               detail: compatibilitySetupError ?? status.message,
-              releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+              releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
               primaryAction: {
                 label: translate('auto.components.UpdateCard.933c6fdf5b', 'Enable & Restart'),
                 pendingLabel: 'Restarting...',
@@ -356,7 +356,7 @@ export function UpdateCard() {
                 ),
                 detail: status.message,
                 // Why: linking the rejected version would let users bypass the publisher check by re-running it.
-                releaseUrl: getReleaseNotesUrlForVersion(null),
+                releaseUrl: getReleaseNotesUrlForVersion(null) ?? undefined,
                 manualLabel: translate(
                   'auto.components.UpdateCard.c9ff9b9ec2',
                   'Check official releases'
@@ -373,7 +373,7 @@ export function UpdateCard() {
                     "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases."
                   ),
                   detail: status.message,
-                  releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+                  releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
                   primaryAction: {
                     label: translate('auto.components.UpdateCard.48565a32bc', 'Retry Download'),
                     onClick: handleUpdate
@@ -386,7 +386,7 @@ export function UpdateCard() {
                     ? 'Could not complete the update.'
                     : 'Could not check for updates.',
                   detail: status.message,
-                  releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+                  releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
                   // Why: check-time failures are often transient, so offer a Re-check instead of forcing manual download.
                   primaryAction: cachedVersion
                     ? {
@@ -405,7 +405,7 @@ export function UpdateCard() {
             title: translate('auto.components.UpdateCard.4cf109845a', 'Update Error'),
             summary: 'Could not restart to install the update.',
             detail: installError,
-            releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+            releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
             primaryAction: {
               label: translate('auto.components.UpdateCard.2c2d3e03ca', 'Try Again'),
               onClick: handleInstallRetry
@@ -515,7 +515,9 @@ export function UpdateCard() {
         <LinuxPackageInstallRecoveryCard
           recovery={linuxPackageRecovery.recovery}
           diagnostic={linuxPackageRecovery.diagnostic}
-          releaseUrl={isLocalBuild ? undefined : getReleaseNotesUrlForVersion(cachedVersion)}
+          releaseUrl={
+            isLocalBuild ? undefined : (getReleaseNotesUrlForVersion(cachedVersion) ?? undefined)
+          }
           onClose={handleCollapseWithAnimation}
         />
       )
@@ -575,7 +577,8 @@ export function UpdateCard() {
     const releaseUrl = isLocalBuild
       ? undefined
       : (('releaseUrl' in status ? status.releaseUrl : undefined) ??
-        getReleaseNotesUrlForVersion(status.version))
+          getReleaseNotesUrlForVersion(status.version)) ||
+        undefined
 
     if (isRichMode && changelog) {
       return (
@@ -833,6 +836,7 @@ function DownloadingContent({
   showReleaseNotes: boolean
 }) {
   const release = changelog?.release
+  const releaseNotesUrl = release?.releaseNotesUrl ?? getReleaseNotesUrlForVersion(version)
   const showMedia =
     release?.mediaUrl && !mediaFailed && !(prefersReducedMotion && isAnimatedGif(release.mediaUrl))
 
@@ -886,14 +890,10 @@ function DownloadingContent({
             })}
       </p>
 
-      {showReleaseNotes && (
+      {showReleaseNotes && releaseNotesUrl && (
         <button
           className="text-xs text-muted-foreground underline hover:text-foreground self-start"
-          onClick={() =>
-            void window.api.shell.openUrl(
-              release ? release.releaseNotesUrl : getReleaseNotesUrlForVersion(version)
-            )
-          }
+          onClick={() => void window.api.shell.openUrl(releaseNotesUrl)}
         >
           {release
             ? translate('auto.components.UpdateCard.aad383aecc', 'Read the full release notes')

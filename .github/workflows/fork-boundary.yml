@@ -1,0 +1,140 @@
+name: Fork Boundary
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - '.github/CODEOWNERS'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'config/**'
+      - 'mobile/package.json'
+      - 'config/hivecode-brand-allowlist.json'
+      - 'config/product/**'
+      - 'config/scripts/audit-fork-delta.*'
+      - 'config/scripts/check-hivecode-brand-boundary.*'
+      - 'config/scripts/generate-product-config.*'
+      - 'src/main/runtime/**'
+      - 'src/main/orca-profiles/**'
+      - 'src/main/persistence/**'
+      - 'src/main/product/**'
+      - 'src/relay/**'
+      - 'src/shared/**'
+      - 'mobile/src/transport/**'
+      - 'mobile/src/generated/**'
+      - 'docs/engineering/fork-boundary-policy.md'
+  workflow_dispatch:
+
+concurrency:
+  group: fork-boundary-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_REPOSITORY: stablyai/orca
+
+jobs:
+  boundary:
+    name: verify fork boundary and compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch upstream comparison base
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_url="https://github.com/${UPSTREAM_REPOSITORY}.git"
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url upstream "$upstream_url"
+          else
+            git remote add upstream "$upstream_url"
+          fi
+          git fetch --no-tags upstream main
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Verify product configuration
+        run: pnpm run verify:product-config
+
+      - name: Enforce HiveCode brand boundary
+        run: pnpm run check:brand-boundary
+
+      - name: Generate fork delta evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          node config/scripts/audit-fork-delta.mjs \
+            --base upstream/main \
+            --head HEAD \
+            --output "$RUNNER_TEMP/fork-delta.md" > "$RUNNER_TEMP/fork-delta.stdout"
+          node config/scripts/audit-fork-delta.mjs \
+            --base upstream/main \
+            --head HEAD \
+            --json > "$RUNNER_TEMP/fork-delta.json"
+          node -e '
+            const fs = require("node:fs")
+            const report = JSON.parse(fs.readFileSync(process.env.REPORT, "utf8"))
+            const c = report.counts
+            const lines = [
+              "## Fork boundary evidence",
+              `- Base: \\`${report.baseSha}\\``,
+              `- Head: \\`${report.headSha}\\``,
+              `- Behind / ahead: \\`${c.behind} / ${c.ahead}\\``,
+              `- Changed files: \\`${report.changedFiles.length}\\``,
+              `- Upstream-core files: \\`${report.upstreamCoreFiles.length}\\``,
+              `- Product overlay files: \\`${report.productOverlayFiles.length}\\``,
+              `- RPC/schema files: \\`${report.rpcSchemaFiles.length}\\``,
+              `- Persistence files: \\`${report.persistenceFiles.length}\\``,
+              `- Blueprint/Pet files: \\`${report.blueprintPetFiles.length}\\``,
+              `- Upstream endpoint matches: \\`${report.upstreamEndpointMatches.length}\\``
+            ]
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\\n")}\\n`)
+          '
+        env:
+          REPORT: ${{ runner.temp }}/fork-delta.json
+
+      - name: Run focused product and boundary tests
+        run: |
+          pnpm exec vitest run --config config/vitest.config.ts \
+            config/scripts/audit-fork-delta.test.mjs \
+            config/scripts/check-hivecode-brand-boundary.test.mjs \
+            config/scripts/generate-product-config.test.mjs \
+            config/scripts/product-identity-integration.test.mjs \
+            config/scripts/product-release-workflow-boundary.test.mjs \
+            config/scripts/packaged-updater-security-boundary.test.mjs \
+            src/shared/orca-cli-command-name.test.ts \
+            src/shared/pairing.test.ts \
+            src/shared/product-update-policy.test.ts \
+            src/shared/product-update-source.test.ts \
+            src/main/orca-profiles/profile-cloud-auth-config.test.ts \
+            src/main/ipc/feedback.test.ts \
+            src/main/startup/hivecode-user-data-migration.test.ts
+
+      - name: Typecheck upstream and product adapters
+        run: pnpm run typecheck
+
+      - name: Upload fork boundary evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fork-boundary-evidence
+          path: |
+            ${{ runner.temp }}/fork-delta.md
+            ${{ runner.temp }}/fork-delta.stdout
+            ${{ runner.temp }}/fork-delta.json
+          if-no-files-found: ignore
+          retention-days: 30

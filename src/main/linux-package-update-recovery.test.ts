@@ -322,7 +322,9 @@ describePosix('resolveLinuxPackageInstallInstructions', () => {
       command: 'installed command',
       packageFileName: 'orca.deb'
     })
-    expect(buildCommandMock).toHaveBeenCalledWith('deb', filePath)
+    expect(buildCommandMock).toHaveBeenCalledWith('deb', filePath, {
+      expectedSha512: SHA512
+    })
   })
 
   it('reports missing without a retained artifact', async () => {

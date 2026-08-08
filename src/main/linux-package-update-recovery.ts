@@ -25,6 +25,9 @@ export type LinuxPackageRecoveryUnavailableReason =
   | 'hash-mismatch'
   | 'no-sudo'
   | 'no-package-manager'
+  | 'no-integrity-checker'
+  | 'no-secure-staging-tools'
+  | 'invalid-package-digest'
   | 'invalid-package-path'
   | 'read-failed'
 
@@ -291,7 +294,9 @@ export async function resolveLinuxPackageInstallInstructions(
     return validation
   }
   const { artifact } = validation
-  const command = buildLinuxPackageInstallCommand(artifact.packageType, artifact.path)
+  const command = buildLinuxPackageInstallCommand(artifact.packageType, artifact.path, {
+    expectedSha512: artifact.sha512
+  })
   if (!command.ok) {
     return command
   }

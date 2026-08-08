@@ -1,7 +1,6 @@
 import {
   OFFICIAL_MARKETPLACE_OWNER,
-  OFFICIAL_MARKETPLACE_GIT_SOURCE,
-  isOfficialMarketplaceGitSource,
+  isConfiguredMarketplaceGitSource,
   isOfficialOrganizationGitSource,
   isOfficialPluginIdentity,
   isMarketplaceListingSupported,
@@ -26,6 +25,7 @@ import type {
   PluginMarketplaceListing,
   PluginMarketplaceSourceState
 } from './plugin-marketplace-projection'
+import { projectMarketplaceSourceState } from './plugin-marketplace-projection'
 export type {
   PluginMarketplaceListing,
   PluginMarketplaceSourceState
@@ -39,9 +39,10 @@ export class PluginMarketplaceService {
   private readonly store: PluginMarketplaceStore
   private readonly fetcher: MarketplaceFetcher
   private readonly getKillListEntry: (pluginKey: string) => PluginKillListEntry | null
+  private readonly officialSource: PluginMarketplaceGitSource | null
   private readonly refreshChains = new Map<string, Promise<PluginMarketplaceSourceState>>()
   private readonly sourceErrors = new Map<string, string>()
-  private officialSeedPromise: Promise<PluginMarketplaceSourceState> | null = null
+  private officialSeedPromise: Promise<PluginMarketplaceSourceState | null> | null = null
   private officialSeedRequested = false
 
   constructor(options: {
@@ -49,10 +50,14 @@ export class PluginMarketplaceService {
     fetcher?: MarketplaceFetcher
     store?: PluginMarketplaceStore
     getKillListEntry?: (pluginKey: string) => PluginKillListEntry | null
+    officialSource?: PluginMarketplaceGitSource | null
   }) {
     this.store = options.store ?? new PluginMarketplaceStore(options.pluginsDataDir)
     this.fetcher = options.fetcher ?? fetchPluginMarketplace
     this.getKillListEntry = options.getKillListEntry ?? (() => null)
+    this.officialSource = options.officialSource
+      ? pluginMarketplaceGitSourceSchema.parse(options.officialSource)
+      : null
   }
 
   async listSources(): Promise<PluginMarketplaceSourceState[]> {
@@ -100,8 +105,10 @@ export class PluginMarketplaceService {
 
   async removeSource(sourceId: string): Promise<boolean> {
     const source = (await this.store.listSources()).find((candidate) => candidate.id === sourceId)
-    if (source && isOfficialMarketplaceGitSource(source.source.url)) {
-      throw new Error('the official marketplace is managed by Orca and cannot be removed')
+    if (source && this.isOfficialSource(source.source)) {
+      throw new Error(
+        'the official marketplace is managed by product configuration and cannot be removed'
+      )
     }
     const removed = await this.store.removeSource(sourceId)
     if (removed) {
@@ -115,7 +122,10 @@ export class PluginMarketplaceService {
     return removed
   }
 
-  seedOfficialSource(): Promise<PluginMarketplaceSourceState> {
+  seedOfficialSource(): Promise<PluginMarketplaceSourceState | null> {
+    if (!this.officialSource) {
+      return Promise.resolve(null)
+    }
     this.officialSeedRequested = true
     if (!this.officialSeedPromise) {
       const seed = this.performOfficialSeed()
@@ -210,10 +220,13 @@ export class PluginMarketplaceService {
   }
 
   private async performOfficialSeed(): Promise<PluginMarketplaceSourceState> {
+    const officialSource = this.officialSource
+    if (!officialSource) {
+      throw new Error('the official marketplace is disabled by product configuration')
+    }
     const sources = await this.store.listSources()
-    const existing = sources.find((source) => isOfficialMarketplaceGitSource(source.source.url))
-    const source =
-      existing ?? (await this.store.addSource(OFFICIAL_MARKETPLACE_GIT_SOURCE, Date.now()))
+    const existing = sources.find((source) => this.isOfficialSource(source.source))
+    const source = existing ?? (await this.store.addSource(officialSource, Date.now()))
     const snapshot = await this.store.readSnapshot(source.id).catch(() => null)
     if (snapshot) {
       return this.stateFromSnapshot(source, snapshot, false)
@@ -237,7 +250,7 @@ export class PluginMarketplaceService {
     source: PluginMarketplaceRegisteredSource
   ): Promise<PluginMarketplaceFetchResult> {
     const fetched = await this.fetcher(source)
-    validateMarketplaceProvenance(source, fetched)
+    validateMarketplaceProvenance(source, fetched, this.officialSource?.url ?? null)
     return fetched
   }
 
@@ -267,7 +280,7 @@ export class PluginMarketplaceService {
     entry: PluginMarketplaceEntry
   ): PluginMarketplaceListing {
     const official =
-      isOfficialMarketplaceGitSource(source.source.url) &&
+      this.isOfficialSource(source.source) &&
       snapshot.marketplace.owner.toLowerCase() === OFFICIAL_MARKETPLACE_OWNER &&
       isOfficialPluginIdentity(entry.id) &&
       isOfficialOrganizationGitSource(entry.source.url)
@@ -300,21 +313,20 @@ export class PluginMarketplaceService {
     stale: boolean,
     error?: string
   ): PluginMarketplaceSourceState {
-    return {
-      id: source.id,
-      source: source.source,
-      addedAt: source.addedAt,
-      marketplace: snapshot
-        ? {
-            name: snapshot.marketplace.name,
-            owner: snapshot.marketplace.owner,
-            resolvedCommit: snapshot.marketplaceCommit,
-            fetchedAt: snapshot.fetchedAt
-          }
-        : null,
+    return projectMarketplaceSourceState(
+      source,
+      snapshot,
       stale,
-      official: isOfficialMarketplaceGitSource(source.source.url),
-      ...(error ? { error } : {})
-    }
+      this.isOfficialSource(source.source),
+      error
+    )
+  }
+
+  private isOfficialSource(source: PluginMarketplaceGitSource): boolean {
+    return (
+      this.officialSource !== null &&
+      source.ref === this.officialSource.ref &&
+      isConfiguredMarketplaceGitSource(source.url, this.officialSource.url)
+    )
   }
 }

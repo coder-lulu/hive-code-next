@@ -6,7 +6,23 @@ const { netFetchMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  net: { fetch: netFetchMock }
+  net: { fetch: netFetchMock },
+  session: {
+    fromPartition: vi.fn(() => ({ fetch: netFetchMock }))
+  }
+}))
+
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  })
 }))
 
 function buildAtomFeed(tags: string[]): string {
@@ -122,7 +138,8 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
 
     await expect(fetchNewerReleaseTagsWithReadiness('1.4.26', 1)).resolves.toEqual({
       tags: [],
-      state: 'no-newer'
+      state: 'no-newer',
+      currentTag: 'v1.4.26'
     })
 
     netFetchMock.mockResolvedValue({ ok: false, text: () => Promise.resolve('') })
@@ -253,6 +270,46 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
     })
   })
 
+  it('rejects an oversized manifest asset list before launching HEAD requests', async () => {
+    let headRequests = 0
+    netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(buildAtomFeed(['v1.4.28']))
+        })
+      }
+      if (isPlatformManifestRequest(url)) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              [
+                'version: 1.4.28',
+                'files:',
+                ...Array.from({ length: 17 }, (_, index) => [
+                  `  - url: asset-${index}.zip`,
+                  '    sha512: test'
+                ]).flat()
+              ].join('\n')
+            )
+        })
+      }
+      if (init?.method === 'HEAD') {
+        headRequests += 1
+        return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('') })
+      }
+      return Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('') })
+    })
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.4.26')).resolves.toBeNull()
+    expect(headRequests).toBe(0)
+  })
+
   it('treats an explicit asset 404 as not-ready when another asset is unavailable', async () => {
     netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
       if (url === 'https://github.com/stablyai/orca/releases.atom') {
@@ -298,7 +355,18 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
     })
   })
 
-  it('accepts absolute manifest asset URLs without rewriting them to release asset paths', async () => {
+  it.each([
+    'https://downloads.example.com/Orca-1.4.27-arm64-mac.zip',
+    'https://github.com/stablyai/orca/releases/download/v1.4.27/../other.zip',
+    '//evil.example.test/payload.zip',
+    '/evil/repo/releases/download/v9/payload.zip',
+    '../other.zip',
+    'nested/payload.zip',
+    'nested\\payload.zip',
+    'payload.zip?token=secret',
+    'payload.zip#fragment',
+    '%2e%2e%2fpayload.zip'
+  ])('rejects a manifest asset outside the configured tag path: %s', async (assetUrl) => {
     const assetUrls: string[] = []
     netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
       if (url === 'https://github.com/stablyai/orca/releases.atom') {
@@ -314,12 +382,7 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
           ok: true,
           text: () =>
             Promise.resolve(
-              [
-                'version: 1.4.27',
-                'files:',
-                '  - url: https://downloads.example.com/Orca-1.4.27-arm64-mac.zip',
-                '    sha512: test'
-              ].join('\n')
+              ['version: 1.4.27', 'files:', `  - url: ${assetUrl}`, '    sha512: test'].join('\n')
             )
         })
       }
@@ -334,8 +397,120 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
 
     const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
 
-    expect(await fetchNewerReleaseTag('1.4.26')).toBe('v1.4.27')
-    expect(assetUrls).toEqual(['https://downloads.example.com/Orca-1.4.27-arm64-mac.zip'])
+    expect(await fetchNewerReleaseTag('1.4.26')).toBeNull()
+    expect(assetUrls).toEqual([])
+  })
+
+  it('does not follow updater manifest redirects outside approved GitHub asset origins', async () => {
+    let manifestRedirect: RequestRedirect | undefined
+    const unexpectedUrls: string[] = []
+    netFetchMock.mockImplementation((url: string, init?: { redirect?: RequestRedirect }) => {
+      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(buildAtomFeed(['v1.4.27']))
+        })
+      }
+      if (isPlatformManifestRequest(url)) {
+        manifestRedirect = init?.redirect
+        return Promise.resolve({
+          ok: false,
+          status: 302,
+          headers: { get: () => 'https://evil.example.test/latest-mac.yml' },
+          text: () => Promise.resolve('')
+        })
+      }
+      unexpectedUrls.push(url)
+      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('') })
+    })
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.4.26')).resolves.toBeNull()
+    expect(manifestRedirect).toBe('manual')
+    expect(unexpectedUrls).toEqual([])
+  })
+
+  it('does not follow release asset redirects outside approved GitHub asset origins', async () => {
+    const unexpectedUrls: string[] = []
+    let assetRedirect: RequestRedirect | undefined
+    netFetchMock.mockImplementation(
+      (url: string, init?: { method?: string; redirect?: RequestRedirect }) => {
+        if (url === 'https://github.com/stablyai/orca/releases.atom') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(buildAtomFeed(['v1.4.27']))
+          })
+        }
+        if (isPlatformManifestRequest(url)) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(buildManifest('v1.4.27'))
+          })
+        }
+        if (init?.method === 'HEAD' && url.includes('/releases/download/v1.4.27/')) {
+          assetRedirect = init.redirect
+          return Promise.resolve({
+            ok: false,
+            status: 302,
+            headers: { get: () => 'https://evil.example.test/payload.zip' },
+            text: () => Promise.resolve('')
+          })
+        }
+        unexpectedUrls.push(url)
+        return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('') })
+      }
+    )
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.4.26')).resolves.toBeNull()
+    expect(assetRedirect).toBe('manual')
+    expect(unexpectedUrls).toEqual([])
+  })
+
+  it('follows an approved GitHub release asset redirect one manual hop', async () => {
+    const approvedAssetUrl =
+      'https://release-assets.githubusercontent.com/github-production-release-asset/123/asset.zip?sig=test'
+    const requestedUrls: string[] = []
+    netFetchMock.mockImplementation(
+      (url: string, init?: { method?: string; redirect?: RequestRedirect }) => {
+        requestedUrls.push(url)
+        if (url === 'https://github.com/stablyai/orca/releases.atom') {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(buildAtomFeed(['v1.4.27']))
+          })
+        }
+        if (isPlatformManifestRequest(url)) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(buildManifest('v1.4.27'))
+          })
+        }
+        if (url === approvedAssetUrl) {
+          return Promise.resolve({ ok: init?.redirect === 'manual', status: 200 })
+        }
+        if (init?.method === 'HEAD' && url.includes('/releases/download/v1.4.27/')) {
+          return Promise.resolve({
+            ok: false,
+            status: 302,
+            headers: { get: () => approvedAssetUrl }
+          })
+        }
+        return Promise.resolve({ ok: false, status: 503 })
+      }
+    )
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.4.26')).resolves.toBe('v1.4.27')
+    expect(requestedUrls).toContain(approvedAssetUrl)
   })
 
   it('treats malformed updater manifests as not ready', async () => {
@@ -409,7 +584,8 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
       fetchNewerReleaseTagsWithReadiness('1.4.26', 1, { includePrerelease: false })
     ).resolves.toEqual({
       tags: [],
-      state: 'no-newer'
+      state: 'no-newer',
+      currentTag: 'v1.4.26'
     })
   })
 

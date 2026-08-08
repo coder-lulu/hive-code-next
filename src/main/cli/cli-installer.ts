@@ -14,9 +14,11 @@ import {
   writeFile
 } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { CliInstallMethod, CliInstallStatus } from '../../shared/cli-install-types'
+import { hivecodeProductConfig } from '../../shared/generated/product-config'
+import { getCompatibilityCliCommandNamesForPlatform } from '../../shared/orca-cli-command-name'
 import { expandWindowsEnvironmentVariables } from '../../shared/windows-environment-expansion'
 import { buildAppImageCliWrapper } from './appimage-cli-wrapper'
 import {
@@ -27,9 +29,8 @@ import {
 } from './windows-user-path-registry'
 
 const execFileAsync = promisify(execFile)
-const DEFAULT_MAC_COMMAND_PATH = '/usr/local/bin/orca'
+const DEFAULT_MAC_COMMAND_PATH = '/usr/local/bin/hivecode'
 const DEV_COMMAND_NAME = 'orca-dev'
-const LINUX_COMMAND_NAME = 'orca-ide'
 const LEGACY_LINUX_COMMAND_NAME = 'orca'
 const DEV_LAUNCHER_DIR = ['cli', 'bin']
 const WINDOWS_PATH_WRITE_TIMEOUT_MS = 5_000
@@ -87,8 +88,7 @@ export class CliInstaller {
       // Why: development builds must not claim the production shell command.
       return DEV_COMMAND_NAME
     }
-    // Why: packaged Linux uses `orca-ide` to avoid shadowing GNOME Orca's /usr/bin/orca.
-    return this.platform === 'linux' ? LINUX_COMMAND_NAME : 'orca'
+    return hivecodeProductConfig.cli.primary
   }
 
   constructor(options: CliInstallerOptions = {}) {
@@ -110,7 +110,7 @@ export class CliInstaller {
     const candidateMacPath = options.defaultMacCommandPath ?? DEFAULT_MAC_COMMAND_PATH
     this.macCommandPath = existsSync(dirname(candidateMacPath))
       ? candidateMacPath
-      : join(this.homePath, '.local', 'bin', 'orca')
+      : join(this.homePath, '.local', 'bin', 'hivecode')
     this.privilegedRunner = options.privilegedRunner ?? runMacPrivilegedCommand
     this.userPathReader = options.userPathReader ?? readWindowsUserPathRegistry
     this.userPathMutationReader =
@@ -169,12 +169,13 @@ export class CliInstaller {
     }
 
     const spec = await this.resolveActiveInstallSpec(defaultSpec, launcherPath)
+    const activeLauncherPath = this.resolveLauncherForCommandPath(spec.commandPath, launcherPath)
     const baseStatus =
       spec.installMethod === 'symlink'
-        ? await this.inspectSymlink(spec.commandPath, launcherPath)
+        ? await this.inspectSymlink(spec.commandPath, activeLauncherPath)
         : this.isLinuxAppImage()
-          ? await this.inspectAppImageWrapper(spec.commandPath, launcherPath)
-          : await this.inspectWindowsWrapper(spec.commandPath, launcherPath)
+          ? await this.inspectAppImageWrapper(spec.commandPath, activeLauncherPath)
+          : await this.inspectWindowsWrapper(spec.commandPath, activeLauncherPath)
     const pathDirectory = dirname(spec.commandPath)
     const pathProbe = await this.probePathConfiguration(pathDirectory)
     return this.withPathInfo(baseStatus, pathDirectory, pathProbe)
@@ -204,6 +205,8 @@ export class CliInstaller {
       await this.installWindowsWrapper(status.commandPath, status.launcherPath)
     }
 
+    await this.installCompatibilityAliases(status)
+
     if (this.platform === 'win32') {
       // Why: Windows shells find commands via user PATH, so the installer owns that entry, not the desktop installer.
       await this.ensureWindowsPathEntry(dirname(status.commandPath))
@@ -218,6 +221,7 @@ export class CliInstaller {
       return status
     }
     if (status.state === 'not_installed') {
+      await this.removeCompatibilityAliases(status)
       await this.removeLegacyLinuxCommandIfManaged(status.launcherPath)
       if (this.platform === 'win32') {
         await this.removeWindowsPathEntry(dirname(status.commandPath))
@@ -241,6 +245,8 @@ export class CliInstaller {
       await unlink(status.commandPath)
       await this.removeWindowsPathEntry(dirname(status.commandPath))
     }
+
+    await this.removeCompatibilityAliases(status)
 
     return this.getStatus()
   }
@@ -350,8 +356,7 @@ export class CliInstaller {
 
     if (this.platform === 'linux') {
       // Why: Linux lacks a privileged global command flow; ~/.local/bin is the least-surprising user-scoped dir.
-      // Why `orca-ide`: GNOME Orca ships /usr/bin/orca, so avoid shadowing that screen reader.
-      return join(this.homePath, '.local', 'bin', LINUX_COMMAND_NAME)
+      return join(this.homePath, '.local', 'bin', 'hivecode')
     }
 
     if (this.platform === 'win32') {
@@ -383,6 +388,22 @@ export class CliInstaller {
       cliEntryPath: join(this.appPathValue, 'out', 'cli', 'index.js'),
       commandName: this.commandName
     })
+  }
+
+  private resolveLauncherForCommandPath(commandPath: string, defaultLauncherPath: string): string {
+    if (!this.isPackaged || this.platform === 'win32' || this.isLinuxAppImage()) {
+      return defaultLauncherPath
+    }
+
+    const commandName = basename(commandPath)
+    const supportedNames = new Set([
+      hivecodeProductConfig.cli.primary,
+      ...getCompatibilityCliCommandNamesForPlatform(this.platform)
+    ])
+    const matchingLauncherPath = join(this.resourcesPath, 'bin', commandName)
+    return supportedNames.has(commandName) && existsSync(matchingLauncherPath)
+      ? matchingLauncherPath
+      : defaultLauncherPath
   }
 
   private async installSymlink(status: CliInstallStatus): Promise<void> {
@@ -450,6 +471,81 @@ export class CliInstaller {
     }
   }
 
+  private resolveCompatibilityAliasSpecs(primaryStatus: CliInstallStatus): InstallSpec[] {
+    if (
+      !this.isPackaged ||
+      this.commandPathOverride ||
+      !primaryStatus.commandPath ||
+      this.platform === 'win32'
+    ) {
+      return []
+    }
+
+    const specs: InstallSpec[] = []
+    for (const alias of getCompatibilityCliCommandNamesForPlatform(this.platform)) {
+      const commandPath = join(dirname(primaryStatus.commandPath as string), alias)
+      if (this.isLinuxAppImage()) {
+        if (this.appImagePath) {
+          specs.push({ commandPath, installMethod: 'wrapper' })
+        }
+        continue
+      }
+
+      const launcherPath = join(this.resourcesPath, 'bin', alias)
+      if (existsSync(launcherPath)) {
+        specs.push({ commandPath, installMethod: 'symlink' })
+      }
+    }
+    return specs
+  }
+
+  private resolveAliasLauncherPath(spec: InstallSpec): string | null {
+    return spec.installMethod === 'wrapper'
+      ? this.appImagePath
+      : join(this.resourcesPath, 'bin', basename(spec.commandPath))
+  }
+
+  private async inspectCompatibilityAlias(
+    spec: InstallSpec,
+    launcherPath: string
+  ): Promise<CliInstallStatus> {
+    return spec.installMethod === 'wrapper'
+      ? this.inspectAppImageWrapper(spec.commandPath, launcherPath)
+      : this.inspectSymlink(spec.commandPath, launcherPath)
+  }
+
+  private async installCompatibilityAliases(primaryStatus: CliInstallStatus): Promise<void> {
+    for (const spec of this.resolveCompatibilityAliasSpecs(primaryStatus)) {
+      const launcherPath = this.resolveAliasLauncherPath(spec)
+      if (!launcherPath) {
+        continue
+      }
+      const aliasStatus = await this.inspectCompatibilityAlias(spec, launcherPath)
+      if (aliasStatus.state === 'conflict' || aliasStatus.state === 'installed') {
+        continue
+      }
+      await (spec.installMethod === 'wrapper'
+        ? this.installAppImageWrapper(spec.commandPath, launcherPath)
+        : this.installSymlink(aliasStatus))
+    }
+  }
+
+  private async removeCompatibilityAliases(primaryStatus: CliInstallStatus): Promise<void> {
+    for (const spec of this.resolveCompatibilityAliasSpecs(primaryStatus)) {
+      const launcherPath = this.resolveAliasLauncherPath(spec)
+      if (!launcherPath) {
+        continue
+      }
+      const aliasStatus = await this.inspectCompatibilityAlias(spec, launcherPath)
+      if (aliasStatus.state !== 'installed') {
+        continue
+      }
+      await (spec.installMethod === 'wrapper'
+        ? unlink(spec.commandPath)
+        : this.removeSymlink(spec.commandPath))
+    }
+  }
+
   private isManagedLegacyLinuxTarget(resolvedTarget: string, launcherPath: string): boolean {
     const legacyLauncherPath = resolve(dirname(launcherPath), LEGACY_LINUX_COMMAND_NAME)
     if (resolvedTarget === legacyLauncherPath) {
@@ -461,13 +557,7 @@ export class CliInstaller {
     }
 
     const devLauncherDir = resolve(this.userDataPath, ...DEV_LAUNCHER_DIR)
-    const devRelative = relative(devLauncherDir, resolvedTarget)
-    if (devRelative && !devRelative.startsWith('..') && !isAbsolute(devRelative)) {
-      return true
-    }
-
-    // Why: AppImage upgrades can strand a legacy symlink into a now-gone FUSE mount that isn't a sibling of the stable path.
-    return /(?:^|[/\\])resources[/\\]bin[/\\]orca$/.test(resolvedTarget)
+    return samePathEntry(this.platform, dirname(resolvedTarget), devLauncherDir)
   }
 
   private async installWindowsWrapper(commandPath: string, launcherPath: string): Promise<void> {
@@ -606,34 +696,34 @@ export class CliInstaller {
       return true
     }
 
-    if (basename(resolvedTarget) !== expectedName) {
+    const managedLauncherNames = new Set([
+      expectedName,
+      DEV_COMMAND_NAME,
+      ...getCompatibilityCliCommandNamesForPlatform(this.platform)
+    ])
+    if (!managedLauncherNames.has(basename(resolvedTarget))) {
       return false
     }
 
-    const devLauncherDir = resolve(this.userDataPath, ...DEV_LAUNCHER_DIR)
-    if (isPathInsideOrEqual(devLauncherDir, resolvedTarget)) {
-      return true
-    }
-
-    if (this.platform === 'darwin') {
-      // Why: reclaim symlinks to an older Orca.app launcher, but never replace arbitrary user-owned symlinks.
-      return /(?:^|[/\\])[^/\\]+\.app[/\\]Contents[/\\]Resources[/\\]bin[/\\][^/\\]+$/.test(
-        resolvedTarget
-      )
-    }
-
-    if (this.platform === 'linux') {
-      return /(?:^|[/\\])resources[/\\]bin[/\\][^/\\]+$/.test(resolvedTarget)
-    }
-
-    return false
+    const managedLauncherDirectories = [
+      dirname(resolve(launcherPath)),
+      resolve(this.userDataPath, ...DEV_LAUNCHER_DIR)
+    ]
+    return managedLauncherDirectories.some((directory) =>
+      samePathEntry(this.platform, dirname(resolvedTarget), directory)
+    )
   }
 
   private isSiblingDevLauncherTarget(
     resolvedTarget: string,
     packagedLauncherName: string
   ): boolean {
-    if (![packagedLauncherName, DEV_COMMAND_NAME].includes(basename(resolvedTarget))) {
+    const managedLauncherNames = [
+      packagedLauncherName,
+      DEV_COMMAND_NAME,
+      ...getCompatibilityCliCommandNamesForPlatform(this.platform)
+    ]
+    if (!managedLauncherNames.includes(basename(resolvedTarget))) {
       return false
     }
 
@@ -644,7 +734,7 @@ export class CliInstaller {
     // Why: dev builds generate launchers under the sibling `*-dev` profile; packaged Orca must reclaim that command.
     return (
       basename(siblingDevUserDataPath) === `${basename(packagedUserDataPath)}-dev` &&
-      isPathInsideOrEqual(siblingDevLauncherDir, resolvedTarget)
+      samePathEntry(this.platform, dirname(resolvedTarget), siblingDevLauncherDir)
     )
   }
 
@@ -1059,11 +1149,6 @@ function samePathEntry(
     : left === right
 }
 
-function isPathInsideOrEqual(parentPath: string, childPath: string): boolean {
-  const childRelative = relative(parentPath, childPath)
-  return childRelative === '' || (!childRelative.startsWith('..') && !isAbsolute(childRelative))
-}
-
 async function isExecutableFile(commandPath: string): Promise<boolean> {
   try {
     const stats = await stat(commandPath)
@@ -1205,13 +1290,13 @@ export function getBundledLauncherPath(
   resourcesPath: string
 ): string | null {
   if (platform === 'darwin') {
-    return join(resourcesPath, 'bin', 'orca')
+    return join(resourcesPath, 'bin', 'hivecode')
   }
   if (platform === 'linux') {
-    return join(resourcesPath, 'bin', LINUX_COMMAND_NAME)
+    return join(resourcesPath, 'bin', 'hivecode')
   }
   if (platform === 'win32') {
-    return join(resourcesPath, 'bin', 'orca.exe')
+    return join(resourcesPath, 'bin', 'hivecode.exe')
   }
   return null
 }

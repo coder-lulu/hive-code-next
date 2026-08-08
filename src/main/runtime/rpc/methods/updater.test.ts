@@ -58,6 +58,18 @@ describe('runtime updater RPC methods', () => {
     })
   })
 
+  it('preserves localBuild through RPC parameter validation', () => {
+    const method = UPDATER_METHODS.find((candidate) => candidate.name === 'updater.check')
+    if (!method?.params) {
+      throw new Error('Missing updater.check parameter schema')
+    }
+
+    expect(method.params.parse({ localBuild: true, includePrerelease: false })).toEqual({
+      localBuild: true,
+      includePrerelease: false
+    })
+  })
+
   it('enriches status.get without changing the runtime status source', async () => {
     const result = await handler(STATUS_METHODS, 'status.get')(undefined, { runtime } as never)
     expect(result).toEqual({

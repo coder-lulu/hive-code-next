@@ -1,0 +1,39 @@
+{
+  "$schema": "./product-manifest.schema.json",
+  "schemaVersion": 1,
+  "displayName": "HiveCode",
+  "shortName": "HiveCode",
+  "slug": "hivecode",
+  "cli": {
+    "primary": "hivecode",
+    "aliases": ["orca", "orca-ide"]
+  },
+  "schemes": {
+    "primary": "hivecode",
+    "aliases": ["orca"]
+  },
+  "desktop": {
+    "appId": "com.hivekernel.hivecode.desktop",
+    "executableName": "HiveCode",
+    "publisher": null,
+    "updateChannel": null,
+    "updateRepository": null,
+    "starRepository": null
+  },
+  "mobile": {
+    "bundleId": "com.hivekernel.hivecode.mobile",
+    "packageId": "com.hivekernel.hivecode.mobile"
+  },
+  "endpoints": {
+    "cloud": null,
+    "relay": null,
+    "update": null,
+    "telemetry": null,
+    "diagnostics": null,
+    "feedback": null,
+    "pluginKillList": null,
+    "pluginMarketplace": null,
+    "changelog": null,
+    "nudge": null
+  }
+}

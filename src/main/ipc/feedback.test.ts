@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { fetchMock, handlers } = vi.hoisted(() => ({
+const { fetchMock, handlers, productEndpoint } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
-  handlers: new Map<string, (_event: unknown, args?: unknown) => unknown>()
+  handlers: new Map<string, (_event: unknown, args?: unknown) => unknown>(),
+  productEndpoint: { value: 'https://www.onorca.dev/v1/feedback' as string | null }
 }))
 
 vi.mock('electron', () => ({
@@ -14,6 +15,10 @@ vi.mock('electron', () => ({
     removeHandler: vi.fn((channel: string) => handlers.delete(channel))
   },
   net: { fetch: (...args: unknown[]) => fetchMock(...args) }
+}))
+
+vi.mock('../product/product-external-service-endpoints', () => ({
+  getProductExternalServiceEndpoints: () => ({ feedback: productEndpoint.value })
 }))
 
 import { MAX_FEEDBACK_IMAGE_RESPONSE_BYTES } from './feedback-image-attachments'
@@ -57,12 +62,30 @@ describe('submitFeedback', () => {
   beforeEach(() => {
     vi.useRealTimers()
     handlers.clear()
+    productEndpoint.value = 'https://www.onorca.dev/v1/feedback'
     fetchMock.mockReset()
     fetchMock.mockResolvedValue(okResponse())
   })
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('fails closed without a configured product feedback endpoint', async () => {
+    productEndpoint.value = null
+
+    await expect(
+      submitFeedback({
+        feedback: 'must stay local',
+        githubLogin: null,
+        githubEmail: null
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      status: null,
+      error: expect.stringContaining('not configured')
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('strips GitHub identity and anonymous contact fields when submitted anonymously', async () => {

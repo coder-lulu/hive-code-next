@@ -103,6 +103,8 @@ docs/**
 !docs/reference/remote-wire-compatibility.md
 !docs/reference/windows-setup-shell.md
 !docs/reference/xterm-patch-regeneration.md
+!docs/engineering/
+!docs/engineering/**
 
 # Stably CLI (only docs/ are tracked)
 .stably/*

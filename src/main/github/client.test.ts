@@ -23,7 +23,8 @@ const {
   getSshGitProviderMock,
   readLocalGitConfigSignatureMock,
   acquireMock,
-  releaseMock
+  releaseMock,
+  getProductStarRepositoryMock
 } = vi.hoisted(() => ({
   execFileAsyncMock: vi.fn(),
   ghExecFileAsyncMock: vi.fn(),
@@ -54,7 +55,12 @@ const {
   getSshGitProviderMock: vi.fn(),
   readLocalGitConfigSignatureMock: vi.fn(),
   acquireMock: vi.fn(),
-  releaseMock: vi.fn()
+  releaseMock: vi.fn(),
+  getProductStarRepositoryMock: vi.fn()
+}))
+
+vi.mock('../product/product-external-service-endpoints', () => ({
+  getProductStarRepository: getProductStarRepositoryMock
 }))
 
 vi.mock('./gh-utils', () => ({
@@ -179,6 +185,7 @@ import {
   mergePR,
   resolveReviewThread,
   setPRAutoMerge,
+  starOrca,
   updatePRState,
   updatePRTitle,
   _getMergeQueueCacheSizeForTests,
@@ -205,6 +212,26 @@ describe('checkOrcaStarred', () => {
     acquireMock.mockReset()
     releaseMock.mockReset()
     acquireMock.mockResolvedValue(undefined)
+    getProductStarRepositoryMock.mockReset()
+    getProductStarRepositoryMock.mockReturnValue('stablyai/orca')
+  })
+
+  it('fails closed without invoking gh when the product star repository is null', async () => {
+    getProductStarRepositoryMock.mockReturnValue(null)
+
+    await expect(checkOrcaStarred()).resolves.toBeNull()
+
+    expect(execFileAsyncMock).not.toHaveBeenCalled()
+    expect(acquireMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects the star write without invoking gh when product authority is null', async () => {
+    getProductStarRepositoryMock.mockReturnValue(null)
+
+    await expect(starOrca()).resolves.toBe(false)
+
+    expect(execFileAsyncMock).not.toHaveBeenCalled()
+    expect(acquireMock).not.toHaveBeenCalled()
   })
 
   it('returns true only for an included successful GitHub response', async () => {

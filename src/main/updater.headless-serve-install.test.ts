@@ -74,6 +74,22 @@ vi.mock('electron', () => ({
   net: { fetch: vi.fn() }
 }))
 
+vi.mock('./product/product-updater-network-boundary', () => ({
+  installProductUpdaterNetworkBoundary: vi.fn()
+}))
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  })
+}))
+
 vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))
 vi.mock('./electron-updater-loader', () => ({ loadElectronAutoUpdater: () => autoUpdaterMock }))
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
@@ -88,7 +104,9 @@ vi.mock('./updater-prerelease-feed', () => ({
     tags: ['v1.0.61'],
     state: 'ready'
   }),
-  getReleaseDownloadUrl: vi.fn()
+  getReleaseDownloadUrl: vi.fn(
+    (tag: string) => `https://github.com/stablyai/orca/releases/download/${tag}`
+  )
 }))
 vi.mock('./update-install-exit-watchdog', () => ({
   armUpdateInstallExitWatchdog: vi.fn(),
@@ -163,6 +181,7 @@ describe('headless serve update install handoff', () => {
 
     checkForUpdatesFromMenu()
     await vi.advanceTimersByTimeAsync(0)
+    ;(await import('./updater')).downloadUpdate()
     autoUpdaterMock.emit('update-downloaded', { version: pendingInstaller.version })
     const nativeReadyHandler = nativeUpdaterMock.on.mock.calls.find(
       ([event]) => event === 'update-downloaded'
@@ -175,6 +194,7 @@ describe('headless serve update install handoff', () => {
       expect.objectContaining({ state: 'downloaded', version: pendingInstaller.version })
     )
 
+    recordUpdaterLifecycleMock.mockClear()
     quitAndInstall()
     quitAndInstall()
     await vi.advanceTimersByTimeAsync(100)
@@ -337,6 +357,7 @@ describe('headless serve update install handoff', () => {
     })
     checkForUpdatesFromMenu()
     await vi.advanceTimersByTimeAsync(0)
+    ;(await import('./updater')).downloadUpdate()
     autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
     const nativeReadyHandler = nativeUpdaterMock.on.mock.calls.find(
       ([event]) => event === 'update-downloaded'
@@ -375,6 +396,7 @@ describe('headless serve update install handoff', () => {
       })
       checkForUpdatesFromMenu()
       await vi.advanceTimersByTimeAsync(0)
+      ;(await import('./updater')).downloadUpdate()
       autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
 
       const { deferMacQuitUntilInstallerReady } = await import('./updater-mac-install')
@@ -423,6 +445,7 @@ describe('headless serve update install handoff', () => {
       })
       checkForUpdatesFromMenu()
       await vi.advanceTimersByTimeAsync(0)
+      ;(await import('./updater')).downloadUpdate()
       autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
 
       const preventDefault = vi.fn()
@@ -453,6 +476,7 @@ describe('headless serve update install handoff', () => {
       })
       checkForUpdatesFromMenu()
       await vi.advanceTimersByTimeAsync(0)
+      ;(await import('./updater')).downloadUpdate()
       autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
 
       quitAndInstall()
@@ -468,7 +492,7 @@ describe('headless serve update install handoff', () => {
     }
   )
 
-  it('preserves interactive download and install-on-quit behavior', async () => {
+  it('preserves interactive download with explicit install behavior', async () => {
     const send = vi.fn()
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
@@ -490,7 +514,7 @@ describe('headless serve update install handoff', () => {
     await vi.advanceTimersByTimeAsync(0)
     downloadUpdate()
 
-    expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(true)
+    expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(false)
     expect(autoUpdaterMock.autoRunAppAfterInstall).toBe(true)
     expect(autoUpdaterMock.downloadUpdate).toHaveBeenCalledTimes(1)
     expect(getRemoteServerUpdateSupport()).toEqual({

@@ -1,18 +1,21 @@
 #!/bin/bash
-# Why: remove the PATH symlink that after-install.sh created, but only if it
-# still points into an Orca install dir — never delete an unrelated
-# /usr/bin/orca-ide a user or other package may own.
+# Why: remove only the HiveCode-owned PATH symlinks created by after-install.sh.
+# Never delete a regular file, bare /usr/bin/orca, or another package's symlink.
 set -e
 
-link="/usr/bin/orca-ide"
-
-if [ -L "$link" ]; then
-  target="$(readlink "$link" || true)"
-  case "$target" in
-    /opt/Orca/*|/opt/orca-ide/*|/opt/orca/*)
-      rm -f "$link"
-      ;;
-  esac
-fi
+for link in /usr/bin/hivecode /usr/bin/orca-ide; do
+  if [ -L "$link" ]; then
+    target="$(readlink "$link" || true)"
+    case "$target" in
+      /opt/HiveCode/resources/bin/hivecode|/opt/HiveCode/resources/bin/orca-ide|\
+      /opt/hivecode/resources/bin/hivecode|/opt/hivecode/resources/bin/orca-ide|\
+      /opt/Orca/resources/bin/hivecode|/opt/Orca/resources/bin/orca-ide|\
+      /opt/orca-ide/resources/bin/hivecode|/opt/orca-ide/resources/bin/orca-ide|\
+      /opt/orca/resources/bin/hivecode|/opt/orca/resources/bin/orca-ide)
+        rm -f "$link"
+        ;;
+    esac
+  fi
+done
 
 exit 0

@@ -1,9 +1,23 @@
 /* eslint-disable max-lines -- Why: root and generated command help text live together so CLI discovery stays greppable. */
 import type { CommandSpec } from './args'
+import { hivecodeProductConfig } from '../shared/generated/product-config'
 import { findCommandSpec, isCommandGroup, supportsBrowserPageFlag } from './args'
 import { unknownCommandData } from './command-suggestion'
 
-const ROOT_HELP_TEXT = `orca
+const PRIMARY_CLI_COMMAND = hivecodeProductConfig.cli.primary
+const PRIMARY_PAIRING_SCHEME = hivecodeProductConfig.schemes.primary
+const LEGACY_CLI_INVOCATION_PATTERN = /(^|[\s`$])orca(?=(?:\s|$))/gm
+
+function formatProductCliHelp(value: string): string {
+  return value
+    .replace(
+      LEGACY_CLI_INVOCATION_PATTERN,
+      (_match, prefix: string) => `${prefix}${PRIMARY_CLI_COMMAND}`
+    )
+    .replaceAll('orca://', `${PRIMARY_PAIRING_SCHEME}://`)
+}
+
+const ROOT_HELP_TEXT = formatProductCliHelp(`orca
 
 Usage: orca <command> [options]
 
@@ -359,7 +373,7 @@ Examples:
   $ orca goto --url https://example.com/login
   $ orca keypress --key Enter
   $ orca eval --expression "document.title"
-  $ orca tab list --json`
+  $ orca tab list --json`)
 
 export function printHelp(specs: CommandSpec[], commandPath: string[] = []): void {
   const exactSpec = findCommandSpec(specs, commandPath)
@@ -376,7 +390,11 @@ export function printHelp(specs: CommandSpec[], commandPath: string[] = []): voi
   if (commandPath.length > 0) {
     const { nextSteps } = unknownCommandData(specs, commandPath)
     const recovery = nextSteps.map((step) => `Next step: ${step}`).join('\n')
-    console.log(`Unknown command: ${commandPath.join(' ')}${recovery ? `\n${recovery}` : ''}\n`)
+    console.log(
+      formatProductCliHelp(
+        `Unknown command: ${commandPath.join(' ')}${recovery ? `\n${recovery}` : ''}\n`
+      )
+    )
   }
 
   console.log(ROOT_HELP_TEXT)
@@ -412,7 +430,7 @@ export function formatCommandHelp(spec: CommandSpec): string {
     }
   }
 
-  return lines.join('\n')
+  return formatProductCliHelp(lines.join('\n'))
 }
 
 export function formatGroupHelp(specs: CommandSpec[], group: string): string {
@@ -422,7 +440,7 @@ export function formatGroupHelp(specs: CommandSpec[], group: string): string {
     lines.push(`  ${spec.path.slice(1).join(' ').padEnd(18)} ${spec.summary}`)
   }
   lines.push('', `Run \`orca ${group} <command> --help\` for command-specific usage.`)
-  return lines.join('\n')
+  return formatProductCliHelp(lines.join('\n'))
 }
 
 function formatCommandFlagHelp(flag: string, commandPath: string[]): string {

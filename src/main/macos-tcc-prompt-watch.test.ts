@@ -49,8 +49,13 @@ describe('parseTccPromptEvent', () => {
 })
 
 describe('isOrcaAttributedPrompt', () => {
-  it('accepts the app and detached terminal helper across Orca build identities', () => {
+  it('accepts the app and detached terminal helper across HiveCode and Orca identities', () => {
     for (const id of [
+      'com.hivekernel.hivecode.desktop',
+      'com.hivekernel.hivecode.desktop.helper',
+      'com.hivekernel.hivecode.desktop.dev',
+      'com.hivekernel.hivecode.desktop.dev.1234567890',
+      'com.hivekernel.hivecode.desktop.dev.1234567890.helper',
       'com.stablyai.orca',
       'com.stablyai.orca.helper',
       'com.stablyai.orca.dev',

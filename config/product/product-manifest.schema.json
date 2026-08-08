@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HiveCode product manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "displayName",
+    "shortName",
+    "slug",
+    "cli",
+    "schemes",
+    "desktop",
+    "mobile",
+    "endpoints"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "displayName": { "type": "string", "minLength": 1 },
+    "shortName": { "type": "string", "minLength": 1 },
+    "slug": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+    "cli": {
+      "$ref": "#/$defs/compatibilityNames",
+      "properties": {
+        "primary": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" }
+        }
+      }
+    },
+    "schemes": {
+      "$ref": "#/$defs/compatibilityNames",
+      "properties": {
+        "primary": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]*$" },
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]*$" }
+        }
+      }
+    },
+    "desktop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "appId",
+        "executableName",
+        "publisher",
+        "updateChannel",
+        "updateRepository",
+        "starRepository"
+      ],
+      "properties": {
+        "appId": { "$ref": "#/$defs/nullableString" },
+        "executableName": { "type": "string", "minLength": 1 },
+        "publisher": { "$ref": "#/$defs/nullableString" },
+        "updateChannel": {
+          "type": ["string", "null"],
+          "enum": ["stable", "rc", null]
+        },
+        "updateRepository": { "$ref": "#/$defs/nullableString" },
+        "starRepository": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "mobile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundleId", "packageId"],
+      "properties": {
+        "bundleId": { "$ref": "#/$defs/nullableString" },
+        "packageId": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cloud",
+        "relay",
+        "update",
+        "telemetry",
+        "diagnostics",
+        "feedback",
+        "pluginKillList",
+        "pluginMarketplace",
+        "changelog",
+        "nudge"
+      ],
+      "properties": {
+        "cloud": { "$ref": "#/$defs/nullableUrl" },
+        "relay": { "$ref": "#/$defs/nullableUrl" },
+        "update": { "$ref": "#/$defs/nullableUrl" },
+        "telemetry": { "$ref": "#/$defs/nullableUrl" },
+        "diagnostics": { "$ref": "#/$defs/nullableUrl" },
+        "feedback": { "$ref": "#/$defs/nullableUrl" },
+        "pluginKillList": { "$ref": "#/$defs/nullableUrl" },
+        "pluginMarketplace": { "$ref": "#/$defs/nullableUrl" },
+        "changelog": { "$ref": "#/$defs/nullableUrl" },
+        "nudge": { "$ref": "#/$defs/nullableUrl" }
+      }
+    }
+  },
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "nullableUrl": {
+      "type": ["string", "null"],
+      "format": "uri"
+    },
+    "compatibilityNames": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "aliases"],
+      "properties": {
+        "primary": { "type": "string", "minLength": 1 },
+        "aliases": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+      }
+    }
+  }
+}
