@@ -8,6 +8,9 @@ import { useMobileNativeChatStreamingBubble } from './use-mobile-native-chat-str
 
 type Props = {
   controller: MobileNativeChatController
+  /** Opens a tapped file reference (worktree-relative or absolute, optional
+   *  :line(:col) suffix) through the shared tap-to-open flow. */
+  onOpenFile: (pathText: string) => void
   /** Native-chat image attachments: picking adds a composer chip, and sending
    *  rides the pending images along with the message text (desktop parity). */
   images: MobileNativeChatImageAttachments
@@ -30,6 +33,7 @@ type Props = {
  *  the chat list below it does not. */
 export function MobileNativeChatOverlay({
   controller,
+  onOpenFile,
   images,
   onMicPress,
   micActive,
@@ -64,18 +68,21 @@ export function MobileNativeChatOverlay({
         streaming={streaming}
         onStop={controller.handleNativeChatStop}
         ask={controller.nativeChatAsk}
+        askKey={controller.nativeChatAskKey}
+        onDismissAsk={controller.dismissNativeChatAsk}
         onAnswerAsk={controller.handleNativeChatAnswerAsk}
         onCancelAsk={controller.handleNativeChatCancelAsk}
         question={controller.nativeChatQuestion}
         onAnswerQuestion={controller.handleNativeChatQuestionAnswer}
         permission={controller.nativeChatPermission}
         onRespondPermission={controller.handleNativeChatRespondPermission}
-        onOpenFile={controller.handleNativeChatOpenFile}
+        onOpenFile={onOpenFile}
         hasMore={session.hasMore}
         loadingEarlier={session.loadingEarlier}
         onLoadEarlier={session.loadEarlier}
         onSend={images.sendNativeChat}
         pending={controller.chatPending}
+        imagePreviewsByMessageId={controller.chatImagePreviewsByMessageId}
         composerText={controller.chatComposerText}
         onComposerTextChange={controller.setChatComposerText}
         onAttachImage={() => void images.attachImage('library')}
@@ -92,6 +99,7 @@ export function MobileNativeChatOverlay({
         onClearSendError={onClearSendError}
         filePaths={controller.nativeChatFilePaths}
         onNeedFiles={controller.loadNativeChatFiles}
+        sessionOptions={controller.nativeChatSessionOptions}
         keyboardInset={keyboardInset}
       />
     </View>

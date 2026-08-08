@@ -56,7 +56,9 @@ import {
   resolveActivityPortalSwap
 } from './activity-portal-thread-reconciliation'
 import {
+  ACTIVITY_PORTAL_READINESS_BURST_WINDOW_MS,
   createActivityPortalReadinessLatch,
+  type ActivityPortalReadinessLatch,
   type ActivityPortalReadinessStatus
 } from './activity-portal-readiness-oscillation'
 import type { Repo, TerminalTab, Worktree } from '../../../../shared/types'
@@ -80,6 +82,7 @@ import {
   resolveActivityThreadStatusPreview
 } from '@/lib/activity-thread-display'
 import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
+import { isLatinShortcutKey } from '@/lib/ime-latin-shortcut-key'
 
 type ThreadReadFilter = 'all' | 'unread'
 type ActivityGroupBy = 'status' | 'project' | 'worktree' | 'agent'
@@ -289,13 +292,16 @@ export function useActivityTerminalPortalStatus(
     paneKey: null,
     status: 'loading'
   })
+  // Why: portal churn replaces every subscription identity, so the burst budget must outlive it.
+  const readinessLatchRef = useRef<ActivityPortalReadinessLatch | null>(null)
 
   useLayoutEffect(() => {
     let disposed = false
     let readinessFrame: number | null = null
+    let readinessReleaseTimer: number | null = null
     let pendingStatus: ActivityTerminalPortalReadiness['status'] | null = null
 
-    // Why: subscription churn can otherwise chain layout-effect updates past React's root-wide limit.
+    // Why: coalesce observer bursts and cancel frames from stale portal subscriptions.
     const scheduleReadiness = (status: ActivityTerminalPortalReadiness['status']): void => {
       if (disposed) {
         return
@@ -325,6 +331,10 @@ export function useActivityTerminalPortalStatus(
         cancelAnimationFrame(readinessFrame)
         readinessFrame = null
       }
+      if (readinessReleaseTimer !== null) {
+        window.clearTimeout(readinessReleaseTimer)
+        readinessReleaseTimer = null
+      }
     }
 
     if (!target || !paneKey) {
@@ -336,10 +346,22 @@ export function useActivityTerminalPortalStatus(
       return disposeFrame
     }
 
-    const readinessLatch = createActivityPortalReadinessLatch()
+    const readinessLatch = (readinessLatchRef.current ??= createActivityPortalReadinessLatch())
 
     const updateReadiness = (status: ActivityTerminalPortalReadiness['status']): void => {
-      scheduleReadiness(readinessLatch.next(status))
+      const nextStatus = readinessLatch.next(status)
+      scheduleReadiness(nextStatus)
+      if (readinessReleaseTimer !== null) {
+        window.clearTimeout(readinessReleaseTimer)
+        readinessReleaseTimer = null
+      }
+      if (nextStatus !== status) {
+        // Why: a quiet loading pane has no mutation to release the burst latch on its own.
+        readinessReleaseTimer = window.setTimeout(
+          checkReadiness,
+          ACTIVITY_PORTAL_READINESS_BURST_WINDOW_MS
+        )
+      }
     }
 
     const checkReadiness = (): void => {
@@ -569,7 +591,8 @@ function appendActivityEventsForEntry(args: {
     })
   }
 
-  if (!isActivityEventState(args.entry.state)) {
+  // Why: SessionStart creates an idle row, not an "Agent finished" activity event (STA-3386).
+  if (!isActivityEventState(args.entry.state) || args.entry.sessionBoundary === true) {
     return
   }
   appendActivityEvent({
@@ -1081,7 +1104,7 @@ export function isActivityFilterFocusShortcut(
   event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'shiftKey'>,
   isMac = navigator.userAgent.includes('Mac')
 ): boolean {
-  if (event.key.toLowerCase() !== 'f' || event.shiftKey || event.altKey) {
+  if (!isLatinShortcutKey(event, 'f') || event.shiftKey || event.altKey) {
     return false
   }
   return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
@@ -1578,6 +1601,7 @@ export default function ActivityPrototypePage(): React.JSX.Element {
     visibleThread
   ])
 
+  // Why: swap-staged makes the displayed thread selected, so this branch cannot repeat by itself.
   useLayoutEffect(() => {
     const swap = resolveActivityPortalSwap({
       selectedThread,

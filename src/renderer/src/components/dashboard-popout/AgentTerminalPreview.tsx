@@ -14,7 +14,6 @@ import {
 import { syncPreviewTerminalLigatures } from './preview-terminal-ligatures'
 import { installPreviewTerminalCompatibility } from './preview-terminal-compatibility'
 import { createPreviewClipboardPaster } from './preview-terminal-paste'
-import { installPreviewImeBridge, type PreviewImeBridge } from './preview-terminal-ime-bridge'
 import type { DashboardCardTerminalInput } from '../../../../shared/dashboard-snapshot'
 import { translate } from '@/i18n/i18n'
 import { getBuiltinTheme, resolveEffectiveTerminalAppearance } from '@/lib/terminal-theme'
@@ -49,11 +48,13 @@ function clamp(value: number, min: number, max: number): number {
  */
 export function AgentTerminalPreview({
   ptyId,
-  terminalInput = null
+  terminalInput = null,
+  className
 }: {
   ptyId: string
   /** Host-input facts relayed with the card; null routes bytes by client OS. */
   terminalInput?: DashboardCardTerminalInput | null
+  className?: string
 }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -100,7 +101,6 @@ export function AgentTerminalPreview({
     let terminal: Terminal | null = null
     let offData: (() => void) | null = null
     let userInputDisposable: { dispose: () => void } | null = null
-    let imeBridge: PreviewImeBridge | null = null
     let disposeKeyHandler: (() => void) | null = null
     let disposeTerminalCompatibility: (() => void) | null = null
     // Why: mirrors the pane's tracker — the policy needs the flags the TUI
@@ -200,24 +200,12 @@ export function AgentTerminalPreview({
       isDisposed: () => disposed
     })
 
-    const disposeImeNativeTextBridge = (): void => {
-      imeBridge?.dispose()
-      imeBridge = null
-    }
-
-    const installImeNativeTextBridge = (): void => {
-      if (terminal) {
-        imeBridge = installPreviewImeBridge(terminal)
-      }
-    }
-
     const installKeyHandler = (): void => {
       if (!terminal) {
         return
       }
       disposeKeyHandler = installPreviewTerminalKeyHandler({
         terminal,
-        claimImeKeyEvent: (event) => imeBridge?.claimKeyEvent(event) ?? false,
         pasteClipboardText: (activeElement, source) =>
           void pasteClipboardText(activeElement, source),
         // Why: route through terminal.input so the chord's bytes carry core's user-input signal, like typed keys.
@@ -292,7 +280,6 @@ export function AgentTerminalPreview({
         terminalRef.current = terminal
         installTerminalCompatibility()
         installInputRouting()
-        installImeNativeTextBridge()
         installKeyHandler()
       } else if (replaceExisting) {
         // Why: keep the old frame visible during capture, then atomically replace it once the authoritative snapshot arrives.
@@ -362,7 +349,6 @@ export function AgentTerminalPreview({
         offData = null
         userInputDisposable?.dispose()
         userInputDisposable = null
-        disposeImeNativeTextBridge()
         disposeTerminalCompatibility?.()
         disposeTerminalCompatibility = null
         disposeKeyHandler?.()
@@ -414,7 +400,6 @@ export function AgentTerminalPreview({
       offAppMenuPaste()
       offData?.()
       userInputDisposable?.dispose()
-      disposeImeNativeTextBridge()
       disposeTerminalCompatibility?.()
       disposeKeyHandler?.()
       void window.api.terminalPreview.unsubscribe(ptyId)
@@ -444,7 +429,10 @@ export function AgentTerminalPreview({
     // buffer is. The terminal keeps the pane's true dimensions and is scaled/
     // clipped to fit; fitToBox anchors whichever end keeps the cursor in view.
     <div
-      className="relative h-[calc(100vh-140px)] w-full overflow-hidden bg-background p-1.5"
+      className={cn(
+        'relative h-[calc(100vh-140px)] w-full overflow-hidden bg-background p-1.5',
+        className
+      )}
       style={terminalTheme?.background ? { backgroundColor: terminalTheme.background } : undefined}
     >
       {ptyGone ? (

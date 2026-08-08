@@ -70,6 +70,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { cn } from '@/lib/utils'
+import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 import { DiffSectionItem } from '@/components/editor/DiffSectionItem'
 import type { DecoratedDiffComment } from '@/components/diff-comments/useDiffCommentDecorator'
 import {
@@ -210,6 +211,7 @@ import {
   validateTaskPageGitHubDuplicateTarget,
   type TaskPageGitHubCloseAction
 } from '@/components/task-page-github-status-actions'
+import { assertTaskPageGitHubDialogStateAuthority } from '@/components/task-page-github-dialog-state-authority'
 import { sortChecksBySeverity } from '../../../shared/pr-check-severity-order'
 import {
   getCheckConclusion,
@@ -349,7 +351,8 @@ function WorkItemStateBadge({
   )
 }
 
-function PRReviewersPanel({
+// Exported for IME Enter guard tests; not used outside this module in production.
+export function PRReviewersPanel({
   item,
   loading,
   repoPath,
@@ -396,6 +399,7 @@ function PRReviewersPanel({
   const reviewerInputRef = useRef<HTMLInputElement | null>(null)
   const reviewerInputFocusFrameRef = useRef<number | null>(null)
   const reviewerPanelMountedRef = useRef(true)
+  const reviewerImeEnter = useImeEnterGestureOwnership()
 
   const cancelReviewerInputFocusFrame = useCallback((): void => {
     if (reviewerInputFocusFrameRef.current !== null) {
@@ -888,6 +892,10 @@ function PRReviewersPanel({
                 ref={reviewerInputRef}
                 value={reviewerInput}
                 onChange={(event) => setReviewerInput(event.target.value)}
+                onCompositionStart={() => reviewerImeEnter.setComposing(true)}
+                onCompositionEnd={() => reviewerImeEnter.setComposing(false)}
+                onKeyUp={reviewerImeEnter.onKeyUp}
+                onBlur={reviewerImeEnter.reset}
                 disabled={submitting || !canRequestReview}
                 placeholder={translate(
                   'auto.components.GitHubItemDialog.bb42774171',
@@ -898,6 +906,9 @@ function PRReviewersPanel({
                 aria-haspopup="listbox"
                 className="h-8 min-w-0 cursor-text rounded-md border-border/50 bg-background text-xs"
                 onKeyDown={(event) => {
+                  if (reviewerImeEnter.ownsKeyDown(event)) {
+                    return
+                  }
                   if (event.key === 'ArrowDown' && actionableReviewerRows.length > 0) {
                     event.preventDefault()
                     setActiveReviewerIndex(
@@ -2834,6 +2845,14 @@ function PRActionsPanel({
     }
     const previousState = localState
     setStatePending(true)
+    // Why: without registry authority a search-lagged Tasks refetch silently
+    // reverts this row to its pre-mutation state (STA-3343).
+    const authority = assertTaskPageGitHubDialogStateAuthority({
+      repoId: item.repoId,
+      itemId: item.id,
+      state: nextState,
+      sourceContext
+    })
     applyStatePatch(nextState)
     try {
       await runPullRequestStateUpdate({
@@ -2853,7 +2872,9 @@ function PRActionsPanel({
       )
       onMutated()
     } catch (err) {
-      applyStatePatch(previousState)
+      if (authority.revert()) {
+        applyStatePatch(previousState)
+      }
       toast.error(
         err instanceof Error
           ? err.message
@@ -2913,6 +2934,13 @@ function PRActionsPanel({
         toast.error(result.error)
         return
       }
+      // Why: merge is confirmed here; hold 'merged' against search-lagged refetches.
+      assertTaskPageGitHubDialogStateAuthority({
+        repoId: item.repoId,
+        itemId: item.id,
+        state: 'merged',
+        sourceContext
+      })
       applyStatePatch('merged')
       if (mergeTarget.kind === 'environment') {
         notifyWorkItemDetailsMutation(
@@ -4175,6 +4203,9 @@ function GHEditSection({
         return
       }
       const prevState = localState
+      // Why: without registry authority a search-lagged Tasks refetch silently
+      // reverts this row to its pre-mutation state (STA-3343).
+      let authority: { revert: () => boolean } | null = null
       run('state', {
         mutate: () =>
           runIssueUpdate({
@@ -4189,14 +4220,22 @@ function GHEditSection({
                 : { state: newState }
           }),
         onOptimistic: () => {
+          authority = assertTaskPageGitHubDialogStateAuthority({
+            repoId: item.repoId,
+            itemId: item.id,
+            state: newState,
+            sourceContext
+          })
           onStateChange(newState)
           patchWorkItem(item.id, { state: newState }, item.repoId, { sourceContext })
           patchProjectRowIfNeeded({ state: newState })
         },
         onRevert: () => {
-          onStateChange(prevState)
-          patchWorkItem(item.id, { state: prevState }, item.repoId, { sourceContext })
-          patchProjectRowIfNeeded({ state: prevState })
+          if (authority?.revert()) {
+            onStateChange(prevState)
+            patchWorkItem(item.id, { state: prevState }, item.repoId, { sourceContext })
+            patchProjectRowIfNeeded({ state: prevState })
+          }
         },
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('github-tasks')

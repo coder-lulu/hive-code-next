@@ -115,6 +115,10 @@ import {
   loadTerminalAccessoryLayout
 } from '../../../../src/terminal/terminal-accessory-layout'
 import { createTerminalLiveAccessoryInput } from '../../../../src/terminal/terminal-live-accessory-input'
+import {
+  TerminalLiveInputField,
+  type TerminalLiveInputFieldHandle
+} from '../../../../src/terminal/terminal-live-input-field'
 import { sendTerminalLiveAccessoryRawBytes } from '../../../../src/terminal/terminal-live-accessory-raw-send'
 import {
   clearTerminalLiveInputFocusTimer,
@@ -127,7 +131,9 @@ import type { TerminalLiveInputSender } from '../../../../src/terminal/terminal-
 import { isTerminalSendRpcAccepted } from '../../../../src/terminal/terminal-send-rpc-response'
 import { sendMobileTerminalQueryReply } from '../../../../src/terminal/mobile-terminal-query-reply'
 import { TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY } from '../../../../../src/shared/protocol-version'
+import { imeGuardedSubmitProps } from '../../../../src/ime/ime-submit-carry'
 import { useTerminalLiveInputCommit } from '../../../../src/terminal/use-terminal-live-input-commit'
+import { useTerminalLiveInputPreedit } from '../../../../src/terminal/use-terminal-live-input-preedit'
 import { resolveMobileTerminalInputGate } from '../../../../src/terminal/terminal-input-connection-gate'
 import {
   buildTerminalSendParams,
@@ -196,8 +202,11 @@ import { MobileTerminalLiveInputStatus } from '../../../../src/session/MobileTer
 import { MobileTerminalInputActions } from '../../../../src/session/MobileTerminalInputActions'
 import { resolveMobileFileTabDoc } from '../../../../src/files/mobile-file-tab-doc'
 import { captureMobileFileMutationOwnership } from '../../../../src/files/mobile-file-mutation-ownership'
-import { openMobileTerminalFileTap } from '../../../../src/session/mobile-terminal-file-tap-open'
+import { useMobileFileTapHandlers } from '../../../../src/session/use-mobile-file-tap-handlers'
 import { useLiveWorktreeName } from '../../../../src/session/use-live-worktree-name'
+import { useMissingWorktreeBounce } from '../../../../src/session/use-missing-worktree-bounce'
+import { hostRouteWithNotice } from '../../../../src/host-route-notice'
+import { LAST_VISITED_WORKTREE_STORAGE_KEY } from '../../../../src/worktree/last-visited-worktree-repo'
 import {
   acceptSessionSnapshot,
   applyClosedTabTombstones,
@@ -859,11 +868,18 @@ export default function SessionScreen() {
   const reconnectAttempts = useReconnectAttempt(hostId)
   const lastConnectedAt = useLastConnectedAt(hostId)
   const forceReconnectHost = useForceReconnect()
-  const worktreeName = useLiveWorktreeName({
+  const { name: worktreeName, resolution: worktreeResolution } = useLiveWorktreeName({
     client,
     connState,
     routeName: routeWorktreeName,
     worktreeId
+  })
+  // Why: a workspace deleted on the desktop leaves every RPC on this route failing forever.
+  useMissingWorktreeBounce({
+    hostId,
+    worktreeId,
+    resolution: worktreeResolution,
+    bounce: (id) => router.replace(hostRouteWithNotice(id, 'worktree-missing'))
   })
   // Master-detail state: wide layouts dock a tapped panel beside the session; narrow keeps it null and pushes full-screen routes.
   const { isWideLayout } = useResponsiveLayout()
@@ -1020,7 +1036,7 @@ export default function SessionScreen() {
   const viewportRef = useRef<{ cols: number; rows: number } | null>(null)
   const viewportMeasuredRef = useRef(false)
   const terminalRefs = useRef<Map<string, TerminalWebViewHandle>>(new Map())
-  const liveInputRef = useRef<TextInput>(null)
+  const liveInputRef = useRef<TerminalLiveInputFieldHandle>(null)
   const commandInputRef = useRef<TextInput>(null)
   const liveInputFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sendLiveTerminalInputRef = useRef<TerminalLiveInputSender>(async () => false)
@@ -1081,9 +1097,12 @@ export default function SessionScreen() {
     liveInputRef,
     liveInputTerminalHandles,
     liveInputTerminalHandlesRef,
+    platform: Platform.OS,
     sendLiveTerminalInputRef,
     setLiveInputCapture
   })
+  const { isComposing: liveInputComposing, handleLiveInputChangeWithPreedit } =
+    useTerminalLiveInputPreedit(handleLiveInputChange)
   const { canCompose, canSend } = resolveMobileTerminalInputGate({
     connState,
     activeHandle,
@@ -1693,7 +1712,8 @@ export default function SessionScreen() {
 
       try {
         const response = await client.sendRequest('terminal.list', {
-          worktree: `id:${worktreeId}`
+          worktree: `id:${worktreeId}`,
+          includeVisualLayouts: false
         })
         if (response.ok) {
           const result = (response as RpcSuccess).result as { terminals: Terminal[] }
@@ -2639,7 +2659,7 @@ export default function SessionScreen() {
   useEffect(() => {
     if (hostId && worktreeId) {
       void AsyncStorage.setItem(
-        'orca:last-visited-worktree',
+        LAST_VISITED_WORKTREE_STORAGE_KEY,
         JSON.stringify({ hostId, worktreeId })
       )
     }
@@ -2871,7 +2891,8 @@ export default function SessionScreen() {
             worktree: `id:${worktreeId}`,
             tabId: matchingTab.id,
             notifyClients: false,
-            navigation: 'caller'
+            navigation: 'caller',
+            intent: 'user'
           }).catch(() => {})
         }
       }
@@ -2911,7 +2932,8 @@ export default function SessionScreen() {
             worktree: `id:${worktreeId}`,
             tabId: tab.id,
             notifyClients: false,
-            navigation: 'caller'
+            navigation: 'caller',
+            intent: 'user'
           }).catch(() => {})
         }
         return
@@ -2935,7 +2957,8 @@ export default function SessionScreen() {
           worktree: `id:${worktreeId}`,
           tabId: tab.id,
           notifyClients: false,
-          navigation: 'caller'
+          navigation: 'caller',
+          intent: 'user'
         }).catch(() => {})
       }
       if (tab.type === 'browser') {
@@ -3192,44 +3215,23 @@ export default function SessionScreen() {
     })
   }, [])
 
-  // Tap a terminal file path → resolve on host, open as file tab (mirrors desktop Cmd/Ctrl-click); silent on a miss.
-  const handleFileTapActivationSeqRef = useRef(0)
-  const handleFileTap = useCallback(
-    (handle: string, pathText: string, line: number | null, column: number | null) => {
-      if (handle !== activeHandleRef.current || !client) {
-        return
-      }
-      const activationSeq = ++handleFileTapActivationSeqRef.current
-      openMobileTerminalFileTap<MobileSessionTab>({
-        client,
-        hostId,
-        worktreeId,
-        worktreeName: routeWorktreeName,
-        terminalHandle: handle,
-        pathText,
-        cwd: terminalCwdRef.current.get(handle) ?? null,
-        line,
-        column,
-        pushPreviewRoute: (href) => router.push(href),
-        openBrowser: (url) => void handleCreateBrowserRef.current?.(url),
-        triggerOpenFeedback: triggerSelection,
-        fetchSessionTabs,
-        getSessionTabs: () => sessionTabsRef.current,
-        getActiveSessionTabId: () => activeSessionTabIdRef.current,
-        getActivationState: (activated) => ({
-          activated,
-          activationSeq,
-          latestActivationSeq: handleFileTapActivationSeqRef.current,
-          sourceTerminalHandle: handle,
-          activeTerminalHandle: activeHandleRef.current,
-          activeTabType: activeSessionTabTypeRef.current
-        }),
-        switchSessionTab: (tab) => switchSessionTabRef.current?.(tab),
-        scheduleDelayedAction
-      })
-    },
-    [client, fetchSessionTabs, hostId, routeWorktreeName, router, scheduleDelayedAction, worktreeId]
-  )
+  // Tap a terminal or chat file path → resolve on host, open as file tab/preview.
+  const { handleFileTap, handleNativeChatFileTap } = useMobileFileTapHandlers<MobileSessionTab>({
+    client,
+    hostId,
+    worktreeId,
+    worktreeName: routeWorktreeName,
+    activeHandleRef,
+    terminalCwdRef,
+    openBrowser: (url) => void handleCreateBrowserRef.current?.(url),
+    fetchSessionTabs,
+    getSessionTabs: () => sessionTabsRef.current,
+    getActiveSessionTabId: () => activeSessionTabIdRef.current,
+    getActiveSessionTabType: () => activeSessionTabTypeRef.current,
+    switchSessionTab: (tab) => switchSessionTabRef.current?.(tab),
+    scheduleDelayedAction,
+    reportChatTapFailure: nativeChatSendError.show
+  })
 
   const handleOpenedFileDiffActivationSeqRef = useRef(0)
   // Capture active tab at tap time; reading it after openDiff would misread a mid-RPC switch and let the retry steal focus.
@@ -4207,7 +4209,10 @@ export default function SessionScreen() {
       tabId: activePendingTerminalTab.id,
       leafId: activePendingTerminalTab.leafId,
       notifyClients: false,
-      navigation: 'caller'
+      navigation: 'caller',
+      // Why: this only ever runs for the tab the user is looking at, so it is the
+      // tail of their tap — the gesture that materializes a parked pane.
+      intent: 'user'
     })
       .then((response) => {
         if (!response.ok) {
@@ -4750,6 +4755,7 @@ export default function SessionScreen() {
                 ))}
                 <MobileNativeChatOverlay
                   controller={nativeChatController}
+                  onOpenFile={handleNativeChatFileTap}
                   images={nativeChatImages}
                   onMicPress={handleDictationToggle}
                   micActive={dictation.isRecording}
@@ -4989,6 +4995,8 @@ export default function SessionScreen() {
                       <MobileTerminalLiveInputStatus
                         dictation={dictation}
                         isAttaching={isAttaching}
+                        liveInputText={liveInputCapture}
+                        composingText={liveInputComposing ? liveInputCapture : ''}
                       />
                     </Pressable>
                     <MobileTerminalInputActions
@@ -5006,11 +5014,11 @@ export default function SessionScreen() {
                       onDictationPressOut={handleDictationPressOut}
                       onDictationCancel={cancelDictation}
                     />
-                    <TextInput
+                    <TerminalLiveInputField
                       ref={liveInputRef}
                       style={styles.liveInputCapture}
                       value={liveInputCapture}
-                      onChangeText={handleLiveInputChange}
+                      onChange={handleLiveInputChangeWithPreedit}
                       onKeyPress={handleLiveInputKeyPress}
                       onSubmitEditing={handleLiveInputSubmit}
                       placeholder=""
@@ -5059,7 +5067,7 @@ export default function SessionScreen() {
                       returnKeyType="send"
                       // Why: composing is local — an outage must not lock the field or discard typed text (#6713).
                       editable={canCompose}
-                      onSubmitEditing={() => void handleSend()}
+                      {...imeGuardedSubmitProps(Platform.OS, () => void handleSend())}
                     />
                     <MobileTerminalInputActions
                       canSend={canSend}
