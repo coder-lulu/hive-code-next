@@ -496,7 +496,10 @@ describe('legacy user data paths', () => {
 
 describe('main-process migration wiring', () => {
   it('validates after Store load and completes only after startup succeeds', () => {
-    const mainSource = readFileSync(join(import.meta.dirname, '..', 'index.ts'), 'utf8')
+    const mainSource = readFileSync(join(import.meta.dirname, '..', 'index.ts'), 'utf8').replaceAll(
+      '\r\n',
+      '\n'
+    )
     const prepareOffset = mainSource.indexOf('const migrationResult = migrateUserDataFromOrca({')
     const storeOffset = mainSource.indexOf('store = new Store(')
     const validateOffset = mainSource.indexOf(

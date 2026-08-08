@@ -30,6 +30,9 @@ describe('product cloud config wiring', () => {
     const genericSource = readFileSync(GENERIC_CONFIG_PATH, 'utf8')
     expect(genericSource).not.toContain('onorca.dev')
     expect(genericSource).not.toContain('ORCA_PRODUCT_DEFAULTS')
+
+    const genericArtifactSource = readFileSync(GENERIC_ARTIFACT_CONFIG_PATH, 'utf8')
+    expect(genericArtifactSource).not.toContain('share.onorca.dev')
   })
 
   it('prevents runtime modules from calling the generic Orca defaults directly', () => {
