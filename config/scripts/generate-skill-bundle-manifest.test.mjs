@@ -54,6 +54,11 @@ async function createReleaseSandbox() {
   return {
     generate: (...args) => execFileSync(process.execPath, [script, ...args], { stdio: 'pipe' }),
     read: (name) => readFile(path.join(root, 'resources', 'skills', name), 'utf8'),
+    rewriteArtifactWithCrlf: async (name) => {
+      const artifactPath = path.join(root, 'resources', 'skills', name)
+      const artifact = await readFile(artifactPath, 'utf8')
+      await writeFile(artifactPath, artifact.replace(/\n/g, '\r\n'), 'utf8')
+    },
     editSkill: (body) => writeFile(path.join(skillRoot, 'SKILL.md'), body)
   }
 }
@@ -71,6 +76,15 @@ describe('skill bundle manifest generator', () => {
 
     expect(classifyFile(lf)).toBe('text')
     expect(normalizeText(crlf)).toEqual(lf)
+  })
+
+  it('accepts CRLF-generated artifacts from a Windows checkout', async () => {
+    const sandbox = await createReleaseSandbox()
+    sandbox.generate('--write')
+    await sandbox.rewriteArtifactWithCrlf('current-manifest.json')
+    await sandbox.rewriteArtifactWithCrlf('snapshot-registry.json')
+
+    expect(() => sandbox.generate()).not.toThrow()
   })
 
   it('classifies null-containing and invalid UTF-8 content as binary', () => {
