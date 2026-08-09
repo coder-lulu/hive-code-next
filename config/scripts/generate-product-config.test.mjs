@@ -1,9 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
+  checkProductConfig,
   generateProductConfig,
   normalizeProductManifest,
   renderProductConfigModule,
@@ -168,6 +169,20 @@ describe('generateProductConfig', () => {
       const mobile = readFileSync(result.files[1], 'utf8')
       expect(desktop).toBe(mobile)
       expect(desktop).toContain("primary: 'hivecode'")
+    } finally {
+      rmSync(outputRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts CRLF-generated modules from a Windows checkout', () => {
+    const outputRoot = mkdtempSync(path.join(tmpdir(), 'hivecode-product-config-'))
+    try {
+      const { files } = generateProductConfig({ manifest: validManifest, outputRoot })
+      for (const filePath of files) {
+        writeFileSync(filePath, readFileSync(filePath, 'utf8').replace(/\n/g, '\r\n'), 'utf8')
+      }
+
+      expect(() => checkProductConfig({ manifest: validManifest, outputRoot })).not.toThrow()
     } finally {
       rmSync(outputRoot, { recursive: true, force: true })
     }
