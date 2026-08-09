@@ -4,15 +4,15 @@ import { describe, expect, it } from 'vitest'
 const source = readFileSync(
   new URL('../../app/h/[hostId]/session/[worktreeId].tsx', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 const reconciliationHookSource = readFileSync(
   new URL('./use-mobile-session-tabs-reconciliation.ts', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 const autoCreateHookSource = readFileSync(
   new URL('./use-initial-session-terminal-autocreate.ts', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 
 function sliceBetween(startPattern: string, endPattern: string): string {
   const start = source.indexOf(startPattern)

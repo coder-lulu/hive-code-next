@@ -5,15 +5,15 @@ import { describe, expect, it } from 'vitest'
 const terminalWebViewSource = readFileSync(
   new URL('./TerminalWebView.tsx', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 const terminalHtmlSource = readFileSync(
   new URL('./terminal-webview-html.ts', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 const terminalWebglRecoverySource = readFileSync(
   new URL('./terminal-webview-webgl-recovery-injected.ts', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 
 function extractStatusDotNormalizer() {
   const declarationStart = terminalHtmlSource.indexOf('  var CLAUDE_STATUS_DOT =')
