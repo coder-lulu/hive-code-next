@@ -24,15 +24,18 @@ const productManifest = require('./product/hivecode.product.json')
 // Developer ID signature, and notarization ticket — or Squirrel.Mac refuses to
 // swap them over an installed Orca and macOS treats each build as a new app.
 const isMacHourly = process.env.ORCA_MAC_HOURLY === '1'
+const isMacDaily = process.env.ORCA_MAC_DAILY === '1'
 const isMacAdhoc = process.env.ORCA_MAC_ADHOC === '1'
-const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacAdhoc
+const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
 const localBuildVersion = isMacRelease ? undefined : process.env.ORCA_LOCAL_BUILD_VERSION
 const devChannelBuildVersion = isMacHourly
   ? process.env.ORCA_HOURLY_BUILD_VERSION
-  : isMacAdhoc
-    ? process.env.ORCA_ADHOC_BUILD_VERSION
-    : undefined
+  : isMacDaily
+    ? process.env.ORCA_DAILY_BUILD_VERSION
+    : isMacAdhoc
+      ? process.env.ORCA_ADHOC_BUILD_VERSION
+      : undefined
 const appId = productManifest.desktop.appId
 if (!appId) {
   throw new Error('HiveCode desktop appId must be configured before packaging')

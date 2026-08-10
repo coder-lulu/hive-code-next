@@ -1,9 +1,9 @@
 import { compareAppVersions, isValidAppVersion } from './app-version'
 import { resolveProductUpdateSource } from './product-update-source'
 
-export type ReleaseChannel = 'stable' | 'rc' | 'hourly' | 'adhoc'
+export type ReleaseChannel = 'stable' | 'rc' | 'hourly' | 'daily' | 'adhoc'
 
-// Why: hourly/adhoc are retained as historical version kinds, but their upstream
+// Why: hourly/daily/adhoc are retained as historical version kinds, but their upstream
 // workflows publish to repositories that the product manifest does not
 // configure. They must remain unavailable until dedicated product sources exist.
 export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'rc']
@@ -12,17 +12,18 @@ export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = 
   stable: 'Stable',
   rc: 'RC',
   hourly: 'Hourly',
+  daily: 'Daily',
   adhoc: 'Adhoc'
 }
 
 export const HOURLY_PRERELEASE_IDENTIFIER = 'hourly'
+export const DAILY_PRERELEASE_IDENTIFIER = 'daily'
 export const ADHOC_PRERELEASE_IDENTIFIER = 'adhoc'
 
 /** Historical dev channels whose upstream workflows publish outside the main repo. */
-const DEDICATED_REPO_CHANNELS = ['hourly', 'adhoc'] as const
+const DEDICATED_REPO_CHANNELS = ['hourly', 'daily', 'adhoc'] as const
 
 export type DedicatedRepoChannel = (typeof DEDICATED_REPO_CHANNELS)[number]
-
 export function isReleaseChannel(value: unknown): value is ReleaseChannel {
   return typeof value === 'string' && RELEASE_CHANNELS.includes(value as ReleaseChannel)
 }
@@ -62,14 +63,19 @@ export function normalizeTagToVersion(tag: string): string {
  *  uniquely versioned so electron-updater never reads one as "same version". */
 const HOURLY_VERSION = /^\d+\.\d+\.\d+-hourly\.(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/
 
+/** `1.4.160-daily.202607281415` — same minute stamp as hourly. Daily cuts once
+ *  per day, so collisions are not a concern; the stamp still carries the hour so
+ *  a forced re-cut the same calendar day remains unique. */
+const DAILY_VERSION = /^\d+\.\d+\.\d+-daily\.(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/
+
 /**
  * `1.4.160-adhoc.20260728140533` — same idea, but stamped to the second.
  *
- * Why seconds here and not for hourly: hourly runs under a concurrency group, so
- * two of them can never be cut in the same minute. Adhoc builds are dispatched
- * on demand by whoever wants one, so two people cutting from different branches
- * at once is ordinary — and a minute-resolution stamp would collide on the tag
- * and fail the second build eight minutes in.
+ * Why seconds here and not for hourly/daily: those run under a concurrency
+ * group, so two of them can never be cut in the same minute. Adhoc builds are
+ * dispatched on demand by whoever wants one, so two people cutting from
+ * different branches at once is ordinary — and a minute-resolution stamp would
+ * collide on the tag and fail the second build eight minutes in.
  */
 const ADHOC_VERSION = /^\d+\.\d+\.\d+-adhoc\.(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/
 
@@ -103,12 +109,20 @@ export function isHourlyVersion(version: string): boolean {
   return HOURLY_VERSION.test(normalizeTagToVersion(version))
 }
 
+export function isDailyVersion(version: string): boolean {
+  return DAILY_VERSION.test(normalizeTagToVersion(version))
+}
+
 export function isAdhocVersion(version: string): boolean {
   return ADHOC_VERSION.test(normalizeTagToVersion(version))
 }
 
 export function formatHourlyVersion(baseVersion: string, stamp: string): string {
   return `${baseVersion}-${HOURLY_PRERELEASE_IDENTIFIER}.${stamp}`
+}
+
+export function formatDailyVersion(baseVersion: string, stamp: string): string {
+  return `${baseVersion}-${DAILY_PRERELEASE_IDENTIFIER}.${stamp}`
 }
 
 export function formatAdhocVersion(baseVersion: string, stamp: string): string {
@@ -120,15 +134,24 @@ export function parseHourlyVersionStamp(version: string): Date | null {
   return parseStampedVersion(version, HOURLY_VERSION)
 }
 
+/** Returns the build's UTC timestamp, or null when the version isn't daily. */
+export function parseDailyVersionStamp(version: string): Date | null {
+  return parseStampedVersion(version, DAILY_VERSION)
+}
+
 /** Returns the build's UTC timestamp, or null when the version isn't adhoc. */
 export function parseAdhocVersionStamp(version: string): Date | null {
   return parseStampedVersion(version, ADHOC_VERSION)
 }
 
-/** The build's UTC timestamp for either dev channel, so a picker row can render
- *  a date without first working out which channel produced the version. */
+/** The build's UTC timestamp for any dev channel, so a picker row can render a
+ *  date without first working out which channel produced the version. */
 export function parseDevBuildStamp(version: string): Date | null {
-  return parseHourlyVersionStamp(version) ?? parseAdhocVersionStamp(version)
+  return (
+    parseHourlyVersionStamp(version) ??
+    parseDailyVersionStamp(version) ??
+    parseAdhocVersionStamp(version)
+  )
 }
 
 export function getVersionChannel(version: string): ReleaseChannel | null {
@@ -138,6 +161,9 @@ export function getVersionChannel(version: string): ReleaseChannel | null {
   }
   if (isHourlyVersion(normalized)) {
     return 'hourly'
+  }
+  if (isDailyVersion(normalized)) {
+    return 'daily'
   }
   if (isAdhocVersion(normalized)) {
     return 'adhoc'

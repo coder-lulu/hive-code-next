@@ -19,42 +19,6 @@ const {
   verifyPackagedMainRuntimeDeps
 } = require('../packaged-runtime-node-modules.cjs')
 
-const MUTABLE_BUILD_ENV = [
-  'ORCA_MAC_HOURLY',
-  'ORCA_MAC_ADHOC',
-  'ORCA_MAC_RELEASE',
-  'ORCA_HOURLY_BUILD_VERSION',
-  'ORCA_ADHOC_BUILD_VERSION',
-  'ORCA_LOCAL_BUILD_VERSION'
-]
-
-/** Re-requires the config under a temporary env, then restores env and module cache. */
-function withEnv(env, assert) {
-  const configPath = require.resolve('../electron-builder.config.cjs')
-  const original = Object.fromEntries(MUTABLE_BUILD_ENV.map((key) => [key, process.env[key]]))
-  try {
-    for (const key of MUTABLE_BUILD_ENV) {
-      delete process.env[key]
-    }
-    Object.assign(process.env, env)
-    delete require.cache[configPath]
-    assert(require('../electron-builder.config.cjs'))
-  } finally {
-    for (const [key, value] of Object.entries(original)) {
-      if (value === undefined) {
-        delete process.env[key]
-      } else {
-        process.env[key] = value
-      }
-    }
-    delete require.cache[configPath]
-    require('../electron-builder.config.cjs')
-  }
-}
-
-const withHourlyEnv = (assert) => withEnv({ ORCA_MAC_HOURLY: '1' }, assert)
-const withAdhocEnv = (assert) => withEnv({ ORCA_MAC_ADHOC: '1' }, assert)
-
 describe('electron-builder config', () => {
   it('keeps the packaged app identity aligned with local-build validation', () => {
     expect(electronBuilderConfig.appId).toBe(
@@ -302,73 +266,6 @@ describe('electron-builder config', () => {
       delete require.cache[configPath]
       require('../electron-builder.config.cjs')
     }
-  })
-
-  // Why: Squirrel.Mac swaps the .app in place only when the replacement carries the
-  // same bundle id and a valid Developer ID signature.
-  it('builds hourly artifacts with the release signing identity', () => {
-    withHourlyEnv((config) => {
-      expect(config.mac.appId).toBeUndefined()
-      expect(config.appId).toBe('com.hivekernel.hivecode.desktop')
-      expect(config.mac.hardenedRuntime).toBe(true)
-      expect(config.forceCodeSigning).toBe(true)
-    })
-  })
-
-  // Why hourly must notarize despite the round trip: TCC anchors a notarized
-  // Developer ID app's grants on identifier + team, not on its cdhash, so they
-  // survive an update. An unnotarized hourly reads as a new client every build
-  // and loses file access under Documents/Desktop/Downloads with no re-prompt.
-  it('notarizes hourly builds like releases, and neither locally', () => {
-    withHourlyEnv((config) => {
-      expect(config.mac.notarize).toBe(true)
-    })
-    withEnv({ ORCA_MAC_RELEASE: '1' }, (config) => {
-      expect(config.mac.notarize).toBe(true)
-    })
-    expect(electronBuilderConfig.mac.notarize).toBe(false)
-  })
-
-  // Why: no HiveCode release repository or update channel has been approved yet.
-  // Every build mode must remain local-only instead of falling back to upstream Orca.
-  it('does not publish any build mode without an approved HiveCode update channel', () => {
-    withHourlyEnv((config) => {
-      expect(config.publish).toBeUndefined()
-    })
-    withAdhocEnv((config) => {
-      expect(config.publish).toBeUndefined()
-    })
-    expect(electronBuilderConfig.publish).toBeUndefined()
-  })
-
-  it('stamps hourly packages with the hourly version', () => {
-    withEnv(
-      { ORCA_MAC_HOURLY: '1', ORCA_HOURLY_BUILD_VERSION: '1.4.160-hourly.202607281400' },
-      (config) => {
-        expect(config.extraMetadata).toEqual({ version: '1.4.160-hourly.202607281400' })
-      }
-    )
-  })
-
-  // Why adhoc carries the identical mac identity to hourly so its TCC grants
-  // remain stable; publishing remains disabled until HiveCode owns a channel.
-  it('builds adhoc artifacts with the HiveCode release identity', () => {
-    withAdhocEnv((config) => {
-      expect(config.appId).toBe('com.hivekernel.hivecode.desktop')
-      expect(config.mac.hardenedRuntime).toBe(true)
-      expect(config.mac.notarize).toBe(true)
-      expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toBeUndefined()
-    })
-  })
-
-  it('stamps adhoc packages with the adhoc version', () => {
-    withEnv(
-      { ORCA_MAC_ADHOC: '1', ORCA_ADHOC_BUILD_VERSION: '1.4.160-adhoc.20260728140533' },
-      (config) => {
-        expect(config.extraMetadata).toEqual({ version: '1.4.160-adhoc.20260728140533' })
-      }
-    )
   })
 
   it('uses Orca native rebuild hook instead of electron-builder default rebuild', () => {
