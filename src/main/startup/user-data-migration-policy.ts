@@ -25,6 +25,10 @@ const PROFILE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 
 type JsonRecord = Record<string, unknown>
 
+type MigrationProfileSummary = Omit<SanitizedMigrationProfile, 'data' | 'activeView'> & {
+  sourceKind: 'local' | 'cloud-linked'
+}
+
 export type SanitizedMigrationProfile = {
   id: string
   name: string
@@ -75,7 +79,8 @@ function readRegularFile(file: string, maxBytes: number, realRoot: string): stri
 function readJsonCandidate(
   paths: readonly string[],
   maxBytes: number,
-  realRoot: string
+  realRoot: string,
+  rejectForbiddenKeys = true
 ): unknown | null {
   let sawFile = false
   for (const file of paths) {
@@ -91,7 +96,7 @@ function readJsonCandidate(
       // Try a rolling backup before giving up on this profile.
       continue
     }
-    if (hasForbiddenMigrationKey(parsed)) {
+    if (rejectForbiddenKeys && hasForbiddenMigrationKey(parsed)) {
       throw new MigrationPolicyError('unsafe-source')
     }
     return parsed
@@ -106,13 +111,11 @@ function dataCandidates(dataFile: string): string[] {
   return [dataFile, ...Array.from({ length: 5 }, (_, index) => `${dataFile}.bak.${index}`)]
 }
 
-function sanitizeProfileSummary(
-  value: JsonRecord
-): Omit<SanitizedMigrationProfile, 'data' | 'activeView'> | null {
+function sanitizeProfileSummary(value: JsonRecord): MigrationProfileSummary | null {
   if (
     typeof value.id !== 'string' ||
     !PROFILE_ID_PATTERN.test(value.id) ||
-    value.kind !== 'local'
+    (value.kind !== 'local' && value.kind !== 'cloud-linked')
   ) {
     return null
   }
@@ -132,7 +135,8 @@ function sanitizeProfileSummary(
     avatar: { kind: 'initials', initials, color: 'neutral' },
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : now,
     updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : now,
-    lastOpenedAt: typeof value.lastOpenedAt === 'number' ? value.lastOpenedAt : now
+    lastOpenedAt: typeof value.lastOpenedAt === 'number' ? value.lastOpenedAt : now,
+    sourceKind: value.kind
   }
 }
 
@@ -159,11 +163,15 @@ function readActiveView(profileDirectory: string, realRoot: string): string | un
     : undefined
 }
 
-function serializeState(value: unknown): string {
-  if (hasForbiddenMigrationKey(value)) {
+function serializeState(value: unknown, allowForbiddenSourceKeys = false): string {
+  if (!allowForbiddenSourceKeys && hasForbiddenMigrationKey(value)) {
     throw new MigrationPolicyError('unsafe-source')
   }
-  return `${JSON.stringify(sanitizePersistedState(value), null, 2)}\n`
+  const sanitized = sanitizePersistedState(value)
+  if (hasForbiddenMigrationKey(sanitized)) {
+    throw new MigrationPolicyError('unsafe-source')
+  }
+  return `${JSON.stringify(sanitized, null, 2)}\n`
 }
 
 function readProfileIndex(root: string, realRoot: string): JsonRecord | null {
@@ -183,16 +191,24 @@ function readIndexedProfiles(
   if (!Array.isArray(index.profiles)) {
     return null
   }
+  const summaries = index.profiles
+    .slice(0, MAX_LOCAL_PROFILES)
+    .filter(isJsonRecord)
+    .map(sanitizeProfileSummary)
+    .filter((summary): summary is MigrationProfileSummary => summary !== null)
+  const localSummaries = summaries.filter((summary) => summary.sourceKind === 'local')
+  // HiveCode has no legacy cloud identity, so project cloud state only for cloud-only installs.
+  const selectedSummaries =
+    localSummaries.length > 0
+      ? localSummaries
+      : summaries.filter((summary) => summary.sourceKind === 'cloud-linked')
   const profiles: SanitizedMigrationProfile[] = []
   const ids = new Set<string>()
-  for (const rawProfile of index.profiles.slice(0, MAX_LOCAL_PROFILES)) {
-    if (!isJsonRecord(rawProfile)) {
+  for (const summary of selectedSummaries) {
+    if (ids.has(summary.id)) {
       continue
     }
-    const summary = sanitizeProfileSummary(rawProfile)
-    if (!summary || ids.has(summary.id)) {
-      continue
-    }
+    const { sourceKind, ...profileSummary } = summary
     const profileDirectory = join(root, 'profiles', summary.id)
     if (!existsSync(profileDirectory)) {
       continue
@@ -204,15 +220,16 @@ function readIndexedProfiles(
     const data = readJsonCandidate(
       dataCandidates(join(profileDirectory, DATA_FILE)),
       MAX_DATA_BYTES,
-      realRoot
+      realRoot,
+      sourceKind === 'local'
     )
     if (data === null) {
       continue
     }
     ids.add(summary.id)
     profiles.push({
-      ...summary,
-      data: serializeState(data),
+      ...profileSummary,
+      data: serializeState(data, sourceKind === 'cloud-linked'),
       activeView: readActiveView(profileDirectory, realRoot)
     })
   }

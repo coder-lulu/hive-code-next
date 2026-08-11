@@ -175,6 +175,48 @@ describe('user data migration policy', () => {
     expect(result?.profiles[0]?.activeView).toBe('{"activeView":"tasks"}\n')
   })
 
+  it('projects a cloud-only profile into a local profile without copying sensitive state', () => {
+    const source = makeRoot()
+    writeJson(join(source, 'orca-profile-index.json'), {
+      schemaVersion: 1,
+      activeProfileId: 'cloud-profile',
+      profiles: [{ id: 'cloud-profile', kind: 'cloud-linked', name: 'Cloud' }]
+    })
+    writeJson(join(source, 'profiles', 'cloud-profile', 'orca-data.json'), {
+      settings: {
+        theme: 'dark',
+        opencodeSessionCookie: 'must-not-copy'
+      },
+      workspaceSession: { providerSession: 'must-not-copy' }
+    })
+
+    const result = readSanitizedMigrationSource(source)
+
+    expect(result?.activeProfileId).toBe('cloud-profile')
+    expect(result?.profiles.map((profile) => profile.id)).toEqual(['cloud-profile'])
+    const sanitized = JSON.parse(result?.profiles[0]?.data ?? '{}')
+    expect(sanitized).toMatchObject({ settings: { theme: 'dark' } })
+    expect(sanitized).not.toHaveProperty('workspaceSession')
+    expect(sanitized.settings).not.toHaveProperty('opencodeSessionCookie')
+  })
+
+  it('continues to reject sensitive state in local indexed profiles', () => {
+    const source = makeRoot()
+    writeJson(join(source, 'orca-profile-index.json'), {
+      schemaVersion: 1,
+      activeProfileId: 'local-work',
+      profiles: [{ id: 'local-work', kind: 'local', name: 'Work' }]
+    })
+    writeJson(join(source, 'profiles', 'local-work', 'orca-data.json'), {
+      settings: { theme: 'dark' },
+      workspaceSession: { providerSession: 'must-not-copy' }
+    })
+
+    expect(() => readSanitizedMigrationSource(source)).toThrowError(
+      expect.objectContaining<Partial<MigrationPolicyError>>({ code: 'unsafe-source' })
+    )
+  })
+
   it('fails closed on sensitive keys in profile metadata and active-view files', () => {
     for (const sensitiveFile of ['index', 'active-view'] as const) {
       const source = makeRoot()
