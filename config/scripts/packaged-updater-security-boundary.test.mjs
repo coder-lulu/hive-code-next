@@ -11,9 +11,9 @@ const {
 
 const roots = []
 
-function validMainBundle() {
+function validMainBundle(runtimeProductConfigChunkName = 'product-config-fixture.js') {
   return `
-    const runtimeProductConfig = require("./chunks/product-config-fixture.js")
+    const runtimeProductConfig = require("./chunks/${runtimeProductConfigChunkName}")
     installProductUpdaterHttpExecutorBoundary(executor)
     executor.addRedirectHandlers = function boundedRedirectHandlers() {}
     executor.doApiRequest = function boundedApiRequest() {}
@@ -113,9 +113,10 @@ function validPackagedMetadata() {
 }
 
 async function createFixture({
-  main = validMainBundle(),
+  main,
   productConfig = validProductConfig(),
   runtimeProductConfig = validBundledMainProductConfig(),
+  runtimeProductConfigChunkName = 'product-config-fixture.js',
   packageMetadata = validPackagedMetadata(),
   renderer = 'const productName = "HiveCode"',
   productLogo = null,
@@ -180,8 +181,8 @@ async function createFixture({
     (await readFile(join(import.meta.dirname, '..', '..', 'resources', 'product-logo.png')))
   const entries = new Map([
     ['package.json', JSON.stringify({ ...packageMetadata, main: './out/main/index.js' })],
-    ['out/main/index.js', main],
-    ['out/main/chunks/product-config-fixture.js', runtimeProductConfig],
+    ['out/main/index.js', main ?? validMainBundle(runtimeProductConfigChunkName)],
+    [`out/main/chunks/${runtimeProductConfigChunkName}`, runtimeProductConfig],
     ['out/shared/generated/product-config.js', productConfig],
     ['out/renderer/assets/index.js', renderer],
     ['out/renderer/assets/product-logo-test.png', approvedProductLogo]
@@ -222,6 +223,31 @@ describe('packaged updater security boundary', () => {
         approvedProductLogoEntry: 'out/renderer/assets/product-logo-test.png',
         appUpdateYmlExists: false
       }
+    )
+  })
+
+  it('accepts the runtime product config in the current brand chunk', async () => {
+    const fixture = await createFixture({
+      runtimeProductConfigChunkName: 'brand-fixture.js'
+    })
+
+    expect(verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toMatchObject(
+      {
+        passed: true,
+        productConfigBundle: 'out/main/chunks/brand-fixture.js'
+      }
+    )
+  })
+
+  it('rejects multiple runtime product config chunk candidates', async () => {
+    const fixture = await createFixture({
+      mainChunks: {
+        'out/main/chunks/brand-decoy.js': validBundledMainProductConfig()
+      }
+    })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /exactly one runtime product config chunk \(found 2\)/i
     )
   })
 
@@ -355,7 +381,7 @@ describe('packaged updater security boundary', () => {
       'out/shared/unsafe.js'
     ]) {
       for (const authority of [
-        'https://github.com/stablyai/orca',
+        'https://github.com/stablyai/orca/releases',
         'https://onorca.dev/docs',
         'https://discord.gg/fzjDKHxv8Q',
         'https://x.com/orca_build'
@@ -372,13 +398,15 @@ describe('packaged updater security boundary', () => {
   })
 
   it('allows the isolated upstream skills source compatibility constant', async () => {
-    const compatibilitySource =
+    const rendererCompatibilitySource =
       'const ORCA_SKILLS_REPOSITORY_URL = "https://github.com/stablyai/orca";'
     const fixture = await createFixture({
-      renderer: `const productName = "HiveCode"; ${compatibilitySource}`,
+      renderer: `const productName = "HiveCode"; ${rendererCompatibilitySource}`,
       publicEntries: {
-        'out/web/assets/compat.js': compatibilitySource,
-        'out/shared/compat.js': compatibilitySource
+        'out/web/assets/compat.js':
+          'const C="https://github.com/stablyai/orca",A="orca-cli",L="computer-use";',
+        'out/shared/compat.js':
+          "exports.ORCA_SKILLS_REPOSITORY_URL = 'https://github.com/stablyai/orca';"
       }
     })
 

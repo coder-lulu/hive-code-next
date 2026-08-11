@@ -88,7 +88,7 @@ const FORBIDDEN_RENDERER_AUTHORITIES = [
 
 const LEGACY_ORCA_LOGO_FINGERPRINTS = ['viewBox="0 0 318.60232 202.66667"', '177.81311,248.33334']
 const ALLOWED_RENDERER_COMPATIBILITY_AUTHORITY_PATTERN =
-  /(?:const|let|var)\s+ORCA_SKILLS_REPOSITORY_URL\s*=\s*(["'])https:\/\/github\.com\/stablyai\/orca\1;?/g
+  /https:\/\/github\.com\/stablyai\/orca(?=["'])/g
 
 const RENDERER_TEXT_ENTRY_PATTERN = /^out\/renderer\/.*\.(?:css|html|js|json|svg)$/i
 const RENDERER_IMAGE_ENTRY_PATTERN = /^out\/renderer\/.*\.(?:jpe?g|png|svg|webp)$/i
@@ -96,7 +96,7 @@ const PUBLIC_RUNTIME_TEXT_ENTRY_PATTERN =
   /^out\/(?:renderer|web|shared)\/.*\.(?:css|html|c?js|mjs|json|svg)$/i
 const MAIN_TEXT_ENTRY_PATTERN = /^out\/main\/.*\.(?:c?js|mjs|json)$/i
 const MAIN_PRODUCT_CONFIG_ENTRY_PATTERN =
-  /^out\/main\/chunks\/product-config-[^/]+\.(?:c?js|mjs)$/i
+  /^out\/main\/chunks\/(?:brand|product-config)-[^/]+\.(?:c?js|mjs)$/i
 
 function normalizeAsarEntryPath(entry) {
   return entry.replace(/\\/g, '/').replace(/^\/+/, '')
@@ -415,7 +415,7 @@ function verifyPackagedRendererBrandBoundary(asar, asarPath, entries) {
     .join('\n')
   const inspectedPublicRuntimeSource = publicRuntimeSource.replace(
     ALLOWED_RENDERER_COMPATIBILITY_AUTHORITY_PATTERN,
-    'const ORCA_SKILLS_REPOSITORY_URL = "[upstream-compatibility-source]";'
+    '[upstream-skills-compatibility-source]'
   )
   for (const authority of FORBIDDEN_RENDERER_AUTHORITIES) {
     if (authority.pattern.test(inspectedPublicRuntimeSource)) {
