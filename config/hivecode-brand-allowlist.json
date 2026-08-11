@@ -148,7 +148,7 @@
     "src/shared/remote-runtime-transport-error-agreement.test.ts"
   ],
   "protectedFileHashes": {
-    ".gitignore": "713fe23278e106c0b3adea138781cf6665de2b94eef6afccdd827631495276aa",
+    ".gitignore": "b2b2cd68525190eb42501566e0ad6f28e26b570f671dbc54359bd16ce53e4649",
     ".gitattributes": "1f969a3716031ad8e140887998840865df4a43425de17656e5278547ca2423b6"
   }
 }

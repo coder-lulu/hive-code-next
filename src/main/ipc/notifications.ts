@@ -29,6 +29,7 @@ import { parsePaneKey } from '../../shared/stable-pane-id'
 import { setTrayAttention } from '../tray/system-tray'
 import { isMainWindowVisible } from '../window/main-window-visibility'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { getTrustedUIRendererWindow } from './ui'
 
 const NOTIFICATION_COOLDOWN_MS = 5000
 const MAX_RECENT_NOTIFICATION_KEYS = 50
@@ -513,8 +514,8 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
           const repoId = getRepoIdFromWorktreeId(args.worktreeId)
           clickHandler = () => {
             release()
-            const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed())
-            if (!win) {
+            const win = getTrustedUIRendererWindow()
+            if (!win || win.isDestroyed()) {
               return
             }
             if (process.platform === 'darwin') {
@@ -523,6 +524,7 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
             if (win.isMinimized()) {
               win.restore()
             }
+            win.show()
             win.focus()
             win.webContents.send('ui:activateWorktree', {
               repoId,
