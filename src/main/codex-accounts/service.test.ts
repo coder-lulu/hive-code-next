@@ -20,6 +20,7 @@ import { buildCodexResetCreditExpectedScope } from '../../shared/codex-reset-cre
 import type { CodexResetCreditAttemptLedger } from '../../shared/codex-reset-credit-attempt-ledger'
 import { buildWslCodexAvailabilityArgs, buildWslCodexLoginArgs } from './wsl-codex-command'
 import type { readHookTrustEntries as ReadHookTrustEntries } from '../codex/config-toml-trust'
+import { applyProductBranding } from '../../shared/brand'
 
 const testState = {
   userDataDir: '',
@@ -1213,7 +1214,7 @@ describe('CodexAccountService config sync', () => {
     )
 
     await expect(service.reauthenticateAccount('account-1')).rejects.toThrow(
-      'Managed Codex home is missing Orca ownership marker.'
+      applyProductBranding('Managed Codex home is missing Orca ownership marker.')
     )
     expect(spawnMock).not.toHaveBeenCalled()
     warnSpy.mockRestore()

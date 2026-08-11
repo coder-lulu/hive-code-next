@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileHostCard } from './MobileHostCard'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -154,7 +155,7 @@ describe('MobileHostCard', () => {
 
     const navigationButton = renderer.root.findAllByType('Pressable')[0]
     expect(navigationButton.props.accessibilityLabel).toBe(
-      'Open Desk, Connected, Orca Relay, Worktree list unavailable'
+      `Open Desk, Connected, ${APP_DISPLAY_NAME} Relay, Worktree list unavailable`
     )
     expect(
       renderer.root
@@ -193,7 +194,7 @@ describe('MobileHostCard', () => {
 
     const navigationButton = renderer.root.findAllByType('Pressable')[0]
     expect(navigationButton.props.accessibilityLabel).toBe(
-      "Open Desk, Can't reach desktop, Update desktop Orca and sign in to connect from anywhere"
+      `Open Desk, Can't reach desktop, Update desktop ${APP_DISPLAY_NAME} and sign in to connect from anywhere`
     )
   })
 })

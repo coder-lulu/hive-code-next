@@ -6,6 +6,7 @@ import type {
   ComputerSnapshotResult
 } from '../../shared/runtime-types'
 import type { CommandHandler } from '../dispatch'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
 import {
@@ -53,7 +54,7 @@ export const COMPUTER_HANDLERS: Record<string, CommandHandler> = {
         return 'Computer-use permission setup is only required on macOS.'
       }
       const firstLine = value.launchedHelper
-        ? 'Opened Orca Computer Use permission setup.'
+        ? `Opened ${APP_DISPLAY_NAME} Computer Use permission setup.`
         : 'Computer Use permissions checked.'
       return [
         firstLine,
@@ -63,7 +64,7 @@ export const COMPUTER_HANDLERS: Record<string, CommandHandler> = {
           ? `Next: ${value.nextStep}`
           : 'Computer Use permissions are already granted.',
         value.launchedHelper
-          ? 'Use the Allow buttons or drag "Orca Computer Use" into the macOS permission list.'
+          ? `Use the Allow buttons or drag "${APP_DISPLAY_NAME} Computer Use" into the macOS permission list.`
           : null
       ]
         .filter((line) => line !== null)

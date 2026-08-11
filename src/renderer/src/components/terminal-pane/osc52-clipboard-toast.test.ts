@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import en from '@/i18n/locales/en.json'
 import es from '@/i18n/locales/es.json'
 import ja from '@/i18n/locales/ja.json'
@@ -118,8 +119,7 @@ describe('showOsc52ClipboardFailedToast', () => {
     showOsc52ClipboardFailedToast()
 
     expect(toastErrorMock).toHaveBeenCalledWith('Terminal clipboard copy could not be confirmed', {
-      description:
-        'The terminal app requested a copy, but Orca could not confirm that it reached the system clipboard.',
+      description: `The terminal app requested a copy, but ${APP_DISPLAY_NAME} could not confirm that it reached the system clipboard.`,
       duration: 12_000
     })
   })

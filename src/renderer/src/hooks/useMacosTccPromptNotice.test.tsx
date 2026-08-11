@@ -4,6 +4,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { getDefaultSettings } from '../../../shared/constants'
 import { UI_LANGUAGE_SPANISH } from '../../../shared/ui-language'
 import { useAppStore } from '@/store'
@@ -113,10 +114,9 @@ it('connects the notice to the macOS prompt and keeps it open until closed', asy
   showNotice?.({ promptCount: 1 }, acknowledge)
 
   expect(toastWarning).toHaveBeenCalledWith(
-    'Seeing “Orca would like to access…” prompts?',
+    `Seeing “${APP_DISPLAY_NAME} would like to access…” prompts?`,
     expect.objectContaining({
-      description:
-        'Permission messages from macOS may appear when an agent or terminal tool running in Orca attempts to access protected files. Grant Full Disk Access in Settings to reduce these prompts.'
+      description: `Permission messages from macOS may appear when an agent or terminal tool running in ${APP_DISPLAY_NAME} attempts to access protected files. Grant Full Disk Access in Settings to reduce these prompts.`
     })
   )
   const options = toastWarning.mock.calls[0]?.[1] as

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createTestStore } from './store-test-helpers'
 import type { Repo } from '../../../../shared/types'
 import {
@@ -196,7 +197,7 @@ describe('repo slice runtime folder fallback', () => {
     expect(toastError).toHaveBeenCalledWith(
       'Failed to add project',
       expect.objectContaining({
-        description: 'Update Orca server to open non-Git folders on this runtime.'
+        description: `Update ${APP_DISPLAY_NAME} server to open non-Git folders on this runtime.`
       })
     )
   })

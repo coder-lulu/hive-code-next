@@ -2,6 +2,7 @@ import os from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as TracerModule from './observability/tracer'
 import type * as UpdaterModule from './updater'
+import { applyProductBranding } from '../shared/brand'
 
 const {
   appMock,
@@ -131,8 +132,9 @@ const DEB_ELEVATION_ERROR =
   'Error: Command failed: /usr/bin/pkexec --disable-internal-agent "/bin/bash" "-c" "dpkg -i \'/home/u/.cache/orca-updater/pending/orca-ide_1.4.163_amd64.deb\'"\npkexec must be setuid root'
 
 // electron-updater's ERR_UPDATER_INVALID_SIGNATURE text, which drives its own card in UpdateCard.
-const WINDOWS_SIGNATURE_MISMATCH_ERROR =
+const WINDOWS_SIGNATURE_MISMATCH_ERROR = applyProductBranding(
   'New version 1.4.163 is not signed by the application owner: publisherNames: Orca, Inc.'
+)
 
 type CapturedSpan = {
   readonly name: string

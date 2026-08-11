@@ -6,6 +6,7 @@ import type { FeatureInteractionState } from '../../../shared/feature-interactio
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { MIN_COMPATIBLE_RUNTIME_SERVER_VERSION } from '../../../shared/protocol-version'
+import { applyProductBranding } from '@/product-brand'
 
 const TEST_COMMIT_OID = '0123456789abcdef0123456789abcdef01234567'
 
@@ -253,7 +254,7 @@ describe('web runtime environment identity', () => {
 
     await expect(
       globals.window.api.runtimeEnvironments.resolve({ selector: 'web-server-a' })
-    ).rejects.toThrow('Unknown Orca runtime environment: web-server-a')
+    ).rejects.toThrow(applyProductBranding('Unknown Orca runtime environment: web-server-a'))
   })
 
   it('keeps pairing state separate from generic Active Server settings writes', async () => {
@@ -325,7 +326,7 @@ describe('web runtime environment identity', () => {
       globals.window.api.settings.setActiveRuntimeEnvironmentPreference({
         environmentId: 'unknown-server'
       })
-    ).rejects.toThrow('Unknown Orca runtime environment: unknown-server')
+    ).rejects.toThrow(applyProductBranding('Unknown Orca runtime environment: unknown-server'))
     expect(JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}')).toMatchObject({
       activeRuntimeEnvironmentId: paired.environment.id
     })
@@ -360,7 +361,7 @@ describe('web runtime environment identity', () => {
 
     await expect(
       globals.window.api.runtimeEnvironments.resolve({ selector: 'web-server-old' })
-    ).rejects.toThrow('Unknown Orca runtime environment: web-server-old')
+    ).rejects.toThrow(applyProductBranding('Unknown Orca runtime environment: web-server-old'))
   })
 
   it('keeps pairing while manual disconnect fences passive reconnects', async () => {
@@ -605,7 +606,9 @@ describe('web runtime environment identity', () => {
     ).resolves.toMatchObject({
       ok: false,
       kind: 'environment-save-failed',
-      message: 'Orca verified the host but could not save it. Check browser storage and try again.'
+      message: applyProductBranding(
+        'Orca verified the host but could not save it. Check browser storage and try again.'
+      )
     })
     await expect(globals.window.api.runtimeEnvironments.list()).resolves.toMatchObject([
       { id: 'web-server-a' }
@@ -3018,7 +3021,7 @@ describe('web worktree preload API', () => {
     })
 
     await expect(serverAList).rejects.toThrow(
-      'The paired Orca server changed while the request was in progress.'
+      applyProductBranding('The paired Orca server changed while the request was in progress.')
     )
     await expect(globals.window.api.worktrees.listAll()).resolves.toMatchObject([
       { id: 'worktree-b', runtimeOwnerEnvironmentId: paired.environment.id }
@@ -3188,7 +3191,7 @@ describe('web worktree preload API', () => {
     })
 
     await expect(detected).rejects.toThrow(
-      'The paired Orca server changed while the request was in progress.'
+      applyProductBranding('The paired Orca server changed while the request was in progress.')
     )
     expect(runtimeCalls).toEqual(['worktree.detectedList'])
   })

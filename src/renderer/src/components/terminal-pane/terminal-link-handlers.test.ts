@@ -25,6 +25,7 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '@/runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '@/runtime/runtime-rpc-client'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const openUrlMock = vi.fn()
 const openFileUriMock = vi.fn()
@@ -1535,7 +1536,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     links[0]!.hover?.({} as MouseEvent, links[0]!.text)
 
     expect(linkTooltip.textContent).toBe(
-      '/repo/CLAUDE.md (Click for actions or ⌘+click to open in Orca)'
+      `/repo/CLAUDE.md (Click for actions or ⌘+click to open in ${APP_DISPLAY_NAME})`
     )
   })
 

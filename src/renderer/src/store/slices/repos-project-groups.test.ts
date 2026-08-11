@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createTestStore } from './store-test-helpers'
 import type {
   NestedRepoScanResult,
@@ -862,7 +863,7 @@ describe('project group store routing', () => {
         name: 'Broken folder'
       })
     ).rejects.toThrow(
-      'Folder not found. Orca cannot find /srv/app. Remove and re-import the folder.'
+      `Folder not found. ${APP_DISPLAY_NAME} cannot find /srv/app. Remove and re-import the folder.`
     )
   })
 })

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
@@ -195,8 +196,7 @@ describe('runtime-status slice', () => {
       "Can't reach Dev Box",
       expect.objectContaining({
         id: 'runtime-environment-disconnected:env-a',
-        description:
-          'Check that Orca is running on this server and that your network connection is working, then try again.',
+        description: `Check that ${APP_DISPLAY_NAME} is running on this server and that your network connection is working, then try again.`,
         action: expect.objectContaining({ label: 'Try again' })
       })
     )

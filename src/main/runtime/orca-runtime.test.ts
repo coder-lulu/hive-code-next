@@ -21,6 +21,7 @@ import type {
   WorkspaceSessionState
 } from '../../shared/types'
 import { AGENT_STATUS_STALE_AFTER_MS } from '../../shared/agent-status-types'
+import { applyProductBranding } from '../../shared/brand'
 import {
   reviewHeadRemoteRefComponent,
   REVIEW_HEAD_FETCH_TIMEOUT_MS
@@ -41054,8 +41055,9 @@ describe('OrcaRuntimeService', () => {
     expect(result.warnings).toEqual([
       expect.objectContaining({
         code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-        message:
+        message: applyProductBranding(
           'Worktree created, but Orca could not validate the current directory as a parent context.'
+        )
       })
     ])
   })

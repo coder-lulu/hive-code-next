@@ -16,7 +16,7 @@ import {
   WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL
 } from '../../shared/windows-batch-spawn'
 import { isSkillsCliAgentKeyShaped, toSkillsCliAgentKeys } from '../../shared/skills-cli-agent-keys'
-import { applyProductBranding } from '../../shared/brand'
+import { applyProductBranding, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   buildAgentFeatureSkillInstallArgs,
   buildAgentFeatureSkillUpdateArgs
@@ -253,8 +253,8 @@ function formatSkillSelectionHelp(verb: SkillMutationVerb, skillNames: string[])
     `Choose one or more skills to ${verb}:`,
     ...skillNames.map((name) => `  ${name}`),
     '',
-    `Usage: orca skills ${verb} --skill <name> [--skill <name> ...]`,
-    `   or: orca skills ${verb} --all`
+    `Usage: ${PRIMARY_CLI_COMMAND} skills ${verb} --skill <name> [--skill <name> ...]`,
+    `   or: ${PRIMARY_CLI_COMMAND} skills ${verb} --all`
   ].join('\n')
 }
 

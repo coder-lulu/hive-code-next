@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../src/shared/brand'
+import { brandGuideMarkdown } from './generate-bundled-skill-guides.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 // Why: orca-linear and its legacy linear-tickets alias now ship hybrid discovery stubs, so
@@ -20,14 +22,14 @@ function skillBody(skill) {
 function normalizeLegacyBody(skill) {
   return skillBody(skill).replace(
     `# Linear Tickets (Legacy Name)\n\n${legacyIntro}\n\n`,
-    '# Orca Linear\n\n'
+    `# ${APP_DISPLAY_NAME} Linear\n\n`
   )
 }
 
 describe('orca-linear skill guidance', () => {
   it('keeps canonical and legacy Linear guide bodies from drifting', () => {
-    const canonical = readFileSync(canonicalGuidePath, 'utf8')
-    const legacy = readFileSync(legacyGuidePath, 'utf8')
+    const canonical = brandGuideMarkdown(readFileSync(canonicalGuidePath, 'utf8'))
+    const legacy = brandGuideMarkdown(readFileSync(legacyGuidePath, 'utf8'))
 
     expect(canonical).toContain('name: orca-linear')
     expect(legacy).toContain('name: linear-tickets')
@@ -109,7 +111,7 @@ describe('orca-linear install stubs', () => {
       const frontmatter = (text) => /^---\n[\s\S]*?\n---\n/u.exec(text)[0]
 
       expect(frontmatter(readFileSync(stubPath, 'utf8'))).toBe(
-        frontmatter(readFileSync(guidePath, 'utf8'))
+        frontmatter(brandGuideMarkdown(readFileSync(guidePath, 'utf8')))
       )
     })
   }

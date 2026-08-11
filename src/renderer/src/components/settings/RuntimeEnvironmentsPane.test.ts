@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applyProductBranding } from '@/product-brand'
 import {
   MIN_COMPATIBLE_RUNTIME_SERVER_VERSION,
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
@@ -207,7 +208,9 @@ describe('RuntimeEnvironmentsPane host details', () => {
     expect(getActiveServerModeDescription(true)).toContain('Use this computer by default')
     expect(getActiveServerModeDescription(true)).toContain('browser/mobile handoff')
     expect(getActiveServerModeDescription(false)).toContain('default Host')
-    expect(getActiveServerModeDescription(false)).toContain('paired Orca runtime')
+    expect(getActiveServerModeDescription(false)).toContain(
+      applyProductBranding('paired Orca runtime')
+    )
   })
 
   it('blocks removing the active server independently of local-runtime availability', () => {

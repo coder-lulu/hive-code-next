@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME, applyProductBranding } from '@/product-brand'
 
 import ko from '@/i18n/locales/ko.json'
 import { i18n } from '@/i18n/i18n'
@@ -64,7 +65,7 @@ describe('browser settings search copy', () => {
   // it, so the default output has to stay byte-identical to the pre-feature copy.
   it('keeps the pre-feature wording while inverting is off', () => {
     expect(getBrowserLinkRoutingDescription({ isMac: true })).toBe(
-      "Open http(s) links in Orca's built-in browser — from the terminal, markdown, and the editor. ⇧⌘-click always uses your system browser."
+      `Open http(s) links in ${APP_DISPLAY_NAME}'s built-in browser — from the terminal, markdown, and the editor. ⇧⌘-click always uses your system browser.`
     )
     expect(getBrowserLinkRoutingDescription({ isMac: false })).toContain(
       'Shift+Ctrl+click always uses your system browser.'
@@ -89,7 +90,7 @@ describe('browser link routing modifier copy', () => {
       'Default Search Engine',
       'Default Zoom',
       'Link Routing',
-      'Hold Shift to open in Orca',
+      `Hold Shift to open in ${APP_DISPLAY_NAME}`,
       'Show terminal link actions',
       'Localhost Worktree Labels',
       'Session & Cookies'
@@ -97,7 +98,7 @@ describe('browser link routing modifier copy', () => {
   })
 
   it('names the destination the modifier actually reaches', () => {
-    expect(getLinkRoutingModifierTitle(false)).toBe('Hold Shift to open in Orca')
+    expect(getLinkRoutingModifierTitle(false)).toBe(`Hold Shift to open in ${APP_DISPLAY_NAME}`)
     expect(getLinkRoutingModifierTitle(true)).toBe('Hold Shift to open in your web browser')
   })
 
@@ -112,7 +113,7 @@ describe('browser link routing modifier copy', () => {
 
   it('points the description at Orca only when links currently open externally', () => {
     expect(getLinkRoutingModifierDescription({ openLinksInApp: false, isMac: true })).toContain(
-      "Orca's built-in browser"
+      `${APP_DISPLAY_NAME}'s built-in browser`
     )
     expect(getLinkRoutingModifierDescription({ openLinksInApp: true, isMac: true })).toContain(
       'system browser'
@@ -157,10 +158,10 @@ describe('Link Routing description localization', () => {
     await i18n.changeLanguage('ko')
 
     const description = getBrowserLinkRoutingDescription({ isMac: true })
-    expect(description).toBe(koCopy.replace('{{shortcut}}', '⇧⌘-click'))
+    expect(description).toBe(applyProductBranding(koCopy.replace('{{shortcut}}', '⇧⌘-click')))
     expect(description).not.toMatch(/\{\{.+?\}\}/)
     // Fails when the copy is a hardcoded English literal.
-    expect(description).not.toContain("Orca's built-in browser")
+    expect(description).not.toContain(`${APP_DISPLAY_NAME}'s built-in browser`)
 
     // The entry title is localized too, so match on the description instead.
     const entry = getBrowserPaneSearchEntries({ isMac: true }).find(
@@ -169,7 +170,9 @@ describe('Link Routing description localization', () => {
     expect(entry).toBeDefined()
 
     await i18n.changeLanguage('en')
-    expect(getBrowserLinkRoutingDescription({ isMac: true })).toContain("Orca's built-in browser")
+    expect(getBrowserLinkRoutingDescription({ isMac: true })).toContain(
+      `${APP_DISPLAY_NAME}'s built-in browser`
+    )
   })
 
   it('renders the Korean copy for the invert-on variant', async () => {
@@ -182,9 +185,9 @@ describe('Link Routing description localization', () => {
     await i18n.changeLanguage('ko')
 
     const description = getBrowserLinkRoutingDescription({ isMac: true }, true)
-    expect(description).toBe(koBase)
+    expect(description).toBe(applyProductBranding(koBase))
     // Fails when the invert-on branch regresses to a hardcoded English literal.
-    expect(description).not.toContain("Orca's built-in browser")
+    expect(description).not.toContain(`${APP_DISPLAY_NAME}'s built-in browser`)
   })
 
   it('uses the catalog key rather than an inline literal', () => {

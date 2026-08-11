@@ -4,6 +4,7 @@ import type { PairingOffer } from './pairing'
 import { decrypt, encrypt } from './e2ee-crypto'
 import { getRemoteRuntimeRequestAdmissionEvidence } from './remote-runtime-prepared-request-admission'
 import type { RemoteRuntimeWebSocketCallbacks } from './remote-runtime-request-websocket'
+import { applyProductBranding } from './brand'
 
 const opens: FakeOpenedSocket[] = []
 
@@ -83,7 +84,9 @@ describe('RemoteRuntimeRequestConnection stale socket callbacks', () => {
     connection.close()
     connection.close()
 
-    await expect(request).rejects.toThrow('Remote Orca runtime closed the connection.')
+    await expect(request).rejects.toThrow(
+      applyProductBranding('Remote Orca runtime closed the connection.')
+    )
     expect(socket.cleanup).toHaveBeenCalledTimes(1)
     expect(socket.ws.close).toHaveBeenCalledTimes(1)
   })

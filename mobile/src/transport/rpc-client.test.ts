@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { connect } from './rpc-client'
 import { encodeTerminalStreamFrame, TerminalStreamOpcode } from './terminal-stream-protocol'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('./e2ee', () => ({
   generateKeyPair: () => ({
@@ -594,7 +595,9 @@ describe('mobile rpc-client connection timeout', () => {
 
       await vi.advanceTimersByTimeAsync(1)
       await Promise.resolve()
-      expect(requestOutcome).toBe('Timed out while connecting to the remote Orca runtime.')
+      expect(requestOutcome).toBe(
+        `Timed out while connecting to the remote ${APP_DISPLAY_NAME} runtime.`
+      )
     } finally {
       client.close()
       await request.catch(() => undefined)

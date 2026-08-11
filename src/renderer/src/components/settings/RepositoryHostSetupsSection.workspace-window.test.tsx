@@ -12,6 +12,7 @@ import type { RuntimeStatus } from '../../../../shared/runtime-types'
 import type { Project, ProjectHostSetup, Repo } from '../../../../shared/types'
 import { useAppStore } from '../../store'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 let container: HTMLDivElement
 let root: Root
@@ -115,7 +116,7 @@ describe('RepositoryHostSetupsSection workspace window availability', () => {
     expect(currentSetup?.textContent).not.toContain('Ready')
     // The host is reachable — this must not be reported as a lost connection.
     expect(container.textContent).not.toContain('Disconnected')
-    expect(container.textContent).toContain('Open Orca on')
+    expect(container.textContent).toContain(`Open ${APP_DISPLAY_NAME} on`)
   })
 
   it('keeps a graph-ready runtime owner Ready when it reports no desktop window', () => {

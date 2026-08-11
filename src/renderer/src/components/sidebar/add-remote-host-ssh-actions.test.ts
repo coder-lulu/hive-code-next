@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SshTarget } from '../../../../shared/ssh-types'
 import { EMPTY_FORM } from '../settings/ssh-target-draft'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -206,6 +207,6 @@ describe('SSH config picker response admission', () => {
         },
         {} as never
       )
-    ).rejects.toThrow('Restart Orca')
+    ).rejects.toThrow(`Restart ${APP_DISPLAY_NAME}`)
   })
 })

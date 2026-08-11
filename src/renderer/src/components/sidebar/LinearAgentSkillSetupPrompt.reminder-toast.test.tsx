@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import type { CliInstallStatus } from '../../../../shared/cli-install-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LINEAR_AGENT_SKILL_NAMES } from '@/lib/agent-feature-install-commands'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   LinearAgentSkillSetupPrompt,
   _linearAgentSkillSetupPromptInternalsForTests
@@ -218,11 +219,10 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
       'Enable agents to read and edit the attached Linear ticket.'
     )
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI and Linear skill are missing',
+      `${APP_DISPLAY_NAME} CLI and Linear skill are missing`,
       expect.objectContaining({
         id: 'linear-agent-skill-setup-orca.linearTicketsSkill.setupDismissed.host',
-        description:
-          'Install the Orca CLI and the Linear skill to enable your agents to read and edit Linear tasks.',
+        description: `Install the ${APP_DISPLAY_NAME} CLI and the Linear skill to enable your agents to read and edit Linear tasks.`,
         action: {
           label: 'Set up',
           onClick: expect.any(Function)
@@ -237,9 +237,9 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
     await renderPrompt({ linked: true, remote: false, surface: 'modal' })
 
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI is missing',
+      `${APP_DISPLAY_NAME} CLI is missing`,
       expect.objectContaining({
-        description: 'Install the Orca CLI to enable your agents to read and edit Linear tasks.'
+        description: `Install the ${APP_DISPLAY_NAME} CLI to enable your agents to read and edit Linear tasks.`
       })
     )
   })
@@ -249,10 +249,9 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
     await renderPrompt({ linked: true, remote: true, surface: 'modal' })
 
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI and Linear skill are missing',
+      `${APP_DISPLAY_NAME} CLI and Linear skill are missing`,
       expect.objectContaining({
-        description:
-          'Install the Orca CLI and the Linear skill to enable your agents to read and edit Linear tasks. Remote agent environments may need their own setup.'
+        description: `Install the ${APP_DISPLAY_NAME} CLI and the Linear skill to enable your agents to read and edit Linear tasks. Remote agent environments may need their own setup.`
       })
     )
   })
@@ -274,10 +273,9 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
     await renderPrompt(wslProps)
 
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI and Linear skill are missing',
+      `${APP_DISPLAY_NAME} CLI and Linear skill are missing`,
       expect.objectContaining({
-        description:
-          'Install the Orca CLI and the Linear skill to enable your agents to read and edit Linear tasks. This setup runs in the selected WSL agent runtime.'
+        description: `Install the ${APP_DISPLAY_NAME} CLI and the Linear skill to enable your agents to read and edit Linear tasks. This setup runs in the selected WSL agent runtime.`
       })
     )
   })

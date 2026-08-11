@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applyProductBranding } from '../../src/shared/brand'
 
 import { repairTranslatedValue } from './locale-translation-policy.mjs'
 
@@ -24,11 +25,13 @@ describe('locale-translation-policy es PR glossary', () => {
 
   it('rewrites PR inside longer sentences', () => {
     expect(
-      repairEs(
-        'Add Orca attribution to commits, PRs, and issues.',
-        'Agregue la atribución de Orca a commits, relaciones públicas y problemas.'
+      applyProductBranding(
+        repairEs(
+          'Add Orca attribution to commits, PRs, and issues.',
+          'Agregue la atribución de Orca a commits, relaciones públicas y problemas.'
+        )
       )
-    ).toBe('Agregue la atribución de Orca a commits, PR y problemas.')
+    ).toBe(applyProductBranding('Agregue la atribución de Orca a commits, PR y problemas.'))
     expect(
       repairEs(
         'Open the PR details to view current reviewers.',

@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings, TaskProvider } from '../../../../shared/types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { TaskProviderReadiness } from './task-source-setup-state'
 import { TasksPane } from './TasksPane'
 
@@ -51,7 +52,7 @@ vi.mock('./TaskSourceSimpleSetup', () => ({
     <div data-testid={`code-host-${props.providerLabel}`}>
       {props.unavailable ? (
         <>
-          <span>Orca couldn&apos;t check this connection</span>
+          <span>{APP_DISPLAY_NAME} couldn&apos;t check this connection</span>
           <button type="button" onClick={props.onRetryConnection}>
             Try again
           </button>
@@ -380,7 +381,7 @@ describe('TasksPane', () => {
     await renderInteractivePane()
 
     expect(container?.textContent).toContain('Status unavailable')
-    expect(container?.textContent).toContain("Orca couldn't check this connection")
+    expect(container?.textContent).toContain(`${APP_DISPLAY_NAME} couldn't check this connection`)
     const retry = Array.from(container?.querySelectorAll('button') ?? []).find(
       (button) => button.textContent === 'Try again'
     )

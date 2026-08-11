@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applyProductBranding } from '../../src/shared/brand'
 
 import { LOCALIZABLE_GENERIC_TERMS } from './locale-generic-ui-terms.mjs'
 import { NEVER_TRANSLATE_VALUES, repairTranslatedValue } from './locale-translation-policy.mjs'
@@ -120,13 +121,15 @@ describe('locale generic UI terms', () => {
   it('does not cut a valid word that contains a nonsense rendering', () => {
     // 终端子进程 is "terminal sub-process" — 端子 sits inside 终端 + 子.
     expect(
-      repairTranslatedValue({
-        key: 'auto.components.settings.AdvancedNetworkSettingsSection.823e0f15b1',
-        enValue: 'Proxy URL for Orca network requests and local terminal subprocesses.',
-        localeValue: '用于 Orca 网络请求和本地终端子进程的代理 URL。',
-        locale: 'zh'
-      })
-    ).toBe('用于 Orca 网络请求和本地终端子进程的代理 URL。')
+      applyProductBranding(
+        repairTranslatedValue({
+          key: 'auto.components.settings.AdvancedNetworkSettingsSection.823e0f15b1',
+          enValue: 'Proxy URL for Orca network requests and local terminal subprocesses.',
+          localeValue: '用于 Orca 网络请求和本地终端子进程的代理 URL。',
+          locale: 'zh'
+        })
+      )
+    ).toBe(applyProductBranding('用于 Orca 网络请求和本地终端子进程的代理 URL。'))
   })
 
   it('still fills in a translation when the catalog holds English', () => {

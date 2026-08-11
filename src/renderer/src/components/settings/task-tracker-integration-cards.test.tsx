@@ -7,6 +7,7 @@ import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { TooltipProvider } from '../ui/tooltip'
 import { LinearIntegrationCard } from './task-tracker-integration-cards'
+import { applyProductBranding } from '@/product-brand'
 
 const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
 
@@ -129,7 +130,9 @@ describe('LinearIntegrationCard account scope', () => {
     expect(rendered.querySelector('[data-settings-section="integrations-linear"]')).not.toBeNull()
     expect(rendered.textContent).toContain(`Account scope: ${LOCAL_HOST_LABEL}`)
     expect(rendered.textContent).toContain(
-      'Credentials and account checks for this provider are owned by this desktop client. Use Settings > Remote Orca Servers > Advanced to edit server-owned credentials.'
+      applyProductBranding(
+        'Credentials and account checks for this provider are owned by this desktop client. Use Settings > Remote Orca Servers > Advanced to edit server-owned credentials.'
+      )
     )
     expect(rendered.textContent).toContain('Open Remote Servers')
     expect(rendered.textContent).toContain('Add access with a Personal API key')
@@ -150,7 +153,9 @@ describe('LinearIntegrationCard account scope', () => {
 
     expect(rendered.textContent).toContain('Account scope: Remote server: runtime-1')
     expect(rendered.textContent).toContain(
-      'Credentials and account checks for this provider are owned by this remote server. Use Settings > Remote Orca Servers > Advanced to edit another default runtime scope.'
+      applyProductBranding(
+        'Credentials and account checks for this provider are owned by this remote server. Use Settings > Remote Orca Servers > Advanced to edit another default runtime scope.'
+      )
     )
     await act(async () => {
       Array.from(rendered.querySelectorAll('button'))

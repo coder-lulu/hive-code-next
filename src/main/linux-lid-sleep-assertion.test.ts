@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import {
   LINUX_LID_SLEEP_ASSERTION_RETRY_MS,
   LinuxLidSleepAssertion
@@ -36,7 +37,7 @@ describe('LinuxLidSleepAssertion', () => {
       'systemd-inhibit',
       [
         '--what=sleep:handle-lid-switch',
-        '--who=Orca',
+        `--who=${APP_DISPLAY_NAME}`,
         '--why=Agents are working',
         '--mode=block',
         'sleep',

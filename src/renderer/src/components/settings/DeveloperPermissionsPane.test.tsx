@@ -3,6 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { DeveloperPermissionState } from '../../../../shared/developer-permissions-types'
 import { FULL_DISK_ACCESS_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import { DeveloperPermissionsPane } from './DeveloperPermissionsPane'
@@ -80,8 +81,7 @@ it('requests Local Network access without claiming a permission verdict', async 
   expect(toastMessageMock).toHaveBeenCalledWith(
     'Check for a macOS prompt',
     expect.objectContaining({
-      description:
-        'If prompted, choose Allow. If no prompt appears, open System Settings and enable Orca under Privacy & Security → Local Network.',
+      description: `If prompted, choose Allow. If no prompt appears, open System Settings and enable ${APP_DISPLAY_NAME} under Privacy & Security → Local Network.`,
       action: expect.objectContaining({ label: 'Open System Settings' })
     })
   )

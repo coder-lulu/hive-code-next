@@ -2,6 +2,7 @@
 preload API plus remote fallbacks; keeping route coverage together makes local
 versus environment behavior easy to audit. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { applyProductBranding } from '@/product-brand'
 import {
   cancelRuntimeFileList,
   copyRuntimePath,
@@ -853,7 +854,7 @@ describe('runtime file client', () => {
         '/remote/repo/archive.zip',
         'archive.zip'
       )
-    ).rejects.toThrow('Remote file download requires a newer Orca server')
+    ).rejects.toThrow(applyProductBranding('Remote file download requires a newer Orca server'))
 
     expect(fsStartDownloadedFile).not.toHaveBeenCalled()
     expect(fsSaveDownloadedFile).not.toHaveBeenCalled()

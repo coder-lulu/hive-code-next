@@ -8,6 +8,7 @@ import { AddRepoNestedImportStep } from './AddRepoNestedImportStep'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Dialog } from '@/components/ui/dialog'
 import type { NestedRepoScanResult } from '../../../../shared/types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const scan: NestedRepoScanResult = {
   selectedPath: '/workspace/platform',
@@ -83,7 +84,9 @@ describe('AddRepoNestedImportStep', () => {
     expect(html).not.toContain('What is a')
     expect(html).toContain('Group these repositories?')
     expect(html).toContain('Choose this if these projects belong together')
-    expect(html).toContain('Orca will group them and let you work from the parent folder')
+    expect(html).toContain(
+      `${APP_DISPLAY_NAME} will group them and let you work from the parent folder`
+    )
     expect(html).toContain('No, import separately')
     expect(html).toContain('Yes, import as group')
     expect(html).toContain('payments/api')

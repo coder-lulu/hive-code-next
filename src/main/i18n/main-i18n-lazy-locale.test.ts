@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 // Why: main-i18n avoids bundling locale catalogs on the cold-start path.
 // English comes from translateMain() fallbacks; non-English catalogs load
@@ -84,7 +85,7 @@ describe('main-i18n lazy locale loading', () => {
     ])
 
     await setMainUiLanguage(id)
-    expect(translateMain('menu.file', 'File')).toBe('Arquivo Orca')
+    expect(translateMain('menu.file', 'File')).toBe(`Arquivo ${APP_DISPLAY_NAME}`)
 
     setMainPluginLanguagePacks([])
     expect(await setMainUiLanguage(id)).toBe('en')

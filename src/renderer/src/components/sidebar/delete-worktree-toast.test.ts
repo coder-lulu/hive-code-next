@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getDeleteWorktreeToastCopy } from './delete-worktree-toast'
 import { classifyWorktreeForceDeleteReason } from '../../../../shared/worktree-removal'
+import { applyProductBranding } from '@/product-brand'
 
 // Why: production never hands this function a literal reason — the store derives it from
 // classifyWorktreeForceDeleteReason (store/slices/worktrees.ts). Passing one in would let a
@@ -28,8 +29,9 @@ describe('getDeleteWorktreeToastCopy', () => {
       )
     ).toEqual({
       title: 'Failed to delete workspace feature/foo',
-      description:
-        'Orca could not confirm every terminal in this workspace has exited, so it stopped before deleting any files. Use Force Delete to remove it anyway.',
+      description: applyProductBranding(
+        'Orca could not confirm every terminal in this workspace has exited, so it stopped before deleting any files. Use Force Delete to remove it anyway.'
+      ),
       isDestructive: false
     })
   })
@@ -44,8 +46,9 @@ describe('getDeleteWorktreeToastCopy', () => {
       )
     ).toEqual({
       title: 'Failed to delete workspace feature/foo',
-      description:
-        'This workspace still has running terminals, so Orca stopped before deleting any files. Force Delete will kill them and discard any uncommitted work they hold.',
+      description: applyProductBranding(
+        'This workspace still has running terminals, so Orca stopped before deleting any files. Force Delete will kill them and discard any uncommitted work they hold.'
+      ),
       isDestructive: false
     })
   })
@@ -60,8 +63,9 @@ describe('getDeleteWorktreeToastCopy', () => {
       )
     ).toEqual({
       title: 'Failed to delete workspace feature/foo',
-      description:
-        'Orca could not confirm every terminal in this workspace has exited, so it stopped before deleting any files. Use Force Delete to remove it anyway.',
+      description: applyProductBranding(
+        'Orca could not confirm every terminal in this workspace has exited, so it stopped before deleting any files. Use Force Delete to remove it anyway.'
+      ),
       isDestructive: false
     })
   })
@@ -76,8 +80,9 @@ describe('getDeleteWorktreeToastCopy', () => {
       )
     ).toEqual({
       title: 'Failed to delete workspace feature/foo',
-      description:
-        'Orca could not confirm every terminal in this workspace has exited, so it stopped before deleting any files. Use Force Delete to remove it anyway.',
+      description: applyProductBranding(
+        'Orca could not confirm every terminal in this workspace has exited, so it stopped before deleting any files. Use Force Delete to remove it anyway.'
+      ),
       isDestructive: false
     })
   })
@@ -106,7 +111,9 @@ describe('getDeleteWorktreeToastCopy', () => {
       )
     ).toEqual({
       title: 'Failed to delete workspace feature/foo',
-      description: 'Git already removed this workspace. Use Force Delete to clear it from Orca.',
+      description: applyProductBranding(
+        'Git already removed this workspace. Use Force Delete to clear it from Orca.'
+      ),
       isDestructive: false
     })
   })

@@ -24,6 +24,7 @@ import {
   AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
   SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY
 } from './protocol-version'
+import { applyProductBranding } from './brand'
 
 const TEST_PROJECT_PATH = path.join('tmp', 'project')
 
@@ -671,7 +672,7 @@ describe('RemoteRuntimeSharedControlConnection', () => {
     const connection = new RemoteRuntimeSharedControlConnection(server.pairing)
 
     await expect(connection.request('worktree.ps', undefined, 1000)).rejects.toThrow(
-      'Remote Orca runtime closed the connection'
+      applyProductBranding('Remote Orca runtime closed the connection')
     )
     expect(connection.getDiagnostics()).toMatchObject({
       state: 'closed',

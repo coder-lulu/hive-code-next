@@ -3,11 +3,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { BUNDLED_SKILL_GUIDES } from '../../src/cli/bundled-skill-guides'
+import { APP_DISPLAY_NAME } from '../../src/shared/brand'
 import {
   CANONICAL_GUIDE_NAMES,
   GUIDE_ALIASES,
   STUB_TOPICS,
   assertAliasContract,
+  brandGuideMarkdown,
   buildArtifacts,
   frontmatterBlock,
   normalizeMarkdown,
@@ -49,7 +51,7 @@ describe('bundled skill guide generator', () => {
       }
       const source = await readFile(path.join(projectDir, 'skill-guides', `${name}.md`))
       const projection = await readFile(path.join(projectDir, 'skills', name, 'SKILL.md'))
-      expect(projection, name).toEqual(source)
+      expect(projection.toString(), name).toEqual(brandGuideMarkdown(source.toString()))
     }
   })
 
@@ -60,7 +62,9 @@ describe('bundled skill guide generator', () => {
       const projection = await readFile(path.join(projectDir, 'skills', name, 'SKILL.md'), 'utf8')
 
       // The routing frontmatter is the unchanged discovery surface.
-      expect(projection.startsWith(frontmatterBlock(source, `${name}.md`))).toBe(true)
+      expect(
+        projection.startsWith(frontmatterBlock(brandGuideMarkdown(source), `${name}.md`))
+      ).toBe(true)
       // The stub is a thin hybrid pointer, not the full guide.
       expect(projection).not.toEqual(source)
       expect(projection.length).toBeLessThan(source.length)
@@ -81,8 +85,12 @@ describe('bundled skill guide generator', () => {
     }
 
     for (const [name, commands] of Object.entries(expectedFallbackCommands)) {
-      const stub = await readFile(path.join(projectDir, 'skill-stubs', `${name}.md`), 'utf8')
-      const fallback = stub.split('## If an older Orca does not recognize `skills get`')[1]
+      const stub = brandGuideMarkdown(
+        await readFile(path.join(projectDir, 'skill-stubs', `${name}.md`), 'utf8')
+      )
+      const fallback = stub.split(
+        `## If an older ${APP_DISPLAY_NAME} does not recognize \`skills get\``
+      )[1]
 
       expect(fallback, name).toBeDefined()
       for (const command of commands) {
@@ -98,9 +106,8 @@ describe('bundled skill guide generator', () => {
     )
 
     for (const guide of BUNDLED_SKILL_GUIDES) {
-      const source = await readFile(
-        path.join(projectDir, 'skill-guides', `${guide.name}.md`),
-        'utf8'
+      const source = brandGuideMarkdown(
+        await readFile(path.join(projectDir, 'skill-guides', `${guide.name}.md`), 'utf8')
       )
       const frontmatter = parseFrontmatter(source, `${guide.name}.md`)
       expect(guide.description).toBe(frontmatter.description)
@@ -170,13 +177,15 @@ describe('bundled skill guide generator', () => {
     const artifacts = await buildArtifacts(root)
 
     await expect(verifyArtifacts(artifacts, root)).rejects.toThrow(
-      'src/cli/bundled-skill-guides.ts'
+      path.join('src', 'cli', 'bundled-skill-guides.ts')
     )
     await writeArtifacts(artifacts)
     await expect(verifyArtifacts(artifacts, root)).resolves.toBeUndefined()
 
     await writeFile(path.join(root, 'skills', 'computer-use', 'SKILL.md'), 'stale\n')
-    await expect(verifyArtifacts(artifacts, root)).rejects.toThrow('skills/computer-use/SKILL.md')
+    await expect(verifyArtifacts(artifacts, root)).rejects.toThrow(
+      path.join('skills', 'computer-use', 'SKILL.md')
+    )
   })
 
   it('rejects mismatched source names and ambiguous aliases', async () => {

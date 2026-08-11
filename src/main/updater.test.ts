@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import type * as UpdaterModule from './updater'
 import type * as RecoveryModule from './linux-package-update-recovery'
 import type { UpdateStatus } from '../shared/types'
+import { applyProductBranding } from '../shared/brand'
 
 const productUpdatePolicy = vi.hoisted(() => ({ configured: true }))
 const productUpdateSourceState = vi.hoisted(() => ({
@@ -206,8 +207,10 @@ const { getLinuxRootPackageTypeMock, recordUpdaterLifecycleMock } = vi.hoisted((
 // Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
 const PRE_COMMIT_INSTALL_FAILURE =
   process.platform === 'darwin'
-    ? 'Could not restart to install the update. Quit and reopen Orca, then try again.'
-    : 'Could not start the update installer. Orca remains open.'
+    ? applyProductBranding(
+        'Could not restart to install the update. Quit and reopen Orca, then try again.'
+      )
+    : applyProductBranding('Could not start the update installer. Orca remains open.')
 
 // Why: only the marker resolver is faked so the real artifact capture/redaction path stays under test.
 vi.mock('./linux-update-package-type', () => ({
@@ -4660,7 +4663,9 @@ describe('updater', () => {
       expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message: 'Could not restart to install the update. Quit and reopen Orca, then try again.'
+        message: applyProductBranding(
+          'Could not restart to install the update. Quit and reopen Orca, then try again.'
+        )
       })
       expect(updater.isQuittingForUpdate()).toBe(false)
     })
@@ -4760,8 +4765,9 @@ describe('updater', () => {
       expect(updater.isQuittingForUpdate()).toBe(false)
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message:
+        message: applyProductBranding(
           'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.'
+        )
       })
       expect(recordUpdaterLifecycleMock).toHaveBeenCalledWith(
         'linux_package_revalidation_failed',
@@ -4786,8 +4792,9 @@ describe('updater', () => {
       expect(updater.isQuittingForUpdate()).toBe(false)
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message:
+        message: applyProductBranding(
           'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.'
+        )
       })
       expect(send).toHaveBeenCalledWith('updater:quitAndInstallAborted')
       expect(recordUpdaterLifecycleMock).toHaveBeenCalledWith(
@@ -4869,8 +4876,9 @@ describe('updater', () => {
       expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1)
       expect(lastStatus(send)).toEqual({
         state: 'error',
-        message:
-          'Orca could not read the downloaded package. Download the update again, or get it from the official release page.',
+        message: applyProductBranding(
+          'Orca could not read the downloaded package. Download the update again, or get it from the official release page.'
+        ),
         recovery: {
           kind: 'linux-package-install',
           packageType: 'deb',
@@ -4896,8 +4904,9 @@ describe('updater', () => {
       expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
       expect(lastStatus(send)).toMatchObject({
         state: 'error',
-        message:
+        message: applyProductBranding(
           'Orca could not read the downloaded package. Download the update again, or get it from the official release page.'
+        )
       })
 
       updater.quitAndInstall()

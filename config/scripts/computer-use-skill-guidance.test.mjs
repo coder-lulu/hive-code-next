@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { BUNDLED_SKILL_GUIDES } from '../../src/cli/bundled-skill-guides'
+import { brandGuideMarkdown } from './generate-bundled-skill-guides.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 // Why: computer-use now ships a hybrid discovery stub, so its version-sensitive command
@@ -93,7 +94,7 @@ describe('computer-use install stub', () => {
     const frontmatter = (text) => /^---\n[\s\S]*?\n---\n/u.exec(text)[0]
 
     expect(frontmatter(readFileSync(stubPath, 'utf8'))).toBe(
-      frontmatter(readFileSync(guidePath, 'utf8'))
+      frontmatter(brandGuideMarkdown(readFileSync(guidePath, 'utf8')))
     )
   })
 })

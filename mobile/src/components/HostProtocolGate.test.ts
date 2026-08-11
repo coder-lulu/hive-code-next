@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import { HostProtocolGate, useHostProtocolGates } from './HostProtocolGate'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const nativeTestState = vi.hoisted(() => ({
   openUrl: vi.fn(),
@@ -98,8 +99,9 @@ describe('HostProtocolGate', () => {
     }
     renderer = await renderGate()
     const output = renderedText(renderer)
-    expect(output).toContain('Update Orca Mobile')
-    expect(output).toContain('Open App Store')
+    expect(output).toContain(`Update ${APP_DISPLAY_NAME} Mobile`)
+    expect(output).toContain('official iOS distribution channel')
+    expect(output).not.toContain('Open iOS download')
     expect(output).not.toContain('HostContent')
   })
 
@@ -112,15 +114,14 @@ describe('HostProtocolGate', () => {
     }
     renderer = await renderGate()
     const output = renderedText(renderer)
-    expect(output).toContain('Update Orca Mobile')
-    expect(output).toContain('Update Orca Mobile from GitHub Releases')
-    expect(output).toContain('Open GitHub Releases')
+    expect(output).toContain(`Update ${APP_DISPLAY_NAME} Mobile`)
+    expect(output).toContain(
+      `Update ${APP_DISPLAY_NAME} Mobile from the official Android distribution channel`
+    )
+    expect(output).not.toContain('Open Android download')
     expect(output).not.toContain('mobile app store')
     expect(output).not.toContain('HostContent')
-    act(() => renderer?.root.findAllByType('Pressable')[0]?.props.onPress())
-    expect(nativeTestState.openUrl).toHaveBeenCalledWith(
-      'https://github.com/stablyai/orca/releases'
-    )
+    expect(nativeTestState.openUrl).not.toHaveBeenCalled()
   })
 
   it('replaces the host UI with the block screen when desktop is too old', async () => {
@@ -131,8 +132,9 @@ describe('HostProtocolGate', () => {
     }
     renderer = await renderGate()
     const output = renderedText(renderer)
-    expect(output).toContain('Update Orca on your computer')
-    expect(output).toContain('Open GitHub Releases')
+    expect(output).toContain(`Update ${APP_DISPLAY_NAME} on your computer`)
+    expect(output).not.toContain('Open desktop download')
+    expect(nativeTestState.openUrl).not.toHaveBeenCalled()
     expect(output).not.toContain('HostContent')
   })
 
@@ -150,7 +152,7 @@ describe('HostProtocolGate', () => {
     const output = renderedText(renderer)
     expect(output).toContain('HostContent')
     expect(output).toContain('browser.screencast.v1')
-    expect(output).not.toContain('Update Orca')
+    expect(output).not.toContain(`Update ${APP_DISPLAY_NAME}`)
     expect(client.sendRequest).toHaveBeenCalledOnce()
   })
 
@@ -215,7 +217,7 @@ describe('HostProtocolGate', () => {
     })
 
     const output = renderedText(renderer)
-    expect(output).toContain('Update Orca Mobile')
+    expect(output).toContain(`Update ${APP_DISPLAY_NAME} Mobile`)
     expect(output).not.toContain('HostContent')
   })
 

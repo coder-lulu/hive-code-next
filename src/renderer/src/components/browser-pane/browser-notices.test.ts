@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   formatByteCount,
   formatDownloadFinishedNotice,
@@ -146,10 +147,10 @@ describe('browser notice formatting', () => {
       "The certificate for localhost:3443 isn't valid at the current date and time."
     )
     expect(formatLoadFailureDescription(loadError(-202), meta)).toBe(
-      "Orca doesn't trust the authority that issued the certificate for localhost:3443."
+      `${APP_DISPLAY_NAME} doesn't trust the authority that issued the certificate for localhost:3443.`
     )
     expect(formatLoadFailureDescription(loadError(-208), meta)).toBe(
-      "Orca couldn't verify the certificate for localhost:3443."
+      `${APP_DISPLAY_NAME} couldn't verify the certificate for localhost:3443.`
     )
     expect(isCertificateLoadError(loadError(-219))).toBe(true)
     expect(isCertificateLoadError(loadError(-215))).toBe(false)

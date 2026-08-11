@@ -3,6 +3,7 @@ import {
   formatWorkspaceCreateError,
   getWorkspaceCreateErrorToastMessage
 } from './workspace-create-error-format'
+import { applyProductBranding } from '@/product-brand'
 
 describe('formatWorkspaceCreateError', () => {
   it('returns guidance for missing default base ref failures', () => {
@@ -14,7 +15,7 @@ describe('formatWorkspaceCreateError', () => {
 
     expect(formatted).toEqual({
       title: 'No base branch found',
-      message: 'Orca could not resolve a usable base ref for this workspace.',
+      message: applyProductBranding('Orca could not resolve a usable base ref for this workspace.'),
       help: 'Create an initial commit (for example on main), or select an existing branch in Create From, then try again.'
     })
     expect(getWorkspaceCreateErrorToastMessage(formatted)).toBe('No base branch found')

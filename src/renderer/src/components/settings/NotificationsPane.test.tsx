@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { GlobalSettings, NotificationDispatchRequest } from '../../../../shared/types'
 import { getNotificationSoundOptions } from '@/components/notification-sound-options'
@@ -103,7 +104,7 @@ describe('NotificationsPane', () => {
     expect(toastMessage).toHaveBeenCalledWith(
       'Test notification requested',
       expect.objectContaining({
-        description: 'If no macOS banner appeared, enable Allow notifications for Orca.',
+        description: `If no macOS banner appeared, enable Allow notifications for ${APP_DISPLAY_NAME}.`,
         action: expect.objectContaining({ label: 'Open Settings' })
       })
     )
@@ -211,7 +212,7 @@ describe('NotificationsPane', () => {
     expect(toastError).toHaveBeenCalledWith(
       'Windows did not show the notification',
       expect.objectContaining({
-        description: 'Enable notifications for Orca in Windows Settings.',
+        description: `Enable notifications for ${APP_DISPLAY_NAME} in Windows Settings.`,
         action: expect.objectContaining({ label: 'Open Settings' })
       })
     )

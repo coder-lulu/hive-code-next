@@ -9,6 +9,7 @@ import {
   getEphemeralVmRecipeResultConnection,
   parseEphemeralVmRecipeResult
 } from '../../shared/ephemeral-vm-recipes'
+import { applyProductBranding } from '../../shared/brand'
 import { getDefaultUserDataPath } from './metadata'
 import { getMacAppBundlePath } from './mac-app-update-bundle'
 import {
@@ -58,7 +59,9 @@ export function launchOrcaApp(): void {
 
   throw new RuntimeClientError(
     'runtime_open_failed',
-    'Could not determine how to launch Orca. Start Orca manually and try again.'
+    applyProductBranding(
+      'Could not determine how to launch Orca. Start Orca manually and try again.'
+    )
   )
 }
 
@@ -243,8 +246,12 @@ function waitForRecipeJson(child: ReturnType<typeof spawnProcess>): Promise<numb
         new RuntimeClientError(
           'runtime_serve_failed',
           typeof code === 'number'
-            ? `Orca serve exited before printing valid recipe JSON with code ${code}.`
-            : `Orca serve exited before printing valid recipe JSON via ${signal}.`
+            ? applyProductBranding(
+                `Orca serve exited before printing valid recipe JSON with code ${code}.`
+              )
+            : applyProductBranding(
+                `Orca serve exited before printing valid recipe JSON via ${signal}.`
+              )
         )
       )
     }
@@ -281,7 +288,9 @@ function resolveForegroundOrcaExecutable(): string {
   }
   throw new RuntimeClientError(
     'runtime_serve_failed',
-    'Could not determine how to start Orca server. Set ORCA_APP_EXECUTABLE to the Orca executable.'
+    applyProductBranding(
+      'Could not determine how to start Orca server. Set ORCA_APP_EXECUTABLE to the Orca executable.'
+    )
   )
 }
 

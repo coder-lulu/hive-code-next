@@ -1,19 +1,19 @@
 // @vitest-environment happy-dom
-
 import { act, type ComponentProps, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { CliInstallStatus } from '../../../../shared/cli-install-types'
 import type { ProjectExecutionRuntimeResolution } from '../../../../shared/project-execution-runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LINEAR_AGENT_SKILL_NAMES } from '@/lib/agent-feature-install-commands'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   LinearAgentSkillSetupPrompt,
   _linearAgentSkillSetupPromptInternalsForTests
 } from './LinearAgentSkillSetupPrompt'
-
 const HOST_DISMISS_STORAGE_KEY = 'orca.linearTicketsSkill.setupDismissed.host'
 const FEDORA_DISMISS_STORAGE_KEY = 'orca.linearTicketsSkill.setupDismissed.wsl.Fedora'
-
+const MISSING_BOTH_COPY = `${APP_DISPLAY_NAME} CLI and Linear agent skill are missing`
+type PromptProps = ComponentProps<typeof LinearAgentSkillSetupPrompt>
 const projectHostRuntime: ProjectExecutionRuntimeResolution = {
   status: 'resolved',
   runtime: {
@@ -24,7 +24,6 @@ const projectHostRuntime: ProjectExecutionRuntimeResolution = {
     cacheKey: 'repo-1:windows-host'
   }
 }
-
 const projectWslRuntime: ProjectExecutionRuntimeResolution = {
   status: 'resolved',
   runtime: {
@@ -36,7 +35,6 @@ const projectWslRuntime: ProjectExecutionRuntimeResolution = {
     cacheKey: 'repo-1:wsl:Ubuntu'
   }
 }
-
 const mocks = vi.hoisted(() => ({
   skillState: {
     installed: false,
@@ -52,19 +50,16 @@ const mocks = vi.hoisted(() => ({
   ensureWslCli: vi.fn(async () => null as CliInstallStatus | null),
   panelProps: [] as Record<string, unknown>[]
 }))
-
 vi.mock('@/hooks/useInstalledAgentSkills', async (importOriginal) => ({
   ...(await importOriginal()),
   useInstalledAgentSkillNames: mocks.useInstalledAgentSkillNames
 }))
-
 vi.mock('@/lib/agent-skill-cli-prerequisite', () => ({
   AGENT_SKILL_CLI_PREREQUISITE_NOTICE: 'CLI registration notice',
   ensureOrcaCliAvailableForAgentSkillTerminal: mocks.ensureCli,
   isOrcaCliAvailableOnPath: (status: CliInstallStatus | null | undefined) =>
     status?.state === 'installed' && status.pathConfigured
 }))
-
 vi.mock('../settings/CliSkillRuntimeSetup', () => ({
   buildSkillCommandForRuntime: (
     command: string,
@@ -79,7 +74,6 @@ vi.mock('../settings/CliSkillRuntimeSetup', () => ({
       ? { distro: runtime.wslDistro.trim() }
       : undefined
 }))
-
 vi.mock('../settings/AgentSkillSetupPanel', () => ({
   AgentSkillSetupPanel: (props: Record<string, unknown> & { children?: ReactNode }) => {
     mocks.panelProps.push(props)
@@ -103,10 +97,8 @@ vi.mock('../settings/AgentSkillSetupPanel', () => ({
     )
   }
 }))
-
 let root: Root | null = null
 let container: HTMLDivElement | null = null
-
 function installLocalStorageShim(): void {
   const values = new Map<string, string>()
   Object.defineProperty(window, 'localStorage', {
@@ -119,7 +111,6 @@ function installLocalStorageShim(): void {
     }
   })
 }
-
 function cliStatus(overrides: Partial<CliInstallStatus>): CliInstallStatus {
   return {
     platform: 'darwin',
@@ -137,10 +128,7 @@ function cliStatus(overrides: Partial<CliInstallStatus>): CliInstallStatus {
     ...overrides
   }
 }
-
-async function renderPrompt(
-  props: ComponentProps<typeof LinearAgentSkillSetupPrompt>
-): Promise<HTMLDivElement> {
+async function renderPrompt(props: PromptProps): Promise<HTMLDivElement> {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -153,16 +141,12 @@ async function renderPrompt(
   await act(async () => {})
   return container
 }
-
-async function updatePrompt(
-  props: ComponentProps<typeof LinearAgentSkillSetupPrompt>
-): Promise<void> {
+async function updatePrompt(props: PromptProps): Promise<void> {
   await act(async () => {
     root?.render(<LinearAgentSkillSetupPrompt {...props} />)
   })
   await act(async () => {})
 }
-
 async function unmountPrompt(): Promise<void> {
   if (root) {
     await act(async () => {
@@ -173,7 +157,6 @@ async function unmountPrompt(): Promise<void> {
   container?.remove()
   container = null
 }
-
 function findBodyButton(label: string): HTMLButtonElement | undefined {
   return Array.from(document.body.querySelectorAll('button')).find(
     (button) => button.textContent === label
@@ -242,7 +225,7 @@ describe('LinearAgentSkillSetupPrompt', () => {
     const rendered = await renderPrompt({ linked: true, remote: false })
 
     expect(rendered.textContent).toContain('Set up Linear agent skill')
-    expect(rendered.textContent).toContain('Orca CLI and Linear agent skill are missing')
+    expect(rendered.textContent).toContain(MISSING_BOTH_COPY)
     expect(rendered.textContent).toContain('Install it for host agent handoffs')
     expect(mocks.useInstalledAgentSkillNames).toHaveBeenCalledWith(
       LINEAR_AGENT_SKILL_NAMES,
@@ -460,10 +443,8 @@ describe('LinearAgentSkillSetupPrompt', () => {
     expect(document.body.textContent).toContain(
       'Enable agents to read and edit the attached Linear ticket.'
     )
-    expect(document.body.textContent).toContain('Orca CLI and Linear agent skill are missing.')
+    expect(document.body.textContent).toContain(`${MISSING_BOTH_COPY}.`)
     expect(document.body.textContent).toContain('Mock install')
-    // Why: the permanent opt-out is an EyeOff icon (no visible text); the casual
-    // dismiss is the dialog ×. Neither "Not now" nor any dismiss label shows as text.
     expect(document.body.textContent).not.toContain('Not now')
     expect(mocks.panelProps.at(-1)).toEqual(
       expect.objectContaining({
@@ -471,7 +452,6 @@ describe('LinearAgentSkillSetupPrompt', () => {
       })
     )
 
-    // Why: the × must snooze for the session, not persist a permanent dismissal.
     const closeButton = Array.from(document.body.querySelectorAll('button')).find(
       (button) => button.textContent === 'Close'
     )
@@ -696,7 +676,7 @@ describe('LinearAgentSkillSetupPrompt', () => {
     expect(document.body.textContent).toContain(
       'Enable agents to read and edit the attached Linear ticket.'
     )
-    expect(document.body.textContent).toContain('Orca CLI is missing.')
+    expect(document.body.textContent).toContain(`${APP_DISPLAY_NAME} CLI is missing.`)
     expect(document.body.textContent).not.toContain('Linear ticket access is ready')
   })
 
@@ -739,7 +719,7 @@ describe('LinearAgentSkillSetupPrompt', () => {
     expect(document.body.textContent).toContain(
       'Enable agents to read and edit the attached Linear ticket.'
     )
-    expect(document.body.textContent).toContain('Orca CLI is missing.')
+    expect(document.body.textContent).toContain(`${APP_DISPLAY_NAME} CLI is missing.`)
     expect(document.body.textContent).not.toContain('Linear ticket access is ready')
   })
 
@@ -779,7 +759,7 @@ describe('LinearAgentSkillSetupPrompt', () => {
       'Enable agents to read and edit the attached Linear ticket.'
     )
     expect(document.body.textContent).toContain('Linear agent skill is missing.')
-    expect(document.body.textContent).not.toContain('Orca CLI is missing.')
+    expect(document.body.textContent).not.toContain(`${APP_DISPLAY_NAME} CLI is missing.`)
   })
 
   it('ignores older same-context CLI refreshes that finish after a newer Re-check', async () => {
@@ -916,7 +896,6 @@ describe('LinearAgentSkillSetupPrompt', () => {
   it('permanently dismisses the modal-only prompt when requested', async () => {
     await renderPrompt({ linked: true, remote: false, surface: 'modal' })
 
-    // Why: permanent dismiss is now an EyeOff icon button (aria-label, no text).
     const dismissButton = document.body.querySelector<HTMLButtonElement>(
       'button[aria-label="Don\'t show again"]'
     )

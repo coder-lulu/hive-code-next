@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   getChecksPanelReviewState,
   shouldShowChecksPanelPublishBranchAction,
@@ -125,7 +126,7 @@ describe('getChecksPanelReviewState — precedence', () => {
     expect(state.workflowAction).toBe('publish_branch')
     // Hard error concurrent with the blocker: detail appended, create suppressed.
     expect(state.detail).toBe(
-      'Orca also could not confirm whether this branch already has a pull request.'
+      `${APP_DISPLAY_NAME} also could not confirm whether this branch already has a pull request.`
     )
   })
 

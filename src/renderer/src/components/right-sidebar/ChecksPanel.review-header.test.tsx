@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChecksPanelReviewHeader } from './ChecksPanel'
 import type { ChecksPanelHostedReviewModifierDestination } from './checks-panel-hosted-review-click-routing'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -91,11 +92,13 @@ describe('ChecksPanelReviewHeader', () => {
   // Why: with inverting on and Link Routing off the modifier reaches Orca here, so the
   // hint must name Orca rather than the destination a plain click already uses.
   it('names Orca when the modifier inverts toward the built-in browser', () => {
-    expect(renderHeader({ modifierHintDestination: 'orca' })).toContain('⇧⌘+click to open in Orca')
+    expect(renderHeader({ modifierHintDestination: 'orca' })).toContain(
+      `⇧⌘+click to open in ${APP_DISPLAY_NAME}`
+    )
 
     vi.stubGlobal('navigator', { userAgent: 'Windows' })
     expect(renderHeader({ modifierHintDestination: 'orca' })).toContain(
-      'Shift+Ctrl+click to open in Orca'
+      `Shift+Ctrl+click to open in ${APP_DISPLAY_NAME}`
     )
   })
 

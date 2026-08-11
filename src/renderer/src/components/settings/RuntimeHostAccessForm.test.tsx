@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../../../shared/pairing'
+import { applyProductBranding } from '@/product-brand'
 import { RuntimeHostAccessForm } from './RuntimeHostAccessForm'
 
 function accessLink(endpoint: string): string {
@@ -57,7 +58,9 @@ describe('RuntimeHostAccessForm', () => {
         onSubmit={vi.fn()}
       />
     )
-    expect(markup).toContain('Enter an Orca access link or bare pairing code.')
+    expect(markup).toContain(
+      applyProductBranding('Enter an Orca access link or bare pairing code.')
+    )
     expect(markup).toContain('aria-invalid="true"')
   })
 

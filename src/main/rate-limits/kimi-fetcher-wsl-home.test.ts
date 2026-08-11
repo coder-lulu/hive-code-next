@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const netFetchMock = vi.hoisted(() => vi.fn())
 const files = vi.hoisted(() => new Map<string, string>())
@@ -79,7 +80,7 @@ describe('fetchKimiRateLimits with a WSL credentials home', () => {
 
     expect(result.status).toBe('error')
     expect(result.usageMetadata?.failureKind).toBe('delegated-refresh-required')
-    expect(result.error).toContain('on the computer running Orca')
+    expect(result.error).toContain(`on the computer running ${APP_DISPLAY_NAME}`)
     expect(netFetchMock).not.toHaveBeenCalled()
   })
 

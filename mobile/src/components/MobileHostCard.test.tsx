@@ -9,6 +9,7 @@ import {
   type HostWorktreeInfo
 } from '../worktree/home-worktree-info'
 import { MobileHostCard } from './MobileHostCard'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -99,7 +100,7 @@ describe('MobileHostCard', () => {
     })
 
     expect(lines).toContain('Connecting…')
-    expect(lines).toContain(' · Orca Relay')
+    expect(lines).toContain(` · ${APP_DISPLAY_NAME} Relay`)
   })
 
   it('names the relay while a failed direct dial is still retrying', async () => {
@@ -109,7 +110,7 @@ describe('MobileHostCard', () => {
       path: 'relay'
     })
 
-    expect(lines).toContain(' · Orca Relay')
+    expect(lines).toContain(` · ${APP_DISPLAY_NAME} Relay`)
   })
 
   it('leaves an idle disconnected host unlabelled', async () => {
@@ -119,7 +120,7 @@ describe('MobileHostCard', () => {
       path: 'relay'
     })
 
-    expect(lines).not.toContain(' · Orca Relay')
+    expect(lines).not.toContain(` · ${APP_DISPLAY_NAME} Relay`)
   })
 
   it('does not guess a direct path before the dial resolves', async () => {

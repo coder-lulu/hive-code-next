@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRepoBackedTaskEmptyState } from './task-page-empty-state'
+import { applyProductBranding } from '@/product-brand'
 
 describe('getRepoBackedTaskEmptyState', () => {
   it('explains when no repo-backed task source is selected', () => {
@@ -10,8 +11,9 @@ describe('getRepoBackedTaskEmptyState', () => {
       })
     ).toEqual({
       title: 'No project sources selected',
-      description:
+      description: applyProductBranding(
         'Select at least one project source so Orca knows which host/account to fetch tasks from.'
+      )
     })
   })
 

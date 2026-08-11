@@ -6,6 +6,7 @@ import {
   getRuntimeMetadataPath,
   type RuntimeMetadata
 } from '../../shared/runtime-bootstrap'
+import { applyProductBranding } from '../../shared/brand'
 import { RuntimeClientError } from './types'
 
 export function readMetadata(userDataPath: string): RuntimeMetadata {
@@ -15,7 +16,7 @@ export function readMetadata(userDataPath: string): RuntimeMetadata {
     if (!metadata || !findTransport(metadata, 'unix', 'named-pipe') || !metadata.authToken) {
       throw new RuntimeClientError(
         'runtime_unavailable',
-        `Orca runtime metadata is incomplete at ${metadataPath}`
+        applyProductBranding(`Orca runtime metadata is incomplete at ${metadataPath}`)
       )
     }
     return metadata
@@ -25,7 +26,9 @@ export function readMetadata(userDataPath: string): RuntimeMetadata {
     }
     throw new RuntimeClientError(
       'runtime_unavailable',
-      `Could not read Orca runtime metadata at ${metadataPath}. Start the Orca app first.`
+      applyProductBranding(
+        `Could not read Orca runtime metadata at ${metadataPath}. Start the Orca app first.`
+      )
     )
   }
 }

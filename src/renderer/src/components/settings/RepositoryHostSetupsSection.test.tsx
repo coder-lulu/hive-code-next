@@ -12,6 +12,7 @@ import {
 import type { Project, ProjectHostSetup, Repo } from '../../../../shared/types'
 import { useAppStore } from '../../store'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 let container: HTMLDivElement
 let root: Root
@@ -734,7 +735,9 @@ describe('RepositoryHostSetupsSection', () => {
     renderSection(localRepo)
     clickButton('Add to another host')
 
-    expect(container.textContent).toContain('Update Orca on this host to set up projects')
+    expect(container.textContent).toContain(
+      `Update ${APP_DISPLAY_NAME} on this host to set up projects`
+    )
     const browseButton = findButton('Browse folder')
     const plannedButton = findButton('Add host placeholder')
     expect(browseButton?.disabled).toBe(true)

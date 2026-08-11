@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WindowsFirewallNotice } from './WindowsFirewallNotice'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 afterEach(cleanup)
 
@@ -59,10 +60,14 @@ describe('WindowsFirewallNotice', () => {
       <WindowsFirewallNotice pairingReady address="192.168.0.108" usingRelay />
     )
     expect(await screen.findByText(/allow phone connections through/i)).toBeInTheDocument()
-    expect(screen.getByText(/still works over Orca Relay/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`still works over ${APP_DISPLAY_NAME} Relay`, 'i'))
+    ).toBeInTheDocument()
 
     rerender(<WindowsFirewallNotice pairingReady address="192.168.0.108" />)
-    expect(screen.queryByText(/still works over Orca Relay/i)).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(new RegExp(`still works over ${APP_DISPLAY_NAME} Relay`, 'i'))
+    ).not.toBeInTheDocument()
   })
 
   it('repairs only after explicit user action and hides after success', async () => {
@@ -118,12 +123,16 @@ describe('WindowsFirewallNotice', () => {
     const user = userEvent.setup()
     render(<WindowsFirewallNotice pairingReady address="192.168.0.108" />)
 
-    expect(await screen.findByText(/Windows may be blocking Orca Mobile/i)).toBeInTheDocument()
+    expect(
+      await screen.findByText(new RegExp(`Windows may be blocking ${APP_DISPLAY_NAME} Mobile`, 'i'))
+    ).toBeInTheDocument()
     expect(screen.getByText(/Block rule can override/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /repair firewall access/i }))
 
     await waitFor(() => expect(getWindowsFirewallStatus).toHaveBeenCalledTimes(2))
-    expect(screen.getByText(/Windows may be blocking Orca Mobile/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`Windows may be blocking ${APP_DISPLAY_NAME} Mobile`, 'i'))
+    ).toBeInTheDocument()
   })
 
   it('ignores a stale inspection that resolves after a newer result', async () => {
@@ -150,7 +159,9 @@ describe('WindowsFirewallNotice', () => {
       .mockResolvedValueOnce(clearedStatus)
     setMobileApi({ getWindowsFirewallStatus })
     render(<WindowsFirewallNotice pairingReady address="192.168.0.108" />)
-    expect(await screen.findByText(/Windows may be blocking Orca Mobile/i)).toBeInTheDocument()
+    expect(
+      await screen.findByText(new RegExp(`Windows may be blocking ${APP_DISPLAY_NAME} Mobile`, 'i'))
+    ).toBeInTheDocument()
 
     // Why: UAC elevation bounces window focus, so an older in-flight
     // inspection can resolve after a newer one and must not win.
@@ -158,13 +169,17 @@ describe('WindowsFirewallNotice', () => {
     window.dispatchEvent(new Event('focus'))
     await waitFor(() => expect(getWindowsFirewallStatus).toHaveBeenCalledTimes(3))
     await waitFor(() =>
-      expect(screen.queryByText(/Windows may be blocking Orca Mobile/i)).not.toBeInTheDocument()
+      expect(
+        screen.queryByText(new RegExp(`Windows may be blocking ${APP_DISPLAY_NAME} Mobile`, 'i'))
+      ).not.toBeInTheDocument()
     )
 
     await act(async () => {
       resolveStale(blockedStatus)
     })
-    expect(screen.queryByText(/Windows may be blocking Orca Mobile/i)).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(new RegExp(`Windows may be blocking ${APP_DISPLAY_NAME} Mobile`, 'i'))
+    ).not.toBeInTheDocument()
   })
 
   it('does not offer a firewall rule while the selected network is public', async () => {
