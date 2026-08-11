@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { useCallback, useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -14,7 +15,7 @@ import { colors, radii, spacing, typography } from '../src/theme/mobile-theme'
 const LINK_MODE_OPTIONS: PickerOption<MobileTerminalLinkOpenMode>[] = [
   {
     value: 'orca-browser',
-    label: 'Orca browser on desktop',
+    label: productNameText('Orca browser on desktop'),
     subtitle: 'Open in the streamed browser from your paired desktop.'
   },
   {

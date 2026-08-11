@@ -8,6 +8,12 @@ const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
 const { FileMatcher } = require('app-builder-lib/out/fileMatcher')
 const electronBuilderNativeRebuild = require('./electron-builder-native-rebuild.cjs')
+const expectedPackagedMetadata = {
+  name: 'hivecode',
+  productName: 'HiveCode',
+  description: 'HiveCode',
+  author: { name: 'HiveCode' }
+}
 const {
   createPackagedRuntimeNodeModuleResources,
   findAsarEntry,
@@ -20,6 +26,10 @@ const {
 } = require('../packaged-runtime-node-modules.cjs')
 
 describe('electron-builder config', () => {
+  it('replaces upstream npm metadata in packaged application identity', () => {
+    expect(electronBuilderConfig.extraMetadata).toEqual(expectedPackagedMetadata)
+  })
+
   it('keeps the packaged app identity aligned with local-build validation', () => {
     expect(electronBuilderConfig.appId).toBe(
       require('../../src/shared/local-build-compatibility-contract.json').appId
@@ -84,6 +94,15 @@ describe('electron-builder config', () => {
       })
       expect(electronBuilderConfig[platform].extraResources).toEqual(
         expect.arrayContaining([bundledPluginResources])
+      )
+      expect(electronBuilderConfig[platform].extraResources).toEqual(
+        expect.arrayContaining([
+          {
+            from: 'resources/onboarding/feature-wall',
+            to: 'onboarding/feature-wall',
+            filter: ['tile-01.*', 'tile-02.*', 'tile-04.*', 'tile-08.*', 'tile-11.*']
+          }
+        ])
       )
     }
     expect(electronBuilderConfig.mac.extraResources).toEqual(
@@ -225,6 +244,7 @@ describe('electron-builder config', () => {
       delete process.env.ORCA_MAC_RELEASE
       process.env.ORCA_LOCAL_BUILD_VERSION = '1.4.159-rc.0.local.123.abc'
       expect(require('../electron-builder.config.cjs').extraMetadata).toEqual({
+        ...expectedPackagedMetadata,
         version: '1.4.159-rc.0.local.123.abc'
       })
     } finally {
@@ -251,7 +271,9 @@ describe('electron-builder config', () => {
       delete require.cache[configPath]
       process.env.ORCA_LOCAL_BUILD_VERSION = '1.4.159-local.123.abc'
       process.env.ORCA_MAC_RELEASE = '1'
-      expect(require('../electron-builder.config.cjs').extraMetadata).toBeUndefined()
+      expect(require('../electron-builder.config.cjs').extraMetadata).toEqual(
+        expectedPackagedMetadata
+      )
     } finally {
       if (originalLocalVersion === undefined) {
         delete process.env.ORCA_LOCAL_BUILD_VERSION

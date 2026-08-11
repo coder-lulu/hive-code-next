@@ -15,6 +15,7 @@ import type { RuntimeStatus } from './runtime-types'
 import type { SshConnectionState, SshConnectionStatus } from './ssh-types'
 import type { RuntimeEnvironmentSource } from './runtime-environments'
 import type { GlobalSettings, Repo } from './types'
+import { APP_DISPLAY_NAME } from './brand'
 
 export type ExecutionHostHealth =
   | 'local'
@@ -162,7 +163,7 @@ function addRuntimeHost(
     id: hostId,
     kind: 'runtime',
     label,
-    detail: 'Orca server',
+    detail: `${APP_DISPLAY_NAME} server`,
     health: controlHealth ?? runtimeHealth(status, compatibility),
     compatibility: compatibility ?? undefined,
     capabilities: status?.capabilities,

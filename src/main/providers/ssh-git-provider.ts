@@ -3,6 +3,7 @@
    indirection — every method is a 1:1 forwarder to a relay RPC plus a
    small amount of param plumbing. */
 import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
+import { applyProductBranding } from '../../shared/brand'
 import type { GitProviderStatusOptions, IGitProvider } from './types'
 import type {
   GitStatusResult,
@@ -165,7 +166,9 @@ export class SshGitProvider implements IGitProvider {
       // raw JSON-RPC method-not-found error in Source Control.
       if (isJsonRpcMethodNotFoundError(error)) {
         throw new Error(
-          'SSH submodule diff support is unavailable on this relay. Reconnect the SSH target to update Orca on the host, then try again.'
+          applyProductBranding(
+            'SSH submodule diff support is unavailable on this relay. Reconnect the SSH target to update Orca on the host, then try again.'
+          )
         )
       }
       throw error
@@ -621,7 +624,9 @@ export class SshGitProvider implements IGitProvider {
         // Why: older SSH relays predate the durable-ref MR fetch; surface a
         // reconnect prompt instead of a raw JSON-RPC method-not-found error.
         throw new Error(
-          'This SSH host is running an older Orca relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.'
+          applyProductBranding(
+            'This SSH host is running an older Orca relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.'
+          )
         )
       }
       throw error
@@ -648,7 +653,9 @@ export class SshGitProvider implements IGitProvider {
         // Why: older SSH relays predate git.fetchGitHubPullRequestHead; surface a
         // reconnect prompt instead of a raw JSON-RPC method-not-found error.
         throw new Error(
-          'This SSH host is running an older Orca relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.'
+          applyProductBranding(
+            'This SSH host is running an older Orca relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.'
+          )
         )
       }
       throw error
@@ -822,7 +829,9 @@ export class SshGitProvider implements IGitProvider {
         // Why: older SSH relays predate git.forceDeletePreservedBranch; surface
         // a reconnect prompt instead of a raw JSON-RPC method-not-found error.
         throw new Error(
-          'This SSH host is running an older Orca relay that cannot delete preserved branches. Reconnect to deploy the latest relay, then try again.'
+          applyProductBranding(
+            'This SSH host is running an older Orca relay that cannot delete preserved branches. Reconnect to deploy the latest relay, then try again.'
+          )
         )
       }
       throw error
@@ -883,7 +892,9 @@ export class SshGitProvider implements IGitProvider {
     } catch (error) {
       if (isJsonRpcMethodNotFoundError(error)) {
         throw new Error(
-          'SSH clone support is unavailable on this relay. Reconnect the SSH target to update Orca on the host, then try again.'
+          applyProductBranding(
+            'SSH clone support is unavailable on this relay. Reconnect the SSH target to update Orca on the host, then try again.'
+          )
         )
       }
       throw error

@@ -17,6 +17,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { CliInstallMethod, CliInstallStatus } from '../../shared/cli-install-types'
+import { applyProductBranding } from '../../shared/brand'
 import { hivecodeProductConfig } from '../../shared/generated/product-config'
 import { getCompatibilityCliCommandNamesForPlatform } from '../../shared/orca-cli-command-name'
 import { expandWindowsEnvironmentVariables } from '../../shared/windows-environment-expansion'
@@ -164,7 +165,7 @@ export class CliInstaller {
         state: 'unsupported',
         currentTarget: null,
         unsupportedReason: this.isPackaged ? 'launcher_missing' : 'launch_mode_unavailable',
-        detail
+        detail: applyProductBranding(detail)
       }
     }
 
@@ -187,7 +188,9 @@ export class CliInstaller {
       throw new Error(status.detail ?? 'CLI registration is unavailable on this build.')
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+      throw new Error(
+        applyProductBranding(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+      )
     }
 
     // eslint-disable-next-line unicorn/prefer-ternary -- Why: the install path performs async side effects and is easier to audit as an explicit branch than as an awaited ternary.
@@ -230,10 +233,16 @@ export class CliInstaller {
       return status
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+      throw new Error(
+        applyProductBranding(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+      )
     }
     if (status.state === 'stale') {
-      throw new Error(`Refusing to remove a command not owned by Orca at ${status.commandPath}.`)
+      throw new Error(
+        applyProductBranding(
+          `Refusing to remove a command not owned by Orca at ${status.commandPath}.`
+        )
+      )
     }
 
     if (status.installMethod === 'symlink') {
@@ -836,7 +845,7 @@ export class CliInstaller {
       state: args.state,
       currentTarget: args.currentTarget,
       unsupportedReason: null,
-      detail: args.detail
+      detail: args.detail === null ? null : applyProductBranding(args.detail)
     }
   }
 
@@ -881,7 +890,9 @@ export class CliInstaller {
         pathConfigured,
         state: 'not_installed',
         currentTarget: null,
-        detail: `Register ${status.commandPath} to use Orca from Command Prompt or PowerShell.`
+        detail: applyProductBranding(
+          `Register ${status.commandPath} to use Orca from Command Prompt or PowerShell.`
+        )
       }
     }
 
@@ -890,9 +901,10 @@ export class CliInstaller {
         ...status,
         pathDirectory,
         pathConfigured,
-        detail:
+        detail: applyProductBranding(
           pathProbe.detail ??
-          'The Orca launcher exists, but Orca could not check your Windows user PATH.'
+            'The Orca launcher exists, but Orca could not check your Windows user PATH.'
+        )
       }
     }
 
@@ -983,7 +995,9 @@ export class CliInstaller {
           ? `Add this folder to your PATH manually: ${pathDirectory}. Or run Orca as an administrator and try again.`
           : `Remove this folder from your PATH manually: ${pathDirectory}. Or run Orca as an administrator and try again.`
       throw new Error(
-        `Windows blocked updating your user PATH (access denied). This usually means your PATH environment variable is managed by Group Policy or your organization's device management. ${guidance}`,
+        applyProductBranding(
+          `Windows blocked updating your user PATH (access denied). This usually means your PATH environment variable is managed by Group Policy or your organization's device management. ${guidance}`
+        ),
         { cause: error }
       )
     }

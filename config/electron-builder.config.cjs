@@ -40,9 +40,22 @@ const appId = productManifest.desktop.appId
 if (!appId) {
   throw new Error('HiveCode desktop appId must be configured before packaging')
 }
+// Why: the development package keeps its upstream-compatible internal name, but those
+// fields also feed app.asar package metadata and Windows PE version resources. Override
+// the packaged copy so no upstream owner or product identity leaks into shipped files.
+const packagedMetadata = {
+  name: productManifest.slug,
+  productName: productManifest.displayName,
+  description: productManifest.displayName,
+  author: { name: productManifest.displayName }
+}
+const packagedVersion = devChannelBuildVersion ?? localBuildVersion
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
-  to: 'onboarding/feature-wall'
+  to: 'onboarding/feature-wall',
+  // Why: the remaining upstream recordings contain baked-in Orca screenshots.
+  // Do not ship those binaries until the tiles are re-recorded with HiveCode.
+  filter: ['tile-01.*', 'tile-02.*', 'tile-04.*', 'tile-08.*', 'tile-11.*']
 }
 // Why: freshness detection needs immutable identity metadata from this exact
 // app build, but never needs the skill package bytes or a runtime network read.
@@ -85,11 +98,14 @@ const winSpeechNativeResource = {
 module.exports = {
   appId,
   productName: productManifest.displayName,
-  ...(devChannelBuildVersion
-    ? { extraMetadata: { version: devChannelBuildVersion } }
-    : localBuildVersion
-      ? { extraMetadata: { version: localBuildVersion } }
-      : {}),
+  // Why: undefined lets electron-builder infer a GitHub publisher from package metadata
+  // or the current Git remote. The product manifest has no approved release authority,
+  // so make every packaging channel explicitly non-publishing.
+  publish: null,
+  extraMetadata: {
+    ...packagedMetadata,
+    ...(packagedVersion ? { version: packagedVersion } : {})
+  },
   directories: {
     buildResources: 'resources/build'
   },
@@ -558,7 +574,7 @@ function chmodMacServeSimHelpers(resourcesDir, electronPlatformName) {
 async function signMacComputerUseHelper(helperAppPath, packager) {
   if (!existsSync(helperAppPath)) {
     if (isMacRelease) {
-      throw new Error(`Missing Orca Computer Use helper app at ${helperAppPath}`)
+      throw new Error(`Missing HiveCode Computer Use helper app at ${helperAppPath}`)
     }
     return
   }
@@ -572,7 +588,7 @@ async function signMacComputerUseHelper(helperAppPath, packager) {
     findInstalledMacSigningIdentity(codeSigningInfo?.keychainFile) ??
     (isMacRelease ? null : '-')
   if (!identity) {
-    throw new Error('Missing signing identity for Orca Computer Use helper app')
+    throw new Error('Missing signing identity for HiveCode Computer Use helper app')
   }
   // Why: TCC grants attach to this nested app's code identity. Sign it before
   // the outer Orca.app is sealed so production builds preserve that identity.

@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import type { RpcFailure } from '../transport/types'
 
 const RENDERER_UNAVAILABLE = 'renderer_unavailable'
@@ -18,7 +19,7 @@ export function buildMarkdownDiskFallbackDoc(args: {
     ? 'File too large for mobile preview'
     : args.tabIsDirty
       ? 'Desktop has unsaved changes. Showing disk content.'
-      : 'Editing needs Orca desktop running.'
+      : productNameText('Editing needs Orca desktop running.')
   return {
     status: 'ready' as const,
     content: args.content,

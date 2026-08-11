@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { applyProductBranding } from '../../../../shared/brand'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalBoolean, OptionalString, requiredString } from '../schemas'
 import { ORCHESTRATION_RUN_PAGE_LIMIT } from '../../../../shared/orchestration-run-pagination'
@@ -39,7 +40,9 @@ function requireCallerPane(
   if (!paneKey) {
     throw new OrchestrationError(
       'stable_pane_required',
-      'The coordinator terminal has no stable pane identity. Run this command inside a live Orca terminal.'
+      applyProductBranding(
+        'The coordinator terminal has no stable pane identity. Run this command inside a live Orca terminal.'
+      )
     )
   }
   return paneKey

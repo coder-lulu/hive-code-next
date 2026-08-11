@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -278,7 +279,7 @@ export function MobileAgentSessionHistoryPanel({
         <View style={styles.state}>
           <Text style={styles.stateTitle}>Agent Session History Unavailable</Text>
           <Text style={styles.stateText}>
-            Update Orca on this host to browse agent session history.
+            {productNameText('Update Orca on this host to browse agent session history.')}
           </Text>
         </View>
       ) : screenState.kind === 'error' ? (

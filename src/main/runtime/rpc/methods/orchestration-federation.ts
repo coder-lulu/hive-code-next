@@ -1,4 +1,5 @@
 import type { TuiAgent } from '../../../../shared/types'
+import { applyProductBranding } from '../../../../shared/brand'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
@@ -231,7 +232,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             taskId: params.taskId,
             dispatchId: params.dispatchId,
             taskSpec: params.taskSpec,
-            coordinatorHandle: 'Run home (relayed by Orca)',
+            coordinatorHandle: applyProductBranding('Run home (relayed by Orca)'),
             workerHandle: terminalHandle,
             dispatchCapability: capability,
             devMode: params.devMode,

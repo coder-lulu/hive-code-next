@@ -33,20 +33,8 @@ vi.mock('../../resources/icon-dev.png?asset', () => ({
   default: 'classic-dev-icon'
 }))
 
-vi.mock('../../resources/app-icons/orca-watercolor.png?asset', () => ({
-  default: 'watercolor-icon'
-}))
-
-vi.mock('../../resources/app-icons/orca-watercolor.png?asset&asarUnpack', () => ({
-  default: 'watercolor-icon-unpacked'
-}))
-
-vi.mock('../../resources/app-icons/orca-blue.png?asset', () => ({
-  default: 'blue-icon'
-}))
-
-vi.mock('../../resources/app-icons/orca-blue.png?asset&asarUnpack', () => ({
-  default: 'blue-icon-unpacked'
+vi.mock('../../resources/icon.png?asset&asarUnpack', () => ({
+  default: 'classic-icon-unpacked'
 }))
 
 import { applyAppIcon, getAppIconPath, persistMacDockIcon } from './app-icon'
@@ -82,10 +70,10 @@ describe('app icon selection', () => {
     vi.useRealTimers()
   })
 
-  it('resolves classic, watercolor, blue, and invalid icon ids', () => {
+  it('maps legacy and invalid icon ids to approved product assets', () => {
     expect(getAppIconPath('classic')).toBe('classic-icon')
-    expect(getAppIconPath('watercolor')).toBe('watercolor-icon')
-    expect(getAppIconPath('blue')).toBe('blue-icon')
+    expect(getAppIconPath('watercolor')).toBe('classic-icon')
+    expect(getAppIconPath('blue')).toBe('classic-icon')
     expect(getAppIconPath('missing')).toBe('classic-icon')
   })
 
@@ -99,7 +87,7 @@ describe('app icon selection', () => {
 
     applyAppIcon('watercolor')
 
-    expect(createFromPathMock).toHaveBeenCalledWith('watercolor-icon')
+    expect(createFromPathMock).toHaveBeenCalledWith('classic-icon')
     if (process.platform === 'darwin') {
       expect(dockSetIconMock).toHaveBeenCalledWith(image)
     } else {
@@ -138,7 +126,7 @@ describe('app icon selection', () => {
       expect.objectContaining({
         env: expect.objectContaining({
           ORCA_APP_BUNDLE_PATH: '/Applications/Orca.app',
-          ORCA_APP_ICON_PATH: 'watercolor-icon-unpacked'
+          ORCA_APP_ICON_PATH: 'classic-icon-unpacked'
         })
       }),
       expect.any(Function)
@@ -317,7 +305,7 @@ describe('app icon selection', () => {
       expect.any(Array),
       expect.objectContaining({
         env: expect.objectContaining({
-          ORCA_APP_ICON_PATH: 'watercolor-icon-unpacked'
+          ORCA_APP_ICON_PATH: 'classic-icon-unpacked'
         })
       }),
       expect.any(Function)
@@ -327,16 +315,6 @@ describe('app icon selection', () => {
     await waitForQueuedPersistence()
 
     expect(execFile).toHaveBeenCalledTimes(2)
-    expect(execFile).not.toHaveBeenCalledWith(
-      '/usr/bin/osascript',
-      expect.any(Array),
-      expect.objectContaining({
-        env: expect.objectContaining({
-          ORCA_APP_ICON_PATH: 'blue-icon-unpacked'
-        })
-      }),
-      expect.any(Function)
-    )
     expect(execFile).toHaveBeenNthCalledWith(
       2,
       '/usr/bin/osascript',
@@ -439,7 +417,7 @@ describe('app icon selection', () => {
       expect.any(Array),
       expect.objectContaining({
         env: expect.objectContaining({
-          ORCA_APP_ICON_PATH: 'blue-icon-unpacked'
+          ORCA_APP_ICON_PATH: 'classic-icon-unpacked'
         }),
         timeout: 10_000
       }),

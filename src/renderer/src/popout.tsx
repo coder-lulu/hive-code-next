@@ -15,7 +15,9 @@ import { translate } from './i18n/i18n'
 import { useAppStore } from './store'
 import type { GlobalSettings } from '../../shared/types'
 import { getOrCreateRendererRoot } from './lib/react-renderer-root'
+import { APP_DISPLAY_NAME } from './product-brand'
 
+document.title = `${APP_DISPLAY_NAME} Agent Dashboard`
 // Why: the pop-out window is a separate BrowserWindow with its own React root,
 // so it must run the same renderer bootstrap as main.tsx (crash diagnostics,
 // theme, i18n, error boundary) rather than inheriting anything from the main

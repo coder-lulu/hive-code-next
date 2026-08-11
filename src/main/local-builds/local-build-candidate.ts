@@ -11,6 +11,7 @@ import {
   type LocalBuildCompatibility
 } from '../../shared/local-build-compatibility'
 import { isValidAppVersion } from '../../shared/app-version'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { isBoundedUpdaterArtifactSize } from '../updater-artifact-size-policy'
 
 const MAX_MANIFEST_BYTES = 256 * 1024
@@ -252,7 +253,9 @@ export async function loadLocalBuildCandidate(
     .filter((entry) => entry.compatibility.architecture === architecture)
   if (matching.length !== 1) {
     await Promise.all(validated.map((entry) => entry.file.close()))
-    throw new Error(`The manifest must contain exactly one ${architecture} Orca ZIP.`)
+    throw new Error(
+      `The manifest must contain exactly one ${architecture} ${APP_DISPLAY_NAME} ZIP.`
+    )
   }
   const target = matching[0]
   await Promise.all(

@@ -2,6 +2,8 @@
 // agents-orchestration-steps.ts so the rail / body code can render both the
 // same way.
 
+import { applyProductBranding } from './brand'
+
 export type WorkbenchStepId = 'terminal' | 'editor' | 'browser'
 
 export type WorkbenchStep = {
@@ -25,14 +27,17 @@ export const WORKBENCH_STEPS: readonly WorkbenchStep[] = [
     id: 'editor',
     name: 'Editor',
     subtitle: 'Editor',
-    description: 'Use our Notion-style markdown editor to write notes without leaving Orca.'
+    description: applyProductBranding(
+      'Use our Notion-style markdown editor to write notes without leaving Orca.'
+    )
   },
   {
     id: 'browser',
     name: 'Browser',
     subtitle: 'Browser',
-    description:
+    description: applyProductBranding(
       "Run your app in Orca's browser, send selected UI elements to agents, and let your agents interact with your webpage."
+    )
   }
 ] as const
 

@@ -1,8 +1,6 @@
-#!/usr/bin/env node
-
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const SCRIPT_DIR = import.meta.dirname
@@ -203,7 +201,10 @@ function listRepositoryFiles(root) {
       windowsHide: true
     }
   )
-  return output.split('\0').filter(Boolean)
+  return output
+    .split('\0')
+    .filter(Boolean)
+    .filter((filePath) => existsSync(path.join(root, filePath)))
 }
 
 function loadAllowlist(allowlistPath) {

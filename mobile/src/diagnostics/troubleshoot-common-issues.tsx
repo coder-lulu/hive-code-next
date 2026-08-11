@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { WifiOff, Shield, Monitor, Clock, Globe } from 'lucide-react-native'
 import { colors } from '../theme/mobile-theme'
 
@@ -24,8 +25,8 @@ export const troubleshootCommonIssues: TroubleshootSection[] = [
     icon: <Shield size={16} color={colors.textSecondary} />,
     title: 'Firewall Blocking Port 6768',
     steps: [
-      'macOS: System Settings → Network → Firewall — allow Orca.',
-      'Windows: Defender Firewall → Allow app — enable Orca for Private networks.',
+      productNameText('macOS: System Settings → Network → Firewall — allow Orca.'),
+      productNameText('Windows: Defender Firewall → Allow app — enable Orca for Private networks.'),
       'Linux: sudo ufw allow 6768',
       'Corporate/school networks may block P2P — try a personal hotspot.'
     ]
@@ -35,8 +36,8 @@ export const troubleshootCommonIssues: TroubleshootSection[] = [
     icon: <Monitor size={16} color={colors.textSecondary} />,
     title: 'Desktop App Not Running',
     steps: [
-      'Orca must be open on your desktop to accept connections.',
-      'Try restarting Orca — the companion server starts on launch.',
+      productNameText('Orca must be open on your desktop to accept connections.'),
+      productNameText('Try restarting Orca — the companion server starts on launch.'),
       'After an update, you may need to re-pair via QR code.'
     ]
   },

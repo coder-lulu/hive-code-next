@@ -16,6 +16,7 @@ import {
 } from '../../../shared/terminal-snapshot-unavailability'
 import { e2eConfig, e2eDisableRemoteTerminalStallRecovery } from '@/lib/e2e-config'
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-breadcrumb-recorder'
+import { applyProductBranding } from '@/product-brand'
 import { deliverTerminalDataWithDeferredCredit } from '@/lib/pane-manager/terminal-delivery-credit'
 import { unwrapRuntimeRpcResult } from './runtime-rpc-client'
 import { getRuntimeEnvironmentRevision } from './runtime-environment-revision'
@@ -569,7 +570,8 @@ class RemoteRuntimeTerminalMultiplexer {
                 this.failConnection(Object.assign(new Error(error.message), { code: error.code }))
               }
             },
-            onClose: () => this.handleClose('Remote Orca runtime closed the connection.')
+            onClose: () =>
+              this.handleClose(applyProductBranding('Remote Orca runtime closed the connection.'))
           }
         )
         .then((subscription) => {

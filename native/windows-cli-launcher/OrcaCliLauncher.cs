@@ -32,7 +32,7 @@ internal static class OrcaCliLauncher
 
             if (!File.Exists(cliPath))
             {
-                Console.Error.WriteLine("Unable to locate the Orca CLI entrypoint at \"{0}\"", cliPath);
+                Console.Error.WriteLine("Unable to locate the HiveCode CLI entrypoint at \"{0}\"", cliPath);
                 return 1;
             }
 
@@ -62,7 +62,7 @@ internal static class OrcaCliLauncher
         }
         catch (Exception error)
         {
-            Console.Error.WriteLine("Unable to start the Orca CLI: {0}", error.Message);
+            Console.Error.WriteLine("Unable to start the HiveCode CLI: {0}", error.Message);
             return 1;
         }
     }

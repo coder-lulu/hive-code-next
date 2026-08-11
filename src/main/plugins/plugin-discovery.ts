@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises'
 import type { Dirent } from 'node:fs'
 import { join } from 'node:path'
 import { PLUGIN_CONTENT_HASH_PATTERN } from '../../shared/plugins/plugin-install-lockfile'
+import { applyProductBranding } from '../../shared/brand'
 import {
   PLUGIN_MANIFEST_FILENAME,
   isQualifiedPluginKey,
@@ -111,7 +112,9 @@ async function readManifestDir(
     return {
       pluginKey,
       rootDir,
-      error: `requires Orca ${manifest.engines.orca} (this is ${hostVersion})`,
+      error: applyProductBranding(
+        `requires Orca ${manifest.engines.orca} (this is ${hostVersion})`
+      ),
       isDev
     }
   }

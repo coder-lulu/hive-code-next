@@ -1,4 +1,9 @@
-# Headless Linux Server
+# Headless Linux Server (Orca Compatibility Reference)
+
+> This document is retained as an upstream Orca compatibility reference. HiveCode does not publish
+> Linux server assets from this repository yet, so the download URLs and `orca` commands below are
+> not HiveCode release instructions. Use them only when operating an explicitly compatible upstream
+> runtime, and keep the legacy paths and identifiers unchanged for that runtime.
 
 Use this guide when you want to run `orca serve` on a Linux machine without a
 desktop session, such as an Ubuntu VPS or a remote build box.

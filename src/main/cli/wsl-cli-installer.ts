@@ -2,6 +2,7 @@
    splitting the installer would separate conflict checks from the operations they guard. */
 import { execFile } from 'node:child_process'
 import type { CliInstallStatus } from '../../shared/cli-install-types'
+import { applyProductBranding } from '../../shared/brand'
 import { getDefaultWslDistro } from '../wsl'
 import { CliInstaller } from './cli-installer'
 import {
@@ -205,7 +206,9 @@ export class WslCliInstaller {
       throw new Error(status.detail ?? 'WSL CLI registration is unavailable.')
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+      throw new Error(
+        applyProductBranding(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+      )
     }
 
     // Why: the launcher and PowerShell bridge are one registration; the
@@ -289,7 +292,9 @@ export class WslCliInstaller {
       return status
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+      throw new Error(
+        applyProductBranding(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+      )
     }
 
     await this.run(
@@ -424,10 +429,11 @@ export class WslCliInstaller {
       state: args.state,
       currentTarget: args.currentTarget,
       unsupportedReason: null,
-      detail:
+      detail: applyProductBranding(
         args.state === 'installed' && !args.pathConfigured
           ? `${args.commandPath} is registered, but ${getPosixDirname(args.commandPath)} is not on PATH in ${args.distro}.`
           : args.detail
+      )
     }
   }
 
@@ -447,7 +453,7 @@ export class WslCliInstaller {
       state: 'unsupported',
       currentTarget: null,
       unsupportedReason,
-      detail
+      detail: applyProductBranding(detail)
     }
   }
 

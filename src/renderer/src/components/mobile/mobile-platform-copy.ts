@@ -1,26 +1,27 @@
 import type { Platform } from './MobileHero'
 import { translate } from '@/i18n/i18n'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 
 // iOS ships two App Store tracks: the public App Store build (slower, ~weekly)
 // and the TestFlight preview build (daily). Android only ships one APK track.
 export type IosChannel = 'stable' | 'preview'
 
-export type InstallCopy = { ctaLabel: string; url: string }
+export type InstallCopy = { ctaLabel: string; url: string | null }
 
 const IOS_CHANNEL_COPY: Record<IosChannel, InstallCopy> = {
   stable: {
     ctaLabel: 'Open App Store',
-    url: 'https://apps.apple.com/app/orca-ide/id6766130217'
+    url: PRODUCT_PUBLIC_LINKS.iosDownload
   },
   preview: {
     ctaLabel: 'Open TestFlight',
-    url: 'https://testflight.apple.com/join/YjeGMQBA'
+    url: null
   }
 }
 
 const ANDROID_COPY: InstallCopy = {
   ctaLabel: 'Download APK',
-  url: 'https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.37/app-release.apk'
+  url: PRODUCT_PUBLIC_LINKS.androidDownload
 }
 
 export function getInstallCopy(platform: Platform, iosChannel: IosChannel): InstallCopy {

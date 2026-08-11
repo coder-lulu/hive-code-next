@@ -347,10 +347,10 @@ describe('orca root help', () => {
     await main([], '/tmp/repo')
 
     expect(logSpy.mock.calls.flat().join('\n')).toContain(
-      'account add               Add a managed Claude or Codex account on this Orca host'
+      'account add               Add a managed Claude or Codex account on this HiveCode host'
     )
     expect(logSpy.mock.calls.flat().join('\n')).toContain(
-      'account list              List managed Claude and Codex accounts on this Orca host'
+      'account list              List managed Claude and Codex accounts on this HiveCode host'
     )
     logSpy.mockRestore()
   })
@@ -389,7 +389,7 @@ describe('orca root help', () => {
       'hivecode terminal create --worktree active --command "codex"'
     )
     expect(logSpy.mock.calls[0][0]).toContain(
-      'orchestration worker-start Start a supervised worker locally or on a connected Orca server'
+      'orchestration worker-start Start a supervised worker locally or on a connected HiveCode server'
     )
     expect(logSpy.mock.calls[0][0]).toContain(
       'orchestration ask         Ask the coordinator a blocking question'
@@ -542,7 +542,7 @@ describe('orca root help', () => {
     expect(createHelp).toContain('folder:<folderId>')
     expect(createHelp).toContain('worktree:<worktreeId>')
     expect(createHelp).toContain(
-      '--no-parent only affects Orca lineage; omit --base-branch to use the repo default base'
+      '--no-parent only affects HiveCode lineage; omit --base-branch to use the repo default base'
     )
 
     logSpy.mockClear()

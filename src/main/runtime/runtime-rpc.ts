@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto'
 import { readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RuntimeMetadata, RuntimeTransportMetadata } from '../../shared/runtime-bootstrap'
+import { applyProductBranding } from '../../shared/brand'
 import type { OrcaRuntimeService } from './orca-runtime'
 import { NETWORK_EXPOSURE_FAILED_GUIDANCE } from './network-exposure-guidance'
 import { writeRuntimeMetadata } from './runtime-metadata'
@@ -119,10 +120,12 @@ function pairingUnavailable(
   return { available: false, reason, guidance }
 }
 
-const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE =
+const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE = applyProductBranding(
   'The pairing registry is unavailable. Verify that the Orca data directory is writable.'
-const E2EE_KEY_UNAVAILABLE_GUIDANCE =
+)
+const E2EE_KEY_UNAVAILABLE_GUIDANCE = applyProductBranding(
   'The E2EE identity is unavailable. Verify that the Orca data directory is writable.'
+)
 
 type MobileRelayPairingProvider = {
   createPairingRelay(
@@ -852,8 +855,9 @@ export class OrcaRuntimeRpcServer {
       return {
         available: false,
         reason: 'relay_mint_failed',
-        guidance:
-          'Orca Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.',
+        guidance: applyProductBranding(
+          'Orca Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.'
+        ),
         relayFailure
       }
     }
@@ -862,7 +866,7 @@ export class OrcaRuntimeRpcServer {
       return refuseAutomaticWithoutRelay({
         code: 'relay_provider_unavailable',
         stage: 'provider_missing',
-        message: 'Orca Relay is not available on this desktop'
+        message: applyProductBranding('Orca Relay is not available on this desktop')
       })
     }
     const device = this.deviceRegistry?.getDevice(direct.deviceId)

@@ -3,12 +3,13 @@
 
 import type { EventName, EventProps } from '../../../shared/telemetry-events'
 import type { TelemetryConsentState } from '../../../shared/telemetry-consent-types'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 
 // Re-exported so renderer call sites can import the mapper alongside `track` (impl is shared because main needs the same mapping).
 export { tuiAgentToAgentKind } from '../../../shared/agent-kind'
 
 // Single source-of-truth for the privacy doc URL so FirstLaunchBanner and PrivacyPane can't drift.
-export const PRIVACY_URL = 'https://www.onorca.dev/docs/telemetry'
+export const PRIVACY_URL = PRODUCT_PUBLIC_LINKS.privacyPolicy
 
 // Why: the IPC boundary is untyped at runtime, so validate before the Privacy pane trusts a payload from main.
 function isTelemetryConsentState(x: unknown): x is TelemetryConsentState {

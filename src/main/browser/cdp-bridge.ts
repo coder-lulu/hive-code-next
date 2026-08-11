@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: the CDP bridge owns debugger lifecycle, ref map management, command serialization, and all browser interaction logic in one module so the browser automation boundary stays coherent. */
 import { webContents } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import type {
   BrowserCaptureStartResult,
   BrowserCaptureStopResult,
@@ -1034,7 +1035,7 @@ export class CdpBridge {
     if (tabs.length === 0) {
       throw new BrowserError(
         'browser_no_tab',
-        'No browser tab is open. Use the Orca UI to open a browser tab first.'
+        applyProductBranding('No browser tab is open. Use the Orca UI to open a browser tab first.')
       )
     }
     if (tabs.length === 1) {

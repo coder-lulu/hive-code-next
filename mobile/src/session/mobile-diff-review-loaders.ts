@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { buildMobileDiffLines } from './mobile-diff-lines'
 import { buildMobileDiffReviewQueue } from './mobile-diff-review-queue'
 import {
@@ -71,7 +72,10 @@ export async function loadMobileDiffReviewSnapshot(
   const statusResponse = await client.sendRequest('git.status', { worktree: `id:${worktreeId}` })
   if (!statusResponse.ok) {
     if (isMobileGitUnavailable(statusResponse.error?.code, statusResponse.error?.message)) {
-      return { kind: 'unavailable', message: 'Update Orca desktop to review changes on mobile.' }
+      return {
+        kind: 'unavailable',
+        message: productNameText('Update Orca desktop to review changes on mobile.')
+      }
     }
     throw new Error(statusResponse.error?.message || 'Unable to load changes')
   }

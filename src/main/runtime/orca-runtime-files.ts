@@ -38,6 +38,7 @@ import {
   resolveRuntimePath
 } from '../../shared/cross-platform-path'
 import { PhysicalExitTracker } from '../../shared/physical-exit-tracker'
+import { applyProductBranding } from '../../shared/brand'
 import { sortDirEntries } from '../../shared/file-name-sort'
 import type {
   RuntimeFileListResult,
@@ -101,8 +102,9 @@ const WINDOWS_RUNTIME_FILE_WATCH_DEBOUNCE_MS = 150
 export const WINDOWS_RUNTIME_FILE_WATCH_CLOSE_DEADLINE_MS = 10_000
 const TERMINAL_FILE_GRANT_TTL_MS = 10 * 60 * 1000
 const OPEN_NOFOLLOW = typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0
-const RUNTIME_FILE_MUTATION_UPDATE_REQUIRED =
+const RUNTIME_FILE_MUTATION_UPDATE_REQUIRED = applyProductBranding(
   'Remote file changes require a newer Orca client. Update the paired client and try again.'
+)
 
 function assertRuntimeFileMutationExpectation(
   connectionId: string | undefined,

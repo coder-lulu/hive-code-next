@@ -124,9 +124,9 @@ function infoPlist() {
   <key>LSUIElement</key>
   <true/>
   <key>NSAccessibilityUsageDescription</key>
-  <string>Orca Computer Use needs Accessibility permission to read and interact with app interfaces when you ask Orca to use apps.</string>
+  <string>HiveCode Computer Use needs Accessibility permission to read and interact with app interfaces when you ask HiveCode to use apps.</string>
   <key>NSScreenCaptureUsageDescription</key>
-  <string>Orca Computer Use needs Screen Recording permission to capture app windows when you ask Orca to inspect your screen.</string>
+  <string>HiveCode Computer Use needs Screen Recording permission to capture app windows when you ask HiveCode to inspect your screen.</string>
 </dict>
 </plist>
 `

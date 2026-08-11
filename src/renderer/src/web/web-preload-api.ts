@@ -147,6 +147,7 @@ import {
 } from '../../../shared/feature-interactions'
 import { normalizeContextualTourIds, type ContextualTourId } from '../../../shared/contextual-tours'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME, applyProductBranding } from '@/product-brand'
 import { translateHostAccessLinkError } from '@/lib/remote-pairing-copy'
 import { getDefaultCreateProjectParent } from '@/components/sidebar/create-project-defaults'
 import {
@@ -541,14 +542,16 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       configured: false,
       state: 'unconfigured' as const,
       persistence: 'none' as const,
-      setupMessage: 'Orca Cloud sign-in is not available in the browser fallback.'
+      setupMessage: applyProductBranding(
+        'Orca Cloud sign-in is not available in the browser fallback.'
+      )
     })
 
   return {
     app: {
       getIdentity: () =>
         Promise.resolve({
-          name: 'Orca',
+          name: APP_DISPLAY_NAME,
           isDev: false,
           devLabel: null,
           devBranch: null,
@@ -1402,7 +1405,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
     addFromPairingCode: async ({ name, pairingCode }) => {
       const offer = parseWebPairingInput(pairingCode)
       if (!offer) {
-        throw new Error('Invalid Orca pairing code.')
+        throw new Error(applyProductBranding('Invalid Orca pairing code.'))
       }
       const previousEnvironment = activeEnvironment
       closeActiveRuntimeClients()
@@ -2932,7 +2935,9 @@ function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
     state: 'unsupported',
     currentTarget: null,
     unsupportedReason: 'launch_mode_unavailable',
-    detail: 'CLI registration is managed on the Orca server, not in the web browser.'
+    detail: applyProductBranding(
+      'CLI registration is managed on the Orca server, not in the web browser.'
+    )
   } as const
   return {
     getInstallStatus: () => Promise.resolve(status),
@@ -2966,7 +2971,7 @@ function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
       state: 'not_installed',
       configPath: '',
       managedHooksPresent: false,
-      detail: 'Agent hook status is only available on the Orca server.'
+      detail: applyProductBranding('Agent hook status is only available on the Orca server.')
     } as const)
   return {
     claudeStatus: () => status('claude'),
@@ -3033,7 +3038,7 @@ function createComputerUsePermissionsApi(): NonNullable<
         helperAppPath: null,
         openedSettings: false,
         launchedHelper: false,
-        nextStep: 'Computer-use permissions are managed on the Orca server.'
+        nextStep: applyProductBranding('Computer-use permissions are managed on the Orca server.')
       })),
     reset: () =>
       Promise.resolve({
@@ -3662,13 +3667,13 @@ function resolveEnvironment(selector: string): StoredWebRuntimeEnvironment {
   if (environment.compatibleEnvironmentIds?.includes(selector)) {
     return environment
   }
-  throw new Error(`Unknown Orca runtime environment: ${selector}`)
+  throw new Error(applyProductBranding(`Unknown Orca runtime environment: ${selector}`))
 }
 
 function requireActiveEnvironment(): StoredWebRuntimeEnvironment {
   activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment()
   if (!activeEnvironment) {
-    throw new Error('Pair this web client with an Orca server first.')
+    throw new Error(applyProductBranding('Pair this web client with an Orca server first.'))
   }
   return activeEnvironment
 }
@@ -3680,7 +3685,9 @@ function requireActiveEnvironmentOrNull(): StoredWebRuntimeEnvironment | null {
 
 function assertActiveEnvironment(environmentId: string): void {
   if (requireActiveEnvironment().id !== environmentId) {
-    throw new Error('The paired Orca server changed while the request was in progress.')
+    throw new Error(
+      applyProductBranding('The paired Orca server changed while the request was in progress.')
+    )
   }
 }
 

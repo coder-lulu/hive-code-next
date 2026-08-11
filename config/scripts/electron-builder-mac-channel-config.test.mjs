@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
+const expectedPackagedMetadata = {
+  name: 'hivecode',
+  productName: 'HiveCode',
+  description: 'HiveCode',
+  author: { name: 'HiveCode' }
+}
 
 const MUTABLE_BUILD_ENV = [
   'ORCA_MAC_HOURLY',
@@ -73,16 +79,19 @@ describe('electron-builder mac channel config', () => {
   // Dev-channel environment variables must not reactivate upstream publishing.
   it('keeps publishing disabled for unconfigured channels', () => {
     withHourlyEnv((config) => {
-      expect(config.publish).toBeUndefined()
+      expect(config.publish).toBeNull()
     })
-    expect(electronBuilderConfig.publish).toBeUndefined()
+    expect(electronBuilderConfig.publish).toBeNull()
   })
 
   it('stamps hourly packages with the hourly version', () => {
     withEnv(
       { ORCA_MAC_HOURLY: '1', ORCA_HOURLY_BUILD_VERSION: '1.4.160-hourly.202607281400' },
       (config) => {
-        expect(config.extraMetadata).toEqual({ version: '1.4.160-hourly.202607281400' })
+        expect(config.extraMetadata).toEqual({
+          ...expectedPackagedMetadata,
+          version: '1.4.160-hourly.202607281400'
+        })
       }
     )
   })
@@ -93,7 +102,7 @@ describe('electron-builder mac channel config', () => {
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toBeUndefined()
+      expect(config.publish).toBeNull()
     })
   })
 
@@ -101,7 +110,10 @@ describe('electron-builder mac channel config', () => {
     withEnv(
       { ORCA_MAC_ADHOC: '1', ORCA_ADHOC_BUILD_VERSION: '1.4.160-adhoc.20260728140533' },
       (config) => {
-        expect(config.extraMetadata).toEqual({ version: '1.4.160-adhoc.20260728140533' })
+        expect(config.extraMetadata).toEqual({
+          ...expectedPackagedMetadata,
+          version: '1.4.160-adhoc.20260728140533'
+        })
       }
     )
   })
@@ -112,7 +124,7 @@ describe('electron-builder mac channel config', () => {
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toBeUndefined()
+      expect(config.publish).toBeNull()
     })
   })
 
@@ -120,7 +132,10 @@ describe('electron-builder mac channel config', () => {
     withEnv(
       { ORCA_MAC_DAILY: '1', ORCA_DAILY_BUILD_VERSION: '1.4.160-daily.202607281300' },
       (config) => {
-        expect(config.extraMetadata).toEqual({ version: '1.4.160-daily.202607281300' })
+        expect(config.extraMetadata).toEqual({
+          ...expectedPackagedMetadata,
+          version: '1.4.160-daily.202607281300'
+        })
       }
     )
   })
@@ -129,11 +144,7 @@ describe('electron-builder mac channel config', () => {
     withHourlyEnv((hourly) => {
       withDailyEnv((daily) => {
         withAdhocEnv((adhoc) => {
-          expect([hourly.publish, daily.publish, adhoc.publish]).toEqual([
-            undefined,
-            undefined,
-            undefined
-          ])
+          expect([hourly.publish, daily.publish, adhoc.publish]).toEqual([null, null, null])
         })
       })
     })

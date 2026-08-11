@@ -2,6 +2,7 @@
 import * as pty from 'node-pty'
 import { statSync } from 'node:fs'
 import { delimiter, win32 as pathWin32 } from 'node:path'
+import { applyProductBranding } from '../../shared/brand'
 import type { SubprocessHandle } from './session'
 import { DaemonProtocolError } from './types'
 import {
@@ -253,9 +254,11 @@ function formatMissingDaemonPathError(kind: 'helper' | 'cwd', path: string): Dae
   const detailName = kind === 'helper' ? 'helper' : 'cwd'
   const step = kind === 'helper' ? 'posix_spawn' : 'daemon_cwd'
   return new DaemonProtocolError(
-    `Daemon's ${kind === 'helper' ? 'node-pty install' : 'working directory'} is gone ` +
-      `(worktree deleted?). Restart Orca. node-pty: ${step} failed: ENOENT ` +
-      `(errno 2, No such file or directory) - ${detailName}='${path}'`
+    applyProductBranding(
+      `Daemon's ${kind === 'helper' ? 'node-pty install' : 'working directory'} is gone ` +
+        `(worktree deleted?). Restart Orca. node-pty: ${step} failed: ENOENT ` +
+        `(errno 2, No such file or directory) - ${detailName}='${path}'`
+    )
   )
 }
 

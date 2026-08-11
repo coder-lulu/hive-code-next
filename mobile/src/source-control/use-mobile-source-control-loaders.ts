@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { View } from 'react-native'
 import type { RpcClient } from '../transport/rpc-client'
@@ -216,7 +217,7 @@ export function useMobileSourceControlLoaders(params: Params): MobileSourceContr
             if (isMobileGitUnavailable(response.error?.code, response.error?.message)) {
               setScreenState({
                 kind: 'unavailable',
-                message: 'Update Orca desktop to use Source Control on mobile.'
+                message: productNameText('Update Orca desktop to use Source Control on mobile.')
               })
               return false
             }

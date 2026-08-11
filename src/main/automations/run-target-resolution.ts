@@ -1,6 +1,7 @@
 import type { Store } from '../persistence'
 import type { Automation } from '../../shared/automations-types'
 import { getAutomationLegacyRepoId } from '../../shared/automation-run-identity'
+import { applyProductBranding } from '../../shared/brand'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../shared/execution-host'
 import type { ProjectHostSetup, Repo } from '../../shared/types'
 import { splitWorktreeIdForFilesystem } from '../../shared/worktree-id'
@@ -44,8 +45,9 @@ export function resolveAutomationRunTarget(
   ) {
     return {
       ok: false,
-      error:
+      error: applyProductBranding(
         'Remote-server automation scheduling is not available from this Orca client yet. Run this automation on the remote server or update Orca when durable remote scheduling is available.'
+      )
     }
   }
 

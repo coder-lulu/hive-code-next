@@ -1,5 +1,6 @@
 import type { HostedReviewCreationBlockedReason } from '../../../../shared/hosted-review'
 import { translate } from '@/i18n/i18n'
+import { applyProductBranding } from '@/product-brand'
 import {
   autoRetrySchedule,
   capitalizeReviewLabel,
@@ -58,7 +59,9 @@ const SAFETY_COPY: Record<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.fork.body',
-      fallback: 'Orca cannot create a {{reviewLabel}} from this fork head here.'
+      fallback: applyProductBranding(
+        'Orca cannot create a {{reviewLabel}} from this fork head here.'
+      )
     }
   },
   base_not_on_remote: {
@@ -79,7 +82,9 @@ const SAFETY_COPY: Record<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.unsupported.body',
-      fallback: 'This repository provider does not support creating a {{reviewLabel}} from Orca.'
+      fallback: applyProductBranding(
+        'This repository provider does not support creating a {{reviewLabel}} from Orca.'
+      )
     }
   }
 }
@@ -154,8 +159,9 @@ const BRANCH_BLOCKER_COPY: Record<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.auth_required.body',
-      fallback:
+      fallback: applyProductBranding(
         '{{provider}} must be connected in this environment before Orca can create a {{reviewLabel}}.'
+      )
     },
     workflow: null
   }

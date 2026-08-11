@@ -1,10 +1,8 @@
+import { APP_DISPLAY_NAME, PRODUCT_PUBLIC_LINKS } from '@/product-brand'
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { CompatVerdict } from '../transport/protocol-compat'
-
-const RELEASES_URL = 'https://github.com/stablyai/orca/releases'
-const IOS_APP_STORE_URL = 'itms-apps://apps.apple.com/app/orca-ide/id6766130217'
 
 type Props = {
   verdict: Extract<CompatVerdict, { kind: 'blocked' }>
@@ -12,19 +10,28 @@ type Props = {
 
 export function ProtocolBlockScreen({ verdict }: Props) {
   const isMobileTooOld = verdict.reason === 'mobile-too-old'
-  // Why: Android APKs ship through GitHub Releases until a Play Store listing exists.
   const mobileUpdateTarget =
     Platform.OS === 'ios'
-      ? { label: 'Open App Store', url: IOS_APP_STORE_URL, storeName: 'the App Store' }
-      : { label: 'Open GitHub Releases', url: RELEASES_URL, storeName: 'GitHub Releases' }
+      ? {
+          label: 'Open iOS download',
+          url: PRODUCT_PUBLIC_LINKS.iosDownload,
+          storeName: 'the official iOS distribution channel'
+        }
+      : {
+          label: 'Open Android download',
+          url: PRODUCT_PUBLIC_LINKS.androidDownload,
+          storeName: 'the official Android distribution channel'
+        }
   const primaryAction = isMobileTooOld
     ? { label: mobileUpdateTarget.label, url: mobileUpdateTarget.url }
-    : { label: 'Open GitHub Releases', url: RELEASES_URL }
+    : { label: 'Open desktop download', url: PRODUCT_PUBLIC_LINKS.desktopDownload }
 
-  const title = isMobileTooOld ? 'Update Orca Mobile' : 'Update Orca on your computer'
+  const title = isMobileTooOld
+    ? `Update ${APP_DISPLAY_NAME} Mobile`
+    : `Update ${APP_DISPLAY_NAME} on your computer`
   const body = isMobileTooOld
-    ? `This desktop needs a newer Orca Mobile app. Update Orca Mobile from ${mobileUpdateTarget.storeName}, then try this host again.`
-    : 'This paired desktop app is too old for your current Orca Mobile app. Update Orca on your computer, then try this host again.'
+    ? `This desktop needs a newer ${APP_DISPLAY_NAME} Mobile app. Update ${APP_DISPLAY_NAME} Mobile from ${mobileUpdateTarget.storeName}, then try this host again.`
+    : `This paired desktop app is too old for your current ${APP_DISPLAY_NAME} Mobile app. Update ${APP_DISPLAY_NAME} on your computer, then try this host again.`
   const recoveryNote =
     'Already updated? Go back to Hosts and refresh the connection. If this message stays, remove this host and pair it again.'
 
@@ -33,14 +40,16 @@ export function ProtocolBlockScreen({ verdict }: Props) {
       <View style={styles.card}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.body}>{body}</Text>
-        <Pressable
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-          onPress={() => {
-            void Linking.openURL(primaryAction.url)
-          }}
-        >
-          <Text style={styles.primaryButtonText}>{primaryAction.label}</Text>
-        </Pressable>
+        {primaryAction.url ? (
+          <Pressable
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+            onPress={() => {
+              void Linking.openURL(primaryAction.url!)
+            }}
+          >
+            <Text style={styles.primaryButtonText}>{primaryAction.label}</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           onPress={() => {

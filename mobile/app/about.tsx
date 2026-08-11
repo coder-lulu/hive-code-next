@@ -1,3 +1,9 @@
+import {
+  PRODUCT_PUBLIC_LINKS,
+  PRODUCT_SOURCE_REPOSITORY,
+  PRODUCT_SOURCE_REPOSITORY_URL,
+  productNameText
+} from '@/product-brand'
 import { View, Text, StyleSheet, Pressable, Linking, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -37,6 +43,7 @@ function XIcon({ size = 16, color = colors.textSecondary }) {
 }
 
 export default function AboutScreen() {
+  const sourceRepositoryUrl = PRODUCT_SOURCE_REPOSITORY_URL
   const router = useRouter()
   const insets = useSafeAreaInsets()
 
@@ -51,35 +58,47 @@ export default function AboutScreen() {
 
       <View style={styles.brand}>
         <OrcaLogo size={28} />
-        <Text style={styles.brandName}>Orca</Text>
+        <Text style={styles.brandName}>{productNameText('Orca')}</Text>
         <Text style={styles.brandSub}>Open-source agent IDE for 100x builders</Text>
       </View>
 
-      <View style={styles.section}>
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://onOrca.dev')}
-        >
-          <Globe size={16} color={colors.textSecondary} />
-          <Text style={styles.rowValue}>onOrca.dev</Text>
-        </Pressable>
-        <View style={styles.separator} />
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://github.com/stablyai/orca')}
-        >
-          <GithubIcon />
-          <Text style={styles.rowValue}>stablyai/orca</Text>
-        </Pressable>
-        <View style={styles.separator} />
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://x.com/orca_build')}
-        >
-          <XIcon />
-          <Text style={styles.rowValue}>@orca_build</Text>
-        </Pressable>
-      </View>
+      {PRODUCT_PUBLIC_LINKS.website || sourceRepositoryUrl || PRODUCT_PUBLIC_LINKS.social ? (
+        <View style={styles.section}>
+          {PRODUCT_PUBLIC_LINKS.website ? (
+            <Pressable
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.website!)}
+            >
+              <Globe size={16} color={colors.textSecondary} />
+              <Text style={styles.rowValue}>Website</Text>
+            </Pressable>
+          ) : null}
+          {PRODUCT_PUBLIC_LINKS.website && (sourceRepositoryUrl || PRODUCT_PUBLIC_LINKS.social) ? (
+            <View style={styles.separator} />
+          ) : null}
+          {sourceRepositoryUrl ? (
+            <Pressable
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              onPress={() => void Linking.openURL(sourceRepositoryUrl)}
+            >
+              <GithubIcon />
+              <Text style={styles.rowValue}>{PRODUCT_SOURCE_REPOSITORY}</Text>
+            </Pressable>
+          ) : null}
+          {sourceRepositoryUrl && PRODUCT_PUBLIC_LINKS.social ? (
+            <View style={styles.separator} />
+          ) : null}
+          {PRODUCT_PUBLIC_LINKS.social ? (
+            <Pressable
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.social!)}
+            >
+              <XIcon />
+              <Text style={styles.rowValue}>Social</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <Text style={styles.versionText}>{getVersionLabel()}</Text>
     </View>

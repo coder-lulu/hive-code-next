@@ -73,6 +73,7 @@ import {
   WINDOW_QUIT_RENDERER_ACK_TIMEOUT_MS
 } from './createMainWindow'
 import { ipcMain } from 'electron'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { shouldRecoverRendererAfterProcessGone } from '../crash-reporting/process-gone-classification'
 import {
   resetExpectedTeardownStateForTest,
@@ -196,6 +197,7 @@ describe('createMainWindow', () => {
     // Why: macOS swallows the app-activating click unless the window accepts
     // first mouse, forcing a second click to focus the floating workspace.
     expect(browserWindowOptions.acceptFirstMouse).toBe(true)
+    expect(browserWindowOptions.title).toBe(APP_DISPLAY_NAME)
     if (process.platform === 'darwin') {
       expect(browserWindowOptions).toMatchObject({
         titleBarStyle: 'hiddenInset'

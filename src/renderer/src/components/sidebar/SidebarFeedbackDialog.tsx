@@ -15,6 +15,7 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { cn } from '@/lib/utils'
 import type { GitHubViewer } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 import {
   extractImageFilesFromDataTransfer,
   hasAttachableFeedbackImage,
@@ -25,9 +26,9 @@ import {
 import { SidebarFeedbackImageAttachments } from './SidebarFeedbackImageAttachments'
 import { useFeedbackImageDrop } from './use-feedback-image-drop'
 
-const GITHUB_ISSUES_URL = 'https://github.com/stablyai/orca/issues/'
-const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
-const X_URL = 'https://x.com/orca_build'
+const GITHUB_ISSUES_URL = PRODUCT_PUBLIC_LINKS.support
+const DISCORD_URL = PRODUCT_PUBLIC_LINKS.community
+const X_URL = PRODUCT_PUBLIC_LINKS.social
 
 type SubmitIdentity = {
   githubLogin: string | null
@@ -39,8 +40,10 @@ type SidebarFeedbackDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
-function openExternalUrl(url: string): void {
-  void window.api.shell.openUrl(url)
+function openExternalUrl(url: string | null): void {
+  if (url) {
+    void window.api.shell.openUrl(url)
+  }
 }
 
 function getSubmitIdentity(viewer: GitHubViewer | null, anonymous: boolean): SubmitIdentity {
@@ -321,6 +324,7 @@ export function SidebarFeedbackDialog({
               variant="outline"
               size="sm"
               className="h-8 text-xs"
+              disabled={!GITHUB_ISSUES_URL}
               onClick={() => openExternalUrl(GITHUB_ISSUES_URL)}
             >
               <Github className="size-3.5" />
@@ -335,6 +339,7 @@ export function SidebarFeedbackDialog({
               variant="outline"
               size="sm"
               className="h-8 text-xs"
+              disabled={!DISCORD_URL}
               onClick={() => openExternalUrl(DISCORD_URL)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" className="size-3.5 fill-current">
@@ -351,6 +356,7 @@ export function SidebarFeedbackDialog({
               variant="outline"
               size="sm"
               className="h-8 text-xs"
+              disabled={!X_URL}
               onClick={() => openExternalUrl(X_URL)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" className="size-3.5 fill-current">

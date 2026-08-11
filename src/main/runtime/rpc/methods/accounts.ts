@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { applyProductBranding } from '../../../../shared/brand'
 import { defineMethod, defineStreamingMethod, type RpcAnyMethod } from '../core'
 
 // Why: monotonically increasing per-process counter avoids the Date.now()
@@ -151,7 +152,9 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
       // Why: capturing a host filesystem path is local-socket-only; paired
       // mobile and remote-runtime tokens must never read host credential paths.
       if (clientKind !== undefined) {
-        throw new Error('Adding Claude accounts is only available on the Orca host runtime.')
+        throw new Error(
+          applyProductBranding('Adding Claude accounts is only available on the Orca host runtime.')
+        )
       }
       return runtime.addClaudeAccountFromConfigDir(params.configDir, {
         runtime: params.runtime,
@@ -165,7 +168,9 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     params: AddCodexFromHomeParams,
     handler: async (params, { runtime, clientKind }) => {
       if (clientKind !== undefined) {
-        throw new Error('Adding Codex accounts is only available on the Orca host runtime.')
+        throw new Error(
+          applyProductBranding('Adding Codex accounts is only available on the Orca host runtime.')
+        )
       }
       return runtime.addCodexAccountFromHome(params.sourceHome, {
         runtime: params.runtime,

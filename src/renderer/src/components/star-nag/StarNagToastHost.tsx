@@ -3,8 +3,8 @@ import { Check, ExternalLink, Loader2, Star, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
+import { PRODUCT_SOURCE_REPOSITORY_URL } from '@/product-links'
 
-const ORCA_REPO_URL = 'https://github.com/stablyai/orca'
 type StarNagMode = 'gh' | 'web'
 type StarNagToastStatus = 'idle' | 'busy' | 'starred' | 'opened'
 
@@ -20,10 +20,15 @@ function StarNagToast({
   mode: initialMode,
   markResolved,
   setDismissSuppressed
-}: StarNagToastProps): React.JSX.Element {
+}: StarNagToastProps): React.JSX.Element | null {
   const [mode, setMode] = useState(initialMode)
   const [status, setStatus] = useState<StarNagToastStatus>('idle')
   const busy = status === 'busy'
+
+  const sourceRepositoryUrl = PRODUCT_SOURCE_REPOSITORY_URL
+  if (!sourceRepositoryUrl) {
+    return null
+  }
 
   const close = (): void => {
     if (busy) {
@@ -49,7 +54,7 @@ function StarNagToast({
     setDismissSuppressed(true)
     if (mode === 'web') {
       try {
-        await window.api.shell.openUrl(ORCA_REPO_URL)
+        await window.api.shell.openUrl(sourceRepositoryUrl)
         await window.api.starNag.openWeb()
         markResolved()
         setStatus('opened')

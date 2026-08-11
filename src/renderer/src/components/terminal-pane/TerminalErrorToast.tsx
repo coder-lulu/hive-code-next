@@ -1,4 +1,5 @@
 import { translate } from '@/i18n/i18n'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 const SSH_PREFIX = 'SSH connection is not active'
 // Produced by pty-connection.ts reportError() when a PTY reattach can't reach its SSH host.
 const SSH_CONNECT_FAILURE_PREFIX = 'SSH connection failed'
@@ -101,7 +102,7 @@ export function TerminalErrorToast({
                 'Restart the terminal daemon from here to clear stale daemon state.'
               )}
             </>
-          ) : !ssh ? (
+          ) : !ssh && PRODUCT_PUBLIC_LINKS.support ? (
             <>
               {'\n'}
               {translate(
@@ -109,7 +110,7 @@ export function TerminalErrorToast({
                 'If this persists, please'
               )}{' '}
               <a
-                href="https://github.com/stablyai/orca/issues"
+                href={PRODUCT_PUBLIC_LINKS.support}
                 style={{ color: '#fca5a5', textDecoration: 'underline' }}
               >
                 {translate(

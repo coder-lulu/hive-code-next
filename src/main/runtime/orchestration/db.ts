@@ -38,6 +38,7 @@ import type {
   FederationRelayItemRow
 } from './types'
 import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestration-task-display'
+import { applyProductBranding } from '../../../shared/brand'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { OrchestrationError } from './orchestration-error'
@@ -3489,7 +3490,7 @@ export class OrchestrationDb {
     }
 
     const originalBody = message.body ? `\n\nOriginal body:\n${message.body}` : ''
-    const body = `Orca rejected this ${message.type}: ${reason}${originalBody}`
+    const body = `${applyProductBranding('Orca rejected this')} ${message.type}: ${reason}${originalBody}`
     const payload = addLifecycleRejectionMarker(message.payload, code, reason)
     // Why: rejected lifecycle signals stay auditable but must not reach read paths as actionable completion/liveness events.
     this.db

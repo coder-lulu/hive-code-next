@@ -1,3 +1,5 @@
+import { applyProductBranding } from '../../shared/brand'
+
 export function getRemoteLinearReadHelp(commandPath: string[]): string | null {
   if (commandPath.length === 1 && commandPath[0] === 'linear') {
     return LINEAR_HELP
@@ -74,7 +76,7 @@ Commands:
 
 Run \`orca linear <command> --help\` for command-specific usage.`
 
-const LINEAR_ISSUE_HELP = `orca linear issue
+const LINEAR_ISSUE_HELP = applyProductBranding(`orca linear issue
 
 Usage: orca linear issue [<id>] [--current] [--comments] [--children] [--depth <n>] [--attachments] [--relations] [--activity] [--full] [--workspace <id>] [--json]
 
@@ -99,7 +101,7 @@ Options:
 Examples:
   $ orca linear issue ENG-123
   $ orca linear issue --current --comments
-  $ orca linear issue https://linear.app/acme/issue/ENG-123 --full --json`
+  $ orca linear issue https://linear.app/acme/issue/ENG-123 --full --json`)
 
 const LINEAR_MCP_ISSUE_LIST_HELP = `orca linear list-issues
 

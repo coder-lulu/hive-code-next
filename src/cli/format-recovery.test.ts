@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { formatCliError } from './format'
 import { RuntimeClientError, RuntimeRpcFailureError } from './runtime-client'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 describe('CLI error recovery', () => {
   it('prints did-you-mean next steps for an unknown-command error carrying data', () => {
@@ -56,5 +57,16 @@ describe('CLI error recovery', () => {
     const output = formatCliError(error, { commandPath: ['computer', 'click'] })
 
     expect(output).toContain('Fix the command flags or RPC params')
+  })
+
+  it('brands user-facing names without rewriting compatibility commands or schemes', () => {
+    const error = new RuntimeClientError(
+      'runtime_unavailable',
+      'Orca rejected the Orca:// compatibility link.'
+    )
+
+    expect(formatCliError(error)).toBe(
+      `${APP_DISPLAY_NAME} rejected the Orca:// compatibility link.\n${APP_DISPLAY_NAME} is not running. Run 'orca open' first.`
+    )
   })
 })

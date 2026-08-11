@@ -1,4 +1,5 @@
 import { shellEscape } from './ssh-connection-utils'
+import { applyProductBranding } from '../../shared/brand'
 import { isWindowsRemoteHost, joinRemotePath, type RemoteHostPlatform } from './ssh-remote-platform'
 import {
   RELAY_UPLOAD_IDENTITY_FILE_NAME as IDENTITY_FILE_NAME,
@@ -136,7 +137,7 @@ function reservePosixStageCommand(poolDir: string, owner: string): string {
     'fi;',
     'fi;',
     'done;',
-    `printf '%s\\n' 'Orca relay upload staging quota is full; reconnect after 40 minutes or inspect .orca-remote/${RELAY_UPLOAD_STAGE_POOL_NAME}' >&2;`,
+    `printf '%s\\n' '${applyProductBranding('Orca relay upload staging quota is full; reconnect after 40 minutes or inspect .orca-remote/')}${RELAY_UPLOAD_STAGE_POOL_NAME}' >&2;`,
     'exit 75'
   ].join(' ')
 }

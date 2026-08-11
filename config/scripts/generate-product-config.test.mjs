@@ -16,6 +16,22 @@ const validManifest = {
   displayName: 'HiveCode',
   shortName: 'HiveCode',
   slug: 'hivecode',
+  branding: {
+    logoAsset: 'resources/product-logo.png',
+    logoSha256: '337e995f0c3f8d08ec420bc8f133290de51504517e3e5f995d814987d57be6b1'
+  },
+  publicLinks: {
+    website: null,
+    documentation: null,
+    support: null,
+    community: null,
+    social: null,
+    desktopDownload: null,
+    androidDownload: null,
+    iosDownload: null,
+    privacyPolicy: null,
+    termsOfService: null
+  },
   cli: { primary: 'hivecode', aliases: ['orca', 'orca-ide'] },
   schemes: { primary: 'hivecode', aliases: ['orca'] },
   desktop: {
@@ -122,6 +138,7 @@ describe('validateProductManifest', () => {
   })
 
   it.each([
+    ['publicLinks', 'website'],
     ['cli', 'aliases'],
     ['schemes', 'primary'],
     ['desktop', 'appId'],

@@ -11,6 +11,7 @@ import {
 } from '../../shared/agent-detection'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
+import { applyProductBranding } from '../../shared/brand'
 import { sortDirEntries } from '../../shared/file-name-sort'
 import { isServerDriveListRequest, listWindowsDrives } from './windows-drive-listing'
 import { extractLastOsc7Uri, extractOscScanTail } from '../daemon/osc7-uri-extraction'
@@ -1803,10 +1804,12 @@ function createTerminalRevealWarning(handle: string, error?: unknown): string {
     error instanceof Error && error.message.trim().length > 0
       ? ` Reason: ${error.message.trim()}.`
       : ''
-  return [
-    `Terminal ${handle} is running, but Orca could not make it discoverable.${reason}`,
-    `Run \`orca terminal focus --terminal ${handle}\` to reveal and focus it.`
-  ].join(' ')
+  return applyProductBranding(
+    [
+      `Terminal ${handle} is running, but Orca could not make it discoverable.${reason}`,
+      `Run \`orca terminal focus --terminal ${handle}\` to reveal and focus it.`
+    ].join(' ')
+  )
 }
 
 // Why: an absent `surfaceOwner` means "default", so surfacing callers must omit
@@ -2149,7 +2152,9 @@ function assertProjectHostSetupHostIsSupported(hostId: ExecutionHostId | null | 
     return
   }
   throw new Error(
-    'SSH hosts are not supported by this operation. Set the project up from the Orca desktop app, which owns the SSH connection.'
+    applyProductBranding(
+      'SSH hosts are not supported by this operation. Set the project up from the Orca desktop app, which owns the SSH connection.'
+    )
   )
 }
 
@@ -21263,8 +21268,9 @@ export class OrcaRuntimeService {
     } else if (lineageResolution.parent.type === 'worktree') {
       warnings.push({
         code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-        message:
-          'Worktree created, but Orca could not record lineage because instance identity was unavailable.',
+        message: applyProductBranding(
+          'Worktree created, but Orca could not record lineage because instance identity was unavailable.'
+        ),
         details: {
           childHasInstanceId: Boolean(childInstanceId),
           parentHasInstanceId: Boolean(parentInstanceId),
@@ -28320,7 +28326,9 @@ export class OrcaRuntimeService {
       } catch {
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-          message: 'Worktree created, but Orca could not validate the environment parent context.',
+          message: applyProductBranding(
+            'Worktree created, but Orca could not validate the environment parent context.'
+          ),
           details: { envParentWorkspace: input.envParentWorkspace }
         })
       }
@@ -28386,8 +28394,9 @@ export class OrcaRuntimeService {
         // Why: a stale terminal handle (reload/SSH reconnect) shouldn't drop lineage; keep resolving other inferred candidates.
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-          message:
-            'Worktree created, but Orca could not validate the caller terminal as a parent context.',
+          message: applyProductBranding(
+            'Worktree created, but Orca could not validate the caller terminal as a parent context.'
+          ),
           details: { callerTerminalHandle: input.callerTerminalHandle }
         })
       }
@@ -28402,8 +28411,9 @@ export class OrcaRuntimeService {
       } catch {
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-          message:
-            'Worktree created, but Orca could not validate the current directory as a parent context.',
+          message: applyProductBranding(
+            'Worktree created, but Orca could not validate the current directory as a parent context.'
+          ),
           details: { cwdParentWorktree: input.cwdParentWorktree }
         })
       }
@@ -28427,7 +28437,9 @@ export class OrcaRuntimeService {
         warnings: [
           {
             code: 'LINEAGE_PARENT_CONTEXT_CONFLICT',
-            message: 'Worktree created, but Orca could not prove which parent context caused it.',
+            message: applyProductBranding(
+              'Worktree created, but Orca could not prove which parent context caused it.'
+            ),
             details: {
               terminalParentWorkspaceKey: candidates.find((c) => c.source === 'terminal-context')
                 ?.parent.workspaceKey,
@@ -32405,7 +32417,9 @@ export class OrcaRuntimeService {
       if (!worktree) {
         throw new LinearAgentAccessError(
           'linear_issue_required',
-          'Run --current from inside an Orca-managed worktree or pass an issue id.'
+          applyProductBranding(
+            'Run --current from inside an Orca-managed worktree or pass an issue id.'
+          )
         )
       }
     }
@@ -32413,7 +32427,9 @@ export class OrcaRuntimeService {
     if (!worktree) {
       throw new LinearAgentAccessError(
         'linear_issue_required',
-        'Run --current from inside an Orca-managed worktree or pass an issue id.'
+        applyProductBranding(
+          'Run --current from inside an Orca-managed worktree or pass an issue id.'
+        )
       )
     }
 
@@ -32557,7 +32573,9 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the state change, but Orca could not confirm it.',
+            applyProductBranding(
+              'Linear may have applied the state change, but Orca could not confirm it.'
+            ),
             {
               nextSteps: [
                 `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the current state before retrying.`
@@ -32605,7 +32623,9 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the relation change, but Orca could not confirm it.',
+            applyProductBranding(
+              'Linear may have applied the relation change, but Orca could not confirm it.'
+            ),
             {
               nextSteps: [
                 `Run \`orca linear issue ${target.issue.identifier} --relations --workspace ${target.workspaceId} --json\` before retrying.`
@@ -32684,7 +32704,9 @@ export class OrcaRuntimeService {
           (cause) =>
             linearError(
               'linear_write_unconfirmed',
-              'Linear may have applied the issue save, but Orca could not confirm it.',
+              applyProductBranding(
+                'Linear may have applied the issue save, but Orca could not confirm it.'
+              ),
               {
                 nextSteps: [
                   `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` before retrying.`
@@ -32733,7 +32755,9 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the task update, but Orca could not confirm it.',
+            applyProductBranding(
+              'Linear may have applied the task update, but Orca could not confirm it.'
+            ),
             {
               nextSteps: [
                 `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the updated field before retrying.`
@@ -33747,7 +33771,7 @@ export class OrcaRuntimeService {
     }
     if (isLinearAuthError(error)) {
       return linearError('linear_auth_expired', 'Linear authentication expired.', {
-        nextSteps: ['Reconnect Linear from Orca settings.']
+        nextSteps: [applyProductBranding('Reconnect Linear from Orca settings.')]
       })
     }
     return linearError(classifyLinearError(error), linearMessage(error))
@@ -34069,7 +34093,9 @@ export class OrcaRuntimeService {
     }
     if (teams.length === 0 && (getLinearStatus().workspaces?.length ?? 0) === 0) {
       throw linearError('linear_not_connected', 'Linear is not connected.', {
-        nextSteps: ['Connect Linear from Orca settings, then retry the issue create.']
+        nextSteps: [
+          applyProductBranding('Connect Linear from Orca settings, then retry the issue create.')
+        ]
       })
     }
     const matches = teams.filter(
@@ -34274,7 +34300,7 @@ export class OrcaRuntimeService {
           : ''
     return linearError(
       'linear_write_unconfirmed',
-      'Linear may have applied the write, but Orca could not confirm it.',
+      applyProductBranding('Linear may have applied the write, but Orca could not confirm it.'),
       {
         writeId,
         workspaceId,

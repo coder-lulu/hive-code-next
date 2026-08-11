@@ -1,9 +1,9 @@
 {
-  "name": "orca",
+  "name": "hivecode",
   "version": "1.4.178-rc.2",
   "private": true,
   "description": "Next-gen IDE for parallel agentic development",
-  "author": "stablyai",
+  "author": "HiveKernel",
   "bin": {
     "hivecode": "./out/cli/index.js",
     "orca-dev": "./config/scripts/orca-dev.mjs",
@@ -83,7 +83,7 @@
     "rebuild:electron": "node config/scripts/rebuild-native-deps.mjs",
     "rebuild:node": "pnpm rebuild node-pty",
     "build:unpack": "pnpm run verify:product-config && pnpm run build && pnpm run ensure:electron-runtime && electron-builder --config config/electron-builder.config.cjs --dir",
-    "scan:packaged-updater": "node config/scripts/scan-packaged-updater-artifact.mjs",
+    "scan:packaged-updater": "node config/scripts/scan-packaged-updater-artifact.mjs --resources dist/win-unpacked/resources",
     "build:win": "pnpm run verify:product-config && pnpm run build:desktop && pnpm run ensure:electron-runtime && electron-builder --config config/electron-builder.config.cjs --win",
     "build:icons": "bash resources/icon-source/generate.sh",
     "build:mac": "pnpm run verify:product-config && pnpm run build:desktop && pnpm run build:computer-macos && pnpm run build:notification-status-macos && pnpm run ensure:electron-runtime && node config/scripts/build-mac-local.mjs",

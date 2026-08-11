@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { applyProductBranding } from '../../shared/brand'
 
 export type WindowsUserPathReadResult =
   | { state: 'success'; value: string | null; expandable: boolean }
@@ -112,7 +113,7 @@ export class WindowsUserPathRegistryReader {
       if (!key || typeof key !== 'object') {
         return {
           state: 'unknown',
-          detail: 'Orca could not read the Windows user PATH registry key.'
+          detail: applyProductBranding('Orca could not read the Windows user PATH registry key.')
         }
       }
 
@@ -139,7 +140,7 @@ export class WindowsUserPathRegistryReader {
     } catch {
       return {
         state: 'unknown',
-        detail: 'Orca could not read the Windows user PATH registry value.'
+        detail: applyProductBranding('Orca could not read the Windows user PATH registry value.')
       }
     }
   }

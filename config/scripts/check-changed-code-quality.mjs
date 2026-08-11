@@ -40,6 +40,65 @@ export function parseAddedLineRanges(diff) {
   return ranges
 }
 
+function decodeGitPatchPath(value) {
+  if (!value.startsWith('"')) {
+    return value
+  }
+
+  const bytes = []
+  for (let index = 1; index < value.length - 1; index += 1) {
+    const character = value[index]
+    if (character !== '\\') {
+      bytes.push(...Buffer.from(character, 'utf8'))
+      continue
+    }
+
+    const escaped = value[++index]
+    const octal = value.slice(index, index + 3)
+    if (/^[0-7]{3}$/.test(octal)) {
+      bytes.push(Number.parseInt(octal, 8))
+      index += 2
+      continue
+    }
+
+    const escapedCharacters = {
+      b: String.fromCharCode(8),
+      f: String.fromCharCode(12),
+      n: String.fromCharCode(10),
+      r: String.fromCharCode(13),
+      t: String.fromCharCode(9),
+      v: String.fromCharCode(11)
+    }
+    bytes.push(...Buffer.from(escapedCharacters[escaped] ?? escaped, 'utf8'))
+  }
+  return Buffer.from(bytes).toString('utf8')
+}
+
+export function parseAddedLineRangesByFile(diff) {
+  const rangesByFile = new Map()
+  let currentFile = null
+
+  for (const rawLine of diff.split(String.fromCharCode(10))) {
+    const line = rawLine.endsWith(String.fromCharCode(13)) ? rawLine.slice(0, -1) : rawLine
+    if (line.startsWith('+++ ')) {
+      const patchPath = decodeGitPatchPath(line.slice(4))
+      currentFile = patchPath === '/dev/null' ? null : patchPath.replace(/^b\//, '')
+      continue
+    }
+    if (!currentFile || !line.startsWith('@@ ')) {
+      continue
+    }
+
+    const ranges = parseAddedLineRanges(line)
+    if (ranges.length > 0) {
+      const existingRanges = rangesByFile.get(currentFile) ?? []
+      existingRanges.push(...ranges)
+      rangesByFile.set(currentFile, existingRanges)
+    }
+  }
+  return rangesByFile
+}
+
 export function overlapsAddedLines(startLine, endLine, ranges) {
   return ranges.some((range) => startLine <= range.end && endLine >= range.start)
 }
@@ -89,13 +148,22 @@ export function collectAddedLineRanges(root, requestedBase) {
   )
   const rangesByFile = new Map()
 
-  for (const file of changedFiles) {
-    if (!SOURCE_FILE_PATTERN.test(file) || !existsSync(path.join(root, file))) {
-      continue
-    }
-    const diff = runGit(root, ['diff', '--unified=0', '--no-color', comparisonBase, '--', file])
-    const ranges = parseAddedLineRanges(diff)
-    if (ranges.length > 0) {
+  const changedSourceFiles = changedFiles.filter(
+    (file) => SOURCE_FILE_PATTERN.test(file) && existsSync(path.join(root, file))
+  )
+  for (const fileChunk of chunkFilesForCommand(changedSourceFiles)) {
+    const diff = runGit(root, [
+      '-c',
+      'core.quotePath=true',
+      'diff',
+      '--unified=0',
+      '--no-color',
+      '--no-ext-diff',
+      comparisonBase,
+      '--',
+      ...fileChunk
+    ])
+    for (const [file, ranges] of parseAddedLineRangesByFile(diff)) {
       rangesByFile.set(file, ranges)
     }
   }
@@ -165,21 +233,57 @@ function printDiagnostic(diagnostic, root) {
   console.error(`${file}:${line} ${code}: ${diagnostic.message}`)
 }
 
+export function chunkFilesForCommand(files, maximumArgumentLength = 6_000) {
+  const chunks = []
+  let currentChunk = []
+  let currentLength = 0
+
+  for (const file of files) {
+    const argumentLength = file.length + 1
+    if (currentChunk.length > 0 && currentLength + argumentLength > maximumArgumentLength) {
+      chunks.push(currentChunk)
+      currentChunk = []
+      currentLength = 0
+    }
+    currentChunk.push(file)
+    currentLength += argumentLength
+  }
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk)
+  }
+  return chunks
+}
+
+export function resolveOxlintCommand(root, nodeExecutable = process.execPath) {
+  return {
+    command: nodeExecutable,
+    args: [path.join(root, 'node_modules', 'oxlint', 'bin', 'oxlint')]
+  }
+}
+
 function runOxlintScan(root, scan, files) {
-  const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-  const result = spawnSync(pnpm, ['exec', 'oxlint', ...scan.args, '--format', 'json', ...files], {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: 128 * 1024 * 1024
-  })
-  if (result.error) {
-    throw result.error
+  const oxlint = resolveOxlintCommand(root)
+  const diagnostics = []
+  for (const fileChunk of chunkFilesForCommand(files)) {
+    const result = spawnSync(
+      oxlint.command,
+      [...oxlint.args, ...scan.args, '--format', 'json', ...fileChunk],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 128 * 1024 * 1024
+      }
+    )
+    if (result.error) {
+      throw result.error
+    }
+    if (!result.stdout.trim()) {
+      process.stderr.write(result.stderr)
+      throw new Error(`${scan.label} failed before producing diagnostics.`)
+    }
+    diagnostics.push(...(parseOxlintOutput(result.stdout, scan.label).diagnostics ?? []))
   }
-  if (!result.stdout.trim()) {
-    process.stderr.write(result.stderr)
-    throw new Error(`${scan.label} failed before producing diagnostics.`)
-  }
-  return parseOxlintOutput(result.stdout, scan.label).diagnostics ?? []
+  return diagnostics
 }
 
 export function main(

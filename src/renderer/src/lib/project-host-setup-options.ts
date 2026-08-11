@@ -12,6 +12,7 @@ import {
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY
 } from '../../../shared/protocol-version'
 import type { ProjectHostSetup, Repo } from '../../../shared/types'
+import { applyProductBranding } from '@/product-brand'
 
 export type ProjectHostSetupOption =
   | {
@@ -210,7 +211,7 @@ function getHostSetupAvailability(host: ExecutionHostRegistryEntry): {
   if (host.health === 'blocked') {
     return {
       isAvailable: false,
-      detail: 'Orca server version is incompatible'
+      detail: applyProductBranding('Orca server version is incompatible')
     }
   }
   // Why: disconnected hosts cannot confirm project setup or runtime capabilities,
@@ -235,7 +236,7 @@ function getHostSetupAvailability(host: ExecutionHostRegistryEntry): {
     ) {
       return {
         isAvailable: false,
-        detail: 'Update Orca on this host to set up projects'
+        detail: applyProductBranding('Update Orca on this host to set up projects')
       }
     }
   }

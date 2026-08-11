@@ -2,6 +2,7 @@
    spawn failure handling, and output normalization; keeping them together
    prevents those paths from drifting. */
 import { spawn, type ChildProcess } from 'node:child_process'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { GlobalSettings, Repo, TuiAgent } from '../../shared/types'
 import {
   buildCommitMessagePrompt,
@@ -228,7 +229,7 @@ function sanitizeAgentFailureDetail(detail: string | null): string | null {
 }
 
 function userFacingUnsafeWindowsBatchArgs(label: string): string {
-  return `${label} cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so Orca sends the prompt on stdin.`
+  return `${label} cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so ${APP_DISPLAY_NAME} sends the prompt on stdin.`
 }
 
 function toModelDiscoveryCapability(

@@ -4,6 +4,7 @@ import { isKeepaliveFrame } from '../../../shared/runtime-rpc-envelope'
 import type { WebPairingOffer } from './web-pairing'
 import { installWindowVisibilityInterval } from '../lib/window-visibility-interval'
 import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime-tailscale-hint'
+import { applyProductBranding } from '../../../shared/brand'
 import {
   decrypt,
   decryptBytes,
@@ -118,7 +119,7 @@ export class WebRuntimeClient {
       if (!this.sendEncrypted({ id, deviceToken: this.pairing.deviceToken, method, params })) {
         this.pending.delete(id)
         window.clearTimeout(timeout)
-        reject(new Error('Remote Orca runtime is not connected.'))
+        reject(new Error(applyProductBranding('Remote Orca runtime is not connected.')))
       }
     })
   }
@@ -329,7 +330,7 @@ export class WebRuntimeClient {
     this.subscriptions.set(id, subscription)
     if (!this.sendEncrypted({ id, deviceToken: this.pairing.deviceToken, method, params })) {
       this.subscriptions.delete(id)
-      throw new Error('Remote Orca runtime is not connected.')
+      throw new Error(applyProductBranding('Remote Orca runtime is not connected.'))
     }
     return {
       unsubscribe: () => {
@@ -360,8 +361,8 @@ export class WebRuntimeClient {
     this.childClients.clear()
     this.fileWatchTeardownRetries.clear()
     this.clearTimers()
-    this.rejectAllPending('Remote Orca runtime connection closed.')
-    this.rejectAllWaiters(new Error('Remote Orca runtime connection closed.'))
+    this.rejectAllPending(applyProductBranding('Remote Orca runtime connection closed.'))
+    this.rejectAllWaiters(new Error(applyProductBranding('Remote Orca runtime connection closed.')))
     if (shouldNotifySubscriptions) {
       this.notifySubscriptionsClosed()
     } else {
@@ -438,7 +439,7 @@ export class WebRuntimeClient {
         this.rejectAllWaiters(
           new Error(
             withRemoteRuntimeTailscaleHint(
-              'Could not connect to the remote Orca runtime.',
+              applyProductBranding('Could not connect to the remote Orca runtime.'),
               this.pairing.endpoint
             )
           )
@@ -595,7 +596,9 @@ export class WebRuntimeClient {
       return Promise.reject(createWebRuntimeUnauthorizedError())
     }
     if (this.intentionallyClosed) {
-      return Promise.reject(new Error('Remote Orca runtime connection closed.'))
+      return Promise.reject(
+        new Error(applyProductBranding('Remote Orca runtime connection closed.'))
+      )
     }
     return new Promise((resolve, reject) => {
       const timeout = window.setTimeout(() => {

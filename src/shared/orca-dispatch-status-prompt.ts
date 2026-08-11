@@ -1,3 +1,5 @@
+import { applyProductBranding } from './brand'
+
 // Why: full Orca dispatch preambles are multi-KB (CLI instructions before
 // `=== TASK ===`). A naive first-N-char fold of the agent-status prompt keeps
 // only lifecycle boilerplate and drops the task body the UI needs as a
@@ -7,6 +9,9 @@
 
 export const ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX =
   'You are working inside Orca, a multi-agent IDE.'
+const HIVECODE_DISPATCH_STATUS_PREAMBLE_PREFIX = applyProductBranding(
+  ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX
+)
 export const ORCA_DISPATCH_STATUS_TASK_MARKER = '=== TASK ==='
 const ORCA_DISPATCH_STATUS_TASK_ID_MARKER = 'Your task ID is:'
 // Why: real preambles put === TASK === near the end (~4KB+). Scan past the
@@ -22,8 +27,10 @@ export function isOrcaDispatchStatusPrompt(value: string): boolean {
     start++
   }
   return (
-    start + ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX.length <= scanEnd &&
-    value.startsWith(ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX, start)
+    (start + ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX.length <= scanEnd &&
+      value.startsWith(ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX, start)) ||
+    (start + HIVECODE_DISPATCH_STATUS_PREAMBLE_PREFIX.length <= scanEnd &&
+      value.startsWith(HIVECODE_DISPATCH_STATUS_PREAMBLE_PREFIX, start))
   )
 }
 
@@ -74,7 +81,10 @@ export function compactDispatchPromptForStatus(
 
   // Why: keep the dispatch prefix (isOrcaDispatchPrompt) + task id (label match)
   // + task body (fallback preview) so UI helpers still work on the 200-char field.
-  let compact = ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX
+  const preamblePrefix = scan.startsWith(HIVECODE_DISPATCH_STATUS_PREAMBLE_PREFIX)
+    ? HIVECODE_DISPATCH_STATUS_PREAMBLE_PREFIX
+    : ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX
+  let compact = preamblePrefix
   if (taskId) {
     compact += ` ${ORCA_DISPATCH_STATUS_TASK_ID_MARKER} ${taskId}`
   }

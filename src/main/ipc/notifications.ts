@@ -28,6 +28,7 @@ import { readNotificationAuthorizationStatus } from './notification-authorizatio
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import { setTrayAttention } from '../tray/system-tray'
 import { isMainWindowVisible } from '../window/main-window-visibility'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const NOTIFICATION_COOLDOWN_MS = 5000
 const MAX_RECENT_NOTIFICATION_KEYS = 50
@@ -119,8 +120,8 @@ function probeNotificationDelivery(): Promise<NotificationDeliveryProbeResult> {
   permissionDialogTriggeredThisSession = true
 
   const probe = new Notification({
-    title: 'Orca notifications are on',
-    body: 'Orca will alert you when agents finish or terminals need attention.',
+    title: `${APP_DISPLAY_NAME} notifications are on`,
+    body: `${APP_DISPLAY_NAME} will alert you when agents finish or terminals need attention.`,
     silent: true
   })
   activeNotifications.add(probe)
@@ -643,8 +644,8 @@ export function triggerStartupNotificationRegistration(store: Store): void {
   store.updateUI({ notificationPermissionRequested: true })
 
   const notification = new Notification({
-    title: 'Orca is ready to notify you',
-    body: 'Allow notifications so Orca can alert you when agents finish or terminals need attention.'
+    title: `${APP_DISPLAY_NAME} is ready to notify you`,
+    body: `Allow notifications so ${APP_DISPLAY_NAME} can alert you when agents finish or terminals need attention.`
   })
 
   // Why: prevent GC from collecting the notification and its click handler while it's still visible.

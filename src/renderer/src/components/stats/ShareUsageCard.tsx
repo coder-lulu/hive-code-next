@@ -10,11 +10,11 @@ import {
   getDailySegments,
   getDailyTotal,
   getLegendItems,
-  OrcaLogo,
   RANGE_LABELS
 } from './share-card-utils'
 import type { ClaudeShareData, CodexShareData } from './share-card-utils'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME, PRODUCT_LOGO_URL } from '@/product-brand'
 
 export type ShareUsageCardProps = (ClaudeShareData | CodexShareData) & {
   range: string
@@ -108,11 +108,16 @@ function CardHeader(props: { providerLabel: string; range: string }): React.JSX.
     >
       <div style={{ display: 'table-cell', verticalAlign: 'middle' }}>
         <div style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-          <OrcaLogo />
+          <img
+            src={PRODUCT_LOGO_URL}
+            alt=""
+            aria-hidden="true"
+            style={{ width: 26, height: 26, objectFit: 'contain', verticalAlign: 'middle' }}
+          />
         </div>
         <div style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 10 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#fafafa', lineHeight: 1.2 }}>
-            {translate('auto.components.stats.ShareUsageCard.0eb31e79ee', 'Orca IDE')}
+            {APP_DISPLAY_NAME}
           </div>
           <div style={{ fontSize: 10, color: '#555', letterSpacing: 0.3 }}>
             {props.providerLabel}{' '}

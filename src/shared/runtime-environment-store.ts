@@ -7,6 +7,7 @@ import { parsePairingCode, type PairingOffer } from './pairing'
 import { classifyRemotePairingHostname } from './remote-pairing-address'
 import { writeSecureJsonFileWithinLimit } from './bounded-secure-json-file'
 import { hardenExistingSecureFile } from './secure-file'
+import { applyProductBranding } from './brand'
 import {
   createEnvironmentFromPairingOffer,
   getPreferredPairingOffer,
@@ -246,7 +247,7 @@ function readEnvironmentStore(userDataPath: string): RuntimeEnvironmentStore {
   } catch {
     throw new RuntimeEnvironmentStoreError(
       'runtime_error',
-      `Could not read Orca environments at ${path}; the file is invalid.`
+      applyProductBranding(`Could not read Orca environments at ${path}; the file is invalid.`)
     )
   }
 }
@@ -263,7 +264,9 @@ function writeEnvironmentStore(userDataPath: string, store: RuntimeEnvironmentSt
     if (error instanceof JsonStringifyByteLimitError) {
       throw new RuntimeEnvironmentStoreError(
         'runtime_error',
-        `Could not write Orca environments at ${path}; the store exceeds its durable capacity.`
+        applyProductBranding(
+          `Could not write Orca environments at ${path}; the store exceeds its durable capacity.`
+        )
       )
     }
     throw error

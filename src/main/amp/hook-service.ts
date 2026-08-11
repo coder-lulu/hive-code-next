@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path'
 import type { SFTPWrapper } from 'ssh2'
 
 import type { AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import { applyProductBranding } from '../../shared/brand'
 import {
   readTextFileRemote,
   writeTextFileRemoteAtomic
@@ -87,7 +88,7 @@ function statusFromState(pluginPath: string, state: PluginFileState): AgentHookI
         state: 'partial',
         configPath: pluginPath,
         managedHooksPresent: false,
-        detail: 'Amp Orca status plugin exists but is not Orca-managed'
+        detail: applyProductBranding('Amp Orca status plugin exists but is not Orca-managed')
       }
     case 'error':
       return {

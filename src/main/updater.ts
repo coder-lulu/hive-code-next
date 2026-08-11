@@ -15,6 +15,7 @@ import type {
 } from '../shared/remote-server-update'
 import { hasConfiguredProductUpdateChannel } from '../shared/product-update-policy'
 import { resolveProductUpdateSource } from '../shared/product-update-source'
+import { applyProductBranding } from '../shared/brand'
 import {
   installProductUpdaterNetworkBoundary,
   type ProductUpdaterHttpExecutor
@@ -334,6 +335,9 @@ function decorateStatusWithActiveNudge(status: UpdateStatus): UpdateStatus {
 
 /** `force` re-delivers a status the renderer must not miss even when it repeats the current one. */
 function sendStatus(status: UpdateStatus, options?: { force?: boolean }): void {
+  if (status.state === 'error') {
+    status = { ...status, message: applyProductBranding(status.message) }
+  }
   const pendingUserInitiatedCheckVariant = pendingUserInitiatedCheckAfterInFlight
   const shouldLaunchPendingUserInitiatedCheck =
     pendingUserInitiatedCheckVariant !== null &&
@@ -770,6 +774,7 @@ function shouldHandleUpdaterErrorEvent(): boolean {
 }
 
 function sendErrorStatus(message: string, userInitiated?: boolean): void {
+  message = applyProductBranding(message)
   if (
     currentStatus.state === 'error' &&
     currentStatus.message === message &&

@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { Platform } from 'react-native'
 import { z } from 'zod'
 import type { DeviceCredentialInstalled } from '../../../src/shared/mobile-relay-credential-contract'
@@ -105,6 +106,6 @@ export async function deleteMobileRelayCredentialBundle(hostId: string): Promise
 
 function requireNativeSecretStore(): void {
   if (Platform.OS === 'web') {
-    throw new Error('Orca Relay credentials require a native secret store')
+    throw new Error(productNameText('Orca Relay credentials require a native secret store'))
   }
 }

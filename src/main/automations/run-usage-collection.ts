@@ -1,4 +1,5 @@
 import type { Automation, AutomationRun, AutomationRunUsage } from '../../shared/automations-types'
+import { applyProductBranding } from '../../shared/brand'
 import type { ClaudeUsageStore } from '../claude-usage/store'
 import type { CodexUsageStore } from '../codex-usage/store'
 
@@ -95,5 +96,9 @@ export async function collectAutomationRunUsage({
       completedAt: collectedAt
     })
   }
-  return unavailable(null, 'provider_unsupported', 'This agent does not report usage to Orca yet.')
+  return unavailable(
+    null,
+    'provider_unsupported',
+    applyProductBranding('This agent does not report usage to Orca yet.')
+  )
 }

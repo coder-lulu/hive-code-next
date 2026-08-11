@@ -4,6 +4,7 @@ import {
   ServeReadinessPublisher,
   type ServeReadiness
 } from './serve-readiness'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const ready: ServeReadiness = {
   runtimeId: 'runtime-1',
@@ -31,7 +32,7 @@ describe('ServeReadinessPublisher', () => {
     expect(write).toHaveBeenCalledOnce()
     expect(write).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Orca server ready\nBound endpoint: ws://0.0.0.0:6768\nAdvertised endpoint: wss://orca.example.test/runtime'
+        `${APP_DISPLAY_NAME} server ready\nBound endpoint: ws://0.0.0.0:6768\nAdvertised endpoint: wss://orca.example.test/runtime`
       )
     )
     expect(write).toHaveBeenCalledWith(

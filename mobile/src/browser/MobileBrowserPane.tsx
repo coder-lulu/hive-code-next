@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 /* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: mobile browser state mirrors a remote desktop screencast session and CDP dialogs, which are external systems that cannot be derived during render. */
 // Why: import from 'buffer' (the npm polyfill), not 'node:buffer' — Metro
 // can't resolve Node's builtin in a React Native bundle.
@@ -430,7 +431,7 @@ export function MobileBrowserPane({
       busyRef.current = false
       setBusy(false)
       if (screencastSupported === false) {
-        setError('Update desktop Orca to stream browser tabs on mobile.')
+        setError(productNameText('Update desktop Orca to stream browser tabs on mobile.'))
       } else if (screencastSupported === null) {
         setError('Checking desktop browser streaming support.')
       } else if (!tab.browserPageId) {

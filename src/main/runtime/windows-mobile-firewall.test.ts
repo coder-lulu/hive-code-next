@@ -168,6 +168,10 @@ describe('windows mobile firewall', () => {
     expect(encoded).toBeTruthy()
     const repairScript = Buffer.from(encoded!, 'base64').toString('utf16le')
     expect(repairScript).toContain("-Name 'Orca.MobilePairing'")
+    expect(repairScript).toContain("-DisplayName 'HiveCode Mobile Pairing'")
+    expect(repairScript).toContain(
+      "-Description 'Allows HiveCode Mobile to connect to this HiveCode desktop on private networks.'"
+    )
     expect(repairScript).toContain(
       "Where-Object { $_.Enabled -eq 'True' -and $_.Direction -eq 'Inbound' -and $_.Action -eq 'Block' }"
     )

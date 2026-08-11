@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Why: repo slice owns local/runtime routing, add/remove/reorder side effects, and cross-slice teardown; splitting mid-refactor would obscure its invariants. */
 import type { StateCreator } from 'zustand'
 import { toast } from 'sonner'
+import { applyProductBranding } from '@/product-brand'
 import type { AppState } from '../types'
 import type { SshRepoReadoption } from '../../../../shared/ssh-types'
 import type {
@@ -513,7 +514,9 @@ async function assertProjectHostSetupRuntimeCapability(
   await assertRuntimeEnvironmentCapability(
     target.environmentId,
     PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
-    'The selected Orca server does not support project host setup yet. Update Orca on the server and try again.',
+    applyProductBranding(
+      'The selected Orca server does not support project host setup yet. Update Orca on the server and try again.'
+    ),
     15_000
   )
 }
@@ -528,7 +531,9 @@ async function assertProjectHostSetupMutationRuntimeCapabilities(
   await assertRuntimeEnvironmentCapability(
     target.environmentId,
     WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,
-    'The selected Orca server does not support explicit workspace run hosts yet. Update Orca on the server and try again.',
+    applyProductBranding(
+      'The selected Orca server does not support explicit workspace run hosts yet. Update Orca on the server and try again.'
+    ),
     15_000
   )
 }

@@ -35,6 +35,8 @@ const REQUIRED_ROOT_KEYS = [
   'displayName',
   'shortName',
   'slug',
+  'branding',
+  'publicLinks',
   'cli',
   'schemes',
   'desktop',
@@ -42,6 +44,19 @@ const REQUIRED_ROOT_KEYS = [
   'endpoints'
 ]
 const ROOT_KEYS = new Set(['$schema', ...REQUIRED_ROOT_KEYS])
+const BRANDING_KEYS = new Set(['logoAsset', 'logoSha256'])
+const PUBLIC_LINK_KEYS = new Set([
+  'website',
+  'documentation',
+  'support',
+  'community',
+  'social',
+  'desktopDownload',
+  'androidDownload',
+  'iosDownload',
+  'privacyPolicy',
+  'termsOfService'
+])
 const DESKTOP_KEYS = new Set([
   'appId',
   'executableName',
@@ -170,6 +185,26 @@ function assertManifestShape(manifest) {
   assertNonEmptyString(manifest.displayName, 'displayName')
   assertNonEmptyString(manifest.shortName, 'shortName')
   assertNonEmptyString(manifest.slug, 'slug', SLUG_PATTERN)
+
+  assertObject(manifest.branding, 'branding')
+  assertKnownKeys(manifest.branding, BRANDING_KEYS, 'branding')
+  assertRequiredKeys(manifest.branding, BRANDING_KEYS, 'branding')
+  assertNonEmptyString(manifest.branding.logoAsset, 'branding.logoAsset')
+  if (
+    !/^resources\/[A-Za-z0-9._/-]+$/.test(manifest.branding.logoAsset) ||
+    manifest.branding.logoAsset.includes('..')
+  ) {
+    throw new Error('branding.logoAsset must be a safe repository resources path')
+  }
+  assertNonEmptyString(manifest.branding.logoSha256, 'branding.logoSha256', /^[a-f0-9]{64}$/)
+
+  assertObject(manifest.publicLinks, 'publicLinks')
+  assertKnownKeys(manifest.publicLinks, PUBLIC_LINK_KEYS, 'publicLinks')
+  assertRequiredKeys(manifest.publicLinks, PUBLIC_LINK_KEYS, 'publicLinks')
+  for (const key of PUBLIC_LINK_KEYS) {
+    assertEndpoint(manifest.publicLinks[key], `publicLinks.${key}`, true)
+  }
+
   assertAliasGroup(manifest.cli, 'cli', CLI_NAME_PATTERN)
   assertAliasGroup(manifest.schemes, 'schemes', SCHEME_PATTERN)
 
@@ -289,6 +324,13 @@ export function normalizeProductManifest(manifest) {
     displayName: manifest.displayName.trim(),
     shortName: manifest.shortName.trim(),
     slug: manifest.slug.trim(),
+    branding: {
+      logoAsset: manifest.branding.logoAsset.trim(),
+      logoSha256: manifest.branding.logoSha256.trim()
+    },
+    publicLinks: Object.fromEntries(
+      [...PUBLIC_LINK_KEYS].map((key) => [key, nullableString(manifest.publicLinks[key])])
+    ),
     cli: {
       primary: manifest.cli.primary.trim(),
       aliases: manifest.cli.aliases.map((item) => item.trim())

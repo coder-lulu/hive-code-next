@@ -1,5 +1,7 @@
 // Per-step copy for the agents-orchestration tile in the Explore Orca modal.
 
+import { applyProductBranding } from './brand'
+
 export type AgentsStepId = 'statuses' | 'usage' | 'orchestration'
 
 export type AgentsStep = {
@@ -27,7 +29,9 @@ export const AGENTS_STEPS: readonly AgentsStep[] = [
     id: 'orchestration',
     name: 'Orchestration',
     subtitle: 'Orchestration',
-    description: 'Enable agents to manage and coordinate Orca workspaces to execute larger tasks.'
+    description: applyProductBranding(
+      'Enable agents to manage and coordinate Orca workspaces to execute larger tasks.'
+    )
   },
   {
     id: 'usage',

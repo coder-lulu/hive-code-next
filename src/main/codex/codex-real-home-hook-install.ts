@@ -22,6 +22,7 @@ import {
 import { removeCodexManagedHookTrustEntries } from './codex-managed-trust-reconciliation'
 import { getCodexManagedHookInstallMaterial } from './hook-service'
 import { getSystemCodexHomePath } from './codex-home-paths'
+import { applyProductBranding } from '../../shared/brand'
 import type { CodexTrustEntry } from './config-toml-trust'
 import { restoreCodexTrustConfig } from './codex-trust-config-rollback'
 import { mutateRealHomeHooksPreservingUserTrust } from './codex-user-hook-trust-rebase'
@@ -78,7 +79,9 @@ function assertHooksJsonGeneration(
   if (currentRaw !== expectedRaw || resolveHooksJsonWritePath(hooksJsonPath) !== hooksWritePath) {
     // Why: the pre-mutation RPC can overlap a user's editor save. Abort rather
     // than atomically replacing a newer file with the stale parsed snapshot.
-    throw new Error('Codex hooks.json changed while Orca prepared its trust repair')
+    throw new Error(
+      applyProductBranding('Codex hooks.json changed while Orca prepared its trust repair')
+    )
   }
 }
 

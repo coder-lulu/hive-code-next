@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   Animated,
@@ -836,6 +837,28 @@ function FileReader({
   }
 
   return renderSourceText(doc.content)
+}
+
+function createEffectTimerRegistry() {
+  let disposed = false
+  const timers = new Set<ReturnType<typeof setTimeout>>()
+
+  return {
+    get disposed() {
+      return disposed
+    },
+    schedule(callback: () => void, delayMs: number) {
+      if (disposed) {
+        return
+      }
+      timers.add(setTimeout(callback, delayMs))
+    },
+    dispose() {
+      disposed = true
+      timers.forEach(clearTimeout)
+      timers.clear()
+    }
+  }
 }
 
 export default function SessionScreen() {
@@ -2726,18 +2749,15 @@ export default function SessionScreen() {
     }
     // Why: clear the initialized flag so the reconnect scrollback replaces stale content instead of being dropped.
     initializedHandlesRef.current.clear()
-    let disposed = false
-    const timers: ReturnType<typeof setTimeout>[] = []
-    function addTimer(fn: () => void, ms: number) {
-      if (disposed) {
-        return
-      }
-      timers.push(setTimeout(fn, ms))
-    }
+    const timerRegistry = createEffectTimerRegistry()
     void (async () => {
       const reportActivationOutcome = (response: RpcSuccess | null): void => {
-        if (!disposed && response && headlessActivationNeedsHostRenderer(response.result)) {
-          showToast('Open Orca on the host to wake sleeping agents.', 3000)
+        if (
+          !timerRegistry.disposed &&
+          response &&
+          headlessActivationNeedsHostRenderer(response.result)
+        ) {
+          showToast(productNameText('Open Orca on the host to wake sleeping agents.'), 3000)
         }
       }
       if (client && created !== '1' && !isFloatingWorkspaceRoute) {
@@ -2751,21 +2771,21 @@ export default function SessionScreen() {
           .then((response) => reportActivationOutcome(response.ok ? response : null))
           .catch(() => null)
       }
-      if (disposed) {
+      if (timerRegistry.disposed) {
         return
       }
       await ensureSessionTabs().catch(() => null)
-      if (disposed) {
+      if (timerRegistry.disposed) {
         return
       }
       await fetchTerminals({ allowEmptyLoaded: false })
-      if (disposed) {
+      if (timerRegistry.disposed) {
         return
       }
-      addTimer(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
-      addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
+      timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
+      timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
       if (client && created === '1' && !isFloatingWorkspaceRoute) {
-        addTimer(() => {
+        timerRegistry.schedule(() => {
           if (activeHandleRef.current) {
             return
           }
@@ -2778,20 +2798,17 @@ export default function SessionScreen() {
               })
               .catch(() => null)
             reportActivationOutcome(activationResponse?.ok ? activationResponse : null)
-            if (disposed) {
+            if (timerRegistry.disposed) {
               return
             }
             await fetchTerminals({ allowEmptyLoaded: true })
-            addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
+            timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
           })()
         }, 1800)
       }
     })()
     return () => {
-      disposed = true
-      for (const t of timers) {
-        clearTimeout(t)
-      }
+      timerRegistry.dispose()
     }
   }, [
     client,

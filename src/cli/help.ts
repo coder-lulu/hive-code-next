@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Why: root and generated command help text live together so CLI discovery stays greppable. */
 import type { CommandSpec } from './args'
 import { hivecodeProductConfig } from '../shared/generated/product-config'
+import { applyProductBranding } from '../shared/brand'
 import { findCommandSpec, isCommandGroup, supportsBrowserPageFlag } from './args'
 import { unknownCommandData } from './command-suggestion'
 
@@ -9,12 +10,14 @@ const PRIMARY_PAIRING_SCHEME = hivecodeProductConfig.schemes.primary
 const LEGACY_CLI_INVOCATION_PATTERN = /(^|[\s`$])orca(?=(?:\s|$))/gm
 
 function formatProductCliHelp(value: string): string {
-  return value
-    .replace(
-      LEGACY_CLI_INVOCATION_PATTERN,
-      (_match, prefix: string) => `${prefix}${PRIMARY_CLI_COMMAND}`
-    )
-    .replaceAll('orca://', `${PRIMARY_PAIRING_SCHEME}://`)
+  return applyProductBranding(
+    value
+      .replace(
+        LEGACY_CLI_INVOCATION_PATTERN,
+        (_match, prefix: string) => `${prefix}${PRIMARY_CLI_COMMAND}`
+      )
+      .replaceAll('orca://', `${PRIMARY_PAIRING_SCHEME}://`)
+  )
 }
 
 const ROOT_HELP_TEXT = formatProductCliHelp(`orca

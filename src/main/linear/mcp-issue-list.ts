@@ -2,6 +2,7 @@ import type {
   LinearMcpIssueListRequest,
   LinearMcpIssueListResult
 } from '../../shared/linear-agent-access'
+import { applyProductBranding } from '../../shared/brand'
 import { getClients, getStatus, type LinearClientForWorkspace } from './client'
 import { withLinearRead } from './issue-context-client'
 import { linearError } from './issue-context-errors'
@@ -67,7 +68,9 @@ export async function listMcpIssues(
       throw entryFailures[0].error
     }
     throw linearError('linear_not_connected', 'Linear is not connected.', {
-      nextSteps: ['Connect Linear from Orca settings, then retry the issue list.']
+      nextSteps: [
+        applyProductBranding('Connect Linear from Orca settings, then retry the issue list.')
+      ]
     })
   }
   const { pages, failures } = await readIssueListWorkspaces(

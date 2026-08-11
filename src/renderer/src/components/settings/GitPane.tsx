@@ -21,12 +21,14 @@ import {
   getKeepLocalMainUpToDateTitle
 } from './keep-local-main-up-to-date-setting'
 import { translate } from '@/i18n/i18n'
+import { applyProductBranding } from '@/product-brand'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
 
 export { getGitPaneSearchEntries }
 
-const KEEP_LOCAL_MAIN_UP_TO_DATE_DESCRIPTION =
+const KEEP_LOCAL_MAIN_UP_TO_DATE_DESCRIPTION = applyProductBranding(
   'When you create a workspace, Orca refreshes the remote base and safely fast-forwards your matching local branch, such as main or master. This keeps commands like git diff main...HEAD from comparing against stale history. Orca skips the update if that branch has uncommitted changes or local-only commits.'
+)
 const KEEP_LOCAL_MAIN_UP_TO_DATE_KEYWORDS = [
   'main',
   'master',

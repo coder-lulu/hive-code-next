@@ -2,6 +2,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { WebContents } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import { captureScreenshot } from './cdp-screenshot'
 import { buildPrintToPdfOptions, CdpPdfStreamStore } from './cdp-print-to-pdf'
 import { ANTI_DETECTION_SCRIPT } from './anti-detection'
@@ -502,7 +503,9 @@ export class CdpWsProxy {
     if (unsupportedParam) {
       this.sendError(
         clientId,
-        `Page.reload parameter "${unsupportedParam}" is not supported for Orca tab reloads`,
+        applyProductBranding(
+          `Page.reload parameter "${unsupportedParam}" is not supported for Orca tab reloads`
+        ),
         client
       )
       return

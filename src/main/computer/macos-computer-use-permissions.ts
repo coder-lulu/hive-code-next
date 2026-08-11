@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { RuntimeClientError } from './runtime-client-error'
 import { resolveMacOSComputerUseAppPath } from './macos-native-provider-paths'
 import { getComputerUsePermissionStatus } from './macos-computer-use-permission-status'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type {
   ComputerUsePermissionId,
   ComputerUsePermissionResetResult,
@@ -40,7 +41,10 @@ async function openComputerUsePermissionsAsync(
 
   const helperAppPath = resolveMacOSComputerUseAppPath()
   if (!helperAppPath) {
-    throw new RuntimeClientError('accessibility_error', 'Orca Computer Use.app was not found')
+    throw new RuntimeClientError(
+      'accessibility_error',
+      `${APP_DISPLAY_NAME} Computer Use.app was not found`
+    )
   }
   const status = await getComputerUsePermissionStatus()
   if (status.helperUnavailableReason) {
@@ -99,7 +103,10 @@ async function resetComputerUsePermissionsAsync(): Promise<ComputerUsePermission
 
   const helperAppPath = resolveMacOSComputerUseAppPath()
   if (!helperAppPath) {
-    throw new RuntimeClientError('accessibility_error', 'Orca Computer Use.app was not found')
+    throw new RuntimeClientError(
+      'accessibility_error',
+      `${APP_DISPLAY_NAME} Computer Use.app was not found`
+    )
   }
 
   const status = await getComputerUsePermissionStatus()
@@ -171,5 +178,5 @@ function nextPermissionStep(
   if (!missing) {
     return null
   }
-  return `Grant ${missing.id === 'accessibility' ? 'Accessibility' : 'Screen Recording'} to Orca Computer Use, then retry get-app-state.`
+  return `Grant ${missing.id === 'accessibility' ? 'Accessibility' : 'Screen Recording'} to ${APP_DISPLAY_NAME} Computer Use, then retry get-app-state.`
 }

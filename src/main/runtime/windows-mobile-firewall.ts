@@ -6,9 +6,13 @@ import type {
   WindowsNetworkCategory
 } from '../../shared/windows-mobile-firewall'
 import { hasSufficientWindowsFirewallRemoteScope } from './windows-firewall-remote-scope'
+import { applyProductBranding } from '../../shared/brand'
 
 const FIREWALL_RULE_NAME = 'Orca.MobilePairing'
-const FIREWALL_RULE_DISPLAY_NAME = 'Orca Mobile Pairing'
+const FIREWALL_RULE_DISPLAY_NAME = applyProductBranding('Orca Mobile Pairing')
+const FIREWALL_RULE_DESCRIPTION = applyProductBranding(
+  'Allows Orca Mobile to connect to this Orca desktop on private networks.'
+)
 const POWERSHELL_TIMEOUT_MS = 10_000
 const ELEVATION_TIMEOUT_MS = 5 * 60_000
 
@@ -226,7 +230,7 @@ foreach ($rule in $blockingRules) {
   }
 }
 Get-NetFirewallRule -Name ${quotePowerShell(FIREWALL_RULE_NAME)} -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-New-NetFirewallRule -Name ${quotePowerShell(FIREWALL_RULE_NAME)} -DisplayName ${quotePowerShell(FIREWALL_RULE_DISPLAY_NAME)} -Description 'Allows Orca Mobile to connect to this Orca desktop on private networks.' -Direction Inbound -Action Allow -Enabled True -Profile Private -Protocol TCP -LocalPort ${port} -Program ${quotePowerShell(executablePath)} -EdgeTraversalPolicy Block | Out-Null`
+New-NetFirewallRule -Name ${quotePowerShell(FIREWALL_RULE_NAME)} -DisplayName ${quotePowerShell(FIREWALL_RULE_DISPLAY_NAME)} -Description ${quotePowerShell(FIREWALL_RULE_DESCRIPTION)} -Direction Inbound -Action Allow -Enabled True -Profile Private -Protocol TCP -LocalPort ${port} -Program ${quotePowerShell(executablePath)} -EdgeTraversalPolicy Block | Out-Null`
 }
 
 function buildElevationScript(powershellPath: string, encodedRepairScript: string): string {

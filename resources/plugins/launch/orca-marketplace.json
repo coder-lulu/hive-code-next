@@ -1,5 +1,5 @@
 {
-  "name": "Orca Official Plugins",
+  "name": "HiveCode Official Plugins",
   "owner": "stablyai",
   "plugins": [
     {
@@ -9,7 +9,7 @@
         "url": "https://github.com/stablyai/orca-portuguese.git",
         "ref": "v1.0.0"
       },
-      "description": "Brazilian Portuguese translations for common Orca navigation.",
+      "description": "Brazilian Portuguese translations for common HiveCode navigation.",
       "categories": ["languages", "official"]
     },
     {
@@ -29,7 +29,7 @@
         "url": "https://github.com/stablyai/orca-navigation-shortcuts.git",
         "ref": "v1.0.0"
       },
-      "description": "Command aliases and optional shortcuts for frequent Orca views.",
+      "description": "Command aliases and optional shortcuts for frequent HiveCode views.",
       "categories": ["keybindings", "official"]
     }
   ]

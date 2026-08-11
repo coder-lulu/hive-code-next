@@ -1,5 +1,6 @@
 import type { GitHubPRRefreshSkippedReason } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { applyProductBranding } from '@/product-brand'
 import { getGitHubUnavailableEmptyStateCopy } from './github-refresh-error-copy'
 import {
   autoRetrySchedule,
@@ -179,8 +180,9 @@ const HARD_ERROR_COPY: Record<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.cli.body',
-      fallback:
+      fallback: applyProductBranding(
         'Orca could not run {{provider}} CLI in this environment. Set it up here, then retry.'
+      )
     }
   }
 }
@@ -214,8 +216,9 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.disconnected.body',
-      fallback:
+      fallback: applyProductBranding(
         "This repository's execution host is disconnected, so Orca cannot refresh {{reviewLabel}} status."
+      )
     },
     recovery: ['retry']
   },
@@ -237,7 +240,9 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.archived.body',
-      fallback: 'This repository is archived, so Orca is not refreshing {{reviewLabel}} status.'
+      fallback: applyProductBranding(
+        'This repository is archived, so Orca is not refreshing {{reviewLabel}} status.'
+      )
     },
     recovery: []
   },
@@ -248,7 +253,9 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.not_git.body',
-      fallback: 'Orca could not treat this folder as a Git repository for {{reviewLabel}} status.'
+      fallback: applyProductBranding(
+        'Orca could not treat this folder as a Git repository for {{reviewLabel}} status.'
+      )
     },
     recovery: []
   },
@@ -259,8 +266,9 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.remote.body',
-      fallback:
+      fallback: applyProductBranding(
         'Orca could not refresh {{reviewLabel}} status for this remote context. Retry after the host is available.'
+      )
     },
     recovery: ['retry']
   }

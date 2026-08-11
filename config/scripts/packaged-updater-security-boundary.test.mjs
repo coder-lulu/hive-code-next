@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
@@ -13,6 +13,7 @@ const roots = []
 
 function validMainBundle() {
   return `
+    const runtimeProductConfig = require("./chunks/product-config-fixture.js")
     installProductUpdaterHttpExecutorBoundary(executor)
     executor.addRedirectHandlers = function boundedRedirectHandlers() {}
     executor.doApiRequest = function boundedApiRequest() {}
@@ -37,26 +38,90 @@ function validMainBundle() {
 
 function validProductConfig() {
   return `
-    updateRepository: null,
-    updateChannel: null,
-    starRepository: null,
-    cloud: null,
-    relay: null,
-    update: null,
-    telemetry: null,
-    diagnostics: null,
-    feedback: null,
-    pluginKillList: null,
-    pluginMarketplace: null,
-    changelog: null,
-    nudge: null
+    exports.hivecodeProductConfig = {
+      schemaVersion: 1,
+      displayName: 'HiveCode',
+      shortName: 'HiveCode',
+      slug: 'hivecode',
+      branding: {
+        logoAsset: 'resources/product-logo.png',
+        logoSha256: '337e995f0c3f8d08ec420bc8f133290de51504517e3e5f995d814987d57be6b1'
+      },
+      publicLinks: {
+        website: null,
+        documentation: null,
+        support: null,
+        community: null,
+        social: null,
+        desktopDownload: null,
+        androidDownload: null,
+        iosDownload: null,
+        privacyPolicy: null,
+        termsOfService: null
+      },
+      cli: { primary: 'hivecode', aliases: ['orca', 'orca-ide'] },
+      schemes: { primary: 'hivecode', aliases: ['orca'] },
+      desktop: {
+        appId: 'com.hivekernel.hivecode.desktop',
+        executableName: 'HiveCode',
+        publisher: null,
+        updateChannel: null,
+        updateRepository: null,
+        starRepository: null
+      },
+      mobile: {
+        bundleId: 'com.hivekernel.hivecode.mobile',
+        packageId: 'com.hivekernel.hivecode.mobile'
+      },
+      endpoints: {
+        artifacts: null,
+        cloud: null,
+        relay: null,
+        update: null,
+        telemetry: null,
+        diagnostics: null,
+        feedback: null,
+        pluginKillList: null,
+        pluginMarketplace: null,
+        changelog: null,
+        nudge: null
+      }
+    };
   `
+}
+
+function validBundledMainProductConfig(productConfig = validProductConfig()) {
+  const declaration = productConfig.replace(
+    'exports.hivecodeProductConfig =',
+    'const hivecodeProductConfig ='
+  )
+  return `${declaration}
+    Object.defineProperty(exports, "hivecodeProductConfig", {
+      enumerable: true,
+      get: function() { return hivecodeProductConfig; }
+    });
+  `
+}
+
+function validPackagedMetadata() {
+  return {
+    name: 'hivecode',
+    productName: 'HiveCode',
+    description: 'HiveCode',
+    author: { name: 'HiveCode' }
+  }
 }
 
 async function createFixture({
   main = validMainBundle(),
   productConfig = validProductConfig(),
-  electronUpdaterVersion = '6.8.9'
+  runtimeProductConfig = validBundledMainProductConfig(),
+  packageMetadata = validPackagedMetadata(),
+  renderer = 'const productName = "HiveCode"',
+  productLogo = null,
+  electronUpdaterVersion = '6.8.9',
+  mainChunks = {},
+  publicEntries = {}
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'product-packaged-updater-'))
   roots.push(root)
@@ -110,14 +175,29 @@ async function createFixture({
     'utf8'
   )
 
+  const approvedProductLogo =
+    productLogo ??
+    (await readFile(join(import.meta.dirname, '..', '..', 'resources', 'product-logo.png')))
   const entries = new Map([
-    ['package.json', JSON.stringify({ main: './out/main/index.js' })],
+    ['package.json', JSON.stringify({ ...packageMetadata, main: './out/main/index.js' })],
     ['out/main/index.js', main],
-    ['out/shared/generated/product-config.js', productConfig]
+    ['out/main/chunks/product-config-fixture.js', runtimeProductConfig],
+    ['out/shared/generated/product-config.js', productConfig],
+    ['out/renderer/assets/index.js', renderer],
+    ['out/renderer/assets/product-logo-test.png', approvedProductLogo]
   ])
+  for (const [entry, source] of Object.entries(mainChunks)) {
+    entries.set(entry, source)
+  }
+  for (const [entry, source] of Object.entries(publicEntries)) {
+    entries.set(entry, source)
+  }
   const asar = {
     listPackage: () => [...entries.keys()].map((entry) => `/${entry}`),
-    extractFile: (_asarPath, internalPath) => Buffer.from(entries.get(internalPath), 'utf8')
+    extractFile: (_asarPath, internalPath) => {
+      const value = entries.get(internalPath)
+      return Buffer.isBuffer(value) ? value : Buffer.from(value, 'utf8')
+    }
   }
   return { resourcesDir, asar }
 }
@@ -134,10 +214,41 @@ describe('packaged updater security boundary', () => {
       {
         passed: true,
         mainBundle: 'out/main/index.js',
-        productConfigBundle: 'out/shared/generated/product-config.js',
+        productConfigBundle: 'out/main/chunks/product-config-fixture.js',
+        generatedProductConfigBundle: 'out/shared/generated/product-config.js',
         electronUpdaterVersion: '6.8.9',
         builderUtilRuntimeVersion: '9.7.0',
+        rendererBrandMarker: 'HiveCode',
+        approvedProductLogoEntry: 'out/renderer/assets/product-logo-test.png',
         appUpdateYmlExists: false
+      }
+    )
+  })
+
+  it('rejects upstream npm and PE identity in packaged application metadata', async () => {
+    for (const packageMetadata of [
+      { ...validPackagedMetadata(), name: 'orca' },
+      { ...validPackagedMetadata(), productName: 'Orca' },
+      { ...validPackagedMetadata(), description: 'Next-gen IDE for parallel agentic development' },
+      { ...validPackagedMetadata(), author: { name: 'stablyai' } }
+    ]) {
+      const fixture = await createFixture({ packageMetadata })
+      expect(() =>
+        verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)
+      ).toThrow(/packaged application metadata/i)
+    }
+  })
+
+  it('accepts the TypeScript CommonJS export predeclaration before the static config', async () => {
+    const fixture = await createFixture({
+      productConfig: `exports.hivecodeProductConfig = void 0;\n${validProductConfig()}`
+    })
+
+    expect(verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toMatchObject(
+      {
+        passed: true,
+        productConfigBundle: 'out/main/chunks/product-config-fixture.js',
+        generatedProductConfigBundle: 'out/shared/generated/product-config.js'
       }
     )
   })
@@ -145,7 +256,8 @@ describe('packaged updater security boundary', () => {
   it('rejects a forbidden upstream marketplace or star authority in the main runtime', async () => {
     for (const authority of [
       'https://github.com/stablyai/orca-plugins.git',
-      'const repository = "stablyai/orca"'
+      'const repository = "stablyai/orca"',
+      'https://github.com/stablyai/orca'
     ]) {
       const fixture = await createFixture({ main: `${validMainBundle()}\n${authority}` })
       expect(() =>
@@ -156,6 +268,11 @@ describe('packaged updater security boundary', () => {
 
   it('rejects every packaged product config field that re-enables an external authority', async () => {
     for (const field of [
+      'publisher',
+      'updateRepository',
+      'updateChannel',
+      'starRepository',
+      'artifacts',
       'cloud',
       'relay',
       'update',
@@ -165,7 +282,17 @@ describe('packaged updater security boundary', () => {
       'pluginKillList',
       'pluginMarketplace',
       'changelog',
-      'nudge'
+      'nudge',
+      'website',
+      'documentation',
+      'support',
+      'community',
+      'social',
+      'desktopDownload',
+      'androidDownload',
+      'iosDownload',
+      'privacyPolicy',
+      'termsOfService'
     ]) {
       const fixture = await createFixture({
         productConfig: validProductConfig().replace(
@@ -178,6 +305,104 @@ describe('packaged updater security boundary', () => {
         verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)
       ).toThrow(new RegExp(`product config null policy is missing:.*${field}`))
     }
+  })
+
+  it('validates the exported product config rather than accepting decoy null markers', async () => {
+    const exportedConfig = validProductConfig().replace(
+      'cloud: null',
+      'cloud: "https://cloud.attacker.test"'
+    )
+    const decoyNullMarkers = validProductConfig().replace(
+      'exports.hivecodeProductConfig =',
+      'const decoy ='
+    )
+    const fixture = await createFixture({
+      productConfig: `${exportedConfig}\n${decoyNullMarkers}`
+    })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /packaged product config/i
+    )
+  })
+
+  it('rejects a malicious product config consumed by Main even when the standalone copy is safe', async () => {
+    const runtimeProductConfig = validBundledMainProductConfig(
+      validProductConfig().replace('cloud: null', 'cloud: "https://cloud.attacker.test"')
+    )
+    const fixture = await createFixture({ runtimeProductConfig })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /product config null policy is missing:.*endpoints\.cloud/i
+    )
+  })
+
+  it('rejects forbidden upstream authorities from every packaged main chunk', async () => {
+    const fixture = await createFixture({
+      mainChunks: {
+        'out/main/chunks/unsafe.js': 'const attribution = "https://github.com/stablyai/orca";'
+      }
+    })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /forbidden upstream authority/i
+    )
+  })
+
+  it('rejects upstream public authorities from renderer, web, and shared runtimes', async () => {
+    for (const entry of [
+      'out/renderer/assets/unsafe.js',
+      'out/web/assets/unsafe.js',
+      'out/shared/unsafe.js'
+    ]) {
+      for (const authority of [
+        'https://github.com/stablyai/orca',
+        'https://onorca.dev/docs',
+        'https://discord.gg/fzjDKHxv8Q',
+        'https://x.com/orca_build'
+      ]) {
+        const fixture = await createFixture({
+          publicEntries: { [entry]: `const unsafeAuthority = "${authority}"` }
+        })
+
+        expect(() =>
+          verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)
+        ).toThrow(/forbidden upstream authority/i)
+      }
+    }
+  })
+
+  it('allows the isolated upstream skills source compatibility constant', async () => {
+    const compatibilitySource =
+      'const ORCA_SKILLS_REPOSITORY_URL = "https://github.com/stablyai/orca";'
+    const fixture = await createFixture({
+      renderer: `const productName = "HiveCode"; ${compatibilitySource}`,
+      publicEntries: {
+        'out/web/assets/compat.js': compatibilitySource,
+        'out/shared/compat.js': compatibilitySource
+      }
+    })
+
+    expect(() =>
+      verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)
+    ).not.toThrow()
+  })
+
+  it('rejects the legacy Orca logo fingerprint from the packaged renderer', async () => {
+    const fixture = await createFixture({
+      renderer: 'const productName = "HiveCode"; const legacyPath = "177.81311,248.33334"'
+    })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /legacy Orca logo fingerprint/i
+    )
+  })
+
+  it('requires the approved HiveCode product logo bytes in the packaged renderer', async () => {
+    const fixture = await createFixture({ productLogo: Buffer.from('not-the-approved-logo') })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /approved HiveCode product logo/i
+    )
   })
 
   it('rejects an unpinned or incompatible packaged updater dependency', async () => {

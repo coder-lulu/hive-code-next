@@ -10,6 +10,7 @@ import type {
   ArtifactWriteRequest
 } from '../../shared/artifacts'
 import { assertArtifactSharingAllowed } from '../../shared/artifact-sharing-gate'
+import { applyProductBranding } from '../../shared/brand'
 import { ensureActiveOrcaProfile } from '../orca-profiles/profile-index-store'
 import { runWithFreshOrcaCloudSession } from '../orca-profiles/profile-cloud-session-refresh'
 import { getProductArtifactCloudConfig } from '../product/product-artifact-cloud-config'
@@ -60,7 +61,9 @@ function authContext(
         !isArtifactShareLifecycleCurrent(active.profile.id, userDataPath, lifecycleGeneration)
       ) {
         throw new Error(
-          'The signed-in Orca account changed while the artifact request was running.'
+          applyProductBranding(
+            'The signed-in Orca account changed while the artifact request was running.'
+          )
         )
       }
     }
@@ -73,7 +76,9 @@ function storedSessionAuthContext(
   userDataPath: string
 ): ArtifactAuthContext {
   if (!active.profile.cloud) {
-    throw new Error('The active Orca profile is not linked to a cloud account.')
+    throw new Error(
+      applyProductBranding('The active Orca profile is not linked to a cloud account.')
+    )
   }
   return authContext(
     active,
@@ -193,7 +198,9 @@ export class ArtifactCloudService {
           auth.scope
         )
         if (!record) {
-          throw new Error('This file has not been shared from the active Orca profile.')
+          throw new Error(
+            applyProductBranding('This file has not been shared from the active Orca profile.')
+          )
         }
         return this.publisher.runForSlug(record.slug, auth, async () => {
           auth.assertCurrent()
@@ -235,7 +242,9 @@ export class ArtifactCloudService {
           auth.scope
         )
         if (!record) {
-          throw new Error('This file has not been shared from the active Orca profile.')
+          throw new Error(
+            applyProductBranding('This file has not been shared from the active Orca profile.')
+          )
         }
         return this.publisher.runForSlug(record.slug, auth, async () => {
           auth.assertCurrent()

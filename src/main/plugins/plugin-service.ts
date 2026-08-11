@@ -1,4 +1,5 @@
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
+import { applyProductBranding as brandCopy } from '../../shared/brand'
 import {
   capabilityKinds,
   type PluginCapabilityKind
@@ -229,7 +230,7 @@ export class PluginService {
   activationError(pluginKey: string): string | null {
     const blocked = this.options.getPluginKillListEntry?.(pluginKey)
     return (
-      (blocked ? `Blocked by Orca's plugin safety list: ${blocked.reason}` : null) ??
+      (blocked ? brandCopy(`Blocked by Orca's plugin safety list: ${blocked.reason}`) : null) ??
       this.contentPacks.error(pluginKey) ??
       this.workerController.activationError(pluginKey)
     )

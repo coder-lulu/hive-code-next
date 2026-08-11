@@ -8,6 +8,8 @@
     "displayName",
     "shortName",
     "slug",
+    "branding",
+    "publicLinks",
     "cli",
     "schemes",
     "desktop",
@@ -20,6 +22,43 @@
     "displayName": { "type": "string", "minLength": 1 },
     "shortName": { "type": "string", "minLength": 1 },
     "slug": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+    "branding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logoAsset", "logoSha256"],
+      "properties": {
+        "logoAsset": { "type": "string", "pattern": "^resources/[A-Za-z0-9._/-]+$" },
+        "logoSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "publicLinks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "website",
+        "documentation",
+        "support",
+        "community",
+        "social",
+        "desktopDownload",
+        "androidDownload",
+        "iosDownload",
+        "privacyPolicy",
+        "termsOfService"
+      ],
+      "properties": {
+        "website": { "type": ["string", "null"], "format": "uri" },
+        "documentation": { "type": ["string", "null"], "format": "uri" },
+        "support": { "type": ["string", "null"], "format": "uri" },
+        "community": { "type": ["string", "null"], "format": "uri" },
+        "social": { "type": ["string", "null"], "format": "uri" },
+        "desktopDownload": { "type": ["string", "null"], "format": "uri" },
+        "androidDownload": { "type": ["string", "null"], "format": "uri" },
+        "iosDownload": { "type": ["string", "null"], "format": "uri" },
+        "privacyPolicy": { "type": ["string", "null"], "format": "uri" },
+        "termsOfService": { "type": ["string", "null"], "format": "uri" }
+      }
+    },
     "cli": {
       "$ref": "#/$defs/compatibilityNames",
       "properties": {

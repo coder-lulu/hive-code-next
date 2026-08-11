@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { Monitor, MoreVertical } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { ConnectionVerdict } from '../transport/connection-health'
@@ -49,7 +50,7 @@ export function MobileHostCard(props: {
       : null
   const discoveryHint =
     props.verdict.kind === 'unreachable' && !props.host.relay
-      ? 'Update desktop Orca and sign in to connect from anywhere'
+      ? productNameText('Update desktop Orca and sign in to connect from anywhere')
       : null
   const credentialHint = credentialMissing
     ? 'Tap to re-pair with your desktop'

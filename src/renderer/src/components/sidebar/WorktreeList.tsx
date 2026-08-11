@@ -57,6 +57,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { applyProductBranding } from '@/product-brand'
 import type {
   Worktree,
   Repo,
@@ -629,7 +630,9 @@ function getWorktreeVisibilityMenuLabel(repo: Repo): string {
     repo,
     isLegacyRepoForExternalWorktreeVisibility(repo)
   )
-  return visibility === 'show' ? 'Hide non-Orca worktrees' : 'Show hidden worktrees'
+  return visibility === 'show'
+    ? applyProductBranding('Hide non-Orca worktrees')
+    : 'Show hidden worktrees'
 }
 
 const SIDEBAR_POINTER_DRAG_THRESHOLD_PX = 4

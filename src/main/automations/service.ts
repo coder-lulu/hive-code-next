@@ -19,6 +19,7 @@ import {
   didAutomationPrecheckPass,
   formatAutomationPrecheckFailure
 } from '../../shared/automation-precheck'
+import { applyProductBranding } from '../../shared/brand'
 
 const DEFAULT_TICK_MS = 60 * 1000
 
@@ -197,7 +198,7 @@ export class AutomationService {
         runId: run.id,
         status: 'skipped_missed',
         workspaceId: automation.workspaceId,
-        error: 'Orca was unavailable during the missed-run grace window.'
+        error: applyProductBranding('Orca was unavailable during the missed-run grace window.')
       })
       this.store.advanceAutomationNextRun(automation.id, now)
       return
@@ -231,7 +232,7 @@ export class AutomationService {
         runId: run.id,
         status: 'skipped_unavailable',
         workspaceId: automation.workspaceId,
-        error: 'No Orca window was available to launch the automation.'
+        error: applyProductBranding('No Orca window was available to launch the automation.')
       })
     }
     const updated = this.store.updateAutomationRun({

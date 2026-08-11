@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { LucideProps } from 'lucide-react'
-import logo from '../../../../../resources/logo.svg'
+import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
 import { cn } from '@/lib/utils'
 
 export function OrcaLogoSettingsIcon({ className }: LucideProps): React.JSX.Element {
@@ -8,6 +8,6 @@ export function OrcaLogoSettingsIcon({ className }: LucideProps): React.JSX.Elem
     src: logo,
     alt: '',
     'aria-hidden': true,
-    className: cn('object-contain invert dark:invert-0', className)
+    className: cn('rounded-sm object-contain', className)
   })
 }

@@ -19,7 +19,9 @@ import {
 import { installWebPreloadApi } from './web-preload-api'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { translate } from '../i18n/i18n'
+import { APP_DISPLAY_NAME } from '../product-brand'
 
+document.title = `${APP_DISPLAY_NAME} Web`
 const App = lazy(() => import('../App'))
 
 function WebRoot(): React.JSX.Element {
@@ -43,7 +45,7 @@ function WebRoot(): React.JSX.Element {
     if (startupDecision.kind === 'auto-save-runtime-offer') {
       saveStoredWebRuntimeEnvironment(
         createStoredWebRuntimeEnvironment({
-          name: 'Orca Server',
+          name: `${APP_DISPLAY_NAME} Server`,
           offer: startupDecision.offer,
           previousEnvironment: readStoredWebRuntimeEnvironment()
         })

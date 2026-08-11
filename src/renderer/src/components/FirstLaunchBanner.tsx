@@ -22,6 +22,7 @@ export function FirstLaunchBanner({
   // Double-click guard: a second Turn-off click would re-derive `via` as 'settings', mis-tagging one opt-out as two.
   const [inFlight, setInFlight] = useState(false)
   const mountedRef = useMountedRef()
+  const privacyUrl = PRIVACY_URL
 
   const handleAcknowledge = async (): Promise<void> => {
     if (inFlight) {
@@ -83,14 +84,19 @@ export function FirstLaunchBanner({
           {translate(
             'auto.components.FirstLaunchBanner.958d2cc31b',
             'Anonymous counts of which features you use help us prioritize what to build. No file contents, prompts, terminal output, or anything that identifies you. Change anytime in Settings -> Privacy & Telemetry.'
-          )}{' '}
-          <button
-            type="button"
-            className="underline underline-offset-2 hover:text-foreground"
-            onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
-          >
-            {translate('auto.components.FirstLaunchBanner.d1deebb050', 'Privacy policy')}
-          </button>
+          )}
+          {privacyUrl ? (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-foreground"
+                onClick={() => void window.api.shell.openUrl(privacyUrl)}
+              >
+                {translate('auto.components.FirstLaunchBanner.d1deebb050', 'Privacy policy')}
+              </button>
+            </>
+          ) : null}
           .
         </p>
       </div>

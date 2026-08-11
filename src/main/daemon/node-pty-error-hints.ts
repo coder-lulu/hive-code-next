@@ -1,3 +1,5 @@
+import { applyProductBranding } from '../../shared/brand'
+
 export type NodePtyDiagnostic = {
   step: string
   errno: number
@@ -25,13 +27,15 @@ const RESOURCE_EXHAUSTION_ERRNOS = new Set([
   35 // EAGAIN on macOS
 ])
 
-const PTY_ALLOCATION_HINT = [
-  'Your system cannot allocate any more pty devices.',
-  '',
-  'Orca requires a pty device to launch a new terminal. This error is usually due to having too many terminal windows or terminal sessions open, either in Orca or another program.',
-  '',
-  'Free up some pty devices and try again.'
-].join('\n')
+const PTY_ALLOCATION_HINT = applyProductBranding(
+  [
+    'Your system cannot allocate any more pty devices.',
+    '',
+    'Orca requires a pty device to launch a new terminal. This error is usually due to having too many terminal windows or terminal sessions open, either in Orca or another program.',
+    '',
+    'Free up some pty devices and try again.'
+  ].join('\n')
+)
 
 const TERMINAL_PROCESS_LIMIT_HINT = [
   'Your system cannot start another terminal process.',
@@ -56,7 +60,9 @@ export function parseNodePtyDiagnostic(message: string): NodePtyDiagnostic | nul
 
 export function getNodePtyRecoveryHint(diagnostic: NodePtyDiagnostic): string | null {
   if (diagnostic.step === 'posix_spawn' && diagnostic.errno === 2) {
-    return "Daemon's node-pty install is gone (worktree deleted?). Restart Orca."
+    return applyProductBranding(
+      "Daemon's node-pty install is gone (worktree deleted?). Restart Orca."
+    )
   }
   if (
     PTY_ALLOCATION_STEPS.has(diagnostic.step) &&

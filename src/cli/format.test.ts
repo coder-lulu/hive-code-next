@@ -17,6 +17,7 @@ import {
 } from './format'
 import type { ComputerActionResult, RuntimeWorktreeRecord } from '../shared/runtime-types'
 import type { Automation } from '../shared/automations-types'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 let testScreenshotDir: string | null = null
 
@@ -135,7 +136,7 @@ describe('formatCliError', () => {
     })
 
     expect(formatCliError(error)).toContain(
-      'Next step: Using this same Orca CLI executable, run: skills get orchestration --full'
+      `Next step: Using this same ${APP_DISPLAY_NAME} CLI executable, run: skills get orchestration --full`
     )
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     reportCliError(error, true)
@@ -144,7 +145,10 @@ describe('formatCliError', () => {
         code: 'orchestration_migration_required',
         data: {
           effectsApplied: false,
-          nextCommandArgs: ['skills', 'get', 'orchestration', '--full']
+          nextCommandArgs: ['skills', 'get', 'orchestration', '--full'],
+          nextSteps: [
+            `Using this same ${APP_DISPLAY_NAME} CLI executable, run: skills get orchestration --full`
+          ]
         }
       }
     })

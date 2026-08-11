@@ -6,6 +6,7 @@ import {
   openComputerUsePermissions,
   resetComputerUsePermissions
 } from './macos-computer-use-permissions'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const resolveHelperAppPathMock = vi.hoisted(() => vi.fn())
 const resolveHelperExecutablePathMock = vi.hoisted(() => vi.fn())
@@ -108,7 +109,7 @@ describe('openComputerUsePermissions', () => {
         { id: 'accessibility', status: 'granted' },
         { id: 'screenshots', status: 'not-granted' }
       ],
-      nextStep: 'Grant Screen Recording to Orca Computer Use, then retry get-app-state.'
+      nextStep: `Grant Screen Recording to ${APP_DISPLAY_NAME} Computer Use, then retry get-app-state.`
     })
     expect(spawnSync).toHaveBeenCalledWith(
       '/usr/bin/pkill',
@@ -141,7 +142,7 @@ describe('openComputerUsePermissions', () => {
         { id: 'accessibility', status: 'not-granted' },
         { id: 'screenshots', status: 'not-granted' }
       ],
-      nextStep: 'Grant Accessibility to Orca Computer Use, then retry get-app-state.'
+      nextStep: `Grant Accessibility to ${APP_DISPLAY_NAME} Computer Use, then retry get-app-state.`
     })
     expect(spawn).toHaveBeenCalledWith(
       '/usr/bin/open',
@@ -164,7 +165,7 @@ describe('openComputerUsePermissions', () => {
         { id: 'accessibility', status: 'granted' },
         { id: 'screenshots', status: 'not-granted' }
       ],
-      nextStep: 'Grant Screen Recording to Orca Computer Use, then retry get-app-state.'
+      nextStep: `Grant Screen Recording to ${APP_DISPLAY_NAME} Computer Use, then retry get-app-state.`
     })
     expect(spawn).toHaveBeenCalledWith(
       '/usr/bin/open',
@@ -195,7 +196,7 @@ describe('openComputerUsePermissions', () => {
     resolveHelperAppPathMock.mockReturnValue(null)
 
     await expect(openComputerUsePermissions()).rejects.toThrow(
-      'Orca Computer Use.app was not found'
+      `${APP_DISPLAY_NAME} Computer Use.app was not found`
     )
   })
 

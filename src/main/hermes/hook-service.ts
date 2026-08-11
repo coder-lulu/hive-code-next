@@ -16,6 +16,7 @@ import type { SFTPWrapper } from 'ssh2'
 import { parse, stringify } from 'yaml'
 
 import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import { applyProductBranding } from '../../shared/brand'
 import {
   readTextFileRemote,
   writeTextFileRemoteAtomic
@@ -200,7 +201,9 @@ function getPluginFilesState(pluginDir = getPluginDir()): {
     return {
       present: true,
       managed,
-      detail: managed ? null : 'Hermes orca-status plugin exists but is not Orca-managed'
+      detail: managed
+        ? null
+        : applyProductBranding('Hermes orca-status plugin exists but is not Orca-managed')
     }
   } catch (error) {
     return {
@@ -272,8 +275,8 @@ function getPluginManifest(): string {
     `# ${HERMES_PLUGIN_MARKER}`,
     `name: ${HERMES_PLUGIN_NAME}`,
     'version: 1.0.0',
-    'description: "Reports Hermes Agent lifecycle events to Orca."',
-    'author: "Orca"',
+    `description: "${applyProductBranding('Reports Hermes Agent lifecycle events to Orca.')}"`,
+    `author: "${applyProductBranding('Orca')}"`,
     'kind: standalone',
     'provides_hooks:',
     ...HERMES_EVENTS.map((event) => `  - ${event}`),

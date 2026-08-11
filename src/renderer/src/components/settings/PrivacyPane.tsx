@@ -53,6 +53,7 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
   const [inFlight, setInFlight] = useState(false)
   const mountedRef = useMountedRef()
   const fetchSettings = useAppStore((s) => s.fetchSettings)
+  const privacyUrl = PRIVACY_URL
 
   useEffect(() => {
     let stale = false
@@ -101,14 +102,19 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
             {translate(
               'auto.components.settings.PrivacyPane.8bfdd23a88',
               'Help us figure out what to build next. Orca sends anonymous counts of which features you use and where things break.'
-            )}{' '}
-            <button
-              type="button"
-              className="underline underline-offset-2 hover:text-foreground"
-              onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
-            >
-              {translate('auto.components.settings.PrivacyPane.77410e0566', 'Privacy policy')}
-            </button>
+            )}
+            {privacyUrl ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="underline underline-offset-2 hover:text-foreground"
+                  onClick={() => void window.api.shell.openUrl(privacyUrl)}
+                >
+                  {translate('auto.components.settings.PrivacyPane.77410e0566', 'Privacy policy')}
+                </button>
+              </>
+            ) : null}
             .
           </p>
         </div>

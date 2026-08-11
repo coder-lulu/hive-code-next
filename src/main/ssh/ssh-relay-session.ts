@@ -3,6 +3,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { BrowserWindow } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import { deployAndLaunchRelay } from './ssh-relay-deploy'
 import { execCommand } from './ssh-relay-deploy-helpers'
 import { isRelayVersionMismatchError } from './ssh-relay-version-mismatch-error'
@@ -1350,7 +1351,7 @@ export class SshRelaySession {
   private wireUpRemoteOrcaCli(mux: SshChannelMultiplexer, connectionIncarnation: string): void {
     mux.onRequest('orca.cli', async (params) => {
       if (!this.runtime) {
-        throw new Error('Orca runtime is unavailable')
+        throw new Error(applyProductBranding('Orca runtime is unavailable'))
       }
       const argv = Array.isArray(params.argv)
         ? params.argv.filter((item): item is string => typeof item === 'string')
@@ -1389,7 +1390,7 @@ export class SshRelaySession {
     })
     mux.onRequest('orca.cli.postOutput', async (params) => {
       if (!this.runtime) {
-        throw new Error('Orca runtime is unavailable')
+        throw new Error(applyProductBranding('Orca runtime is unavailable'))
       }
       const rawEnv = params.env
       const env =

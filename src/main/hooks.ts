@@ -3,6 +3,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, chmodSync, rmSync }
 import { dirname, join } from 'node:path'
 import { exec, execFile } from 'node:child_process'
 import { getDefaultRepoHookSettings } from '../shared/constants'
+import { applyProductBranding } from '../shared/brand'
 import { getRuntimePathBasename } from '../shared/cross-platform-path'
 import { resolveHookCommandSourcePolicy } from '../shared/hook-command-source-policy'
 import { shouldWaitForSetupBeforeAgentStartup } from '../shared/setup-agent-startup-policy'
@@ -406,13 +407,15 @@ function getHookWslContext(
 // Why: cmd cannot run a POSIX script, and executing its interpreter-agnostic prefix (`pnpm
 // install`, `git submodule update`) before dying on the first bash-only line is worse than not
 // starting: half-applied setup looks like a working worktree.
-const WINDOWS_RUNNER_SHEBANG_REFUSAL = [
-  'echo Orca setup: this script starts with a "#!" interpreter line, so it needs a POSIX shell. 1>&2',
-  'echo Orca setup: this worktree runs setup through cmd.exe, which cannot execute it. 1>&2',
-  'echo Orca setup: set the Windows terminal shell to Git Bash, or rewrite the script in cmd syntax. 1>&2',
-  'exit /b 1',
-  ''
-].join('\r\n')
+const WINDOWS_RUNNER_SHEBANG_REFUSAL = applyProductBranding(
+  [
+    'echo Orca setup: this script starts with a "#!" interpreter line, so it needs a POSIX shell. 1>&2',
+    'echo Orca setup: this worktree runs setup through cmd.exe, which cannot execute it. 1>&2',
+    'echo Orca setup: set the Windows terminal shell to Git Bash, or rewrite the script in cmd syntax. 1>&2',
+    'exit /b 1',
+    ''
+  ].join('\r\n')
+)
 
 export function buildWindowsRunnerScript(script: string): string {
   // Why: launchers invoke this runner under `cmd /v:on`, and EnableExtensions does not reset an

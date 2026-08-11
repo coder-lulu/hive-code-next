@@ -8,6 +8,7 @@ import {
 import type { FeatureWallOpenSourceTelemetry } from '../../../../shared/telemetry-events'
 import { track } from '@/lib/telemetry'
 import { translate } from '@/i18n/i18n'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 
 export function PreviewMedia(props: {
   posterUrl: string | null
@@ -61,7 +62,8 @@ export function RelatedFeatures(props: {
   const items = workflow.relatedTileIds
     .map((id) => getFeatureWallMediaTile(id))
     .filter((tile): tile is NonNullable<typeof tile> => tile !== null)
-  if (items.length === 0) {
+  const docsUrl = PRODUCT_PUBLIC_LINKS.documentation
+  if (items.length === 0 || !docsUrl) {
     return null
   }
   return (
@@ -84,7 +86,7 @@ export function RelatedFeatures(props: {
                   source
                 })
                 track('feature_wall_tile_clicked', { tile_id: tile.id })
-                void window.api.shell.openUrl(tile.docsUrl)
+                void window.api.shell.openUrl(docsUrl)
               }}
               className="inline-flex items-center gap-1.5 text-left text-[13px] hover:underline hover:underline-offset-2"
             >

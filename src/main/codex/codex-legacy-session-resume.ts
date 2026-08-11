@@ -8,6 +8,7 @@ import type {
 } from '../../shared/ai-vault-resume-preparation'
 import { isPerAccountManagedCodexHome } from '../../shared/ai-vault-resume-preparation'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import { applyProductBranding } from '../../shared/brand'
 import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
 import {
   appendCodexSessionHealAuditRecord,
@@ -19,8 +20,9 @@ import {
 } from './codex-session-backfill-copy'
 import { resolveCodexSessionBackfillPaths } from './codex-session-backfill'
 
-const RETRYABLE_RESUME_ERROR =
+const RETRYABLE_RESUME_ERROR = applyProductBranding(
   'Orca could not safely move this legacy Codex session into your system Codex home. Retry resume; if it still fails, check that both Codex session folders are readable and writable.'
+)
 
 const materializations = new Map<string, Promise<void>>()
 

@@ -3,7 +3,13 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as ProductLinksModule from '@/product-links'
 import { StarNagCard } from './StarNagCard'
+
+vi.mock('@/product-links', async (importOriginal) => ({
+  ...(await importOriginal<typeof ProductLinksModule>()),
+  PRODUCT_SOURCE_REPOSITORY_URL: 'https://example.com/source'
+}))
 
 type ShowPayload = { mode?: 'gh' | 'web'; surface?: 'card' | 'toast' }
 type ShowCallback = (payload?: ShowPayload) => void

@@ -110,9 +110,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-m', 'second'], attributionEnv)
     expect(runGit(repo, ['rev-parse', 'HEAD']).trim()).not.toBe(beforeHead)
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain('Made-with: HiveCode')
   })
 
   posixSubprocessIt('still adds the trailer when git commit uses --no-verify shorthand', () => {
@@ -133,9 +131,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-n', '-m', 'initial'], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain('Made-with: HiveCode')
   })
 
   posixSubprocessIt('adds the trailer when git commit uses combined -am shorthand', () => {
@@ -158,9 +154,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-am', 'combined message'], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain('Made-with: HiveCode')
   })
 
   posixSubprocessIt('adds the trailer when git commit follows global git config args', () => {
@@ -181,9 +175,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['-c', 'core.quotePath=false', 'commit', '-m', 'initial'], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain('Made-with: HiveCode')
   })
 
   posixSubprocessIt('adds the trailer to commit message files before git runs', () => {
@@ -206,9 +198,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-F', messagePath], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain('Made-with: HiveCode')
     expect(readFileSync(messagePath, 'utf8')).toBe('initial from file\n')
   })
 
@@ -318,7 +308,7 @@ if [[ -f "${hookCounterPath}" ]]; then
   count="$(cat "${hookCounterPath}")"
 fi
 printf '%s\\n' "$((count + 1))" >"${hookCounterPath}"
-grep -Fq 'Co-authored-by: Orca <help@stably.ai>' "$1"
+grep -Fq 'Made-with: HiveCode' "$1"
 `,
       'utf8'
     )
@@ -335,9 +325,7 @@ grep -Fq 'Co-authored-by: Orca <help@stably.ai>' "$1"
     runGit(repo, ['commit', '-m', 'initial'], attributionEnv)
 
     expect(readFileSync(hookCounterPath, 'utf8').trim()).toBe('1')
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain('Made-with: HiveCode')
   })
 
   posixSubprocessIt('adds git attribution to the original commit command without amending', () => {
@@ -385,7 +373,7 @@ exit 1
 
     expect(existsSync(commitPath)).toBe(true)
     expect(existsSync(amendPath)).toBe(false)
-    expect(readFileSync(argsPath, 'utf8')).toContain('Co-authored-by: Orca <help@stably.ai>')
+    expect(readFileSync(argsPath, 'utf8')).toContain('Made-with: HiveCode')
   })
 
   posixSubprocessIt('passes editor-based commits through without attribution', () => {

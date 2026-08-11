@@ -1433,9 +1433,9 @@ function WorktreeJumpPaletteContent({
   }, [openSettingsPage, openSettingsTarget])
 
   const buildQuickActionContext = useCallback(
-    () =>
+    (state = useAppStore.getState()) =>
       buildCmdJQuickActionContext({
-        state: useAppStore.getState(),
+        state,
         activeGroupSnapshot: activeGroupSnapshotRef.current,
         openNewBrowserTab: openNewBrowserTabInActiveWorkspace,
         openNewMarkdownFile: openNewMarkdownInActiveWorkspace,
@@ -1454,26 +1454,36 @@ function WorktreeJumpPaletteContent({
     ]
   )
 
-  // Why: filtering via buildQuickActionContext() inside a memo with stable primitive deps
-  // instead of calling it inline every render — a fresh context object as a useMemo dep
-  // defeated the middleItems memo (new identity every keystroke).
+  const quickActionAvailabilityState = useMemo(
+    () => ({
+      ...useAppStore.getState(),
+      activeView,
+      activeWorktreeId,
+      worktreesByRepo,
+      repos,
+      sshConnectionStates,
+      activeGroupIdByWorktree,
+      groupsByWorktree,
+      settings
+    }),
+    [
+      activeGroupIdByWorktree,
+      activeView,
+      activeWorktreeId,
+      groupsByWorktree,
+      repos,
+      settings,
+      sshConnectionStates,
+      worktreesByRepo
+    ]
+  )
+
+  // Why: pass a snapshot built from the subscribed availability fields so the memo
+  // remains stable across unrelated store updates without serving stale actions.
   const availableActionResults = useMemo(() => {
-    const ctx = buildQuickActionContext()
+    const ctx = buildQuickActionContext(quickActionAvailabilityState)
     return actionResults.filter((action) => action.isAvailable(ctx).available)
-  }, [
-    actionResults,
-    buildQuickActionContext,
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- these are the availability-determining primitives buildQuickActionContext reads from the store; listing them ensures the memo recomputes when availability actually changes, not on every render.
-    activeView,
-    activeWorktreeId,
-    worktreesByRepo,
-    repos,
-    sshConnectionStates,
-    activeGroupIdByWorktree,
-    groupsByWorktree,
-    isLoading,
-    settings?.activeRuntimeEnvironmentId
-  ])
+  }, [actionResults, buildQuickActionContext, quickActionAvailabilityState])
 
   const middleItems = useMemo<(SettingsPaletteItem | QuickActionPaletteItem)[]>(
     () =>

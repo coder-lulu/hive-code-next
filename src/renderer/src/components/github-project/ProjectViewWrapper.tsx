@@ -60,6 +60,8 @@ import {
   type CachedVisibleProjectTable
 } from './project-visible-table-cache'
 import { translate } from '@/i18n/i18n'
+import { applyProductBranding } from '@/product-brand'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 import { buildTaskSourceContextFromRepo } from '../../../../shared/task-source-context'
 import {
   githubProjectHost,
@@ -69,8 +71,6 @@ import {
 type Props = {
   selectedRepoIds: ReadonlySet<string>
 }
-
-const ORCA_FEATURE_REQUEST_URL = 'https://github.com/stablyai/orca/issues/new'
 
 function listProjectViewsForRuntime(
   settings: Parameters<typeof getActiveRuntimeTarget>[0],
@@ -1174,6 +1174,7 @@ function ViewTabStrip({
   activeViewId: string | null
   onPick: (viewId: string) => void
 }): React.JSX.Element {
+  const featureRequestUrl = PRODUCT_PUBLIC_LINKS.support
   // Why: emulate GitHub Projects' tab strip; non-table layouts stay visible but disabled.
   return (
     <div className="project-view-tab-strip flex min-h-[41px] min-w-0 flex-none items-end gap-1 overflow-x-auto overflow-y-hidden border-b border-border/50 bg-muted/20 px-3 pt-3">
@@ -1201,11 +1202,17 @@ function ViewTabStrip({
             title={
               supported
                 ? v.name
-                : translate(
-                    'auto.components.github.project.ProjectViewWrapper.2edf5e7e77',
-                    "{{value0}} — Orca doesn't support {{value1}} project views yet. File a feature request at {{value2}}.",
-                    { value0: v.name, value1: layoutLabel, value2: ORCA_FEATURE_REQUEST_URL }
-                  )
+                : featureRequestUrl
+                  ? translate(
+                      'auto.components.github.project.ProjectViewWrapper.2edf5e7e77',
+                      "{{value0}} — Orca doesn't support {{value1}} project views yet. File a feature request at {{value2}}.",
+                      { value0: v.name, value1: layoutLabel, value2: featureRequestUrl }
+                    )
+                  : translate(
+                      'auto.components.github.project.ProjectViewWrapper.unsupportedView',
+                      "{{value0}} — Orca doesn't support {{value1}} project views yet.",
+                      { value0: v.name, value1: layoutLabel }
+                    )
             }
             className={cn(
               'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-md border-x border-t px-3 py-1.5 text-xs',
@@ -1223,17 +1230,23 @@ function ViewTabStrip({
         if (supported) {
           return tab
         }
-        const unsupportedMessage = `Orca doesn't support ${layoutLabel} project views yet.`
+        const unsupportedMessage = applyProductBranding(
+          `Orca doesn't support ${layoutLabel} project views yet.`
+        )
         return (
           <HoverCard key={v.id} openDelay={200} closeDelay={100}>
             <HoverCardTrigger asChild>
               <span
                 tabIndex={0}
-                aria-label={translate(
-                  'auto.components.github.project.ProjectViewWrapper.55de4fb57a',
-                  '{{value0}}. {{value1}} File a feature request at {{value2}}.',
-                  { value0: v.name, value1: unsupportedMessage, value2: ORCA_FEATURE_REQUEST_URL }
-                )}
+                aria-label={
+                  featureRequestUrl
+                    ? translate(
+                        'auto.components.github.project.ProjectViewWrapper.55de4fb57a',
+                        '{{value0}}. {{value1}} File a feature request at {{value2}}.',
+                        { value0: v.name, value1: unsupportedMessage, value2: featureRequestUrl }
+                      )
+                    : `${v.name}. ${unsupportedMessage}`
+                }
                 className="inline-flex shrink-0 cursor-not-allowed rounded-t-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 {tab}
@@ -1248,18 +1261,20 @@ function ViewTabStrip({
                     'Switch to a Table view to work with this project in Orca.'
                   )}
                 </p>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  onClick={() => void window.api.shell.openUrl(ORCA_FEATURE_REQUEST_URL)}
-                >
-                  {translate(
-                    'auto.components.github.project.ProjectViewWrapper.4d2a77a119',
-                    'File feature request'
-                  )}
-                  <ExternalLink className="size-3" />
-                </Button>
+                {featureRequestUrl && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => void window.api.shell.openUrl(featureRequestUrl)}
+                  >
+                    {translate(
+                      'auto.components.github.project.ProjectViewWrapper.4d2a77a119',
+                      'File feature request'
+                    )}
+                    <ExternalLink className="size-3" />
+                  </Button>
+                )}
               </div>
             </HoverCardContent>
           </HoverCard>
@@ -1298,7 +1313,7 @@ function ErrorState({
       </div>
     )
   }
-  const copy =
+  const copy = applyProductBranding(
     error.type === 'too_large'
       ? `This view has ${totalCount ?? 'many'} items — too large to render in Orca. Narrow the view's filter on GitHub.`
       : error.type === 'unsupported_layout'
@@ -1308,6 +1323,7 @@ function ErrorState({
           : error.type === 'schema_drift'
             ? 'Could not read this project view.'
             : error.message
+  )
   return (
     <div className="flex flex-1 flex-col items-start gap-3 p-6 text-sm">
       <div className="text-muted-foreground">{copy}</div>

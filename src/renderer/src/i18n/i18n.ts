@@ -12,6 +12,7 @@ import { DEFAULT_LOCALE, resolveUiLocale } from './supported-languages'
 import type { SupportedUiLocale } from '../../../shared/ui-locale'
 import { isPluginUiLanguage, type UiLanguage } from '../../../shared/ui-language'
 import type { PluginLanguagePackRegistration } from '../../../shared/plugins/plugin-language-pack-artifact'
+import { applyProductBranding } from '../../../shared/brand'
 
 export const i18n: I18nInstance = i18next.createInstance()
 
@@ -75,7 +76,10 @@ void i18n
 
 export function translate(key: string, fallback: string, options?: TOptions): string {
   const value = i18n.t(key, { defaultValue: fallback, ...options })
-  return isPseudoLocalizationLocale(i18n.language) ? pseudoLocalizeString(value) : value
+  const brandedValue = applyProductBranding(value)
+  return isPseudoLocalizationLocale(i18n.language)
+    ? pseudoLocalizeString(brandedValue)
+    : brandedValue
 }
 
 export async function setRendererUiLanguage(language: UiLanguage): Promise<void> {

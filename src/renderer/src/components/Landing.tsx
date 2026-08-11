@@ -12,7 +12,8 @@ import {
 import { ShortcutKeyCombo } from './ShortcutKeyCombo'
 import { useShortcutKeyDetails, type ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import logo from '../../../../resources/logo.svg'
+import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
+import { PRODUCT_SOURCE_REPOSITORY_URL } from '@/product-links'
 import { translate } from '@/i18n/i18n'
 import { hasGitHubBackedProject, type PreflightIssue } from './landing-preflight-issues'
 import { useLandingPreflightRuntime } from './landing-preflight-runtime'
@@ -23,18 +24,21 @@ type ShortcutItem = {
   action: string
 }
 
-// Do not deep-link to /stargazers: GitHub 404s that page for users without repo write access.
-const ORCA_GITHUB_URL = 'https://github.com/stablyai/orca'
-
 type StarState = 'loading' | 'starred' | 'not-starred' | 'web-fallback' | 'hidden'
 
 function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Element | null {
-  const [state, setState] = useState<StarState>('loading')
+  const [state, setState] = useState<StarState>(
+    PRODUCT_SOURCE_REPOSITORY_URL ? 'loading' : 'hidden'
+  )
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const mountedRef = useMountedRef()
 
   useEffect(() => {
+    if (!PRODUCT_SOURCE_REPOSITORY_URL) {
+      setState('hidden')
+      return
+    }
     let cancelled = false
     void window.api.gh.checkOrcaStarred().then((result) => {
       if (cancelled) {
@@ -65,12 +69,15 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
   }, [menuOpen])
 
   const handleClick = async (): Promise<void> => {
+    if (!PRODUCT_SOURCE_REPOSITORY_URL) {
+      return
+    }
     if (state === 'starred') {
       setMenuOpen((v) => !v)
       return
     }
     if (state === 'web-fallback') {
-      await window.api.shell.openUrl(ORCA_GITHUB_URL)
+      await window.api.shell.openUrl(PRODUCT_SOURCE_REPOSITORY_URL)
       return
     }
     if (state !== 'not-starred') {
@@ -264,7 +271,7 @@ export default function Landing(): React.JSX.Element {
             <img
               src={logo}
               alt={translate('auto.components.Landing.520304a067', 'Orca logo')}
-              className="size-12"
+              className="size-12 rounded-xl object-contain"
             />
           </div>
           <h1 className="text-4xl font-bold text-foreground tracking-tight">

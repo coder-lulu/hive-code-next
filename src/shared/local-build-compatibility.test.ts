@@ -26,7 +26,7 @@ describe('local build compatibility', () => {
   it('rejects state and live-terminal protocol incompatibilities', () => {
     expect(
       getLocalBuildCompatibilityError(target({ readableStateSchemaVersions: [2] }), 1, [])
-    ).toContain('cannot read Orca workspace state schema')
+    ).toContain('cannot read HiveCode workspace state schema')
     expect(getLocalBuildCompatibilityError(target(), 1, [26])).toContain(
       'cannot reconnect terminal daemon protocol 26'
     )

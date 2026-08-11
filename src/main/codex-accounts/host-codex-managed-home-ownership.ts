@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { applyProductBranding } from '../../shared/brand'
 
 type HostCodexManagedHomeOwnershipOptions = {
   candidatePath: string
@@ -82,7 +83,9 @@ export function assertOwnedHostCodexManagedHomePath({
   try {
     markerIsRegularFile = lstatSync(markerPath).isFile()
   } catch (error) {
-    throw new Error('Managed Codex home is missing Orca ownership marker.', { cause: error })
+    throw new Error(applyProductBranding('Managed Codex home is missing Orca ownership marker.'), {
+      cause: error
+    })
   }
   if (!markerIsRegularFile) {
     throw new Error('Managed Codex home ownership marker is not a regular file.')

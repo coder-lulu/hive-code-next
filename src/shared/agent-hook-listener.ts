@@ -53,6 +53,7 @@ import {
   type CodexSubagentTranscriptState
 } from './codex-subagent-transcript'
 import { ORCA_HOOK_PROTOCOL_VERSION } from './agent-hook-types'
+import { applyProductBranding } from './brand'
 import { REMOTE_AGENT_HOOK_ENV, type AgentHookSource } from './agent-hook-relay'
 import {
   agentProviderSessionsEqual,
@@ -306,8 +307,9 @@ export function warnOnHookEnvOrVersionMismatch(
     if (!state.warnedEnvs.has(key) && state.warnedEnvs.size < MAX_WARNED_KEYS) {
       state.warnedEnvs.add(key)
       console.warn(
-        `[agent-hooks] received ${env} hook on ${expectedEnv} server. ` +
-          'Likely a stale terminal from another Orca install.'
+        applyProductBranding(
+          `[agent-hooks] received ${env} hook on ${expectedEnv} server. Likely a stale terminal from another Orca install.`
+        )
       )
     }
   }

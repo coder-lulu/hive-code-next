@@ -1,4 +1,5 @@
 import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from './local-build-compatibility-contract'
+import { applyProductBranding } from './brand'
 
 export const LOCAL_BUILD_COMPATIBILITY_FILENAME = 'orca-local-build.json'
 export const LOCAL_BUILD_COMPATIBILITY_FORMAT_VERSION =
@@ -78,7 +79,9 @@ export function getLocalBuildCompatibilityError(
   liveDaemonProtocols: readonly number[]
 ): string | null {
   if (!target.readableStateSchemaVersions.includes(currentStateSchemaVersion)) {
-    return `This build cannot read Orca workspace state schema ${currentStateSchemaVersion}. Your workspace was not changed.`
+    return applyProductBranding(
+      `This build cannot read Orca workspace state schema ${currentStateSchemaVersion}. Your workspace was not changed.`
+    )
   }
   const unsupportedProtocols = liveDaemonProtocols.filter(
     (protocol) => !target.attachableDaemonProtocolVersions.includes(protocol)

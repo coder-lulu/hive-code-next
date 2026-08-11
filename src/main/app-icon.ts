@@ -8,21 +8,19 @@ import { app, BrowserWindow, nativeImage } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import classicIcon from '../../resources/icon.png?asset'
 import classicDevIcon from '../../resources/icon-dev.png?asset'
-import watercolorIcon from '../../resources/app-icons/orca-watercolor.png?asset'
-import watercolorMacDockIcon from '../../resources/app-icons/orca-watercolor.png?asset&asarUnpack'
-import blueIcon from '../../resources/app-icons/orca-blue.png?asset'
-import blueMacDockIcon from '../../resources/app-icons/orca-blue.png?asset&asarUnpack'
+import classicMacDockIcon from '../../resources/icon.png?asset&asarUnpack'
 import { normalizeAppIconId, type AppIconId } from '../shared/app-icon'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 const APP_ICON_PATHS = {
   classic: is.dev ? classicDevIcon : classicIcon,
-  watercolor: watercolorIcon,
-  blue: blueIcon
+  watercolor: is.dev ? classicDevIcon : classicIcon,
+  blue: is.dev ? classicDevIcon : classicIcon
 } satisfies Record<AppIconId, string>
 
 const MAC_DOCK_ICON_PATHS = {
-  watercolor: watercolorMacDockIcon,
-  blue: blueMacDockIcon
+  watercolor: classicMacDockIcon,
+  blue: classicMacDockIcon
 } satisfies Record<Exclude<AppIconId, 'classic'>, string>
 
 type ExecFile = (
@@ -47,9 +45,9 @@ const MAC_DOCK_ICON_SCRIPT = [
   'set appPath to system attribute "ORCA_APP_BUNDLE_PATH"',
   'set iconPath to system attribute "ORCA_APP_ICON_PATH"',
   "set image to current application's NSImage's alloc()'s initWithContentsOfFile:iconPath",
-  'if image is missing value then error "Orca app icon image could not be loaded"',
+  `if image is missing value then error "${APP_DISPLAY_NAME} app icon image could not be loaded"`,
   "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:image forFile:appPath options:0",
-  'if ok is false then error "Orca app icon could not be persisted"'
+  `if ok is false then error "${APP_DISPLAY_NAME} app icon could not be persisted"`
 ]
 
 const MAC_DOCK_ICON_CLEAR_SCRIPT = [
@@ -57,7 +55,7 @@ const MAC_DOCK_ICON_CLEAR_SCRIPT = [
   'use scripting additions',
   'set appPath to system attribute "ORCA_APP_BUNDLE_PATH"',
   "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:(missing value) forFile:appPath options:0",
-  'if ok is false then error "Orca app icon could not be cleared"'
+  `if ok is false then error "${APP_DISPLAY_NAME} app icon could not be cleared"`
 ]
 
 const MAC_DOCK_ICON_COMMAND_TIMEOUT_MS = 10_000

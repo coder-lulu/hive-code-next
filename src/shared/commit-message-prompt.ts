@@ -1,8 +1,11 @@
+import { applyProductBranding } from './brand'
+
 // Why: keeping the base prompt and assembly here (in shared) lets both the
 // renderer (preview/tests) and main (actual generation) reach the exact same
 // string without duplicating the wording.
 
-const COMMIT_MESSAGE_BASE_PROMPT = `You are generating a single git commit message.
+const COMMIT_MESSAGE_BASE_PROMPT =
+  applyProductBranding(`You are generating a single git commit message.
 Read the staged diff below and produce the message.
 
 Rules:
@@ -15,7 +18,7 @@ Staged diff:
 \`\`\`diff
 {{DIFF}}
 \`\`\`
-`
+`)
 
 export {
   cleanGeneratedCommitMessage,

@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-brand'
 import {
   ChevronLeft,
   ChevronRight,
@@ -209,23 +210,31 @@ export default function SettingsScreen() {
           </View>
         ) : null}
 
-        <View style={[styles.section, styles.sectionSpacer]}>
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => void Linking.openURL('https://www.onorca.dev/privacy')}
-          >
-            <Shield size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Privacy Policy</Text>
-          </Pressable>
-          <View style={styles.separator} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => void Linking.openURL('https://github.com/stablyai/orca/issues')}
-          >
-            <LifeBuoy size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Support</Text>
-          </Pressable>
-        </View>
+        {PRODUCT_PUBLIC_LINKS.privacyPolicy || PRODUCT_PUBLIC_LINKS.support ? (
+          <View style={[styles.section, styles.sectionSpacer]}>
+            {PRODUCT_PUBLIC_LINKS.privacyPolicy ? (
+              <Pressable
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.privacyPolicy!)}
+              >
+                <Shield size={16} color={colors.textSecondary} />
+                <Text style={styles.rowLabel}>Privacy Policy</Text>
+              </Pressable>
+            ) : null}
+            {PRODUCT_PUBLIC_LINKS.privacyPolicy && PRODUCT_PUBLIC_LINKS.support ? (
+              <View style={styles.separator} />
+            ) : null}
+            {PRODUCT_PUBLIC_LINKS.support ? (
+              <Pressable
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.support!)}
+              >
+                <LifeBuoy size={16} color={colors.textSecondary} />
+                <Text style={styles.rowLabel}>Support</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   )

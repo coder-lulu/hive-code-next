@@ -17,6 +17,7 @@ import { useAppStore } from '../../store'
 import { BUNDLED_PET, BUNDLED_PETS, findBundledPet, isBundledPetId } from '../pet/pet-models'
 import { PET_SIZE_MAX, PET_SIZE_MIN } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 // Why: cluster pet-related controls (show/hide, character picker, custom
 // upload + removal, jump-to-settings) behind a single status-bar segment. Only
@@ -45,7 +46,9 @@ function PetStatusSegmentInner(): React.JSX.Element {
   const handleImport = async (): Promise<void> => {
     console.log('[pet-overlay] upload: click')
     if (!window.api?.pet?.import) {
-      console.warn('[pet-overlay] upload: window.api.pet.import missing — restart Orca')
+      console.warn(
+        `[pet-overlay] upload: window.api.pet.import missing — restart ${APP_DISPLAY_NAME}`
+      )
       toast.error(
         translate(
           'auto.components.status.bar.PetStatusSegment.e6234bcc17',

@@ -1,4 +1,5 @@
 import type { OrchestrationCliCommand } from './cli-command'
+import { applyProductBranding } from '../../../shared/brand'
 
 export type PreambleParams = {
   taskId: string
@@ -138,10 +139,10 @@ ${postDoneInstructions}`
   const drift =
     params.baseDrift && params.baseDrift.behind > 0 ? buildDriftSection(params.baseDrift) : ''
 
-  return `${header}${drift}
+  return applyProductBranding(`${header}${drift}
 
 === TASK ===
-${params.taskSpec}`
+${params.taskSpec}`)
 }
 
 function buildPostWorkerDoneInstructions({

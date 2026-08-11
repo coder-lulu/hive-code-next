@@ -26,8 +26,10 @@ import {
 import { validateComputerProviderActionParams } from './computer-provider-action-validation'
 import { normalizeComputerActionResult } from './computer-action-verification-normalization'
 import { RuntimeClientError } from './runtime-client-error'
+import { applyProductBranding } from '../../shared/brand'
 
 const REQUEST_TIMEOUT_MS = 60_000
+const HELPER_NOT_FOUND_ERROR = applyProductBranding('Orca Computer Use.app was not found')
 
 export class MacOSNativeProviderClient {
   private socket: net.Socket | null = null
@@ -96,7 +98,7 @@ export class MacOSNativeProviderClient {
     const id = this.nextId++
     const helperExecutablePath = resolveMacOSComputerUseExecutablePath()
     if (!helperExecutablePath) {
-      throw new RuntimeClientError('accessibility_error', 'Orca Computer Use.app was not found')
+      throw new RuntimeClientError('accessibility_error', HELPER_NOT_FOUND_ERROR)
     }
     const transport = await this.ensureSocketStarted(helperExecutablePath)
     const token = this.socketToken
