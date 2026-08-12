@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">HiveKernel adaptive icon foreground</title>
+  <desc id="desc">A honey-gold hexagonal kernel surrounded by six blue nodes.</desc>
+  <g transform="translate(256 256) scale(.8) translate(-256 -256)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 72 414 163v182l-158 91-158-91V163z" stroke="#f2ae16" stroke-width="30"/>
+    <path d="M256 72v37M414 163l-32 19M414 345l-32-19M256 436v-37M98 345l32-19M98 163l32 19" stroke="#f7c22d" stroke-width="22"/>
+    <path d="M256 111v44M382 182l-38 22M382 330l-38-22M256 401v-44M130 330l38-22M130 182l38 22" stroke="#fffdf8" stroke-width="18"/>
+    <path d="M256 161 338 208v96l-82 47-82-47v-96z" fill="#ffbd12" stroke="#f5a20b" stroke-width="5"/>
+    <path d="m256 161 82 47-82 48-82-48z" fill="#ffda23" stroke="none"/>
+    <path d="M256 256v95" stroke="#ef8e08" stroke-width="5"/>
+    <g fill="#1687ed" stroke="#fbf8f1" stroke-width="10">
+      <circle cx="256" cy="72" r="25"/>
+      <circle cx="414" cy="163" r="25"/>
+      <circle cx="414" cy="345" r="25"/>
+      <circle cx="256" cy="436" r="25"/>
+      <circle cx="98" cy="345" r="25"/>
+      <circle cx="98" cy="163" r="25"/>
+    </g>
+  </g>
+</svg>

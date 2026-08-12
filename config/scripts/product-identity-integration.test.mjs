@@ -54,7 +54,7 @@ describe('HiveCode product identity integration', () => {
   it('locks the renderer to the approved HiveCode product logo', () => {
     expect(manifest.branding).toEqual({
       logoAsset: 'resources/product-logo.png',
-      logoSha256: '337e995f0c3f8d08ec420bc8f133290de51504517e3e5f995d814987d57be6b1'
+      logoSha256: 'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
     })
 
     const logoPath = path.join(repoRoot, 'resources', 'product-logo.png')
@@ -95,20 +95,20 @@ describe('HiveCode product identity integration', () => {
     const approvedAssetHashes = new Map([
       [
         'resources/build/icon.icns',
-        '6fbbfe438fc9864f8f2599cb6c91d1336aaee41cb851a786807bdf079d4395dc'
+        '272ee05e02a6607d5e60fa1abd6fce9bb5f35a9c17cd1b20f8e60988decc91af'
       ],
       [
         'resources/build/icon.ico',
-        'af3d36802e35fabee79feba55b20414b73f05f4b7bad3820870ff049e767389d'
+        'd670099a83874fcfbe8f4e263defba80a0635e3a57e1bdde13788818fd3c8bb3'
       ],
       [
         'resources/build/icon.png',
-        'cc6222a53654f2df5b0862b5f4d232d6dd345af84beff98958866a3970bf3157'
+        'bbad4c2af11cc81514422c29f5975c7cf985cd50483bb4a1702640ee93fde0af'
       ],
-      ['resources/icon.png', 'ab3f21d4beb536533bcd9f2f51a458605525f5c2dffc7f7c92d99692fcec8829'],
+      ['resources/icon.png', 'b23ce8815889c4c3dd426c3b25fa24869525130fed39d00f1b247284ecc6afb1'],
       [
         'resources/icon-dev.png',
-        'ab3f21d4beb536533bcd9f2f51a458605525f5c2dffc7f7c92d99692fcec8829'
+        'b23ce8815889c4c3dd426c3b25fa24869525130fed39d00f1b247284ecc6afb1'
       ],
       [
         'resources/tray/hivecode-menu-barTemplate.png',
@@ -120,19 +120,19 @@ describe('HiveCode product identity integration', () => {
       ],
       [
         'mobile/assets/icon.png',
-        'cc6222a53654f2df5b0862b5f4d232d6dd345af84beff98958866a3970bf3157'
+        'bbad4c2af11cc81514422c29f5975c7cf985cd50483bb4a1702640ee93fde0af'
       ],
       [
         'mobile/assets/adaptive-icon.png',
-        'cc6222a53654f2df5b0862b5f4d232d6dd345af84beff98958866a3970bf3157'
+        '45929d312d42cb36911935c574883506422b7a58a4f73a47291edc235529a857'
       ],
       [
         'mobile/assets/splash-icon.png',
-        '337e995f0c3f8d08ec420bc8f133290de51504517e3e5f995d814987d57be6b1'
+        'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
       ],
       [
         'mobile/assets/favicon.png',
-        'dda01628148bc6b33e37506a61dcb24e25cd126aab6d9aefcfe12c9fef0c445f'
+        '5761711eb8fd340e5124c31c61da3c2982852bd5ed04af8fe3717400a7c2359e'
       ]
     ])
     for (const [relativePath, expectedHash] of approvedAssetHashes) {
@@ -143,12 +143,12 @@ describe('HiveCode product identity integration', () => {
       )
     }
 
-    expect(mobileApp.expo.splash.backgroundColor).toBe('#FBF7F0')
-    expect(mobileApp.expo.android.adaptiveIcon.backgroundColor).toBe('#FBF7F0')
+    expect(mobileApp.expo.splash.backgroundColor).toBe('#FBF8F1')
+    expect(mobileApp.expo.android.adaptiveIcon.backgroundColor).toBe('#FBF8F1')
     const splashPlugin = mobileApp.expo.plugins.find(
       (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen'
     )
-    expect(splashPlugin?.[1]?.backgroundColor).toBe('#FBF7F0')
+    expect(splashPlugin?.[1]?.backgroundColor).toBe('#FBF8F1')
 
     const mobileLogo = readFileSync(
       path.join(repoRoot, 'mobile', 'src', 'components', 'OrcaLogo.tsx'),
@@ -180,7 +180,7 @@ describe('HiveCode product identity integration', () => {
     expect(existsSync(iconSourceAssetPath)).toBe(true)
     if (existsSync(iconSourceAssetPath)) {
       expect(createHash('sha256').update(readFileSync(iconSourceAssetPath)).digest('hex')).toBe(
-        'cc6222a53654f2df5b0862b5f4d232d6dd345af84beff98958866a3970bf3157'
+        'bbad4c2af11cc81514422c29f5975c7cf985cd50483bb4a1702640ee93fde0af'
       )
     }
 

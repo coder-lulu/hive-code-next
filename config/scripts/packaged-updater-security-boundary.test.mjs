@@ -45,7 +45,7 @@ function validProductConfig() {
       slug: 'hivecode',
       branding: {
         logoAsset: 'resources/product-logo.png',
-        logoSha256: '337e995f0c3f8d08ec420bc8f133290de51504517e3e5f995d814987d57be6b1'
+        logoSha256: 'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
       },
       publicLinks: {
         website: null,

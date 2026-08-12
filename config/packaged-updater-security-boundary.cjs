@@ -10,7 +10,7 @@ const { $schema: _productSchema, ...EXPECTED_PRODUCT_CONFIG } = require(
 const EXPECTED_ELECTRON_UPDATER_VERSION = '6.8.9'
 const EXPECTED_BUILDER_UTIL_RUNTIME_VERSION = '9.7.0'
 const EXPECTED_PRODUCT_LOGO_SHA256 =
-  '337e995f0c3f8d08ec420bc8f133290de51504517e3e5f995d814987d57be6b1'
+  'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
 const EXPECTED_PACKAGED_APPLICATION_METADATA = {
   name: EXPECTED_PRODUCT_CONFIG.slug,
   productName: EXPECTED_PRODUCT_CONFIG.displayName,
@@ -153,9 +153,7 @@ function resolveMainProductConfigBundle(entries, mainBundle, mainSource) {
   const productConfigBundle = candidates[0]
   const relativeRequirePath = `./${posix.relative(posix.dirname(mainBundle), productConfigBundle)}`
   const escapedRequirePath = relativeRequirePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const staticRequirePattern = new RegExp(
-    `require\\(\\s*(["'])${escapedRequirePath}\\1\\s*\\)`
-  )
+  const staticRequirePattern = new RegExp(`require\\(\\s*(["'])${escapedRequirePath}\\1\\s*\\)`)
   if (!staticRequirePattern.test(mainSource)) {
     throw new Error(
       `Packaged Main entry does not statically require its runtime product config: ${relativeRequirePath}`
@@ -334,9 +332,7 @@ function parseStaticObject(source, state) {
 }
 
 function parsePackagedProductConfig(source) {
-  const directAssignments = [
-    ...source.matchAll(/\bexports\.hivecodeProductConfig\s*=\s*(?=\{)/g)
-  ]
+  const directAssignments = [...source.matchAll(/\bexports\.hivecodeProductConfig\s*=\s*(?=\{)/g)]
   const bundledDeclarations = [
     ...source.matchAll(/\b(?:const|let|var)\s+hivecodeProductConfig\s*=\s*(?=\{)/g)
   ]
