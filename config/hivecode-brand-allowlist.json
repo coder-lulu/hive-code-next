@@ -128,6 +128,7 @@
     "src/main/startup/protocol-handler.test.ts",
     "src/main/startup/protocol-handler.ts",
     "src/main/startup/serve-desktop-activation-wiring.test.ts",
+    "src/main/startup/user-data-migration-policy.ts",
     "src/main/tray/system-tray.test.ts",
     "src/main/tray/system-tray.ts",
     "src/main/window/attach-main-window-services.test.ts",
@@ -157,7 +158,7 @@
     "src/shared/remote-runtime-transport-error-agreement.test.ts"
   ],
   "protectedFileHashes": {
-    ".gitignore": "b2b2cd68525190eb42501566e0ad6f28e26b570f671dbc54359bd16ce53e4649",
+    ".gitignore": "1c7c1e70ca9c7af22b5e16db06276f11c295b62da41da557c9332c37236c19fb",
     ".gitattributes": "1f969a3716031ad8e140887998840865df4a43425de17656e5278547ca2423b6"
   }
 }

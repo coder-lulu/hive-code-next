@@ -14,6 +14,7 @@ import type {
   WorktreeLineage,
   WorkspaceLineage,
   ProjectHostSetup,
+  Repo,
   WorktreeMeta
 } from '../../../../shared/types'
 import type { RuntimeWorktreeListResult } from '../../../../shared/runtime-types'
@@ -1393,8 +1394,7 @@ async function listWorktreeLineageForRuntime(
     workspaceLineage?: Record<string, WorkspaceLineage>
   }
   const normalizeLineageResponse = (value: Record<string, WorktreeLineage> | LineageListResponse) =>
-    Object.prototype.hasOwnProperty.call(value, 'lineage') ||
-    Object.prototype.hasOwnProperty.call(value, 'workspaceLineage')
+    Object.hasOwn(value, 'lineage') || Object.hasOwn(value, 'workspaceLineage')
       ? {
           worktreeLineageById: (value as LineageListResponse).lineage ?? {},
           workspaceLineageByChildKey: (value as LineageListResponse).workspaceLineage ?? {}
@@ -2143,15 +2143,11 @@ function getHostedReviewLinkForMetaRefresh(
   existingWorktree: Worktree | undefined,
   key: HostedReviewLinkKey
 ): number | null {
-  return Object.prototype.hasOwnProperty.call(updates, key)
-    ? (updates[key] ?? null)
-    : (existingWorktree?.[key] ?? null)
+  return Object.hasOwn(updates, key) ? (updates[key] ?? null) : (existingWorktree?.[key] ?? null)
 }
 
 function hasExplicitPushTargetClear(updates: Partial<WorktreeMeta>): boolean {
-  return (
-    Object.prototype.hasOwnProperty.call(updates, 'pushTarget') && updates.pushTarget === undefined
-  )
+  return Object.hasOwn(updates, 'pushTarget') && updates.pushTarget === undefined
 }
 
 type RuntimeWorktreeMetaUpdates = Omit<Partial<WorktreeMeta>, 'pushTarget'> & {
@@ -3447,7 +3443,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           : false
       }
       // Direct SSH lineage requires its own qualified authority result.
-      if (!directSshAuthority) {
+      // Bulk runtime callers apply one final host-wide snapshot after all repo merges.
+      if (!directSshAuthority && !options?.suppressRemoteLineageRefresh) {
         await refreshRemoteWorktreeLineageBestEffort(settings, set)
       }
       return directCallerAuthority ? refresh.providerResult! : refresh.result.authoritative
@@ -5555,7 +5552,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     set((s) => {
       for (const [worktreeId, tabs] of Object.entries(s.tabsByWorktree)) {
         const index = tabs.findIndex((tab) => tab.id === tabId)
-        if (index < 0) {
+        if (index === -1) {
           continue
         }
         const tab = tabs[index]
@@ -6065,7 +6062,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       const repoIdsWithRemovedOwners = new Set<string>()
       const survivingRepoIds = new Set<string>()
       const repoIdsWithSurvivingOwners = new Set<string>()
-      const survivingRepos: AppState['repos'] = []
+      const survivingRepos: Repo[] = []
       for (const repo of s.repos) {
         if (isRemovedRuntimeHostId(getRepoExecutionHostId(repo), removed)) {
           repoIdsWithRemovedOwners.add(repo.id)

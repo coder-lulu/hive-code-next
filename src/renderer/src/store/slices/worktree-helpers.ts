@@ -58,6 +58,8 @@ export type WorktreeFetchOptions = {
   requireAuthoritative?: boolean
   executionHostId?: ExecutionHostId
   forceLocalOwner?: boolean
+  /** Skip automatic remote lineage when the caller owns a final host-wide refresh. */
+  suppressRemoteLineageRefresh?: boolean
 }
 
 export type DirectSshWorktreeFetchOptions = WorktreeFetchOptions & {
@@ -391,9 +393,7 @@ export function withoutErasedRequiredWorktreeFields(
   updates: Partial<WorktreeMeta>
 ): Partial<WorktreeMeta> {
   const erased = Object.keys(ERASURE_PROTECTED_KEYS).filter(
-    (key) =>
-      updates[key as keyof WorktreeMeta] === undefined &&
-      Object.prototype.hasOwnProperty.call(updates, key)
+    (key) => updates[key as keyof WorktreeMeta] === undefined && Object.hasOwn(updates, key)
   )
   if (erased.length === 0) {
     return updates

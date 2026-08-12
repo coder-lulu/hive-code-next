@@ -7,6 +7,9 @@
       "webDescription": "Vuelva a cargar el cliente web o vuelva a conectarse al servidor Orca vinculado."
     }
   },
+  "githubChecks": {
+    "retrying": "Reintentando…"
+  },
   "settings": {
     "appearance": {
       "language": {
@@ -558,6 +561,14 @@
             "format": {
               "37cf0bc991": "Orca no pudo resolver una referencia base utilizable para este espacio de trabajo.",
               "64555d0014": "No se encontró ninguna rama base"
+            }
+          }
+        },
+        "browser": {
+          "tab": {
+            "open": {
+              "urlFailed": "No se pudo abrir la URL.",
+              "searchFailed": "No se pudo buscar con {{value0}}."
             }
           }
         }
@@ -2988,7 +2999,9 @@
             "2c38630a01": "El espacio de trabajo ya no existe",
             "4f0d9a71c2": "La pestaña ya no existe",
             "d7d496a451": "La página del navegador ya no existe",
-            "7726ce9970": "La pestaña del emulador móvil ya no existe"
+            "7726ce9970": "La pestaña del emulador móvil ya no existe",
+            "chooseAction": "Elige una acción.",
+            "searchProvider": "Buscar con {{value0}}"
           },
           "TabBarQuickCommandsButton": {
             "a2c7a33831": "Comando",
@@ -3008,7 +3021,12 @@
             "c781f992e4": "destructivo",
             "be8f0ff166": "Eliminar",
             "f3a8c2d1e7": "Buscar comandos rápidos...",
-            "b4e7f9a2c1": "No hay comandos coincidentes"
+            "b4e7f9a2c1": "No hay comandos coincidentes",
+            "8d525e5f15": "Copiado",
+            "53b17a4b1b": "No se pudo copiar",
+            "a9a564b7e7": "Copiar {{value0}}",
+            "69a1441a21": "Nada que copiar",
+            "192a4616a5": "Acciones del comando rápido"
           },
           "shell": {
             "icons": {
@@ -6413,7 +6431,11 @@
           "38d61927e6": "No hay comandos rápidos guardados.",
           "44923dd982": "destructivo",
           "ec1ed99e70": "Eliminar",
-          "d1d0976320": "Ninguno"
+          "d1d0976320": "Ninguno",
+          "8d525e5f15": "Copiado",
+          "53b17a4b1b": "No se pudo copiar",
+          "a9a564b7e7": "Copiar {{value0}}",
+          "69a1441a21": "Nada que copiar"
         },
         "RecentTabOrderControl": {
           "3b17c81ede": "Orden de la barra de pestañas",
@@ -10136,7 +10158,7 @@
             "653c105ecc": "Más acciones de PR",
             "f316a8ca2b": "No hay comentarios sin resolver seleccionados.",
             "d00ebdc402": "Resolver comentarios de {{value0}} con IA",
-            "ed3f79c031": "Revisa el prompt antes de iniciar un agente. Una vez entregado el prompt, Orca responde a los comentarios seleccionados y resuelve los hilos en el host cuando es posible.",
+            "5eb2163b6b": "Revisa el prompt antes de iniciar un agente. Una vez entregado el prompt, Orca resuelve los hilos seleccionados en el host y responde a los comentarios que no puede resolver.",
             "f273f2271c": "Agente iniciado. Marcados como resueltos: {{value0}}; respondidos: {{value1}}; omitidos: {{value2}}; con error: {{value3}}.{{value4}}",
             "aa95b81a3a": "Agente iniciado. Marcados como resueltos: {{value0}}; respondidos: {{value1}}; omitidos: {{value2}}; con error: {{value3}}.",
             "495b2f8c4b": "Agente iniciado, pero no se pudieron resolver ni responder los comentarios seleccionados.",
@@ -10150,7 +10172,8 @@
               "pending": "Syncing…",
               "branch": "Sync Branch"
             },
-            "7e4b2a19c0": "No se pudo resolver el PR de GitHub para responder."
+            "7e4b2a19c0": "No se pudo resolver el PR de GitHub para responder.",
+            "430f1a62d4": "No se pudo resolver el hilo seleccionado en el host."
           },
           "CreatePullRequestDialog": {
             "2bc1b4345e": "Cancelar",
@@ -10750,7 +10773,7 @@
                 "actionRequiredHint": "Este check requiere una acción manual en GitHub (por ejemplo, aprobar la ejecución del workflow) antes de que el merge quede desbloqueado.",
                 "b3195cba33": "Desmarcar autor como bot",
                 "f588b46a6c": "Marcar autor como bot",
-                "checkDetailsLoadFailed": "No se pudieron cargar los detalles del check."
+                "e45324fbed": "No se pudieron cargar los detalles del check."
               },
               "empty": {
                 "state": {

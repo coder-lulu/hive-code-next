@@ -109,7 +109,7 @@ export async function listMcpIssues(
   }
 }
 
-function getIssueListEntries(workspaceId?: string | 'all'): {
+function getIssueListEntries(workspaceId?: (string & {}) | 'all'): {
   entries: LinearClientForWorkspace[]
   failures: WorkspaceReadFailure[]
 } {

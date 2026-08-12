@@ -33,9 +33,14 @@ pnpm test
 
 ## Pull Requests
 
-Describe the user-visible outcome, compatibility impact, and verification you
-ran. Include screenshots for UI changes and call out any platform-specific or
-SSH-specific behavior.
+Each pull request should follow [`.github/pull_request_template.md`](./pull_request_template.md). In particular:
+
+- open with an ELI5 of the change (plain language paragraph; the PR title is the one-liner)
+- explain what changed and why, and stay focused on a single topic when possible
+- for any UI or interaction change, attach **before and after** screenshots (or short videos); if there is no visual change, say `No visual change` and why
+- include high-quality tests when behavior changes or bug fixes warrant them
+- include a brief code review summary from your AI coding agent that explicitly checks cross-platform compatibility, SSH/remote/local compatibility, supported agent and integration compatibility, performance risk, UI quality when applicable, and basic security risk
+- mention any platform-specific, remote/SSH-specific, agent-specific, integration-specific, or git-provider-specific behavior and testing notes
 
 ## Upstream Synchronization
 
