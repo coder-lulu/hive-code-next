@@ -146,7 +146,7 @@ describe('buildMobileCreatePrAction', () => {
 
   it('keeps a disabled status row for providers without review creation', () => {
     const { descriptor } = action({
-      eligibility: eligibility({ provider: 'bitbucket' as HostedReviewProvider })
+      eligibility: eligibility({ provider: 'unsupported' as HostedReviewProvider })
     })
 
     expect(descriptor).toMatchObject({
