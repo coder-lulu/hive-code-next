@@ -310,7 +310,7 @@ function parseStaticObject(source, state) {
       source[state.index] === '"' || source[state.index] === "'"
         ? parseStaticString(source, state)
         : parseStaticIdentifier(source, state)
-    if (Object.prototype.hasOwnProperty.call(value, key)) {
+    if (Object.hasOwn(value, key)) {
       throw new Error(`Duplicate product config key: ${key}`)
     }
     skipStaticWhitespace(source, state)

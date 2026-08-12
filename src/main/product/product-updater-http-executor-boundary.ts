@@ -146,7 +146,7 @@ export function installProductUpdaterHttpExecutorBoundary(
     requestProcessor,
     redirectCount
   ) {
-    if (!Object.prototype.hasOwnProperty.call(options, REDIRECT_DEPTH)) {
+    if (!Object.hasOwn(options, REDIRECT_DEPTH)) {
       setRedirectDepth(options, 0)
     }
     if (getRedirectDepth(options) > MAX_UPDATER_REDIRECTS) {
@@ -167,7 +167,7 @@ export function installProductUpdaterHttpExecutorBoundary(
 
   const originalDoDownload = executor.doDownload
   executor.doDownload = function boundedDownload(options, downloadOptions, redirectCount) {
-    if (!Object.prototype.hasOwnProperty.call(options, REDIRECT_DEPTH)) {
+    if (!Object.hasOwn(options, REDIRECT_DEPTH)) {
       setRedirectDepth(options, 0)
     }
     if (getRedirectDepth(options) > MAX_UPDATER_REDIRECTS) {
