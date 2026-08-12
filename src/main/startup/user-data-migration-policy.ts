@@ -81,7 +81,7 @@ function readJsonCandidate(
   maxBytes: number,
   realRoot: string,
   rejectForbiddenKeys = true
-): unknown | null {
+): unknown {
   let sawFile = false
   for (const file of paths) {
     const raw = readRegularFile(file, maxBytes, realRoot)
