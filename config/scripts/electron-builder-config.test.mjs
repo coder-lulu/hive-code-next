@@ -33,6 +33,30 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.extraMetadata).toEqual(expectedPackagedMetadata)
   })
 
+  it('uses the branded product name for Windows shell entries', () => {
+    expect(electronBuilderConfig.productName).toBe('HiveCode')
+    expect(electronBuilderConfig.win.executableName).toBe('HiveCode')
+    expect(electronBuilderConfig.nsis).toMatchObject({
+      artifactName: 'hivecode-windows-setup.${ext}',
+      shortcutName: '${productName}',
+      uninstallDisplayName: '${productName}',
+      oneClick: false,
+      allowToChangeInstallationDirectory: true,
+      runAfterFinish: false,
+      license: 'installer-license.txt'
+    })
+  })
+
+  it('keeps the Windows installer notice beside the NSIS build resources', async () => {
+    const notice = await readFile(
+      join(process.cwd(), 'resources', 'build', 'installer-license.txt'),
+      'utf8'
+    )
+    expect(notice).toContain('HiveCode 安装许可、隐私与用户须知')
+    expect(notice).toContain('https://www.onorca.dev/docs/telemetry')
+    expect(notice).toContain('正式商业发布前，请由法务审核')
+  })
+
   it('keeps the packaged app identity aligned with local-build validation', () => {
     expect(electronBuilderConfig.appId).toBe(
       require('../../src/shared/local-build-compatibility-contract.json').appId

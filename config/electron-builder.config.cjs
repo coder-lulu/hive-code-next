@@ -345,6 +345,16 @@ module.exports = {
     artifactName: 'hivecode-windows-setup.${ext}',
     shortcutName: '${productName}',
     uninstallDisplayName: '${productName}',
+    // Why: the assisted NSIS wizard must require users to review the
+    // installation, privacy, and usage terms before continuing.
+    license: 'installer-license.txt',
+    // Why: assisted installs let users review and change the destination instead
+    // of silently writing to the default per-user location.
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    // Why: installation should finish inside the wizard; an implicit first launch
+    // can surface startup windows while the installer is still tearing down.
+    runAfterFinish: false,
     createDesktopShortcut: 'always',
     // Why: on a real uninstall, stop and remove the relocated terminal daemon
     // (which lives outside the install dir under LOCALAPPDATA by design). Guarded

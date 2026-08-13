@@ -1,0 +1,85 @@
+﻿HiveCode 安装许可、隐私与用户须知
+HiveCode Installation License, Privacy and User Notice
+
+版本 Version: 1.0
+
+请在继续安装前阅读本文件。点击“我同意”即表示您已阅读并接受本文件。
+Please read this notice before continuing. By selecting “I agree”, you confirm
+that you have read and accepted these terms.
+
+一、软件许可 / 1. Software license
+
+HiveCode 及其源代码按照随附的 MIT License 提供。除适用法律另有规定外，
+软件按“现状”提供，不作任何明示或默示保证。完整 MIT License 请参阅项目
+根目录中的 LICENSE 文件。
+
+HiveCode and its source code are provided under the accompanying MIT License.
+Except where required by law, the software is provided “AS IS”, without warranty
+of any kind. See the LICENSE file in the project source for the complete license.
+
+二、本地访问与命令执行 / 2. Local access and command execution
+
+HiveCode 是开发工具。根据您的操作和工作区设置，它可能会读取或写入您
+选择的文件夹，运行终端命令，访问 Git、SSH、浏览器自动化工具和本机开发
+服务，并在本机保存必要的运行日志。请只授予您信任的工作区和命令所需的
+权限，并在执行具有破坏性或外部影响的操作前检查命令内容。
+
+HiveCode is a development tool. Based on your actions and workspace settings,
+it may read or write folders you select, run terminal commands, access Git, SSH,
+browser automation tools, and local development services, and store necessary
+runtime logs locally. Grant access only to workspaces and commands you trust,
+and review commands before destructive or externally visible operations.
+
+三、联网、模型服务与密钥 / 3. Network, model services and credentials
+
+当您选择使用云端模型、远程主机、更新检查或其他联网功能时，相关请求和
+您主动提交的内容可能会发送给相应的第三方服务商。第三方服务商的条款、
+隐私政策、可用性和数据保留规则由其自行负责。请勿向不受信任的服务提交
+密码、私钥、令牌或其他敏感信息，并按照服务商要求管理密钥。
+
+When you use cloud models, remote hosts, update checks, or other network features,
+requests and content you submit may be sent to the relevant third-party provider.
+That provider controls its own terms, privacy policy, availability, and retention
+rules. Do not submit passwords, private keys, tokens, or other sensitive data to
+untrusted services, and manage credentials as required by the provider.
+
+四、可选遥测与隐私 / 4. Optional telemetry and privacy
+
+遥测为可选功能。您可以在 HiveCode 设置中关闭遥测；关闭后不会影响核心
+编辑和终端功能。遥测说明和关闭方法见：
+https://www.onorca.dev/docs/telemetry
+除您主动提交或启用的功能外，HiveCode 不应被理解为对第三方服务数据处理
+作出承诺。安装前请确认您的组织政策和适用法律要求。
+
+Telemetry is optional. You can disable it in HiveCode settings; doing so does not
+disable core editing or terminal features. Details and opt-out instructions are at:
+https://www.onorca.dev/docs/telemetry
+Do not treat HiveCode as making promises about data processing by third-party
+services beyond the features you submit or enable. Check your organization’s
+policies and applicable laws before installation.
+
+五、责任与风险 / 5. Responsibility and risk
+
+您对通过 HiveCode 发起的命令、文件变更、远程连接、浏览器操作以及密钥
+保护负责。请建立备份并遵守您所在组织的安全、隐私和合规要求。开发者不
+对因误用、错误配置、第三方服务或不可预见的系统故障造成的损失承担超出
+适用法律允许范围的责任。
+
+You are responsible for commands, file changes, remote connections, browser
+actions, and credential protection initiated through HiveCode. Keep backups and
+follow your organization’s security, privacy, and compliance requirements. To the
+extent permitted by law, the developers are not liable for loss caused by misuse,
+misconfiguration, third-party services, or unforeseen system failures.
+
+六、商业发布说明 / 6. Commercial release note
+
+本文件用于安装时的产品告知，不构成针对特定司法辖区的完整法律协议。
+正式商业发布前，请由法务审核许可、隐私政策、数据处理和消费者告知内容。
+
+This file is an installation notice and is not a complete legal agreement for any
+particular jurisdiction. Obtain legal review of licensing, privacy, data
+processing, and consumer notices before a formal commercial release.
+
+继续安装即表示您同意上述条款，并确认您有权在目标计算机上安装本软件。
+Continuing the installation means that you accept the terms above and confirm
+that you are authorized to install this software on the target computer.
