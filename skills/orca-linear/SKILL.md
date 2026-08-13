@@ -33,7 +33,7 @@ Choose the executable once and reuse it for every later command:
 - If the `ORCA_CLI_COMMAND` environment variable is set, use its value. HiveCode exports this
   for managed WSL sessions.
 - Otherwise, in a dev checkout whose session exposes `ORCA_DEV_REPO_ROOT`, use `orca-dev`.
-- Otherwise, on Linux outside an HiveCode-managed terminal, use `orca-ide`. Never run bare
+- Otherwise, on Linux outside a HiveCode-managed terminal, use `orca-ide`. Never run bare
   `orca` there — outside HiveCode's terminals it normally resolves to the
   GNOME Orca screen reader (`/usr/bin/orca`) and starts speech on the user's machine.
 - Otherwise, use `orca`.

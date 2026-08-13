@@ -46,14 +46,17 @@ untrusted services, and manage credentials as required by the provider.
 四、可选遥测与隐私 / 4. Optional telemetry and privacy
 
 遥测为可选功能。您可以在 HiveCode 设置中关闭遥测；关闭后不会影响核心
-编辑和终端功能。遥测说明和关闭方法见：
-https://www.onorca.dev/docs/telemetry
+编辑和终端功能。安装后可在“设置 > 隐私与遥测”中查看说明、更改
+选择，并管理诊断数据。未配置 HiveCode 自有隐私政策网址时，安装程序不会
+将您导向上游产品的政策页面。
 除您主动提交或启用的功能外，HiveCode 不应被理解为对第三方服务数据处理
 作出承诺。安装前请确认您的组织政策和适用法律要求。
 
 Telemetry is optional. You can disable it in HiveCode settings; doing so does not
-disable core editing or terminal features. Details and opt-out instructions are at:
-https://www.onorca.dev/docs/telemetry
+disable core editing or terminal features. After installation, open Settings >
+Privacy & Telemetry to review the notice, change your choice, and manage diagnostic
+data. Until HiveCode has a configured first-party privacy-policy URL, the installer
+does not direct you to an upstream product's policy page.
 Do not treat HiveCode as making promises about data processing by third-party
 services beyond the features you submit or enable. Check your organization’s
 policies and applicable laws before installation.

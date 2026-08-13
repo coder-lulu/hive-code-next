@@ -20,7 +20,6 @@ const userVisibleSharedFiles = [
 ]
 const mainBrandSurfaceFiles = [
   'src/main/app-icon.ts',
-  'src/main/attribution/terminal-attribution.ts',
   'src/main/codex/codex-app-server-session.ts',
   'src/main/i18n/main-i18n.ts',
   'src/main/index.ts',

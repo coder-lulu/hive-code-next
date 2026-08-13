@@ -53,7 +53,9 @@ describe('electron-builder config', () => {
       'utf8'
     )
     expect(notice).toContain('HiveCode 安装许可、隐私与用户须知')
-    expect(notice).toContain('https://www.onorca.dev/docs/telemetry')
+    expect(notice).toContain('设置 > 隐私与遥测')
+    expect(notice).toContain('Settings >\nPrivacy & Telemetry')
+    expect(notice).not.toMatch(/onorca\.dev|github\.com\/stablyai\/orca/i)
     expect(notice).toContain('正式商业发布前，请由法务审核')
   })
 
