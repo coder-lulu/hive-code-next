@@ -173,6 +173,7 @@ import {
   migrateUserDataFromOrca,
   validateUserDataMigration
 } from './startup/hivecode-user-data-migration'
+import { resolveUserDataMigrationStartupAction } from './startup/user-data-migration-startup-policy'
 import { hydrateShellPath, mergePathSegments } from './startup/hydrate-shell-path'
 import { createWindowsShellPathHydration } from './startup/windows-shell-path-hydration'
 import {
@@ -377,6 +378,7 @@ let desktopRelayStatus: RelayBrokerStatus = 'offline'
 let pendingUnpairedDeviceAuthFailure = false
 let userDataMigrationNeedsValidation = false
 let userDataMigrationNeedsCompletion = false
+let userDataMigrationSkippedUnsafeSource = false
 // Why: gates whether headless serve installs the offscreen browser backend (and advertises browser pane support).
 let headlessBrowserDisplayAvailable = false
 
@@ -925,21 +927,19 @@ if (hasSingleInstanceLock) {
     const migrationResult = migrateUserDataFromOrca({
       hiveCodeUserData: getCanonicalUserDataPath()
     })
+    const migrationAction = resolveUserDataMigrationStartupAction(migrationResult)
     if (migrationResult.migrated) {
-      userDataMigrationNeedsValidation = true
-      userDataMigrationNeedsCompletion = true
       console.log(`[hivecode] Prepared ${migrationResult.copiedCount} sanitized migration files`)
-    } else if (migrationResult.reason === 'awaiting-validation') {
+    }
+    if (migrationAction === 'validate-and-complete') {
       userDataMigrationNeedsValidation = true
       userDataMigrationNeedsCompletion = true
-    } else if (migrationResult.reason === 'awaiting-completion') {
+    } else if (migrationAction === 'complete') {
       userDataMigrationNeedsCompletion = true
-    } else if (
-      migrationResult.reason === 'migration-in-progress' ||
-      migrationResult.reason === 'migration-conflict' ||
-      migrationResult.reason === 'unsafe-source' ||
-      migrationResult.reason === 'error'
-    ) {
+    } else if (migrationAction === 'start-clean') {
+      userDataMigrationSkippedUnsafeSource = true
+      console.warn('[hivecode] Legacy user data migration skipped: unsafe-source')
+    } else if (migrationAction === 'block' && !migrationResult.migrated) {
       // Why: continuing would create or mutate target profile data and could
       // make a safe retry impossible. Do not expose filesystem paths in errors.
       throw new Error(
@@ -3251,6 +3251,31 @@ void app.whenReady().then(async () => {
   ])
   if (!runtimeRpcStartResult.ok) {
     void showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
+  }
+  if (userDataMigrationSkippedUnsafeSource) {
+    userDataMigrationSkippedUnsafeSource = false
+    const showMigrationWarning = (): void => {
+      void dialog
+        .showMessageBox(win, {
+          type: 'warning',
+          buttons: ['OK'],
+          defaultId: 0,
+          title: `${APP_DISPLAY_NAME} started with a new profile`,
+          message: 'Data from an older app version could not be imported safely.',
+          detail: `Your existing data was not changed. ${APP_DISPLAY_NAME} started with a new local profile instead.`
+        })
+        .catch((error) => {
+          console.warn(
+            '[hivecode] Could not show legacy data migration warning:',
+            error instanceof Error ? error.message : String(error)
+          )
+        })
+    }
+    if (win.isVisible()) {
+      showMigrationWarning()
+    } else {
+      win.once('show', showMigrationWarning)
+    }
   }
 
   const cloudAuth = getProductCloudAuthConfig()

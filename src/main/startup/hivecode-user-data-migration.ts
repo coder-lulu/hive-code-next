@@ -49,7 +49,7 @@ export type MigrationResult =
         | 'awaiting-completion'
         | 'migration-in-progress'
         | 'no-orca-data'
-        | 'existing-hivecode-data'
+        | 'existing-target-data'
         | 'migration-conflict'
         | 'unsafe-source'
         | 'error'
@@ -259,11 +259,21 @@ export function migrateUserDataFromOrca(
       return { migrated: false, reason: 'awaiting-validation' }
     }
     if (targetManagedDataExists(target)) {
-      return { migrated: false, reason: 'existing-hivecode-data' }
+      return { migrated: false, reason: 'existing-target-data' }
     }
     const backupPath = join(target, MIGRATION_BACKUP)
     if (!existsSync(backupPath)) {
-      const source = findSource(paths)
+      let source: SanitizedMigrationSource | null
+      try {
+        source = findSource(paths)
+      } catch (error) {
+        const code = migrationErrorCode(error)
+        return {
+          migrated: false,
+          reason: code === 'unsafe-source' ? 'unsafe-source' : 'error',
+          errorCode: code
+        }
+      }
       if (!source) {
         return { migrated: false, reason: 'no-orca-data' }
       }
@@ -282,11 +292,7 @@ export function migrateUserDataFromOrca(
     const code = migrationErrorCode(error)
     return {
       migrated: false,
-      reason: existsSync(join(target, MIGRATION_MARKER))
-        ? 'migration-conflict'
-        : code === 'unsafe-source'
-          ? 'unsafe-source'
-          : 'error',
+      reason: existsSync(join(target, MIGRATION_MARKER)) ? 'migration-conflict' : 'error',
       errorCode: code
     }
   } finally {

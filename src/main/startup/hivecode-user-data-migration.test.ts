@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync
 } from 'node:fs'
@@ -16,8 +17,10 @@ import {
   getLegacyOrcaUserDataPath,
   migrateUserDataFromOrca,
   validateUserDataMigration,
+  type MigrationResult,
   type MigrationStep
 } from './hivecode-user-data-migration'
+import { resolveUserDataMigrationStartupAction } from './user-data-migration-startup-policy'
 
 const MARKER = '.hivecode-migration-state.json'
 const LOCK = '.hivecode-migration.lock'
@@ -105,10 +108,11 @@ describe('copy-only user data migration', () => {
   it('fails closed when source data contains a forbidden sensitive key', () => {
     const source = createTempDir()
     const target = createTempDir()
-    writeJson(join(source, 'orca-data.json'), {
+    const sourceData = JSON.stringify({
       settings: { theme: 'light' },
       workspaceSession: { authToken: 'secret-value' }
     })
+    writeFileSync(join(source, 'orca-data.json'), sourceData, 'utf8')
 
     const result = migrateUserDataFromOrca({
       hiveCodeUserData: target,
@@ -116,6 +120,8 @@ describe('copy-only user data migration', () => {
     })
 
     expect(result).toMatchObject({ migrated: false, reason: 'unsafe-source' })
+    expect(readFileSync(join(source, 'orca-data.json'), 'utf8')).toBe(sourceData)
+    expect(readdirSync(target)).toEqual([])
   })
 
   it('advances prepared to validated to completed only through explicit gates', () => {
@@ -162,7 +168,7 @@ describe('copy-only user data migration', () => {
     try {
       expect(migrateUserDataFromOrca({ hiveCodeUserData: target, orcaUserData: source })).toEqual({
         migrated: false,
-        reason: 'existing-hivecode-data'
+        reason: 'existing-target-data'
       })
       expect(readFileSync(targetData, 'utf8')).toBe('{"existing":true}')
     } finally {
@@ -385,6 +391,20 @@ describe('copy-only user data migration', () => {
     expect(existsSync(join(target, LOCK))).toBe(true)
   })
 
+  it('does not classify an unsafe target lock as a recoverable source rejection', () => {
+    const source = createTempDir()
+    const target = createTempDir()
+    writeJson(join(source, 'orca-data.json'), { settings: { theme: 'dark' } })
+    writeFileSync(join(target, LOCK), 'not-json', 'utf8')
+
+    expect(migrateUserDataFromOrca({ hiveCodeUserData: target, orcaUserData: source })).toEqual({
+      migrated: false,
+      reason: 'error',
+      errorCode: 'unsafe-source'
+    })
+    expect(readFileSync(join(target, LOCK), 'utf8')).toBe('not-json')
+  })
+
   it('reclaims a stale lock and completes the prepared transaction', () => {
     const source = createTempDir()
     const target = createTempDir()
@@ -494,6 +514,57 @@ describe('legacy user data paths', () => {
   })
 })
 
+describe('user data migration startup policy', () => {
+  it('starts clean only when the untouched legacy source is rejected', () => {
+    expect(
+      resolveUserDataMigrationStartupAction({
+        migrated: false,
+        reason: 'unsafe-source'
+      })
+    ).toBe('start-clean')
+  })
+
+  it('keeps target migration failures startup-blocking', () => {
+    const blockingResults: MigrationResult[] = [
+      { migrated: false, reason: 'migration-in-progress' },
+      { migrated: false, reason: 'migration-conflict' },
+      { migrated: false, reason: 'error' }
+    ]
+
+    expect(blockingResults.map(resolveUserDataMigrationStartupAction)).toEqual([
+      'block',
+      'block',
+      'block'
+    ])
+  })
+
+  it('blocks unknown migration states by default', () => {
+    expect(resolveUserDataMigrationStartupAction({ migrated: false, reason: 'future-state' })).toBe(
+      'block'
+    )
+  })
+
+  it('preserves validation, completion, and no-op startup states', () => {
+    const results: MigrationResult[] = [
+      { migrated: true, copiedCount: 2, needsValidation: true },
+      { migrated: false, reason: 'awaiting-validation' },
+      { migrated: false, reason: 'awaiting-completion' },
+      { migrated: false, reason: 'already-migrated' },
+      { migrated: false, reason: 'no-orca-data' },
+      { migrated: false, reason: 'existing-target-data' }
+    ]
+
+    expect(results.map(resolveUserDataMigrationStartupAction)).toEqual([
+      'validate-and-complete',
+      'validate-and-complete',
+      'complete',
+      'continue',
+      'continue',
+      'continue'
+    ])
+  })
+})
+
 describe('main-process migration wiring', () => {
   it('validates after Store load and completes only after startup succeeds', () => {
     const mainSource = readFileSync(join(import.meta.dirname, '..', 'index.ts'), 'utf8').replaceAll(
@@ -516,7 +587,10 @@ describe('main-process migration wiring', () => {
     expect(validateOffset).toBeGreaterThan(storeOffset)
     expect(headlessReadyOffset).toBeGreaterThan(validateOffset)
     expect(desktopReadyOffset).toBeGreaterThan(headlessReadyOffset)
-    expect(mainSource).toContain("migrationResult.reason === 'migration-conflict'")
-    expect(mainSource).toContain("migrationResult.reason === 'migration-in-progress'")
+    expect(mainSource).toContain('resolveUserDataMigrationStartupAction(migrationResult)')
+    expect(mainSource).toContain("migrationAction === 'start-clean'")
+    expect(mainSource).toContain('Data from an older app version could not be imported safely.')
+    expect(mainSource).toContain('Your existing data was not changed.')
+    expect(mainSource).not.toContain('Older Orca data could not be imported safely.')
   })
 })
