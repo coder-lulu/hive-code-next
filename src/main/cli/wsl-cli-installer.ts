@@ -25,6 +25,7 @@ const BRIDGE_MANAGED_MARKER = getWslBridgeMarker()
 const WSL_COMMAND_NAME = 'orca-ide'
 const LEGACY_WSL_COMMAND_NAME = 'orca'
 const WSL_COMMAND_TIMEOUT_MS = 10_000
+const WSL_COMMAND_FAILURE_MESSAGE = 'Unable to communicate with the selected WSL distribution.'
 
 function normalizeManagedScriptContent(content: string): string {
   return content.replace(/\n+$/u, '\n')
@@ -495,8 +496,21 @@ async function runWslCommand(distro: string, command: string): Promise<string> {
           encoding: 'utf8',
           timeout: WSL_COMMAND_TIMEOUT_MS
         },
-        (error, stdout) => {
-          finish(error ?? null, stdout)
+        (error, stdout, stderr) => {
+          if (error) {
+            // Why: wsl.exe can combine UTF-16LE Windows diagnostics with UTF-8 guest output.
+            // Do not expose Node's decoded command/error text to IPC consumers: it is both
+            // unreadable and leaks the internal command line into Settings notifications.
+            console.warn('[wsl-cli] WSL command failed', {
+              distro,
+              code: error.code,
+              signal: error.signal,
+              stderrBytes: Buffer.byteLength(stderr)
+            })
+            finish(new Error(WSL_COMMAND_FAILURE_MESSAGE))
+            return
+          }
+          finish(null, stdout)
         }
       )
     } catch (error) {
