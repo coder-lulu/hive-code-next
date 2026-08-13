@@ -7,7 +7,7 @@ import { applyProductBranding } from '../../shared/brand'
 import type { SubprocessHandle } from './session'
 import { DaemonProtocolError } from './types'
 import {
-  getAttributionShellLaunchConfig,
+  getMarkerlessShellLaunchConfig,
   getShellReadyLaunchConfig,
   resolvePtyShellPath
 } from './shell-ready'
@@ -803,18 +803,17 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
       // Why: payload-bearing Codex startup text can be dropped by rc-file noise; plain Codex stays markerless for the startup-speed path.
       shellLaunch = shouldWaitForShellReady
         ? getShellReadyLaunchConfig(shellPath)
-        : getAttributionShellLaunchConfig(shellPath)
+        : getMarkerlessShellLaunchConfig(shellPath)
     } else if (opts.command) {
       shellLaunch = getShellReadyLaunchConfig(shellPath)
     } else {
       shellLaunch =
-        env.ORCA_ATTRIBUTION_SHIM_DIR ||
         env.ORCA_OPENCODE_CONFIG_DIR ||
         env.ORCA_MIMOCODE_HOME ||
         env.ORCA_OMP_STATUS_EXTENSION ||
         env.ORCA_CODEX_HOME ||
         env.ORCA_AGENT_TEAMS_SHIM_DIR
-          ? getAttributionShellLaunchConfig(shellPath)
+          ? getMarkerlessShellLaunchConfig(shellPath)
           : null
     }
     if (shellLaunch) {
@@ -1065,6 +1064,8 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
   return {
     pid: proc.pid,
     shellPath,
+    shellCwd: spawnCwd,
+    shellPathEnv: env.PATH,
     ...(slavePath ? { slavePath } : {}),
     ...(startupCommandDeliveredInShellArgs ? { startupCommandDeliveredInShellArgs: true } : {}),
     getForegroundProcess: () => {

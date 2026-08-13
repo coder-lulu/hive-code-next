@@ -133,9 +133,8 @@ export function writeSecureFile(
   }
 }
 
-export function fsyncFileSync(path: string): void {
-  // Windows requires a writable file handle for FlushFileBuffers, which backs fsyncSync.
-  const descriptor = openSync(path, process.platform === 'win32' ? 'r+' : 'r')
+function fsyncPathSync(path: string, flags: 'r' | 'r+'): void {
+  const descriptor = openSync(path, flags)
   try {
     fsyncSync(descriptor)
   } finally {
@@ -143,12 +142,17 @@ export function fsyncFileSync(path: string): void {
   }
 }
 
+export function fsyncFileSync(path: string): void {
+  // FlushFileBuffers requires a write-capable handle on Windows.
+  fsyncPathSync(path, 'r+')
+}
+
 export function bestEffortFsyncDirectorySync(directory: string): void {
   if (process.platform === 'win32') {
     return
   }
   try {
-    fsyncFileSync(directory)
+    fsyncPathSync(directory, 'r')
   } catch (error) {
     if (
       error instanceof Error &&

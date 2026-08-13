@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type {
   HostedReviewCreationBlockedReason,
-  HostedReviewCreationEligibility,
-  HostedReviewProvider
+  HostedReviewCreationEligibility
 } from '../../../src/shared/hosted-review'
 import {
   buildMobileCreatePrAction,
@@ -61,7 +60,7 @@ describe('buildMobileCreatePrAction', () => {
 
   it('uses merge-request copy for GitLab', () => {
     const { descriptor } = action({
-      eligibility: eligibility({ provider: 'gitlab' as HostedReviewProvider })
+      eligibility: eligibility({ provider: 'gitlab' })
     })
 
     expect(descriptor.label).toBe('Create Merge Request')
@@ -146,7 +145,7 @@ describe('buildMobileCreatePrAction', () => {
 
   it('keeps a disabled status row for providers without review creation', () => {
     const { descriptor } = action({
-      eligibility: eligibility({ provider: 'unsupported' as HostedReviewProvider })
+      eligibility: eligibility({ provider: 'unsupported' })
     })
 
     expect(descriptor).toMatchObject({
@@ -211,7 +210,7 @@ describe('cold-mount layout stability (issue #8411)', () => {
       'unsupported provider',
       {
         kind: 'ready',
-        eligibility: eligibility({ provider: 'bitbucket' as HostedReviewProvider })
+        eligibility: eligibility({ provider: 'unsupported' })
       } satisfies MobileCreatePrEligibilityState
     ],
     ['eligibility error', { kind: 'error' } satisfies MobileCreatePrEligibilityState]

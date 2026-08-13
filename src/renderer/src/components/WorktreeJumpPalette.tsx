@@ -1487,7 +1487,8 @@ function WorktreeJumpPaletteContent({
       sshConnectionStates,
       activeGroupIdByWorktree,
       groupsByWorktree,
-      settings
+      settings,
+      runtimeStatusByEnvironmentId
     }),
     [
       activeGroupIdByWorktree,
@@ -1495,6 +1496,7 @@ function WorktreeJumpPaletteContent({
       activeWorktreeId,
       groupsByWorktree,
       repos,
+      runtimeStatusByEnvironmentId,
       settings,
       sshConnectionStates,
       worktreesByRepo
