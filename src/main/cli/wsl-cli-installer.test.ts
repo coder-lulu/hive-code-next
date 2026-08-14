@@ -826,14 +826,13 @@ describe('WslCliInstaller', () => {
         _options: unknown,
         callback: (error: Error, stdout: string, stderr: Buffer) => void
       ) => {
-        const error = Object.assign(
-          new Error(
-            "Command failed: wsl.exe -d ubuntu2204-python -- bash -lc 'printf %s secret | base64 -d'"
-          ),
-          { code: 0xffffffff }
-        )
         callback(
-          error,
+          Object.assign(
+            new Error(
+              "Command failed: wsl.exe -d ubuntu2204-python -- bash -lc 'printf %s secret | base64 -d'"
+            ),
+            { code: 0xffffffff }
+          ),
           '',
           Buffer.from(
             'wsl: \u4e0d\u5b58\u5728\u5177\u6709\u6240\u63d0\u4f9b\u540d\u79f0\u7684\u5206\u53d1。\r\n',
@@ -850,10 +849,8 @@ describe('WslCliInstaller', () => {
     })
 
     await expect(installer.getStatus()).rejects.toThrow(
-      'Unable to communicate with the selected WSL distribution.'
+      /^Unable to communicate with the selected WSL distribution\.$/
     )
-    await expect(installer.getStatus()).rejects.not.toThrow('ubuntu2204-python')
-    await expect(installer.getStatus()).rejects.not.toThrow('base64')
   })
 
   it('refuses to remove an old managed launcher when the bridge path is user-owned', async () => {

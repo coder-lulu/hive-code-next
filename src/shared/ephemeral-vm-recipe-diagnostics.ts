@@ -1,4 +1,5 @@
 import { parsePairingCode } from './pairing'
+import { stripCredentialsFromMessage } from './git-remote-error'
 import {
   getEphemeralVmRecipeResultConnection,
   type EphemeralVmRecipeConnection,
@@ -41,7 +42,7 @@ export function redactEphemeralVmRecipeDiagnosticText(text: string): string {
   }
   const schemes = [hivecodeProductConfig.schemes.primary, ...hivecodeProductConfig.schemes.aliases]
   const pairPattern = schemes.map((s) => `${s}://pair`).join('|')
-  return text
+  return stripCredentialsFromMessage(text)
     .replace(new RegExp(`(${pairPattern})\\?code=[A-Za-z0-9_-]+`, 'g'), '$1?code=[redacted]')
     .replace(
       /("(?:pairingCode|deviceToken|publicKeyB64|token|secret|password|apiKey|accessToken|identityFile|identityAgent|proxyCommand)"\s*:\s*)"[^"]*"/gi,

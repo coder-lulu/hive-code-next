@@ -31,6 +31,16 @@ pnpm typecheck
 pnpm test
 ```
 
+Add high-quality tests for behavior changes and bug fixes. Prefer tests that would actually catch a regression, not shallow coverage that only exercises the happy path.
+
+If your change affects UI or interaction behavior, verify it on the platforms it could impact.
+
+## Type Declarations: Prefer `.ts` Over `.d.ts`
+
+Project-owned type declarations belong in `.ts` files. `.d.ts` is reserved for ambient shims (e.g., `env.d.ts`, `vite/client.d.ts`). TypeScript's `skipLibCheck: true` setting applies globally, including to our own `.d.ts` files, which means any unresolved type reference in a `.d.ts` silently becomes `any` at its call sites. Write your types in `.ts` files so the compiler actually checks them.
+
+CI enforces this for `src/preload/` and `src/shared/`.
+
 ## Pull Requests
 
 Each pull request should follow [`.github/pull_request_template.md`](./pull_request_template.md). In particular:

@@ -81,11 +81,12 @@ import {
   NON_TRANSPLANTABLE_HOST_KEY_SQL,
   normalizeCookieDomain,
   normalizeCookieImportDomain,
-  removeAllCookiesExcept,
   replaceCookiesForImportedDomains,
   restoreImportedDomainCookies,
   type CookieImportMode
 } from './browser-cookie-import-policy'
+import { removeTransplantableCookies, withCookieClearLock } from './browser-cookie-import-clear'
+import { openCookieClearStore } from './browser-cookie-clear-store'
 import {
   createChromiumCookieSnapshot,
   type ChromiumCookieSnapshot
@@ -1782,9 +1783,20 @@ export async function importCookiesFromBrowser(
     // Why: clear stale cookies first; mixing them with the imported set makes sites reject the
     // session. Non-transplantable families are exempt — nothing was imported for them, and their
     // live session is the only one that works.
-    await removeAllCookiesExcept(targetSession.cookies, (cookie) =>
-      isNonTransplantableCookieDomain(cookie.domain ?? '')
-    )
+    const cookieClearStore = openCookieClearStore(targetSession)
+    try {
+      await withCookieClearLock(targetSession, () =>
+        removeTransplantableCookies({
+          cookies: cookieClearStore,
+          clearData: (options) => targetSession.clearData(options),
+          snapshotClearIdentities: (cookies) => cookieClearStore.snapshotClearIdentities(cookies),
+          restoreClearIdentities: (identities) =>
+            cookieClearStore.restoreClearIdentities(identities)
+        })
+      )
+    } finally {
+      cookieClearStore.dispose()
+    }
     diag(
       `  cleared existing session cookies before loading ${decryptedCookies.length} imported cookies`
     )

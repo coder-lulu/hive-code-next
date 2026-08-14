@@ -2667,7 +2667,6 @@ describe('web UI preload API', () => {
                     directoryPath: '/skills/computer-use',
                     skillFilePath: '/skills/computer-use/SKILL.md',
                     installed: true,
-                    fileCount: 1,
                     updatedAt: null
                   }
                 ],
