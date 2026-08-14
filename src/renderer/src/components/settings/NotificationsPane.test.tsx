@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { GlobalSettings, NotificationDispatchRequest } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { NotificationDispatchRequest } from '../../../../shared/notification-settings-types'
 import { getNotificationSoundOptions } from '@/components/notification-sound-options'
 import {
   createNotificationVolumeDraftState,

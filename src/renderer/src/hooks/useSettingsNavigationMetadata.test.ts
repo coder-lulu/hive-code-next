@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import { buildSettingsNavigationMetadata } from './useSettingsNavigationMetadata'
-import type { Repo } from '../../../shared/types'
+import type { Repo } from '../../../shared/repo-types'
 
 const repo = {
   id: 'repo-1',

@@ -3,8 +3,9 @@ import type { Automation } from '../../shared/automations-types'
 import { getAutomationLegacyRepoId } from '../../shared/automation-run-identity'
 import { applyProductBranding } from '../../shared/brand'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../shared/execution-host'
-import type { ProjectHostSetup, Repo } from '../../shared/types'
-import { splitWorktreeIdForFilesystem } from '../../shared/worktree-id'
+import type { ProjectHostSetup } from '../../shared/project-types'
+import type { Repo } from '../../shared/repo-types'
+import { splitWorktreeIdForFilesystem } from '../../shared/worktree/id'
 
 export type AutomationRunTargetResult =
   | { ok: true; cwd: string; repo: Repo; setup?: ProjectHostSetup }

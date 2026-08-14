@@ -1,5 +1,5 @@
-import type { TuiAgent } from '../../../../shared/types'
 import { applyProductBranding } from '../../../../shared/brand'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'

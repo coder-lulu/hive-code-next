@@ -1,7 +1,7 @@
 import type {
   LinearMcpIssueListRequest,
   LinearMcpIssueListResult
-} from '../../shared/linear-agent-access'
+} from '../../shared/linear/agent-access'
 import { applyProductBranding } from '../../shared/brand'
 import { getClients, getStatus, type LinearClientForWorkspace } from './client'
 import { withLinearRead } from './issue-context-client'

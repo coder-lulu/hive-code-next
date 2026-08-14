@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createTestStore } from './store-test-helpers'
-import type {
-  NestedRepoScanResult,
-  Repo,
-  ProjectGroup,
-  FolderWorkspace
-} from '../../../../shared/types'
+import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
+import type { NestedRepoScanResult, ProjectGroup } from '../../../../shared/project-group-types'
+import type { Repo } from '../../../../shared/repo-types'
 import {
   createCompatibleRuntimeStatusResponse,
   createCompatibleRuntimeStatusResponseIfNeeded,

@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { applyProductBranding } from '../../shared/brand'
 import type { Store } from '../persistence'
-import { splitWorktreeId, splitWorktreeIdForFilesystem } from '../../shared/worktree-id'
+import { splitWorktreeId, splitWorktreeIdForFilesystem } from '../../shared/worktree/id'
 import { isFolderRepo } from '../../shared/repo-kind'
 import type {
   WorkspacePortKillRequest,

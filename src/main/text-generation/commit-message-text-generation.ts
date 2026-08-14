@@ -3,7 +3,9 @@
    prevents those paths from drifting. */
 import { spawn, type ChildProcess } from 'node:child_process'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
-import type { GlobalSettings, Repo, TuiAgent } from '../../shared/types'
+import type { GlobalSettings } from '../../shared/global-settings-types'
+import type { Repo } from '../../shared/repo-types'
+import type { TuiAgent } from '../../shared/tui-agent'
 import {
   buildCommitMessagePrompt,
   splitGeneratedCommitMessage,

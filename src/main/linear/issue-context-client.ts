@@ -1,7 +1,7 @@
-import type { LinearSearchIssueSummary, LinearSearchResult } from '../../shared/linear-agent-access'
-import { clampLinearSearchLimit } from '../../shared/linear-agent-access'
 import { applyProductBranding } from '../../shared/brand'
-import type { LinearWorkspace } from '../../shared/types'
+import type { LinearSearchIssueSummary, LinearSearchResult } from '../../shared/linear/agent-access'
+import { clampLinearSearchLimit } from '../../shared/linear/agent-access'
+import type { LinearWorkspace } from '../../shared/linear/workspace-types'
 import {
   acquire,
   clearToken,

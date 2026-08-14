@@ -12,7 +12,7 @@ import {
   normalizeTerminalTitle
 } from '../../shared/agent-detection'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
-import { planWorktreeSortOrderUpdates } from '../../shared/worktree-sort-order-update'
+import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
 import { applyProductBranding } from '../../shared/brand'
 import { sortDirEntries } from '../../shared/file-name-sort'
@@ -118,7 +118,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
-import { resolveWorktreeAddBaseRef } from '../../shared/worktree-base-ref'
+import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import { OrchestrationDb } from './orchestration/db'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
 import {
@@ -163,7 +163,10 @@ import type {
   OrchestrationEnvironmentTransport,
   OrchestrationWorkerServer
 } from './orchestration/environment-transport'
-import { clearFederationAckCheckpoints } from './orchestration/federation-ack-checkpoints'
+import {
+  clearFederationAckCheckpoints,
+  releaseFederationAckCheckpoint
+} from './orchestration/federation-ack-checkpoints'
 import { syncFederatedDispatch } from './orchestration/federation-sync'
 import { formatMessagePointer } from './orchestration/formatter'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
@@ -175,24 +178,52 @@ import type {
   AutomationUpdateInput,
   AutomationWorkspaceMode
 } from '../../shared/automations-types'
+import type { DirEntry, FilesystemPathFlavor } from '../../shared/filesystem-entry-types'
+import type { FolderWorkspace, WorkspaceKey } from '../../shared/folder-workspace-types'
 import type {
-  AutomationWorkspaceProvenance,
-  CliWorkspaceProvenance,
-  BaseRefSearchResult,
-  CreateWorktreeResult,
-  DetectedWorktree,
-  DetectedWorktreeListResult,
-  ForceDeleteWorktreeBranchResult,
-  GitHubPrStartPoint,
-  GitPushTarget,
-  BranchPrefixStrategy,
-  GitWorktreeInfo,
+  GitHubPRReviewCommentInput,
+  GitHubReactionContent
+} from '../../shared/github/comment-types'
+import type { PRRefreshOutcome } from '../../shared/github/pull-request-refresh-types'
+import type { GitHubOwnerRepo, GitHubPRFile } from '../../shared/github/pull-request-types'
+import type { ListWorkItemsResult } from '../../shared/github/work-item-types'
+import type {
+  GitLabIssueUpdate,
+  GitLabMRInlineCommentInput,
+  GitLabProjectRef,
+  GitLabWorkItem,
+  MRListState
+} from '../../shared/gitlab-types'
+import type { GlobalSettings } from '../../shared/global-settings-types'
+import type {
   GitHubCreateIssueFields,
-  GitHubOwnerRepo,
-  GlobalSettings,
-  PersistedUIState,
+  GitHubIssueUpdate,
+  GitHubPullRequestStateUpdate,
+  LinearIssueUpdate
+} from '../../shared/issue-mutation-types'
+import type {
+  JiraConnectArgs,
+  JiraCreateIssueArgs,
+  JiraIssueFilter,
+  JiraIssueUpdate,
+  JiraSiteSelection
+} from '../../shared/jira-types'
+import type { LinearCustomViewModel, LinearProjectSummary } from '../../shared/linear/project-types'
+import type { LinearWorkspaceSelection } from '../../shared/linear/workspace-types'
+import type {
+  ClaudeRateLimitAccountsState,
+  CodexRateLimitAccountsState
+} from '../../shared/managed-account-types'
+import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
+import type { MemorySnapshot, StatsSummary } from '../../shared/process-stats-types'
+import type {
+  NestedRepoScanResult,
+  ProjectGroup,
+  ProjectGroupImportMode,
+  ProjectGroupImportResult
+} from '../../shared/project-group-types'
+import type {
   Project,
-  ProjectUpdateArgs,
   ProjectHostSetup,
   ProjectHostSetupCloneArgs,
   ProjectHostSetupCreateArgs,
@@ -203,62 +234,49 @@ import type {
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult,
-  Repo,
-  RemoveWorktreeResult,
-  StatsSummary,
-  Worktree,
-  WorktreeLineage,
-  WorkspaceLineage,
-  WorkspaceKey,
-  WorktreeLineageWarning,
-  WorktreeMeta,
-  WorktreeBaseStatusEvent,
-  WorktreeRemoteBranchConflictEvent,
-  WorktreeStartupLaunch,
-  LinearCustomViewModel,
-  JiraConnectArgs,
-  JiraCreateIssueArgs,
-  JiraIssueFilter,
-  JiraIssueUpdate,
-  JiraSiteSelection,
-  LinearIssueUpdate,
-  LinearProjectSummary,
-  LinearWorkspaceSelection,
-  NestedRepoScanResult,
-  ProjectGroup,
-  FolderWorkspace,
-  ProjectGroupImportMode,
-  ProjectGroupImportResult,
-  MemorySnapshot,
-  Tab,
-  TabGroupLayoutNode,
-  TerminalQuickCommand,
+  ProjectUpdateArgs
+} from '../../shared/project-types'
+import type { BaseRefSearchResult, Repo } from '../../shared/repo-types'
+import type { Tab, TabGroupLayoutNode } from '../../shared/tab-types'
+import type { TerminalQuickCommand } from '../../shared/terminal-quick-command-types'
+import type {
   TerminalLayoutSnapshot,
   TerminalPaneLayoutNode,
-  TerminalTab,
-  TuiAgent,
-  WorkspaceCreateTelemetrySource,
-  WorkspaceSessionState,
+  TerminalTab
+} from '../../shared/terminal-tab-types'
+import type { TuiAgent } from '../../shared/tui-agent'
+import type { BranchPrefixStrategy } from '../../shared/ui-chrome-types'
+import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
+import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../shared/workspace-source'
+import type {
+  WorktreeBaseStatusEvent,
+  WorktreeRemoteBranchConflictEvent
+} from '../../shared/worktree/base-ref-drift-types'
+import type {
+  CreateWorktreeResult,
+  ForceDeleteWorktreeBranchResult,
+  RemoveWorktreeResult
+} from '../../shared/worktree/create-types'
+import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
+import type {
+  WorkspaceLineage,
+  WorktreeLineage,
+  WorktreeLineageWarning
+} from '../../shared/worktree/lineage-types'
+import type { WorktreeMeta } from '../../shared/worktree/meta-types'
+import type {
+  AutomationWorkspaceProvenance,
+  CliWorkspaceProvenance,
+  DetectedWorktree,
+  DetectedWorktreeListResult,
+  GitHubPrStartPoint,
+  GitPushTarget,
+  GitWorktreeInfo,
   WorkspaceLinkedItem,
-  DirEntry,
-  FilesystemPathFlavor,
-  GitHubIssueUpdate,
-  GitHubPullRequestStateUpdate,
-  GitHubPRFile,
-  GitHubPRReviewCommentInput,
-  GitHubReactionContent,
-  GitLabIssueUpdate,
-  GitLabMRInlineCommentInput,
-  GitLabProjectRef,
-  GitLabWorkItem,
-  ListWorkItemsResult,
-  MRListState,
-  PRRefreshOutcome,
-  ClaudeRateLimitAccountsState,
-  CodexRateLimitAccountsState
-} from '../../shared/types'
+  Worktree
+} from '../../shared/worktree/types'
 import type { TaskSourceContext } from '../../shared/task-source-context'
-import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree-removal'
+import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree/removal'
 import {
   LOCAL_EXECUTION_HOST_ID,
   getRepoExecutionHostId,
@@ -312,7 +330,7 @@ import type {
   LinearTeamMembersResult,
   LinearTeamStatesResult,
   LinearStatusSetResult
-} from '../../shared/linear-agent-access'
+} from '../../shared/linear/agent-access'
 import {
   HEADLESS_RUNTIME_WINDOW_ID,
   type RuntimeDesktopWindowStatus,
@@ -371,17 +389,22 @@ import {
   type RuntimeSessionTabCloseReason,
   type RuntimeBrowserDriverState,
   type RuntimeTerminalDriverState,
+  type RuntimeRendererSyncWindowGraph,
   type RuntimeSyncWindowGraph,
   type RuntimeWorktreeListResult,
   type BrowserTabInfo,
   type BrowserScreencastResult
 } from '../../shared/runtime-types'
 import {
+  RUNTIME_GRAPH_RELOAD_TIMEOUT_MS,
+  RuntimeGraphReloadLifecycle
+} from './runtime-graph-reload-lifecycle'
+import {
   LINEAR_SEARCH_MAX_LIMIT,
   LINEAR_WRITE_BODY_CAP,
   clampLinearSearchLimit
-} from '../../shared/linear-agent-access'
-import { isLinearUuid } from '../../shared/linear-uuid'
+} from '../../shared/linear/agent-access'
+import { isLinearUuid } from '../../shared/linear/uuid'
 import type { FeatureInteractionId } from '../../shared/feature-interactions'
 import type { TerminalPaneSplitSource } from '../../shared/feature-education-telemetry'
 import {
@@ -390,14 +413,14 @@ import {
   getRepoIdFromWorktreeId,
   splitWorktreeId,
   splitWorktreeIdForFilesystem
-} from '../../shared/worktree-id'
+} from '../../shared/worktree/id'
 import {
   getProjectIdForProviderIdentity,
   getProjectHostSetupForRepo,
   getProjectHostSetupWorktreeMeta
 } from '../../shared/project-host-setup-projection'
 import { parsePtySessionId } from '../../shared/pty-session-id-format'
-import { clampLinearIssueListLimit } from '../../shared/linear-issue-read-limits'
+import { clampLinearIssueListLimit } from '../../shared/linear/issue-read-limits'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { DEFAULT_WORKSPACE_STATUS_ID } from '../../shared/workspace-statuses'
 import {
@@ -488,13 +511,13 @@ import {
   buildKnownOrcaWorkspaceLayouts,
   isLegacyRepoForExternalWorktreeVisibility,
   toDetectedWorktree
-} from '../../shared/worktree-ownership'
+} from '../../shared/worktree/ownership'
 import { isAgentScratchRepoRootPath } from '../../shared/agent-scratch-worktrees'
 import {
   createWorktreeVisibilitySourceMatcher,
   normalizeCustomWorktreeVisibilitySources,
   type WorktreeVisibilitySourceMatcher
-} from '../../shared/worktree-visibility-sources'
+} from '../../shared/worktree/visibility-sources'
 import {
   BROWSER_HEADLESS_RUNTIME_CAPABILITY,
   BROWSER_CERTIFICATE_TRUST_RUNTIME_CAPABILITY,
@@ -717,6 +740,14 @@ import {
 } from './repo-worktree-resolution-scan'
 import { readRepoWorktreeAdminFingerprint } from './repo-worktree-admin-fingerprint'
 import {
+  listStoredWorktreeRowsForRepo,
+  resolveRepoWorktreeRows,
+  resolveScopedWorktreeIdRow,
+  RESOLVED_WORKTREE_REPO_TIMEOUT_MS,
+  type RepoWorktreeRowDeps
+} from './repo-worktree-row-resolution'
+import { withTimeout } from '../../shared/promise-timeout-fallback'
+import {
   getLocalWorktreePathAccess,
   removeLocalWorktreePath,
   toLocalWorktreeRuntimePath
@@ -852,7 +883,7 @@ import type {
   UpdateIssueTypeBySlugArgs,
   UpdateProjectItemFieldArgs,
   UpdatePullRequestBySlugArgs
-} from '../../shared/github-project-types'
+} from '../../shared/github/project-types'
 import {
   getBaseRefDefault,
   getDefaultRemote,
@@ -2555,10 +2586,11 @@ type RuntimeWorktreeScanCache = {
   result: RuntimeWorktreeScanResult
   expiresAt: number
   /**
-   * Git-admin state read as of the scan's start, kept unresolved so no caller ever waits on the
-   * probe to receive a scan result. Resolves to `null` when the state could not be read.
+   * Git-admin state read as of the scan's start, written back once the probe settles. Never holds a
+   * pending promise: a wedged mount would otherwise poison every later refresh that awaits it.
+   * `null` means "cannot prove unchanged" (unreadable layout, still probing, probe timed out).
    */
-  adminFingerprint: Promise<string | null>
+  adminFingerprint: string | null
   /** When the Git scan behind `result` actually ran, so reconciliation can be bounded. */
   scannedAt: number
 }
@@ -2571,7 +2603,9 @@ type RuntimeWorktreeScanInFlight = {
 
 type RuntimeWorktreeScanRefresh = {
   result: RuntimeWorktreeScanResult
-  adminFingerprint: Promise<string | null>
+  adminFingerprint: string | null
+  /** Still-running probe whose value the cache entry adopts if it settles; never awaited by a caller. */
+  adminFingerprintProbe: Promise<string | null> | null
   scannedAt: number
 }
 
@@ -2730,6 +2764,11 @@ function getSetupRunnerCommandPlatformForLaunch(
   return getSetupRunnerCommandPlatformForPath(setup?.runnerScriptPath ?? '', fallbackPlatform)
 }
 
+export type RuntimeRendererReloadFence = Readonly<{
+  revision: number
+  recovery: 'renderer' | 'headless' | 'reloading'
+}>
+
 export class OrcaRuntimeService {
   private readonly runtimeId = randomUUID()
   private readonly startedAt = Date.now()
@@ -2750,6 +2789,18 @@ export class OrcaRuntimeService {
   private rendererGraphEpoch = 0
   private graphStatus: RuntimeGraphStatus = 'unavailable'
   private authoritativeWindowId: number | null = null
+  private headlessGraphFallbackAvailable = false
+  private pendingHeadlessPromotionWindowId: number | null = null
+  private rendererGeneration: string | null = null
+  private readonly graphReloadLifecycle = new RuntimeGraphReloadLifecycle({
+    timeoutMs: RUNTIME_GRAPH_RELOAD_TIMEOUT_MS,
+    onSettled: ({ revision, windowId, outcome, durationMs }) => {
+      console.info(
+        `[runtime-graph] reload revision=${revision} window=${windowId} outcome=${outcome} durationMs=${durationMs}`
+      )
+    },
+    onTimeout: (_revision, windowId) => this.handleGraphReloadTimeout(windowId)
+  })
   // Why: paired graph transactions need foreground timer cadence only until their publication settles.
   private readonly rendererPublicationThrottle = new RendererPublicationThrottle()
   private tabs = new Map<string, RuntimeSyncedTab>()
@@ -2889,6 +2940,8 @@ export class OrcaRuntimeService {
   private worktreeScanGenerations = new Map<string, number>()
   private worktreeScanCache = new Map<string, RuntimeWorktreeScanCache>()
   private worktreeScanInFlight = new Map<string, RuntimeWorktreeScanInFlight>()
+  /** Repos whose Git-admin probe has not settled yet; caps abandoned fs work at one per repo. */
+  private worktreeAdminFingerprintProbes = new Set<string>()
   private cloneInFlightByPath = new Map<string, Promise<void>>()
   private agentDetector: AgentDetector | null = null
   private ptyForegroundAgentRefreshes = new Map<string, PtyForegroundAgentRefresh>()
@@ -4744,8 +4797,12 @@ export class OrcaRuntimeService {
         throw error
       })
       .finally(() => {
-        if (this.orchestrationFederationSyncs.get(dispatchId)?.promise === sync) {
-          this.orchestrationFederationSyncs.delete(dispatchId)
+        if (this.orchestrationFederationSyncs.get(dispatchId)?.promise !== sync) {
+          return
+        }
+        this.orchestrationFederationSyncs.delete(dispatchId)
+        if (!db.isFederatedDispatchRelayEligible(dispatchId)) {
+          releaseFederationAckCheckpoint(this, dispatchId)
         }
       })
     this.orchestrationFederationSyncs.set(dispatchId, { db, promise: sync })
@@ -5501,11 +5558,18 @@ export class OrcaRuntimeService {
 
   attachWindow(windowId: number): void {
     if (this.authoritativeWindowId === HEADLESS_RUNTIME_WINDOW_ID) {
+      if (
+        this.pendingHeadlessPromotionWindowId !== null &&
+        windowId !== this.pendingHeadlessPromotionWindowId
+      ) {
+        return
+      }
       // Why: promotion is a renderer reload of the same graph owner, not a new
       // runtime; stale handles must transition before the real window publishes.
       this.persistWindowlessPtyBindingsForDesktopAttach()
-      this.markRendererReloading(HEADLESS_RUNTIME_WINDOW_ID)
+      this.pendingHeadlessPromotionWindowId = windowId
       this.authoritativeWindowId = windowId
+      this.beginGraphReload(windowId)
       return
     }
     if (this.authoritativeWindowId === null) {
@@ -5582,12 +5646,44 @@ export class OrcaRuntimeService {
     }
   }
 
-  syncWindowGraph(windowId: number, graph: RuntimeSyncWindowGraph): RuntimeSyncWindowGraphResult {
+  syncWindowGraph(
+    windowId: number,
+    graph: RuntimeSyncWindowGraph | RuntimeRendererSyncWindowGraph
+  ): RuntimeSyncWindowGraphResult {
+    if (
+      windowId !== HEADLESS_RUNTIME_WINDOW_ID &&
+      this.authoritativeWindowId === HEADLESS_RUNTIME_WINDOW_ID &&
+      this.headlessGraphFallbackAvailable
+    ) {
+      if (windowId !== this.pendingHeadlessPromotionWindowId) {
+        throw new Error('Runtime graph publisher does not match the pending desktop promotion')
+      }
+      // Why: a renderer may publish after a failed promotion was restored to
+      // headless authority; accepting that late healthy graph is self-healing.
+      this.attachWindow(windowId)
+    }
     if (this.authoritativeWindowId === null) {
       this.authoritativeWindowId = windowId
     }
     if (windowId !== this.authoritativeWindowId) {
       throw new Error('Runtime graph publisher does not match the authoritative window')
+    }
+    const rendererGeneration =
+      windowId === HEADLESS_RUNTIME_WINDOW_ID
+        ? null
+        : 'rendererGeneration' in graph && typeof graph.rendererGeneration === 'string'
+          ? graph.rendererGeneration
+          : undefined
+    if (
+      typeof rendererGeneration === 'string' &&
+      rendererGeneration === this.rendererGeneration &&
+      this.graphStatus !== 'ready'
+    ) {
+      throw new Error('Runtime graph publisher belongs to a superseded renderer generation')
+    }
+    if (windowId === HEADLESS_RUNTIME_WINDOW_ID) {
+      this.headlessGraphFallbackAvailable = true
+      this.rendererGeneration = null
     }
 
     const graphWasReady = this.graphStatus === 'ready'
@@ -5756,9 +5852,10 @@ export class OrcaRuntimeService {
         this.mobileSessionTabsNotifyCoalescer.schedule(worktreeId)
       }
     }
-    this.graphStatus = 'ready'
-    this.setTerminalSideEffectConsumerAvailable(windowId !== HEADLESS_RUNTIME_WINDOW_ID)
-    this.refreshWritableFlags()
+    this.markGraphReady(windowId)
+    if (rendererGeneration !== undefined) {
+      this.rendererGeneration = rendererGeneration
+    }
     for (const leaf of this.leaves.values()) {
       this.adoptPreAllocatedHandle(leaf)
       const previousLeaf = previousLeaves.get(this.getLeafKey(leaf.tabId, leaf.leafId))
@@ -27738,9 +27835,17 @@ export class OrcaRuntimeService {
         // Best-effort fallback below preserves the original split authority error.
       }
       if (!stopped) {
-        this.ptyController.kill(result.id)
+        try {
+          this.ptyController.kill(result.id)
+        } catch {
+          // Best-effort cleanup; retirement below still runs and the original error still throws.
+        }
       }
-      this.ptyController.retireRejectedPty?.(result.id)
+      try {
+        this.ptyController.retireRejectedPty?.(result.id)
+      } catch {
+        // Best-effort cleanup; preserve the original split authority error.
+      }
       throw error
     }
     const committedSourceAuthority = sourceAuthority.persisted
@@ -28565,16 +28670,38 @@ export class OrcaRuntimeService {
     return false
   }
 
-  markRendererReloading(windowId: number): void {
+  markRendererReloading(windowId: number): RuntimeRendererReloadFence | null {
+    if (
+      windowId !== HEADLESS_RUNTIME_WINDOW_ID &&
+      this.authoritativeWindowId === HEADLESS_RUNTIME_WINDOW_ID &&
+      this.headlessGraphFallbackAvailable
+    ) {
+      this.attachWindow(windowId)
+      const revision = this.graphReloadLifecycle.getActiveRevision()
+      return this.authoritativeWindowId === windowId && revision !== null
+        ? { revision, recovery: 'headless' }
+        : null
+    }
     if (windowId !== this.authoritativeWindowId) {
-      return
+      return null
+    }
+    if (this.graphStatus === 'reloading') {
+      return {
+        revision: this.graphReloadLifecycle.begin(windowId),
+        recovery: this.shouldRestoreHeadlessGraph(windowId) ? 'headless' : 'reloading'
+      }
     }
     if (this.graphStatus !== 'ready') {
-      return
+      return null
     }
+    return { revision: this.beginGraphReload(windowId), recovery: 'renderer' }
+  }
+
+  private beginGraphReload(windowId: number): number {
     // Why: a renderer reload tears down the live graph, so live handles must go stale immediately, not be reused against the rebuild.
     this.rendererGraphEpoch += 1
     this.graphStatus = 'reloading'
+    const revision = this.graphReloadLifecycle.begin(windowId)
     this.setTerminalSideEffectConsumerAvailable(false)
     this.rememberDetachedPreAllocatedLeaves()
     this.handles.clear()
@@ -28582,19 +28709,74 @@ export class OrcaRuntimeService {
     // Why: handleByPtyId (pre-allocated CLI handles) survives reloads so CLI agents keep control; adoptPreAllocatedHandle re-links on the new graph.
     this.rejectAllWaiters('terminal_handle_stale')
     this.refreshWritableFlags()
+    return revision
+  }
+
+  markRendererReloadCancelled(windowId: number, fence: RuntimeRendererReloadFence): boolean {
+    if (
+      windowId !== this.authoritativeWindowId ||
+      this.graphStatus !== 'reloading' ||
+      !this.graphReloadLifecycle.settle(fence.revision, 'cancelled')
+    ) {
+      return false
+    }
+    if (fence.recovery === 'headless' && this.shouldRestoreHeadlessGraph(windowId)) {
+      this.restoreHeadlessGraphAuthority()
+      return false
+    }
+    if (fence.recovery === 'renderer') {
+      this.graphStatus = 'ready'
+      this.setTerminalSideEffectConsumerAvailable(true)
+      this.refreshWritableFlags()
+      return true
+    }
+    this.graphReloadLifecycle.begin(windowId)
+    return false
   }
 
   markGraphReady(windowId: number): void {
     if (windowId !== this.authoritativeWindowId) {
       return
     }
+    this.graphReloadLifecycle.settleActive('success')
+    if (windowId !== HEADLESS_RUNTIME_WINDOW_ID) {
+      this.headlessGraphFallbackAvailable = false
+      this.pendingHeadlessPromotionWindowId = null
+    }
     this.graphStatus = 'ready'
     this.setTerminalSideEffectConsumerAvailable(windowId !== HEADLESS_RUNTIME_WINDOW_ID)
     this.refreshWritableFlags()
   }
 
-  markGraphUnavailable(windowId: number): void {
+  markGraphReloadFailed(
+    windowId: number,
+    _reason: 'renderer-frame-unavailable' | 'renderer-process-gone'
+  ): void {
     if (windowId !== this.authoritativeWindowId) {
+      return
+    }
+    if (this.graphStatus === 'ready') {
+      this.beginGraphReload(windowId)
+    }
+    this.graphReloadLifecycle.settleActive('failure')
+    this.transitionGraphReloadToTerminalState(windowId)
+  }
+
+  markGraphUnavailable(windowId: number): void {
+    if (
+      this.authoritativeWindowId === HEADLESS_RUNTIME_WINDOW_ID &&
+      windowId === this.pendingHeadlessPromotionWindowId
+    ) {
+      this.pendingHeadlessPromotionWindowId = null
+      return
+    }
+    if (windowId !== this.authoritativeWindowId) {
+      return
+    }
+    this.graphReloadLifecycle.settleActive('cancelled')
+    if (this.shouldRestoreHeadlessGraph(windowId)) {
+      this.pendingHeadlessPromotionWindowId = null
+      this.restoreHeadlessGraphAuthority()
       return
     }
     // Why: once the authoritative renderer graph disappears, fail closed for live-terminal ops instead of guessing from old state.
@@ -28612,6 +28794,49 @@ export class OrcaRuntimeService {
     this.handleByLeafKey.clear()
     // Why: pre-allocated CLI handles must survive graph unavailability so they can be re-adopted on reconnect.
     this.rejectAllWaiters('terminal_handle_stale')
+  }
+
+  private handleGraphReloadTimeout(windowId: number): void {
+    if (windowId !== this.authoritativeWindowId || this.graphStatus !== 'reloading') {
+      return
+    }
+    this.transitionGraphReloadToTerminalState(windowId)
+  }
+
+  private transitionGraphReloadToTerminalState(windowId: number): void {
+    if (this.shouldRestoreHeadlessGraph(windowId)) {
+      this.restoreHeadlessGraphAuthority()
+      return
+    }
+    this.graphStatus = 'unavailable'
+    this.setTerminalSideEffectConsumerAvailable(false)
+    this.rememberDetachedPreAllocatedLeaves()
+    this.tabs.clear()
+    this.leaves.clear()
+    this.leavesByPtyId.clear()
+    this.handles.clear()
+    this.handleByLeafKey.clear()
+    this.rejectAllWaiters('terminal_handle_stale')
+    this.refreshWritableFlags()
+  }
+
+  private shouldRestoreHeadlessGraph(windowId: number): boolean {
+    return windowId !== HEADLESS_RUNTIME_WINDOW_ID && this.headlessGraphFallbackAvailable
+  }
+
+  private restoreHeadlessGraphAuthority(): void {
+    this.rendererGraphEpoch += 1
+    this.authoritativeWindowId = HEADLESS_RUNTIME_WINDOW_ID
+    this.graphStatus = 'ready'
+    this.rendererGeneration = null
+    this.setTerminalSideEffectConsumerAvailable(false)
+    this.tabs.clear()
+    this.leaves.clear()
+    this.leavesByPtyId.clear()
+    this.handles.clear()
+    this.handleByLeafKey.clear()
+    this.rejectAllWaiters('terminal_handle_stale')
+    this.refreshWritableFlags()
   }
 
   private assertGraphReady(): void {
@@ -28823,6 +29048,15 @@ export class OrcaRuntimeService {
 
   private async resolveWorktreeSelector(selector: string): Promise<ResolvedWorktree> {
     const explicitWorktreeId = this.getValidatedExplicitWorktreeIdSelector(selector)
+    // Why only `id:`: every other selector kind is matched across the whole fleet, and their
+    // `selector_ambiguous` contract is defined over all repos. Scoping those would silently pick a
+    // winner where today they correctly refuse. An `id:` selector already names its repo.
+    if (explicitWorktreeId && !this.hasFreshResolvedWorktreeCache()) {
+      const scoped = await this.resolveExplicitWorktreeIdScoped(explicitWorktreeId)
+      if (scoped) {
+        return scoped
+      }
+    }
     const worktrees = await this.listResolvedWorktrees()
     let candidates: ResolvedWorktree[]
 
@@ -29416,6 +29650,11 @@ export class OrcaRuntimeService {
     return resolved
   }
 
+  /** A warm fleet snapshot already answers any selector for free, so scoped scanning must yield to it. */
+  private hasFreshResolvedWorktreeCache(): boolean {
+    return Boolean(this.resolvedWorktreeCache && this.resolvedWorktreeCache.expiresAt > Date.now())
+  }
+
   private async listResolvedWorktrees(): Promise<ResolvedWorktree[]> {
     return (await this.listResolvedWorktreeSnapshot()).worktrees
   }
@@ -29448,7 +29687,6 @@ export class OrcaRuntimeService {
     if (!this.store) {
       return { worktrees: [], platformByRepoId: new Map() }
     }
-    const now = Date.now()
     const metaById = this.store.getAllWorktreeMeta() ?? {}
     const repos = this.store.getRepos()
     const projectRuntimeByRepoId = resolveLocalProjectRuntimesForRepos(this.requireStore(), repos)
@@ -29458,85 +29696,47 @@ export class OrcaRuntimeService {
         getAgentLaunchPlatformForRepo(repo, projectRuntimeByRepoId.get(repo.id))
       ])
     )
+    const deps = this.repoWorktreeRowDeps()
     const perRepoWorktrees = await Promise.all(
-      repos.map(async (repo) => {
-        if (isFolderRepo(repo)) {
-          return listRuntimeFolderWorkspaces(this.requireStore(), repo).map((worktree) => ({
-            ...worktree,
-            hostId: worktree.hostId ?? getRepoExecutionHostId(repo),
-            parentWorktreeId: null,
-            childWorktreeIds: [],
-            lineage: null,
-            git: {
-              path: worktree.path,
-              head: worktree.head,
-              branch: worktree.branch,
-              isBare: worktree.isBare,
-              isMainWorktree: worktree.isMainWorktree
-            },
-            displayName: worktree.displayName,
-            comment: worktree.comment
-          }))
-        }
-        // Why: mobile startup shares this path, so a slow repo scan degrades one repo's metadata instead of blocking all session loading.
-        // Why the catch: `withTimeout` resolves its fallback on rejection too, so the rejection must be absorbed first for `null` to mean
-        // "timed out" only. A stall never reached a verdict, so restore persisted rows instead of publishing a healthy-looking empty catalog;
-        // a rejection is a real answer and keeps its shipped zero-row semantics.
-        const scan: RuntimeWorktreeScanResult =
-          (await withTimeout<RuntimeWorktreeScanResult | null>(
-            this.listRepoWorktreesForResolution(repo, projectRuntimeByRepoId).catch(
-              () => ({ ok: false, worktrees: [] }) satisfies RuntimeWorktreeScanResult
-            ),
-            RESOLVED_WORKTREE_REPO_TIMEOUT_MS,
-            null
-          )) ?? { ok: false, worktrees: this.listStoredWorktreesForResolution(repo) }
-        const gitWorktrees = scan.worktrees
-        if (scan.ok) {
-          pruneLineageForMissingRepoWorktrees(this.requireStore(), repo, gitWorktrees)
-        }
-        return gitWorktrees.map((gitWorktree) => {
-          const worktreeId = `${repo.id}::${gitWorktree.path}`
-          // Why: lineage validation needs a durable instance ID even when the runtime sees a workspace before renderer discovery-stamp.
-          const existingMeta = metaById[worktreeId]
-          const meta =
-            existingMeta && existingMeta.instanceId
-              ? existingMeta
-              : this.store?.setWorktreeMeta(worktreeId, {})
-          const merged = {
-            ...mergeWorktree(repo.id, gitWorktree, meta, repo.displayName),
-            hostId: existingMeta?.hostId ?? meta?.hostId ?? getRepoExecutionHostId(repo)
-          }
-          return {
-            ...merged,
-            parentWorktreeId: null,
-            childWorktreeIds: [],
-            lineage: null,
-            git: {
-              path: gitWorktree.path,
-              head: gitWorktree.head,
-              branch: gitWorktree.branch,
-              isBare: gitWorktree.isBare,
-              isMainWorktree: gitWorktree.isMainWorktree
-            },
-            displayName: merged.displayName,
-            comment: merged.comment
-          }
-        })
-      })
+      repos.map(
+        async (repo) => await resolveRepoWorktreeRows(deps, repo, metaById, projectRuntimeByRepoId)
+      )
     )
     const worktrees = projectResolvedWorktreeLineage(
       perRepoWorktrees.flat(),
       this.store?.getAllWorktreeLineage?.() ?? {}
     )
     // Why: short TTL avoids shelling out on every frequent poll while still catching worktree changes made outside Orca.
+    // Why stamped on completion, not entry: a compute that spent longer than the TTL would otherwise publish an
+    // already-expired entry, so the very next poll recomputes and every caller repeats the same slow path.
     if (generation === this.resolvedWorktreeGeneration) {
       this.resolvedWorktreeCache = {
         worktrees,
         platformByRepoId,
-        expiresAt: now + RESOLVED_WORKTREE_CACHE_TTL_MS
+        expiresAt: Date.now() + RESOLVED_WORKTREE_CACHE_TTL_MS
       }
     }
     return { worktrees, platformByRepoId }
+  }
+
+  /** Bind the runtime-owned scan cache and folder-workspace stamping into the row resolver. */
+  private repoWorktreeRowDeps(): RepoWorktreeRowDeps {
+    const store = this.requireStore()
+    return {
+      store,
+      scanRepo: (repo, projectRuntimeByRepoId) =>
+        this.listRepoWorktreesForResolution(repo, projectRuntimeByRepoId),
+      listFolderWorkspaces: (repo) => listRuntimeFolderWorkspaces(store, repo)
+    }
+  }
+
+  private async resolveExplicitWorktreeIdScoped(
+    worktreeId: string
+  ): Promise<ResolvedWorktree | null> {
+    if (!this.store) {
+      return null
+    }
+    return await resolveScopedWorktreeIdRow(this.repoWorktreeRowDeps(), worktreeId)
   }
 
   private async listRepoWorktreesForResolution(
@@ -29581,13 +29781,21 @@ export class OrcaRuntimeService {
         generation === (this.worktreeScanGenerations.get(repo.id) ?? 0) &&
         this.worktreeScanInFlight.get(repo.id)?.promise === promise
       ) {
-        this.worktreeScanCache.set(repo.id, {
+        const entry: RuntimeWorktreeScanCache = {
           generation,
           runtimeKey,
           result: refresh.result,
           expiresAt: Date.now() + resolveWorktreeScanCacheTtlMs(repo),
           adminFingerprint: refresh.adminFingerprint,
           scannedAt: refresh.scannedAt
+        }
+        this.worktreeScanCache.set(repo.id, entry)
+        // Why a writeback instead of storing the promise: a probe that never settles must not be
+        // awaited by a later refresh. Identity check keeps a stale probe out of a newer entry.
+        void refresh.adminFingerprintProbe?.then((fingerprint) => {
+          if (this.worktreeScanCache.get(repo.id) === entry) {
+            entry.adminFingerprint = fingerprint
+          }
         })
       }
       return refresh.result
@@ -29617,29 +29825,53 @@ export class OrcaRuntimeService {
       !getLocalProjectWorktreeGitOptionsForRuntime(repo, projectRuntime).wslDistro
     // Why issue it before the scan: a change landing while the scan runs must not be stamped as
     // already-observed, or the next probe would mask it until the reconciliation deadline.
-    const adminFingerprint = fingerprintCapable
-      ? readRepoWorktreeAdminFingerprint(repo.path)
-      : UNFINGERPRINTED_WORKTREE_SCAN
+    const probe = fingerprintCapable ? this.startRepoWorktreeAdminFingerprintProbe(repo) : null
     const reusable =
-      fingerprintCapable &&
       cached?.result.ok === true &&
       scannedAt - cached.scannedAt < WORKTREE_SCAN_ADMIN_RECONCILE_INTERVAL_MS
         ? cached
         : null
-    if (reusable) {
+    if (probe && reusable) {
       // Why await only here: this is the one branch whose decision needs the probe. A scan-bound
       // caller must never wait on it, or every cold read pays filesystem latency it cannot use.
-      const [current, previous] = await Promise.all([adminFingerprint, reusable.adminFingerprint])
-      if (current !== null && current === previous) {
+      const probed = await withTimeoutResult(probe, WORKTREE_SCAN_ADMIN_FINGERPRINT_TIMEOUT_MS)
+      if (!probed.ok) {
+        // Why log: expiry and "fingerprint unavailable" both surface as `null`, so a wedged mount is
+        // otherwise indistinguishable from a repo that simply cannot be fingerprinted.
+        console.warn('[worktree-scan] admin fingerprint probe expired; running a full scan', {
+          repoId: repo.id,
+          timeoutMs: WORKTREE_SCAN_ADMIN_FINGERPRINT_TIMEOUT_MS
+        })
+      }
+      const current = probed.ok ? probed.value : null
+      if (current !== null && current === reusable.adminFingerprint) {
         return {
           result: reusable.result,
-          adminFingerprint: reusable.adminFingerprint,
+          adminFingerprint: current,
+          adminFingerprintProbe: null,
           scannedAt: reusable.scannedAt
         }
       }
     }
     const result = await this.listRepoWorktreesForResolutionUncached(repo, projectRuntime)
-    return { result, adminFingerprint, scannedAt }
+    return { result, adminFingerprint: null, adminFingerprintProbe: probe, scannedAt }
+  }
+
+  /**
+   * Read one repo's Git-admin fingerprint, unless that repo's previous read is still outstanding.
+   * Why the gate: `withTimeout` abandons a probe without cancelling it, and readdir/stat take no
+   * AbortSignal — on a wedged mount a fresh probe per refresh would pin every libuv fs thread.
+   */
+  private startRepoWorktreeAdminFingerprintProbe(repo: Repo): Promise<string | null> | null {
+    if (this.worktreeAdminFingerprintProbes.has(repo.id)) {
+      return null
+    }
+    this.worktreeAdminFingerprintProbes.add(repo.id)
+    return readRepoWorktreeAdminFingerprint(repo.path)
+      .catch(() => null)
+      .finally(() => {
+        this.worktreeAdminFingerprintProbes.delete(repo.id)
+      })
   }
 
   private async listRepoWorktreesForResolutionUncached(
@@ -29664,37 +29896,7 @@ export class OrcaRuntimeService {
   }
 
   private listStoredWorktreesForResolution(repo: Repo): GitWorktreeInfo[] {
-    const store = this.store
-    if (!store) {
-      return []
-    }
-    const expectedHostId = getRepoExecutionHostId(repo)
-    const repoOwnerCount = store.getRepos().filter((candidate) => candidate.id === repo.id).length
-    const byWorktreeId = new Map<string, GitWorktreeInfo>()
-    for (const [worktreeId, meta] of Object.entries(store.getAllWorktreeMeta())) {
-      const parsed = splitWorktreeId(worktreeId)
-      if (!parsed || parsed.repoId !== repo.id) {
-        continue
-      }
-      // Why: one repo id can be registered on several execution hosts, so a degraded host must not republish another host's rows (same gate as worktrees.ts).
-      if (meta.hostId ? meta.hostId !== expectedHostId : repoOwnerCount > 1) {
-        continue
-      }
-      // Why: keep persisted rows for any repo kind while its scan is unreachable or stalled, instead of zero rows (worktrees:list does the same for disconnected SSH).
-      byWorktreeId.set(worktreeId, {
-        path: parsed.worktreePath,
-        head: '',
-        branch: '',
-        isBare: false,
-        isMainWorktree: areWorktreePathsEqual(parsed.worktreePath, repo.path),
-        ...(meta.sparseDirectories !== undefined ||
-        meta.sparseBaseRef !== undefined ||
-        meta.sparsePresetId !== undefined
-          ? { isSparse: true }
-          : {})
-      })
-    }
-    return [...byWorktreeId.values()]
+    return this.store ? listStoredWorktreeRowsForRepo(this.requireStore(), repo) : []
   }
 
   private async getResolvedWorktreeMap(): Promise<Map<string, ResolvedWorktree>> {
@@ -35522,7 +35724,9 @@ export class OrcaRuntimeService {
     getAvailableAuthoritativeWindow: () => this.getAvailableAuthoritativeWindow(),
     getOffscreenBrowserBackend: () => this.offscreenBrowserBackend,
     // Why: bind directly, not a wrapper arrow — a hand-listed wrapper dropped targetGroupId, so a right-split browser landed in the left.
-    markHeadlessBrowserSessionTabActive: this.markHeadlessBrowserSessionTabActive.bind(this)
+    markHeadlessBrowserSessionTabActive: this.markHeadlessBrowserSessionTabActive.bind(this),
+    notifyHeadlessBrowserSessionTabsChanged: (worktreeId) =>
+      this.notifyMobileSessionTabsChanged(worktreeId)
   })
 
   private readonly emulatorCommands = new RuntimeEmulatorCommands({
@@ -36037,9 +36241,19 @@ const WORKTREE_SCAN_AGENT_SCRATCH_TTL_MS = 5 * 60_000
 // edits are invisible to it and a tip living in packed-refs or reftable only gets an mtime + size
 // stamp, so a real scan still runs on this interval even while the probe reports "unchanged".
 export const WORKTREE_SCAN_ADMIN_RECONCILE_INTERVAL_MS = 5 * 60_000
-/** Stand-in for a repo the local admin probe cannot or need not describe; never matches a real read. */
-const UNFINGERPRINTED_WORKTREE_SCAN: Promise<string | null> = Promise.resolve(null)
-const RESOLVED_WORKTREE_REPO_TIMEOUT_MS = 5000
+// Why reserved rather than spent on the probe: when the probe expires the caller still has to run
+// `git worktree list` and answer inside the same budget, so the fallback needs its own room. Sized
+// for a healthy Git on a busy host, well above the tens of milliseconds a warm list costs.
+const WORKTREE_SCAN_FALLBACK_ALLOWANCE_MS = 1500
+// Why derived from the caller's budget instead of a generous absolute: this wait runs *inside*
+// RESOLVED_WORKTREE_REPO_TIMEOUT_MS, so outlasting it buys nothing — the caller has already given up
+// and restored persisted rows — while turning a reusable scan into a full-budget stall that repeats
+// on every TTL expiry. Subtracting keeps that invariant true by construction if either side moves.
+// Why not smaller: the probe reads a subset of what the fallback scan reads, so a probe too slow to
+// fit is a scan that will not fit either — waiting is strictly better right up to the budget.
+// Expiring yields `null`, the existing "cannot prove unchanged" sentinel, so a real scan runs.
+export const WORKTREE_SCAN_ADMIN_FINGERPRINT_TIMEOUT_MS =
+  RESOLVED_WORKTREE_REPO_TIMEOUT_MS - WORKTREE_SCAN_FALLBACK_ALLOWANCE_MS
 
 export function resolveWorktreeScanCacheTtlMs(repo: Pick<Repo, 'path' | 'connectionId'>): number {
   return !repo.connectionId && isAgentScratchRepoRootPath(repo.path)
@@ -36123,21 +36337,6 @@ function getExplicitWorktreeIdSelector(selector: string | undefined): string | n
   }
   const id = selector.slice(3)
   return id.length > 0 ? id : null
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  return new Promise<T>((resolve) => {
-    timeout = setTimeout(() => resolve(fallback), timeoutMs)
-    promise.then(
-      (value) => resolve(value),
-      () => resolve(fallback)
-    )
-  }).finally(() => {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-  })
 }
 
 function withTimeoutResult<T>(

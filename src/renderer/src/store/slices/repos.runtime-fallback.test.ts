@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createTestStore } from './store-test-helpers'
-import type { Repo } from '../../../../shared/types'
+import type { Repo } from '../../../../shared/repo-types'
 import {
   FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES

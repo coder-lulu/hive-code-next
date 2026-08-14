@@ -1,5 +1,5 @@
-import type { LinearErrorCode, LinearIncludeErrorCode } from '../../shared/linear-agent-access'
 import { applyProductBranding } from '../../shared/brand'
+import type { LinearErrorCode, LinearIncludeErrorCode } from '../../shared/linear/agent-access'
 
 export class LinearAgentAccessError extends Error {
   readonly code: LinearErrorCode

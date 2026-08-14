@@ -1,4 +1,4 @@
-import type { ChangelogData } from '../shared/types'
+import type { ChangelogData } from '../shared/update-status-types'
 import { cancelUnreadResponseBody } from './lib/unread-response-body'
 import { getProductExternalServiceEndpoints } from './product/product-external-service-endpoints'
 import { fetchWithProductUpdaterSession } from './product/product-updater-session'

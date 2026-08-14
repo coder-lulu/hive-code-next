@@ -115,8 +115,8 @@ import {
   resolveUpdateInstallMode
 } from './updater'
 import { configureRemoteServerUpdater } from './runtime/remote-server-updater'
-import type { UpdateCheckOptions } from '../shared/types'
 import { hasConfiguredProductUpdateChannel } from '../shared/product-update-policy'
+import type { UpdateCheckOptions } from '../shared/update-status-types'
 import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
 import {
   installServeSupervisorDisconnectQuit,
@@ -281,7 +281,7 @@ import {
   configureWindowsHostGitEnvironmentReadiness,
   setDefaultWslDistroOverride
 } from './git/runner'
-import { getRepoIdFromWorktreeId } from '../shared/worktree-id'
+import { getRepoIdFromWorktreeId } from '../shared/worktree/id'
 import { parseWorkspaceKey } from '../shared/workspace-scope'
 import { setMigrationUnsupportedPtyListener } from './agent-hooks/migration-unsupported-pty-state'
 import { AgentBrowserBridge } from './browser/agent-browser-bridge'

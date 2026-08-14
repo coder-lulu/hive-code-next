@@ -127,6 +127,7 @@ type MainWindowStub = {
   once: MockFn
   webContents: {
     id?: number
+    getURL: MockFn
     isDestroyed?: MockFn
     isLoadingMainFrame: MockFn
     on: MockFn
@@ -143,6 +144,8 @@ type RuntimeStub = {
   attachWindow: MockFn
   setNotifier: MockFn
   markRendererReloading: MockFn
+  markRendererReloadCancelled: MockFn
+  markGraphReloadFailed: MockFn
   markGraphUnavailable: MockFn
 }
 
@@ -156,6 +159,7 @@ function createMainWindow(
     once: vi.fn(),
     webContents: {
       id: 1,
+      getURL: vi.fn(() => 'file:///opt/orca/renderer/index.html'),
       isDestroyed: vi.fn(() => false),
       isLoadingMainFrame: vi.fn(() => true),
       on: vi.fn(),
@@ -171,8 +175,9 @@ function createMainWindow(
 
 function createStore(): Store & { flushPendingAsync: MockFn } {
   return {
+    getProfileStorageDirectory: vi.fn(() => '/profile-a'),
     flushPendingAsync: vi.fn(() => Promise.resolve())
-  } as Store & { flushPendingAsync: MockFn }
+  } as unknown as Store & { flushPendingAsync: MockFn }
 }
 
 function createRuntime(): RuntimeStub {
@@ -180,6 +185,8 @@ function createRuntime(): RuntimeStub {
     attachWindow: vi.fn(),
     setNotifier: vi.fn(),
     markRendererReloading: vi.fn(),
+    markRendererReloadCancelled: vi.fn(),
+    markGraphReloadFailed: vi.fn(),
     markGraphUnavailable: vi.fn()
   }
 }
@@ -212,28 +219,8 @@ async function fireReadyToShow(mainWindow: MainWindowStub): Promise<void> {
 
 describe('attachMainWindowServices', () => {
   beforeEach(() => {
-    onMock.mockReset()
-    removeAllListenersMock.mockReset()
-    removeListenerMock.mockReset()
-    handleMock.mockReset()
-    removeHandlerMock.mockReset()
-    setPermissionRequestHandlerMock.mockReset()
-    setPermissionCheckHandlerMock.mockReset()
-    systemPreferencesAskForMediaAccessMock.mockReset()
-    systemPreferencesGetMediaAccessStatusMock.mockReset()
-    registerRepoHandlersMock.mockReset()
-    setRepoRemoteClientNotifierMock.mockReset()
-    registerWorktreeHandlersMock.mockReset()
-    registerPtyHandlersMock.mockReset()
-    hydrateLocalPtyRegistryAtBootMock.mockReset()
-    setupAutoUpdaterMock.mockReset()
-    releaseUpdatesConfiguredMock.mockReset()
+    vi.resetAllMocks()
     releaseUpdatesConfiguredMock.mockReturnValue(true)
-    browserManagerUnregisterAllMock.mockReset()
-    acknowledgePendingTccPromptNoticeMock.mockReset()
-    consumePendingTccPromptNoticeMock.mockReset()
-    dismissTccPromptNoticeMock.mockReset()
-    releasePendingTccPromptNoticeMock.mockReset()
     systemPreferencesAskForMediaAccessMock.mockResolvedValue(true)
     systemPreferencesGetMediaAccessStatusMock.mockReturnValue('granted')
   })
@@ -813,6 +800,21 @@ describe('attachMainWindowServices', () => {
     expect(runWorktreeChangeInvalidatorsMock.mock.invocationCallOrder[0]).toBeLessThan(
       sendMock.mock.invocationCallOrder[0]
     )
+  })
+
+  it('marks renderer process loss as a graph reload failure', () => {
+    const mainWindow = createMainWindow()
+    const runtime = createRuntime()
+    attachMainWindowServices(mainWindow as never, createStore(), runtime as never)
+
+    const handlers = mainWindow.webContents.on.mock.calls
+      .filter(([event]) => event === 'render-process-gone')
+      .map(([, handler]) => handler as () => void)
+    for (const handler of handlers) {
+      handler()
+    }
+
+    expect(runtime.markGraphReloadFailed).toHaveBeenCalledWith(1, 'renderer-process-gone')
   })
 
   it('accepts terminal reveal replies only from the main window renderer', async () => {
