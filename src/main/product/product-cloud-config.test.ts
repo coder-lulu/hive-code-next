@@ -51,6 +51,21 @@ describe('HiveCode cloud auth config', () => {
     expect(result.configured).toBe(true)
     if (result.configured) {
       expect(result.config.authorizeEndpoint).toContain('/v1/desktop/auth/authorize')
+      expect(result.config.scope).toBe('openid profile email offline_access hive.session.exchange')
+    }
+  })
+
+  it('allows an explicit development scope to override the HiveCode default', () => {
+    const result = getProductCloudAuthConfig({
+      ORCA_CLOUD_API_URL: 'https://orca-cloud.example/',
+      ORCA_CLOUD_CLIENT_ID: 'desktop-client',
+      ORCA_RELAY_URL: 'https://orca-relay.example',
+      ORCA_CLOUD_AUTH_SCOPE: 'openid profile email offline_access'
+    })
+
+    expect(result.configured).toBe(true)
+    if (result.configured) {
+      expect(result.config.scope).toBe('openid profile email offline_access')
     }
   })
 

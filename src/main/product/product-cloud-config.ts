@@ -9,6 +9,7 @@ const HIVECODE_CLOUD_DEFAULTS: ProductCloudDefaults = {
   apiBaseUrl: hivecodeProductConfig.endpoints.cloud,
   clientId: hivecodeProductConfig.endpoints.cloud ? 'hivecode-desktop' : null,
   relayDirectorUrl: hivecodeProductConfig.endpoints.relay,
+  scope: 'openid profile email offline_access hive.session.exchange',
   productLabel: 'HiveCode Cloud'
 }
 

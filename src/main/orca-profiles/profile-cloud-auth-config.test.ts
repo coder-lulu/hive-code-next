@@ -16,6 +16,7 @@ const TEST_PRODUCT_DEFAULTS: ProductCloudDefaults = {
   apiBaseUrl: 'https://login.example.test',
   clientId: 'desktop-client',
   relayDirectorUrl: 'https://relay.example.test',
+  scope: 'openid test.product.scope',
   productLabel: 'Test Cloud'
 }
 
@@ -51,7 +52,7 @@ describe('Orca cloud auth config', () => {
         relayTokenEndpoint: 'https://orca-cloud.example/v1/desktop/auth/relay-token',
         relayDirectorUrl: 'https://relay.example.test',
         clientId: 'desktop-client',
-        scope: 'openid profile email offline_access'
+        scope: 'openid test.product.scope'
       }
     })
   })
@@ -71,7 +72,7 @@ describe('Orca cloud auth config', () => {
         relayTokenEndpoint: 'https://login.example.test/v1/desktop/auth/relay-token',
         relayDirectorUrl: 'https://relay.example.test',
         clientId: 'desktop-client',
-        scope: 'openid profile email offline_access'
+        scope: 'openid test.product.scope'
       }
     })
   })

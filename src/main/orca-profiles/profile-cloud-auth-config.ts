@@ -67,6 +67,8 @@ export type ProductCloudDefaults = {
   clientId: string | null
   /** Production relay director URL when no ORCA_RELAY_URL env override. */
   relayDirectorUrl: string | null
+  /** Product OAuth scopes when no ORCA_CLOUD_AUTH_SCOPE env override. */
+  scope: string
   /** Label used in setupMessage when cloud is unconfigured in this product. */
   productLabel: string
 }
@@ -132,7 +134,7 @@ export function getOrcaCloudAuthConfig(
         endpoint(apiBaseUrl, '/v1/desktop/auth/relay-token'),
       relayDirectorUrl,
       clientId,
-      scope: configEnv.ORCA_CLOUD_AUTH_SCOPE?.trim() || DEFAULT_SCOPE
+      scope: configEnv.ORCA_CLOUD_AUTH_SCOPE?.trim() || productDefaults.scope || DEFAULT_SCOPE
     }
   }
 }
