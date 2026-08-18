@@ -20,14 +20,9 @@ import { getRemoteRuntimeRequestAdmissionEvidence } from './remote-runtime-prepa
 import { RemoteRuntimeSharedControlConnection } from './remote-runtime-shared-control-connection'
 import * as sharedControlProtocol from './remote-runtime-shared-control-protocol'
 import { isRuntimeSubscriptionReplayResponse } from './runtime-subscription-replay'
-import {
-  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY
-} from './protocol-version'
-import { applyProductBranding } from './brand'
+import * as protocolVersion from './protocol-version'
 
 const TEST_PROJECT_PATH = path.join('tmp', 'project')
-
 type TestServer = {
   pairing: PairingOffer
   requests: { id: string; method: string; params?: unknown }[]
@@ -67,8 +62,11 @@ describe('RemoteRuntimeSharedControlConnection', () => {
       type: 'e2ee_auth',
       deviceToken: 'device-token',
       clientCapabilities: [
-        SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-        AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY
+        protocolVersion.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+        protocolVersion.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
+        protocolVersion.SKILL_INSTALL_RESULT_V2_CAPABILITY,
+        protocolVersion.WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
+        protocolVersion.WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
       ]
     })
     expect(server.requests.map((request) => request.method)).toEqual([
@@ -703,7 +701,7 @@ describe('RemoteRuntimeSharedControlConnection', () => {
     const connection = new RemoteRuntimeSharedControlConnection(server.pairing)
 
     await expect(connection.request('worktree.ps', undefined, 1000)).rejects.toThrow(
-      applyProductBranding('Remote Orca runtime closed the connection')
+      'Remote Orca runtime closed the connection'
     )
     expect(connection.getDiagnostics()).toMatchObject({
       state: 'closed',

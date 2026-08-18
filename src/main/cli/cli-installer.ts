@@ -22,6 +22,7 @@ import { hivecodeProductConfig } from '../../shared/generated/product-config'
 import { getCompatibilityCliCommandNamesForPlatform } from '../../shared/orca-cli-command-name'
 import { expandWindowsEnvironmentVariables } from '../../shared/windows-environment-expansion'
 import { buildAppImageCliWrapper } from './appimage-cli-wrapper'
+import { getBundledLauncherPath } from './bundled-cli-launcher-path'
 import {
   invalidateWindowsUserPathRegistryCache,
   readFreshWindowsUserPathRegistry,
@@ -1299,18 +1300,4 @@ function quotePowerShell(value: string): string {
   return `'${value.replaceAll("'", "''")}'`
 }
 
-export function getBundledLauncherPath(
-  platform: NodeJS.Platform,
-  resourcesPath: string
-): string | null {
-  if (platform === 'darwin') {
-    return join(resourcesPath, 'bin', 'hivecode')
-  }
-  if (platform === 'linux') {
-    return join(resourcesPath, 'bin', 'hivecode')
-  }
-  if (platform === 'win32') {
-    return join(resourcesPath, 'bin', 'hivecode.exe')
-  }
-  return null
-}
+export { getBundledLauncherPath }

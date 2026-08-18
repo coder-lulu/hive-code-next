@@ -156,7 +156,6 @@ export function MobileBrowserPane({
   const [frameMetadata, setFrameMetadata] = useState<BrowserScreencastFrameMetadata | null>(
     cachedInitialFrame?.metadata ?? null
   )
-  const [ready, setReady] = useState(cachedInitialFrame !== null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<BrowserDialogState | null>(null)
@@ -175,7 +174,6 @@ export function MobileBrowserPane({
   const browserLayerRefs = useRef<[View | null, View | null]>([null, null])
   const pendingFrameLayerRef = useRef<FrameLayer | null>(null)
   const visibleFrameLayerRef = useRef<FrameLayer>(0)
-  const readyRef = useRef(cachedInitialFrame !== null)
   const busyRef = useRef(false)
   const lastAppliedFrameAtRef = useRef(0)
   const pendingThrottledFrameRef = useRef<{
@@ -310,10 +308,6 @@ export function MobileBrowserPane({
       busyRef.current = false
       setBusy(false)
     }
-    if (!readyRef.current) {
-      readyRef.current = true
-      setReady(true)
-    }
   }, [])
 
   const clearFrameThrottle = useCallback(() => {
@@ -401,16 +395,12 @@ export function MobileBrowserPane({
         frameMetadataRef.current = cachedFrame.metadata
         setFrameUri(cachedFrame.uri)
         setFrameMetadata(cachedFrame.metadata)
-        readyRef.current = true
-        setReady(true)
       } else {
         frameUriRef.current = null
         frameMountedRef.current = false
         setFrameUri(null)
         setFrameMetadata(null)
         frameMetadataRef.current = null
-        readyRef.current = false
-        setReady(false)
       }
     } else {
       frameMountedRef.current = true
@@ -479,10 +469,6 @@ export function MobileBrowserPane({
         }
         if (event.type === 'ready') {
           clearStartupTimer()
-          if (!readyRef.current) {
-            readyRef.current = true
-            setReady(true)
-          }
           if (busyRef.current) {
             busyRef.current = false
             setBusy(false)
@@ -496,10 +482,6 @@ export function MobileBrowserPane({
           }
         } else if (event.type === 'end') {
           clearStartupTimer()
-          if (readyRef.current) {
-            readyRef.current = false
-            setReady(false)
-          }
           if (busyRef.current) {
             busyRef.current = false
             setBusy(false)
@@ -519,10 +501,6 @@ export function MobileBrowserPane({
           }
           const message = event.message ?? event.error?.message ?? 'Browser stream failed.'
           if (shouldSurfaceBrowserError(message)) {
-            if (readyRef.current) {
-              readyRef.current = false
-              setReady(false)
-            }
             setError(message)
           }
         }
@@ -1210,7 +1188,9 @@ export function MobileBrowserPane({
         ) : null}
         {!renderedFrameSource || busy || error ? (
           <View pointerEvents="none" style={styles.overlay}>
-            {busy || (!ready && !error) ? (
+            {/* Why: a stream can report ready and then deliver no frames, so key the
+                indicator off actually having pixels or it clears into a blank pane. */}
+            {busy || (!renderedFrameSource && !error) ? (
               <ActivityIndicator size="small" color={colors.textSecondary} />
             ) : null}
             {error ? <Text style={styles.errorText}>{error}</Text> : null}

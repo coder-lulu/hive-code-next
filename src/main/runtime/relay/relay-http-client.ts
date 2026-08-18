@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import type { E2EEKeypair } from '../e2ee-keypair'
 import { cancelUnreadResponseBody } from '../../lib/unread-response-body'
+import type { RelayRegion } from './relay-region-preference'
 
 const RELAY_HTTP_REQUEST_DEADLINE_MS = 15_000
 const RELAY_RETRY_AFTER_MAX_MS = 5 * 60_000
@@ -82,6 +83,23 @@ function isAllowedRelayOrigin(value: string): boolean {
   }
 }
 
+function isAllowedRelayEndpoint(value: string): boolean {
+  try {
+    const url = new URL(value)
+    const loopback =
+      url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]'
+    return (
+      url.username === '' &&
+      url.password === '' &&
+      url.search === '' &&
+      url.hash === '' &&
+      (url.protocol === 'https:' || (url.protocol === 'http:' && loopback))
+    )
+  } catch {
+    return false
+  }
+}
+
 export async function exchangeRelayAuthorization(input: {
   endpoint: string
   accessToken: string
@@ -89,9 +107,13 @@ export async function exchangeRelayAuthorization(input: {
   fetch?: typeof globalThis.fetch
   requestDeadlineMs?: number
 }): Promise<RelayAuthorization> {
+  if (!isAllowedRelayEndpoint(input.endpoint)) {
+    throw new RelayHttpError('token-exchange', 400)
+  }
   const relayHostId = deriveRelayHostId(input.keypair.publicKey)
   const response = await (input.fetch ?? globalThis.fetch)(input.endpoint, {
     method: 'POST',
+    redirect: 'error',
     headers: {
       authorization: `Bearer ${input.accessToken}`,
       'content-type': 'application/json'
@@ -117,6 +139,7 @@ export async function requestRelayAssignment(input: {
   relayToken: string
   relayHostId: string
   reconnect?: boolean
+  preferredRegion?: RelayRegion
   fetch?: typeof globalThis.fetch
   requestDeadlineMs?: number
 }): Promise<RelayAssignment> {
@@ -133,6 +156,7 @@ export async function requestRelayAssignment(input: {
     body: JSON.stringify({
       v: 1,
       relayHostId: input.relayHostId,
+      ...(input.preferredRegion ? { preferredRegion: input.preferredRegion } : {}),
       // Declares likely reconnection so the director can verify and admit
       // through its bounded fast lane instead of the placement queue.
       ...(input.reconnect ? { reconnect: true } : {})
@@ -141,6 +165,11 @@ export async function requestRelayAssignment(input: {
   if (!response.ok) {
     const retryAfterMs = relayRetryAfterMs(response.headers.get('retry-after'))
     await cancelUnreadResponseBody(response)
+    if (input.preferredRegion && response.status === 400) {
+      // A rolled-back director rejects the regional hint; preserve the
+      // reconnect lane while retrying without only that field.
+      return await requestRelayAssignment({ ...input, preferredRegion: undefined })
+    }
     if (input.reconnect && response.status === 400) {
       // A rolled-back director rejects unknown fields; retry once unhinted.
       return await requestRelayAssignment({ ...input, reconnect: false })

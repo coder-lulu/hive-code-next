@@ -23,8 +23,6 @@ import {
 } from './project-view/project-error-classification'
 import { applyProductBranding } from '../../shared/brand'
 import type {
-  GetProjectViewTableArgs,
-  GetProjectViewTableResult,
   GitHubProjectField,
   GitHubProjectFieldValue,
   GitHubProjectIteration,
@@ -38,16 +36,22 @@ import type {
   GitHubProjectTable,
   GitHubProjectUser,
   GitHubProjectView,
-  GitHubProjectViewError,
   GitHubProjectViewLayout,
-  GitHubProjectViewSummary,
-  ListAccessibleProjectsArgs,
-  ListAccessibleProjectsResult,
-  ListProjectViewsArgs,
-  ListProjectViewsResult,
-  ResolveProjectRefArgs,
-  ResolveProjectRefResult
+  GitHubProjectViewSummary
 } from '../../shared/github/project-types'
+import type {
+  GetProjectViewTableResult,
+  GitHubProjectViewError,
+  ListAccessibleProjectsResult,
+  ListProjectViewsResult,
+  ResolveProjectRefResult
+} from '../../shared/github/project-result-types'
+import type {
+  GetProjectViewTableArgs,
+  ListAccessibleProjectsArgs,
+  ListProjectViewsArgs,
+  ResolveProjectRefArgs
+} from '../../shared/github/project-request-types'
 import {
   GITHUB_PROJECT_REF_INPUT_TOO_LARGE_ERROR,
   isGitHubProjectRefInputTooLarge

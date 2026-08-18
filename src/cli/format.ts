@@ -1,5 +1,4 @@
 import type { CliStatusResult } from '../shared/runtime-types'
-import { applyProductBranding } from '../shared/brand'
 import { computerUseErrorRecoveryData } from '../shared/computer-use-error-recovery'
 import { prepareComputerCliJsonResult } from './computer-format'
 import type { RuntimeRpcFailure, RuntimeRpcSuccess } from './runtime-client'
@@ -77,9 +76,12 @@ export function printResult<TResult>(
 }
 
 export function formatCliError(error: unknown, context: CliErrorContext = {}): string {
-  const message = applyProductBranding(error instanceof Error ? error.message : String(error))
+  const message = error instanceof Error ? error.message : String(error)
   if (error instanceof RuntimeClientError && error.code === 'runtime_unavailable') {
-    return applyProductBranding(`${message}\nOrca is not running. Run 'orca open' first.`)
+    if (hasOrchestrationRequestId(error.data)) {
+      return message
+    }
+    return `${message}\nOrca is not running. Run 'orca open' first.`
   }
   // Why: error-specific recovery must win over the generic computer fallback.
   if (error instanceof RuntimeClientError) {
@@ -98,39 +100,34 @@ export function formatCliError(error: unknown, context: CliErrorContext = {}): s
     error instanceof RuntimeRpcFailureError &&
     error.response.error.code === 'runtime_unavailable'
   ) {
-    return applyProductBranding(`${message}\nOrca is not running. Run 'orca open' first.`)
+    return `${message}\nOrca is not running. Run 'orca open' first.`
   }
   if (error instanceof RuntimeRpcFailureError) {
     return formatMessageWithNextSteps(message, nextStepsFromData(error.response.error.data))
   }
-  return applyProductBranding(message)
+  return message
+}
+
+function hasOrchestrationRequestId(data: unknown): boolean {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    typeof (data as { orchestrationRequestId?: unknown }).orchestrationRequestId === 'string'
+  )
 }
 
 export function reportCliError(error: unknown, json: boolean, context: CliErrorContext = {}): void {
   if (json) {
     if (error instanceof RuntimeRpcFailureError) {
-      console.log(
-        JSON.stringify(
-          {
-            ...error.response,
-            error: {
-              ...error.response.error,
-              message: applyProductBranding(error.response.error.message),
-              data: brandCliErrorData(error.response.error.data)
-            }
-          },
-          null,
-          2
-        )
-      )
+      console.log(JSON.stringify(error.response, null, 2))
     } else {
       const response: RuntimeRpcFailure = {
         id: 'local',
         ok: false,
         error: {
           code: error instanceof RuntimeClientError ? error.code : 'runtime_error',
-          message: applyProductBranding(error instanceof Error ? error.message : String(error)),
-          data: brandCliErrorData(localCliErrorData(error, context))
+          message: error instanceof Error ? error.message : String(error),
+          data: localCliErrorData(error, context)
         },
         _meta: {
           runtimeId: null
@@ -145,27 +142,9 @@ export function reportCliError(error: unknown, json: boolean, context: CliErrorC
 
 function formatMessageWithNextSteps(message: string, nextSteps: readonly string[]): string {
   if (nextSteps.length === 0) {
-    return applyProductBranding(message)
+    return message
   }
-  return applyProductBranding(
-    `${message}\n${nextSteps.map((step) => `Next step: ${step}`).join('\n')}`
-  )
-}
-
-function brandCliErrorData(data: unknown): unknown {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return data
-  }
-  const nextSteps = (data as { nextSteps?: unknown }).nextSteps
-  if (!Array.isArray(nextSteps)) {
-    return data
-  }
-  return {
-    ...data,
-    nextSteps: nextSteps.map((step) =>
-      typeof step === 'string' ? applyProductBranding(step) : step
-    )
-  }
+  return `${message}\n${nextSteps.map((step) => `Next step: ${step}`).join('\n')}`
 }
 
 function nextStepsFromData(data: unknown): string[] {

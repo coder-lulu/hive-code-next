@@ -62,6 +62,7 @@ export const ORCHESTRATION_RUN_METHODS: RpcMethod[] = [
         coordinatorHandle: params.from,
         coordinatorPaneKey: paneKey
       })
+      runtime.cancelMessageWaiters(params.from)
       if (priorRun) {
         runtime.cancelMessageWaiters(`run:${priorRun.id}`)
       }
@@ -107,6 +108,7 @@ export const ORCHESTRATION_RUN_METHODS: RpcMethod[] = [
           `Run ${params.id} was not found or is inspect-only.`
         )
       }
+      runtime.cancelMessageWaiters(params.from)
       runtime.cancelMessageWaiters(`run:${params.id}`)
       if (priorRun && priorRun.id !== params.id) {
         runtime.cancelMessageWaiters(`run:${priorRun.id}`)

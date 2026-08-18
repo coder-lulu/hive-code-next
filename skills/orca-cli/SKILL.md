@@ -2,12 +2,12 @@
 name: orca-cli
 description: >-
   Use the public `orca` CLI to operate HiveCode-managed worktrees, folder contexts,
-  terminals, repos, automations, artifacts, worktree comments, and the browser
+  terminals, repos, automations, artifacts, skill sharing, worktree comments, and the browser
   embedded inside the HiveCode app. Use when the user says "$orca-cli", "use orca cli",
   "HiveCode worktree", "child worktree", "cardStatus", "spawn codex/claude in a worktree",
   "read/wait/send HiveCode terminal", "terminal send", "full handoff", "handover",
   "give this to another agent", "another worktree", "HiveCode browser", "orca artifacts",
-  "share HTML/Markdown", "public artifact link", or "control the browser inside
+  "share HTML/Markdown", "public artifact link", "share skills", or "control the browser inside
   HiveCode". Prefer this over raw `git worktree`, ad hoc
   PTYs, Playwright, or Computer Use when the task touches HiveCode-managed state.
   Use Computer Use for browser windows, webviews, or desktop UI outside HiveCode's

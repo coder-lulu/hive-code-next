@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { formatCliError } from './format'
 import { RuntimeClientError, RuntimeRpcFailureError } from './runtime-client'
-import { APP_DISPLAY_NAME } from '../shared/brand'
 
 describe('CLI error recovery', () => {
   it('prints did-you-mean next steps for an unknown-command error carrying data', () => {
@@ -59,14 +58,16 @@ describe('CLI error recovery', () => {
     expect(output).toContain('Fix the command flags or RPC params')
   })
 
-  it('brands user-facing names without rewriting compatibility commands or schemes', () => {
+  it('does not replace mutation recovery with generic runtime startup advice', () => {
     const error = new RuntimeClientError(
       'runtime_unavailable',
-      'Orca rejected the Orca:// compatibility link.'
+      'Re-issue the same command with --retry-request mutation_1.',
+      { orchestrationRequestId: 'mutation_1' }
     )
 
-    expect(formatCliError(error)).toBe(
-      `${APP_DISPLAY_NAME} rejected the Orca:// compatibility link.\n${APP_DISPLAY_NAME} is not running. Run 'orca open' first.`
-    )
+    const output = formatCliError(error)
+
+    expect(output).toContain('--retry-request mutation_1')
+    expect(output).not.toContain('orca open')
   })
 })

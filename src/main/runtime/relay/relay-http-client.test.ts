@@ -81,6 +81,42 @@ describe('relay HTTP client', () => {
     })
   })
 
+  it('sends only the coarse region and preserves reconnect when removing it', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json({ error: 'invalid_request' }, { status: 400 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          v: 1,
+          cellUrl: 'https://relay-c1.example',
+          assignmentEpoch: 4,
+          lease: 'lease-jwt'
+        })
+      )
+
+    await expect(
+      requestRelayAssignment({
+        directorUrl: 'https://relay.example',
+        relayToken: 'scoped-token',
+        relayHostId: 'AbCdEf0123_-xyZ9',
+        reconnect: true,
+        preferredRegion: 'asia-east2',
+        fetch
+      })
+    ).resolves.toMatchObject({ assignmentEpoch: 4 })
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
+      v: 1,
+      relayHostId: 'AbCdEf0123_-xyZ9',
+      preferredRegion: 'asia-east2',
+      reconnect: true
+    })
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({
+      v: 1,
+      relayHostId: 'AbCdEf0123_-xyZ9',
+      reconnect: true
+    })
+  })
+
   it('retries once unhinted when a rolled-back director rejects the hint', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
@@ -149,6 +185,42 @@ describe('relay HTTP client', () => {
         fetch
       })
     ).rejects.toMatchObject({ name: 'TimeoutError' })
+  })
+
+  it('rejects non-TLS token exchange endpoints before sending the bearer', async () => {
+    const keypair = nacl.box.keyPair()
+    const fetch = vi.fn<typeof globalThis.fetch>()
+
+    await expect(
+      exchangeRelayAuthorization({
+        endpoint: 'http://auth.example/v1/desktop/auth/relay-token',
+        accessToken: 'ordinary-access-token',
+        keypair: {
+          ...keypair,
+          publicKeyB64: Buffer.from(keypair.publicKey).toString('base64')
+        },
+        fetch
+      })
+    ).rejects.toThrow('relay_token-exchange_failed_400')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('disables redirects for token exchange requests', async () => {
+    const keypair = nacl.box.keyPair()
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({ relayToken: 'scoped-relay-token', expiresAt: Date.now() + 300_000 })
+    )
+
+    await exchangeRelayAuthorization({
+      endpoint: 'https://auth.example/v1/desktop/auth/relay-token',
+      accessToken: 'ordinary-access-token',
+      keypair: {
+        ...keypair,
+        publicKeyB64: Buffer.from(keypair.publicKey).toString('base64')
+      },
+      fetch
+    })
+    expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('error')
   })
 
   it('rejects data-plane supplied non-origin URLs', async () => {

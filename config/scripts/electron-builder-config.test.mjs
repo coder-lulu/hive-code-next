@@ -52,11 +52,12 @@ describe('electron-builder config', () => {
       join(process.cwd(), 'resources', 'build', 'installer-license.txt'),
       'utf8'
     )
-    expect(notice).toContain('HiveCode 安装许可、隐私与用户须知')
-    expect(notice).toContain('设置 > 隐私与遥测')
-    expect(notice).toContain('Settings >\nPrivacy & Telemetry')
-    expect(notice).not.toMatch(/onorca\.dev|github\.com\/stablyai\/orca/i)
-    expect(notice).toContain('正式商业发布前，请由法务审核')
+    const normalizedNotice = notice.replace(/\r\n/g, '\n')
+    expect(normalizedNotice).toContain('HiveCode 安装许可、隐私与用户须知')
+    expect(normalizedNotice).toContain('设置 > 隐私与遥测')
+    expect(normalizedNotice).toContain('Settings >\nPrivacy & Telemetry')
+    expect(normalizedNotice).not.toMatch(/onorca\.dev|github\.com\/stablyai\/orca/i)
+    expect(normalizedNotice).toContain('正式商业发布前，请由法务审核')
   })
 
   it('keeps the packaged app identity aligned with local-build validation', () => {
@@ -197,6 +198,20 @@ describe('electron-builder config', () => {
     )
     expect(electronBuilderConfig.mac.extraResources).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ to: 'orca-notification-status' })])
+    )
+  })
+
+  it('ships the mac keyboard-layout helper in Contents/MacOS, not Resources', () => {
+    expect(electronBuilderConfig.mac.extraFiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: 'native/keyboard-layout-macos/.build/release/orca-keyboard-layout',
+          to: 'MacOS/orca-keyboard-layout'
+        })
+      ])
+    )
+    expect(electronBuilderConfig.mac.extraResources).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ to: 'orca-keyboard-layout' })])
     )
   })
 
