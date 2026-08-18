@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { OrchestrationDb } from './db'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
 
@@ -198,7 +199,7 @@ describe('lifecycle reconciliation', () => {
       type: 'worker_done',
       priority: 'high',
       subject: 'Rejected worker_done: Done',
-      body: expect.stringContaining('HiveCode rejected this worker_done')
+      body: expect.stringContaining(`${APP_DISPLAY_NAME} rejected this worker_done`)
     })
     const persisted = db.getMessageById(message.id)
     expect(JSON.parse(persisted?.payload ?? '{}')).toMatchObject({

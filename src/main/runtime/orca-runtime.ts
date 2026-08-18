@@ -11,6 +11,7 @@ import {
   isShellProcess,
   normalizeTerminalTitle
 } from '../../shared/agent-detection'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
@@ -30955,7 +30956,7 @@ export class OrcaRuntimeService {
       } catch {
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-          message: 'Worktree created, but Orca could not validate the environment parent context.',
+          message: `Worktree created, but ${APP_DISPLAY_NAME} could not validate the environment parent context.`,
           details: { envParentWorkspace: input.envParentWorkspace }
         })
       }
@@ -31021,8 +31022,7 @@ export class OrcaRuntimeService {
         // Why: a stale terminal handle (reload/SSH reconnect) shouldn't drop lineage; keep resolving other inferred candidates.
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-          message:
-            'Worktree created, but Orca could not validate the caller terminal as a parent context.',
+          message: `Worktree created, but ${APP_DISPLAY_NAME} could not validate the caller terminal as a parent context.`,
           details: { callerTerminalHandle: input.callerTerminalHandle }
         })
       }
@@ -31037,8 +31037,7 @@ export class OrcaRuntimeService {
       } catch {
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-          message:
-            'Worktree created, but Orca could not validate the current directory as a parent context.',
+          message: `Worktree created, but ${APP_DISPLAY_NAME} could not validate the current directory as a parent context.`,
           details: { cwdParentWorktree: input.cwdParentWorktree }
         })
       }

@@ -140,7 +140,6 @@
     "src/main/rate-limits/kimi-fetcher.test.ts",
     "src/main/runtime/orca-runtime-files-rename-authority.test.ts",
     "src/main/runtime/orchestration/__snapshots__/preamble.test.ts.snap",
-    "src/main/runtime/orchestration/lifecycle-reconciliation.test.ts",
     "src/main/runtime/runtime-rpc-relay-pairing.test.ts",
     "src/main/runtime/windows-mobile-firewall.test.ts",
     "src/main/startup/dev-instance-identity.test.ts",
