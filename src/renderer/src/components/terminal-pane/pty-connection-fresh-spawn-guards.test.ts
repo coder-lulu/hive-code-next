@@ -1,6 +1,7 @@
 import type * as React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { flushAsyncTicks } from './pty-connection-test-async'
 import { sendTerminalInputThroughPane } from './pty-connection-test-dom'
 import {
@@ -428,7 +429,9 @@ describe('connectPanePty', () => {
 
     expect(deps.onPtyErrorRef.current).toHaveBeenCalledWith(
       1,
-      expect.stringContaining('Orca attempts background recovery for managed local and WSL homes')
+      expect.stringContaining(
+        `${APP_DISPLAY_NAME} attempts background recovery for managed local and WSL homes`
+      )
     )
   })
 

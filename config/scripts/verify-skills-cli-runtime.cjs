@@ -8,7 +8,7 @@ const BUILTINS = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]
 const CLI_COMMAND_TIMEOUT_MS = 30_000
 
 function artifactPath(outDir, file) {
-  return relative(outDir, file).split(sep).join('/')
+  return relative(outDir, file).split(/[\\/]/).join('/')
 }
 
 function runtimeImportSpecifiers(source, file) {

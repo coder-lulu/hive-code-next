@@ -925,7 +925,7 @@ jobs:
 
   skill-sharing-release-gate:
     needs: cut
-    if: needs.cut.outputs.should_release == 'true'
+    if: github.repository == 'stablyai/orca' && needs.cut.outputs.should_release == 'true'
     name: skill sharing release gate ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -968,7 +968,7 @@ jobs:
 
   skill-sharing-linux-floor-release-gate:
     needs: cut
-    if: needs.cut.outputs.should_release == 'true'
+    if: github.repository == 'stablyai/orca' && needs.cut.outputs.should_release == 'true'
     name: skill sharing release gate linux-glibc-2.31
     runs-on: ubuntu-latest
     timeout-minutes: 20

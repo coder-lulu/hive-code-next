@@ -10,6 +10,7 @@ import {
 } from './file-explorer-row-action-visibility'
 import { directoryNode, fileNode } from './file-explorer-tree-node-test-fixtures'
 import type * as RuntimeFileClient from '@/runtime/runtime-file-client'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const { downloadRuntimeFileMock, toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
   downloadRuntimeFileMock: vi.fn(),
@@ -175,7 +176,7 @@ describe('FileExplorerRow collapse folder action', () => {
     await copyFileToOsClipboard(fileNode, 'ssh-1')
 
     expect(toastErrorMock).toHaveBeenCalledWith(
-      "Could not copy the file because Orca's temporary storage is unavailable"
+      `Could not copy the file because ${APP_DISPLAY_NAME}'s temporary storage is unavailable`
     )
   })
 

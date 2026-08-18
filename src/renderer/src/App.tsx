@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { PRODUCT_LOGO_URL } from '@/product-brand'
 import { ConfirmationDialogProvider } from './components/confirmation-dialog'
 import { BrowserWebAuthnAccountDialog } from './components/browser-webauthn-account-dialog'
 import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-preference-dialog'
@@ -56,6 +57,7 @@ function App(): React.JSX.Element {
   return (
     <div
       ref={setAppRootNode}
+      data-product-logo={PRODUCT_LOGO_URL}
       className="app-layout"
       style={
         {

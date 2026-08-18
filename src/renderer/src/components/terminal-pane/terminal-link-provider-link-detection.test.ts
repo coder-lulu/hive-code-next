@@ -1,6 +1,7 @@
 import type { IDisposable, ILink } from '@xterm/xterm'
 import { describe, expect, it, vi } from 'vitest'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createFilePathLinkProvider, getTerminalFileOpenHint } from './terminal-link-handlers'
 import { TERMINAL_PATH_EXISTS_CACHE_MAX_ENTRIES } from './terminal-path-exists-cache'
 import { getConnectionId } from '@/lib/connection-context'
@@ -134,7 +135,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     links[0]!.hover?.({} as MouseEvent, links[0]!.text)
 
     expect(linkTooltip.textContent).toBe(
-      '/repo/CLAUDE.md (Click for actions or ⌘+click to open in Orca)'
+      `/repo/CLAUDE.md (Click for actions or ⌘+click to open in ${APP_DISPLAY_NAME})`
     )
   })
 

@@ -10,6 +10,7 @@ vi.mock('sonner', () => ({
 }))
 
 import type { BrowserCookieImportSummary } from '../../../shared/browser-workspace-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { emitBrowserCookieImportToast } from './browser-cookie-import-toast'
 
 const summary: BrowserCookieImportSummary = {
@@ -68,7 +69,7 @@ describe('emitBrowserCookieImportToast', () => {
 
     const message = warningToastMock.mock.calls[0]?.[0]
     expect(message).toBe(
-      "Orca cannot decrypt 3 of this browser's cookies because they use app-bound encryption. You can import cookies from a file using “From File…”."
+      `${APP_DISPLAY_NAME} cannot decrypt 3 of this browser's cookies because they use app-bound encryption. You can import cookies from a file using “From File…”.`
     )
     expect(message).not.toContain('export')
   })
@@ -82,7 +83,7 @@ describe('emitBrowserCookieImportToast', () => {
 
     expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.')
     expect(warningToastMock).toHaveBeenCalledWith(
-      'Google cookies were not imported. Open a browser in Orca on Remote Mac with this profile, then sign into Google.',
+      `Google cookies were not imported. Open a browser in ${APP_DISPLAY_NAME} on Remote Mac with this profile, then sign into Google.`,
       { duration: 12000 }
     )
     expect(successToastMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -204,7 +205,7 @@ describe('emitBrowserCookieImportToast', () => {
         'Imported 1 of 2 cookies. The rest could not be loaded, and the restart fallback was unavailable. Try the import again.'
       ],
       [
-        'Google cookies were not imported. Open a browser in Orca on Remote Mac with this profile, then sign into Google.',
+        `Google cookies were not imported. Open a browser in ${APP_DISPLAY_NAME} on Remote Mac with this profile, then sign into Google.`,
         { duration: 12000 }
       ]
     ])

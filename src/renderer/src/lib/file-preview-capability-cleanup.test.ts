@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { openFilePreviewToSide } from './file-preview'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const mocks = vi.hoisted(() => ({
   availability: {
@@ -66,7 +67,9 @@ describe('paired HTML side-preview capability cleanup', () => {
     })
 
     await vi.waitFor(() =>
-      expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in Orca Browser.')
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        `Unable to open this file in ${APP_DISPLAY_NAME} Browser.`
+      )
     )
     expect(mocks.closeEmptyGroup).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()

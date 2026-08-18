@@ -4,6 +4,7 @@ import {
   getFolderWorkspacePathStatusDescription,
   getFolderWorkspacePathStatusTitle
 } from './folder-workspace-path-status'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 // Why: the status crosses the runtime RPC wire and is cast, not decoded (`result: z.unknown()`), so
 // the cast at the test boundary is the point — a newer host really can put these on the wire.
@@ -50,10 +51,10 @@ describe('getFolderWorkspacePathStatusTitle', () => {
 describe('getFolderWorkspacePathStatusDescription', () => {
   it('keeps the declared reasons on their own copy', () => {
     expect(getFolderWorkspacePathStatusDescription(wireStatus('missing'))).toBe(
-      'Orca cannot find /srv/scans. Remove and re-import this folder workspace.'
+      `${APP_DISPLAY_NAME} cannot find /srv/scans. Remove and re-import this folder workspace.`
     )
     expect(getFolderWorkspacePathStatusDescription(wireStatus(undefined))).toBe(
-      'Orca cannot verify this folder right now. Check the runtime or SSH connection and try again.'
+      `${APP_DISPLAY_NAME} cannot verify this folder right now. Check the runtime or SSH connection and try again.`
     )
   })
 
@@ -71,7 +72,7 @@ describe('getFolderWorkspacePathStatusDescription', () => {
     expect(typeof description).toBe('string')
     expect(description).not.toBe('')
     expect(description).not.toBe(
-      'Orca cannot find /srv/scans. Remove and re-import this folder workspace.'
+      `${APP_DISPLAY_NAME} cannot find /srv/scans. Remove and re-import this folder workspace.`
     )
   })
 })

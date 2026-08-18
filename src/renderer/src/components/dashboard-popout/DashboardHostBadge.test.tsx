@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { DashboardHostBadge } from './DashboardHostBadge'
 
 afterEach(cleanup)
@@ -40,7 +41,7 @@ describe('DashboardHostBadge', () => {
       </TooltipProvider>
     )
 
-    const badge = screen.getByLabelText('Remote Orca host · Build Mac')
+    const badge = screen.getByLabelText(`Remote ${APP_DISPLAY_NAME} host · Build Mac`)
     expect(badge).toHaveAttribute('data-dashboard-host-badge', 'remote')
     expect(badge.querySelector('.lucide-server')).toBeInTheDocument()
 

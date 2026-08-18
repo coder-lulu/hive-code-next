@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 import { stringify } from 'yaml'
 import type { LocalBuildCompatibility } from '../../shared/local-build-compatibility'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { loadLocalBuildCandidate } from './local-build-candidate'
 import { startLocalBuildFeed } from './local-build-feed-server'
 
@@ -167,6 +168,6 @@ describe('loadLocalBuildCandidate', () => {
       loadLocalBuildCandidate(manifestPath, 'x64', {
         readCompatibility: async () => compatibility()
       })
-    ).rejects.toThrow('exactly one x64 Orca ZIP')
+    ).rejects.toThrow(`exactly one x64 ${APP_DISPLAY_NAME} ZIP`)
   })
 })
