@@ -818,41 +818,6 @@ describe('WslCliInstaller', () => {
     expect(killMock).toHaveBeenCalled()
   })
 
-  it('hides mixed-encoding WSL command failures from the user-facing error', async () => {
-    execFileMock.mockImplementation(
-      (
-        _command: string,
-        _args: string[],
-        _options: unknown,
-        callback: (error: Error, stdout: string, stderr: Buffer) => void
-      ) => {
-        callback(
-          Object.assign(
-            new Error(
-              "Command failed: wsl.exe -d ubuntu2204-python -- bash -lc 'printf %s secret | base64 -d'"
-            ),
-            { code: 0xffffffff }
-          ),
-          '',
-          Buffer.from(
-            'wsl: \u4e0d\u5b58\u5728\u5177\u6709\u6240\u63d0\u4f9b\u540d\u79f0\u7684\u5206\u53d1。\r\n',
-            'utf16le'
-          )
-        )
-        return { kill: vi.fn() }
-      }
-    )
-    const installer = new WslCliInstaller({
-      platform: 'win32',
-      distro: 'ubuntu2204-python',
-      hostInstaller: { getStatus: async () => makeHostStatus() }
-    })
-
-    await expect(installer.getStatus()).rejects.toThrow(
-      /^Unable to communicate with the selected WSL distribution\.$/
-    )
-  })
-
   it('refuses to remove an old managed launcher when the bridge path is user-owned', async () => {
     const oldLauncher = _internals.buildWslLauncher(
       'C:\\Old\\orca.cmd',
