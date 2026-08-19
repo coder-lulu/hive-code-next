@@ -10,7 +10,7 @@ import { getBundledLauncherPath } from './cli-installer'
 const DISPATCHER_MARKER = '# orca-serve-bare-orca-dispatcher'
 
 export type LinuxBareOrcaDispatcherOptions = {
-  /** Packaged app resources root; the bundled `orca-ide` launcher lives under it. */
+  /** Packaged app resources root; the bundled product launcher lives under it. */
   resourcesPath: string
   /** Test seam — defaults to the real home directory. */
   homePath?: string
@@ -26,7 +26,7 @@ export type LinuxBareOrcaDispatcherState =
 export type LinuxBareOrcaDispatcherResult = {
   state: LinuxBareOrcaDispatcherState
   dispatcherPath: string
-  /** What the dispatcher execs: the stable AppImage, or the bundled orca-ide. */
+  /** What the dispatcher execs: the stable AppImage, or the bundled product launcher. */
   target: string | null
 }
 
@@ -60,8 +60,8 @@ export async function installLinuxBareOrcaDispatcher(
   return { state: 'installed', dispatcherPath, target: resolved.target }
 }
 
-/** Bare-`orca` script that execs the Orca CLI: the stable AppImage when running
- *  from one, otherwise the bundled `orca-ide` launcher. Shared by the serve
+/** Bare-`orca` script that execs the product CLI: the stable AppImage when running
+ *  from one, otherwise the bundled product launcher. Shared by the serve
  *  dispatcher and the managed-terminal PATH shim. */
 export function buildBareOrcaCliScript(
   resourcesPath: string,

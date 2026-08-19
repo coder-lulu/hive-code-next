@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
@@ -9,16 +9,17 @@ vi.mock('electron', () => ({
 }))
 
 import { ensureLinuxTerminalOrcaCliShimDir } from './linux-terminal-orca-cli-shim'
+import { getBundledLauncherPath } from './bundled-cli-launcher-path'
 
 const created: string[] = []
+const bundledLinuxLauncher = basename(getBundledLauncherPath('linux', '/')!)
 
 async function makeFixture(): Promise<{ userDataPath: string; resourcesPath: string }> {
   const root = await mkdtemp(join(tmpdir(), 'orca-terminal-cli-shim-'))
   created.push(root)
   const resourcesPath = join(root, 'resources')
-  // The bundled orca-ide launcher must exist for the shim to be written.
   mkdirSync(join(resourcesPath, 'bin'), { recursive: true })
-  writeFileSync(join(resourcesPath, 'bin', 'orca-ide'), '#!/usr/bin/env bash\n', 'utf8')
+  writeFileSync(join(resourcesPath, 'bin', bundledLinuxLauncher), '#!/usr/bin/env bash\n', 'utf8')
   return { userDataPath: join(root, 'user-data'), resourcesPath }
 }
 
@@ -27,7 +28,7 @@ afterEach(async () => {
 })
 
 describe('ensureLinuxTerminalOrcaCliShimDir', () => {
-  it('writes an executable bare-orca shim that execs the bundled orca-ide launcher', async () => {
+  it('writes an executable bare-orca shim that execs the bundled product launcher', async () => {
     const { userDataPath, resourcesPath } = await makeFixture()
 
     const shimDir = ensureLinuxTerminalOrcaCliShimDir({
@@ -39,9 +40,11 @@ describe('ensureLinuxTerminalOrcaCliShimDir', () => {
     expect(shimDir).toBe(join(userDataPath, 'linux-orca-cli-shim'))
     const content = readFileSync(join(shimDir!, 'orca'), 'utf8')
     // Single-quoted so a resources path with shell metacharacters can't break out.
-    expect(content).toContain(`exec '${join(resourcesPath, 'bin', 'orca-ide')}' "$@"`)
-    const mode = statSync(join(shimDir!, 'orca')).mode & 0o777
-    expect(mode & 0o111).not.toBe(0)
+    expect(content).toContain(`exec '${join(resourcesPath, 'bin', bundledLinuxLauncher)}' "$@"`)
+    if (process.platform !== 'win32') {
+      const mode = statSync(join(shimDir!, 'orca')).mode & 0o777
+      expect(mode & 0o111).not.toBe(0)
+    }
   })
 
   it('memoizes per userDataPath and re-asserts the exec bit for a stale shim', async () => {
@@ -72,8 +75,10 @@ describe('ensureLinuxTerminalOrcaCliShimDir', () => {
     })
     expect(healed).not.toBeNull()
     const healedPath = join(healed!, 'orca')
-    expect(readFileSync(healedPath, 'utf8')).toContain('orca-ide')
-    expect(statSync(healedPath).mode & 0o111).not.toBe(0)
+    expect(readFileSync(healedPath, 'utf8')).toContain(bundledLinuxLauncher)
+    if (process.platform !== 'win32') {
+      expect(statSync(healedPath).mode & 0o111).not.toBe(0)
+    }
   })
 
   it('execs the stable AppImage (not the ephemeral mount) when running from an AppImage', async () => {
@@ -107,7 +112,7 @@ describe('ensureLinuxTerminalOrcaCliShimDir', () => {
     // userData path succeeds — proving failures are not cached.
     const resourcesPath = join(root, 'resources')
     mkdirSync(join(resourcesPath, 'bin'), { recursive: true })
-    writeFileSync(join(resourcesPath, 'bin', 'orca-ide'), '#!/usr/bin/env bash\n', 'utf8')
+    writeFileSync(join(resourcesPath, 'bin', bundledLinuxLauncher), '#!/usr/bin/env bash\n', 'utf8')
     const recovered = ensureLinuxTerminalOrcaCliShimDir({
       userDataPath,
       resourcesPath,
