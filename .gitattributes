@@ -4,6 +4,8 @@
 /config/scripts/publish-complete-draft-releases.mjs text eol=lf
 /config/scripts/release-rc-history.mjs text eol=lf
 /config/scripts/run-internal-dev-setup.mjs text eol=lf
+/config/scripts/trim-windows-icon-source.mjs text eol=lf
+/config/scripts/trim-windows-icon-source.test.mjs text eol=lf
 /config/scripts/verify-cli-bin.mjs text eol=lf
 /config/scripts/verify-release-required-assets.mjs text eol=lf
 /skill-guides/*.md text eol=lf
