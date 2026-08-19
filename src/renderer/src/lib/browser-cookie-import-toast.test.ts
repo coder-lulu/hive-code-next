@@ -102,7 +102,7 @@ describe('emitBrowserCookieImportToast', () => {
 
     expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.')
     expect(warningToastMock).toHaveBeenCalledWith(
-      '1 cookies were not imported because their site-partition could not be read. Sign in to those sites again in Orca.',
+      `1 cookies were not imported because their site-partition could not be read. Sign in to those sites again in ${APP_DISPLAY_NAME}.`,
       { duration: 12000 }
     )
   })

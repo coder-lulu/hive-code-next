@@ -77,7 +77,9 @@ export type RuntimeFileOperationArgs = {
 }
 
 const QUICK_OPEN_REMOTE_UPDATE_REQUIRED_MESSAGE =
-  'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'
+  applyProductBranding(
+    'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'
+  )
 
 function assertExternalSshReadOwnership(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,

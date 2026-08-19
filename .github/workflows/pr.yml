@@ -81,6 +81,9 @@ jobs:
       - name: Enforce product brand boundary
         run: pnpm run check:brand-boundary
 
+      - name: Verify product config
+        run: pnpm run verify:product-config
+
       - name: Verify bundled skill guides
         run: pnpm run verify:bundled-skill-guides
 

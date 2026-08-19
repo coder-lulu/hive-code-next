@@ -1,4 +1,5 @@
 import { execFileAsync, acquire, release } from '../../gh-utils'
+import { getProductStarRepository } from '../../../product/product-external-service-endpoints'
 export const ORCA_REPO = 'stablyai/orca'
 
 /**
@@ -6,11 +7,15 @@ export const ORCA_REPO = 'stablyai/orca'
  * Returns true if starred, false if not, null if unable to determine (gh unavailable).
  */
 export async function checkOrcaStarred(): Promise<boolean | null> {
+  const repository = getProductStarRepository()
+  if (!repository) {
+    return null
+  }
   await acquire()
   try {
     const { stdout, stderr } = await execFileAsync(
       'gh',
-      ['api', '--include', `user/starred/${ORCA_REPO}`],
+      ['api', '--include', `user/starred/${repository}`],
       { encoding: 'utf-8' }
     )
     const response = `${stdout ?? ''}\n${stderr ?? ''}`
@@ -35,9 +40,13 @@ export async function checkOrcaStarred(): Promise<boolean | null> {
  * Star the Orca repo for the authenticated user.
  */
 export async function starOrca(): Promise<boolean> {
+  const repository = getProductStarRepository()
+  if (!repository) {
+    return false
+  }
   await acquire()
   try {
-    await execFileAsync('gh', ['api', '-X', 'PUT', `user/starred/${ORCA_REPO}`], {
+    await execFileAsync('gh', ['api', '-X', 'PUT', `user/starred/${repository}`], {
       encoding: 'utf-8'
     })
     return true
