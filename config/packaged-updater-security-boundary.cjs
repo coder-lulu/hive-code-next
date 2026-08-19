@@ -10,7 +10,7 @@ const { $schema: _productSchema, ...EXPECTED_PRODUCT_CONFIG } = require(
 const EXPECTED_ELECTRON_UPDATER_VERSION = '6.8.9'
 const EXPECTED_BUILDER_UTIL_RUNTIME_VERSION = '9.7.0'
 const EXPECTED_PRODUCT_LOGO_SHA256 =
-  'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
+  '46325bf9d05755d2b412f0a2e720cb1944d69abb7f6e3c07b59ed304f4e81950'
 const EXPECTED_PACKAGED_APPLICATION_METADATA = {
   name: EXPECTED_PRODUCT_CONFIG.slug,
   productName: EXPECTED_PRODUCT_CONFIG.displayName,
@@ -31,6 +31,7 @@ const REQUIRED_MAIN_LITERALS = [
 
 const REQUIRED_NULL_PATHS = [
   'desktop.publisher',
+  'desktop.updateProvider',
   'desktop.updateRepository',
   'desktop.updateChannel',
   'desktop.starRepository',

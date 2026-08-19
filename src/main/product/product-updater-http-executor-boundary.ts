@@ -51,7 +51,8 @@ function isAuthorizedExecutorRequest(
     requestOptionsToUrl(options).href,
     state.productRepository,
     state.getMode(),
-    state.getLocalFeedUrl()
+    state.getLocalFeedUrl(),
+    state.getReleaseFeedUrl()
   )
 }
 
@@ -86,7 +87,8 @@ function patchRedirectOptionPropagation(executor: ProductUpdaterHttpExecutor): v
             nextUrl.href,
             state.productRepository,
             state.getMode(),
-            state.getLocalFeedUrl()
+            state.getLocalFeedUrl(),
+            state.getReleaseFeedUrl()
           )
         ) {
           reject(new Error('Updater redirect is outside the product network boundary'))

@@ -4,8 +4,11 @@
 // way other Windows taskbar/"Open with" icons do. Without this the glyph is only
 // ~83% of the frame and looks visibly small next to native apps (issue #5357).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { PNG } from 'pngjs'
+
+const require = createRequire(import.meta.url)
+const { PNG } = require('pngjs')
 
 // Why: Windows renders the largest ICO frame at small sizes too, so the glyph
 // must fill nearly the whole canvas (~96%) to match native apps. A small uniform

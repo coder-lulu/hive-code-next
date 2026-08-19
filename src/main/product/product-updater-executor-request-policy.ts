@@ -48,7 +48,9 @@ export function isInitialRequestWithinActiveFeed(
       requestUrl.href,
       state.productRepository,
       mode,
-      state.getLocalFeedUrl()
+      state.getLocalFeedUrl(),
+      [],
+      state.getReleaseFeedUrl()
     )
   )
 }

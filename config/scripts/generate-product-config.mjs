@@ -27,6 +27,7 @@ const SLUG_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const GITHUB_REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/
 const PRODUCT_UPDATE_CHANNELS = new Set(['stable', 'rc'])
+const PRODUCT_UPDATE_PROVIDERS = new Set(['github', 'hivecloud'])
 const STRICT_HTTPS_ENDPOINTS = new Set(['artifacts', 'pluginMarketplace', 'changelog', 'nudge'])
 const ORIGIN_ONLY_ENDPOINTS = new Set(['artifacts'])
 
@@ -61,6 +62,7 @@ const DESKTOP_KEYS = new Set([
   'appId',
   'executableName',
   'publisher',
+  'updateProvider',
   'updateChannel',
   'updateRepository',
   'starRepository'
@@ -214,6 +216,13 @@ function assertManifestShape(manifest) {
   assertOptionalString(manifest.desktop.appId, 'desktop.appId')
   assertNonEmptyString(manifest.desktop.executableName, 'desktop.executableName')
   assertOptionalString(manifest.desktop.publisher, 'desktop.publisher')
+  assertOptionalString(manifest.desktop.updateProvider, 'desktop.updateProvider')
+  if (
+    manifest.desktop.updateProvider &&
+    !PRODUCT_UPDATE_PROVIDERS.has(manifest.desktop.updateProvider)
+  ) {
+    throw new Error('desktop.updateProvider must be github, hivecloud, or null')
+  }
   assertOptionalString(manifest.desktop.updateChannel, 'desktop.updateChannel')
   if (
     manifest.desktop.updateChannel &&
@@ -343,6 +352,7 @@ export function normalizeProductManifest(manifest) {
       appId: nullableString(manifest.desktop.appId),
       executableName: manifest.desktop.executableName.trim(),
       publisher: nullableString(manifest.desktop.publisher),
+      updateProvider: nullableString(manifest.desktop.updateProvider),
       updateChannel: nullableString(manifest.desktop.updateChannel),
       updateRepository: nullableString(manifest.desktop.updateRepository),
       starRepository: nullableString(manifest.desktop.starRepository)

@@ -23,6 +23,7 @@ function validMainBundle(runtimeProductConfigChunkName = 'product-config-fixture
     const MAX_UPDATER_ARTIFACT_BYTES = 2147483648
     const config = {
       updateRepository: null,
+      updateProvider: null,
       updateChannel: null,
       starRepository: null,
       update: null,
@@ -45,7 +46,7 @@ function validProductConfig() {
       slug: 'hivecode',
       branding: {
         logoAsset: 'resources/product-logo.png',
-        logoSha256: 'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
+        logoSha256: '46325bf9d05755d2b412f0a2e720cb1944d69abb7f6e3c07b59ed304f4e81950'
       },
       publicLinks: {
         website: null,
@@ -65,6 +66,7 @@ function validProductConfig() {
         appId: 'com.hivekernel.hivecode.desktop',
         executableName: 'HiveCode',
         publisher: null,
+        updateProvider: null,
         updateChannel: null,
         updateRepository: null,
         starRepository: null
@@ -295,6 +297,7 @@ describe('packaged updater security boundary', () => {
   it('rejects every packaged product config field that re-enables an external authority', async () => {
     for (const field of [
       'publisher',
+      'updateProvider',
       'updateRepository',
       'updateChannel',
       'starRepository',

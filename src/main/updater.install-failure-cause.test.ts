@@ -92,13 +92,15 @@ vi.mock('../shared/product-update-source', () => ({
   resolveProductUpdateSource: () => ({
     channel: 'stable',
     feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    provider: 'github',
     github: {
       repo: 'stablyai/orca',
       atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
       releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
       releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
     }
-  })
+  }),
+  resolveProductUpdateFeedUrl: (source: { feedUrl: string }) => source.feedUrl
 }))
 
 vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))

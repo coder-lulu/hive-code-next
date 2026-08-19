@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import { app, BrowserWindow, powerMonitor } from 'electron'
 import { is } from '@electron-toolkit/utils'
+import { parse } from 'yaml'
 import type {
   LinuxPackageInstallInstructions,
   LinuxPackageInstallRecovery,
@@ -14,7 +15,10 @@ import type {
   RemoteServerUpdateSupport
 } from '../shared/remote-server-update'
 import { hasConfiguredProductUpdateChannel } from '../shared/product-update-policy'
-import { resolveProductUpdateSource } from '../shared/product-update-source'
+import {
+  resolveProductUpdateFeedUrl,
+  resolveProductUpdateSource
+} from '../shared/product-update-source'
 import { applyProductBranding } from '../shared/brand'
 import {
   installProductUpdaterNetworkBoundary,
@@ -67,6 +71,7 @@ import {
 import {
   compareVersions,
   isBenignCheckFailure,
+  isValidVersion,
   isMissingUpdateManifestFailure,
   isPrereleaseVersion,
   statusesEqual
@@ -76,6 +81,9 @@ import {
   getReleaseDownloadUrl
 } from './updater-prerelease-feed'
 import { fetchNudge, shouldApplyNudge } from './updater-nudge'
+import { cancelUnreadResponseBody } from './lib/unread-response-body'
+import { fetchWithProductUpdaterSession } from './product/product-updater-session'
+import { readResponseTextWithLimit } from './updater-response-body'
 import {
   failServeUpdateHandoff,
   getServeUpdateHandoffFailure,
@@ -100,6 +108,7 @@ type UpdateCandidateIdentity = {
   generation: number
   authorityEpoch: number
   kind: 'release' | 'local' | 'pinned'
+  provider: 'github' | 'hivecloud' | null
   source: 'release' | UpdateSource
   repository: string | null
   sourceChannel: 'stable' | 'rc' | null
@@ -128,6 +137,8 @@ export type UpdateInstallMode =
   | 'unsupported-headless-serve'
 
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+const MAX_GENERIC_UPDATE_MANIFEST_BYTES = 256 * 1024
+const GENERIC_UPDATE_PREFLIGHT_TIMEOUT_MS = 5000
 const AUTO_UPDATE_RETRY_INTERVAL_MS = 60 * 60 * 1000
 // Why: a persistently-failing feed used to re-arm the retry at a fixed 1h cadence forever (issue #7576); backoff doubles per failure up to this cap, any completed check resets.
 const MAX_AUTO_UPDATE_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000
@@ -618,15 +629,30 @@ function isUpdateCandidateCurrent(candidate: UpdateCandidateIdentity): boolean {
     return activeUpdateSource === 'local' && activeLocalBuildFeed?.url === candidate.feedUrl
   }
   const source = hasConfiguredProductUpdateChannel() ? resolveProductUpdateSource() : null
-  if (!source?.github) {
+  if (!source) {
     return false
   }
   if (candidate.kind === 'pinned') {
     return isPinnedBuildActive && activeUpdateSource === candidate.source
   }
+  if (source.provider === 'hivecloud') {
+    return (
+      activeUpdateSource === 'release' &&
+      !isPinnedBuildActive &&
+      candidate.provider === 'hivecloud' &&
+      candidate.repository === null &&
+      candidate.sourceChannel === source.channel &&
+      candidate.feedUrl === activeReleaseFeedUrl &&
+      candidate.overrideChannel === (getReleaseChannelOverride?.() ?? null)
+    )
+  }
+  if (!source.github) {
+    return false
+  }
   return (
     activeUpdateSource === 'release' &&
     !isPinnedBuildActive &&
+    candidate.provider === 'github' &&
     candidate.repository === source.github.repo &&
     candidate.sourceChannel === source.channel &&
     candidate.overrideChannel === (getReleaseChannelOverride?.() ?? null)
@@ -1592,6 +1618,7 @@ function commitReleaseFeedForAttempt(
     generation: attemptId,
     authorityEpoch: updateAuthorityEpoch,
     kind: 'release',
+    provider: 'github',
     source: 'release',
     repository: source.github.repo,
     sourceChannel: source.channel,
@@ -1604,10 +1631,105 @@ function commitReleaseFeedForAttempt(
   return true
 }
 
+function getGenericUpdateManifestName(): string {
+  if (process.platform === 'darwin') {
+    return 'latest-mac.yml'
+  }
+  if (process.platform === 'linux') {
+    return 'latest-linux.yml'
+  }
+  return 'latest.yml'
+}
+
+async function prepareHiveCloudReleaseFeed(
+  variant: UpdateCheckVariant,
+  attemptId: number
+): Promise<ReleaseFeedPreflightResult> {
+  const source = resolveProductUpdateSource()
+  if (source?.provider !== 'hivecloud' || source.github !== null) {
+    throw new Error('HiveCloud update source is not configured')
+  }
+  const feedUrl = resolveProductUpdateFeedUrl(source, process.platform, process.arch)
+  if (!feedUrl) {
+    throw new Error('HiveCloud updates are unavailable for this platform')
+  }
+  if (!canCommitReleaseFeedForAttempt(attemptId)) {
+    return 'superseded'
+  }
+
+  advanceUpdateAuthorityEpoch()
+  activeReleaseFeedUrl = feedUrl
+  getAutoUpdater().setFeedURL({ provider: 'generic', url: feedUrl })
+
+  const manifestUrl = new URL(getGenericUpdateManifestName(), feedUrl).href
+  const response = await fetchWithProductUpdaterSession(manifestUrl, {
+    redirect: 'error',
+    signal: AbortSignal.timeout(GENERIC_UPDATE_PREFLIGHT_TIMEOUT_MS)
+  })
+  if (!response.ok) {
+    await cancelUnreadResponseBody(response)
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      variant,
+      'Unable to resolve the HiveCloud update feed'
+    )
+  }
+  const manifestText = await readResponseTextWithLimit(response, MAX_GENERIC_UPDATE_MANIFEST_BYTES)
+  if (manifestText === null) {
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      variant,
+      'HiveCloud update metadata exceeded the size limit'
+    )
+  }
+
+  let version: unknown
+  try {
+    version = (parse(manifestText) as { version?: unknown } | null)?.version
+  } catch {
+    version = null
+  }
+  if (typeof version !== 'string' || !isValidVersion(version)) {
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      variant,
+      'HiveCloud update metadata did not contain a valid version'
+    )
+  }
+  if (!canCommitReleaseFeedForAttempt(attemptId)) {
+    return 'superseded'
+  }
+
+  setExpectedUpdateOffer({
+    generation: attemptId,
+    authorityEpoch: updateAuthorityEpoch,
+    kind: 'release',
+    provider: 'hivecloud',
+    source: 'release',
+    repository: null,
+    sourceChannel: source.channel,
+    checkChannel: variant,
+    tag: version,
+    version,
+    feedUrl,
+    overrideChannel: getReleaseChannelOverride?.() ?? null
+  })
+  return 'ready'
+}
+
 async function pinDefaultReleaseFeed(
   variant: UpdateCheckVariant,
   attemptId: number
 ): Promise<ReleaseFeedPreflightResult> {
+  const source = resolveProductUpdateSource()
+  if (source?.provider === 'hivecloud') {
+    clearPrereleaseFallbackContext()
+    clearPublishingWindowLastGoodCheck()
+    return prepareHiveCloudReleaseFeed(variant, attemptId)
+  }
+  if (source?.provider !== 'github' || !source.github) {
+    throw new Error('Product update source is not configured')
+  }
   const currentVersion = app.getVersion()
   const isPerfCheck = variant === 'perf'
   const includePrerelease = variant !== 'default'
@@ -2002,6 +2124,7 @@ async function checkForLocalBuildFromMenu(): Promise<void> {
       generation: attemptId,
       authorityEpoch: updateAuthorityEpoch,
       kind: 'local',
+      provider: null,
       source: 'local',
       repository: null,
       sourceChannel: null,
@@ -2090,6 +2213,7 @@ async function checkForPinnedBuild(channel: ReleaseChannel, tag: string): Promis
       generation: attemptId,
       authorityEpoch: updateAuthorityEpoch,
       kind: 'pinned',
+      provider: resolveProductUpdateSource()?.provider ?? null,
       source: activeUpdateSource,
       repository: resolveProductUpdateSource()?.github?.repo ?? null,
       sourceChannel: resolveProductUpdateSource()?.channel ?? null,
@@ -2683,6 +2807,16 @@ export function setupAutoUpdater(
 
   const productUpdateSource =
     !opts?.localOnly && hasConfiguredProductUpdateChannel() ? resolveProductUpdateSource() : null
+  const hasValidProviderShape =
+    (productUpdateSource?.provider === 'github' && productUpdateSource.github !== null) ||
+    (productUpdateSource?.provider === 'hivecloud' && productUpdateSource.github === null)
+  const configuredReleaseFeedUrl =
+    productUpdateSource && hasValidProviderShape
+      ? resolveProductUpdateFeedUrl(productUpdateSource, process.platform, process.arch)
+      : null
+  if (activeUpdateSource === 'release') {
+    activeReleaseFeedUrl = configuredReleaseFeedUrl
+  }
   installProductUpdaterNetworkBoundary(
     productUpdateSource?.github?.repo ?? null,
     getProductUpdaterNetworkMode,
@@ -2696,16 +2830,20 @@ export function setupAutoUpdater(
     () => updateAuthorityEpoch
   )
 
-  if (opts?.localOnly || releaseUpdaterServicesInitialized || !productUpdateSource?.github) {
+  if (
+    opts?.localOnly ||
+    releaseUpdaterServicesInitialized ||
+    !productUpdateSource ||
+    !configuredReleaseFeedUrl
+  ) {
     return
   }
   releaseUpdaterServicesInitialized = true
 
-  // Why: generic provider avoids the native GitHub provider's RC-channel filtering; per-check repinning to a concrete /releases/download/<tag>/ URL avoids /latest redirect drift between check and download.
   if (activeUpdateSource === 'release') {
     autoUpdater.setFeedURL({
       provider: 'generic',
-      url: productUpdateSource.feedUrl
+      url: configuredReleaseFeedUrl
     })
   }
 

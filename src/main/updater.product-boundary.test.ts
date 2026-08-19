@@ -44,7 +44,8 @@ function configuredProductSource(channel: 'stable' | 'rc' = 'stable'): ProductUp
       atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
       releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
       releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
-    }
+    },
+    provider: 'github'
   }
 }
 
@@ -94,7 +95,8 @@ describe('updater product boundary', () => {
     productUpdateSourceState.value = {
       channel: 'stable',
       feedUrl: 'https://downloads.example.com/product-update/stable/',
-      github: null
+      github: null,
+      provider: 'github'
     }
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.52'])
     const { checkForUpdatesFromMenu, setupAutoUpdater } = await import('./updater')
@@ -158,8 +160,12 @@ describe('updater product boundary', () => {
     productUpdatePolicy.configured = false
     productUpdateSourceState.value = null
     const send = vi.fn()
-    const { checkForUpdates, checkForUpdatesFromMenu, listAvailableReleaseBuilds, setupAutoUpdater } =
-      await import('./updater')
+    const {
+      checkForUpdates,
+      checkForUpdatesFromMenu,
+      listAvailableReleaseBuilds,
+      setupAutoUpdater
+    } = await import('./updater')
     setupAutoUpdater({ webContents: { send } } as never, {
       getLastUpdateCheckAt: () => Date.now()
     })

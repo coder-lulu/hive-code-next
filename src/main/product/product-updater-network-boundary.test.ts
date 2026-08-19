@@ -7,6 +7,7 @@ import {
   installProductUpdaterHttpExecutorBoundary,
   installProductUpdaterNetworkBoundary,
   isAllowedProductUpdaterRequest,
+  isAllowedProductUpdaterRedirectTarget,
   isBoundedUpdaterArtifactSize
 } from './product-updater-network-boundary'
 
@@ -52,6 +53,66 @@ describe('isAllowedProductUpdaterRequest', () => {
     'https://github.com/coder-lulu/hive-code/releases/download/v1.0.0/Product.zip'
   ])('allows an approved release updater request: %s', (url) => {
     expect(isAllowedProductUpdaterRequest(url, productRepository, 'release')).toBe(true)
+  })
+
+  it.each([
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/latest.yml',
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/latest.yml?noCache=1j4abc',
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/HiveCode.exe'
+  ])('allows a request within the active HiveCloud feed: %s', (url) => {
+    expect(
+      isAllowedProductUpdaterRequest(
+        url,
+        null,
+        'release',
+        null,
+        [],
+        'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+      )
+    ).toBe(true)
+  })
+
+  it.each([
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/arm64/latest.yml',
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64-escape/HiveCode.exe',
+    'https://cdn.example/HiveCode.exe',
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/latest.yml?token=secret'
+  ])('blocks a request outside the active HiveCloud feed: %s', (url) => {
+    expect(
+      isAllowedProductUpdaterRequest(
+        url,
+        null,
+        'release',
+        null,
+        [],
+        'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+      )
+    ).toBe(false)
+  })
+
+  it('does not grant a HiveCloud feed any GitHub redirect authority', () => {
+    const feed = 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+    expect(
+      isAllowedProductUpdaterRedirectTarget(`${feed}HiveCode.exe`, null, 'release', null, feed)
+    ).toBe(true)
+    expect(
+      isAllowedProductUpdaterRedirectTarget(
+        'https://github.com/stablyai/orca/releases/download/v1.0.0/Orca.exe',
+        null,
+        'release',
+        null,
+        feed
+      )
+    ).toBe(false)
+    expect(
+      isAllowedProductUpdaterRedirectTarget(
+        'https://release-assets.githubusercontent.com/orca/Orca.exe',
+        null,
+        'release',
+        null,
+        feed
+      )
+    ).toBe(false)
   })
 
   it.each([

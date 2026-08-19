@@ -44,10 +44,23 @@ async function fetchUpdaterMetadata(
 
   while (true) {
     const isAllowed =
-      redirects === 0 ? isAllowedProductUpdaterRequest : isAllowedProductUpdaterRedirectTarget
-    if (
-      !isAllowed(currentUrl.href, state.productRepository, state.getMode(), state.getLocalFeedUrl())
-    ) {
+      redirects === 0
+        ? isAllowedProductUpdaterRequest(
+            currentUrl.href,
+            state.productRepository,
+            state.getMode(),
+            state.getLocalFeedUrl(),
+            [],
+            state.getReleaseFeedUrl()
+          )
+        : isAllowedProductUpdaterRedirectTarget(
+            currentUrl.href,
+            state.productRepository,
+            state.getMode(),
+            state.getLocalFeedUrl(),
+            state.getReleaseFeedUrl()
+          )
+    if (!isAllowed) {
       throw new Error('Updater metadata request was blocked by the product network boundary')
     }
     const response = await updaterSession.fetch(currentUrl.href, {

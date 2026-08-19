@@ -55,12 +55,35 @@ function isAllowedExactControlRequest(url: URL, allowedUrls: readonly string[]):
   })
 }
 
+function isAllowedActiveReleaseFeedRequest(url: URL, releaseFeedUrl: string | null): boolean {
+  let feed: URL
+  try {
+    feed = new URL(releaseFeedUrl ?? '')
+  } catch {
+    return false
+  }
+  return (
+    feed.protocol === 'https:' &&
+    !feed.username &&
+    !feed.password &&
+    !feed.search &&
+    !feed.hash &&
+    feed.pathname.endsWith('/') &&
+    !feed.pathname.includes('%') &&
+    url.origin === feed.origin &&
+    url.pathname.startsWith(feed.pathname) &&
+    !url.pathname.includes('%') &&
+    hasAllowedGitHubReleaseQuery(url)
+  )
+}
+
 export function isAllowedProductUpdaterRequest(
   url: string,
   productRepository: string | null,
   mode: ProductUpdaterNetworkMode,
   localFeedUrl: string | null = null,
-  additionalReleaseControlUrls: readonly string[] = []
+  additionalReleaseControlUrls: readonly string[] = [],
+  releaseFeedUrl: string | null = null
 ): boolean {
   let parsed: URL
   try {
@@ -94,12 +117,16 @@ export function isAllowedProductUpdaterRequest(
     )
   }
 
-  if (!productRepository || !GITHUB_REPOSITORY_PATTERN.test(productRepository)) {
-    return false
-  }
-
   if (isAllowedExactControlRequest(parsed, additionalReleaseControlUrls)) {
     return true
+  }
+
+  if (isAllowedActiveReleaseFeedRequest(parsed, releaseFeedUrl)) {
+    return true
+  }
+
+  if (!productRepository || !GITHUB_REPOSITORY_PATTERN.test(productRepository)) {
+    return false
   }
 
   if (isAllowedGitHubControlRequest(parsed, productRepository)) {
@@ -122,12 +149,19 @@ export function isAllowedProductUpdaterRedirectTarget(
   url: string,
   productRepository: string | null,
   mode: ProductUpdaterNetworkMode,
-  localFeedUrl: string | null = null
+  localFeedUrl: string | null = null,
+  releaseFeedUrl: string | null = null
 ): boolean {
-  if (isAllowedProductUpdaterRequest(url, productRepository, mode, localFeedUrl)) {
+  if (
+    isAllowedProductUpdaterRequest(url, productRepository, mode, localFeedUrl, [], releaseFeedUrl)
+  ) {
     return true
   }
-  if (mode !== 'release') {
+  if (
+    mode !== 'release' ||
+    !productRepository ||
+    !GITHUB_REPOSITORY_PATTERN.test(productRepository)
+  ) {
     return false
   }
   try {
@@ -147,9 +181,12 @@ export function isFinalUpdaterArtifactUrl(
   url: string,
   productRepository: string | null,
   mode: ProductUpdaterNetworkMode,
-  localFeedUrl: string | null
+  localFeedUrl: string | null,
+  releaseFeedUrl: string | null = null
 ): boolean {
-  if (!isAllowedProductUpdaterRequest(url, productRepository, mode, localFeedUrl)) {
+  if (
+    !isAllowedProductUpdaterRequest(url, productRepository, mode, localFeedUrl, [], releaseFeedUrl)
+  ) {
     return false
   }
   const parsed = new URL(url)
@@ -157,6 +194,9 @@ export function isFinalUpdaterArtifactUrl(
     return false
   }
   if (mode === 'local') {
+    return true
+  }
+  if (isAllowedActiveReleaseFeedRequest(parsed, releaseFeedUrl)) {
     return true
   }
   return (
@@ -169,9 +209,18 @@ export function isFinalUpdaterRedirectArtifactUrl(
   url: string,
   productRepository: string | null,
   mode: ProductUpdaterNetworkMode,
-  localFeedUrl: string | null
+  localFeedUrl: string | null,
+  releaseFeedUrl: string | null = null
 ): boolean {
-  if (!isAllowedProductUpdaterRedirectTarget(url, productRepository, mode, localFeedUrl)) {
+  if (
+    !isAllowedProductUpdaterRedirectTarget(
+      url,
+      productRepository,
+      mode,
+      localFeedUrl,
+      releaseFeedUrl
+    )
+  ) {
     return false
   }
   const parsed = new URL(url)
@@ -179,6 +228,9 @@ export function isFinalUpdaterRedirectArtifactUrl(
     return false
   }
   if (mode === 'local') {
+    return true
+  }
+  if (isAllowedActiveReleaseFeedRequest(parsed, releaseFeedUrl)) {
     return true
   }
   return (

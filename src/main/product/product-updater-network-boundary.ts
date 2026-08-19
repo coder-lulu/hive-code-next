@@ -14,6 +14,7 @@ export { installProductUpdaterHttpExecutorBoundary } from './product-updater-htt
 export type { ProductUpdaterHttpExecutor } from './product-updater-http-executor-types'
 export {
   isAllowedProductUpdaterRequest,
+  isAllowedProductUpdaterRedirectTarget,
   type ProductUpdaterNetworkMode
 } from './product-updater-network-policy'
 export { isBoundedUpdaterArtifactSize } from '../updater-artifact-size-policy'
@@ -51,7 +52,8 @@ export function installProductUpdaterNetworkBoundary(
         normalizedUrl,
         productRepository,
         getMode(),
-        getLocalFeedUrl()
+        getLocalFeedUrl(),
+        getReleaseFeedUrl()
       )
     ) {
       authorizedRedirectUrls.set(normalizedUrl, epoch)
@@ -66,7 +68,8 @@ export function installProductUpdaterNetworkBoundary(
           productRepository,
           getMode(),
           getLocalFeedUrl(),
-          getAdditionalReleaseControlUrls()
+          getAdditionalReleaseControlUrls(),
+          getReleaseFeedUrl()
         )
     })
   })
@@ -74,9 +77,21 @@ export function installProductUpdaterNetworkBoundary(
     const localFeedUrl = getLocalFeedUrl()
     const mode = getMode()
     const isArtifact =
-      isFinalUpdaterArtifactUrl(details.url, productRepository, mode, localFeedUrl) ||
+      isFinalUpdaterArtifactUrl(
+        details.url,
+        productRepository,
+        mode,
+        localFeedUrl,
+        getReleaseFeedUrl()
+      ) ||
       (isAuthorizedRedirectUrl(details.url) &&
-        isFinalUpdaterRedirectArtifactUrl(details.url, productRepository, mode, localFeedUrl))
+        isFinalUpdaterRedirectArtifactUrl(
+          details.url,
+          productRepository,
+          mode,
+          localFeedUrl,
+          getReleaseFeedUrl()
+        ))
     const isRedirect = details.statusCode >= 300 && details.statusCode < 400
     const isSuccessfulArtifactResponse = details.statusCode === 200 || details.statusCode === 206
     callback({

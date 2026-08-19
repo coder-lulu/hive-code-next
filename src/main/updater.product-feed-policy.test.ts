@@ -5,7 +5,9 @@ const {
   appMock,
   autoUpdaterMock,
   fetchNewerReleaseTagsMock,
+  fetchProductUpdateManifestMock,
   productUpdateSourceState,
+  installProductUpdaterNetworkBoundaryMock,
   moduleFactories,
   resetUpdaterMocks
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
@@ -28,6 +30,7 @@ vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSo
 vi.mock('./product/product-updater-network-boundary', () =>
   moduleFactories.productUpdaterNetworkBoundary()
 )
+vi.mock('./product/product-updater-session', () => moduleFactories.productUpdaterSession())
 vi.mock('./linux-root-package-install-policy', () =>
   moduleFactories.linuxRootPackageInstallPolicy()
 )
@@ -41,7 +44,8 @@ function configuredProductSource(channel: 'stable' | 'rc'): ProductUpdateSource 
       atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
       releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
       releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
-    }
+    },
+    provider: 'github'
   }
 }
 
@@ -66,6 +70,69 @@ describe('updater product feed policy', () => {
       })
     })
     expect(autoUpdaterMock.allowPrerelease).toBe(true)
+  })
+
+  it('configures the platform-specific HiveCloud generic feed without GitHub authority', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'darwin', arch: 'arm64' })
+    productUpdateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+      github: null,
+      provider: 'hivecloud'
+    }
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/macos/arm64/'
+    })
+    expect(installProductUpdaterNetworkBoundaryMock).toHaveBeenCalledWith(
+      null,
+      expect.any(Function),
+      autoUpdaterMock.httpExecutor,
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function)
+    )
+  })
+
+  it('checks the HiveCloud manifest directly without a GitHub release fallback', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'darwin', arch: 'arm64' })
+    productUpdateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+      github: null,
+      provider: 'hivecloud'
+    }
+    const send = vi.fn()
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      queueMicrotask(() => autoUpdaterMock.emit('update-available', { version: '1.0.52' }))
+      return Promise.resolve(undefined)
+    })
+    const { checkForUpdatesFromMenu, setupAutoUpdater } = await import('./updater')
+    setupAutoUpdater({ webContents: { send } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+
+    checkForUpdatesFromMenu()
+
+    await vi.waitFor(() => {
+      expect(send).toHaveBeenCalledWith(
+        'updater:status',
+        expect.objectContaining({ state: 'available', version: '1.0.52' })
+      )
+    })
+    expect(fetchProductUpdateManifestMock).toHaveBeenCalledWith(
+      'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/macos/arm64/latest-mac.yml',
+      expect.objectContaining({ redirect: 'error' })
+    )
+    expect(fetchNewerReleaseTagsMock).not.toHaveBeenCalled()
   })
 
   it('resets prerelease acceptance when an RC override changes to stable', async () => {

@@ -18,7 +18,7 @@ const validManifest = {
   slug: 'hivecode',
   branding: {
     logoAsset: 'resources/product-logo.png',
-    logoSha256: 'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
+    logoSha256: '46325bf9d05755d2b412f0a2e720cb1944d69abb7f6e3c07b59ed304f4e81950'
   },
   publicLinks: {
     website: null,
@@ -38,6 +38,7 @@ const validManifest = {
     appId: '',
     executableName: 'HiveCode',
     publisher: '',
+    updateProvider: '',
     updateChannel: '',
     updateRepository: '',
     starRepository: ''
@@ -110,6 +111,15 @@ describe('validateProductManifest', () => {
     ).toThrow('desktop.updateChannel must be stable, rc, or null')
   })
 
+  it('rejects unknown updater providers', () => {
+    expect(() =>
+      validateProductManifest({
+        ...validManifest,
+        desktop: { ...validManifest.desktop, updateProvider: 'generic' }
+      })
+    ).toThrow('desktop.updateProvider must be github, hivecloud, or null')
+  })
+
   it.each(['artifacts', 'changelog', 'nudge'])(
     'requires HTTPS for the remote-content %s endpoint',
     (key) => {
@@ -143,6 +153,7 @@ describe('validateProductManifest', () => {
     ['schemes', 'primary'],
     ['desktop', 'appId'],
     ['desktop', 'publisher'],
+    ['desktop', 'updateProvider'],
     ['desktop', 'updateRepository'],
     ['desktop', 'starRepository'],
     ['mobile', 'bundleId'],

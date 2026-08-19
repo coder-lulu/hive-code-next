@@ -36,6 +36,7 @@ const findStep = (job, predicate, description) => {
 describe('disabled product release workflow boundary', () => {
   it('keeps every retained upstream release job unreachable in the product repository', () => {
     expect(productManifest.desktop.updateRepository).toBeNull()
+    expect(productManifest.desktop.updateProvider).toBeNull()
     expect(productManifest.endpoints.update).toBeNull()
     expect(productManifest.desktop.updateChannel).toBeNull()
 

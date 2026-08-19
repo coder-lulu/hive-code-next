@@ -13,6 +13,7 @@ const DEFAULT_PRODUCT_MANIFEST_PATH = path.join(
   'hivecode.product.json'
 )
 const REQUIRED_PROTECTED_FILES = ['.gitignore', '.gitattributes']
+const GIT_FILE_LIST_MAX_BUFFER = 16 * 1024 * 1024
 
 export function loadCanonicalBrandLiteral(manifestPath = DEFAULT_PRODUCT_MANIFEST_PATH) {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
@@ -197,6 +198,7 @@ function listRepositoryFiles(root) {
       cwd: root,
       encoding: 'utf8',
       env,
+      maxBuffer: GIT_FILE_LIST_MAX_BUFFER,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true
     }

@@ -112,7 +112,8 @@ describe('updater candidate fencing', () => {
         atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
         releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
         releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
-      }
+      },
+      provider: 'github'
     }
     updater.downloadUpdate()
 

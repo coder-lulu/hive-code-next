@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { resolveProductUpdateSource } from './product-update-source'
+import { resolveProductUpdateFeedUrl, resolveProductUpdateSource } from './product-update-source'
 
 const config = (
   updateChannel: string | null,
   updateEndpoint: string | null,
-  updateRepository: string | null = 'coder-lulu/hive-code'
+  updateRepository: string | null = 'coder-lulu/hive-code',
+  updateProvider: string | null = 'github'
 ): Parameters<typeof resolveProductUpdateSource>[0] => ({
-  desktop: { updateChannel, updateRepository },
+  desktop: { updateChannel, updateProvider, updateRepository },
   endpoints: { update: updateEndpoint }
 })
 
@@ -15,19 +16,27 @@ describe('resolveProductUpdateSource', () => {
     [
       null,
       'https://github.com/coder-lulu/hive-code/releases/latest/download',
-      'coder-lulu/hive-code'
+      'coder-lulu/hive-code',
+      'github'
     ],
-    ['stable', null, 'coder-lulu/hive-code'],
+    ['stable', null, 'coder-lulu/hive-code', 'github'],
+    [
+      'stable',
+      'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      'coder-lulu/hive-code',
+      null
+    ],
     [
       '',
       'https://github.com/coder-lulu/hive-code/releases/latest/download',
-      'coder-lulu/hive-code'
+      'coder-lulu/hive-code',
+      'github'
     ],
-    ['stable', 'https://github.com/coder-lulu/hive-code/releases/latest/download', null]
+    ['stable', 'https://github.com/coder-lulu/hive-code/releases/latest/download', null, 'github']
   ])(
     'fails closed when channel, endpoint, or repository is not configured',
-    (channel, endpoint, repository) => {
-      expect(resolveProductUpdateSource(config(channel, endpoint, repository))).toBeNull()
+    (channel, endpoint, repository, provider) => {
+      expect(resolveProductUpdateSource(config(channel, endpoint, repository, provider))).toBeNull()
     }
   )
 
@@ -44,8 +53,63 @@ describe('resolveProductUpdateSource', () => {
         atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
         releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
         releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
-      }
+      },
+      provider: 'github'
     })
+  })
+
+  it('resolves an explicit HiveCloud generic feed without GitHub metadata', () => {
+    expect(
+      resolveProductUpdateSource(
+        config(
+          'stable',
+          'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+          null,
+          'hivecloud'
+        )
+      )
+    ).toEqual({
+      channel: 'stable',
+      feedUrl: 'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+      github: null,
+      provider: 'hivecloud'
+    })
+  })
+
+  it.each([
+    ['win32', 'x64', 'stable/windows/x64/'],
+    ['darwin', 'arm64', 'stable/macos/arm64/'],
+    ['linux', 'x64', 'stable/linux/x64/']
+  ] as const)('builds the HiveCloud feed for %s/%s', (platform, arch, suffix) => {
+    const source = resolveProductUpdateSource(
+      config(
+        'stable',
+        'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+        null,
+        'hivecloud'
+      )
+    )
+
+    expect(source && resolveProductUpdateFeedUrl(source, platform, arch)).toBe(
+      `https://updates.hivekernel.example/hive/v1/updates/desktop/${suffix}`
+    )
+  })
+
+  it.each([
+    ['freebsd', 'x64'],
+    ['win32', 'ia32'],
+    ['linux', 'riscv64']
+  ] as const)('fails closed for unsupported HiveCloud target %s/%s', (platform, arch) => {
+    const source = resolveProductUpdateSource(
+      config(
+        'stable',
+        'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+        null,
+        'hivecloud'
+      )
+    )
+
+    expect(source && resolveProductUpdateFeedUrl(source, platform, arch)).toBeNull()
   })
 
   it.each([
@@ -56,6 +120,36 @@ describe('resolveProductUpdateSource', () => {
     'https://github.com/coder-lulu/hive%2Fcode/releases/latest/download'
   ])('fails closed for unsupported or non-canonical update endpoint %s', (endpoint) => {
     expect(resolveProductUpdateSource(config('stable', endpoint))).toBeNull()
+  })
+
+  it.each([
+    'https://updates.hivekernel.example/hive/v1/updates/desktop',
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/beta/',
+    'https://github.com/coder-lulu/hive-code/releases/latest/download'
+  ])('fails closed for a non-canonical HiveCloud update endpoint %s', (endpoint) => {
+    expect(resolveProductUpdateSource(config('stable', endpoint, null, 'hivecloud'))).toBeNull()
+  })
+
+  it.each([
+    'http://updates.hivekernel.example/hive/v1/updates/desktop/',
+    'https://user:secret@updates.hivekernel.example/hive/v1/updates/desktop/',
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/?token=secret',
+    'https://updates.hivekernel.example/hive/v1/updates/desktop/#latest'
+  ])('fails closed for an unsafe HiveCloud update endpoint %s', (endpoint) => {
+    expect(resolveProductUpdateSource(config('stable', endpoint, null, 'hivecloud'))).toBeNull()
+  })
+
+  it('fails closed instead of using a configured repository as a HiveCloud fallback', () => {
+    expect(
+      resolveProductUpdateSource(
+        config(
+          'stable',
+          'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+          'stablyai/orca',
+          'hivecloud'
+        )
+      )
+    ).toBeNull()
   })
 
   it.each([

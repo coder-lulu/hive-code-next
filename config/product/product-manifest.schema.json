@@ -88,6 +88,7 @@
         "appId",
         "executableName",
         "publisher",
+        "updateProvider",
         "updateChannel",
         "updateRepository",
         "starRepository"
@@ -96,6 +97,10 @@
         "appId": { "$ref": "#/$defs/nullableString" },
         "executableName": { "type": "string", "minLength": 1 },
         "publisher": { "$ref": "#/$defs/nullableString" },
+        "updateProvider": {
+          "type": ["string", "null"],
+          "enum": ["github", "hivecloud", null]
+        },
         "updateChannel": {
           "type": ["string", "null"],
           "enum": ["stable", "rc", null]

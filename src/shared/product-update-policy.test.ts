@@ -4,10 +4,11 @@ import { hasConfiguredProductUpdateChannel } from './product-update-policy'
 function config(
   updateChannel: string | null,
   updateEndpoint: string | null,
-  updateRepository: string | null = 'coder-lulu/hive-code'
+  updateRepository: string | null = 'coder-lulu/hive-code',
+  updateProvider: string | null = 'github'
 ) {
   return {
-    desktop: { updateChannel, updateRepository },
+    desktop: { updateChannel, updateProvider, updateRepository },
     endpoints: { update: updateEndpoint }
   } as never
 }
@@ -25,6 +26,19 @@ describe('product update policy', () => {
     expect(
       hasConfiguredProductUpdateChannel(
         config('stable', 'https://github.com/coder-lulu/hive-code/releases/latest/download')
+      )
+    ).toBe(true)
+  })
+
+  it('accepts an explicit HiveCloud generic source without a GitHub repository', () => {
+    expect(
+      hasConfiguredProductUpdateChannel(
+        config(
+          'stable',
+          'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+          null,
+          'hivecloud'
+        )
       )
     ).toBe(true)
   })

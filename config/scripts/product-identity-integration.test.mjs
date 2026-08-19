@@ -5,6 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
+const { PNG } = require('pngjs')
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const manifest = JSON.parse(
   readFileSync(path.join(repoRoot, 'config', 'product', 'hivecode.product.json'), 'utf8')
@@ -35,6 +36,29 @@ const macOSComputerUseHelper = readFileSync(
   'utf8'
 )
 
+function readPngAsset(relativePath) {
+  return PNG.sync.read(readFileSync(path.join(repoRoot, relativePath)))
+}
+
+function opaqueBounds(png, threshold = 16) {
+  let minX = png.width
+  let minY = png.height
+  let maxX = -1
+  let maxY = -1
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      if (png.data[(y * png.width + x) * 4 + 3] <= threshold) {
+        continue
+      }
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x)
+      maxY = Math.max(maxY, y)
+    }
+  }
+  return { width: maxX - minX + 1, height: maxY - minY + 1 }
+}
+
 describe('HiveCode product identity integration', () => {
   it('fails closed when official HiveCode public links are not configured', () => {
     expect(manifest.publicLinks).toEqual({
@@ -54,7 +78,7 @@ describe('HiveCode product identity integration', () => {
   it('locks the renderer to the approved HiveCode product logo', () => {
     expect(manifest.branding).toEqual({
       logoAsset: 'resources/product-logo.png',
-      logoSha256: 'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
+      logoSha256: '46325bf9d05755d2b412f0a2e720cb1944d69abb7f6e3c07b59ed304f4e81950'
     })
 
     const logoPath = path.join(repoRoot, 'resources', 'product-logo.png')
@@ -95,44 +119,44 @@ describe('HiveCode product identity integration', () => {
     const approvedAssetHashes = new Map([
       [
         'resources/build/icon.icns',
-        '272ee05e02a6607d5e60fa1abd6fce9bb5f35a9c17cd1b20f8e60988decc91af'
+        '35771887728489b22cd4dbbbb2d9b925c900e9e3cd5a3aedcbe4e7cf255f57ab'
       ],
       [
         'resources/build/icon.ico',
-        'd670099a83874fcfbe8f4e263defba80a0635e3a57e1bdde13788818fd3c8bb3'
+        'e194b6e13524972d56c99aaa468d7938d4cc93e18ea5671dd4c15791b7a659b9'
       ],
       [
         'resources/build/icon.png',
-        'bbad4c2af11cc81514422c29f5975c7cf985cd50483bb4a1702640ee93fde0af'
+        'b7a69da0450fa36d754e492b11a567122e0b1d19dcd03f013837fba1083950ea'
       ],
-      ['resources/icon.png', 'b23ce8815889c4c3dd426c3b25fa24869525130fed39d00f1b247284ecc6afb1'],
+      ['resources/icon.png', '3175a4ae96c2e53e74f09d7dfcd8d914035fdec185d565a70c877ae8a9790c8e'],
       [
         'resources/icon-dev.png',
-        'b23ce8815889c4c3dd426c3b25fa24869525130fed39d00f1b247284ecc6afb1'
+        '3175a4ae96c2e53e74f09d7dfcd8d914035fdec185d565a70c877ae8a9790c8e'
       ],
       [
         'resources/tray/hivecode-menu-barTemplate.png',
-        'ea57c7291a89afbdf4874eeb0e1cc93494cd40983bbde61e5c98a597a2c1f734'
+        '63a6070d3a47b8fdd7abd0582cdf106b998c8f6789163bbe3a54032a74b5bf41'
       ],
       [
         'resources/tray/hivecode-menu-barTemplate@2x.png',
-        '1aaf3c596e75211ee9681fecc5db86e881b667190cadcad150346a9056dc5e04'
+        '0e0f0677ccedc14aeefb1dc1067c2fb85dd22c187d2aa258bc77877e6251c1d5'
       ],
       [
         'mobile/assets/icon.png',
-        'bbad4c2af11cc81514422c29f5975c7cf985cd50483bb4a1702640ee93fde0af'
+        '788759ae38ce6de76a5a774e3aeb317421bcf266eeed11a8eddd4c8e5b3e269d'
       ],
       [
         'mobile/assets/adaptive-icon.png',
-        '45929d312d42cb36911935c574883506422b7a58a4f73a47291edc235529a857'
+        'e29b1fd66f0061d41bf26befef5475cc7446b0a484501efed59ec7d6d3e13fbe'
       ],
       [
         'mobile/assets/splash-icon.png',
-        'd8440bc0b5c22e4f909fc3ad06a1bf3392c66029276e9a98b7cfa2a17ec8804d'
+        '64fc8a02e7eca4b8a84dda59d4078d7a9d4b3b842ac3957a9af8b19671b43206'
       ],
       [
         'mobile/assets/favicon.png',
-        '5761711eb8fd340e5124c31c61da3c2982852bd5ed04af8fe3717400a7c2359e'
+        'c6cbf2769698e88b6cb4a7c14558013ae5879ee369a4e161d6c7614e33a0fd2a'
       ]
     ])
     for (const [relativePath, expectedHash] of approvedAssetHashes) {
@@ -143,12 +167,31 @@ describe('HiveCode product identity integration', () => {
       )
     }
 
-    expect(mobileApp.expo.splash.backgroundColor).toBe('#FBF8F1')
-    expect(mobileApp.expo.android.adaptiveIcon.backgroundColor).toBe('#FBF8F1')
+    const desktopIcon = readPngAsset('resources/build/icon.png')
+    expect([desktopIcon.width, desktopIcon.height]).toEqual([1024, 1024])
+    expect(desktopIcon.data[3]).toBe(0)
+
+    const mobileIcon = readPngAsset('mobile/assets/icon.png')
+    expect([mobileIcon.width, mobileIcon.height]).toEqual([1024, 1024])
+    expect(mobileIcon.data.every((value, index) => index % 4 !== 3 || value === 255)).toBe(true)
+
+    const adaptiveIcon = readPngAsset('mobile/assets/adaptive-icon.png')
+    const adaptiveBounds = opaqueBounds(adaptiveIcon)
+    expect(Math.max(adaptiveBounds.width, adaptiveBounds.height) / adaptiveIcon.width).toBeLessThan(
+      0.62
+    )
+    expect(adaptiveIcon.data[3]).toBe(0)
+
+    const productLogo = readPngAsset('resources/product-logo.png')
+    expect([productLogo.width, productLogo.height]).toEqual([512, 512])
+    expect(productLogo.data[3]).toBe(0)
+
+    expect(mobileApp.expo.splash.backgroundColor).toBe('#EAF2FF')
+    expect(mobileApp.expo.android.adaptiveIcon.backgroundColor).toBe('#EAF2FF')
     const splashPlugin = mobileApp.expo.plugins.find(
       (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen'
     )
-    expect(splashPlugin?.[1]?.backgroundColor).toBe('#FBF8F1')
+    expect(splashPlugin?.[1]?.backgroundColor).toBe('#EAF2FF')
 
     const mobileLogo = readFileSync(
       path.join(repoRoot, 'mobile', 'src', 'components', 'OrcaLogo.tsx'),
@@ -180,9 +223,19 @@ describe('HiveCode product identity integration', () => {
     expect(existsSync(iconSourceAssetPath)).toBe(true)
     if (existsSync(iconSourceAssetPath)) {
       expect(createHash('sha256').update(readFileSync(iconSourceAssetPath)).digest('hex')).toBe(
-        'bbad4c2af11cc81514422c29f5975c7cf985cd50483bb4a1702640ee93fde0af'
+        '788759ae38ce6de76a5a774e3aeb317421bcf266eeed11a8eddd4c8e5b3e269d'
       )
     }
+
+    const masterLogoPath = path.join(
+      repoRoot,
+      'resources',
+      'icon-source',
+      'hivecode-logo-master.png'
+    )
+    expect(createHash('sha256').update(readFileSync(masterLogoPath)).digest('hex')).toBe(
+      '4978f3611915cdd98fb97766ba2938d54c5f378f9075e233bc418c0d13372ca8'
+    )
 
     for (const legacyLogoPath of [
       'resources/logo.svg',
