@@ -22,6 +22,7 @@
     "config/scripts/check-hivecode-brand-boundary.mjs",
     "config/scripts/check-hivecode-brand-boundary.test.mjs",
     "config/scripts/cli-packaging-identity.test.mjs",
+    "config/scripts/dev-electron-bundle-identity.mjs",
     "config/scripts/electron-builder-config.test.mjs",
     "config/scripts/electron-builder-mac-channel-config.test.mjs",
     "config/scripts/generate-hivecode-icon-assets.mjs",
@@ -31,7 +32,6 @@
     "config/scripts/packaged-updater-security-boundary.test.mjs",
     "config/scripts/product-identity-integration.test.mjs",
     "config/scripts/product-release-workflow-boundary.test.mjs",
-    "config/scripts/run-electron-vite-dev.mjs",
     "config/scripts/verify-cli-bin.mjs",
     "config/scripts/verify-cli-bin.test.mjs",
     "docs/engineering/fork-boundary-policy.md",
@@ -183,7 +183,7 @@
     "src/shared/remote-runtime-transport-error-agreement.test.ts"
   ],
   "protectedFileHashes": {
-    ".gitignore": "31306c992a52fd2ce382e65c7e0cd7c09c5fb7b9d06db5f27ed7a0b09b844910",
-    ".gitattributes": "7ed78f0f9cd5efbb820dc88750f5b5b90688c0e544a7c403cb1ad58ba5e79a94"
+    ".gitignore": "3dcd3fddefa1c7811a5d1ff27f5a824c5b3798428eca8323f1e0cb7e289cd621",
+    ".gitattributes": "e137c5cd7e29f2546b030587d1d5da1058a973edd546814b5deb83a55b1825c7"
   }
 }

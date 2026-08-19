@@ -8,6 +8,8 @@ export type IosChannel = 'stable' | 'preview'
 
 export type InstallCopy = { ctaLabel: string; url: string | null }
 
+export const ANDROID_INSTALL_GUIDE_URL = PRODUCT_PUBLIC_LINKS.documentation
+
 const IOS_CHANNEL_COPY: Record<IosChannel, InstallCopy> = {
   stable: {
     ctaLabel: 'Open App Store',

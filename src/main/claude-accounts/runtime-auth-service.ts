@@ -1095,7 +1095,7 @@ export class ClaudeRuntimeAuthService {
             [
               '-d',
               wslInfo.distro,
-              '--',
+              '--exec',
               'bash',
               '-lc',
               buildEncodedWslBashCommand(
