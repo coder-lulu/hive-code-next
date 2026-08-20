@@ -121,7 +121,11 @@ export async function installTranscriptWatcher(
     if (transcriptFileVersionChanged(completedVersion, startVersion)) {
       // Why: a write racing this drain needs another pass even when the reader
       // happened to reach its new EOF; timestamp-only rewrites may need replace.
-      watchedVersion = startVersion
+      // Keep the completed stat as the observed version so duplicate watcher
+      // notifications do not replay the same replacement snapshot. The next
+      // drain still compares the boundary and offset, and pendingReadRequested
+      // ensures a write observed during this drain is reconciled immediately.
+      watchedVersion = completedVersion
       pendingReadRequested = true
     } else {
       watchedVersion = completedVersion
