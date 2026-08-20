@@ -64,7 +64,7 @@ describe('filesystem-list-files real git fallback', () => {
 
   afterEach(async () => {
     if (tempDir) {
-      await rm(tempDir, { recursive: true, force: true })
+      await rm(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
       tempDir = null
     }
     vi.clearAllMocks()
