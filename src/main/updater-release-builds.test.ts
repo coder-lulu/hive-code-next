@@ -38,11 +38,23 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
   }
 }
 
+/** Every platform's manifest by default, so a case that is not about asset
+ *  filtering stays readable and stays green whatever platform is passed. */
+const allPlatformAssets = [
+  { name: 'latest-mac.yml' },
+  { name: 'orca-macos-arm64.dmg' },
+  { name: 'latest.yml' },
+  { name: 'orca-windows-setup.exe' },
+  { name: 'latest-linux.yml' },
+  { name: 'orca-linux.AppImage' }
+]
+
 const release = (tag: string, extra: Record<string, unknown> = {}) => ({
   tag_name: tag,
   draft: false,
   published_at: '2026-07-28T14:00:00Z',
   html_url: `https://github.com/stablyai/orca/releases/tag/${tag}`,
+  assets: allPlatformAssets,
   ...extra
 })
 
@@ -135,16 +147,16 @@ describe('listReleaseBuilds', () => {
       jsonResponse([release('v1.4.160-rc.2'), release('v1.4.159'), release('v1.4.158')])
     )
 
-    await expect(listReleaseBuilds('stable').then((b) => b.map((x) => x.version))).resolves.toEqual(
-      ['1.4.159', '1.4.158']
-    )
+    await expect(
+      listReleaseBuilds('stable', 'darwin').then((b) => b.map((x) => x.version))
+    ).resolves.toEqual(['1.4.159', '1.4.158'])
 
     fetchMock.mockResolvedValue(
       jsonResponse([release('v1.4.160-rc.2'), release('v1.4.159'), release('v1.4.158')])
     )
-    await expect(listReleaseBuilds('rc').then((b) => b.map((x) => x.version))).resolves.toEqual([
-      '1.4.160-rc.2'
-    ])
+    await expect(
+      listReleaseBuilds('rc', 'darwin').then((b) => b.map((x) => x.version))
+    ).resolves.toEqual(['1.4.160-rc.2'])
   })
 
   // Why: a draft release has no downloadable assets; offering it makes the
@@ -159,7 +171,7 @@ describe('listReleaseBuilds', () => {
       ])
     )
 
-    const builds = await listReleaseBuilds('stable')
+    const builds = await listReleaseBuilds('stable', 'darwin')
     expect(builds.map((build) => build.version)).toEqual(['1.4.159'])
   })
 
@@ -193,6 +205,72 @@ describe('listReleaseBuilds', () => {
 
     const builds = await listReleaseBuilds('stable')
     expect(builds.map((build) => build.name)).toEqual(['Product 1.4.163', null, null, null])
+  })
+
+  // Why: a release can publish one platform before another. The picker must not
+  // offer a row whose current platform download would 404.
+  it('hides builds that published no artifact for this platform', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        release('v1.4.163'),
+        release('v1.4.162', {
+          assets: [{ name: 'latest-mac.yml' }, { name: 'orca-macos-arm64.dmg' }]
+        })
+      ])
+    )
+
+    await expect(
+      listReleaseBuilds('stable', 'win32').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.163'])
+  })
+
+  it('returns an empty list when no build has this platform artifact', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest-mac.yml' }] })])
+    )
+
+    await expect(listReleaseBuilds('stable', 'win32')).resolves.toEqual([])
+  })
+
+  it('keeps mac builds visible on macOS regardless of the Windows leg', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest-mac.yml' }] })])
+    )
+
+    await expect(
+      listReleaseBuilds('stable', 'darwin').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.163'])
+  })
+
+  it('resolves the platform installer download url', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([release('v1.4.163')]))
+
+    const [build] = await listReleaseBuilds('stable', 'win32')
+
+    expect(build.installerUrl).toBe(
+      'https://github.com/stablyai/orca/releases/download/v1.4.163/orca-windows-setup.exe'
+    )
+  })
+
+  it('leaves the installer url null when the release published no installer', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest.yml' }] })])
+    )
+
+    const [build] = await listReleaseBuilds('stable', 'win32')
+
+    expect(build.installerUrl).toBeNull()
+  })
+
+  it('tolerates a release whose assets are missing or malformed', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        release('v1.4.163', { assets: undefined }),
+        release('v1.4.162', { assets: [null, { name: 7 }] })
+      ])
+    )
+
+    await expect(listReleaseBuilds('stable', 'win32')).resolves.toEqual([])
   })
 
   it('surfaces a rate limit as an actionable message', async () => {

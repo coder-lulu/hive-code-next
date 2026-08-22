@@ -18,6 +18,7 @@ vi.mock('./product-update-source', () => ({
 }))
 import {
   RELEASE_CHANNELS,
+  findInstallerAssetName,
   formatAdhocVersion,
   formatDailyVersion,
   formatHourlyVersion,
@@ -25,6 +26,7 @@ import {
   getReleaseRepoForChannel,
   getVersionChannel,
   hasDedicatedReleaseRepo,
+  hasInstallableArtifactForPlatform,
   isAdhocVersion,
   isChannelSupportedOnPlatform,
   isDailyVersion,
@@ -34,8 +36,10 @@ import {
   parseDailyVersionStamp,
   parseDevBuildStamp,
   parseHourlyVersionStamp,
+  requiresManualDevChannelInstall,
   sortReleaseBuildsNewestFirst,
-  type ReleaseBuild
+  type ReleaseBuild,
+  type ReleaseChannel
 } from './release-channel'
 import { compareAppVersions } from './app-version'
 
@@ -189,9 +193,65 @@ describe('release channel', () => {
   it('does not offer unconfigured dev channels on any platform', () => {
     for (const channel of ['hourly', 'daily', 'adhoc'] as const) {
       expect(isChannelSupportedOnPlatform(channel, 'darwin')).toBe(false)
-      expect(isChannelSupportedOnPlatform(channel, 'linux')).toBe(false)
       expect(isChannelSupportedOnPlatform(channel, 'win32')).toBe(false)
+      expect(isChannelSupportedOnPlatform(channel, 'linux')).toBe(false)
     }
+  })
+
+  it('does not expose a manual-install route to an unconfigured dev channel', () => {
+    const manual = (runningChannel: ReleaseChannel | null, targetChannel: ReleaseChannel) =>
+      requiresManualDevChannelInstall({ platform: 'win32', runningChannel, targetChannel })
+
+    expect(manual('stable', 'adhoc')).toBe(false)
+    expect(manual('rc', 'hourly')).toBe(false)
+    expect(manual('stable', 'daily')).toBe(false)
+    expect(manual(null, 'adhoc')).toBe(false)
+    expect(manual('adhoc', 'hourly')).toBe(false)
+    expect(manual('hourly', 'adhoc')).toBe(false)
+    expect(manual('hourly', 'stable')).toBe(false)
+    expect(manual('adhoc', 'rc')).toBe(false)
+    expect(manual('stable', 'rc')).toBe(false)
+    expect(manual('rc', 'stable')).toBe(false)
+  })
+
+  // Why: macOS dev builds are signed and notarized like a release, so the
+  // updater installs them over a stable build with no manual step.
+  it('never requires a manual install off Windows', () => {
+    for (const platform of ['darwin', 'linux'] as const) {
+      expect(
+        requiresManualDevChannelInstall({
+          platform,
+          runningChannel: 'stable',
+          targetChannel: 'adhoc'
+        })
+      ).toBe(false)
+    }
+  })
+
+  it('detects an installable artifact from the platform update manifest', () => {
+    expect(hasInstallableArtifactForPlatform('win32', ['latest.yml'])).toBe(true)
+    expect(hasInstallableArtifactForPlatform('win32', ['latest-mac.yml'])).toBe(false)
+    expect(hasInstallableArtifactForPlatform('darwin', ['latest-mac.yml'])).toBe(true)
+    expect(hasInstallableArtifactForPlatform('darwin', ['latest.yml'])).toBe(false)
+    expect(hasInstallableArtifactForPlatform('linux', ['latest-linux-arm64.yml'])).toBe(true)
+    expect(hasInstallableArtifactForPlatform('linux', [])).toBe(false)
+    // An unknown platform must not hide every build; a download-time error is a
+    // better failure than an empty picker with no explanation.
+    expect(hasInstallableArtifactForPlatform('freebsd', [])).toBe(true)
+  })
+
+  it('finds the directly runnable installer for a platform', () => {
+    const assets = [
+      'latest.yml',
+      'orca-windows-setup.exe',
+      'orca-macos-arm64.dmg',
+      'orca-linux.AppImage'
+    ]
+    expect(findInstallerAssetName('win32', assets)).toBe('orca-windows-setup.exe')
+    expect(findInstallerAssetName('darwin', assets)).toBe('orca-macos-arm64.dmg')
+    expect(findInstallerAssetName('linux', assets)).toBe('orca-linux.AppImage')
+    expect(findInstallerAssetName('win32', ['latest.yml'])).toBeNull()
+    expect(findInstallerAssetName('freebsd', assets)).toBeNull()
   })
 
   it('offers stable and rc on every platform', () => {
@@ -221,7 +281,8 @@ describe('release channel', () => {
       channel: 'hourly',
       name: null,
       publishedAt: null,
-      releaseUrl: `https://github.com/stablyai/orca-hourly/releases/tag/v${version}`
+      releaseUrl: `https://github.com/stablyai/orca-hourly/releases/tag/v${version}`,
+      installerUrl: null
     })
     const sorted = sortReleaseBuildsNewestFirst([
       build('1.4.160-hourly.202607280900'),
@@ -266,7 +327,8 @@ describe('release channel', () => {
       channel: 'adhoc',
       name: null,
       publishedAt: null,
-      releaseUrl: `https://github.com/stablyai/orca-adhoc/releases/tag/v${version}`
+      releaseUrl: `https://github.com/stablyai/orca-adhoc/releases/tag/v${version}`,
+      installerUrl: null
     })
     const sorted = sortReleaseBuildsNewestFirst([
       build('1.4.160-adhoc.20260728140502'),

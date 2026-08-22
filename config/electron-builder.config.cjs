@@ -26,14 +26,27 @@ const productManifest = require('./product/hivecode.product.json')
 const isMacHourly = process.env.ORCA_MAC_HOURLY === '1'
 const isMacDaily = process.env.ORCA_MAC_DAILY === '1'
 const isMacAdhoc = process.env.ORCA_MAC_ADHOC === '1'
+// Why a second set of variables rather than making the mac ones platform-neutral:
+// the mac ones gate `isMacRelease` below, which turns on hardened runtime,
+// notarization, and root-level `forceCodeSigning`. A Windows dev build that
+// reused them would fail packaging outright for want of a cert it is
+// deliberately not using.
+const isWinHourly = process.env.ORCA_WIN_HOURLY === '1'
+const isWinDaily = process.env.ORCA_WIN_DAILY === '1'
+const isWinAdhoc = process.env.ORCA_WIN_ADHOC === '1'
+const isWinDevChannel = isWinHourly || isWinDaily || isWinAdhoc
 const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
-const localBuildVersion = isMacRelease ? undefined : process.env.ORCA_LOCAL_BUILD_VERSION
-const devChannelBuildVersion = isMacHourly
+const localBuildVersion =
+  isMacRelease || isWinDevChannel ? undefined : process.env.ORCA_LOCAL_BUILD_VERSION
+const isHourlyChannel = isMacHourly || isWinHourly
+const isDailyChannel = isMacDaily || isWinDaily
+const isAdhocChannel = isMacAdhoc || isWinAdhoc
+const devChannelBuildVersion = isHourlyChannel
   ? process.env.ORCA_HOURLY_BUILD_VERSION
-  : isMacDaily
+  : isDailyChannel
     ? process.env.ORCA_DAILY_BUILD_VERSION
-    : isMacAdhoc
+    : isAdhocChannel
       ? process.env.ORCA_ADHOC_BUILD_VERSION
       : undefined
 const appId = productManifest.desktop.appId

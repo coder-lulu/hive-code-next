@@ -734,6 +734,9 @@ export function createMainWindow(
       case 'openTasks':
         mainWindow.webContents.send('ui:openTasks')
         return
+      case 'toggleAgentDashboard':
+        mainWindow.webContents.send('ui:toggleAgentDashboard')
+        return
       case 'switchRecentTab':
         mainWindow.webContents.send('ui:switchRecentTab')
         return

@@ -1,7 +1,9 @@
 import { resolveProductUpdateSource } from '../shared/product-update-source'
 import {
+  findInstallerAssetName,
   getReleaseRepoForChannel,
   getVersionChannel,
+  hasInstallableArtifactForPlatform,
   normalizeTagToVersion,
   sortReleaseBuildsNewestFirst,
   type ReleaseBuild,
@@ -29,9 +31,24 @@ type GitHubReleaseEntry = {
   name?: unknown
   draft?: unknown
   published_at?: unknown
+  html_url?: unknown
+  assets?: unknown
 }
 
-function parseReleaseEntry(entry: GitHubReleaseEntry, repo: string): ReleaseBuild | null {
+function readAssetNames(assets: unknown): string[] {
+  if (!Array.isArray(assets)) {
+    return []
+  }
+  return assets
+    .map((asset) => (asset as { name?: unknown })?.name)
+    .filter((name): name is string => typeof name === 'string')
+}
+
+function parseReleaseEntry(
+  entry: GitHubReleaseEntry,
+  repo: string,
+  platform: NodeJS.Platform
+): ReleaseBuild | null {
   if (typeof entry.tag_name !== 'string' || entry.draft === true) {
     return null
   }
@@ -41,6 +58,15 @@ function parseReleaseEntry(entry: GitHubReleaseEntry, repo: string): ReleaseBuil
   if (!isValidVersion(version) || !channel) {
     return null
   }
+  // Why filter on assets rather than on a per-channel platform table: a release
+  // is published as soon as one platform's leg finishes, and a leg can fail
+  // outright. Asking what the release actually carries covers both without the
+  // picker ever offering a row whose download 404s.
+  const assetNames = readAssetNames(entry.assets)
+  if (!hasInstallableArtifactForPlatform(platform, assetNames)) {
+    return null
+  }
+  const installerAsset = findInstallerAssetName(platform, assetNames)
   // Why null when it merely repeats the tag: GitHub titles an untitled release
   // with its tag name, and hourlies predating the naming change were created that
   // way too. Neither says anything the version beside it does not.
@@ -51,7 +77,10 @@ function parseReleaseEntry(entry: GitHubReleaseEntry, repo: string): ReleaseBuil
     channel,
     name: name && name !== tag ? name : null,
     publishedAt: typeof entry.published_at === 'string' ? entry.published_at : null,
-    releaseUrl: `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}`
+    releaseUrl: `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}`,
+    installerUrl: installerAsset
+      ? `${getReleaseDownloadUrlForRepo(repo, tag)}/${encodeURIComponent(installerAsset)}`
+      : null
   }
 }
 
@@ -64,7 +93,10 @@ function parseReleaseEntry(entry: GitHubReleaseEntry, repo: string): ReleaseBuil
  * yesterday's hourly". This runs only on explicit dev interaction, so its
  * unauthenticated rate limit never touches background checks.
  */
-export async function listReleaseBuilds(channel: ReleaseChannel): Promise<ReleaseBuild[]> {
+export async function listReleaseBuilds(
+  channel: ReleaseChannel,
+  platform: NodeJS.Platform = process.platform
+): Promise<ReleaseBuild[]> {
   const github = resolveProductUpdateSource()?.github
   const repo = getReleaseRepoForChannel(channel)
   if (!github || !repo || github.repo !== repo) {
@@ -99,7 +131,7 @@ export async function listReleaseBuilds(channel: ReleaseChannel): Promise<Releas
     throw new Error(`Could not read the ${channel} release list.`)
   }
   const builds = payload
-    .map((entry) => parseReleaseEntry(entry as GitHubReleaseEntry, repo))
+    .map((entry) => parseReleaseEntry(entry as GitHubReleaseEntry, repo, platform))
     .filter((build): build is ReleaseBuild => build !== null)
     // Why: the main repo serves both stable and rc, so filter to the asked-for channel.
     .filter((build) => build.channel === channel)
