@@ -1,8 +1,8 @@
 // Append-only NDJSON logger for the detached daemon process. The daemon runs
 // out-of-process with stdio 'ignore', so console output goes nowhere; this
 // writes lifecycle events to a rotated file under the app's logs directory so
-// they land in diagnostic bundles (windows-terminal-update-survival-plan.md
-// §Phase 0). Never log terminal input/output content or tokens.
+// they land in diagnostic bundles. Never log terminal input/output content or
+// tokens.
 //
 // Two hard constraints:
 //   1. FAIL-OPEN. Any error (EACCES, ENOSPC, bad path) disables logging and is

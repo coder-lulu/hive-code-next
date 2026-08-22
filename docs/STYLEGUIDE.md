@@ -1,6 +1,6 @@
 # HiveCode UI Style Guide
 
-This is the **UI/visual design** doc for HiveCode — color tokens, typography, component selection, and UX rules. It is _not_ an architecture doc; for system-level design see code and inline comments. Token values live in `src/renderer/src/assets/main.css` (canonical); this file documents the _roles and rules_ for using them.
+This is the **UI/visual design** doc for HiveCode — color tokens, typography, component selection, and UX rules. It is _not_ an architecture doc; for system-level design see the authoritative [product design](./engineering/product-design.md). Token values live in `src/renderer/src/assets/main.css` (canonical); this file documents the _roles and rules_ for using them.
 
 ## Overview
 

@@ -35,7 +35,7 @@
     "config/scripts/verify-cli-bin.mjs",
     "config/scripts/verify-cli-bin.test.mjs",
     "docs/engineering/fork-boundary-policy.md",
-    "docs/engineering/fork-delta-baseline.md",
+    "docs/engineering/product-design.md",
     "docs/readme/README.es.md",
     "docs/readme/README.fr.md",
     "docs/readme/README.ja.md",

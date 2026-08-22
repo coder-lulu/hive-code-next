@@ -224,7 +224,7 @@ Existing Orca integrations remain supported where changing them would break inst
 
 ## Developing
 
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for contribution guidance and the boundary for synchronizing changes from upstream.
+Start with the authoritative [product, architecture, and roadmap design](docs/engineering/product-design.md). See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for contribution guidance and the boundary for synchronizing changes from upstream.
 
 ## Attribution & License
 

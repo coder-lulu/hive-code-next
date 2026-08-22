@@ -12,7 +12,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "format": "oxfmt --write .",
-    "lint": "oxlint && pnpm run audit:code-quality:native && pnpm run audit:code-quality:type-aware && pnpm run check:reliability-gates && pnpm run check:max-lines-ratchet && pnpm run check:brand-boundary && pnpm run verify:bundled-skill-guides && pnpm run verify:skill-bundle-manifest && pnpm run verify:product-config && pnpm run verify:localization-catalog && pnpm run verify:localization-extraction && pnpm run verify:localization-coverage",
+    "lint": "oxlint && pnpm run audit:code-quality:native && pnpm run audit:code-quality:type-aware && pnpm run check:reliability-gates && pnpm run check:max-lines-ratchet && pnpm run check:brand-boundary && pnpm run verify:bundled-skill-guides && pnpm run verify:skill-bundle-manifest && pnpm run verify:product-config && pnpm run verify:documentation-governance && pnpm run verify:localization-catalog && pnpm run verify:localization-extraction && pnpm run verify:localization-coverage",
     "audit:code-quality": "pnpm run audit:code-quality:native && pnpm run audit:code-quality:type-aware && pnpm run audit:react-doctor",
     "audit:code-quality:native": "oxlint --config config/oxlint-code-quality-native-plugins.json src config tests mobile --deny-warnings",
     "audit:code-quality:type-aware": "oxlint --type-aware --config config/oxlint-code-quality-type-aware.json src config tests --deny-warnings",
@@ -37,6 +37,7 @@
     "verify:bundled-skill-guides": "node config/scripts/generate-bundled-skill-guides.mjs --check",
     "generate:product-config": "node config/scripts/generate-product-config.mjs --write",
     "verify:product-config": "node config/scripts/generate-product-config.mjs --check",
+    "verify:documentation-governance": "node config/scripts/verify-documentation-governance.mjs",
     "generate:skill-bundle-manifest": "node config/scripts/generate-skill-bundle-manifest.mjs --write",
     "verify:skill-bundle-manifest": "node config/scripts/generate-skill-bundle-manifest.mjs",
     "verify:macos-entitlements": "node config/scripts/verify-macos-entitlements.mjs",

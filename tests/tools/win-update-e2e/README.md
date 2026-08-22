@@ -11,13 +11,9 @@ the update — and whether any console/terminal window flashes.
 > the shared modules in this directory (app driver, daemon discovery, PowerShell
 > runner, platform guard, table renderer).
 
-It is the Phase 0 "proof harness" deliverable from
-[`docs/windows-terminal-update-survival-plan.md`](../../docs/windows-terminal-update-survival-plan.md).
-It exists specifically because the July 2026 attempt shipped four broken RCs
-without ever installing the packaged artifact (see
-[`docs/windows-terminal-update-survival-postmortem.md`](../../docs/windows-terminal-update-survival-postmortem.md),
-"Why verification missed every one of these"). Its design refuses to repeat
-those verification failures:
+This proof harness exists because an earlier update attempt validated build
+outputs without installing the packaged artifact. Its design prevents that
+verification gap from recurring:
 
 - **Window visibility is measured by window enumeration + owner/canary
   attribution — never by conhost command-line heuristics.** The post-mortem

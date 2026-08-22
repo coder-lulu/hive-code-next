@@ -222,7 +222,7 @@ pnpm test
 
 ## 开发
 
-贡献和 upstream 同步边界请参阅[贡献指南](../../.github/CONTRIBUTING.md)。
+产品现状、总体架构、功能设计和开发路线以[产品总设计](../engineering/product-design.md)为准。贡献和 upstream 同步边界请参阅[贡献指南](../../.github/CONTRIBUTING.md)。
 
 ## 归属与许可证
 

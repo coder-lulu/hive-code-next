@@ -116,6 +116,15 @@ readSawMarker: true
 
 If this repro fails, debug the desktop runtime/PTY path before the mobile WebView. If it passes but the phone is blank, debug the session screen or `TerminalWebView` readiness/queueing path.
 
+### Stable Terminal And Recovery Behavior
+
+The authoritative cross-product behavior lives in [`docs/engineering/product-design.md`](../docs/engineering/product-design.md). Mobile changes must preserve these local contracts:
+
+- The first focus for a terminal handle uses direct input. Users can opt into buffered input, and switching sessions does not open the keyboard automatically.
+- Output received before the terminal WebView is ready is queued with a bound and replayed in order. Reconnect establishes a fresh PTY subscription.
+- Foreground and network handoffs probe liveness and replace a dead physical client. A disconnected socket is not proof that the remote session exited.
+- Expected relay migration keeps loaded content visible and presents a connecting/reconnecting state instead of an empty grey surface.
+
 ## Terminal Color Repro Without A Phone
 
 Use this when terminal colors disappear after switching tabs. Open a Claude Code terminal and at least one other terminal in the target worktree, then run:
