@@ -43,7 +43,8 @@ describe('documentation governance', () => {
       [CANONICAL_PRODUCT_DESIGN]: REQUIRED_DESIGN,
       'README.md': `[Design](${CANONICAL_PRODUCT_DESIGN})`,
       'docs/agent-skill-sharing-installation-plan.md': '# Old plan',
-      'docs/new-roadmap-v2.md': '# Parallel roadmap'
+      'docs/new-roadmap-v2.md': '# Parallel roadmap',
+      'docs/产品总设计（修正版）.md': '# Parallel revision'
     })
 
     expect(errors).toContain(
@@ -51,6 +52,9 @@ describe('documentation governance', () => {
     )
     expect(errors).toContain(
       'Parallel plan/version document is not allowed: docs/new-roadmap-v2.md'
+    )
+    expect(errors).toContain(
+      'Parallel plan/version document is not allowed: docs/产品总设计（修正版）.md'
     )
   })
 })

@@ -31,7 +31,7 @@ const REQUIRED_DESIGN_SECTIONS = [
 ]
 
 const PARALLEL_DOCUMENT_PATTERN =
-  /(?:^|[-_.])(plan|checklist|findings|draft|final|revised|new|copy|v\d+)(?=[-_.]|$)/i
+  /(?:^|[-_.])(plan|checklist|findings|draft|final|revised|new|copy|v\d+)(?=[-_.]|$)|修正版|最终版|新版|草稿|副本/i
 
 function normalizeRepoPath(filePath) {
   return filePath.replaceAll('\\', '/').replace(/^\.\//, '')

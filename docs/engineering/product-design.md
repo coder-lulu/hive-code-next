@@ -26,7 +26,17 @@
 
 ## 2. 产品定位与原则
 
-HiveCode 是一个以本地优先、远程等价和多智能体并行为核心的开发工作台。它把工作区、终端、代码审查、浏览器、移动客户端和多种编码 Agent 放在同一个可恢复会话模型中，而不是替代 Git、Shell、SSH、Agent CLI 或用户选择的云厂商。
+HiveCode 当前以本地优先、远程等价和多智能体并行为核心的开发工作台进入市场。它把工作区、终端、代码审查、浏览器、移动客户端和多种编码 Agent 放在同一个可恢复会话模型中，而不是替代 Git、Shell、SSH、Agent CLI 或用户选择的云厂商。
+
+长期产品定位是 AI Agent 软件生产基础设施：Runtime Plane 持有文件、Git、Shell、PTY 和 Agent 生命周期；HiveCode Cloud 作为 Control Plane 管理身份、组织、Runtime/Agent 注册、能力、工作流意图、Skill、Artifact、策略和审计。云端不能成为执行中心，也不能要求本地代码或 prompt 上传后才能工作。
+
+### 2.1 产品层级
+
+| 产品层级            | 目标用户               | 能力边界                                                             | 当前状态                                                |
+| ------------------- | ---------------------- | -------------------------------------------------------------------- | ------------------------------------------------------- |
+| HiveCode Developer  | 个人开发者与高级工程师 | Desktop、CLI、本地/远程 Runtime、Agent Teams、Mobile Control         | 核心能力已启用；正式发布与更新体系规划中                |
+| HiveCode Team       | 约 10–200 人研发团队   | Organization、Team/Project、RBAC、Agent/Skill 模板、共享、用量和审计 | **规划**；依赖 Identity、Registry、Relay 与 Package API |
+| HiveCode Enterprise | 大型企业和受监管环境   | SSO、私有 Runtime、策略、合规、多区域、私有部署和成本治理            | **规划**；在 Team 控制面稳定后交付                      |
 
 长期原则：
 
@@ -37,7 +47,7 @@ HiveCode 是一个以本地优先、远程等价和多智能体并行为核心�
 5. **最小权限与明确同意。** Agent 账号与 HiveCode Cloud 身份分离；遥测、诊断、发布和分享分别授权。
 6. **上游兼容是持续成本。** 产品差异进入产品层和 composition root；通用能力尽量保持为可上游合并的注入点。
 
-非目标：自建模型供应商、托管用户的 Codex/Claude 凭据、把短暂断网等同于进程死亡、把用户 VM/provider/billing 包装为 HiveCode 自营服务、用云端功能阻断本地开发主链路。
+非目标：普通 AI Chat 或单 Agent 编码工具、自建模型供应商、托管用户的 Codex/Claude 凭据、把短暂断网等同于进程死亡、把用户 VM/provider/billing 包装为 HiveCode 自营服务、用云端功能阻断本地开发主链路。
 
 ## 3. 当前能力基线
 
@@ -266,10 +276,12 @@ Release 是其余云功能的前置安全能力。目标支持 `rc` 与 `stable`
 目标服务分为：
 
 1. **Identity/Capability API**：OIDC Authorization Code + PKCE、session exchange、refresh/revoke、组织和 capability；
-2. **Relay Director/Cells**：区域选择、短期 token、连接租约、drain/rebind、E2EE 数据转发；
-3. **Package API**：Artifact/Skill 元数据、upload finalize、授权 download grant、share 生命周期；
-4. **对象与元数据存储**：对象存储保存密文/包，PostgreSQL 保存授权、版本、审计和幂等键；
-5. **服务端可观测性**：从第一阶段提供 SLO、错误率、容量、审计和告警，不等于产品遥测。
+2. **Runtime/Agent Registry**：注册 Runtime 和 Agent 的身份、版本、能力、权限、Skill 依赖、健康与有界运行摘要；业务状态和执行内容仍只在 Runtime；
+3. **Relay Director/Cells**：区域选择、短期 token、连接租约、drain/rebind、E2EE 数据转发；
+4. **Package API**：Artifact/Skill 元数据、upload finalize、授权 download grant、share 生命周期；
+5. **Workflow/Policy Plane**：保存版本化工作流意图、审批、RBAC、策略、用量和成本预算；实际步骤由目标 Runtime 执行；
+6. **对象与元数据存储**：对象存储保存密文/包，PostgreSQL 保存授权、版本、审计和幂等键；
+7. **服务端可观测性**：从第一阶段提供 SLO、错误率、容量、审计和告警，不等于产品遥测。
 
 产品 Telemetry 最后启用。启用前必须具备隐私政策、事件目录、保留/删除策略、显式 opt-in 和端到端零请求测试；不得采集路径、prompt、terminal 内容、token 或 Cloud user id。Diagnostics 维持用户主动触发、预览和脱敏。
 
@@ -322,21 +334,23 @@ Release 是其余云功能的前置安全能力。目标支持 `rc` 与 `stable`
 | 4. Skill Sharing       | P1     | 复用现有 bundle/事务安装，连接 HiveCode Package API                                             | Native Windows/WSL/macOS/Linux/SSH/paired runtime 全矩阵；撤销、回滚、恶意包测试通过      |
 | 5. Plugin Marketplace  | P1     | HiveCode trust namespace、官方源、审核、权限 consent、kill list                                 | 官方身份不可自授；commit/hash/signature 固定；离线 kill-list 策略和恶意插件隔离通过       |
 | 6. Product Telemetry   | P2     | 自有 collector、事件治理、显式同意、保留/删除                                                   | opt-in 前零请求；隐私政策生效；敏感字段负例和服务端删除审计通过                           |
-| 7. 多区域与团队增强    | P2     | Relay 多区域、组织级策略、团队分享/管理、容量治理                                               | 跨区切换和灾备演练；租户隔离、审计、成本与容量预算达标                                    |
+| 7. Team Control Plane  | P2     | Organization、RBAC、Runtime/Agent Registry、工作流意图、团队共享、审计和用量                    | 租户隔离、执行权边界、审批、审计完整性和配额门禁通过                                      |
+| 8. Enterprise          | P3     | SSO、私有 Runtime、多区域、合规策略、成本治理和私有部署                                         | 跨区灾备、策略强制、合规审计、容量与成本预算达标                                          |
 
 阶段 3A 与 3B 可在 Identity 稳定后并行；Marketplace 的 trust policy 可提前实现，但不能在信任、kill list 和隔离测试完成前对外启用。产品 Telemetry 不阻塞服务端可观测性。
 
 ## 8. 决策记录
 
-| 决策             | 结论                                 | 拒绝方案                                                |
-| ---------------- | ------------------------------------ | ------------------------------------------------------- |
-| 云端所有权       | 只接入 HiveCode 自有或明确受控的服务 | 正式包回退 Orca Cloud；会导致品牌、隐私、SLA 和权限失控 |
-| 首个线上闭环     | Release/Updater 先于 Cloud 分享      | 先开放显眼的分享 UI；缺少安全发布和回滚能力             |
-| Auth/Relay       | 配置和部署解耦                       | 要求 cloud+relay 同时存在；阻塞渐进交付                 |
-| Artifact/Skill   | 共享基础设施、分离领域策略           | 用一个 share 模型覆盖所有对象；权限和生命周期不同       |
-| Marketplace 信任 | 产品 trust anchor 决定官方身份       | marketplace index 自报 official；可被供应链伪造         |
-| 产品遥测         | 明确 opt-in，最后启用                | 关闭提示即静默 opt-in；不满足当前产品隐私要求           |
-| 设计文档         | 单一总设计 + 窄 reference            | 每功能保留 plan/checklist/findings 多份现状             |
+| 决策             | 结论                                                     | 拒绝方案                                                |
+| ---------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| 云端所有权       | 只接入 HiveCode 自有或明确受控的服务                     | 正式包回退 Orca Cloud；会导致品牌、隐私、SLA 和权限失控 |
+| 首个线上闭环     | Release/Updater 先于 Cloud 分享                          | 先开放显眼的分享 UI；缺少安全发布和回滚能力             |
+| Auth/Relay       | 配置和部署解耦                                           | 要求 cloud+relay 同时存在；阻塞渐进交付                 |
+| Artifact/Skill   | 共享基础设施、分离领域策略                               | 用一个 share 模型覆盖所有对象；权限和生命周期不同       |
+| Marketplace 信任 | 产品 trust anchor 决定官方身份                           | marketplace index 自报 official；可被供应链伪造         |
+| 产品遥测         | 明确 opt-in，最后启用                                    | 关闭提示即静默 opt-in；不满足当前产品隐私要求           |
+| 产品层级         | Developer 验证本地执行面，Team/Enterprise 逐级增加控制面 | 一开始同时交付全部企业能力；依赖和安全边界无法验证      |
+| 设计文档         | 单一总设计 + 窄 reference                                | 每功能保留 plan/checklist/findings 多份现状             |
 
 ## 9. 相关稳定规范
 
