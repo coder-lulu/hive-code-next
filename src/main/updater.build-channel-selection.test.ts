@@ -81,12 +81,10 @@ describe('updater', () => {
     }
   )
 
-  // Why this refuses rather than trying: electron-updater would download the
-  // whole installer and then fail it with a raw ERR_UPDATER_INVALID_SIGNATURE,
-  // because a signed build verifies every installer against the publisherName
-  // baked into its own app-update.yml. The picker disables this, but IPC is
-  // reachable regardless.
-  it('refuses to pin a Windows dev build from a signed build, and says what to do', async () => {
+  // Why this stops before signature routing: the product deliberately leaves the
+  // upstream dev-channel repositories unconfigured, so IPC must fail closed even
+  // on a platform where Orca would publish that artifact.
+  it('refuses to pin an unconfigured Windows dev build', async () => {
     const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     try {
       appMock.getVersion.mockReturnValue('1.4.160')
@@ -100,7 +98,7 @@ describe('updater', () => {
 
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message: expect.stringContaining('Download the installer from the release page'),
+        message: 'Adhoc builds are produced only for macOS and Windows.',
         userInitiated: true
       })
       expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
@@ -109,36 +107,57 @@ describe('updater', () => {
     }
   })
 
-  // The way out of a dev channel must stay in-app: an unsigned build carries no
-  // publisherName, so electron-updater skips verification entirely.
-  it.each([
-    ['another dev build', 'adhoc', 'v1.4.160-adhoc.20260728140533'],
-    ['back to stable', 'stable', 'v1.4.160']
-  ] as const)(
-    'still pins %s from an unsigned Windows dev build',
-    async (_label, channel, targetTag) => {
-      const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
-      try {
-        appMock.getVersion.mockReturnValue('1.4.160-hourly.202607281400')
-        const send = vi.fn()
-        const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-        setupAutoUpdater({ webContents: { send } } as never, {
-          getLastUpdateCheckAt: () => Date.now()
-        })
+  it('does not pin an unconfigured dev channel from an unsigned Windows build', async () => {
+    const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    try {
+      appMock.getVersion.mockReturnValue('1.4.160-hourly.202607281400')
+      const send = vi.fn()
+      const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+      setupAutoUpdater({ webContents: { send } } as never, {
+        getLastUpdateCheckAt: () => Date.now()
+      })
 
-        checkForUpdatesFromMenu({ channel, targetTag })
+      checkForUpdatesFromMenu({
+        channel: 'adhoc',
+        targetTag: 'v1.4.160-adhoc.20260728140533'
+      })
 
-        expect(send).not.toHaveBeenCalledWith('updater:status', {
-          state: 'error',
-          message: expect.stringContaining('Download the installer'),
-          userInitiated: true
-        })
-        expect(autoUpdaterMock.allowDowngrade).toBe(true)
-      } finally {
-        platformSpy.mockRestore()
-      }
+      expect(send).toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message: 'Adhoc builds are produced only for macOS and Windows.',
+        userInitiated: true
+      })
+      expect(autoUpdaterMock.allowDowngrade).toBe(false)
+      expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    } finally {
+      platformSpy.mockRestore()
     }
-  )
+  })
+
+  // The way back to a configured stable channel must stay in-app: an unsigned
+  // build carries no publisherName, so electron-updater skips verification.
+  it('still pins stable from an unsigned Windows dev build', async () => {
+    const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    try {
+      appMock.getVersion.mockReturnValue('1.4.160-hourly.202607281400')
+      const send = vi.fn()
+      const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+      setupAutoUpdater({ webContents: { send } } as never, {
+        getLastUpdateCheckAt: () => Date.now()
+      })
+
+      checkForUpdatesFromMenu({ channel: 'stable', targetTag: 'v1.4.160' })
+
+      expect(send).not.toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message: expect.stringContaining('Download the installer'),
+        userInitiated: true
+      })
+      expect(autoUpdaterMock.allowDowngrade).toBe(true)
+    } finally {
+      platformSpy.mockRestore()
+    }
+  })
 
   it.runIf(process.platform === 'darwin')(
     'allows a validated local build to downgrade through the normal updater lifecycle',
