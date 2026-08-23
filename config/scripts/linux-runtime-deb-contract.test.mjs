@@ -40,5 +40,37 @@ describe('Linux Runtime deb contract', () => {
     expect(afterInstall).not.toMatch(/systemctl\s+enable/)
     expect(builder).toContain("process.env.HIVECODE_HEADLESS_RUNTIME_DEB === '1'")
     expect(packageJson.scripts['build:linux:runtime-deb']).toContain('build-linux-runtime-deb.mjs')
+    expect(packageJson.homepage).toBe('https://github.com/coder-lulu/hive-code-next')
+    expect(builder).toContain("'!.pnpm-store{,/**/*}'")
+    for (const dependency of [
+      'libgtk-3-0',
+      'libnspr4',
+      'libnss3',
+      'libatk-bridge2.0-0',
+      'libcups2',
+      'libgbm1',
+      'libasound2',
+      'libxss1'
+    ]) {
+      expect(builder).toContain(`'${dependency}'`)
+    }
+    const buildScript = readFileSync(
+      join(root, 'config/scripts/build-linux-runtime-deb.mjs'),
+      'utf8'
+    )
+    expect(buildScript).toMatch(/'--publish',\s*'never'/u)
+  })
+
+  it('keeps every directly executed Linux package script LF-only', () => {
+    for (const relativePath of [
+      'resources/linux/bin/hivecode',
+      'resources/linux/bin/orca-ide',
+      'resources/linux/packaging/after-install.sh',
+      'resources/linux/packaging/after-remove.sh'
+    ]) {
+      const content = readFileSync(join(root, relativePath))
+      expect(content.subarray(0, 2).toString('utf8')).toBe('#!')
+      expect(content.includes(Buffer.from('\r\n'))).toBe(false)
+    }
   })
 })

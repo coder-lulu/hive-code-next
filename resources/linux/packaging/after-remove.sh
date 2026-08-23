@@ -1,4 +1,5 @@
 #!/bin/bash
+# Package-manager hooks must remain LF-only so dpkg can execute their shebangs.
 # Why: remove only the HiveCode-owned PATH symlinks created by after-install.sh.
 # Never delete a regular file, bare /usr/bin/orca, or another package's symlink.
 set -e

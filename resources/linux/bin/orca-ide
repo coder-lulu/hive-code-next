@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# This launcher must remain LF-only; it is executed directly from the Linux package.
 set -euo pipefail
 
 # Why: `orca-ide` remains a safe Linux compatibility command; resolve symlinks

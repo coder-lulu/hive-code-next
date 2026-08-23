@@ -1,4 +1,5 @@
 #!/bin/bash
+# Package-manager hooks must remain LF-only so dpkg can execute their shebangs.
 # Why: register HiveCode and the safe `orca-ide` compatibility command at
 # package-install time. Never claim bare `orca`, which belongs to GNOME Orca.
 # The in-app "Install CLI" action (CliInstaller) can never run on a headless

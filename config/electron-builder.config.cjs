@@ -154,6 +154,9 @@ module.exports = {
     // it is gitignored, but exclude it defensively so a stray local capture at
     // package time never bloats app.asar.
     '!pr-evidence{,/**/*}',
+    // Why: local clean-build rehearsals may place pnpm's content-addressed store
+    // under the repository root. It is never a runtime input and can exceed 2 GiB.
+    '!.pnpm-store{,/**/*}',
     '!Casks{,/**/*}',
     '!{AGENTS.md,CLAUDE.md,DEVELOPING.md,bundle-size-progress.md,ORCHESTRATION_IMPLEMENTATION_CHECKLIST.md,ORCHESTRATION_STRUCTURED_OUTPUT_DESIGN.md}',
     '!out/**/*.test.js',
@@ -566,6 +569,26 @@ module.exports = {
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
     depends: [
+      'libgtk-3-0',
+      'libnotify4',
+      'libnspr4',
+      'libnss3',
+      'libxss1',
+      'libxtst6',
+      'xdg-utils',
+      'libatspi2.0-0',
+      'libuuid1',
+      'libsecret-1-0',
+      'libatk1.0-0',
+      'libatk-bridge2.0-0',
+      'libcups2',
+      'libcairo2',
+      'libpango-1.0-0',
+      'libxcomposite1',
+      'libxdamage1',
+      'libxrandr2',
+      'libgbm1',
+      'libasound2',
       'python3',
       'python3-gi',
       'gir1.2-atspi-2.0',

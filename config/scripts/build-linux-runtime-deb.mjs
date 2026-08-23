@@ -14,7 +14,9 @@ const result = spawnSync(
     'config/electron-builder.config.cjs',
     '--linux',
     'deb',
-    '--x64'
+    '--x64',
+    '--publish',
+    'never'
   ],
   {
     cwd: process.cwd(),

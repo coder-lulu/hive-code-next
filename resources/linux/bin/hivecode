@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# This launcher must remain LF-only; it is executed directly from the Linux package.
 set -euo pipefail
 
 # Why: this launcher is invoked through a user or package-manager symlink; resolve

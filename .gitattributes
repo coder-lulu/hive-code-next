@@ -27,3 +27,7 @@
 # the reviewable change, and pin LF because they are compared byte-for-byte.
 # Not -diff: the shell diff is the review surface when a wrapper does change.
 /src/main/__fixtures__/shell-wrapper-snapshots/*.txt linguist-generated=true text eol=lf
+# Linux package hooks and CLI launchers are executed directly by the kernel.
+# Pin LF even when the repository is prepared on Windows.
+/resources/linux/**/*.sh text eol=lf
+/resources/linux/bin/* text eol=lf

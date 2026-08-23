@@ -12,6 +12,7 @@ import {
   parseExpectedSigners,
   parseExpectedThumbprints,
   parseSignatureJson,
+  resolvePowerShellExecutable,
   validateExecutablePath,
   verifyWindowsInnerSignature
 } from './verify-windows-inner-signature.mjs'
@@ -161,33 +162,76 @@ describe('verify-windows-inner-signature', () => {
   })
 
   it('runs PowerShell with an argument array and fails on stderr or nonzero exit', () => {
-    const calls = []
-    const spawnSyncImpl = (command, args, options) => {
-      calls.push({ command, args, options })
-      return { status: 0, stdout: JSON.stringify(validSignature), stderr: '' }
+    withTempFile((_filePath, dir) => {
+      const powershellExecutable = join(dir, 'pwsh.exe')
+      writeFileSync(powershellExecutable, 'pwsh')
+      const calls = []
+      const spawnSyncImpl = (command, args, options) => {
+        calls.push({ command, args, options })
+        return { status: 0, stdout: JSON.stringify(validSignature), stderr: '' }
+      }
+
+      expect(
+        getPowerShellSignatureJson(
+          'C:\\Path With Spaces\\Orca.exe',
+          spawnSyncImpl,
+          powershellExecutable
+        )
+      ).toBe(JSON.stringify(validSignature))
+      expect(calls[0].command).toBe(powershellExecutable)
+      expect(calls[0].args).toContain('-Command')
+      expect(calls[0].args.at(-1)).not.toBe('C:\\Path With Spaces\\Orca.exe')
+      expect(calls[0].options).toEqual(
+        expect.objectContaining({
+          encoding: 'utf8',
+          env: expect.objectContaining({
+            ORCA_WINDOWS_INNER_EXECUTABLE: 'C:\\Path With Spaces\\Orca.exe'
+          })
+        })
+      )
+
+      expect(() =>
+        getPowerShellSignatureJson(
+          'Orca.exe',
+          () => ({ status: 0, stdout: '{}', stderr: 'warning' }),
+          powershellExecutable
+        )
+      ).toThrow(/stderr/)
+      expect(() =>
+        getPowerShellSignatureJson(
+          'Orca.exe',
+          () => ({ status: 7, stdout: '', stderr: '' }),
+          powershellExecutable
+        )
+      ).toThrow(/exit code 7/)
+    })
+  })
+
+  it('resolves only an existing absolute PowerShell executable', () => {
+    const pwsh = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+    const windowsPowerShell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+    const files = new Set([windowsPowerShell])
+    const options = {
+      environment: { ProgramFiles: 'C:\\Program Files', SystemRoot: 'C:\\Windows' },
+      existsSyncImpl: (candidate) => files.has(candidate),
+      statSyncImpl: () => ({ isFile: () => true }),
+      platform: 'win32'
     }
 
-    expect(getPowerShellSignatureJson('C:\\Path With Spaces\\Orca.exe', spawnSyncImpl)).toBe(
-      JSON.stringify(validSignature)
-    )
-    expect(calls[0].command).toBe('pwsh')
-    expect(calls[0].args).toContain('-Command')
-    expect(calls[0].args.at(-1)).not.toBe('C:\\Path With Spaces\\Orca.exe')
-    expect(calls[0].options).toEqual(
-      expect.objectContaining({
-        encoding: 'utf8',
-        env: expect.objectContaining({
-          ORCA_WINDOWS_INNER_EXECUTABLE: 'C:\\Path With Spaces\\Orca.exe'
-        })
+    expect(resolvePowerShellExecutable(options)).toBe(windowsPowerShell)
+    expect(() =>
+      resolvePowerShellExecutable({
+        ...options,
+        configured: 'pwsh.exe'
       })
-    )
-
-    expect(() =>
-      getPowerShellSignatureJson('Orca.exe', () => ({ status: 0, stdout: '{}', stderr: 'warning' }))
-    ).toThrow(/stderr/)
-    expect(() =>
-      getPowerShellSignatureJson('Orca.exe', () => ({ status: 7, stdout: '', stderr: '' }))
-    ).toThrow(/exit code 7/)
+    ).toThrow('existing absolute file')
+    expect(
+      resolvePowerShellExecutable({
+        ...options,
+        configured: pwsh,
+        existsSyncImpl: (candidate) => candidate === pwsh
+      })
+    ).toBe(pwsh)
   })
 
   it('verifies with injected Windows platform and spawn implementation', () => {
@@ -195,6 +239,7 @@ describe('verify-windows-inner-signature', () => {
       const signature = verifyWindowsInnerSignature({
         executablePath: filePath,
         platform: 'win32',
+        powershellExecutable: filePath,
         spawnSyncImpl: () => ({ status: 0, stdout: JSON.stringify(validSignature), stderr: '' })
       })
 
