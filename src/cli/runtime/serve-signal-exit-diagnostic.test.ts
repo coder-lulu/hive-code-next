@@ -2,7 +2,10 @@ import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyProductBranding } from '../../shared/brand'
 import { serveSignalExitError } from './serve-signal-exit-diagnostic'
-import { superviseForegroundServe } from './serve-update-supervisor'
+import {
+  SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS,
+  superviseForegroundServe
+} from './serve-update-supervisor'
 import { RuntimeClientError } from './types'
 
 class FakeChildProcess extends EventEmitter {
@@ -29,6 +32,31 @@ function superviseUntilExit(code: number | null, signal: NodeJS.Signals | null):
   })
   child.emit('exit', code, signal)
   return supervised
+}
+
+function superviseUntilSignal(): {
+  child: FakeChildProcess
+  supervised: Promise<number>
+  forwardSigterm: (signal: 'SIGTERM') => void
+} {
+  const existingListeners = new Set(process.listeners('SIGTERM'))
+  const child = new FakeChildProcess()
+  const supervised = superviseForegroundServe({
+    executable: '/Applications/Orca.app/Contents/MacOS/Orca',
+    childArgs: ['--serve'],
+    spawnOptions: {},
+    spawnChild: vi.fn() as never,
+    handoffPath: null,
+    child: child as never,
+    expectedHandoff: null
+  })
+  const forwardSigterm = process
+    .listeners('SIGTERM')
+    .find((listener) => !existingListeners.has(listener))
+  if (!forwardSigterm) {
+    throw new Error('serve supervisor did not install a SIGTERM listener')
+  }
+  return { child, supervised, forwardSigterm }
 }
 
 afterEach(() => {
@@ -75,6 +103,50 @@ describe('serveSignalExitError', () => {
 })
 
 describe('superviseForegroundServe signal exits', () => {
+  it('allows the Electron teardown budget before force killing an externally stopped serve', async () => {
+    vi.useFakeTimers()
+    const { child, supervised, forwardSigterm } = superviseUntilSignal()
+    let exited = false
+
+    try {
+      forwardSigterm('SIGTERM')
+      expect(child.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
+
+      await vi.advanceTimersByTimeAsync(SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS - 1)
+      expect(child.kill).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
+      child.emit('exit', null, 'SIGKILL')
+      exited = true
+      await expect(supervised).rejects.toThrow(
+        applyProductBranding('Orca serve exited via SIGKILL.')
+      )
+    } finally {
+      if (!exited) {
+        child.emit('exit', 0, null)
+        await supervised.catch(() => undefined)
+      }
+      vi.useRealTimers()
+    }
+  })
+
+  it('clears the external-stop force-kill timer when Electron exits first', async () => {
+    vi.useFakeTimers()
+    const { child, supervised, forwardSigterm } = superviseUntilSignal()
+
+    try {
+      forwardSigterm('SIGTERM')
+      child.emit('exit', 0, null)
+      await expect(supervised).resolves.toBe(0)
+
+      await vi.advanceTimersByTimeAsync(SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS)
+      expect(child.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('throws the macOS diagnostic when the child aborts on darwin', async () => {
     setPlatform('darwin')
 

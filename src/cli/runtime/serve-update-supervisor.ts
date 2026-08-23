@@ -10,6 +10,8 @@ import { serveSignalExitError } from './serve-signal-exit-diagnostic'
 import { waitForMacBundleVersion } from './mac-app-update-bundle'
 
 export const SERVE_REPLACEMENT_READY_TIMEOUT_MS = 60_000
+export const SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS = 25_000
+const SERVE_REPLACEMENT_FORCE_KILL_TIMEOUT_MS = 5_000
 
 type InstallRequestedHandoff = Extract<ServeUpdateHandoffState, { phase: 'install-requested' }>
 type ServeReadiness = 'not-expected' | 'pending' | 'verified' | 'failed'
@@ -113,7 +115,10 @@ function waitForForegroundChild(
     let stateWrite = Promise.resolve()
     const terminateChild = (): void => {
       child.kill('SIGTERM')
-      forceKillTimer ??= setTimeout(() => child.kill('SIGKILL'), 5000)
+      forceKillTimer ??= setTimeout(
+        () => child.kill('SIGKILL'),
+        SERVE_REPLACEMENT_FORCE_KILL_TIMEOUT_MS
+      )
     }
     const recordReplacementFailure = (reason: string): boolean => {
       if (!expected || readiness !== 'pending') {
@@ -141,7 +146,13 @@ function waitForForegroundChild(
     }
     const forwardSignal = (signal: NodeJS.Signals): void => {
       child.kill(signal)
-      forceKillTimer ??= setTimeout(() => child.kill('SIGKILL'), 5000)
+      // Electron's orderly teardown can consume its 20-second deadline plus
+      // telemetry drain time. Keep the fallback below systemd's 30-second stop
+      // deadline without killing a healthy shutdown at the old five-second mark.
+      forceKillTimer ??= setTimeout(
+        () => child.kill('SIGKILL'),
+        SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS
+      )
     }
     const handleMessage = (value: unknown): void => {
       const message = parseServeSupervisorMessage(value)
