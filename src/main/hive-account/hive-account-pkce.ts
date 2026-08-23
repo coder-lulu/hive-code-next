@@ -70,7 +70,7 @@ export function beginHiveAccountPkceFlow(options: HivePkceOptions): Promise<Hive
     const server = createServer((request, response) => {
       try {
         const url = new URL(request.url ?? '/', 'http://127.0.0.1')
-        if (request.method !== 'GET' || url.pathname !== '/auth/callback') {
+        if (request.method !== 'GET' || url.pathname !== '/') {
           response.writeHead(404)
           response.end('Not found')
           return
@@ -110,7 +110,10 @@ export function beginHiveAccountPkceFlow(options: HivePkceOptions): Promise<Hive
         settleFailure(new Error('hive_account_loopback_unavailable'))
         return
       }
-      redirectUri = `http://127.0.0.1:${address.port}/auth/callback`
+      // Keycloak's native-app loopback registration permits an ephemeral port
+      // only for the exact http://127.0.0.1 redirect URI. Keep the callback at
+      // the origin root so the registered path still matches exactly.
+      redirectUri = `http://127.0.0.1:${address.port}`
       void options
         .prepareDeviceAuthorization(nonce)
         .then(async () => {

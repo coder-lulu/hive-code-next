@@ -5,7 +5,7 @@ const config = {
   apiBaseUrl: 'https://api.hivekernel.com',
   identityIssuer: 'https://identity.hivekernel.com/realms/hive',
   clientId: 'hivecode-desktop',
-  scope: 'openid profile email offline_access hive.session.exchange'
+  scope: 'openid profile email hive.session.exchange'
 }
 
 function jsonResponse(value: unknown, status = 200): Response {
@@ -71,7 +71,7 @@ describe('Hive account Native client', () => {
       client.exchangeSession({
         authorizationCode: 'code',
         codeVerifier: 'verifier',
-        redirectUri: 'http://127.0.0.1:32123/auth/callback',
+        redirectUri: 'http://127.0.0.1:32123',
         nonce: 'nonce'
       })
     ).resolves.toMatchObject({ account: { displayName: 'Ada' }, authorityId: 'hive-primary' })

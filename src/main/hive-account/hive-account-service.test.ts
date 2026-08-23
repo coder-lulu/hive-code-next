@@ -21,7 +21,7 @@ const config = {
   apiBaseUrl: 'https://api.hivekernel.com',
   identityIssuer: 'https://identity.hivekernel.com/realms/hive',
   clientId: 'hivecode-desktop',
-  scope: 'openid profile email offline_access hive.session.exchange'
+  scope: 'openid profile email hive.session.exchange'
 }
 
 const sessionResponse = {
@@ -83,7 +83,7 @@ function createService(): HiveAccountService {
         authorizationCode: 'code',
         codeVerifier: 'verifier',
         nonce: 'nonce',
-        redirectUri: 'http://127.0.0.1:32123/auth/callback'
+        redirectUri: 'http://127.0.0.1:32123'
       }
     }
   } as never)
@@ -106,7 +106,7 @@ describe('Hive account application service', () => {
       authorizationCode: 'code',
       codeVerifier: 'verifier',
       nonce: 'nonce',
-      redirectUri: 'http://127.0.0.1:32123/auth/callback'
+      redirectUri: 'http://127.0.0.1:32123'
     })
     await expect(createService().getState()).resolves.toMatchObject({ status: 'signed-in' })
   })

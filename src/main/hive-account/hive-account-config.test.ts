@@ -17,7 +17,7 @@ describe('Hive account product configuration', () => {
         apiBaseUrl: 'https://api.hivekernel.com',
         identityIssuer: 'https://identity.hivekernel.com/realms/hive',
         clientId: 'hivecode-desktop',
-        scope: 'openid profile email offline_access hive.session.exchange'
+        scope: 'openid profile email hive.session.exchange'
       }
     })
   })

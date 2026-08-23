@@ -12,8 +12,8 @@ type HiveAccountConfigResult =
   | { configured: true; config: HiveAccountConfig }
   | { configured: false; setupMessage: string }
 
-const CLIENT_ID = 'hivecode-desktop'
-const SCOPE = 'openid profile email offline_access hive.session.exchange'
+export const HIVE_ACCOUNT_CLIENT_ID = 'hivecode-desktop'
+const SCOPE = 'openid profile email hive.session.exchange'
 
 function isPackagedBuild(): boolean {
   try {
@@ -72,6 +72,6 @@ export function getHiveAccountConfig(
   }
   return {
     configured: true,
-    config: { apiBaseUrl, identityIssuer, clientId: CLIENT_ID, scope: SCOPE }
+    config: { apiBaseUrl, identityIssuer, clientId: HIVE_ACCOUNT_CLIENT_ID, scope: SCOPE }
   }
 }
