@@ -17,6 +17,7 @@ describe('Linux Runtime deb contract', () => {
       join(root, 'resources/linux/packaging/after-install.sh'),
       'utf8'
     )
+    const launcher = readFileSync(join(root, 'resources/linux/bin/hivecode'), 'utf8')
     const afterRemove = readFileSync(
       join(root, 'resources/linux/packaging/after-remove.sh'),
       'utf8'
@@ -39,11 +40,12 @@ describe('Linux Runtime deb contract', () => {
       'ExecStart=/usr/bin/hivecode serve --port 6768 --json $HIVECODE_RUNTIME_ARGS'
     )
     expect(unit).toContain('RestartPreventExitStatus=3')
-    expect(unit).toContain('KillMode=control-group')
+    expect(unit).toContain('KillMode=mixed')
     expect(unit).toContain('NoNewPrivileges=false')
     expect(unit).toContain('PrivateTmp=false')
     expect(unit).toContain('ProtectSystem=full')
     expect(unit).not.toContain('--no-sandbox')
+    expect(launcher).toContain('ELECTRON_RUN_AS_NODE=1 exec "$ELECTRON" "$CLI" "$@"')
     expect(afterInstall).toContain('hivecode-runtime.service')
     expect(afterInstall).toContain('chmod 4755 "$sandbox"')
     expect(afterInstall).not.toMatch(/systemctl\s+enable/)
