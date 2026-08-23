@@ -103,7 +103,7 @@
         },
         "updateChannel": {
           "type": ["string", "null"],
-          "enum": ["stable", "rc", null]
+          "enum": ["stable", "beta", "rc", null]
         },
         "updateRepository": { "$ref": "#/$defs/nullableString" },
         "starRepository": { "$ref": "#/$defs/nullableString" }

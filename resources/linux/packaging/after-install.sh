@@ -52,6 +52,25 @@ for dir in /opt/HiveCode /opt/hivecode /opt/Orca /opt/orca-ide /opt/orca; do
   if [ -x "$hivecode_shim" ] && [ -x "$orca_ide_shim" ]; then
     install_link hivecode "$hivecode_shim"
     install_link orca-ide "$orca_ide_shim"
+    runtime_unit="$dir/resources/systemd/hivecode-runtime.service"
+    runtime_env_example="$dir/resources/systemd/runtime.env.example"
+    if [ -f "$runtime_unit" ]; then
+      if ! getent group hivecode-runtime >/dev/null 2>&1; then
+        groupadd --system hivecode-runtime
+      fi
+      if ! getent passwd hivecode-runtime >/dev/null 2>&1; then
+        useradd --system --gid hivecode-runtime --home-dir /var/lib/hivecode-runtime \
+          --create-home --shell /usr/sbin/nologin hivecode-runtime
+      fi
+      install -d -m 755 /usr/lib/systemd/system /etc/hivecode
+      install -m 644 "$runtime_unit" /usr/lib/systemd/system/hivecode-runtime.service
+      if [ -f "$runtime_env_example" ] && [ ! -e /etc/hivecode/runtime.env.example ]; then
+        install -m 644 "$runtime_env_example" /etc/hivecode/runtime.env.example
+      fi
+      if command -v systemctl >/dev/null 2>&1; then
+        systemctl daemon-reload || true
+      fi
+    fi
     break
   fi
 done

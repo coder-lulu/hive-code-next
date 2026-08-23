@@ -14,8 +14,8 @@ function config(
 }
 
 describe('product update policy', () => {
-  it('keeps release updates disabled for the approved null configuration', () => {
-    expect(hasConfiguredProductUpdateChannel()).toBe(false)
+  it('enables only the approved HiveCloud beta product source by default', () => {
+    expect(hasConfiguredProductUpdateChannel()).toBe(true)
   })
 
   it('requires both an approved channel and a HiveCode update endpoint', () => {

@@ -26,7 +26,7 @@ const SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*$/
 const SLUG_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const GITHUB_REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/
-const PRODUCT_UPDATE_CHANNELS = new Set(['stable', 'rc'])
+const PRODUCT_UPDATE_CHANNELS = new Set(['stable', 'beta', 'rc'])
 const PRODUCT_UPDATE_PROVIDERS = new Set(['github', 'hivecloud'])
 const STRICT_HTTPS_ENDPOINTS = new Set(['artifacts', 'pluginMarketplace', 'changelog', 'nudge'])
 const ORIGIN_ONLY_ENDPOINTS = new Set(['artifacts'])
@@ -228,7 +228,7 @@ function assertManifestShape(manifest) {
     manifest.desktop.updateChannel &&
     !PRODUCT_UPDATE_CHANNELS.has(manifest.desktop.updateChannel)
   ) {
-    throw new Error('desktop.updateChannel must be stable, rc, or null')
+    throw new Error('desktop.updateChannel must be stable, beta, rc, or null')
   }
   assertOptionalString(manifest.desktop.updateRepository, 'desktop.updateRepository')
   if (manifest.desktop.updateRepository) {

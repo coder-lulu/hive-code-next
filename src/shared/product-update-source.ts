@@ -1,6 +1,6 @@
 import { hivecodeProductConfig } from './generated/product-config'
 
-const PRODUCT_UPDATE_CHANNELS = ['stable', 'rc'] as const
+const PRODUCT_UPDATE_CHANNELS = ['stable', 'beta', 'rc'] as const
 type ProductUpdateChannel = (typeof PRODUCT_UPDATE_CHANNELS)[number]
 const PRODUCT_UPDATE_PROVIDERS = ['github', 'hivecloud'] as const
 type ProductUpdateProvider = (typeof PRODUCT_UPDATE_PROVIDERS)[number]

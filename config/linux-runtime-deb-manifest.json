@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "packageName": "hivecode-runtime",
+  "architecture": "x64",
+  "packageFormat": "deb",
+  "supportedDistributions": ["ubuntu-20.04", "ubuntu-22.04", "ubuntu-24.04", "debian-stable"],
+  "glibcMinimum": "2.31",
+  "service": {
+    "unit": "hivecode-runtime.service",
+    "user": "hivecode-runtime",
+    "stateDirectory": "/var/lib/hivecode-runtime",
+    "environmentFile": "/etc/hivecode/runtime.env"
+  },
+  "installBehavior": {
+    "enableService": false,
+    "startService": false,
+    "preserveStateOnRemove": true
+  }
+}

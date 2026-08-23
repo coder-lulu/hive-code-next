@@ -114,7 +114,7 @@ type UpdateCandidateIdentity = {
   provider: 'github' | 'hivecloud' | null
   source: 'release' | UpdateSource
   repository: string | null
-  sourceChannel: 'stable' | 'rc' | null
+  sourceChannel: 'stable' | 'beta' | 'rc' | null
   checkChannel: UpdateCheckVariant | ReleaseChannel | 'local'
   tag: string
   version: string
@@ -462,8 +462,12 @@ function getUpdateCheckVariant(options?: UpdateCheckOptions): UpdateCheckVariant
     return override === 'rc' ? 'prerelease' : 'default'
   }
   const configuredChannel = resolveProductUpdateSource()?.channel
-  if (configuredChannel === 'stable' || configuredChannel === 'rc') {
-    return configuredChannel === 'rc' ? 'prerelease' : 'default'
+  if (
+    configuredChannel === 'stable' ||
+    configuredChannel === 'beta' ||
+    configuredChannel === 'rc'
+  ) {
+    return configuredChannel === 'stable' ? 'default' : 'prerelease'
   }
   // Defensive compatibility for a legacy RC install whose manifest has no source.
   return isPrereleaseVersion(app.getVersion()) ? 'prerelease' : 'default'

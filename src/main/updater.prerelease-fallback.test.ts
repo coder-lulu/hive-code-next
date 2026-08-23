@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ProductUpdateSource } from './updater-test-harness'
 
 const {
   appMock,
@@ -31,7 +32,7 @@ vi.mock('./linux-root-package-install-policy', () =>
   moduleFactories.linuxRootPackageInstallPolicy()
 )
 
-function useProductChannel(channel: 'stable' | 'rc'): void {
+function useProductChannel(channel: ProductUpdateSource['channel']): void {
   productUpdateSourceState.value = {
     ...productUpdateSourceState.value!,
     channel

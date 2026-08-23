@@ -18,4 +18,17 @@ for link in /usr/bin/hivecode /usr/bin/orca-ide; do
   fi
 done
 
+if [ -f /usr/lib/systemd/system/hivecode-runtime.service ]; then
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl disable --now hivecode-runtime.service >/dev/null 2>&1 || true
+  fi
+  rm -f /usr/lib/systemd/system/hivecode-runtime.service
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload || true
+  fi
+fi
+
+# Runtime state, the service account, and operator-owned /etc/hivecode/runtime.env
+# are deliberately preserved for reinstall or rollback.
+
 exit 0

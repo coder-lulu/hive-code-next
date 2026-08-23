@@ -26,6 +26,7 @@ const productManifest = require('./product/hivecode.product.json')
 const isMacHourly = process.env.ORCA_MAC_HOURLY === '1'
 const isMacDaily = process.env.ORCA_MAC_DAILY === '1'
 const isMacAdhoc = process.env.ORCA_MAC_ADHOC === '1'
+const isHeadlessRuntimeDeb = process.env.HIVECODE_HEADLESS_RUNTIME_DEB === '1'
 // Why a second set of variables rather than making the mac ones platform-neutral:
 // the mac ones gate `isMacRelease` below, which turns on hardened runtime,
 // notarization, and root-level `forceCodeSigning`. A Windows dev build that
@@ -35,6 +36,7 @@ const isWinHourly = process.env.ORCA_WIN_HOURLY === '1'
 const isWinDaily = process.env.ORCA_WIN_DAILY === '1'
 const isWinAdhoc = process.env.ORCA_WIN_ADHOC === '1'
 const isWinDevChannel = isWinHourly || isWinDaily || isWinAdhoc
+const isHardwareWindowsSigning = process.env.HIVECODE_WINDOWS_HARDWARE_SIGNING === '1'
 const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
 const localBuildVersion =
@@ -331,6 +333,14 @@ module.exports = {
   },
   win: {
     executableName: productManifest.desktop.executableName,
+    ...(isHardwareWindowsSigning
+      ? {
+          signtoolOptions: {
+            sign: './config/scripts/sign-windows-artifact.mjs',
+            signingHashAlgorithms: ['sha256']
+          }
+        }
+      : {}),
     extraResources: [
       ...commonExtraResources,
       ...createPackagedRuntimeNodeModuleResources('win32'),
@@ -494,7 +504,7 @@ module.exports = {
   },
   // Why: release builds should fail if signing is unavailable instead of
   // silently downgrading to ad-hoc artifacts that look shippable in CI logs.
-  forceCodeSigning: isMacRelease,
+  forceCodeSigning: isMacRelease || isHardwareWindowsSigning,
   dmg: {
     artifactName: 'hivecode-macos-${arch}.${ext}'
   },
@@ -514,6 +524,14 @@ module.exports = {
       ...commonExtraResources,
       ...createPackagedRuntimeNodeModuleResources('linux'),
       linuxSpeechNativeResource,
+      ...(isHeadlessRuntimeDeb
+        ? [
+            {
+              from: 'resources/linux/systemd',
+              to: 'systemd'
+            }
+          ]
+        : []),
       {
         from: 'resources/linux/bin/hivecode',
         to: 'bin/hivecode'
@@ -540,8 +558,10 @@ module.exports = {
     artifactName: isLinuxArm64Release ? 'hivecode-linux-arm64.${ext}' : 'hivecode-linux.${ext}'
   },
   deb: {
-    packageName: 'hivecode',
-    artifactName: 'hivecode_${version}_${arch}.${ext}',
+    packageName: isHeadlessRuntimeDeb ? 'hivecode-runtime' : 'hivecode',
+    artifactName: isHeadlessRuntimeDeb
+      ? 'hivecode-runtime_${version}_${arch}.${ext}'
+      : 'hivecode_${version}_${arch}.${ext}',
     // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).

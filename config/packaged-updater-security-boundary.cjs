@@ -31,14 +31,11 @@ const REQUIRED_MAIN_LITERALS = [
 
 const REQUIRED_NULL_PATHS = [
   'desktop.publisher',
-  'desktop.updateProvider',
   'desktop.updateRepository',
-  'desktop.updateChannel',
   'desktop.starRepository',
   'endpoints.artifacts',
   'endpoints.cloud',
   'endpoints.relay',
-  'endpoints.update',
   'endpoints.telemetry',
   'endpoints.diagnostics',
   'endpoints.feedback',

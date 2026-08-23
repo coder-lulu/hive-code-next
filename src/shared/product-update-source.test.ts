@@ -76,6 +76,21 @@ describe('resolveProductUpdateSource', () => {
     })
   })
 
+  it('maps the HiveCloud beta channel to the matching server feed', () => {
+    const source = resolveProductUpdateSource(
+      config(
+        'beta',
+        'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+        null,
+        'hivecloud'
+      )
+    )
+
+    expect(source && resolveProductUpdateFeedUrl(source, 'win32', 'x64')).toBe(
+      'https://updates.hivekernel.example/hive/v1/updates/desktop/beta/windows/x64/'
+    )
+  })
+
   it.each([
     ['win32', 'x64', 'stable/windows/x64/'],
     ['darwin', 'arm64', 'stable/macos/arm64/'],
@@ -161,7 +176,7 @@ describe('resolveProductUpdateSource', () => {
     expect(resolveProductUpdateSource(config('stable', endpoint))).toBeNull()
   })
 
-  it.each(['beta', 'hourly', 'adhoc', 'STABLE'])(
+  it.each(['hourly', 'adhoc', 'STABLE'])(
     'fails closed for unsupported product update channel %s',
     (channel) => {
       expect(

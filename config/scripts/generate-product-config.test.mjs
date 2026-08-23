@@ -108,7 +108,7 @@ describe('validateProductManifest', () => {
         ...validManifest,
         desktop: { ...validManifest.desktop, updateChannel: 'hourly' }
       })
-    ).toThrow('desktop.updateChannel must be stable, rc, or null')
+    ).toThrow('desktop.updateChannel must be stable, beta, rc, or null')
   })
 
   it('rejects unknown updater providers', () => {

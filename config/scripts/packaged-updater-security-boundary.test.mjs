@@ -23,10 +23,10 @@ function validMainBundle(runtimeProductConfigChunkName = 'product-config-fixture
     const MAX_UPDATER_ARTIFACT_BYTES = 2147483648
     const config = {
       updateRepository: null,
-      updateProvider: null,
-      updateChannel: null,
+      updateProvider: 'hivecloud',
+      updateChannel: 'beta',
       starRepository: null,
-      update: null,
+      update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/',
       telemetry: null,
       diagnostics: null,
       pluginMarketplace: null
@@ -66,8 +66,8 @@ function validProductConfig() {
         appId: 'com.hivekernel.hivecode.desktop',
         executableName: 'HiveCode',
         publisher: null,
-        updateProvider: null,
-        updateChannel: null,
+        updateProvider: 'hivecloud',
+        updateChannel: 'beta',
         updateRepository: null,
         starRepository: null
       },
@@ -79,7 +79,7 @@ function validProductConfig() {
         artifacts: null,
         cloud: null,
         relay: null,
-        update: null,
+        update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/',
         telemetry: null,
         diagnostics: null,
         feedback: null,
@@ -297,14 +297,11 @@ describe('packaged updater security boundary', () => {
   it('rejects every packaged product config field that re-enables an external authority', async () => {
     for (const field of [
       'publisher',
-      'updateProvider',
       'updateRepository',
-      'updateChannel',
       'starRepository',
       'artifacts',
       'cloud',
       'relay',
-      'update',
       'telemetry',
       'diagnostics',
       'feedback',
@@ -334,6 +331,19 @@ describe('packaged updater security boundary', () => {
         verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)
       ).toThrow(new RegExp(`product config null policy is missing:.*${field}`))
     }
+  })
+
+  it('rejects a packaged updater authority that differs from the canonical HiveCloud feed', async () => {
+    const fixture = await createFixture({
+      productConfig: validProductConfig().replace(
+        "update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/'",
+        "update: 'https://updates.attacker.test/hive/v1/updates/desktop/'"
+      )
+    })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /does not match the canonical product manifest/i
+    )
   })
 
   it('validates the exported product config rather than accepting decoy null markers', async () => {

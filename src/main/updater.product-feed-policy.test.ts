@@ -35,7 +35,7 @@ vi.mock('./linux-root-package-install-policy', () =>
   moduleFactories.linuxRootPackageInstallPolicy()
 )
 
-function configuredProductSource(channel: 'stable' | 'rc'): ProductUpdateSource {
+function configuredProductSource(channel: ProductUpdateSource['channel']): ProductUpdateSource {
   return {
     channel,
     feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',

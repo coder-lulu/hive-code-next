@@ -4,7 +4,7 @@ import type { Mock } from 'vitest'
 type ProductUpdaterSpy = Mock<(...args: unknown[]) => unknown>
 
 export type ProductUpdateSource = {
-  channel: 'stable' | 'rc'
+  channel: 'stable' | 'beta' | 'rc'
   feedUrl: string
   github: {
     repo: string

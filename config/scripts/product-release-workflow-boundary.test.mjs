@@ -33,12 +33,31 @@ const findStep = (job, predicate, description) => {
   return step
 }
 
-describe('disabled product release workflow boundary', () => {
-  it('keeps every retained upstream release job unreachable in the product repository', () => {
+function isUpstreamGuardedJob(jobs, jobName, visiting = new Set()) {
+  const job = jobs[jobName]
+  if (!job || visiting.has(jobName)) {
+    return false
+  }
+  if (String(job.if ?? '').includes(upstreamRepositoryGuard)) {
+    return true
+  }
+  const dependencies = typeof job.needs === 'string' ? [job.needs] : (job.needs ?? [])
+  if (dependencies.length === 0) {
+    return false
+  }
+  const next = new Set(visiting)
+  next.add(jobName)
+  return dependencies.every((dependency) => isUpstreamGuardedJob(jobs, dependency, next))
+}
+
+describe('HiveCloud product release workflow boundary', () => {
+  it('uses only the approved HiveCloud beta feed and keeps retained upstream jobs unreachable', () => {
     expect(productManifest.desktop.updateRepository).toBeNull()
-    expect(productManifest.desktop.updateProvider).toBeNull()
-    expect(productManifest.endpoints.update).toBeNull()
-    expect(productManifest.desktop.updateChannel).toBeNull()
+    expect(productManifest.desktop.updateProvider).toBe('hivecloud')
+    expect(productManifest.endpoints.update).toBe(
+      'https://updates.hivekernel.com/hive/v1/updates/desktop/'
+    )
+    expect(productManifest.desktop.updateChannel).toBe('beta')
 
     for (const workflowName of retainedUpstreamReleaseWorkflows) {
       const workflow = parse(
@@ -47,11 +66,11 @@ describe('disabled product release workflow boundary', () => {
       const jobs = workflow?.jobs ?? {}
       expect(Object.keys(jobs), `${workflowName} must contain at least one job`).not.toHaveLength(0)
 
-      for (const [jobName, job] of Object.entries(jobs)) {
+      for (const jobName of Object.keys(jobs)) {
         expect(
-          String(job?.if ?? ''),
-          `${workflowName}:${jobName} must be hard-bound to the retained upstream repository while product updates are disabled`
-        ).toContain(upstreamRepositoryGuard)
+          isUpstreamGuardedJob(jobs, jobName),
+          `${workflowName}:${jobName} must be transitively hard-bound to the retained upstream repository`
+        ).toBe(true)
       }
     }
   })
