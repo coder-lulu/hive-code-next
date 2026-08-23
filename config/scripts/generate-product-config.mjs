@@ -10,6 +10,7 @@ const GENERATED_RELATIVE_PATHS = [
 const ENDPOINT_KEYS = [
   'artifacts',
   'cloud',
+  'identityIssuer',
   'relay',
   'update',
   'telemetry',

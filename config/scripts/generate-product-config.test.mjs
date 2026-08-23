@@ -47,6 +47,7 @@ const validManifest = {
   endpoints: {
     artifacts: null,
     cloud: '',
+    identityIssuer: null,
     relay: null,
     update: '',
     telemetry: null,
@@ -68,6 +69,7 @@ describe('validateProductManifest', () => {
       endpoints: {
         artifacts: null,
         cloud: null,
+        identityIssuer: null,
         relay: null,
         update: null,
         telemetry: null,

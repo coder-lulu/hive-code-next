@@ -124,6 +124,7 @@
       "required": [
         "artifacts",
         "cloud",
+        "identityIssuer",
         "relay",
         "update",
         "telemetry",
@@ -137,6 +138,7 @@
       "properties": {
         "artifacts": { "$ref": "#/$defs/nullableUrl" },
         "cloud": { "$ref": "#/$defs/nullableUrl" },
+        "identityIssuer": { "$ref": "#/$defs/nullableUrl" },
         "relay": { "$ref": "#/$defs/nullableUrl" },
         "update": { "$ref": "#/$defs/nullableUrl" },
         "telemetry": { "$ref": "#/$defs/nullableUrl" },

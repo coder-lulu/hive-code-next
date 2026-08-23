@@ -696,6 +696,37 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       orgMemberChangeRole: async () => ({ status: 'unconfigured' }),
       orgMemberRemove: async () => ({ status: 'unconfigured' })
     },
+    hiveAccount: {
+      getState: () =>
+        Promise.resolve({
+          configured: false,
+          status: 'unconfigured',
+          persistence: 'none',
+          setupMessage: 'HiveCloud account sign-in is available in HiveCode Desktop.'
+        }),
+      signIn: async () => ({
+        status: 'unconfigured',
+        state: {
+          configured: false,
+          status: 'unconfigured',
+          persistence: 'none',
+          setupMessage: 'HiveCloud account sign-in is available in HiveCode Desktop.'
+        }
+      }),
+      refresh: async () => ({
+        status: 'unconfigured',
+        state: {
+          configured: false,
+          status: 'unconfigured',
+          persistence: 'none',
+          setupMessage: 'HiveCloud account sign-in is available in HiveCode Desktop.'
+        }
+      }),
+      signOut: async () => ({
+        status: 'already-signed-out',
+        state: { configured: true, status: 'signed-out', persistence: 'encrypted' }
+      })
+    },
     e2e: {
       getConfig: () => webE2EConfig
     },

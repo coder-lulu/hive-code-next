@@ -618,6 +618,13 @@ const api = {
     orgMemberRemove: (args) => ipcRenderer.invoke('orcaProfiles:orgMemberRemove', args)
   } satisfies PreloadApi['orcaProfiles'],
 
+  hiveAccount: {
+    getState: () => ipcRenderer.invoke('hiveAccount:getState'),
+    signIn: () => ipcRenderer.invoke('hiveAccount:signIn'),
+    refresh: () => ipcRenderer.invoke('hiveAccount:refresh'),
+    signOut: () => ipcRenderer.invoke('hiveAccount:signOut')
+  } satisfies PreloadApi['hiveAccount'],
+
   platform: {
     get: () => ({
       platform: process.platform,

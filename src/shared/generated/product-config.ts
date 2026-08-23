@@ -44,7 +44,8 @@ export const hivecodeProductConfig = {
   },
   endpoints: {
     artifacts: null,
-    cloud: null,
+    cloud: 'https://api.hivekernel.com',
+    identityIssuer: 'https://identity.hivekernel.com/realms/hive',
     relay: null,
     update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/',
     telemetry: null,

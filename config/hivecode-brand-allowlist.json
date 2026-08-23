@@ -8,6 +8,7 @@
     ".github/ISSUE_TEMPLATE/feature_request.yml",
     ".github/ISSUE_TEMPLATE/other.yml",
     ".github/workflows/fork-boundary.yml",
+    ".github/workflows/hivecode-windows-hardware-sign.yml",
     ".github/workflows/upstream-sync.yml",
     "config/electron-builder.config.cjs",
     "config/hivecode-brand-allowlist.json",
@@ -22,6 +23,7 @@
     "config/scripts/build-notification-status-macos.mjs",
     "config/scripts/build-windows-cli-launcher.test.mjs",
     "config/scripts/build-windows-x64-hardware-signed.mjs",
+    "config/scripts/build-windows-x64-hardware-signed.test.mjs",
     "config/scripts/check-hivecode-brand-boundary.mjs",
     "config/scripts/check-hivecode-brand-boundary.test.mjs",
     "config/scripts/cli-packaging-identity.test.mjs",
@@ -31,6 +33,7 @@
     "config/scripts/generate-hivecode-icon-assets.mjs",
     "config/scripts/generate-product-config.mjs",
     "config/scripts/generate-product-config.test.mjs",
+    "config/scripts/hivecode-windows-hardware-signing-workflow.test.mjs",
     "config/scripts/linux-runtime-deb-contract.test.mjs",
     "config/scripts/mac-build-compatibility.test.mjs",
     "config/scripts/packaged-updater-security-boundary.test.mjs",
@@ -40,6 +43,8 @@
     "config/scripts/sign-windows-artifact.test.mjs",
     "config/scripts/verify-cli-bin.mjs",
     "config/scripts/verify-cli-bin.test.mjs",
+    "config/scripts/verify-hivecode-windows-artifact.mjs",
+    "config/scripts/verify-windows-inner-signature.mjs",
     "docs/engineering/fork-boundary-policy.md",
     "docs/engineering/product-design.md",
     "docs/readme/README.es.md",
@@ -126,6 +131,13 @@
     "src/main/codex-accounts/service-account-add-login.test.ts",
     "src/main/computer/macos-computer-use-permissions.ts",
     "src/main/daemon/node-pty-error-hints.test.ts",
+    "src/main/hive-account/hive-account-client.test.ts",
+    "src/main/hive-account/hive-account-config.test.ts",
+    "src/main/hive-account/hive-account-config.ts",
+    "src/main/hive-account/hive-account-device.ts",
+    "src/main/hive-account/hive-account-pkce.ts",
+    "src/main/hive-account/hive-account-secure-store.test.ts",
+    "src/main/hive-account/hive-account-service.test.ts",
     "src/main/index.ts",
     "src/main/ipc/feedback.ts",
     "src/main/ipc/notification-system-settings-link.ts",
@@ -168,6 +180,7 @@
     "src/renderer/src/lib/file-preview.test.ts",
     "src/renderer/src/web/web-pairing.test.ts",
     "src/renderer/src/web/web-pairing.ts",
+    "src/renderer/src/web/web-preload-api.ts",
     "src/renderer/src/web/web-runtime-client.test.ts",
     "src/shared/brand.ts",
     "src/shared/contextual-tours.test.ts",
@@ -192,6 +205,6 @@
   ],
   "protectedFileHashes": {
     ".gitignore": "0751cfb1b0af3e3ecc85e615c83cbf101bd8936e10c3b792cfb61a8973e3ef15",
-    ".gitattributes": "b3ec62550d93ac6060109b47399c3c6cf7dd955ae49244975318454210a44c19"
+    ".gitattributes": "d2e174a66bd2b89ac9b523df5cb5faadf7443f8492b96aad8e79c018ad289a35"
   }
 }
