@@ -34,7 +34,6 @@ const REQUIRED_NULL_PATHS = [
   'desktop.updateRepository',
   'desktop.starRepository',
   'endpoints.artifacts',
-  'endpoints.cloud',
   'endpoints.relay',
   'endpoints.telemetry',
   'endpoints.diagnostics',

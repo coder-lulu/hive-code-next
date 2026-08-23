@@ -77,7 +77,8 @@ function validProductConfig() {
       },
       endpoints: {
         artifacts: null,
-        cloud: null,
+        cloud: 'https://api.hivekernel.com',
+        identityIssuer: 'https://identity.hivekernel.com/realms/hive',
         relay: null,
         update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/',
         telemetry: null,
@@ -300,7 +301,6 @@ describe('packaged updater security boundary', () => {
       'updateRepository',
       'starRepository',
       'artifacts',
-      'cloud',
       'relay',
       'telemetry',
       'diagnostics',
@@ -346,9 +346,29 @@ describe('packaged updater security boundary', () => {
     )
   })
 
+  it.each([
+    ['cloud API', "cloud: 'https://api.hivekernel.com'", "cloud: 'https://cloud.attacker.test'"],
+    [
+      'identity issuer',
+      "identityIssuer: 'https://identity.hivekernel.com/realms/hive'",
+      "identityIssuer: 'https://identity.attacker.test/realms/hive'"
+    ]
+  ])(
+    'rejects a packaged %s authority outside the canonical product manifest',
+    async (_, from, to) => {
+      const fixture = await createFixture({
+        productConfig: validProductConfig().replace(from, to)
+      })
+
+      expect(() =>
+        verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)
+      ).toThrow(/does not match the canonical product manifest/i)
+    }
+  )
+
   it('validates the exported product config rather than accepting decoy null markers', async () => {
     const exportedConfig = validProductConfig().replace(
-      'cloud: null',
+      "cloud: 'https://api.hivekernel.com'",
       'cloud: "https://cloud.attacker.test"'
     )
     const decoyNullMarkers = validProductConfig().replace(
@@ -366,12 +386,15 @@ describe('packaged updater security boundary', () => {
 
   it('rejects a malicious product config consumed by Main even when the standalone copy is safe', async () => {
     const runtimeProductConfig = validBundledMainProductConfig(
-      validProductConfig().replace('cloud: null', 'cloud: "https://cloud.attacker.test"')
+      validProductConfig().replace(
+        "cloud: 'https://api.hivekernel.com'",
+        'cloud: "https://cloud.attacker.test"'
+      )
     )
     const fixture = await createFixture({ runtimeProductConfig })
 
     expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
-      /product config null policy is missing:.*endpoints\.cloud/i
+      /does not match the canonical product manifest/i
     )
   })
 
