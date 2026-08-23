@@ -4,6 +4,16 @@
 # Never delete a regular file, bare /usr/bin/orca, or another package's symlink.
 set -e
 
+# Debian runs the old package's postrm with "upgrade" after unpacking a new
+# version. RPM passes 1 while another package version remains installed. Neither
+# transition is an uninstall: keep operator-managed enablement and live service
+# state intact so upgrades do not silently lose boot persistence.
+case "${1:-}" in
+  upgrade|failed-upgrade|abort-upgrade|1)
+    exit 0
+    ;;
+esac
+
 for link in /usr/bin/hivecode /usr/bin/orca-ide; do
   if [ -L "$link" ]; then
     target="$(readlink "$link" || true)"

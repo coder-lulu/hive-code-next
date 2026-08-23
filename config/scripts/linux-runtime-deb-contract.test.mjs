@@ -17,6 +17,10 @@ describe('Linux Runtime deb contract', () => {
       join(root, 'resources/linux/packaging/after-install.sh'),
       'utf8'
     )
+    const afterRemove = readFileSync(
+      join(root, 'resources/linux/packaging/after-remove.sh'),
+      'utf8'
+    )
     const builder = readFileSync(join(root, 'config/electron-builder.config.cjs'), 'utf8')
     const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
@@ -43,6 +47,9 @@ describe('Linux Runtime deb contract', () => {
     expect(afterInstall).toContain('hivecode-runtime.service')
     expect(afterInstall).toContain('chmod 4755 "$sandbox"')
     expect(afterInstall).not.toMatch(/systemctl\s+enable/)
+    const upgradeGuard = afterRemove.indexOf('upgrade|failed-upgrade|abort-upgrade|1')
+    expect(upgradeGuard).toBeGreaterThanOrEqual(0)
+    expect(upgradeGuard).toBeLessThan(afterRemove.indexOf('for link in'))
     expect(builder).toContain("process.env.HIVECODE_HEADLESS_RUNTIME_DEB === '1'")
     expect(packageJson.scripts['build:linux:runtime-deb']).toContain('build-linux-runtime-deb.mjs')
     expect(packageJson.homepage).toBe('https://github.com/coder-lulu/hive-code-next')
