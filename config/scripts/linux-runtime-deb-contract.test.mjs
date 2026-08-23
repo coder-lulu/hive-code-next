@@ -35,6 +35,7 @@ describe('Linux Runtime deb contract', () => {
       'ExecStart=/usr/bin/hivecode serve --port 6768 --json $HIVECODE_RUNTIME_ARGS'
     )
     expect(unit).toContain('RestartPreventExitStatus=3')
+    expect(unit).toContain('KillMode=control-group')
     expect(unit).toContain('NoNewPrivileges=false')
     expect(unit).toContain('PrivateTmp=false')
     expect(unit).toContain('ProtectSystem=full')
