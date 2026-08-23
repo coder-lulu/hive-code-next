@@ -35,8 +35,12 @@ describe('Linux Runtime deb contract', () => {
       'ExecStart=/usr/bin/hivecode serve --port 6768 --json $HIVECODE_RUNTIME_ARGS'
     )
     expect(unit).toContain('RestartPreventExitStatus=3')
+    expect(unit).toContain('NoNewPrivileges=false')
+    expect(unit).toContain('PrivateTmp=false')
+    expect(unit).toContain('ProtectSystem=full')
     expect(unit).not.toContain('--no-sandbox')
     expect(afterInstall).toContain('hivecode-runtime.service')
+    expect(afterInstall).toContain('chmod 4755 "$sandbox"')
     expect(afterInstall).not.toMatch(/systemctl\s+enable/)
     expect(builder).toContain("process.env.HIVECODE_HEADLESS_RUNTIME_DEB === '1'")
     expect(packageJson.scripts['build:linux:runtime-deb']).toContain('build-linux-runtime-deb.mjs')

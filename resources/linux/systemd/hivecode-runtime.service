@@ -24,8 +24,10 @@ TimeoutStopSec=30
 Restart=on-failure
 RestartPreventExitStatus=3
 RestartSec=5
-NoNewPrivileges=true
-PrivateTmp=true
+# Chromium's setuid sandbox must be allowed to elevate inside its helper.
+# PrivateTmp hides the shared X11 socket directory from the managed Xvfb.
+NoNewPrivileges=false
+PrivateTmp=false
 ProtectSystem=full
 UMask=0077
 
