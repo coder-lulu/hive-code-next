@@ -1,4 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
+
+const electronNetFetch = vi.hoisted(() => vi.fn())
+
+vi.mock('electron', () => ({
+  net: { fetch: electronNetFetch }
+}))
+
 import { HiveAccountClient } from './hive-account-client'
 
 const config = {
@@ -16,6 +23,26 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe('Hive account Native client', () => {
+  it('uses the Electron Chrome network stack by default', async () => {
+    electronNetFetch.mockResolvedValueOnce(
+      jsonResponse({
+        issuer: config.identityIssuer,
+        authorization_endpoint:
+          'https://identity.hivekernel.com/realms/hive/protocol/openid-connect/auth'
+      })
+    )
+
+    const client = new HiveAccountClient(config)
+
+    await expect(client.discoverAuthorizationEndpoint()).resolves.toContain(
+      '/protocol/openid-connect/auth'
+    )
+    expect(electronNetFetch).toHaveBeenCalledWith(
+      `${config.identityIssuer}/.well-known/openid-configuration`,
+      expect.objectContaining({ redirect: 'error', cache: 'no-store' })
+    )
+  })
+
   it('accepts only discovery metadata for the configured issuer and origin', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({

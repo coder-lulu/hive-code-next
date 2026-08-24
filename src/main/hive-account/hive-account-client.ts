@@ -1,3 +1,4 @@
+import { net } from 'electron'
 import { randomBytes } from 'node:crypto'
 import type { HiveAccountSessionProfile, HiveAccountSummary } from '../../shared/hive-account'
 import type { HiveAccountConfig } from './hive-account-config'
@@ -32,7 +33,9 @@ export class HiveAccountRequestError extends Error {
   }
 }
 
-type FetchLike = typeof fetch
+type FetchLike = (input: string, init: RequestInit) => Promise<Response>
+
+const electronFetch: FetchLike = (input, init) => net.fetch(input, init)
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -149,7 +152,7 @@ function normalizeSession(value: unknown): NativeSessionResponse {
 export class HiveAccountClient {
   constructor(
     private readonly config: HiveAccountConfig,
-    private readonly fetchImpl: FetchLike = fetch
+    private readonly fetchImpl: FetchLike = electronFetch
   ) {}
 
   async discoverAuthorizationEndpoint(): Promise<string> {
