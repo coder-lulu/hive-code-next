@@ -620,7 +620,7 @@ const api = {
 
   hiveAccount: {
     getState: () => ipcRenderer.invoke('hiveAccount:getState'),
-    signIn: () => ipcRenderer.invoke('hiveAccount:signIn'),
+    signIn: (options) => ipcRenderer.invoke('hiveAccount:signIn', options),
     refresh: () => ipcRenderer.invoke('hiveAccount:refresh'),
     signOut: () => ipcRenderer.invoke('hiveAccount:signOut')
   } satisfies PreloadApi['hiveAccount'],

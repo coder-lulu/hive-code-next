@@ -28,6 +28,8 @@ const sessionResponse = {
   accessToken: 'access',
   refreshToken: 'refresh',
   expiresAt: Date.now() + 600_000,
+  sessionExpiresAt: Date.now() + 90 * 24 * 60 * 60 * 1_000,
+  sessionProfile: 'TRUSTED' as const,
   account: { accountId: '123e4567-e89b-42d3-a456-426614174000', displayName: 'Ada' },
   authorityId: 'hive-primary'
 }
@@ -92,7 +94,7 @@ function createService(): HiveAccountService {
 describe('Hive account application service', () => {
   it('creates a device authorization before exchanging and persists the Native session', async () => {
     const service = createService()
-    const result = await service.signIn()
+    const result = await service.signIn({ sessionProfile: 'TRUSTED' })
     expect(result).toMatchObject({
       status: 'signed-in',
       state: {
@@ -111,9 +113,28 @@ describe('Hive account application service', () => {
     await expect(createService().getState()).resolves.toMatchObject({ status: 'signed-in' })
   })
 
+  it('keeps a temporary authorization in memory and does not restore it after restart', async () => {
+    client.exchangeSession.mockResolvedValue({
+      ...sessionResponse,
+      sessionExpiresAt: Date.now() + 24 * 60 * 60 * 1_000,
+      sessionProfile: 'TEMPORARY'
+    })
+    const service = createService()
+
+    await expect(service.signIn({ sessionProfile: 'TEMPORARY' })).resolves.toMatchObject({
+      status: 'signed-in',
+      state: { persistence: 'none', sessionProfile: 'TEMPORARY' }
+    })
+
+    expect(client.createDeviceAuthorization).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionProfile: 'TEMPORARY' })
+    )
+    await expect(createService().getState()).resolves.toMatchObject({ status: 'signed-out' })
+  })
+
   it('single-flights refresh and revokes the current Cloud session on sign-out', async () => {
     const service = createService()
-    await service.signIn()
+    await service.signIn({ sessionProfile: 'TRUSTED' })
     const [first, second] = await Promise.all([service.refresh(), service.refresh()])
     expect(first.status).toBe('refreshed')
     expect(second.status).toBe('refreshed')
@@ -133,13 +154,15 @@ describe('Hive account application service', () => {
       status: 'error',
       errorCode: 'secure_storage_unavailable'
     })
-    await expect(createService().signIn()).resolves.toMatchObject({ status: 'failed' })
+    await expect(createService().signIn({ sessionProfile: 'TRUSTED' })).resolves.toMatchObject({
+      status: 'failed'
+    })
     expect(client.discoverAuthorizationEndpoint).not.toHaveBeenCalled()
   })
 
   it('revokes a refreshed session that loses a race with sign-out', async () => {
     const service = createService()
-    await service.signIn()
+    await service.signIn({ sessionProfile: 'TRUSTED' })
     let finishRefresh: ((value: typeof sessionResponse) => void) | undefined
     client.refreshSession.mockReturnValue(
       new Promise((resolve) => {

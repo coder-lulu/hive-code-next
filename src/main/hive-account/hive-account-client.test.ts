@@ -41,7 +41,7 @@ describe('Hive account Native client', () => {
         jsonResponse(
           {
             expiresAt: new Date(Date.now() + 60_000).toISOString(),
-            contractRevision: 'stage2a-device-authorization-v1'
+            contractRevision: 'stage2a-device-authorization-v2'
           },
           201
         )
@@ -51,6 +51,8 @@ describe('Hive account Native client', () => {
           accessToken: 'access',
           refreshToken: 'refresh',
           expiresAt: '2030-01-01T00:00:00Z',
+          sessionExpiresAt: '2030-04-01T00:00:00Z',
+          sessionProfile: 'TRUSTED',
           account: {
             accountId: '123e4567-e89b-42d3-a456-426614174000',
             displayName: 'Ada'
@@ -65,6 +67,7 @@ describe('Hive account Native client', () => {
       nonce: 'nonce',
       devicePublicKey: 'public',
       deviceLabel: 'desktop',
+      sessionProfile: 'TRUSTED',
       proof: 'proof'
     })
     await expect(
@@ -80,6 +83,7 @@ describe('Hive account Native client', () => {
       nonce: 'nonce',
       devicePublicKey: 'public',
       deviceLabel: 'desktop',
+      sessionProfile: 'TRUSTED',
       proof: 'proof',
       clientId: 'hivecode-desktop'
     })
@@ -123,6 +127,8 @@ describe('Hive account Native client', () => {
         accessToken: 'access',
         refreshToken: 'refresh',
         expiresAt: '2020-01-01T00:00:00Z',
+        sessionExpiresAt: '2020-01-02T00:00:00Z',
+        sessionProfile: 'TEMPORARY',
         account: {
           accountId: '123e4567-e89b-42d3-a456-426614174000',
           displayName: 'Ada'

@@ -1,4 +1,8 @@
 export type HiveAccountPersistence = 'none' | 'encrypted'
+export type HiveAccountSessionProfile = 'TEMPORARY' | 'TRUSTED' | 'LEGACY'
+export type HiveAccountSignInOptions = {
+  sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
+}
 
 export type HiveAccountErrorCode =
   | 'secure_storage_unavailable'
@@ -24,6 +28,8 @@ export type HiveAccountState = {
   authorityId?: string
   deviceLabel?: string
   expiresAt?: number
+  sessionExpiresAt?: number
+  sessionProfile?: HiveAccountSessionProfile
   errorCode?: HiveAccountErrorCode
   setupMessage?: string
 }

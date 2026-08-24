@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron'
-import type { HiveAccountState } from '../../shared/hive-account'
+import type { HiveAccountSignInOptions, HiveAccountState } from '../../shared/hive-account'
 import { HiveAccountService } from '../hive-account/hive-account-service'
 
 type HiveAccountHandlerService = Pick<
@@ -13,6 +13,20 @@ type HiveAccountHandlerDependencies = {
 
 const defaultDependencies: HiveAccountHandlerDependencies = {
   createService: (userDataPath) => new HiveAccountService(userDataPath)
+}
+
+export function requireHiveAccountSignInOptions(value: unknown): HiveAccountSignInOptions {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid HiveCloud sign-in options')
+  }
+  const record = value as Record<string, unknown>
+  if (
+    Object.keys(record).length !== 1 ||
+    (record.sessionProfile !== 'TEMPORARY' && record.sessionProfile !== 'TRUSTED')
+  ) {
+    throw new Error('Invalid HiveCloud sign-in options')
+  }
+  return { sessionProfile: record.sessionProfile }
 }
 
 export function registerHiveAccountHandlers(
@@ -36,7 +50,9 @@ export function registerHiveAccountHandlers(
   ipcMain.handle('hiveAccount:getState', () =>
     startupRefreshPending ? startupState : service.getState()
   )
-  ipcMain.handle('hiveAccount:signIn', () => service.signIn())
+  ipcMain.handle('hiveAccount:signIn', (_event, options) =>
+    service.signIn(requireHiveAccountSignInOptions(options))
+  )
   ipcMain.handle('hiveAccount:refresh', () => service.refresh())
   ipcMain.handle('hiveAccount:signOut', () => service.signOut())
 }

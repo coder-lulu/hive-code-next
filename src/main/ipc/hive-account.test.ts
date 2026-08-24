@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const electronMocks = vi.hoisted(() => ({
-  handlers: new Map<string, () => unknown>(),
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
   getPath: vi.fn(() => 'C:\\app-data'),
-  handle: vi.fn((channel: string, handler: () => unknown) => {
+  handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
     electronMocks.handlers.set(channel, handler)
   })
 }))
@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
   ipcMain: { handle: electronMocks.handle }
 }))
 
-import { registerHiveAccountHandlers } from './hive-account'
+import { registerHiveAccountHandlers, requireHiveAccountSignInOptions } from './hive-account'
 
 beforeEach(() => {
   electronMocks.handlers.clear()
@@ -53,5 +53,42 @@ describe('registerHiveAccountHandlers', () => {
 
     await expect(getStateHandler?.()).resolves.toEqual({ status: 'signed-out' })
     expect(getState).toHaveBeenCalledOnce()
+  })
+
+  it('validates and forwards the selected session profile', async () => {
+    const service = {
+      getState: vi.fn(),
+      refresh: vi.fn().mockResolvedValue({ state: { status: 'signed-out' } }),
+      signIn: vi.fn().mockResolvedValue({ status: 'signed-in' }),
+      signOut: vi.fn()
+    }
+    registerHiveAccountHandlers({ createService: () => service as never })
+    const signInHandler = electronMocks.handlers.get('hiveAccount:signIn')
+
+    await signInHandler?.(undefined, { sessionProfile: 'TRUSTED' })
+
+    expect(service.signIn).toHaveBeenCalledWith({ sessionProfile: 'TRUSTED' })
+  })
+})
+
+describe('Hive account IPC sign-in options', () => {
+  it('accepts only the two explicit session profiles', () => {
+    expect(requireHiveAccountSignInOptions({ sessionProfile: 'TEMPORARY' })).toEqual({
+      sessionProfile: 'TEMPORARY'
+    })
+    expect(requireHiveAccountSignInOptions({ sessionProfile: 'TRUSTED' })).toEqual({
+      sessionProfile: 'TRUSTED'
+    })
+  })
+
+  it.each([
+    undefined,
+    {},
+    { sessionProfile: 'LEGACY' },
+    { sessionProfile: 'TRUSTED', extra: true }
+  ])('rejects malformed renderer input %#', (value) => {
+    expect(() => requireHiveAccountSignInOptions(value)).toThrow(
+      'Invalid HiveCloud sign-in options'
+    )
   })
 })

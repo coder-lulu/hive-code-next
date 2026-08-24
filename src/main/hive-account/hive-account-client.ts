@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import type { HiveAccountSummary } from '../../shared/hive-account'
+import type { HiveAccountSessionProfile, HiveAccountSummary } from '../../shared/hive-account'
 import type { HiveAccountConfig } from './hive-account-config'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -9,6 +9,8 @@ export type NativeSessionResponse = {
   accessToken: string
   refreshToken: string
   expiresAt: number
+  sessionExpiresAt: number
+  sessionProfile: HiveAccountSessionProfile
   account: HiveAccountSummary
   authorityId: string
 }
@@ -119,13 +121,23 @@ function normalizeSession(value: unknown): NativeSessionResponse {
     throw new Error('invalid_hive_account_session_response')
   }
   const expiresAt = instant(value.expiresAt, 'expires_at')
+  const sessionExpiresAt = instant(value.sessionExpiresAt, 'session_expires_at')
   if (expiresAt <= Date.now()) {
     throw new Error('expired_hive_account_session_response')
+  }
+  if (sessionExpiresAt <= expiresAt) {
+    throw new Error('invalid_hive_account_session_expiry')
+  }
+  const sessionProfile = text(value.sessionProfile, 'session_profile')
+  if (!['TEMPORARY', 'TRUSTED', 'LEGACY'].includes(sessionProfile)) {
+    throw new Error('invalid_hive_account_session_profile')
   }
   return {
     accessToken: text(value.accessToken, 'access_token'),
     refreshToken: text(value.refreshToken, 'refresh_token'),
     expiresAt,
+    sessionExpiresAt,
+    sessionProfile: sessionProfile as HiveAccountSessionProfile,
     account: {
       accountId: uuid(value.account.accountId, 'account_id'),
       displayName: text(value.account.displayName, 'display_name')
@@ -158,6 +170,7 @@ export class HiveAccountClient {
     nonce: string
     devicePublicKey: string
     deviceLabel: string
+    sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
     proof: string
   }): Promise<void> {
     const value = await requestJson(
@@ -170,7 +183,7 @@ export class HiveAccountClient {
     )
     if (
       !isRecord(value) ||
-      value.contractRevision !== 'stage2a-device-authorization-v1' ||
+      value.contractRevision !== 'stage2a-device-authorization-v2' ||
       instant(value.expiresAt, 'device_authorization_expiry') <= Date.now()
     ) {
       throw new Error('invalid_hive_device_authorization_response')

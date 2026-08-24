@@ -1,5 +1,6 @@
 import { createPrivateKey, generateKeyPairSync, sign } from 'node:crypto'
 import { hostname } from 'node:os'
+import type { HiveAccountSessionProfile } from '../../shared/hive-account'
 import { hiveAccountSecurePath, readSecureJson, writeSecureJson } from './hive-account-secure-store'
 
 type StoredDeviceIdentity = {
@@ -77,13 +78,14 @@ export function getOrCreateHiveDeviceIdentity(userDataPath: string): HiveDeviceI
 export function signHiveDeviceAuthorization(
   identity: HiveDeviceIdentity,
   nonce: string,
-  clientId: string
+  clientId: string,
+  sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
 ): string {
   const privateKey = createPrivateKey({
     key: Buffer.from(identity.privateKeyPkcs8, 'base64'),
     format: 'der',
     type: 'pkcs8'
   })
-  const context = `hive-device-authorization-v1\n${nonce}\n${clientId}\n${identity.deviceLabel}`
+  const context = `hive-device-authorization-v2\n${nonce}\n${clientId}\n${identity.deviceLabel}\n${sessionProfile}`
   return sign(null, Buffer.from(context, 'utf8'), privateKey).toString('base64url')
 }

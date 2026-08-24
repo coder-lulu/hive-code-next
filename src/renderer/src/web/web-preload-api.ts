@@ -704,7 +704,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
           persistence: 'none',
           setupMessage: 'HiveCloud account sign-in is available in HiveCode Desktop.'
         }),
-      signIn: async () => ({
+      signIn: async (_options) => ({
         status: 'unconfigured',
         state: {
           configured: false,

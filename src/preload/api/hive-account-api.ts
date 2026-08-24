@@ -1,5 +1,6 @@
 import type {
   HiveAccountRefreshResult,
+  HiveAccountSignInOptions,
   HiveAccountSignInResult,
   HiveAccountSignOutResult,
   HiveAccountState
@@ -7,7 +8,7 @@ import type {
 
 export type HiveAccountApi = {
   getState: () => Promise<HiveAccountState>
-  signIn: () => Promise<HiveAccountSignInResult>
+  signIn: (options: HiveAccountSignInOptions) => Promise<HiveAccountSignInResult>
   refresh: () => Promise<HiveAccountRefreshResult>
   signOut: () => Promise<HiveAccountSignOutResult>
 }

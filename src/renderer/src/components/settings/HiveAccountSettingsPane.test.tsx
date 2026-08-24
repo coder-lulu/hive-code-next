@@ -37,7 +37,9 @@ const signedInState = {
   persistence: 'encrypted' as const,
   account: { accountId: '123e4567-e89b-42d3-a456-426614174000', displayName: 'Ada' },
   deviceLabel: 'workstation',
-  expiresAt: Date.now() + 60_000
+  expiresAt: Date.now() + 60_000,
+  sessionExpiresAt: Date.now() + 90 * 24 * 60 * 60 * 1_000,
+  sessionProfile: 'TRUSTED' as const
 }
 
 beforeEach(() => {
@@ -87,8 +89,27 @@ describe('HiveAccountSettingsPane', () => {
     render(<HiveAccountSettingsPane />)
 
     await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCloud' }))
-    expect(mocks.signIn).toHaveBeenCalledOnce()
+    expect(screen.getByText('Approve HiveCloud sign-in')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Approve sign-in' }))
+    expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TEMPORARY' })
     await waitFor(() => expect(screen.getByText('Ada')).toBeInTheDocument())
+  })
+
+  it('requires an explicit approval before creating a trusted session', async () => {
+    const user = userEvent.setup()
+    mocks.getState.mockResolvedValue({
+      configured: true,
+      status: 'signed-out',
+      persistence: 'encrypted'
+    })
+    mocks.signIn.mockResolvedValue({ status: 'signed-in', state: signedInState })
+    render(<HiveAccountSettingsPane />)
+
+    await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCloud' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Trust this device' }))
+    await user.click(screen.getByRole('button', { name: 'Approve sign-in' }))
+
+    expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TRUSTED' })
   })
 
   it('disables cloud login when secure storage is unavailable', async () => {

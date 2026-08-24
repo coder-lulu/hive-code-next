@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { HiveAccountSignOutConfirmDialog } from './HiveAccountSignOutConfirmDialog'
+import { HiveAccountSignInConfirmDialog } from './HiveAccountSignInConfirmDialog'
 
 function errorCopy(error: HiveAccountErrorCode | undefined): string {
   switch (error) {
@@ -103,6 +104,7 @@ function expiresCopy(expiresAt: number | undefined): string {
 export function HiveAccountSettingsPane(): React.JSX.Element {
   const [state, setState] = useState<HiveAccountState | null>(null)
   const [busy, setBusy] = useState<'sign-in' | 'refresh' | 'sign-out' | null>(null)
+  const [signInOpen, setSignInOpen] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
   const connected = state?.status === 'signed-in'
   const secureStorageBlocked =
@@ -134,15 +136,16 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
     }
   }, [])
 
-  const signIn = async (): Promise<void> => {
+  const signIn = async (sessionProfile: 'TEMPORARY' | 'TRUSTED'): Promise<void> => {
     if (busy) {
       return
     }
     setBusy('sign-in')
     try {
-      const result = await window.api.hiveAccount.signIn()
+      const result = await window.api.hiveAccount.signIn({ sessionProfile })
       setState(result.state)
       if (result.status === 'signed-in') {
+        setSignInOpen(false)
         toast.success(
           translate('auto.components.settings.orcaAccount.signedInToast', 'Signed in to HiveCloud')
         )
@@ -257,7 +260,7 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
               type="button"
               size="sm"
               disabled={!canSignIn || busy !== null}
-              onClick={() => void signIn()}
+              onClick={() => setSignInOpen(true)}
             >
               {busy === 'sign-in'
                 ? translate('auto.components.settings.orcaAccount.signingIn', 'Signing in…')
@@ -286,10 +289,21 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
                 <p className="text-sm font-medium">
                   {translate(
                     'auto.components.settings.orcaAccount.sessionExpires',
-                    'Session expires'
+                    'Sign-in authorization valid until'
                   )}
                 </p>
-                <p className="text-xs text-muted-foreground">{expiresCopy(state.expiresAt)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {expiresCopy(state.sessionExpiresAt)} ·{' '}
+                  {state.sessionProfile === 'TRUSTED'
+                    ? translate(
+                        'auto.components.settings.orcaAccount.trustedSession',
+                        'Trusted device'
+                      )
+                    : translate(
+                        'auto.components.settings.orcaAccount.temporarySession',
+                        'Temporary device'
+                      )}
+                </p>
               </div>
             </div>
           </div>
@@ -301,6 +315,12 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
         onOpenChange={setSignOutOpen}
         onConfirm={() => void signOut()}
         signingOut={busy === 'sign-out'}
+      />
+      <HiveAccountSignInConfirmDialog
+        open={signInOpen}
+        onOpenChange={setSignInOpen}
+        onConfirm={(sessionProfile) => void signIn(sessionProfile)}
+        signingIn={busy === 'sign-in'}
       />
     </>
   )

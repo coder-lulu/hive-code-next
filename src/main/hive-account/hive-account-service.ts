@@ -1,16 +1,22 @@
 import type {
-  HiveAccountErrorCode,
   HiveAccountRefreshResult,
+  HiveAccountSignInOptions,
   HiveAccountSignInResult,
   HiveAccountSignOutResult,
   HiveAccountState
 } from '../../shared/hive-account'
 import { getHiveAccountConfig, type HiveAccountConfig } from './hive-account-config'
-import { HiveAccountClient, HiveAccountRequestError } from './hive-account-client'
+import { HiveAccountClient } from './hive-account-client'
 import { getOrCreateHiveDeviceIdentity, signHiveDeviceAuthorization } from './hive-account-device'
 import { migrateLegacyOrcaCloudIdentity } from './hive-account-legacy-migration'
 import { beginHiveAccountPkceFlow } from './hive-account-pkce'
 import { isHiveAccountEncryptionAvailable } from './hive-account-secure-store'
+import {
+  classifyHiveAccountError,
+  errorState,
+  signedOutState,
+  stateFromSession
+} from './hive-account-state'
 import {
   clearHiveAccountSession,
   readHiveAccountSession,
@@ -30,54 +36,11 @@ const defaultDependencies: ServiceDependencies = {
   beginAuthorization: beginHiveAccountPkceFlow
 }
 
-function signedOutState(): HiveAccountState {
-  return { configured: true, status: 'signed-out', persistence: 'encrypted' }
-}
-
-function stateFromSession(session: HiveAccountSession): HiveAccountState {
-  return {
-    configured: true,
-    status: 'signed-in',
-    persistence: 'encrypted',
-    account: session.account,
-    authorityId: session.authorityId,
-    deviceLabel: session.deviceLabel,
-    expiresAt: session.expiresAt,
-    ...(session.expiresAt <= Date.now() ? { errorCode: 'session_expired' as const } : {})
-  }
-}
-
-function errorState(errorCode: HiveAccountErrorCode): HiveAccountState {
-  return { configured: true, status: 'error', persistence: 'none', errorCode }
-}
-
-function classifyError(error: unknown): HiveAccountErrorCode {
-  if (error instanceof HiveAccountRequestError) {
-    if (error.status === 401 || error.status === 403) {
-      return 'session_rejected'
-    }
-    if (error.status >= 500) {
-      return 'server_unavailable'
-    }
-    return 'authorization_failed'
-  }
-  if (error instanceof Error) {
-    if (error.message === 'hive_account_authorization_cancelled') {
-      return 'authorization_cancelled'
-    }
-    if (error.message === 'hive_account_authorization_timeout') {
-      return 'authorization_timeout'
-    }
-    if (error.name === 'AbortError' || error instanceof TypeError) {
-      return 'network_unavailable'
-    }
-  }
-  return 'authorization_failed'
-}
-
 export class HiveAccountService {
   private signInFlight: Promise<HiveAccountSignInResult> | null = null
   private refreshFlight: Promise<HiveAccountRefreshResult> | null = null
+  private temporarySession: HiveAccountSession | null = null
+  private refreshTimer: NodeJS.Timeout | undefined
   private mutationEpoch = 0
 
   constructor(
@@ -100,7 +63,7 @@ export class HiveAccountService {
     if (!isHiveAccountEncryptionAvailable()) {
       return errorState('secure_storage_unavailable')
     }
-    const stored = readHiveAccountSession(this.userDataPath)
+    const stored = this.readCurrentSession()
     if (stored.status === 'missing') {
       return signedOutState()
     }
@@ -110,20 +73,21 @@ export class HiveAccountService {
     if (stored.status === 'unreadable') {
       return errorState('credential_unreadable')
     }
+    this.scheduleRefresh(stored.value)
     return stateFromSession(stored.value)
   }
 
-  signIn(): Promise<HiveAccountSignInResult> {
+  signIn(options: HiveAccountSignInOptions): Promise<HiveAccountSignInResult> {
     if (this.signInFlight) {
       return this.signInFlight
     }
-    this.signInFlight = this.runSignIn().finally(() => {
+    this.signInFlight = this.runSignIn(options).finally(() => {
       this.signInFlight = null
     })
     return this.signInFlight
   }
 
-  private async runSignIn(): Promise<HiveAccountSignInResult> {
+  private async runSignIn(options: HiveAccountSignInOptions): Promise<HiveAccountSignInResult> {
     const expectedEpoch = ++this.mutationEpoch
     const configured = this.dependencies.getConfig()
     if (!configured.configured) {
@@ -153,7 +117,13 @@ export class HiveAccountService {
             nonce,
             devicePublicKey: device.identity.publicKey,
             deviceLabel: device.identity.deviceLabel,
-            proof: signHiveDeviceAuthorization(device.identity, nonce, configured.config.clientId)
+            sessionProfile: options.sessionProfile,
+            proof: signHiveDeviceAuthorization(
+              device.identity,
+              nonce,
+              configured.config.clientId,
+              options.sessionProfile
+            )
           })
         }
       })
@@ -162,21 +132,23 @@ export class HiveAccountService {
         await this.bestEffortRevokeCurrent(client, exchange.accessToken)
         return { status: 'cancelled', state: signedOutState() }
       }
-      const previous = readHiveAccountSession(this.userDataPath)
+      const previous = this.readCurrentSession()
       const generation = previous.status === 'ok' ? previous.value.generation + 1 : 1
       const session: HiveAccountSession = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         ...exchange,
         deviceLabel: device.identity.deviceLabel,
         generation,
         savedAt: Date.now()
       }
-      if (!saveHiveAccountSession(this.userDataPath, session)) {
+      if (!this.persistSession(session)) {
+        await this.bestEffortRevokeCurrent(client, exchange.accessToken)
         return { status: 'failed', state: errorState('secure_storage_unavailable') }
       }
+      this.scheduleRefresh(session)
       return { status: 'signed-in', state: stateFromSession(session) }
     } catch (error) {
-      const errorCode = classifyError(error)
+      const errorCode = classifyHiveAccountError(error)
       return {
         status: errorCode === 'authorization_cancelled' ? 'cancelled' : 'failed',
         state: errorState(errorCode)
@@ -200,7 +172,7 @@ export class HiveAccountService {
     if (!configured.configured) {
       return { status: 'unconfigured', state: await this.getState() }
     }
-    const stored = readHiveAccountSession(this.userDataPath)
+    const stored = this.readCurrentSession()
     if (stored.status === 'missing') {
       return { status: 'signed-out', state: signedOutState() }
     }
@@ -216,7 +188,7 @@ export class HiveAccountService {
     try {
       const client = this.dependencies.createClient(configured.config)
       const refreshed = await client.refreshSession(expected.refreshToken)
-      const current = readHiveAccountSession(this.userDataPath)
+      const current = this.readCurrentSession()
       if (
         current.status !== 'ok' ||
         this.mutationEpoch !== expectedEpoch ||
@@ -230,22 +202,24 @@ export class HiveAccountService {
         }
       }
       const session: HiveAccountSession = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         ...refreshed,
         deviceLabel: expected.deviceLabel,
         generation: expected.generation + 1,
         savedAt: Date.now()
       }
-      if (!saveHiveAccountSession(this.userDataPath, session)) {
+      if (!this.persistSession(session)) {
         return { status: 'failed', state: errorState('secure_storage_unavailable') }
       }
+      this.scheduleRefresh(session)
       return { status: 'refreshed', state: stateFromSession(session) }
     } catch (error) {
-      const errorCode = classifyError(error)
+      const errorCode = classifyHiveAccountError(error)
       if (errorCode === 'session_rejected') {
-        clearHiveAccountSession(this.userDataPath)
+        this.clearCurrentSession()
         return { status: 'signed-out', state: signedOutState() }
       }
+      this.scheduleRefresh(expected, 60_000)
       return { status: 'failed', state: { ...stateFromSession(expected), errorCode } }
     }
   }
@@ -253,7 +227,7 @@ export class HiveAccountService {
   async signOut(): Promise<HiveAccountSignOutResult> {
     this.mutationEpoch += 1
     const configured = this.dependencies.getConfig()
-    const stored = readHiveAccountSession(this.userDataPath)
+    const stored = this.readCurrentSession()
     if (stored.status === 'missing') {
       return { status: 'already-signed-out', state: signedOutState() }
     }
@@ -267,7 +241,7 @@ export class HiveAccountService {
     } catch {
       remoteRevoked = false
     } finally {
-      clearHiveAccountSession(this.userDataPath)
+      this.clearCurrentSession()
     }
     return {
       status: remoteRevoked ? 'remote-and-local' : 'local-only',
@@ -293,5 +267,49 @@ export class HiveAccountService {
       // The credential was never persisted. The Web security center remains
       // the recovery surface if this best-effort cleanup cannot reach Cloud.
     }
+  }
+
+  private readCurrentSession(): ReturnType<typeof readHiveAccountSession> {
+    return this.temporarySession
+      ? { status: 'ok', value: this.temporarySession }
+      : readHiveAccountSession(this.userDataPath)
+  }
+
+  private persistSession(session: HiveAccountSession): boolean {
+    if (session.sessionProfile === 'TEMPORARY') {
+      this.temporarySession = session
+      clearHiveAccountSession(this.userDataPath)
+      return true
+    }
+    this.temporarySession = null
+    return saveHiveAccountSession(this.userDataPath, session)
+  }
+
+  private clearCurrentSession(): void {
+    this.temporarySession = null
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer)
+      this.refreshTimer = undefined
+    }
+    clearHiveAccountSession(this.userDataPath)
+  }
+
+  private scheduleRefresh(session: HiveAccountSession, retryDelay?: number): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer)
+    }
+    if (session.sessionExpiresAt <= Date.now()) {
+      this.refreshTimer = undefined
+      return
+    }
+    const delay = retryDelay ?? Math.max(0, session.expiresAt - Date.now() - 60_000)
+    this.refreshTimer = setTimeout(
+      () => {
+        this.refreshTimer = undefined
+        void this.refresh()
+      },
+      Math.min(delay, 2_147_000_000)
+    )
+    this.refreshTimer.unref?.()
   }
 }

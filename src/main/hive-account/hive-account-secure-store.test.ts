@@ -43,12 +43,17 @@ describe('Hive account secure identity and session storage', () => {
     }
     expect(second.identity.publicKey).toBe(first.identity.publicKey)
 
-    const signature = signHiveDeviceAuthorization(first.identity, 'nonce', 'hivecode-desktop')
+    const signature = signHiveDeviceAuthorization(
+      first.identity,
+      'nonce',
+      'hivecode-desktop',
+      'TRUSTED'
+    )
     const publicKey = createPublicKey({
       key: { kty: 'OKP', crv: 'Ed25519', x: first.identity.publicKey },
       format: 'jwk'
     })
-    const canonical = `hive-device-authorization-v1\nnonce\nhivecode-desktop\n${first.identity.deviceLabel}`
+    const canonical = `hive-device-authorization-v2\nnonce\nhivecode-desktop\n${first.identity.deviceLabel}\nTRUSTED`
     expect(
       verify(null, Buffer.from(canonical), publicKey, Buffer.from(signature, 'base64url'))
     ).toBe(true)
@@ -56,10 +61,12 @@ describe('Hive account secure identity and session storage', () => {
 
   it('never writes session tokens as plaintext and fails closed without safeStorage', () => {
     const session: HiveAccountSession = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       accessToken: 'secret-access-token',
       refreshToken: 'secret-refresh-token',
       expiresAt: Date.now() + 60_000,
+      sessionExpiresAt: Date.now() + 90 * 24 * 60 * 60 * 1_000,
+      sessionProfile: 'TRUSTED',
       account: { accountId: '123e4567-e89b-42d3-a456-426614174000', displayName: 'Ada' },
       authorityId: 'hive-primary',
       deviceLabel: 'desktop',
