@@ -28,6 +28,9 @@ import {
 type WorktreeLinkedPathOptionsForTest = NonNullable<Parameters<typeof createWorktreeLinkedPaths>[3]>
 type ApfsCloneDepsForTest = NonNullable<WorktreeLinkedPathOptionsForTest['apfsCloneDeps']>
 const posixIt = process.platform === 'win32' ? it.skip : it
+// Why: ordinary Windows tokens cannot create the file symlinks these fixtures
+// materialize without Developer Mode or administrator privileges.
+const symlinkIt = process.platform === 'win32' ? it.skip : it
 
 function createApfsCloneDeps(options: {
   uuid?: string
@@ -89,18 +92,21 @@ describe('createWorktreeSymlinks', () => {
     rmSync(root, { recursive: true, force: true })
   })
 
-  it('symlinks a file from primary into the worktree at the same relative path', async () => {
-    writeFileSync(join(primary, '.env'), 'SECRET=1\n')
-    await createWorktreeSymlinks(primary, worktree, ['.env'])
+  symlinkIt(
+    'symlinks a file from primary into the worktree at the same relative path',
+    async () => {
+      writeFileSync(join(primary, '.env'), 'SECRET=1\n')
+      await createWorktreeSymlinks(primary, worktree, ['.env'])
 
-    const linkStat = lstatSync(join(worktree, '.env'))
-    expect(linkStat.isSymbolicLink()).toBe(true)
-    expect(readlinkSync(join(worktree, '.env'))).toBe(join(primary, '.env'))
-    // Following the link yields the primary's contents.
-    expect(statSync(join(worktree, '.env')).isFile()).toBe(true)
-  })
+      const linkStat = lstatSync(join(worktree, '.env'))
+      expect(linkStat.isSymbolicLink()).toBe(true)
+      expect(readlinkSync(join(worktree, '.env'))).toBe(join(primary, '.env'))
+      // Following the link yields the primary's contents.
+      expect(statSync(join(worktree, '.env')).isFile()).toBe(true)
+    }
+  )
 
-  it('symlinks a directory from primary into the worktree', async () => {
+  symlinkIt('symlinks a directory from primary into the worktree', async () => {
     mkdirSync(join(primary, 'node_modules'))
     writeFileSync(join(primary, 'node_modules', 'marker'), 'installed')
     await createWorktreeSymlinks(primary, worktree, ['node_modules'])
@@ -109,7 +115,7 @@ describe('createWorktreeSymlinks', () => {
     expect(statSync(join(worktree, 'node_modules', 'marker')).isFile()).toBe(true)
   })
 
-  it('creates parent directories lazily for nested paths', async () => {
+  symlinkIt('creates parent directories lazily for nested paths', async () => {
     mkdirSync(join(primary, 'apps', 'web'), { recursive: true })
     writeFileSync(join(primary, 'apps', 'web', '.env'), 'X=1\n')
     await createWorktreeSymlinks(primary, worktree, ['apps/web/.env'])
@@ -177,7 +183,7 @@ describe('createWorktreeSymlinks', () => {
     )
   })
 
-  it('strips a leading slash then treats the remainder as a relative path', async () => {
+  symlinkIt('strips a leading slash then treats the remainder as a relative path', async () => {
     writeFileSync(join(primary, '.env'), 'X=1\n')
     await createWorktreeSymlinks(primary, worktree, ['/.env'])
 
@@ -192,7 +198,7 @@ describe('createWorktreeSymlinks', () => {
     expect(error).not.toHaveBeenCalled()
   })
 
-  it('continues processing later entries after one fails', async () => {
+  symlinkIt('continues processing later entries after one fails', async () => {
     writeFileSync(join(primary, '.env'), 'X=1\n')
     writeFileSync(join(primary, 'config.json'), '{}')
 
@@ -340,7 +346,7 @@ describe('createWorktreeSymlinks', () => {
     expect(readFileSync(join(target, 'marker'), 'utf8')).toBe('CLONED\n')
   })
 
-  it('falls back to symlink when macOS clone-copy is unavailable', async () => {
+  symlinkIt('falls back to symlink when macOS clone-copy is unavailable', async () => {
     writeFileSync(join(primary, '.env'), 'SECRET=1\n')
     const cloneWorktreePath = vi.fn(async () => {
       throw new Error('clonefile unsupported')
@@ -378,22 +384,25 @@ describe('createWorktreeSymlinks', () => {
     )
   })
 
-  it('keeps symlink sources as symlinks instead of APFS clone-copying their targets', async () => {
-    writeFileSync(join(primary, '.env.real'), 'SECRET=1\n')
-    symlinkSync(join(primary, '.env.real'), join(primary, '.env'), 'file')
-    const cloneWorktreePath = vi.fn(async () => {
-      throw new Error('clone should not be called for symlink sources')
-    })
+  symlinkIt(
+    'keeps symlink sources as symlinks instead of APFS clone-copying their targets',
+    async () => {
+      writeFileSync(join(primary, '.env.real'), 'SECRET=1\n')
+      symlinkSync(join(primary, '.env.real'), join(primary, '.env'), 'file')
+      const cloneWorktreePath = vi.fn(async () => {
+        throw new Error('clone should not be called for symlink sources')
+      })
 
-    await createWorktreeLinkedPaths(primary, worktree, ['.env'], {
-      platform: 'darwin',
-      cloneWorktreePath
-    })
+      await createWorktreeLinkedPaths(primary, worktree, ['.env'], {
+        platform: 'darwin',
+        cloneWorktreePath
+      })
 
-    expect(cloneWorktreePath).not.toHaveBeenCalled()
-    expect(lstatSync(join(worktree, '.env')).isSymbolicLink()).toBe(true)
-    expect(readlinkSync(join(worktree, '.env'))).toBe(join(primary, '.env'))
-  })
+      expect(cloneWorktreePath).not.toHaveBeenCalled()
+      expect(lstatSync(join(worktree, '.env')).isSymbolicLink()).toBe(true)
+      expect(readlinkSync(join(worktree, '.env'))).toBe(join(primary, '.env'))
+    }
+  )
 })
 
 // Why: a plain `fs.symlink` needs Developer Mode or admin on Windows, so an
@@ -673,7 +682,7 @@ describe('removeWorktreeSymlinks', () => {
     rmSync(root, { recursive: true, force: true })
   })
 
-  it('unlinks configured symlinks from the worktree', async () => {
+  symlinkIt('unlinks configured symlinks from the worktree', async () => {
     writeFileSync(join(primary, '.env'), 'SECRET=1\n')
     mkdirSync(join(primary, 'node_modules'))
     symlinkSync(join(primary, '.env'), join(worktree, '.env'), 'file')
@@ -699,7 +708,7 @@ describe('removeWorktreeSymlinks', () => {
     expect(statSync(join(worktree, '.env')).isFile()).toBe(true)
   })
 
-  it('identifies only actual symlinks for removal preflight', async () => {
+  symlinkIt('identifies only actual symlinks for removal preflight', async () => {
     writeFileSync(join(primary, '.env'), 'PRIMARY=1\n')
     symlinkSync(join(primary, '.env'), join(worktree, '.env'))
     writeFileSync(join(worktree, 'config.json'), '{}\n')

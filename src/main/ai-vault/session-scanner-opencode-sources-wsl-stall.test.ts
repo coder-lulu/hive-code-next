@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Dirent } from 'node:fs'
 import type * as NodeFsPromisesModule from 'node:fs/promises'
+import { join } from 'node:path'
 import type { AiVaultScanIssue } from '../../shared/ai-vault-types'
 
 const WSL_HOME = '\\\\wsl.localhost\\Ubuntu\\home\\ada'
-const WSL_DATA_DIR = `${WSL_HOME}/.local/share/opencode`
+const WSL_DATA_DIR = join(WSL_HOME, '.local', 'share', 'opencode')
+const WSL_PRIMARY_DATA_DIR = join(WSL_HOME, 'opencode')
 
 const mocks = vi.hoisted(() => ({ readdir: vi.fn(), stat: vi.fn() }))
 
@@ -98,7 +100,7 @@ describe('OpenCode source discovery with a stalled WSL data directory', () => {
       // silent [] here reads as "no OpenCode sessions" on a clean scan.
       await expect(discoveries).resolves.toHaveLength(1)
       expect(
-        issues.some((issue) => issue.agent === 'opencode' && issue.path === `${WSL_HOME}/opencode`)
+        issues.some((issue) => issue.agent === 'opencode' && issue.path === WSL_PRIMARY_DATA_DIR)
       ).toBe(true)
     } finally {
       restoreEnv('XDG_DATA_HOME', previousXdg)
