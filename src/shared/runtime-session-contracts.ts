@@ -2,7 +2,6 @@ import type { AgentStatusEntry, AgentStatusOrchestrationContext } from './agent-
 import type { BrowserCertificateFailure, BrowserLoadError } from './browser-workspace-types'
 import type { RemoteServerUpdateSupport } from './remote-server-update'
 import type { RemoteRuntimeSharedConnectionDiagnostics } from './remote-runtime-shared-control-types'
-import type { RuntimeBrowserPlacement } from './runtime-browser-placement'
 import type { RuntimeCapability } from './protocol-version'
 import type { TabGroupLayoutNode } from './tab-types'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
@@ -95,10 +94,6 @@ export type RuntimeStatus = {
   runtimeProtocolVersion?: number
   minCompatibleRuntimeClientVersion?: number
   capabilities?: RuntimeCapability[]
-  /** Optional policy for clients that negotiated worktree.create-idempotency.v1. */
-  worktreeCreateIdempotency?: {
-    dedupeTtlMs: number
-  }
   /**
    * Optional for mixed-version peers. Absence means the host predates structured
    * degradation reporting, not that the host proved every optional feature available.
@@ -252,9 +247,6 @@ export type RuntimeMobileSessionBrowserTab = {
   title: string
   browserWorkspaceId: string
   browserPageId: string | null
-  browserProfileId?: string
-  executionHostKey?: string
-  placement?: RuntimeBrowserPlacement
   url: string
   loading: boolean
   canGoBack: boolean
@@ -319,16 +311,6 @@ export type RuntimeMobileSessionTabCloseResult = {
 
 export type RuntimeSessionTabCloseReason = 'user' | 'pty-exit' | 'cleanup'
 
-/**
- * The publication epoch a runtime answers with for a worktree it has published nothing for yet —
- * the state every worktree is in for a moment after the host process restarts.
- *
- * Paired with `snapshotVersion: 0` it marks a synthesized placeholder, not a host answer: the
- * runtime is saying "ask me later", not "those tabs are gone". Clients must not read absence from
- * such a frame as evidence a tab was closed.
- */
-export const UNPUBLISHED_WORKTREE_PUBLICATION_EPOCH = 'none'
-
 export type RuntimeMobileSessionTabsSnapshot = {
   worktree: string
   publicationEpoch: string
@@ -352,16 +334,6 @@ export type RuntimeMobileSessionTabsResult = {
   tabGroups?: RuntimeMobileSessionTabGroup[]
   tabGroupLayout?: TabGroupLayoutNode | null
   tabs: RuntimeMobileSessionClientTab[]
-  /**
-   * Set while a freshly started runtime has not yet taken back the client-hosted pages its paired
-   * hosts are still holding. Such a snapshot is authoritative about terminals, which it rehydrated
-   * from disk, but silently empty of browser rows it has simply not heard about yet — so a client
-   * must not read the absence of its own client-hosted rows here as "the host closed them".
-   *
-   * Always bounded: the runtime clears it once a host attaches, and drops it on a deadline so a
-   * host that never returns cannot hold rows open forever.
-   */
-  clientHostedPagesUnreconciled?: true
 }
 
 export type RuntimeMobileSessionCreateTerminalResult = {
