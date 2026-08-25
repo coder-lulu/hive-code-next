@@ -193,7 +193,7 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
 }
 `
   )
-  writeFakeWindowsRegistry(projectDir)
+  writeFakeWindowsNativeModules(projectDir)
 }
 
 function writeLoadableNativeModules(projectDir, { nativeDir = null } = {}) {
@@ -215,10 +215,10 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
 }
 `
   )
-  writeFakeWindowsRegistry(projectDir)
+  writeFakeWindowsNativeModules(projectDir)
 }
 
-function writeFakeWindowsRegistry(projectDir) {
+function writeFakeWindowsNativeModules(projectDir) {
   if (process.platform !== 'win32') {
     return
   }
@@ -228,6 +228,9 @@ function writeFakeWindowsRegistry(projectDir) {
     join(registryDir, 'index.js'),
     'exports.HK = { CU: 0x80000001 }; exports.getRegistryKey = () => ({})\n'
   )
+  const processTreeDir = join(projectDir, 'node_modules', '@vscode', 'windows-process-tree')
+  mkdirSync(processTreeDir, { recursive: true })
+  writeFileSync(join(processTreeDir, 'index.js'), 'module.exports = {}\n')
 }
 
 function writeNodePtyPatchFile(projectDir) {

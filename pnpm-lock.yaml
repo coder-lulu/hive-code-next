@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@vscode/windows-process-tree@0.8.0':
-    hash: 93adb1ec7cd7b58d05a2cac1d3d3e0e3c917c231d80d68f2184b27ee02eb8ea4
+    hash: 3be4eff6bd9aaba4b4fffcea98fd4180bbb629de0bad1eefe2005aaa9bf15e42
     path: config/patches/@vscode__windows-process-tree@0.8.0.patch
   '@xterm/addon-ligatures@0.11.0-beta.287':
     hash: 47405b9994b5acf1b4e90b49250358c1ca03649854d59560e7732b72fe336920
@@ -27,7 +27,7 @@ patchedDependencies:
     hash: bdd871d794e360f5cd1969b627c168f3a1f5dbbb3fa57dcf767bb4fd6a54849f
     path: config/patches/lint-staged@16.4.0.patch
   node-pty@1.1.0:
-    hash: 28ba93b346bb852cb76ce0eb294c3497353c4300e7ed6170b291ba035a98dee6
+    hash: 3927a66891cb654003155989f649f1252f101a914f082eaa861aadcd0c289d6f
     path: config/patches/node-pty@1.1.0.patch
 
 importers:
@@ -69,7 +69,7 @@ importers:
         version: 3.3.1
       node-pty:
         specifier: ^1.1.0
-        version: 1.1.0(patch_hash=28ba93b346bb852cb76ce0eb294c3497353c4300e7ed6170b291ba035a98dee6)
+        version: 1.1.0(patch_hash=3927a66891cb654003155989f649f1252f101a914f082eaa861aadcd0c289d6f)
       posthog-node:
         specifier: ^5.33.3
         version: 5.33.3
@@ -407,7 +407,7 @@ importers:
     optionalDependencies:
       '@vscode/windows-process-tree':
         specifier: 0.8.0
-        version: 0.8.0(patch_hash=93adb1ec7cd7b58d05a2cac1d3d3e0e3c917c231d80d68f2184b27ee02eb8ea4)
+        version: 0.8.0(patch_hash=3be4eff6bd9aaba4b4fffcea98fd4180bbb629de0bad1eefe2005aaa9bf15e42)
       sherpa-onnx-darwin-arm64:
         specifier: 1.12.37
         version: 1.12.37
@@ -9605,7 +9605,7 @@ snapshots:
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.0
 
-  '@vscode/windows-process-tree@0.8.0(patch_hash=93adb1ec7cd7b58d05a2cac1d3d3e0e3c917c231d80d68f2184b27ee02eb8ea4)':
+  '@vscode/windows-process-tree@0.8.0(patch_hash=3be4eff6bd9aaba4b4fffcea98fd4180bbb629de0bad1eefe2005aaa9bf15e42)':
     dependencies:
       node-addon-api: 7.1.0
     optional: true
@@ -12046,7 +12046,7 @@ snapshots:
 
   node-int64@0.4.0: {}
 
-  node-pty@1.1.0(patch_hash=28ba93b346bb852cb76ce0eb294c3497353c4300e7ed6170b291ba035a98dee6):
+  node-pty@1.1.0(patch_hash=3927a66891cb654003155989f649f1252f101a914f082eaa861aadcd0c289d6f):
     dependencies:
       node-addon-api: 7.1.1
 
