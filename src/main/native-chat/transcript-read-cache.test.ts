@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as TranscriptReader from './transcript-reader'
 
@@ -43,7 +43,6 @@ async function seedSession(sessionId: string, turns: number): Promise<string> {
   }))
   const filePath = join(projectDir, `${sessionId}.jsonl`)
   await writeFile(filePath, jsonLines(records))
-  process.env.HOME = root
   return filePath
 }
 
@@ -77,9 +76,9 @@ afterEach(async () => {
 
 describe('readNativeChatTranscriptCached', () => {
   it('returns the same cached object on an mtime hit without re-reading', async () => {
-    await seedSession('sess-hit', 3)
-    const first = await readNativeChatTranscriptCached('claude', 'sess-hit')
-    const second = await readNativeChatTranscriptCached('claude', 'sess-hit')
+    const filePath = await seedSession('sess-hit', 3)
+    const first = await readNativeChatTranscriptCached('claude', 'sess-hit', filePath)
+    const second = await readNativeChatTranscriptCached('claude', 'sess-hit', filePath)
     expect(readSpy).toHaveBeenCalledTimes(1)
     // Same reference: the second call served the cached parse.
     expect(second).toBe(first)
@@ -87,26 +86,27 @@ describe('readNativeChatTranscriptCached', () => {
 
   it('re-reads when the file mtime changes', async () => {
     const filePath = await seedSession('sess-mtime', 2)
-    await readNativeChatTranscriptCached('claude', 'sess-mtime')
+    await readNativeChatTranscriptCached('claude', 'sess-mtime', filePath)
     expect(readSpy).toHaveBeenCalledTimes(1)
     // Bump mtime into the future to invalidate without changing content shape.
     const future = new Date(Date.now() + 5_000)
     await utimes(filePath, future, future)
-    await readNativeChatTranscriptCached('claude', 'sess-mtime')
+    await readNativeChatTranscriptCached('claude', 'sess-mtime', filePath)
     expect(readSpy).toHaveBeenCalledTimes(2)
   })
 
   it('clear() empties the cache so the next read re-reads', async () => {
-    await seedSession('sess-clear', 1)
-    await readNativeChatTranscriptCached('claude', 'sess-clear')
+    const filePath = await seedSession('sess-clear', 1)
+    await readNativeChatTranscriptCached('claude', 'sess-clear', filePath)
     clearNativeChatTranscriptCache()
-    await readNativeChatTranscriptCached('claude', 'sess-clear')
+    await readNativeChatTranscriptCached('claude', 'sess-clear', filePath)
     expect(readSpy).toHaveBeenCalledTimes(2)
   })
 
   it('returns an error result for an unknown session without throwing', async () => {
-    await seedSession('present', 1)
-    const result = await readNativeChatTranscriptCached('claude', 'absent')
+    const presentPath = await seedSession('present', 1)
+    const absentPath = join(dirname(presentPath), 'absent.jsonl')
+    const result = await readNativeChatTranscriptCached('claude', 'absent', absentPath)
     expect('error' in result && result.error).toBeTruthy()
   })
 
@@ -115,11 +115,12 @@ describe('readNativeChatTranscriptCached', () => {
   // retry instead of settling into a permanent error, and it must never be
   // cached (a real error already isn't cached; this locks in the same for a miss).
   it('marks a resolve miss as notFound and does not cache it', async () => {
-    await seedSession('present-2', 1)
-    const first = await readNativeChatTranscriptCached('claude', 'absent-2')
+    const presentPath = await seedSession('present-2', 1)
+    const absentPath = join(dirname(presentPath), 'absent-2.jsonl')
+    const first = await readNativeChatTranscriptCached('claude', 'absent-2', absentPath)
     expect('error' in first && first.notFound).toBe(true)
     expect(readSpy).not.toHaveBeenCalled()
-    const second = await readNativeChatTranscriptCached('claude', 'absent-2')
+    const second = await readNativeChatTranscriptCached('claude', 'absent-2', absentPath)
     expect(second).not.toBe(first)
   })
 
