@@ -1,12 +1,14 @@
 import { net } from 'electron'
 import {
   normalizeClaim,
+  normalizeConnectionTicketConsume,
   normalizeHeartbeat,
   normalizeLease,
   normalizeLookup,
   normalizeRegistration,
   problemCategory,
   type RuntimeClaim,
+  type RuntimeConnectionTicketConsume,
   type RuntimeHeartbeat,
   type RuntimeLease,
   type RuntimeRegistration,
@@ -15,6 +17,7 @@ import {
 
 export type {
   RuntimeClaim,
+  RuntimeConnectionTicketConsume,
   RuntimeHeartbeat,
   RuntimeLease,
   RuntimeRegistration,
@@ -187,6 +190,15 @@ export class HiveRuntimeCloudClient {
   ): Promise<RuntimeHeartbeat> {
     return normalizeHeartbeat(
       await this.request('/hive/v1/runtime-heartbeats', request, {}, 200, signal)
+    )
+  }
+
+  async consumeConnectionTicket(
+    request: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<RuntimeConnectionTicketConsume> {
+    return normalizeConnectionTicketConsume(
+      await this.request('/hive/v1/connection-tickets', request, {}, 200, signal)
     )
   }
 }

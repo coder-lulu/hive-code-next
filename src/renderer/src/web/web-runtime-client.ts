@@ -2,6 +2,7 @@
 import type { RuntimeRpcResponse, RuntimeRpcSuccess } from '../../../shared/runtime-rpc-envelope'
 import { isKeepaliveFrame } from '../../../shared/runtime-rpc-envelope'
 import type { WebPairingOffer } from './web-pairing'
+import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'
 import { installWindowVisibilityInterval } from '../lib/window-visibility-interval'
 import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime-tailscale-hint'
 import { applyProductBranding } from '../../../shared/brand'
@@ -76,6 +77,23 @@ const HEARTBEAT_INTERVAL_MS = 10_000
 const HEARTBEAT_IDLE_MS = 25_000
 const HEARTBEAT_PROBE_GRACE_MS = 20_000
 
+type WebRuntimeConnection =
+  | {
+      kind: 'pairing'
+      endpoint: string
+      publicKeyB64: string
+      deviceToken: string
+    }
+  | {
+      kind: 'cloud-managed'
+      endpoint: string
+      publicKeyB64: string
+      managedWebSessionId: string
+      runtimeSessionId: string
+      sessionToken: string
+      expiresAt: string
+    }
+
 export class WebRuntimeClient {
   private ws: WebSocket | null = null
   private sharedKey: Uint8Array | null = null
@@ -98,9 +116,11 @@ export class WebRuntimeClient {
   private readonly childClients = new Set<WebRuntimeClient>()
   private readonly waiters: { resolve: () => void; reject: (error: Error) => void }[] = []
   private readonly serverPublicKey: Uint8Array
+  private readonly connection: WebRuntimeConnection
 
-  constructor(private readonly pairing: WebPairingOffer) {
-    this.serverPublicKey = publicKeyFromBase64(pairing.publicKeyB64)
+  constructor(input: WebPairingOffer | CloudLaunchBootstrap | WebRuntimeConnection) {
+    this.connection = normalizeConnection(input)
+    this.serverPublicKey = publicKeyFromBase64(this.connection.publicKeyB64)
     this.openConnection()
   }
 
@@ -118,7 +138,7 @@ export class WebRuntimeClient {
         reject(new Error(`Request timed out: ${method}`))
       }, timeoutMs)
       this.pending.set(id, { method, resolve, reject, timeout })
-      if (!this.sendEncrypted({ id, deviceToken: this.pairing.deviceToken, method, params })) {
+      if (!this.sendEncrypted({ id, ...this.rpcCredential(), method, params })) {
         this.pending.delete(id)
         window.clearTimeout(timeout)
         reject(new Error(applyProductBranding('Remote Orca runtime is not connected.')))
@@ -136,7 +156,7 @@ export class WebRuntimeClient {
       // Why: sharing the main socket for file watches avoids exhausting the server's WebSocket connection cap.
       return this.subscribeSharedFileWatch(params, callbacks, options)
     }
-    const client = new WebRuntimeClient(this.pairing)
+    const client = new WebRuntimeClient(this.connection)
     this.childClients.add(client)
     const closeChild = (notifySubscriptions = false): void => {
       this.childClients.delete(client)
@@ -330,7 +350,7 @@ export class WebRuntimeClient {
     const id = this.nextId()
     const subscription: RuntimeSubscription = { id, method, params, callbacks, needsReplay: false }
     this.subscriptions.set(id, subscription)
-    if (!this.sendEncrypted({ id, deviceToken: this.pairing.deviceToken, method, params })) {
+    if (!this.sendEncrypted({ id, ...this.rpcCredential(), method, params })) {
       this.subscriptions.delete(id)
       throw new Error(applyProductBranding('Remote Orca runtime is not connected.'))
     }
@@ -342,7 +362,7 @@ export class WebRuntimeClient {
         if (teardown) {
           this.sendEncrypted({
             id: this.nextId(),
-            deviceToken: this.pairing.deviceToken,
+            ...this.rpcCredential(),
             method: teardown.method,
             params: teardown.params
           })
@@ -384,7 +404,7 @@ export class WebRuntimeClient {
     }
     let ws: WebSocket
     try {
-      ws = new WebSocket(this.pairing.endpoint)
+      ws = new WebSocket(this.connection.endpoint)
     } catch (error) {
       this.rejectAllPending(error instanceof Error ? error.message : String(error))
       this.scheduleReconnect()
@@ -442,7 +462,7 @@ export class WebRuntimeClient {
           new Error(
             withRemoteRuntimeTailscaleHint(
               applyProductBranding('Could not connect to the remote Orca runtime.'),
-              this.pairing.endpoint
+              this.connection.endpoint
             )
           )
         )
@@ -459,16 +479,7 @@ export class WebRuntimeClient {
       try {
         const control = JSON.parse(raw) as { type?: unknown }
         if (control.type === 'e2ee_ready') {
-          this.sendEncrypted({
-            type: 'e2ee_auth',
-            deviceToken: this.pairing.deviceToken,
-            clientCapabilities: [
-              SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-              AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-              WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-              WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-            ]
-          })
+          this.sendEncrypted(this.authenticationFrame())
           return
         }
       } catch {
@@ -614,7 +625,7 @@ export class WebRuntimeClient {
           new Error(
             withRemoteRuntimeTailscaleHint(
               'Timed out while connecting to the remote Orca runtime.',
-              this.pairing.endpoint
+              this.connection.endpoint
             )
           )
         )
@@ -732,7 +743,7 @@ export class WebRuntimeClient {
       if (
         this.sendEncrypted({
           id: subscription.id,
-          deviceToken: this.pairing.deviceToken,
+          ...this.rpcCredential(),
           method: subscription.method,
           params: subscription.params
         })
@@ -847,13 +858,65 @@ export class WebRuntimeClient {
       if (
         this.sendEncrypted({
           id: `web-heartbeat-${this.nextId()}`,
-          deviceToken: this.pairing.deviceToken,
+          ...this.rpcCredential(),
           method: 'status.get'
         })
       ) {
         this.heartbeatProbeSentAt = now
       }
     }
+  }
+
+  private rpcCredential(): { deviceToken: string } | Record<string, never> {
+    return this.connection.kind === 'pairing' ? { deviceToken: this.connection.deviceToken } : {}
+  }
+
+  private authenticationFrame(): Record<string, unknown> {
+    const clientCapabilities = [
+      SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+      AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
+      WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
+      WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
+    ]
+    return this.connection.kind === 'pairing'
+      ? {
+          type: 'e2ee_auth',
+          deviceToken: this.connection.deviceToken,
+          clientCapabilities
+        }
+      : {
+          type: 'e2ee_auth',
+          principalKind: 'cloud_managed_web_session',
+          managedWebSessionId: this.connection.managedWebSessionId,
+          runtimeSessionId: this.connection.runtimeSessionId,
+          sessionToken: this.connection.sessionToken,
+          clientCapabilities
+        }
+  }
+}
+
+function normalizeConnection(
+  input: WebPairingOffer | CloudLaunchBootstrap | WebRuntimeConnection
+): WebRuntimeConnection {
+  if ('kind' in input) {
+    return input
+  }
+  if ('protocolVersion' in input) {
+    return {
+      kind: 'cloud-managed',
+      endpoint: input.websocketUrl,
+      publicKeyB64: input.serverPublicKeyB64,
+      managedWebSessionId: input.managedWebSessionId,
+      runtimeSessionId: input.runtimeSessionId,
+      sessionToken: input.sessionToken,
+      expiresAt: input.expiresAt
+    }
+  }
+  return {
+    kind: 'pairing',
+    endpoint: input.endpoint,
+    publicKeyB64: input.publicKeyB64,
+    deviceToken: input.deviceToken
   }
 }
 

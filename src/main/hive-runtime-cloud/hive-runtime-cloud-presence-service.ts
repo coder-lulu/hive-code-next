@@ -1,6 +1,8 @@
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
-import { activateHiveRuntimeCloudPresence } from './hive-runtime-cloud-activation'
-import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
+import {
+  persistHiveRuntimeCloudRegistrationState,
+  runHiveRuntimeCloudActivation
+} from './hive-runtime-cloud-activation-runner'
 import type { HiveRuntimeCloudConfig } from './hive-runtime-cloud-config'
 import {
   sendHiveRuntimeCloudHeartbeat,
@@ -8,10 +10,8 @@ import {
 } from './hive-runtime-cloud-heartbeat'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import {
-  ClaimPendingPresenceError,
   defaultPresenceDependencies,
   FatalPresenceError,
-  isRetryablePresenceError,
   schedulePresenceRetry,
   type ActiveLease,
   type HiveRuntimeCloudPresenceState,
@@ -19,12 +19,19 @@ import {
   type PresenceDependencies,
   type RuntimeSource
 } from './hive-runtime-cloud-presence-support'
-import type { HiveRuntimeCloudRegistrationState } from './hive-runtime-cloud-state-store'
+import {
+  HiveRuntimeCloudLeaseContextPublisher,
+  type CurrentHiveRuntimeCloudLeaseContext,
+  type HiveRuntimeCloudLeaseContextListener
+} from './hive-runtime-cloud-lease-context'
+import {
+  handleHiveRuntimeCloudActivationFailure,
+  handleHiveRuntimeCloudHeartbeatFailure
+} from './hive-runtime-cloud-presence-failure'
+import { scheduleHiveRuntimeCloudHeartbeat } from './hive-runtime-cloud-presence-scheduling'
 
 const HEARTBEAT_INTERVAL_MS = 30_000
 const STALE_OPERATION = Symbol('stale_operation')
-
-export type { HiveRuntimeCloudPresenceState, PresenceDependencies }
 
 export class HiveRuntimeCloudPresenceService {
   private readonly client: PresenceClient | null
@@ -38,6 +45,7 @@ export class HiveRuntimeCloudPresenceService {
   private abortController: AbortController | null = null
   private inFlight: Promise<void> | null = null
   private lease: ActiveLease | null = null
+  private readonly leaseContext = new HiveRuntimeCloudLeaseContextPublisher()
   private pendingHeartbeat: PendingHeartbeat | null = null
   private retryAttempt = 0
 
@@ -54,6 +62,14 @@ export class HiveRuntimeCloudPresenceService {
 
   getState(): HiveRuntimeCloudPresenceState {
     return this.state
+  }
+
+  getCurrentLeaseContext(): CurrentHiveRuntimeCloudLeaseContext | null {
+    return this.leaseContext.current(this.state, this.authorization, this.lease)
+  }
+
+  subscribeLeaseContext(listener: HiveRuntimeCloudLeaseContextListener): () => void {
+    return this.leaseContext.subscribe(listener, () => this.getCurrentLeaseContext())
   }
 
   setAuthorization(authorization: HiveRuntimeCloudAuthorization | null): void {
@@ -74,8 +90,10 @@ export class HiveRuntimeCloudPresenceService {
     }
     this.resetWork()
     this.lease = null
+    this.leaseContext.clearIdentity()
     this.pendingHeartbeat = null
     this.state = this.runtimeReady ? 'ACTIVATING' : 'WAITING_RUNTIME'
+    this.publishLeaseContext()
     if (this.runtimeReady) {
       this.startActivation()
     }
@@ -89,8 +107,10 @@ export class HiveRuntimeCloudPresenceService {
     if (!ready) {
       this.resetWork()
       this.lease = null
+      this.leaseContext.clearIdentity()
       this.pendingHeartbeat = null
       this.state = this.authorization ? 'WAITING_RUNTIME' : 'SIGNED_OUT'
+      this.publishLeaseContext()
       return
     }
     if (this.authorization) {
@@ -108,16 +128,20 @@ export class HiveRuntimeCloudPresenceService {
     this.resetWork()
     this.authorization = null
     this.lease = null
+    this.leaseContext.clearIdentity()
     this.pendingHeartbeat = null
     this.state = this.config.enabled ? 'STOPPED' : 'DISABLED'
+    this.publishLeaseContext()
     await pending?.catch(() => undefined)
   }
 
   private fence(state: 'SIGNED_OUT' | 'FENCED'): void {
     this.resetWork()
     this.lease = null
+    this.leaseContext.clearIdentity()
     this.pendingHeartbeat = null
     this.state = state
+    this.publishLeaseContext()
   }
 
   private resetWork(): void {
@@ -147,7 +171,17 @@ export class HiveRuntimeCloudPresenceService {
     const controller = new AbortController()
     this.abortController = controller
     this.inFlight = this.activate(epoch, controller.signal)
-      .catch((error: unknown) => this.handleActivationFailure(epoch, error))
+      .catch((error: unknown) =>
+        handleHiveRuntimeCloudActivationFailure(error, {
+          stale: error === STALE_OPERATION || epoch !== this.epoch || this.stopped,
+          claimPending: () => (this.state = 'CLAIM_PENDING'),
+          fence: () => this.fence('FENCED'),
+          retry: () => {
+            this.state = 'OFFLINE_RETRY'
+            this.scheduleRetry(() => this.startActivation())
+          }
+        })
+      )
       .finally(() => {
         if (this.epoch === epoch) {
           this.abortController = null
@@ -158,40 +192,28 @@ export class HiveRuntimeCloudPresenceService {
 
   private async activate(epoch: number, signal: AbortSignal): Promise<void> {
     this.assertCurrent(epoch)
-    if (!this.client) {
-      throw new FatalPresenceError('client_unavailable')
-    }
-    const loadedIdentity = this.dependencies.loadIdentity(this.userDataPath)
-    if (loadedIdentity.status !== 'ok') {
-      throw new FatalPresenceError('identity_unavailable')
-    }
-    const identity = loadedIdentity.identity
-    const stored = this.dependencies.readState(this.userDataPath)
-    if (stored.status === 'unavailable' || stored.status === 'unreadable') {
-      throw new FatalPresenceError('registration_state_unavailable')
-    }
     const authorization = this.authorization
     if (!authorization) {
       throw STALE_OPERATION
     }
-    const result = await activateHiveRuntimeCloudPresence({
+    const result = await runHiveRuntimeCloudActivation({
       client: this.client,
       authorization,
-      identity,
-      stored: stored.status === 'ok' ? stored.value : null,
+      userDataPath: this.userDataPath,
       bootId: this.bootId,
-      report: this.runtimeSource.getReport(),
+      runtimeSource: this.runtimeSource,
+      dependencies: this.dependencies,
       signal,
-      now: this.dependencies.now,
-      randomUuid: this.dependencies.randomUuid,
       assertCurrent: () => this.assertCurrent(epoch),
-      saveState: (state) => this.saveState(state)
+      saveState: (state) =>
+        persistHiveRuntimeCloudRegistrationState(this.dependencies, this.userDataPath, state)
     })
     if (result.status === 'CLAIM_PENDING') {
       this.state = 'CLAIM_PENDING'
       return
     }
     this.bootId = result.bootId
+    this.leaseContext.setIdentity(result.identity, result.runtimeRecordId)
     this.lease = result.lease
     this.pendingHeartbeat = null
     this.state = 'LEASED'
@@ -199,13 +221,7 @@ export class HiveRuntimeCloudPresenceService {
     try {
       await this.sendHeartbeat(epoch, result.identity, signal)
     } catch (error) {
-      this.handleHeartbeatFailure(epoch, result.identity, error)
-    }
-  }
-
-  private saveState(state: HiveRuntimeCloudRegistrationState): void {
-    if (!this.dependencies.saveState(this.userDataPath, state)) {
-      throw new FatalPresenceError('registration_state_write_failed')
+      this.handleHeartbeatFailureWith(epoch, result.identity, error)
     }
   }
 
@@ -239,25 +255,22 @@ export class HiveRuntimeCloudPresenceService {
     this.pendingHeartbeat = null
     this.retryAttempt = 0
     this.state = 'ONLINE'
-    this.scheduleHeartbeat(epoch, identity)
-  }
-
-  private scheduleHeartbeat(epoch: number, identity: HiveRuntimeCloudIdentity): void {
-    this.timer = setTimeout(() => {
-      this.timer = undefined
-      if (this.epoch !== epoch || this.stopped) {
-        return
+    this.publishLeaseContext()
+    this.timer = scheduleHiveRuntimeCloudHeartbeat(
+      HEARTBEAT_INTERVAL_MS,
+      () => this.epoch === epoch && !this.stopped,
+      () => {
+        this.timer = undefined
+        this.startHeartbeat(epoch, identity)
       }
-      this.startHeartbeat(epoch, identity)
-    }, HEARTBEAT_INTERVAL_MS)
-    this.timer.unref?.()
+    )
   }
 
   private startHeartbeat(epoch: number, identity: HiveRuntimeCloudIdentity): void {
     const controller = new AbortController()
     this.abortController = controller
     this.inFlight = this.sendHeartbeat(epoch, identity, controller.signal)
-      .catch((error: unknown) => this.handleHeartbeatFailure(epoch, identity, error))
+      .catch((error: unknown) => this.handleHeartbeatFailureWith(epoch, identity, error))
       .finally(() => {
         if (this.epoch === epoch) {
           this.abortController = null
@@ -266,46 +279,28 @@ export class HiveRuntimeCloudPresenceService {
       })
   }
 
-  private handleActivationFailure(epoch: number, error: unknown): void {
-    if (error === STALE_OPERATION || epoch !== this.epoch || this.stopped) {
-      return
-    }
-    if (error instanceof ClaimPendingPresenceError) {
-      this.state = 'CLAIM_PENDING'
-      return
-    }
-    if (error instanceof FatalPresenceError || !isRetryablePresenceError(error)) {
-      this.fence('FENCED')
-      return
-    }
-    this.state = 'OFFLINE_RETRY'
-    this.scheduleRetry(() => this.startActivation())
-  }
-
-  private handleHeartbeatFailure(
+  private handleHeartbeatFailureWith(
     epoch: number,
     identity: HiveRuntimeCloudIdentity,
     error: unknown
   ): void {
-    if (error === STALE_OPERATION || epoch !== this.epoch || this.stopped) {
-      return
-    }
-    if (
-      error instanceof HiveRuntimeCloudRequestError &&
-      (error.status === 409 || error.status === 410)
-    ) {
-      this.lease = null
-      this.pendingHeartbeat = null
-      this.state = 'OFFLINE_RETRY'
-      this.scheduleRetry(() => this.startActivation())
-      return
-    }
-    if (error instanceof FatalPresenceError || !isRetryablePresenceError(error)) {
-      this.fence('FENCED')
-      return
-    }
-    this.state = 'OFFLINE_RETRY'
-    this.scheduleRetry(() => this.startHeartbeat(epoch, identity))
+    handleHiveRuntimeCloudHeartbeatFailure(error, {
+      stale: error === STALE_OPERATION || epoch !== this.epoch || this.stopped,
+      tupleChanged: () => {
+        this.lease = null
+        this.leaseContext.clearIdentity()
+        this.pendingHeartbeat = null
+        this.state = 'OFFLINE_RETRY'
+        this.publishLeaseContext()
+        this.scheduleRetry(() => this.startActivation())
+      },
+      fence: () => this.fence('FENCED'),
+      retry: () => {
+        this.state = 'OFFLINE_RETRY'
+        this.publishLeaseContext()
+        this.scheduleRetry(() => this.startHeartbeat(epoch, identity))
+      }
+    })
   }
 
   private scheduleRetry(action: () => void, explicitDelay?: number): void {
@@ -316,5 +311,9 @@ export class HiveRuntimeCloudPresenceService {
       action,
       explicitDelay
     )
+  }
+
+  private publishLeaseContext(): void {
+    this.leaseContext.publish(this.getCurrentLeaseContext())
   }
 }

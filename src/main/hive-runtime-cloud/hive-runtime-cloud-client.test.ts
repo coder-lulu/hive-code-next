@@ -91,4 +91,32 @@ describe('Hive Runtime Cloud HTTP client', () => {
     expect(failure).toBeInstanceOf(HiveRuntimeCloudTransportError)
     expect(String(failure)).not.toContain('sensitive upstream detail')
   })
+
+  it('consumes a Connection Ticket using the Cloud controller 200 response contract', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse({
+        managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
+        runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+        status: 'ACTIVE',
+        expiresAt: '2026-08-25T09:00:00.000Z',
+        controlVersion: 1
+      })
+    )
+    const client = new HiveRuntimeCloudClient('https://api.hivekernel.com', fetchImpl)
+    const request = { protocolVersion: 'web-launch-consume/v1', proof: 'signed' }
+
+    await expect(client.consumeConnectionTicket(request)).resolves.toMatchObject({
+      status: 'ACTIVE',
+      controlVersion: 1
+    })
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://api.hivekernel.com/hive/v1/connection-tickets',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(request),
+        cache: 'no-store',
+        redirect: 'error'
+      })
+    )
+  })
 })

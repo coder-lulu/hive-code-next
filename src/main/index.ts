@@ -81,6 +81,7 @@ import { HiveAccountService } from './hive-account/hive-account-service'
 import { getHiveRuntimeCloudConfig } from './hive-runtime-cloud/hive-runtime-cloud-config'
 import { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud/hive-runtime-cloud-presence-service'
 import { createHiveRuntimeCloudReport } from './hive-runtime-cloud/hive-runtime-cloud-report'
+import { HiveRuntimeCloudWebLaunchService } from './hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import type { HiveAccountState } from '../shared/hive-account'
 import { ArtifactCloudService } from './artifacts/artifact-cloud-service'
 import { SkillCloudService } from './skills/skill-cloud-service'
@@ -394,6 +395,7 @@ let runtimeRpc: OrcaRuntimeRpcServer | null = null
 let hiveAccountService: HiveAccountService | null = null
 let hiveAccountStartupState: Promise<HiveAccountState> | null = null
 let runtimeCloudPresence: HiveRuntimeCloudPresenceService | null = null
+let runtimeCloudWebLaunch: HiveRuntimeCloudWebLaunchService | null = null
 let unsubscribeRuntimeCloudAuthorization: (() => void) | null = null
 const serveReadinessPublisher = new ServeReadinessPublisher()
 let desktopRelayService: DesktopRelayService | null = null
@@ -2823,10 +2825,18 @@ void app.whenReady().then(async () => {
     skillTransactionRecovery
   })
   runtime = runtimeService
+  const runtimeCloudConfig = getHiveRuntimeCloudConfig()
   const processRuntimeCloudPresence = new HiveRuntimeCloudPresenceService(
-    getHiveRuntimeCloudConfig(),
+    runtimeCloudConfig,
     app.getPath('userData'),
-    { getReport: () => createHiveRuntimeCloudReport(runtimeService, app.getVersion()) }
+    {
+      getReport: () =>
+        createHiveRuntimeCloudReport(
+          runtimeService,
+          app.getVersion(),
+          runtimeCloudConfig.enabled ? runtimeCloudConfig.webLaunch : undefined
+        )
+    }
   )
   runtimeCloudPresence = processRuntimeCloudPresence
   if (hiveAccountService) {
@@ -3276,6 +3286,19 @@ void app.whenReady().then(async () => {
       : {}),
     webClientRoot: getBundledWebClientRoot()
   })
+  if (runtimeCloudConfig.enabled && runtimeCloudConfig.webLaunch) {
+    const processRuntimeCloudWebLaunch = new HiveRuntimeCloudWebLaunchService({
+      apiBaseUrl: runtimeCloudConfig.apiBaseUrl,
+      config: runtimeCloudConfig.webLaunch,
+      presence: processRuntimeCloudPresence,
+      getServerPublicKey: () => runtimeRpc?.getE2EEPublicKey() ?? null,
+      terminateSessionConnections: (managedWebSessionId) => {
+        runtimeRpc?.terminateCloudWebSessionConnections(managedWebSessionId)
+      }
+    })
+    runtimeCloudWebLaunch = processRuntimeCloudWebLaunch
+    runtimeRpc.setCloudWebLaunchService(processRuntimeCloudWebLaunch)
+  }
   registerMobileHandlers(runtimeRpc, {
     getRelayStatus: () => desktopRelayStatus,
     consumePendingUnpairedDeviceAuthFailure: (webContentsId) => {
@@ -3548,6 +3571,8 @@ app.on('will-quit', (e) => {
   destroySystemTray()
   unsubscribeRuntimeCloudAuthorization?.()
   unsubscribeRuntimeCloudAuthorization = null
+  runtimeCloudWebLaunch?.close()
+  runtimeCloudWebLaunch = null
   const runtimeCloudPresenceShutdown = runtimeCloudPresence?.stop() ?? Promise.resolve()
   runtimeCloudPresence = null
   hiveAccountService = null

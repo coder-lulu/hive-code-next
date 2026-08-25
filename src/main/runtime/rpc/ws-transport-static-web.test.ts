@@ -42,6 +42,28 @@ describe('WebSocketTransport static web client', () => {
     await expect(assetResponse.text()).resolves.toBe('console.log("web")')
   })
 
+  it('routes the Cloud exchange before falling through to static assets', async () => {
+    const staticRoot = mkdtempSync(join(tmpdir(), 'ws-transport-static-'))
+    writeFileSync(join(staticRoot, 'web-index.html'), '<html>web</html>')
+    const transport = new WebSocketTransport({
+      host: '127.0.0.1',
+      port: 0,
+      staticRoot,
+      httpRouteHandler: (_request, response) => {
+        response.statusCode = 201
+        response.end('exchange')
+        return true
+      }
+    })
+    transports.push(transport)
+    await transport.start()
+
+    const response = await fetch(`http://127.0.0.1:${transport.resolvedPort}/exchange`)
+
+    expect(response.status).toBe(201)
+    await expect(response.text()).resolves.toBe('exchange')
+  })
+
   it('serves web assets when a reverse-proxy path prefix is forwarded', async () => {
     const staticRoot = mkdtempSync(join(tmpdir(), 'ws-transport-static-'))
     mkdirSync(join(staticRoot, 'assets'))

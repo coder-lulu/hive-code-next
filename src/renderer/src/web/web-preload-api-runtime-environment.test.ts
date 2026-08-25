@@ -18,6 +18,49 @@ describe('web runtime environment identity', () => {
     vi.doUnmock('./web-runtime-client')
   })
 
+  it('keeps a Cloud-managed bootstrap volatile across Runtime status updates', async () => {
+    const constructedWith: unknown[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        constructor(connection: unknown) {
+          constructedWith.push(connection)
+        }
+
+        call(method: string): Promise<RuntimeRpcResponse<unknown>> {
+          return Promise.resolve({
+            id: method,
+            ok: true,
+            result: { runtimeId: 'runtime-cloud' },
+            _meta: { runtimeId: 'runtime-cloud' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+    const globals = installBrowserGlobals('Linux')
+    const bootstrap = {
+      protocolVersion: 'cloud-launch/v1' as const,
+      managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
+      runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+      websocketUrl: 'wss://runtime.example/_hive/runtime-rpc',
+      serverPublicKeyB64: 'server-public-key',
+      sessionToken: 'A'.repeat(43),
+      expiresAt: '2026-08-25T09:00:00.000Z'
+    }
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi(bootstrap)
+
+    const [environment] = await globals.window.api.runtimeEnvironments.list()
+    await globals.window.api.runtimeEnvironments.getStatus({ selector: environment!.id })
+
+    expect(constructedWith).toEqual([bootstrap])
+    expect(globals.storage.getItem('orca.web.runtimeEnvironment.v1')).toBeNull()
+    expect(JSON.stringify(await globals.window.api.runtimeEnvironments.list())).not.toContain(
+      bootstrap.sessionToken
+    )
+  })
+
   it('does not resolve an old server selector through a differently keyed server', async () => {
     const globals = installBrowserGlobals('Linux')
     writeStoredRuntimeEnvironment(globals.storage, 'web-server-a')

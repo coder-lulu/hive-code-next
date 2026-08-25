@@ -3,8 +3,17 @@ import { createServer as createHttpsServer, type Server as HttpsServer } from 'n
 import { createServer as createHttpServer, type Server as HttpServer } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { RpcTransport } from './transport'
-import { createStaticWebClientHandler } from './static-web-client-handler'
 import { RemoteRuntimeServerHeartbeat } from './remote-runtime-server-heartbeat'
+import {
+  createWebSocketHttpRequestListener,
+  parseWebSocketConnectionRequest,
+  type WebSocketConnectionRequest,
+  type WebSocketHttpRouteHandler
+} from './ws-http-routing'
+import { rejectWebSocketOverCapacity } from './ws-connection-admission'
+import { isWebSocketPortFallbackError } from './ws-listen-fallback'
+
+export type { WebSocketConnectionRequest, WebSocketHttpRouteHandler } from './ws-http-routing'
 
 const MAX_WS_MESSAGE_BYTES = 1024 * 1024
 // Why: one desktop remote-host client can hold many concurrent streams, so keep the cap high enough that stale streams don't starve control RPCs.
@@ -37,6 +46,7 @@ export type WebSocketTransportOptions = {
   preAuthTimeoutMs?: number
   // Why: the pairing server can also serve the browser client, avoiding a second static server.
   staticRoot?: string
+  httpRouteHandler?: WebSocketHttpRouteHandler
   // Why: devices paired while the fallback port was active point at it, so it must bind first on later launches or those pairings strand (STA-1511).
   fallbackPort?: number
   // Why: serve --port clients dial the pinned port; prefer it first so a stale fallback can't steal the pin (issue #8535). Default keeps fallback-first (STA-1511).
@@ -51,6 +61,7 @@ export class WebSocketTransport implements RpcTransport {
   private readonly heartbeat: RemoteRuntimeServerHeartbeat
   private readonly preAuthTimeoutMs: number
   private readonly staticRoot: string | undefined
+  private readonly httpRouteHandler: WebSocketHttpRouteHandler | undefined
   private readonly fallbackPort: number | undefined
   private readonly preferPinnedPort: boolean
   private httpServer: HttpsServer | HttpServer | null = null
@@ -63,6 +74,7 @@ export class WebSocketTransport implements RpcTransport {
   private wsClientIds = new Map<WebSocket, string>()
   private heartbeatConnections = new Set<WebSocket>()
   private preAuthTimers = new WeakMap<WebSocket, ReturnType<typeof setTimeout>>()
+  private connectionRequests = new WeakMap<WebSocket, WebSocketConnectionRequest>()
 
   constructor({
     host,
@@ -73,6 +85,7 @@ export class WebSocketTransport implements RpcTransport {
     heartbeatNow,
     preAuthTimeoutMs,
     staticRoot,
+    httpRouteHandler,
     fallbackPort,
     preferPinnedPort
   }: WebSocketTransportOptions) {
@@ -87,6 +100,7 @@ export class WebSocketTransport implements RpcTransport {
     )
     this.preAuthTimeoutMs = preAuthTimeoutMs ?? PRE_AUTH_TIMEOUT_MS
     this.staticRoot = staticRoot
+    this.httpRouteHandler = httpRouteHandler
     this.fallbackPort = fallbackPort
     this.preferPinnedPort = preferPinnedPort === true
   }
@@ -116,6 +130,10 @@ export class WebSocketTransport implements RpcTransport {
       ws.terminate()
     }
     return sockets.length
+  }
+
+  getConnectionRequest(ws: WebSocket): WebSocketConnectionRequest {
+    return this.connectionRequests.get(ws) ?? { pathname: null, origin: null }
   }
 
   // Why: with port 0 the OS assigns a random port; callers read the real bound port here for metadata and the mobile QR.
@@ -157,7 +175,7 @@ export class WebSocketTransport implements RpcTransport {
         // Why: a persisted fallback may fail for any reason, while configured ports fall through only when their listen is occupied or denied.
         if (
           port !== persistedFallbackPort &&
-          (!isPortListenFallbackError(error, port) || port === 0)
+          (!isWebSocketPortFallbackError(error, port) || port === 0)
         ) {
           throw error
         }
@@ -171,9 +189,10 @@ export class WebSocketTransport implements RpcTransport {
   }
 
   private createHttpServer(): HttpServer | HttpsServer {
-    const requestListener = this.staticRoot
-      ? createStaticWebClientHandler(this.staticRoot)
-      : undefined
+    const requestListener = createWebSocketHttpRequestListener(
+      this.staticRoot,
+      this.httpRouteHandler
+    )
     return this.tlsCert && this.tlsKey
       ? createHttpsServer({ cert: this.tlsCert, key: this.tlsKey }, requestListener)
       : createHttpServer(requestListener)
@@ -199,25 +218,17 @@ export class WebSocketTransport implements RpcTransport {
       maxPayload: MAX_WS_MESSAGE_BYTES
     })
 
-    wss.on('connection', (ws) => {
+    wss.on('connection', (ws, request) => {
       if (wss.clients.size > MAX_WS_CONNECTIONS) {
-        this.rejectOverCapacity(ws)
+        rejectWebSocketOverCapacity(ws)
         return
       }
+      parseWebSocketConnectionRequest(ws, request, this.connectionRequests)
       this.handleConnection(ws)
     })
 
     this.httpServer = httpServer
     this.wss = wss
-  }
-
-  // Why: force-terminate soon after the 1013 close since a half-open phone may never ack and would hold the descriptor past the WS cap; the 'error' listener absorbs a reset while closing.
-  private rejectOverCapacity(ws: WebSocket): void {
-    ws.on('error', () => {})
-    ws.close(1013, 'Maximum connections reached')
-    const terminateTimer = setTimeout(() => ws.terminate(), 1_000)
-    terminateTimer.unref?.()
-    ws.once('close', () => clearTimeout(terminateTimer))
   }
 
   async stop(): Promise<void> {
@@ -334,20 +345,4 @@ export class WebSocketTransport implements RpcTransport {
       this.preAuthTimers.delete(ws)
     }
   }
-}
-
-function isPortListenFallbackError(error: unknown, port: number): boolean {
-  if (!(error instanceof Error) || !('code' in error)) {
-    return false
-  }
-  if (error.code === 'EADDRINUSE') {
-    return true
-  }
-  return (
-    error.code === 'EACCES' &&
-    'syscall' in error &&
-    error.syscall === 'listen' &&
-    'port' in error &&
-    error.port === port
-  )
 }

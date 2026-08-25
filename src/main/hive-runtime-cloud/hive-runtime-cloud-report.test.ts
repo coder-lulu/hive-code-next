@@ -31,4 +31,30 @@ describe('Hive Runtime Cloud report', () => {
       expect(report).not.toHaveProperty('webHttpsOrigin')
     }
   )
+
+  it('publishes the complete frozen endpoint tuple only behind the Web Launch gate', () => {
+    const report = createHiveRuntimeCloudReport(
+      runtime('ready'),
+      '1.4.178-rc.7',
+      {
+        publicOrigin: 'https://code.hivekernel.com',
+        webClientPath: '/web-index.html',
+        websocketPath: '/_hive/runtime-rpc'
+      },
+      () => Date.parse('2026-08-25T08:01:00.000Z')
+    )
+
+    expect(report.capabilities).toEqual([
+      'pairing-v3',
+      'runtime-health-v1',
+      'connection-ticket-v1',
+      'web-launch-grant-v1'
+    ])
+    expect(report).toMatchObject({
+      webHttpsOrigin: 'https://code.hivekernel.com',
+      webClientPath: '/web-index.html',
+      websocketPath: '/_hive/runtime-rpc',
+      webEndpointExpiresAt: '2026-08-25T08:02:15.000Z'
+    })
+  })
 })

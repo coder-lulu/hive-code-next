@@ -37,6 +37,7 @@ export type ActivationResult =
   | {
       status: 'LEASED'
       identity: HiveRuntimeCloudIdentity
+      runtimeRecordId: string
       bootId: string
       lease: ActiveLease
     }
@@ -198,5 +199,11 @@ export async function activateHiveRuntimeCloudPresence(
   }
   const bootId = registration.latestLeaseEpoch > 0 ? options.randomUuid() : options.bootId
   const lease = await acquireRuntimeLease(options, registration, bootId)
-  return { status: 'LEASED', identity: options.identity, bootId, lease }
+  return {
+    status: 'LEASED',
+    identity: options.identity,
+    runtimeRecordId: registration.runtimeRecordId,
+    bootId,
+    lease
+  }
 }

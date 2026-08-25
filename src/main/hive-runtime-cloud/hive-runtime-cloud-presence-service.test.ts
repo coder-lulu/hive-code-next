@@ -4,10 +4,8 @@ import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account
 import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
-import {
-  HiveRuntimeCloudPresenceService,
-  type PresenceDependencies
-} from './hive-runtime-cloud-presence-service'
+import { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud-presence-service'
+import type { PresenceDependencies } from './hive-runtime-cloud-presence-support'
 import type { HiveRuntimeCloudRegistrationState } from './hive-runtime-cloud-state-store'
 
 const ids = [
@@ -114,6 +112,36 @@ async function activate(service: HiveRuntimeCloudPresenceService): Promise<void>
 }
 
 describe('Hive Runtime Cloud Presence service', () => {
+  it('publishes the complete signed lease context only while heartbeat is current', async () => {
+    const { service } = fixture()
+    const observed = vi.fn()
+    const unsubscribe = service.subscribeLeaseContext(observed)
+
+    await activate(service)
+
+    expect(service.getCurrentLeaseContext()).toEqual({
+      authorityId: authorization.authorityId,
+      identity,
+      tuple: {
+        authorityGeneration: 1,
+        runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
+        runtimeInstanceId: identity.runtimeInstanceId,
+        bootId: '323e4567-e89b-42d3-a456-426614174000',
+        heartbeatLeaseId: '823e4567-e89b-42d3-a456-426614174000',
+        leaseEpoch: 1,
+        fencingEpoch: 1
+      }
+    })
+    expect(observed).toHaveBeenLastCalledWith(service.getCurrentLeaseContext())
+
+    service.setAuthorization(null)
+
+    expect(service.getCurrentLeaseContext()).toBeNull()
+    expect(observed).toHaveBeenLastCalledWith(null)
+    unsubscribe()
+    await service.stop()
+  })
+
   it('registers, Claims, discards the activation token, leases, and heartbeats immediately', async () => {
     const { service, client, saveState } = fixture()
 

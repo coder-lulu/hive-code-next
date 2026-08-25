@@ -27,9 +27,11 @@ import { loadOrCreateE2EEKeypair, type E2EEKeypair } from './e2ee-keypair'
 import { UnpairedDeviceAuthThrottle } from './rpc/unpaired-device-auth-throttle'
 import {
   MobileSocketWiring,
+  type AuthenticatedCloudManagedSocket,
   type AuthenticatedMobileSocket,
   type MobileSocketTransportMetadata
 } from './rpc/mobile-socket-wiring'
+import type { HiveRuntimeCloudWebLaunchService } from '../hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import type { PairingRelay } from '../../shared/mobile-relay-pairing-offer'
 import type { MobilePairingConnectionMode } from '../../shared/mobile-pairing-connection-mode'
 import type { RuntimePairingReach } from '../../shared/runtime-pairing-reach'
@@ -481,6 +483,10 @@ function injectDeviceScope(response: string, scope: DeviceScope): string {
   }
 }
 
+function cloudManagedClientId(managedWebSessionId: string): string {
+  return `cloud-managed:${managedWebSessionId}`
+}
+
 export class OrcaRuntimeRpcServer {
   private readonly runtime: OrcaRuntimeService
   private readonly dispatcher: RpcDispatcher
@@ -513,6 +519,7 @@ export class OrcaRuntimeRpcServer {
   private transports: RuntimeTransportMetadata[] = []
   private metadataOwnershipWatch: RuntimeMetadataOwnershipWatch | null = null
   private mobileSocketWiring: MobileSocketWiring | null = null
+  private cloudWebLaunchService: HiveRuntimeCloudWebLaunchService | null = null
   // Why: detaches the current WebSocketTransport from the session wiring so a pairing rebind can swap
   // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
   private detachWebSocketWiring: (() => void) | null = null
@@ -590,6 +597,17 @@ export class OrcaRuntimeRpcServer {
 
   getMobileSocketWiring(): MobileSocketWiring | null {
     return this.mobileSocketWiring
+  }
+
+  setCloudWebLaunchService(service: HiveRuntimeCloudWebLaunchService | null): void {
+    if (this.activeTransports.length > 0 || this.mobileSocketWiring) {
+      throw new Error('Cloud Web Launch must be configured before Runtime RPC starts')
+    }
+    this.cloudWebLaunchService = service
+  }
+
+  terminateCloudWebSessionConnections(managedWebSessionId: string): number {
+    return this.mobileSocketWiring?.terminateCloudSessionConnections(managedWebSessionId) ?? 0
   }
 
   getRelayRevokeOutbox(): RelayRevokeOutbox {
@@ -1275,11 +1293,20 @@ export class OrcaRuntimeRpcServer {
       host: options.host,
       port: options.port,
       staticRoot: this.webClientRoot,
+      ...(this.cloudWebLaunchService
+        ? {
+            httpRouteHandler: (request, response) =>
+              this.cloudWebLaunchService?.handleHttpRequest(request, response) ?? false
+          }
+        : {}),
       ...(options.fallbackPort !== undefined ? { fallbackPort: options.fallbackPort } : {}),
       ...(options.preferPinnedPort ? { preferPinnedPort: true } : {})
     })
     const mobileSocketWiring = this.ensureMobileSocketWiring(deviceRegistry, e2eeKeypair)
-    this.detachWebSocketWiring = mobileSocketWiring.attachTransport(wsTransport)
+    this.detachWebSocketWiring = mobileSocketWiring.attachTransport(wsTransport, (ws) => ({
+      transport: 'direct',
+      request: wsTransport.getConnectionRequest(ws)
+    }))
 
     try {
       await wsTransport.start()
@@ -1315,6 +1342,47 @@ export class OrcaRuntimeRpcServer {
     const mobileSocketWiring = new MobileSocketWiring({
       deviceRegistry,
       e2eeKeypair,
+      ...(this.cloudWebLaunchService
+        ? {
+            resolveCloudManagedSession: (auth, metadata: MobileSocketTransportMetadata) =>
+              metadata.transport === 'direct'
+                ? (this.cloudWebLaunchService?.resolveSession(
+                    auth,
+                    metadata.request ?? { pathname: null, origin: null }
+                  ) ?? null)
+                : null,
+            onCloudText: (socket, plaintext, reply, sendBinary) => {
+              void this.handleWebSocketMessage(
+                plaintext,
+                reply,
+                sendBinary,
+                undefined,
+                socket.ws,
+                null,
+                undefined,
+                socket
+              )
+            },
+            onCloudBinary: (socket, bytes) => {
+              if (!this.cloudWebLaunchService?.revalidateSession(socket.principal)) {
+                this.terminateCloudWebSessionConnections(socket.principal.managedWebSessionId)
+                return
+              }
+              this.handleWebSocketBinaryMessage(bytes, socket.ws)
+            },
+            onCloudReady: () => {
+              this.runtime.activateRecentPtyPathCandidateTracking?.()
+            },
+            onCloudClose: (socket, hasOtherConnections) => {
+              this.cleanupAuthenticatedWebSocket(socket)
+              if (!hasOtherConnections) {
+                this.runtime.onClientDisconnected(
+                  cloudManagedClientId(socket.principal.managedWebSessionId)
+                )
+              }
+            }
+          }
+        : {}),
       onText: (socket, plaintext, reply, sendBinary) => {
         void this.handleWebSocketMessage(
           plaintext,
@@ -1340,11 +1408,7 @@ export class OrcaRuntimeRpcServer {
         if (!socket) {
           return
         }
-        this.abortWebSocketDispatches(socket.ws)
-        // Why: subscriptions and binary streams are socket-scoped, but disconnect state is device-scoped across transports.
-        this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
-        this.runtime.cancelMobileDictationForConnection(socket.connectionId)
-        this.binaryStreamHandlers.delete(socket.connectionId)
+        this.cleanupAuthenticatedWebSocket(socket)
         if (!hasOtherConnections) {
           this.runtime.onClientDisconnected(socket.device.deviceToken)
         }
@@ -1358,6 +1422,15 @@ export class OrcaRuntimeRpcServer {
     })
     this.mobileSocketWiring = mobileSocketWiring
     return mobileSocketWiring
+  }
+
+  private cleanupAuthenticatedWebSocket(
+    socket: AuthenticatedMobileSocket | AuthenticatedCloudManagedSocket
+  ): void {
+    this.abortWebSocketDispatches(socket.ws)
+    this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
+    this.runtime.cancelMobileDictationForConnection(socket.connectionId)
+    this.binaryStreamHandlers.delete(socket.connectionId)
   }
 
   // Why: STA-2370 — widen the loopback listener to all interfaces so a freshly generated pairing
@@ -1619,7 +1692,8 @@ export class OrcaRuntimeRpcServer {
     wsTransport?: WebSocketTransport,
     ws?: WebSocket,
     authenticatedDeviceToken?: string | null,
-    authenticatedSocket?: AuthenticatedMobileSocket
+    authenticatedSocket?: AuthenticatedMobileSocket,
+    authenticatedCloudSocket?: AuthenticatedCloudManagedSocket
   ): Promise<void> {
     let request: RpcRequest
     try {
@@ -1638,26 +1712,52 @@ export class OrcaRuntimeRpcServer {
       return
     }
 
+    const requestRecord = request as unknown as Record<string, unknown>
+    if (authenticatedCloudSocket) {
+      if (
+        'deviceToken' in requestRecord ||
+        'sessionToken' in requestRecord ||
+        'authToken' in requestRecord
+      ) {
+        reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Credential mismatch')))
+        return
+      }
+      if (!this.cloudWebLaunchService?.revalidateSession(authenticatedCloudSocket.principal)) {
+        reply(
+          JSON.stringify(this.buildError(request.id, 'unauthorized', 'Managed session expired'))
+        )
+        this.terminateCloudWebSessionConnections(
+          authenticatedCloudSocket.principal.managedWebSessionId
+        )
+        return
+      }
+    }
+
     const requestToken =
       typeof (request as Record<string, unknown>).deviceToken === 'string'
         ? ((request as Record<string, unknown>).deviceToken as string)
         : null
-    if (authenticatedDeviceToken && requestToken && requestToken !== authenticatedDeviceToken) {
+    if (
+      !authenticatedCloudSocket &&
+      authenticatedDeviceToken &&
+      requestToken &&
+      requestToken !== authenticatedDeviceToken
+    ) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Device token mismatch')))
       return
     }
     // Why: E2EE already authenticated the channel; authorize by that bound identity, not a repeated request field.
-    const token = authenticatedDeviceToken ?? requestToken
-    if (!token) {
+    const token = authenticatedCloudSocket ? null : (authenticatedDeviceToken ?? requestToken)
+    if (!authenticatedCloudSocket && !token) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Missing device token')))
       return
     }
-    const device = this.deviceRegistry?.validateToken(token)
-    if (!device) {
+    const device = token ? this.deviceRegistry?.validateToken(token) : null
+    if (!authenticatedCloudSocket && !device) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Invalid device token')))
       return
     }
-    if (device.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
+    if (device?.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
       reply(
         JSON.stringify(
           this.buildError(
@@ -1671,7 +1771,7 @@ export class OrcaRuntimeRpcServer {
     }
 
     // Why: bind deviceToken to this socket so ws.on('close') knows which mobile client disconnected.
-    if (wsTransport && ws) {
+    if (wsTransport && ws && token) {
       wsTransport.setClientId(ws, token)
     }
 
@@ -1687,10 +1787,13 @@ export class OrcaRuntimeRpcServer {
     // Why: older pairings may lack scope metadata, so stamp the authenticated scope onto status.get.
     const replyForRequest =
       request.method === 'status.get'
-        ? (response: string): void => reply(injectDeviceScope(response, device.scope))
+        ? (response: string): void => reply(injectDeviceScope(response, device?.scope ?? 'runtime'))
         : reply
 
-    const connectionId = ws ? this.mobileSocketWiring?.getConnectionId(ws) : undefined
+    const connectionId =
+      authenticatedCloudSocket?.connectionId ??
+      authenticatedSocket?.connectionId ??
+      (ws ? this.mobileSocketWiring?.getConnectionId(ws) : undefined)
     const pairingProvider = this.mobileRelayPairingProvider
     const pairingContext =
       pairingProvider && authenticatedSocket
@@ -1716,15 +1819,19 @@ export class OrcaRuntimeRpcServer {
           }
         : undefined
     try {
+      const clientId = authenticatedCloudSocket
+        ? cloudManagedClientId(authenticatedCloudSocket.principal.managedWebSessionId)
+        : token!
       await this.dispatcher.dispatchStreaming(request, replyForRequest, {
         // Why: the validated credential preserves existing federation ownership without trusting request fields.
-        authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(token),
+        authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(clientId),
         connectionId,
-        clientId: token,
-        pairedDeviceId: device.deviceId,
+        clientId,
+        ...(device ? { pairedDeviceId: device.deviceId } : {}),
         // Why: gates the mobile-only payload diet so full-screen web/desktop clients aren't truncated.
-        clientKind: device.scope,
-        clientCapabilities: authenticatedSocket?.clientCapabilities,
+        clientKind: device?.scope ?? 'runtime',
+        clientCapabilities:
+          authenticatedCloudSocket?.clientCapabilities ?? authenticatedSocket?.clientCapabilities,
         pairing: pairingContext,
         signal: abortRegistration?.signal,
         sendBinary,

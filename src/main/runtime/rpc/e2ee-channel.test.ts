@@ -102,6 +102,49 @@ describe('E2EEChannel', () => {
       expect(JSON.parse(ctx.ws.sent[0]!)).toEqual({ type: 'e2ee_ready' })
     })
 
+    it('binds a distinct Cloud-managed principal without resolving DeviceRegistry', () => {
+      const principal = {
+        principalKind: 'cloud_managed_web_session' as const,
+        managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
+        runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+        expiresAt: Date.parse('2026-08-25T09:00:00.000Z')
+      }
+      const resolveAuthenticatedDevice = vi.fn()
+      const resolveCloudManagedSession = vi.fn().mockReturnValue(principal)
+      const onCloudReady = vi.fn()
+      const ctx = setup({
+        resolveAuthenticatedDevice,
+        resolveCloudManagedSession,
+        onCloudReady
+      })
+      ctx.channel.handleRawMessage(
+        JSON.stringify({
+          type: 'e2ee_hello',
+          publicKeyB64: publicKeyToBase64(ctx.clientKeys.publicKey)
+        })
+      )
+      const sharedKey = deriveSharedKey(ctx.clientKeys.secretKey, ctx.serverKeys.publicKey)
+
+      ctx.channel.handleRawMessage(
+        encrypt(
+          JSON.stringify({
+            type: 'e2ee_auth',
+            principalKind: 'cloud_managed_web_session',
+            managedWebSessionId: principal.managedWebSessionId,
+            runtimeSessionId: principal.runtimeSessionId,
+            sessionToken: 'A'.repeat(43)
+          }),
+          sharedKey
+        )
+      )
+
+      expect(resolveAuthenticatedDevice).not.toHaveBeenCalled()
+      expect(resolveCloudManagedSession).toHaveBeenCalledOnce()
+      expect(onCloudReady).toHaveBeenCalledWith(ctx.channel, principal)
+      expect(ctx.channel.authenticatedCloudSession).toBe(principal)
+      expect(ctx.channel.deviceToken).toBeNull()
+    })
+
     it('binds runtime capabilities to encrypted authenticated metadata', () => {
       const ctx = setup({
         resolveAuthenticatedDevice: (token) =>

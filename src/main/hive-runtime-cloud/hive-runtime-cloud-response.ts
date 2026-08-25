@@ -49,6 +49,14 @@ export type RuntimeHeartbeat = RuntimeLease & {
   duplicate: boolean
 }
 
+export type RuntimeConnectionTicketConsume = Readonly<{
+  managedWebSessionId: string
+  runtimeSessionId: string
+  status: 'ACTIVE'
+  expiresAt: number
+  controlVersion: number
+}>
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -257,5 +265,28 @@ export function normalizeHeartbeat(value: unknown): RuntimeHeartbeat {
     leaseExpiresAt: instant(value.leaseExpiresAt),
     presence: value.presence as RuntimeHeartbeat['presence'],
     duplicate: value.duplicate
+  }
+}
+
+export function normalizeConnectionTicketConsume(value: unknown): RuntimeConnectionTicketConsume {
+  if (!isRecord(value)) {
+    throw new Error('invalid_hive_runtime_cloud_response')
+  }
+  exactKeys(value, [
+    'managedWebSessionId',
+    'runtimeSessionId',
+    'status',
+    'expiresAt',
+    'controlVersion'
+  ])
+  if (value.status !== 'ACTIVE') {
+    throw new Error('invalid_hive_runtime_cloud_response')
+  }
+  return {
+    managedWebSessionId: uuid(value.managedWebSessionId),
+    runtimeSessionId: uuid(value.runtimeSessionId),
+    status: 'ACTIVE',
+    expiresAt: instant(value.expiresAt),
+    controlVersion: positiveInteger(value.controlVersion)
   }
 }

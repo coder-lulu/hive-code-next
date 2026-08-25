@@ -1,8 +1,9 @@
-import { createPublicKey, generateKeyPairSync, verify } from 'node:crypto'
+import { createHash, createPublicKey, generateKeyPairSync, verify } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import {
   canonicalRuntimeHeartbeatBody,
+  createRuntimeConnectionTicketConsumeRequest,
   createRuntimeHeartbeatRequest,
   createRuntimeLeaseAcquireRequest,
   createRuntimeRegistrationRequest
@@ -119,5 +120,101 @@ describe('Hive Runtime Cloud proofs', () => {
     })
 
     expect(verifies(input, request.proof.signature)).toBe(true)
+  })
+
+  it('signs a Connection Ticket consume over the recursively sorted protected body', () => {
+    const request = createRuntimeConnectionTicketConsumeRequest(
+      identity,
+      {
+        ticketId: '523e4567-e89b-42d3-a456-426614174000',
+        launchSecret: 'A'.repeat(43),
+        authorityGeneration: 2,
+        runtimeRecordId: '623e4567-e89b-42d3-a456-426614174000',
+        bootId: '323e4567-e89b-42d3-a456-426614174000',
+        heartbeatLeaseId: '423e4567-e89b-42d3-a456-426614174000',
+        leaseEpoch: 3,
+        fencingEpoch: 4
+      },
+      context
+    )
+    const { proof, ...protectedBody } = request
+    const input = JSON.stringify({
+      authorityId: proof.authorityId,
+      bodySha256: proof.bodySha256,
+      issuedAt: proof.issuedAt,
+      method: proof.method,
+      nonce: proof.nonce,
+      path: proof.path,
+      protocolVersion: proof.protocolVersion
+    })
+
+    expect(protectedBody).toMatchObject({
+      protocolVersion: 'web-launch-consume/v1',
+      runtimeInstanceId: identity.runtimeInstanceId
+    })
+    expect(proof).toMatchObject({
+      protocolVersion: 'hive-runtime-connection-ticket-consume/v1',
+      path: '/hive/v1/connection-tickets'
+    })
+    expect(proof.bodySha256).toBe(
+      createHash('sha256')
+        .update(canonicalRuntimeHeartbeatBody(protectedBody), 'utf8')
+        .digest('hex')
+    )
+    expect(verifies(input, proof.signature)).toBe(true)
+  })
+
+  it('publishes a web endpoint only when every endpoint field is available', () => {
+    const baseReport = {
+      runtimeVersion: '1.4.178-rc.7',
+      runtimeProtocolVersion: 3 as const,
+      capabilities: ['web-launch-grant-v1'] as const,
+      readiness: 'READY' as const,
+      readinessReasonCode: 'healthy' as const,
+      startedAt: '2026-08-25T07:59:00.000Z',
+      connectionCapabilities: ['orca-direct'] as const
+    }
+    const full = createRuntimeHeartbeatRequest(
+      identity,
+      {
+        bootId: '323e4567-e89b-42d3-a456-426614174000',
+        leaseId: '423e4567-e89b-42d3-a456-426614174000',
+        authorityGeneration: 1,
+        leaseEpoch: 1,
+        fencingEpoch: 1,
+        heartbeatSeq: 2,
+        sourceReportedAt: '2026-08-25T08:00:00.000Z',
+        report: {
+          ...baseReport,
+          webHttpsOrigin: 'https://code.hivekernel.com',
+          webClientPath: '/web',
+          websocketPath: '/runtime',
+          webEndpointExpiresAt: '2026-08-25T08:01:15.000Z'
+        }
+      },
+      context
+    )
+    const partial = createRuntimeHeartbeatRequest(
+      identity,
+      {
+        bootId: '323e4567-e89b-42d3-a456-426614174000',
+        leaseId: '423e4567-e89b-42d3-a456-426614174000',
+        authorityGeneration: 1,
+        leaseEpoch: 1,
+        fencingEpoch: 1,
+        heartbeatSeq: 3,
+        sourceReportedAt: '2026-08-25T08:00:00.000Z',
+        report: { ...baseReport, webHttpsOrigin: 'https://code.hivekernel.com' }
+      },
+      context
+    )
+
+    expect(full.report).toMatchObject({
+      webHttpsOrigin: 'https://code.hivekernel.com',
+      webClientPath: '/web',
+      websocketPath: '/runtime',
+      webEndpointExpiresAt: '2026-08-25T08:01:15.000Z'
+    })
+    expect(partial.report).not.toHaveProperty('webHttpsOrigin')
   })
 })

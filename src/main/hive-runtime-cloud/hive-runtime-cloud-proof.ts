@@ -47,13 +47,13 @@ export type HiveRuntimeCloudReport = Readonly<{
   readinessReasonCode: HiveRuntimeCloudReadinessReason
   startedAt: string
   connectionCapabilities: readonly HiveRuntimeCloudConnectionCapability[]
+  webHttpsOrigin?: string
+  webClientPath?: string
+  websocketPath?: string
+  webEndpointExpiresAt?: string
 }>
 
-type ProofContext = Readonly<{
-  authorityId: string
-  issuedAt?: string
-  nonce?: string
-}>
+type ProofContext = Readonly<{ authorityId: string; issuedAt?: string; nonce?: string }>
 
 function privateKey(identity: HiveRuntimeCloudIdentity) {
   return createPrivateKey({
@@ -241,6 +241,11 @@ export function createRuntimeHeartbeatRequest(
   }>,
   context: ProofContext
 ) {
+  const hasCompleteWebEndpoint =
+    input.report.webHttpsOrigin !== undefined &&
+    input.report.webClientPath !== undefined &&
+    input.report.websocketPath !== undefined &&
+    input.report.webEndpointExpiresAt !== undefined
   const body = {
     runtimeInstanceId: identity.runtimeInstanceId,
     bootId: input.bootId,
@@ -257,13 +262,56 @@ export function createRuntimeHeartbeatRequest(
       readiness: input.report.readiness,
       readinessReasonCode: input.report.readinessReasonCode,
       startedAt: input.report.startedAt,
-      connectionCapabilities: [...input.report.connectionCapabilities]
+      connectionCapabilities: [...input.report.connectionCapabilities],
+      ...(hasCompleteWebEndpoint
+        ? {
+            webHttpsOrigin: input.report.webHttpsOrigin,
+            webClientPath: input.report.webClientPath,
+            websocketPath: input.report.websocketPath,
+            webEndpointExpiresAt: input.report.webEndpointExpiresAt
+          }
+        : {})
     },
     clientAuthMode: 'IDENTITY_PROOF'
   }
   const unsigned = baseProof(
     'hive-runtime-heartbeat/v1',
     '/hive/v1/runtime-heartbeats',
+    sha256(canonicalRuntimeHeartbeatBody(body)),
+    context
+  )
+  return attachSignature(body, unsigned, heartbeatSignatureInput(unsigned), identity)
+}
+
+export function createRuntimeConnectionTicketConsumeRequest(
+  identity: HiveRuntimeCloudIdentity,
+  input: Readonly<{
+    ticketId: string
+    launchSecret: string
+    authorityGeneration: number
+    runtimeRecordId: string
+    bootId: string
+    heartbeatLeaseId: string
+    leaseEpoch: number
+    fencingEpoch: number
+  }>,
+  context: ProofContext
+) {
+  const body = {
+    protocolVersion: 'web-launch-consume/v1',
+    ticketId: input.ticketId,
+    launchSecret: input.launchSecret,
+    authorityGeneration: input.authorityGeneration,
+    runtimeRecordId: input.runtimeRecordId,
+    runtimeInstanceId: identity.runtimeInstanceId,
+    bootId: input.bootId,
+    heartbeatLeaseId: input.heartbeatLeaseId,
+    leaseEpoch: input.leaseEpoch,
+    fencingEpoch: input.fencingEpoch
+  }
+  const unsigned = baseProof(
+    'hive-runtime-connection-ticket-consume/v1',
+    '/hive/v1/connection-tickets',
     sha256(canonicalRuntimeHeartbeatBody(body)),
     context
   )

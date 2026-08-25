@@ -134,6 +134,7 @@ import {
 import { parseWebPairingInput } from './web-pairing'
 import { copyClipboardTextViaExecCommand } from './web-clipboard-copy-fallback'
 import { WebRuntimeClient } from './web-runtime-client'
+import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'
 import { isWebRuntimeUnauthorizedError } from './web-runtime-client-error'
 import { RuntimeRpcCallQueuePool } from '../../../shared/runtime-rpc-call-queue'
 import {
@@ -191,6 +192,7 @@ export const CLIPBOARD_IMAGE_SINGLE_FRAME_FALLBACK_BASE64_CHARS = 256 * 1024
 const CLIPBOARD_IMAGE_SAVE_TIMEOUT_MS = 30_000
 
 let activeEnvironment: StoredWebRuntimeEnvironment | null = readStoredWebRuntimeEnvironment()
+let activeCloudBootstrap: CloudLaunchBootstrap | null = null
 let worktreeVisibilityDefaultsRuntimeEnvironmentId: string | null = null
 let worktreeVisibilityDefaultsRuntimeValue: WorktreeVisibilityDefaults | null = null
 let activeClient: WebRuntimeClient | null = null
@@ -520,8 +522,11 @@ export const GITLAB_WEB_RPC_METHODS = {
 const WEB_KEYBINDING_PLATFORMS: readonly KeybindingPlatform[] = ['darwin', 'linux', 'win32']
 const webKeybindingListeners = new Set<(snapshot: KeybindingFileSnapshot) => void>()
 
-export function installWebPreloadApi(): void {
-  activeEnvironment = readStoredWebRuntimeEnvironment()
+export function installWebPreloadApi(cloudBootstrap?: CloudLaunchBootstrap): void {
+  activeCloudBootstrap = cloudBootstrap ?? null
+  activeEnvironment = cloudBootstrap
+    ? createVolatileCloudEnvironment(cloudBootstrap)
+    : readStoredWebRuntimeEnvironment()
   const webWindow = window as unknown as { __ORCA_WEB_CLIENT__?: boolean }
   webWindow.__ORCA_WEB_CLIENT__ = true
   window.electron = createFallbackProxy(['electron']) as Window['electron']
@@ -1490,6 +1495,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
       }
       const previousEnvironment = activeEnvironment
       closeActiveRuntimeClients()
+      activeCloudBootstrap = null
       activeEnvironment = createStoredWebRuntimeEnvironment({ name, offer, previousEnvironment })
       manuallyDisconnectedEnvironmentIds.clear()
       saveStoredWebRuntimeEnvironment(activeEnvironment)
@@ -1591,6 +1597,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
       }
       manuallyDisconnectedEnvironmentIds.clear()
       closeActiveRuntimeClients()
+      activeCloudBootstrap = null
       activeEnvironment = nextEnvironment
       return {
         ok: true,
@@ -3758,7 +3765,11 @@ function getClientForEnvironment(environment: StoredWebRuntimeEnvironment): WebR
   }
   if (!activeClient || activeClientEnvironmentId !== environment.id) {
     activeClient?.close()
-    activeClient = new WebRuntimeClient(getPreferredWebPairingOffer(environment))
+    activeClient = new WebRuntimeClient(
+      activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)
+        ? activeCloudBootstrap
+        : getPreferredWebPairingOffer(environment)
+    )
     activeClientEnvironmentId = environment.id
   }
   return activeClient
@@ -3777,7 +3788,11 @@ function disconnectActiveRuntimeEnvironment(): void {
 
 function removeActiveRuntimeEnvironment(): void {
   disconnectActiveRuntimeEnvironment()
-  clearStoredWebRuntimeEnvironment()
+  if (activeCloudBootstrap) {
+    activeCloudBootstrap = null
+  } else {
+    clearStoredWebRuntimeEnvironment()
+  }
   activeEnvironment = null
 }
 
@@ -3845,7 +3860,46 @@ function updateEnvironmentFromResponse(
     typeof (response.result as { pairedDeviceId?: unknown }).pairedDeviceId === 'string'
       ? (response.result as { pairedDeviceId: string }).pairedDeviceId
       : undefined
+  if (activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)) {
+    activeEnvironment = {
+      ...environment,
+      runtimeId,
+      updatedAt: Date.now(),
+      lastUsedAt: Date.now()
+    }
+    return
+  }
   activeEnvironment = updateStoredEnvironmentRuntimeId(environment, runtimeId, pairedDeviceId)
+}
+
+function cloudEnvironmentId(bootstrap: CloudLaunchBootstrap): string {
+  return `cloud-${bootstrap.managedWebSessionId}`
+}
+
+function createVolatileCloudEnvironment(
+  bootstrap: CloudLaunchBootstrap
+): StoredWebRuntimeEnvironment {
+  const now = Date.now()
+  const id = cloudEnvironmentId(bootstrap)
+  return {
+    id,
+    name: 'Hive Runtime',
+    createdAt: now,
+    updatedAt: now,
+    lastUsedAt: null,
+    runtimeId: null,
+    preferredEndpointId: `wss-${id}`,
+    endpoints: [
+      {
+        id: `wss-${id}`,
+        kind: 'websocket',
+        label: 'Cloud WSS',
+        endpoint: bootstrap.websocketUrl,
+        deviceToken: '',
+        publicKeyB64: bootstrap.serverPublicKeyB64
+      }
+    ]
+  }
 }
 
 function getStoredSettings(): GlobalSettings {
