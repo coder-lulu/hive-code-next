@@ -14,6 +14,10 @@ import {
   type RuntimeRegistration,
   type RuntimeRegistrationLookup
 } from './hive-runtime-cloud-response'
+import {
+  normalizeWebSessionControlPull,
+  type RuntimeWebSessionControlPull
+} from './hive-runtime-cloud-web-session-control-response'
 
 export type {
   RuntimeClaim,
@@ -23,6 +27,7 @@ export type {
   RuntimeRegistration,
   RuntimeRegistrationLookup
 } from './hive-runtime-cloud-response'
+export type { RuntimeWebSessionControlPull } from './hive-runtime-cloud-web-session-control-response'
 
 const REQUEST_TIMEOUT_MS = 10_000
 const MAXIMUM_RESPONSE_BYTES = 65_536
@@ -122,6 +127,13 @@ export class HiveRuntimeCloudClient {
       } catch {
         throw new HiveRuntimeCloudTransportError()
       }
+      if (expectedStatus === 204 && response.status === expectedStatus) {
+        const contentLength = response.headers.get('content-length')
+        if (response.body !== null || (contentLength !== null && contentLength !== '0')) {
+          throw new Error('invalid_hive_runtime_cloud_response')
+        }
+        return undefined
+      }
       const value = await parseResponse(response)
       if (response.status !== expectedStatus) {
         throw new HiveRuntimeCloudRequestError(response.status, problemCategory(value))
@@ -200,5 +212,21 @@ export class HiveRuntimeCloudClient {
     return normalizeConnectionTicketConsume(
       await this.request('/hive/v1/connection-tickets', request, {}, 200, signal)
     )
+  }
+
+  async pullWebSessionControls(
+    request: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<RuntimeWebSessionControlPull> {
+    return normalizeWebSessionControlPull(
+      await this.request('/hive/v1/runtime-web-sessions/control-pull', request, {}, 200, signal)
+    )
+  }
+
+  async acknowledgeWebSessionRevocations(
+    request: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<void> {
+    await this.request('/hive/v1/runtime-web-sessions/revocation-acks', request, {}, 204, signal)
   }
 }

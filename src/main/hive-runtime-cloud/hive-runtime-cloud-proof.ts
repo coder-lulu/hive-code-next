@@ -53,7 +53,7 @@ export type HiveRuntimeCloudReport = Readonly<{
   webEndpointExpiresAt?: string
 }>
 
-type ProofContext = Readonly<{ authorityId: string; issuedAt?: string; nonce?: string }>
+export type ProofContext = Readonly<{ authorityId: string; issuedAt?: string; nonce?: string }>
 
 function privateKey(identity: HiveRuntimeCloudIdentity) {
   return createPrivateKey({
@@ -63,11 +63,11 @@ function privateKey(identity: HiveRuntimeCloudIdentity) {
   })
 }
 
-function sha256(value: string): string {
+export function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
-function baseProof(
+export function baseProof(
   protocolVersion: string,
   path: string,
   bodySha256: string,
@@ -128,7 +128,7 @@ export function canonicalRuntimeHeartbeatBody(value: Record<string, unknown>): s
   return JSON.stringify(canonicalValue(value))
 }
 
-function heartbeatSignatureInput(proof: Omit<HiveRuntimeCloudProof, 'signature'>): string {
+export function heartbeatSignatureInput(proof: Omit<HiveRuntimeCloudProof, 'signature'>): string {
   return JSON.stringify({
     authorityId: proof.authorityId,
     bodySha256: proof.bodySha256,
@@ -140,7 +140,7 @@ function heartbeatSignatureInput(proof: Omit<HiveRuntimeCloudProof, 'signature'>
   })
 }
 
-function attachSignature<T extends Record<string, unknown>>(
+export function attachSignature<T extends Record<string, unknown>>(
   body: T,
   unsigned: Omit<HiveRuntimeCloudProof, 'signature'>,
   signatureInput: string,

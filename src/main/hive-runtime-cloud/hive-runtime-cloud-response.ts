@@ -57,11 +57,11 @@ export type RuntimeConnectionTicketConsume = Readonly<{
   controlVersion: number
 }>
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function exactKeys(value: Record<string, unknown>, fields: readonly string[]): void {
+export function exactKeys(value: Record<string, unknown>, fields: readonly string[]): void {
   const keys = Object.keys(value).sort()
   const expected = [...fields].sort()
   if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
@@ -76,7 +76,7 @@ function text(value: unknown): string {
   return value
 }
 
-function uuid(value: unknown): string {
+export function uuid(value: unknown): string {
   const result = text(value)
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(result)) {
     throw new Error('invalid_hive_runtime_cloud_response')
@@ -84,7 +84,7 @@ function uuid(value: unknown): string {
   return result
 }
 
-function positiveInteger(value: unknown): number {
+export function positiveInteger(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
     throw new Error('invalid_hive_runtime_cloud_response')
   }

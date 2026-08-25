@@ -39,6 +39,7 @@ export type HiveRuntimeCloudManagedSessionRegistration = Readonly<{
   runtimeSessionId: string
   currentTuple: HiveRuntimeCloudCurrentTuple
   expiresAt: number
+  controlVersion: number
   sessionToken?: string
 }>
 
@@ -63,7 +64,10 @@ export type HiveRuntimeCloudManagedSessionIdentifiers = Readonly<{
 type RegistryEntry = Readonly<{
   principal: HiveRuntimeCloudManagedWebSessionPrincipal
   tokenDigest: Buffer
+  controlVersion: number
 }>
+
+export type HiveRuntimeCloudControlledRevocationResult = 'REVOKED' | 'ABSENT' | 'MISMATCH' | 'STALE'
 
 export type HiveRuntimeCloudManagedSessionRegistryOptions = Readonly<{
   onInvalidate?: (event: HiveRuntimeCloudManagedSessionInvalidation) => void
@@ -148,6 +152,7 @@ export class HiveRuntimeCloudManagedSessionRegistry {
     const runtimeSessionId = requireUuid(input.runtimeSessionId, 'runtime_session_id')
     const currentTuple = validatedTuple(input.currentTuple)
     const expiresAt = requirePositiveInteger(input.expiresAt, 'managed_session_expires_at')
+    const controlVersion = requirePositiveInteger(input.controlVersion, 'control_version')
     const sessionToken = requireSessionToken(
       input.sessionToken ?? randomBytes(32).toString('base64url')
     )
@@ -165,7 +170,8 @@ export class HiveRuntimeCloudManagedSessionRegistry {
     }
     this.entries.set(managedWebSessionId, {
       principal,
-      tokenDigest: tokenDigest(sessionToken)
+      tokenDigest: tokenDigest(sessionToken),
+      controlVersion
     })
     return { sessionToken, principal }
   }
@@ -220,6 +226,26 @@ export class HiveRuntimeCloudManagedSessionRegistry {
     return this.invalidateMatching(identifiers, 'REVOKED')
   }
 
+  revokeControlled(
+    input: HiveRuntimeCloudManagedSessionIdentifiers & Readonly<{ controlVersion: number }>
+  ): HiveRuntimeCloudControlledRevocationResult {
+    const managedWebSessionId = requireUuid(input.managedWebSessionId, 'managed_web_session_id')
+    const runtimeSessionId = requireUuid(input.runtimeSessionId, 'runtime_session_id')
+    const controlVersion = requirePositiveInteger(input.controlVersion, 'control_version')
+    const entry = this.entries.get(managedWebSessionId)
+    if (!entry) {
+      return 'ABSENT'
+    }
+    if (entry.principal.runtimeSessionId !== runtimeSessionId) {
+      return 'MISMATCH'
+    }
+    if (controlVersion <= entry.controlVersion) {
+      return 'STALE'
+    }
+    this.invalidate(entry, 'REVOKED')
+    return 'REVOKED'
+  }
+
   remove(identifiers: HiveRuntimeCloudManagedSessionIdentifiers): boolean {
     return this.invalidateMatching(identifiers, 'REMOVED')
   }
@@ -234,6 +260,15 @@ export class HiveRuntimeCloudManagedSessionRegistry {
     }
     this.notifyAll(stale, 'TUPLE_FENCED')
     return stale.length
+  }
+
+  pruneExpired(now: number): number {
+    const expired = [...this.entries.values()].filter((entry) => entry.principal.expiresAt <= now)
+    for (const entry of expired) {
+      this.entries.delete(entry.principal.managedWebSessionId)
+    }
+    this.notifyAll(expired, 'EXPIRED')
+    return expired.length
   }
 
   clear(): number {

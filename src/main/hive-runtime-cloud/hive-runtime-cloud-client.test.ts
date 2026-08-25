@@ -119,4 +119,42 @@ describe('Hive Runtime Cloud HTTP client', () => {
       })
     )
   })
+
+  it('pulls strict revocation commands and accepts only an empty 204 acknowledgement', async () => {
+    const command = {
+      managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
+      runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+      controlVersion: 2,
+      action: 'REVOKE'
+    }
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ commands: [command] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    const client = new HiveRuntimeCloudClient('https://api.hivekernel.com', fetchImpl)
+
+    await expect(client.pullWebSessionControls({ proof: 'pull' })).resolves.toEqual({
+      commands: [command]
+    })
+    await expect(client.acknowledgeWebSessionRevocations({ proof: 'ack' })).resolves.toBeUndefined()
+    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+      'https://api.hivekernel.com/hive/v1/runtime-web-sessions/control-pull',
+      'https://api.hivekernel.com/hive/v1/runtime-web-sessions/revocation-acks'
+    ])
+  })
+
+  it('rejects a 204 acknowledgement that declares a response body', async () => {
+    const response = new Response(null, {
+      status: 204,
+      headers: { 'content-length': '2' }
+    })
+    const client = new HiveRuntimeCloudClient(
+      'https://api.hivekernel.com',
+      vi.fn().mockResolvedValue(response)
+    )
+
+    await expect(client.acknowledgeWebSessionRevocations({})).rejects.toThrow(
+      'invalid_hive_runtime_cloud_response'
+    )
+  })
 })

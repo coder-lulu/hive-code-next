@@ -34,6 +34,7 @@ function register(
     runtimeSessionId: RUNTIME_SESSION_ID,
     currentTuple: currentTuple(),
     expiresAt: NOW + 60_000,
+    controlVersion: 1,
     sessionToken: SESSION_TOKEN,
     ...overrides
   })
@@ -46,7 +47,8 @@ describe('Hive Runtime Cloud managed session registry', () => {
       managedWebSessionId: MANAGED_SESSION_ID,
       runtimeSessionId: RUNTIME_SESSION_ID,
       currentTuple: currentTuple(),
-      expiresAt: NOW + 60_000
+      expiresAt: NOW + 60_000,
+      controlVersion: 1
     })
 
     expect(created.sessionToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
@@ -182,6 +184,55 @@ describe('Hive Runtime Cloud managed session registry', () => {
       })
     ).toBe(true)
     expect(onInvalidate).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'REMOVED' }))
+  })
+
+  it('accepts only a newer control version for the exact runtime session', () => {
+    const onInvalidate = vi.fn()
+    const registry = new HiveRuntimeCloudManagedSessionRegistry({ onInvalidate })
+    register(registry, { controlVersion: 1 })
+
+    expect(
+      registry.revokeControlled({
+        managedWebSessionId: MANAGED_SESSION_ID,
+        runtimeSessionId: '723e4567-e89b-42d3-a456-426614174000',
+        controlVersion: 2
+      })
+    ).toBe('MISMATCH')
+    expect(
+      registry.revokeControlled({
+        managedWebSessionId: MANAGED_SESSION_ID,
+        runtimeSessionId: RUNTIME_SESSION_ID,
+        controlVersion: 1
+      })
+    ).toBe('STALE')
+    expect(registry.size).toBe(1)
+    expect(onInvalidate).not.toHaveBeenCalled()
+
+    expect(
+      registry.revokeControlled({
+        managedWebSessionId: MANAGED_SESSION_ID,
+        runtimeSessionId: RUNTIME_SESSION_ID,
+        controlVersion: 2
+      })
+    ).toBe('REVOKED')
+    expect(
+      registry.revokeControlled({
+        managedWebSessionId: MANAGED_SESSION_ID,
+        runtimeSessionId: RUNTIME_SESSION_ID,
+        controlVersion: 2
+      })
+    ).toBe('ABSENT')
+    expect(onInvalidate).toHaveBeenCalledOnce()
+  })
+
+  it('prunes expired sessions without waiting for another authentication attempt', () => {
+    const onInvalidate = vi.fn()
+    const registry = new HiveRuntimeCloudManagedSessionRegistry({ onInvalidate })
+    register(registry, { expiresAt: NOW })
+
+    expect(registry.pruneExpired(NOW)).toBe(1)
+    expect(registry.size).toBe(0)
+    expect(onInvalidate).toHaveBeenCalledWith(expect.objectContaining({ reason: 'EXPIRED' }))
   })
 
   it('fences only sessions outside the current full tuple and can clear the remainder', () => {

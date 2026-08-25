@@ -6,6 +6,7 @@ import { HiveRuntimeCloudClient, HiveRuntimeCloudRequestError } from './hive-run
 import type { HiveRuntimeCloudWebLaunchConfig } from './hive-runtime-cloud-config'
 import {
   HiveRuntimeCloudManagedSessionRegistry,
+  type HiveRuntimeCloudControlledRevocationResult,
   type HiveRuntimeCloudManagedWebSessionPrincipal
 } from './hive-runtime-cloud-managed-session-registry'
 import type { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud-presence-service'
@@ -38,6 +39,7 @@ export class HiveRuntimeCloudWebLaunchService {
   private readonly getServerPublicKey: () => string | null
   private readonly client: TicketClient
   private readonly now: () => number
+  private readonly terminateSessionConnections: (managedWebSessionId: string) => void
   private readonly registry: HiveRuntimeCloudManagedSessionRegistry
   private readonly unsubscribePresence: () => void
 
@@ -47,9 +49,10 @@ export class HiveRuntimeCloudWebLaunchService {
     this.getServerPublicKey = options.getServerPublicKey
     this.client = options.client ?? new HiveRuntimeCloudClient(options.apiBaseUrl)
     this.now = options.now ?? Date.now
+    this.terminateSessionConnections = options.terminateSessionConnections
     this.registry = new HiveRuntimeCloudManagedSessionRegistry({
       onInvalidate: ({ principal }) => {
-        options.terminateSessionConnections(principal.managedWebSessionId)
+        this.terminateSessionConnections(principal.managedWebSessionId)
       }
     })
     this.unsubscribePresence = this.presence.subscribeLeaseContext((context) => {
@@ -114,7 +117,8 @@ export class HiveRuntimeCloudWebLaunchService {
         managedWebSessionId: consumed.managedWebSessionId,
         runtimeSessionId: consumed.runtimeSessionId,
         currentTuple: current.tuple,
-        expiresAt: consumed.expiresAt
+        expiresAt: consumed.expiresAt,
+        controlVersion: consumed.controlVersion
       })
       response.statusCode = 201
       response.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -162,6 +166,24 @@ export class HiveRuntimeCloudWebLaunchService {
   revalidateSession(principal: E2EEAuthenticatedCloudSession): boolean {
     const context = this.presence.getCurrentLeaseContext()
     return context ? this.registry.revalidate(principal, context.tuple, this.now()) : false
+  }
+
+  revokeManagedSession(
+    command: Readonly<{
+      managedWebSessionId: string
+      runtimeSessionId: string
+      controlVersion: number
+    }>
+  ): HiveRuntimeCloudControlledRevocationResult {
+    const result = this.registry.revokeControlled(command)
+    if (result === 'ABSENT') {
+      this.terminateSessionConnections(command.managedWebSessionId)
+    }
+    return result
+  }
+
+  expireManagedSessions(): number {
+    return this.registry.pruneExpired(this.now())
   }
 
   close(): void {

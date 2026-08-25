@@ -82,6 +82,7 @@ import { getHiveRuntimeCloudConfig } from './hive-runtime-cloud/hive-runtime-clo
 import { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud/hive-runtime-cloud-presence-service'
 import { createHiveRuntimeCloudReport } from './hive-runtime-cloud/hive-runtime-cloud-report'
 import { HiveRuntimeCloudWebLaunchService } from './hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
+import { HiveRuntimeCloudWebSessionControlService } from './hive-runtime-cloud/hive-runtime-cloud-web-session-control-service'
 import type { HiveAccountState } from '../shared/hive-account'
 import { ArtifactCloudService } from './artifacts/artifact-cloud-service'
 import { SkillCloudService } from './skills/skill-cloud-service'
@@ -396,6 +397,7 @@ let hiveAccountService: HiveAccountService | null = null
 let hiveAccountStartupState: Promise<HiveAccountState> | null = null
 let runtimeCloudPresence: HiveRuntimeCloudPresenceService | null = null
 let runtimeCloudWebLaunch: HiveRuntimeCloudWebLaunchService | null = null
+let runtimeCloudWebSessionControl: HiveRuntimeCloudWebSessionControlService | null = null
 let unsubscribeRuntimeCloudAuthorization: (() => void) | null = null
 const serveReadinessPublisher = new ServeReadinessPublisher()
 let desktopRelayService: DesktopRelayService | null = null
@@ -3298,6 +3300,13 @@ void app.whenReady().then(async () => {
     })
     runtimeCloudWebLaunch = processRuntimeCloudWebLaunch
     runtimeRpc.setCloudWebLaunchService(processRuntimeCloudWebLaunch)
+    const processRuntimeCloudWebSessionControl = new HiveRuntimeCloudWebSessionControlService({
+      apiBaseUrl: runtimeCloudConfig.apiBaseUrl,
+      presence: processRuntimeCloudPresence,
+      target: processRuntimeCloudWebLaunch
+    })
+    runtimeCloudWebSessionControl = processRuntimeCloudWebSessionControl
+    processRuntimeCloudWebSessionControl.start()
   }
   registerMobileHandlers(runtimeRpc, {
     getRelayStatus: () => desktopRelayStatus,
@@ -3571,6 +3580,9 @@ app.on('will-quit', (e) => {
   destroySystemTray()
   unsubscribeRuntimeCloudAuthorization?.()
   unsubscribeRuntimeCloudAuthorization = null
+  const runtimeCloudWebSessionControlShutdown =
+    runtimeCloudWebSessionControl?.stop() ?? Promise.resolve()
+  runtimeCloudWebSessionControl = null
   runtimeCloudWebLaunch?.close()
   runtimeCloudWebLaunch = null
   const runtimeCloudPresenceShutdown = runtimeCloudPresence?.stop() ?? Promise.resolve()
@@ -3647,6 +3659,7 @@ app.on('will-quit', (e) => {
     { name: 'daemon', promise: daemonTeardown },
     { name: 'runtime-rpc', promise: rpcStopAndClear },
     { name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown },
+    { name: 'runtime-cloud-web-session-control', promise: runtimeCloudWebSessionControlShutdown },
     { name: 'watchers', promise: watcherShutdown },
     { name: 'emulator', promise: emulatorShutdown },
     { name: 'ssh', promise: sshShutdown },

@@ -6,6 +6,7 @@ import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import type { CurrentHiveRuntimeCloudLeaseContext } from './hive-runtime-cloud-lease-context'
 import { HiveRuntimeCloudWebLaunchService } from './hive-runtime-cloud-web-launch-service'
+import { HiveRuntimeCloudWebSessionControlService } from './hive-runtime-cloud-web-session-control-service'
 
 vi.mock('electron', () => ({ net: { fetch: vi.fn() } }))
 
@@ -242,6 +243,54 @@ describe('Hive Runtime Cloud Web Launch service', () => {
     presence.set(null)
 
     expect(terminateSessionConnections).toHaveBeenCalledWith(MANAGED_SESSION_ID)
+  })
+
+  it('removes the registry entry and terminates its socket before a revocation ack', async () => {
+    const bootstrap = (await (await exchange()).json()) as { sessionToken: string }
+    const events: string[] = []
+    terminateSessionConnections.mockImplementation(() => events.push('terminate'))
+    const acknowledgeWebSessionRevocations = vi.fn().mockImplementation(async () => {
+      events.push('ack')
+    })
+    const controls = new HiveRuntimeCloudWebSessionControlService({
+      apiBaseUrl: 'https://api.hivekernel.com',
+      presence,
+      target: service,
+      client: {
+        pullWebSessionControls: vi.fn().mockResolvedValue({
+          commands: [
+            {
+              managedWebSessionId: MANAGED_SESSION_ID,
+              runtimeSessionId: RUNTIME_SESSION_ID,
+              controlVersion: 2,
+              action: 'REVOKE'
+            }
+          ]
+        }),
+        acknowledgeWebSessionRevocations
+      }
+    })
+
+    await controls.pollNow()
+    await controls.pollNow()
+
+    expect(events).toEqual(['terminate', 'ack', 'terminate', 'ack'])
+    expect(
+      service.resolveSession(
+        {
+          type: 'e2ee_auth',
+          principalKind: 'cloud_managed_web_session',
+          managedWebSessionId: MANAGED_SESSION_ID,
+          runtimeSessionId: RUNTIME_SESSION_ID,
+          sessionToken: bootstrap.sessionToken
+        },
+        {
+          pathname: '/_hive/runtime-rpc',
+          origin: 'https://code.hivekernel.com'
+        }
+      )
+    ).toBeNull()
+    await controls.stop()
   })
 
   it.each([

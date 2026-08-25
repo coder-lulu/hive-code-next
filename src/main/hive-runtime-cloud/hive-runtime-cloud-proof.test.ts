@@ -8,6 +8,10 @@ import {
   createRuntimeLeaseAcquireRequest,
   createRuntimeRegistrationRequest
 } from './hive-runtime-cloud-proof'
+import {
+  createRuntimeWebSessionControlPullRequest,
+  createRuntimeWebSessionRevocationAckRequest
+} from './hive-runtime-cloud-web-session-control-proof'
 
 const { privateKey, publicKey } = generateKeyPairSync('ed25519')
 const publicJwk = publicKey.export({ format: 'jwk' }) as { x: string }
@@ -216,5 +220,70 @@ describe('Hive Runtime Cloud proofs', () => {
       webEndpointExpiresAt: '2026-08-25T08:01:15.000Z'
     })
     expect(partial.report).not.toHaveProperty('webHttpsOrigin')
+  })
+
+  it('binds control pull and revocation ack proofs to the current full tuple', () => {
+    const tuple = {
+      authorityGeneration: 2,
+      runtimeRecordId: '623e4567-e89b-42d3-a456-426614174000',
+      bootId: '323e4567-e89b-42d3-a456-426614174000',
+      heartbeatLeaseId: '423e4567-e89b-42d3-a456-426614174000',
+      leaseEpoch: 3,
+      fencingEpoch: 4
+    }
+    const pull = createRuntimeWebSessionControlPullRequest(
+      identity,
+      { ...tuple, limit: 50 },
+      context
+    )
+    const acknowledgement = {
+      managedWebSessionId: '523e4567-e89b-42d3-a456-426614174000',
+      controlVersion: 2,
+      action: 'REVOKE' as const
+    }
+    const ack = createRuntimeWebSessionRevocationAckRequest(
+      identity,
+      { ...tuple, acknowledgements: [acknowledgement] },
+      context
+    )
+
+    expect(pull).toMatchObject({
+      protocolVersion: 'web-session-control-pull/v1',
+      ...tuple,
+      runtimeInstanceId: identity.runtimeInstanceId,
+      limit: 50,
+      proof: {
+        protocolVersion: 'hive-runtime-web-session-control-pull/v1',
+        path: '/hive/v1/runtime-web-sessions/control-pull'
+      }
+    })
+    expect(ack).toMatchObject({
+      protocolVersion: 'web-session-revocation-ack/v1',
+      ...tuple,
+      runtimeInstanceId: identity.runtimeInstanceId,
+      acknowledgements: [acknowledgement],
+      proof: {
+        protocolVersion: 'hive-runtime-web-session-revocation-ack/v1',
+        path: '/hive/v1/runtime-web-sessions/revocation-acks'
+      }
+    })
+    for (const request of [pull, ack]) {
+      const { proof, ...protectedBody } = request
+      const input = JSON.stringify({
+        authorityId: proof.authorityId,
+        bodySha256: proof.bodySha256,
+        issuedAt: proof.issuedAt,
+        method: proof.method,
+        nonce: proof.nonce,
+        path: proof.path,
+        protocolVersion: proof.protocolVersion
+      })
+      expect(proof.bodySha256).toBe(
+        createHash('sha256')
+          .update(canonicalRuntimeHeartbeatBody(protectedBody), 'utf8')
+          .digest('hex')
+      )
+      expect(verifies(input, proof.signature)).toBe(true)
+    }
   })
 })
