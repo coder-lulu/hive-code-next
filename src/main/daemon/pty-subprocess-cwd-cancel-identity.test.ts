@@ -67,15 +67,23 @@ describe('createPtySubprocess cwd cancellation identity', () => {
     const abort = new AbortController()
     abort.abort()
 
-    await expect(
-      createPtySubprocess({
-        sessionId: 'canceled-cwd-session',
-        cols: 80,
-        rows: 24,
-        cwd: '/Volumes/dead/repo',
-        cancelSignal: abort.signal
-      })
-    ).rejects.toThrow(TerminalAttachCanceledError)
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
+    try {
+      await expect(
+        createPtySubprocess({
+          sessionId: 'canceled-cwd-session',
+          cols: 80,
+          rows: 24,
+          cwd: '/Volumes/dead/repo',
+          cancelSignal: abort.signal
+        })
+      ).rejects.toThrow(TerminalAttachCanceledError)
+    } finally {
+      if (platform) {
+        Object.defineProperty(process, 'platform', platform)
+      }
+    }
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
@@ -84,13 +92,21 @@ describe('createPtySubprocess cwd cancellation identity', () => {
       new Error('Working directory "/gone" does not exist. It may have been deleted.')
     )
 
-    await expect(
-      createPtySubprocess({
-        sessionId: 'missing-cwd-session',
-        cols: 80,
-        rows: 24,
-        cwd: '/gone'
-      })
-    ).rejects.toThrow(/does not exist/)
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
+    try {
+      await expect(
+        createPtySubprocess({
+          sessionId: 'missing-cwd-session',
+          cols: 80,
+          rows: 24,
+          cwd: '/gone'
+        })
+      ).rejects.toThrow(/does not exist/)
+    } finally {
+      if (platform) {
+        Object.defineProperty(process, 'platform', platform)
+      }
+    }
   })
 })

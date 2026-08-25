@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type * as LocalPtyUtils from '../providers/local-pty-utils'
+import type * as Wsl from '../wsl'
 
 const {
   spawnMock,
@@ -58,6 +59,12 @@ vi.mock('../providers/local-pty-utils', async (importOriginal) => {
     validateWorkingDirectoryAsync: validateWorkingDirectoryMock
   }
 })
+
+vi.mock('../wsl', async (importOriginal) => ({
+  ...(await importOriginal<typeof Wsl>()),
+  // Keep default-distro assertions independent of the host's WSL installation.
+  getDefaultWslDistro: () => 'Ubuntu'
+}))
 
 vi.mock('../providers/agent-foreground-process', () => ({
   resolveAgentForegroundProcessWithAvailability: async (...args: unknown[]) => {
@@ -146,7 +153,7 @@ describe('createPtySubprocess', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'wsl.exe',
-      ['--exec', 'sh', '-c', expect.stringContaining(`cd '${expectedLinuxCwd}'`)],
+      ['-d', 'Ubuntu', '--exec', 'sh', '-c', expect.stringContaining(`cd '${expectedLinuxCwd}'`)],
       expect.objectContaining({ cwd: expect.any(String) })
     )
   })

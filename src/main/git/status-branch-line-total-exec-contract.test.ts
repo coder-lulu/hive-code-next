@@ -100,6 +100,21 @@ async function write(repo: string, relativePath: string, contents: string): Prom
   await writeFile(target, contents)
 }
 
+async function removeTempRootWithWindowsRetry(root: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      await rm(root, { recursive: true, force: true })
+      return
+    } catch (error) {
+      if (process.platform !== 'win32' || (error as NodeJS.ErrnoException).code !== 'EBUSY') {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+  }
+  await rm(root, { recursive: true, force: true })
+}
+
 /** The `mergeBase → worktree` diff, distinguished from the per-area numstats by its rev + `--`. */
 function rangedDiffCalls(): string[][] {
   return gitExecCalls.filter((args) => args.includes('--numstat') && args.at(-1) === '--')
@@ -143,7 +158,7 @@ afterEach(async () => {
   execHooks.beforeExec = undefined
   coalescerJoins.onJoin = undefined
   resetGitReadCaches()
-  await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(tempRoots.splice(0).map((root) => removeTempRootWithWindowsRetry(root)))
 })
 
 describe('branch line total completeness', () => {

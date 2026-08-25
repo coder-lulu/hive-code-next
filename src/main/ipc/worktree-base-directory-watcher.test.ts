@@ -55,7 +55,8 @@ type PollerCallback = (events: WorktreeBasePollEvent[]) => void
 const watcherCallbacks = new Map<string, PollerCallback>()
 const unsubscribeMocks = new Map<string, ReturnType<typeof vi.fn>>()
 const pollerOptions = new Map<string, WorktreeBasePollerOptions>()
-const absolutePath = (...parts: string[]): string => join(sep, ...parts)
+const absolutePath = (...parts: string[]): string =>
+  process.platform === 'win32' ? join('C:\\', ...parts) : join(sep, ...parts)
 const WORKTREE_ROOT = absolutePath('workspace', 'worktrees')
 const PROJECT_ROOT = absolutePath('workspace', 'projects', 'project')
 const PROJECT_GIT_COMMON_DIR = join(PROJECT_ROOT, '.git')
@@ -91,7 +92,7 @@ function makeWindow(options: { destroyed?: () => boolean } = {}) {
 }
 
 function emit(root: string, events: WorktreeBasePollEvent[]): void {
-  const callback = watcherCallbacks.get(root)
+  const callback = watcherCallbacks.get(root) ?? watcherCallbacks.get(root.replace(/\\/g, '/'))
   if (!callback) {
     throw new Error(`No poller callback for ${root}`)
   }
@@ -109,9 +110,16 @@ describe('worktree base directory watcher', () => {
     vi.mocked(startWorktreeBaseDirectoryPoller).mockImplementation(
       async (target, _getRepos, onEvents, options) => {
         const unsubscribe = vi.fn(async () => {})
-        watcherCallbacks.set(target.path, onEvents)
-        unsubscribeMocks.set(target.path, unsubscribe)
-        pollerOptions.set(target.path, options ?? {})
+        const aliases = new Set([
+          target.path,
+          target.path.replace(/\\/g, '/'),
+          target.path.split('/').join(String.fromCharCode(92))
+        ])
+        for (const alias of aliases) {
+          watcherCallbacks.set(alias, onEvents)
+          unsubscribeMocks.set(alias, unsubscribe)
+          pollerOptions.set(alias, options ?? {})
+        }
         return { unsubscribe }
       }
     )
@@ -226,7 +234,9 @@ describe('worktree base directory watcher', () => {
     )
     await syncWorktreeBaseDirectoryWatchers(makeStore([makeRepo()]) as never, makeWindow() as never)
     const getPaths = pollerOptions.get(PROJECT_GIT_COMMON_DIR)?.getGitStatusRefPaths
-    expect(getPaths?.()).toEqual([join(PROJECT_GIT_COMMON_DIR, 'refs/remotes/origin/first')])
+    expect(getPaths?.()?.map((path) => path.replace(/\\/g, '/'))).toEqual([
+      join(PROJECT_GIT_COMMON_DIR, 'refs/remotes/origin/first').replace(/\\/g, '/')
+    ])
 
     await setWorktreeGitStatusRefWatch(
       {
@@ -246,7 +256,9 @@ describe('worktree base directory watcher', () => {
       },
       async () => undefined
     )
-    expect(getPaths?.()).toEqual([join(PROJECT_GIT_COMMON_DIR, 'refs/remotes/origin/next')])
+    expect(getPaths?.()?.map((path) => path.replace(/\\/g, '/'))).toEqual([
+      join(PROJECT_GIT_COMMON_DIR, 'refs/remotes/origin/next').replace(/\\/g, '/')
+    ])
 
     await setWorktreeGitStatusRefWatch(
       {

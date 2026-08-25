@@ -602,6 +602,19 @@ function killSpawnedCommandTree(child: ChildProcess): Promise<void> {
   })
 }
 
+function waitForChildClose(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, WINDOWS_TREE_KILL_WAIT_MS)
+    child.once('close', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
+}
+
 type ExecFileCaptureOptions = Omit<ExecFileOptions, 'timeout'> & {
   timeout?: number
   stdin?: string
@@ -675,10 +688,13 @@ function execFileCapture(
         finish(abortError)
         return
       }
-      void killSpawnedCommandTree(child).then(() => {
-        terminating = false
-        finish(abortError)
-      })
+      const childClose = waitForChildClose(child)
+      void killSpawnedCommandTree(child)
+        .then(() => childClose)
+        .then(() => {
+          terminating = false
+          finish(abortError)
+        })
     }
 
     try {
@@ -737,10 +753,13 @@ function execFileCapture(
           finish(timeoutError)
           return
         }
-        void killSpawnedCommandTree(child).then(() => {
-          terminating = false
-          finish(timeoutError)
-        })
+        const childClose = waitForChildClose(child)
+        void killSpawnedCommandTree(child)
+          .then(() => childClose)
+          .then(() => {
+            terminating = false
+            finish(timeoutError)
+          })
       }, options.timeout)
     }
     options.signal?.addEventListener('abort', onAbort, { once: true })

@@ -76,7 +76,13 @@ describe('CodexRuntimeHomeService.getMirroredHostHomePathForStatus', () => {
     const { CodexRuntimeHomeService } = await import('./runtime-home-service')
     const service = new CodexRuntimeHomeService(createStore([], null) as never)
 
-    expect(service.getMirroredHostHomePathForStatus()).toEqual({ kind: 'ready', homePath: null })
+    expect(service.getMirroredHostHomePathForStatus()).toEqual({
+      kind: 'ready',
+      // Windows cannot probe shell startup files, so the system-default lane
+      // intentionally remains on the shared managed home there.
+      homePath:
+        process.platform === 'win32' ? join(testState.userData, 'codex-runtime-home', 'home') : null
+    })
   })
 
   it('returns the selected account own home, which is what its mirror targets', async () => {

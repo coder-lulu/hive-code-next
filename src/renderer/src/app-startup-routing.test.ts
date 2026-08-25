@@ -510,8 +510,8 @@ describe('renderer startup runtime routing', () => {
     expect(checkpointBlock).toContain('!isIntentionalAppRestartInProgress()')
     expect(checkpointBlock).toContain('freshState.openFiles.some((file) => file.isDirty)')
     expect(checkpointBlock).toContain('sessions: []')
-    expect(checkpointBlock).toContain(
-      'return\n      }\n      window.api.app.stageBeforeUnloadSync({\n        sessions: sessionSnapshots'
+    expect(checkpointBlock).toMatch(
+      /return\s*\}\s*window\.api\.app\.stageBeforeUnloadSync\(\{\s*sessions: sessionSnapshots/su
     )
     expect(source).toContain(
       'window.addEventListener(ORCA_APP_RESTART_ABORTED_EVENT, shutdownCheckpoint.reset)'
