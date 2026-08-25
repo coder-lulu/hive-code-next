@@ -11,6 +11,8 @@ import { getOrCreateHiveDeviceIdentity, signHiveDeviceAuthorization } from './hi
 import { migrateLegacyOrcaCloudIdentity } from './hive-account-legacy-migration'
 import { beginHiveAccountPkceFlow } from './hive-account-pkce'
 import { isHiveAccountEncryptionAvailable } from './hive-account-secure-store'
+import { publishHiveAccountResult } from './hive-account-state-publication'
+import { completeHiveAccountSignOut } from './hive-account-sign-out'
 import {
   classifyHiveAccountError,
   errorState,
@@ -45,7 +47,8 @@ export class HiveAccountService {
 
   constructor(
     private readonly userDataPath: string,
-    private readonly dependencies: ServiceDependencies = defaultDependencies
+    private readonly dependencies: ServiceDependencies = defaultDependencies,
+    private readonly onStateChanged: (state: HiveAccountState) => void = () => undefined
   ) {
     migrateLegacyOrcaCloudIdentity(userDataPath)
   }
@@ -81,9 +84,11 @@ export class HiveAccountService {
     if (this.signInFlight) {
       return this.signInFlight
     }
-    this.signInFlight = this.runSignIn(options).finally(() => {
-      this.signInFlight = null
-    })
+    this.signInFlight = this.runSignIn(options)
+      .then((result) => publishHiveAccountResult(this.onStateChanged, result))
+      .finally(() => {
+        this.signInFlight = null
+      })
     return this.signInFlight
   }
 
@@ -160,9 +165,11 @@ export class HiveAccountService {
     if (this.refreshFlight) {
       return this.refreshFlight
     }
-    this.refreshFlight = this.runRefresh().finally(() => {
-      this.refreshFlight = null
-    })
+    this.refreshFlight = this.runRefresh()
+      .then((result) => publishHiveAccountResult(this.onStateChanged, result))
+      .finally(() => {
+        this.refreshFlight = null
+      })
     return this.refreshFlight
   }
 
@@ -228,25 +235,19 @@ export class HiveAccountService {
     this.mutationEpoch += 1
     const configured = this.dependencies.getConfig()
     const stored = this.readCurrentSession()
-    if (stored.status === 'missing') {
-      return { status: 'already-signed-out', state: signedOutState() }
-    }
-    let remoteRevoked = false
-    try {
-      if (configured.configured && stored.status === 'ok') {
-        const client = this.dependencies.createClient(configured.config)
-        await this.revokeCurrent(client, stored.value.accessToken)
-        remoteRevoked = true
-      }
-    } catch {
-      remoteRevoked = false
-    } finally {
-      this.clearCurrentSession()
-    }
-    return {
-      status: remoteRevoked ? 'remote-and-local' : 'local-only',
-      state: signedOutState()
-    }
+    const revokeRemote =
+      configured.configured && stored.status === 'ok'
+        ? async (): Promise<void> => {
+            const client = this.dependencies.createClient(configured.config)
+            await this.revokeCurrent(client, stored.value.accessToken)
+          }
+        : null
+    const result = await completeHiveAccountSignOut({
+      hasStoredSession: stored.status !== 'missing',
+      revokeRemote,
+      clearLocal: () => this.clearCurrentSession()
+    })
+    return publishHiveAccountResult(this.onStateChanged, result)
   }
 
   private async revokeCurrent(client: HiveAccountClient, accessToken: string): Promise<void> {

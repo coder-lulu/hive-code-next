@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HiveAccountState } from '../../shared/hive-account'
 
 const safeStorageMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
@@ -16,6 +17,7 @@ vi.mock('electron', () => ({
 }))
 
 import { HiveAccountService } from './hive-account-service'
+import { HiveAccountRequestError } from './hive-account-client'
 
 const config = {
   apiBaseUrl: 'https://api.hivekernel.com',
@@ -73,22 +75,28 @@ beforeEach(() => {
 
 afterEach(() => rmSync(userDataPath, { recursive: true, force: true }))
 
-function createService(): HiveAccountService {
-  return new HiveAccountService(userDataPath, {
-    getConfig: () => ({ configured: true, config }),
-    createClient: () => client,
-    beginAuthorization: async (options: {
-      prepareDeviceAuthorization: (nonce: string) => Promise<void>
-    }) => {
-      await options.prepareDeviceAuthorization('nonce')
-      return {
-        authorizationCode: 'code',
-        codeVerifier: 'verifier',
-        nonce: 'nonce',
-        redirectUri: 'http://127.0.0.1:32123'
+function createService(
+  onStateChanged: (state: HiveAccountState) => void = () => undefined
+): HiveAccountService {
+  return new HiveAccountService(
+    userDataPath,
+    {
+      getConfig: () => ({ configured: true, config }),
+      createClient: () => client,
+      beginAuthorization: async (options: {
+        prepareDeviceAuthorization: (nonce: string) => Promise<void>
+      }) => {
+        await options.prepareDeviceAuthorization('nonce')
+        return {
+          authorizationCode: 'code',
+          codeVerifier: 'verifier',
+          nonce: 'nonce',
+          redirectUri: 'http://127.0.0.1:32123'
+        }
       }
-    }
-  } as never)
+    } as never,
+    onStateChanged
+  )
 }
 
 describe('Hive account application service', () => {
@@ -181,5 +189,44 @@ describe('Hive account application service', () => {
 
     await expect(refresh).resolves.toMatchObject({ status: 'signed-out' })
     expect(client.revokeSession).toHaveBeenCalledTimes(2)
+  })
+
+  it('publishes every completed account mutation to renderer subscribers', async () => {
+    const onStateChanged = vi.fn()
+    const service = createService(onStateChanged)
+
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    await service.refresh()
+    await service.signOut()
+
+    expect(onStateChanged.mock.calls.map(([state]) => state.status)).toEqual([
+      'signed-in',
+      'signed-in',
+      'signed-out'
+    ])
+  })
+
+  it('does not fail an account mutation when a renderer state listener throws', async () => {
+    const service = createService(() => {
+      throw new Error('renderer disappeared')
+    })
+
+    await expect(service.signIn({ sessionProfile: 'TRUSTED' })).resolves.toMatchObject({
+      status: 'signed-in'
+    })
+  })
+
+  it('publishes a signed-out state when refresh rejects the stored session', async () => {
+    const onStateChanged = vi.fn()
+    const service = createService(onStateChanged)
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    onStateChanged.mockClear()
+    client.refreshSession.mockRejectedValue(new HiveAccountRequestError(401, null))
+
+    await expect(service.refresh()).resolves.toMatchObject({ status: 'signed-out' })
+
+    expect(onStateChanged).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ status: 'signed-out' })
+    )
   })
 })

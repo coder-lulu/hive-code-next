@@ -175,7 +175,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
 
   return (
     <>
-      <div className="flex items-center gap-1">
+      <div className="right-sidebar-header-no-drag mr-1 flex items-center gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -192,7 +192,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               <Settings className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4} className="flex items-center gap-1.5">
+          <TooltipContent side="bottom" sideOffset={6} className="flex items-center gap-1.5">
             {translate('auto.components.sidebar.SidebarSettingsHelpMenu.a428c25998', 'Settings')}
             {settingsShortcut.keys.length > 0 ? (
               <ShortcutKeyCombo
@@ -223,11 +223,11 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={4}>
+            <TooltipContent side="bottom" sideOffset={6}>
               {translate('auto.components.sidebar.SidebarSettingsHelpMenu.2991a0106c', 'Help')}
             </TooltipContent>
           </Tooltip>
-          <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-52">
+          <DropdownMenuContent side="bottom" align="end" sideOffset={8} className="w-52">
             <DropdownMenuItem onSelect={openShortcutsSettings}>
               <Keyboard className="size-3.5" />
               {translate(

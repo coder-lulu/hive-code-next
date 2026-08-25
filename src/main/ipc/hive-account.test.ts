@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const electronMocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   getPath: vi.fn(() => 'C:\\app-data'),
+  getAllWindows: vi.fn(() => []),
   handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
     electronMocks.handlers.set(channel, handler)
   })
@@ -10,14 +11,21 @@ const electronMocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   app: { getPath: electronMocks.getPath },
+  BrowserWindow: { getAllWindows: electronMocks.getAllWindows },
   ipcMain: { handle: electronMocks.handle }
 }))
 
+import {
+  HIVE_ACCOUNT_STATE_CHANGED_CHANNEL,
+  type HiveAccountState
+} from '../../shared/hive-account'
 import { registerHiveAccountHandlers, requireHiveAccountSignInOptions } from './hive-account'
 
 beforeEach(() => {
   electronMocks.handlers.clear()
   electronMocks.getPath.mockClear()
+  electronMocks.getAllWindows.mockReset()
+  electronMocks.getAllWindows.mockReturnValue([])
   electronMocks.handle.mockClear()
 })
 
@@ -68,6 +76,44 @@ describe('registerHiveAccountHandlers', () => {
     await signInHandler?.(undefined, { sessionProfile: 'TRUSTED' })
 
     expect(service.signIn).toHaveBeenCalledWith({ sessionProfile: 'TRUSTED' })
+  })
+
+  it('broadcasts service-owned account changes to every live renderer window', () => {
+    let publishState: ((state: HiveAccountState) => void) | undefined
+    const liveSend = vi.fn()
+    const destroyedWindowSend = vi.fn()
+    electronMocks.getAllWindows.mockReturnValue([
+      {
+        isDestroyed: () => false,
+        webContents: { isDestroyed: () => false, send: liveSend }
+      },
+      {
+        isDestroyed: () => true,
+        webContents: { isDestroyed: () => false, send: destroyedWindowSend }
+      }
+    ] as never)
+    const service = {
+      getState: vi.fn(),
+      refresh: vi.fn().mockResolvedValue({ state: { status: 'signed-out' } }),
+      signIn: vi.fn(),
+      signOut: vi.fn()
+    }
+
+    registerHiveAccountHandlers({
+      createService: (_userDataPath, onStateChanged) => {
+        publishState = onStateChanged
+        return service as never
+      }
+    })
+    const state: HiveAccountState = {
+      configured: true,
+      status: 'signed-out',
+      persistence: 'encrypted'
+    }
+    publishState?.(state)
+
+    expect(liveSend).toHaveBeenCalledExactlyOnceWith(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, state)
+    expect(destroyedWindowSend).not.toHaveBeenCalled()
   })
 })
 

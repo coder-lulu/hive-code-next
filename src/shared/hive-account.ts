@@ -1,4 +1,5 @@
 export type HiveAccountPersistence = 'none' | 'encrypted'
+export const HIVE_ACCOUNT_STATE_CHANGED_CHANNEL = 'hiveAccount:stateChanged'
 export type HiveAccountSessionProfile = 'TEMPORARY' | 'TRUSTED' | 'LEGACY'
 export type HiveAccountSignInOptions = {
   sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>

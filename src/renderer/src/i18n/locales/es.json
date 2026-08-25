@@ -4286,6 +4286,24 @@
           "keepDefaultBranch": "Excepto la rama predeterminada",
           "keepDefaultBranchAria": "Mantener visible la rama predeterminada al ocultar los espacios de trabajo en reposo"
         },
+        "SidebarFooter": {
+          "accountMenu": "Menú de cuenta de {{value0}}",
+          "account": "Cuenta",
+          "appearance": "Apariencia",
+          "activity": "Actividad",
+          "notifications": "Notificaciones",
+          "checkingAccount": "Comprobando cuenta…",
+          "signIn": "Iniciar sesión",
+          "signInAgain": "Volver a iniciar sesión",
+          "accountUnavailable": "Cuenta no disponible",
+          "connected": "Sesión iniciada",
+          "signInSuccess": "Sesión iniciada en HiveCloud",
+          "signInFailed": "No se pudo iniciar sesión en HiveCloud. Inténtalo de nuevo o comprueba el estado del servicio.",
+          "signOut": "Cerrar sesión",
+          "localSignOut": "La sesión se cerró localmente. Revoca la sesión remota en la configuración de seguridad de HiveCloud cuando estés en línea.",
+          "signOutSuccess": "Sesión cerrada en HiveCloud",
+          "signOutFailed": "No se pudo cerrar la sesión de HiveCloud. Comprueba los permisos de los archivos e inténtalo de nuevo."
+        },
         "SidebarHeader": {
           "92154beb7e": "Nuevo espacio de trabajo",
           "49f62c5665": "Tablero de espacios de trabajo",
@@ -4341,7 +4359,7 @@
         "SidebarToolbar": {
           "19e32d0e5f": "Abrir el selector de carpetas para agregar un proyecto",
           "abc62b6328": "Agregar proyecto",
-          "87d0064026": "El tablero de espacios de trabajo se movió a la barra inferior",
+          "87d0064026": "El tablero de espacios de trabajo se movió a la barra superior",
           "a30e34eb5c": "Cerrar tablero de espacios de trabajo",
           "49f62c5665": "Tablero de espacios de trabajo"
         },

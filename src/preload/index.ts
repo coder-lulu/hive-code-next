@@ -4,6 +4,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
+import { HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, type HiveAccountState } from '../shared/hive-account'
 import type { MacCapturedDigitRowChord } from '../shared/macos-symbolic-hotkeys'
 import type { ComputerAwakeStatus } from '../shared/computer-awake-mode'
 import type {
@@ -622,7 +623,14 @@ const api = {
     getState: () => ipcRenderer.invoke('hiveAccount:getState'),
     signIn: (options) => ipcRenderer.invoke('hiveAccount:signIn', options),
     refresh: () => ipcRenderer.invoke('hiveAccount:refresh'),
-    signOut: () => ipcRenderer.invoke('hiveAccount:signOut')
+    signOut: () => ipcRenderer.invoke('hiveAccount:signOut'),
+    onStateChanged: (callback: (state: HiveAccountState) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: HiveAccountState): void => {
+        callback(state)
+      }
+      ipcRenderer.on(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, listener)
+      return () => ipcRenderer.removeListener(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, listener)
+    }
   } satisfies PreloadApi['hiveAccount'],
 
   platform: {

@@ -4267,6 +4267,24 @@
           "keepDefaultBranch": "デフォルトのブランチを除く",
           "keepDefaultBranchAria": "スリープ中のワークスペースを非表示にしてもデフォルトのブランチは表示したままにする"
         },
+        "SidebarFooter": {
+          "accountMenu": "{{value0}}アカウントメニュー",
+          "account": "アカウント",
+          "appearance": "外観",
+          "activity": "アクティビティ",
+          "notifications": "通知",
+          "checkingAccount": "アカウントを確認中…",
+          "signIn": "ログイン",
+          "signInAgain": "再ログイン",
+          "accountUnavailable": "アカウントを利用できません",
+          "connected": "ログイン済み",
+          "signInSuccess": "HiveCloud にログインしました",
+          "signInFailed": "HiveCloud へのログインに失敗しました。再試行するか、サービスの状態を確認してください。",
+          "signOut": "ログアウト",
+          "localSignOut": "この端末からログアウトしました。オンライン時に HiveCloud のセキュリティ設定からリモートセッションを無効にしてください。",
+          "signOutSuccess": "HiveCloud からログアウトしました",
+          "signOutFailed": "HiveCloud からログアウトできませんでした。ファイルの権限を確認して、もう一度お試しください。"
+        },
         "SidebarHeader": {
           "92154beb7e": "新規ワークスペース",
           "49f62c5665": "ワークスペースボード",
@@ -4322,7 +4340,7 @@
         "SidebarToolbar": {
           "19e32d0e5f": "フォルダーピッカーを開いてプロジェクトを追加します",
           "abc62b6328": "プロジェクトを追加",
-          "87d0064026": "ワークスペースボードは下部バーに移動しました",
+          "87d0064026": "ワークスペースボードはトップバーに移動しました",
           "a30e34eb5c": "ワークスペースボードを閉じる",
           "49f62c5665": "ワークスペースボード"
         },

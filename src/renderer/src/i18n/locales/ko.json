@@ -4269,6 +4269,24 @@
           "keepDefaultBranch": "기본 브랜치는 제외",
           "keepDefaultBranchAria": "슬립 중인 워크스페이스를 숨겨도 기본 브랜치는 계속 표시"
         },
+        "SidebarFooter": {
+          "accountMenu": "{{value0}} 계정 메뉴",
+          "account": "계정",
+          "appearance": "모양",
+          "activity": "활동",
+          "notifications": "알림",
+          "checkingAccount": "계정 확인 중…",
+          "signIn": "로그인",
+          "signInAgain": "다시 로그인",
+          "accountUnavailable": "계정을 사용할 수 없음",
+          "connected": "로그인됨",
+          "signInSuccess": "HiveCloud에 로그인했습니다",
+          "signInFailed": "HiveCloud 로그인에 실패했습니다. 다시 시도하거나 서비스 상태를 확인하세요.",
+          "signOut": "로그아웃",
+          "localSignOut": "로컬에서 로그아웃했습니다. 온라인 상태에서 HiveCloud 보안 설정의 원격 세션을 해제하세요.",
+          "signOutSuccess": "HiveCloud에서 로그아웃했습니다",
+          "signOutFailed": "HiveCloud에서 로그아웃하지 못했습니다. 파일 권한을 확인한 후 다시 시도하세요."
+        },
         "SidebarHeader": {
           "92154beb7e": "새로운 워크스페이스",
           "49f62c5665": "워크스페이스 보드",
@@ -4324,7 +4342,7 @@
         "SidebarToolbar": {
           "19e32d0e5f": "폴더 선택기를 열어 프로젝트를 추가하세요.",
           "abc62b6328": "프로젝트 추가",
-          "87d0064026": "워크스페이스 보드가 하단 바로 옮겨졌습니다",
+          "87d0064026": "워크스페이스 보드가 상단 바로 옮겨졌습니다",
           "a30e34eb5c": "워크스페이스 보드 닫기",
           "49f62c5665": "워크스페이스 보드"
         },

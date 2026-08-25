@@ -1,5 +1,9 @@
-import { app, ipcMain } from 'electron'
-import type { HiveAccountSignInOptions, HiveAccountState } from '../../shared/hive-account'
+import { app, BrowserWindow, ipcMain } from 'electron'
+import {
+  HIVE_ACCOUNT_STATE_CHANGED_CHANNEL,
+  type HiveAccountSignInOptions,
+  type HiveAccountState
+} from '../../shared/hive-account'
 import { HiveAccountService } from '../hive-account/hive-account-service'
 
 type HiveAccountHandlerService = Pick<
@@ -8,11 +12,23 @@ type HiveAccountHandlerService = Pick<
 >
 
 type HiveAccountHandlerDependencies = {
-  createService: (userDataPath: string) => HiveAccountHandlerService
+  createService: (
+    userDataPath: string,
+    onStateChanged: (state: HiveAccountState) => void
+  ) => HiveAccountHandlerService
 }
 
 const defaultDependencies: HiveAccountHandlerDependencies = {
-  createService: (userDataPath) => new HiveAccountService(userDataPath)
+  createService: (userDataPath, onStateChanged) =>
+    new HiveAccountService(userDataPath, undefined, onStateChanged)
+}
+
+function broadcastHiveAccountState(state: HiveAccountState): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      window.webContents.send(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, state)
+    }
+  }
 }
 
 export function requireHiveAccountSignInOptions(value: unknown): HiveAccountSignInOptions {
@@ -32,7 +48,7 @@ export function requireHiveAccountSignInOptions(value: unknown): HiveAccountSign
 export function registerHiveAccountHandlers(
   dependencies: HiveAccountHandlerDependencies = defaultDependencies
 ): void {
-  const service = dependencies.createService(app.getPath('userData'))
+  const service = dependencies.createService(app.getPath('userData'), broadcastHiveAccountState)
   let startupRefreshPending = true
   const startupState: Promise<HiveAccountState> = service
     .refresh()

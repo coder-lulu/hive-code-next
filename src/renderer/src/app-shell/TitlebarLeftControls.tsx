@@ -15,6 +15,8 @@ import {
 } from '@/store/slices/worktree-nav-history'
 import { useShortcutLabel } from '../hooks/useShortcutLabel'
 import { useAppStore } from '../store'
+import { WorkspaceTitlebarControls } from '../components/sidebar/WorkspaceTitlebarControls'
+import type { WorkspaceBoardPanelState } from '../components/sidebar/useWorkspaceBoardPanel'
 import { hasCustomTitleBar, isMac } from './app-window-chrome'
 import type { AppChromeLayout } from './use-app-chrome-layout'
 
@@ -23,7 +25,13 @@ import type { AppChromeLayout } from './use-app-chrome-layout'
  * worktree back/forward pair. Shared by the full-width titlebar and the sidebar-width left
  * header so the agent badge popover isn't duplicated.
  */
-export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): React.JSX.Element {
+export function TitlebarLeftControls({
+  layout,
+  workspaceBoardPanel
+}: {
+  layout: AppChromeLayout
+  workspaceBoardPanel: WorkspaceBoardPanelState
+}): React.JSX.Element {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const canGoBackWorktree = useAppStore(canGoBackWorktreeHistory)
@@ -107,6 +115,9 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
             </TooltipContent>
           </Tooltip>
         )}
+        {layout.showSidebar && layout.sidebarOpen ? (
+          <WorkspaceTitlebarControls workspaceBoardPanel={workspaceBoardPanel} />
+        ) : null}
       </div>
       {/* Why: Back/Forward span worktree + page history, so show the cluster wherever the shortcut is live (hidden in Settings/non-stack views). */}
       {shouldShowWorktreeHistoryControls(layout.activeView) && (

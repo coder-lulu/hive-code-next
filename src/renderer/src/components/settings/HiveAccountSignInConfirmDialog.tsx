@@ -46,7 +46,7 @@ export function HiveAccountSignInConfirmDialog({
           <DialogDescription>
             {translate(
               'auto.components.settings.orcaAccount.signInConfirmDescription',
-              'Review this request before HiveCode opens the secure browser sign-in.'
+              'Review this request before the desktop app opens the secure browser sign-in.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -63,7 +63,7 @@ export function HiveAccountSignInConfirmDialog({
             <p>
               {translate(
                 'auto.components.settings.orcaAccount.approvalSecurityDescription',
-                'HiveCode rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.'
+                'The app rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.'
               )}
             </p>
           </div>
@@ -85,7 +85,12 @@ export function HiveAccountSignInConfirmDialog({
             <p className="text-xs text-muted-foreground">
               {translate('auto.components.settings.orcaAccount.requestApplication', 'Application')}
             </p>
-            <p className="font-medium">HiveCode Desktop</p>
+            <p className="font-medium">
+              {translate(
+                'auto.components.settings.orcaAccount.requestApplicationName',
+                'Desktop application'
+              )}
+            </p>
           </div>
           <div className="col-span-2 flex items-center gap-2">
             <Monitor className="size-4 text-muted-foreground" />
@@ -99,7 +104,7 @@ export function HiveAccountSignInConfirmDialog({
               <p className="font-medium">
                 {translate(
                   'auto.components.settings.orcaAccount.currentDesktop',
-                  'This HiveCode desktop'
+                  'This desktop app'
                 )}
               </p>
             </div>
@@ -128,7 +133,7 @@ export function HiveAccountSignInConfirmDialog({
                   )
                 : translate(
                     'auto.components.settings.orcaAccount.temporaryApprovalDescription',
-                    'Use a temporary sign-in for up to 24 hours; closing HiveCode removes it.'
+                    'Use a temporary sign-in for up to 24 hours; closing the app removes it.'
                   )}
             </p>
           </div>

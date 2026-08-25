@@ -131,8 +131,14 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
           })
         }
       })
+    const unsubscribeAccountState = window.api.hiveAccount.onStateChanged((next) => {
+      if (active) {
+        setState(next)
+      }
+    })
     return () => {
       active = false
+      unsubscribeAccountState()
     }
   }, [])
 

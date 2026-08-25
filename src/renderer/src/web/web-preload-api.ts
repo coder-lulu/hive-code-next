@@ -725,7 +725,8 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       signOut: async () => ({
         status: 'already-signed-out',
         state: { configured: true, status: 'signed-out', persistence: 'encrypted' }
-      })
+      }),
+      onStateChanged: () => noopUnsubscribe
     },
     e2e: {
       getConfig: () => webE2EConfig

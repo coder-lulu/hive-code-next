@@ -15,7 +15,16 @@ const mocks = vi.hoisted(() => ({
   panel: {
     workspaceBoardOpen: false,
     workspaceBoardRenderedOpen: true,
-    workspaceBoardDragPreviewOpen: false
+    workspaceBoardDragPreviewOpen: false,
+    workspaceBoardMenuOpen: false,
+    openWorkspaceBoard: vi.fn(),
+    closeWorkspaceBoard: vi.fn(),
+    toggleWorkspaceBoard: vi.fn(),
+    handleWorkspaceBoardOpenChange: vi.fn(),
+    setWorkspaceBoardMenuOpen: vi.fn(),
+    previewWorkspaceBoardFromDrag: vi.fn(),
+    solidifyWorkspaceBoardFromDrag: vi.fn(),
+    cancelWorkspaceBoardDragPreview: vi.fn()
   }
 }))
 
@@ -51,8 +60,8 @@ vi.mock('./WorktreeList', () => ({
   default: () => <div data-testid="worktree-list" />
 }))
 
-vi.mock('./SidebarToolbar', () => ({
-  default: () => <div data-testid="sidebar-toolbar" />
+vi.mock('./SidebarFooter', () => ({
+  default: () => <div data-testid="sidebar-footer" />
 }))
 
 vi.mock('./WorkspaceKanbanDrawer', () => ({
@@ -79,20 +88,6 @@ vi.mock('./useSidebarProjectDrop', () => ({
   })
 }))
 
-vi.mock('./useWorkspaceBoardPanel', () => ({
-  useWorkspaceBoardPanel: () => ({
-    ...mocks.panel,
-    workspaceBoardMenuOpen: false,
-    toggleWorkspaceBoard: vi.fn(),
-    handleWorkspaceBoardOpenChange: vi.fn(),
-    setWorkspaceBoardMenuOpen: vi.fn(),
-    closeWorkspaceBoard: mocks.closeWorkspaceBoard,
-    previewWorkspaceBoardFromDrag: vi.fn(),
-    solidifyWorkspaceBoardFromDrag: vi.fn(),
-    cancelWorkspaceBoardDragPreview: vi.fn()
-  })
-}))
-
 import Sidebar from './index'
 
 function setSidebarState(settings: GlobalSettings, statusBarVisible = true): void {
@@ -112,13 +107,21 @@ function setSidebarState(settings: GlobalSettings, statusBarVisible = true): voi
 
 function renderSidebar(): string {
   return renderToStaticMarkup(
-    <Sidebar worktreeScrollOffsetRef={{ current: 0 }} worktreeScrollAnchorRef={{ current: null }} />
+    <Sidebar
+      worktreeScrollOffsetRef={{ current: 0 }}
+      worktreeScrollAnchorRef={{ current: null }}
+      workspaceBoardPanel={mocks.panel}
+    />
   )
 }
 
 function sidebarElement(): ReactNode {
   return (
-    <Sidebar worktreeScrollOffsetRef={{ current: 0 }} worktreeScrollAnchorRef={{ current: null }} />
+    <Sidebar
+      worktreeScrollOffsetRef={{ current: 0 }}
+      worktreeScrollAnchorRef={{ current: null }}
+      workspaceBoardPanel={mocks.panel}
+    />
   )
 }
 
@@ -127,20 +130,29 @@ beforeEach(() => {
   mocks.panel = {
     workspaceBoardOpen: false,
     workspaceBoardRenderedOpen: true,
-    workspaceBoardDragPreviewOpen: false
+    workspaceBoardDragPreviewOpen: false,
+    workspaceBoardMenuOpen: false,
+    openWorkspaceBoard: vi.fn(),
+    closeWorkspaceBoard: mocks.closeWorkspaceBoard,
+    toggleWorkspaceBoard: vi.fn(),
+    handleWorkspaceBoardOpenChange: vi.fn(),
+    setWorkspaceBoardMenuOpen: vi.fn(),
+    previewWorkspaceBoardFromDrag: vi.fn(),
+    solidifyWorkspaceBoardFromDrag: vi.fn(),
+    cancelWorkspaceBoardDragPreview: vi.fn()
   }
 })
 
 afterEach(cleanup)
 
 describe('Sidebar', () => {
-  it('anchors the setup script popup to the bottom toolbar', () => {
+  it('anchors the setup script popup to the bottom footer', () => {
     setSidebarState(getDefaultSettings(tmpdir()))
     const view = render(sidebarElement())
     const prompt = view.getByTestId('setup-script-prompt-card')
-    const toolbar = view.getByTestId('sidebar-toolbar')
+    const footer = view.getByTestId('sidebar-footer')
 
-    expect(prompt.parentElement).toBe(toolbar.parentElement)
+    expect(prompt.parentElement).toBe(footer.parentElement)
     expect(prompt.parentElement?.classList.contains('relative')).toBe(true)
     expect(prompt.parentElement?.classList.contains('shrink-0')).toBe(true)
   })

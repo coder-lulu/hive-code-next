@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   signIn: vi.fn(),
   refresh: vi.fn(),
   signOut: vi.fn(),
+  onStateChanged: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
   warning: vi.fn()
@@ -50,7 +51,8 @@ beforeEach(() => {
         getState: mocks.getState,
         signIn: mocks.signIn,
         refresh: mocks.refresh,
-        signOut: mocks.signOut
+        signOut: mocks.signOut,
+        onStateChanged: mocks.onStateChanged
       }
     }
   })
@@ -58,6 +60,7 @@ beforeEach(() => {
     mock.mockReset()
   }
   mocks.getState.mockResolvedValue(signedInState)
+  mocks.onStateChanged.mockReturnValue(vi.fn())
   mocks.refresh.mockResolvedValue({ status: 'refreshed', state: signedInState })
   mocks.signOut.mockResolvedValue({
     status: 'remote-and-local',

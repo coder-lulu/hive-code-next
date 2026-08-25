@@ -11,4 +11,5 @@ export type HiveAccountApi = {
   signIn: (options: HiveAccountSignInOptions) => Promise<HiveAccountSignInResult>
   refresh: () => Promise<HiveAccountRefreshResult>
   signOut: () => Promise<HiveAccountSignOutResult>
+  onStateChanged: (callback: (state: HiveAccountState) => void) => () => void
 }

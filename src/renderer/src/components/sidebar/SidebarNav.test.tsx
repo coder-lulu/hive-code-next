@@ -4,7 +4,6 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -17,16 +16,13 @@ const mocks = vi.hoisted(() => ({
   openTaskPage: vi.fn(),
   openAutomationsPage: vi.fn(),
   openActivityPage: vi.fn(),
-  openMobilePage: vi.fn(),
   openArtifactsPage: vi.fn(),
   openModal: vi.fn(),
   updateSettings: vi.fn(),
   refreshPreflightStatus: vi.fn(),
   checkLinearConnection: vi.fn(),
-  hasPairedMobileDevice: false,
   agentBucketCounts: { attention: 0, working: 0, done: 0, idle: 0 },
   getAgentBucketCounts: vi.fn(),
-  dismissMobileOnboardingBadge: vi.fn(),
   setSetupGuideSidebarDismissed: vi.fn()
 }))
 
@@ -54,14 +50,6 @@ vi.mock('@/components/dashboard/useAgentBucketCounts', () => ({
 
 vi.mock('@/hooks/useShortcutLabel', () => ({
   useShortcutKeyComboDetails: () => [{ keys: ['⌘', 'J'], doubleTap: false }]
-}))
-
-vi.mock('./mobile-sidebar-onboarding-badge', () => ({
-  useMobileSidebarOnboardingBadge: () => ({
-    visible: false,
-    hasPairedDevice: mocks.hasPairedMobileDevice,
-    dismiss: mocks.dismissMobileOnboardingBadge
-  })
 }))
 
 vi.mock('../setup-guide/use-setup-guide-progress', () => ({
@@ -134,7 +122,6 @@ function setSidebarState({
     openTaskPage: mocks.openTaskPage,
     openAutomationsPage: mocks.openAutomationsPage,
     openActivityPage: mocks.openActivityPage,
-    openMobilePage: mocks.openMobilePage,
     openArtifactsPage: mocks.openArtifactsPage,
     openModal: mocks.openModal,
     updateSettings: mocks.updateSettings,
@@ -216,7 +203,6 @@ describe('SidebarNav', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     await i18n.changeLanguage('en')
-    mocks.hasPairedMobileDevice = false
     mocks.agentBucketCounts = { attention: 0, working: 0, done: 0, idle: 0 }
     setSidebarState()
   })
@@ -340,14 +326,12 @@ describe('SidebarNav', () => {
     const container = await renderSidebarNav()
 
     expect(queryButtonByText(container, 'Automations')).not.toBeNull()
-    expect(queryButtonByText(container, `${APP_DISPLAY_NAME} Mobile`)).not.toBeNull()
 
     await act(async () => {
       await i18n.changeLanguage('zh')
     })
 
     expect(queryButtonByText(container, '自动化')).not.toBeNull()
-    expect(queryButtonByText(container, `${APP_DISPLAY_NAME} 手机端`)).not.toBeNull()
   })
 
   it('updates labels when pseudo-localization is enabled after mount', async () => {
@@ -358,28 +342,6 @@ describe('SidebarNav', () => {
     })
 
     expect(queryButtonByText(container, '[Automations]')).not.toBeNull()
-    expect(queryButtonByText(container, `[${APP_DISPLAY_NAME} Mobile]`)).not.toBeNull()
-  })
-
-  it('shows the inline hide control only once a device is paired', async () => {
-    const beforePairing = await renderSidebarNav()
-    expect(queryButtonByText(beforePairing, `${APP_DISPLAY_NAME} Mobile`)).not.toBeNull()
-    expect(beforePairing.querySelector('button[aria-label="Hide from sidebar"]')).toBeNull()
-
-    mocks.hasPairedMobileDevice = true
-    const container = await renderSidebarNav()
-    const hideButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Hide from sidebar"]'
-    )
-
-    expect(queryButtonByText(container, `${APP_DISPLAY_NAME} Mobile`)).not.toBeNull()
-    expect(hideButton).not.toBeNull()
-    expect(hideButton?.querySelector('svg')).not.toBeNull()
-
-    await clickButton(hideButton as HTMLButtonElement)
-
-    expect(mocks.updateSettings).toHaveBeenCalledWith({ showMobileButton: false })
-    expect(mocks.openMobilePage).not.toHaveBeenCalled()
   })
 
   it('shows the Automations entry by default for older settings', () => {
@@ -415,19 +377,6 @@ describe('SidebarNav', () => {
     await clickButton(getHideButton(automationsMenu as HTMLElement))
 
     expect(mocks.updateSettings).toHaveBeenCalledWith({ showAutomationsButton: false })
-  })
-
-  it('hides Mobile from its sidebar context menu', async () => {
-    const container = await renderSidebarNav()
-
-    const mobileMenu = getButtonByText(container, `${APP_DISPLAY_NAME} Mobile`).closest(
-      '[data-testid="context-menu"]'
-    )
-    expect(mobileMenu).not.toBeNull()
-
-    await clickButton(getHideButton(mobileMenu as HTMLElement))
-
-    expect(mocks.updateSettings).toHaveBeenCalledWith({ showMobileButton: false })
   })
 
   it('hides the worktree palette shortcut until the search field is hovered or focused', async () => {
