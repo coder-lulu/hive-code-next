@@ -91,6 +91,8 @@ import {
 } from '../ai-vault/runtime-session-scanner'
 import type { PluginService } from '../plugins/plugin-service'
 import type { PluginMarketplaceHandlerServices } from './plugin-marketplaces'
+import type { HiveAccountService } from '../hive-account/hive-account-service'
+import type { HiveAccountState } from '../../shared/hive-account'
 
 let registered = false
 
@@ -102,6 +104,8 @@ type CoreHandlerLifecycleOptions = {
   prepareAiVaultSessionResume?: (
     args: AiVaultPrepareSessionResumeArgs
   ) => Promise<AiVaultPrepareSessionResumeResult>
+  hiveAccountService?: HiveAccountService
+  hiveAccountStartupState?: Promise<HiveAccountState>
 }
 
 export function registerCoreHandlers(
@@ -189,7 +193,16 @@ export function registerCoreHandlers(
     registerPluginHandlers(store, pluginService, runtime, marketplaceServices)
   }
   registerTelemetryHandlers(store)
-  registerHiveAccountHandlers()
+  registerHiveAccountHandlers(
+    lifecycleOptions.hiveAccountService
+      ? {
+          service: lifecycleOptions.hiveAccountService,
+          ...(lifecycleOptions.hiveAccountStartupState
+            ? { startupState: lifecycleOptions.hiveAccountStartupState }
+            : {})
+        }
+      : undefined
+  )
   registerOrcaProfileHandlers(store, {
     onBeforeRelaunch: lifecycleOptions.onBeforeRelaunch,
     onAuthMutation: lifecycleOptions.onOrcaProfileAuthMutation,

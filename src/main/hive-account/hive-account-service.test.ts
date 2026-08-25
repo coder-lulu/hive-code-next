@@ -229,4 +229,57 @@ describe('Hive account application service', () => {
       expect.objectContaining({ status: 'signed-out' })
     )
   })
+
+  it('exposes a main-only bounded authorization snapshot without refresh material', async () => {
+    const service = createService()
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+
+    expect(service.getRuntimeCloudAuthorization()).toEqual({
+      accessToken: 'access',
+      accountId: sessionResponse.account.accountId,
+      authorityId: 'hive-primary',
+      sessionExpiresAt: sessionResponse.sessionExpiresAt,
+      sessionGeneration: 1
+    })
+    expect(service.getRuntimeCloudAuthorization()).not.toHaveProperty('refreshToken')
+    expect(service.getRuntimeCloudAuthorization()).not.toHaveProperty('privateKey')
+  })
+
+  it('fences Runtime Cloud authorization before remote sign-out can settle', async () => {
+    const service = createService()
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    let finishList: ((value: never[]) => void) | undefined
+    client.listCloudSessions.mockReturnValue(
+      new Promise((resolve) => {
+        finishList = resolve
+      })
+    )
+    const authorizations: unknown[] = []
+    service.subscribeRuntimeCloudAuthorization((authorization) =>
+      authorizations.push(authorization)
+    )
+
+    const signOut = service.signOut()
+
+    expect(authorizations).toEqual([null])
+    expect(service.getRuntimeCloudAuthorization()).toBeNull()
+    finishList?.([])
+    await signOut
+    expect(service.getRuntimeCloudAuthorization()).toBeNull()
+  })
+
+  it('fences before a rejected refresh clears the stored session', async () => {
+    const service = createService()
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    client.refreshSession.mockRejectedValue(new HiveAccountRequestError(401, null))
+    const authorizations: unknown[] = []
+    service.subscribeRuntimeCloudAuthorization((authorization) =>
+      authorizations.push(authorization)
+    )
+
+    await service.refresh()
+
+    expect(authorizations).toEqual([null])
+    expect(service.getRuntimeCloudAuthorization()).toBeNull()
+  })
 })

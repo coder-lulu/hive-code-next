@@ -115,6 +115,31 @@ describe('registerHiveAccountHandlers', () => {
     expect(liveSend).toHaveBeenCalledExactlyOnceWith(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, state)
     expect(destroyedWindowSend).not.toHaveBeenCalled()
   })
+
+  it('uses the process service and startup refresh without starting a second refresh', async () => {
+    const startupState = Promise.resolve({
+      configured: true,
+      status: 'signed-in',
+      persistence: 'encrypted'
+    } as const)
+    const subscribeStateChanged = vi.fn(() => vi.fn())
+    const service = {
+      getState: vi.fn(),
+      refresh: vi.fn(),
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      subscribeStateChanged
+    }
+
+    registerHiveAccountHandlers({ service: service as never, startupState })
+
+    await expect(electronMocks.handlers.get('hiveAccount:getState')?.()).resolves.toMatchObject({
+      status: 'signed-in'
+    })
+    expect(service.refresh).not.toHaveBeenCalled()
+    expect(electronMocks.getPath).not.toHaveBeenCalled()
+    expect(subscribeStateChanged).toHaveBeenCalledOnce()
+  })
 })
 
 describe('Hive account IPC sign-in options', () => {

@@ -25,6 +25,10 @@ import {
   saveHiveAccountSession,
   type HiveAccountSession
 } from './hive-account-session-store'
+import { HiveAccountPublication } from './hive-account-publication'
+import { scheduleHiveAccountRefresh } from './hive-account-refresh-schedule'
+
+export type { HiveRuntimeCloudAuthorization } from './hive-account-publication'
 
 type ServiceDependencies = {
   getConfig: () => ReturnType<typeof getHiveAccountConfig>
@@ -38,18 +42,18 @@ const defaultDependencies: ServiceDependencies = {
   beginAuthorization: beginHiveAccountPkceFlow
 }
 
-export class HiveAccountService {
+export class HiveAccountService extends HiveAccountPublication {
   private signInFlight: Promise<HiveAccountSignInResult> | null = null
   private refreshFlight: Promise<HiveAccountRefreshResult> | null = null
   private temporarySession: HiveAccountSession | null = null
   private refreshTimer: NodeJS.Timeout | undefined
   private mutationEpoch = 0
-
   constructor(
     private readonly userDataPath: string,
     private readonly dependencies: ServiceDependencies = defaultDependencies,
-    private readonly onStateChanged: (state: HiveAccountState) => void = () => undefined
+    onStateChanged: (state: HiveAccountState) => void = () => undefined
   ) {
+    super(onStateChanged)
     migrateLegacyOrcaCloudIdentity(userDataPath)
   }
 
@@ -85,7 +89,7 @@ export class HiveAccountService {
       return this.signInFlight
     }
     this.signInFlight = this.runSignIn(options)
-      .then((result) => publishHiveAccountResult(this.onStateChanged, result))
+      .then((result) => publishHiveAccountResult((state) => this.publishState(state), result))
       .finally(() => {
         this.signInFlight = null
       })
@@ -146,11 +150,13 @@ export class HiveAccountService {
         generation,
         savedAt: Date.now()
       }
+      this.fenceRuntimeCloudAuthorization()
       if (!this.persistSession(session)) {
         await this.bestEffortRevokeCurrent(client, exchange.accessToken)
         return { status: 'failed', state: errorState('secure_storage_unavailable') }
       }
       this.scheduleRefresh(session)
+      this.publishRuntimeCloudSession(session)
       return { status: 'signed-in', state: stateFromSession(session) }
     } catch (error) {
       const errorCode = classifyHiveAccountError(error)
@@ -166,7 +172,7 @@ export class HiveAccountService {
       return this.refreshFlight
     }
     this.refreshFlight = this.runRefresh()
-      .then((result) => publishHiveAccountResult(this.onStateChanged, result))
+      .then((result) => publishHiveAccountResult((state) => this.publishState(state), result))
       .finally(() => {
         this.refreshFlight = null
       })
@@ -219,10 +225,12 @@ export class HiveAccountService {
         return { status: 'failed', state: errorState('secure_storage_unavailable') }
       }
       this.scheduleRefresh(session)
+      this.publishRuntimeCloudSession(session)
       return { status: 'refreshed', state: stateFromSession(session) }
     } catch (error) {
       const errorCode = classifyHiveAccountError(error)
       if (errorCode === 'session_rejected') {
+        this.fenceRuntimeCloudAuthorization()
         this.clearCurrentSession()
         return { status: 'signed-out', state: signedOutState() }
       }
@@ -233,6 +241,7 @@ export class HiveAccountService {
 
   async signOut(): Promise<HiveAccountSignOutResult> {
     this.mutationEpoch += 1
+    this.fenceRuntimeCloudAuthorization()
     const configured = this.dependencies.getConfig()
     const stored = this.readCurrentSession()
     const revokeRemote =
@@ -247,7 +256,7 @@ export class HiveAccountService {
       revokeRemote,
       clearLocal: () => this.clearCurrentSession()
     })
-    return publishHiveAccountResult(this.onStateChanged, result)
+    return publishHiveAccountResult((state) => this.publishState(state), result)
   }
 
   private async revokeCurrent(client: HiveAccountClient, accessToken: string): Promise<void> {
@@ -276,6 +285,11 @@ export class HiveAccountService {
       : readHiveAccountSession(this.userDataPath)
   }
 
+  protected getRuntimeCloudSession(): HiveAccountSession | null {
+    const stored = this.readCurrentSession()
+    return stored.status === 'ok' ? stored.value : null
+  }
+
   private persistSession(session: HiveAccountSession): boolean {
     if (session.sessionProfile === 'TEMPORARY') {
       this.temporarySession = session
@@ -296,21 +310,9 @@ export class HiveAccountService {
   }
 
   private scheduleRefresh(session: HiveAccountSession, retryDelay?: number): void {
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer)
-    }
-    if (session.sessionExpiresAt <= Date.now()) {
+    this.refreshTimer = scheduleHiveAccountRefresh(this.refreshTimer, session, retryDelay, () => {
       this.refreshTimer = undefined
-      return
-    }
-    const delay = retryDelay ?? Math.max(0, session.expiresAt - Date.now() - 60_000)
-    this.refreshTimer = setTimeout(
-      () => {
-        this.refreshTimer = undefined
-        void this.refresh()
-      },
-      Math.min(delay, 2_147_000_000)
-    )
-    this.refreshTimer.unref?.()
+      void this.refresh()
+    })
   }
 }

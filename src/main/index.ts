@@ -77,6 +77,11 @@ import { initOnboardingCohortClassifier } from './telemetry/onboarding-cohort-cl
 import { resolveConsent } from './telemetry/consent'
 import { triggerStartupNotificationRegistration } from './ipc/startup-notification-registration'
 import { OrcaRuntimeService, type RuntimeWorktreeLifecycleEvent } from './runtime/orca-runtime'
+import { HiveAccountService } from './hive-account/hive-account-service'
+import { getHiveRuntimeCloudConfig } from './hive-runtime-cloud/hive-runtime-cloud-config'
+import { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud/hive-runtime-cloud-presence-service'
+import { createHiveRuntimeCloudReport } from './hive-runtime-cloud/hive-runtime-cloud-report'
+import type { HiveAccountState } from '../shared/hive-account'
 import { ArtifactCloudService } from './artifacts/artifact-cloud-service'
 import { SkillCloudService } from './skills/skill-cloud-service'
 import { recoverPendingSkillTransactions } from './skills/skill-transaction-startup-recovery'
@@ -386,6 +391,10 @@ let claudeRuntimeAuth: ClaudeRuntimeAuthService | null = null
 let runtime: OrcaRuntimeService | null = null
 let rateLimits: RateLimitService | null = null
 let runtimeRpc: OrcaRuntimeRpcServer | null = null
+let hiveAccountService: HiveAccountService | null = null
+let hiveAccountStartupState: Promise<HiveAccountState> | null = null
+let runtimeCloudPresence: HiveRuntimeCloudPresenceService | null = null
+let unsubscribeRuntimeCloudAuthorization: (() => void) | null = null
 const serveReadinessPublisher = new ServeReadinessPublisher()
 let desktopRelayService: DesktopRelayService | null = null
 let desktopRelayStatus: RelayBrokerStatus = 'offline'
@@ -1625,6 +1634,8 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
     crashReports ?? undefined,
     keybindings,
     {
+      ...(hiveAccountService ? { hiveAccountService } : {}),
+      ...(hiveAccountStartupState ? { hiveAccountStartupState } : {}),
       getAdditionalAiVaultCodexHomePaths: () =>
         codexRuntimeHome ? codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery() : [],
       prepareAiVaultSessionResume: (args) =>
@@ -1635,6 +1646,8 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       onBeforeRelaunch: async () => {
         isQuitting = true
         desktopRelayService?.fenceAndCloseNow()
+        runtimeCloudPresence?.setRuntimeReady(false)
+        runtimeCloudPresence?.setAuthorization(null)
         await preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
       },
       onOrcaProfileAuthMutation: () => desktopRelayService?.authMutated(),
@@ -1667,8 +1680,11 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       isRecoveryReloadInFlight,
       onCodexHomePtySpawned: handleCodexHomePtySpawned,
       onPtyExit: handlePtyExit,
-      onBeforeUpdateQuit: () =>
-        preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store }),
+      onBeforeUpdateQuit: () => {
+        runtimeCloudPresence?.setRuntimeReady(false)
+        runtimeCloudPresence?.setAuthorization(null)
+        return preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
+      },
       updateInstallMode: resolveUpdateInstallMode(isServeMode),
       onWorktreeLifecycle: emitPluginWorktreeLifecycle
     }
@@ -2471,6 +2487,14 @@ void app.whenReady().then(async () => {
   } catch {
     console.warn('[proxy] Failed to apply network proxy settings')
   }
+  // Why: account ownership is process-wide. Start one refresh after proxy setup so desktop IPC
+  // and headless Runtime Presence cannot race separate session generations.
+  const processHiveAccountService = new HiveAccountService(app.getPath('userData'))
+  hiveAccountService = processHiveAccountService
+  hiveAccountStartupState = processHiveAccountService
+    .refresh()
+    .then((result) => result.state)
+    .catch(() => processHiveAccountService.getState())
   // Why: browser sessions serve desktop webviews and runtime profile commands, so init at app startup rather than via a renderer IPC path.
   initializeBrowserSessionsForApp({
     orcaProfileId: activeOrcaProfile.profile.id,
@@ -2799,6 +2823,20 @@ void app.whenReady().then(async () => {
     skillTransactionRecovery
   })
   runtime = runtimeService
+  const processRuntimeCloudPresence = new HiveRuntimeCloudPresenceService(
+    getHiveRuntimeCloudConfig(),
+    app.getPath('userData'),
+    { getReport: () => createHiveRuntimeCloudReport(runtimeService, app.getVersion()) }
+  )
+  runtimeCloudPresence = processRuntimeCloudPresence
+  if (hiveAccountService) {
+    unsubscribeRuntimeCloudAuthorization = hiveAccountService.subscribeRuntimeCloudAuthorization(
+      (authorization) => {
+        processRuntimeCloudPresence.setAuthorization(authorization)
+      }
+    )
+    processRuntimeCloudPresence.setAuthorization(hiveAccountService.getRuntimeCloudAuthorization())
+  }
   runtimeService.prepareLegacyWorkerTerminalRecovery()
   publishProviderSessionChanges(agentHookServer.getProviderSessionIdentities())
   browserManager.setBrowserGuestStateChangedListener((worktreeId) => {
@@ -3311,6 +3349,7 @@ void app.whenReady().then(async () => {
       console.error('[runtime] Failed to start headless RPC transport:', error)
       throw error
     })
+    runtimeCloudPresence?.setRuntimeReady(true)
     settleServeDesktopActivation()
     installServeSignalHandlers()
     // Why: headless serve has no renderer to run the normal cli:install flow; do it here for macOS/Linux only (Windows-excluded: install() only mutates registry PATH, not child terminals).
@@ -3378,6 +3417,8 @@ void app.whenReady().then(async () => {
   ])
   if (!runtimeRpcStartResult.ok) {
     void showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
+  } else {
+    runtimeCloudPresence?.setRuntimeReady(true)
   }
   if (userDataMigrationSkippedUnsafeSource) {
     userDataMigrationSkippedUnsafeSource = false
@@ -3463,6 +3504,8 @@ app.on('before-quit', () => {
   }
   isQuitting = true
   desktopRelayService?.fenceAndCloseNow()
+  runtimeCloudPresence?.setRuntimeReady(false)
+  runtimeCloudPresence?.setAuthorization(null)
   runtimeRpc?.setMobileRelayPairingProvider(null)
   unsubscribeAgentAwakeStatusChanges?.()
   unsubscribeAgentAwakeStatusChanges = null
@@ -3503,6 +3546,12 @@ app.on('will-quit', (e) => {
   }
   // Why: before-quit can still be aborted by renderer beforeunload; only remove the Windows tray icon on the committed quit path.
   destroySystemTray()
+  unsubscribeRuntimeCloudAuthorization?.()
+  unsubscribeRuntimeCloudAuthorization = null
+  const runtimeCloudPresenceShutdown = runtimeCloudPresence?.stop() ?? Promise.resolve()
+  runtimeCloudPresence = null
+  hiveAccountService = null
+  hiveAccountStartupState = null
   // Why: an agent still working at quit gets no terminating hook, so stats.flushAsync() closes those sessions out synchronously (only the write is deferred) — otherwise their duration is lost.
   starNag?.stop()
   automations?.stop()
@@ -3572,6 +3621,7 @@ app.on('will-quit', (e) => {
   settleTeardownWithinDeadline([
     { name: 'daemon', promise: daemonTeardown },
     { name: 'runtime-rpc', promise: rpcStopAndClear },
+    { name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown },
     { name: 'watchers', promise: watcherShutdown },
     { name: 'emulator', promise: emulatorShutdown },
     { name: 'ssh', promise: sshShutdown },

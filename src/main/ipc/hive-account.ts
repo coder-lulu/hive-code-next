@@ -11,17 +11,21 @@ type HiveAccountHandlerService = Pick<
   'getState' | 'signIn' | 'refresh' | 'signOut'
 >
 
-type HiveAccountHandlerDependencies = {
-  createService: (
+export type HiveAccountHandlerDependencies = {
+  service?: HiveAccountHandlerService & {
+    subscribeStateChanged?: (listener: (state: HiveAccountState) => void) => () => void
+  }
+  startupState?: Promise<HiveAccountState>
+  createService?: (
     userDataPath: string,
     onStateChanged: (state: HiveAccountState) => void
   ) => HiveAccountHandlerService
 }
 
-const defaultDependencies: HiveAccountHandlerDependencies = {
+const defaultDependencies = {
   createService: (userDataPath, onStateChanged) =>
     new HiveAccountService(userDataPath, undefined, onStateChanged)
-}
+} satisfies HiveAccountHandlerDependencies
 
 function broadcastHiveAccountState(state: HiveAccountState): void {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -48,12 +52,20 @@ export function requireHiveAccountSignInOptions(value: unknown): HiveAccountSign
 export function registerHiveAccountHandlers(
   dependencies: HiveAccountHandlerDependencies = defaultDependencies
 ): void {
-  const service = dependencies.createService(app.getPath('userData'), broadcastHiveAccountState)
+  const service =
+    dependencies.service ??
+    (dependencies.createService ?? defaultDependencies.createService)(
+      app.getPath('userData'),
+      broadcastHiveAccountState
+    )
+  dependencies.service?.subscribeStateChanged?.(broadcastHiveAccountState)
   let startupRefreshPending = true
-  const startupState: Promise<HiveAccountState> = service
-    .refresh()
-    .then((result) => result.state)
-    .catch(() => service.getState())
+  const startupState: Promise<HiveAccountState> =
+    dependencies.startupState ??
+    service
+      .refresh()
+      .then((result) => result.state)
+      .catch(() => service.getState())
   void startupState.then(
     () => {
       startupRefreshPending = false
