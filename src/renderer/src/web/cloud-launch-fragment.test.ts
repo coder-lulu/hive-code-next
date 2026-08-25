@@ -6,6 +6,7 @@ import {
 
 const ticketId = '123e4567-e89b-42d3-a456-426614174000'
 const launchSecret = 'A'.repeat(43)
+const documentTitle = 'Runtime Client'
 
 describe('cloud launch fragment', () => {
   it('accepts only the exact launch fragment credential', () => {
@@ -50,11 +51,11 @@ describe('cloud launch fragment', () => {
         search: '?source=email'
       },
       history: { replaceState },
-      documentTitle: 'HiveCode'
+      documentTitle
     })
 
     expect(result).toBeUndefined()
     expect(replaceState).toHaveBeenCalledOnce()
-    expect(replaceState).toHaveBeenCalledWith(null, 'HiveCode', 'https://runtime.example/web/')
+    expect(replaceState).toHaveBeenCalledWith(null, documentTitle, 'https://runtime.example/web/')
   })
 })

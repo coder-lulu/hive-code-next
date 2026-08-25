@@ -36,12 +36,12 @@ function originRelativePath(value: string | undefined): string | null {
 }
 
 function webLaunchConfig(env: NodeJS.ProcessEnv): HiveRuntimeCloudWebLaunchConfig | undefined {
-  if (!enabled(env.HIVECODE_RUNTIME_CLOUD_WEB_LAUNCH_ENABLED)) {
+  if (!enabled(env.HIVE_RUNTIME_CLOUD_WEB_LAUNCH_ENABLED)) {
     return undefined
   }
-  const origin = env.HIVECODE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN
-  const webClientPath = originRelativePath(env.HIVECODE_RUNTIME_CLOUD_WEB_CLIENT_PATH)
-  const websocketPath = originRelativePath(env.HIVECODE_RUNTIME_CLOUD_WEBSOCKET_PATH)
+  const origin = env.HIVE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN
+  const webClientPath = originRelativePath(env.HIVE_RUNTIME_CLOUD_WEB_CLIENT_PATH)
+  const websocketPath = originRelativePath(env.HIVE_RUNTIME_CLOUD_WEBSOCKET_PATH)
   return origin === 'https://code.hivekernel.com' && webClientPath && websocketPath
     ? { publicOrigin: origin, webClientPath, websocketPath }
     : undefined
@@ -50,7 +50,7 @@ function webLaunchConfig(env: NodeJS.ProcessEnv): HiveRuntimeCloudWebLaunchConfi
 export function getHiveRuntimeCloudConfig(
   env: NodeJS.ProcessEnv = process.env
 ): HiveRuntimeCloudConfig {
-  if (!enabled(env.HIVECODE_RUNTIME_CLOUD_PRESENCE_ENABLED)) {
+  if (!enabled(env.HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED)) {
     return { enabled: false }
   }
   const account = getHiveAccountConfig(env)

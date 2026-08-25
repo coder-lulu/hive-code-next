@@ -1,14 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
-vi.mock('../../shared/generated/product-config', () => ({
-  hivecodeProductConfig: {
-    endpoints: {
-      cloud: 'https://api.hivekernel.com',
-      identityIssuer: 'https://identity.hivekernel.com/realms/hive'
-    }
-  }
-}))
 
 import { getHiveRuntimeCloudConfig } from './hive-runtime-cloud-config'
 
@@ -20,14 +12,14 @@ describe('Hive Runtime Cloud config', () => {
   })
 
   it('reuses the validated Hive account Cloud origin when explicitly enabled', () => {
-    expect(getHiveRuntimeCloudConfig({ HIVECODE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'true' })).toEqual({
+    expect(getHiveRuntimeCloudConfig({ HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'true' })).toEqual({
       enabled: true,
       apiBaseUrl: 'https://api.hivekernel.com'
     })
   })
 
   it('does not accept fuzzy truthy values', () => {
-    expect(getHiveRuntimeCloudConfig({ HIVECODE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'yes' })).toEqual({
+    expect(getHiveRuntimeCloudConfig({ HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'yes' })).toEqual({
       enabled: false
     })
   })
@@ -35,11 +27,11 @@ describe('Hive Runtime Cloud config', () => {
   it('enables Web Launch only for the frozen public HTTPS and WSS paths', () => {
     expect(
       getHiveRuntimeCloudConfig({
-        HIVECODE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'true',
-        HIVECODE_RUNTIME_CLOUD_WEB_LAUNCH_ENABLED: 'true',
-        HIVECODE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN: 'https://code.hivekernel.com',
-        HIVECODE_RUNTIME_CLOUD_WEB_CLIENT_PATH: '/web-index.html',
-        HIVECODE_RUNTIME_CLOUD_WEBSOCKET_PATH: '/_hive/runtime-rpc'
+        HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'true',
+        HIVE_RUNTIME_CLOUD_WEB_LAUNCH_ENABLED: 'true',
+        HIVE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN: 'https://code.hivekernel.com',
+        HIVE_RUNTIME_CLOUD_WEB_CLIENT_PATH: '/web-index.html',
+        HIVE_RUNTIME_CLOUD_WEBSOCKET_PATH: '/_hive/runtime-rpc'
       })
     ).toEqual({
       enabled: true,
@@ -59,11 +51,11 @@ describe('Hive Runtime Cloud config', () => {
   ])('fails closed for an unsafe Web Launch endpoint', (origin, webClientPath, websocketPath) => {
     expect(
       getHiveRuntimeCloudConfig({
-        HIVECODE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'true',
-        HIVECODE_RUNTIME_CLOUD_WEB_LAUNCH_ENABLED: 'true',
-        HIVECODE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN: origin,
-        HIVECODE_RUNTIME_CLOUD_WEB_CLIENT_PATH: webClientPath,
-        HIVECODE_RUNTIME_CLOUD_WEBSOCKET_PATH: websocketPath
+        HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED: 'true',
+        HIVE_RUNTIME_CLOUD_WEB_LAUNCH_ENABLED: 'true',
+        HIVE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN: origin,
+        HIVE_RUNTIME_CLOUD_WEB_CLIENT_PATH: webClientPath,
+        HIVE_RUNTIME_CLOUD_WEBSOCKET_PATH: websocketPath
       })
     ).toEqual({ enabled: true, apiBaseUrl: 'https://api.hivekernel.com' })
   })
