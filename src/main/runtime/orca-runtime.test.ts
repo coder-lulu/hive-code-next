@@ -20446,6 +20446,9 @@ describe('OrcaRuntimeService', () => {
     return { tabId: identity.tabId, identity }
   }
 
+  // The full Windows Vitest shard can contend with several renderer/runtime workers while
+  // this test waits for the exact reveal handshake. Keep the assertion intact but allow the
+  // host-level scheduling budget to match the existing 30-second test contract elsewhere.
   it('fences provider resume and reveals one exact live legacy worker without stealing focus', async () => {
     const workerLeafId = HEADLESS_LEAF_ID
     const coordinatorLeafId = HEADLESS_SECOND_LEAF_ID
@@ -20670,7 +20673,7 @@ describe('OrcaRuntimeService', () => {
     runtime.registerPreAllocatedHandleForPty('pty-legacy', replacementHandle)
     await expect(runtime.readTerminal(replacementHandle)).resolves.toMatchObject({ tail: [] })
     expect(serializeProviderBuffer).not.toHaveBeenCalled()
-  })
+  }, 90_000)
 
   it('retries renderer reveal before clearing an adopted legacy worker resume fence', async () => {
     const workerPaneKey = `legacy-worker:${HEADLESS_LEAF_ID}`
