@@ -19,14 +19,14 @@ describe('browser notice formatting', () => {
         permission: 'media',
         origin: 'https://example.com'
       })
-    ).toBe('https://example.com asked for camera or microphone access, and Orca denied it.')
+    ).toBe('https://example.com asked for camera or microphone access, and HiveCode denied it.')
     expect(
       formatPermissionNotice({
         browserPageId: 'browser-1',
         permission: 'geolocation',
         origin: 'unknown'
       })
-    ).toBe('this page asked for your location, and Orca denied it.')
+    ).toBe('this page asked for your location, and HiveCode denied it.')
   })
 
   it('names the storage permission in words rather than its raw token', () => {
@@ -37,7 +37,7 @@ describe('browser notice formatting', () => {
     })
     expect(notice).not.toContain('top-level-storage-access')
     expect(notice).toBe(
-      'https://example.com asked for cookie access on behalf of an embedded site, and Orca denied it.'
+      'https://example.com asked for cookie access on behalf of an embedded site, and HiveCode denied it.'
     )
   })
 
@@ -47,7 +47,7 @@ describe('browser notice formatting', () => {
     ['display-capture', 'permission to capture your screen'],
     ['window-management', 'screen information and multi-screen window placement'],
     ['keyboardLock', 'permission to capture keyboard input'],
-    ['openExternal', 'permission to open a link outside Orca'],
+    ['openExternal', 'permission to open a link outside HiveCode'],
     ['fileSystem', 'access to your files or folders'],
     ['hid', 'access to a connected human interface device'],
     ['usb', 'access to a USB device'],
@@ -63,7 +63,7 @@ describe('browser notice formatting', () => {
         permission,
         origin: 'https://example.com'
       })
-    ).toBe(`https://example.com asked for ${description}, and Orca denied it.`)
+    ).toBe(`https://example.com asked for ${description}, and HiveCode denied it.`)
   })
 
   // Pin the raw-token fallback for permissions Chromium adds later.
@@ -74,7 +74,7 @@ describe('browser notice formatting', () => {
         permission: 'some-future-permission',
         origin: 'https://example.com'
       })
-    ).toBe('https://example.com asked for some-future-permission, and Orca denied it.')
+    ).toBe('https://example.com asked for some-future-permission, and HiveCode denied it.')
   })
 
   it('formats popup outcomes', () => {
@@ -84,7 +84,7 @@ describe('browser notice formatting', () => {
         origin: 'https://example.com',
         action: 'opened-in-orca'
       })
-    ).toBe('https://example.com opened a new page in Orca.')
+    ).toBe('https://example.com opened a new page in HiveCode.')
 
     expect(
       formatPopupNotice({
@@ -100,7 +100,7 @@ describe('browser notice formatting', () => {
         origin: 'unknown',
         action: 'blocked'
       })
-    ).toBe('A site tried to open a popup Orca does not support here.')
+    ).toBe('A site tried to open a popup HiveCode does not support here.')
   })
 
   it('formats download completion and byte counts', () => {

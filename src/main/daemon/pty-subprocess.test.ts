@@ -133,37 +133,44 @@ describe('createPtySubprocess', () => {
   })
 
   it('does not spawn after cancellation wins during async cwd validation', async () => {
-    let releaseValidation: () => void = () => {}
-    const validationGate = new Promise<void>((resolve) => {
-      releaseValidation = resolve
-    })
-    validateWorkingDirectoryMock.mockImplementationOnce(() => validationGate)
-    let canceled = false
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
+    try {
+      let releaseValidation: () => void = () => {}
+      const validationGate = new Promise<void>((resolve) => {
+        releaseValidation = resolve
+      })
+      validateWorkingDirectoryMock.mockImplementationOnce(() => validationGate)
+      let canceled = false
 
-    const spawning = createPtySubprocess({
-      sessionId: 'canceled-validation',
-      cols: 80,
-      rows: 24,
-      isCanceled: () => canceled
-    })
-    await vi.waitFor(() => expect(validateWorkingDirectoryMock).toHaveBeenCalled())
+      const spawning = createPtySubprocess({
+        sessionId: 'canceled-validation',
+        cols: 80,
+        rows: 24,
+        isCanceled: () => canceled
+      })
+      await vi.waitFor(() => expect(validateWorkingDirectoryMock).toHaveBeenCalled())
 
-    canceled = true
-    releaseValidation()
+      canceled = true
+      releaseValidation()
 
-    await expect(spawning).rejects.toThrow('Attach canceled for session canceled-validation')
-    expect(spawnMock).not.toHaveBeenCalled()
+      await expect(spawning).rejects.toThrow('Attach canceled for session canceled-validation')
+      expect(spawnMock).not.toHaveBeenCalled()
+    } finally {
+      if (platform) {
+        Object.defineProperty(process, 'platform', platform)
+      }
+    }
   })
 
   it('does not report a spawn strategy when node-pty fails before launch', async () => {
-    spawnMock.mockImplementationOnce(() => {
-      throw new Error('spawn failed')
-    })
     const onMacosTccSpawnStrategy = vi.fn()
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
-    Object.defineProperty(process, 'platform', { value: 'linux' })
-
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
     try {
+      spawnMock.mockImplementationOnce(() => {
+        throw new Error('spawn failed')
+      })
       await expect(
         createPtySubprocess({
           sessionId: 'test',
