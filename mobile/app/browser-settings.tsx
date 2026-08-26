@@ -1,27 +1,34 @@
 import { productNameText } from '@/product-brand'
 import { useCallback, useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight, Globe } from 'lucide-react-native'
 import { PickerModal, type PickerOption } from '../src/components/PickerModal'
 import {
+  MobileGroupedList,
+  MobileGroupedListRow,
+  MobileIconButton,
+  MobileScreenHeader
+} from '../src/components/ui'
+import {
   loadTerminalLinkOpenMode,
   saveTerminalLinkOpenMode,
   type MobileTerminalLinkOpenMode
 } from '../src/storage/preferences'
-import { colors, radii, spacing, typography } from '../src/theme/mobile-theme'
+import type { MobileTheme } from '../src/theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
 
 const LINK_MODE_OPTIONS: PickerOption<MobileTerminalLinkOpenMode>[] = [
   {
     value: 'orca-browser',
-    label: productNameText('Orca browser on desktop'),
-    subtitle: 'Open in the streamed browser from your paired desktop.'
+    label: productNameText('Orca 桌面端浏览器'),
+    subtitle: '在已配对电脑的流式浏览器中打开。'
   },
   {
     value: 'phone-browser',
-    label: 'Phone browser',
-    subtitle: 'Open in Safari, Chrome, or another browser on this phone.'
+    label: '手机浏览器',
+    subtitle: '在此手机的 Safari、Chrome 或其他浏览器中打开。'
   }
 ]
 
@@ -34,6 +41,8 @@ function linkModeLabel(mode: MobileTerminalLinkOpenMode): string {
 export default function BrowserSettingsScreen(): React.JSX.Element {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [linkMode, setLinkMode] = useState<MobileTerminalLinkOpenMode>('orca-browser')
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -47,37 +56,44 @@ export default function BrowserSettingsScreen(): React.JSX.Element {
   }, [])
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
-      <View style={styles.topRow}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={22} color={colors.textSecondary} />
-        </Pressable>
-        <Text style={styles.heading}>Browser</Text>
-      </View>
+    <View style={styles.screen}>
+      <MobileScreenHeader
+        leading={
+          <MobileIconButton
+            accessibilityLabel="返回"
+            icon={ChevronLeft}
+            iconSize={24}
+            onPress={() => router.back()}
+          />
+        }
+        title="浏览器"
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.groupHeading}>LINKS</Text>
-        <Text style={styles.groupDescription}>
-          Choose where HTTP(S) links tapped in terminal output open.
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + theme.spacing.space32 }
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text maxFontSizeMultiplier={1.3} style={styles.description}>
+          选择在终端输出中点按 HTTP(S) 链接时的打开位置。
         </Text>
-        <View style={[styles.section, styles.sectionTopGap]}>
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        <MobileGroupedList title="链接">
+          <MobileGroupedListRow
+            accessibilityLabel={`打开终端链接，当前为${linkModeLabel(linkMode)}`}
+            detail={linkModeLabel(linkMode)}
+            leading={<Globe color={theme.color.text.secondary} size={20} strokeWidth={2} />}
             onPress={() => setPickerOpen(true)}
-          >
-            <Globe size={16} color={colors.textSecondary} />
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Open terminal links</Text>
-              <Text style={styles.rowSublabel}>{linkModeLabel(linkMode)}</Text>
-            </View>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-        </View>
+            title="打开终端链接"
+            trailing={<ChevronRight color={theme.color.text.tertiary} size={20} strokeWidth={2} />}
+          />
+        </MobileGroupedList>
       </ScrollView>
 
       <PickerModal<MobileTerminalLinkOpenMode>
         visible={pickerOpen}
-        title="Open terminal links"
+        title="打开终端链接"
         options={LINK_MODE_OPTIONS}
         selected={linkMode}
         onSelect={selectLinkMode}
@@ -87,78 +103,14 @@ export default function BrowserSettingsScreen(): React.JSX.Element {
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase,
-    paddingHorizontal: spacing.lg,
-    paddingTop: 0
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textPrimary
-  },
-  scrollContent: {
-    paddingBottom: spacing.xl
-  },
-  groupHeading: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-    paddingHorizontal: spacing.xs
-  },
-  groupDescription: {
-    fontSize: typography.bodySize - 1,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    paddingHorizontal: spacing.xs
-  },
-  section: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.card,
-    overflow: 'hidden'
-  },
-  sectionTopGap: {
-    marginTop: spacing.sm
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  rowPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  rowContent: {
-    flex: 1
-  },
-  rowLabel: {
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textPrimary
-  },
-  rowSublabel: {
-    fontSize: typography.bodySize - 2,
-    color: colors.textSecondary,
-    marginTop: 2
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.color.bg.canvas },
+    content: {
+      gap: theme.spacing.space16,
+      paddingHorizontal: theme.spacing.space20,
+      paddingTop: theme.spacing.space20
+    },
+    description: { ...theme.typography.body, color: theme.color.text.secondary }
+  })
+}

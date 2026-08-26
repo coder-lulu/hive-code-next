@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from 'react'
 import { View, Text, Pressable, TextInput, StyleSheet, Switch } from 'react-native'
 import { ChevronLeft } from 'lucide-react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { colors, spacing, radii, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 import { BottomDrawer } from './BottomDrawer'
 import {
   buildTerminalShortcutKey,
@@ -37,17 +38,17 @@ const SHORTCUT_MODIFIERS: { id: TerminalShortcutModifier; label: string; glyph?:
 // fixed grids rather than one ragged wrap row that clipped F7-F12.
 const SPECIAL_KEY_GROUPS: { title: string; ids: string[]; columns: number }[] = [
   {
-    title: 'Editing',
+    title: '编辑',
     ids: ['escape', 'tab', 'enter', 'backspace', 'delete', 'insert', 'space'],
     columns: 4
   },
   {
-    title: 'Navigation',
+    title: '导航',
     ids: ['arrowUp', 'arrowDown', 'arrowLeft', 'arrowRight', 'home', 'end', 'pageUp', 'pageDown'],
     columns: 4
   },
   {
-    title: 'Function',
+    title: '功能键',
     ids: ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'],
     columns: 6
   }
@@ -78,6 +79,8 @@ export async function saveCustomKeys(keys: CustomKey[]): Promise<void> {
 }
 
 export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortcuts }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMemo(() => createCustomKeyModalStyles(theme), [theme])
   const [step, setStep] = useState<Step>('choose-type')
   const [shortcutKey, setShortcutKey] = useState('c')
   const [shortcutModifiers, setShortcutModifiers] = useState<TerminalShortcutModifier[]>(['ctrl'])
@@ -190,18 +193,18 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
           <Pressable
             style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
             onPress={onBack}
-            accessibilityLabel="Back"
+            accessibilityLabel="返回"
           >
-            <ChevronLeft size={18} color={colors.textSecondary} />
+            <ChevronLeft size={20} color={theme.color.text.secondary} strokeWidth={2} />
           </Pressable>
         ) : (
           <View style={styles.backSpacer} />
         )}
         <Text style={styles.title}>
-          {step === 'choose-type' && 'Add Shortcut'}
-          {step === 'shortcut-combo' && 'Shortcut Combo'}
-          {step === 'special-keys' && 'Pick a key'}
-          {step === 'text-macro' && 'Text Macro'}
+          {step === 'choose-type' && '添加快捷键'}
+          {step === 'shortcut-combo' && '组合快捷键'}
+          {step === 'special-keys' && '选择按键'}
+          {step === 'text-macro' && '文本宏'}
         </Text>
         <View style={styles.backSpacer} />
       </View>
@@ -212,16 +215,16 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             onPress={() => setStep('shortcut-combo')}
           >
-            <Text style={styles.rowLabel}>Shortcut Combo</Text>
-            <Text style={styles.rowHint}>Build Ctrl, Alt, and Shift key chords</Text>
+            <Text style={styles.rowLabel}>组合快捷键</Text>
+            <Text style={styles.rowHint}>组合 Ctrl、Alt 与 Shift 按键</Text>
           </Pressable>
           <View style={styles.separator} />
           <Pressable
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             onPress={() => setStep('text-macro')}
           >
-            <Text style={styles.rowLabel}>Text Macro</Text>
-            <Text style={styles.rowHint}>Send custom text command</Text>
+            <Text style={styles.rowLabel}>文本宏</Text>
+            <Text style={styles.rowHint}>发送自定义文本命令</Text>
           </Pressable>
           {onManageShortcuts ? (
             <>
@@ -230,8 +233,8 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
                 onPress={onManageShortcuts}
               >
-                <Text style={styles.rowLabel}>Manage Shortcuts</Text>
-                <Text style={styles.rowHint}>Show, hide, or reorder shortcut keys</Text>
+                <Text style={styles.rowLabel}>管理快捷键</Text>
+                <Text style={styles.rowHint}>显示、隐藏或调整快捷键顺序</Text>
               </Pressable>
             </>
           ) : null}
@@ -258,7 +261,7 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Modifiers</Text>
+            <Text style={styles.sectionLabel}>修饰键</Text>
             <View style={styles.mods}>
               {SHORTCUT_MODIFIERS.map((modifier) => {
                 const selected = shortcutModifiers.includes(modifier.id)
@@ -289,13 +292,13 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Key</Text>
+            <Text style={styles.sectionLabel}>按键</Text>
             <TextInput
               style={styles.keyInput}
               value={shortcutKey.length === 1 ? shortcutKey.toUpperCase() : ''}
               onChangeText={handleShortcutKeyInput}
               placeholder={SPECIAL_KEY_BY_ID[shortcutKey]?.label ?? 'C'}
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={theme.color.text.tertiary}
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={1}
@@ -304,7 +307,7 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
               style={({ pressed }) => [styles.moreLink, pressed && styles.moreLinkPressed]}
               onPress={() => setStep('special-keys')}
             >
-              <Text style={styles.moreLinkText}>More keys — Tab, arrows, F1–F12…</Text>
+              <Text style={styles.moreLinkText}>更多按键：Tab、方向键、F1–F12…</Text>
             </Pressable>
           </View>
 
@@ -316,7 +319,7 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
             <Text
               style={[styles.saveButtonText, !shortcutPreview && styles.saveButtonTextDisabled]}
             >
-              Add
+              添加
             </Text>
           </Pressable>
         </View>
@@ -363,33 +366,36 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
       {step === 'text-macro' && (
         <View style={styles.group}>
           <View style={styles.macroForm}>
-            <Text style={styles.fieldLabel}>Label</Text>
+            <Text style={styles.fieldLabel}>名称</Text>
             <TextInput
               style={styles.fieldInput}
               value={macroLabel}
               onChangeText={setMacroLabel}
-              placeholder="e.g. Build"
-              placeholderTextColor={colors.textMuted}
+              placeholder="例如：构建"
+              placeholderTextColor={theme.color.text.tertiary}
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Text style={styles.fieldLabel}>Command</Text>
+            <Text style={styles.fieldLabel}>命令</Text>
             <TextInput
               style={styles.fieldInput}
               value={macroText}
               onChangeText={setMacroText}
-              placeholder="e.g. pnpm build"
-              placeholderTextColor={colors.textMuted}
+              placeholder="例如：pnpm build"
+              placeholderTextColor={theme.color.text.tertiary}
               autoCapitalize="none"
               autoCorrect={false}
             />
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Press Enter</Text>
+              <Text style={styles.switchLabel}>自动按下 Enter</Text>
               <Switch
                 value={macroEnter}
                 onValueChange={setMacroEnter}
-                trackColor={{ false: colors.bgRaised, true: colors.textSecondary }}
-                thumbColor={colors.textPrimary}
+                trackColor={{
+                  false: theme.color.bg.subtle,
+                  true: theme.color.bg.selected
+                }}
+                thumbColor={theme.color.text.inverse}
               />
             </View>
             <Pressable
@@ -400,7 +406,7 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
               <Text
                 style={[styles.saveButtonText, !macroText.trim() && styles.saveButtonTextDisabled]}
               >
-                Add Shortcut
+                添加快捷键
               </Text>
             </Pressable>
           </View>
@@ -410,276 +416,225 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
   )
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingBottom: spacing.sm
-  },
-  backButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  backButtonPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  backSpacer: {
-    width: 30
-  },
-  title: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    textAlign: 'center'
-  },
-  group: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12,
-    overflow: 'hidden'
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginHorizontal: spacing.md
-  },
-  row: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  rowPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  rowLabel: {
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textPrimary,
-    marginBottom: 1
-  },
-  rowHint: {
-    fontSize: 12,
-    color: colors.textMuted
-  },
-  shortcutForm: {
-    paddingTop: spacing.sm
-  },
-  preview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.lg + spacing.xs,
-    flexWrap: 'wrap'
-  },
-  previewKeycapRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  previewPlus: {
-    color: colors.textMuted,
-    fontSize: 16
-  },
-  keycap: {
-    minWidth: 48,
-    height: 48,
-    paddingHorizontal: spacing.md,
-    borderRadius: 10,
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  keycapModifier: {
-    minWidth: 0
-  },
-  keycapWarn: {
-    borderColor: colors.statusAmber
-  },
-  keycapText: {
-    color: colors.textPrimary,
-    fontFamily: typography.monoFamily,
-    fontSize: 17,
-    fontWeight: '600'
-  },
-  keycapTextWarn: {
-    color: colors.statusAmber
-  },
-  keycapModifierText: {
-    color: colors.textSecondary,
-    fontFamily: typography.monoFamily,
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  section: {
-    marginTop: spacing.md
-  },
-  sectionLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: spacing.sm,
-    paddingLeft: 2
-  },
-  mods: {
-    flexDirection: 'row',
-    gap: spacing.sm
-  },
-  chip: {
-    flex: 1,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: colors.bgPanel,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4
-  },
-  chipSelected: {
-    backgroundColor: colors.textPrimary
-  },
-  chipPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  chipText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500'
-  },
-  chipTextSelected: {
-    color: colors.bgBase
-  },
-  chipGlyph: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontFamily: typography.monoFamily
-  },
-  chipGlyphSelected: {
-    color: 'rgba(10,10,10,0.5)'
-  },
-  keyInput: {
-    width: '100%',
-    height: 56,
-    borderRadius: 10,
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    color: colors.textPrimary,
-    fontFamily: typography.monoFamily,
-    fontSize: 22,
-    fontWeight: '600',
-    textAlign: 'center'
-  },
-  moreLink: {
-    paddingVertical: spacing.sm,
-    alignItems: 'center'
-  },
-  moreLinkPressed: {
-    opacity: 0.6
-  },
-  moreLinkText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    textDecorationLine: 'underline'
-  },
-  specialKeysForm: {
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.md,
-    gap: spacing.md
-  },
-  specialGroup: {
-    gap: spacing.xs
-  },
-  specialGroupTitle: {
-    fontSize: 11,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    paddingLeft: 2,
-    marginBottom: spacing.xs
-  },
-  keyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -spacing.xs / 2
-  },
-  keyCellWrap: {
-    paddingHorizontal: spacing.xs / 2,
-    paddingVertical: spacing.xs / 2
-  },
-  keyCell: {
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: colors.bgPanel,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  keyCellPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  keyCellSelected: {
-    backgroundColor: colors.textPrimary
-  },
-  keyCellText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    fontFamily: typography.monoFamily
-  },
-  keyCellTextSelected: {
-    color: colors.bgBase
-  },
-  macroForm: {
-    padding: spacing.md,
-    gap: spacing.sm
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textSecondary
-  },
-  fieldInput: {
-    backgroundColor: colors.bgBase,
-    color: colors.textPrimary,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 14,
-    fontFamily: typography.monoFamily,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs
-  },
-  switchLabel: {
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  },
-  saveButton: {
-    marginTop: spacing.md,
-    backgroundColor: colors.textPrimary,
-    paddingVertical: spacing.md,
-    borderRadius: 10,
-    alignItems: 'center'
-  },
-  saveButtonDisabled: {
-    backgroundColor: colors.bgRaised
-  },
-  saveButtonText: {
-    color: colors.bgBase,
-    fontSize: 15,
-    fontWeight: '600'
-  },
-  saveButtonTextDisabled: {
-    color: colors.textMuted
-  }
-})
+export function createCustomKeyModalStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    header: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingBottom: theme.spacing.space8
+    },
+    backButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control
+    },
+    backButtonPressed: { backgroundColor: theme.color.bg.subtle },
+    backSpacer: { width: theme.size.minimumTouchTarget },
+    title: {
+      ...theme.typography.sectionTitle,
+      flex: 1,
+      color: theme.color.text.primary,
+      textAlign: 'center'
+    },
+    group: {
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      marginHorizontal: theme.spacing.space16,
+      backgroundColor: theme.color.border.subtle
+    },
+    row: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space12
+    },
+    rowPressed: { backgroundColor: theme.color.bg.subtle },
+    rowLabel: {
+      ...theme.typography.label,
+      marginBottom: theme.spacing.space4,
+      color: theme.color.text.primary
+    },
+    rowHint: { ...theme.typography.caption, color: theme.color.text.secondary },
+    shortcutForm: { paddingTop: theme.spacing.space8 },
+    preview: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: theme.spacing.space8,
+      paddingVertical: theme.spacing.space20
+    },
+    previewKeycapRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    previewPlus: { ...theme.typography.sectionTitle, color: theme.color.text.tertiary },
+    keycap: {
+      minWidth: theme.spacing.space48,
+      height: theme.spacing.space48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space12,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    keycapModifier: { minWidth: 0 },
+    keycapWarn: { borderColor: theme.color.status.warning },
+    keycapText: {
+      ...theme.typography.code,
+      color: theme.color.text.primary,
+      fontSize: 17,
+      fontWeight: '600'
+    },
+    keycapTextWarn: { color: theme.color.status.warning },
+    keycapModifierText: {
+      ...theme.typography.code,
+      color: theme.color.text.secondary,
+      fontSize: 14,
+      fontWeight: '600'
+    },
+    section: { marginTop: theme.spacing.space12 },
+    sectionLabel: {
+      ...theme.typography.caption,
+      marginBottom: theme.spacing.space8,
+      paddingLeft: theme.spacing.space4,
+      color: theme.color.text.secondary,
+      fontWeight: '500'
+    },
+    mods: { flexDirection: 'row', gap: theme.spacing.space8 },
+    chip: {
+      minHeight: theme.size.minimumTouchTarget,
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: theme.spacing.space4,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    chipSelected: {
+      borderColor: theme.color.bg.selected,
+      backgroundColor: theme.color.bg.selected
+    },
+    chipPressed: { backgroundColor: theme.color.bg.subtle },
+    chipText: { ...theme.typography.label, color: theme.color.text.secondary },
+    chipTextSelected: { color: theme.color.text.inverse },
+    chipGlyph: { ...theme.typography.code, color: theme.color.text.tertiary },
+    chipGlyphSelected: { color: theme.color.text.inverse, opacity: 0.55 },
+    keyInput: {
+      width: '100%',
+      height: 56,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface,
+      color: theme.color.text.primary,
+      fontFamily: theme.typography.code.fontFamily,
+      fontSize: 22,
+      fontWeight: '600',
+      textAlign: 'center'
+    },
+    moreLink: {
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: theme.spacing.space8
+    },
+    moreLinkPressed: { opacity: 0.6 },
+    moreLinkText: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      textDecorationLine: 'underline'
+    },
+    specialKeysForm: {
+      gap: theme.spacing.space12,
+      paddingTop: theme.spacing.space4,
+      paddingBottom: theme.spacing.space12
+    },
+    specialGroup: { gap: theme.spacing.space4 },
+    specialGroupTitle: {
+      ...theme.typography.caption,
+      marginBottom: theme.spacing.space4,
+      paddingLeft: theme.spacing.space4,
+      color: theme.color.text.secondary,
+      fontWeight: '500'
+    },
+    keyGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginHorizontal: -theme.spacing.space4 / 2
+    },
+    keyCellWrap: {
+      paddingHorizontal: theme.spacing.space4 / 2,
+      paddingVertical: theme.spacing.space4 / 2
+    },
+    keyCell: {
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    keyCellPressed: { backgroundColor: theme.color.bg.subtle },
+    keyCellSelected: {
+      borderColor: theme.color.bg.selected,
+      backgroundColor: theme.color.bg.selected
+    },
+    keyCellText: {
+      ...theme.typography.code,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    keyCellTextSelected: { color: theme.color.text.inverse },
+    macroForm: { gap: theme.spacing.space8, padding: theme.spacing.space16 },
+    fieldLabel: { ...theme.typography.label, color: theme.color.text.secondary },
+    fieldInput: {
+      minHeight: theme.spacing.space48,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.canvas,
+      color: theme.color.text.primary,
+      fontFamily: theme.typography.code.fontFamily,
+      fontSize: theme.typography.label.fontSize
+    },
+    switchRow: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.space4
+    },
+    switchLabel: { ...theme.typography.label, color: theme.color.text.primary },
+    saveButton: {
+      minHeight: theme.spacing.space48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: theme.spacing.space12,
+      paddingVertical: theme.spacing.space12,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.selected
+    },
+    saveButtonDisabled: { backgroundColor: theme.color.bg.subtle },
+    saveButtonText: { ...theme.typography.label, color: theme.color.text.inverse },
+    saveButtonTextDisabled: { color: theme.color.text.tertiary }
+  })
+}

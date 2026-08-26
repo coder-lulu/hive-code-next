@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { GitMerge, Link2Off } from 'lucide-react-native'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import type { GitHubPRMergeMethod, PRInfo } from '../../../../src/shared/github/pull-request-types'
 import type { RpcClient } from '../../transport/rpc-client'
 import type { MobilePrActions } from '../../session/use-mobile-pr-actions'
@@ -9,7 +9,7 @@ import { unlinkMobilePr } from '../../source-control/mobile-pr-link'
 import { ConfirmModal } from '../ConfirmModal'
 import { canShowMobilePRAutoMergeControl } from './pr-auto-merge-availability'
 import { resolveMobilePrMergeMethod, resolvePrActionAvailability } from './pr-actions-state'
-import { prActionsStyles as styles } from './pr-actions-styles'
+import { createPrActionsStyles } from './pr-actions-styles'
 
 type Props = {
   pr: PRInfo
@@ -27,6 +27,8 @@ type Confirm =
 // Merge primary; Close/Reopen + Unlink share one secondary row. No section title —
 // button labels are self-explanatory and a header wasted a full row on mobile.
 export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createPrActionsStyles)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
   const [unlinking, setUnlinking] = useState(false)
   // Local unlink errors — unlink is not routed through the actions engine.
@@ -65,7 +67,7 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
         setUnlinkError(outcome.error)
       }
     } catch (err) {
-      setUnlinkError(err instanceof Error ? err.message : 'Failed to unlink pull request.')
+      setUnlinkError(err instanceof Error ? err.message : '取消关联拉取请求失败。')
     } finally {
       setUnlinking(false)
     }
@@ -74,22 +76,22 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
   const confirmCopy = (): { title: string; message: string; confirmLabel: string } => {
     if (confirm?.kind === 'merge') {
       return {
-        title: 'Merge pull request?',
-        message: `This will merge #${pr.number} into its base branch.`,
-        confirmLabel: 'Merge'
+        title: '合并拉取请求？',
+        message: `这会将 #${pr.number} 合并到目标分支。`,
+        confirmLabel: '合并'
       }
     }
     if (confirm?.kind === 'state' && confirm.state === 'closed') {
       return {
-        title: 'Close pull request?',
-        message: `#${pr.number} will be closed without merging.`,
-        confirmLabel: 'Close'
+        title: '关闭拉取请求？',
+        message: `#${pr.number} 将被关闭且不会合并。`,
+        confirmLabel: '关闭'
       }
     }
     return {
-      title: 'Reopen pull request?',
-      message: `#${pr.number} will be reopened.`,
-      confirmLabel: 'Reopen'
+      title: '重新打开拉取请求？',
+      message: `#${pr.number} 将重新打开。`,
+      confirmLabel: '重新打开'
     }
   }
 
@@ -123,22 +125,20 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
           }}
           disabled={mergeBusy}
           accessibilityRole="button"
-          accessibilityLabel="Merge pull request"
+          accessibilityLabel="合并拉取请求"
         >
           {mergeBusy ? (
-            <ActivityIndicator color={colors.onMergeGreen} />
+            <ActivityIndicator color={theme.color.text.inverse} />
           ) : (
-            <GitMerge size={16} color={colors.onMergeGreen} strokeWidth={2.2} />
+            <GitMerge size={16} color={theme.color.text.inverse} strokeWidth={2.2} />
           )}
-          <Text style={[styles.actionButtonText, styles.actionButtonTextMerge]}>
-            Merge pull request
-          </Text>
+          <Text style={[styles.actionButtonText, styles.actionButtonTextMerge]}>合并拉取请求</Text>
         </Pressable>
       ) : null}
 
       {showAutoMerge ? (
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Auto-merge when ready</Text>
+          <Text style={styles.toggleLabel}>就绪后自动合并</Text>
           <Pressable
             style={[styles.togglePill, autoMerge && styles.togglePillOn]}
             onPress={() => {
@@ -148,13 +148,13 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
             disabled={autoMergeBusy}
             accessibilityRole="switch"
             accessibilityState={{ checked: autoMerge }}
-            accessibilityLabel="Toggle auto-merge"
+            accessibilityLabel="切换自动合并"
           >
             {autoMergeBusy ? (
-              <ActivityIndicator color={colors.textSecondary} />
+              <ActivityIndicator color={theme.color.text.secondary} />
             ) : (
               <Text style={[styles.togglePillText, autoMerge && styles.togglePillTextOn]}>
-                {autoMerge ? 'On' : 'Off'}
+                {autoMerge ? '开启' : '关闭'}
               </Text>
             )}
           </Pressable>
@@ -176,16 +176,16 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
               }}
               disabled={stateBusy}
               accessibilityRole="button"
-              accessibilityLabel={avail.canClose ? 'Close pull request' : 'Reopen pull request'}
+              accessibilityLabel={avail.canClose ? '关闭拉取请求' : '重新打开拉取请求'}
             >
-              {stateBusy ? <ActivityIndicator color={colors.textSecondary} /> : null}
+              {stateBusy ? <ActivityIndicator color={theme.color.text.secondary} /> : null}
               <Text
                 style={[
                   styles.actionButtonText,
                   avail.canClose && styles.actionButtonDestructiveText
                 ]}
               >
-                {avail.canClose ? 'Close' : 'Reopen'}
+                {avail.canClose ? '关闭' : '重新打开'}
               </Text>
             </Pressable>
           ) : null}
@@ -199,14 +199,14 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
               onPress={() => void unlink()}
               disabled={unlinkBusy}
               accessibilityRole="button"
-              accessibilityLabel="Unlink pull request"
+              accessibilityLabel="取消关联拉取请求"
             >
               {unlinking ? (
-                <ActivityIndicator color={colors.textSecondary} />
+                <ActivityIndicator color={theme.color.text.secondary} />
               ) : (
-                <Link2Off size={16} color={colors.textSecondary} strokeWidth={2.2} />
+                <Link2Off size={16} color={theme.color.text.secondary} strokeWidth={2.2} />
               )}
-              <Text style={styles.actionButtonText}>Unlink</Text>
+              <Text style={styles.actionButtonText}>取消关联</Text>
             </Pressable>
           ) : null}
         </View>

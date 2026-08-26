@@ -1,4 +1,4 @@
-import { colors } from '../theme/mobile-theme'
+import { darkTheme, lightTheme } from '../theme/mobile-theme'
 
 // Theme normalization and page-surface painting injected into the WebView IIFE.
 // Mirrors the desktop minimumContrastRatio gate (src/renderer/src/lib/terminal-contrast-correction.ts,
@@ -9,8 +9,8 @@ import { colors } from '../theme/mobile-theme'
 export const TERMINAL_WEBVIEW_THEME_JS = `
   var DARK_BG_MIN_CONTRAST = 3;
   var LIGHT_BG_MIN_CONTRAST = 4.5;
-  // Dark app surface a transparent terminal background composites over (matches desktop APP_SURFACE_COLORS.dark).
-  var CONTRAST_APP_SURFACE = { r: 10, g: 10, b: 10 };
+  var DARK_APP_SURFACE_COLOR = '${darkTheme.color.bg.canvas}';
+  var LIGHT_APP_SURFACE_COLOR = '${lightTheme.color.bg.canvas}';
 
   function parseTerminalBackgroundRgba(value) {
     if (typeof value !== 'string') return null;
@@ -65,14 +65,17 @@ export const TERMINAL_WEBVIEW_THEME_JS = `
 
   // Pick the xterm minimumContrastRatio floor from the composed terminal background.
   // Unparseable input defaults to the dark floor so agent output never stays invisible.
-  function resolveTerminalContrastFloor(background) {
+  function resolveTerminalContrastFloor(background, mode) {
     var color = parseTerminalBackgroundRgba(background);
     if (!color) return DARK_BG_MIN_CONTRAST;
+    var appSurface = parseTerminalBackgroundRgba(
+      mode === 'light' ? LIGHT_APP_SURFACE_COLOR : DARK_APP_SURFACE_COLOR
+    ) || { r: 10, g: 10, b: 10 };
     var composited = color.a < 1
       ? {
-          r: Math.round(color.r * color.a + CONTRAST_APP_SURFACE.r * (1 - color.a)),
-          g: Math.round(color.g * color.a + CONTRAST_APP_SURFACE.g * (1 - color.a)),
-          b: Math.round(color.b * color.a + CONTRAST_APP_SURFACE.b * (1 - color.a))
+          r: Math.round(color.r * color.a + appSurface.r * (1 - color.a)),
+          g: Math.round(color.g * color.a + appSurface.g * (1 - color.a)),
+          b: Math.round(color.b * color.a + appSurface.b * (1 - color.a))
         }
       : color;
     var isLight = terminalContrastRatio({ r: 0, g: 0, b: 0 }, composited) >=
@@ -97,10 +100,21 @@ export const TERMINAL_WEBVIEW_THEME_JS = `
   function applyTerminalTheme(input) {
     terminalThemeInput = input;
     terminalTheme = normalizeTerminalTheme(input);
-    var background = terminalTheme.background || '${colors.terminalBg}';
+    var background = terminalTheme.background || '${darkTheme.terminal.background}';
     document.documentElement.style.background = background;
     document.body.style.background = background;
-    terminalMinimumContrastRatio = resolveTerminalContrastFloor(background);
+    var rootStyle = document.documentElement.style;
+    if (typeof rootStyle.setProperty === 'function') {
+      rootStyle.setProperty('--terminal-scroll-thumb', terminalTheme.brightBlack || terminalTheme.foreground);
+      rootStyle.setProperty('--terminal-accent', terminalTheme.blue || terminalTheme.foreground);
+      rootStyle.setProperty('--terminal-foreground', terminalTheme.foreground);
+      rootStyle.setProperty(
+        '--terminal-menu-background',
+        terminalTheme.selectionBackground || terminalTheme.background
+      );
+      rootStyle.setProperty('--terminal-menu-active', terminalTheme.brightBlack || terminalTheme.foreground);
+    }
+    terminalMinimumContrastRatio = resolveTerminalContrastFloor(background, input && input.mode);
     if (term) {
       term.options.theme = terminalTheme;
       term.options.minimumContrastRatio = terminalMinimumContrastRatio;

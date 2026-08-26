@@ -62,6 +62,14 @@ vi.mock('lucide-react-native', () => ({
   User: 'User'
 }))
 
+vi.mock('./theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('./theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: (factory: (theme: typeof lightTheme) => unknown) => factory(lightTheme)
+  }
+})
+
 vi.mock('./transport/host-store', () => ({ loadHosts: dependencies.loadHosts }))
 
 vi.mock('./transport/client-context', () => {

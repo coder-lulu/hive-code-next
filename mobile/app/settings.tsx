@@ -1,44 +1,62 @@
-import { useCallback, useRef, useState } from 'react'
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Linking,
-  ActivityIndicator,
-  ScrollView
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { PRODUCT_PUBLIC_LINKS } from '@/product-brand'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
-  ChevronLeft,
-  ChevronRight,
-  Info,
   Bell,
-  Wrench,
-  Shield,
-  LifeBuoy,
-  Mic,
+  ChevronLeft,
+  Database,
   Globe,
+  Info,
+  KeyRound,
+  Languages,
+  LifeBuoy,
+  LogIn,
   MessageSquare,
+  Mic,
+  MonitorDown,
+  Palette,
+  RefreshCw,
+  Scale,
+  Shield,
   Terminal as TerminalIcon,
-  KeyRound
+  UserRound,
+  Wrench
 } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../src/theme/mobile-theme'
+import { APP_DISPLAY_NAME, PRODUCT_PUBLIC_LINKS, productNameText } from '@/product-brand'
+import { useMobileTheme, useMobileThemePreference } from '../src/theme/mobile-theme-provider'
+import type { MobileThemePreference } from '../src/theme/mobile-theme-preference'
+import { SettingsGroup, SettingsRow } from '../src/settings/SettingsGroup'
+import { createSettingsScreenStyles } from '../src/settings/settings-screen-styles'
 import {
   loadPendingHostCredentialCleanup,
   subscribePendingHostCredentialCleanup
 } from '../src/transport/host-credential-cleanup'
 import { retryPendingHostCredentialCleanup } from '../src/transport/host-store'
+import { useMobileAuthSession } from '../src/auth/mobile-auth-session'
+
+const THEME_OPTIONS: readonly { label: string; value: MobileThemePreference }[] = [
+  { label: '系统', value: 'system' },
+  { label: '浅色', value: 'light' },
+  { label: '深色', value: 'dark' }
+]
 
 export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const { hydrated: authHydrated, session } = useMobileAuthSession()
+  const {
+    preference,
+    hydrated: themePreferenceHydrated,
+    setPreference
+  } = useMobileThemePreference()
+  const styles = useMemo(() => createSettingsScreenStyles(theme), [theme])
   const [pendingCredentialIds, setPendingCredentialIds] = useState<string[]>([])
   const [credentialStorageUnreadable, setCredentialStorageUnreadable] = useState(false)
   const [retryingCredentialCleanup, setRetryingCredentialCleanup] = useState(false)
   const [credentialRetryFailed, setCredentialRetryFailed] = useState(false)
+  const [themePreferenceSaveFailed, setThemePreferenceSaveFailed] = useState(false)
   const credentialRefreshGenerationRef = useRef(0)
 
   useFocusEffect(
@@ -51,8 +69,6 @@ export default function SettingsScreen() {
           if (active && generation === credentialRefreshGenerationRef.current) {
             setPendingCredentialIds(state.ids)
             setCredentialStorageUnreadable(state.storageUnreadable)
-            // Why: neutral copy once the queue is confirmed empty so a later
-            // pending set does not inherit a previous Retry failure message.
             if (state.ids.length === 0 && !state.storageUnreadable) {
               setCredentialRetryFailed(false)
             }
@@ -87,102 +103,208 @@ export default function SettingsScreen() {
     }
   }, [retryingCredentialCleanup])
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back()
+      return
+    }
+    router.replace('/')
+  }
+
   const pendingCredentialCount = pendingCredentialIds.length
-  // Why: show the cleanup card whenever cleanup is pending OR the durable queue
-  // is unreadable — an unreadable queue can hide an orphaned token, so keep a
-  // retry affordance rather than a silently-empty (hidden) section.
   const showCredentialCleanup = pendingCredentialCount > 0 || credentialStorageUnreadable
 
+  const changeThemePreference = useCallback(
+    async (nextPreference: MobileThemePreference) => {
+      setThemePreferenceSaveFailed(false)
+      const saved = await setPreference(nextPreference)
+      setThemePreferenceSaveFailed(!saved)
+    },
+    [setPreference]
+  )
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
-      <View style={styles.topRow}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={22} color={colors.textSecondary} />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={styles.topBar}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          hitSlop={4}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          onPress={goBack}
+        >
+          <ChevronLeft size={24} strokeWidth={1.8} color={theme.color.text.primary} />
         </Pressable>
-        <Text style={styles.heading}>Settings</Text>
+        <Text style={[theme.typography.pageTitle, { color: theme.color.text.primary }]}>设置</Text>
+        <View style={styles.backButton} />
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.lg }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + theme.spacing.space32 }
+        ]}
       >
-        <View style={styles.section}>
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        <SettingsGroup title="账号">
+          <SettingsRow
+            icon={UserRound}
+            label={`${APP_DISPLAY_NAME} 账号`}
+            value={!authHydrated ? '读取中' : session ? session.account.displayName : '未登录'}
+            onPress={() => router.push('/account')}
+          />
+          <SettingsRow
+            last
+            icon={LogIn}
+            label="登录与注册"
+            value={session ? '已登录' : '登录/注册'}
+            onPress={() => router.push('/login')}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="显示与语言">
+          <View style={styles.appearanceRow}>
+            <Palette size={20} strokeWidth={1.8} color={theme.color.text.secondary} />
+            <View style={styles.appearanceContent}>
+              <Text style={[theme.typography.body, { color: theme.color.text.primary }]}>外观</Text>
+              <View accessibilityLabel="外观主题" style={styles.themeOptions}>
+                {THEME_OPTIONS.map((option) => {
+                  const selected = option.value === preference
+                  return (
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{
+                        checked: selected,
+                        disabled: !themePreferenceHydrated
+                      }}
+                      disabled={!themePreferenceHydrated}
+                      key={option.value}
+                      onPress={() => void changeThemePreference(option.value)}
+                      style={({ pressed }) => [
+                        styles.themeOption,
+                        selected && styles.themeOptionSelected,
+                        pressed && styles.themeOptionPressed
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          theme.typography.caption,
+                          styles.themeOptionText,
+                          selected && styles.themeOptionTextSelected
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+              {themePreferenceSaveFailed ? (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[theme.typography.caption, { color: theme.color.status.warning }]}
+                >
+                  主题已临时切换，但未能保存到此设备。
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          <SettingsRow last disabled icon={Languages} label="语言" value="简体中文 · 后续支持" />
+        </SettingsGroup>
+
+        <SettingsGroup title="客户端">
+          <SettingsRow
+            icon={TerminalIcon}
+            label="终端"
             onPress={() => router.push('/terminal-settings')}
-          >
-            <TerminalIcon size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Terminal</Text>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.separator} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          />
+          <SettingsRow
+            icon={MessageSquare}
+            label="聊天界面"
             onPress={() => router.push('/native-chat-settings')}
-          >
-            <MessageSquare size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Chat UI</Text>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.separator} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          />
+          <SettingsRow
+            icon={Globe}
+            label="浏览器"
             onPress={() => router.push('/browser-settings')}
-          >
-            <Globe size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Browser</Text>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.separator} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => router.push('/voice-settings')}
-          >
-            <Mic size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Voice</Text>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.separator} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          />
+          <SettingsRow icon={Mic} label="语音" onPress={() => router.push('/voice-settings')} />
+          <SettingsRow
+            last
+            icon={Bell}
+            label="通知"
             onPress={() => router.push('/notifications')}
-          >
-            <Bell size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Notifications</Text>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.separator} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="支持与诊断">
+          <SettingsRow
+            icon={Wrench}
+            label="故障排查"
             onPress={() => router.push('/troubleshoot')}
-          >
-            <Wrench size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>Troubleshooting</Text>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.separator} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          />
+          <SettingsRow
+            last={!PRODUCT_PUBLIC_LINKS.support}
+            icon={LifeBuoy}
+            label="帮助与反馈"
+            onPress={() => router.push('/feedback')}
+          />
+          {PRODUCT_PUBLIC_LINKS.support ? (
+            <SettingsRow
+              last
+              icon={Globe}
+              label="在线帮助"
+              onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.support!)}
+            />
+          ) : null}
+        </SettingsGroup>
+
+        <SettingsGroup title="法律与隐私">
+          <SettingsRow icon={Shield} label="隐私中心" onPress={() => router.push('/privacy')} />
+          <SettingsRow
+            icon={Scale}
+            label="服务协议"
+            value={PRODUCT_PUBLIC_LINKS.termsOfService ? '已配置' : '尚未配置'}
+            onPress={() => router.push({ pathname: '/legal', params: { document: 'terms' } })}
+          />
+          <SettingsRow
+            last
+            icon={Shield}
+            label="隐私政策"
+            value={PRODUCT_PUBLIC_LINKS.privacyPolicy ? '已配置' : '尚未配置'}
+            onPress={() => router.push({ pathname: '/legal', params: { document: 'privacy' } })}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="存储与关于">
+          <SettingsRow icon={Database} label="存储空间" onPress={() => router.push('/storage')} />
+          <SettingsRow disabled icon={MonitorDown} label="桌面客户端下载" value="尚未配置" />
+          <SettingsRow disabled icon={RefreshCw} label="检查更新" value="后续支持" />
+          <SettingsRow
+            last
+            icon={Info}
+            label={productNameText('关于 Orca')}
             onPress={() => router.push('/about')}
-          >
-            <Info size={16} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>About</Text>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </Pressable>
-        </View>
+          />
+        </SettingsGroup>
 
         {showCredentialCleanup ? (
-          <View style={[styles.section, styles.sectionSpacer]}>
-            <View style={styles.credentialCleanupRow}>
-              <KeyRound size={16} color={colors.statusAmber} />
-              <View style={styles.credentialCleanupCopy}>
-                <Text style={styles.credentialCleanupTitle}>Pairing credential cleanup</Text>
-                <Text accessibilityLiveRegion="polite" style={styles.rowHint}>
+          <SettingsGroup title="安全恢复">
+            <View style={styles.credentialRow}>
+              <KeyRound size={20} strokeWidth={1.8} color={theme.color.status.warning} />
+              <View style={styles.credentialCopy}>
+                <Text style={[theme.typography.body, { color: theme.color.text.primary }]}>
+                  配对凭据清理
+                </Text>
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[theme.typography.caption, { color: theme.color.text.secondary }]}
+                >
                   {credentialRetryFailed
-                    ? "Cleanup still couldn't be confirmed. Try again later."
+                    ? '仍无法确认清理结果，请稍后重试。'
                     : pendingCredentialCount > 0
-                      ? `Couldn't confirm cleanup for ${pendingCredentialCount} credential${pendingCredentialCount === 1 ? '' : 's'} on this device.`
-                      : "Couldn't check cleanup status on this device. Retry to be safe."}
+                      ? `此设备仍有 ${pendingCredentialCount} 个凭据未确认清理。`
+                      : '无法读取凭据清理状态，请重试确认。'}
                 </Text>
               </View>
               <Pressable
@@ -193,138 +315,25 @@ export default function SettingsScreen() {
                   disabled: retryingCredentialCleanup
                 }}
                 disabled={retryingCredentialCleanup}
-                hitSlop={8}
+                hitSlop={4}
                 style={({ pressed }) => [
                   styles.retryButton,
-                  pressed && !retryingCredentialCleanup && styles.rowPressed
+                  pressed && !retryingCredentialCleanup && styles.pressed
                 ]}
                 onPress={() => void retryCredentialCleanup()}
               >
                 {retryingCredentialCleanup ? (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <ActivityIndicator size="small" color={theme.color.text.secondary} />
                 ) : (
-                  <Text style={styles.retryButtonText}>Retry</Text>
+                  <Text style={[theme.typography.label, { color: theme.color.text.primary }]}>
+                    重试
+                  </Text>
                 )}
               </Pressable>
             </View>
-          </View>
-        ) : null}
-
-        {PRODUCT_PUBLIC_LINKS.privacyPolicy || PRODUCT_PUBLIC_LINKS.support ? (
-          <View style={[styles.section, styles.sectionSpacer]}>
-            {PRODUCT_PUBLIC_LINKS.privacyPolicy ? (
-              <Pressable
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-                onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.privacyPolicy!)}
-              >
-                <Shield size={16} color={colors.textSecondary} />
-                <Text style={styles.rowLabel}>Privacy Policy</Text>
-              </Pressable>
-            ) : null}
-            {PRODUCT_PUBLIC_LINKS.privacyPolicy && PRODUCT_PUBLIC_LINKS.support ? (
-              <View style={styles.separator} />
-            ) : null}
-            {PRODUCT_PUBLIC_LINKS.support ? (
-              <Pressable
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-                onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.support!)}
-              >
-                <LifeBuoy size={16} color={colors.textSecondary} />
-                <Text style={styles.rowLabel}>Support</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          </SettingsGroup>
         ) : null}
       </ScrollView>
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase,
-    paddingHorizontal: spacing.lg
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xl
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textPrimary
-  },
-  section: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12,
-    overflow: 'hidden'
-  },
-  sectionSpacer: {
-    marginTop: spacing.md
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  rowPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  rowLabel: {
-    flex: 1,
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textPrimary
-  },
-  credentialCleanupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  credentialCleanupCopy: {
-    flex: 1,
-    gap: spacing.xs
-  },
-  credentialCleanupTitle: {
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textPrimary
-  },
-  rowHint: {
-    fontSize: typography.metaSize,
-    color: colors.textSecondary,
-    lineHeight: 17
-  },
-  retryButton: {
-    width: 72,
-    height: 32,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  retryButtonText: {
-    fontSize: typography.metaSize,
-    fontWeight: '600',
-    color: colors.textPrimary
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginHorizontal: spacing.md
-  }
-})

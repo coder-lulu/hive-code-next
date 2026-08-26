@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Windows file-symlink privilege gates keep the security cases beside the shared FsHandler fixture. */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { FsHandler } from './fs-handler'
 import { MAX_TEXT_FILE_SIZE } from './fs-handler-utils'
@@ -18,47 +17,26 @@ vi.mock('@parcel/watcher', () => ({
   subscribe: mockSubscribe
 }))
 
+type HandlerContext = { clientId: number; isStale: () => boolean }
+type RequestHandler = (
+  params: Record<string, unknown>,
+  context?: HandlerContext
+) => Promise<unknown>
+type NotificationHandler = (params: Record<string, unknown>, context?: HandlerContext) => void
+
 function createMockDispatcher() {
-  const requestHandlers = new Map<
-    string,
-    (
-      params: Record<string, unknown>,
-      context?: { clientId: number; isStale: () => boolean }
-    ) => Promise<unknown>
-  >()
-  const notificationHandlers = new Map<
-    string,
-    (
-      params: Record<string, unknown>,
-      context?: { clientId: number; isStale: () => boolean }
-    ) => void
-  >()
+  const requestHandlers = new Map<string, RequestHandler>()
+  const notificationHandlers = new Map<string, NotificationHandler>()
   const detachListeners = new Set<(clientId: number) => void>()
   const notifications: { method: string; params?: Record<string, unknown> }[] = []
 
   return {
-    onRequest: vi.fn(
-      (
-        method: string,
-        handler: (
-          params: Record<string, unknown>,
-          context?: { clientId: number; isStale: () => boolean }
-        ) => Promise<unknown>
-      ) => {
-        requestHandlers.set(method, handler)
-      }
-    ),
-    onNotification: vi.fn(
-      (
-        method: string,
-        handler: (
-          params: Record<string, unknown>,
-          context?: { clientId: number; isStale: () => boolean }
-        ) => void
-      ) => {
-        notificationHandlers.set(method, handler)
-      }
-    ),
+    onRequest: vi.fn((method: string, handler: RequestHandler) => {
+      requestHandlers.set(method, handler)
+    }),
+    onNotification: vi.fn((method: string, handler: NotificationHandler) => {
+      notificationHandlers.set(method, handler)
+    }),
     notify: vi.fn((method: string, params?: Record<string, unknown>) => {
       notifications.push({ method, params })
     }),
@@ -73,7 +51,7 @@ function createMockDispatcher() {
     async callRequest(
       method: string,
       params: Record<string, unknown> = {},
-      context?: { clientId?: number; isStale: () => boolean }
+      context?: Partial<HandlerContext>
     ) {
       const handler = requestHandlers.get(method)
       if (!handler) {
@@ -87,7 +65,7 @@ function createMockDispatcher() {
     callNotification(
       method: string,
       params: Record<string, unknown> = {},
-      context?: { clientId: number; isStale: () => boolean }
+      context?: HandlerContext
     ) {
       const handler = notificationHandlers.get(method)
       if (!handler) {

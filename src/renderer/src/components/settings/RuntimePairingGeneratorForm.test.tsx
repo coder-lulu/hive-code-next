@@ -65,4 +65,15 @@ describe('RuntimePairingGeneratorForm', () => {
     expect(markup).toContain('The connection address changed.')
     expect(markup).not.toContain('stale-secret')
   })
+
+  it('renders legacy pairing URLs with the HiveCode scheme', () => {
+    const markup = renderForm('another', '100.76.32.125', {
+      address: '100.76.32.125',
+      runtimePairingUrl: 'orca://pair?code=legacy-secret',
+      webClientUrl: 'https://example.test/?pair=legacy-secret'
+    })
+
+    expect(markup).toContain('hivecode://pair?code=legacy-secret')
+    expect(markup).not.toContain('orca://pair?code=legacy-secret')
+  })
 })

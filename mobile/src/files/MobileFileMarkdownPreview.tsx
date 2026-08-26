@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { Code, Pencil } from 'lucide-react-native'
 import { MobileMarkdown } from '../components/MobileMarkdown'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import {
   MobileFilePreviewSourceText,
   MobileFilePreviewTruncatedNote
 } from './MobileFilePreviewSourceText'
-import { filePreviewStyles as styles } from './mobile-file-preview-styles'
+import { createFilePreviewStyles } from './mobile-file-preview-styles'
 
 type Props = {
   relativePath: string
@@ -24,6 +24,8 @@ export function MobileFileMarkdownPreview({
   byteLength,
   initialLine
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createFilePreviewStyles)
   const [mode, setMode] = useState<'preview' | 'source'>(() => (initialLine ? 'source' : 'preview'))
   const [previousRelativePath, setPreviousRelativePath] = useState(relativePath)
   const [previousInitialLine, setPreviousInitialLine] = useState(initialLine)
@@ -45,11 +47,11 @@ export function MobileFileMarkdownPreview({
           onPress={() => setMode('source')}
           accessibilityRole="button"
           accessibilityState={{ selected: sourceSelected }}
-          accessibilityLabel="View Markdown source"
+          accessibilityLabel="查看 Markdown 源码"
         >
           <Code
             size={15}
-            color={sourceSelected ? colors.textPrimary : colors.textSecondary}
+            color={sourceSelected ? theme.color.text.inverse : theme.color.text.secondary}
             strokeWidth={2.2}
           />
         </Pressable>
@@ -58,11 +60,11 @@ export function MobileFileMarkdownPreview({
           onPress={() => setMode('preview')}
           accessibilityRole="button"
           accessibilityState={{ selected: previewSelected }}
-          accessibilityLabel="View rendered Markdown preview"
+          accessibilityLabel="查看 Markdown 预览"
         >
           <Pencil
             size={15}
-            color={previewSelected ? colors.textPrimary : colors.textSecondary}
+            color={previewSelected ? theme.color.text.inverse : theme.color.text.secondary}
             strokeWidth={2.2}
           />
         </Pressable>

@@ -1,185 +1,164 @@
 import { StyleSheet } from 'react-native'
 
-import { colors, spacing, radii, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 
-export const mobileSessionFrameStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase
-  },
-  kavInner: {
-    flex: 1
-  },
-  // Master-detail content row below the header chrome (KTD2): the existing content is
-  // the flex-1 left child; the dock column (when present on wide) is the right child.
-  sessionContentRow: {
-    flex: 1,
-    flexDirection: 'row'
-  },
-  sessionContentMain: {
-    flex: 1,
-    minWidth: 0
-  },
-  sessionChrome: {
-    backgroundColor: colors.bgPanel,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  sessionTopBar: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.xs
-  },
-  backButtonPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  filesButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.button,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.xs
-  },
-  filesButtonPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  // Selected state for the active docked-panel icon on wide layouts (R2).
-  filesButtonActive: {
-    backgroundColor: colors.bgRaised
-  },
-  sessionTitleBlock: {
-    flex: 1,
-    minWidth: 0
-  },
-  sessionTitle: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  sessionMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2
-  },
-  sessionMetaText: {
-    flexShrink: 1,
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
-  },
-  tabBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle
-  },
-  tabScroll: {
-    flex: 1,
-    maxHeight: 36
-  },
-  tabContent: {
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.sm
-  },
-  tab: {
-    width: 128,
-    maxWidth: 128,
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent'
-  },
-  tabActive: {
-    // Neutral grey underline, matching the desktop terminal tab's active
-    // indicator (a muted foreground/card mix), not a blue accent.
-    borderBottomColor: colors.textSecondary
-  },
-  tabLabelRow: {
-    maxWidth: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs
-  },
-  tabText: {
-    flexShrink: 1,
-    color: colors.textSecondary,
-    fontSize: 13
-  },
-  tabTextActive: {
-    color: colors.textPrimary
-  },
-  newTerminalButton: {
-    width: 40,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent'
-  },
-  newTerminalButtonPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  newTerminalButtonDisabled: {
-    opacity: 0.45
-  },
-  // Divider between the + new-terminal button and the Quick Commands launcher,
-  // matching the tab strip's borderSubtle separators.
-  tabActionDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 18,
-    backgroundColor: colors.borderSubtle
-  },
-  terminalFrame: {
-    flex: 1,
-    minHeight: 0,
-    position: 'relative',
-    overflow: 'hidden'
-  },
-  terminalPane: {
-    ...StyleSheet.absoluteFillObject
-  },
-  terminalPaneHidden: {
-    opacity: 0
-  },
-  terminalWebView: {
-    flex: 1
-  },
-  markdownFrame: {
-    flex: 1,
-    minHeight: 0,
-    backgroundColor: colors.bgBase
-  },
-  browserFrame: {
-    flex: 1,
-    minHeight: 0,
-    backgroundColor: colors.bgBase
-  },
-  markdownEditor: {
-    flex: 1,
-    position: 'relative'
-  },
-  markdownState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.md
-  },
-  markdownError: {
-    color: colors.statusRed,
-    fontSize: typography.bodySize
-  }
-})
+export function createMobileSessionFrameStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.color.bg.canvas
+    },
+    kavInner: {
+      flex: 1
+    },
+    sessionContentRow: {
+      flex: 1,
+      flexDirection: 'row'
+    },
+    sessionContentMain: {
+      flex: 1,
+      minWidth: 0,
+      backgroundColor: theme.color.bg.canvas
+    },
+    sessionChrome: {
+      backgroundColor: theme.color.bg.surface,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle
+    },
+    sessionTopBar: {
+      minHeight: theme.size.navigationBarHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.space8
+    },
+    backButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.space4
+    },
+    backButtonPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    filesButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.control,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: theme.spacing.space4
+    },
+    filesButtonPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    filesButtonActive: {
+      backgroundColor: theme.color.bg.selected
+    },
+    sessionTitleBlock: {
+      flex: 1,
+      minWidth: 0
+    },
+    sessionTitle: {
+      ...theme.typography.label,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    sessionMetaRow: {
+      minHeight: theme.spacing.space20,
+      flexDirection: 'row',
+      alignItems: 'center'
+    },
+    sessionMetaText: {
+      ...theme.typography.caption,
+      flexShrink: 1,
+      color: theme.color.text.secondary
+    },
+    tabBar: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle,
+      backgroundColor: theme.color.bg.surface
+    },
+    tabScroll: {
+      flex: 1,
+      maxHeight: theme.size.minimumTouchTarget
+    },
+    tabContent: {
+      paddingHorizontal: theme.spacing.space8
+    },
+    tab: {
+      width: 128,
+      maxWidth: 128,
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space8,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent'
+    },
+    tabActive: {
+      borderBottomColor: theme.color.text.primary
+    },
+    tabLabelRow: {
+      maxWidth: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4
+    },
+    tabText: {
+      ...theme.typography.meta,
+      flexShrink: 1,
+      color: theme.color.text.secondary
+    },
+    tabTextActive: {
+      color: theme.color.text.primary,
+      fontWeight: '500'
+    },
+    newTerminalButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    newTerminalButtonPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    newTerminalButtonDisabled: {
+      opacity: 0.45
+    },
+    tabActionDivider: {
+      width: StyleSheet.hairlineWidth,
+      height: theme.spacing.space20,
+      backgroundColor: theme.color.border.subtle
+    },
+    terminalFrame: {
+      flex: 1,
+      minHeight: 0,
+      position: 'relative',
+      overflow: 'hidden'
+    },
+    terminalPane: {
+      ...StyleSheet.absoluteFillObject
+    },
+    terminalPaneHidden: {
+      opacity: 0
+    },
+    terminalWebView: {
+      flex: 1
+    },
+    markdownFrame: {
+      flex: 1,
+      minHeight: 0,
+      backgroundColor: theme.color.bg.canvas
+    },
+    browserFrame: {
+      flex: 1,
+      minHeight: 0,
+      backgroundColor: theme.color.bg.canvas
+    }
+  })
+}

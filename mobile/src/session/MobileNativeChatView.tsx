@@ -11,13 +11,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import { ArrowDown, ChevronsDownUp, ChevronsUpDown, Square } from 'lucide-react-native'
+import { formatAgentTypeLabel } from '../../../src/shared/agent-type-label'
 import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
-import { colors } from '../theme/mobile-theme'
-import { styles } from './mobile-native-chat-view-styles'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { createMobileNativeChatViewStyles } from './mobile-native-chat-view-styles'
 import {
   buildMobileNativeChatTransientData,
-  mobileNativeChatEmptyState,
   type MobileNativeChatPendingItem
 } from './mobile-native-chat-render-data'
 import { useMobileNativeChatPinchGesture } from './use-mobile-native-chat-pinch-gesture'
@@ -34,6 +34,8 @@ import { mobileChatQuestionKey, type MobileChatQuestion } from './mobile-native-
 import type { MobileNativeChatStatus } from './use-mobile-native-chat-session'
 
 const INPUT_LOCK_SETTLE_MS = 600
+const EMPTY_ERROR = '无法读取对话记录。你可以切回终端继续工作。'
+const EMPTY_HINT = '让 Agent 检查代码、解释输出或进行修改。'
 
 /** Why the composer input is locked: the transport is disconnected, or the
  *  terminal subscription has not acknowledged its input lease yet. */
@@ -77,39 +79,22 @@ type Props = {
   onMicPressIn?: () => void
   onMicPressOut?: () => void
   inputLockReason?: MobileNativeChatInputLockReason | null
-  /** Route-reported send failure (answer cards, permission replies, stop). Shares the
-   *  inline banner with a rejected composer send, so one failure paints once. The
-   *  route routes these here only while this view is mounted, and falls back to its
-   *  toast otherwise — a deferred failure must not land on an unmounted banner. */
   sendErrorMessage?: string | null
-  /** Clears `sendErrorMessage` once a later send is accepted. */
   onClearSendError?: () => void
   filePaths?: string[]
   onNeedFiles?: (query: string) => void
   /** Model/session-option pickers for the composer action row (desktop parity). */
   sessionOptions?: MobileNativeChatSessionOptionPickersProps | null
-  /** A pending agent question/permission detected from live status, shown as a
-   *  native card above the composer; answering sends text to the agent. */
-  /** Structured AskUserQuestion prompt parsed from the transcript (preferred over
-   *  the heuristic question card). */
   ask?: AskPrompt | null
-  /** Stable key for the ask card. Dismissal state lives in the controller (it
-   *  must survive this subtree unmounting on a chat↔terminal toggle). */
   askKey?: string | null
-  /** Hide the answered/dismissed ask until a different question arrives. */
   onDismissAsk?: () => void
-  /** Deliver the ask answer as per-question selections; the send hook turns them
-   *  into selector keystrokes (Claude) or pasted label text (other agents). */
   onAnswerAsk?: (prompt: AskPrompt, selections: AskAnswerSelection[]) => Promise<boolean>
   onCancelAsk?: () => Promise<boolean>
   question?: MobileChatQuestion | null
   onAnswerQuestion?: (text: string) => Promise<boolean>
   permission?: MobileChatPermission | null
   onRespondPermission?: (send: string) => Promise<boolean>
-  /** Open a worktree file tapped in agent markdown. */
   onOpenFile?: (relativePath: string) => void
-  /** Pixels to lift the composer by when the soft keyboard is open. The route
-   *  owns keyboard tracking (the app uses manual lift, not KeyboardAvoidingView). */
   keyboardInset?: number
 }
 
@@ -157,6 +142,8 @@ export function MobileNativeChatView({
   onOpenFile,
   keyboardInset = 0
 }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileNativeChatViewStyles)
   const insets = useSafeAreaInsets()
   const listRef = useRef<FlatList<NativeChatMessage>>(null)
   const [toolsExpanded, setToolsExpanded] = useState(false)
@@ -256,27 +243,27 @@ export function MobileNativeChatView({
     [toolsExpanded, fontScale, onScrollToMessage, onOpenFile]
   )
 
-  const emptyState = mobileNativeChatEmptyState(status, agent ?? null, error)
-  const showLoading = status === 'loading' && messages.length === 0
+  const showEmptyState = status === 'error' || status === 'ready' || status === 'waiting-session'
+  const emptyTitle =
+    status === 'error' ? '无法加载对话' : `开始与 ${formatAgentTypeLabel(agent)} 对话`
+  const emptySubtitle = status === 'error' ? (error ?? EMPTY_ERROR) : EMPTY_HINT
 
   // A dead PTY emits subscribed→end; settle both edges so its false lease cannot flash the composer enabled.
-  const rawLockReason = inputLockReason ?? null
-  const rawLockHeld = rawLockReason !== null
   const [lockHeld, setLockHeld] = useState(false)
   useEffect(() => {
-    if (rawLockHeld === lockHeld) {
+    if ((inputLockReason != null) === lockHeld) {
       return
     }
-    const timer = setTimeout(() => setLockHeld(rawLockHeld), INPUT_LOCK_SETTLE_MS)
+    const timer = setTimeout(() => setLockHeld(inputLockReason != null), INPUT_LOCK_SETTLE_MS)
     return () => clearTimeout(timer)
-  }, [lockHeld, rawLockHeld])
-  const lockReason = lockHeld ? (rawLockReason ?? 'waiting') : null
+  }, [inputLockReason, lockHeld])
+  const lockReason = lockHeld ? (inputLockReason ?? 'waiting') : null
 
   return (
     <View style={[styles.root, { paddingBottom: bottomPad }]}>
-      {showLoading ? (
+      {status === 'loading' && messages.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.textSecondary} />
+          <ActivityIndicator color={theme.color.text.secondary} />
         </View>
       ) : (
         <GestureHandlerRootView style={styles.listWrap}>
@@ -320,18 +307,18 @@ export function MobileNativeChatView({
                     disabled={loadingEarlier}
                   >
                     {loadingEarlier ? (
-                      <ActivityIndicator size="small" color={colors.textMuted} />
+                      <ActivityIndicator size="small" color={theme.color.text.tertiary} />
                     ) : (
-                      <Text style={styles.loadEarlierText}>Load earlier messages</Text>
+                      <Text style={styles.loadEarlierText}>加载更早的消息</Text>
                     )}
                   </Pressable>
                 ) : null
               }
               ListEmptyComponent={
-                emptyState ? (
+                showEmptyState ? (
                   <View style={styles.center}>
-                    <Text style={styles.emptyTitle}>{emptyState.title}</Text>
-                    <Text style={styles.emptySubtitle}>{emptyState.subtitle}</Text>
+                    <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+                    <Text style={styles.emptySubtitle}>{emptySubtitle}</Text>
                   </View>
                 ) : null
               }
@@ -341,11 +328,11 @@ export function MobileNativeChatView({
               per-message (the up-arrow in each agent message's controls). */}
           {!atBottom ? (
             <Pressable
-              accessibilityLabel="Scroll to latest"
+              accessibilityLabel="滚动到最新消息"
               style={[styles.fab, styles.fabBottom]}
               onPress={() => listRef.current?.scrollToEnd({ animated: true })}
             >
-              <ArrowDown size={18} color={colors.textPrimary} strokeWidth={2.2} />
+              <ArrowDown size={20} color={theme.color.text.primary} strokeWidth={2} />
             </Pressable>
           ) : null}
         </GestureHandlerRootView>
@@ -397,11 +384,11 @@ export function MobileNativeChatView({
             hitSlop={8}
           >
             {toolsExpanded ? (
-              <ChevronsDownUp size={14} color={colors.textMuted} strokeWidth={2} />
+              <ChevronsDownUp size={16} color={theme.color.text.tertiary} strokeWidth={2} />
             ) : (
-              <ChevronsUpDown size={14} color={colors.textMuted} strokeWidth={2} />
+              <ChevronsUpDown size={16} color={theme.color.text.tertiary} strokeWidth={2} />
             )}
-            <Text style={styles.chromeToggleLabel}>{toolsExpanded ? 'Collapse' : 'Tools'}</Text>
+            <Text style={styles.chromeToggleLabel}>{toolsExpanded ? '收起' : '工具'}</Text>
           </Pressable>
         </View>
         {agentWorking ? (
@@ -409,10 +396,15 @@ export function MobileNativeChatView({
             style={({ pressed }) => [styles.stopButton, pressed && styles.pressed]}
             onPress={onStop}
             hitSlop={8}
-            accessibilityLabel="Stop the agent"
+            accessibilityLabel="停止 Agent"
           >
-            <Square size={13} color={colors.statusRed} strokeWidth={2.4} fill={colors.statusRed} />
-            <Text style={styles.stopLabel}>Stop</Text>
+            <Square
+              size={16}
+              color={theme.color.status.danger}
+              strokeWidth={2.2}
+              fill={theme.color.status.danger}
+            />
+            <Text style={styles.stopLabel}>停止</Text>
           </Pressable>
         ) : null}
       </View>
@@ -444,10 +436,10 @@ export function MobileNativeChatView({
         disabled={lockReason !== null}
         placeholder={
           lockReason === 'disconnected'
-            ? 'Reconnecting…'
+            ? '正在重新连接…'
             : lockReason === 'waiting'
-              ? 'Waiting for terminal…'
-              : 'Message, @files, /commands'
+              ? '正在等待终端…'
+              : '输入消息，支持 @文件、/命令'
         }
         filePaths={filePaths}
         onNeedFiles={onNeedFiles}

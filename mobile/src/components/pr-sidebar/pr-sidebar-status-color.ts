@@ -1,19 +1,19 @@
-import { colors } from '../../theme/mobile-theme'
+import { darkTheme, type MobileTheme } from '../../theme/mobile-theme'
 import type { MobileStatusToken } from './pr-checks-presentation'
 
 // Resolves a pure-logic status token to a concrete mobile-theme color. Keeps the
 // presentation module free of style imports while centralizing the mapping.
-export function statusColor(token: MobileStatusToken): string {
+export function statusColor(token: MobileStatusToken, theme: MobileTheme = darkTheme): string {
   switch (token) {
     case 'statusGreen':
-      return colors.statusGreen
+      return theme.color.status.success
     case 'statusAmber':
-      return colors.statusAmber
+      return theme.color.status.warning
     case 'statusRed':
-      return colors.statusRed
+      return theme.color.status.danger
     case 'statusPurple':
-      return colors.statusPurple
+      return theme.color.brand.primary
     default:
-      return colors.textSecondary
+      return theme.color.text.secondary
   }
 }

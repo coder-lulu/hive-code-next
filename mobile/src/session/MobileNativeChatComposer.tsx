@@ -9,7 +9,8 @@ import {
   View
 } from 'react-native'
 import { ArrowUp, ImagePlus, Mic, Square, X } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { getVerifiedNativeChatCommands } from '../../../src/shared/native-chat-agent-profiles'
 import {
   applyAutocomplete,
@@ -75,10 +76,12 @@ export function MobileNativeChatComposer({
   onMicPressIn,
   onMicPressOut,
   disabled = false,
-  placeholder = 'Message, @files, /commands',
+  placeholder = '输入消息，支持 @文件、/命令',
   filePaths = NO_FILE_PATHS,
   onNeedFiles
 }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [cursor, setCursor] = useState(0)
   // Transiently drives the native caret after a mid-text autocomplete insert,
   // then released on the next selection change so manual caret placement still
@@ -185,12 +188,12 @@ export function MobileNativeChatComposer({
               />
               {onRemoveAttachment ? (
                 <Pressable
-                  accessibilityLabel="Remove image"
+                  accessibilityLabel="移除图片"
                   style={styles.attachmentRemove}
                   onPress={() => onRemoveAttachment(attachment.id)}
                   hitSlop={8}
                 >
-                  <X size={12} color={colors.textPrimary} strokeWidth={2.6} />
+                  <X size={16} color={theme.color.text.primary} strokeWidth={2.2} />
                 </Pressable>
               ) : null}
             </View>
@@ -210,8 +213,8 @@ export function MobileNativeChatComposer({
               setPendingSelection(null)
             }}
             placeholder={placeholder}
-            placeholderTextColor={colors.textMuted}
-            selectionColor={colors.accentBlue}
+            placeholderTextColor={theme.color.text.tertiary}
+            selectionColor={theme.color.brand.primary}
             multiline
             // Why: never revoke `editable` — iOS resigns first responder on a focused
             // field, so a transient lock would yank the keyboard mid-typing (#10681).
@@ -221,15 +224,15 @@ export function MobileNativeChatComposer({
           <View style={styles.actionRow} testID="native-chat-composer-actions">
             {onAttachImage ? (
               <Pressable
-                accessibilityLabel="Attach image"
+                accessibilityLabel="添加图片"
                 style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
                 onPress={onAttachImage}
                 disabled={isAttaching || disabled}
               >
                 {isAttaching ? (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <ActivityIndicator size="small" color={theme.color.text.secondary} />
                 ) : (
-                  <ImagePlus size={20} color={colors.textSecondary} strokeWidth={2} />
+                  <ImagePlus size={20} color={theme.color.text.secondary} strokeWidth={2} />
                 )}
               </Pressable>
             ) : null}
@@ -242,7 +245,7 @@ export function MobileNativeChatComposer({
             <View style={styles.actionSpacer} />
             {onMicPress ? (
               <Pressable
-                accessibilityLabel={micActive ? 'Stop dictation' : 'Dictate'}
+                accessibilityLabel={micActive ? '停止语音输入' : '语音输入'}
                 style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
                 // Hold mode is walkie-talkie (press-in/out); toggle mode taps.
                 onPress={dictationMode === 'hold' ? undefined : onMicPress}
@@ -253,17 +256,17 @@ export function MobileNativeChatComposer({
                 {micActive ? (
                   <Square
                     size={18}
-                    color={colors.statusRed}
+                    color={theme.color.status.danger}
                     strokeWidth={2.4}
-                    fill={colors.statusRed}
+                    fill={theme.color.status.danger}
                   />
                 ) : (
-                  <Mic size={20} color={colors.textSecondary} strokeWidth={2} />
+                  <Mic size={20} color={theme.color.text.secondary} strokeWidth={2} />
                 )}
               </Pressable>
             ) : null}
             <Pressable
-              accessibilityLabel="Send message"
+              accessibilityLabel="发送消息"
               style={({ pressed }) => [
                 styles.sendButton,
                 !canSend && styles.sendButtonDisabled,
@@ -274,7 +277,7 @@ export function MobileNativeChatComposer({
             >
               <ArrowUp
                 size={20}
-                color={canSend ? colors.bgBase : colors.textMuted}
+                color={canSend ? theme.color.text.inverse : theme.color.text.tertiary}
                 strokeWidth={2.6}
               />
             </Pressable>
@@ -285,101 +288,102 @@ export function MobileNativeChatComposer({
   )
 }
 
-const styles = StyleSheet.create({
-  attachmentStrip: {
-    maxHeight: 76,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel
-  },
-  attachmentStripContent: {
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  attachmentThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: radii.button,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgRaised
-  },
-  attachmentImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: radii.button
-  },
-  attachmentRemove: {
-    // Inset inside the thumb: Android drops touches outside the parent's bounds,
-    // so an overhanging badge would lose part of its tap target.
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgRaised,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle
-  },
-  composerInset: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md
-  },
-  bar: {
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgPanel,
-    overflow: 'hidden'
-  },
-  actionRow: {
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  actionSpacer: {
-    flex: 1
-  },
-  input: {
-    width: '100%',
-    maxHeight: 140,
-    minHeight: 40,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize + 1,
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // White send affordance per design — dark arrow on a light circle.
-    backgroundColor: colors.textPrimary
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.bgRaised
-  },
-  pressed: {
-    opacity: 0.7
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    attachmentStrip: {
+      maxHeight: 76,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle,
+      backgroundColor: theme.color.bg.surface
+    },
+    attachmentStripContent: {
+      gap: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8
+    },
+    attachmentThumb: {
+      width: 60,
+      height: 60,
+      borderRadius: theme.radii.control,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.subtle,
+      backgroundColor: theme.color.bg.subtle
+    },
+    attachmentImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: theme.radii.control
+    },
+    attachmentRemove: {
+      // Inset inside the thumb: Android drops touches outside the parent's bounds,
+      // so an overhanging badge would lose part of its tap target.
+      position: 'absolute',
+      top: 2,
+      right: 2,
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.color.bg.elevated,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default
+    },
+    composerInset: {
+      paddingHorizontal: theme.spacing.space12,
+      paddingTop: theme.spacing.space8,
+      paddingBottom: theme.spacing.space12
+    },
+    bar: {
+      gap: theme.spacing.space4,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface,
+      overflow: 'hidden'
+    },
+    actionRow: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    actionSpacer: {
+      flex: 1
+    },
+    input: {
+      ...theme.typography.body,
+      width: '100%',
+      maxHeight: 140,
+      minHeight: theme.size.minimumTouchTarget,
+      color: theme.color.text.primary,
+      backgroundColor: theme.color.bg.subtle,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space12,
+      paddingTop: theme.spacing.space8,
+      paddingBottom: theme.spacing.space8
+    },
+    iconButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    sendButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.color.bg.selected
+    },
+    sendButtonDisabled: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    pressed: {
+      opacity: 0.7
+    }
+  })
+}

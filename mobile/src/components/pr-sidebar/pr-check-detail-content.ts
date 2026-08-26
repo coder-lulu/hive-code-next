@@ -14,6 +14,27 @@ import type {
 const MAX_ANNOTATIONS = 20
 const MAX_JOBS = 100
 
+const CHECK_STATE_LABELS: Readonly<Record<string, string>> = {
+  success: '成功',
+  failure: '失败',
+  failed: '失败',
+  pending: '等待中',
+  queued: '排队中',
+  in_progress: '进行中',
+  completed: '已完成',
+  cancelled: '已取消',
+  timed_out: '已超时',
+  skipped: '已跳过',
+  neutral: '中性',
+  action_required: '需要操作',
+  warning: '警告',
+  notice: '提示'
+}
+
+function checkStateLabel(state: string | null | undefined): string {
+  return state ? (CHECK_STATE_LABELS[state] ?? state) : '未知'
+}
+
 function isFailureState(state: string | null | undefined): boolean {
   return state === 'failure' || state === 'failed' || state === 'cancelled' || state === 'timed_out'
 }
@@ -46,17 +67,17 @@ export type CheckDetailContent = {
   // True when the host returned more annotations than we render.
   annotationsTruncated: boolean
   // "Failed jobs" when only failing jobs are shown, else "Jobs" (matches desktop label).
-  jobsLabel: 'Failed jobs' | 'Jobs'
+  jobsLabel: '失败的任务' | '任务'
   jobs: CheckDetailJob[]
   jobsTruncated: boolean
 }
 
 function mapAnnotation(annotation: PRCheckAnnotation): CheckDetailAnnotation {
-  const path = annotation.path ?? 'Annotation'
+  const path = annotation.path ?? '注解'
   const locator = annotation.startLine ? `${path}:${annotation.startLine}` : path
   return {
     locator,
-    level: annotation.annotationLevel,
+    level: annotation.annotationLevel ? checkStateLabel(annotation.annotationLevel) : null,
     title: annotation.title,
     message: annotation.message
   }
@@ -65,10 +86,10 @@ function mapAnnotation(annotation: PRCheckAnnotation): CheckDetailAnnotation {
 function mapJob(job: PRCheckJob): CheckDetailJob {
   const failedSteps = job.steps
     .filter((step: PRCheckStep) => isFailureState(step.conclusion ?? step.status))
-    .map((step) => ({ name: step.name, state: step.conclusion ?? step.status ?? 'unknown' }))
+    .map((step) => ({ name: step.name, state: checkStateLabel(step.conclusion ?? step.status) }))
   return {
     name: job.name,
-    state: job.conclusion ?? job.status ?? 'unknown',
+    state: checkStateLabel(job.conclusion ?? job.status),
     failedSteps,
     logTail: job.logTail
   }
@@ -76,7 +97,7 @@ function mapJob(job: PRCheckJob): CheckDetailJob {
 
 export function presentCheckDetail(details: PRCheckRunDetails): CheckDetailContent {
   const summaryLines = [
-    details.conclusion ?? details.status,
+    checkStateLabel(details.conclusion ?? details.status),
     details.title,
     details.summary
   ].filter((line): line is string => typeof line === 'string' && line.trim().length > 0)
@@ -90,7 +111,7 @@ export function presentCheckDetail(details: PRCheckRunDetails): CheckDetailConte
     summaryLines,
     annotations: details.annotations.slice(0, MAX_ANNOTATIONS).map(mapAnnotation),
     annotationsTruncated: details.annotations.length > MAX_ANNOTATIONS,
-    jobsLabel: failedJobs.length > 0 ? 'Failed jobs' : 'Jobs',
+    jobsLabel: failedJobs.length > 0 ? '失败的任务' : '任务',
     jobs: visibleJobs.slice(0, MAX_JOBS).map(mapJob),
     jobsTruncated: details.jobs.length > MAX_JOBS
   }

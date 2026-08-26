@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { RotateCw } from 'lucide-react-native'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { PrSidebarState } from '../session/mobile-pr-sidebar-state'
 import type { ConnectionState } from '../transport/types'
 import type { RpcClient } from '../transport/rpc-client'
@@ -17,7 +17,7 @@ import { useMobilePrAiTriage, type MobilePrAiTriage } from '../session/use-mobil
 import { usePRBotAuthorOverrides } from '../session/use-pr-bot-author-overrides'
 import { buildFixChecksPrompt, buildResolveConflictsPrompt } from '../session/pr-ai-triage-prompt'
 import { prSidebarRenderBranch } from './mobile-pr-sidebar-presentation'
-import { mobilePrSidebarStyles as styles } from './pr-sidebar/mobile-pr-sidebar-styles'
+import { createMobilePrSidebarStyles } from './pr-sidebar/mobile-pr-sidebar-styles'
 import type { MobileGitStatusResult } from '../source-control/mobile-git-status'
 import { PRSidebarHeader } from './pr-sidebar/PRSidebarHeader'
 import { PRConflictingFilesSection } from './pr-sidebar/PRConflictingFilesSection'
@@ -58,6 +58,7 @@ export function MobilePRSidebar({
   bottomInset = 0,
   showOpenOnWeb = true
 }: Props) {
+  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
   const branch = prSidebarRenderBranch(state)
   // prNumber is 0 until ready; the hook gates on `ready` so it never fires early.
   const prNumber = state.kind === 'ready' ? state.data.pr.number : 0
@@ -162,16 +163,18 @@ function PrSidebarContent({
   showOpenOnWeb: boolean
   botAuthorOverrides: ReadonlySet<string>
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
   if (branch === 'loading') {
     return (
       <View style={styles.stateArea}>
-        <ActivityIndicator color={colors.textSecondary} />
-        <Text style={styles.stateText}>Loading pull request…</Text>
+        <ActivityIndicator color={theme.color.text.secondary} />
+        <Text style={styles.stateText}>正在加载拉取请求…</Text>
       </View>
     )
   }
   if (branch === 'error') {
-    const message = state.kind === 'error' ? state.message : 'Something went wrong.'
+    const message = state.kind === 'error' ? state.message : '出现了问题。'
     return (
       <View style={styles.stateArea}>
         <Text style={styles.stateText}>{message}</Text>
@@ -179,10 +182,10 @@ function PrSidebarContent({
           style={styles.retryButton}
           onPress={onRetry}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading pull request"
+          accessibilityLabel="重新加载拉取请求"
         >
-          <RotateCw size={14} color={colors.textPrimary} strokeWidth={2.2} />
-          <Text style={styles.retryText}>Retry</Text>
+          <RotateCw size={14} color={theme.color.text.primary} strokeWidth={2.2} />
+          <Text style={styles.retryText}>重试</Text>
         </Pressable>
       </View>
     )
@@ -192,9 +195,7 @@ function PrSidebarContent({
     // mutation-time block (actions.blocked) routes here even from a ready state.
     const message =
       actions.blocked ??
-      (state.kind === 'blocked'
-        ? state.message
-        : 'Not permitted — your GitHub account is not connected.')
+      (state.kind === 'blocked' ? state.message : '无操作权限——你的 GitHub 账号尚未连接。')
     return (
       <View style={styles.stateArea}>
         <Text style={styles.blockedText}>{message}</Text>
@@ -257,6 +258,7 @@ function PrSidebarSections({
   showOpenOnWeb: boolean
   botAuthorOverrides: ReadonlySet<string>
 }) {
+  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
   const pr = data.pr
   // Bind the triage launchers to this PR's data; the prompt builders are pure so
   // building lazily inside launch() keeps a stale capture from leaking in.

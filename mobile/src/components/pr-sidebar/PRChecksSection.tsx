@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
 import { ChevronDown, ChevronRight, ExternalLink, RotateCw, Sparkles } from 'lucide-react-native'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import type { PRCheckDetail } from '../../../../src/shared/github/check-types'
 import type { RpcClient } from '../../transport/rpc-client'
 import { fetchPRCheckDetails, type GitHubPrRepoSlug } from '../../session/github-pr-rpc'
@@ -18,8 +18,8 @@ import {
 import { statusColor } from './pr-sidebar-status-color'
 import { PRSection } from './PRSection'
 import { PRCheckDetailView, type DetailEntry } from './PRCheckDetail'
-import { mobilePrSidebarStyles as styles } from './mobile-pr-sidebar-styles'
-import { prAiTriageStyles as triageStyles } from './pr-ai-triage-styles'
+import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
+import { createPrAiTriageStyles } from './pr-ai-triage-styles'
 
 // Launches the "Fix checks with AI" agent. Absent for display-only usages.
 export type PrChecksTriage = {
@@ -42,6 +42,9 @@ type Props = {
 // fetch github.prCheckDetails, cached per check key (U5). Display-only; the
 // rerun action is U6.
 export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, triage }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
+  const triageStyles = useMobileThemeStyles(createPrAiTriageStyles)
   const sorted = sortPRChecks(checks)
   const summary = summarizePRChecks(checks)
   const rerunBusy = actions?.isBusy({ kind: 'rerun' }) ?? false
@@ -70,7 +73,7 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
         // spinning forever — fall back to an error detail.
         entry = {
           status: 'error',
-          message: err instanceof Error ? err.message : 'Failed to load check details'
+          message: err instanceof Error ? err.message : '无法加载检查详情'
         }
       }
       setDetailCache((prev) => ({ ...prev, [key]: entry }))
@@ -133,13 +136,13 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
 
   return (
     <PRSection
-      title="Checks"
+      title="检查"
       trailing={
         <>
           <Text
             style={[
               styles.summaryLabel,
-              { color: statusColor(checkOutcomeToken(summary.outcome)) }
+              { color: statusColor(checkOutcomeToken(summary.outcome), theme) }
             ]}
           >
             {summary.label}
@@ -151,12 +154,12 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
               onPress={() => actions.rerunFailingChecks()}
               disabled={rerunBusy}
               accessibilityRole="button"
-              accessibilityLabel="Rerun failing checks"
+              accessibilityLabel="重新运行失败的检查"
             >
               {rerunBusy ? (
-                <ActivityIndicator color={colors.textSecondary} />
+                <ActivityIndicator color={theme.color.text.secondary} />
               ) : (
-                <RotateCw size={14} color={colors.textSecondary} strokeWidth={2.2} />
+                <RotateCw size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
               )}
             </Pressable>
           ) : null}
@@ -169,10 +172,10 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
         <View style={triageStyles.triageStrip}>
           <View style={triageStyles.triageStripText}>
             <Text style={triageStyles.triageStripTitle} numberOfLines={1}>
-              {summary.failed} failing check{summary.failed === 1 ? '' : 's'}
+              {summary.failed} 项检查失败
             </Text>
             <Text style={triageStyles.triageStripSubtitle} numberOfLines={1}>
-              Inspect details or start an AI fix pass.
+              查看详情，或让 AI 开始修复。
             </Text>
           </View>
           <Pressable
@@ -180,14 +183,14 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
             onPress={triage.fixChecks}
             disabled={triage.isBusy}
             accessibilityRole="button"
-            accessibilityLabel="Fix failing checks with AI"
+            accessibilityLabel="使用 AI 修复失败的检查"
           >
             {triage.isBusy ? (
-              <ActivityIndicator color={colors.textSecondary} />
+              <ActivityIndicator color={theme.color.text.secondary} />
             ) : (
-              <Sparkles size={13} color={colors.textSecondary} strokeWidth={2.2} />
+              <Sparkles size={13} color={theme.color.text.secondary} strokeWidth={2.2} />
             )}
-            <Text style={triageStyles.triageStripButtonText}>Fix</Text>
+            <Text style={triageStyles.triageStripButtonText}>修复</Text>
           </Pressable>
         </View>
       ) : null}
@@ -204,10 +207,10 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
               style={styles.row}
               onPress={() => toggle(check)}
               accessibilityRole="button"
-              accessibilityLabel={`${check.name} check details`}
+              accessibilityLabel={`${check.name} 检查详情`}
             >
-              <Chevron size={14} color={colors.textSecondary} strokeWidth={2.2} />
-              <View style={[styles.statusDot, { backgroundColor: statusColor(token) }]} />
+              <Chevron size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
+              <View style={[styles.statusDot, { backgroundColor: statusColor(token, theme) }]} />
               <View style={styles.rowMain}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
                   {check.name}
@@ -215,7 +218,10 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
               </View>
               {/* Status word + open-on-host icon (desktop ChecksList row), so the
                   outcome reads without expanding. */}
-              <Text style={[styles.rowStatus, { color: statusColor(token) }]} numberOfLines={1}>
+              <Text
+                style={[styles.rowStatus, { color: statusColor(token, theme) }]}
+                numberOfLines={1}
+              >
                 {checkStatusLabel(check)}
               </Text>
               {url ? (
@@ -224,9 +230,9 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
                   onPress={() => void Linking.openURL(url).catch(() => {})}
                   hitSlop={6}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open ${check.name} on the web`}
+                  accessibilityLabel={`在网页中打开 ${check.name}`}
                 >
-                  <ExternalLink size={13} color={colors.textSecondary} strokeWidth={2.2} />
+                  <ExternalLink size={13} color={theme.color.text.secondary} strokeWidth={2.2} />
                 </Pressable>
               ) : null}
             </Pressable>

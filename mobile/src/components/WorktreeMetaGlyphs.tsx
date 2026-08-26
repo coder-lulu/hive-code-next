@@ -1,6 +1,6 @@
 import { CircleDot, GitMerge, StickyNote } from 'lucide-react-native'
 import { StyleSheet, Text, View } from 'react-native'
-import { colors } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 import { prStateToken } from './pr-state-token'
 import { statusColor } from './pr-sidebar/pr-sidebar-status-color'
 
@@ -12,6 +12,7 @@ export function prStateColor(state: string): string {
 }
 
 type Props = {
+  theme: MobileTheme
   comment?: string | null
   linkedLinearIssue?: string | null
   linkedGitLabMR?: number | null
@@ -23,12 +24,14 @@ type Props = {
 // desktop WorktreeCardMetaBadges row. Mobile shows presence only; the full
 // detail (title/state/labels) is a follow-up detail sheet.
 export function WorktreeMetaGlyphs({
+  theme,
   comment,
   linkedLinearIssue,
   linkedGitLabMR,
   linkedIssue,
   linkedGitLabIssue
 }: Props) {
+  const styles = createStyles(theme)
   const hasNotes = (comment ?? '').trim().length > 0
   const hasLinear = Boolean(linkedLinearIssue)
   const hasGitLabMR = linkedGitLabMR != null
@@ -38,24 +41,26 @@ export function WorktreeMetaGlyphs({
   }
   return (
     <View style={styles.metaGlyphs}>
-      {hasNotes && <StickyNote size={11} color={colors.textMuted} />}
-      {hasIssue && <CircleDot size={11} color={colors.textMuted} />}
+      {hasNotes && <StickyNote size={11} color={theme.color.text.secondary} />}
+      {hasIssue && <CircleDot size={11} color={theme.color.text.secondary} />}
       {hasLinear && <Text style={styles.linearGlyph}>L</Text>}
-      {hasGitLabMR && <GitMerge size={11} color={colors.textMuted} />}
+      {hasGitLabMR && <GitMerge size={11} color={theme.color.text.secondary} />}
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  metaGlyphs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginLeft: 2
-  },
-  linearGlyph: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    metaGlyphs: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4,
+      marginLeft: theme.spacing.space4
+    },
+    linearGlyph: {
+      ...theme.typography.caption,
+      fontWeight: '700',
+      color: theme.color.text.secondary
+    }
+  })
+}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { UserPlus, X } from 'lucide-react-native'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import type { GitHubWorkItemDetails } from '../../../../src/shared/github/work-item-types'
 import type { RpcClient } from '../../transport/rpc-client'
 import type { MobilePrActions } from '../../session/use-mobile-pr-actions'
@@ -9,7 +9,7 @@ import { isPrSidebarDetailsPlaceholder } from '../../session/mobile-pr-sidebar-s
 import { getPRReviewerRows } from './pr-checks-presentation'
 import { ReviewerPickerDrawer } from './ReviewerPickerDrawer'
 import { PRSection } from './PRSection'
-import { mobilePrSidebarStyles as styles } from './mobile-pr-sidebar-styles'
+import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
 
 type Props = {
   details: GitHubWorkItemDetails | null
@@ -21,6 +21,8 @@ type Props = {
 // Requested reviewers + their latest review status, with a picker to request /
 // remove (optimistic add/remove via the actions hook).
 export function PRReviewersSection({ details, actions, client, worktreeId }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
   // details === null means phase 2 (work-item payload) is still in flight — same
   // signal Comments uses. Do not treat that as "no reviewers" or the section goes
   // blank while checks (phase 1) already paint. A synthetic placeholder means
@@ -61,23 +63,23 @@ export function PRReviewersSection({ details, actions, client, worktreeId }: Pro
       style={styles.iconButton}
       onPress={() => setPickerOpen(true)}
       accessibilityRole="button"
-      accessibilityLabel="Add or remove reviewers"
+      accessibilityLabel="添加或移除审阅者"
     >
-      <UserPlus size={16} color={colors.textSecondary} strokeWidth={2.2} />
+      <UserPlus size={16} color={theme.color.text.secondary} strokeWidth={2.2} />
     </Pressable>
   )
 
   return (
-    <PRSection title="Reviewers" trailing={addButton}>
+    <PRSection title="审阅者" trailing={addButton}>
       {loadingDetails ? (
         <View style={styles.reviewersStatus}>
-          <ActivityIndicator color={colors.textSecondary} />
-          <Text style={styles.emptyText}>Loading reviewers…</Text>
+          <ActivityIndicator color={theme.color.text.secondary} />
+          <Text style={styles.emptyText}>正在加载审阅者…</Text>
         </View>
       ) : detailsFailed ? (
-        <Text style={styles.emptyText}>Could not load reviewers. Tap refresh to try again.</Text>
+        <Text style={styles.emptyText}>无法加载审阅者。请刷新后重试。</Text>
       ) : rows.length === 0 ? (
-        <Text style={styles.emptyText}>No reviewers requested</Text>
+        <Text style={styles.emptyText}>尚未请求审阅</Text>
       ) : (
         rows.map((row) => {
           const busy = actions.isBusy({ kind: 'reviewer', login: row.login })
@@ -90,7 +92,7 @@ export function PRReviewersSection({ details, actions, client, worktreeId }: Pro
               </View>
               {/* Neutral gray like the desktop PR page (the label text carries the
                   state); keeps the sidebar mostly monochrome. */}
-              <Text style={[styles.rowStatus, { color: colors.textSecondary }]}>
+              <Text style={[styles.rowStatus, { color: theme.color.text.secondary }]}>
                 {row.stateLabel}
               </Text>
               <Pressable
@@ -98,12 +100,12 @@ export function PRReviewersSection({ details, actions, client, worktreeId }: Pro
                 onPress={() => actions.removeReviewer(row.login)}
                 disabled={busy}
                 accessibilityRole="button"
-                accessibilityLabel={`Remove ${row.login}`}
+                accessibilityLabel={`移除 ${row.login}`}
               >
                 {busy ? (
-                  <ActivityIndicator color={colors.textSecondary} />
+                  <ActivityIndicator color={theme.color.text.secondary} />
                 ) : (
-                  <X size={14} color={colors.textSecondary} strokeWidth={2.2} />
+                  <X size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
                 )}
               </Pressable>
             </View>

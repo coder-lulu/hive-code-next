@@ -1,32 +1,41 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import * as Clipboard from 'expo-clipboard'
 import Constants from 'expo-constants'
-import { ChevronLeft, Copy, Check } from 'lucide-react-native'
-import { colors, spacing, typography } from '../src/theme/mobile-theme'
+import * as Clipboard from 'expo-clipboard'
+import { useRouter } from 'expo-router'
+import { Check, ChevronLeft, Copy } from 'lucide-react-native'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ConnectionLog } from '../src/components/ConnectionLog'
-import { loadHosts } from '../src/transport/host-store'
-import { connectionLogStore } from '../src/transport/connection-log-buffer'
+import { MobileIconButton, MobileScreenHeader } from '../src/components/ui'
+import { buildConnectionDiagnosticsReport } from '../src/diagnostics/connection-diagnostics-report'
+import type { MobileTheme } from '../src/theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
 import { useHostClient } from '../src/transport/client-context'
 import {
   useLastConnectedAt,
   useReconnectAttempt
 } from '../src/transport/client-context-connection-metrics'
-import { buildConnectionDiagnosticsReport } from '../src/diagnostics/connection-diagnostics-report'
-import type { ConnectionLogEntry, HostProfile } from '../src/transport/types'
+import { connectionLogStore } from '../src/transport/connection-log-buffer'
+import { loadHosts } from '../src/transport/host-store'
+import type { ConnectionLogEntry, ConnectionState, HostProfile } from '../src/transport/types'
 
-// Why: getSnapshot must be referentially stable when there's no data —
-// a fresh [] per call would make useSyncExternalStore re-render forever.
 const EMPTY_ENTRIES: readonly ConnectionLogEntry[] = []
 
-// Why: reading the log is most needed while a host is failing, so this
-// screen also *acquires* the host client — opening it kicks a dial and the
-// log fills live instead of showing a stale tail.
+const CONNECTION_STATE_LABELS: Readonly<Record<ConnectionState, string>> = {
+  connecting: '正在连接',
+  handshaking: '正在验证',
+  connected: '已连接',
+  disconnected: '已断开',
+  reconnecting: '正在重连',
+  'auth-failed': '验证失败'
+}
+
+// Opening the log acquires the selected host client so a failing dial can fill the log live.
 export default function ConnectionLogScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [hosts, setHosts] = useState<HostProfile[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -38,14 +47,14 @@ export default function ConnectionLogScreen() {
         return
       }
       setHosts(loaded)
-      setSelectedId((prev) => prev ?? loaded[0]?.id ?? null)
+      setSelectedId((previous) => previous ?? loaded[0]?.id ?? null)
     })
     return () => {
       stale = true
     }
   }, [])
 
-  const selected = hosts.find((h) => h.id === selectedId) ?? null
+  const selected = hosts.find((host) => host.id === selectedId) ?? null
   const { state } = useHostClient(selected?.id)
   const reconnectAttempts = useReconnectAttempt(selected?.id)
   const lastConnectedAt = useLastConnectedAt(selected?.id)
@@ -81,141 +90,157 @@ export default function ConnectionLogScreen() {
   }, [selected, state, reconnectAttempts, lastConnectedAt, entries])
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
-      <View style={styles.topRow}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={22} color={colors.textSecondary} />
-        </Pressable>
-        <Text style={styles.heading}>Connection log</Text>
-      </View>
+    <View style={styles.screen}>
+      <MobileScreenHeader
+        leading={
+          <MobileIconButton
+            accessibilityLabel="返回"
+            icon={ChevronLeft}
+            iconSize={24}
+            onPress={() => router.back()}
+          />
+        }
+        title="连接日志"
+      />
 
-      {hosts.length > 1 && (
-        <View style={styles.hostPicker}>
-          {hosts.map((host) => (
-            <Pressable
-              key={host.id}
-              style={[styles.hostChip, host.id === selectedId && styles.hostChipActive]}
-              onPress={() => setSelectedId(host.id)}
-            >
+      <View style={[styles.content, { paddingBottom: insets.bottom + theme.spacing.space20 }]}>
+        {hosts.length > 1 ? (
+          <ScrollView
+            horizontal
+            contentContainerStyle={styles.hostPicker}
+            showsHorizontalScrollIndicator={false}
+            style={styles.hostPickerScroll}
+          >
+            {hosts.map((host) => {
+              const selectedHost = host.id === selectedId
+              return (
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: selectedHost }}
+                  key={host.id}
+                  style={({ pressed }) => [
+                    styles.hostChip,
+                    selectedHost && styles.hostChipActive,
+                    pressed && styles.hostChipPressed
+                  ]}
+                  onPress={() => setSelectedId(host.id)}
+                >
+                  <Text
+                    maxFontSizeMultiplier={1.3}
+                    numberOfLines={1}
+                    style={[styles.hostChipText, selectedHost && styles.hostChipTextActive]}
+                  >
+                    {host.name}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        ) : null}
+
+        {selected ? (
+          <View style={styles.logArea}>
+            <View style={styles.statusRow}>
               <Text
-                style={[styles.hostChipText, host.id === selectedId && styles.hostChipTextActive]}
-                numberOfLines={1}
+                accessibilityLiveRegion="polite"
+                maxFontSizeMultiplier={1.3}
+                style={styles.statusText}
               >
-                {host.name}
+                {CONNECTION_STATE_LABELS[state]}
+                {reconnectAttempts > 0 ? ` · 第 ${reconnectAttempts} 次重连` : ''}
               </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      {selected ? (
-        <>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusText}>
-              {state}
-              {reconnectAttempts > 0 ? ` · attempt ${reconnectAttempts}` : ''}
-            </Text>
-            <Pressable style={styles.copyButton} onPress={() => void copyDiagnostics()}>
-              {copied ? (
-                <Check size={14} color={colors.statusGreen} />
-              ) : (
-                <Copy size={14} color={colors.textSecondary} />
-              )}
-              <Text style={styles.copyButtonText}>{copied ? 'Copied' : 'Copy diagnostics'}</Text>
-            </Pressable>
+              <Pressable
+                accessibilityLabel={copied ? '诊断信息已复制' : '复制诊断信息'}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.copyButton, pressed && styles.copyButtonPressed]}
+                onPress={() => void copyDiagnostics()}
+              >
+                {copied ? (
+                  <Check size={20} color={theme.color.status.success} strokeWidth={2} />
+                ) : (
+                  <Copy size={20} color={theme.color.text.secondary} strokeWidth={2} />
+                )}
+                <Text maxFontSizeMultiplier={1.3} style={styles.copyButtonText}>
+                  {copied ? '已复制' : '复制诊断信息'}
+                </Text>
+              </Pressable>
+            </View>
+            {entries.length > 0 ? (
+              <ConnectionLog entries={[...entries]} title={selected.name} />
+            ) : (
+              <View style={styles.emptyNotice}>
+                <Text maxFontSizeMultiplier={1.3} style={styles.emptyText}>
+                  本次会话还没有连接事件。应用尝试连接这台电脑时，事件会显示在这里。
+                </Text>
+              </View>
+            )}
           </View>
-          {entries.length > 0 ? (
-            <ConnectionLog entries={[...entries]} title={selected.name} />
-          ) : (
-            <Text style={styles.emptyText}>
-              No connection events yet this session. Events appear as the app dials this host.
+        ) : (
+          <View style={styles.emptyNotice}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.emptyText}>
+              暂无已配对电脑。
             </Text>
-          )}
-        </>
-      ) : (
-        <Text style={styles.emptyText}>No paired hosts.</Text>
-      )}
+          </View>
+        )}
+      </View>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase,
-    padding: spacing.lg
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.lg
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textPrimary
-  },
-  hostPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.md
-  },
-  hostChip: {
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: 16,
-    backgroundColor: colors.bgRaised
-  },
-  hostChipActive: {
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  hostChipText: {
-    fontSize: typography.metaSize,
-    color: colors.textSecondary,
-    maxWidth: 160
-  },
-  hostChipTextActive: {
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm
-  },
-  statusText: {
-    fontSize: typography.metaSize,
-    color: colors.textSecondary
-  },
-  copyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs + 2,
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    backgroundColor: colors.bgRaised
-  },
-  copyButtonText: {
-    fontSize: typography.metaSize,
-    fontWeight: '600',
-    color: colors.textPrimary
-  },
-  emptyText: {
-    fontSize: typography.metaSize,
-    color: colors.textMuted,
-    lineHeight: 18
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.color.bg.canvas },
+    content: {
+      flex: 1,
+      gap: theme.spacing.space16,
+      paddingHorizontal: theme.spacing.space20,
+      paddingTop: theme.spacing.space20
+    },
+    hostPickerScroll: { flexGrow: 0 },
+    hostPicker: { gap: theme.spacing.space8 },
+    hostChip: {
+      minHeight: theme.size.minimumTouchTarget,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space16,
+      borderRadius: theme.radii.circle,
+      backgroundColor: theme.color.bg.subtle
+    },
+    hostChipActive: { backgroundColor: theme.color.bg.selected },
+    hostChipPressed: { opacity: 0.72 },
+    hostChipText: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary
+    },
+    hostChipTextActive: { color: theme.color.text.inverse, fontWeight: '500' },
+    logArea: { flex: 1, gap: theme.spacing.space12 },
+    statusRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing.space8
+    },
+    statusText: { ...theme.typography.meta, color: theme.color.text.secondary },
+    copyButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space12,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    copyButtonPressed: { backgroundColor: theme.color.bg.subtle },
+    copyButtonText: { ...theme.typography.label, color: theme.color.text.primary },
+    emptyNotice: {
+      padding: theme.spacing.space16,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    emptyText: { ...theme.typography.meta, color: theme.color.text.secondary }
+  })
+}

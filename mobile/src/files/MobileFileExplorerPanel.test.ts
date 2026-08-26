@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileFileExplorerPanel } from './MobileFileExplorerPanel'
 import type { MobileDirEntry } from './file-tree'
 import type { RpcResponse } from '../transport/types'
+import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
 
 type MockClient = {
   sendRequest: ReturnType<typeof vi.fn>
@@ -73,6 +74,11 @@ vi.mock('lucide-react-native', () => ({
 
 vi.mock('../platform/haptics', () => ({
   triggerSelection: vi.fn()
+}))
+
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileTheme: () => lightTheme,
+  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
 }))
 
 vi.mock('../transport/client-context', () => ({
@@ -175,7 +181,7 @@ describe('MobileFileExplorerPanel', () => {
       relativePath: ''
     })
 
-    await pressByLabel(renderer, 'Open folder src')
+    await pressByLabel(renderer, '打开文件夹 src')
     await vi.waitFor(() => expect(client.sendRequest).toHaveBeenCalledTimes(2))
     expect(client.sendRequest).toHaveBeenLastCalledWith('files.readDir', {
       worktree: 'id:worktree-a',
@@ -183,8 +189,8 @@ describe('MobileFileExplorerPanel', () => {
     })
     expect(renderedText(renderer)).toContain('app.ts')
 
-    await pressByLabel(renderer, 'Open folder src')
-    await pressByLabel(renderer, 'Open folder src')
+    await pressByLabel(renderer, '打开文件夹 src')
+    await pressByLabel(renderer, '打开文件夹 src')
 
     expect(client.sendRequest).toHaveBeenCalledTimes(2)
   })
@@ -311,7 +317,7 @@ describe('MobileFileExplorerPanel', () => {
     expect(renderedText(renderer)).toContain('src')
     expect(renderedText(renderer)).toContain('README.md')
 
-    await pressByLabel(renderer, 'Open folder src')
+    await pressByLabel(renderer, '打开文件夹 src')
     expect(renderedText(renderer)).toContain('app.ts')
     // Every directory comes from the synthesized cache: one readDir attempt
     // plus one files.list call total, no per-directory RPCs afterwards.
@@ -346,7 +352,7 @@ describe('MobileFileExplorerPanel', () => {
     const renderer = await renderExplorer()
 
     expect(renderedText(renderer)).toContain('README.md')
-    expect(renderedText(renderer)).toContain('Showing first 5000')
+    expect(renderedText(renderer)).toContain('仅显示前 5000 项')
   })
 
   it('reports the files.list failure when the fallback itself fails', async () => {

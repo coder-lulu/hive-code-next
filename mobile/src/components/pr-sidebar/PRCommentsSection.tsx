@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react-native'
 import type { PRState } from '../../../../src/shared/github/pull-request-types'
 import type { GitHubWorkItemDetails } from '../../../../src/shared/github/work-item-types'
 import type { GitHubPrRepoSlug } from '../../session/github-pr-rpc'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import { canAddRootComment } from '../../session/pr-comment-actions'
 import { isPrSidebarDetailsPlaceholder } from '../../session/mobile-pr-sidebar-state'
 import type { MobilePrCommentActions } from '../../session/use-mobile-pr-comment-actions'
@@ -29,8 +29,8 @@ import {
   isResolvedPRCommentGroup,
   type PRCommentGroup
 } from '../../../../src/shared/pr-comment-groups'
-import { prCommentsStyles as styles } from './pr-comments-styles'
-import { mobilePrSidebarStyles as shared } from './mobile-pr-sidebar-styles'
+import { createPrCommentsStyles } from './pr-comments-styles'
+import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
 
 type Props = {
   details: GitHubWorkItemDetails | null
@@ -62,6 +62,8 @@ export function PRCommentsSection({
   actions,
   botAuthorOverrides
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createPrCommentsStyles)
   // details is null while phase 2 (the heavy comments/body payload) is still loading.
   // A synthetic placeholder means phase 2 failed — do not paint that as empty success.
   const loadingDetails = details === null
@@ -121,22 +123,20 @@ export function PRCommentsSection({
 
   return (
     <>
-      <PRSection title="Description">
+      <PRSection title="说明">
         {loadingDetails ? (
-          <ActivityIndicator color={colors.textSecondary} />
+          <ActivityIndicator color={theme.color.text.secondary} />
         ) : detailsFailed ? (
-          <Text style={styles.noDescription}>
-            Could not load description. Tap refresh to try again.
-          </Text>
+          <Text style={styles.noDescription}>无法加载说明。请刷新后重试。</Text>
         ) : body.trim() ? (
           <CommentMarkdown content={body} variant="document" />
         ) : (
-          <Text style={styles.noDescription}>No description provided.</Text>
+          <Text style={styles.noDescription}>未提供说明。</Text>
         )}
       </PRSection>
 
       <PRSection
-        title="Comments"
+        title="评论"
         trailing={
           comments.length > 0 ? (
             <View style={styles.countChip}>
@@ -146,13 +146,13 @@ export function PRCommentsSection({
         }
       >
         {loadingDetails ? (
-          <ActivityIndicator color={colors.textSecondary} />
+          <ActivityIndicator color={theme.color.text.secondary} />
         ) : detailsFailed ? (
-          <Text style={styles.empty}>Could not load comments. Tap refresh to try again.</Text>
+          <Text style={styles.empty}>无法加载评论。请刷新后重试。</Text>
         ) : (
           <View style={styles.list}>
             {comments.length === 0 ? (
-              <Text style={styles.empty}>No comments yet.</Text>
+              <Text style={styles.empty}>暂无评论。</Text>
             ) : (
               <>
                 {isPr ? (
@@ -200,8 +200,8 @@ export function PRCommentsSection({
                         accessibilityRole="button"
                       >
                         <Text style={styles.showMoreText}>
-                          Show {Math.min(remaining, COMMENT_PAGE)} more
-                          {remaining > COMMENT_PAGE ? ` of ${remaining}` : ''}
+                          再显示 {Math.min(remaining, COMMENT_PAGE)} 条
+                          {remaining > COMMENT_PAGE ? `（共剩余 ${remaining} 条）` : ''}
                         </Text>
                       </Pressable>
                     ) : null}
@@ -213,8 +213,8 @@ export function PRCommentsSection({
             {canComment && actions ? (
               <View style={styles.rootComposer}>
                 <PRCommentComposer
-                  placeholder="Add a comment…"
-                  submitLabel="Comment"
+                  placeholder="添加评论…"
+                  submitLabel="评论"
                   submitting={actions.isRootBusy}
                   onSubmit={actions.addRootComment}
                 />
@@ -234,6 +234,9 @@ function CommentGroupView({
   group: PRCommentGroup
   actions?: PRCommentCardActions
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createPrCommentsStyles)
+  const shared = useMobileThemeStyles(createMobilePrSidebarStyles)
   const [expanded, setExpanded] = useState(false)
   const cards =
     group.kind === 'thread'
@@ -260,9 +263,9 @@ function CommentGroupView({
         onPress={() => setExpanded((v) => !v)}
         accessibilityRole="button"
       >
-        <Chevron size={14} color={colors.textSecondary} strokeWidth={2.2} />
+        <Chevron size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
         <Text style={styles.resolvedHeaderText} numberOfLines={1}>
-          Resolved {group.kind === 'thread' ? 'thread' : 'comment'} by {root.author}
+          {root.author} 已解决{group.kind === 'thread' ? '讨论串' : '评论'}
           {count > 1 ? ` (${count})` : ''}
         </Text>
       </Pressable>

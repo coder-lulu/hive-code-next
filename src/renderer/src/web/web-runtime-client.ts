@@ -624,7 +624,7 @@ export class WebRuntimeClient {
         reject(
           new Error(
             withRemoteRuntimeTailscaleHint(
-              'Timed out while connecting to the remote Orca runtime.',
+              applyProductBranding('Timed out while connecting to the remote Orca runtime.'),
               this.connection.endpoint
             )
           )
@@ -652,7 +652,7 @@ export class WebRuntimeClient {
     this.clearConnectTimer()
     this.clearHandshakeTimer()
     this.clearHeartbeatTimer()
-    this.rejectAllPending('Remote Orca runtime connection interrupted.')
+    this.rejectAllPending(applyProductBranding('Remote Orca runtime connection interrupted.'))
     this.handleInterruptedSubscriptions()
     if (this.intentionallyClosed || this.state === 'auth-failed') {
       this.setState(this.state === 'auth-failed' ? 'auth-failed' : 'disconnected')

@@ -1,9 +1,9 @@
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { BellRing, MessageSquare } from 'lucide-react-native'
 import type { MobileOnboardingStep } from './mobile-onboarding-plan'
-import { mobileOnboardingStyles as styles } from './mobile-onboarding-styles'
+import { createMobileOnboardingStyles } from './mobile-onboarding-styles'
 import type { MobileSessionView } from '../storage/session-view-preferences'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 export type NotificationOnboardingChoice = 'enable' | 'skip'
 export type MobileOnboardingBusyChoice = MobileSessionView | NotificationOnboardingChoice | null
@@ -27,6 +27,8 @@ export function MobileOnboardingPage({
   onSessionChoice,
   onNotificationChoice
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileOnboardingStyles)
   const busy = busyChoice !== null
   const isSessionView = step === 'session-view'
 
@@ -41,24 +43,32 @@ export function MobileOnboardingPage({
       <View style={styles.content}>
         <View style={styles.iconSurface}>
           {isSessionView ? (
-            <MessageSquare size={30} color={colors.textPrimary} />
+            <MessageSquare
+              size={theme.spacing.space24}
+              strokeWidth={2}
+              color={theme.color.text.primary}
+            />
           ) : (
-            <BellRing size={30} color={colors.textPrimary} />
+            <BellRing
+              size={theme.spacing.space24}
+              strokeWidth={2}
+              color={theme.color.text.primary}
+            />
           )}
         </View>
-        <Text style={styles.title}>
-          {isSessionView ? 'How should sessions open?' : 'Stay updated while away'}
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>
+          {isSessionView ? '选择会话打开方式' : '及时获取任务动态'}
         </Text>
-        <Text style={styles.body}>
+        <Text maxFontSizeMultiplier={1.3} style={styles.body}>
           {isSessionView
-            ? 'Choose whether supported agent sessions open in the terminal or Chat UI on this device. Press and hold a session tab to switch its view, or change the default later in Settings.'
-            : 'Get notified on this device when an agent needs your input or finishes a task.'}
+            ? '选择此设备上的 Agent 会话默认在终端或聊天界面中打开。长按会话标签页可随时切换，也可稍后在设置中修改。'
+            : '当 Agent 需要你处理或完成任务时，在此设备上接收通知。'}
         </Text>
       </View>
 
       <View style={styles.footer}>
         {error ? (
-          <Text style={styles.error} accessibilityRole="alert">
+          <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} style={styles.error}>
             {error}
           </Text>
         ) : null}
@@ -88,16 +98,16 @@ function SessionViewChoices({
   return (
     <>
       <ChoiceButton
-        label="Use Chat UI"
-        accessibilityLabel="Open sessions in Chat UI"
+        label="使用聊天界面"
+        accessibilityLabel="默认使用聊天界面打开会话"
         primary
         busy={busyChoice === 'chat'}
         disabled={disabled}
         onPress={() => onChoice('chat')}
       />
       <ChoiceButton
-        label="Keep terminal"
-        accessibilityLabel="Open sessions in the terminal"
+        label="保留终端"
+        accessibilityLabel="默认使用终端打开会话"
         busy={busyChoice === 'terminal'}
         disabled={disabled}
         onPress={() => onChoice('terminal')}
@@ -118,16 +128,16 @@ function NotificationChoices({
   return (
     <>
       <ChoiceButton
-        label="Enable notifications"
-        accessibilityLabel="Enable agent notifications"
+        label="开启通知"
+        accessibilityLabel="开启 Agent 通知"
         primary
         busy={busyChoice === 'enable'}
         disabled={disabled}
         onPress={() => onChoice('enable')}
       />
       <ChoiceButton
-        label="Not now"
-        accessibilityLabel="Skip notifications for now"
+        label="暂不开启"
+        accessibilityLabel="暂不开启 Agent 通知"
         busy={busyChoice === 'skip'}
         disabled={disabled}
         onPress={() => onChoice('skip')}
@@ -151,12 +161,17 @@ function ChoiceButton({
   disabled: boolean
   onPress: () => void
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileOnboardingStyles)
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ busy, disabled }}
       disabled={disabled}
       style={({ pressed }) => [
+        styles.choiceButton,
         primary ? styles.primaryButton : styles.secondaryButton,
         pressed && styles.buttonPressed,
         disabled && styles.buttonDisabled
@@ -164,9 +179,17 @@ function ChoiceButton({
       onPress={onPress}
     >
       {busy ? (
-        <ActivityIndicator color={primary ? colors.bgBase : colors.textSecondary} />
+        <ActivityIndicator
+          color={primary ? theme.color.text.inverse : theme.color.text.secondary}
+          size="small"
+        />
       ) : (
-        <Text style={primary ? styles.primaryButtonText : styles.secondaryButtonText}>{label}</Text>
+        <Text
+          maxFontSizeMultiplier={1.3}
+          style={primary ? styles.primaryButtonText : styles.secondaryButtonText}
+        >
+          {label}
+        </Text>
       )}
     </Pressable>
   )

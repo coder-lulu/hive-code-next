@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { View, StyleSheet } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import * as Notifications from 'expo-notifications'
 import * as Linking from 'expo-linking'
-import { colors } from '../src/theme/mobile-theme'
+import type { MobileTheme } from '../src/theme/mobile-theme'
+import { MobileThemeProvider, useMobileTheme } from '../src/theme/mobile-theme-provider'
 import { OrcaLogo } from '../src/components/OrcaLogo'
 import { RpcClientProvider } from '../src/transport/client-context'
 import { getNotificationNavigationTarget } from '../src/notifications/notification-routing'
@@ -13,6 +14,7 @@ import { useOpenNotificationRoute } from '../src/notifications/use-open-notifica
 import { loadHostCatalog } from '../src/transport/host-store'
 import { extractPairingCodeFromUrl } from '../src/transport/pairing'
 import { recoverMobileRelayPairing } from '../src/transport/mobile-relay-pairing-recovery'
+import { MobileAuthSessionProvider } from '../src/auth/mobile-auth-session'
 
 // Why: keeps the native splash screen visible until the React tree is mounted
 // and ready to render. Without this the user sees a blank white/black frame
@@ -34,9 +36,21 @@ Notifications.setNotificationHandler({
 })
 
 export default function RootLayout() {
+  return (
+    <MobileThemeProvider>
+      <MobileAuthSessionProvider>
+        <ThemedRootLayout />
+      </MobileAuthSessionProvider>
+    </MobileThemeProvider>
+  )
+}
+
+function ThemedRootLayout() {
   const router = useRouter()
   const openNotificationRoute = useOpenNotificationRoute()
   const handledNotificationIdsRef = useRef<Set<string>>(new Set())
+  const theme = useMobileTheme()
+  const styles = useMemo(() => createStyles(theme), [theme])
 
   useEffect(() => {
     // Why: pairing publication is journaled across process death; startup must
@@ -160,13 +174,13 @@ export default function RootLayout() {
   return (
     <RpcClientProvider>
       <View style={styles.root} onLayout={onNavigatorLayout}>
-        <StatusBar style="light" />
+        <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: colors.bgPanel },
-            headerTintColor: colors.textPrimary,
+            headerStyle: { backgroundColor: theme.color.bg.surface },
+            headerTintColor: theme.color.text.primary,
             headerTitleStyle: { fontSize: 16, fontWeight: '600' },
-            contentStyle: { backgroundColor: colors.bgBase },
+            contentStyle: { backgroundColor: theme.color.bg.canvas },
             headerShadowVisible: false
             // Why: deliberately no `orientation` screenOption. react-native-screens
             // has no value that respects the device rotation lock — even 'default'
@@ -190,6 +204,21 @@ export default function RootLayout() {
             options={{ headerShown: false, presentation: 'modal', gestureEnabled: false }}
           />
           <Stack.Screen name="settings" options={{ headerShown: false }} />
+          <Stack.Screen name="account" options={{ headerShown: false }} />
+          <Stack.Screen name="account/delete" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="login"
+            options={{
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+              headerShown: false,
+              presentation: 'transparentModal'
+            }}
+          />
+          <Stack.Screen name="privacy" options={{ headerShown: false }} />
+          <Stack.Screen name="legal" options={{ headerShown: false }} />
+          <Stack.Screen name="feedback" options={{ headerShown: false }} />
+          <Stack.Screen name="storage" options={{ headerShown: false }} />
           <Stack.Screen name="terminal-settings" options={{ headerShown: false }} />
           <Stack.Screen name="native-chat-settings" options={{ headerShown: false }} />
           <Stack.Screen name="browser-settings" options={{ headerShown: false }} />
@@ -205,9 +234,11 @@ export default function RootLayout() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bgBase
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: theme.color.bg.canvas
+    }
+  })
+}

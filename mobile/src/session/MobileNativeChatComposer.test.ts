@@ -35,6 +35,14 @@ vi.mock('lucide-react-native', () => ({
   X: 'X'
 }))
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+
 vi.mock('../components/BottomDrawer', async () => {
   const React = await import('react')
   return {
@@ -73,7 +81,7 @@ describe('MobileNativeChatComposer', () => {
       throw new Error('Composer was not rendered')
     }
     return renderer.root.find(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Send message'
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '发送消息'
     ) as { props: { onPress: () => Promise<void> } }
   }
 
@@ -170,7 +178,7 @@ describe('MobileNativeChatComposer', () => {
     })
     const modelPill = (): { props: { accessibilityState: { disabled: boolean } } } =>
       renderer!.root.find(
-        (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Model, Model'
+        (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '模型，模型'
       ) as { props: { accessibilityState: { disabled: boolean } } }
     expect(modelPill().props.accessibilityState).toMatchObject({ disabled: false })
     // Start the send but don't await it — it stays in flight on purpose.
@@ -276,7 +284,7 @@ describe('MobileNativeChatComposer', () => {
     expect(thumbs.map((t) => t.props.source.uri)).toEqual(['file:///a.png', 'file:///b.png'])
 
     const remove = renderer!.root.findAll(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Remove image'
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '移除图片'
     ) as Array<{ props: { onPress: () => void } }>
     remove[1].props.onPress()
     expect(onRemoveAttachment).toHaveBeenCalledWith('img-2')
@@ -369,7 +377,7 @@ describe('MobileNativeChatComposer', () => {
     const onMicPressOut = vi.fn()
     const mic = () =>
       renderer!.root.find(
-        (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Dictate'
+        (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '语音输入'
       ) as { props: { onPress?: unknown; onPressIn?: unknown; onPressOut?: unknown } }
 
     await act(async () => {

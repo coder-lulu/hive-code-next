@@ -6,11 +6,12 @@ import { verdictDisplayLabel } from '../transport/connection-health'
 import { mobileConnectionPathLabel } from '../transport/mobile-connection-path-label'
 import type { MobileConnectionPath } from '../transport/stable-logical-rpc-client'
 import type { ConnectionState, HostCatalogEntry, HostProfile } from '../transport/types'
-import { colors, radii, spacing } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 import { homeHostWorktreeSummary, type HostWorktreeInfo } from '../worktree/home-worktree-info'
 import { StatusDot } from './StatusDot'
 
 export function MobileHostCard(props: {
+  theme: MobileTheme
   host: HostProfile | HostCatalogEntry
   credentialStatus?: HostCatalogEntry['credentialStatus']
   state: ConnectionState
@@ -23,40 +24,42 @@ export function MobileHostCard(props: {
   onLongPress: () => void
   onOpenActions: () => void
 }) {
+  const styles = createStyles(props.theme)
   const credentialUnavailable = props.credentialStatus === 'temporarily-unavailable'
   const credentialMissing = props.credentialStatus === 'missing'
   const connected = props.state === 'connected' && !credentialUnavailable && !credentialMissing
   const isError =
     credentialMissing || ['warning', 'unreachable', 'auth-failed'].includes(props.verdict.kind)
   const statusLabel = credentialMissing
-    ? 'Pairing invalid'
+    ? '配对已失效'
     : credentialUnavailable
-      ? 'Pairing temporarily unavailable'
-      : verdictDisplayLabel(props.verdict)
+      ? '配对凭据暂时不可用'
+      : localizeConnectionStatus(verdictDisplayLabel(props.verdict))
   const statusVerdict: ConnectionVerdict = credentialMissing
     ? { kind: 'auth-failed', label: statusLabel }
     : credentialUnavailable
       ? { kind: 'warning', label: statusLabel }
       : props.verdict
   const worktreeSummary = homeHostWorktreeSummary(props.worktreeInfo)
+  const localizedWorktreeSummary = localizeWorktreeSummary(worktreeSummary)
   const connectionPathLabel =
     !credentialMissing && !credentialUnavailable && connected
-      ? mobileConnectionPathLabel(props.path)
+      ? localizeConnectionPath(mobileConnectionPathLabel(props.path))
       : null
   const discoveryHint =
     props.verdict.kind === 'unreachable' && !props.host.relay
-      ? productNameText('Update desktop Orca and sign in to connect from anywhere')
+      ? productNameText('更新桌面端 Orca 并登录，以便随时随地连接')
       : null
   const credentialHint = credentialMissing
-    ? 'Tap to re-pair with your desktop'
+    ? '点击与桌面端重新配对'
     : credentialUnavailable
-      ? 'Unlock your phone, then tap to retry'
+      ? '解锁手机后点击重试'
       : null
   const accessibilityLabel = [
-    `Open ${props.host.name}`,
+    `打开 ${props.host.name}`,
     statusLabel,
-    connectionPathLabel?.replace(' · ', ' via '),
-    connected ? worktreeSummary?.replace(' · ', ', ') : null,
+    connectionPathLabel?.replaceAll(' · ', '，'),
+    connected ? localizedWorktreeSummary?.replaceAll(' · ', '，') : null,
     discoveryHint,
     credentialHint
   ]
@@ -73,22 +76,25 @@ export function MobileHostCard(props: {
         delayLongPress={400}
       >
         <View style={styles.icon}>
-          <Monitor size={20} color={connected ? colors.textPrimary : colors.textSecondary} />
+          <Monitor
+            size={20}
+            color={connected ? props.theme.color.text.primary : props.theme.color.text.secondary}
+          />
         </View>
         <View style={styles.main}>
           <Text
-            style={[styles.name, !connected && { color: colors.textSecondary }]}
+            style={[styles.name, !connected && { color: props.theme.color.text.secondary }]}
             numberOfLines={1}
           >
             {props.host.name}
           </Text>
           <View style={styles.meta}>
-            <StatusDot state={props.state} verdict={statusVerdict} />
+            <StatusDot state={props.state} verdict={statusVerdict} theme={props.theme} />
             <Text
               style={[
                 styles.metaText,
-                isError && { color: colors.statusRed },
-                credentialUnavailable && { color: colors.statusAmber }
+                isError && { color: props.theme.color.status.danger },
+                credentialUnavailable && { color: props.theme.color.status.warning }
               ]}
               numberOfLines={1}
             >
@@ -96,9 +102,9 @@ export function MobileHostCard(props: {
               {connectionPathLabel ? ` · ${connectionPathLabel}` : ''}
             </Text>
           </View>
-          {connected && worktreeSummary ? (
+          {connected && localizedWorktreeSummary ? (
             <Text style={styles.worktreeMetaText} numberOfLines={1}>
-              {worktreeSummary}
+              {localizedWorktreeSummary}
             </Text>
           ) : null}
           {discoveryHint ? (
@@ -115,70 +121,115 @@ export function MobileHostCard(props: {
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Actions for ${props.host.name}`}
+        accessibilityLabel={`${props.host.name} 的更多操作`}
         hitSlop={8}
         style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
         onPress={props.onOpenActions}
       >
-        <MoreVertical size={18} color={colors.textSecondary} />
+        <MoreVertical size={18} color={props.theme.color.text.secondary} />
       </Pressable>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: radii.card,
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    overflow: 'hidden'
-  },
-  cardMain: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: spacing.md,
-    paddingVertical: 12
-  },
-  cardPressed: { backgroundColor: colors.bgRaised },
-  icon: {
-    width: 46,
-    height: 46,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgRaised,
-    marginRight: 14
-  },
-  main: { flex: 1, minWidth: 0, marginRight: spacing.sm },
-  name: { color: colors.textPrimary, fontSize: 15, fontWeight: '600', lineHeight: 20 },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3, minWidth: 0 },
-  metaText: { flex: 1, fontSize: 12, color: colors.textSecondary },
-  worktreeMetaText: {
-    marginTop: 2,
-    marginLeft: spacing.xl,
-    fontSize: 12,
-    color: colors.textMuted
-  },
-  discoveryHint: {
-    marginTop: spacing.xs,
-    fontSize: 11,
-    lineHeight: 15,
-    color: colors.textMuted
-  },
-  actionButton: {
-    width: 40,
-    height: 40,
-    marginHorizontal: spacing.xs,
-    borderRadius: radii.row,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  actionButtonPressed: {
-    backgroundColor: colors.bgRaised
+const STATUS_TRANSLATIONS: Readonly<Record<string, string>> = {
+  Connected: '已连接',
+  Disconnected: '未连接',
+  'Connecting…': '正在连接…',
+  'Reconnecting…': '正在重新连接…',
+  'Connecting via Relay…': '正在通过安全中继连接…',
+  "Can't connect": '无法连接',
+  "Can't connect via Relay": '无法通过安全中继连接',
+  "Can't reach desktop": '无法访问桌面端',
+  'Pairing invalid — re-pair with your desktop': '配对已失效，请与桌面端重新配对'
+}
+
+function localizeConnectionStatus(label: string): string {
+  const [status, hint] = label.split(' — ')
+  const localizedStatus = STATUS_TRANSLATIONS[status ?? ''] ?? status ?? label
+  return hint === 'check Tailscale' ? `${localizedStatus} — 请检查 Tailscale` : localizedStatus
+}
+
+function localizeConnectionPath(label: string): string {
+  return label.replace('Relay', '安全中继').replace('Direct', '直连').replace('LAN', '局域网')
+}
+
+function localizeWorktreeSummary(summary: string | null): string | null {
+  if (!summary) {
+    return null
   }
-})
+  if (summary === 'Worktree list unavailable') {
+    return '工作区列表不可用'
+  }
+  return summary
+    .replace(/^Last known: /, '上次状态：')
+    .replace(/(\d+) worktrees?/, '$1 个工作区')
+    .replace(/(\d+) active/, '$1 个活跃')
+}
+
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    card: {
+      minHeight: 72,
+      flexDirection: 'row',
+      alignItems: 'center',
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.subtle,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    cardMain: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingLeft: theme.spacing.space12,
+      paddingVertical: theme.spacing.space12
+    },
+    cardPressed: { backgroundColor: theme.color.bg.subtle },
+    icon: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.space12,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.subtle
+    },
+    main: { flex: 1, minWidth: 0, marginRight: theme.spacing.space8 },
+    name: {
+      ...theme.typography.label,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    meta: {
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4,
+      marginTop: theme.spacing.space4
+    },
+    metaText: { ...theme.typography.caption, flex: 1, color: theme.color.text.secondary },
+    worktreeMetaText: {
+      ...theme.typography.caption,
+      marginTop: theme.spacing.space4,
+      marginLeft: theme.spacing.space16,
+      color: theme.color.text.tertiary
+    },
+    discoveryHint: {
+      ...theme.typography.caption,
+      marginTop: theme.spacing.space4,
+      color: theme.color.text.tertiary
+    },
+    actionButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      marginHorizontal: theme.spacing.space4,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control
+    },
+    actionButtonPressed: { backgroundColor: theme.color.bg.subtle }
+  })
+}

@@ -11,7 +11,6 @@ import {
   PanResponder,
   PixelRatio,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -25,7 +24,8 @@ import type {
   BrowserScreencastFrame,
   BrowserScreencastFrameMetadata
 } from '../transport/browser-screencast-protocol'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import {
   MOBILE_BROWSER_FRAME_MIN_INTERVAL_MS,
   buildMobileBrowserScreencastRequest,
@@ -56,6 +56,7 @@ import {
 import { displayBrowserUrl, normalizeBrowserUrl } from './browser-url'
 import { MobileBrowserAddressField } from './MobileBrowserAddressField'
 import { resolveMobileBrowserAddressSync } from './mobile-browser-address-sync'
+import { createMobileBrowserPaneStyles } from './mobile-browser-pane-styles'
 
 export type MobileBrowserTab = {
   type: 'browser'
@@ -140,6 +141,8 @@ export function MobileBrowserPane({
   bottomInset,
   onToast
 }: MobileBrowserPaneProps) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileBrowserPaneStyles)
   const [browserViewMode, setBrowserViewMode] = useState<MobileBrowserViewMode>(() =>
     getInitialMobileBrowserViewMode(worktreeId, tab.browserPageId, tab.url)
   )
@@ -152,6 +155,7 @@ export function MobileBrowserPane({
     url: tab.url
   })
   const [keyboardValue, setKeyboardValue] = useState('')
+  const [keyboardFocused, setKeyboardFocused] = useState(false)
   const [frameUri, setFrameUri] = useState<string | null>(cachedInitialFrame?.uri ?? null)
   const [frameMetadata, setFrameMetadata] = useState<BrowserScreencastFrameMetadata | null>(
     cachedInitialFrame?.metadata ?? null
@@ -1066,21 +1070,33 @@ export function MobileBrowserPane({
           label="Back"
           onPress={goBack}
         >
-          <ChevronLeft size={15} color={buttonColor(!controlsDisabled && tab.canGoBack)} />
+          <ChevronLeft
+            size={20}
+            strokeWidth={2}
+            color={browserControlColor(theme, !controlsDisabled && tab.canGoBack)}
+          />
         </MobileBrowserToolbarIconButton>
         <MobileBrowserToolbarIconButton
           disabled={controlsDisabled || !tab.canGoForward}
           label="Forward"
           onPress={goForward}
         >
-          <ChevronRight size={15} color={buttonColor(!controlsDisabled && tab.canGoForward)} />
+          <ChevronRight
+            size={20}
+            strokeWidth={2}
+            color={browserControlColor(theme, !controlsDisabled && tab.canGoForward)}
+          />
         </MobileBrowserToolbarIconButton>
         <MobileBrowserToolbarIconButton
           disabled={controlsDisabled}
           label="Reload"
           onPress={reloadPage}
         >
-          <RefreshCw size={15} color={buttonColor(!controlsDisabled)} />
+          <RefreshCw
+            size={20}
+            strokeWidth={2}
+            color={browserControlColor(theme, !controlsDisabled)}
+          />
         </MobileBrowserToolbarIconButton>
         <MobileBrowserAddressField
           value={addressValue}
@@ -1187,20 +1203,38 @@ export function MobileBrowserPane({
           </View>
         ) : null}
         {!renderedFrameSource || busy || error ? (
-          <View pointerEvents="none" style={styles.overlay}>
+          <View
+            pointerEvents="none"
+            style={[styles.overlay, !renderedFrameSource && styles.emptyOverlay]}
+          >
             {/* Why: a stream can report ready and then deliver no frames, so key the
                 indicator off actually having pixels or it clears into a blank pane. */}
             {busy || (!renderedFrameSource && !error) ? (
-              <ActivityIndicator size="small" color={colors.textSecondary} />
+              <View style={styles.loadingIndicatorHost}>
+                <ActivityIndicator size="small" color={theme.color.text.secondary} />
+              </View>
             ) : null}
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {error ? (
+              <Text
+                style={styles.errorText}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+                maxFontSizeMultiplier={1.3}
+              >
+                {error}
+              </Text>
+            ) : null}
           </View>
         ) : null}
         {dialog ? (
-          <View style={styles.dialogOverlay}>
-            <View style={styles.dialogCard}>
-              <Text style={styles.dialogTitle}>Browser Dialog</Text>
-              <Text style={styles.dialogMessage}>{dialog.message}</Text>
+          <View style={styles.dialogOverlay} accessibilityViewIsModal>
+            <View style={styles.dialogCard} accessibilityRole="alert">
+              <Text style={styles.dialogTitle} maxFontSizeMultiplier={1.3}>
+                Browser Dialog
+              </Text>
+              <Text style={styles.dialogMessage} maxFontSizeMultiplier={1.3}>
+                {dialog.message}
+              </Text>
               <View style={styles.dialogActions}>
                 {dialog.dialogType !== 'alert' ? (
                   <Pressable
@@ -1209,8 +1243,12 @@ export function MobileBrowserPane({
                       pressed && styles.dialogButtonPressed
                     ]}
                     onPress={() => void sendDialogCommand('browser.dialogDismiss')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel browser dialog"
                   >
-                    <Text style={styles.dialogButtonText}>Cancel</Text>
+                    <Text style={styles.dialogButtonText} maxFontSizeMultiplier={1.3}>
+                      Cancel
+                    </Text>
                   </Pressable>
                 ) : null}
                 <Pressable
@@ -1220,8 +1258,15 @@ export function MobileBrowserPane({
                     pressed && styles.dialogButtonPressed
                   ]}
                   onPress={() => void sendDialogCommand('browser.dialogAccept')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Confirm browser dialog"
                 >
-                  <Text style={[styles.dialogButtonText, styles.dialogButtonPrimaryText]}>OK</Text>
+                  <Text
+                    style={[styles.dialogButtonText, styles.dialogButtonPrimaryText]}
+                    maxFontSizeMultiplier={1.3}
+                  >
+                    OK
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -1246,23 +1291,44 @@ export function MobileBrowserPane({
         />
         <View style={styles.inputRow}>
           <TextInput
-            style={styles.keyboardInput}
+            style={[styles.keyboardInput, keyboardFocused && styles.keyboardInputFocused]}
             value={keyboardValue}
             onChangeText={setKeyboardValue}
             placeholder="Type on page…"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={theme.color.text.tertiary}
+            selectionColor={theme.color.brand.primary}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!controlsDisabled}
+            onFocus={() => setKeyboardFocused(true)}
+            onBlur={() => setKeyboardFocused(false)}
             onSubmitEditing={() => void sendKeyboardText()}
+            accessibilityLabel="Text to type in browser"
+            accessibilityState={{ disabled: controlsDisabled }}
+            maxFontSizeMultiplier={1.3}
           />
           <Pressable
-            style={[styles.sendButton, (controlsDisabled || !keyboardValue) && styles.disabled]}
+            style={({ pressed }) => [
+              styles.sendButton,
+              !controlsDisabled && !!keyboardValue && styles.sendButtonEnabled,
+              pressed && !controlsDisabled && !!keyboardValue && styles.sendButtonPressed,
+              (controlsDisabled || !keyboardValue) && styles.disabled
+            ]}
             disabled={controlsDisabled || !keyboardValue}
             onPress={() => void sendKeyboardText()}
+            accessibilityRole="button"
             accessibilityLabel="Send text to browser"
+            accessibilityState={{ disabled: controlsDisabled || !keyboardValue }}
           >
-            <ArrowUp size={18} color={buttonColor(!controlsDisabled && !!keyboardValue)} />
+            <ArrowUp
+              size={20}
+              strokeWidth={2}
+              color={
+                !controlsDisabled && keyboardValue
+                  ? theme.color.text.inverse
+                  : theme.color.text.tertiary
+              }
+            />
           </Pressable>
         </View>
       </View>
@@ -1270,8 +1336,8 @@ export function MobileBrowserPane({
   )
 }
 
-function buttonColor(enabled: boolean): string {
-  return enabled ? colors.textSecondary : colors.textMuted
+function browserControlColor(theme: MobileTheme, enabled: boolean): string {
+  return enabled ? theme.color.text.secondary : theme.color.text.tertiary
 }
 
 function createBrowserFrameDataUri(frame: BrowserScreencastFrame): string {
@@ -1447,172 +1513,3 @@ function updatePinchZoom(
     MAX_ZOOM
   )
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    minHeight: 0,
-    backgroundColor: colors.bgBase
-  },
-  toolbar: {
-    minHeight: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel
-  },
-  viewport: {
-    flex: 1,
-    minHeight: 0,
-    overflow: 'hidden',
-    backgroundColor: colors.bgBase
-  },
-  browserImageHost: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden'
-  },
-  browserImageFill: {
-    width: '100%',
-    height: '100%'
-  },
-  browserImageLayer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  browserImageLayerHidden: {
-    opacity: 0
-  },
-  browserZoomOffset: {
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  browserFrameBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden'
-  },
-  browserImage: {
-    backgroundColor: colors.bgBase
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.sm,
-    backgroundColor: 'rgba(13, 15, 24, 0.2)'
-  },
-  errorText: {
-    color: colors.textPrimary,
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.button,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 13,
-    textAlign: 'center',
-    overflow: 'hidden'
-  },
-  dialogOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    backgroundColor: 'rgba(13, 15, 24, 0.5)'
-  },
-  dialogCard: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel,
-    padding: spacing.lg
-  },
-  dialogTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  dialogMessage: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    lineHeight: 20,
-    marginTop: spacing.sm
-  },
-  dialogActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.lg
-  },
-  dialogButton: {
-    minHeight: 34,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised,
-    paddingHorizontal: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  dialogButtonPrimary: {
-    backgroundColor: colors.textPrimary
-  },
-  dialogButtonPressed: {
-    opacity: 0.75
-  },
-  dialogButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  dialogButtonPrimaryText: {
-    color: colors.bgBase
-  },
-  keyboardDock: {
-    zIndex: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xs + 2
-  },
-  keyboardInput: {
-    flex: 1,
-    height: 34,
-    backgroundColor: colors.bgRaised,
-    color: colors.textPrimary,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    fontSize: 14,
-    fontFamily: typography.monoFamily,
-    marginRight: spacing.sm
-  },
-  sendButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgRaised
-  },
-  disabled: {
-    opacity: 0.35
-  },
-  disabledText: {
-    color: colors.textMuted
-  }
-})

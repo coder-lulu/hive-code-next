@@ -346,7 +346,7 @@ describe('registerMobileHandlers', () => {
     await expect(handlers.get('mobile:getPairingQR')?.(null, {})).resolves.toMatchObject({
       available: true,
       qrSize: 58,
-      pairingUrl: 'orca://pair#mobile',
+      pairingUrl: 'hivecode://pair#mobile',
       endpoint: 'ws://100.102.47.57:6768',
       deviceId: 'mobile-1',
       connectionMode: 'automatic'
@@ -415,9 +415,8 @@ describe('registerMobileHandlers', () => {
       connectionMode: 'local-only'
     })
 
-    registerMobileHandlers({ createMobilePairingOffer } as never, {
-      encodePairingQr: vi.fn().mockResolvedValue({ ok: false, reason: 'encoding_failed' })
-    })
+    const encodePairingQr = vi.fn().mockResolvedValue({ ok: false, reason: 'encoding_failed' })
+    registerMobileHandlers({ createMobilePairingOffer } as never, { encodePairingQr })
 
     await expect(
       handlers.get('mobile:getPairingQR')?.(null, { address: 'pair.example' })
@@ -426,11 +425,13 @@ describe('registerMobileHandlers', () => {
       qrDataUrl: null,
       qrSize: null,
       qrError: 'encoding_failed',
-      pairingUrl: 'orca://pair?code=copy-me',
+      pairingUrl: 'hivecode://pair?code=copy-me',
       endpoint: 'wss://pair.example/oversized',
       deviceId: 'mobile-large',
       connectionMode: 'local-only'
     })
+
+    expect(encodePairingQr).toHaveBeenCalledWith('hivecode://pair?code=copy-me')
   })
 
   it('lists only paired mobile-scoped devices', () => {
@@ -496,7 +497,7 @@ describe('registerMobileHandlers', () => {
       })
     ).resolves.toEqual({
       available: true,
-      pairingUrl: 'orca://pair#runtime',
+      pairingUrl: 'hivecode://pair#runtime',
       webClientUrl: 'http://100.64.1.20:6768/web-index.html?pairing=runtime',
       endpoint: 'ws://100.64.1.20:6768',
       deviceId: 'runtime-1'

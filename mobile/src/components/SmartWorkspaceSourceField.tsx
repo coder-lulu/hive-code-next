@@ -9,7 +9,8 @@ import {
 } from 'lucide-react-native'
 import type { SmartNameSelection } from '../tasks/mobile-composer-source-types'
 import type { MobileComposerSource } from '../tasks/use-mobile-composer-source'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { TaskProviderLogo } from './TaskProviderLogo'
 
 type Props = {
@@ -25,19 +26,20 @@ type Props = {
 }
 
 function SelectionIcon({ kind }: { kind: SmartNameSelection['kind'] }) {
+  const theme = useMobileTheme()
   if (kind === 'github-pr') {
-    return <GitPullRequest size={15} color={colors.textSecondary} />
+    return <GitPullRequest size={16} color={theme.color.text.secondary} />
   }
   if (kind === 'gitlab-mr') {
-    return <GitMerge size={15} color={colors.textSecondary} />
+    return <GitMerge size={16} color={theme.color.text.secondary} />
   }
   if (kind === 'github-issue' || kind === 'gitlab-issue') {
-    return <CircleDot size={15} color={colors.textSecondary} />
+    return <CircleDot size={16} color={theme.color.text.secondary} />
   }
   if (kind === 'branch') {
-    return <GitBranch size={15} color={colors.textSecondary} />
+    return <GitBranch size={16} color={theme.color.text.secondary} />
   }
-  return <TaskProviderLogo provider="linear" size={15} color={colors.textSecondary} />
+  return <TaskProviderLogo provider="linear" size={16} color={theme.color.text.secondary} />
 }
 
 export function SmartWorkspaceSourceField({
@@ -48,6 +50,8 @@ export function SmartWorkspaceSourceField({
   onBeforeOpen,
   onOpenDrawer
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const selection = composer.smartNameSelection
 
   function openDrawer(): void {
@@ -71,14 +75,21 @@ export function SmartWorkspaceSourceField({
           </Text>
           {selection.url ? (
             <Pressable
-              hitSlop={6}
+              accessibilityRole="link"
+              accessibilityLabel="Open selected source"
+              style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
               onPress={() => selection.url && void Linking.openURL(selection.url).catch(() => {})}
             >
-              <ExternalLink size={15} color={colors.textMuted} />
+              <ExternalLink size={16} color={theme.color.text.tertiary} />
             </Pressable>
           ) : null}
-          <Pressable hitSlop={6} onPress={composer.handleClearSmartNameSelection}>
-            <X size={15} color={colors.textMuted} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear selected source"
+            style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
+            onPress={composer.handleClearSmartNameSelection}
+          >
+            <X size={16} color={theme.color.text.tertiary} />
           </Pressable>
         </View>
       ) : (
@@ -92,7 +103,7 @@ export function SmartWorkspaceSourceField({
           onFocus={openDrawer}
           editable={!disabled && interactive}
           placeholder="Type a name or search a source"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={theme.color.text.tertiary}
           autoCapitalize="none"
           autoCorrect={false}
           // Why: form field is a portal into the picker; return should not
@@ -105,47 +116,60 @@ export function SmartWorkspaceSourceField({
   )
 }
 
-const styles = StyleSheet.create({
-  field: {
-    marginBottom: spacing.md
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs
-  },
-  labelHint: {
-    fontWeight: '400',
-    color: colors.textMuted
-  },
-  input: {
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  },
-  disabled: {
-    opacity: 0.55
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  pillLabel: {
-    flex: 1,
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    field: {
+      marginBottom: theme.spacing.space16
+    },
+    label: {
+      ...theme.typography.meta,
+      fontWeight: '500',
+      color: theme.color.text.secondary,
+      marginBottom: theme.spacing.space8
+    },
+    labelHint: {
+      fontWeight: '400',
+      color: theme.color.text.tertiary
+    },
+    input: {
+      minHeight: theme.size.minimumTouchTarget,
+      backgroundColor: theme.color.bg.surface,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space12,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      ...theme.typography.body,
+      color: theme.color.text.primary
+    },
+    disabled: {
+      opacity: 0.5
+    },
+    pill: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      backgroundColor: theme.color.bg.surface,
+      borderRadius: theme.radii.control,
+      paddingLeft: theme.spacing.space12,
+      borderWidth: 1,
+      borderColor: theme.color.border.default
+    },
+    pillLabel: {
+      flex: 1,
+      ...theme.typography.body,
+      color: theme.color.text.primary
+    },
+    iconButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control
+    },
+    iconButtonPressed: {
+      backgroundColor: theme.color.bg.subtle
+    }
+  })
+}

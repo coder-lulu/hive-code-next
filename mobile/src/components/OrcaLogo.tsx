@@ -2,14 +2,15 @@ import { Image } from 'react-native'
 
 type Props = {
   size?: number
+  unframed?: boolean
 }
 
-export function OrcaLogo({ size = 24 }: Props) {
+export function OrcaLogo({ size = 24, unframed = false }: Props) {
   return (
     <Image
-      source={require('../../assets/icon.png')}
+      source={unframed ? require('../../assets/splash-icon.png') : require('../../assets/icon.png')}
       accessibilityIgnoresInvertColors
-      style={{ width: size, height: size, borderRadius: Math.round(size * 0.22) }}
+      style={{ width: size, height: size, borderRadius: unframed ? 0 : Math.round(size * 0.22) }}
     />
   )
 }

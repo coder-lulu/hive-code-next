@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { GripVertical } from 'lucide-react-native'
@@ -13,7 +13,8 @@ import Animated, {
   type AnimatedRef,
   type SharedValue
 } from 'react-native-reanimated'
-import { colors, spacing } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 import { triggerMediumImpact, triggerSelection } from '../platform/haptics'
 import {
   clampDragReorderIndex,
@@ -227,6 +228,10 @@ function DragReorderRow({
   onAccessibilityMove: (key: string, delta: number) => void
   children: ReactNode
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMemo(() => createDragReorderListStyles(theme), [theme])
+  const activeBackgroundColor = theme.color.bg.elevated
+  const idleBackgroundColor = theme.color.bg.surface
   const {
     positions,
     activeKey,
@@ -274,7 +279,7 @@ function DragReorderRow({
         zIndex: 2,
         elevation: 4,
         shadowOpacity: 0.3,
-        backgroundColor: colors.bgRaised,
+        backgroundColor: activeBackgroundColor,
         transform: [{ scale: 1.02 }]
       }
     }
@@ -283,7 +288,7 @@ function DragReorderRow({
       zIndex: 0,
       elevation: 0,
       shadowOpacity: 0,
-      backgroundColor: colors.bgPanel,
+      backgroundColor: idleBackgroundColor,
       transform: [{ scale: 1 }]
     }
   })
@@ -296,11 +301,11 @@ function DragReorderRow({
           style={styles.handle}
           accessible
           accessibilityRole="button"
-          accessibilityLabel="Drag to reorder"
-          accessibilityHint="Use the move up and move down actions to reorder without dragging"
+          accessibilityLabel="按住拖动以调整顺序"
+          accessibilityHint="也可以使用上移或下移操作调整顺序"
           accessibilityActions={[
-            { name: 'moveUp', label: 'Move up' },
-            { name: 'moveDown', label: 'Move down' }
+            { name: 'moveUp', label: '上移' },
+            { name: 'moveDown', label: '下移' }
           ]}
           onAccessibilityAction={(event) => {
             if (event.nativeEvent.actionName === 'moveUp') {
@@ -311,7 +316,7 @@ function DragReorderRow({
           }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <GripVertical size={18} color={colors.textMuted} />
+          <GripVertical size={18} color={theme.color.text.tertiary} strokeWidth={2} />
         </Animated.View>
       </GestureDetector>
       <View style={styles.rowSeparator} />
@@ -319,31 +324,35 @@ function DragReorderRow({
   )
 }
 
-const styles = StyleSheet.create({
-  row: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8
-  },
-  rowContent: {
-    flex: 1
-  },
-  handle: {
-    alignSelf: 'stretch',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md
-  },
-  rowSeparator: {
-    position: 'absolute',
-    bottom: 0,
-    left: spacing.md,
-    right: spacing.md,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle
-  }
-})
+export function createDragReorderListStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    row: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: theme.color.overlay,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8
+    },
+    rowContent: {
+      flex: 1
+    },
+    handle: {
+      minWidth: theme.size.minimumTouchTarget,
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space12
+    },
+    rowSeparator: {
+      position: 'absolute',
+      bottom: 0,
+      left: theme.spacing.space16,
+      right: theme.spacing.space16,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.color.border.subtle
+    }
+  })
+}

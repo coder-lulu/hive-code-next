@@ -36,14 +36,14 @@ export default function WebConnect({
   const connect = async (): Promise<void> => {
     setError(null)
     if (!parsedOffer) {
-      setError(applyProductBranding('Enter a valid Orca pairing URL or pairing code.'))
+      setError(applyProductBranding('Enter a valid HiveCode pairing URL or pairing code.'))
       return
     }
     if (parsedOffer.scope === 'mobile') {
       setError(
         translate(
           'auto.web.WebConnect.mobileScopeRejected',
-          'This QR code grants limited (mobile) access. To use the full web app, open the browser access link from Settings → Runtime Environments → Share this Orca server → New Link.'
+          'This QR code grants limited (mobile) access. To use the full web app, open the browser access link from Settings → Runtime Environments → Share this HiveCode server → New Link.'
         )
       )
       return
@@ -51,7 +51,7 @@ export default function WebConnect({
     if (isMixedContentWebSocket(parsedOffer.endpoint)) {
       setError(
         applyProductBranding(
-          'This HTTPS page cannot connect to a plain ws:// Orca server. Open the web client over HTTP or pair with a wss:// endpoint.'
+          'This HTTPS page cannot connect to a plain ws:// HiveCode server. Open the web client over HTTP or pair with a wss:// endpoint.'
         )
       )
       return
@@ -74,7 +74,7 @@ export default function WebConnect({
         setError(
           translate(
             'auto.web.WebConnect.mobileScopeRejected',
-            'This QR code grants limited (mobile) access. To use the full web app, open the browser access link from Settings → Runtime Environments → Share this Orca server → New Link.'
+            'This QR code grants limited (mobile) access. To use the full web app, open the browser access link from Settings → Runtime Environments → Share this HiveCode server → New Link.'
           )
         )
         return
@@ -120,12 +120,12 @@ export default function WebConnect({
           </div>
           <div className="min-w-0">
             <h1 className="text-base font-semibold leading-6">
-              {translate('auto.web.WebConnect.e3bcd082ac', 'Connect to Orca')}
+              {translate('auto.web.WebConnect.e3bcd082ac', 'Connect to HiveCode')}
             </h1>
             <p className="mt-1 text-sm leading-5 text-muted-foreground">
               {translate(
                 'auto.web.WebConnect.3affe7de3a',
-                'Paste a pairing URL from an Orca server that this browser can reach.'
+                'Paste a pairing URL from a HiveCode server that this browser can reach.'
               )}
             </p>
           </div>
@@ -151,7 +151,7 @@ export default function WebConnect({
             id="web-runtime-pairing-code"
             value={pairingCode}
             onChange={(event) => setPairingCode(event.target.value)}
-            placeholder={translate('auto.web.WebConnect.27393856e4', 'orca://pair?code=...')}
+            placeholder={translate('auto.web.WebConnect.27393856e4', 'hivecode://pair?code=...')}
             autoComplete="off"
             spellCheck={false}
           />

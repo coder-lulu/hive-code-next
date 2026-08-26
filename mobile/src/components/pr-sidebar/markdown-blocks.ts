@@ -67,7 +67,7 @@ function parseSegment(text: string): MarkdownBlock[] {
     }
     if (m[1].toLowerCase() === 'details') {
       const sm = SUMMARY.exec(m[2])
-      const summary = sm ? stripHtmlTags(sm[1]).trim() : 'Details'
+      const summary = sm ? stripHtmlTags(sm[1]).trim() : '详情'
       const body = m[2].replace(SUMMARY, '')
       blocks.push({ kind: 'details', summary: summary || 'Details', body: parseSegment(body) })
     } else {

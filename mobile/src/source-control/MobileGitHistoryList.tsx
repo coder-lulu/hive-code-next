@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ChevronDown, ChevronRight } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { ConnectionState, RpcSuccess } from '../transport/types'
 import type { RpcClient } from '../transport/rpc-client'
 import { useForceReconnect } from '../transport/client-context'
@@ -36,6 +37,8 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
   bottomInset,
   refreshNonce = 0
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const forceReconnect = useForceReconnect()
   const [rows, setRows] = useState<MobileCommitRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +73,7 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : 'Failed to load history')
+          setError(err instanceof Error ? err.message : '无法加载提交历史')
         }
       }
     })()
@@ -141,9 +144,9 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
             onPress={() => toggleCommit(item)}
           >
             {isOpen ? (
-              <ChevronDown size={14} color={colors.textMuted} />
+              <ChevronDown size={16} color={theme.color.text.tertiary} strokeWidth={2} />
             ) : (
-              <ChevronRight size={14} color={colors.textMuted} />
+              <ChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
             )}
             <View style={styles.commitMain}>
               <Text style={styles.commitSubject} numberOfLines={1}>
@@ -159,12 +162,12 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
               {files === 'loading' || files === undefined ? (
                 // No request can complete while disconnected, so say so instead of spinning forever.
                 connected ? (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <ActivityIndicator size="small" color={theme.color.text.secondary} />
                 ) : (
-                  <Text style={styles.empty}>Waiting for desktop...</Text>
+                  <Text style={styles.empty}>正在等待电脑连接...</Text>
                 )
               ) : files.length === 0 ? (
-                <Text style={styles.empty}>No file changes</Text>
+                <Text style={styles.empty}>没有文件更改</Text>
               ) : (
                 files.map((file) => (
                   <View key={file.path} style={styles.fileRow}>
@@ -183,7 +186,7 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
         </View>
       )
     },
-    [connected, expanded, filesById, toggleCommit]
+    [connected, expanded, filesById, styles, theme, toggleCommit]
   )
 
   const view = resolveMobileHistoryScreenView({ connected, rows, error })
@@ -192,10 +195,10 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
     return (
       <View style={styles.state}>
         <Text style={styles.stateText}>
-          {view.kind === 'waiting' ? 'Waiting for desktop...' : view.message}
+          {view.kind === 'waiting' ? '正在等待电脑连接...' : view.message}
         </Text>
-        <Pressable style={styles.retryButton} onPress={retry} accessibilityLabel="Retry">
-          <Text style={styles.retryText}>Retry</Text>
+        <Pressable style={styles.retryButton} onPress={retry} accessibilityLabel="重试">
+          <Text style={styles.retryText}>重试</Text>
         </Pressable>
       </View>
     )
@@ -203,14 +206,14 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
   if (view.kind === 'loading') {
     return (
       <View style={styles.state}>
-        <ActivityIndicator color={colors.textSecondary} />
+        <ActivityIndicator color={theme.color.text.secondary} />
       </View>
     )
   }
   if (view.kind === 'empty') {
     return (
       <View style={styles.state}>
-        <Text style={styles.stateText}>No commits.</Text>
+        <Text style={styles.stateText}>没有提交记录。</Text>
       </View>
     )
   }
@@ -219,49 +222,67 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
       data={view.rows}
       renderItem={renderCommit}
       keyExtractor={(row) => row.id}
-      contentContainerStyle={{ paddingBottom: spacing.lg + bottomInset }}
+      contentContainerStyle={{ paddingBottom: theme.spacing.space16 + bottomInset }}
     />
   )
 })
 
-const styles = StyleSheet.create({
-  state: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  stateText: { color: colors.textMuted, fontSize: typography.bodySize },
-  retryButton: {
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised
-  },
-  retryText: { color: colors.textPrimary, fontSize: typography.bodySize, fontWeight: '600' },
-  commit: { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
-  commitHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2
-  },
-  commitHeaderPressed: { backgroundColor: colors.bgRaised },
-  commitMain: { flex: 1, minWidth: 0 },
-  commitSubject: { color: colors.textPrimary, fontSize: typography.bodySize },
-  commitMeta: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize,
-    fontFamily: typography.monoFamily,
-    marginTop: 2
-  },
-  files: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: 4 },
-  fileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  filePath: {
-    flex: 1,
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontFamily: typography.monoFamily
-  },
-  fileStat: { fontSize: typography.metaSize, fontFamily: typography.monoFamily },
-  add: { color: colors.gitDecorationAdded },
-  del: { color: colors.gitDecorationDeleted },
-  empty: { color: colors.textMuted, fontSize: typography.metaSize }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    state: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: theme.spacing.space16
+    },
+    stateText: { ...theme.typography.body, color: theme.color.text.tertiary },
+    retryButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      marginTop: theme.spacing.space12,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space8,
+      borderRadius: theme.radii.control,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      backgroundColor: theme.color.bg.surface,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    retryText: { ...theme.typography.label, color: theme.color.text.primary, fontWeight: '600' },
+    commit: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle
+    },
+    commitHeader: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space8
+    },
+    commitHeaderPressed: { backgroundColor: theme.color.bg.subtle },
+    commitMain: { flex: 1, minWidth: 0 },
+    commitSubject: { ...theme.typography.body, color: theme.color.text.primary },
+    commitMeta: {
+      ...theme.typography.code,
+      color: theme.color.text.tertiary,
+      marginTop: theme.spacing.space4
+    },
+    files: {
+      paddingHorizontal: theme.spacing.space20,
+      paddingBottom: theme.spacing.space8,
+      gap: theme.spacing.space4
+    },
+    fileRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space8 },
+    filePath: {
+      flex: 1,
+      ...theme.typography.code,
+      color: theme.color.text.secondary
+    },
+    fileStat: { ...theme.typography.code },
+    add: { color: theme.color.status.success },
+    del: { color: theme.color.status.danger },
+    empty: { ...theme.typography.caption, color: theme.color.text.tertiary }
+  })
+}

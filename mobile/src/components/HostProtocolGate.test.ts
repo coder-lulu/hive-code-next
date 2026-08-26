@@ -2,6 +2,7 @@ import { createElement, useEffect } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
+import { lightTheme } from '../theme/mobile-theme'
 import { HostProtocolGate, useHostProtocolGates } from './HostProtocolGate'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 
@@ -15,12 +16,22 @@ vi.mock('react-native', () => ({
   Linking: { openURL: nativeTestState.openUrl },
   Platform: nativeTestState.platform,
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   StyleSheet: {
     create: <T>(styles: T) => styles,
     absoluteFillObject: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
   },
   Text: 'Text',
   View: 'View'
+}))
+
+vi.mock('lucide-react-native', () => ({ ShieldAlert: 'ShieldAlert' }))
+
+vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
+
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileTheme: () => lightTheme,
+  useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
 }))
 
 vi.mock('expo-router', () => ({

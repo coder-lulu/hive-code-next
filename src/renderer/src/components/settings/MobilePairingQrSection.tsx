@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { translate } from '@/i18n/i18n'
+import { canonicalizePairingUrl } from '../../../../shared/pairing'
 
 type MobilePairingQrSectionProps = {
   qrDataUrl: string | null
@@ -30,6 +31,7 @@ export function MobilePairingQrSection({
   onCodeCopiedChange,
   onClearCodeCopiedTimer
 }: MobilePairingQrSectionProps): React.JSX.Element | null {
+  const displayPairingUrl = pairingUrl ? canonicalizePairingUrl(pairingUrl) : null
   const renderedQrSize = qrSize ?? 192
   const enlargedQrSize = qrSize == null ? 288 : qrSize * 2
   const pairingCodeButtonMountedRef = useRef(false)
@@ -66,11 +68,11 @@ export function MobilePairingQrSection({
   }, [pairingUrl])
 
   async function copyPairingCode() {
-    if (!pairingUrl) {
+    if (!displayPairingUrl) {
       return
     }
     try {
-      await window.api.ui.writeClipboardText(pairingUrl)
+      await window.api.ui.writeClipboardText(displayPairingUrl)
       if (!pairingCodeButtonMountedRef.current) {
         return
       }
@@ -87,7 +89,7 @@ export function MobilePairingQrSection({
     }
   }
 
-  if (!qrDataUrl && !pairingUrl) {
+  if (!qrDataUrl && !displayPairingUrl) {
     return null
   }
 
@@ -123,7 +125,7 @@ export function MobilePairingQrSection({
             <span>
               {translate(
                 'auto.components.settings.MobilePane.pairingQrError',
-                'This pairing code couldn’t be rendered as a QR code. Copy it into Orca Mobile instead.'
+                'This pairing code couldn’t be rendered as a QR code. Copy it into HiveCode Mobile instead.'
               )}
             </span>
           </p>
@@ -131,11 +133,11 @@ export function MobilePairingQrSection({
           <p className="text-muted-foreground max-w-xs text-center text-xs">
             {translate(
               'auto.components.settings.MobilePane.310924ad2c',
-              'Scan this code with the Orca mobile app. Each code creates a unique device token.'
+              'Scan this code with the HiveCode mobile app. Each code creates a unique device token.'
             )}
           </p>
         )}
-        {pairingUrl && (
+        {displayPairingUrl && (
           <div className="flex w-full max-w-lg flex-col gap-1.5 px-4">
             <div className="text-muted-foreground text-center text-xs">
               {translate(
@@ -154,7 +156,7 @@ export function MobilePairingQrSection({
               )}
               className="font-mono text-[11px] leading-tight whitespace-normal break-all h-auto py-2 px-3"
             >
-              <span className="flex-1 text-left">{pairingUrl}</span>
+              <span className="flex-1 text-left">{displayPairingUrl}</span>
               {codeCopied ? (
                 <Check className="ml-2 size-3.5 shrink-0 text-emerald-500" />
               ) : (
@@ -172,7 +174,7 @@ export function MobilePairingQrSection({
               <DialogTitle>
                 {translate(
                   'auto.components.settings.MobilePane.dd3cd78d04',
-                  'Scan with Orca Mobile'
+                  'Scan with HiveCode Mobile'
                 )}
               </DialogTitle>
             </DialogHeader>

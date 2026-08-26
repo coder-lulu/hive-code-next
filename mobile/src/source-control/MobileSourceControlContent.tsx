@@ -8,14 +8,17 @@ import {
   View
 } from 'react-native'
 import { Minus, MoreHorizontal, Plus, Sparkles } from 'lucide-react-native'
-import { colors, spacing } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { MobileSourceControlCreatePrEntry } from './MobileSourceControlCreatePrEntry'
 import { MobileCommitFailurePanel } from './MobileCommitFailurePanel'
-import { KEYBOARD_COMMIT_BAR_CLEARANCE } from './mobile-source-control-screen-state'
+import {
+  KEYBOARD_COMMIT_BAR_CLEARANCE,
+  localizeMobileSourceControlCopy
+} from './mobile-source-control-screen-state'
 import { makeRenderFileRow, BranchCompareFooter } from './MobileSourceControlFileRows'
 import type { MobileSourceControlState } from './use-mobile-source-control-state'
-import { styles } from './mobile-source-control-styles'
-import { hubStyles } from './mobile-source-control-hub-styles'
+import { createMobileSourceControlStyles } from './mobile-source-control-styles'
+import { createMobileSourceControlHubStyles } from './mobile-source-control-hub-styles'
 
 type Props = {
   state: MobileSourceControlState
@@ -24,6 +27,9 @@ type Props = {
 // Changes tab: local file changes only — uncommitted (staged/unstaged) plus
 // committed-on-branch vs base. PR conflicts and push status live elsewhere.
 export function MobileSourceControlContent({ state }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileSourceControlStyles)
+  const hubStyles = useMobileThemeStyles(createMobileSourceControlHubStyles)
   const {
     insets,
     connState,
@@ -81,8 +87,8 @@ export function MobileSourceControlContent({ state }: Props) {
         // desktop link is down, so taps appear to do nothing (STA-1511).
         // Surface the reconnect state where the user is looking.
         <View style={styles.reconnectBanner}>
-          <ActivityIndicator size="small" color={colors.statusAmber} />
-          <Text style={styles.reconnectBannerText}>Reconnecting to desktop...</Text>
+          <ActivityIndicator size="small" color={theme.color.status.warning} />
+          <Text style={styles.reconnectBannerText}>正在重新连接电脑...</Text>
         </View>
       ) : null}
       <View style={hubStyles.changesControls}>
@@ -110,11 +116,11 @@ export function MobileSourceControlContent({ state }: Props) {
             disabled={ioBusy || stageablePaths.length === 0}
           >
             {busyAction === 'stage-all' ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
+              <ActivityIndicator size="small" color={theme.color.text.primary} />
             ) : (
-              <Plus size={15} color={colors.textPrimary} strokeWidth={2.2} />
+              <Plus size={16} color={theme.color.text.primary} strokeWidth={2} />
             )}
-            <Text style={styles.bulkButtonText}>Stage All</Text>
+            <Text style={styles.bulkButtonText}>全部暂存</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [
@@ -126,11 +132,11 @@ export function MobileSourceControlContent({ state }: Props) {
             disabled={ioBusy || unstageablePaths.length === 0}
           >
             {busyAction === 'unstage-all' ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
+              <ActivityIndicator size="small" color={theme.color.text.primary} />
             ) : (
-              <Minus size={15} color={colors.textPrimary} strokeWidth={2.2} />
+              <Minus size={16} color={theme.color.text.primary} strokeWidth={2} />
             )}
-            <Text style={styles.bulkButtonText}>Unstage All</Text>
+            <Text style={styles.bulkButtonText}>全部取消暂存</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [
@@ -141,17 +147,17 @@ export function MobileSourceControlContent({ state }: Props) {
             onPress={() => setShowActionSheet(true)}
             disabled={ioBusy}
             hitSlop={8}
-            accessibilityLabel="Open source control actions"
+            accessibilityLabel="打开源码控制操作"
           >
-            <MoreHorizontal size={18} color={colors.textPrimary} strokeWidth={2.1} />
+            <MoreHorizontal size={20} color={theme.color.text.primary} strokeWidth={2} />
           </Pressable>
         </View>
       </View>
 
       {!hasVisibleChanges ? (
         <View style={styles.state}>
-          <Text style={styles.stateTitle}>No local changes</Text>
-          <Text style={styles.stateText}>Working tree is clean.</Text>
+          <Text style={styles.stateTitle}>没有本地更改</Text>
+          <Text style={styles.stateText}>工作区没有待处理的更改。</Text>
         </View>
       ) : sections.length === 0 ? (
         // Why: RN SectionList with empty `sections` often skips ListFooterComponent,
@@ -174,7 +180,9 @@ export function MobileSourceControlContent({ state }: Props) {
           keyExtractor={(item) => `${item.area}:${item.path}:${item.oldPath ?? ''}`}
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={styles.sectionTitle}>
+                {localizeMobileSourceControlCopy(section.title)}
+              </Text>
               <Text style={styles.sectionCount}>{section.data.length}</Text>
             </View>
           )}
@@ -189,7 +197,8 @@ export function MobileSourceControlContent({ state }: Props) {
           styles.commitBar,
           {
             bottom: keyboardLift > 0 ? keyboardLift + KEYBOARD_COMMIT_BAR_CLEARANCE : keyboardLift,
-            paddingBottom: keyboardLift > 0 ? spacing.md : spacing.md + insets.bottom
+            paddingBottom:
+              keyboardLift > 0 ? theme.spacing.space12 : theme.spacing.space12 + insets.bottom
           }
         ]}
       >
@@ -199,17 +208,17 @@ export function MobileSourceControlContent({ state }: Props) {
               style={[styles.commitInput, styles.commitInputDisabled]}
               accessibilityRole="text"
               accessibilityState={{ disabled: true }}
-              accessibilityLabel="Commit message disabled. No staged files."
+              accessibilityLabel="提交说明不可用，没有已暂存文件。"
             >
-              <Text style={styles.commitInputDisabledText}>No staged files</Text>
+              <Text style={styles.commitInputDisabledText}>没有已暂存文件</Text>
             </View>
           ) : (
             <TextInput
               style={styles.commitInput}
               value={commitMessage}
               onChangeText={setCommitMessage}
-              placeholder="Commit message"
-              placeholderTextColor={colors.textMuted}
+              placeholder="提交说明"
+              placeholderTextColor={theme.color.text.tertiary}
               editable={busyAction === null && openingPath === null && openingBranchPath === null}
               returnKeyType="done"
               onSubmitEditing={primaryAction.onPress}
@@ -228,16 +237,12 @@ export function MobileSourceControlContent({ state }: Props) {
               onPress={() =>
                 generatingMessage ? cancelGenerateCommitMessage() : void generateCommitMessage()
               }
-              accessibilityLabel={
-                generatingMessage
-                  ? 'Cancel commit message generation'
-                  : 'Generate commit message with AI'
-              }
+              accessibilityLabel={generatingMessage ? '取消生成提交说明' : '使用 AI 生成提交说明'}
             >
               {generatingMessage ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
+                <ActivityIndicator size="small" color={theme.color.text.secondary} />
               ) : (
-                <Sparkles size={16} color={colors.textSecondary} strokeWidth={2.1} />
+                <Sparkles size={16} color={theme.color.text.secondary} strokeWidth={2} />
               )}
             </Pressable>
           ) : null}
@@ -250,13 +255,13 @@ export function MobileSourceControlContent({ state }: Props) {
             ]}
             onPress={primaryAction.onPress}
             disabled={primaryAction.disabled}
-            accessibilityLabel={primaryAction.accessibilityLabel}
-            accessibilityHint={primaryAction.accessibilityHint}
+            accessibilityLabel={localizeMobileSourceControlCopy(primaryAction.accessibilityLabel)}
+            accessibilityHint={localizeMobileSourceControlCopy(primaryAction.accessibilityHint)}
           >
             {primaryAction.loading ? (
               <ActivityIndicator
                 size="small"
-                color={createPrHeroActive ? colors.textPrimary : colors.bgBase}
+                color={createPrHeroActive ? theme.color.text.primary : theme.color.text.inverse}
               />
             ) : (
               <Text
@@ -265,7 +270,7 @@ export function MobileSourceControlContent({ state }: Props) {
                   createPrHeroActive && styles.commitButtonSecondaryText
                 ]}
               >
-                {primaryAction.label}
+                {localizeMobileSourceControlCopy(primaryAction.label)}
               </Text>
             )}
           </Pressable>

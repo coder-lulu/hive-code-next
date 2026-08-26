@@ -1,6 +1,7 @@
 import { createElement, type ReactElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { lightTheme } from '../theme/mobile-theme'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ConnectionState } from '../transport/types'
 import { MobileGitHistoryList } from './MobileGitHistoryList'
@@ -26,6 +27,10 @@ vi.mock('react-native', () => ({
 }))
 vi.mock('lucide-react-native', () => ({ ChevronDown: 'ChevronDown', ChevronRight: 'ChevronRight' }))
 vi.mock('../transport/client-context', () => ({ useForceReconnect: () => vi.fn() }))
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileTheme: () => lightTheme,
+  useMobileThemeStyles: <T,>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+}))
 
 function historyResponse(subject: string) {
   return {
@@ -151,7 +156,7 @@ describe('MobileGitHistoryList', () => {
       row?.props.onPress()
     })
     // Offline expand cannot request anything, so nothing is cached as "no file changes".
-    expect(tree()).toContain('Waiting for desktop...')
+    expect(tree()).toContain('正在等待电脑连接...')
     expect(sendRequest).toHaveBeenCalledTimes(1)
 
     await update(client, 'connected')

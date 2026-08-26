@@ -131,7 +131,12 @@ function CloudLaunchRoot({ credential }: { credential: CloudLaunchCredential }):
 function CloudLaunchFailure(): React.JSX.Element {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
-      <p>This Cloud launch link is invalid or has expired. Create a new launch from HiveCloud.</p>
+      <p>
+        {translate(
+          'web.cloudLaunchFailure',
+          'This Cloud launch link is invalid or has expired. Create a new launch from HiveCloud.'
+        )}
+      </p>
     </main>
   )
 }

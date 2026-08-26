@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { colors, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { SlashCommandSuggestion } from '../../../src/shared/native-chat-slash-commands'
 
 /** One row of the composer autocomplete: an agent slash command (with its
@@ -26,6 +27,7 @@ export function MobileNativeChatComposerSuggestions({
   suggestions: readonly ComposerSuggestion[]
   onPick: (suggestion: ComposerSuggestion) => void
 }): React.JSX.Element {
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <View style={styles.suggestions}>
       <ScrollView keyboardShouldPersistTaps="always" style={styles.suggestionScroll}>
@@ -51,32 +53,35 @@ export function MobileNativeChatComposerSuggestions({
   )
 }
 
-const styles = StyleSheet.create({
-  suggestions: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel
-  },
-  suggestionScroll: {
-    maxHeight: 220
-  },
-  suggestion: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle,
-    gap: 1
-  },
-  suggestionPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  suggestionText: {
-    color: colors.textPrimary,
-    fontFamily: typography.monoFamily,
-    fontSize: typography.metaSize
-  },
-  suggestionDescription: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    suggestions: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle,
+      backgroundColor: theme.color.bg.surface
+    },
+    suggestionScroll: {
+      maxHeight: 220
+    },
+    suggestion: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle,
+      gap: theme.spacing.space4
+    },
+    suggestionPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    suggestionText: {
+      ...theme.typography.code,
+      color: theme.color.text.primary
+    },
+    suggestionDescription: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary
+    }
+  })
+}

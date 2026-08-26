@@ -23,6 +23,7 @@ import {
   type MobilePairingAddressChange,
   useMobilePairingAddressPreference
 } from './use-mobile-pairing-address-preference'
+import { canonicalizePairingUrl } from '../../../../shared/pairing'
 
 export default function MobilePage(): React.JSX.Element {
   const [stepIdx, setStepIdx] = useState<StepIndex>(0)
@@ -231,7 +232,10 @@ export default function MobilePage(): React.JSX.Element {
       return
     }
     try {
-      await window.api.ui.writeClipboardText(pairingUrl)
+      // Keep the renderer as a final user-facing boundary: IPC already emits
+      // the canonical scheme, but a stale/mock provider must never put the
+      // legacy `orca://` pairing link on the clipboard.
+      await window.api.ui.writeClipboardText(canonicalizePairingUrl(pairingUrl))
       if (mountedRef.current) {
         toast.success(
           translate('auto.components.mobile.MobilePage.3c1f7168bb', 'Pairing code copied')

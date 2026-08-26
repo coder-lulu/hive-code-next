@@ -25,9 +25,10 @@ import { spacing } from '../theme/mobile-theme'
 import { resolveBottomDrawerFillHeight } from './bottom-drawer-fill-height'
 import { resolveBottomDrawerKeyboardInset } from './bottom-drawer-keyboard-inset'
 import { BOTTOM_DRAWER_HIDE_DURATION_MS } from './bottom-drawer-constants'
-import { bottomDrawerStyles as styles } from './bottom-drawer-styles'
+import { createBottomDrawerStyles } from './bottom-drawer-styles'
 import { useInsideBottomDrawerModalHost } from './bottom-drawer-modal-host'
 import { useResponsiveLayout } from '../layout/responsive-layout'
+import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 const DISMISS_THRESHOLD = 80
 const SPRING_CONFIG = { damping: 28, stiffness: 400 }
@@ -63,6 +64,7 @@ export function MountedBottomDrawer({
   interactive = true,
   zIndex = 1000
 }: MountedBottomDrawerProps) {
+  const styles = useMobileThemeStyles(createBottomDrawerStyles)
   const translateY = useSharedValue(0)
   const progress = useSharedValue(0)
   const keyboardOffset = useSharedValue(0)

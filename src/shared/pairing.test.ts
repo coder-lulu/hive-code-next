@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   encodePairingOffer,
   decodePairingOffer,
+  canonicalizePairingUrl,
   parsePairingCode,
   type PairingOffer
 } from './pairing'
@@ -57,6 +58,15 @@ describe('pairing offer', () => {
 
   it('rejects URLs with wrong scheme', () => {
     expect(() => decodePairingOffer('https://example.com#abc')).toThrow('Invalid pairing URL')
+  })
+
+  it('canonicalizes legacy pairing URLs for user-facing output', () => {
+    expect(canonicalizePairingUrl('orca://pair?code=legacy')).toBe('hivecode://pair?code=legacy')
+    expect(canonicalizePairingUrl('  orca://pair#legacy\n')).toBe('hivecode://pair#legacy')
+    expect(canonicalizePairingUrl('hivecode://pair?code=current')).toBe(
+      'hivecode://pair?code=current'
+    )
+    expect(canonicalizePairingUrl('orca://workspace')).toBe('orca://workspace')
   })
 
   it('rejects orca URLs outside the exact pairing route', () => {

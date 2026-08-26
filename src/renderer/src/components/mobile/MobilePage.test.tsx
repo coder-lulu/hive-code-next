@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MobilePairingConnectionMode } from '../../../../shared/mobile-pairing-connection-mode'
 import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
+import { PRIMARY_PAIRING_SCHEME } from '../../../../shared/pairing'
 
 type StoreState = {
   closeMobilePage: () => void
@@ -55,6 +56,7 @@ vi.mock('./MobilePageContent', () => ({
     onCustomAddressRemove: (address: string) => void
     beforeCustomAddressChange: (address: string) => Promise<boolean>
     handleContinue: () => void
+    copyPairingCode: () => void
     pairQrDataUrl: string | null
     pairQrSize: number | null
     pairingUrl: string | null
@@ -87,6 +89,9 @@ vi.mock('./MobilePageContent', () => ({
       </button>
       <button type="button" onClick={props.handleContinue}>
         Continue
+      </button>
+      <button type="button" onClick={props.copyPairingCode}>
+        Copy pairing code
       </button>
       <button type="button" onClick={() => props.handleConnectionModeChange('automatic')}>
         Orca Relay
@@ -377,6 +382,18 @@ describe('MobilePage pairing connection mode', () => {
     await waitFor(() => expect(screen.getByTestId('pairing-qr-error')).toHaveTextContent('true'))
     expect(screen.getByTestId('pairing-qr')).toHaveTextContent('none')
     expect(screen.getByTestId('pairing-url')).toHaveTextContent('copy-fallback')
+  })
+
+  it('copies the canonical pairing scheme when a provider returns legacy Orca', async () => {
+    const user = userEvent.setup()
+    await openPairingStep()
+    await waitFor(() => expect(screen.getByTestId('pairing-url')).toHaveTextContent('automatic'))
+
+    await user.click(screen.getByRole('button', { name: 'Copy pairing code' }))
+
+    expect(window.api.ui.writeClipboardText).toHaveBeenCalledWith(
+      `${PRIMARY_PAIRING_SCHEME}://pair#automatic`
+    )
   })
 
   it('surfaces Relay failure and retries with a rotated credential', async () => {

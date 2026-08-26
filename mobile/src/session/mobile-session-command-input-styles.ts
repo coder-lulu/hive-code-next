@@ -1,222 +1,224 @@
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 
-import { colors, spacing, radii, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 
-export const mobileSessionCommandInputStyles = StyleSheet.create({
-  createWarningBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: colors.bgPanel,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  createWarningText: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 12,
-    lineHeight: 16
-  },
-  createWarningDismiss: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -4
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    marginBottom: spacing.lg
-  },
-  createError: {
-    color: colors.statusRed,
-    fontSize: 13,
-    marginBottom: spacing.sm
-  },
-  emptyActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: spacing.sm
-  },
-  createButton: {
-    backgroundColor: colors.bgRaised,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.button
-  },
-  createButtonDisabled: {
-    opacity: 0.5
-  },
-  createButtonText: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  commandDock: {
-    zIndex: 20
-  },
-  accessoryBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel
-  },
-  accessoryScroll: {
-    flex: 1,
-    minWidth: 0
-  },
-  accessoryContent: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    gap: spacing.xs
-  },
-  accessoryKey: {
-    backgroundColor: colors.bgRaised,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.button,
-    minWidth: 36,
-    alignItems: 'center'
-  },
-  accessoryKeyPressed: {
-    backgroundColor: colors.borderSubtle
-  },
-  accessoryKeyActive: {
-    backgroundColor: colors.textPrimary
-  },
-  customAccessoryKey: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  accessoryKeyDisabled: {
-    opacity: 0.35
-  },
-  accessoryKeyText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontFamily: typography.monoFamily
-  },
-  accessoryKeyTextActive: {
-    color: colors.bgBase,
-    fontWeight: '700'
-  },
-  accessoryKeyTextDisabled: {
-    color: colors.textMuted
-  },
-  keyboardDismissKey: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.sm,
-    marginVertical: spacing.xs,
-    backgroundColor: colors.bgRaised,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 0,
-    borderRadius: radii.button,
-    minWidth: 36,
-    height: 28
-  },
-  keyboardDismissGlyph: {
-    alignItems: 'center',
-    height: 18,
-    justifyContent: 'flex-start',
-    position: 'relative',
-    width: 18
-  },
-  keyboardDismissChevron: {
-    bottom: -2,
-    position: 'absolute'
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 46,
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel
-  },
-  textInput: {
-    flex: 1,
-    height: 34,
-    backgroundColor: colors.bgRaised,
-    color: colors.textPrimary,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 0,
-    fontSize: 14,
-    fontFamily: typography.monoFamily,
-    marginRight: spacing.sm
-  },
-  liveInputBar: {
-    gap: spacing.sm
-  },
+export function createMobileSessionCommandInputStyles(theme: MobileTheme) {
+  const monoFont = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
 
-  liveInputFocusTarget: {
-    flex: 1,
-    minHeight: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.bgRaised,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.sm + 2
-  },
-
-  liveInputFocusTargetPressed: {
-    backgroundColor: colors.borderSubtle
-  },
-
-  liveInputFocusTargetDisabled: {
-    opacity: 0.45
-  },
-
-  liveInputCapture: {
-    position: 'absolute',
-    opacity: 0,
-    width: 1,
-    height: 1,
-    color: colors.textPrimary
-  },
-  sendButton: {
-    backgroundColor: colors.bgRaised,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  dictationButton: {
-    backgroundColor: colors.bgRaised,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  dictationButtonActive: {
-    backgroundColor: colors.bgPanel,
-    borderColor: colors.textSecondary
-  },
-  sendButtonDisabled: {
-    opacity: 0.35
-  }
-})
+  return StyleSheet.create({
+    createWarningBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      backgroundColor: theme.color.bg.subtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space8
+    },
+    createWarningText: {
+      ...theme.typography.caption,
+      flex: 1,
+      color: theme.color.text.primary
+    },
+    createWarningDismiss: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: theme.spacing.space24
+    },
+    emptyText: {
+      ...theme.typography.body,
+      color: theme.color.text.secondary,
+      marginBottom: theme.spacing.space16,
+      textAlign: 'center'
+    },
+    createError: {
+      ...theme.typography.meta,
+      color: theme.color.status.danger,
+      marginBottom: theme.spacing.space8,
+      textAlign: 'center'
+    },
+    emptyActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: theme.spacing.space8
+    },
+    createButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      justifyContent: 'center',
+      backgroundColor: theme.color.bg.selected,
+      paddingHorizontal: theme.spacing.space20,
+      paddingVertical: theme.spacing.space8,
+      borderRadius: theme.radii.control
+    },
+    createButtonDisabled: {
+      opacity: 0.45
+    },
+    createButtonText: {
+      ...theme.typography.label,
+      color: theme.color.text.inverse,
+      fontWeight: '600'
+    },
+    commandDock: {
+      zIndex: 20,
+      backgroundColor: theme.color.bg.surface
+    },
+    accessoryBar: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle,
+      backgroundColor: theme.color.bg.surface
+    },
+    accessoryScroll: {
+      flex: 1,
+      minWidth: 0
+    },
+    accessoryContent: {
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4,
+      gap: theme.spacing.space4
+    },
+    accessoryKey: {
+      minWidth: theme.size.minimumTouchTarget,
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.color.bg.subtle,
+      paddingHorizontal: theme.spacing.space8,
+      borderRadius: theme.radii.control
+    },
+    accessoryKeyPressed: {
+      backgroundColor: theme.color.border.default
+    },
+    accessoryKeyActive: {
+      backgroundColor: theme.color.bg.selected
+    },
+    customAccessoryKey: {
+      borderWidth: 1,
+      borderColor: theme.color.border.default
+    },
+    accessoryKeyDisabled: {
+      opacity: 0.35
+    },
+    accessoryKeyText: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary,
+      fontFamily: monoFont
+    },
+    accessoryKeyTextActive: {
+      color: theme.color.text.inverse,
+      fontWeight: '600'
+    },
+    accessoryKeyTextDisabled: {
+      color: theme.color.text.tertiary
+    },
+    keyboardDismissKey: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: theme.spacing.space8,
+      backgroundColor: theme.color.bg.subtle,
+      borderRadius: theme.radii.control,
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget
+    },
+    keyboardDismissGlyph: {
+      alignItems: 'center',
+      height: theme.spacing.space20,
+      justifyContent: 'flex-start',
+      position: 'relative',
+      width: theme.spacing.space20
+    },
+    keyboardDismissChevron: {
+      bottom: -2,
+      position: 'absolute'
+    },
+    inputBar: {
+      minHeight: theme.size.navigationBarHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.space4,
+      paddingHorizontal: theme.spacing.space12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle,
+      backgroundColor: theme.color.bg.surface
+    },
+    textInput: {
+      ...theme.typography.code,
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      backgroundColor: theme.color.bg.canvas,
+      color: theme.color.text.primary,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      fontFamily: monoFont,
+      marginRight: theme.spacing.space8
+    },
+    liveInputBar: {
+      gap: theme.spacing.space8
+    },
+    liveInputFocusTarget: {
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      backgroundColor: theme.color.bg.canvas,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space12
+    },
+    liveInputFocusTargetPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    liveInputFocusTargetDisabled: {
+      opacity: 0.45
+    },
+    liveInputCapture: {
+      position: 'absolute',
+      opacity: 0,
+      width: 1,
+      height: 1,
+      color: theme.color.text.primary
+    },
+    sendButton: {
+      backgroundColor: theme.color.bg.selected,
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    dictationButton: {
+      backgroundColor: theme.color.bg.subtle,
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.space8
+    },
+    dictationButtonActive: {
+      backgroundColor: theme.color.brand.subtle,
+      borderColor: theme.color.brand.primary
+    },
+    sendButtonDisabled: {
+      opacity: 0.35
+    }
+  })
+}

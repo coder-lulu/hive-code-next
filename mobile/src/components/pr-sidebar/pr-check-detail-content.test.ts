@@ -25,7 +25,7 @@ describe('presentCheckDetail', () => {
     const content = presentCheckDetail(
       details({ conclusion: 'failure', title: 'Build failed', summary: '   ' })
     )
-    expect(content.summaryLines).toEqual(['failure', 'Build failed'])
+    expect(content.summaryLines).toEqual(['失败', 'Build failed'])
   })
 
   it('maps annotations with a path:line locator and caps at 20', () => {
@@ -46,12 +46,12 @@ describe('presentCheckDetail', () => {
     expect(content.annotationsTruncated).toBe(true)
     expect(content.annotations[0]).toMatchObject({
       locator: 'src/file0.ts:1',
-      level: 'failure',
+      level: '失败',
       message: 'problem 0'
     })
   })
 
-  it('falls back to "Annotation" when no path is present', () => {
+  it('falls back to the localized annotation label when no path is present', () => {
     const content = presentCheckDetail(
       details({
         annotations: [
@@ -67,7 +67,7 @@ describe('presentCheckDetail', () => {
         ]
       })
     )
-    expect(content.annotations[0].locator).toBe('Annotation')
+    expect(content.annotations[0].locator).toBe('注解')
   })
 
   it('prefers failing jobs and surfaces only their failed steps', () => {
@@ -114,13 +114,13 @@ describe('presentCheckDetail', () => {
         ]
       })
     )
-    expect(content.jobsLabel).toBe('Failed jobs')
+    expect(content.jobsLabel).toBe('失败的任务')
     expect(content.jobs).toHaveLength(1)
     expect(content.jobs[0]).toMatchObject({ name: 'failing-job', logTail: 'error: boom' })
-    expect(content.jobs[0].failedSteps).toEqual([{ name: 'bad-step', state: 'failure' }])
+    expect(content.jobs[0].failedSteps).toEqual([{ name: 'bad-step', state: '失败' }])
   })
 
-  it('shows all jobs labeled "Jobs" when none are failing', () => {
+  it('shows all jobs with the localized label when none are failing', () => {
     const content = presentCheckDetail(
       details({
         conclusion: 'success',
@@ -139,7 +139,7 @@ describe('presentCheckDetail', () => {
         ]
       })
     )
-    expect(content.jobsLabel).toBe('Jobs')
+    expect(content.jobsLabel).toBe('任务')
     expect(content.jobs).toHaveLength(1)
   })
 })

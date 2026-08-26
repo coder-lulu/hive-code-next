@@ -20,6 +20,24 @@
       ]
     },
     {
+      "name": "hivecode-android-ui",
+      "sourcePath": "skills/hivecode-android-ui",
+      "releaseRevision": 1,
+      "packageDigest": "e05d7950ead86d65915c2dd67a7b0a85a97a2dba67df67d0045359062753364a",
+      "gitTreeSha": "8928099597c45d09eebac21665bbac3ea2ae1dd8",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 2183,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "4faddea82359d0e65e73794a40cce1bb12c38599900a0a405edd64d7d299f57a",
+          "textNormalizedSha256": "4faddea82359d0e65e73794a40cce1bb12c38599900a0a405edd64d7d299f57a",
+          "identitySha256": "4faddea82359d0e65e73794a40cce1bb12c38599900a0a405edd64d7d299f57a"
+        }
+      ]
+    },
+    {
       "name": "linear-tickets",
       "sourcePath": "skills/linear-tickets",
       "releaseRevision": 11,

@@ -7,7 +7,8 @@ import {
   TerminalWebViewEngineErrorOverlay,
   useTerminalWebViewEngineErrorState
 } from './terminal-webview-engine-error-state'
-import { TERMINAL_WEBVIEW_FRAME_STYLES } from './terminal-webview-frame-styles'
+import { darkTheme } from '../theme/mobile-theme'
+import { createTerminalWebViewFrameStyles } from './terminal-webview-frame-styles'
 import { useTerminalWebReadyWatchdog } from './terminal-webview-ready-watchdog'
 import { XTERM_WEBVIEW_SOURCE } from './terminal-webview-html'
 import type { TerminalWebViewCommand } from './terminal-webview-messages'
@@ -48,6 +49,13 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
   const messageIdRef = useRef(0)
   const pendingPingIdRef = useRef<number | null>(null)
   const terminalThemeKey = useMemo(() => JSON.stringify(terminalTheme ?? null), [terminalTheme])
+  const frameStyles = useMemo(
+    () =>
+      createTerminalWebViewFrameStyles(
+        terminalTheme?.theme.background ?? darkTheme.terminal.background
+      ),
+    [terminalTheme?.theme.background]
+  )
   const measureResolveRef = useRef<
     ((result: { cols: number; rows: number } | null) => void) | null
   >(null)
@@ -364,11 +372,11 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
   )
 
   return (
-    <View style={[TERMINAL_WEBVIEW_FRAME_STYLES.container, style]}>
+    <View style={[frameStyles.container, style]}>
       <WebView
         ref={webViewRef}
         source={XTERM_WEBVIEW_SOURCE}
-        style={TERMINAL_WEBVIEW_FRAME_STYLES.webview}
+        style={frameStyles.webview}
         originWhitelist={['*']}
         javaScriptEnabled
         scrollEnabled={false}
@@ -389,7 +397,11 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
         onContentProcessDidTerminate={handleContentProcessDidTerminate}
       />
       {engineError ? (
-        <TerminalWebViewEngineErrorOverlay message={engineError} onReload={handleReload} />
+        <TerminalWebViewEngineErrorOverlay
+          message={engineError}
+          terminalTheme={terminalTheme}
+          onReload={handleReload}
+        />
       ) : null}
     </View>
   )

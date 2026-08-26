@@ -1,242 +1,198 @@
 import { StyleSheet } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 
-export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase
-  },
-  header: {
-    backgroundColor: colors.bgBase
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  backButton: {
-    padding: spacing.xs,
-    borderRadius: radii.button
-  },
-  backButtonPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  titleBlock: {
-    flex: 1,
-    marginHorizontal: spacing.sm
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.titleSize,
-    fontWeight: '600'
-  },
-  meta: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
-  },
-  refreshButton: {
-    padding: spacing.xs,
-    borderRadius: radii.button
-  },
-  refreshButtonPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  scopeTabs: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    gap: spacing.xs
-  },
-  scopeTab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgPanel
-  },
-  scopeTabActive: {
-    backgroundColor: colors.bgRaised
-  },
-  scopeTabText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize
-  },
-  scopeTabTextActive: {
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  searchRow: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm
-  },
-  searchInput: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize
-  },
-  list: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl
-  },
-  groupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    gap: spacing.sm
-  },
-  groupHeaderText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontWeight: '600',
-    textTransform: 'uppercase'
-  },
-  groupHeaderCount: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize
-  },
-  card: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.card,
-    padding: spacing.md,
-    marginBottom: spacing.sm
-  },
-  cardPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  cardTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  cardTimeAgo: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize
-  },
-  cardLastMessage: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    marginTop: spacing.xs
-  },
-  cardMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.xs
-  },
-  cardMetaText: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize
-  },
-  currentBadge: {
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.button,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2
-  },
-  currentBadgeText: {
-    color: colors.accentBlue,
-    fontSize: typography.metaSize,
-    fontWeight: '600'
-  },
-  resumeButton: {
-    minHeight: 28,
-    minWidth: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 'auto',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.button
-  },
-  resumeButtonPressed: {
-    opacity: 0.78
-  },
-  resumeButtonDisabled: {
-    opacity: 0.45
-  },
-  preview: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    gap: spacing.sm
-  },
-  previewTurn: {
-    gap: 2
-  },
-  previewRole: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize,
-    fontWeight: '600',
-    textTransform: 'uppercase'
-  },
-  previewText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
-  },
-  noticeBanner: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radii.input,
-    backgroundColor: colors.bgPanel
-  },
-  noticeText: {
-    color: colors.statusAmber,
-    fontSize: typography.metaSize
-  },
-  resumeBanner: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radii.input,
-    backgroundColor: colors.bgPanel
-  },
-  resumeBannerText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
-  },
-  state: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.sm
-  },
-  stateTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  stateText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    textAlign: 'center'
-  },
-  retryButton: {
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised
-  },
-  retryText: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  }
-})
+export function createAgentHistoryStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.color.bg.canvas },
+    header: { backgroundColor: theme.color.bg.canvas },
+    topBar: {
+      minHeight: theme.size.navigationBarHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.space16,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle
+    },
+    backButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.circle
+    },
+    backButtonPressed: { backgroundColor: theme.color.bg.subtle },
+    titleBlock: { flex: 1, marginHorizontal: theme.spacing.space8 },
+    title: { ...theme.typography.pageTitle, color: theme.color.text.primary },
+    meta: { ...theme.typography.caption, color: theme.color.text.secondary },
+    refreshButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.circle
+    },
+    refreshButtonPressed: { backgroundColor: theme.color.bg.subtle },
+    scopeTabs: {
+      flexDirection: 'row',
+      marginHorizontal: theme.spacing.space16,
+      marginTop: theme.spacing.space12,
+      padding: theme.spacing.space4,
+      gap: theme.spacing.space4,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.subtle
+    },
+    scopeTab: {
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control
+    },
+    scopeTabActive: { backgroundColor: theme.color.bg.selected },
+    scopeTabText: { ...theme.typography.label, color: theme.color.text.secondary },
+    scopeTabTextActive: { color: theme.color.text.inverse, fontWeight: '600' },
+    searchRow: {
+      paddingHorizontal: theme.spacing.space16,
+      paddingTop: theme.spacing.space12
+    },
+    searchInput: {
+      minHeight: theme.size.minimumTouchTarget,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface,
+      color: theme.color.text.primary,
+      ...theme.typography.body
+    },
+    list: {
+      paddingHorizontal: theme.spacing.space16,
+      paddingTop: theme.spacing.space12,
+      paddingBottom: theme.spacing.space24
+    },
+    groupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.space4,
+      paddingVertical: theme.spacing.space8,
+      gap: theme.spacing.space8
+    },
+    groupHeaderText: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      fontWeight: '600'
+    },
+    groupHeaderCount: { ...theme.typography.caption, color: theme.color.text.tertiary },
+    card: {
+      padding: theme.spacing.space16,
+      marginBottom: theme.spacing.space8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.subtle,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    cardPressed: { backgroundColor: theme.color.bg.subtle },
+    cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space8 },
+    cardTitle: {
+      ...theme.typography.body,
+      flex: 1,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    cardTimeAgo: { ...theme.typography.caption, color: theme.color.text.tertiary },
+    cardLastMessage: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      marginTop: theme.spacing.space4
+    },
+    cardMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: theme.spacing.space8,
+      marginTop: theme.spacing.space8
+    },
+    cardMetaText: { ...theme.typography.caption, color: theme.color.text.tertiary },
+    currentBadge: {
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: 2,
+      borderRadius: theme.radii.small,
+      backgroundColor: theme.color.brand.subtle
+    },
+    currentBadgeText: {
+      ...theme.typography.caption,
+      color: theme.color.brand.primary,
+      fontWeight: '600'
+    },
+    resumeButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      minWidth: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 'auto',
+      borderRadius: theme.radii.circle,
+      backgroundColor: theme.color.bg.subtle
+    },
+    resumeButtonPressed: { opacity: 0.78 },
+    resumeButtonDisabled: { opacity: 0.45 },
+    preview: {
+      marginTop: theme.spacing.space12,
+      paddingTop: theme.spacing.space12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle,
+      gap: theme.spacing.space8
+    },
+    previewTurn: { gap: 2 },
+    previewRole: {
+      ...theme.typography.caption,
+      color: theme.color.text.tertiary,
+      fontWeight: '600'
+    },
+    previewText: { ...theme.typography.meta, color: theme.color.text.secondary },
+    noticeBanner: {
+      marginHorizontal: theme.spacing.space16,
+      marginTop: theme.spacing.space8,
+      padding: theme.spacing.space12,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    noticeText: { ...theme.typography.meta, color: theme.color.status.warning },
+    resumeBanner: {
+      marginHorizontal: theme.spacing.space16,
+      marginTop: theme.spacing.space8,
+      padding: theme.spacing.space12,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    resumeBannerText: { ...theme.typography.meta, color: theme.color.text.secondary },
+    state: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: theme.spacing.space24,
+      gap: theme.spacing.space8
+    },
+    stateTitle: { ...theme.typography.sectionTitle, color: theme.color.text.primary },
+    stateText: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      textAlign: 'center'
+    },
+    retryButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      marginTop: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space20,
+      paddingVertical: theme.spacing.space8,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.selected,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    retryText: {
+      ...theme.typography.label,
+      color: theme.color.text.inverse,
+      fontWeight: '600'
+    }
+  })
+}

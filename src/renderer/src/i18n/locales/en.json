@@ -212,7 +212,7 @@
         "b411ec0069": "Connect",
         "2cf9e5a294": "Clear saved server",
         "4a4c017be1": "Endpoint:",
-        "27393856e4": "orca://pair?code=...",
+        "27393856e4": "hivecode://pair?code=...",
         "7a566540de": "Pairing URL or code",
         "cb4d287238": "Server name",
         "3affe7de3a": "Paste a pairing URL from an Orca server that this browser can reach.",
@@ -5799,9 +5799,9 @@
           "serverName": "Server name",
           "serverNamePlaceholder": "Dev box",
           "pairingCode": "Pairing code",
-          "pairingCodePlaceholder": "orca://pair?code=...",
+          "pairingCodePlaceholder": "hivecode://pair?code=...",
           "pairingHelpPrefix": "Run",
-          "pairingCommand": "orca serve --pairing-address <host>",
+          "pairingCommand": "hivecode serve --pairing-address <host>",
           "pairingHelpSuffix": "on the server and paste the printed pairing URL.",
           "sshImportAlreadySynced": "~/.ssh/config already in sync.",
           "sshImportSynced": "Added {{value0}} host{{value1}} to Orca.",
@@ -7668,9 +7668,9 @@
           "9a3758d983": "No saved servers.",
           "9bee6bbeeb": "Add Server",
           "55fcc964cd": "on the server and paste the printed pairing URL.",
-          "960e901ae4": "orca serve --pairing-address <host>",
+          "960e901ae4": "hivecode serve --pairing-address <host>",
           "163671f7b5": "Run",
-          "c3d772c514": "orca://pair?code=...",
+          "c3d772c514": "hivecode://pair?code=...",
           "9bc9b83474": "Pairing code",
           "e038625857": "Dev box",
           "54ebacc600": "Server name",
@@ -11049,7 +11049,7 @@
           "namePlaceholder": "Linux workstation",
           "nameHelp": "This only changes how the computer appears in Orca.",
           "accessLink": "Access link",
-          "accessLinkPlaceholder": "orca://pair?code=...",
+          "accessLinkPlaceholder": "hivecode://pair?code=...",
           "accessLinkHelp": "Orca shows the destination before connecting. Credentials stay hidden.",
           "destination": "Link destination",
           "loopbackTitle": "This link points back to this device",
@@ -11068,7 +11068,7 @@
           "advanced": "Advanced",
           "sshTunnel": "I am using an SSH tunnel to this local address",
           "sshTunnelHelp": "Keep the tunnel active while using this connection.",
-          "headlessHelp": "Using headless orca serve? Run orca serve --pairing-address <reachable-host> on the other computer.",
+          "headlessHelp": "Using headless hivecode serve? Run hivecode serve --pairing-address <reachable-host> on the other computer.",
           "cancel": "Cancel",
           "addWithTunnel": "Add host using tunnel",
           "addHost": "Add host",
@@ -16514,5 +16514,11 @@
   },
   "quickOpen": {
     "moreMatchesAvailable": "More matches may be available. Refine your search to narrow the results."
+  },
+  "web": {
+    "cloudLaunchFailure": "This Cloud launch link is invalid or has expired. Create a new launch from HiveCloud.",
+    "runtime": {
+      "cloudWebSocket": "Cloud WSS"
+    }
   }
 }

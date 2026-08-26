@@ -1,5 +1,6 @@
 import { Platform, StyleSheet, Text, TextInput, View } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { compactMobileBrowserFileAddress } from './browser-url'
 
 type Props = {
@@ -21,13 +22,15 @@ export function MobileBrowserAddressField({
   onSubmit,
   value
 }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const fileLabel = focused ? null : compactMobileBrowserFileAddress(value)
   const selection = focused ? undefined : { start: 0, end: 0 }
 
   return (
     <View style={styles.field}>
       <TextInput
-        style={styles.input}
+        style={[styles.input, focused && styles.inputFocused, disabled && styles.disabled]}
         value={value}
         onChangeText={onChangeText}
         onFocus={onFocus}
@@ -41,7 +44,11 @@ export function MobileBrowserAddressField({
         numberOfLines={1}
         returnKeyType="go"
         placeholder="URL"
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={theme.color.text.tertiary}
+        selectionColor={theme.color.brand.primary}
+        accessibilityLabel="Browser address"
+        accessibilityState={{ disabled }}
+        maxFontSizeMultiplier={1.3}
         editable={!disabled}
       />
       {fileLabel ? (
@@ -55,37 +62,46 @@ export function MobileBrowserAddressField({
   )
 }
 
-const styles = StyleSheet.create({
-  field: {
-    flex: 1,
-    minWidth: 0,
-    height: 28
-  },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: radii.input,
-    backgroundColor: colors.bgRaised,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 0,
-    fontSize: 12,
-    lineHeight: 16,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-    fontFamily: typography.monoFamily
-  },
-  fileLabelHost: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.input,
-    backgroundColor: colors.bgRaised
-  },
-  fileLabel: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: typography.monoFamily
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    field: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: theme.size.minimumTouchTarget
+    },
+    input: {
+      ...theme.typography.code,
+      flex: 1,
+      minWidth: 0,
+      minHeight: theme.size.minimumTouchTarget,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface,
+      color: theme.color.text.primary,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: 0,
+      includeFontPadding: false,
+      textAlignVertical: 'center'
+    },
+    inputFocused: {
+      borderColor: theme.color.brand.primary
+    },
+    fileLabelHost: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    fileLabel: {
+      ...theme.typography.code,
+      color: theme.color.text.primary
+    },
+    disabled: {
+      opacity: 0.45
+    }
+  })
+}

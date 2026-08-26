@@ -6,6 +6,7 @@ import {
   type MobilePairingConnectionMode
 } from '../../../../shared/mobile-pairing-connection-mode'
 import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
+import { canonicalizePairingUrl } from '../../../../shared/pairing'
 
 type MutableRef<T> = { current: T }
 
@@ -79,7 +80,7 @@ export function useMobilePairingGeneration(params: {
           if (mountedRef.current) {
             setPairQrDataUrl(result.qrDataUrl)
             setPairQrSize(result.qrSize)
-            setPairingUrl(result.pairingUrl)
+            setPairingUrl(canonicalizePairingUrl(result.pairingUrl))
             setPairingQrError(result.qrDataUrl === null)
             setRelayMintFailure(null)
           }

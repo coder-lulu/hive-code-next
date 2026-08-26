@@ -1,166 +1,160 @@
 import { StyleSheet } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 
-export const TEXT_SIZE = 17
-export const MONO_SIZE = 12
-
-export const styles = StyleSheet.create({
-  row: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm
-  },
-  rowUser: {
-    alignItems: 'flex-end'
-  },
-  content: {
-    maxWidth: '100%',
-    gap: spacing.sm
-  },
-  userBubble: {
-    maxWidth: '88%',
-    backgroundColor: colors.textPrimary,
-    borderRadius: radii.card,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  userText: {
-    color: colors.bgBase,
-    fontSize: TEXT_SIZE,
-    lineHeight: TEXT_SIZE + 6,
-    fontWeight: '500'
-  },
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.xs,
-    marginBottom: 2,
-    opacity: 0.7
-  },
-  controlButton: {
-    padding: 3
-  },
-  controlPressed: {
-    opacity: 0.5
-  },
-  copied: {
-    backgroundColor: colors.diffAddedBg,
-    borderRadius: radii.card
-  },
-  reasoning: {
-    opacity: 0.7
-  },
-  toolRun: {
-    marginTop: spacing.xs
-  },
-  toolRunHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  toolRunToggle: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: 3
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end'
-  },
-  toolRunCount: {
-    color: colors.statusGreen,
-    fontFamily: typography.monoFamily,
-    fontSize: MONO_SIZE,
-    fontWeight: '700'
-  },
-  toolRunLabel: {
-    flex: 1,
-    color: colors.textMuted,
-    fontFamily: typography.monoFamily,
-    fontSize: MONO_SIZE
-  },
-  toolRunBody: {
-    paddingLeft: spacing.sm,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.borderSubtle,
-    marginTop: spacing.xs
-  },
-  toolLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: 3
-  },
-  toolName: {
-    color: colors.textPrimary,
-    fontFamily: typography.monoFamily,
-    fontSize: MONO_SIZE + 1,
-    fontWeight: '600'
-  },
-  toolPreview: {
-    flex: 1,
-    color: colors.textMuted,
-    fontFamily: typography.monoFamily,
-    fontSize: MONO_SIZE
-  },
-  toolPreviewLink: {
-    color: colors.accentBlue,
-    textDecorationLine: 'underline'
-  },
-  toolDetail: {
-    paddingLeft: spacing.lg,
-    paddingBottom: spacing.xs,
-    gap: spacing.xs
-  },
-  mono: {
-    color: colors.textSecondary,
-    fontFamily: typography.monoFamily,
-    fontSize: MONO_SIZE,
-    lineHeight: MONO_SIZE + 5
-  },
-  toolResult: {
-    borderRadius: radii.button,
-    backgroundColor: colors.bgPanel,
-    padding: spacing.md
-  },
-  toolResultError: {
-    backgroundColor: colors.diffDeletedBg
-  },
-  imageRef: {
-    color: colors.textSecondary,
-    fontSize: TEXT_SIZE
-  },
-  imageThumb: {
-    width: 200,
-    height: 150,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgRaised,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle
-  },
-  diff: {
-    borderRadius: radii.button,
-    backgroundColor: colors.bgPanel,
-    paddingVertical: spacing.xs,
-    overflow: 'hidden'
-  },
-  diffLine: {
-    color: colors.textSecondary,
-    fontFamily: typography.monoFamily,
-    fontSize: MONO_SIZE,
-    lineHeight: MONO_SIZE + 5,
-    paddingHorizontal: spacing.sm
-  },
-  diffAdd: {
-    color: colors.gitDecorationAdded,
-    backgroundColor: colors.diffAddedBg
-  },
-  diffDel: {
-    color: colors.gitDecorationDeleted,
-    backgroundColor: colors.diffDeletedBg
-  },
-  diffMeta: {
-    color: colors.textMuted
-  }
-})
+export function createMobileNativeChatMessageStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    row: {
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space8
+    },
+    rowUser: {
+      alignItems: 'flex-end'
+    },
+    content: {
+      maxWidth: '100%',
+      gap: theme.spacing.space8
+    },
+    userBubble: {
+      maxWidth: '88%',
+      backgroundColor: theme.color.bg.selected,
+      borderRadius: theme.radii.card,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8
+    },
+    userText: {
+      ...theme.typography.body,
+      color: theme.color.text.inverse,
+      fontWeight: '500'
+    },
+    controls: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: theme.spacing.space4,
+      opacity: 0.72
+    },
+    controlButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control
+    },
+    controlPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    copied: {
+      backgroundColor: theme.color.brand.subtle,
+      borderRadius: theme.radii.card
+    },
+    reasoning: {
+      opacity: 0.72
+    },
+    toolRun: {
+      marginTop: theme.spacing.space4
+    },
+    toolRunHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    toolRunToggle: {
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    controlsRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end'
+    },
+    toolRunCount: {
+      ...theme.typography.code,
+      color: theme.color.status.success,
+      fontWeight: '600'
+    },
+    toolRunLabel: {
+      ...theme.typography.code,
+      flex: 1,
+      color: theme.color.text.tertiary
+    },
+    toolRunBody: {
+      paddingLeft: theme.spacing.space8,
+      borderLeftWidth: 2,
+      borderLeftColor: theme.color.border.subtle,
+      marginTop: theme.spacing.space4
+    },
+    toolLine: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    toolName: {
+      ...theme.typography.code,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    toolPreview: {
+      ...theme.typography.code,
+      flex: 1,
+      color: theme.color.text.tertiary
+    },
+    toolPreviewLink: {
+      color: theme.color.brand.primary,
+      textDecorationLine: 'underline'
+    },
+    toolDetail: {
+      paddingLeft: theme.spacing.space16,
+      paddingBottom: theme.spacing.space4,
+      gap: theme.spacing.space4
+    },
+    mono: {
+      ...theme.typography.code,
+      color: theme.color.text.secondary
+    },
+    toolResult: {
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.subtle,
+      padding: theme.spacing.space12
+    },
+    toolResultError: {
+      borderLeftWidth: 2,
+      borderLeftColor: theme.color.status.danger
+    },
+    imageRef: {
+      ...theme.typography.body,
+      color: theme.color.text.secondary
+    },
+    imageThumb: {
+      width: 200,
+      height: 150,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.subtle,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.subtle
+    },
+    diff: {
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface,
+      paddingVertical: theme.spacing.space4,
+      overflow: 'hidden'
+    },
+    diffLine: {
+      ...theme.typography.code,
+      color: theme.color.text.secondary,
+      paddingHorizontal: theme.spacing.space8
+    },
+    diffAdd: {
+      color: theme.color.status.success,
+      backgroundColor: theme.color.bg.subtle
+    },
+    diffDel: {
+      color: theme.color.status.danger,
+      backgroundColor: theme.color.bg.subtle
+    },
+    diffMeta: {
+      color: theme.color.text.tertiary
+    }
+  })
+}

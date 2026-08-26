@@ -1,8 +1,28 @@
 import { memo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { ShieldQuestion } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { MobileChatPermission } from './mobile-native-chat-permission'
+
+function permissionTitle(title: string): string {
+  if (title === 'Permission requested') {
+    return '请求权限'
+  }
+  const allowMatch = /^Allow (.+)\?$/.exec(title)
+  return allowMatch ? `允许 ${allowMatch[1]}？` : title
+}
+
+function permissionOptionLabel(label: string): string {
+  const labels: Record<string, string> = {
+    Allow: '允许',
+    'Allow always': '始终允许',
+    Deny: '拒绝',
+    Yes: '是',
+    No: '否'
+  }
+  return labels[label] ?? label
+}
 
 // Renders a detected agent permission ask as a card with tappable options.
 // The first option is treated as the primary (allow) action and gets a filled
@@ -14,6 +34,8 @@ function MobileNativeChatPermissionImpl({
   permission: MobileChatPermission
   onRespond: (send: string) => Promise<boolean>
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const respond = async (send: string): Promise<void> => {
@@ -31,8 +53,8 @@ function MobileNativeChatPermissionImpl({
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <ShieldQuestion size={16} color={colors.accentBlue} strokeWidth={2} />
-        <Text style={styles.title}>{permission.title}</Text>
+        <ShieldQuestion size={16} color={theme.color.brand.primary} strokeWidth={2} />
+        <Text style={styles.title}>{permissionTitle(permission.title)}</Text>
       </View>
       {permission.detail ? <Text style={styles.detail}>{permission.detail}</Text> : null}
       <View style={styles.options}>
@@ -49,9 +71,10 @@ function MobileNativeChatPermissionImpl({
               hitSlop={6}
               onPress={() => respond(option.send)}
               disabled={submitting}
+              accessibilityRole="button"
             >
               <Text style={[styles.optionText, isPrimary && styles.optionTextPrimary]}>
-                {option.label}
+                {permissionOptionLabel(option.label)}
               </Text>
             </Pressable>
           )
@@ -63,61 +86,63 @@ function MobileNativeChatPermissionImpl({
 
 export const MobileNativeChatPermission = memo(MobileNativeChatPermissionImpl)
 
-const styles = StyleSheet.create({
-  card: {
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.sm,
-    padding: spacing.md,
-    gap: spacing.sm,
-    borderRadius: radii.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  detail: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    lineHeight: typography.metaSize + 5
-  },
-  options: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm
-  },
-  option: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button
-  },
-  optionPrimary: {
-    backgroundColor: colors.accentBlue
-  },
-  optionSecondary: {
-    backgroundColor: colors.bgRaised,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle
-  },
-  optionPressed: {
-    opacity: 0.7
-  },
-  optionText: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  optionTextPrimary: {
-    color: colors.onAccent
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    card: {
+      marginHorizontal: theme.spacing.space16,
+      marginVertical: theme.spacing.space8,
+      padding: theme.spacing.space16,
+      gap: theme.spacing.space8,
+      borderRadius: theme.radii.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      backgroundColor: theme.color.bg.surface
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    title: {
+      ...theme.typography.sectionTitle,
+      flex: 1,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    detail: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary
+    },
+    options: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.space8
+    },
+    option: {
+      minHeight: theme.size.minimumTouchTarget,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      borderRadius: theme.radii.control
+    },
+    optionPrimary: {
+      backgroundColor: theme.color.bg.selected
+    },
+    optionSecondary: {
+      backgroundColor: theme.color.bg.elevated,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default
+    },
+    optionPressed: {
+      opacity: 0.7
+    },
+    optionText: {
+      ...theme.typography.label,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    optionTextPrimary: {
+      color: theme.color.text.inverse
+    }
+  })
+}

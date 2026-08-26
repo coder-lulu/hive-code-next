@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, StyleSheet, PanResponder } from 'react-native'
 import { Stack, useGlobalSearchParams, usePathname } from 'expo-router'
-import { colors } from '../../src/theme/mobile-theme'
+import type { MobileTheme } from '../../src/theme/mobile-theme'
+import { useMobileTheme } from '../../src/theme/mobile-theme-provider'
 import { useResponsiveLayout } from '../../src/layout/responsive-layout'
 import {
   HOST_SIDEBAR_DEFAULT_WIDTH,
@@ -27,12 +28,12 @@ function clampSidebarToWindow(width: number, windowWidth: number): number {
   return Math.min(hardMax, Math.max(HOST_SIDEBAR_MIN_WIDTH, Math.round(width)))
 }
 
-function HostStack({ animation }: { animation: 'none' | 'default' }) {
+function HostStack({ animation, theme }: { animation: 'none' | 'default'; theme: MobileTheme }) {
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.bgBase },
+        contentStyle: { backgroundColor: theme.color.bg.canvas },
         // In the tablet split view the detail pane should swap instantly like
         // a desktop master-detail; the default slide animates the outgoing
         // screen and briefly reveals the one beneath it. Phones keep the slide.
@@ -59,6 +60,8 @@ function HostStack({ animation }: { animation: 'none' | 'default' }) {
 }
 
 export default function HostGroupLayout() {
+  const theme = useMobileTheme()
+  const styles = useMemo(() => createStyles(theme), [theme])
   // Wide layout = tablet/foldable canvas (see responsive-layout-metrics).
   const { isWideLayout, width: windowWidth } = useResponsiveLayout()
   const { hostId, action } = useGlobalSearchParams<{ hostId?: string; action?: string }>()
@@ -154,36 +157,36 @@ export default function HostGroupLayout() {
           </View>
         ) : null}
         <View style={styles.detail}>
-          <HostStack animation={showSidebar ? 'none' : 'default'} />
+          <HostStack animation={showSidebar ? 'none' : 'default'} theme={theme} />
         </View>
       </View>
     </HostProtocolGate>
   )
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: colors.bgBase
-  },
-  sidebar: {
-    borderRightWidth: 1,
-    borderRightColor: colors.borderSubtle
-  },
-  // Invisible grab strip over the sidebar's right edge. Absolute + elevated so it
-  // sits above the worktree list and reliably owns the drag on Android.
-  resizeHandle: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: RESIZE_EDGE_WIDTH,
-    zIndex: 20,
-    elevation: 20
-  },
-  detail: {
-    flex: 1,
-    minWidth: 0
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    row: {
+      flex: 1,
+      flexDirection: 'row',
+      backgroundColor: theme.color.bg.canvas
+    },
+    sidebar: {
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRightColor: theme.color.border.subtle,
+      backgroundColor: theme.color.bg.surface
+    },
+    // Invisible grab strip over the sidebar's right edge. Absolute + elevated so it
+    // sits above the worktree list and reliably owns the drag on Android.
+    resizeHandle: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      right: 0,
+      width: RESIZE_EDGE_WIDTH,
+      zIndex: 20,
+      elevation: 20
+    },
+    detail: { flex: 1, minWidth: 0, backgroundColor: theme.color.bg.canvas }
+  })
+}

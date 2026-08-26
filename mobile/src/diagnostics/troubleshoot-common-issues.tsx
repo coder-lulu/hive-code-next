@@ -1,10 +1,10 @@
 import { productNameText } from '@/product-brand'
+import type { LucideIcon } from 'lucide-react-native'
 import { WifiOff, Shield, Monitor, Clock, Globe } from 'lucide-react-native'
-import { colors } from '../theme/mobile-theme'
 
 export type TroubleshootSection = {
   id: string
-  icon: React.ReactNode
+  icon: LucideIcon
   title: string
   steps: string[]
 }
@@ -12,63 +12,63 @@ export type TroubleshootSection = {
 export const troubleshootCommonIssues: TroubleshootSection[] = [
   {
     id: 'wifi',
-    icon: <WifiOff size={16} color={colors.textSecondary} />,
-    title: 'Different WiFi Networks',
+    icon: WifiOff,
+    title: '设备不在同一网络',
     steps: [
-      'Both devices must be on the same LAN (unless connected through Tailscale).',
-      'Ethernet and WiFi must share the same subnet.',
-      'Try reconnecting WiFi on both devices.'
+      '除使用 Tailscale 外，手机与电脑必须位于同一局域网。',
+      '有线网络与 Wi-Fi 需要位于同一子网。',
+      '尝试在两台设备上重新连接 Wi-Fi。'
     ]
   },
   {
     id: 'firewall',
-    icon: <Shield size={16} color={colors.textSecondary} />,
-    title: 'Firewall Blocking Port 6768',
+    icon: Shield,
+    title: '防火墙阻止 6768 端口',
     steps: [
-      productNameText('macOS: System Settings → Network → Firewall — allow Orca.'),
-      productNameText('Windows: Defender Firewall → Allow app — enable Orca for Private networks.'),
+      productNameText('macOS：系统设置 → 网络 → 防火墙，允许 Orca。'),
+      productNameText('Windows：Defender 防火墙 → 允许应用，在专用网络中启用 Orca。'),
       'Linux: sudo ufw allow 6768',
-      'Corporate/school networks may block P2P — try a personal hotspot.'
+      '公司或学校网络可能阻止点对点连接，可尝试个人热点。'
     ]
   },
   {
     id: 'desktop',
-    icon: <Monitor size={16} color={colors.textSecondary} />,
-    title: 'Desktop App Not Running',
+    icon: Monitor,
+    title: '电脑端应用未运行',
     steps: [
-      productNameText('Orca must be open on your desktop to accept connections.'),
-      productNameText('Try restarting Orca — the companion server starts on launch.'),
-      'After an update, you may need to re-pair via QR code.'
+      productNameText('电脑上必须打开 Orca 才能接收连接。'),
+      productNameText('尝试重启 Orca，配套服务会在应用启动时运行。'),
+      '更新后可能需要重新扫描二维码配对。'
     ]
   },
   {
     id: 'timeout',
-    icon: <Clock size={16} color={colors.textSecondary} />,
-    title: 'Connection Timeout',
+    icon: Clock,
+    title: '连接超时',
     steps: [
-      'Check WiFi signal strength on your phone.',
-      'Go back to the host list and tap your host to retry.',
-      'Restart both apps if timeouts persist.'
+      '检查手机的 Wi-Fi 信号强度。',
+      '返回电脑列表并点按目标电脑重试。',
+      '如果持续超时，请重启手机端和电脑端应用。'
     ]
   },
   {
     id: 'tailscale',
-    icon: <Globe size={16} color={colors.textSecondary} />,
-    title: 'Tailscale Host Unreachable',
+    icon: Globe,
+    title: '无法访问 Tailscale 电脑',
     steps: [
-      'Host addresses like 100.x.x.x or *.ts.net connect through Tailscale — keep it ON.',
-      'iOS/Android can silently wedge the tunnel: toggle Tailscale off and back on in the Tailscale app.',
-      'Check the desktop is awake and shows as connected in your tailnet.',
-      'Update the Tailscale app — recent releases fix reconnect bugs.'
+      '100.x.x.x 或 *.ts.net 地址通过 Tailscale 连接，请保持 Tailscale 开启。',
+      'iOS 或 Android 的隧道可能卡住，可在 Tailscale 应用中关闭后重新开启。',
+      '确认电脑未休眠，并在 tailnet 中显示为已连接。',
+      '更新 Tailscale 应用，新版本包含重连问题修复。'
     ]
   },
   {
     id: 'vpn',
-    icon: <Shield size={16} color={colors.textSecondary} />,
-    title: 'Other VPN Interference',
+    icon: Shield,
+    title: '其他 VPN 干扰',
     steps: [
-      'Non-Tailscale VPNs can route local traffic through a remote server.',
-      'Disable that VPN or enable split tunneling / "Allow LAN".'
+      '非 Tailscale VPN 可能把本地流量转发到远端服务器。',
+      '关闭该 VPN，或启用分流及“允许局域网”选项。'
     ]
   }
 ]

@@ -1,6 +1,7 @@
 import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lightTheme } from '../theme/mobile-theme'
 import { PickerModal } from './PickerModal'
 
 vi.mock('react-native', () => ({
@@ -11,6 +12,10 @@ vi.mock('react-native', () => ({
 }))
 
 vi.mock('lucide-react-native', () => ({ Check: 'Check' }))
+
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileTheme: () => lightTheme
+}))
 
 vi.mock('./BottomDrawer', async () => {
   const React = await import('react')

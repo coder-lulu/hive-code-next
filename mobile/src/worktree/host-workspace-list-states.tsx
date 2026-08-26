@@ -1,5 +1,5 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
-import { colors, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 import {
   selectHostWorkspaceListState,
   type HostWorkspaceListStateInput
@@ -7,24 +7,26 @@ import {
 
 export function HostWorkspaceListStates(
   props: HostWorkspaceListStateInput & {
+    theme: MobileTheme
     search: string
     activeFilterCount: number
   }
 ) {
+  const styles = createStyles(props.theme)
   const state = selectHostWorkspaceListState(props)
   if (state === 'loading') {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <ActivityIndicator size="small" color={props.theme.color.text.secondary} />
       </View>
     )
   }
   if (state === 'catalog-error') {
     return (
       <View style={styles.centered}>
-        <Text style={styles.emptyText}>Could not load workspaces from this host</Text>
+        <Text style={styles.emptyText}>无法从这台电脑加载工作区</Text>
         <Text style={styles.catalogErrorDetail}>
-          {`worktree.ps failed (${props.catalogError}) — retrying automatically`}
+          {`工作区读取失败（${props.catalogError}），正在自动重试`}
         </Text>
       </View>
     )
@@ -34,10 +36,10 @@ export function HostWorkspaceListStates(
       <View style={styles.centered}>
         <Text style={styles.emptyText}>
           {props.search
-            ? 'No matching worktrees'
+            ? '没有匹配的工作区'
             : props.activeFilterCount > 0
-              ? 'No worktrees match filters'
-              : 'No worktrees'}
+              ? '没有符合筛选条件的工作区'
+              : '暂无工作区'}
         </Text>
       </View>
     )
@@ -45,21 +47,20 @@ export function HostWorkspaceListStates(
   return null
 }
 
-const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize
-  },
-  catalogErrorDetail: {
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.lg,
-    color: colors.textMuted,
-    fontSize: typography.metaSize,
-    textAlign: 'center'
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space20
+    },
+    emptyText: { ...theme.typography.body, color: theme.color.text.secondary },
+    catalogErrorDetail: {
+      ...theme.typography.caption,
+      marginTop: theme.spacing.space4,
+      color: theme.color.text.tertiary,
+      textAlign: 'center'
+    }
+  })
+}

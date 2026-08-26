@@ -20,6 +20,13 @@ vi.mock('lucide-react-native', () => ({
   ChevronRight: 'ChevronRight',
   X: 'X'
 }))
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
 vi.mock('../components/BottomDrawer', async () => {
   const React = await import('react')
   return {
@@ -168,8 +175,8 @@ describe('MobileNativeChatSessionOptionPickers', () => {
 
   it('shows the current model and effort in one pill', () => {
     mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
-    expect(pill('Model').props).toMatchObject({
-      accessibilityLabel: 'Model, Sonnet 5 High',
+    expect(pill('模型').props).toMatchObject({
+      accessibilityLabel: '模型，Sonnet 5 High',
       disabled: false
     })
     const labels = renderer!.root
@@ -180,7 +187,7 @@ describe('MobileNativeChatSessionOptionPickers', () => {
 
   it('opens the model sheet and applies a picked model', async () => {
     mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
-    await act(async () => pill('Model').props.onPress())
+    await act(async () => pill('模型').props.onPress())
     expect(renderer!.root.findByType('BottomDrawer').props.visible).toBe(true)
     await act(async () => rowByText('Opus 4.8').props.onPress())
     expect(setOption).toHaveBeenCalledWith('model', 'opus')
@@ -188,7 +195,7 @@ describe('MobileNativeChatSessionOptionPickers', () => {
 
   it('opens an option picker from the model sheet summary', async () => {
     mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
-    await act(async () => pill('Model').props.onPress())
+    await act(async () => pill('模型').props.onPress())
     await act(async () => rowByText('Effort').props.onPress())
     await act(async () => rowByText('Low').props.onPress())
     expect(setOption).toHaveBeenCalledWith('effort', 'low')
@@ -196,17 +203,17 @@ describe('MobileNativeChatSessionOptionPickers', () => {
 
   it('shows absolute boolean values in option summaries', async () => {
     mount([MODEL_DESCRIPTOR, FAST_MODE_DESCRIPTOR])
-    await act(async () => pill('Model').props.onPress())
-    expect(rowByText('Off').props.accessibilityLabel).toBe('Fast mode, Off')
+    await act(async () => pill('模型').props.onPress())
+    expect(rowByText('关闭').props.accessibilityLabel).toBe('Fast mode，关闭')
   })
 
   it('announces choice selection and disabled state', async () => {
     mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
-    expect(pill('Model').props).toMatchObject({
+    expect(pill('模型').props).toMatchObject({
       accessibilityRole: 'button',
       accessibilityState: { disabled: false }
     })
-    await act(async () => pill('Model').props.onPress())
+    await act(async () => pill('模型').props.onPress())
     expect(rowByText('Sonnet 5').props).toMatchObject({
       accessibilityRole: 'radio',
       accessibilityState: { checked: true, disabled: false }
@@ -216,7 +223,7 @@ describe('MobileNativeChatSessionOptionPickers', () => {
 
   it('closes without dispatch when re-picking the tracked value', async () => {
     mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
-    await act(async () => pill('Model').props.onPress())
+    await act(async () => pill('模型').props.onPress())
     await act(async () => rowByText('Sonnet 5').props.onPress())
     expect(setOption).not.toHaveBeenCalled()
   })
@@ -230,14 +237,14 @@ describe('MobileNativeChatSessionOptionPickers', () => {
         action: { type: 'agent-picker' }
       }
     ])
-    await act(async () => pill('Model').props.onPress())
-    expect(rowByText('Choose in agent picker…').props.accessibilityRole).toBe('button')
-    await act(async () => rowByText('Choose in agent picker…').props.onPress())
+    await act(async () => pill('模型').props.onPress())
+    expect(rowByText('在 Agent 选择器中选择…').props.accessibilityRole).toBe('button')
+    await act(async () => rowByText('在 Agent 选择器中选择…').props.onPress())
     expect(invokeAction).toHaveBeenCalledWith('model')
   })
 
   it('locks the pills while the agent is working', () => {
     mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR], true)
-    expect(pill('Model').props).toMatchObject({ disabled: true })
+    expect(pill('模型').props).toMatchObject({ disabled: true })
   })
 })

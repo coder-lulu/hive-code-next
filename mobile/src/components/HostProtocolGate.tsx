@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useRef, type ReactNode } from 're
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { useHostClient } from '../transport/client-context'
 import { useHostStatusGates, type HostStatusGates } from '../transport/host-status-gates'
-import { colors } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { ProtocolBlockScreen } from './ProtocolBlockScreen'
 
 type Props = {
@@ -23,6 +24,8 @@ export function useHostProtocolGates(): HostStatusGates {
 // Why: single choke point above every /h/[hostId] route so a blocked verdict replaces the
 // whole host UI (sidebar + detail stack) while the host list and other hosts stay usable.
 export function HostProtocolGate({ hostId, children }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const { client, state } = useHostClient(hostId)
   const gates = useHostStatusGates({ hostId, client, connState: state })
   const { compatVerdict, statusPending } = gates
@@ -55,7 +58,7 @@ export function HostProtocolGate({ hostId, children }: Props) {
     return (
       <View style={styles.pending}>
         <ActivityIndicator
-          color={colors.textSecondary}
+          color={theme.color.text.secondary}
           accessibilityLabel="Checking host compatibility"
         />
       </View>
@@ -89,7 +92,7 @@ export function HostProtocolGate({ hostId, children }: Props) {
             accessibilityViewIsModal
           >
             <ActivityIndicator
-              color={colors.textSecondary}
+              color={theme.color.text.secondary}
               accessibilityLabel="Checking host compatibility"
             />
           </View>
@@ -99,23 +102,23 @@ export function HostProtocolGate({ hostId, children }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  pending: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgBase
-  },
-  // Stays mounted across the overlay toggling so the routes below keep their identity.
-  host: {
-    flex: 1
-  },
-  pendingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgBase,
-    zIndex: 1000,
-    elevation: 1000
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    pending: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.color.bg.canvas
+    },
+    // Stays mounted across the overlay toggling so the routes below keep their identity.
+    host: { flex: 1 },
+    pendingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.color.bg.canvas,
+      zIndex: 1000,
+      elevation: 1000
+    }
+  })
+}

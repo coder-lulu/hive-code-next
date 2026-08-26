@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, Save } from 'lucide-react-native'
 import { getWorktreeLabel } from '../session/worktree-label'
-import { colors, spacing } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useForceReconnect, useHostClient } from '../transport/client-context'
 import {
   loadMobileFilePreview,
@@ -25,19 +25,21 @@ import {
   isEditableMobileTerminalArtifactPreview,
   shouldKeepDirtyDraftOnPreviewLoadResult
 } from './mobile-file-preview-editability'
-import { filePreviewStyles as styles } from './mobile-file-preview-styles'
+import { createFilePreviewStyles } from './mobile-file-preview-styles'
 
 type Props = {
   route: MobileFilePreviewRouteState
 }
 
 export function MobileFilePreviewScreen({ route }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createFilePreviewStyles)
   const router = useRouter()
   const previewParams = route.ok ? route.params : null
   const { client, state: connState } = useHostClient(previewParams?.hostId)
   const forceReconnect = useForceReconnect()
   const [preview, setPreview] = useState<MobileFilePreviewResult>(() =>
-    route.ok ? { status: 'loading', message: 'Loading preview...' } : previewError(route.message)
+    route.ok ? { status: 'loading', message: '正在加载预览…' } : previewError(route.message)
   )
   const [draftContent, setDraftContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
@@ -88,7 +90,7 @@ export function MobileFilePreviewScreen({ route }: Props) {
   const loadPreview = useCallback(async () => {
     const loadSourceKey = previewSourceKey
     if (!previewParams || !previewSource || loadSourceKey !== routePreviewSourceKey) {
-      setPreview(previewError(route.ok ? 'Unable to load preview' : route.message))
+      setPreview(previewError(route.ok ? '无法加载预览' : route.message))
       return
     }
     const preserveDirtyDraft =
@@ -96,14 +98,14 @@ export function MobileFilePreviewScreen({ route }: Props) {
       draftContentRef.current !== savedContentRef.current
     if (!client || connState !== 'connected') {
       if (preserveDirtyDraft) {
-        setSaveError('Waiting for desktop...')
+        setSaveError('正在等待桌面端…')
         return
       }
-      setPreview({ status: 'waiting', message: 'Waiting for desktop...', reconnect: true })
+      setPreview({ status: 'waiting', message: '正在等待桌面端…', reconnect: true })
       return
     }
     if (!preserveDirtyDraft) {
-      setPreview({ status: 'loading', message: 'Loading preview...' })
+      setPreview({ status: 'loading', message: '正在加载预览…' })
     }
     setSaveError('')
     try {
@@ -133,7 +135,7 @@ export function MobileFilePreviewScreen({ route }: Props) {
       }
       setPreview(result)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to load preview'
+      const message = err instanceof Error ? err.message : '无法加载预览'
       if (preserveDirtyDraft) {
         setSaveError(message)
         return
@@ -179,7 +181,7 @@ export function MobileFilePreviewScreen({ route }: Props) {
     previewParams?.worktreeName,
     previewParams?.worktreeId ?? ''
   )
-  const meta = previewParams ? `${worktreeLabel} - ${displayPath}` : 'Preview'
+  const meta = previewParams ? `${worktreeLabel} · ${displayPath}` : '预览'
   const isEditableTerminalArtifact =
     previewSource?.source === 'terminalArtifact' &&
     isEditableMobileTerminalArtifactPreview(preview, previewSource.readOnly === true)
@@ -212,7 +214,7 @@ export function MobileFilePreviewScreen({ route }: Props) {
         setSaveError(saveErrorMessageFromPreviewResult(result))
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to save file'
+      const message = err instanceof Error ? err.message : '无法保存文件'
       setSaveError(message)
     } finally {
       setSaving(false)
@@ -224,9 +226,9 @@ export function MobileFilePreviewScreen({ route }: Props) {
       router.back()
       return true
     }
-    Alert.alert('Discard changes?', 'Unsaved edits will be lost.', [
-      { text: 'Stay', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: () => router.back() }
+    Alert.alert('放弃更改？', '尚未保存的编辑内容将丢失。', [
+      { text: '继续编辑', style: 'cancel' },
+      { text: '放弃', style: 'destructive', onPress: () => router.back() }
     ])
     return true
   }, [hasUnsavedTerminalArtifactDraft, router])
@@ -244,13 +246,13 @@ export function MobileFilePreviewScreen({ route }: Props) {
             style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
             onPress={requestBack}
             hitSlop={8}
-            accessibilityLabel="Back to files"
+            accessibilityLabel="返回文件列表"
           >
-            <ChevronLeft size={22} color={colors.textSecondary} strokeWidth={2.2} />
+            <ChevronLeft size={22} color={theme.color.text.secondary} strokeWidth={2.2} />
           </Pressable>
           <View style={styles.titleBlock}>
             <Text style={styles.title} numberOfLines={1}>
-              {title || 'Preview'}
+              {title || '预览'}
             </Text>
             <Text style={styles.meta} numberOfLines={1}>
               {meta}
@@ -261,9 +263,9 @@ export function MobileFilePreviewScreen({ route }: Props) {
               style={[styles.saveButton, (!canSaveArtifact || saving) && styles.saveButtonDisabled]}
               onPress={() => void saveArtifact()}
               disabled={!canSaveArtifact || saving}
-              accessibilityLabel="Save terminal artifact"
+              accessibilityLabel="保存终端文件"
             >
-              <Save size={18} color={colors.textPrimary} strokeWidth={2.2} />
+              <Save size={18} color={theme.color.text.inverse} strokeWidth={2.2} />
             </Pressable>
           ) : null}
         </View>
@@ -271,16 +273,16 @@ export function MobileFilePreviewScreen({ route }: Props) {
       <MobileFilePreviewBody
         preview={preview}
         relativePath={displayPath}
-        title={title || 'File'}
+        title={title || '文件'}
         editable={isEditableTerminalArtifact}
         draftContent={draftContent}
         saveError={saveError}
         lineColumn={lineColumn}
-        imageWidth={Math.max(1, width - spacing.md * 2)}
+        imageWidth={Math.max(1, width - theme.spacing.space16 * 2)}
         imageHeight={Math.max(240, height - 160)}
         onDraftChange={setDraftContent}
         onImageError={() =>
-          setPreview({ status: 'error', message: 'Unable to load preview', reconnect: false })
+          setPreview({ status: 'error', message: '无法加载预览', reconnect: false })
         }
         onRetry={retry}
       />
@@ -289,7 +291,5 @@ export function MobileFilePreviewScreen({ route }: Props) {
 }
 
 function saveErrorMessageFromPreviewResult(result: MobileFilePreviewResult): string {
-  return result.status === 'error' || result.status === 'waiting'
-    ? result.message
-    : 'Unable to save file'
+  return result.status === 'error' || result.status === 'waiting' ? result.message : '无法保存文件'
 }

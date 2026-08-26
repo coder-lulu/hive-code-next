@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
 import type { ReactNode } from 'react'
-import { colors, radii } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 type Props = {
   children: ReactNode
@@ -17,6 +18,7 @@ export function MobileBrowserToolbarIconButton({
   onPress,
   style
 }: Props): React.JSX.Element {
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <Pressable
       style={({ pressed }) => [
@@ -27,25 +29,29 @@ export function MobileBrowserToolbarIconButton({
       ]}
       disabled={disabled}
       onPress={onPress}
+      accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
     >
       {children}
     </Pressable>
   )
 }
 
-const styles = StyleSheet.create({
-  button: {
-    width: 26,
-    height: 26,
-    borderRadius: radii.button,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  buttonPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  disabled: {
-    opacity: 0.35
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    button: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.control,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    buttonPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    disabled: {
+      opacity: 0.45
+    }
+  })
+}

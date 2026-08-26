@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { colors } from '../../theme/mobile-theme'
+import type { MobileTheme } from '../../theme/mobile-theme'
+import { useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import type { ConnectionState } from '../../transport/types'
 import type { RpcClient } from '../../transport/rpc-client'
 import type { MobileGitStatusResult } from '../../source-control/mobile-git-status'
@@ -34,18 +35,19 @@ export function MobilePrViewPanelBody({
   controller
 }: Props) {
   const insets = useSafeAreaInsets()
+  const styles = useMobileThemeStyles(createMobilePrViewPanelStyles)
 
   const sidebarState = !branchContextLoaded
     ? ({ kind: 'loading' } as const)
     : !isGithubRepo
       ? ({
           kind: 'blocked',
-          message: 'Hosted review panel unavailable for this provider.'
+          message: '此代码托管服务暂不支持评审面板。'
         } as const)
       : branch === null
         ? ({
             kind: 'error',
-            message: 'Current branch unavailable.'
+            message: '无法获取当前分支。'
           } as const)
         : controller.prSidebarState
 
@@ -69,9 +71,11 @@ export function MobilePrViewPanelBody({
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase
-  }
-})
+export function createMobilePrViewPanelStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.color.bg.canvas
+    }
+  })
+}

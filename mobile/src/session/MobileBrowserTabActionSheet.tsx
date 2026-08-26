@@ -21,12 +21,12 @@ export function MobileBrowserTabActionSheet(props: {
   return (
     <ActionSheetModal
       visible={target != null}
-      title={target ? getMobileSessionTabTitle(target) : 'Browser'}
+      title={getBrowserActionSheetTitle(target)}
       actions={[
         ...(target?.canGoBack
           ? [
               {
-                label: 'Back',
+                label: '后退',
                 icon: ChevronLeft,
                 onPress: () => {
                   const current = target
@@ -41,7 +41,7 @@ export function MobileBrowserTabActionSheet(props: {
         ...(target?.canGoForward
           ? [
               {
-                label: 'Forward',
+                label: '前进',
                 icon: ChevronRight,
                 onPress: () => {
                   const current = target
@@ -54,7 +54,7 @@ export function MobileBrowserTabActionSheet(props: {
             ]
           : []),
         {
-          label: 'Reload',
+          label: '重新加载',
           icon: RefreshCw,
           onPress: () => {
             const current = target
@@ -65,7 +65,7 @@ export function MobileBrowserTabActionSheet(props: {
           }
         },
         {
-          label: 'Close',
+          label: '关闭',
           destructive: true,
           onPress: () => {
             const current = target
@@ -80,4 +80,15 @@ export function MobileBrowserTabActionSheet(props: {
       onClose={onClose}
     />
   )
+}
+
+function getBrowserActionSheetTitle(target: BrowserTab | null): string {
+  if (!target) {
+    return '浏览器'
+  }
+  const resolvedTitle = getMobileSessionTabTitle(target)
+  if (target.title.trim() === resolvedTitle) {
+    return resolvedTitle
+  }
+  return resolvedTitle === 'New Browser' ? '新建浏览器' : '浏览器'
 }

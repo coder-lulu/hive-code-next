@@ -28,6 +28,14 @@ vi.mock('lucide-react-native', () => ({
   RefreshCw: 'RefreshCw'
 }))
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T,>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+
 vi.mock('../components/MobileRichMarkdownEditor', () => {
   const Editor = forwardRef(
     (props: { onKeyboardInsetChange?: (bottom: number) => void }, ref: unknown) => {
@@ -71,8 +79,7 @@ describe('MobileMarkdownReader', () => {
 
   function dismissButtons(instance: ReactTestRenderer) {
     return instance.root.findAll(
-      (node) =>
-        typeof node.type === 'string' && node.props?.accessibilityLabel === 'Dismiss keyboard'
+      (node) => typeof node.type === 'string' && node.props?.accessibilityLabel === '收起键盘'
     )
   }
 

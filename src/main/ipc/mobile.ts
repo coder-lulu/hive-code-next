@@ -15,6 +15,7 @@ import { resolveAdvertisedPairingHostname } from '../runtime/pairing-endpoint'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import type { RelayBrokerStatus } from '../runtime/relay/relay-session-broker'
 import { encodeMobilePairingQr, type MobilePairingQrResult } from '../runtime/mobile-pairing-qr'
+import { canonicalizePairingUrl } from '../../shared/pairing'
 import { getWindowsDefaultRouteInterfaceNames } from '../runtime/windows-default-route-interfaces'
 import {
   getWebSocketPort,
@@ -127,14 +128,15 @@ export function registerMobileHandlers(
         }
       }
 
-      const qr = await (dependencies.encodePairingQr ?? encodeMobilePairingQr)(offer.pairingUrl)
+      const pairingUrl = canonicalizePairingUrl(offer.pairingUrl)
+      const qr = await (dependencies.encodePairingQr ?? encodeMobilePairingQr)(pairingUrl)
 
       return {
         available: true as const,
         qrDataUrl: qr.ok ? qr.qrDataUrl : null,
         qrSize: qr.ok ? qr.qrSize : null,
         ...(!qr.ok ? { qrError: qr.reason } : {}),
-        pairingUrl: offer.pairingUrl,
+        pairingUrl,
         // Why: with nothing advertised the offer's endpoint is the loopback fallback, which points at
         // whichever device scans the QR — never this host. Report no endpoint so the UI omits it
         // instead of printing an address the phone can't reach.
@@ -194,7 +196,7 @@ export function registerMobileHandlers(
 
       return {
         available: true as const,
-        pairingUrl: offer.pairingUrl,
+        pairingUrl: canonicalizePairingUrl(offer.pairingUrl),
         webClientUrl: offer.webClientUrl,
         endpoint: offer.endpoint,
         deviceId: offer.deviceId

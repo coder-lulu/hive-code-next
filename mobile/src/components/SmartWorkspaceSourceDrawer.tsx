@@ -25,9 +25,9 @@ import {
 } from '../tasks/smart-source-paste-intent'
 import { useSmartWorkspaceSource } from '../tasks/use-smart-workspace-source'
 import type { MobileComposerSource } from '../tasks/use-mobile-composer-source'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { BottomDrawer } from './BottomDrawer'
-import { smartWorkspaceSourceDrawerStyles as styles } from './smart-workspace-source-drawer-styles'
+import { createSmartWorkspaceSourceDrawerStyles } from './smart-workspace-source-drawer-styles'
 import { SmartSourceModeIcon } from './SmartSourceModeIcon'
 import { SmartWorkspaceSourceRow } from './SmartWorkspaceSourceRow'
 
@@ -60,6 +60,8 @@ export function SmartWorkspaceSourceDrawer({
   onRepoChange,
   onClose
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createSmartWorkspaceSourceDrawerStyles)
   const availableModes = useMemo(() => resolveAvailableSmartModes(availability), [availability])
   const [mode, setMode] = useState<SmartNameMode>(() => resolveDefaultSmartMode(availability))
   const [mrStateFilter, setMrStateFilter] = useState<MrStateFilter>('opened')
@@ -197,7 +199,12 @@ export function SmartWorkspaceSourceDrawer({
       <View style={styles.root}>
         <View style={styles.header}>
           <Text style={styles.title}>Name or &apos;Create From&apos;</Text>
-          <Pressable onPress={onClose} hitSlop={8}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close source search"
+            style={({ pressed }) => [styles.doneButton, pressed && styles.doneButtonPressed]}
+            onPress={onClose}
+          >
             <Text style={styles.done}>Done</Text>
           </Pressable>
         </View>
@@ -210,10 +217,17 @@ export function SmartWorkspaceSourceDrawer({
                 {crossRepoPrompt.link.slug.repo}.
               </Text>
               <View style={styles.crossRepoActions}>
-                <Pressable style={styles.crossRepoDismiss} onPress={dismissCrossRepoPrompt}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel repository switch"
+                  style={styles.crossRepoDismiss}
+                  onPress={dismissCrossRepoPrompt}
+                >
                   <Text style={styles.crossRepoDismissText}>Cancel</Text>
                 </Pressable>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Switch to ${crossRepoPrompt.matchingRepo.displayName}`}
                   style={styles.crossRepoSwitch}
                   onPress={() => void handleAcceptCrossRepo()}
                 >
@@ -246,7 +260,7 @@ export function SmartWorkspaceSourceDrawer({
             ListFooterComponent={
               loading ? (
                 <View style={styles.loading}>
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <ActivityIndicator size="small" color={theme.color.text.secondary} />
                 </View>
               ) : showEmpty ? (
                 <Text style={styles.empty}>{emptyHint || 'No results found.'}</Text>
@@ -268,6 +282,9 @@ export function SmartWorkspaceSourceDrawer({
                 return (
                   <Pressable
                     key={option.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={option.label}
+                    accessibilityState={{ selected }}
                     style={[styles.chip, selected && styles.chipSelected]}
                     onPress={() => setMrStateFilter(option.id)}
                   >
@@ -283,10 +300,13 @@ export function SmartWorkspaceSourceDrawer({
           <View style={styles.tabRow}>
             {modeTabs.map((option) => {
               const selected = option.id === effectiveMode
-              const tint = selected ? colors.textPrimary : colors.textSecondary
+              const tint = selected ? theme.color.text.inverse : theme.color.text.secondary
               return (
                 <Pressable
                   key={option.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={option.label}
+                  accessibilityState={{ selected }}
                   style={[styles.tab, selected && styles.tabSelected]}
                   onPress={() => setMode(option.id)}
                 >
@@ -305,7 +325,7 @@ export function SmartWorkspaceSourceDrawer({
             value={composer.name}
             onChangeText={composer.setName}
             placeholder="Type a name or search a source"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={theme.color.text.tertiary}
             autoCapitalize="none"
             autoCorrect={false}
             // Still request native auto-focus; the delayed ref focus is the reliable path.

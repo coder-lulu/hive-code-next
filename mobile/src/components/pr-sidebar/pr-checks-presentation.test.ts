@@ -80,11 +80,11 @@ describe('firstFailingCheckKey', () => {
 })
 
 describe('summarizePRChecks', () => {
-  it('returns a "No checks" summary for an empty list', () => {
+  it('returns a localized empty summary for an empty list', () => {
     const summary = summarizePRChecks([])
     expect(summary.total).toBe(0)
     expect(summary.outcome).toBe('none')
-    expect(summary.label).toBe('No checks')
+    expect(summary.label).toBe('暂无检查')
   })
   it('counts pass/pending/fail and reports worst-case outcome', () => {
     const summary = summarizePRChecks([
@@ -99,7 +99,7 @@ describe('summarizePRChecks', () => {
       failed: 1,
       outcome: 'failure'
     })
-    expect(summary.label).toBe('1 failing · 1 pending · 1 passed')
+    expect(summary.label).toBe('1 项失败 · 1 项等待中 · 1 项通过')
   })
   it('reports pending when no failures but some pending', () => {
     expect(
@@ -124,7 +124,7 @@ describe('summarizePRChecks', () => {
       failed: 0,
       outcome: 'neutral'
     })
-    expect(summary.label).toBe('2 neutral')
+    expect(summary.label).toBe('2 项中性')
   })
   it('counts skipped as passed so the sidebar matches desktop and the tasks grid', () => {
     const summary = summarizePRChecks([
@@ -133,7 +133,7 @@ describe('summarizePRChecks', () => {
       check({ conclusion: 'skipped' })
     ])
     expect(summary).toMatchObject({ total: 3, passed: 3, outcome: 'success' })
-    expect(summary.label).toBe('3 passed')
+    expect(summary.label).toBe('3 项通过')
   })
 })
 
@@ -147,10 +147,10 @@ describe('prCheckKey', () => {
 
 describe('prStateBadge', () => {
   it('maps each PR state to a label + status-color token matching the workspace-list badge', () => {
-    expect(prStateBadge('open')).toEqual({ label: 'Open', token: 'statusGreen' })
-    expect(prStateBadge('closed')).toEqual({ label: 'Closed', token: 'statusRed' })
-    expect(prStateBadge('merged')).toEqual({ label: 'Merged', token: 'statusPurple' })
-    expect(prStateBadge('draft')).toEqual({ label: 'Draft', token: 'textSecondary' })
+    expect(prStateBadge('open')).toEqual({ label: '打开', token: 'statusGreen' })
+    expect(prStateBadge('closed')).toEqual({ label: '已关闭', token: 'statusRed' })
+    expect(prStateBadge('merged')).toEqual({ label: '已合并', token: 'statusPurple' })
+    expect(prStateBadge('draft')).toEqual({ label: '草稿', token: 'textSecondary' })
   })
 })
 
@@ -167,7 +167,7 @@ describe('getPRReviewerRows', () => {
         login: 'alice',
         name: 'Alice',
         avatarUrl: 'a',
-        stateLabel: 'Requested',
+        stateLabel: '已请求',
         token: 'statusAmber'
       }
     ])
@@ -180,8 +180,8 @@ describe('getPRReviewerRows', () => {
       ]
     })
     expect(rows.map((r) => [r.login, r.stateLabel, r.token])).toEqual([
-      ['bob', 'Approved', 'statusGreen'],
-      ['carol', 'Changes requested', 'statusRed']
+      ['bob', '已批准', 'statusGreen'],
+      ['carol', '已请求更改', 'statusRed']
     ])
   })
   it('dedupes a reviewer present in both requests and reviews (requested wins)', () => {
@@ -190,6 +190,6 @@ describe('getPRReviewerRows', () => {
       latestReviews: [{ login: 'alice', state: 'APPROVED' }]
     })
     expect(rows).toHaveLength(1)
-    expect(rows[0].stateLabel).toBe('Requested')
+    expect(rows[0].stateLabel).toBe('已请求')
   })
 })

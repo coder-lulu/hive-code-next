@@ -3893,7 +3893,7 @@ function createVolatileCloudEnvironment(
       {
         id: `wss-${id}`,
         kind: 'websocket',
-        label: 'Cloud WSS',
+        label: translate('web.runtime.cloudWebSocket', 'Cloud WSS'),
         endpoint: bootstrap.websocketUrl,
         deviceToken: '',
         publicKeyB64: bootstrap.serverPublicKeyB64

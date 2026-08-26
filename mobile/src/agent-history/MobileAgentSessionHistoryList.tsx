@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, SectionList, Text, View } from 'react-native'
 import { Play } from 'lucide-react-native'
-import { colors } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 import { MobileAgentIcon } from '../components/MobileAgentIcon'
 import { recentSessionConversationTurns } from '../../../src/shared/ai-vault-session-display'
 import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
 import type { MobileAgentHistorySection } from './agent-history-sections'
 import type { MobileAgentHistoryCard } from './agent-history-session-card'
-import { styles } from './agent-history-styles'
+import { createAgentHistoryStyles } from './agent-history-styles'
 
 // Lazy-render at most this many preview turns when a card is tapped — the
 // scanner already bounds preview text, but rendering them only on tap keeps the
@@ -22,6 +22,7 @@ type Props = {
   resumeActionStateBySessionId?: ReadonlyMap<string, { disabled: boolean; loading: boolean }>
   onResume?: (session: AiVaultSession) => void | Promise<void>
   onRefresh: () => void
+  theme: MobileTheme
 }
 
 export function MobileAgentSessionHistoryList({
@@ -31,9 +32,11 @@ export function MobileAgentSessionHistoryList({
   showCurrentWorktreeBadges,
   resumeActionStateBySessionId,
   onResume,
-  onRefresh
+  onRefresh,
+  theme
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const styles = useMemo(() => createAgentHistoryStyles(theme), [theme])
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedId((prev) => (prev === id ? null : id))
@@ -49,6 +52,8 @@ export function MobileAgentSessionHistoryList({
         resumeActionState={resumeActionStateBySessionId?.get(item.id)}
         onResume={onResume}
         onPress={() => toggleExpanded(item.id)}
+        theme={theme}
+        styles={styles}
       />
     ),
     [
@@ -57,6 +62,8 @@ export function MobileAgentSessionHistoryList({
       resumeActionStateBySessionId,
       sessionsById,
       showCurrentWorktreeBadges,
+      styles,
+      theme,
       toggleExpanded
     ]
   )
@@ -71,7 +78,7 @@ export function MobileAgentSessionHistoryList({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={colors.textSecondary}
+          tintColor={theme.color.text.secondary}
         />
       }
       renderSectionHeader={({ section }) => (
@@ -94,7 +101,9 @@ function AgentHistoryCardRow({
   showCurrentWorktreeBadge,
   resumeActionState,
   onResume,
-  onPress
+  onPress,
+  theme,
+  styles
 }: {
   card: MobileAgentHistoryCard
   expanded: boolean
@@ -103,6 +112,8 @@ function AgentHistoryCardRow({
   resumeActionState?: { disabled: boolean; loading: boolean }
   onResume?: (session: AiVaultSession) => void | Promise<void>
   onPress: () => void
+  theme: MobileTheme
+  styles: ReturnType<typeof createAgentHistoryStyles>
 }) {
   const previewTurns = useMemo(
     () => (expanded && session ? recentSessionConversationTurns(session, PREVIEW_TURN_LIMIT) : []),
@@ -155,9 +166,9 @@ function AgentHistoryCardRow({
             accessibilityLabel="Resume agent session"
           >
             {resumeActionState?.loading ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
+              <ActivityIndicator size="small" color={theme.color.text.primary} />
             ) : (
-              <Play size={17} color={colors.textPrimary} strokeWidth={2.4} />
+              <Play size={17} color={theme.color.text.primary} strokeWidth={2.4} />
             )}
           </Pressable>
         ) : null}

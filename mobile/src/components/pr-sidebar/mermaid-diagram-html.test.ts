@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildHtml } from './MermaidDiagram'
 import { MERMAID_ENGINE_JS } from './mermaid-webview-engine.generated'
+import { darkTheme, lightTheme } from '../../theme/mobile-theme'
 
 vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
@@ -9,10 +10,22 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 vi.mock('react-native-webview', () => ({ WebView: 'WebView' }))
+vi.mock('../../theme/mobile-theme-provider', () => ({
+  useMobileTheme: vi.fn(),
+  useMobileThemeStyles: vi.fn()
+}))
 
 // The diagram source is untrusted (agent output, PR/chat content). It is embedded
 // inside an inline <script>, so it must not be able to close that script element.
 describe('buildHtml source escaping', () => {
+  it.each([lightTheme, darkTheme])('uses the $scheme Graphite palette', (theme) => {
+    const html = buildHtml('graph TD; A-->B', theme)
+
+    expect(html).toContain(`background: ${theme.color.bg.subtle}`)
+    expect(html).toContain(`primaryTextColor: '${theme.color.text.primary}'`)
+    expect(html).toContain(`darkMode: ${theme.scheme === 'dark'}`)
+  })
+
   it('does not let a </script> payload break out of the inline script', () => {
     const payload = 'graph TD; A-->B</script><script>window.evil=1</script>'
     const countClosers = (html: string) => (html.match(/<\/script>/gi) ?? []).length

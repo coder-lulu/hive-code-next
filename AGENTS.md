@@ -1,6 +1,29 @@
 # Design System
 
-All UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don't invent new color values, font sizes, or shadow tiers when a documented one already covers the role. When STYLEGUIDE.md is silent, follow the resolution order in its final section.
+## HiveCode APP UI
+
+Any HiveCode APP/mobile UI work, including changes under `mobile/`, must first read and follow [`HiveCode-APP-UI-AI-Coding-Constraints.md`](./HiveCode-APP-UI-AI-Coding-Constraints.md) in full. It is the product-specific authority for APP layout, visual design, interaction, accessibility, implementation, and delivery. Accessibility and platform requirements remain the highest priority; for APP-specific decisions, this contract takes precedence over the generic desktop style guide. If a request conflicts with it, do not silently create another visual language: apply the contract where possible and report the conflict and resolution in the delivery notes.
+
+HiveCode APP UI must follow the **Graphite Precision / 石墨精密工作台** contract:
+
+1. Use graphite black, warm white, and cool gray as the visual base. Brand blue is limited to the Logo, focus, links, selected icons, and AI states; never use large blue surfaces, blue gradients/glows, or blue-outlined cards.
+2. Business/page code must not hardcode colors, font sizes, spacing, radii, shadows, or other design constants. Use global semantic tokens; add a global token before using a missing value.
+3. Use only the documented typography tokens: `30/38`, `20/28`, `16/24`, `15/22`, `14/20`, `13/18`, and `12/16`, normally with weights `400`, `500`, or `600`.
+4. Use the 4dp grid and spacing tokens `4`, `8`, `12`, `16`, `20`, `24`, `32`, `40`, `48`, and `64dp`. Default horizontal page padding is `20dp`, never below `16dp`.
+5. Use only `4`, `8`, `12`, and `16dp` radii. Non-circular controls must not exceed `16dp`; pills are reserved for status labels, two-state segmented controls, and very short filters.
+6. Settings and task items use grouped lists with dividers. Do not turn every row into an independent rounded card or add decoration without functional meaning.
+7. Use one consistent linear icon system at `1.75–2dp` stroke width and `16`, `20`, or `24dp` sizes. Do not mix emoji, arbitrary Unicode symbols, filled icons, or mismatched stroke styles.
+8. Primary actions use graphite black/inverse colors; brand blue is not the default primary-button color. The “云端工作 / 连接电脑” selected state uses black/white inversion.
+9. The product name is always `HiveCode`; use “连接电脑”, never “链接电脑”; do not introduce `WorkBuddy`, `HvieCode`, or other naming variants.
+10. Use the latest bee mascot only for the home Hero, AI empty states, onboarding, and key success feedback. Do not use it as decoration on settings, account, or legal pages, and never distort, recolor, crop, or outline brand assets.
+11. New pages must support light/dark themes, safe areas, 100%–130% font scaling, keyboard avoidance, narrow/small screens, long text, reduced motion, and minimum `44×44dp` targets. State must never be communicated by color alone, and text contrast must meet WCAG AA.
+12. Before coding, inspect and reuse existing themes, tokens, icons, and shared components in that order. Do not add a UI, font, or icon library without explicit authorization, duplicate equivalent components, use screenshot-matching absolute positioning, or push content with fixed blank space.
+13. Interactive components must implement every applicable default, pressed, focused, disabled, loading, success, and error state. Standard transitions are `160–220ms`, up to `280ms` for complex drawers/sheets, and must respect reduced-motion settings.
+14. UI delivery notes must list changed screens/components, token changes, documented exceptions, and verification results for light/dark themes, small screens, 130% font scaling, keyboard/safe-area behavior, accessibility, and primary interaction states. Do not report only “completed” or “optimized”.
+
+## Shared and Desktop UI
+
+All non-APP UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don't invent new color values, font sizes, or shadow tiers when a documented one already covers the role. When STYLEGUIDE.md is silent, follow the resolution order in its final section.
 
 ## Electron UI Validation
 

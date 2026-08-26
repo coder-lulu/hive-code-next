@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { Alert, View, Text, Pressable, StyleSheet } from 'react-native'
 import { ChevronLeft } from 'lucide-react-native'
-import { colors, spacing } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { BottomDrawer } from '../components/BottomDrawer'
 import type { RpcClient } from '../transport/rpc-client'
 import type { TerminalQuickCommand } from '../../../src/shared/terminal-quick-command-types'
@@ -39,6 +40,8 @@ export function QuickCommandsSheet({
   repoName,
   onLaunch
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const { commands, loading, ready, error, persist } = useQuickCommands({
     client,
     enabled: visible
@@ -103,20 +106,16 @@ export function QuickCommandsSheet({
   const handleDelete = (command: TerminalQuickCommand) => {
     // Why: quick commands sync with desktop, so an accidental one-tap delete
     // removes shared data rather than only dismissing a local row.
-    Alert.alert(
-      `Delete "${command.label || 'Untitled'}"?`,
-      'This quick command will be removed from your saved list.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void persist({ type: 'delete', id: command.id })
-          }
+    Alert.alert(`删除“${command.label || '未命名'}”？`, '此快捷命令将从已保存列表中移除。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: () => {
+          void persist({ type: 'delete', id: command.id })
         }
-      ]
-    )
+      }
+    ])
   }
 
   const handleSave = async () => {
@@ -145,11 +144,11 @@ export function QuickCommandsSheet({
   const title =
     view === 'editor'
       ? draft?.id
-        ? 'Edit Quick Command'
-        : 'Add Quick Command'
+        ? '编辑快捷命令'
+        : '添加快捷命令'
       : view === 'agent'
-        ? 'Choose Agent'
-        : 'Quick Commands'
+        ? '选择 Agent'
+        : '快捷命令'
 
   return (
     <BottomDrawer visible={visible} onClose={onClose}>
@@ -160,9 +159,9 @@ export function QuickCommandsSheet({
           <Pressable
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
             onPress={() => setView(view === 'agent' ? 'editor' : 'list')}
-            accessibilityLabel="Back"
+            accessibilityLabel="返回"
           >
-            <ChevronLeft size={18} color={colors.textSecondary} />
+            <ChevronLeft size={20} color={theme.color.text.secondary} />
           </Pressable>
         )}
         <Text style={styles.title}>{title}</Text>
@@ -171,9 +170,7 @@ export function QuickCommandsSheet({
 
       {view === 'editor' && draft ? (
         <View style={styles.editorDesc}>
-          <Text style={styles.descText}>
-            Save terminal commands or agent prompts for quick access.
-          </Text>
+          <Text style={styles.descText}>保存常用终端命令或 Agent 提示词，方便快速调用。</Text>
         </View>
       ) : null}
 
@@ -228,24 +225,34 @@ export function QuickCommandsSheet({
   )
 }
 
-const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: spacing.sm },
-  backButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  backSpacer: { width: 30 },
-  title: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    textAlign: 'center'
-  },
-  pressed: { backgroundColor: colors.bgRaised },
-  editorDesc: { paddingHorizontal: spacing.xs, paddingBottom: spacing.sm },
-  descText: { fontSize: 12, color: colors.textMuted }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    header: {
+      minHeight: theme.size.navigationBarHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingBottom: theme.spacing.space8
+    },
+    backButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    backSpacer: { width: theme.size.minimumTouchTarget },
+    title: {
+      ...theme.typography.sectionTitle,
+      flex: 1,
+      fontWeight: '600',
+      color: theme.color.text.primary,
+      textAlign: 'center'
+    },
+    pressed: { backgroundColor: theme.color.bg.subtle },
+    editorDesc: {
+      paddingHorizontal: theme.spacing.space4,
+      paddingBottom: theme.spacing.space8
+    },
+    descText: { ...theme.typography.caption, color: theme.color.text.tertiary }
+  })
+}

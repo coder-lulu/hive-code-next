@@ -77,23 +77,23 @@ const OUTCOME_BY_STATE: Record<ProviderCheckSummary['state'], CheckOutcome | 'no
 
 export function summarizePRChecks(checks: readonly PRCheckDetail[]): PRChecksSummary {
   if (checks.length === 0) {
-    return { total: 0, passed: 0, pending: 0, failed: 0, outcome: 'none', label: 'No checks' }
+    return { total: 0, passed: 0, pending: 0, failed: 0, outcome: 'none', label: '暂无检查' }
   }
   // Counts and the worst-case rollup come from the shared summarizer; only the label wording is mobile's.
   const { total, passed, pending, failed, neutral, state } = summarizeProviderChecks(checks)
   const outcome = OUTCOME_BY_STATE[state]
   const parts: string[] = []
   if (failed > 0) {
-    parts.push(`${failed} failing`)
+    parts.push(`${failed} 项失败`)
   }
   if (pending > 0) {
-    parts.push(`${pending} pending`)
+    parts.push(`${pending} 项等待中`)
   }
   if (passed > 0) {
-    parts.push(`${passed} passed`)
+    parts.push(`${passed} 项通过`)
   }
   if (neutral > 0) {
-    parts.push(`${neutral} neutral`)
+    parts.push(`${neutral} 项中性`)
   }
   return {
     total,
@@ -109,25 +109,25 @@ export function summarizePRChecks(checks: readonly PRCheckDetail[]): PRChecksSum
 // outcome is readable without expanding the row. Mirrors getCheckStatusLabel.
 export function checkStatusLabel(check: PRCheckDetail): string {
   if (check.status !== 'completed') {
-    return check.status === 'in_progress' ? 'In progress' : 'Pending'
+    return check.status === 'in_progress' ? '进行中' : '等待中'
   }
   switch (check.conclusion) {
     case 'success':
-      return 'Successful'
+      return '成功'
     case 'failure':
-      return 'Failed'
+      return '失败'
     case 'cancelled':
-      return 'Cancelled'
+      return '已取消'
     case 'timed_out':
-      return 'Timed out'
+      return '已超时'
     case 'action_required':
-      return 'Action required'
+      return '需要操作'
     case 'neutral':
-      return 'Neutral'
+      return '中性'
     case 'skipped':
-      return 'Skipped'
+      return '已跳过'
     default:
-      return 'Pending'
+      return '等待中'
   }
 }
 
@@ -175,10 +175,10 @@ export type PRStateBadge = {
 }
 
 const PR_STATE_LABELS: Record<PRState, string> = {
-  open: 'Open',
-  merged: 'Merged',
-  draft: 'Draft',
-  closed: 'Closed'
+  open: '打开',
+  merged: '已合并',
+  draft: '草稿',
+  closed: '已关闭'
 }
 
 // State-badge color comes from the shared prStateToken so the sidebar badge and
@@ -202,20 +202,20 @@ function reviewStateLabel(state: string | null | undefined): {
 } {
   switch (state) {
     case 'APPROVED':
-      return { label: 'Approved', token: 'statusGreen' }
+      return { label: '已批准', token: 'statusGreen' }
     case 'CHANGES_REQUESTED':
-      return { label: 'Changes requested', token: 'statusRed' }
+      return { label: '已请求更改', token: 'statusRed' }
     case 'COMMENTED':
-      return { label: 'Commented', token: 'textSecondary' }
+      return { label: '已评论', token: 'textSecondary' }
     case 'DISMISSED':
-      return { label: 'Dismissed', token: 'textSecondary' }
+      return { label: '已驳回', token: 'textSecondary' }
     case 'PENDING':
-      return { label: 'Pending', token: 'statusAmber' }
+      return { label: '等待中', token: 'statusAmber' }
     case null:
     case undefined:
-      return { label: 'Reviewed', token: 'textSecondary' }
+      return { label: '已审阅', token: 'textSecondary' }
     default:
-      return { label: 'Reviewed', token: 'textSecondary' }
+      return { label: '已审阅', token: 'textSecondary' }
   }
 }
 
@@ -237,7 +237,7 @@ export function getPRReviewerRows(item: ReviewDisplayItem): ReviewerRow[] {
       login,
       name: user.name,
       avatarUrl: user.avatarUrl,
-      stateLabel: 'Requested',
+      stateLabel: '已请求',
       token: 'statusAmber'
     })
   }

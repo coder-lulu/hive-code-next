@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
 import { WorktreeAgentRow } from './WorktreeAgentRow'
 import { WorktreeListRow, type WorktreeListRowItem } from './WorktreeListRow'
+import { darkTheme, lightTheme } from '../theme/mobile-theme'
 
 const { agentSpinnerRender, agentStateDotRender } = vi.hoisted(() => ({
   agentSpinnerRender: vi.fn(),
@@ -76,6 +77,7 @@ function ListRowHarness({ item, now }: { item: TestItem; now: number }) {
     null,
     createElement(Text, null, sibling),
     createElement(WorktreeListRow, {
+      theme: lightTheme,
       item,
       isReadOnly: false,
       now,
@@ -178,6 +180,7 @@ describe('memoized worktree rows', () => {
           agent: firstAgent,
           depth: 0,
           now: 2_000,
+          theme: lightTheme,
           unvisited: false
         })
       )
@@ -190,6 +193,7 @@ describe('memoized worktree rows', () => {
           agent: firstAgent,
           depth: 0,
           now: 2_000,
+          theme: lightTheme,
           unvisited: false
         })
       )
@@ -202,10 +206,47 @@ describe('memoized worktree rows', () => {
           agent: agent({ state: 'done', updatedAt: 2_000 }),
           depth: 0,
           now: 2_000,
+          theme: lightTheme,
           unvisited: false
         })
       )
     })
     expect(agentStateDotRender).toHaveBeenCalledTimes(2)
   })
+
+  it.each([lightTheme, darkTheme])(
+    'uses semantic %s-theme text colors for compact agent activity',
+    async (theme) => {
+      await act(async () => {
+        renderer = create(
+          createElement(WorktreeAgentRow, {
+            agent: agent(),
+            depth: 0,
+            now: 2_000,
+            theme,
+            unvisited: false
+          })
+        )
+      })
+
+      const textNodes = renderer!.root.findAllByType(Text)
+      expect(textNodes[0]?.props.style[0].color).toBe(theme.color.text.secondary)
+      expect(textNodes[1]?.props.style.color).toBe(theme.color.text.secondary)
+
+      await act(async () => {
+        renderer!.update(
+          createElement(WorktreeAgentRow, {
+            agent: agent(),
+            depth: 0,
+            now: 2_000,
+            theme,
+            unvisited: true
+          })
+        )
+      })
+      expect(renderer!.root.findAllByType(Text)[0]?.props.style[1].color).toBe(
+        theme.color.text.primary
+      )
+    }
+  )
 })

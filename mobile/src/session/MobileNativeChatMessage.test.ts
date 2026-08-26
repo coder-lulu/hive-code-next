@@ -25,6 +25,14 @@ vi.mock('lucide-react-native', () => ({
 }))
 vi.mock('../components/MobileMarkdown', () => ({ MobileMarkdown: 'MobileMarkdown' }))
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+
 import { MobileNativeChatMessage } from './MobileNativeChatMessage'
 
 function userMessage(blocks: NativeChatMessage['blocks']): NativeChatMessage {

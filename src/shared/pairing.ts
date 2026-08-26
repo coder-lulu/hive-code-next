@@ -9,7 +9,7 @@ import {
 } from './mobile-pairing-protocol-limits'
 import { hivecodeProductConfig } from './generated/product-config'
 
-const PRIMARY_PAIRING_SCHEME = hivecodeProductConfig.schemes.primary
+export const PRIMARY_PAIRING_SCHEME = hivecodeProductConfig.schemes.primary
 const SUPPORTED_PAIRING_PROTOCOLS = new Set<string>(
   [PRIMARY_PAIRING_SCHEME, ...hivecodeProductConfig.schemes.aliases].map((scheme) => `${scheme}:`)
 )
@@ -30,6 +30,39 @@ export function encodePairingOffer(offer: PairingOffer): string {
   // Why: Android camera intents and Expo Router preserve query params more
   // reliably than URL fragments when launching a custom-scheme app.
   return `${PRIMARY_PAIRING_SCHEME}://pair?code=${base64url}`
+}
+
+/**
+ * Returns the canonical HiveCode deep-link for a pairing URL.
+ *
+ * Legacy custom schemes remain accepted by the decoder so existing links keep
+ * working, but anything rendered or copied back to a user must use the
+ * product-owned scheme. Non-pairing URLs are returned unchanged because this
+ * helper is not a general-purpose URL migration.
+ */
+export function canonicalizePairingUrl(value: string): string {
+  const trimmed = value.trim()
+  const schemeMatch = /^([a-z][a-z0-9+.-]*):\/\//i.exec(trimmed)
+  if (!schemeMatch || !SUPPORTED_PAIRING_PROTOCOLS.has(`${schemeMatch[1]?.toLowerCase()}:`)) {
+    return value
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+    if (
+      parsed.hostname !== 'pair' ||
+      parsed.username ||
+      parsed.password ||
+      parsed.port ||
+      (parsed.pathname !== '' && parsed.pathname !== '/')
+    ) {
+      return value
+    }
+  } catch {
+    return value
+  }
+
+  return `${PRIMARY_PAIRING_SCHEME}://${trimmed.slice(schemeMatch[0].length)}`
 }
 
 export function decodePairingOffer(url: string): PairingOffer {

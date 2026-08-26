@@ -8,7 +8,7 @@ import type { ConnectionState, HostProfile } from './transport/types'
 export function getHostListActionSheetActions(args: {
   host: HostProfile | null
   state: ConnectionState
-  /** Label "Connect" (not "Reconnect") when never connected this session, so the verb matches the action. */
+  /** Say “连接” (not “重新连接”) until the host has connected this session, so the verb matches the action. */
   hasEverConnected: boolean
   onDismiss: () => void
   onReconnect: (hostId: string) => void
@@ -28,7 +28,7 @@ export function getHostListActionSheetActions(args: {
 
   return [
     {
-      label: args.hasEverConnected && isLive ? 'Reconnect' : 'Connect',
+      label: args.hasEverConnected && isLive ? '重新连接' : '连接',
       icon: RefreshCw,
       onPress: () => {
         args.onDismiss()
@@ -38,7 +38,7 @@ export function getHostListActionSheetActions(args: {
     ...(isLive
       ? [
           {
-            label: 'Disconnect',
+            label: '断开连接',
             icon: PowerOff,
             onPress: () => {
               args.onDismiss()
@@ -48,7 +48,7 @@ export function getHostListActionSheetActions(args: {
         ]
       : []),
     {
-      label: 'Edit host',
+      label: '编辑电脑',
       icon: Edit3,
       closeBeforePress: true,
       onPress: () => {
@@ -57,7 +57,7 @@ export function getHostListActionSheetActions(args: {
       }
     },
     {
-      label: 'Remove',
+      label: '移除电脑',
       destructive: true,
       closeBeforePress: true,
       onPress: () => {

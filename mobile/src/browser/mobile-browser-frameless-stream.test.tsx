@@ -7,7 +7,12 @@ import {
   type BrowserScreencastFrame
 } from '../transport/browser-screencast-protocol'
 import type { RpcClient } from '../transport/rpc-client'
+import { MobileThemeProvider } from '../theme/mobile-theme-provider'
 import { MobileBrowserPane, type MobileBrowserTab } from './MobileBrowserPane'
+
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: { getItem: vi.fn(), setItem: vi.fn() }
+}))
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -19,11 +24,13 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   StyleSheet: {
     absoluteFillObject: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+    hairlineWidth: 1,
     create: (styles: unknown) => styles
   },
   Text: 'Text',
   TextInput: 'TextInput',
-  View: 'View'
+  View: 'View',
+  useColorScheme: () => 'light'
 }))
 
 // Why: covers icons reached transitively too (the view-mode switch), not just the pane's own
@@ -32,6 +39,7 @@ vi.mock('lucide-react-native', () => ({
   ArrowUp: 'ArrowUp',
   ChevronLeft: 'ChevronLeft',
   ChevronRight: 'ChevronRight',
+  Delete: 'Delete',
   Monitor: 'Monitor',
   RefreshCw: 'RefreshCw',
   Smartphone: 'Smartphone'
@@ -90,16 +98,20 @@ async function renderPane(): Promise<{ renderer: ReactTestRenderer; stream: Subs
   let renderer: ReactTestRenderer
   await act(async () => {
     renderer = create(
-      createElement(MobileBrowserPane, {
-        client,
-        // Why: unique worktree id keeps each test on a cold module-level frame cache.
-        worktreeId: `wt-${pageCounter}`,
-        tab,
-        screencastSupported: true,
-        keyboardLift: 0,
-        bottomInset: 0,
-        onToast: () => {}
-      }),
+      createElement(
+        MobileThemeProvider,
+        { preference: 'light' },
+        createElement(MobileBrowserPane, {
+          client,
+          // Why: unique worktree id keeps each test on a cold module-level frame cache.
+          worktreeId: `wt-${pageCounter}`,
+          tab,
+          screencastSupported: true,
+          keyboardLift: 0,
+          bottomInset: 0,
+          onToast: () => {}
+        })
+      ),
       { createNodeMock: () => ({ setNativeProps: () => {} }) }
     )
     await Promise.resolve()

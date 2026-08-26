@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MobileOnboardingScreen from '../../app/mobile-onboarding'
+import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
 
 const mocks = vi.hoisted(() => ({
   params: { hostId: 'paired-host', steps: 'session-view,notifications' },
@@ -42,6 +43,10 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
 vi.mock('../components/OrcaLogo', () => ({ OrcaLogo: 'OrcaLogo' }))
 vi.mock('./MobileOnboardingPage', () => ({ MobileOnboardingPage: 'MobileOnboardingPage' }))
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileTheme: () => lightTheme,
+  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
+}))
 vi.mock('../notifications/mobile-notifications', () => ({
   ensureNotificationPermissions: mocks.ensureNotificationPermissions
 }))
@@ -112,6 +117,17 @@ describe('MobileOnboardingScreen', () => {
     expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
   })
 
+  it('requests notification permission and persists the granted result', async () => {
+    mocks.params = { hostId: 'paired-host', steps: 'notifications' }
+    await renderScreen()
+
+    await act(async () => pages()[0].props.onNotificationChoice('enable'))
+
+    expect(mocks.ensureNotificationPermissions).toHaveBeenCalledOnce()
+    expect(mocks.savePushNotificationsEnabled).toHaveBeenCalledWith(true)
+    expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
+  })
+
   it('keeps the current step retryable when persistence fails', async () => {
     mocks.params = { hostId: 'paired-host', steps: 'session-view' }
     mocks.saveDefaultSessionView
@@ -120,11 +136,27 @@ describe('MobileOnboardingScreen', () => {
     await renderScreen()
 
     await act(async () => pages()[0].props.onSessionChoice('chat'))
-    expect(pages()[0].props.error).toBe('Your choice could not be saved. Try again.')
+    expect(pages()[0].props.error).toBe('未能保存你的选择，请重试。')
 
     await act(async () => pages()[0].props.onSessionChoice('chat'))
     expect(mocks.saveDefaultSessionView).toHaveBeenCalledTimes(2)
     expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
+  })
+
+  it('keeps notification permission errors retryable', async () => {
+    mocks.params = { hostId: 'paired-host', steps: 'notifications' }
+    mocks.ensureNotificationPermissions.mockRejectedValueOnce(new Error('permission unavailable'))
+    await renderScreen()
+
+    await act(async () => pages()[0].props.onNotificationChoice('enable'))
+
+    expect(pages()[0].props).toMatchObject({
+      active: true,
+      busyChoice: null,
+      error: '未能更新通知设置，请重试。'
+    })
+    expect(mocks.savePushNotificationsEnabled).not.toHaveBeenCalled()
+    expect(mocks.replace).not.toHaveBeenCalled()
   })
 
   it('resets carousel state when the route supplies a new onboarding plan', async () => {
@@ -149,6 +181,18 @@ describe('MobileOnboardingScreen', () => {
       expect.anything(),
       expect.objectContaining({ duration: 0, useNativeDriver: true })
     )
+  })
+
+  it('announces Chinese progress and uses the semantic canvas', async () => {
+    await renderScreen()
+    const progress = renderer!.root.findByProps({ accessibilityRole: 'progressbar' })
+    const safeArea = renderer!.root.findByType('SafeAreaView')
+
+    expect(progress.props).toMatchObject({
+      accessibilityLabel: '引导进度',
+      accessibilityValue: { text: '第 1 步，共 2 步' }
+    })
+    expect(safeArea.props.style.backgroundColor).toBe(lightTheme.color.bg.canvas)
   })
 
   it('keeps the next decision available if the cosmetic transition is interrupted', async () => {

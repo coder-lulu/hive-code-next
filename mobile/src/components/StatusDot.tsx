@@ -1,5 +1,6 @@
 import { View, StyleSheet } from 'react-native'
 import { colors } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 import type { ConnectionState } from '../transport/types'
 import type { ConnectionVerdict } from '../transport/connection-health'
 
@@ -19,17 +20,29 @@ const stateColors: Record<ConnectionState, string> = {
 // has escalated to error (red).
 export function StatusDot({
   state,
-  verdict
+  verdict,
+  theme
 }: {
   state: ConnectionState
   verdict?: ConnectionVerdict
+  theme?: MobileTheme
 }) {
+  const semanticStateColor = theme
+    ? {
+        connected: theme.color.status.success,
+        connecting: theme.color.status.warning,
+        handshaking: theme.color.status.warning,
+        reconnecting: theme.color.status.warning,
+        disconnected: theme.color.text.tertiary,
+        'auth-failed': theme.color.status.danger
+      }[state]
+    : null
   const color =
     verdict?.kind === 'unreachable' || verdict?.kind === 'auth-failed'
-      ? colors.statusRed
+      ? (theme?.color.status.danger ?? colors.statusRed)
       : verdict?.kind === 'warning'
-        ? colors.statusAmber
-        : (stateColors[state] ?? colors.textMuted)
+        ? (theme?.color.status.warning ?? colors.statusAmber)
+        : (semanticStateColor ?? stateColors[state] ?? colors.textMuted)
   return <View style={[styles.dot, { backgroundColor: color }]} />
 }
 

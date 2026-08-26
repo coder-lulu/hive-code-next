@@ -1,4 +1,4 @@
-import { createElement } from 'react'
+import { createElement, type ReactElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
@@ -23,7 +23,8 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Text: 'Text',
   TextInput: 'TextInput',
-  View: 'View'
+  View: 'View',
+  useColorScheme: () => 'light'
 }))
 // Every icon in the drawer tree renders as a host element named after itself.
 vi.mock(
@@ -45,6 +46,7 @@ vi.mock('./TaskProviderLogo', () => ({ TaskProviderLogo: 'TaskProviderLogo' }))
 
 import { setCachedRepos } from '../cache/repo-cache'
 import { getLocalExecutionHostLabel } from '../../../src/shared/execution-host'
+import { MobileThemeProvider } from '../theme/mobile-theme-provider'
 import { NewWorktreeModal } from './NewWorktreeModal'
 
 const LOCAL_HOST_LABEL = getLocalExecutionHostLabel('darwin')
@@ -66,6 +68,20 @@ function pickerItems(
   const pickers = renderer.root.findAll((node) => node.type === 'PickerListDrawer')
   const picker = pickers.find((node) => node.props.title === title)
   return picker?.props.items ?? []
+}
+
+function renderModal(client: RpcClient): ReactElement {
+  return createElement(
+    MobileThemeProvider,
+    { preference: 'light' },
+    createElement(NewWorktreeModal, {
+      visible: true,
+      client,
+      hostId: 'host-1',
+      onCreated: () => {},
+      onClose: () => {}
+    })
+  )
 }
 
 describe('NewWorktreeModal project targets', () => {
@@ -92,15 +108,7 @@ describe('NewWorktreeModal project targets', () => {
     const client = { sendRequest } as unknown as RpcClient
 
     await act(async () => {
-      renderer = create(
-        createElement(NewWorktreeModal, {
-          visible: true,
-          client,
-          hostId: 'host-1',
-          onCreated: () => {},
-          onClose: () => {}
-        })
-      )
+      renderer = create(renderModal(client))
       await Promise.resolve()
     })
     await act(async () => {
@@ -141,15 +149,7 @@ describe('NewWorktreeModal project targets', () => {
     } as unknown as RpcClient
 
     await act(async () => {
-      renderer = create(
-        createElement(NewWorktreeModal, {
-          visible: true,
-          client,
-          hostId: 'host-1',
-          onCreated: () => {},
-          onClose: () => {}
-        })
-      )
+      renderer = create(renderModal(client))
       await Promise.resolve()
     })
 

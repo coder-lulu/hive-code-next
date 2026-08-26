@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
+import type { MobileTheme } from '../theme/mobile-theme'
 import { buildAgentRowLineageTree, flattenAgentRowLineage } from '../worktree/agent-row-lineage'
 import { WorktreeAgentRow } from './WorktreeAgentRow'
 import { WorktreeAgentSummary } from './WorktreeAgentSummary'
@@ -8,13 +9,14 @@ import { WorktreeAgentSummary } from './WorktreeAgentSummary'
 type Props = {
   agents: RuntimeWorktreeAgentRow[]
   now: number
+  theme: MobileTheme
   unvisited: boolean
 }
 
 // Inline agent list for one worktree row: flattens the spawn lineage and renders
 // a depth-indented WorktreeAgentRow per agent, mirroring the desktop sidebar's
 // WorktreeCardAgents.
-export function WorktreeAgentList({ agents, now, unvisited }: Props) {
+export function WorktreeAgentList({ agents, now, theme, unvisited }: Props) {
   const nodes = useMemo(() => flattenAgentRowLineage(agents), [agents])
   const summaryAgents = useMemo(() => {
     const lineage = buildAgentRowLineageTree(agents)
@@ -30,6 +32,7 @@ export function WorktreeAgentList({ agents, now, unvisited }: Props) {
           agents={summaryAgents}
           expanded={expanded}
           now={now}
+          theme={theme}
           onToggle={() => setExpanded((value) => !value)}
         />
       ) : null}
@@ -40,6 +43,7 @@ export function WorktreeAgentList({ agents, now, unvisited }: Props) {
               agent={node.row}
               depth={node.depth}
               now={now}
+              theme={theme}
               unvisited={unvisited}
             />
           ))

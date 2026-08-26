@@ -3,7 +3,8 @@
 
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Check, ChevronDown, ChevronRight } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type {
   SessionOptionDescriptor,
   SessionOptionValue
@@ -11,6 +12,7 @@ import type {
 
 /** Muted one-liner above a group — dispatch state, or why a row is locked. */
 export function SessionOptionCaption({ children }: { children: string }): React.JSX.Element {
+  const styles = useMobileThemeStyles(createStyles)
   return <Text style={styles.caption}>{children}</Text>
 }
 
@@ -25,6 +27,8 @@ export function Pill({
   disabled: boolean
   onPress: () => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <Pressable
       accessibilityLabel={accessibleName}
@@ -42,7 +46,10 @@ export function Pill({
       >
         {label}
       </Text>
-      <ChevronDown size={12} color={disabled ? colors.textMuted : colors.textSecondary} />
+      <ChevronDown
+        size={16}
+        color={disabled ? theme.color.text.tertiary : theme.color.text.secondary}
+      />
     </Pressable>
   )
 }
@@ -64,6 +71,8 @@ function ChoiceRow({
   divided: boolean
   onPress: () => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <Pressable
       accessibilityRole="radio"
@@ -79,7 +88,7 @@ function ChoiceRow({
       disabled={disabled}
     >
       <View style={[styles.radio, selected && styles.radioOn]}>
-        {selected ? <Check size={12} color={colors.bgBase} strokeWidth={3} /> : null}
+        {selected ? <Check size={12} color={theme.color.text.inverse} strokeWidth={3} /> : null}
       </View>
       <View style={styles.rowBody}>
         <Text style={styles.rowLabel}>{label}</Text>
@@ -104,6 +113,7 @@ function ActionRow({
   grouped: boolean
   onPress: () => void
 }): React.JSX.Element {
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <Pressable
       accessibilityRole="button"
@@ -132,9 +142,11 @@ export function SessionOptionSummaryRow({
   divided: boolean
   onPress: () => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <Pressable
-      accessibilityLabel={`${label}, ${value}`}
+      accessibilityLabel={`${label}，${value}`}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       style={({ pressed }) => [
@@ -150,7 +162,7 @@ export function SessionOptionSummaryRow({
       <Text style={styles.summaryValue} numberOfLines={1}>
         {value}
       </Text>
-      <ChevronRight size={16} color={colors.textMuted} strokeWidth={2.2} />
+      <ChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
     </Pressable>
   )
 }
@@ -173,7 +185,7 @@ export function DescriptorRows({
   if (descriptor.action?.type === 'toggle-command') {
     return (
       <ActionRow
-        label={`Toggle ${descriptor.label.toLowerCase()}`}
+        label={`切换${descriptor.label}`}
         disabled={locked}
         grouped={grouped}
         onPress={onInvokeAction}
@@ -184,7 +196,7 @@ export function DescriptorRows({
   if (descriptor.action?.type === 'agent-picker') {
     return (
       <ActionRow
-        label="Choose in agent picker…"
+        label="在 Agent 选择器中选择…"
         disabled={locked}
         grouped={grouped}
         onPress={onInvokeAction}
@@ -197,10 +209,10 @@ export function DescriptorRows({
     return (
       <>
         {current === undefined ? (
-          <SessionOptionCaption>Current value unknown — pick On or Off</SessionOptionCaption>
+          <SessionOptionCaption>当前值未知，请选择开启或关闭</SessionOptionCaption>
         ) : null}
         <ChoiceRow
-          label="On"
+          label="开启"
           selected={current === true}
           disabled={locked}
           grouped={grouped}
@@ -208,7 +220,7 @@ export function DescriptorRows({
           onPress={() => onSetOption(true)}
         />
         <ChoiceRow
-          label="Off"
+          label="关闭"
           selected={current === false}
           disabled={locked}
           grouped={grouped}
@@ -237,109 +249,111 @@ export function DescriptorRows({
   )
 }
 
-const styles = StyleSheet.create({
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    maxWidth: 180,
-    minHeight: 28,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.button,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgRaised
-  },
-  pillText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontWeight: '600',
-    flexShrink: 1
-  },
-  pillTextDisabled: {
-    color: colors.textMuted
-  },
-  pressed: {
-    opacity: 0.7
-  },
-  caption: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xs
-  },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    minHeight: 44,
-    alignItems: 'center',
-    borderRadius: radii.card,
-    backgroundColor: colors.bgRaised,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    marginBottom: spacing.xs
-  },
-  rowSelected: {
-    borderColor: colors.statusGreen
-  },
-  rowGrouped: {
-    marginBottom: 0,
-    borderWidth: 0,
-    borderRadius: 0,
-    backgroundColor: 'transparent'
-  },
-  rowDivided: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle
-  },
-  rowDisabled: {
-    opacity: 0.5
-  },
-  radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: colors.textMuted,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  radioOn: {
-    backgroundColor: colors.statusGreen,
-    borderColor: colors.statusGreen
-  },
-  rowBody: {
-    flex: 1,
-    gap: 2
-  },
-  rowLabel: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  rowDescription: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
-  },
-  summaryRow: {
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  summaryLabel: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  summaryValue: {
-    maxWidth: 160,
-    color: colors.textSecondary,
-    fontSize: typography.bodySize
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4,
+      maxWidth: 180,
+      minHeight: theme.size.minimumTouchTarget,
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4,
+      borderRadius: theme.radii.control,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      backgroundColor: theme.color.bg.elevated
+    },
+    pillText: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      fontWeight: '600',
+      flexShrink: 1
+    },
+    pillTextDisabled: {
+      color: theme.color.text.tertiary
+    },
+    pressed: {
+      opacity: 0.7
+    },
+    caption: {
+      ...theme.typography.meta,
+      color: theme.color.text.tertiary,
+      paddingHorizontal: theme.spacing.space12,
+      paddingBottom: theme.spacing.space4
+    },
+    row: {
+      flexDirection: 'row',
+      gap: theme.spacing.space8,
+      padding: theme.spacing.space8,
+      minHeight: theme.size.groupedListRowMinHeight,
+      alignItems: 'center',
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.elevated,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      marginBottom: theme.spacing.space4
+    },
+    rowSelected: {
+      borderColor: theme.color.brand.primary
+    },
+    rowGrouped: {
+      marginBottom: 0,
+      borderWidth: 0,
+      borderRadius: 0,
+      backgroundColor: 'transparent'
+    },
+    rowDivided: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle
+    },
+    rowDisabled: {
+      opacity: 0.5
+    },
+    radio: {
+      width: theme.spacing.space20,
+      height: theme.spacing.space20,
+      borderRadius: theme.radii.circle,
+      borderWidth: 1.5,
+      borderColor: theme.color.text.tertiary,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    radioOn: {
+      backgroundColor: theme.color.brand.primary,
+      borderColor: theme.color.brand.primary
+    },
+    rowBody: {
+      flex: 1,
+      gap: theme.spacing.space4
+    },
+    rowLabel: {
+      ...theme.typography.label,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    rowDescription: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary
+    },
+    summaryRow: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8
+    },
+    summaryLabel: {
+      ...theme.typography.label,
+      flex: 1,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    summaryValue: {
+      ...theme.typography.label,
+      maxWidth: 160,
+      color: theme.color.text.secondary
+    }
+  })
+}

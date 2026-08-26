@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
+import { lightTheme } from '../theme/mobile-theme'
 import { WorktreeAgentList } from './WorktreeAgentList'
 
 vi.mock('react-native', () => ({
@@ -51,22 +52,21 @@ describe('WorktreeAgentList', () => {
         createElement(WorktreeAgentList, {
           agents: [agent('agent-1'), agent('agent-2'), agent('agent-3')],
           now: 2_000,
+          theme: lightTheme,
           unvisited: false
         })
       )
     })
 
     const summary = renderer!.root.findByType('Pressable')
-    expect(summary.props.accessibilityLabel).toBe('Expand 3 agents')
+    expect(summary.props.accessibilityLabel).toBe('展开 3 个智能体')
     expect(summary.props.accessibilityState).toEqual({ expanded: false })
     expect(renderer!.root.findAllByType('WorktreeAgentRow')).toHaveLength(0)
 
     await act(async () => summary.props.onPress({ stopPropagation }))
 
     expect(stopPropagation).toHaveBeenCalledTimes(1)
-    expect(renderer!.root.findByType('Pressable').props.accessibilityLabel).toBe(
-      'Collapse 3 agents'
-    )
+    expect(renderer!.root.findByType('Pressable').props.accessibilityLabel).toBe('收起 3 个智能体')
     expect(renderer!.root.findAllByType('WorktreeAgentRow')).toHaveLength(3)
   })
 
@@ -76,6 +76,7 @@ describe('WorktreeAgentList', () => {
         createElement(WorktreeAgentList, {
           agents: [agent('agent-1')],
           now: 2_000,
+          theme: lightTheme,
           unvisited: false
         })
       )
@@ -91,11 +92,12 @@ describe('WorktreeAgentList', () => {
         createElement(WorktreeAgentList, {
           agents: [agent('parent-1'), agent('child-1', 'parent-1'), agent('parent-2')],
           now: 2_000,
+          theme: lightTheme,
           unvisited: false
         })
       )
     })
 
-    expect(renderer!.root.findByType('Pressable').props.accessibilityLabel).toBe('Expand 2 agents')
+    expect(renderer!.root.findByType('Pressable').props.accessibilityLabel).toBe('展开 2 个智能体')
   })
 })

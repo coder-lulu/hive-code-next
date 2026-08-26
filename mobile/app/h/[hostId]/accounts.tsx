@@ -13,8 +13,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, Check, RefreshCw, User } from 'lucide-react-native'
 import { loadHosts } from '../../../src/transport/host-store'
 import { useHostClient } from '../../../src/transport/client-context'
-import { colors, spacing } from '../../../src/theme/mobile-theme'
-import { styles } from '../../../src/accounts/mobile-accounts-screen-styles'
+import { createMobileAccountsScreenStyles } from '../../../src/accounts/mobile-accounts-screen-styles'
+import { useMobileTheme, useMobileThemeStyles } from '../../../src/theme/mobile-theme-provider'
 import { useNow } from '../../../src/hooks/use-now'
 import { ClaudeIcon, OpenAIIcon } from '../../../src/components/AgentIcons'
 import {
@@ -38,6 +38,8 @@ import { useCodexResetCreditAction } from '../../../src/components/use-codex-res
 export default function AccountsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileAccountsScreenStyles)
   const { hostId } = useLocalSearchParams<{ hostId: string }>()
 
   // Why: shared client per host. See docs/mobile-shared-client-per-host.md.
@@ -231,6 +233,7 @@ export default function AccountsScreen() {
                     unavailable={activeSessionBar.unavailable}
                     loading={activeSessionBar.loading}
                     resetText={getWindowResetLabel(activeUsage, 'session', now)}
+                    theme={theme}
                   />
                   <UsageBar
                     label="7d"
@@ -238,15 +241,16 @@ export default function AccountsScreen() {
                     unavailable={activeWeeklyBar.unavailable}
                     loading={activeWeeklyBar.loading}
                     resetText={getWindowResetLabel(activeUsage, 'weekly', now)}
+                    theme={theme}
                   />
                 </View>
               ) : null}
             </View>
             <View style={styles.rowTrailing}>
               {activeAccountId === null ? (
-                <Check size={16} color={colors.accentBlue} />
+                <Check size={16} color={theme.color.status.success} />
               ) : busyAccountId === `${provider}:default` ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
+                <ActivityIndicator size="small" color={theme.color.text.secondary} />
               ) : null}
             </View>
           </Pressable>
@@ -286,6 +290,7 @@ export default function AccountsScreen() {
                         unavailable={sessionBar.unavailable}
                         loading={sessionBar.loading}
                         resetText={getWindowResetLabel(usage, 'session', now)}
+                        theme={theme}
                       />
                       <UsageBar
                         label="7d"
@@ -293,6 +298,7 @@ export default function AccountsScreen() {
                         unavailable={weeklyBar.unavailable}
                         loading={weeklyBar.loading}
                         resetText={getWindowResetLabel(usage, 'weekly', now)}
+                        theme={theme}
                       />
                     </View>
                     {usage?.error ? (
@@ -303,9 +309,9 @@ export default function AccountsScreen() {
                   </View>
                   <View style={styles.rowTrailing}>
                     {isActive ? (
-                      <Check size={16} color={colors.accentBlue} />
+                      <Check size={16} color={theme.color.status.success} />
                     ) : busyAccountId === account.id ? (
-                      <ActivityIndicator size="small" color={colors.textSecondary} />
+                      <ActivityIndicator size="small" color={theme.color.text.secondary} />
                     ) : null}
                   </View>
                 </Pressable>
@@ -319,6 +325,7 @@ export default function AccountsScreen() {
               busy={resettingCodex}
               disabled={resettingCodex || busyAccountId !== null || connState !== 'connected'}
               onPress={confirmCodexReset}
+              theme={theme}
             />
           ) : null}
         </View>
@@ -330,10 +337,10 @@ export default function AccountsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topRow}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={22} color={colors.textPrimary} />
+          <ChevronLeft size={22} color={theme.color.text.primary} />
         </Pressable>
         <View style={styles.titleWrap}>
-          <Text style={styles.heading}>Accounts</Text>
+          <Text style={styles.heading}>Agent 账号</Text>
           {hostName ? (
             <Text style={styles.subheading} numberOfLines={1}>
               {hostName}
@@ -346,26 +353,29 @@ export default function AccountsScreen() {
           disabled={!client || refreshing || connState !== 'connected'}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color={colors.textSecondary} />
+            <ActivityIndicator size="small" color={theme.color.text.secondary} />
           ) : (
-            <RefreshCw size={18} color={colors.textSecondary} />
+            <RefreshCw size={18} color={theme.color.text.secondary} />
           )}
         </Pressable>
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: insets.bottom + theme.spacing.space24 }
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refresh}
-            tintColor={colors.textSecondary}
+            tintColor={theme.color.text.secondary}
           />
         }
       >
         {connState !== 'connected' && !snapshot ? (
           <View style={styles.placeholder}>
-            <ActivityIndicator color={colors.textSecondary} />
+            <ActivityIndicator color={theme.color.text.secondary} />
             <Text style={styles.placeholderText}>Connecting to {hostName || 'host'}…</Text>
           </View>
         ) : error && !snapshot ? (
@@ -374,7 +384,7 @@ export default function AccountsScreen() {
           </View>
         ) : !snapshot ? (
           <View style={styles.placeholder}>
-            <ActivityIndicator color={colors.textSecondary} />
+            <ActivityIndicator color={theme.color.text.secondary} />
             <Text style={styles.placeholderText}>Loading accounts…</Text>
           </View>
         ) : (
@@ -382,7 +392,7 @@ export default function AccountsScreen() {
             {renderProviderSection('claude', 'Claude')}
             {renderProviderSection('codex', 'Codex')}
             <View style={styles.footerHint}>
-              <User size={14} color={colors.textMuted} />
+              <User size={14} color={theme.color.text.tertiary} />
               <Text style={styles.footerHintText}>
                 Add or re-authenticate accounts from desktop Settings → Accounts.
               </Text>

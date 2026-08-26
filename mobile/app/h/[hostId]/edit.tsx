@@ -13,7 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../../../src/theme/mobile-theme'
+import type { MobileTheme } from '../../../src/theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../../src/theme/mobile-theme-provider'
 import { loadHosts, updateHostNameAndEndpoint } from '../../../src/transport/host-store'
 import { displayHostEndpoint } from '../../../src/transport/host-endpoint'
 import { resolveHostEndpointEdit } from '../../../src/transport/host-endpoint-edit'
@@ -23,6 +24,8 @@ import type { HostProfile } from '../../../src/transport/types'
 export default function EditHostScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const { hostId } = useLocalSearchParams<{ hostId: string }>()
   const primeHosts = usePrimeHosts()
   const forceReconnectHost = useForceReconnect()
@@ -142,7 +145,7 @@ export default function EditHostScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topRow}>
         <Pressable
           style={styles.backButton}
@@ -150,9 +153,9 @@ export default function EditHostScreen() {
           accessibilityRole="button"
           accessibilityLabel="Back"
         >
-          <ChevronLeft size={22} color={colors.textSecondary} />
+          <ChevronLeft size={22} color={theme.color.text.primary} />
         </Pressable>
-        <Text style={styles.heading}>Edit host</Text>
+        <Text style={styles.heading}>编辑电脑</Text>
         <Pressable
           style={({ pressed }) => [
             styles.saveButton,
@@ -164,9 +167,9 @@ export default function EditHostScreen() {
           accessibilityLabel="Save host"
         >
           {saving ? (
-            <ActivityIndicator size="small" color={colors.bgBase} />
+            <ActivityIndicator size="small" color={theme.color.text.inverse} />
           ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={styles.saveButtonText}>保存</Text>
           )}
         </Pressable>
       </View>
@@ -180,7 +183,7 @@ export default function EditHostScreen() {
         </View>
       ) : !host ? (
         <View style={styles.loadingState}>
-          <ActivityIndicator color={colors.textSecondary} />
+          <ActivityIndicator color={theme.color.text.secondary} />
         </View>
       ) : (
         <KeyboardAvoidingView
@@ -188,7 +191,10 @@ export default function EditHostScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
-            contentContainerStyle={[styles.form, { paddingBottom: insets.bottom + spacing.xl }]}
+            contentContainerStyle={[
+              styles.form,
+              { paddingBottom: insets.bottom + theme.spacing.space24 }
+            ]}
             keyboardShouldPersistTaps="handled"
           >
             <Text style={styles.help}>
@@ -197,7 +203,7 @@ export default function EditHostScreen() {
               different IP (for example home LAN vs Tailscale).
             </Text>
 
-            <Text style={styles.label}>Name</Text>
+            <Text style={styles.label}>名称</Text>
             <TextInput
               style={styles.input}
               accessibilityLabel="Name"
@@ -207,13 +213,13 @@ export default function EditHostScreen() {
                 setSaveError(null)
               }}
               placeholder="Host name"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={theme.color.text.tertiary}
               autoCapitalize="words"
               autoCorrect={false}
               returnKeyType="next"
             />
 
-            <Text style={styles.label}>Address</Text>
+            <Text style={styles.label}>连接地址</Text>
             <TextInput
               style={styles.input}
               accessibilityLabel="Address"
@@ -223,7 +229,7 @@ export default function EditHostScreen() {
                 setSaveError(null)
               }}
               placeholder="192.168.1.10:6768"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={theme.color.text.tertiary}
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="off"
@@ -256,120 +262,125 @@ export default function EditHostScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase
-  },
-  flex: {
-    flex: 1
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    gap: spacing.sm
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  heading: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '700'
-  },
-  saveButton: {
-    minWidth: 64,
-    height: 34,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.button,
-    backgroundColor: colors.surfaceBright,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  saveButtonDisabled: {
-    opacity: 0.4
-  },
-  saveButtonText: {
-    color: colors.bgBase,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  form: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm
-  },
-  help: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    lineHeight: 20,
-    marginBottom: spacing.sm
-  },
-  label: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontWeight: '500',
-    marginTop: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4
-  },
-  input: {
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.row,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10
-  },
-  hint: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize,
-    lineHeight: 16
-  },
-  preview: {
-    marginTop: spacing.sm,
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : typography.monoFamily
-  },
-  previewError: {
-    marginTop: spacing.sm,
-    color: colors.statusRed,
-    fontSize: typography.bodySize
-  },
-  errorText: {
-    color: colors.statusRed,
-    fontSize: typography.bodySize,
-    marginTop: spacing.md
-  },
-  errorState: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    gap: spacing.md
-  },
-  loadingState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  secondaryButton: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised
-  },
-  secondaryButtonText: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '500'
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.color.bg.canvas
+    },
+    flex: {
+      flex: 1
+    },
+    topRow: {
+      minHeight: theme.size.navigationBarHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.space20,
+      gap: theme.spacing.space8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle
+    },
+    backButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    heading: {
+      ...theme.typography.pageTitle,
+      flex: 1,
+      color: theme.color.text.primary
+    },
+    saveButton: {
+      minWidth: 64,
+      minHeight: theme.size.minimumTouchTarget,
+      paddingHorizontal: theme.spacing.space16,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.selected,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    saveButtonDisabled: {
+      opacity: 0.4
+    },
+    saveButtonText: {
+      ...theme.typography.label,
+      color: theme.color.text.inverse,
+      fontWeight: '600'
+    },
+    form: {
+      paddingHorizontal: theme.spacing.space20,
+      paddingTop: theme.spacing.space20,
+      gap: theme.spacing.space8
+    },
+    help: {
+      ...theme.typography.body,
+      color: theme.color.text.secondary,
+      marginBottom: theme.spacing.space8
+    },
+    label: {
+      ...theme.typography.label,
+      color: theme.color.text.secondary,
+      fontWeight: '500',
+      marginTop: theme.spacing.space12
+    },
+    input: {
+      minHeight: theme.size.minimumTouchTarget,
+      backgroundColor: theme.color.bg.surface,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      color: theme.color.text.primary,
+      ...theme.typography.body,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: Platform.OS === 'ios' ? 12 : 10
+    },
+    hint: {
+      ...theme.typography.caption,
+      color: theme.color.text.tertiary
+    },
+    preview: {
+      ...theme.typography.code,
+      marginTop: theme.spacing.space8,
+      color: theme.color.text.secondary,
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : theme.typography.code.fontFamily
+    },
+    previewError: {
+      ...theme.typography.body,
+      marginTop: theme.spacing.space8,
+      color: theme.color.status.danger
+    },
+    errorText: {
+      ...theme.typography.body,
+      color: theme.color.status.danger,
+      marginTop: theme.spacing.space12
+    },
+    errorState: {
+      flex: 1,
+      paddingHorizontal: theme.spacing.space20,
+      paddingTop: theme.spacing.space24,
+      gap: theme.spacing.space12
+    },
+    loadingState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    secondaryButton: {
+      alignSelf: 'flex-start',
+      minHeight: theme.size.minimumTouchTarget,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space8,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.subtle,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    secondaryButtonText: {
+      ...theme.typography.label,
+      color: theme.color.text.primary,
+      fontWeight: '500'
+    }
+  })
+}

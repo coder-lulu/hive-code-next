@@ -6,6 +6,7 @@ import type {
 import type { BrowserLoadError } from '../../../../../shared/browser-workspace-types'
 import { isChromiumCertificateErrorCode } from '../../../../../shared/browser-certificate-errors'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { BROWSER_GUEST_RECOVERY_ERROR_CODE } from '../host-guest/browser-page-guest-recovery'
 
 export type LoadFailureMeta = {
@@ -37,7 +38,7 @@ function humanizePermission(permission: string): string {
     case 'keyboardLock':
       return 'permission to capture keyboard input'
     case 'openExternal':
-      return 'permission to open a link outside HiveCode'
+      return `permission to open a link outside ${APP_DISPLAY_NAME}`
     case 'fileSystem':
       return 'access to your files or folders'
     case 'hid':
@@ -61,18 +62,18 @@ function humanizePermission(permission: string): string {
 
 export function formatPermissionNotice(event: BrowserPermissionDeniedEvent): string {
   const target = event.origin === 'unknown' ? 'this page' : event.origin
-  return `${target} asked for ${humanizePermission(event.permission)}, and HiveCode denied it.`
+  return `${target} asked for ${humanizePermission(event.permission)}, and ${APP_DISPLAY_NAME} denied it.`
 }
 
 export function formatPopupNotice(event: BrowserPopupEvent): string {
   const target = event.origin === 'unknown' ? 'A site' : event.origin
   if (event.action === 'opened-in-orca') {
-    return `${target} opened a new page in HiveCode.`
+    return `${target} opened a new page in ${APP_DISPLAY_NAME}.`
   }
   if (event.action === 'opened-external') {
     return `${target} opened a new window in your default browser.`
   }
-  return `${target} tried to open a popup HiveCode does not support here.`
+  return `${target} tried to open a popup ${APP_DISPLAY_NAME} does not support here.`
 }
 
 export function formatDownloadFinishedNotice(event: BrowserDownloadFinishedEvent): string {

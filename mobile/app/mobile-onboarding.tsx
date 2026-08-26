@@ -18,12 +18,13 @@ import {
   type NotificationOnboardingChoice
 } from '../src/onboarding/MobileOnboardingPage'
 import { parseMobileOnboardingSteps } from '../src/onboarding/mobile-onboarding-plan'
-import { mobileOnboardingStyles as styles } from '../src/onboarding/mobile-onboarding-styles'
+import { createMobileOnboardingStyles } from '../src/onboarding/mobile-onboarding-styles'
 import {
   saveDefaultSessionView,
   type MobileSessionView
 } from '../src/storage/session-view-preferences'
 import { savePushNotificationsEnabled } from '../src/storage/preferences'
+import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
 
 const SLIDE_DURATION_MS = 280
 
@@ -52,6 +53,8 @@ function MobileOnboardingFlow({
   rawSteps: string | undefined
 }) {
   const router = useRouter()
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileOnboardingStyles)
   const steps = useMemo(() => parseMobileOnboardingSteps(rawSteps), [rawSteps])
   const { width } = useWindowDimensions()
   const [activeIndex, setActiveIndex] = useState(0)
@@ -110,7 +113,7 @@ function MobileOnboardingFlow({
         await saveDefaultSessionView(view)
         advanceOrContinue()
       } catch {
-        setError('Your choice could not be saved. Try again.')
+        setError('未能保存你的选择，请重试。')
         setBusyChoice(null)
         choiceInFlightRef.current = false
       }
@@ -131,7 +134,7 @@ function MobileOnboardingFlow({
         await savePushNotificationsEnabled(enabled)
         advanceOrContinue()
       } catch {
-        setError('Notification settings could not be updated. Try again.')
+        setError('未能更新通知设置，请重试。')
         setBusyChoice(null)
         choiceInFlightRef.current = false
       }
@@ -144,14 +147,17 @@ function MobileOnboardingFlow({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.brandRow}>
-        <OrcaLogo size={22} />
-        <Text style={styles.brandName}>{productNameText('Orca')}</Text>
+        <OrcaLogo size={theme.spacing.space24} />
+        <Text maxFontSizeMultiplier={1.3} style={styles.brandName}>
+          {productNameText('Orca')}
+        </Text>
         {steps.length > 1 ? (
           <View
             accessible
+            accessibilityLiveRegion="polite"
             accessibilityRole="progressbar"
-            accessibilityLabel="Onboarding progress"
-            accessibilityValue={{ text: `Step ${activeIndex + 1} of ${steps.length}` }}
+            accessibilityLabel="引导进度"
+            accessibilityValue={{ text: `第 ${activeIndex + 1} 步，共 ${steps.length} 步` }}
             style={styles.progress}
           >
             {steps.map((step, index) => (
