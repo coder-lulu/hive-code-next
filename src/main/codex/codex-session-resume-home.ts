@@ -1,7 +1,8 @@
 import { lstatSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { posix, win32 } from 'node:path'
 import {
   getRuntimePathBasename,
+  isWindowsAbsolutePathLike,
   normalizeRuntimePathForComparison,
   relativePathInsideRoot
 } from '../../shared/cross-platform-path'
@@ -14,6 +15,10 @@ const TRUSTED_CODEX_ROLLOUT_TAIL = String.raw`\d{4}/\d{2}/\d{2}/rollout-[^/:]+\.
 const ROLLOUT_RELATIVE_PATH = new RegExp(`^${TRUSTED_CODEX_ROLLOUT_TAIL}$`)
 // Why: case-insensitive because trusted-home matching folds Windows path case too.
 const CODEX_ROLLOUT_LAYOUT_PATH = new RegExp(`(?:^|/)sessions/${CLAIMED_CODEX_ROLLOUT_TAIL}$`, 'i')
+
+function joinCodexPath(root: string, ...segments: string[]): string {
+  return (isWindowsAbsolutePathLike(root) ? win32 : posix).join(root, ...segments)
+}
 
 /** `resume` pins CODEX_HOME to the account that owns the rollout. `fresh` means
  *  provenance could not be verified, so the caller drops the resume argv — an
@@ -85,7 +90,7 @@ function resolveTrustedCodexSessionResume(args: {
   }
 
   for (const homePath of args.trustedCodexHomes) {
-    const sessionsRoot = join(homePath, 'sessions')
+    const sessionsRoot = joinCodexPath(homePath, 'sessions')
     if (!isCodexRolloutInsideSessionsRoot(sessionsRoot, persistedPath)) {
       continue
     }
@@ -280,7 +285,7 @@ export async function findTrustedCodexSessionResume(args: {
 
   const selectedAccountHome = args.getSelectedAccountCodexHome()
   const selectedSessionsRoot = selectedAccountHome
-    ? normalizeRuntimePathForComparison(join(selectedAccountHome, 'sessions'))
+    ? normalizeRuntimePathForComparison(joinCodexPath(selectedAccountHome, 'sessions'))
     : null
   const listSessionFiles =
     args.listSessionFiles ??
@@ -305,7 +310,7 @@ export async function findTrustedCodexSessionResume(args: {
       continue
     }
     seenHomes.add(comparisonHome)
-    const sessionsRoot = join(homePath, 'sessions')
+    const sessionsRoot = joinCodexPath(homePath, 'sessions')
     if (
       !args.listSessionFiles &&
       !sessionsTreeIsPresent(sessionsRoot, isSelectedAccountHome(selectedAccountHome, homePath))

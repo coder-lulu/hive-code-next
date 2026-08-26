@@ -62,7 +62,9 @@ describe('deferred worktree removal against the real Git binary', () => {
 
     // The user-visible removal is complete: nothing on disk, nothing registered.
     expect(existsSync(worktreePath)).toBe(false)
-    expect(await git(['worktree', 'list'], repoPath)).not.toContain(worktreePath)
+    expect(await git(['worktree', 'list'], repoPath)).not.toContain(
+      worktreePath.replace(/\\/g, '/')
+    )
     // Only the rename path creates this root, so its presence proves the deletion was deferred.
     expect(existsSync(trashRoot)).toBe(true)
     expect((await readdir(trashRoot)).every(isWorktreeTrashEntryName)).toBe(true)
@@ -77,7 +79,7 @@ describe('deferred worktree removal against the real Git binary', () => {
 
     await removeWorktree(repoPath, worktreePath, false, { deleteBranch: false })
 
-    expect(await git(['worktree', 'list'], repoPath)).toContain(siblingPath)
+    expect(await git(['worktree', 'list'], repoPath)).toContain(siblingPath.replace(/\\/g, '/'))
     expect(existsSync(siblingPath)).toBe(true)
   })
 
@@ -92,7 +94,7 @@ describe('deferred worktree removal against the real Git binary', () => {
 
     await expect(removeWorktree(repoPath, worktreePath, false)).rejects.toThrow()
     expect(existsSync(join(worktreePath, 'seed.txt'))).toBe(true)
-    expect(await git(['worktree', 'list'], repoPath)).toContain(worktreePath)
+    expect(await git(['worktree', 'list'], repoPath)).toContain(worktreePath.replace(/\\/g, '/'))
     expect(existsSync(getWorktreeTrashRoot(worktreePath))).toBe(false)
   })
 

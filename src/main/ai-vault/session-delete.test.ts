@@ -35,7 +35,7 @@ vi.mock('../wsl-unc-delete', () => ({
 
 import { deleteAiVaultSessionFile } from './session-delete'
 
-const HOME = join('/tmp', 'orca-ai-vault-delete-exec-fixture-home')
+const HOME = resolve(join('/tmp', 'orca-ai-vault-delete-exec-fixture-home'))
 const GEMINI_ROOT = join(HOME, '.gemini', 'tmp')
 const CLAUDE_ROOT = join(HOME, '.claude', 'projects')
 const ROVO_ROOT = join(HOME, '.rovodev', 'sessions')
@@ -124,7 +124,7 @@ describe('deleteAiVaultSessionFile', () => {
     // the real target, which the text-only root would not match. Realpath-ing
     // the root as well keeps this legit delete from a false rejection.
     const filePath = join(GEMINI_ROOT, 'project-a', 'session-1.json')
-    const realRoot = join('/real', '.gemini', 'tmp')
+    const realRoot = resolve(join('/real', '.gemini', 'tmp'))
     const realFile = join(realRoot, 'project-a', 'session-1.json')
     lstatMock.mockResolvedValue({ isFile: () => true })
     realpathMock.mockImplementation((p: string) =>
