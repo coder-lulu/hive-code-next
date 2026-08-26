@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Why this exists: the dev-channel workflows run from main, but they build (and
 // therefore read `config/electron-builder.config.cjs` from) whatever ref was
 // asked for. A branch cut before Windows dev builds landed has a config that

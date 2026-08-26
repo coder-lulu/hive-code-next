@@ -23,7 +23,9 @@ const {
   acknowledgePendingTccPromptNoticeMock,
   consumePendingTccPromptNoticeMock,
   dismissTccPromptNoticeMock,
-  releasePendingTccPromptNoticeMock
+  releasePendingTccPromptNoticeMock,
+  scheduleWorktreeBaseDirectoryWatcherSyncMock,
+  setWorktreeBaseDirectoryWatcherSyncContextMock
 } = vi.hoisted(() => ({
   onMock: vi.fn(),
   removeAllListenersMock: vi.fn(),
@@ -46,7 +48,9 @@ const {
   acknowledgePendingTccPromptNoticeMock: vi.fn(),
   consumePendingTccPromptNoticeMock: vi.fn(),
   dismissTccPromptNoticeMock: vi.fn(),
-  releasePendingTccPromptNoticeMock: vi.fn()
+  releasePendingTccPromptNoticeMock: vi.fn(),
+  scheduleWorktreeBaseDirectoryWatcherSyncMock: vi.fn(),
+  setWorktreeBaseDirectoryWatcherSyncContextMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -76,6 +80,11 @@ vi.mock('../ipc/repos', () => ({
 
 vi.mock('../ipc/worktrees', () => ({
   registerWorktreeHandlers: registerWorktreeHandlersMock
+}))
+
+vi.mock('../ipc/worktree-base-directory-watcher', () => ({
+  scheduleWorktreeBaseDirectoryWatcherSync: scheduleWorktreeBaseDirectoryWatcherSyncMock,
+  setWorktreeBaseDirectoryWatcherSyncContext: setWorktreeBaseDirectoryWatcherSyncContextMock
 }))
 
 vi.mock('../ipc/worktree-change-invalidators', () => ({
