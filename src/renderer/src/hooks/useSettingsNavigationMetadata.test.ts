@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { buildSettingsNavigationMetadata } from './useSettingsNavigationMetadata'
 import type { Repo } from '../../../shared/repo-types'
 
@@ -116,7 +115,7 @@ describe('settings navigation metadata', () => {
     const account = desktopSections.find((section) => section.id === 'orca-account')
 
     expect(account?.group).toBe('setup')
-    expect(account?.searchEntries[0]?.title).toBe(`${APP_DISPLAY_NAME} account`)
+    expect(account?.searchEntries[0]?.title).toBe('HiveCloud account')
     expect(ids({ isWebClient: true })).not.toContain('orca-account')
   })
 

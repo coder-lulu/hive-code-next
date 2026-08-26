@@ -195,7 +195,7 @@ describe('RateLimitService', () => {
     }
   })
 
-  it('allows usage-panel Fable supplements for inactive Claude account previews', async () => {
+  it('applies the platform usage-panel supplement policy to inactive Claude previews', async () => {
     const service = new RateLimitService()
     const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
     service.setInactiveClaudeAccountsResolver(() => [account])
@@ -206,7 +206,7 @@ describe('RateLimitService', () => {
     expect(fetchManagedAccountUsage).toHaveBeenCalledWith(
       account,
       expect.objectContaining({
-        allowUsagePanelSupplement: true,
+        allowUsagePanelSupplement: process.platform !== 'win32',
         signal: expect.any(AbortSignal)
       })
     )

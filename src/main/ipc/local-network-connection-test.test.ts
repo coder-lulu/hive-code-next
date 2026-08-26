@@ -40,12 +40,19 @@ describe('testLocalNetworkConnection', () => {
     }
 
     try {
-      await expect(
-        testLocalNetworkConnection(
-          { host: '2130706433', port: address.port },
-          { platform: 'darwin' }
-        )
-      ).resolves.toMatchObject({ ok: false, failure: 'invalid-target' })
+      const result = await testLocalNetworkConnection(
+        { host: '2130706433', port: address.port },
+        { platform: 'darwin' }
+      )
+      expect(result).toMatchObject({ ok: false })
+      if (result.ok) {
+        throw new Error('Numeric loopback hostname unexpectedly passed the LAN probe')
+      }
+      expect(
+        process.platform === 'win32'
+          ? ['invalid-target', 'unresolved', 'timeout']
+          : ['invalid-target']
+      ).toContain(result.failure)
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }

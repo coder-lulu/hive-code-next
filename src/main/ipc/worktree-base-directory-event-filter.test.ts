@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { join, win32 } from 'node:path'
+import { posix, win32 } from 'node:path'
 import {
   classifyWorktreeBaseChange,
   matchingWorktreeBaseRepoIds,
   type WorktreeBaseWatchTarget
 } from './worktree-base-directory-event-filter'
 
+const { join } = posix
 const COMMON_DIR = join('/repos', 'project', '.git')
 
 function makeGitCommonTarget(): WorktreeBaseWatchTarget {

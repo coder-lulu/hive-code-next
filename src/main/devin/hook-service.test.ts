@@ -65,9 +65,13 @@ describe('DevinHookService', () => {
     }
     const script = readFileSync(getDevinManagedScriptPath(), 'utf8')
     expect(script).toContain('/hook/devin')
-    // Why: payload is piped to curl via stdin (`payload@-`) so it never lands
-    // on the curl command line (EDR oversized-command-line false positive).
-    expect(script).toContain('printf \'%s\' "$payload" | curl')
+    // Why: both platform scripts give curl the payload through stdin
+    // (`payload@-`), avoiding an oversized command-line argument.
+    if (process.platform === 'win32') {
+      expect(script).toContain('"%SystemRoot%\\System32\\curl.exe"')
+    } else {
+      expect(script).toContain('printf \'%s\' "$payload" | curl')
+    }
     expect(script).toContain('--data-urlencode "payload@-"')
     expect(script).not.toContain('--data-urlencode "payload=${payload}"')
   })

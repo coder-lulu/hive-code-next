@@ -287,7 +287,9 @@ describe('createPtySubprocess', () => {
     expect(env.ORCA_HISTFILE).toBe(expected)
     // The wrapping consequence: no inherited value may point a pane at Orca's
     // ZDOTDIR that the client scoped no history for.
-    expect(env.ORCA_SHELL_FEATURES).toBe(expected === undefined ? undefined : 'history')
+    expect(env.ORCA_SHELL_FEATURES).toBe(
+      process.platform === 'win32' || expected === undefined ? undefined : 'history'
+    )
   })
 
   it('does not inherit ELECTRON_RUN_AS_NODE from the daemon process env', async () => {

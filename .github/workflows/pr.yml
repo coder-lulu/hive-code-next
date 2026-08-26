@@ -122,6 +122,9 @@ jobs:
       - name: Verify product config
         run: pnpm run verify:product-config
 
+      - name: Verify documentation governance
+        run: pnpm run verify:documentation-governance
+
       - name: Verify bundled skill guides
         run: pnpm run verify:bundled-skill-guides
 

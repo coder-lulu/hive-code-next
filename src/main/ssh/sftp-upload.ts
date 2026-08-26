@@ -185,13 +185,17 @@ export async function uploadDirectory(
   options?: { exclusive?: boolean; signal?: AbortSignal }
 ): Promise<void> {
   options?.signal?.throwIfAborted()
-  await assertLocalUploadPathInsideRoot(rootRealPath, localDir)
+  // Windows can expose the same directory through a long path and its 8.3
+  // alias. Canonicalize the root with the same API used for candidates before
+  // performing lexical containment checks.
+  const canonicalRootRealPath = await realpath(rootRealPath)
+  await assertLocalUploadPathInsideRoot(canonicalRootRealPath, localDir)
   const entries = await readdir(localDir, { withFileTypes: true })
   for (const entry of entries) {
     options?.signal?.throwIfAborted()
     const localPath = pathJoin(localDir, entry.name)
     const remotePath = `${remoteDir}/${entry.name}`
-    await assertLocalUploadPathInsideRoot(rootRealPath, localPath)
+    await assertLocalUploadPathInsideRoot(canonicalRootRealPath, localPath)
     const statResult = await lstat(localPath)
 
     // Why: skip symlinks and special files (sockets, FIFOs, devices) to
@@ -204,7 +208,7 @@ export async function uploadDirectory(
 
     if (statResult.isDirectory()) {
       await mkdirSftp(sftp, remotePath, { allowExisting: !options?.exclusive })
-      await uploadDirectory(sftp, localPath, remotePath, rootRealPath, options)
+      await uploadDirectory(sftp, localPath, remotePath, canonicalRootRealPath, options)
     } else {
       await uploadFile(sftp, localPath, remotePath, options)
     }

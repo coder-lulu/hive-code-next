@@ -50,7 +50,7 @@ describe('AgentExecHandler', () => {
 
     const pending = handlers.get('agent.execNonInteractive')!(
       {
-        binary: 'agent',
+        binary: 'orca-test-agent',
         args: ['--flag', 42],
         cwd: '/repo',
         stdin: 'PROMPT',
@@ -70,7 +70,7 @@ describe('AgentExecHandler', () => {
       timedOut: false,
       canceled: false
     })
-    expect(spawnMock).toHaveBeenCalledWith('agent', ['--flag', '42'], {
+    expect(spawnMock).toHaveBeenCalledWith('orca-test-agent', ['--flag', '42'], {
       cwd: '/repo',
       env: expect.objectContaining({
         ...process.env,

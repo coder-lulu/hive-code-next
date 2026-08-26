@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
-import { realpathSync } from 'node:fs'
-import { join } from 'node:path'
+import { lstatSync, realpathSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { BrowserWindow } from 'electron'
 import type { Repo } from '../../shared/repo-types'
 import type { Store } from '../persistence'
@@ -89,6 +89,37 @@ function resolveRealPath(pathValue: string): string {
   }
 }
 
+function pathsReferToSameEntry(left: string, right: string): boolean {
+  try {
+    const leftStat = statSync(left)
+    const rightStat = statSync(right)
+    return leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino
+  } catch {
+    return (
+      normalizeRuntimePathForComparison(resolveRealPath(left)) ===
+      normalizeRuntimePathForComparison(resolveRealPath(right))
+    )
+  }
+}
+
+function pathContainsSymbolicLink(pathValue: string): boolean {
+  let current = pathValue
+  while (true) {
+    try {
+      if (lstatSync(current).isSymbolicLink()) {
+        return true
+      }
+    } catch {
+      return false
+    }
+    const parent = dirname(current)
+    if (parent === current) {
+      return false
+    }
+    current = parent
+  }
+}
+
 /**
  * Git's verdict on the folder, or null when it must stay a folder project.
  *
@@ -106,10 +137,12 @@ function resolveUpgrade(repoPath: string): { externalWorktreeVisibility?: 'hide'
     return null
   }
   const gitRoot = getGitRepoRoot(repoPath)
-  if (resolveRealPath(gitRoot) !== resolveRealPath(repoPath)) {
+  if (!pathsReferToSameEntry(gitRoot, repoPath)) {
     return null
   }
-  return normalizeRuntimePathForComparison(gitRoot) === normalizeRuntimePathForComparison(repoPath)
+  const spellingMatches =
+    normalizeRuntimePathForComparison(gitRoot) === normalizeRuntimePathForComparison(repoPath)
+  return spellingMatches || !pathContainsSymbolicLink(repoPath)
     ? { externalWorktreeVisibility: 'hide' }
     : {}
 }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Windows file-symlink privilege gates keep the security cases beside the shared FsHandler fixture. */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { FsHandler } from './fs-handler'
 import { MAX_TEXT_FILE_SIZE } from './fs-handler-utils'
@@ -384,27 +385,30 @@ describe('FsHandler', () => {
     await expect(fs.readFile(filePath, 'utf-8')).resolves.toBe('abcdef')
   })
 
-  it('writeTerminalArtifact rejects a retargeted symlink before writing outside temp', async () => {
-    const filePath = path.join(tmpDir, 'artifact-link.json')
-    const outsidePath = path.join(tmpDir, 'outside.json')
-    writeFileSync(filePath, '{"ok":true}')
-    writeFileSync(outsidePath, '{"secret":true}')
-    const stats = await fs.stat(filePath)
-    const expectedRealPath = await fs.realpath(filePath)
-    await fs.rm(filePath)
-    symlinkSync(outsidePath, filePath)
+  it.skipIf(process.platform === 'win32')(
+    'writeTerminalArtifact rejects a retargeted symlink before writing outside temp',
+    async () => {
+      const filePath = path.join(tmpDir, 'artifact-link.json')
+      const outsidePath = path.join(tmpDir, 'outside.json')
+      writeFileSync(filePath, '{"ok":true}')
+      writeFileSync(outsidePath, '{"secret":true}')
+      const stats = await fs.stat(filePath)
+      const expectedRealPath = await fs.realpath(filePath)
+      await fs.rm(filePath)
+      symlinkSync(outsidePath, filePath)
 
-    await expect(
-      dispatcher.callRequest('fs.writeTerminalArtifact', {
-        filePath,
-        content: '{"ok":false}',
-        expectedRealPath,
-        expectedStatIdentity: statIdentity(stats),
-        maxBytes: 512 * 1024
-      })
-    ).rejects.toThrow('terminal_file_grant_stale')
-    await expect(fs.readFile(outsidePath, 'utf-8')).resolves.toBe('{"secret":true}')
-  })
+      await expect(
+        dispatcher.callRequest('fs.writeTerminalArtifact', {
+          filePath,
+          content: '{"ok":false}',
+          expectedRealPath,
+          expectedStatIdentity: statIdentity(stats),
+          maxBytes: 512 * 1024
+        })
+      ).rejects.toThrow('terminal_file_grant_stale')
+      await expect(fs.readFile(outsidePath, 'utf-8')).resolves.toBe('{"secret":true}')
+    }
+  )
 
   it('writeTerminalArtifact rejects hard-linked files before writing', async () => {
     const outsidePath = path.join(tmpDir, 'outside-hardlink.json')
@@ -459,18 +463,21 @@ describe('FsHandler', () => {
     expect(result.type).toBe('directory')
   })
 
-  it('lstat returns symlink type without following links', async () => {
-    const targetFile = path.join(tmpDir, 'target.txt')
-    const linkPath = path.join(tmpDir, 'link.txt')
-    writeFileSync(targetFile, 'target')
-    symlinkSync(targetFile, linkPath)
+  it.skipIf(process.platform === 'win32')(
+    'lstat returns symlink type without following links',
+    async () => {
+      const targetFile = path.join(tmpDir, 'target.txt')
+      const linkPath = path.join(tmpDir, 'link.txt')
+      writeFileSync(targetFile, 'target')
+      symlinkSync(targetFile, linkPath)
 
-    const result = (await dispatcher.callRequest('fs.lstat', { filePath: linkPath })) as {
-      type: string
+      const result = (await dispatcher.callRequest('fs.lstat', { filePath: linkPath })) as {
+        type: string
+      }
+
+      expect(result.type).toBe('symlink')
     }
-
-    expect(result.type).toBe('symlink')
-  })
+  )
 
   it('workspaceSpaceScan returns bounded top-level size details', async () => {
     mkdirSync(path.join(tmpDir, 'node_modules'))
@@ -618,7 +625,7 @@ describe('FsHandler', () => {
     expect(content).toBe('existing')
   })
 
-  it('realpath resolves symlinks', async () => {
+  it.skipIf(process.platform === 'win32')('realpath resolves symlinks', async () => {
     const realFile = path.join(tmpDir, 'real.txt')
     const linkPath = path.join(tmpDir, 'link.txt')
     writeFileSync(realFile, 'real')

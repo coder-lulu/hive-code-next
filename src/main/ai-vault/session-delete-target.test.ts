@@ -1,10 +1,10 @@
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { validateAiVaultSessionDeleteTarget } from './session-delete-target'
 
 // All roots are supplied via rootOptions so these tests never touch the real
 // home directory or filesystem — validation is pure string-path judgement.
-const HOME = join('/tmp', 'orca-ai-vault-delete-fixture-home')
+const HOME = resolve('/tmp', 'orca-ai-vault-delete-fixture-home')
 const GEMINI_ROOT = join(HOME, '.gemini', 'tmp')
 const CURSOR_ROOT = join(HOME, '.cursor', 'projects')
 const HERMES_ROOT = join(HOME, '.hermes', 'sessions')
@@ -265,7 +265,7 @@ describe('validateAiVaultSessionDeleteTarget', () => {
   })
 
   it('allows a gemini file under a WSL-expanded root', () => {
-    const wslHome = join('/tmp', 'orca-ai-vault-delete-fixture-wsl-home')
+    const wslHome = resolve('/tmp', 'orca-ai-vault-delete-fixture-wsl-home')
     const result = validateAiVaultSessionDeleteTarget({
       agent: 'gemini',
       filePath: join(wslHome, '.gemini', 'tmp', 'project-a', 'session-1.json'),
@@ -337,7 +337,7 @@ describe('directory-shaped agents', () => {
   })
 
   it("pairs a WSL-home claude session with that distro's session-env, not the local one", () => {
-    const wslHome = join('/tmp', 'orca-wsl-home')
+    const wslHome = resolve('/tmp', 'orca-wsl-home')
     const filePath = join(wslHome, '.claude', 'projects', '-proj', 'sess-2.jsonl')
     const result = validateAiVaultSessionDeleteTarget({
       agent: 'claude',

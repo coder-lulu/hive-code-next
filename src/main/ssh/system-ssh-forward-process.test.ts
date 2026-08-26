@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { join } from 'node:path'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 const { existsSyncMock, spawnMock, connectMock, createServerMock } = vi.hoisted(() => ({
@@ -38,7 +39,9 @@ import {
 import type { SshTarget } from '../../shared/ssh-types'
 
 const SYSTEM_SSH_PATH =
-  process.platform === 'win32' ? 'C:\\Windows\\System32\\OpenSSH\\ssh.exe' : '/usr/bin/ssh'
+  process.platform === 'win32'
+    ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh.exe')
+    : '/usr/bin/ssh'
 
 type FakeChildProcess = EventEmitter & {
   stderr: EventEmitter
