@@ -1,12 +1,19 @@
 import { EventEmitter } from 'node:events'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { applyProductBranding } from '../../shared/brand'
 import { serveSignalExitError } from './serve-signal-exit-diagnostic'
 import {
-  SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS,
+  SERVE_CHILD_FORCE_KILL_GRACE_MS,
+  SERVE_CHILD_FORCE_KILL_SCHEDULING_MARGIN_MS,
   superviseForegroundServe
 } from './serve-update-supervisor'
 import { RuntimeClientError } from './types'
+import {
+  QUIT_RENDERER_ACK_TIMEOUT_MS,
+  WILL_QUIT_TEARDOWN_DEADLINE_MS
+} from '../../shared/quit-teardown-deadline'
 
 class FakeChildProcess extends EventEmitter {
   kill = vi.fn()
@@ -21,27 +28,13 @@ function setPlatform(platform: NodeJS.Platform): void {
 
 function superviseUntilExit(code: number | null, signal: NodeJS.Signals | null): Promise<number> {
   const child = new FakeChildProcess()
-  const supervised = superviseForegroundServe({
-    executable: '/Applications/Orca.app/Contents/MacOS/Orca',
-    childArgs: ['--serve'],
-    spawnOptions: {},
-    spawnChild: vi.fn() as never,
-    handoffPath: null,
-    child: child as never,
-    expectedHandoff: null
-  })
+  const supervised = superviseChild(child)
   child.emit('exit', code, signal)
   return supervised
 }
 
-function superviseUntilSignal(): {
-  child: FakeChildProcess
-  supervised: Promise<number>
-  forwardSigterm: (signal: 'SIGTERM') => void
-} {
-  const existingListeners = new Set(process.listeners('SIGTERM'))
-  const child = new FakeChildProcess()
-  const supervised = superviseForegroundServe({
+function superviseChild(child: FakeChildProcess): Promise<number> {
+  return superviseForegroundServe({
     executable: '/Applications/Orca.app/Contents/MacOS/Orca',
     childArgs: ['--serve'],
     spawnOptions: {},
@@ -50,17 +43,12 @@ function superviseUntilSignal(): {
     child: child as never,
     expectedHandoff: null
   })
-  const forwardSigterm = process
-    .listeners('SIGTERM')
-    .find((listener) => !existingListeners.has(listener))
-  if (!forwardSigterm) {
-    throw new Error('serve supervisor did not install a SIGTERM listener')
-  }
-  return { child, supervised, forwardSigterm }
 }
 
 afterEach(() => {
   Object.defineProperty(process, 'platform', originalPlatform)
+  vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 describe('serveSignalExitError', () => {
@@ -83,7 +71,7 @@ describe('serveSignalExitError', () => {
     for (const platform of ['linux', 'win32'] as const) {
       const error = serveSignalExitError('SIGABRT', platform)
 
-      expect(error.message).toBe(applyProductBranding('Orca serve exited via SIGABRT.'))
+      expect(error.message).toBe('Orca serve exited via SIGABRT.')
       expect(error.data).toBeUndefined()
     }
   })
@@ -91,60 +79,93 @@ describe('serveSignalExitError', () => {
   it('does not claim the macOS cause for other darwin signals', () => {
     const error = serveSignalExitError('SIGKILL', 'darwin')
 
-    expect(error.message).toBe(applyProductBranding('Orca serve exited via SIGKILL.'))
+    expect(error.message).toBe('Orca serve exited via SIGKILL.')
     expect(error.data).toBeUndefined()
   })
 
   it('stays clear when neither a code nor a signal is reported', () => {
     expect(serveSignalExitError(null, 'darwin').message).toBe(
-      applyProductBranding('Orca serve exited without reporting an exit code or signal.')
+      'Orca serve exited without reporting an exit code or signal.'
     )
   })
 })
 
 describe('superviseForegroundServe signal exits', () => {
-  it('allows the Electron teardown budget before force killing an externally stopped serve', async () => {
+  it('lets pre-commit and committed Electron quit deadlines finish before force-killing serve', async () => {
+    setPlatform('linux')
     vi.useFakeTimers()
-    const { child, supervised, forwardSigterm } = superviseUntilSignal()
-    let exited = false
+    const child = new FakeChildProcess()
+    const supervised = superviseChild(child)
 
-    try {
-      forwardSigterm('SIGTERM')
-      expect(child.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
+    expect(SERVE_CHILD_FORCE_KILL_GRACE_MS).toBe(
+      QUIT_RENDERER_ACK_TIMEOUT_MS +
+        WILL_QUIT_TEARDOWN_DEADLINE_MS +
+        SERVE_CHILD_FORCE_KILL_SCHEDULING_MARGIN_MS
+    )
+    expect(SERVE_CHILD_FORCE_KILL_GRACE_MS).toBeLessThanOrEqual(35_000)
 
-      await vi.advanceTimersByTimeAsync(SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS - 1)
-      expect(child.kill).toHaveBeenCalledTimes(1)
+    process.emit('SIGTERM', 'SIGTERM')
+    expect(child.kill).toHaveBeenCalledOnce()
+    expect(child.kill).toHaveBeenLastCalledWith('SIGTERM')
 
-      await vi.advanceTimersByTimeAsync(1)
-      expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
-      child.emit('exit', null, 'SIGKILL')
-      exited = true
-      await expect(supervised).rejects.toThrow(
-        applyProductBranding('Orca serve exited via SIGKILL.')
-      )
-    } finally {
-      if (!exited) {
-        child.emit('exit', 0, null)
-        await supervised.catch(() => undefined)
-      }
-      vi.useRealTimers()
-    }
+    await vi.advanceTimersByTimeAsync(QUIT_RENDERER_ACK_TIMEOUT_MS + WILL_QUIT_TEARDOWN_DEADLINE_MS)
+    expect(child.kill).toHaveBeenCalledOnce()
+
+    await vi.advanceTimersByTimeAsync(SERVE_CHILD_FORCE_KILL_SCHEDULING_MARGIN_MS)
+    expect(child.kill).toHaveBeenLastCalledWith('SIGKILL')
+    expect(child.kill).toHaveBeenCalledTimes(2)
+
+    child.emit('exit', null, 'SIGKILL')
+    await expect(supervised).rejects.toThrow('Orca serve exited via SIGKILL.')
   })
 
-  it('clears the external-stop force-kill timer when Electron exits first', async () => {
+  it('lets a shared-console Windows child handle Ctrl-C gracefully', async () => {
+    setPlatform('win32')
     vi.useFakeTimers()
-    const { child, supervised, forwardSigterm } = superviseUntilSignal()
+    const child = new FakeChildProcess()
+    const supervised = superviseChild(child)
 
-    try {
-      forwardSigterm('SIGTERM')
-      child.emit('exit', 0, null)
-      await expect(supervised).resolves.toBe(0)
+    process.emit('SIGINT', 'SIGINT')
+    expect(child.kill).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(1)
 
-      await vi.advanceTimersByTimeAsync(SERVE_EXTERNAL_SIGNAL_FORCE_KILL_TIMEOUT_MS)
-      expect(child.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
-    } finally {
-      vi.useRealTimers()
-    }
+    child.emit('exit', 0, null)
+    await expect(supervised).resolves.toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not terminate an exited child when update handoff completion fails late', async () => {
+    vi.useFakeTimers()
+    const missingParent = await mkdtemp(join(tmpdir(), 'orca-serve-missing-handoff-'))
+    await rm(missingParent, { recursive: true })
+    const child = new FakeChildProcess()
+    const supervised = superviseForegroundServe({
+      executable: '/Applications/Orca.app/Contents/MacOS/Orca',
+      childArgs: ['--serve'],
+      spawnOptions: {},
+      spawnChild: vi.fn() as never,
+      handoffPath: join(missingParent, 'handoff.json'),
+      child: child as never,
+      expectedHandoff: {
+        schemaVersion: 1,
+        phase: 'install-requested',
+        fromVersion: '1.0.51',
+        targetVersion: '1.0.61',
+        servingPid: child.pid
+      }
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    child.emit('message', {
+      type: 'orca:serve-ready',
+      version: '1.0.61',
+      runtimeId: 'runtime-new'
+    })
+    child.emit('exit', 0, null)
+
+    await expect(supervised).resolves.toBe(1)
+    expect(child.kill).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('throws the macOS diagnostic when the child aborts on darwin', async () => {
@@ -159,7 +180,7 @@ describe('superviseForegroundServe signal exits', () => {
     setPlatform('linux')
 
     await expect(superviseUntilExit(null, 'SIGABRT')).rejects.toThrow(
-      applyProductBranding('Orca serve exited via SIGABRT.')
+      'Orca serve exited via SIGABRT.'
     )
   })
 
