@@ -10,9 +10,9 @@ export function getWindowsPowerShellExecutablePath(): string {
   return getWindowsSystem32Path('WindowsPowerShell/v1.0/powershell.exe')
 }
 
-// Why: unlike conhost, hidden PowerShell relays hook output and exit status (#14818).
-export const WINDOWS_POWERSHELL_HOOK_SWITCHES =
-  '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden'
+// Why no -WindowStyle Hidden: Windows PowerShell launched through cmd.exe maps
+// every non-zero hook exit to 0xFFFFFFFF with that switch, hiding the real status.
+export const WINDOWS_POWERSHELL_HOOK_SWITCHES = '-NoProfile -NonInteractive -ExecutionPolicy Bypass'
 
 // Why: redirected PowerShell progress becomes CLIXML that can corrupt merged JSON output.
 const HOOK_PROGRESS_SILENCER = "$ProgressPreference='SilentlyContinue'; "

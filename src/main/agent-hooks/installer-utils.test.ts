@@ -93,20 +93,23 @@ describe('readHooksJsonWithRaw', () => {
 })
 
 describe('writeHooksJson', () => {
-  it('updates a symlink target without replacing the hook config link', () => {
-    const targetPath = join(tmpDir, 'dotfiles-hooks.json')
-    writeFileSync(targetPath, '{"hooks":{}}\n')
-    symlinkSync(targetPath, configPath)
+  it.skipIf(process.platform === 'win32')(
+    'updates a symlink target without replacing the hook config link',
+    () => {
+      const targetPath = join(tmpDir, 'dotfiles-hooks.json')
+      writeFileSync(targetPath, '{"hooks":{}}\n')
+      symlinkSync(targetPath, configPath)
 
-    writeHooksJson(configPath, { hooks: { Stop: [] } })
+      writeHooksJson(configPath, { hooks: { Stop: [] } })
 
-    expect(lstatSync(configPath).isSymbolicLink()).toBe(true)
-    expect(JSON.parse(readFileSync(targetPath, 'utf-8'))).toEqual({
-      hooks: { Stop: [] }
-    })
-  })
+      expect(lstatSync(configPath).isSymbolicLink()).toBe(true)
+      expect(JSON.parse(readFileSync(targetPath, 'utf-8'))).toEqual({
+        hooks: { Stop: [] }
+      })
+    }
+  )
 
-  it('does not replace a dangling hook config symlink', () => {
+  it.skipIf(process.platform === 'win32')('does not replace a dangling hook config symlink', () => {
     const targetPath = join(tmpDir, 'missing-dotfiles-hooks.json')
     symlinkSync(targetPath, configPath)
 
@@ -146,7 +149,7 @@ describe('writeHooksJson', () => {
     expect(bak).toEqual(original)
   })
 
-  it('does not follow an existing .bak symlink', () => {
+  it.skipIf(process.platform === 'win32')('does not follow an existing .bak symlink', () => {
     const original = '{"hooks":{}}\n'
     const backupTarget = join(tmpDir, 'dotfiles-backup.json')
     writeFileSync(configPath, original, 'utf-8')
@@ -604,7 +607,7 @@ describe('wrapPosixHookCommand', () => {
 })
 
 const qualifiedWindowsPowerShellCommand =
-  /^[A-Za-z]:\/[^"]*\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand \S+$/
+  /^[A-Za-z]:\/[^"]*\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand \S+$/
 
 function decodeWindowsHookCommand(command: string): string {
   const encodedCommand = command.match(/ -EncodedCommand (\S+)$/)?.[1]
@@ -660,7 +663,7 @@ describe('wrapWindowsHookCommand', () => {
   })
 
   it.skipIf(process.platform !== 'win32')(
-    'executes a script path containing a cmd.exe caret literally',
+    'propagates the exit code through cmd.exe when the script path contains a caret',
     () => {
       const scriptDir = join(tmpDir, 'home with ^ caret', '.orca', 'agent-hooks')
       mkdirSync(scriptDir, { recursive: true })

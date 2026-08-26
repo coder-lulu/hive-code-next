@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type * as NodeFs from 'node:fs'
 import type * as NodeOs from 'node:os'
+import { join } from 'node:path'
 import { hashWorktreeId } from '../main/terminal-history-id'
 
 // Why mocked rather than a real temp dir: the assertion is the Windows -> Linux
@@ -34,6 +35,7 @@ vi.mock('node:fs', async (importOriginal) => {
 })
 
 const worktreeId = 'relay-wsl::/remote/worktree'
+const expectedHostHistoryRoot = join('C:\\Users\\relay', '.orca-remote', 'terminal-history')
 
 describe('relay WSL shell history', () => {
   it('hands the guest a drvfs path for the host history file', async () => {
@@ -44,7 +46,7 @@ describe('relay WSL shell history', () => {
       wsl: true
     })
 
-    expect(root).toBe('C:\\Users\\relay/.orca-remote/terminal-history')
+    expect(root).toBe(expectedHostHistoryRoot)
     expect(env.HISTFILE).toBe(
       `/mnt/c/Users/relay/.orca-remote/terminal-history/${hashWorktreeId(worktreeId)}-bash_history`
     )
@@ -58,7 +60,7 @@ describe('relay WSL shell history', () => {
     injectRelayHistoryEnv(env, worktreeId, '/bin/bash')
 
     expect(env.HISTFILE).toBe(
-      `C:\\Users\\relay/.orca-remote/terminal-history/${hashWorktreeId(worktreeId)}-bash_history`
+      join(expectedHostHistoryRoot, `${hashWorktreeId(worktreeId)}-bash_history`)
     )
   })
 

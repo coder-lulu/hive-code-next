@@ -157,6 +157,9 @@ describe('PR workflow parallelism', () => {
 
   it('keeps every real-zsh test in the dedicated shell lane', () => {
     const discoveredFiles = globSync(testFilePatterns)
+      // Why: fast-glob returns host-native separators on Windows, while the
+      // workflow contract and fixture list use repository-relative POSIX paths.
+      .map((testFile) => testFile.replaceAll('\\', '/'))
       // Why this file is excluded: it carries the detector pattern as a literal
       // and would otherwise match itself.
       .filter((testFile) => testFile !== 'config/scripts/pr-workflow-parallelism.test.mjs')
