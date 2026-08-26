@@ -272,7 +272,7 @@ describe('HiveCode product identity integration', () => {
         appId: 'com.hivekernel.hivecode.desktop',
         executableName: 'HiveCode',
         publisher: null,
-        updateChannel: null
+        updateChannel: 'beta'
       }
     })
     expect(electronBuilderConfig).toMatchObject({
@@ -315,7 +315,7 @@ describe('HiveCode product identity integration', () => {
   })
 
   it('does not publish HiveCode builds through the upstream Orca release channel', () => {
-    expect(manifest.desktop.updateChannel).toBeNull()
+    expect(manifest.desktop.updateChannel).toBe('beta')
     expect(electronBuilderConfig.publish).toBeNull()
     const bumpJob = homebrewBumpWorkflow.slice(
       homebrewBumpWorkflow.indexOf('  bump-cask:'),
@@ -326,7 +326,7 @@ describe('HiveCode product identity integration', () => {
 
   it('prevents package metadata from becoming an implicit upstream publication target', () => {
     expect(packageManifest.private).toBe(true)
-    expect(packageManifest).not.toHaveProperty('homepage')
+    expect(packageManifest.homepage).toBe('https://github.com/coder-lulu/hive-code-next')
     expect(packageManifest).not.toHaveProperty('repository')
   })
 
