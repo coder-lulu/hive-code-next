@@ -2,42 +2,24 @@ diff --git a/binding.gyp b/binding.gyp
 index 855bd4b86f0a3c18c7594212c0e42b6e35bc4001..5f15551cb1520af996f216500a83ac68b57f5104 100644
 --- a/binding.gyp
 +++ b/binding.gyp
-@@ -1,24 +1,29 @@
- {
-   "targets": [
+@@ -3,7 +3,7 @@
      {
        "target_name": "windows_process_tree",
--      "dependencies": [
+       "dependencies": [
 -        "<!(node -p \"require('node-addon-api').targets\"):node_addon_api_except",
--      ],
-+      "include_dirs": [
-+        "<!@(node -p \"require('node-addon-api').include\")"
-+      ],
-+      "defines": [ "NAPI_CPP_EXCEPTIONS" ],
-+      "cflags!": [ "-fno-exceptions" ],
-+      "cflags_cc!": [ "-fno-exceptions" ],
++        "<!(node -p \"require.resolve('node-addon-api/node_addon_api.gyp')\"):node_addon_api_except",
+       ],
        "conditions": [
          ['OS=="win"', {
-           "sources": [
-             "src/addon.cc",
-             "src/cpu_worker.cc",
-             "src/process.cc",
-             "src/process_worker.cc",
-             "src/process_commandline.cc"
+@@ -16,9 +16,6 @@
            ],
--          "include_dirs": [],
+           "include_dirs": [],
            "libraries": [ 'psapi.lib' ],
 -          "msvs_configuration_attributes": {
 -            "SpectreMitigation": "Spectre"
 -          },
-+          "defines": [ "_HAS_EXCEPTIONS=1" ],
-+          "msvs_configuration_attributes": {
-+            "IntermediateDirectory": "$(TEMP)\\hivecode-wpt\\$(ProjectGuid)\\$(Platform)\\$(Configuration)"
-+          },
            "msvs_settings": {
              "VCCLCompilerTool": {
-+              "ExceptionHandling": 1,
-+              "EnablePREfast": "true",
                "AdditionalOptions": [
 diff --git a/src/process.cc b/src/process.cc
 index 3eea92077c4d1d433119361d5c432881859131e9..1998f4addd4d7e9aba946ea6f7f7a4a5d13291bc 100644
@@ -50,5 +32,5 @@ index 3eea92077c4d1d433119361d5c432881859131e9..1998f4addd4d7e9aba946ea6f7f7a4a5
 -    } while (process_count < 1024 && Process32Next(snapshot_handle, &process_entry));
 +    } while (Process32Next(snapshot_handle, &process_entry));
    }
-
+ 
    CloseHandle(snapshot_handle);
