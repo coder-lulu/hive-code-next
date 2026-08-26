@@ -117,7 +117,8 @@ export async function request<T>(
 ): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-  let response: Response
+  let response: Response | undefined
+  let payload: unknown
   try {
     response = await fetch(`${apiBase()}${path}`, {
       method: 'POST',
@@ -129,8 +130,20 @@ export async function request<T>(
       body: JSON.stringify(body),
       signal: controller.signal
     })
+    if (response.status === 204) {
+      return {} as T
+    }
+    payload = await response.json()
   } catch (failure) {
     const timedOut = failure instanceof Error && failure.name === 'AbortError'
+    if (response && !timedOut) {
+      throw new MobileApiError(
+        '登录服务暂时不可用，请稍后再试',
+        response.status,
+        undefined,
+        isRetryableApiError(response.status, undefined)
+      )
+    }
     throw new MobileApiError(
       timedOut ? '登录服务响应超时，请重试' : '登录服务暂时不可用，请稍后再试',
       timedOut ? 408 : 0,
@@ -140,19 +153,8 @@ export async function request<T>(
   } finally {
     clearTimeout(timeout)
   }
-  let payload: unknown
-  try {
-    payload = await response.json()
-  } catch {
-    if (response.status === 204) {
-      return {} as T
-    }
-    throw new MobileApiError(
-      '登录服务暂时不可用，请稍后再试',
-      response.status,
-      undefined,
-      isRetryableApiError(response.status, undefined)
-    )
+  if (!response) {
+    throw new MobileApiError('登录服务暂时不可用，请稍后再试', 0, undefined, true)
   }
   if (!response.ok) {
     const category = apiErrorCategory(payload)
