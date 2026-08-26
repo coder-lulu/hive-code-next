@@ -38,7 +38,9 @@ import type { SshTarget } from '../../shared/ssh-types'
 import type { SystemSshResolvedConfig } from './ssh-control-socket'
 
 const SYSTEM_SSH_PATH =
-  process.platform === 'win32' ? 'C:\\Windows\\System32\\OpenSSH\\ssh.exe' : '/usr/bin/ssh'
+  process.platform === 'win32'
+    ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh.exe')
+    : '/usr/bin/ssh'
 
 function decodePowerShellCommand(command: string): string {
   const encoded = command.match(/-EncodedCommand\s+(\S+)/)?.[1]
