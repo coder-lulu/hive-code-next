@@ -16,14 +16,16 @@ import {
 import { assertWorktreeCleanForRemoval } from './worktree'
 import { getStatus } from './status'
 
+const gitNullDevice = process.platform === 'win32' ? 'NUL' : devNull
+
 const git = (args: string[], cwd: string): void => {
   execFileSync('git', args, {
     cwd,
     stdio: 'ignore',
     env: {
       ...process.env,
-      GIT_CONFIG_GLOBAL: devNull,
-      GIT_CONFIG_SYSTEM: devNull
+      GIT_CONFIG_GLOBAL: gitNullDevice,
+      GIT_CONFIG_SYSTEM: gitNullDevice
     }
   })
 }
@@ -50,7 +52,7 @@ describe('resolveWorktreeSharedDirectories', () => {
   })
 
   afterEach(() => {
-    warn.mockRestore()
+    warn?.mockRestore()
     rmSync(repo, { recursive: true, force: true })
   })
 

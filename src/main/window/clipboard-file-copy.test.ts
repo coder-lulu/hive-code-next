@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { writeFileToClipboard, type ClipboardFileDeps } from './clipboard-file-copy'
 
 function makeDeps(overrides: Partial<ClipboardFileDeps> = {}): ClipboardFileDeps {
@@ -42,8 +44,9 @@ describe('writeFileToClipboard', () => {
 
   it('writes a public.file-url buffer on macOS', async () => {
     const writeBuffer = vi.fn()
+    const filePath = resolve('/repo/a b.png')
     const result = await writeFileToClipboard(
-      '/repo/a b.png',
+      filePath,
       makeDeps({ platform: 'darwin', writeBuffer })
     )
     expect(result).toEqual({ ok: true })
@@ -51,7 +54,7 @@ describe('writeFileToClipboard', () => {
     const [format, buffer] = writeBuffer.mock.calls[0]
     expect(format).toBe('public.file-url')
     // spaces are percent-encoded into the file URL
-    expect(buffer.toString('utf8')).toBe('file:///repo/a%20b.png')
+    expect(buffer.toString('utf8')).toBe(pathToFileURL(filePath).href)
   })
 
   it('reports a failure when the macOS clipboard write throws', async () => {
@@ -65,17 +68,18 @@ describe('writeFileToClipboard', () => {
 
   it('uses the authorized resolved path for clipboard payloads', async () => {
     const writeBuffer = vi.fn()
+    const resolvedPath = resolve('/repo/actual.png')
     await writeFileToClipboard(
       '/repo/link.png',
       makeDeps({
         platform: 'darwin',
-        resolveFilePath: async () => ({ ok: true, path: '/repo/actual.png' }),
+        resolveFilePath: async () => ({ ok: true, path: resolvedPath }),
         writeBuffer
       })
     )
     expect(writeBuffer).toHaveBeenCalledWith(
       'public.file-url',
-      Buffer.from('file:///repo/actual.png', 'utf8')
+      Buffer.from(pathToFileURL(resolvedPath).href, 'utf8')
     )
   })
 
@@ -102,26 +106,28 @@ describe('writeFileToClipboard', () => {
 
   it('uses the KDE text/uri-list payload on a KDE desktop', async () => {
     const runCommand = vi.fn(async (_command: string, _args: string[], _stdin?: string) => {})
+    const filePath = resolve('/repo/a b.png')
     const result = await writeFileToClipboard(
-      '/repo/a b.png',
+      filePath,
       makeDeps({ platform: 'linux', desktop: 'KDE', runCommand })
     )
     expect(result).toEqual({ ok: true })
     const [command, args, stdin] = runCommand.mock.calls[0]
     expect(command).toBe('wl-copy')
     expect(args).toContain('text/uri-list')
-    expect(stdin).toBe('file:///repo/a%20b.png\r\n')
+    expect(stdin).toBe(`${pathToFileURL(filePath).href}\r\n`)
   })
 
   it('uses the GNOME copied-files payload on non-KDE desktops', async () => {
     const runCommand = vi.fn(async (_command: string, _args: string[], _stdin?: string) => {})
+    const filePath = resolve('/repo/a.png')
     await writeFileToClipboard(
-      '/repo/a.png',
+      filePath,
       makeDeps({ platform: 'linux', desktop: 'GNOME', runCommand })
     )
     const [, args, stdin] = runCommand.mock.calls[0]
     expect(args).toContain('x-special/gnome-copied-files')
-    expect(stdin).toBe('copy\nfile:///repo/a.png')
+    expect(stdin).toBe(`copy\n${pathToFileURL(filePath).href}`)
   })
 
   it('tries each Linux tool and reports unsupported when all fail', async () => {

@@ -146,7 +146,7 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     expect(settings.activeCodexManagedAccountId).toBe(account.id)
   })
 
-  it('keeps E in-place auth when selection becomes real-home without an explicit sync', async () => {
+  it('keeps E in-place auth when selection becomes system default without an explicit sync', async () => {
     const fresh = createAuth('one@example.com', 'acct-1', 'e-refresh', 3_000)
     const mismatch = createAuth('other@example.com', 'acct-other', 'stale-shared', 4_000)
     const account = createManagedAccount('account-1', 'acct-1', fresh)
@@ -159,13 +159,19 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     settings.activeCodexManagedAccountId = null
     settings.activeCodexManagedAccountIdsByRuntime = { host: null, wsl: {} }
 
-    expect(service.prepareForCodexLaunch()).toBeNull()
+    // Windows cannot probe shell startup files, so its system-default route
+    // intentionally remains on the shared managed home.
+    const systemDefaultLaunchHome = process.platform === 'win32' ? sharedHome() : null
+    const systemDefaultRateLimitHome = process.platform === 'win32' ? sharedHome() : systemHome()
+    expect(service.prepareForCodexLaunch()).toBe(systemDefaultLaunchHome)
     expect(service.prepareForRateLimitFetch()).toEqual({
       kind: 'ready',
-      codexHomePath: systemHome()
+      codexHomePath: systemDefaultRateLimitHome
     })
     expect(readFileSync(join(account.managedHomePath, 'auth.json'), 'utf-8')).toBe(fresh)
-    expect(readFileSync(sharedAuthPath(), 'utf-8')).toBe(mismatch)
+    expect(readFileSync(sharedAuthPath(), 'utf-8')).toBe(
+      process.platform === 'win32' ? 'system auth sentinel\n' : mismatch
+    )
     expect(readFileSync(systemAuthPath(), 'utf-8')).toBe('system auth sentinel\n')
   })
 

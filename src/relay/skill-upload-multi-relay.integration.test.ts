@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { build } from 'esbuild'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { spawnRelay, type RelayProcess } from './subprocess-test-utils'
+import { relayTestSocketPath } from './relay-test-socket-path'
 
 let bundleRoot: string
 let relayEntry: string
@@ -98,12 +99,26 @@ describe('skill upload ownership across relay processes', () => {
     const environment = { ...process.env, HOME: home, USERPROFILE: home }
     const first = spawnRelay(
       relayEntry,
-      ['--sock-path', join(root, 'first.sock'), '--endpoint-dir', join(root, 'first-hooks')],
+      [
+        '--sock-path',
+        relayTestSocketPath(root, 'first.sock'),
+        '--grace-time',
+        '1',
+        '--endpoint-dir',
+        join(root, 'first-hooks')
+      ],
       { env: environment }
     )
     const second = spawnRelay(
       relayEntry,
-      ['--sock-path', join(root, 'second.sock'), '--endpoint-dir', join(root, 'second-hooks')],
+      [
+        '--sock-path',
+        relayTestSocketPath(root, 'second.sock'),
+        '--grace-time',
+        '1',
+        '--endpoint-dir',
+        join(root, 'second-hooks')
+      ],
       { env: environment }
     )
     relays.push(first, second)
@@ -179,7 +194,7 @@ describe('skill upload ownership across relay processes', () => {
       path.endsWith(`${secondDisposalUpload.uploadId}.tar.gz`)
     )
 
-    first.kill('SIGTERM')
+    first.proc.stdin?.end()
     await first.waitForExit()
     relays.splice(relays.indexOf(first), 1)
     expect(await readdir(uploadRoot)).toEqual([
@@ -187,7 +202,7 @@ describe('skill upload ownership across relay processes', () => {
     ])
     expect(await stagedArchives(uploadRoot)).toEqual([secondDisposalPath])
     await expect(readFile(secondDisposalPath!)).resolves.toEqual(secondDisposalBytes)
-    second.kill('SIGTERM')
+    second.proc.stdin?.end()
     await second.waitForExit()
     relays.splice(relays.indexOf(second), 1)
     expect(await readdir(uploadRoot)).toEqual([])
@@ -219,7 +234,7 @@ describe('skill upload ownership across relay processes', () => {
           owner.entry,
           [
             '--sock-path',
-            join(root, `${owner.kind}.sock`),
+            relayTestSocketPath(root, `${owner.kind}.sock`),
             '--endpoint-dir',
             join(root, `${owner.kind}-hooks`)
           ],
