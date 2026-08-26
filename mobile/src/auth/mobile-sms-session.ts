@@ -12,6 +12,9 @@ export type MobileSession = {
 }
 
 export function isTerminalMobileSessionError(failure: unknown): boolean {
+  if (failure instanceof Error && failure.message === '登录服务返回了无效会话') {
+    return true
+  }
   if (!(failure instanceof MobileApiError)) {
     return false
   }

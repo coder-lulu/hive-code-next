@@ -111,8 +111,19 @@ async function restorePendingFlows(): Promise<void> {
             continue
           }
           const [challengeId, flow] = candidate
-          if (flow.expiresAt > now && pendingFlows.size < MAX_PENDING_FLOWS) {
-            pendingFlows.set(challengeId, flow)
+          if (flow.expiresAt <= now || flow.stage === 'EXCHANGED') {
+            continue
+          }
+          if (pendingFlows.size < MAX_PENDING_FLOWS) {
+            if (flow.stage === 'AUTHORIZED') {
+              // Authorization codes are one-time credentials. Never restore
+              // one from disk after process death; obtain a fresh code from
+              // the already-verified challenge instead.
+              const { authorizationCode: _discarded, ...retryableFlow } = flow
+              pendingFlows.set(challengeId, { ...retryableFlow, stage: 'VERIFIED' })
+            } else {
+              pendingFlows.set(challengeId, flow)
+            }
           }
         }
         persistPendingFlows()
