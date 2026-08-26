@@ -16,6 +16,11 @@ import {
 import type * as DaemonHealthModule from './daemon-health'
 import type * as DaemonTccAttributionModule from './daemon-tcc-attribution'
 
+// Windows named-pipe shutdown does not expose the POSIX token-ENOENT lifecycle
+// used by this audit-specific scenario; the Windows transport has its own
+// missing-pipe evidence coverage.
+const unixIt = it.skipIf(process.platform === 'win32')
+
 const { getMacDaemonSystemResolverHealthMock, getMacDaemonTccAttributionHealthMock } = vi.hoisted(
   () => ({
     getMacDaemonSystemResolverHealthMock: vi.fn(
@@ -599,7 +604,7 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       })
     })
 
-    it('audits token ENOENT only after an authenticated disconnect', async () => {
+    unixIt('audits token ENOENT only after an authenticated disconnect', async () => {
       const observations: {
         trigger: string
         state: string
@@ -609,6 +614,10 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       await adapter.listProcesses()
 
       await server.shutdown()
+      // The audit contract under test is the authenticated disconnect followed
+      // by an absent token; make the ENOENT precondition explicit rather than
+      // depending on platform-specific shutdown cleanup timing.
+      rmSync(tokenPath, { force: true })
       await waitFor(
         () => !(adapter as unknown as { client: { isConnected(): boolean } }).client.isConnected()
       )
