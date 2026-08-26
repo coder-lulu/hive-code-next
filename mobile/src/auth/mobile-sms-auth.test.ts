@@ -17,7 +17,12 @@ vi.mock('../generated/product-config', () => ({
   hivecodeProductConfig: { endpoints: { cloud: 'https://cloud.example.test/' } }
 }))
 
-import { loginWithMobileSms, requestMobileSms } from './mobile-sms-auth'
+import {
+  loginWithMobileSms,
+  requestMobileSms,
+  refreshMobileSession,
+  revokeMobileSession
+} from './mobile-sms-auth'
 
 function response(data: unknown, status = 200) {
   return {
@@ -250,5 +255,51 @@ describe('mobile SMS authentication client', () => {
       'https://cloud.example.test/hive/v1/auth/sms-authorizations',
       'https://cloud.example.test/hive/v1/auth/session-exchange'
     ])
+  })
+
+  it('coalesces concurrent refresh requests for the same refresh token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response(session))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const [first, second] = await Promise.all([
+      refreshMobileSession('refresh-token'),
+      refreshMobileSession('refresh-token')
+    ])
+
+    expect(first).toEqual(second)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://cloud.example.test/hive/v1/auth/session-refresh',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  it('revokes a JWT-backed session with its current security version', async () => {
+    const payload = btoa(
+      JSON.stringify({
+        session_id: '3e7af3d4-5e59-4bdf-9fdf-935fed933426',
+        session_security_version: 13
+      })
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+    const fetchMock = vi.fn().mockResolvedValue(response({ revoked: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await revokeMobileSession({ ...session, accessToken: `header.${payload}.signature` })
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe(
+      'https://cloud.example.test/hive/v1/cloud-sessions/3e7af3d4-5e59-4bdf-9fdf-935fed933426/revoke'
+    )
+    expect(options.headers).toMatchObject({
+      Authorization: expect.stringContaining('header.'),
+      'Idempotency-Key': expect.any(String)
+    })
+    expect(JSON.parse(String(options.body))).toEqual({
+      expectedSecurityVersion: 13,
+      reason: 'owner_sign_out'
+    })
   })
 })
