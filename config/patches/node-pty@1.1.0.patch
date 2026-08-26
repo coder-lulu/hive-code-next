@@ -88,6 +88,7 @@ index 8c4fca9022..0a01730616 100644
 +    consoleProcessList = [shellPid];
 +}
  process.send({ consoleProcessList: consoleProcessList });
+ process.exit(0);
 diff --git a/lib/unixTerminal.js b/lib/unixTerminal.js
 index 1ec12f796a..cec8b67aef 100644
 --- a/lib/unixTerminal.js
@@ -118,6 +119,7 @@ index 181ccabbbe..67f31facf8 100644
 +  consoleProcessList = [shellPid];
 +}
  process.send!({ consoleProcessList });
+ process.exit(0);
 diff --git a/src/unix/pty.cc b/src/unix/pty.cc
 index 7b4b9e1f99..383df0c9c4 100644
 --- a/src/unix/pty.cc

@@ -203,7 +203,7 @@ describe('memoized worktree rows', () => {
     await act(async () => {
       renderer!.update(
         createElement(WorktreeAgentRow, {
-          agent: agent({ state: 'done', updatedAt: 2_000 }),
+          agent: agent({ state: 'working', workingMode: 'monitoring', updatedAt: 2_000 }),
           depth: 0,
           now: 2_000,
           theme: lightTheme,
@@ -212,6 +212,23 @@ describe('memoized worktree rows', () => {
       )
     })
     expect(agentStateDotRender).toHaveBeenCalledTimes(2)
+    expect(agentStateDotRender).toHaveBeenLastCalledWith({ state: 'monitoring' })
+  })
+
+  it('passes workspace monitoring mode to the status indicator', async () => {
+    await act(async () => {
+      renderer = create(
+        createElement(ListRowHarness, {
+          item: { ...baseItem, status: 'working', workingMode: 'monitoring' },
+          now: 2_000
+        })
+      )
+    })
+
+    expect(agentSpinnerRender).toHaveBeenLastCalledWith({
+      status: 'working',
+      workingMode: 'monitoring'
+    })
   })
 
   it.each([lightTheme, darkTheme])(

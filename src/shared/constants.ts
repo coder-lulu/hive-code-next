@@ -162,7 +162,9 @@ export function getDefaultOnboardingState(): OnboardingState {
   }
 }
 
-function getDefaultWorkspaceDir(homeDir: string): string {
+/** The stock worktree root. Exported so callers can tell an untouched default apart
+ *  from a workspace directory the user actually chose. */
+export function getDefaultWorkspaceDir(homeDir: string): string {
   const separator = homeDir.includes('\\') ? '\\' : '/'
   const trimmedHomeDir = homeDir.replace(/[\\/]+$/, '')
   return [trimmedHomeDir, 'orca', 'workspaces'].join(separator)
@@ -287,6 +289,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     // Why: Orca-first keeps core shortcuts working from a focused terminal; TUI-ownership users opt in.
     terminalShortcutPolicy: 'orca-first',
     floatingTerminalEnabled: true,
+    browserClientHostedRemoteEnabled: true,
     floatingTerminalDefaultedForAllUsers: true,
     floatingTerminalCwd: '~',
     floatingTerminalTrustedCwds: [],
@@ -442,6 +445,7 @@ export function getDefaultPersistedState(homedir: string): PersistedState {
     workspaceSession: getDefaultWorkspaceSession(),
     workspaceSessionsByHostId: {},
     sshTargets: [],
+    sshTargetGenerationCounter: 0,
     deletedSshConfigAliases: [],
     sshRemotePtyLeases: [],
     sshPtyConsumerRecoveries: [],
@@ -476,6 +480,7 @@ export function getDefaultUIState(): PersistedUIState {
     workspaceHostScope: 'all',
     visibleWorkspaceHostIds: null,
     workspaceHostOrder: [],
+    automationHostFilter: { kind: 'all' },
     manualRepoOrder: [],
     showSleepingWorkspaces: DEFAULT_SHOW_SLEEPING_WORKSPACES,
     hideDefaultBranchWorkspace: false,

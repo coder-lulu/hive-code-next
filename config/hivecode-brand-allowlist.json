@@ -246,7 +246,7 @@
     "src/shared/runtime-environment-store.ts"
   ],
   "protectedFileHashes": {
-    ".gitignore": "0751cfb1b0af3e3ecc85e615c83cbf101bd8936e10c3b792cfb61a8973e3ef15",
+    ".gitignore": "287dc34a47a75b585ba4bd8b066dbbb79d73a8e45b51b83973d1cf016f7e7e2c",
     ".gitattributes": "d2e174a66bd2b89ac9b523df5cb5faadf7443f8492b96aad8e79c018ad289a35"
   }
 }

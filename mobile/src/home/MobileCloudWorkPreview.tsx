@@ -93,12 +93,12 @@ export function MobileCloudWorkPreview({
       {!composerFocused ? (
         <View style={styles.hero}>
           <View
-            accessibilityLabel={productNameText('Orca 小蜜蜂助手挥手并操作笔记本电脑')}
+            accessibilityLabel={productNameText('HiveCode 小蜜蜂助手挥手并操作笔记本电脑')}
             style={styles.assistantVisual}
           >
             <Image source={GRAPHITE_MASCOT} resizeMode="contain" style={styles.mascot} />
           </View>
-          <Text style={styles.title}>{productNameText('Orca，我帮你')}</Text>
+          <Text style={styles.title}>{productNameText('HiveCode，我帮你')}</Text>
           <Text style={styles.subtitle}>描述目标，我会在你的电脑上完成规划、编码与验证</Text>
         </View>
       ) : null}

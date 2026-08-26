@@ -35,6 +35,7 @@ authority.
 
 | Capability              | Preferred behavior                                | Compatibility behavior                                                                  |
 | ----------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `fetch-no-write-fetch-head` | Fetch a private rebase ref without changing worktree-local `FETCH_HEAD` | Serialize all HiveCode fetch/pull operations per worktree Git directory before Git 2.29 |
 | `worktree-list-z`       | NUL-delimited worktree paths with `prunable` marks | Line-block parser for Git before `worktree list -z` (2.36); the `prunable`/`locked` annotations still parse on Git 2.31–2.35, and a path-existence probe restores `prunable` detection for Git before 2.31 |
 | `rev-parse-path-format` | Absolute repo metadata paths                      | Resolve legacy relative output against the scanned repo                                 |
 | `for-each-ref-exclude`  | Exclude remote HEAD before the output limit       | Request extra refs, then filter remote HEAD in HiveCode                                 |

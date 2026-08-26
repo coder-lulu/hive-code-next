@@ -14,7 +14,7 @@ import {
   type RuntimeMetadataOwnershipWatch
 } from './runtime-metadata-ownership-watch'
 import { RpcDispatcher } from './rpc/dispatcher'
-import type { RpcRequest, RpcResponse } from './rpc/core'
+import type { RpcAnyMethod, RpcRequest, RpcResponse } from './rpc/core'
 import { errorResponse } from './rpc/errors'
 import { fingerprintAuthenticatedPairingCredential } from './rpc/orchestration-mutation-executor'
 import type { RpcMessageContext, RpcTransport } from './rpc/transport'
@@ -82,6 +82,8 @@ type OrcaRuntimeRpcServerOptions = {
   longPollCap?: number
   // Why: test-only override for the ownership reclaim cadence.
   metadataOwnershipPollMs?: number
+  // Test-only protocol injection for browser/host admission coverage.
+  methods?: readonly RpcAnyMethod[]
 }
 
 export type PairingOfferUnavailableReason =
@@ -469,6 +471,19 @@ function longPollClassOf(request: RpcRequest): LongPollClass | null {
   return null
 }
 
+export type RuntimeLongPollClass = 'ask' | 'browser-host' | 'wait'
+
+export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollClass | null {
+  if (request.method === 'browser.clientHost.attach') return 'browser-host'
+  if (request.method === 'terminal.wait') return 'wait'
+  if (request.method === 'orchestration.ask') return 'ask'
+  if (request.method === 'orchestration.check') {
+    const params = request.params as { wait?: unknown } | undefined
+    return params?.wait === true ? 'wait' : null
+  }
+  return null
+}
+
 // Why: status.get has no per-connection context in the dispatcher, so stamp the scope here at the transport boundary.
 function injectDeviceScope(response: string, scope: DeviceScope): string {
   try {
@@ -559,10 +574,11 @@ export class OrcaRuntimeRpcServer {
     webClientRoot,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
     longPollCap = LONG_POLL_CAP,
-    metadataOwnershipPollMs = RUNTIME_METADATA_OWNERSHIP_POLL_MS
+    metadataOwnershipPollMs = RUNTIME_METADATA_OWNERSHIP_POLL_MS,
+    methods
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
-    this.dispatcher = new RpcDispatcher({ runtime })
+    this.dispatcher = new RpcDispatcher({ runtime, methods })
     this.userDataPath = userDataPath
     this.pid = pid
     this.platform = platform

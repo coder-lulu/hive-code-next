@@ -33,22 +33,23 @@ describeOnWsl('runWslProcess against a real distro', () => {
     // probe budget -- this is #14288 reproduced, not simulated.
     await guest(`cp -f "$HOME/.profile" ${PROFILE} 2>/dev/null || true`)
     await guest(`printf '\\nsleep 60\\n' >> "$HOME/.profile"`)
-    invalidateWslGuestEnvironment()
+    invalidateWslGuestEnvironment(undefined, true)
   }, 120_000)
 
   afterAll(async () => {
     await guest(`cp -f ${PROFILE} "$HOME/.profile" 2>/dev/null || rm -f "$HOME/.profile"`)
     await guest(`rm -f ${PROFILE}`)
-    invalidateWslGuestEnvironment()
+    invalidateWslGuestEnvironment(undefined, true)
   }, 120_000)
 
   it('probe lane survives a ~/.profile that blocks for a minute', async () => {
-    // The first call pays one login shell (which the blocking profile stalls,
-    // so it times out and the lane degrades); every later call must not.
-    // What must never happen is the probe lane inheriting the stall per call.
+    // The blocking profile makes the probe time out -- that is the point: the
+    // call must still answer inside its own budget rather than inheriting the
+    // 60s stall. This is #14288 against a real distro, and it relies on a
+    // failed probe being non-fatal.
     const started = Date.now()
     const result = await runWslProcess({
-      lane: 'probe',
+      loginPath: 'preferred',
       distro: DISTRO,
       program: '/bin/echo',
       args: ['orca-probe-ok'],
@@ -61,7 +62,12 @@ describeOnWsl('runWslProcess against a real distro', () => {
 
   it('second probe-lane call does not pay the login shell again', async () => {
     const started = Date.now()
-    await runWslProcess({ lane: 'probe', distro: DISTRO, program: '/bin/true', timeoutMs: 15_000 })
+    await runWslProcess({
+      loginPath: 'preferred',
+      distro: DISTRO,
+      program: '/bin/true',
+      timeoutMs: 15_000
+    })
     expect(Date.now() - started).toBeLessThan(5_000)
   }, 30_000)
 
@@ -69,7 +75,7 @@ describeOnWsl('runWslProcess against a real distro', () => {
     // Stock Ubuntu writes its rc hint to stdout. Anything parsing that stream
     // reads the banner as data unless the fence removes it (#11327, #11823).
     const result = await runWslProcess({
-      lane: 'interactive',
+      loginPath: 'preferred',
       distro: DISTRO,
       program: '/bin/echo',
       args: ['ORCA_PAYLOAD'],
@@ -87,7 +93,7 @@ describeOnWsl('runWslProcess against a real distro', () => {
       `echo "x" | awk '{print $1}'`
     ].join('\n')
     const result = await runWslProcess({
-      lane: 'probe',
+      loginPath: 'preferred',
       distro: DISTRO,
       script,
       args: ['ORCA_ARG'],
@@ -103,7 +109,7 @@ describeOnWsl('runWslProcess against a real distro', () => {
 
   it('propagated env crosses the boundary via WSLENV', async () => {
     const result = await runWslProcess({
-      lane: 'probe',
+      loginPath: 'preferred',
       distro: DISTRO,
       script: 'printf %s "$ORCA_WSLENV_PROBE"',
       env: { ORCA_WSLENV_PROBE: 'crossed' },
@@ -114,7 +120,7 @@ describeOnWsl('runWslProcess against a real distro', () => {
 
   it('runs in the requested guest cwd', async () => {
     const result = await runWslProcess({
-      lane: 'probe',
+      loginPath: 'preferred',
       distro: DISTRO,
       program: '/bin/pwd',
       cwd: '/tmp',

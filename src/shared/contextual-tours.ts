@@ -5,6 +5,7 @@ export type ContextualTourId =
   | 'workspace-board'
   | 'workspace-agent-sessions'
   | 'browser'
+  | 'client-hosted-browser'
   | 'tasks'
   | 'automations'
   | 'floating-workspace'
@@ -22,6 +23,7 @@ export type ContextualTourStepActionKind =
   | 'show-worktrees'
   | 'open-tasks'
   | 'open-getting-started'
+  | 'open-client-hosted-browser-settings'
 
 export type ContextualTourStepAction = {
   kind: ContextualTourStepActionKind
@@ -122,6 +124,21 @@ export const CONTEXTUAL_TOURS = [
           '[data-contextual-tour-target="browser-import-hint"], [data-contextual-tour-target="browser-import-cookies-control"]',
         // Sit below the Import button with the arrow pointing up at it.
         preferredPlacement: 'bottom'
+      }
+    ]
+  },
+  {
+    id: 'client-hosted-browser',
+    steps: [
+      {
+        id: 'client-hosted-browser-intro',
+        title: 'This page renders on your desktop',
+        body: 'Remote browser tabs now render on this device. Network traffic still goes through the remote host.',
+        targetSelector: '[data-contextual-tour-target="client-hosted-browser-controls"]',
+        requiredForStart: true,
+        preferredPlacement: 'bottom',
+        primaryAction: { kind: 'complete', label: 'Got it' },
+        secondaryAction: { kind: 'open-client-hosted-browser-settings', label: 'Browser settings' }
       }
     ]
   },

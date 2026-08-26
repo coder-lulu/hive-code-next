@@ -35,6 +35,7 @@ vi.mock('@/lib/language-detect', () => ({
 }))
 
 vi.mock('@/lib/worktree-activation', () => ({
+  activateAndRevealWorkspace: vi.fn(),
   activateAndRevealWorktree: vi.fn()
 }))
 

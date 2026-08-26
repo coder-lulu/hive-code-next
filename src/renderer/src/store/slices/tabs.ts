@@ -127,7 +127,12 @@ export type TabsSlice = {
   activateTab: (tabId: string, opts?: { preservePreview?: boolean; worktreeId?: string }) => void
   closeUnifiedTab: (
     tabId: string,
-    opts?: { recordInteraction?: boolean; terminalRetirementHandled?: boolean }
+    opts?: {
+      /** Keep the worktree selected even if this empties it — for closes the user did not ask for. */
+      preserveWorktreeSelection?: boolean
+      recordInteraction?: boolean
+      terminalRetirementHandled?: boolean
+    }
   ) => { closedTabId: string; wasLastTab: boolean; worktreeId: string } | null
   reorderUnifiedTabs: (
     groupId: string,
@@ -157,7 +162,8 @@ export type TabsSlice = {
   createEmptySplitGroup: (
     worktreeId: string,
     sourceGroupId: string,
-    direction: TabSplitDirection
+    direction: TabSplitDirection,
+    opts?: { activate?: boolean }
   ) => string | null
   moveUnifiedTabToGroup: (
     tabId: string,
@@ -1184,7 +1190,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         nextLayoutByWorktree = collapsedState.layoutByWorktree
         nextActiveGroupIdByWorktree = collapsedState.activeGroupIdByWorktree
       }
+      // Why: the landing fallback answers "the user emptied this worktree". An unwound create
+      // never added a tab, so it must leave the selection exactly as the click found it.
       const shouldDeactivateWorktree =
+        !opts?.preserveWorktreeSelection &&
         current.activeWorktreeId === worktreeId &&
         nextTabs.length === 0 &&
         (current.tabsByWorktree[worktreeId] ?? []).length === 0 &&
@@ -1645,7 +1654,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
     return true
   },
 
-  createEmptySplitGroup: (worktreeId, sourceGroupId, direction) => {
+  createEmptySplitGroup: (worktreeId, sourceGroupId, direction, opts) => {
     const newGroupId = createBrowserUuid()
     const newGroup: TabGroup = {
       id: newGroupId,
@@ -1653,6 +1662,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       activeTabId: null,
       tabOrder: []
     }
+    const shouldActivate = opts?.activate !== false
     set((state) => {
       const existing = state.groupsByWorktree[worktreeId] ?? []
       const currentLayout =
@@ -1669,7 +1679,14 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
           ...state.layoutByWorktree,
           [worktreeId]: replaceLeaf(currentLayout, sourceGroupId, replacement)
         },
-        activeGroupIdByWorktree: { ...state.activeGroupIdByWorktree, [worktreeId]: newGroupId }
+        ...(shouldActivate
+          ? {
+              activeGroupIdByWorktree: {
+                ...state.activeGroupIdByWorktree,
+                [worktreeId]: newGroupId
+              }
+            }
+          : {})
       }
     })
     get().recordFeatureInteraction?.('terminal-panes')

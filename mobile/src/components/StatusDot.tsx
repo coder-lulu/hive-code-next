@@ -1,8 +1,8 @@
 import { View, StyleSheet } from 'react-native'
 import { colors } from '../theme/mobile-theme'
-import type { MobileTheme } from '../theme/mobile-theme'
 import type { ConnectionState } from '../transport/types'
 import type { ConnectionVerdict } from '../transport/connection-health'
+import type { MobileTheme } from '../theme/mobile-theme'
 
 const stateColors: Record<ConnectionState, string> = {
   connected: colors.statusGreen,
@@ -11,6 +11,16 @@ const stateColors: Record<ConnectionState, string> = {
   reconnecting: colors.statusAmber,
   disconnected: colors.textMuted,
   'auth-failed': colors.statusRed
+}
+
+export function statusDotColor(state: ConnectionState, verdict?: ConnectionVerdict): string {
+  if (verdict?.kind === 'unreachable' || verdict?.kind === 'auth-failed') {
+    return colors.statusRed
+  }
+  if (verdict?.kind === 'warning' || (verdict?.kind === 'normal' && verdict.label.endsWith('…'))) {
+    return colors.statusAmber
+  }
+  return stateColors[state] ?? colors.textMuted
 }
 
 // Why: when caller passes a verdict, the dot color reflects the verdict's
@@ -27,22 +37,13 @@ export function StatusDot({
   verdict?: ConnectionVerdict
   theme?: MobileTheme
 }) {
-  const semanticStateColor = theme
-    ? {
-        connected: theme.color.status.success,
-        connecting: theme.color.status.warning,
-        handshaking: theme.color.status.warning,
-        reconnecting: theme.color.status.warning,
-        disconnected: theme.color.text.tertiary,
-        'auth-failed': theme.color.status.danger
-      }[state]
-    : null
-  const color =
-    verdict?.kind === 'unreachable' || verdict?.kind === 'auth-failed'
-      ? (theme?.color.status.danger ?? colors.statusRed)
-      : verdict?.kind === 'warning'
-        ? (theme?.color.status.warning ?? colors.statusAmber)
-        : (semanticStateColor ?? stateColors[state] ?? colors.textMuted)
+  const color = theme
+    ? verdict?.kind === 'unreachable' || verdict?.kind === 'auth-failed'
+      ? theme.color.status.danger
+      : verdict?.kind === 'warning' || (verdict?.kind === 'normal' && verdict.label.endsWith('…'))
+        ? theme.color.status.warning
+        : theme.color.status[state === 'connected' ? 'success' : state === 'auth-failed' ? 'danger' : 'warning']
+    : statusDotColor(state, verdict)
   return <View style={[styles.dot, { backgroundColor: color }]} />
 }
 

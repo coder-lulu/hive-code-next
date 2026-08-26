@@ -27,7 +27,7 @@ patchedDependencies:
     hash: bdd871d794e360f5cd1969b627c168f3a1f5dbbb3fa57dcf767bb4fd6a54849f
     path: config/patches/lint-staged@16.4.0.patch
   node-pty@1.1.0:
-    hash: 3927a66891cb654003155989f649f1252f101a914f082eaa861aadcd0c289d6f
+    hash: abfd86abce11317deea20c2e1e001b0a1e28d56ba605f285aea785b698585ebb
     path: config/patches/node-pty@1.1.0.patch
 
 importers:
@@ -69,7 +69,7 @@ importers:
         version: 3.3.1
       node-pty:
         specifier: ^1.1.0
-        version: 1.1.0(patch_hash=3927a66891cb654003155989f649f1252f101a914f082eaa861aadcd0c289d6f)
+        version: 1.1.0(patch_hash=abfd86abce11317deea20c2e1e001b0a1e28d56ba605f285aea785b698585ebb)
       posthog-node:
         specifier: ^5.33.3
         version: 5.33.3
@@ -3390,6 +3390,7 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xterm/addon-fit@0.12.0-beta.287':
     resolution: {integrity: sha512-2MDj+J4x67bjOS/SuBPxSYEWH38NbX6ENV18RbKVOhfRYCX3yERnuHBOrgH9hYdY8rCtsLQmuVgF6cmvCJiV2w==}
@@ -12046,7 +12047,7 @@ snapshots:
 
   node-int64@0.4.0: {}
 
-  node-pty@1.1.0(patch_hash=3927a66891cb654003155989f649f1252f101a914f082eaa861aadcd0c289d6f):
+  node-pty@1.1.0(patch_hash=abfd86abce11317deea20c2e1e001b0a1e28d56ba605f285aea785b698585ebb):
     dependencies:
       node-addon-api: 7.1.1
 

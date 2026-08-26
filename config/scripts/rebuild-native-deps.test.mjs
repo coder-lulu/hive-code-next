@@ -18,6 +18,9 @@ const sourceScriptPath = fileURLToPath(new URL('./rebuild-native-deps.mjs', impo
 const sourceInstallScriptPath = fileURLToPath(
   new URL('./install-electron-package-binary.mjs', import.meta.url)
 )
+const sourceNodePtyJobOwnershipPath = fileURLToPath(
+  new URL('./node-pty-job-ownership.cjs', import.meta.url)
+)
 
 describe('rebuild-native-deps Electron install fallback', () => {
   it('continues non-strict postinstall when Electron retry download fails', () => {
@@ -209,6 +212,36 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
     }
   )
 
+  it.skipIf(process.platform !== 'win32')(
+    'rebuilds a loadable ConPTY native that lacks Orca job ownership',
+    () => {
+      const projectDir = mkTempProject()
+
+      try {
+        const rebuildLogPath = join(projectDir, 'electron-rebuild.log')
+        writeFakeUsableElectronPackage(projectDir, { platform: 'win32' })
+        writeFakeElectronRebuild(projectDir, { logPathEnv: 'ORCA_REBUILD_TEST_LOG' })
+        writeFakeLoadableNodePty(projectDir, { ownsPtyJob: false })
+        writeFakeWindowsRegistry(projectDir)
+        writeFakeWindowsProcessTree(projectDir)
+
+        const result = runRebuildScript(projectDir, {
+          ORCA_REBUILD_TEST_LOG: rebuildLogPath,
+          npm_config_platform: 'win32',
+          npm_config_arch: process.arch
+        })
+
+        expect(result.status, result.stderr).toBe(0)
+        expect(result.stdout).toContain('Rebuilding failed native modules: node-pty')
+        expect(result.stdout).toContain('missing listJobProcessIds')
+        const rebuildCall = JSON.parse(readFileSync(rebuildLogPath, 'utf8').trim())
+        expect(rebuildCall.onlyModules).toEqual(['node-pty'])
+      } finally {
+        rmSync(projectDir, { recursive: true, force: true })
+      }
+    }
+  )
+
   it.skipIf(process.platform === 'win32')(
     'rebuilds when Electron can load node-pty but patched build artifacts are missing',
     () => {
@@ -306,6 +339,10 @@ function mkTempProject() {
   copyFileSync(
     sourceInstallScriptPath,
     join(projectDir, 'config', 'scripts', 'install-electron-package-binary.mjs')
+  )
+  copyFileSync(
+    sourceNodePtyJobOwnershipPath,
+    join(projectDir, 'config', 'scripts', 'node-pty-job-ownership.cjs')
   )
   return projectDir
 }
@@ -497,7 +534,10 @@ function writeFakeNodePtyConptyPayload(projectDir, arch) {
   writeFileSync(join(sourceDir, 'OpenConsole.exe'), `OpenConsole.exe ${arch}`)
 }
 
-function writeFakeLoadableNodePty(projectDir, { nativeDir = 'prebuilds/pty' } = {}) {
+function writeFakeLoadableNodePty(
+  projectDir,
+  { nativeDir = 'prebuilds/pty', ownsPtyJob = true } = {}
+) {
   const nodePtyDir = join(projectDir, 'node_modules', 'node-pty')
   mkdirSync(join(nodePtyDir, 'lib'), { recursive: true })
   writeFileSync(join(nodePtyDir, 'index.js'), 'module.exports = {}\n')
@@ -505,7 +545,19 @@ function writeFakeLoadableNodePty(projectDir, { nativeDir = 'prebuilds/pty' } = 
     join(nodePtyDir, 'lib', 'utils.js'),
     `
 exports.loadNativeModule = function loadNativeModule(nativeName) {
-  return { dir: ${JSON.stringify(nativeDir)}, module: { nativeName } }
+  return {
+    dir: ${JSON.stringify(nativeDir)},
+    module: {
+      nativeName,
+      ...(${JSON.stringify(ownsPtyJob)}
+        ? {
+            listJobProcessIds() {},
+            terminateJob() {},
+            assignCurrentProcessToJob() {}
+          }
+        : {})
+    }
+  }
 }
 `
   )

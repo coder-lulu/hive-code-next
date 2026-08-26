@@ -93,7 +93,9 @@ describe('browser link routing modifier copy', () => {
       `Hold Shift to open in ${APP_DISPLAY_NAME}`,
       'Show terminal link actions',
       'Localhost Worktree Labels',
-      'Session & Cookies'
+      'Session & Cookies',
+      'Remote server workspaces',
+      'SSH workspaces'
     ])
   })
 

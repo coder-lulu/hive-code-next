@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { waitForProcessExitUntil } from './codex-process-exit-deadline'
 import { stderrIndicatesMissingAppServer } from './codex-app-server-capability-signal'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { withCliRuntimeOnPath } from '../../shared/node-cli-command-resolution'
 
 // Why: `codex app-server` is Orca's sanctioned RPC surface into Codex-owned
 // state (hook trust hashes, the sqlite thread index). This module owns the
@@ -11,6 +11,17 @@ import { APP_DISPLAY_NAME } from '../../shared/brand'
 export type CodexAppServerInvocation = {
   command: string
   args: string[]
+  /**
+   * The resolved CLI path, used to pair the CLI with the `node` it was installed
+   * against — without it a CLI resolved out of a version-manager directory runs
+   * under whatever node leads PATH and dies on a NODE_MODULE_VERSION mismatch
+   * (stablyai/orca#10932).
+   *
+   * Required, and `null` only for a guest-side launcher (wsl.exe) where the host
+   * path means nothing. Optional would let a native builder omit it and silently
+   * fall back to pairing against a cmd.exe wrapper with no type error.
+   */
+  cliPath: string | null
   /** Overlay applied on top of the inherited environment (e.g. CODEX_HOME). */
   env?: Record<string, string>
   /** Env keys stripped from the inherited environment before spawn (e.g. an
@@ -112,8 +123,11 @@ export async function runCodexAppServerSession<T>(
   for (const key of invocation.envToDelete ?? []) {
     delete childEnv[key]
   }
+  const pairedEnv = invocation.cliPath
+    ? withCliRuntimeOnPath(invocation.cliPath, childEnv)
+    : childEnv
   const child = spawnImpl(invocation.command, invocation.args, {
-    env: childEnv,
+    env: pairedEnv,
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true
   }) as ChildProcessWithoutNullStreams
@@ -277,7 +291,7 @@ export async function runCodexAppServerSession<T>(
   try {
     const session = async (): Promise<T> => {
       await requestRpc('initialize', {
-        clientInfo: { name: 'orca_desktop', title: APP_DISPLAY_NAME, version: '0.0.0' }
+        clientInfo: { name: 'orca_desktop', title: 'Orca', version: '0.0.0' }
       })
       notify('initialized')
       return body({ request: requestRpc, notify })
