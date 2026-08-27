@@ -48,28 +48,10 @@ jobs:
 
       # Why pnpm first: setup-node needs pnpm on PATH to locate the store it caches.
       # Without that cache every E2E job re-downloaded the whole dependency set.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      # Why: the build's plain-Node daemon smoke load resolves node-pty.
+      - uses: ./.github/actions/install-node-dependencies
         with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: package.json
-          cache: pnpm
-
-      # Why: this job runs the same pnpm install path as pr.yml's verify
-      # job, so it needs the same pinned node-gyp override to avoid pnpm's
-      # broken bundled gyp_main.py on Linux.
-      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          native-runtime: node
 
       # Why: building here avoids parallel builds inside Playwright globalSetup;
       # paired-browser specs also need the standalone web bundle.

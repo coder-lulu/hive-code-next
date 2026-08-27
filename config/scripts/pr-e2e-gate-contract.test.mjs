@@ -157,6 +157,17 @@ describe('PR E2E gate contract', () => {
     expect(sshDockerRunner).toContain("'electron-headful'")
   })
 
+  it('reuses the composite install action instead of duplicating pnpm setup', () => {
+    const installFor = (jobName) =>
+      e2eWorkflow.jobs[jobName].steps.find(
+        (step) => step.uses === './.github/actions/install-node-dependencies'
+      )
+
+    expect(installFor('build').with['native-runtime']).toBe('node')
+    for (const jobName of ['e2e', 'changed-e2e', 'ssh-docker-watcher-isolation']) {
+      expect(installFor(jobName).with['native-runtime'], jobName).toBe('electron')
+    }
+  })
   it('installs zsh in every Linux lane that can run paired startup readiness', () => {
     for (const jobName of ['e2e', 'changed-e2e', 'ssh-docker-watcher-isolation']) {
       const installStep = e2eWorkflow.jobs[jobName].steps.find((step) =>
