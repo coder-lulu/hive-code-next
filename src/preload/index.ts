@@ -640,6 +640,8 @@ const api = {
   hiveAccount: {
     getState: () => ipcRenderer.invoke('hiveAccount:getState'),
     signIn: (options) => ipcRenderer.invoke('hiveAccount:signIn', options),
+    startSmsSignIn: (options) => ipcRenderer.invoke('hiveAccount:startSmsSignIn', options),
+    completeSmsSignIn: (options) => ipcRenderer.invoke('hiveAccount:completeSmsSignIn', options),
     refresh: () => ipcRenderer.invoke('hiveAccount:refresh'),
     signOut: () => ipcRenderer.invoke('hiveAccount:signOut'),
     onStateChanged: (callback: (state: HiveAccountState) => void): (() => void) => {

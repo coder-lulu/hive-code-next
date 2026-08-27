@@ -10302,6 +10302,7 @@
           "temporarySession": "临时设备",
           "signInConfirmTitle": "确认登录 HiveCloud",
           "signInConfirmDescription": "确认此请求后，桌面应用将打开浏览器进行安全登录。",
+          "smsSignInDescription": "验证手机号即可登录，无需打开浏览器。",
           "approvalSecurityTitle": "短期访问凭据将受到保护",
           "approvalSecurityDescription": "应用会自动轮换 10 分钟有效期的访问令牌。下方选项决定实际的登录授权方式。",
           "requestStatus": "状态",

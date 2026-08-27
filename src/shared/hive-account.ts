@@ -4,6 +4,21 @@ export type HiveAccountSessionProfile = 'TEMPORARY' | 'TRUSTED' | 'LEGACY'
 export type HiveAccountSignInOptions = {
   sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
 }
+export type HiveAccountSmsSignInOptions = {
+  phoneNumber: string
+  sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
+  locale?: 'zh-CN' | 'en-US'
+  termsAccepted: true
+}
+export type HiveAccountSmsVerifyOptions = {
+  challengeId: string
+  smsCode: string
+}
+export type HiveAccountSmsChallenge = {
+  challengeId: string
+  expiresInSeconds: number
+  resendAfterSeconds: number
+}
 
 export type HiveAccountErrorCode =
   | 'secure_storage_unavailable'

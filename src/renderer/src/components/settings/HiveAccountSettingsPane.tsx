@@ -164,6 +164,41 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
     }
   }
 
+  const startSmsSignIn = (phoneNumber: string, sessionProfile: 'TEMPORARY' | 'TRUSTED') => {
+    if (!window.api.hiveAccount.startSmsSignIn) {
+      return Promise.reject(new Error('sms_sign_in_unavailable'))
+    }
+    return window.api.hiveAccount.startSmsSignIn({
+      phoneNumber,
+      sessionProfile,
+      termsAccepted: true
+    })
+  }
+
+  const completeSmsSignIn = async (challengeId: string, smsCode: string): Promise<void> => {
+    if (busy) {
+      return
+    }
+    setBusy('sign-in')
+    try {
+      if (!window.api.hiveAccount.completeSmsSignIn) {
+        throw new Error('sms_sign_in_unavailable')
+      }
+      const result = await window.api.hiveAccount.completeSmsSignIn({ challengeId, smsCode })
+      setState(result.state)
+      if (result.status === 'signed-in') {
+        setSignInOpen(false)
+        toast.success(
+          translate('auto.components.settings.orcaAccount.signedInToast', 'Signed in to HiveCloud')
+        )
+      } else if (result.status === 'failed') {
+        toast.error(errorCopy(result.state.errorCode))
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const refresh = async (): Promise<void> => {
     if (busy) {
       return
@@ -326,6 +361,8 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
         open={signInOpen}
         onOpenChange={setSignInOpen}
         onConfirm={(sessionProfile) => void signIn(sessionProfile)}
+        onSmsStart={startSmsSignIn}
+        onSmsComplete={completeSmsSignIn}
         signingIn={busy === 'sign-in'}
       />
     </>

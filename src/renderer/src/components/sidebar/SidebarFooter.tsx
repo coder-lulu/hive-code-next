@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Keeps account state, sign-in methods, and the sidebar action surface synchronized. */
+
 import React from 'react'
 import { Bell, Check, LogIn, LogOut, MonitorSmartphone, Palette, UserRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -117,6 +119,56 @@ const SidebarFooter = React.memo(function SidebarFooter() {
     setSigningIn(true)
     try {
       const result = await window.api.hiveAccount.signIn({ sessionProfile })
+      setAccountState(result.state)
+      if (result.status === 'signed-in') {
+        setSignInOpen(false)
+        toast.success(
+          translate('auto.components.sidebar.SidebarFooter.signInSuccess', 'Signed in to HiveCloud')
+        )
+      } else if (result.status === 'failed') {
+        toast.error(
+          translate(
+            'auto.components.sidebar.SidebarFooter.signInFailed',
+            'HiveCloud sign-in failed. Try again or check the service status.'
+          )
+        )
+      }
+    } catch {
+      toast.error(
+        translate(
+          'auto.components.sidebar.SidebarFooter.signInFailed',
+          'HiveCloud sign-in failed. Try again or check the service status.'
+        )
+      )
+    } finally {
+      setSigningIn(false)
+    }
+  }
+
+  const startSmsSignIn = (
+    phoneNumber: string,
+    sessionProfile: HiveAccountSignInOptions['sessionProfile']
+  ) => {
+    if (!window.api.hiveAccount.startSmsSignIn) {
+      return Promise.reject(new Error('sms_sign_in_unavailable'))
+    }
+    return window.api.hiveAccount.startSmsSignIn({
+      phoneNumber,
+      sessionProfile,
+      termsAccepted: true
+    })
+  }
+
+  const completeSmsSignIn = async (challengeId: string, smsCode: string): Promise<void> => {
+    if (signingIn) {
+      return
+    }
+    setSigningIn(true)
+    try {
+      if (!window.api.hiveAccount.completeSmsSignIn) {
+        throw new Error('sms_sign_in_unavailable')
+      }
+      const result = await window.api.hiveAccount.completeSmsSignIn({ challengeId, smsCode })
       setAccountState(result.state)
       if (result.status === 'signed-in') {
         setSignInOpen(false)
@@ -359,6 +411,8 @@ const SidebarFooter = React.memo(function SidebarFooter() {
         open={signInOpen}
         onOpenChange={setSignInOpen}
         onConfirm={(sessionProfile) => void signIn(sessionProfile)}
+        onSmsStart={startSmsSignIn}
+        onSmsComplete={completeSmsSignIn}
         signingIn={signingIn}
       />
       <HiveAccountSignOutConfirmDialog

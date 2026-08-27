@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Keeps device authorization, SMS challenge, OIDC exchange, and refresh requests on one audited cloud-account transport boundary. */
+
 import { net } from 'electron'
 import { randomBytes } from 'node:crypto'
 import type { HiveAccountSessionProfile, HiveAccountSummary } from '../../shared/hive-account'
@@ -20,6 +22,12 @@ export type CloudSessionEntry = {
   cloudSessionId: string
   securityVersion: number
   currentSession: boolean
+}
+
+export type SmsChallengeStart = {
+  challengeId: string
+  expiresInSeconds: number
+  resendAfterSeconds: number
 }
 
 export class HiveAccountRequestError extends Error {
@@ -113,6 +121,9 @@ async function requestJson(fetchImpl: FetchLike, url: string, init: RequestInit)
       }
       throw new HiveAccountRequestError(response.status, category)
     }
+    if (response.status === 204 || body.trim().length === 0) {
+      return undefined
+    }
     return parseJson(body)
   } finally {
     clearTimeout(timeout)
@@ -205,6 +216,86 @@ export class HiveAccountClient {
         body: JSON.stringify({ ...args, clientId: this.config.clientId })
       })
     )
+  }
+
+  async createSmsChallenge(args: {
+    nonce: string
+    phoneNumber: string
+    locale?: 'zh-CN' | 'en-US'
+    termsAccepted: true
+  }): Promise<SmsChallengeStart> {
+    const value = await requestJson(
+      this.fetchImpl,
+      `${this.config.apiBaseUrl}/hive/v1/auth/sms-challenges`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          ...args,
+          clientId: this.config.clientId,
+          locale: args.locale ?? 'zh-CN'
+        })
+      }
+    )
+    if (
+      !isRecord(value) ||
+      typeof value.challengeId !== 'string' ||
+      !/^[0-9a-f]{32}$/.test(value.challengeId) ||
+      typeof value.expiresInSeconds !== 'number' ||
+      typeof value.resendAfterSeconds !== 'number'
+    ) {
+      throw new Error('invalid_hive_sms_challenge_response')
+    }
+    return {
+      challengeId: value.challengeId,
+      expiresInSeconds: value.expiresInSeconds,
+      resendAfterSeconds: value.resendAfterSeconds
+    }
+  }
+
+  async verifySmsChallenge(args: {
+    challengeId: string
+    nonce: string
+    smsCode: string
+    termsAccepted: true
+  }): Promise<void> {
+    await requestJson(
+      this.fetchImpl,
+      `${this.config.apiBaseUrl}/hive/v1/auth/sms-challenges/${args.challengeId}/verify`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          nonce: args.nonce,
+          clientId: this.config.clientId,
+          smsCode: args.smsCode,
+          termsAccepted: true
+        })
+      }
+    )
+  }
+
+  async authorizeSms(args: {
+    nonce: string
+    codeChallenge: string
+    redirectUri: string
+    state: string
+  }): Promise<{ authorizationCode: string; state: string }> {
+    const value = await requestJson(
+      this.fetchImpl,
+      `${this.config.apiBaseUrl}/hive/v1/auth/sms-authorizations`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...args, clientId: this.config.clientId })
+      }
+    )
+    if (
+      !isRecord(value) ||
+      typeof value.authorizationCode !== 'string' ||
+      typeof value.state !== 'string' ||
+      value.state !== args.state
+    ) {
+      throw new Error('invalid_hive_sms_authorization_response')
+    }
+    return { authorizationCode: value.authorizationCode, state: value.state }
   }
 
   async refreshSession(refreshToken: string): Promise<NativeSessionResponse> {

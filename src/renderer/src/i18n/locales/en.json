@@ -11370,6 +11370,7 @@
           "temporarySession": "Temporary device",
           "signInConfirmTitle": "Approve HiveCloud sign-in",
           "signInConfirmDescription": "Review this request before the desktop app opens the secure browser sign-in.",
+          "smsSignInDescription": "Verify your phone number to sign in without opening a browser.",
           "approvalSecurityTitle": "Short access credentials remain protected",
           "approvalSecurityDescription": "The app rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.",
           "requestStatus": "Status",

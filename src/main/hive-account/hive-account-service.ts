@@ -1,13 +1,21 @@
+/* eslint-disable max-lines -- HiveCloud account lifecycle and SMS authentication share one secure-store and PKCE boundary. */
+
+import { createHash, randomBytes } from 'node:crypto'
 import type {
   HiveAccountRefreshResult,
+  HiveAccountSessionProfile,
   HiveAccountSignInOptions,
   HiveAccountSignInResult,
   HiveAccountSignOutResult,
   HiveAccountState
 } from '../../shared/hive-account'
 import { getHiveAccountConfig, type HiveAccountConfig } from './hive-account-config'
-import { HiveAccountClient } from './hive-account-client'
-import { getOrCreateHiveDeviceIdentity, signHiveDeviceAuthorization } from './hive-account-device'
+import { HiveAccountClient, type SmsChallengeStart } from './hive-account-client'
+import {
+  getOrCreateHiveDeviceIdentity,
+  signHiveDeviceAuthorization,
+  type HiveDeviceIdentity
+} from './hive-account-device'
 import { migrateLegacyOrcaCloudIdentity } from './hive-account-legacy-migration'
 import { beginHiveAccountPkceFlow } from './hive-account-pkce'
 import { isHiveAccountEncryptionAvailable } from './hive-account-secure-store'
@@ -36,6 +44,22 @@ type ServiceDependencies = {
   beginAuthorization: typeof beginHiveAccountPkceFlow
 }
 
+type PendingSmsSignIn = {
+  nonce: string
+  state: string
+  codeVerifier: string
+  codeChallenge: string
+  redirectUri: string
+  challengeId: string
+  sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
+  device: HiveDeviceIdentity
+  config: HiveAccountConfig
+}
+
+function randomToken(bytes: number): string {
+  return randomBytes(bytes).toString('base64url')
+}
+
 const defaultDependencies: ServiceDependencies = {
   getConfig: () => getHiveAccountConfig(),
   createClient: (config) => new HiveAccountClient(config),
@@ -44,6 +68,8 @@ const defaultDependencies: ServiceDependencies = {
 
 export class HiveAccountService extends HiveAccountPublication {
   private signInFlight: Promise<HiveAccountSignInResult> | null = null
+  private smsSignInFlight: Promise<HiveAccountSignInResult> | null = null
+  private pendingSmsSignIn: PendingSmsSignIn | null = null
   private refreshFlight: Promise<HiveAccountRefreshResult> | null = null
   private temporarySession: HiveAccountSession | null = null
   private refreshTimer: NodeJS.Timeout | undefined
@@ -94,6 +120,139 @@ export class HiveAccountService extends HiveAccountPublication {
         this.signInFlight = null
       })
     return this.signInFlight
+  }
+
+  async startSmsSignIn(options: {
+    phoneNumber: string
+    sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
+    locale?: 'zh-CN' | 'en-US'
+    termsAccepted: true
+  }): Promise<SmsChallengeStart> {
+    if (this.pendingSmsSignIn) {
+      throw new Error('hive_account_sms_sign_in_pending')
+    }
+    const configured = this.dependencies.getConfig()
+    if (!configured.configured) {
+      throw new Error('hive_account_not_configured')
+    }
+    if (!isHiveAccountEncryptionAvailable()) {
+      throw new Error('secure_storage_unavailable')
+    }
+    if (!/^\+?[0-9]{6,20}$/.test(options.phoneNumber.trim())) {
+      throw new Error('hive_account_sms_phone_invalid')
+    }
+    const device = getOrCreateHiveDeviceIdentity(this.userDataPath)
+    if (device.status !== 'ok') {
+      throw new Error('secure_storage_unavailable')
+    }
+    const nonce = randomToken(32)
+    const state = randomToken(32)
+    const codeVerifier = randomToken(32)
+    const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url')
+    const redirectUri = 'http://127.0.0.1'
+    const client = this.dependencies.createClient(configured.config)
+    await client.createDeviceAuthorization({
+      nonce,
+      devicePublicKey: device.identity.publicKey,
+      deviceLabel: device.identity.deviceLabel,
+      sessionProfile: options.sessionProfile,
+      proof: signHiveDeviceAuthorization(
+        device.identity,
+        nonce,
+        configured.config.clientId,
+        options.sessionProfile
+      )
+    })
+    const challenge = await client.createSmsChallenge({
+      nonce,
+      phoneNumber: options.phoneNumber.trim(),
+      locale: options.locale ?? 'zh-CN',
+      termsAccepted: options.termsAccepted
+    })
+    this.pendingSmsSignIn = {
+      nonce,
+      state,
+      codeVerifier,
+      codeChallenge,
+      redirectUri,
+      challengeId: challenge.challengeId,
+      sessionProfile: options.sessionProfile,
+      device: device.identity,
+      config: configured.config
+    }
+    return challenge
+  }
+
+  completeSmsSignIn(args: {
+    challengeId: string
+    smsCode: string
+  }): Promise<HiveAccountSignInResult> {
+    if (this.smsSignInFlight) {
+      return this.smsSignInFlight
+    }
+    this.smsSignInFlight = this.runSmsSignIn(args)
+      .then((result) => publishHiveAccountResult((state) => this.publishState(state), result))
+      .finally(() => {
+        this.smsSignInFlight = null
+      })
+    return this.smsSignInFlight
+  }
+
+  private async runSmsSignIn(args: {
+    challengeId: string
+    smsCode: string
+  }): Promise<HiveAccountSignInResult> {
+    const pending = this.pendingSmsSignIn
+    if (!pending || pending.challengeId !== args.challengeId || !/^\d{6}$/.test(args.smsCode)) {
+      return { status: 'failed', state: errorState('authorization_failed') }
+    }
+    const expectedEpoch = ++this.mutationEpoch
+    try {
+      const client = this.dependencies.createClient(pending.config)
+      await client.verifySmsChallenge({
+        challengeId: pending.challengeId,
+        nonce: pending.nonce,
+        smsCode: args.smsCode,
+        termsAccepted: true
+      })
+      const authorization = await client.authorizeSms({
+        nonce: pending.nonce,
+        codeChallenge: pending.codeChallenge,
+        redirectUri: pending.redirectUri,
+        state: pending.state
+      })
+      const exchange = await client.exchangeSession({
+        authorizationCode: authorization.authorizationCode,
+        codeVerifier: pending.codeVerifier,
+        redirectUri: pending.redirectUri,
+        nonce: pending.nonce
+      })
+      if (this.mutationEpoch !== expectedEpoch) {
+        this.pendingSmsSignIn = null
+        await this.bestEffortRevokeCurrent(client, exchange.accessToken)
+        return { status: 'cancelled', state: signedOutState() }
+      }
+      const previous = this.readCurrentSession()
+      const session: HiveAccountSession = {
+        schemaVersion: 2,
+        ...exchange,
+        deviceLabel: pending.device.deviceLabel,
+        generation: previous.status === 'ok' ? previous.value.generation + 1 : 1,
+        savedAt: Date.now()
+      }
+      this.fenceRuntimeCloudAuthorization()
+      if (!this.persistSession(session)) {
+        this.pendingSmsSignIn = null
+        await this.bestEffortRevokeCurrent(client, exchange.accessToken)
+        return { status: 'failed', state: errorState('secure_storage_unavailable') }
+      }
+      this.scheduleRefresh(session)
+      this.publishRuntimeCloudSession(session)
+      this.pendingSmsSignIn = null
+      return { status: 'signed-in', state: stateFromSession(session) }
+    } catch (error) {
+      return { status: 'failed', state: errorState(classifyHiveAccountError(error)) }
+    }
   }
 
   private async runSignIn(options: HiveAccountSignInOptions): Promise<HiveAccountSignInResult> {
@@ -241,6 +400,7 @@ export class HiveAccountService extends HiveAccountPublication {
 
   async signOut(): Promise<HiveAccountSignOutResult> {
     this.mutationEpoch += 1
+    this.pendingSmsSignIn = null
     this.fenceRuntimeCloudAuthorization()
     const configured = this.dependencies.getConfig()
     const stored = this.readCurrentSession()
