@@ -59,6 +59,7 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
     try {
       const challenge = await requestMobileSms(`+86${phoneNumber}`, termsAccepted)
       setChallengeId(challenge.challengeId)
+      setSmsCode('')
       setCountdown(challenge.resendAfterSeconds)
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : '验证码发送失败，请稍后再试')

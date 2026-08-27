@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "description": "Ordered intake policy for changes introduced from upstream/main",
+  "defaultPriority": 6,
+  "priorities": [
+    {
+      "level": 1,
+      "id": "security-data-consistency",
+      "label": "Security and data consistency",
+      "action": "Absorb first after focused security, persistence, and migration review.",
+      "pathPatterns": [
+        "^src/main/persistence/",
+        "^src/main/security/",
+        "^src/main/crypto/",
+        "^src/shared/(?:crypto|security|persistence)/"
+      ],
+      "subjectPatterns": [
+        "security",
+        "cve[- ]?\\d+",
+        "vulnerab",
+        "encrypt",
+        "e2ee",
+        "signature",
+        "integrity",
+        "consistency",
+        "migration",
+        "data[ -]?loss",
+        "corrupt"
+      ]
+    },
+    {
+      "level": 2,
+      "id": "pty-wsl-ssh-relay-stability",
+      "label": "PTY, WSL, SSH, and Relay stability",
+      "action": "Absorb next with the three-platform PTY/WSL/SSH and Relay contract suites.",
+      "pathPatterns": [
+        "^src/main/pty/",
+        "^src/main/ipc/pty/",
+        "^src/main/git/",
+        "^src/main/ssh/",
+        "^src/main/providers/ssh-",
+        "^src/relay/",
+        "^mobile/src/transport/"
+      ],
+      "subjectPatterns": ["pty", "wsl", "ssh", "relay", "transport", "socket"]
+    },
+    {
+      "level": 3,
+      "id": "agent-runtime-recovery",
+      "label": "Agent recovery and Runtime fixes",
+      "action": "Absorb after Runtime RPC, reconnect, and agent-resume contract review.",
+      "pathPatterns": [
+        "^src/main/runtime/",
+        "^src/renderer/src/web/web-runtime",
+        "agent",
+        "^mobile/src/session/"
+      ],
+      "subjectPatterns": ["agent", "runtime", "resume", "recover", "session", "reconnect"]
+    },
+    {
+      "level": 4,
+      "id": "performance",
+      "label": "Performance optimizations",
+      "action": "Absorb after benchmark evidence and regression-budget review.",
+      "pathPatterns": ["benchmark", "perf", "performance"],
+      "subjectPatterns": [
+        "perf",
+        "performance",
+        "latency",
+        "throughput",
+        "memory",
+        "cpu",
+        "optimis",
+        "optimiz"
+      ]
+    },
+    {
+      "level": 5,
+      "id": "modularization",
+      "label": "Modular refactoring",
+      "action": "Absorb only behind behavior-contract tests and the module split ledger.",
+      "pathPatterns": ["module", "modules", "refactor", "command-runner/", "preload-api/"],
+      "subjectPatterns": ["refactor", "modular", "split", "extract", "facade", "module"]
+    },
+    {
+      "level": 6,
+      "id": "orca-product-interaction",
+      "label": "Pure upstream product interaction or branding",
+      "action": "Do not absorb automatically; require explicit product-boundary review.",
+      "pathPatterns": [
+        "^src/renderer/src/components/",
+        "^src/renderer/src/i18n/",
+        "^skill-guides/",
+        "^README",
+        "^docs/"
+      ],
+      "subjectPatterns": ["ui", "ux", "brand", "rename", "icon", "theme", "copy", "product"]
+    }
+  ]
+}

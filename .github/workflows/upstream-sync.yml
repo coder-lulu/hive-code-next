@@ -37,6 +37,7 @@ jobs:
       upstream_sha: ${{ steps.sync.outputs.upstream_sha }}
       target_sha: ${{ steps.sync.outputs.target_sha }}
       vendor_sha: ${{ steps.sync.outputs.vendor_sha }}
+      vendor_base_sha: ${{ steps.sync.outputs.vendor_base_sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -121,6 +122,7 @@ jobs:
             echo "upstream_sha=$upstream_sha"
             echo "target_sha=$target_sha"
             echo "vendor_sha=$vendor_sha"
+            echo "vendor_base_sha=$vendor_base_sha"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -128,6 +130,7 @@ jobs:
             printf '%s\n' "- Upstream: $upstream_sha"
             printf '%s\n' "- Product target: $TARGET_BRANCH at $target_sha"
             printf '%s\n' "- vendor-integration: $vendor_sha"
+            printf '%s\n' "- Previous vendor base: $vendor_base_sha"
             printf '%s\n' "- Target PR branch: $TARGET_BRANCH"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -180,13 +183,22 @@ jobs:
             --head HEAD \
             --output "$RUNNER_TEMP/fork-delta.md" > "$RUNNER_TEMP/fork-delta.stdout"
 
+      - name: Track upstream change intake priorities
+        env:
+          VENDOR_BASE_SHA: ${{ needs.sync.outputs.vendor_base_sha }}
+          UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node config/scripts/track-upstream-changes.mjs \
+            --base "$VENDOR_BASE_SHA" \
+            --head "$UPSTREAM_SHA" \
+            --output "$RUNNER_TEMP/upstream-change-intake.md"
+
       - uses: ./.github/actions/install-node-dependencies
 
-      - name: Verify generated product configuration
-        run: pnpm run verify:product-config
-
-      - name: Enforce fork boundary
-        run: pnpm run check:brand-boundary
+      - name: Run fixed upstream sync gates
+        run: node config/scripts/run-upstream-sync-gates.mjs --suite=common
 
       - name: Run product and compatibility tests
         run: |
@@ -232,15 +244,50 @@ jobs:
           path: |
             ${{ runner.temp }}/fork-delta.md
             ${{ runner.temp }}/fork-delta.stdout
+            ${{ runner.temp }}/upstream-change-intake.md
           if-no-files-found: ignore
           retention-days: 30
+
+  platform-gates:
+    name: PTY / WSL / SSH (${{ matrix.os }})
+    needs: sync
+    if: needs.sync.result == 'success'
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout vendor-integration
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.sync.outputs.vendor_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tested vendor commit
+        env:
+          VENDOR_SHA: ${{ needs.sync.outputs.vendor_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$VENDOR_SHA"
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Run PTY, WSL, and SSH platform contracts
+        run: node config/scripts/run-upstream-sync-gates.mjs --suite=platform
 
   propose:
     name: propose reviewed vendor update
     needs:
       - sync
       - gates
-    if: needs.gates.result == 'success'
+      - platform-gates
+    if: needs.gates.result == 'success' && needs.platform-gates.result == 'success'
     permissions:
       contents: read
       pull-requests: write

@@ -174,6 +174,7 @@ export async function saveMobileSession(session: MobileSession): Promise<void> {
 }
 
 export async function clearStoredMobileSession(): Promise<void> {
+  invalidateMobileSessionRefreshes()
   await Promise.all([
     SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
@@ -182,13 +183,25 @@ export async function clearStoredMobileSession(): Promise<void> {
 }
 
 let refreshInFlight: { refreshToken: string; promise: Promise<MobileSession> } | null = null
+let refreshEpoch = 0
+
+export function invalidateMobileSessionRefreshes(): void {
+  refreshEpoch += 1
+  // Do not hand a caller the superseded promise when a new sign-in or
+  // sign-out immediately starts another refresh with the same token.
+  refreshInFlight = null
+}
 
 export function refreshMobileSession(refreshToken: string): Promise<MobileSession> {
   if (refreshInFlight?.refreshToken === refreshToken) {
     return refreshInFlight.promise
   }
+  const expectedEpoch = refreshEpoch
   const promise = (async () => {
     const session = parseSession(await request('/hive/v1/auth/session-refresh', { refreshToken }))
+    if (refreshEpoch !== expectedEpoch) {
+      throw new Error('mobile_session_refresh_superseded')
+    }
     await saveMobileSession(session)
     return session
   })()

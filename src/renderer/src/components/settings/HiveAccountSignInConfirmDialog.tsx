@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { KeyRound, Loader2, Monitor } from 'lucide-react'
 import type { HiveAccountSignInOptions } from '../../../../shared/hive-account'
 import type { HiveAccountSmsChallenge } from '../../../../shared/hive-account'
@@ -20,6 +20,7 @@ export function HiveAccountSignInConfirmDialog({
   onOpenChange,
   onConfirm,
   onSmsStart,
+  onSmsCancel,
   onSmsComplete,
   signingIn
 }: {
@@ -30,6 +31,7 @@ export function HiveAccountSignInConfirmDialog({
     phoneNumber: string,
     sessionProfile: HiveAccountSignInOptions['sessionProfile']
   ) => Promise<HiveAccountSmsChallenge>
+  onSmsCancel?: () => Promise<void> | void
   onSmsComplete?: (challengeId: string, smsCode: string) => Promise<void>
   signingIn: boolean
 }): React.JSX.Element {
@@ -40,6 +42,9 @@ export function HiveAccountSignInConfirmDialog({
   const [challenge, setChallenge] = useState<HiveAccountSmsChallenge | null>(null)
   const [smsError, setSmsError] = useState<string | null>(null)
   const [smsTermsAccepted, setSmsTermsAccepted] = useState(false)
+  const [startingSms, setStartingSms] = useState(false)
+  const smsAttempt = useRef(0)
+  const smsBusy = signingIn || startingSms
 
   useEffect(() => {
     if (!open) {
@@ -58,11 +63,20 @@ export function HiveAccountSignInConfirmDialog({
       setSmsError('Enter a valid phone number and accept the terms.')
       return
     }
+    const attempt = ++smsAttempt.current
     setSmsError(null)
+    setStartingSms(true)
     try {
-      setChallenge(await onSmsStart(phoneNumber.trim(), trusted ? 'TRUSTED' : 'TEMPORARY'))
+      const nextChallenge = await onSmsStart(phoneNumber.trim(), trusted ? 'TRUSTED' : 'TEMPORARY')
+      if (attempt === smsAttempt.current) {
+        setChallenge(nextChallenge)
+      }
     } catch {
-      setSmsError('Unable to send a code. Try again.')
+      if (attempt === smsAttempt.current) {
+        setSmsError('Unable to send a code. Try again.')
+      }
+    } finally {
+      setStartingSms(false)
     }
   }
 
@@ -79,8 +93,26 @@ export function HiveAccountSignInConfirmDialog({
     }
   }
 
+  const handleOpenChange = (nextOpen: boolean): void => {
+    if (!nextOpen) {
+      smsAttempt.current += 1
+      void onSmsCancel?.()
+    }
+    onOpenChange(nextOpen)
+  }
+
+  const switchMethod = (nextMethod: 'sms' | 'browser'): void => {
+    if (nextMethod === 'browser') {
+      smsAttempt.current += 1
+      void onSmsCancel?.()
+      setChallenge(null)
+      setSmsCode('')
+    }
+    setMethod(nextMethod)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
           <DialogTitle>
@@ -107,7 +139,7 @@ export function HiveAccountSignInConfirmDialog({
             type="button"
             size="sm"
             variant={method === 'sms' ? 'default' : 'outline'}
-            onClick={() => setMethod('sms')}
+            onClick={() => switchMethod('sms')}
           >
             {translate('auto.components.settings.orcaAccount.smsLogin', 'Phone verification')}
           </Button>
@@ -115,7 +147,7 @@ export function HiveAccountSignInConfirmDialog({
             type="button"
             size="sm"
             variant={method === 'browser' ? 'default' : 'outline'}
-            onClick={() => setMethod('browser')}
+            onClick={() => switchMethod('browser')}
           >
             {translate('auto.components.settings.orcaAccount.browserLogin', 'Browser sign-in')}
           </Button>
@@ -132,7 +164,7 @@ export function HiveAccountSignInConfirmDialog({
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                 value={phoneNumber}
                 onChange={(event) => setPhoneNumber(event.target.value)}
-                disabled={Boolean(challenge) || signingIn}
+                disabled={Boolean(challenge) || smsBusy}
                 inputMode="tel"
                 autoComplete="tel"
                 placeholder="13800138000"
@@ -150,7 +182,7 @@ export function HiveAccountSignInConfirmDialog({
                   onChange={(event) =>
                     setSmsCode(event.target.value.replace(/\D/g, '').slice(0, 6))
                   }
-                  disabled={signingIn}
+                  disabled={smsBusy}
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   placeholder="••••••"
@@ -167,7 +199,7 @@ export function HiveAccountSignInConfirmDialog({
               <Checkbox
                 checked={smsTermsAccepted}
                 onCheckedChange={(checked) => setSmsTermsAccepted(checked === true)}
-                disabled={signingIn}
+                disabled={smsBusy}
               />
               <span>
                 {translate(
@@ -185,9 +217,9 @@ export function HiveAccountSignInConfirmDialog({
               type="button"
               className="w-full"
               onClick={() => void (challenge ? completeSms() : startSms())}
-              disabled={signingIn}
+              disabled={smsBusy}
             >
-              {signingIn ? <Loader2 className="size-4 animate-spin" /> : null}
+              {smsBusy ? <Loader2 className="size-4 animate-spin" /> : null}
               {challenge
                 ? translate('auto.components.settings.orcaAccount.verifySms', 'Verify and sign in')
                 : translate(

@@ -145,18 +145,30 @@ const SidebarFooter = React.memo(function SidebarFooter() {
     }
   }
 
-  const startSmsSignIn = (
+  const startSmsSignIn = async (
     phoneNumber: string,
     sessionProfile: HiveAccountSignInOptions['sessionProfile']
   ) => {
-    if (!window.api.hiveAccount.startSmsSignIn) {
-      return Promise.reject(new Error('sms_sign_in_unavailable'))
+    if (signingIn) {
+      throw new Error('hive_account_sms_sign_in_pending')
     }
-    return window.api.hiveAccount.startSmsSignIn({
-      phoneNumber,
-      sessionProfile,
-      termsAccepted: true
-    })
+    if (!window.api.hiveAccount.startSmsSignIn) {
+      throw new Error('sms_sign_in_unavailable')
+    }
+    setSigningIn(true)
+    try {
+      return await window.api.hiveAccount.startSmsSignIn({
+        phoneNumber,
+        sessionProfile,
+        termsAccepted: true
+      })
+    } finally {
+      setSigningIn(false)
+    }
+  }
+
+  const cancelSmsSignIn = async (): Promise<void> => {
+    await window.api.hiveAccount.cancelSmsSignIn?.()
   }
 
   const completeSmsSignIn = async (challengeId: string, smsCode: string): Promise<void> => {
@@ -412,6 +424,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
         onOpenChange={setSignInOpen}
         onConfirm={(sessionProfile) => void signIn(sessionProfile)}
         onSmsStart={startSmsSignIn}
+        onSmsCancel={cancelSmsSignIn}
         onSmsComplete={completeSmsSignIn}
         signingIn={signingIn}
       />

@@ -13,6 +13,7 @@ export type HiveAccountApi = {
   getState: () => Promise<HiveAccountState>
   signIn: (options: HiveAccountSignInOptions) => Promise<HiveAccountSignInResult>
   startSmsSignIn?: (options: HiveAccountSmsSignInOptions) => Promise<HiveAccountSmsChallenge>
+  cancelSmsSignIn?: () => Promise<void>
   completeSmsSignIn?: (options: HiveAccountSmsVerifyOptions) => Promise<HiveAccountSignInResult>
   refresh: () => Promise<HiveAccountRefreshResult>
   signOut: () => Promise<HiveAccountSignOutResult>

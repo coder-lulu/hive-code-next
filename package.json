@@ -23,6 +23,7 @@
     "check:react-doctor:changed": "node config/scripts/check-react-doctor-changed.mjs",
     "check:zustand-selector-fanout": "node config/scripts/zustand-selector-fanout-benchmark.mjs --check",
     "audit:fork-delta": "node config/scripts/audit-fork-delta.mjs",
+    "audit:upstream-changes": "node config/scripts/track-upstream-changes.mjs",
     "doctor": "pnpm dlx react-doctor@0.9.1 . --no-telemetry",
     "lint:react-doctor": "oxlint --config config/oxlint-react-doctor.json",
     "lint:react-doctor:changed": "node config/scripts/lint-react-doctor-changed.mjs",
@@ -33,6 +34,7 @@
     "check:reliability-gates": "node config/scripts/check-reliability-gates.mjs",
     "check:max-lines-ratchet": "node config/scripts/check-max-lines-ratchet.mjs",
     "check:brand-boundary": "node config/scripts/check-hivecode-brand-boundary.mjs",
+    "verify:upstream-sync-gates": "node config/scripts/run-upstream-sync-gates.mjs --suite=common",
     "check:runtime-electron-ratchet": "node config/scripts/check-runtime-electron-ratchet.mjs",
     "build:orcad": "node config/scripts/build-orcad.mjs",
     "smoke:orcad-terminal": "node config/scripts/ensure-native-runtime.mjs --runtime=node && pnpm run build:cli && pnpm run build:orcad && node config/scripts/runtime-serve-terminal-smoke.mjs --target orcad",
@@ -229,7 +231,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "dompurify": "^3.4.13",
-    "electron": "^43.1.0",
+    "electron": "43.1.0",
     "electron-builder": "^26.15.3",
     "electron-builder-squirrel-windows": "^26.15.3",
     "electron-vite": "^5.0.0",
@@ -278,7 +280,7 @@
     "typescript-api": "npm:typescript@6.0.3",
     "unified": "^11.0.5",
     "vite": "npm:rolldown-vite@7.3.1",
-    "vitest": "^4.1.5",
+    "vitest": "4.1.5",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2",
     "zustand": "^5.0.14"
@@ -303,7 +305,8 @@
     ]
   },
   "engines": {
-    "node": "24"
+    "node": "24.18.0",
+    "pnpm": ">=10.24.0 <11"
   },
   "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
   "pnpm": {

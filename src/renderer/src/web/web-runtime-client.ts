@@ -1,8 +1,22 @@
 /* eslint-disable max-lines -- Why: one transport boundary — E2EE WebSocket state machine, JSON-RPC routing, streaming, binary frame forwarding. */
-import type { RuntimeRpcResponse, RuntimeRpcSuccess } from '../../../shared/runtime-rpc-envelope'
+import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { isKeepaliveFrame } from '../../../shared/runtime-rpc-envelope'
 import type { WebPairingOffer } from './web-pairing'
 import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'
+import {
+  createFileWatchReplayOverflowResponse,
+  getFileWatchSubscriptionId,
+  isEndResult,
+  isFileWatchStartingResponse,
+  isRuntimeFailureResponse,
+  normalizeConnection,
+  websocketPayloadToUint8,
+  type WebRuntimeConnection
+} from './web-runtime-client-protocol'
+import {
+  createWebRuntimeClientTransport,
+  type WebRuntimeClientTransport
+} from './web-runtime-client-transport'
 import { installWindowVisibilityInterval } from '../lib/window-visibility-interval'
 import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime-tailscale-hint'
 import { applyProductBranding } from '../../../shared/brand'
@@ -10,8 +24,6 @@ import {
   decrypt,
   decryptBytes,
   deriveSharedKey,
-  encrypt,
-  encryptBytes,
   generateKeyPair,
   publicKeyFromBase64,
   publicKeyToBase64
@@ -77,24 +89,8 @@ const HEARTBEAT_INTERVAL_MS = 10_000
 const HEARTBEAT_IDLE_MS = 25_000
 const HEARTBEAT_PROBE_GRACE_MS = 20_000
 
-type WebRuntimeConnection =
-  | {
-      kind: 'pairing'
-      endpoint: string
-      publicKeyB64: string
-      deviceToken: string
-    }
-  | {
-      kind: 'cloud-managed'
-      endpoint: string
-      publicKeyB64: string
-      managedWebSessionId: string
-      runtimeSessionId: string
-      sessionToken: string
-      expiresAt: string
-    }
-
 export class WebRuntimeClient {
+  private readonly transport: WebRuntimeClientTransport
   private ws: WebSocket | null = null
   private sharedKey: Uint8Array | null = null
   private state: WebRuntimeConnectionState = 'disconnected'
@@ -121,6 +117,11 @@ export class WebRuntimeClient {
   constructor(input: WebPairingOffer | CloudLaunchBootstrap | WebRuntimeConnection) {
     this.connection = normalizeConnection(input)
     this.serverPublicKey = publicKeyFromBase64(this.connection.publicKeyB64)
+    this.transport = createWebRuntimeClientTransport({
+      waitForConnected: (timeoutMs) => this.waitForConnected(timeoutMs),
+      getWebSocket: () => this.ws,
+      getSharedKey: () => this.sharedKey
+    })
     this.openConnection()
   }
 
@@ -129,7 +130,7 @@ export class WebRuntimeClient {
     params?: unknown,
     options?: { timeoutMs?: number }
   ): Promise<RuntimeRpcResponse<unknown>> {
-    await this.waitForConnected(options?.timeoutMs)
+    await this.transport.connectionWaiters.wait(options?.timeoutMs)
     return new Promise((resolve, reject) => {
       const id = this.nextId()
       const timeoutMs = options?.timeoutMs ?? REQUEST_TIMEOUT_MS
@@ -138,7 +139,7 @@ export class WebRuntimeClient {
         reject(new Error(`Request timed out: ${method}`))
       }, timeoutMs)
       this.pending.set(id, { method, resolve, reject, timeout })
-      if (!this.sendEncrypted({ id, ...this.rpcCredential(), method, params })) {
+      if (!this.transport.sendEncrypted({ id, ...this.rpcCredential(), method, params })) {
         this.pending.delete(id)
         window.clearTimeout(timeout)
         reject(new Error(applyProductBranding('Remote Orca runtime is not connected.')))
@@ -346,11 +347,11 @@ export class WebRuntimeClient {
     callbacks: SubscriptionCallbacks,
     options?: SubscribeOptions
   ): Promise<WebRuntimeSubscriptionHandle> {
-    await this.waitForConnected(options?.timeoutMs)
+    await this.transport.connectionWaiters.wait(options?.timeoutMs)
     const id = this.nextId()
     const subscription: RuntimeSubscription = { id, method, params, callbacks, needsReplay: false }
     this.subscriptions.set(id, subscription)
-    if (!this.sendEncrypted({ id, ...this.rpcCredential(), method, params })) {
+    if (!this.transport.sendEncrypted({ id, ...this.rpcCredential(), method, params })) {
       this.subscriptions.delete(id)
       throw new Error(applyProductBranding('Remote Orca runtime is not connected.'))
     }
@@ -360,7 +361,7 @@ export class WebRuntimeClient {
         // Tell the server to reap its keyed cleanup before the socket closes; best-effort (a closed socket already reaps).
         const teardown = options?.buildUnsubscribe?.(params)
         if (teardown) {
-          this.sendEncrypted({
+          this.transport.sendEncrypted({
             id: this.nextId(),
             ...this.rpcCredential(),
             method: teardown.method,
@@ -369,7 +370,7 @@ export class WebRuntimeClient {
         }
       },
       sendBinary: (bytes) => {
-        this.sendEncryptedBinary(bytes)
+        this.transport.sendEncryptedBinary(bytes)
       }
     }
   }
@@ -479,7 +480,7 @@ export class WebRuntimeClient {
       try {
         const control = JSON.parse(raw) as { type?: unknown }
         if (control.type === 'e2ee_ready') {
-          this.sendEncrypted(this.authenticationFrame())
+          this.transport.sendEncrypted(this.authenticationFrame())
           return
         }
       } catch {
@@ -539,12 +540,18 @@ export class WebRuntimeClient {
       return
     }
 
-    let response: RuntimeRpcResponse<unknown> | Record<string, unknown>
+    let parsed: unknown
     try {
-      response = JSON.parse(plaintext) as RuntimeRpcResponse<unknown> | Record<string, unknown>
+      parsed = JSON.parse(plaintext) as unknown
     } catch {
       return
     }
+    // Why: an authenticated runtime can still send a malformed JSON value; reject primitive and
+    // array frames before using object-only operators so a bad frame cannot create an unhandled rejection.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return
+    }
+    const response = parsed as RuntimeRpcResponse<unknown> | Record<string, unknown>
     if (isKeepaliveFrame(response)) {
       return
     }
@@ -583,24 +590,6 @@ export class WebRuntimeClient {
     this.pending.delete(response.id)
     window.clearTimeout(pending.timeout)
     pending.resolve(response as RuntimeRpcResponse<unknown>)
-  }
-
-  private sendEncrypted(message: unknown): boolean {
-    const ws = this.ws
-    if (!ws || ws.readyState !== WebSocket.OPEN || !this.sharedKey) {
-      return false
-    }
-    ws.send(encrypt(JSON.stringify(message), this.sharedKey))
-    return true
-  }
-
-  private sendEncryptedBinary(bytes: Uint8Array<ArrayBufferLike>): boolean {
-    const ws = this.ws
-    if (!ws || ws.readyState !== WebSocket.OPEN || !this.sharedKey) {
-      return false
-    }
-    ws.send(encryptBytes(bytes, this.sharedKey))
-    return true
   }
 
   private waitForConnected(timeoutMs = REQUEST_TIMEOUT_MS): Promise<void> {
@@ -741,7 +730,7 @@ export class WebRuntimeClient {
       subscription.needsReplay = false
       this.subscriptions.set(subscription.id, subscription)
       if (
-        this.sendEncrypted({
+        this.transport.sendEncrypted({
           id: subscription.id,
           ...this.rpcCredential(),
           method: subscription.method,
@@ -856,7 +845,7 @@ export class WebRuntimeClient {
     if (this.heartbeatProbeSentAt === null && now - this.lastInboundFrameAt >= HEARTBEAT_IDLE_MS) {
       // Why: fire-and-forget liveness probe; its id is intentionally unmatched so it registers no pending request/timeout.
       if (
-        this.sendEncrypted({
+        this.transport.sendEncrypted({
           id: `web-heartbeat-${this.nextId()}`,
           ...this.rpcCredential(),
           method: 'status.get'
@@ -893,106 +882,4 @@ export class WebRuntimeClient {
           clientCapabilities
         }
   }
-}
-
-function normalizeConnection(
-  input: WebPairingOffer | CloudLaunchBootstrap | WebRuntimeConnection
-): WebRuntimeConnection {
-  if ('kind' in input) {
-    return input
-  }
-  if ('protocolVersion' in input) {
-    return {
-      kind: 'cloud-managed',
-      endpoint: input.websocketUrl,
-      publicKeyB64: input.serverPublicKeyB64,
-      managedWebSessionId: input.managedWebSessionId,
-      runtimeSessionId: input.runtimeSessionId,
-      sessionToken: input.sessionToken,
-      expiresAt: input.expiresAt
-    }
-  }
-  return {
-    kind: 'pairing',
-    endpoint: input.endpoint,
-    publicKeyB64: input.publicKeyB64,
-    deviceToken: input.deviceToken
-  }
-}
-
-function isRuntimeFailureResponse(
-  response: RuntimeRpcResponse<unknown> | Record<string, unknown>
-): response is RuntimeRpcResponse<unknown> & { ok: false } {
-  return (
-    'ok' in response &&
-    response.ok === false &&
-    'error' in response &&
-    !!response.error &&
-    typeof response.error === 'object' &&
-    'code' in response.error
-  )
-}
-
-function getFileWatchSubscriptionId(response: RuntimeRpcResponse<unknown>): string | null {
-  if (!response.ok) {
-    return null
-  }
-  const result = response.result
-  if (!result || typeof result !== 'object') {
-    return null
-  }
-  const subscriptionId = (result as { subscriptionId?: unknown }).subscriptionId
-  return typeof subscriptionId === 'string' ? subscriptionId : null
-}
-
-function createFileWatchReplayOverflowResponse(
-  readyResponse: RuntimeRpcSuccess<unknown>,
-  params: unknown
-): RuntimeRpcSuccess<{
-  type: 'changed'
-  worktree: string
-  events: { kind: 'overflow'; absolutePath: string }[]
-}> {
-  const worktree = (params as { worktree?: unknown } | null)?.worktree
-  return {
-    id: readyResponse.id,
-    ok: true,
-    result: {
-      type: 'changed',
-      worktree: typeof worktree === 'string' ? worktree : '',
-      // Why: overflow consumers re-scan the whole root and ignore the path (client lacks the server-side root here).
-      events: [{ kind: 'overflow', absolutePath: '' }]
-    },
-    _meta: readyResponse._meta
-  }
-}
-
-function isFileWatchStartingResponse(
-  response: RuntimeRpcResponse<unknown>
-): response is RuntimeRpcSuccess<{ type: 'starting'; subscriptionId: string }> {
-  return (
-    response.ok &&
-    !!response.result &&
-    typeof response.result === 'object' &&
-    (response.result as { type?: unknown }).type === 'starting'
-  )
-}
-
-function isEndResult(value: unknown): value is { type: 'end' } {
-  return !!value && typeof value === 'object' && (value as { type?: unknown }).type === 'end'
-}
-
-async function websocketPayloadToUint8(
-  value: unknown
-): Promise<Uint8Array<ArrayBufferLike> | null> {
-  if (value instanceof Uint8Array) {
-    return value
-  }
-  if (value instanceof ArrayBuffer) {
-    return new Uint8Array(value)
-  }
-  if (value instanceof Blob) {
-    return new Uint8Array(await value.arrayBuffer())
-  }
-  return null
 }

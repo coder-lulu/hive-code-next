@@ -93,6 +93,7 @@ describe('HiveAccountSettingsPane', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCloud' }))
     expect(screen.getByText('Approve HiveCloud sign-in')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Browser sign-in' }))
     await user.click(screen.getByRole('button', { name: 'Approve sign-in' }))
     expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TEMPORARY' })
     await waitFor(() => expect(screen.getByText('Ada')).toBeInTheDocument())
@@ -110,6 +111,7 @@ describe('HiveAccountSettingsPane', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCloud' }))
     await user.click(screen.getByRole('checkbox', { name: 'Trust this device' }))
+    await user.click(screen.getByRole('button', { name: 'Browser sign-in' }))
     await user.click(screen.getByRole('button', { name: 'Approve sign-in' }))
 
     expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TRUSTED' })

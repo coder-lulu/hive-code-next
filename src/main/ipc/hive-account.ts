@@ -10,7 +10,13 @@ import { HiveAccountService } from '../hive-account/hive-account-service'
 
 type HiveAccountHandlerService = Pick<
   HiveAccountService,
-  'getState' | 'signIn' | 'startSmsSignIn' | 'completeSmsSignIn' | 'refresh' | 'signOut'
+  | 'getState'
+  | 'signIn'
+  | 'startSmsSignIn'
+  | 'cancelSmsSignIn'
+  | 'completeSmsSignIn'
+  | 'refresh'
+  | 'signOut'
 >
 
 export type HiveAccountHandlerDependencies = {
@@ -124,6 +130,7 @@ export function registerHiveAccountHandlers(
   ipcMain.handle('hiveAccount:startSmsSignIn', (_event, options) =>
     service.startSmsSignIn(requireHiveAccountSmsSignInOptions(options))
   )
+  ipcMain.handle('hiveAccount:cancelSmsSignIn', () => service.cancelSmsSignIn())
   ipcMain.handle('hiveAccount:completeSmsSignIn', (_event, options) =>
     service.completeSmsSignIn(requireHiveAccountSmsVerifyOptions(options))
   )

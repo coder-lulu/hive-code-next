@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 const DEFAULT_BASE = 'upstream/main'
 const DEFAULT_HEAD = 'HEAD'
+const SYNC_BOUNDARY = JSON.parse(
+  readFileSync(new URL('../upstream-sync-boundary.json', import.meta.url), 'utf8')
+)
 
 const UPSTREAM_CORE_PREFIXES = [
   'src/main/runtime/',
@@ -110,6 +113,33 @@ export function classifyForkPath(filePath) {
   }
 
   return classes
+}
+
+function matchesBoundaryPrefix(filePath, prefix) {
+  const normalized = filePath.replaceAll('\\', '/')
+  return normalized === prefix || normalized.startsWith(prefix)
+}
+
+export function classifySyncBoundaryPath(filePath) {
+  if (
+    SYNC_BOUNDARY.productBoundary.paths.some((prefix) => matchesBoundaryPrefix(filePath, prefix))
+  ) {
+    return 'productBoundary'
+  }
+  if (SYNC_BOUNDARY.manualReview.paths.some((prefix) => matchesBoundaryPrefix(filePath, prefix))) {
+    return 'manualReview'
+  }
+  if (
+    SYNC_BOUNDARY.moduleSplitTargets?.some((target) =>
+      target.boundaryPaths?.some((prefix) => matchesBoundaryPrefix(filePath, prefix))
+    )
+  ) {
+    return 'manualReview'
+  }
+  if (SYNC_BOUNDARY.directAbsorb.paths.some((prefix) => matchesBoundaryPrefix(filePath, prefix))) {
+    return 'directAbsorb'
+  }
+  return null
 }
 
 function parseOwnCommits(output) {
@@ -220,6 +250,13 @@ export function collectForkDelta({ base = DEFAULT_BASE, head = DEFAULT_HEAD, git
     .filter(Boolean)
     .map((line) => sanitizeEndpointMatch(line, resolvedHead))
 
+  const boundaryFiles = (className) =>
+    uniqueSorted(
+      changedFiles
+        .flatMap((change) => [change.path, change.oldPath].filter(Boolean))
+        .filter((filePath) => classifySyncBoundaryPath(filePath) === className)
+    )
+
   return {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -237,7 +274,10 @@ export function collectForkDelta({ base = DEFAULT_BASE, head = DEFAULT_HEAD, git
     upstreamEndpointMatches,
     rpcSchemaFiles: pathsForClass(changedFiles, 'rpcSchema'),
     persistenceFiles: pathsForClass(changedFiles, 'persistence'),
-    blueprintPetFiles: pathsForClass(changedFiles, 'blueprintPet')
+    blueprintPetFiles: pathsForClass(changedFiles, 'blueprintPet'),
+    productBoundaryFiles: boundaryFiles('productBoundary'),
+    directAbsorbFiles: boundaryFiles('directAbsorb'),
+    manualReviewFiles: boundaryFiles('manualReview')
   }
 }
 
@@ -284,6 +324,18 @@ ${renderItems(report.upstreamCoreFiles)}
 ## Product overlay files (${report.productOverlayFiles.length})
 
 ${renderItems(report.productOverlayFiles)}
+
+## Synchronization boundary: product-owned (${report.productBoundaryFiles?.length ?? 0})
+
+${renderItems(report.productBoundaryFiles ?? [])}
+
+## Synchronization boundary: directly absorbable (${report.directAbsorbFiles?.length ?? 0})
+
+${renderItems(report.directAbsorbFiles ?? [])}
+
+## Synchronization boundary: manual review (${report.manualReviewFiles?.length ?? 0})
+
+${renderItems(report.manualReviewFiles ?? [])}
 
 ## HiveCode literal files (${report.hivecodeLiteralFiles.length})
 

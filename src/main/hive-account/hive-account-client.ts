@@ -241,7 +241,12 @@ export class HiveAccountClient {
       typeof value.challengeId !== 'string' ||
       !/^[0-9a-f]{32}$/.test(value.challengeId) ||
       typeof value.expiresInSeconds !== 'number' ||
-      typeof value.resendAfterSeconds !== 'number'
+      !Number.isSafeInteger(value.expiresInSeconds) ||
+      value.expiresInSeconds <= 0 ||
+      typeof value.resendAfterSeconds !== 'number' ||
+      !Number.isSafeInteger(value.resendAfterSeconds) ||
+      value.resendAfterSeconds < 0 ||
+      value.resendAfterSeconds > value.expiresInSeconds
     ) {
       throw new Error('invalid_hive_sms_challenge_response')
     }

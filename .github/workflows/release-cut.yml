@@ -829,7 +829,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux
           - os: macos-15
             platform: mac
@@ -1021,7 +1021,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux
           - os: macos-15
             platform: mac
@@ -1106,7 +1106,7 @@ jobs:
             eb_cache_path: |
               ~\AppData\Local\electron\Cache
               ~\AppData\Local\electron-builder\Cache
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux-x64
             release_command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm --x64 --publish always
             unpacked_dir: dist/linux-unpacked
@@ -1177,7 +1177,7 @@ jobs:
       # been observed on Linux runners — see run 25081763129. The macOS
       # and Windows release jobs exercise the same pnpm install path and
       # have not reproduced it, so keep the gate narrow until we know why.
-      # Using runner.os instead of matrix.os == 'ubuntu-latest' means the
+      # Using runner.os instead of matrix.os == 'ubuntu-22.04' means the
       # gate still works if another Linux matrix entry is added later.
       - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
         if: runner.os == 'Linux'

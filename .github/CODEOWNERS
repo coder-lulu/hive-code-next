@@ -13,6 +13,7 @@
 /mobile/src/transport/ @coder-lulu
 /config/hivecode-brand-allowlist.json @coder-lulu
 /config/product/hivecode.product.json @coder-lulu
+/config/upstream-sync-boundary.json @coder-lulu
 /config/scripts/audit-fork-delta.mjs @coder-lulu
 /config/scripts/audit-fork-delta.test.mjs @coder-lulu
 /config/scripts/check-hivecode-brand-boundary.mjs @coder-lulu

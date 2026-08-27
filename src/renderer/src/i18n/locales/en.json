@@ -11383,7 +11383,15 @@
           "trustedApprovalDescription": "Keep an operating-system-encrypted sign-in for up to 90 days.",
           "temporaryApprovalDescription": "Use a temporary sign-in for up to 24 hours; closing the app removes it.",
           "cancelRequest": "Cancel request",
-          "approveSignIn": "Approve sign-in"
+          "approveSignIn": "Approve sign-in",
+          "smsLogin": "Phone verification",
+          "browserLogin": "Browser sign-in",
+          "phoneNumber": "Phone number",
+          "smsCode": "SMS code",
+          "smsExpiry": "Code expires in {seconds}s.",
+          "smsTerms": "I agree to the Terms of Service and Privacy Policy",
+          "verifySms": "Verify and sign in",
+          "sendSms": "Send verification code"
         },
         "automations": {
           "showButton": "Show Automations Button",

@@ -783,8 +783,10 @@ describe('WebRuntimeClient', () => {
       publicKeyB64: Buffer.alloc(32).toString('base64')
     })
     const internals = client as unknown as {
-      waitForConnected: (timeoutMs?: number) => Promise<void>
-      sendEncrypted: (message: unknown) => boolean
+      transport: {
+        connectionWaiters: { wait: (timeoutMs?: number) => Promise<void> }
+        sendEncrypted: (message: unknown) => boolean
+      }
       subscribeOnCurrentConnection: (
         method: string,
         params: unknown,
@@ -792,9 +794,9 @@ describe('WebRuntimeClient', () => {
         options?: { buildUnsubscribe?: (params: unknown) => unknown }
       ) => Promise<{ unsubscribe: () => void }>
     }
-    vi.spyOn(internals, 'waitForConnected').mockResolvedValue(undefined)
+    internals.transport.connectionWaiters.wait = vi.fn().mockResolvedValue(undefined)
     const sent: unknown[] = []
-    vi.spyOn(internals, 'sendEncrypted').mockImplementation((message) => {
+    internals.transport.sendEncrypted = vi.fn((message) => {
       sent.push(message)
       return true
     })

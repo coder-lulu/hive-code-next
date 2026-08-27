@@ -44,11 +44,13 @@
     "config/scripts/product-release-workflow-boundary.test.mjs",
     "config/scripts/sign-windows-artifact.mjs",
     "config/scripts/sign-windows-artifact.test.mjs",
+    "config/scripts/upstream-sync-boundary-contract.test.mjs",
     "config/scripts/verify-cli-bin.mjs",
     "config/scripts/verify-cli-bin.test.mjs",
     "config/scripts/verify-hivecode-windows-artifact.mjs",
     "config/scripts/verify-windows-inner-signature.mjs",
     "config/scripts/windows-native-build-patch-contract.test.mjs",
+    "config/upstream-sync-boundary.json",
     "docs/engineering/fork-boundary-policy.md",
     "docs/engineering/product-design.md",
     "docs/readme/README.es.md",
@@ -57,6 +59,7 @@
     "docs/readme/README.ko.md",
     "docs/readme/README.pt.md",
     "docs/readme/README.zh-CN.md",
+    "docs/reference/build-toolchain.md",
     "docs/reference/git-compatibility.md",
     "docs/reference/headless-linux-server.md",
     "docs/reference/linux-glibc-compatibility.md",
@@ -246,7 +249,7 @@
     "src/shared/runtime-environment-store.ts"
   ],
   "protectedFileHashes": {
-    ".gitignore": "287dc34a47a75b585ba4bd8b066dbbb79d73a8e45b51b83973d1cf016f7e7e2c",
+    ".gitignore": "ec030f34b744d9afb6b85b40e30c7f2bd9fdf69050438d1b9c9a910c49714d6a",
     ".gitattributes": "d2e174a66bd2b89ac9b523df5cb5faadf7443f8492b96aad8e79c018ad289a35"
   }
 }

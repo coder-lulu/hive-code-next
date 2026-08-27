@@ -607,7 +607,7 @@ describe('Electron runtime package contract', () => {
       'terminal-long-table-scroll-restore.spec.ts'
     )
     expect(goldenMatrix).toEqual([
-      { os: 'ubuntu-latest', platform: 'linux' },
+      { os: 'ubuntu-22.04', platform: 'linux' },
       { os: 'macos-15', platform: 'mac' },
       { os: 'windows-2022', platform: 'windows' }
     ])

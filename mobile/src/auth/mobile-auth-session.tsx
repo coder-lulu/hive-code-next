@@ -10,6 +10,7 @@ import {
 } from 'react'
 import {
   clearStoredMobileSession,
+  invalidateMobileSessionRefreshes,
   isTerminalMobileSessionError,
   loadStoredMobileSession,
   refreshMobileSession,
@@ -102,7 +103,13 @@ export function MobileAuthSessionProvider(props: PropsWithChildren) {
     }
   }, [applySession])
 
-  const signIn = useCallback((next: MobileSession) => applySession(next), [applySession])
+  const signIn = useCallback(
+    (next: MobileSession) => {
+      invalidateMobileSessionRefreshes()
+      applySession(next)
+    },
+    [applySession]
+  )
 
   const refresh = useCallback(async () => {
     const current = sessionRef.current

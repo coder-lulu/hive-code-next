@@ -164,15 +164,27 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
     }
   }
 
-  const startSmsSignIn = (phoneNumber: string, sessionProfile: 'TEMPORARY' | 'TRUSTED') => {
-    if (!window.api.hiveAccount.startSmsSignIn) {
-      return Promise.reject(new Error('sms_sign_in_unavailable'))
+  const startSmsSignIn = async (phoneNumber: string, sessionProfile: 'TEMPORARY' | 'TRUSTED') => {
+    if (busy) {
+      throw new Error('hive_account_sms_sign_in_pending')
     }
-    return window.api.hiveAccount.startSmsSignIn({
-      phoneNumber,
-      sessionProfile,
-      termsAccepted: true
-    })
+    if (!window.api.hiveAccount.startSmsSignIn) {
+      throw new Error('sms_sign_in_unavailable')
+    }
+    setBusy('sign-in')
+    try {
+      return await window.api.hiveAccount.startSmsSignIn({
+        phoneNumber,
+        sessionProfile,
+        termsAccepted: true
+      })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const cancelSmsSignIn = async (): Promise<void> => {
+    await window.api.hiveAccount.cancelSmsSignIn?.()
   }
 
   const completeSmsSignIn = async (challengeId: string, smsCode: string): Promise<void> => {
@@ -362,6 +374,7 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
         onOpenChange={setSignInOpen}
         onConfirm={(sessionProfile) => void signIn(sessionProfile)}
         onSmsStart={startSmsSignIn}
+        onSmsCancel={cancelSmsSignIn}
         onSmsComplete={completeSmsSignIn}
         signingIn={busy === 'sign-in'}
       />

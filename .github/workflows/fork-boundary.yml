@@ -20,13 +20,21 @@ on:
       - 'config/product/**'
       - 'config/scripts/audit-fork-delta.*'
       - 'config/scripts/check-hivecode-brand-boundary.*'
+      - 'config/upstream-sync-boundary.json'
       - 'config/scripts/generate-product-config.*'
       - 'src/main/runtime/**'
+      - 'src/main/git/**'
+      - 'src/main/providers/ssh-git-provider*'
+      - 'src/main/window/**'
       - 'src/main/orca-profiles/**'
       - 'src/main/persistence/**'
       - 'src/main/product/**'
       - 'src/relay/**'
       - 'src/shared/**'
+      - 'src/renderer/src/components/terminal-pane/pty-connection*'
+      - 'src/renderer/src/web/web-runtime-client*'
+      - 'src/renderer/src/web/web-preload-api*'
+      - 'src/renderer/src/web/preload-api/**'
       - 'mobile/src/transport/**'
       - 'mobile/src/generated/**'
       - 'docs/engineering/fork-boundary-policy.md'
@@ -97,6 +105,9 @@ jobs:
               `- Changed files: \\`${report.changedFiles.length}\\``,
               `- Upstream-core files: \\`${report.upstreamCoreFiles.length}\\``,
               `- Product overlay files: \\`${report.productOverlayFiles.length}\\``,
+              `- Product-boundary files: \\`${report.productBoundaryFiles.length}\\``,
+              `- Direct-absorb files: \\`${report.directAbsorbFiles.length}\\``,
+              `- Manual-review files: \\`${report.manualReviewFiles.length}\\``,
               `- RPC/schema files: \\`${report.rpcSchemaFiles.length}\\``,
               `- Persistence files: \\`${report.persistenceFiles.length}\\``,
               `- Blueprint/Pet files: \\`${report.blueprintPetFiles.length}\\``,

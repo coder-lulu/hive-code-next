@@ -216,7 +216,9 @@ pnpm typecheck
 pnpm test
 ```
 
-Build the desktop application with `pnpm run build:desktop`. Native builds are platform-specific; see the scripts under `config/scripts/` for supported targets.
+Build the desktop application with `pnpm run build:desktop`. The supported Node/pnpm,
+Electron/Vitest versions and Windows/macOS/Linux native build matrix are documented in
+[`docs/reference/build-toolchain.md`](docs/reference/build-toolchain.md).
 
 ## Compatibility
 

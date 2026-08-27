@@ -40,6 +40,9 @@ let userDataPath: string
 let client: {
   discoverAuthorizationEndpoint: ReturnType<typeof vi.fn>
   createDeviceAuthorization: ReturnType<typeof vi.fn>
+  createSmsChallenge: ReturnType<typeof vi.fn>
+  verifySmsChallenge: ReturnType<typeof vi.fn>
+  authorizeSms: ReturnType<typeof vi.fn>
   exchangeSession: ReturnType<typeof vi.fn>
   refreshSession: ReturnType<typeof vi.fn>
   listCloudSessions: ReturnType<typeof vi.fn>
@@ -56,6 +59,16 @@ beforeEach(() => {
         'https://identity.hivekernel.com/realms/hive/protocol/openid-connect/auth'
       ),
     createDeviceAuthorization: vi.fn().mockResolvedValue(undefined),
+    createSmsChallenge: vi.fn().mockResolvedValue({
+      challengeId: '0123456789abcdef0123456789abcdef',
+      expiresInSeconds: 300,
+      resendAfterSeconds: 60
+    }),
+    verifySmsChallenge: vi.fn().mockResolvedValue(undefined),
+    authorizeSms: vi.fn().mockResolvedValue({
+      authorizationCode: 'sms-code',
+      state: 'sms-state'
+    }),
     exchangeSession: vi.fn().mockResolvedValue(sessionResponse),
     refreshSession: vi.fn().mockResolvedValue({
       ...sessionResponse,
@@ -204,6 +217,123 @@ describe('Hive account application service', () => {
       'signed-in',
       'signed-out'
     ])
+  })
+
+  it('allows a cancelled SMS challenge to be started again', async () => {
+    const service = createService()
+    await service.startSmsSignIn({
+      phoneNumber: '+8613800138000',
+      sessionProfile: 'TEMPORARY',
+      termsAccepted: true
+    })
+    service.cancelSmsSignIn()
+
+    await expect(
+      service.startSmsSignIn({
+        phoneNumber: '+8613800138000',
+        sessionProfile: 'TEMPORARY',
+        termsAccepted: true
+      })
+    ).resolves.toMatchObject({ challengeId: '0123456789abcdef0123456789abcdef' })
+    expect(client.createSmsChallenge).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not resurrect a cancelled SMS start that finishes late', async () => {
+    const service = createService()
+    let resolveChallenge:
+      | ((value: {
+          challengeId: string
+          expiresInSeconds: number
+          resendAfterSeconds: number
+        }) => void)
+      | undefined
+    client.createSmsChallenge.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveChallenge = resolve
+      })
+    )
+
+    const start = service.startSmsSignIn({
+      phoneNumber: '+8613800138000',
+      sessionProfile: 'TEMPORARY',
+      termsAccepted: true
+    })
+    await vi.waitFor(() => expect(client.createSmsChallenge).toHaveBeenCalledOnce())
+    service.cancelSmsSignIn()
+    const retry = service.startSmsSignIn({
+      phoneNumber: '+8613800138000',
+      sessionProfile: 'TEMPORARY',
+      termsAccepted: true
+    })
+    resolveChallenge?.({
+      challengeId: '0123456789abcdef0123456789abcdef',
+      expiresInSeconds: 300,
+      resendAfterSeconds: 60
+    })
+
+    await expect(start).rejects.toThrow('hive_account_sms_sign_in_cancelled')
+    await expect(retry).resolves.toMatchObject({ challengeId: '0123456789abcdef0123456789abcdef' })
+    expect(client.createSmsChallenge).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries authorization without re-verifying an already verified SMS challenge', async () => {
+    const service = createService()
+    client.authorizeSms
+      .mockRejectedValueOnce(new HiveAccountRequestError(503, 'unavailable'))
+      .mockResolvedValueOnce({ authorizationCode: 'sms-code-2', state: 'sms-state' })
+
+    await service.startSmsSignIn({
+      phoneNumber: '+8613800138000',
+      sessionProfile: 'TEMPORARY',
+      termsAccepted: true
+    })
+    const first = await service.completeSmsSignIn({
+      challengeId: '0123456789abcdef0123456789abcdef',
+      smsCode: '123456'
+    })
+    expect(first.status).toBe('failed')
+
+    const second = await service.completeSmsSignIn({
+      challengeId: '0123456789abcdef0123456789abcdef',
+      smsCode: '123456'
+    })
+    expect(second.status).toBe('signed-in')
+    expect(client.verifySmsChallenge).toHaveBeenCalledOnce()
+    expect(client.authorizeSms).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a failed SMS exchange with a fresh authorization code', async () => {
+    const service = createService()
+    client.exchangeSession
+      .mockRejectedValueOnce(new HiveAccountRequestError(503, 'unavailable'))
+      .mockResolvedValueOnce(sessionResponse)
+
+    await service.startSmsSignIn({
+      phoneNumber: '+8613800138000',
+      sessionProfile: 'TEMPORARY',
+      termsAccepted: true
+    })
+    await expect(
+      service.completeSmsSignIn({
+        challengeId: '0123456789abcdef0123456789abcdef',
+        smsCode: '123456'
+      })
+    ).resolves.toMatchObject({ status: 'failed' })
+    await expect(
+      service.completeSmsSignIn({
+        challengeId: '0123456789abcdef0123456789abcdef',
+        smsCode: '123456'
+      })
+    ).resolves.toMatchObject({ status: 'signed-in' })
+
+    expect(client.verifySmsChallenge).toHaveBeenCalledOnce()
+    expect(client.authorizeSms).toHaveBeenCalledTimes(2)
+    expect(client.exchangeSession).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        authorizationCode: 'sms-code'
+      })
+    )
   })
 
   it('does not fail an account mutation when a renderer state listener throws', async () => {

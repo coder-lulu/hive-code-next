@@ -21,7 +21,8 @@ import {
   loginWithMobileSms,
   requestMobileSms,
   refreshMobileSession,
-  revokeMobileSession
+  revokeMobileSession,
+  invalidateMobileSessionRefreshes
 } from './mobile-sms-auth'
 
 function response(data: unknown, status = 200) {
@@ -272,6 +273,25 @@ describe('mobile SMS authentication client', () => {
       'https://cloud.example.test/hive/v1/auth/session-refresh',
       expect.objectContaining({ method: 'POST' })
     )
+  })
+
+  it('does not persist a refresh result after the session is invalidated', async () => {
+    let resolveRefresh: ((value: ReturnType<typeof response>) => void) | undefined
+    const fetchMock = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve
+        })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const refresh = refreshMobileSession('refresh-token')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    invalidateMobileSessionRefreshes()
+    resolveRefresh?.(response(session))
+
+    await expect(refresh).rejects.toThrow('mobile_session_refresh_superseded')
+    expect(secureStore.setItemAsync).not.toHaveBeenCalled()
   })
 
   it('revokes a JWT-backed session with its current security version', async () => {

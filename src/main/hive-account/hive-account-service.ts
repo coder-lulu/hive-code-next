@@ -51,6 +51,8 @@ type PendingSmsSignIn = {
   codeChallenge: string
   redirectUri: string
   challengeId: string
+  expiresAt: number
+  stage: 'ISSUED' | 'VERIFIED'
   sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
   device: HiveDeviceIdentity
   config: HiveAccountConfig
@@ -69,6 +71,8 @@ const defaultDependencies: ServiceDependencies = {
 export class HiveAccountService extends HiveAccountPublication {
   private signInFlight: Promise<HiveAccountSignInResult> | null = null
   private smsSignInFlight: Promise<HiveAccountSignInResult> | null = null
+  private smsStartFlight: Promise<SmsChallengeStart> | null = null
+  private smsStartEpoch: number | null = null
   private pendingSmsSignIn: PendingSmsSignIn | null = null
   private refreshFlight: Promise<HiveAccountRefreshResult> | null = null
   private temporarySession: HiveAccountSession | null = null
@@ -128,9 +132,45 @@ export class HiveAccountService extends HiveAccountPublication {
     locale?: 'zh-CN' | 'en-US'
     termsAccepted: true
   }): Promise<SmsChallengeStart> {
-    if (this.pendingSmsSignIn) {
+    this.reapExpiredSmsSignIn()
+    const startInFlight = this.smsStartFlight && this.smsStartEpoch === this.mutationEpoch
+    if (this.pendingSmsSignIn || startInFlight) {
       throw new Error('hive_account_sms_sign_in_pending')
     }
+    const flight = this.runStartSmsSignIn(options)
+    this.smsStartFlight = flight
+    this.smsStartEpoch = this.mutationEpoch
+    try {
+      return await flight
+    } finally {
+      if (this.smsStartFlight === flight) {
+        this.smsStartFlight = null
+        this.smsStartEpoch = null
+      }
+    }
+  }
+
+  cancelSmsSignIn(): void {
+    if (!this.pendingSmsSignIn && !this.smsStartFlight) {
+      return
+    }
+    this.mutationEpoch += 1
+    this.pendingSmsSignIn = null
+  }
+
+  private reapExpiredSmsSignIn(): void {
+    if (this.pendingSmsSignIn && this.pendingSmsSignIn.expiresAt <= Date.now()) {
+      this.cancelSmsSignIn()
+    }
+  }
+
+  private async runStartSmsSignIn(options: {
+    phoneNumber: string
+    sessionProfile: Exclude<HiveAccountSessionProfile, 'LEGACY'>
+    locale?: 'zh-CN' | 'en-US'
+    termsAccepted: true
+  }): Promise<SmsChallengeStart> {
+    const expectedEpoch = ++this.mutationEpoch
     const configured = this.dependencies.getConfig()
     if (!configured.configured) {
       throw new Error('hive_account_not_configured')
@@ -169,6 +209,9 @@ export class HiveAccountService extends HiveAccountPublication {
       locale: options.locale ?? 'zh-CN',
       termsAccepted: options.termsAccepted
     })
+    if (this.mutationEpoch !== expectedEpoch) {
+      throw new Error('hive_account_sms_sign_in_cancelled')
+    }
     this.pendingSmsSignIn = {
       nonce,
       state,
@@ -176,6 +219,8 @@ export class HiveAccountService extends HiveAccountPublication {
       codeChallenge,
       redirectUri,
       challengeId: challenge.challengeId,
+      expiresAt: Date.now() + Math.max(1, challenge.expiresInSeconds) * 1000,
+      stage: 'ISSUED',
       sessionProfile: options.sessionProfile,
       device: device.identity,
       config: configured.config
@@ -206,26 +251,56 @@ export class HiveAccountService extends HiveAccountPublication {
     if (!pending || pending.challengeId !== args.challengeId || !/^\d{6}$/.test(args.smsCode)) {
       return { status: 'failed', state: errorState('authorization_failed') }
     }
+    if (pending.expiresAt <= Date.now()) {
+      this.cancelSmsSignIn()
+      return { status: 'failed', state: errorState('authorization_failed') }
+    }
     const expectedEpoch = ++this.mutationEpoch
     try {
       const client = this.dependencies.createClient(pending.config)
-      await client.verifySmsChallenge({
-        challengeId: pending.challengeId,
-        nonce: pending.nonce,
-        smsCode: args.smsCode,
-        termsAccepted: true
-      })
+      if (pending.stage === 'ISSUED') {
+        await client.verifySmsChallenge({
+          challengeId: pending.challengeId,
+          nonce: pending.nonce,
+          smsCode: args.smsCode,
+          termsAccepted: true
+        })
+        if (
+          this.mutationEpoch !== expectedEpoch ||
+          this.pendingSmsSignIn?.challengeId !== pending.challengeId
+        ) {
+          return { status: 'cancelled', state: signedOutState() }
+        }
+        this.pendingSmsSignIn = { ...pending, stage: 'VERIFIED' }
+      }
+
+      const verified = this.pendingSmsSignIn
+      if (!verified || verified.challengeId !== pending.challengeId) {
+        return { status: 'cancelled', state: signedOutState() }
+      }
+      if (verified.stage !== 'VERIFIED') {
+        return { status: 'failed', state: errorState('authorization_failed') }
+      }
+      // Authorization codes are single-use. Keep the SMS challenge at VERIFIED
+      // until the exchange succeeds so a transient authorization or exchange
+      // failure can obtain a fresh code without asking the user to re-enter SMS.
       const authorization = await client.authorizeSms({
-        nonce: pending.nonce,
-        codeChallenge: pending.codeChallenge,
-        redirectUri: pending.redirectUri,
-        state: pending.state
+        nonce: verified.nonce,
+        codeChallenge: verified.codeChallenge,
+        redirectUri: verified.redirectUri,
+        state: verified.state
       })
+      if (
+        this.mutationEpoch !== expectedEpoch ||
+        this.pendingSmsSignIn?.challengeId !== pending.challengeId
+      ) {
+        return { status: 'cancelled', state: signedOutState() }
+      }
       const exchange = await client.exchangeSession({
         authorizationCode: authorization.authorizationCode,
-        codeVerifier: pending.codeVerifier,
-        redirectUri: pending.redirectUri,
-        nonce: pending.nonce
+        codeVerifier: verified.codeVerifier,
+        redirectUri: verified.redirectUri,
+        nonce: verified.nonce
       })
       if (this.mutationEpoch !== expectedEpoch) {
         this.pendingSmsSignIn = null
@@ -236,7 +311,7 @@ export class HiveAccountService extends HiveAccountPublication {
       const session: HiveAccountSession = {
         schemaVersion: 2,
         ...exchange,
-        deviceLabel: pending.device.deviceLabel,
+        deviceLabel: verified.device.deviceLabel,
         generation: previous.status === 'ok' ? previous.value.generation + 1 : 1,
         savedAt: Date.now()
       }

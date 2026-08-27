@@ -9,10 +9,10 @@ exception — see below.)
 ## Why this needs attention
 
 A native module (`.node`) links against the glibc of the machine that compiled
-it. Our release CI compiles node-pty from source on GitHub's `ubuntu-latest`
-runner, whose glibc rises over time as the image is bumped. A binary compiled on
-a newer glibc can reference symbol versions that do not exist on an older target,
-and the dynamic loader then refuses to load it:
+it. Our release CI compiles node-pty from source on the pinned GitHub
+`ubuntu-22.04` runner. Keep this pin: a binary compiled on a newer glibc can
+reference symbol versions that do not exist on an older target, and the dynamic
+loader then refuses to load it:
 
 ```
 /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by .../pty.node)

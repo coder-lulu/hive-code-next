@@ -47,8 +47,8 @@ describe('PR workflow parallelism', () => {
     expect(workflow.permissions).toEqual({ contents: 'read' })
   })
 
-  it('shards the general test suite across Node 24 and Node 26', () => {
-    expect(workflow.jobs.test.strategy.matrix.node).toEqual(['24', '26'])
+  it('shards the general test suite on the pinned Node 24 runtime', () => {
+    expect(workflow.jobs.test.strategy.matrix.node).toEqual(['24.18.0'])
     expect(workflow.jobs.test.strategy.matrix.shard).toEqual(
       Array.from({ length: 16 }, (_, index) => index + 1)
     )

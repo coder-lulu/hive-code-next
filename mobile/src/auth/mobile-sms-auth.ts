@@ -13,6 +13,7 @@ export {
   clearStoredMobileSession,
   isTerminalMobileSessionError,
   loadStoredMobileSession,
+  invalidateMobileSessionRefreshes,
   parseSession,
   refreshMobileSession,
   revokeMobileSession,
@@ -172,7 +173,12 @@ export async function requestMobileSms(
     !isRecord(challenge) ||
     typeof challenge.challengeId !== 'string' ||
     typeof challenge.expiresInSeconds !== 'number' ||
-    typeof challenge.resendAfterSeconds !== 'number'
+    !Number.isSafeInteger(challenge.expiresInSeconds) ||
+    challenge.expiresInSeconds <= 0 ||
+    typeof challenge.resendAfterSeconds !== 'number' ||
+    !Number.isSafeInteger(challenge.resendAfterSeconds) ||
+    challenge.resendAfterSeconds < 0 ||
+    challenge.resendAfterSeconds > challenge.expiresInSeconds
   ) {
     throw new Error('登录服务返回了无效验证码挑战')
   }
@@ -207,6 +213,11 @@ export async function loginWithMobileSms(
   await restorePendingFlows()
   let flow = pendingFlows.get(challengeId)
   if (!flow) {
+    throw new Error('验证码已失效，请重新获取')
+  }
+  if (flow.expiresAt <= Date.now()) {
+    pendingFlows.delete(challengeId)
+    persistPendingFlows()
     throw new Error('验证码已失效，请重新获取')
   }
   if (!termsAccepted) {

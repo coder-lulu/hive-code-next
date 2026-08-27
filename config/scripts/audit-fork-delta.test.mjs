@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   classifyForkPath,
+  classifySyncBoundaryPath,
   collectForkDelta,
   parseNameStatus,
   parseRevListCount,
@@ -40,6 +41,37 @@ describe('classifyForkPath', () => {
     expect(classifyForkPath('config/product/hivecode.product.json')).toEqual(['productOverlay'])
     expect(classifyForkPath('src/main/ipc/pet-window.ts')).toEqual(['blueprintPet'])
     expect(classifyForkPath('src/main/foo.ts')).toEqual([])
+  })
+})
+
+describe('classifySyncBoundaryPath', () => {
+  it('gives product and manual-review paths precedence over broad absorb paths', () => {
+    expect(classifySyncBoundaryPath('src/shared/generated/product-config.ts')).toBe(
+      'productBoundary'
+    )
+    expect(classifySyncBoundaryPath('src/main/runtime/rpc/methods/session.ts')).toBe('manualReview')
+    expect(classifySyncBoundaryPath('src/shared/remote-wire.ts')).toBe('directAbsorb')
+    expect(classifySyncBoundaryPath('src/renderer/src/App.tsx')).toBeNull()
+  })
+
+  it('keeps every large-module facade and extracted implementation on manual review', () => {
+    const manualReviewPaths = [
+      'src/main/git/runner.ts',
+      'src/main/git/command-runner/git-exec-file.ts',
+      'src/renderer/src/components/terminal-pane/pty-connection.ts',
+      'src/renderer/src/components/terminal-pane/pty-connection/connect-pane-pty.ts',
+      'src/renderer/src/web/web-runtime-client.ts',
+      'src/renderer/src/web/web-runtime-client-protocol.ts',
+      'src/renderer/src/web/web-preload-api.ts',
+      'src/renderer/src/web/preload-api/web-runtime-api.ts',
+      'src/main/window/createMainWindow.ts',
+      'src/main/window/main-window-state-lifecycle.ts',
+      'src/main/providers/ssh-git-provider.ts',
+      'src/main/providers/ssh-git-provider-status.ts'
+    ]
+    for (const path of manualReviewPaths) {
+      expect(classifySyncBoundaryPath(path), path).toBe('manualReview')
+    }
   })
 })
 
