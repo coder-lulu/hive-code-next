@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { ShareUsageCard, type ShareUsageCardProps } from './ShareUsageCard'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 
 type ShareUsageButtonProps = ShareUsageCardProps
 
@@ -106,14 +108,23 @@ export function ShareUsageButton(props: ShareUsageButtonProps): React.JSX.Elemen
     }
 
     const lines = [
-      `My ${rangeLabel} ${providerName} usage via @orca_build`,
+      `My ${rangeLabel} ${providerName} usage via ${APP_DISPLAY_NAME}`,
       '',
       `${fmtTokens(totalTokens)} tokens · ${costStr} est. cost`,
       '',
-      'github.com/stablyai/orca'
+      APP_DISPLAY_NAME
     ]
-    const url = `https://x.com/intent/post?text=${encodeURIComponent(lines.join('\n'))}`
-    await window.api.shell.openUrl(url)
+    const socialUrl = PRODUCT_PUBLIC_LINKS.social
+    if (!socialUrl) {
+      return
+    }
+    const socialHost = new URL(socialUrl).hostname.toLowerCase()
+    if (socialHost === 'x.com' || socialHost === 'www.x.com') {
+      const url = `https://x.com/intent/post?text=${encodeURIComponent(lines.join('\n'))}`
+      await window.api.shell.openUrl(url)
+      return
+    }
+    await window.api.shell.openUrl(socialUrl)
   }, [props])
 
   return (
@@ -162,17 +173,19 @@ export function ShareUsageButton(props: ShareUsageButtonProps): React.JSX.Elemen
                 </>
               )}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => void handleShareToX()}
-              disabled={capturing}
-              className="flex-1"
-            >
-              <span className="mr-2">
-                <XIcon />
-              </span>
-              {translate('auto.components.stats.ShareUsageButton.7d6b25323d', 'Share on X')}
-            </Button>
+            {PRODUCT_PUBLIC_LINKS.social ? (
+              <Button
+                variant="outline"
+                onClick={() => void handleShareToX()}
+                disabled={capturing}
+                className="flex-1"
+              >
+                <span className="mr-2">
+                  <XIcon />
+                </span>
+                {translate('auto.components.stats.ShareUsageButton.7d6b25323d', 'Share on X')}
+              </Button>
+            ) : null}
           </div>
         </div>
       </DialogContent>

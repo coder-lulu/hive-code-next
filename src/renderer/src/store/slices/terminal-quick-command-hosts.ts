@@ -11,6 +11,7 @@ import { parseExecutionHostId, type ExecutionHostId } from '../../../../shared/e
 import { TERMINAL_QUICK_COMMANDS_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import { translate } from '@/i18n/i18n'
+import { applyProductBranding } from '@/product-brand'
 import { getRuntimeEnvironmentConnectionGeneration } from './runtime-status'
 
 export type RuntimeTerminalQuickCommands = {
@@ -44,7 +45,7 @@ function readCommands(result: unknown): TerminalQuickCommand[] {
   const raw = (result as { terminalQuickCommands?: unknown } | null)?.terminalQuickCommands
   const commands = parseNormalizedTerminalQuickCommands(raw)
   if (!commands) {
-    throw new Error('Remote Orca returned invalid quick commands.')
+    throw new Error(applyProductBranding('Remote Orca returned invalid quick commands.'))
   }
   return commands
 }

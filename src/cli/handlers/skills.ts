@@ -15,6 +15,7 @@ import {
   WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL
 } from '../../shared/windows-batch-spawn'
 import { isSkillsCliAgentKeyShaped, toSkillsCliAgentKeys } from '../../shared/skills-cli-agent-keys'
+import { applyProductBranding, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   buildAgentFeatureSkillInstallArgs,
   buildAgentFeatureSkillUpdateArgs
@@ -244,8 +245,8 @@ function formatSkillSelectionHelp(verb: SkillMutationVerb, skillNames: string[])
     `Choose one or more skills to ${verb}:`,
     ...skillNames.map((name) => `  ${name}`),
     '',
-    `Usage: orca skills ${verb} --skill <name> [--skill <name> ...]`,
-    `   or: orca skills ${verb} --all`
+    `Usage: ${PRIMARY_CLI_COMMAND} skills ${verb} --skill <name> [--skill <name> ...]`,
+    `   or: ${PRIMARY_CLI_COMMAND} skills ${verb} --all`
   ].join('\n')
 }
 
@@ -272,9 +273,11 @@ function createSkillMutationHandler(verb: SkillMutationVerb): CommandHandler {
     if (process.env.ORCA_CLI_CWD) {
       throw new RuntimeClientError(
         'invalid_environment',
-        `orca skills ${verb} writes to the machine that runs it, but this shell forwards ` +
-          `orca to the Orca host. Run the same orca skills ${verb} command on the machine ` +
-          "you want it on, where it can detect that host's agents."
+        applyProductBranding(
+          `orca skills ${verb} writes to the machine that runs it, but this shell forwards ` +
+            `orca to the Orca host. Run the same orca skills ${verb} command on the machine ` +
+            "you want it on, where it can detect that host's agents."
+        )
       )
     }
 
@@ -321,7 +324,7 @@ export const SKILL_HANDLERS: Record<string, CommandHandler> = {
     // canonical sorting keeps agent-visible output reproducible across builds.
     const topics = guides.map((guide) => ({
       name: guide.name,
-      description: guide.description.replace(/\s+/g, ' ').trim()
+      description: applyProductBranding(guide.description.replace(/\s+/g, ' ').trim())
     }))
     writeStdout(
       json
@@ -335,7 +338,7 @@ export const SKILL_HANDLERS: Record<string, CommandHandler> = {
     const guides = canonicalGuides(BUNDLED_SKILL_GUIDES)
     const guide = requireTopic(flags, guides)
     const full = flags.has('full')
-    const markdown = full ? guide.fullMarkdown : guide.markdown
+    const markdown = applyProductBranding(full ? guide.fullMarkdown : guide.markdown)
     writeStdout(json ? JSON.stringify({ name: guide.name, full, markdown }, null, 2) : markdown)
   },
   'skills install': createSkillMutationHandler('install'),

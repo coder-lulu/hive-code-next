@@ -11,6 +11,13 @@ function install(absolutePath: string, options?: { file?: boolean; mode?: number
   executables.set(absolutePath, { file: options?.file ?? true, mode: options?.mode ?? 0o755 })
 }
 
+function installSecureStagingTools(): void {
+  install('/usr/bin/sh')
+  install('/usr/bin/mktemp')
+  install('/usr/bin/cp')
+  install('/usr/bin/rm')
+}
+
 async function loadCommandModule() {
   return import('./linux-package-install-command')
 }
@@ -250,5 +257,98 @@ describe('buildLinuxPackageInstallCommand', () => {
       ok: true,
       command: `/usr/bin/sudo /usr/bin/apt install -- '/tmp/a b'"'"'; id #.deb'`
     })
+  })
+
+  it('copies the pinned inode into a root-owned file and verifies that immutable handoff', async () => {
+    install('/usr/bin/sudo')
+    install('/usr/bin/sha512sum')
+    install('/usr/bin/dpkg')
+    installSecureStagingTools()
+    const { buildLinuxPackageInstallCommand } = await loadCommandModule()
+    const sha512 = Buffer.alloc(64, 0xab).toString('base64')
+    const expectedHex = 'ab'.repeat(64)
+
+    const result = buildLinuxPackageInstallCommand('deb', "/tmp/a b'; id #.deb", {
+      expectedSha512: sha512
+    })
+
+    expect(result.ok).toBe(true)
+    const command = result.ok ? result.command : ''
+    expect(command).toContain("/usr/bin/sh -eu -c '")
+    expect(command).toContain('/usr/bin/sudo /usr/bin/mktemp')
+    expect(command).toContain('/usr/bin/sudo /usr/bin/cp -- "/proc/$$/fd/3" "$staged"')
+    expect(command).toContain('/usr/bin/sudo /usr/bin/sha512sum -- "$staged"')
+    expect(command).toContain(`[ "${'${actual%% *}'}" = "$2" ]`)
+    expect(command).toContain('/usr/bin/sudo /usr/bin/dpkg -i -- "$staged"')
+    expect(command).toContain('/usr/bin/sudo /usr/bin/rm -f -- "$staged"')
+    expect(command).toContain('terminate() { exit 128; }')
+    expect(command).toContain('trap cleanup EXIT')
+    expect(command).toContain('trap terminate HUP INT TERM')
+    expect(command).not.toContain('trap cleanup EXIT HUP INT TERM')
+    expect(command).toContain(`'/tmp/a b'"'"'; id #.deb' '${expectedHex}'`)
+    expect(command).not.toContain('/usr/bin/dpkg -i -- "/proc/$$/fd/3"')
+    expect(command.indexOf('sha512sum -- "$staged"')).toBeLessThan(
+      command.indexOf('dpkg -i -- "$staged"')
+    )
+  })
+
+  it('refuses a verified command when secure root-owned staging tools are incomplete', async () => {
+    install('/usr/bin/sudo')
+    install('/usr/bin/sha512sum')
+    install('/usr/bin/dpkg')
+    install('/usr/bin/sh')
+    install('/usr/bin/mktemp')
+    install('/usr/bin/rm')
+    // cp is deliberately absent: installing directly from the mutable source must not be a fallback.
+    const { buildLinuxPackageInstallCommand } = await loadCommandModule()
+
+    expect(
+      buildLinuxPackageInstallCommand('deb', '/tmp/orca.deb', {
+        expectedSha512: Buffer.alloc(64).toString('base64')
+      })
+    ).toEqual({ ok: false, reason: 'no-secure-staging-tools' })
+  })
+
+  it('refuses to build a pinned command without a trusted SHA-512 utility', async () => {
+    install('/usr/bin/sudo')
+    install('/usr/bin/dpkg')
+    const { buildLinuxPackageInstallCommand } = await loadCommandModule()
+
+    expect(
+      buildLinuxPackageInstallCommand('deb', '/tmp/orca.deb', {
+        expectedSha512: Buffer.alloc(64).toString('base64')
+      })
+    ).toEqual({ ok: false, reason: 'no-integrity-checker' })
+  })
+
+  it('refuses a malformed digest instead of weakening the pinned command', async () => {
+    install('/usr/bin/sudo')
+    install('/usr/bin/sha512sum')
+    install('/usr/bin/dpkg')
+    const { buildLinuxPackageInstallCommand } = await loadCommandModule()
+
+    expect(
+      buildLinuxPackageInstallCommand('deb', '/tmp/orca.deb', {
+        expectedSha512: 'not-a-sha512-digest'
+      })
+    ).toEqual({ ok: false, reason: 'invalid-package-digest' })
+  })
+
+  it('uses rpm directly for a pinned rpm rather than a manager that may reopen the cache path', async () => {
+    install('/usr/bin/sudo')
+    install('/usr/bin/sha512sum')
+    install('/usr/bin/dnf')
+    install('/sbin/rpm')
+    installSecureStagingTools()
+    const { buildLinuxPackageInstallCommand } = await loadCommandModule()
+
+    const result = buildLinuxPackageInstallCommand('rpm', '/tmp/orca.rpm', {
+      expectedSha512: Buffer.alloc(64, 0xcd).toString('base64')
+    })
+    expect(result).toEqual({
+      ok: true,
+      command: expect.stringContaining('/usr/bin/sudo /sbin/rpm -Uvh "$staged"')
+    })
+    expect(result.ok ? result.command : '').not.toContain('/usr/bin/dnf')
   })
 })

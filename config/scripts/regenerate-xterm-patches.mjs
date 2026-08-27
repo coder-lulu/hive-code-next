@@ -486,10 +486,35 @@ function overlayBuildOutput(pristineDir, upstreamRoot, packageEntry, destination
   }
 }
 
-function diffFolders(folderA, folderB) {
+function commonParentDirectory(folderA, folderB) {
+  const resolvedA = path.resolve(folderA)
+  const resolvedB = path.resolve(folderB)
+  const rootA = path.parse(resolvedA).root
+  const rootB = path.parse(resolvedB).root
+  if (rootA.toLowerCase() !== rootB.toLowerCase()) {
+    throw new Error(`Cannot diff folders on different filesystems: ${folderA}, ${folderB}`)
+  }
+  const partsA = resolvedA.slice(rootA.length).split(path.sep)
+  const partsB = resolvedB.slice(rootB.length).split(path.sep)
+  const commonParts = []
+  while (
+    commonParts.length < partsA.length &&
+    commonParts.length < partsB.length &&
+    partsA[commonParts.length].toLowerCase() === partsB[commonParts.length].toLowerCase()
+  ) {
+    commonParts.push(partsA[commonParts.length])
+  }
+  return path.join(rootA, ...commonParts)
+}
+
+export function diffFolders(folderA, folderB) {
+  const cwd = commonParentDirectory(folderA, folderB)
+  const relativeA = path.relative(cwd, folderA)
+  const relativeB = path.relative(cwd, folderB)
   let stdout
   try {
-    stdout = execFileSync('git', [...PNPM_DIFF_FLAGS, folderA, folderB], {
+    stdout = execFileSync('git', [...PNPM_DIFF_FLAGS, relativeA, relativeB], {
+      cwd,
       encoding: 'utf8',
       maxBuffer: 512 * 1024 * 1024,
       env: pnpmDiffEnvironment(),
@@ -502,7 +527,7 @@ function diffFolders(folderA, folderB) {
     }
     stdout = error.stdout
   }
-  return normalizePnpmDiff(stdout, folderA, folderB)
+  return normalizePnpmDiff(stdout, relativeA, relativeB)
 }
 
 /** The source of truth for the hand-written half: what the checkout itself holds. */

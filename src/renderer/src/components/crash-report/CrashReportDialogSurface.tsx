@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { useMountedRef } from '@/hooks/useMountedRef'
+import { applyProductBranding } from '@/product-brand'
 import {
   formatCrashReportText,
   isReactErrorBoundaryReport,
@@ -45,8 +46,8 @@ function getDialogTitle(report: CrashReportRecord | null): string {
     return 'Report a crash'
   }
   return report && isReactErrorBoundaryReport(report)
-    ? 'Orca hit a recoverable UI error'
-    : 'Orca closed unexpectedly'
+    ? applyProductBranding('Orca hit a recoverable UI error')
+    : applyProductBranding('Orca closed unexpectedly')
 }
 
 function getDialogDescription(report: CrashReportRecord | null): string {
@@ -64,7 +65,7 @@ function getNotesPlaceholder(report: CrashReportRecord | null): string {
   }
   return report && isReactErrorBoundaryReport(report)
     ? 'Optional: what were you doing before this UI error?'
-    : 'Optional: what were you doing before Orca closed?'
+    : applyProductBranding('Optional: what were you doing before Orca closed?')
 }
 
 type CrashReportDialogSurfaceProps = {

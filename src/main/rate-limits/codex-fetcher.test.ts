@@ -289,7 +289,9 @@ describe('fetchCodexRateLimits', () => {
       status: 'error',
       error: 'Rate-limit fetch aborted'
     })
-    expect(rpcChild.kill).toHaveBeenCalledTimes(1)
+    expect(process.platform === 'win32' ? rpcChild.stdin.end : rpcChild.kill).toHaveBeenCalledTimes(
+      1
+    )
     expect(ptySpawnMock).not.toHaveBeenCalled()
   })
 
@@ -390,7 +392,9 @@ describe('fetchCodexRateLimits', () => {
       status: 'error',
       error: 'RPC timeout'
     })
-    expect(rpcChild.kill).toHaveBeenCalledTimes(1)
+    expect(process.platform === 'win32' ? rpcChild.stdin.end : rpcChild.kill).toHaveBeenCalledTimes(
+      1
+    )
     expect(rpcChild.stdout.listenerCount('data')).toBe(0)
     expect(rpcChild.stderr.listenerCount('data')).toBe(0)
     expect(rpcChild.listenerCount('error')).toBe(0)

@@ -1,6 +1,7 @@
 import { Platform, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import type { MobileComposerSource } from '../tasks/use-mobile-composer-source'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 type Props = {
   composer: MobileComposerSource
@@ -11,6 +12,8 @@ type Props = {
 // pill is shown (the field itself is no longer the name input); the branch-name
 // override and reuse toggle mirror the desktop composer's advanced branch fields.
 export function SmartWorkspaceAdvancedFields({ composer, selectedRepoIsGit }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const selection = composer.smartNameSelection
   const showBranchOverride = selectedRepoIsGit && (!selection || selection.kind === 'branch')
   return (
@@ -23,7 +26,7 @@ export function SmartWorkspaceAdvancedFields({ composer, selectedRepoIsGit }: Pr
             value={composer.name}
             onChangeText={composer.setName}
             placeholder="Workspace name"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={theme.color.text.tertiary}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -38,7 +41,7 @@ export function SmartWorkspaceAdvancedFields({ composer, selectedRepoIsGit }: Pr
             value={composer.branchNameOverride ?? ''}
             onChangeText={composer.handleBranchNameOverrideChange}
             placeholder="Derived from name"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={theme.color.text.tertiary}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -54,8 +57,11 @@ export function SmartWorkspaceAdvancedFields({ composer, selectedRepoIsGit }: Pr
             <Switch
               value={composer.reuseSelectedBranch}
               onValueChange={composer.setReuseSelectedBranch}
-              trackColor={{ false: colors.borderSubtle, true: colors.textSecondary }}
-              thumbColor={colors.textPrimary}
+              trackColor={{
+                false: theme.color.border.default,
+                true: theme.color.text.secondary
+              }}
+              thumbColor={theme.color.bg.surface}
               style={styles.reuseSwitch}
             />
           </View>
@@ -65,38 +71,42 @@ export function SmartWorkspaceAdvancedFields({ composer, selectedRepoIsGit }: Pr
   )
 }
 
-const styles = StyleSheet.create({
-  field: {
-    marginBottom: spacing.md
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs
-  },
-  input: {
-    backgroundColor: colors.bgRaised,
-    color: colors.textPrimary,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? spacing.sm + 2 : spacing.sm,
-    fontSize: typography.bodySize,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  reuseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm
-  },
-  reuseLabel: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.textSecondary
-  },
-  reuseSwitch: {
-    transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }]
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    field: {
+      marginBottom: theme.spacing.space16
+    },
+    label: {
+      ...theme.typography.meta,
+      fontWeight: '500',
+      color: theme.color.text.secondary,
+      marginBottom: theme.spacing.space8
+    },
+    input: {
+      minHeight: theme.size.minimumTouchTarget,
+      backgroundColor: theme.color.bg.surface,
+      color: theme.color.text.primary,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: Platform.OS === 'ios' ? theme.spacing.space12 : theme.spacing.space8,
+      ...theme.typography.body,
+      borderWidth: 1,
+      borderColor: theme.color.border.default
+    },
+    reuseRow: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing.space12
+    },
+    reuseLabel: {
+      flex: 1,
+      ...theme.typography.meta,
+      color: theme.color.text.secondary
+    },
+    reuseSwitch: {
+      transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }]
+    }
+  })
+}

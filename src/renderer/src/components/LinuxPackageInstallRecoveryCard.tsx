@@ -35,20 +35,36 @@ export function LinuxPackageInstallRecoveryCard({
   releaseUrl?: string
   onClose: () => void
 }) {
+  const manualInstallRequired = recovery.reason === 'manual-install-required'
   // Why: i18n boots in English and swaps catalogs after the persisted language loads, so these must
   // be resolved per render — at module scope they would freeze the whole card in English.
-  const TITLE = translate(
+  const FAILURE_TITLE = translate(
     'auto.components.LinuxPackageInstallRecoveryCard.53e1559f99',
     'Automatic Install Failed'
   )
-  const SUMMARY = translate(
+  const MANUAL_TITLE = translate(
+    'auto.components.LinuxPackageInstallRecoveryCard.manualTitle',
+    'Manual Install Required'
+  )
+  const FAILURE_SUMMARY = translate(
     'auto.components.LinuxPackageInstallRecoveryCard.a7ac6ec78b',
     'Orca downloaded the update but could not install the system package automatically.'
   )
-  const EXPLAINER = translate(
+  const MANUAL_SUMMARY = translate(
+    'auto.components.LinuxPackageInstallRecoveryCard.manualSummary',
+    'Automatic installation is disabled for Linux system packages because the privileged installer cannot preserve the verified file identity.'
+  )
+  const FAILURE_EXPLAINER = translate(
     'auto.components.LinuxPackageInstallRecoveryCard.82c6dbea00',
     'Copy the command and run it in a system terminal on the computer where Orca is installed. After it finishes, quit and reopen Orca to run the new version.'
   )
+  const MANUAL_EXPLAINER = translate(
+    'auto.components.LinuxPackageInstallRecoveryCard.manualExplainer',
+    'Copy the inode-pinned command and run it in a POSIX shell. After it finishes, quit and reopen the app to run the new version.'
+  )
+  const TITLE = manualInstallRequired ? MANUAL_TITLE : FAILURE_TITLE
+  const SUMMARY = manualInstallRequired ? MANUAL_SUMMARY : FAILURE_SUMMARY
+  const EXPLAINER = manualInstallRequired ? MANUAL_EXPLAINER : FAILURE_EXPLAINER
   const AGENT_NOTE = translate(
     'auto.components.LinuxPackageInstallRecoveryCard.53c4b8e148',
     'No usable authentication agent answered the privileged install request.'
@@ -56,6 +72,10 @@ export function LinuxPackageInstallRecoveryCard({
   const TRUST_NOTE = translate(
     'auto.components.LinuxPackageInstallRecoveryCard.b7e7c5bc95',
     'Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point.'
+  )
+  const MANUAL_TRUST_NOTE = translate(
+    'auto.components.LinuxPackageInstallRecoveryCard.manualTrustNote',
+    'The copied command opens the package first, verifies SHA-512 through that file descriptor, and installs the same descriptor-backed file.'
   )
   const CHECKING_LABEL = translate(
     'auto.components.LinuxPackageInstallRecoveryCard.c732bcbf8f',
@@ -216,7 +236,7 @@ export function LinuxPackageInstallRecoveryCard({
   const detail = [
     recovery.reason === 'authentication-agent-unavailable' ? AGENT_NOTE : null,
     diagnostic,
-    TRUST_NOTE
+    manualInstallRequired ? MANUAL_TRUST_NOTE : TRUST_NOTE
   ]
     .filter(Boolean)
     .join(' ')
@@ -235,10 +255,18 @@ export function LinuxPackageInstallRecoveryCard({
       detail={detail}
       // Why: with no safe command to copy, revealing the retained package becomes the primary path.
       primaryAction={commandUnavailable ? showAction : copyAction}
-      secondaryAction={retryAction}
+      secondaryAction={
+        manualInstallRequired
+          ? commandUnavailable
+            ? officialReleaseAction
+            : showAction
+          : retryAction
+      }
       // Why: the button row only fits two actions at this card width, so the demoted mode keeps
       // Show Package and Retry there and drops the official-release link to the link row.
-      tertiaryAction={commandUnavailable ? officialReleaseAction : showAction}
+      tertiaryAction={
+        manualInstallRequired ? undefined : commandUnavailable ? officialReleaseAction : showAction
+      }
       footnote={footnote}
       onClose={onClose}
     />

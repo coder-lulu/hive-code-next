@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../product-brand'
 import { isTailscaleEndpoint } from '../../../src/shared/remote-runtime-tailscale-hint'
 import type { ConnectionLogEntry, ConnectionState } from '../transport/types'
 import { formatEndpoint } from './host-reachability'
@@ -18,9 +19,9 @@ export function buildConnectionDiagnosticsReport(args: {
 }): string {
   const now = args.nowMs ?? Date.now()
   const lines: string[] = []
-  lines.push('Orca Mobile connection diagnostics')
+  lines.push(`${APP_DISPLAY_NAME} Mobile connection diagnostics`)
   lines.push(`Generated: ${new Date(now).toISOString()}`)
-  lines.push(`App: Orca Mobile ${args.appVersion} · ${args.platform}`)
+  lines.push(`App: ${APP_DISPLAY_NAME} Mobile ${args.appVersion} · ${args.platform}`)
   lines.push(`Host: ${args.hostName}`)
   lines.push(
     `Endpoint: ${formatEndpoint(args.endpoint)}${isTailscaleEndpoint(args.endpoint) ? ' (Tailscale)' : ''}`

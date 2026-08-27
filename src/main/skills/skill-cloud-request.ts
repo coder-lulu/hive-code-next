@@ -1,4 +1,4 @@
-import { resolveArtifactCloudApiUrl } from '../artifacts/artifact-cloud-config'
+import { getProductArtifactCloudConfig } from '../product/product-artifact-cloud-config'
 import { createSkillCloudDeadline } from './skill-cloud-deadline'
 
 export class SkillCloudRequestError extends Error {
@@ -22,7 +22,11 @@ export async function skillCloudRequest<T>(input: {
   fetcher?: typeof fetch
   timeoutMs?: number
 }): Promise<T> {
-  const apiUrl = resolveArtifactCloudApiUrl(input.apiUrl)
+  const artifactConfig = getProductArtifactCloudConfig(input.apiUrl)
+  if (!artifactConfig.configured) {
+    throw new Error(artifactConfig.setupMessage)
+  }
+  const apiUrl = artifactConfig.apiUrl
   const url = new URL(input.path, `${apiUrl}/`)
   if (url.origin !== apiUrl || !url.pathname.startsWith('/v1/')) {
     throw new Error('skill-cloud-request-path-invalid')

@@ -14,7 +14,12 @@ import {
   Settings
 } from 'lucide-react'
 import { toast } from 'sonner'
-import logo from '../../../../../resources/logo.svg'
+import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
+import {
+  PRODUCT_CHANGELOG_URL,
+  PRODUCT_PUBLIC_LINKS,
+  PRODUCT_SOURCE_REPOSITORY_URL
+} from '@/product-links'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -35,11 +40,6 @@ import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 
-const DOCS_URL = 'https://www.onorca.dev/docs'
-const CHANGELOG_URL = 'https://onorca.dev/changelog'
-const GITHUB_URL = 'https://github.com/stablyai/orca'
-const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
-const X_URL = 'https://x.com/orca_build'
 const NO_UPDATE_CHECK_MODIFIERS = {
   altKey: false,
   ctrlKey: false,
@@ -100,6 +100,13 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
   const updateCheckModifiersRef = React.useRef(NO_UPDATE_CHECK_MODIFIERS)
   const mountedRef = useMountedRef()
   const updateCheckHint = getUpdateCheckHint()
+  const hasPublicLinks = Boolean(
+    PRODUCT_PUBLIC_LINKS.documentation ||
+    PRODUCT_CHANGELOG_URL ||
+    PRODUCT_SOURCE_REPOSITORY_URL ||
+    PRODUCT_PUBLIC_LINKS.community ||
+    PRODUCT_PUBLIC_LINKS.social
+  )
 
   const showMilestones =
     setupProgress.ready && setupProgress.coreDoneCount < setupProgress.coreTotal
@@ -168,7 +175,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
 
   return (
     <>
-      <div className="flex items-center gap-1">
+      <div className="right-sidebar-header-no-drag mr-1 flex items-center gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -185,7 +192,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               <Settings className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4} className="flex items-center gap-1.5">
+          <TooltipContent side="bottom" sideOffset={6} className="flex items-center gap-1.5">
             {translate('auto.components.sidebar.SidebarSettingsHelpMenu.a428c25998', 'Settings')}
             {settingsShortcut.keys.length > 0 ? (
               <ShortcutKeyCombo
@@ -216,11 +223,11 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={4}>
+            <TooltipContent side="bottom" sideOffset={6}>
               {translate('auto.components.sidebar.SidebarSettingsHelpMenu.2991a0106c', 'Help')}
             </TooltipContent>
           </Tooltip>
-          <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-52">
+          <DropdownMenuContent side="bottom" align="end" sideOffset={8} className="w-52">
             <DropdownMenuItem onSelect={openShortcutsSettings}>
               <Keyboard className="size-3.5" />
               {translate(
@@ -242,7 +249,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                   src={logo}
                   alt=""
                   aria-hidden="true"
-                  className="size-3.5 object-contain invert opacity-55 dark:invert-0"
+                  className="size-3.5 rounded-sm object-contain opacity-70"
                 />
                 {translate(
                   'auto.components.sidebar.SidebarSettingsHelpMenu.f8a2c91d4e',
@@ -267,42 +274,56 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 'Onboarding'
               )}
             </DropdownMenuItem>
-            <ExternalMenuItem
-              label={translate(
-                'auto.components.sidebar.SidebarSettingsHelpMenu.cdc87f897e',
-                'Docs'
-              )}
-              url={DOCS_URL}
-              icon={<BookOpen className="size-3.5" />}
-            />
-            <ExternalMenuItem
-              label={translate(
-                'auto.components.sidebar.SidebarSettingsHelpMenu.5f83d86d92',
-                'Changelog'
-              )}
-              url={CHANGELOG_URL}
-              icon={<ScrollText className="size-3.5" />}
-            />
-            <DropdownMenuSeparator />
-            <ExternalMenuItem
-              label={translate(
-                'auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a',
-                'GitHub'
-              )}
-              url={GITHUB_URL}
-              icon={<Github className="size-3.5" />}
-            />
-            <DropdownMenuItem onSelect={() => openExternalUrl(DISCORD_URL)}>
-              <DiscordIcon />
-              {translate('auto.components.sidebar.SidebarSettingsHelpMenu.eb9884e55b', 'Discord')}
-              <ExternalLink className="ml-auto size-3 text-muted-foreground" />
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => openExternalUrl(X_URL)}>
-              <XIcon />
-              {translate('auto.components.sidebar.SidebarSettingsHelpMenu.c4f8e1b72a', 'X')}
-              <ExternalLink className="ml-auto size-3 text-muted-foreground" />
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {PRODUCT_PUBLIC_LINKS.documentation ? (
+              <ExternalMenuItem
+                label={translate(
+                  'auto.components.sidebar.SidebarSettingsHelpMenu.cdc87f897e',
+                  'Docs'
+                )}
+                url={PRODUCT_PUBLIC_LINKS.documentation}
+                icon={<BookOpen className="size-3.5" />}
+              />
+            ) : null}
+            {PRODUCT_CHANGELOG_URL ? (
+              <ExternalMenuItem
+                label={translate(
+                  'auto.components.sidebar.SidebarSettingsHelpMenu.5f83d86d92',
+                  'Changelog'
+                )}
+                url={PRODUCT_CHANGELOG_URL}
+                icon={<ScrollText className="size-3.5" />}
+              />
+            ) : null}
+            {PRODUCT_SOURCE_REPOSITORY_URL ||
+            PRODUCT_PUBLIC_LINKS.community ||
+            PRODUCT_PUBLIC_LINKS.social ? (
+              <DropdownMenuSeparator />
+            ) : null}
+            {PRODUCT_SOURCE_REPOSITORY_URL ? (
+              <ExternalMenuItem
+                label={translate(
+                  'auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a',
+                  'GitHub'
+                )}
+                url={PRODUCT_SOURCE_REPOSITORY_URL}
+                icon={<Github className="size-3.5" />}
+              />
+            ) : null}
+            {PRODUCT_PUBLIC_LINKS.community ? (
+              <DropdownMenuItem onSelect={() => openExternalUrl(PRODUCT_PUBLIC_LINKS.community!)}>
+                <DiscordIcon />
+                {translate('auto.components.sidebar.SidebarSettingsHelpMenu.eb9884e55b', 'Discord')}
+                <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+              </DropdownMenuItem>
+            ) : null}
+            {PRODUCT_PUBLIC_LINKS.social ? (
+              <DropdownMenuItem onSelect={() => openExternalUrl(PRODUCT_PUBLIC_LINKS.social!)}>
+                <XIcon />
+                {translate('auto.components.sidebar.SidebarSettingsHelpMenu.c4f8e1b72a', 'X')}
+                <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+              </DropdownMenuItem>
+            ) : null}
+            {hasPublicLinks ? <DropdownMenuSeparator /> : null}
             <DropdownMenuItem
               disabled={updateStatus.state === 'checking' || updateStatus.state === 'downloading'}
               onPointerDown={handleCheckForUpdatesPointerDown}

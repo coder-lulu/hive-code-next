@@ -1,4 +1,5 @@
 import { RemoteCliArgumentError } from './ssh-remote-cli-argument-error'
+import { applyProductBranding } from '../../shared/brand'
 
 type RemoteFlags = Map<string, string | boolean>
 
@@ -26,8 +27,9 @@ export function resolveRemoteOrchestrationSender(
     // synthetic "unknown" handle for lifecycle authority decisions.
     throw new RemoteCliArgumentError(
       'no_active_sender_terminal',
-      'Could not determine the sender terminal for this orchestration command. ' +
-        'Pass --from <terminal-handle> or run the command inside a live Orca terminal with ORCA_TERMINAL_HANDLE set.'
+      applyProductBranding(
+        'Could not determine the sender terminal for this orchestration command. Pass --from <terminal-handle> or run the command inside a live Orca terminal with ORCA_TERMINAL_HANDLE set.'
+      )
     )
   }
   return explicit ?? envHandle ?? 'unknown'

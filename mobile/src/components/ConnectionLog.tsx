@@ -1,32 +1,26 @@
+import { CircleCheck, CircleX, Info, TriangleAlert, type LucideIcon } from 'lucide-react-native'
 import { useRef } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { ConnectionLogEntry } from '../transport/types'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 
 type Props = {
   entries: ConnectionLogEntry[]
-  // Tag printed before the first entry so it's clear what's being logged
-  // (e.g. 'Pairing' vs 'Reconnect').
   title?: string
 }
 
-const LEVEL_COLOR: Record<ConnectionLogEntry['level'], string> = {
-  info: colors.textSecondary,
-  success: colors.statusGreen,
-  warn: colors.statusAmber,
-  error: colors.statusRed
-}
-
-const LEVEL_GLYPH: Record<ConnectionLogEntry['level'], string> = {
-  info: '•',
-  success: '✓',
-  warn: '!',
-  error: '✕'
+const LEVEL_PRESENTATION: Record<
+  ConnectionLogEntry['level'],
+  { readonly icon: LucideIcon; readonly label: string }
+> = {
+  info: { icon: Info, label: '信息' },
+  success: { icon: CircleCheck, label: '成功' },
+  warn: { icon: TriangleAlert, label: '警告' },
+  error: { icon: CircleX, label: '错误' }
 }
 
 function formatTime(ts: number, baseTs: number): string {
-  // Why: show elapsed seconds since the first entry — absolute wall-clock
-  // time isn't actionable when debugging "why is connecting stuck".
   const elapsed = Math.max(0, ts - baseTs) / 1000
   if (elapsed < 10) {
     return `+${elapsed.toFixed(2)}s`
@@ -39,6 +33,8 @@ function formatTime(ts: number, baseTs: number): string {
 
 export function ConnectionLog({ entries, title }: Props) {
   const scrollRef = useRef<ScrollView | null>(null)
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
 
   if (entries.length === 0) {
     return null
@@ -47,7 +43,11 @@ export function ConnectionLog({ entries, title }: Props) {
 
   return (
     <View style={styles.container}>
-      {title && <Text style={styles.title}>{title}</Text>}
+      {title ? (
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>
+          {title}
+        </Text>
+      ) : null}
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -55,86 +55,98 @@ export function ConnectionLog({ entries, title }: Props) {
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
-        {entries.map((entry) => (
-          <View key={entry.id} style={styles.row}>
-            <Text style={styles.timestamp}>{formatTime(entry.ts, baseTs)}</Text>
-            <Text style={[styles.glyph, { color: LEVEL_COLOR[entry.level] }]}>
-              {LEVEL_GLYPH[entry.level]}
-            </Text>
-            <View style={styles.rowText}>
-              <Text style={[styles.message, { color: LEVEL_COLOR[entry.level] }]}>
-                {entry.message}
+        {entries.map((entry) => {
+          const elapsedTime = formatTime(entry.ts, baseTs)
+          const presentation = LEVEL_PRESENTATION[entry.level]
+          const Icon = presentation.icon
+          const levelColor = getLevelColor(theme, entry.level)
+          const accessibilityLabel = [elapsedTime, presentation.label, entry.message, entry.detail]
+            .filter(Boolean)
+            .join('，')
+
+          return (
+            <View
+              accessible
+              accessibilityLabel={accessibilityLabel}
+              accessibilityRole="text"
+              key={entry.id}
+              style={styles.row}
+            >
+              <Text maxFontSizeMultiplier={1.3} style={styles.timestamp}>
+                {elapsedTime}
               </Text>
-              {entry.detail && (
-                <Text style={styles.detail} numberOfLines={2}>
-                  {entry.detail}
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <Icon color={levelColor} size={16} strokeWidth={2} />
+              </View>
+              <View style={styles.rowText}>
+                <Text maxFontSizeMultiplier={1.3} style={[styles.message, { color: levelColor }]}>
+                  {entry.message}
                 </Text>
-              )}
+                {entry.detail ? (
+                  <Text maxFontSizeMultiplier={1.3} numberOfLines={2} style={styles.detail}>
+                    {entry.detail}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          </View>
-        ))}
+          )
+        })}
       </ScrollView>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    maxHeight: 240,
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md
-  },
-  title: {
-    fontSize: typography.metaSize,
-    fontFamily: typography.monoFamily,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.xs
-  },
-  scroll: {
-    maxHeight: 200
-  },
-  scrollContent: {
-    gap: 6
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm
-  },
-  timestamp: {
-    fontFamily: typography.monoFamily,
-    fontSize: typography.metaSize,
-    color: colors.textMuted,
-    width: 52,
-    paddingTop: 1
-  },
-  glyph: {
-    fontFamily: typography.monoFamily,
-    fontSize: typography.metaSize,
-    width: 12,
-    textAlign: 'center',
-    paddingTop: 1
-  },
-  rowText: {
-    flex: 1
-  },
-  message: {
-    fontFamily: typography.monoFamily,
-    fontSize: typography.metaSize,
-    lineHeight: 16
-  },
-  detail: {
-    fontFamily: typography.monoFamily,
-    fontSize: 11,
-    color: colors.textMuted,
-    lineHeight: 14,
-    marginTop: 1
+function getLevelColor(theme: MobileTheme, level: ConnectionLogEntry['level']): string {
+  switch (level) {
+    case 'success':
+      return theme.color.status.success
+    case 'warn':
+      return theme.color.status.warning
+    case 'error':
+      return theme.color.status.danger
+    case 'info':
+      return theme.color.text.secondary
   }
-})
+}
+
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    container: {
+      width: '100%',
+      maxHeight: theme.spacing.space64 * 4,
+      flexShrink: 1,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space12
+    },
+    title: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      marginBottom: theme.spacing.space8
+    },
+    scroll: { flexShrink: 1 },
+    scrollContent: { gap: theme.spacing.space8 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: theme.spacing.space8
+    },
+    timestamp: {
+      ...theme.typography.code,
+      width: theme.spacing.space64,
+      flexShrink: 0,
+      color: theme.color.text.tertiary
+    },
+    rowText: { flex: 1 },
+    message: { ...theme.typography.code },
+    detail: {
+      ...theme.typography.caption,
+      fontFamily: theme.typography.code.fontFamily,
+      color: theme.color.text.tertiary,
+      marginTop: theme.spacing.space4
+    }
+  })
+}

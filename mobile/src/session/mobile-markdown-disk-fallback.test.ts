@@ -4,6 +4,7 @@ import {
   buildMarkdownDiskFallbackDoc,
   shouldReadMarkdownFromDiskAfterReadTabFailure
 } from './mobile-markdown-disk-fallback'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 function failure(code: string, message: string): RpcFailure {
   return {
@@ -57,7 +58,7 @@ describe('buildMarkdownDiskFallbackDoc', () => {
       isDirty: false,
       editable: false,
       stale: false,
-      readOnlyReason: 'Editing needs Orca desktop running.'
+      readOnlyReason: `Editing needs ${APP_DISPLAY_NAME} desktop running.`
     })
   })
 

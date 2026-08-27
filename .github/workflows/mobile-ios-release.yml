@@ -25,6 +25,7 @@ on:
 
 jobs:
   ios-build:
+    if: github.repository == 'stablyai/orca'
     # GitHub-hosted macOS runner: required for Xcode. Expo SDK 55's
     # expo-modules-core declares swift_version 6.0 and uses Swift 6 syntax
     # (@MainActor isolation). Xcode 16.x (macos-15) can't even parse it
@@ -61,7 +62,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version-file: package.json
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -151,6 +152,7 @@ jobs:
 
   ios-distribute:
     name: Distribute to external TestFlight testers
+    if: github.repository == 'stablyai/orca'
     needs: ios-build
     runs-on: ubuntu-latest
     # Fastlane's processing wait fails after 20m; this outer bound leaves setup

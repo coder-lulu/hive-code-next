@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import type * as ChildProcess from 'node:child_process'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { generateCommitMessageFromContext } from './commit-message-text-generation'
 import {
   createChildTerminationExpectation,
@@ -260,8 +261,8 @@ describe('generateCommitMessageFromContext', () => {
 
       expect(result).toEqual({
         success: false,
-        error:
-          'C:/tools/agent.cmd cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so Orca sends the prompt on stdin.'
+        canceled: undefined,
+        error: `C:/tools/agent.cmd cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so ${APP_DISPLAY_NAME} sends the prompt on stdin.`
       })
       expect(spawnMock).not.toHaveBeenCalled()
     })

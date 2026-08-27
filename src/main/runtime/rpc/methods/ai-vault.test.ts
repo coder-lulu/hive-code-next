@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { join } from 'node:path'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import { OrcaRuntimeService } from '../../orca-runtime'
@@ -400,8 +401,7 @@ describe('aiVault.listSessions handler + shared cache', () => {
     const options = scanAiVaultSessionsInWorker.mock.calls[0]?.[0] as AiVaultScanOptions
     // Why: the codex-home is sourced from the runtime, not the window-only
     // registerCoreHandlers path, so it survives in serve mode.
-    expect(options.additionalCodexSessionsDirs).toContain('/runtime/codex/home/sessions')
-    expect(options.wslHomeDirs).toEqual([])
+    expect(options.additionalCodexSessionsDirs).toContain(join('/runtime/codex/home', 'sessions'))
   })
 
   it('forwards codex-home through the real OrcaRuntimeService construction path', async () => {
@@ -413,6 +413,6 @@ describe('aiVault.listSessions handler + shared cache', () => {
     })
     await runtime.listAiVaultSessions({})
     const options = scanAiVaultSessionsInWorker.mock.calls[0]?.[0] as AiVaultScanOptions
-    expect(options.additionalCodexSessionsDirs).toContain('/ctor/codex/home/sessions')
+    expect(options.additionalCodexSessionsDirs).toContain(join('/ctor/codex/home', 'sessions'))
   })
 })

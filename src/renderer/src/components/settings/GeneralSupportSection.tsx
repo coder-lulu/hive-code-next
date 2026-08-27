@@ -8,9 +8,7 @@ import { Separator } from '../ui/separator'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
-
-// Do not deep-link to /stargazers: GitHub 404s that page for users without repo write access.
-const ORCA_GITHUB_URL = 'https://github.com/stablyai/orca'
+import { PRODUCT_SOURCE_REPOSITORY_URL } from '@/product-links'
 
 type SupportState =
   | 'loading'
@@ -37,9 +35,15 @@ export function GeneralSupportSection({
   // dimensions as the resolved section. When gh resolves to 'hidden', the
   // placeholder collapses with a grid-rows transition so content above it
   // doesn't shift; anything below (nothing today, but future-proof) eases up.
-  const [starState, setStarState] = useState<SupportState>('loading')
+  const [starState, setStarState] = useState<SupportState>(
+    PRODUCT_SOURCE_REPOSITORY_URL ? 'loading' : 'hidden'
+  )
 
   useEffect(() => {
+    if (!PRODUCT_SOURCE_REPOSITORY_URL) {
+      setStarState('hidden')
+      return
+    }
     let cancelled = false
     void window.api.gh.checkOrcaStarred().then((result) => {
       if (cancelled) {
@@ -57,9 +61,12 @@ export function GeneralSupportSection({
   }, [])
 
   const handleStarClick = async (): Promise<void> => {
+    if (!PRODUCT_SOURCE_REPOSITORY_URL) {
+      return
+    }
     if (starState === 'web-fallback') {
       setStarState('opening-github')
-      await window.api.shell.openUrl(ORCA_GITHUB_URL)
+      await window.api.shell.openUrl(PRODUCT_SOURCE_REPOSITORY_URL)
       if (mountedRef.current) {
         setStarState('web-fallback')
       }

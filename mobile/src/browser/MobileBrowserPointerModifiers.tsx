@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 export type BrowserPointerModifier = 'cmd' | 'ctrl' | 'alt' | 'shift'
 
@@ -21,6 +22,7 @@ export function MobileBrowserPointerModifiers({
   selectedModifiers,
   onToggle
 }: Props): React.JSX.Element {
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <View style={styles.modifierRow}>
       {BROWSER_POINTER_MODIFIERS.map((modifier) => {
@@ -56,40 +58,43 @@ export function MobileBrowserPointerModifiers({
   )
 }
 
-const styles = StyleSheet.create({
-  modifierRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.xs
-  },
-  keyButton: {
-    minHeight: 30,
-    minWidth: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised,
-    paddingHorizontal: spacing.sm
-  },
-  keyButtonPressed: {
-    backgroundColor: colors.borderSubtle
-  },
-  keyButtonSelected: {
-    backgroundColor: colors.textPrimary
-  },
-  keyButtonText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontFamily: typography.monoFamily
-  },
-  keyButtonTextSelected: {
-    color: colors.bgBase
-  },
-  disabled: {
-    opacity: 0.35
-  },
-  disabledText: {
-    color: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    modifierRow: {
+      flexDirection: 'row',
+      gap: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space12,
+      paddingTop: theme.spacing.space8
+    },
+    keyButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      minWidth: theme.size.minimumTouchTarget,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.subtle,
+      paddingHorizontal: theme.spacing.space8
+    },
+    keyButtonPressed: {
+      backgroundColor: theme.color.border.default
+    },
+    keyButtonSelected: {
+      backgroundColor: theme.color.bg.selected
+    },
+    keyButtonText: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary,
+      fontWeight: '500'
+    },
+    keyButtonTextSelected: {
+      color: theme.color.text.inverse
+    },
+    disabled: {
+      opacity: 0.45
+    },
+    disabledText: {
+      color: theme.color.text.tertiary
+    }
+  })
+}

@@ -7,6 +7,7 @@ import {
   installBrowserGlobals,
   writeStoredRuntimeEnvironment
 } from './web-preload-api-test-harness'
+import { APP_DISPLAY_NAME } from '../product-brand'
 
 describe('web browser-local port capability', () => {
   beforeEach(() => {
@@ -336,7 +337,7 @@ describe('web worktree preload API', () => {
     })
 
     await expect(serverAList).rejects.toThrow(
-      'The paired Orca server changed while the request was in progress.'
+      `The paired ${APP_DISPLAY_NAME} server changed while the request was in progress.`
     )
     await expect(globals.window.api.worktrees.listAll()).resolves.toMatchObject([
       { id: 'worktree-b', runtimeOwnerEnvironmentId: paired.environment.id }
@@ -540,7 +541,7 @@ describe('web worktree preload API', () => {
     })
 
     await expect(detected).rejects.toThrow(
-      'The paired Orca server changed while the request was in progress.'
+      `The paired ${APP_DISPLAY_NAME} server changed while the request was in progress.`
     )
     expect(runtimeCalls).toEqual(['worktree.detectedList'])
   })

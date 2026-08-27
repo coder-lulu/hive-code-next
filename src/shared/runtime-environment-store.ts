@@ -7,6 +7,7 @@ import { parsePairingCode, type PairingOffer } from './pairing'
 import { classifyRemotePairingHostname } from './remote-pairing-address'
 import { writeSecureJsonFileWithinLimit } from './bounded-secure-json-file'
 import { hardenExistingSecureFile } from './secure-file'
+import { applyProductBranding } from './brand'
 import {
   createEnvironmentFromPairingOffer,
   getPreferredPairingOffer,
@@ -54,7 +55,7 @@ export function addEnvironmentFromPairingCode(
   if (!offer) {
     throw new RuntimeEnvironmentStoreError(
       'invalid_argument',
-      'Invalid pairing code. Expected an orca://pair?... URL or bare pairing payload.'
+      'Invalid pairing code. Expected a hivecode://pair?... URL or bare pairing payload.'
     )
   }
   const store = readEnvironmentStore(userDataPath)
@@ -105,7 +106,7 @@ export function updateEnvironmentFromPairingCode(
   if (!offer) {
     throw new RuntimeEnvironmentStoreError(
       'invalid_argument',
-      'Invalid pairing code. Expected an orca://pair?... URL or bare pairing payload.'
+      'Invalid pairing code. Expected a hivecode://pair?... URL or bare pairing payload.'
     )
   }
   const store = readEnvironmentStore(userDataPath)
@@ -249,7 +250,7 @@ function readEnvironmentStore(userDataPath: string): RuntimeEnvironmentStore {
   } catch {
     throw new RuntimeEnvironmentStoreError(
       'runtime_error',
-      `Could not read Orca environments at ${path}; the file is invalid.`
+      applyProductBranding(`Could not read Orca environments at ${path}; the file is invalid.`)
     )
   }
 }
@@ -266,7 +267,9 @@ function writeEnvironmentStore(userDataPath: string, store: RuntimeEnvironmentSt
     if (error instanceof JsonStringifyByteLimitError) {
       throw new RuntimeEnvironmentStoreError(
         'runtime_error',
-        `Could not write Orca environments at ${path}; the store exceeds its durable capacity.`
+        applyProductBranding(
+          `Could not write Orca environments at ${path}; the store exceeds its durable capacity.`
+        )
       )
     }
     throw error

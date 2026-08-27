@@ -1,9 +1,10 @@
+import { productNameText } from '@/product-brand'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, RefreshCw } from 'lucide-react-native'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useHostClient } from '../transport/client-context'
 import type { RpcSuccess } from '../transport/types'
 import type { RpcClient } from '../transport/rpc-client'
@@ -35,7 +36,7 @@ import {
   type MobileAiVaultResumeRepo
 } from './agent-history-resume-target'
 import { buildMobileAgentHistoryResumeActionState } from './agent-history-session-card'
-import { styles } from './agent-history-styles'
+import { createAgentHistoryStyles } from './agent-history-styles'
 
 export type MobileAgentSessionHistoryPanelProps = {
   hostId: string
@@ -55,6 +56,8 @@ export function MobileAgentSessionHistoryPanel({
   name = ''
 }: MobileAgentSessionHistoryPanelProps) {
   const router = useRouter()
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createAgentHistoryStyles)
   const { client, state: connState } = useHostClient(hostId)
   const [worktrees, setWorktrees] = useState<Worktree[]>([])
   const [worktreesLoaded, setWorktreesLoaded] = useState(false)
@@ -249,11 +252,11 @@ export function MobileAgentSessionHistoryPanel({
             hitSlop={8}
             accessibilityLabel="Back"
           >
-            <ChevronLeft size={22} color={colors.textSecondary} strokeWidth={2.2} />
+            <ChevronLeft size={22} color={theme.color.text.primary} strokeWidth={2.2} />
           </Pressable>
           <View style={styles.titleBlock}>
             <Text style={styles.title} numberOfLines={1}>
-              Agent Session History
+              Agent 会话历史
             </Text>
             <Text style={styles.meta} numberOfLines={1}>
               {worktreeLabel}
@@ -265,20 +268,20 @@ export function MobileAgentSessionHistoryPanel({
             hitSlop={8}
             accessibilityLabel="Refresh agent sessions"
           >
-            <RefreshCw size={18} color={colors.textSecondary} strokeWidth={2.1} />
+            <RefreshCw size={18} color={theme.color.text.secondary} strokeWidth={2.1} />
           </Pressable>
         </View>
       </SafeAreaView>
 
       {screenState.kind === 'loading' ? (
         <View style={styles.state}>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
+          <ActivityIndicator size="small" color={theme.color.text.secondary} />
         </View>
       ) : screenState.kind === 'unsupported' ? (
         <View style={styles.state}>
           <Text style={styles.stateTitle}>Agent Session History Unavailable</Text>
           <Text style={styles.stateText}>
-            Update Orca on this host to browse agent session history.
+            {productNameText('Update Orca on this host to browse agent session history.')}
           </Text>
         </View>
       ) : screenState.kind === 'error' ? (
@@ -313,7 +316,7 @@ export function MobileAgentSessionHistoryPanel({
               value={query}
               onChangeText={setQuery}
               placeholder="Search sessions, repo:, path:"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={theme.color.text.tertiary}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -346,6 +349,7 @@ export function MobileAgentSessionHistoryPanel({
               resumeActionStateBySessionId={resumeActionStateBySessionId}
               onResume={onResumeSession}
               onRefresh={() => void onRefresh()}
+              theme={theme}
             />
           )}
         </>

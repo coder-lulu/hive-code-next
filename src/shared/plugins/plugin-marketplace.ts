@@ -9,7 +9,6 @@ export const PLUGIN_MARKETPLACE_CATEGORY_LIMIT = 16
 export const OFFICIAL_PLUGIN_PUBLISHER = 'stablyai'
 export const OFFICIAL_PLUGIN_ID_PREFIX = 'orca-'
 export const OFFICIAL_MARKETPLACE_OWNER = 'stablyai'
-export const OFFICIAL_MARKETPLACE_REPOSITORY = 'orca-plugins'
 
 // Why: theme/icon/skill contributions were deferred, so `contributes` now
 // rejects them and any plugin declaring one fails to install wholesale. The
@@ -114,12 +113,6 @@ export type PluginMarketplaceEntry = z.infer<typeof pluginMarketplaceEntrySchema
 export type PluginMarketplaceGitSource = z.infer<typeof pluginMarketplaceGitSourceSchema>
 export type PluginMarketplaceTrustMetadata = z.infer<typeof pluginMarketplaceTrustMetadataSchema>
 
-export const OFFICIAL_MARKETPLACE_GIT_SOURCE: PluginMarketplaceGitSource = {
-  kind: 'git',
-  url: 'https://github.com/stablyai/orca-plugins.git',
-  ref: 'main'
-}
-
 export function splitQualifiedPluginKey(pluginKey: string): {
   publisher: string
   id: string
@@ -197,11 +190,20 @@ export function isOfficialOrganizationGitSource(url: string): boolean {
   return source?.host === 'github.com' && source.owner.toLowerCase() === OFFICIAL_PLUGIN_PUBLISHER
 }
 
-export function isOfficialMarketplaceGitSource(url: string): boolean {
+export function isConfiguredMarketplaceGitSource(
+  url: string,
+  configuredUrl: string | null
+): boolean {
+  if (!configuredUrl) {
+    return false
+  }
   const source = parseGitRepositoryIdentity(url)
+  const configured = parseGitRepositoryIdentity(configuredUrl)
   return (
-    source?.host === 'github.com' &&
-    source.owner.toLowerCase() === OFFICIAL_MARKETPLACE_OWNER &&
-    source.repository.toLowerCase() === OFFICIAL_MARKETPLACE_REPOSITORY
+    source !== null &&
+    configured !== null &&
+    source.host === configured.host &&
+    source.owner.toLowerCase() === configured.owner.toLowerCase() &&
+    source.repository.toLowerCase() === configured.repository.toLowerCase()
   )
 }

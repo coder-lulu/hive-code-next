@@ -5,13 +5,13 @@ import {
   MobileRichMarkdownEditor,
   type MobileRichMarkdownEditorHandle
 } from '../components/MobileRichMarkdownEditor'
-import { colors, spacing } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import {
   resolveMarkdownFloatingActionsBottom,
   shouldShowMarkdownFloatingActions
 } from './markdown-floating-actions-layout'
 import type { MarkdownDocState } from './mobile-session-route-types'
-import { styles } from './mobile-session-styles'
+import { createMobileSessionReaderStyles } from './mobile-session-reader-styles'
 
 type Props = {
   documentId: string
@@ -34,6 +34,8 @@ export function MobileMarkdownReader({
   onDiscard,
   keyboardLift
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileSessionReaderStyles)
   const editorRef = useRef<MobileRichMarkdownEditorHandle>(null)
   // Native Keyboard events under-report the WebView editor's covered area, so prefer the larger WebView-measured inset.
   const [webviewKeyboardInset, setWebviewKeyboardInset] = useState(0)
@@ -43,7 +45,7 @@ export function MobileMarkdownReader({
   if (!doc || doc.status === 'loading') {
     return (
       <View style={styles.markdownState}>
-        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <ActivityIndicator size="small" color={theme.color.text.secondary} />
       </View>
     )
   }
@@ -52,8 +54,8 @@ export function MobileMarkdownReader({
       <View style={styles.markdownState}>
         <Text style={styles.markdownError}>{doc.message}</Text>
         <Pressable style={styles.markdownRefreshButton} onPress={onRefresh}>
-          <RefreshCw size={14} color={colors.textPrimary} />
-          <Text style={styles.markdownRefreshText}>Retry</Text>
+          <RefreshCw size={16} color={theme.color.text.primary} />
+          <Text style={styles.markdownRefreshText}>重试</Text>
         </Pressable>
       </View>
     )
@@ -62,9 +64,9 @@ export function MobileMarkdownReader({
   const statusText = doc.saveError
     ? doc.saveError
     : doc.readOnlyReason
-      ? 'Read only'
+      ? '只读'
       : doc.stale
-        ? 'Changed on desktop'
+        ? '桌面端已更改'
         : null
   const showRefresh = Boolean((doc.stale && !doc.isDirty) || !doc.editable)
   const showCopy = Boolean(doc.saveError || !doc.editable)
@@ -96,8 +98,8 @@ export function MobileMarkdownReader({
             {
               bottom: resolveMarkdownFloatingActionsBottom({
                 keyboardLift: effectiveKeyboardLift,
-                restingBottom: spacing.lg,
-                liftedClearance: spacing.md
+                restingBottom: theme.spacing.space16,
+                liftedClearance: theme.spacing.space12
               })
             }
           ]}
@@ -117,14 +119,14 @@ export function MobileMarkdownReader({
                 onPress={() => editorRef.current?.dismissKeyboard()}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Dismiss keyboard"
-                accessibilityHint="Hides the software keyboard and keeps the markdown editor open."
+                accessibilityLabel="收起键盘"
+                accessibilityHint="隐藏软键盘并保持 Markdown 编辑器打开。"
               >
                 <View style={styles.keyboardDismissGlyph}>
-                  <KeyboardIcon size={15} color={colors.textSecondary} strokeWidth={2} />
+                  <KeyboardIcon size={16} color={theme.color.text.secondary} strokeWidth={2} />
                   <ChevronDown
-                    size={10}
-                    color={colors.textSecondary}
+                    size={12}
+                    color={theme.color.text.secondary}
                     strokeWidth={2.5}
                     style={styles.keyboardDismissChevron}
                   />
@@ -132,19 +134,34 @@ export function MobileMarkdownReader({
               </Pressable>
             ) : null}
             {showCopy ? (
-              <Pressable style={styles.markdownFloatingButton} onPress={onCopy}>
-                <Text style={styles.markdownFloatingButtonText}>Copy</Text>
+              <Pressable
+                style={styles.markdownFloatingButton}
+                onPress={onCopy}
+                accessibilityRole="button"
+                accessibilityLabel="复制 Markdown"
+              >
+                <Text style={styles.markdownFloatingButtonText}>复制</Text>
               </Pressable>
             ) : null}
             {showRefresh ? (
-              <Pressable style={styles.markdownFloatingButton} onPress={onRefresh}>
-                <RefreshCw size={13} color={colors.textPrimary} />
-                <Text style={styles.markdownFloatingButtonText}>Refresh</Text>
+              <Pressable
+                style={styles.markdownFloatingButton}
+                onPress={onRefresh}
+                accessibilityRole="button"
+                accessibilityLabel="刷新 Markdown"
+              >
+                <RefreshCw size={16} color={theme.color.text.primary} />
+                <Text style={styles.markdownFloatingButtonText}>刷新</Text>
               </Pressable>
             ) : null}
             {doc.isDirty ? (
-              <Pressable style={styles.markdownFloatingButton} onPress={onDiscard}>
-                <Text style={styles.markdownFloatingButtonText}>Discard</Text>
+              <Pressable
+                style={styles.markdownFloatingButton}
+                onPress={onDiscard}
+                accessibilityRole="button"
+                accessibilityLabel="放弃 Markdown 更改"
+              >
+                <Text style={styles.markdownFloatingButtonText}>放弃</Text>
               </Pressable>
             ) : null}
             {showSave ? (
@@ -156,11 +173,15 @@ export function MobileMarkdownReader({
                 ]}
                 disabled={!doc.editable || !doc.isDirty || doc.saving}
                 onPress={onSave}
+                accessibilityRole="button"
+                accessibilityLabel="保存 Markdown"
               >
                 {doc.saving ? (
-                  <ActivityIndicator size="small" color={colors.textPrimary} />
+                  <ActivityIndicator size="small" color={theme.color.text.inverse} />
                 ) : (
-                  <Text style={styles.markdownFloatingButtonText}>Save</Text>
+                  <Text style={[styles.markdownFloatingButtonText, styles.markdownSaveButtonText]}>
+                    保存
+                  </Text>
                 )}
               </Pressable>
             ) : null}

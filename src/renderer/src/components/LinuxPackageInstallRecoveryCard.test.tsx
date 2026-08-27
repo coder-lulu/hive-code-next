@@ -3,16 +3,19 @@ import { act, cleanup, fireEvent, render, screen, type RenderResult } from '@tes
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LinuxPackageInstallRecovery } from '../../../shared/update-status-types'
+import { APP_DISPLAY_NAME, applyProductBranding } from '@/product-brand'
 import { LinuxPackageInstallRecoveryCard } from './LinuxPackageInstallRecoveryCard'
 
 const RELEASE_URL = 'https://github.com/stablyai/orca/releases/tag/v1.4.200'
 const DIAGNOSTIC = 'pkexec: no polkit authentication agent found'
 const INSTALL_COMMAND = 'sudo apt-get install -y /tmp/orca-updates/orca_1.4.200_amd64.deb'
 const PACKAGE_FILE_NAME = 'orca_1.4.200_amd64.deb'
-const SUMMARY = 'Orca downloaded the update but could not install the system package automatically.'
+const SUMMARY = applyProductBranding(
+  'Orca downloaded the update but could not install the system package automatically.'
+)
 const COPIED_NOTE =
   `Command copied. Run it in a system terminal to install ${PACKAGE_FILE_NAME}, ` +
-  'then quit and reopen Orca.'
+  `then quit and reopen ${APP_DISPLAY_NAME}.`
 const INSTRUCTIONS = {
   ok: true as const,
   command: INSTALL_COMMAND,
@@ -148,9 +151,15 @@ describe('LinuxPackageInstallRecoveryCard copy', () => {
     expect(screen.getByText('Automatic Install Failed')).toBeTruthy()
     expect(screen.getByText(SUMMARY)).toBeTruthy()
     expect(
-      screen.getByText(/a system terminal on the computer where Orca is installed/)
+      screen.getByText((content) =>
+        content.includes(`a system terminal on the computer where ${APP_DISPLAY_NAME} is installed`)
+      )
     ).toBeTruthy()
-    expect(screen.getByText(/quit and reopen Orca to run the new version/)).toBeTruthy()
+    expect(
+      screen.getByText((content) =>
+        content.includes(`quit and reopen ${APP_DISPLAY_NAME} to run the new version`)
+      )
+    ).toBeTruthy()
 
     expect(button('Copy Install Command')).toBeTruthy()
     expect(button('Try Automatic Install Again')).toBeTruthy()
@@ -163,6 +172,21 @@ describe('LinuxPackageInstallRecoveryCard copy', () => {
     expect(screen.queryByRole('button', { name: 'Retry Download' })).toBeNull()
     // The release fallback only appears once no command can be built.
     expect(screen.queryByRole('button', { name: 'Download Manually' })).toBeNull()
+  })
+
+  it('presents a manual-only system-package flow without an automatic retry', () => {
+    renderCard({ recovery: makeRecovery({ reason: 'manual-install-required' }) })
+
+    expect(screen.getByText('Manual Install Required')).toBeTruthy()
+    expect(
+      screen.getByText(/automatic installation is disabled for Linux system packages/i)
+    ).toBeTruthy()
+    expect(screen.getByText(/inode-pinned command.*POSIX shell/)).toBeTruthy()
+    fireEvent.click(button('Show details'))
+    expect(screen.getByText(/verifies SHA-512 through that file descriptor/)).toBeTruthy()
+    expect(button('Copy Install Command')).toBeTruthy()
+    expect(button('Show Package')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Try Automatic Install Again' })).toBeNull()
   })
 
   it('minimizes to the status bar from the header control', () => {
@@ -437,11 +461,16 @@ describe('LinuxPackageInstallRecoveryCard details', () => {
     fireEvent.click(button('Show details'))
 
     // Why: the digest check is a point-in-time claim, not a standing guarantee about the file.
-    const detail = screen.getByText(/Orca checks the downloaded file against the release metadata/)
+    const detail = screen.getByText((content) =>
+      content.includes(
+        applyProductBranding('Orca checks the downloaded file against the release metadata')
+      )
+    )
     expect(detail.textContent).toContain('at the moment it builds this command')
     expect(detail.textContent).toContain(
-      'The system package itself is not signature-checked, and Orca cannot vouch for the file ' +
-        'after that point.'
+      applyProductBranding(
+        'The system package itself is not signature-checked, and Orca cannot vouch for the file after that point.'
+      )
     )
   })
 

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-
 import { repairTranslatedValue } from './locale-translation-policy.mjs'
 
 const repairEs = (enValue, localeValue) =>

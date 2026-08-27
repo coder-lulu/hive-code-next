@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
-import { colors, radii, spacing } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 import { agentDotState } from '../worktree/agent-row-display'
 import { AgentStateDot } from './AgentStateDot'
 import { MobileAgentIcon } from './MobileAgentIcon'
@@ -12,13 +12,15 @@ type Props = {
   agents: RuntimeWorktreeAgentRow[]
   expanded: boolean
   now: number
+  theme: MobileTheme
   onToggle: () => void
 }
 
-export function WorktreeAgentSummary({ agents, expanded, now, onToggle }: Props) {
+export function WorktreeAgentSummary({ agents, expanded, now, theme, onToggle }: Props) {
+  const styles = createStyles(theme)
   const visibleAgents = agents.slice(0, MAX_VISIBLE_AGENTS)
   const hiddenCount = agents.length - visibleAgents.length
-  const subject = `${agents.length} agents`
+  const subject = `${agents.length} 个智能体`
 
   return (
     <Pressable
@@ -28,7 +30,7 @@ export function WorktreeAgentSummary({ agents, expanded, now, onToggle }: Props)
         pressed && styles.summaryPressed
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} ${subject}`}
+      accessibilityLabel={`${expanded ? '收起' : '展开'} ${subject}`}
       accessibilityState={{ expanded }}
       onPress={(event) => {
         event.stopPropagation()
@@ -49,56 +51,56 @@ export function WorktreeAgentSummary({ agents, expanded, now, onToggle }: Props)
         </View>
       )}
       {expanded ? (
-        <ChevronDown size={12} color={colors.textMuted} />
+        <ChevronDown size={12} color={theme.color.text.secondary} />
       ) : (
-        <ChevronRight size={12} color={colors.textMuted} />
+        <ChevronRight size={12} color={theme.color.text.secondary} />
       )}
     </Pressable>
   )
 }
 
-const styles = StyleSheet.create({
-  summary: {
-    minHeight: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radii.button
-  },
-  summaryCollapsed: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgRaised
-  },
-  summaryPressed: {
-    opacity: 0.72
-  },
-  expandedLabel: {
-    flex: 1,
-    paddingLeft: spacing.xs,
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textMuted
-  },
-  agentIcons: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs
-  },
-  agentStatus: {
-    height: 19,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 3,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgPanel
-  },
-  hiddenCount: {
-    fontSize: 10,
-    color: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    summary: {
+      minHeight: theme.spacing.space24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4,
+      paddingHorizontal: theme.spacing.space4,
+      borderRadius: theme.radii.control
+    },
+    summaryCollapsed: {
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      backgroundColor: theme.color.bg.subtle
+    },
+    summaryPressed: { opacity: 0.72 },
+    expandedLabel: {
+      ...theme.typography.caption,
+      flex: 1,
+      paddingLeft: theme.spacing.space4,
+      fontWeight: '500',
+      color: theme.color.text.secondary
+    },
+    agentIcons: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4
+    },
+    agentStatus: {
+      height: theme.spacing.space20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: theme.spacing.space4,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    hiddenCount: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary
+    }
+  })
+}

@@ -17,10 +17,11 @@ import {
   serializeRemoteRuntimeRpcRequest
 } from './remote-runtime-memory-limits'
 import { getRemoteRuntimeRequestAdmissionEvidence } from './remote-runtime-prepared-request-admission'
-import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabilities'
 import { RemoteRuntimeSharedControlConnection } from './remote-runtime-shared-control-connection'
 import * as sharedControlProtocol from './remote-runtime-shared-control-protocol'
 import { isRuntimeSubscriptionReplayResponse } from './runtime-subscription-replay'
+import * as protocolVersion from './protocol-version'
+import { APP_DISPLAY_NAME } from './brand'
 
 const TEST_PROJECT_PATH = path.join('tmp', 'project')
 type TestServer = {
@@ -61,7 +62,13 @@ describe('RemoteRuntimeSharedControlConnection', () => {
     expect(server.auths).toContainEqual({
       type: 'e2ee_auth',
       deviceToken: 'device-token',
-      clientCapabilities: remoteRuntimeClientCapabilities()
+      clientCapabilities: [
+        protocolVersion.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+        protocolVersion.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
+        protocolVersion.SKILL_INSTALL_RESULT_V2_CAPABILITY,
+        protocolVersion.WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
+        protocolVersion.WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
+      ]
     })
     expect(server.requests.map((request) => request.method)).toEqual([
       'worktree.ps',
@@ -695,7 +702,7 @@ describe('RemoteRuntimeSharedControlConnection', () => {
     const connection = new RemoteRuntimeSharedControlConnection(server.pairing)
 
     await expect(connection.request('worktree.ps', undefined, 1000)).rejects.toThrow(
-      'Remote Orca runtime closed the connection'
+      `Remote ${APP_DISPLAY_NAME} runtime closed the connection`
     )
     expect(connection.getDiagnostics()).toMatchObject({
       state: 'closed',

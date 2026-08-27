@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import { isSubmittableCommentBody } from '../../session/pr-comment-actions'
-import { prCommentComposerStyles as styles } from './pr-comment-composer-styles'
+import { createPrCommentComposerStyles } from './pr-comment-composer-styles'
 
 type Props = {
   // Plain-text composer shared by the reply affordance, the root-comment box, and
@@ -27,6 +27,8 @@ export function PRCommentComposer({
   onCancel,
   autoFocus
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createPrCommentComposerStyles)
   const [body, setBody] = useState(initialBody ?? '')
   // Why: parent `submitting` flips async; a fast double-tap can fire onSubmit
   // twice before it flips, so guard locally in the same synchronous tick.
@@ -55,7 +57,7 @@ export function PRCommentComposer({
         value={body}
         onChangeText={setBody}
         placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={theme.color.text.tertiary}
         multiline
         editable={!submitting}
         autoFocus={autoFocus}
@@ -67,9 +69,9 @@ export function PRCommentComposer({
             onPress={onCancel}
             disabled={submitting}
             accessibilityRole="button"
-            accessibilityLabel="Cancel"
+            accessibilityLabel="取消"
           >
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={styles.cancelText}>取消</Text>
           </Pressable>
         ) : null}
         <Pressable
@@ -84,7 +86,7 @@ export function PRCommentComposer({
           accessibilityLabel={submitLabel}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color={colors.bgBase} />
+            <ActivityIndicator size="small" color={theme.color.text.inverse} />
           ) : (
             <Text style={styles.submitText}>{submitLabel}</Text>
           )}

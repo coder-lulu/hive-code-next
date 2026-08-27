@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join, win32 as pathWin32 } from 'node:path'
 import { net } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import type {
   ProviderRateLimits,
   RateLimitWindow,
@@ -267,7 +268,7 @@ function expiredSessionMessage(home: KimiHomeResolution): string {
   const where =
     home.runtime === 'wsl'
       ? `inside WSL (${home.wslDistro ?? 'default distro'})`
-      : 'on the computer running Orca'
+      : `on the computer running ${applyProductBranding('Orca')}`
   return `Kimi session expired — run kimi ${where}, then retry usage.`
 }
 

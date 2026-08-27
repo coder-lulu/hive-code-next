@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { translate } from '@/i18n/i18n'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 import { resolveClientEnvironmentFooter } from '@/lib/client-environment-info'
 import { hasClientEnvironmentFooter } from '../../../../shared/client-environment-info'
 
@@ -193,7 +194,7 @@ export function TerminalErrorToast({
                 'Restart the terminal daemon from here to clear stale daemon state.'
               )}
             </>
-          ) : showIssueLink ? (
+          ) : showIssueLink && PRODUCT_PUBLIC_LINKS.support ? (
             <>
               {'\n'}
               {translate(
@@ -201,7 +202,7 @@ export function TerminalErrorToast({
                 'If this persists, please'
               )}{' '}
               <a
-                href="https://github.com/stablyai/orca/issues"
+                href={PRODUCT_PUBLIC_LINKS.support}
                 style={{ color: '#fca5a5', textDecoration: 'underline' }}
               >
                 {translate(

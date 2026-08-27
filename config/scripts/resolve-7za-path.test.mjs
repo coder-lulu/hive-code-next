@@ -1,12 +1,15 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { legacy7zaRelativePath, resolve7zaPath } from './resolve-7za-path.mjs'
 
-const projectRoot = resolve(import.meta.dirname, '../..')
+// Why process.cwd(): Vitest's import.meta transform can reinterpret a Windows
+// candidate directory segment such as `\150c...` as an invalid escape.
+// This suite is invoked from the repository root by the package scripts.
+const projectRoot = process.cwd()
 
 describe('7za path resolution for the Windows signing gates (#6487)', () => {
   // Why fixtures: 7zip-bin@5.2.0 ships mac/{arm64,x64}, win/{arm64,ia32,x64}

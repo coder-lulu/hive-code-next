@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { View, Text, Pressable, TextInput, StyleSheet, Switch } from 'react-native'
 import { ChevronDown, ChevronRight } from 'lucide-react-native'
-import { colors, spacing, radii, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { MobileAgentIcon } from '../components/MobileAgentIcon'
 import {
   getQuickCommandAgentLabel,
@@ -34,6 +35,7 @@ function ActionToggle({
   value: QuickCommandDraft['action']
   onChange: (action: QuickCommandDraft['action']) => void
 }) {
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <View style={styles.toggleGroup}>
       {(['terminal-command', 'agent-prompt'] as const).map((action) => {
@@ -51,7 +53,7 @@ function ActionToggle({
             accessibilityState={{ selected }}
           >
             <Text style={[styles.toggleText, selected && styles.toggleTextSelected]}>
-              {action === 'terminal-command' ? 'Terminal Command' : 'Agent Prompt'}
+              {action === 'terminal-command' ? '终端命令' : 'Agent 提示词'}
             </Text>
           </Pressable>
         )
@@ -72,6 +74,8 @@ export function QuickCommandEditorForm({
   onCancel,
   onSave
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const hasRepoScope = repoId !== null
   const [advancedOpen, setAdvancedOpen] = useState(draft.scope.type === 'repo')
   const isAgent = draft.action === 'agent-prompt'
@@ -80,13 +84,13 @@ export function QuickCommandEditorForm({
   return (
     <View style={styles.form}>
       <View style={styles.field}>
-        <Text style={styles.label}>Label</Text>
+        <Text style={styles.label}>名称</Text>
         <TextInput
           style={styles.input}
           value={draft.label}
           onChangeText={(label) => onChange({ label })}
-          placeholder="Start dev server"
-          placeholderTextColor={colors.textMuted}
+          placeholder="启动开发服务器"
+          placeholderTextColor={theme.color.text.tertiary}
           autoCapitalize="none"
           autoCorrect={false}
           maxLength={MAX_QUICK_COMMAND_LABEL_LENGTH}
@@ -94,7 +98,7 @@ export function QuickCommandEditorForm({
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Action</Text>
+        <Text style={styles.label}>操作</Text>
         <ActionToggle value={draft.action} onChange={(action) => onChange({ action })} />
       </View>
 
@@ -112,21 +116,21 @@ export function QuickCommandEditorForm({
                 <Text style={styles.selectValueText}>{getQuickCommandAgentLabel(draft.agent)}</Text>
               </View>
             ) : (
-              <Text style={styles.selectPlaceholder}>Choose agent</Text>
+              <Text style={styles.selectPlaceholder}>选择 Agent</Text>
             )}
-            <ChevronDown size={16} color={colors.textMuted} />
+            <ChevronDown size={16} color={theme.color.text.tertiary} />
           </Pressable>
         </View>
       ) : null}
 
       <View style={styles.field}>
-        <Text style={styles.label}>{isAgent ? 'Prompt' : 'Command Text'}</Text>
+        <Text style={styles.label}>{isAgent ? '提示词' : '命令内容'}</Text>
         <TextInput
           style={[styles.input, styles.textarea, !isAgent && styles.mono]}
           value={isAgent ? draft.prompt : draft.command}
           onChangeText={(text) => onChange(isAgent ? { prompt: text } : { command: text })}
-          placeholder={isAgent ? 'Ask the agent to investigate this workspace' : 'npm run dev'}
-          placeholderTextColor={colors.textMuted}
+          placeholder={isAgent ? '让 Agent 检查此工作区' : 'npm run dev'}
+          placeholderTextColor={theme.color.text.tertiary}
           autoCapitalize="none"
           autoCorrect={false}
           multiline
@@ -134,9 +138,7 @@ export function QuickCommandEditorForm({
             isAgent ? MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH : MAX_QUICK_COMMAND_TERMINAL_TEXT_LENGTH
           }
         />
-        {isAgent ? (
-          <Text style={styles.hint}>Supports skills, file paths, and built-in commands.</Text>
-        ) : null}
+        {isAgent ? <Text style={styles.hint}>支持 Skills、文件路径和内置命令。</Text> : null}
       </View>
 
       <View style={styles.field}>
@@ -147,11 +149,11 @@ export function QuickCommandEditorForm({
           accessibilityState={{ expanded: advancedOpen }}
         >
           {advancedOpen ? (
-            <ChevronDown size={16} color={colors.textSecondary} />
+            <ChevronDown size={16} color={theme.color.text.secondary} />
           ) : (
-            <ChevronRight size={16} color={colors.textSecondary} />
+            <ChevronRight size={16} color={theme.color.text.secondary} />
           )}
-          <Text style={styles.advancedText}>Advanced</Text>
+          <Text style={styles.advancedText}>高级选项</Text>
         </Pressable>
 
         {advancedOpen ? (
@@ -159,22 +161,23 @@ export function QuickCommandEditorForm({
             {!isAgent ? (
               <View style={styles.switchRow}>
                 <View style={styles.switchText}>
-                  <Text style={styles.switchTitle}>Append Enter</Text>
-                  <Text style={styles.switchDesc}>
-                    Submit immediately instead of only inserting text.
-                  </Text>
+                  <Text style={styles.switchTitle}>自动回车</Text>
+                  <Text style={styles.switchDesc}>立即提交，而不是仅插入文本。</Text>
                 </View>
                 <Switch
                   value={draft.appendEnter}
                   onValueChange={(appendEnter) => onChange({ appendEnter })}
-                  trackColor={{ false: colors.bgRaised, true: colors.accentBlue }}
-                  thumbColor={colors.surfaceBright}
+                  trackColor={{
+                    false: theme.color.bg.subtle,
+                    true: theme.color.brand.primary
+                  }}
+                  thumbColor={theme.color.bg.surface}
                 />
               </View>
             ) : null}
 
             <View style={styles.field}>
-              <Text style={styles.label}>Scope</Text>
+              <Text style={styles.label}>作用域</Text>
               <View style={styles.toggleGroup}>
                 {(['global', 'repo'] as const).map((scopeType) => {
                   const selected = draft.scope.type === scopeType
@@ -201,7 +204,7 @@ export function QuickCommandEditorForm({
                       accessibilityState={{ selected, disabled }}
                     >
                       <Text style={[styles.toggleText, selected && styles.toggleTextSelected]}>
-                        {scopeType === 'global' ? 'Global' : 'Project'}
+                        {scopeType === 'global' ? '全局' : '当前项目'}
                       </Text>
                     </Pressable>
                   )
@@ -223,7 +226,7 @@ export function QuickCommandEditorForm({
           onPress={onCancel}
           accessibilityRole="button"
         >
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>取消</Text>
         </Pressable>
         <Pressable
           style={[styles.button, styles.saveButton, !canSave && styles.saveButtonDisabled]}
@@ -232,7 +235,7 @@ export function QuickCommandEditorForm({
           accessibilityRole="button"
         >
           <Text style={[styles.saveText, !canSave && styles.saveTextDisabled]}>
-            {mode === 'edit' ? 'Save' : 'Add Quick Command'}
+            {mode === 'edit' ? '保存' : '添加快捷命令'}
           </Text>
         </Pressable>
       </View>
@@ -240,78 +243,112 @@ export function QuickCommandEditorForm({
   )
 }
 
-const styles = StyleSheet.create({
-  form: { gap: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.sm },
-  field: { gap: spacing.sm },
-  label: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  input: {
-    backgroundColor: colors.bgPanel,
-    color: colors.textPrimary,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  textarea: { minHeight: 92, textAlignVertical: 'top' },
-  mono: { fontFamily: typography.monoFamily },
-  hint: { fontSize: 12, color: colors.textMuted },
-  error: { fontSize: 13, color: colors.statusRed, marginTop: spacing.xs },
-  pressed: { backgroundColor: colors.bgRaised },
-  toggleGroup: { flexDirection: 'row', gap: spacing.sm },
-  toggleItem: {
-    flex: 1,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  toggleItemSelected: { backgroundColor: colors.bgRaised, borderColor: colors.textMuted },
-  toggleItemDisabled: { opacity: 0.4 },
-  toggleText: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
-  toggleTextSelected: { color: colors.textPrimary },
-  select: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.input,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2
-  },
-  selectValue: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  selectValueText: { fontSize: 14, color: colors.textPrimary },
-  selectPlaceholder: { fontSize: 14, color: colors.textMuted },
-  scopeRepoName: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontFamily: typography.monoFamily,
-    paddingHorizontal: spacing.xs
-  },
-  advancedToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs
-  },
-  advancedText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  advancedBody: { gap: spacing.md, paddingTop: spacing.xs },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  switchText: { flex: 1 },
-  switchTitle: { fontSize: 14, color: colors.textPrimary },
-  switchDesc: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
-  footer: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  button: { flex: 1, borderRadius: 8, paddingVertical: spacing.md, alignItems: 'center' },
-  cancelButton: { borderWidth: 1, borderColor: colors.borderSubtle },
-  cancelText: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  saveButton: { backgroundColor: colors.textPrimary },
-  saveButtonDisabled: { backgroundColor: colors.bgRaised },
-  saveText: { fontSize: 14, fontWeight: '700', color: colors.bgBase },
-  saveTextDisabled: { color: colors.textMuted }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    form: {
+      gap: theme.spacing.space12,
+      paddingTop: theme.spacing.space4,
+      paddingBottom: theme.spacing.space8
+    },
+    field: { gap: theme.spacing.space8 },
+    label: { ...theme.typography.caption, fontWeight: '600', color: theme.color.text.secondary },
+    input: {
+      ...theme.typography.label,
+      minHeight: theme.size.minimumTouchTarget,
+      backgroundColor: theme.color.bg.surface,
+      color: theme.color.text.primary,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      borderWidth: 1,
+      borderColor: theme.color.border.default
+    },
+    textarea: { minHeight: 92, textAlignVertical: 'top' },
+    mono: { ...theme.typography.code },
+    hint: { ...theme.typography.caption, color: theme.color.text.tertiary },
+    error: {
+      ...theme.typography.meta,
+      color: theme.color.status.danger,
+      marginTop: theme.spacing.space4
+    },
+    pressed: { backgroundColor: theme.color.bg.subtle },
+    toggleGroup: { flexDirection: 'row', gap: theme.spacing.space8 },
+    toggleItem: {
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.control,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      backgroundColor: theme.color.bg.surface,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    toggleItemSelected: {
+      backgroundColor: theme.color.bg.selected,
+      borderColor: theme.color.bg.selected
+    },
+    toggleItemDisabled: { opacity: 0.4 },
+    toggleText: { ...theme.typography.meta, fontWeight: '500', color: theme.color.text.secondary },
+    toggleTextSelected: { color: theme.color.text.inverse },
+    select: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.color.bg.surface,
+      borderRadius: theme.radii.control,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8
+    },
+    selectValue: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space8 },
+    selectValueText: { ...theme.typography.label, color: theme.color.text.primary },
+    selectPlaceholder: { ...theme.typography.label, color: theme.color.text.tertiary },
+    scopeRepoName: {
+      ...theme.typography.code,
+      color: theme.color.text.secondary,
+      paddingHorizontal: theme.spacing.space4
+    },
+    advancedToggle: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4,
+      paddingVertical: theme.spacing.space4
+    },
+    advancedText: {
+      ...theme.typography.meta,
+      fontWeight: '600',
+      color: theme.color.text.secondary
+    },
+    advancedBody: { gap: theme.spacing.space12, paddingTop: theme.spacing.space4 },
+    switchRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space12 },
+    switchText: { flex: 1 },
+    switchTitle: { ...theme.typography.label, color: theme.color.text.primary },
+    switchDesc: {
+      ...theme.typography.caption,
+      color: theme.color.text.tertiary,
+      marginTop: theme.spacing.space4
+    },
+    footer: {
+      flexDirection: 'row',
+      gap: theme.spacing.space8,
+      marginTop: theme.spacing.space8
+    },
+    button: {
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.control,
+      paddingVertical: theme.spacing.space12,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    cancelButton: { borderWidth: 1, borderColor: theme.color.border.default },
+    cancelText: { ...theme.typography.label, fontWeight: '600', color: theme.color.text.primary },
+    saveButton: { backgroundColor: theme.color.bg.selected },
+    saveButtonDisabled: { backgroundColor: theme.color.bg.subtle },
+    saveText: { ...theme.typography.label, fontWeight: '600', color: theme.color.text.inverse },
+    saveTextDisabled: { color: theme.color.text.tertiary }
+  })
+}

@@ -21,6 +21,7 @@ export function RightSidebarTopActivityBar({
   onSelectTab,
   checksStatus,
   closeButton,
+  settingsHelpControls,
   activityBarPosition,
   onChangeActivityBarPosition
 }: {
@@ -31,6 +32,7 @@ export function RightSidebarTopActivityBar({
   onSelectTab: (tab: ActiveRightSidebarTab) => void
   checksStatus: CheckStatus | null
   closeButton: React.ReactNode
+  settingsHelpControls: React.ReactNode
   activityBarPosition: ActivityBarPosition
   onChangeActivityBarPosition: (pos: ActivityBarPosition) => void
 }): React.JSX.Element {
@@ -79,6 +81,7 @@ export function RightSidebarTopActivityBar({
                 RIGHT_SIDEBAR_HEADER_NO_DRAG_CLASS_NAME
               )}
             >
+              {settingsHelpControls}
               {closeButton}
             </div>
           </TooltipProvider>
@@ -91,6 +94,7 @@ export function RightSidebarTopActivityBar({
                 RIGHT_SIDEBAR_HEADER_NO_DRAG_CLASS_NAME
               )}
             >
+              {settingsHelpControls}
               {closeButton}
             </div>
           </TooltipProvider>

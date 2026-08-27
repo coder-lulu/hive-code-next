@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Check } from 'lucide-react-native'
 import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 type Props = {
   prompt: AskPrompt
@@ -21,6 +22,8 @@ const OTHER = -1
  *  on the last step), and a Cancel that dismisses the prompt. Neutral styling
  *  with a subtle green accent on the active choice to match the rest of the app. */
 export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [index, setIndex] = useState(0)
   const [selections, setSelections] = useState<number[][]>(() => prompt.questions.map(() => []))
   const [otherText, setOtherText] = useState<string[]>(() => prompt.questions.map(() => ''))
@@ -115,10 +118,10 @@ export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): Reac
               onPress={() => setIndex(i)}
             >
               <Text style={[styles.tabText, i === index && styles.tabTextActive]} numberOfLines={1}>
-                {qq.header || `Step ${i + 1}`}
+                {qq.header || `第 ${i + 1} 步`}
               </Text>
               {isAnswered(i) ? (
-                <Check size={11} color={colors.statusGreen} strokeWidth={3} />
+                <Check size={16} color={theme.color.brand.primary} strokeWidth={2.4} />
               ) : null}
             </Pressable>
           ))}
@@ -138,7 +141,7 @@ export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): Reac
           />
         ))}
         <OptionRow
-          label="Other…"
+          label="其他…"
           selected={otherSelected}
           multi={q.multiSelect}
           onPress={() => toggle(index, OTHER, q.multiSelect)}
@@ -148,8 +151,8 @@ export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): Reac
             style={styles.input}
             value={otherText[index]}
             onChangeText={(v) => setOther(index, v)}
-            placeholder="Type your answer"
-            placeholderTextColor={colors.textMuted}
+            placeholder="输入你的回答"
+            placeholderTextColor={theme.color.text.tertiary}
             multiline
             autoFocus
           />
@@ -173,8 +176,10 @@ export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): Reac
           }}
           disabled={submitting}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="取消回答"
         >
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>取消</Text>
         </Pressable>
         {total > 1 ? (
           <Text style={styles.progress}>
@@ -185,9 +190,11 @@ export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): Reac
           style={[styles.next, !canAdvance && styles.nextDisabled]}
           onPress={advance}
           disabled={!canAdvance}
+          accessibilityRole="button"
+          accessibilityLabel={isLast ? '提交回答' : '下一步'}
         >
           <Text style={[styles.nextText, !canAdvance && styles.nextTextDisabled]}>
-            {isLast ? 'Submit' : 'Next'}
+            {isLast ? '提交' : '下一步'}
           </Text>
         </Pressable>
       </View>
@@ -208,8 +215,19 @@ function OptionRow({
   multi?: boolean
   onPress: () => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   return (
-    <Pressable style={[styles.option, selected && styles.optionSelected]} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.option,
+        selected && styles.optionSelected,
+        pressed && styles.pressed
+      ]}
+      onPress={onPress}
+      accessibilityRole={multi ? 'checkbox' : 'radio'}
+      accessibilityState={{ checked: selected }}
+    >
       {/* Multi-select reads as a checkbox (square); single-select as a radio (circle). */}
       <View
         style={[
@@ -218,7 +236,7 @@ function OptionRow({
           selected && styles.checkOn
         ]}
       >
-        {selected ? <Check size={12} color={colors.bgBase} strokeWidth={3} /> : null}
+        {selected ? <Check size={12} color={theme.color.text.inverse} strokeWidth={3} /> : null}
       </View>
       <View style={styles.optionBody}>
         <Text style={styles.optionLabel}>{label}</Text>
@@ -232,147 +250,155 @@ function OptionRow({
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    maxHeight: 380,
-    backgroundColor: colors.bgPanel,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle
-  },
-  tabs: {
-    flexGrow: 0,
-    paddingTop: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle
-  },
-  tabsContent: {
-    paddingHorizontal: spacing.sm,
-    gap: spacing.xs,
-    alignItems: 'center'
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minHeight: 36,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent'
-  },
-  tabActive: {
-    borderBottomColor: colors.statusGreen
-  },
-  tabText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontWeight: '600'
-  },
-  tabTextActive: {
-    color: colors.textPrimary
-  },
-  scroll: {
-    paddingHorizontal: spacing.md
-  },
-  questionText: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize + 1,
-    fontWeight: '600',
-    marginVertical: spacing.sm
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgRaised,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    marginBottom: spacing.xs
-  },
-  optionSelected: {
-    borderColor: colors.statusGreen
-  },
-  check: {
-    width: 18,
-    height: 18,
-    borderWidth: 1.5,
-    borderColor: colors.textMuted,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  checkCircle: {
-    borderRadius: 9
-  },
-  checkSquare: {
-    borderRadius: 4
-  },
-  checkOn: {
-    backgroundColor: colors.statusGreen,
-    borderColor: colors.statusGreen
-  },
-  optionBody: {
-    flex: 1,
-    gap: 2
-  },
-  optionLabel: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  optionDescription: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
-  },
-  input: {
-    backgroundColor: colors.bgRaised,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    padding: spacing.sm,
-    minHeight: 44,
-    marginBottom: spacing.xs
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    gap: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle
-  },
-  cancel: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm
-  },
-  cancelText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  progress: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize
-  },
-  next: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.button,
-    backgroundColor: colors.textPrimary
-  },
-  nextDisabled: {
-    backgroundColor: colors.bgRaised
-  },
-  nextText: {
-    color: colors.bgBase,
-    fontSize: typography.bodySize,
-    fontWeight: '700'
-  },
-  nextTextDisabled: {
-    color: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    card: {
+      maxHeight: 380,
+      backgroundColor: theme.color.bg.surface,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle
+    },
+    tabs: {
+      flexGrow: 0,
+      paddingTop: theme.spacing.space8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.color.border.subtle
+    },
+    tabsContent: {
+      paddingHorizontal: theme.spacing.space8,
+      gap: theme.spacing.space4,
+      alignItems: 'center'
+    },
+    tab: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4,
+      minHeight: theme.size.minimumTouchTarget,
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent'
+    },
+    tabActive: {
+      borderBottomColor: theme.color.brand.primary
+    },
+    tabText: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      fontWeight: '600'
+    },
+    tabTextActive: {
+      color: theme.color.text.primary
+    },
+    scroll: {
+      paddingHorizontal: theme.spacing.space12
+    },
+    questionText: {
+      ...theme.typography.sectionTitle,
+      color: theme.color.text.primary,
+      fontWeight: '600',
+      marginVertical: theme.spacing.space8
+    },
+    option: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      padding: theme.spacing.space8,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.elevated,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      marginBottom: theme.spacing.space4
+    },
+    optionSelected: {
+      borderColor: theme.color.brand.primary
+    },
+    pressed: {
+      opacity: 0.72
+    },
+    check: {
+      width: theme.spacing.space20,
+      height: theme.spacing.space20,
+      borderWidth: 1.5,
+      borderColor: theme.color.text.tertiary,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    checkCircle: {
+      borderRadius: theme.radii.circle
+    },
+    checkSquare: {
+      borderRadius: theme.radii.small
+    },
+    checkOn: {
+      backgroundColor: theme.color.brand.primary,
+      borderColor: theme.color.brand.primary
+    },
+    optionBody: {
+      flex: 1,
+      gap: theme.spacing.space4
+    },
+    optionLabel: {
+      ...theme.typography.label,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    optionDescription: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary
+    },
+    input: {
+      ...theme.typography.body,
+      backgroundColor: theme.color.bg.elevated,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      color: theme.color.text.primary,
+      padding: theme.spacing.space12,
+      minHeight: theme.size.minimumTouchTarget,
+      marginBottom: theme.spacing.space4
+    },
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: theme.spacing.space12,
+      gap: theme.spacing.space8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle
+    },
+    cancel: {
+      minHeight: theme.size.minimumTouchTarget,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space8
+    },
+    cancelText: {
+      ...theme.typography.label,
+      color: theme.color.text.secondary,
+      fontWeight: '600'
+    },
+    progress: {
+      ...theme.typography.meta,
+      color: theme.color.text.tertiary
+    },
+    next: {
+      minHeight: theme.size.minimumTouchTarget,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space16,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.selected
+    },
+    nextDisabled: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    nextText: {
+      ...theme.typography.label,
+      color: theme.color.text.inverse,
+      fontWeight: '600'
+    },
+    nextTextDisabled: {
+      color: theme.color.text.tertiary
+    }
+  })
+}

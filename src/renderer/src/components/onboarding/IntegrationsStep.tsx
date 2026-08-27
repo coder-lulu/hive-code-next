@@ -8,6 +8,7 @@ import { IntegrationStatusPill } from '@/components/integration-status-pill'
 import { cn } from '@/lib/utils'
 import { OnboardingInlineCommandTerminal } from './OnboardingInlineCommandTerminal'
 import { translate } from '@/i18n/i18n'
+import { applyProductBranding } from '@/product-brand'
 
 type GitHubSetupState = 'checking' | 'connected' | 'not-installed' | 'not-authenticated'
 
@@ -219,9 +220,11 @@ export function LinearRow(props: { compact?: boolean } = {}): React.JSX.Element 
 
 const CAPABILITIES = [
   'Start a workspace from any GitHub issue or pull request, prefilled with its title and context',
-  'Browse GitHub issues and pull requests in the Tasks view without leaving Orca',
+  applyProductBranding(
+    'Browse GitHub issues and pull requests in the Tasks view without leaving Orca'
+  ),
   'See issue state, review status, and CI checks on every worktree',
-  'Read, comment on, and merge pull requests without leaving Orca'
+  applyProductBranding('Read, comment on, and merge pull requests without leaving Orca')
 ] as const
 
 export function IntegrationsStep(): React.JSX.Element {

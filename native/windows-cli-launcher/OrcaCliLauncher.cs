@@ -12,7 +12,7 @@ internal static class OrcaCliLauncher
             string launcherDirectory = Path.GetDirectoryName(typeof(OrcaCliLauncher).Assembly.Location);
             string resourcesDirectory = Directory.GetParent(launcherDirectory).FullName;
             string appDirectory = Directory.GetParent(resourcesDirectory).FullName;
-            string electronPath = Path.Combine(appDirectory, "Orca.exe");
+            string electronPath = FindAppExecutable(appDirectory);
             string cliPath = Path.Combine(
                 resourcesDirectory,
                 "app.asar.unpacked",
@@ -21,15 +21,18 @@ internal static class OrcaCliLauncher
                 "index.js"
             );
 
-            if (!File.Exists(electronPath))
+            if (electronPath == null)
             {
-                Console.Error.WriteLine("Unable to locate Orca.exe next to \"{0}\"", resourcesDirectory);
+                Console.Error.WriteLine(
+                    "Unable to locate HiveCode.exe or the Orca.exe compatibility executable next to \"{0}\"",
+                    resourcesDirectory
+                );
                 return 1;
             }
 
             if (!File.Exists(cliPath))
             {
-                Console.Error.WriteLine("Unable to locate the Orca CLI entrypoint at \"{0}\"", cliPath);
+                Console.Error.WriteLine("Unable to locate the HiveCode CLI entrypoint at \"{0}\"", cliPath);
                 return 1;
             }
 
@@ -49,10 +52,7 @@ internal static class OrcaCliLauncher
             Environment.SetEnvironmentVariable("ELECTRON_RUN_AS_NODE", "1");
             Environment.SetEnvironmentVariable("ORCA_WINDOWS_PACKAGED_CLI_LAUNCHER", "1");
             string requestedCliCommand = Environment.GetEnvironmentVariable("ORCA_CLI_COMMAND");
-            Environment.SetEnvironmentVariable(
-                "ORCA_CLI_COMMAND",
-                requestedCliCommand == "orca-ide" ? "orca-ide" : "orca"
-            );
+            Environment.SetEnvironmentVariable("ORCA_CLI_COMMAND", ResolveCliCommand(requestedCliCommand));
 
             using (Process child = Process.Start(startInfo))
             {
@@ -62,9 +62,43 @@ internal static class OrcaCliLauncher
         }
         catch (Exception error)
         {
-            Console.Error.WriteLine("Unable to start the Orca CLI: {0}", error.Message);
+            Console.Error.WriteLine("Unable to start the HiveCode CLI: {0}", error.Message);
             return 1;
         }
+    }
+
+    private static string FindAppExecutable(string appDirectory)
+    {
+        foreach (string executableName in new[] { "HiveCode.exe", "Orca.exe" })
+        {
+            string candidate = Path.Combine(appDirectory, executableName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static string ResolveCliCommand(string requestedCliCommand)
+    {
+        if (
+            requestedCliCommand == "hivecode" ||
+            requestedCliCommand == "orca" ||
+            requestedCliCommand == "orca-ide"
+        )
+        {
+            return requestedCliCommand;
+        }
+
+        string launcherName = Path.GetFileNameWithoutExtension(
+            typeof(OrcaCliLauncher).Assembly.Location
+        ).ToLowerInvariant();
+        if (launcherName == "hivecode" || launcherName == "orca-ide")
+        {
+            return launcherName;
+        }
+        return "orca";
     }
 
     private static void MoveEnvironmentVariable(string sourceName, string targetName)

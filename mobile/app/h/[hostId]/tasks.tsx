@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -29,6 +30,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   Send,
   X
 } from 'lucide-react-native'
@@ -48,10 +50,10 @@ import { ConfirmModal } from '../../../src/components/ConfirmModal'
 import { MobileMarkdown } from '../../../src/components/MobileMarkdown'
 import { MobileAgentIcon } from '../../../src/components/MobileAgentIcon'
 import { MobileWorkspaceNameInput } from '../../../src/components/MobileWorkspaceNameInput'
-import { MobileSearchField } from '../../../src/components/MobileSearchField'
 import { MobileSyntaxSegments } from '../../../src/components/MobileSyntaxSegments'
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
 import { TaskProviderLogo } from '../../../src/components/TaskProviderLogo'
+import { MobileIconButton } from '../../../src/components/ui'
 import {
   buildGitHubPrFileDiffPreview,
   type GitHubPrFileDiffLine
@@ -113,7 +115,20 @@ import {
   trustedOrcaHooksWithSetupApproval,
   wasSetupHookPreviouslyApproved
 } from '../../../src/tasks/setup-hook-trust'
-import { colors, radii, spacing, typography } from '../../../src/theme/mobile-theme'
+import {
+  colors as legacyColors,
+  radii,
+  spacing,
+  typography,
+  type MobileTheme
+} from '../../../src/theme/mobile-theme'
+import { useMobileTheme } from '../../../src/theme/mobile-theme-provider'
+import {
+  createMobileTaskCompatColors,
+  createMobileTaskScreenPalette,
+  createMobileTaskScreenStyles
+} from '../../../src/tasks/mobile-task-screen-styles'
+import { createMobileTaskScreenChromeStyles } from '../../../src/tasks/mobile-task-screen-chrome-styles'
 import { triggerMediumImpact } from '../../../src/platform/haptics'
 import {
   groupRows,
@@ -163,6 +178,8 @@ import {
   githubProjectHost,
   githubProjectIdentityKey as githubProjectKey
 } from '../../../../src/shared/github/project-identity'
+
+const colors = legacyColors
 
 type RepoSummary = {
   id: string
@@ -1855,7 +1872,10 @@ function discussionSummary(count: number): string {
   return `${count} ${count === 1 ? 'comment' : 'comments'}`
 }
 
-function renderCommentReactions(comment: DetailComment): ReactNode {
+type TaskScreenStyles = ReturnType<typeof createStyles>
+type TaskScreenColors = ReturnType<typeof createMobileTaskCompatColors>
+
+function renderCommentReactions(comment: DetailComment, styles: TaskScreenStyles): ReactNode {
   const reactions = (comment.reactions ?? []).filter((reaction) => reaction.count > 0)
   if (reactions.length === 0) {
     return null
@@ -1892,6 +1912,8 @@ function GitHubPrFileDiff({
   contents,
   commentDrafts,
   disabled,
+  colors,
+  styles,
   onCommentDraftChange,
   onSubmitComment
 }: {
@@ -1899,6 +1921,8 @@ function GitHubPrFileDiff({
   contents: GitHubPRFileContents
   commentDrafts: Record<string, string>
   disabled: boolean
+  colors: TaskScreenColors
+  styles: TaskScreenStyles
   onCommentDraftChange: (key: string, value: string) => void
   onSubmitComment: (line: number) => void
 }): ReactNode {
@@ -2071,6 +2095,11 @@ export default function MobileTasksScreen() {
   const { hostId, taskSource } = useLocalSearchParams<{ hostId: string; taskSource?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const colors = useMemo(() => createMobileTaskCompatColors(theme), [theme])
+  const styles = useMemo(() => createStyles(theme), [theme])
+  const taskScreenStyles = useMemo(() => createMobileTaskScreenStyles(theme), [theme])
+  const taskScreenPalette = useMemo(() => createMobileTaskScreenPalette(theme), [theme])
   const { client, state: connState } = useHostClient(hostId)
   const reconnectAttempts = useReconnectAttempt(hostId)
   const lastConnectedAt = useLastConnectedAt(hostId)
@@ -2154,6 +2183,7 @@ export default function MobileTasksScreen() {
   >({})
   const [query, setQuery] = useState(getTaskPresetQuery('issues'))
   const [appliedQuery, setAppliedQuery] = useState(getTaskPresetQuery('issues'))
+  const [searchFocused, setSearchFocused] = useState(false)
   const [showProviderPicker, setShowProviderPicker] = useState(false)
   const [showGitHubKindPicker, setShowGitHubKindPicker] = useState(false)
   const [showGitHubPresetPicker, setShowGitHubPresetPicker] = useState(false)
@@ -2943,7 +2973,10 @@ export default function MobileTasksScreen() {
         setMergeMethodTaskItem(null)
         setMergeMethodProjectRow(null)
         resetWorkspaceCreateState()
-        setError('Update Orca desktop to use Tasks on mobile.')
+        // The dedicated unsupported state below already explains the capability
+        // mismatch. Keep the generic error channel clear so the same condition
+        // is not rendered twice as both a failure banner and an empty state.
+        setError('')
         setTaskStateHydrated(false)
         return
       }
@@ -3804,7 +3837,7 @@ export default function MobileTasksScreen() {
           return
         }
         if (explicitView && explicitView.layout !== 'TABLE_LAYOUT') {
-          throw new Error("Orca doesn't support this GitHub Project layout yet.")
+          throw new Error(productNameText("Orca doesn't support this GitHub Project layout yet."))
         }
         if (!explicitView && !rememberedView) {
           // Why: desktop asks which Project view to open the first time a project
@@ -5647,7 +5680,9 @@ export default function MobileTasksScreen() {
       const kind = projectRowType(row)
       const repo = findProjectRowRepo(row)
       if (!kind || !row.content.number || !row.content.url) {
-        setError('Add the project item repository to Orca before creating a workspace.')
+        setError(
+          productNameText('Add the project item repository to Orca before creating a workspace.')
+        )
         return
       }
       if (!repo) {
@@ -8214,7 +8249,7 @@ export default function MobileTasksScreen() {
         {commentDate(comment.createdAt) ? ` · ${commentDate(comment.createdAt)}` : ''}
       </Text>
       <MobileMarkdown content={comment.body} />
-      {renderCommentReactions(comment)}
+      {renderCommentReactions(comment, styles)}
       {SHOW_MOBILE_COMMENT_THREAD_TOOLS &&
       actionItem?.provider === 'github' &&
       detailPayload?.provider === 'github' ? (
@@ -8689,79 +8724,221 @@ export default function MobileTasksScreen() {
             ? 'No GitLab tasks'
             : 'No Linear tasks'
   const isGithubProjectSearch = provider === 'github' && githubMode === 'project'
+  const searchValue = isGithubProjectSearch ? githubProjectSearch : query
+  const searchPlaceholder = isGithubProjectSearch ? '搜索项目视图' : `搜索 ${providerLabel} 任务`
+  const showSearchClear = isGithubProjectSearch
+    ? githubProjectSearch.length > 0 ||
+      (appliedGithubProjectSearch !== undefined && appliedGithubProjectSearch.length > 0)
+    : provider === 'github'
+      ? query.trim() !== getTaskPresetQuery(githubPreset).trim()
+      : query.length > 0
+  const visibleTaskCount =
+    provider === 'github' && githubMode === 'project'
+      ? visibleGitHubProjectRows.length
+      : provider === 'linear'
+        ? linearIssuesForView.length
+        : sortedItems.length
+  const showTaskListSummary =
+    tasksSupported &&
+    !(provider === 'linear' && !linearConnected) &&
+    !(provider === 'github' && githubMode === 'project' && !activeGitHubProject)
+
+  function selectTaskProvider(next: TaskProvider) {
+    const resume = taskResumeRef.current
+    persistTaskSource(next)
+    setProvider(next)
+    setItems([])
+    if (next === 'github') {
+      const nextMode = resume.githubMode === 'project' ? 'project' : 'items'
+      setGithubMode(nextMode)
+      if (nextMode === 'project') {
+        setQuery('')
+        setAppliedQuery('')
+        return
+      }
+      const preset =
+        resume.githubItemsPreset === null
+          ? githubPreset
+          : normalizeGitHubPreset(resume.githubItemsPreset ?? githubPreset)
+      const nextQuery =
+        resume.githubItemsPreset === null
+          ? (resume.githubItemsQuery ?? '')
+          : getTaskPresetQuery(preset)
+      const nextKind = githubKindFromQuery(nextQuery, preset)
+      setGithubPreset(preset)
+      setGithubKind(nextKind)
+      setQuery(nextQuery)
+      setAppliedQuery(scopeGitHubTaskSearch(nextQuery, nextKind))
+      return
+    }
+    if (next === 'linear') {
+      const nextQuery = resume.linearQuery ?? ''
+      setLinearFilter(normalizeLinearFilter(resume.linearPreset))
+      setQuery(nextQuery)
+      setAppliedQuery(nextQuery.trim())
+      return
+    }
+    setQuery('')
+    setAppliedQuery('')
+  }
+
+  function submitTaskSearch() {
+    if (!taskUiReady) {
+      return
+    }
+    if (isGithubProjectSearch) {
+      applyGitHubProjectSearch()
+      return
+    }
+    const nextQuery =
+      provider === 'github' ? scopeGitHubTaskSearch(query, githubKind) : query.trim()
+    setQuery(nextQuery)
+    setAppliedQuery(nextQuery)
+    if (provider === 'github') {
+      persistTaskResumeState({
+        githubItemsPreset:
+          nextQuery.trim() === getTaskPresetQuery(githubPreset) ? githubPreset : null,
+        githubItemsQuery: nextQuery.trim()
+      })
+    } else if (provider === 'linear') {
+      persistTaskResumeState({ linearQuery: nextQuery.trim() })
+    }
+  }
+
+  function clearTaskSearch() {
+    if (isGithubProjectSearch) {
+      const viewFilter = githubProjectTable?.selectedView.filter ?? ''
+      setGithubProjectSearch('')
+      setAppliedGithubProjectSearch(viewFilter ? '' : undefined)
+      return
+    }
+    if (provider === 'github') {
+      const nextQuery = getTaskPresetQuery(githubPreset)
+      setQuery(nextQuery)
+      setAppliedQuery(nextQuery)
+      persistTaskResumeState({
+        githubItemsPreset: githubPreset,
+        githubItemsQuery: nextQuery
+      })
+      return
+    }
+    setQuery('')
+    setAppliedQuery('')
+    if (provider === 'linear') {
+      persistTaskResumeState({ linearQuery: '' })
+    }
+  }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View ref={setTaskCopyFeedbackRootRef} style={styles.topChrome}>
-        <View style={styles.statusBar}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={22} color={colors.textPrimary} />
-          </Pressable>
-          <View style={styles.titleWrap}>
-            <StatusDot state={connState} verdict={headerVerdict} />
-            <Text style={styles.title}>Tasks</Text>
+    <SafeAreaView style={[styles.container, taskScreenStyles.container]} edges={['top']}>
+      <View ref={setTaskCopyFeedbackRootRef} style={[styles.topChrome, taskScreenStyles.topChrome]}>
+        <View style={[styles.statusBar, taskScreenStyles.statusBar]}>
+          <View style={taskScreenStyles.headerSide}>
+            <MobileIconButton
+              accessibilityLabel="返回"
+              icon={ChevronLeft}
+              onPress={() => router.back()}
+            />
           </View>
-          <Pressable
-            style={styles.iconButton}
-            disabled={!taskUiReady || loading || refreshing || githubProjectLoading}
-            onPress={() => {
-              if (!taskUiReady) {
-                return
-              }
-              if (provider === 'github' && githubMode === 'project') {
-                refreshGitHubProject()
-                return
-              }
-              refreshTasks()
-            }}
-          >
-            <RefreshCw size={16} color={taskUiReady ? colors.textSecondary : colors.textMuted} />
-          </Pressable>
-          {showHeaderCreateTask ? (
-            <Pressable
-              style={styles.iconButton}
-              disabled={!taskUiReady}
+          <View style={[styles.titleWrap, taskScreenStyles.titleWrap]}>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.title, taskScreenStyles.title]}>
+              任务中心
+            </Text>
+            <View style={taskScreenStyles.connectionStatus}>
+              <StatusDot state={connState} verdict={headerVerdict} />
+              <Text
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={taskScreenStyles.connectionStatusText}
+              >
+                {headerVerdict.label}
+              </Text>
+            </View>
+          </View>
+          <View style={[taskScreenStyles.headerSide, taskScreenStyles.headerActions]}>
+            <MobileIconButton
+              accessibilityLabel="刷新任务"
+              icon={RefreshCw}
+              disabled={!taskUiReady || loading || refreshing || githubProjectLoading}
+              loading={loading || refreshing || githubProjectLoading}
               onPress={() => {
                 if (!taskUiReady) {
                   return
                 }
-                if (provider === 'linear' && !linearConnected) {
-                  setLinearApiKeyDraft('')
-                  setLinearConnectState('idle')
-                  setLinearConnectError('')
-                  setShowLinearConnect(true)
+                if (provider === 'github' && githubMode === 'project') {
+                  refreshGitHubProject()
                   return
                 }
-                setCreateTitle('')
-                setCreateBody('')
-                setShowCreateTask(true)
+                refreshTasks()
               }}
-            >
-              <Plus size={16} color={taskUiReady ? colors.textSecondary : colors.textMuted} />
-            </Pressable>
-          ) : null}
+            />
+            {showHeaderCreateTask ? (
+              <MobileIconButton
+                accessibilityLabel="新建任务"
+                icon={Plus}
+                disabled={!taskUiReady}
+                onPress={() => {
+                  if (!taskUiReady) {
+                    return
+                  }
+                  if (provider === 'linear' && !linearConnected) {
+                    setLinearApiKeyDraft('')
+                    setLinearConnectState('idle')
+                    setLinearConnectError('')
+                    setShowLinearConnect(true)
+                    return
+                  }
+                  setCreateTitle('')
+                  setCreateBody('')
+                  setShowCreateTask(true)
+                }}
+              />
+            ) : null}
+          </View>
+        </View>
+
+        <View accessibilityRole="tablist" style={taskScreenStyles.providerTabs}>
+          {providerOptions.map((option) => {
+            const selected = option.value === provider
+            return (
+              <Pressable
+                key={option.value}
+                accessibilityRole="tab"
+                accessibilityState={{ disabled: !taskUiReady, selected }}
+                disabled={!taskUiReady}
+                onLongPress={() => setShowProviderPicker(true)}
+                onPress={() => selectTaskProvider(option.value)}
+                style={({ pressed }) => [
+                  taskScreenStyles.providerTab,
+                  selected && taskScreenStyles.providerTabSelected,
+                  pressed && taskScreenStyles.providerTabPressed
+                ]}
+              >
+                <TaskProviderLogo
+                  provider={option.value}
+                  size={16}
+                  color={selected ? taskScreenPalette.textPrimary : taskScreenPalette.textSecondary}
+                />
+                <Text
+                  maxFontSizeMultiplier={1.3}
+                  style={[
+                    taskScreenStyles.providerTabText,
+                    selected && taskScreenStyles.providerTabTextSelected
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            )
+          })}
         </View>
 
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.toolbarScroll}
-          contentContainerStyle={styles.toolbar}
+          style={[styles.toolbarScroll, taskScreenStyles.toolbarScroll]}
+          contentContainerStyle={[styles.toolbar, taskScreenStyles.toolbar]}
         >
-          <Pressable
-            style={styles.segmentButton}
-            disabled={!taskUiReady}
-            onPress={() => {
-              if (!taskUiReady) {
-                return
-              }
-              setShowProviderPicker(true)
-            }}
-          >
-            <TaskProviderLogo provider={provider} size={14} color={colors.textPrimary} />
-            <Text style={styles.segmentButtonText}>{providerLabel}</Text>
-          </Pressable>
-
           {provider === 'gitlab' || (provider === 'github' && githubMode !== 'project') ? (
             <Pressable
               style={styles.segmentButton}
@@ -9068,84 +9245,54 @@ export default function MobileTasksScreen() {
 
         {provider === 'gitlab' && gitlabView === 'todos' ? null : provider === 'linear' &&
           !linearConnected ? null : (
-          <View style={styles.searchBar}>
-            <MobileSearchField
-              value={isGithubProjectSearch ? githubProjectSearch : query}
-              onChangeText={isGithubProjectSearch ? setGithubProjectSearch : setQuery}
-              placeholder={
-                isGithubProjectSearch
-                  ? 'Search project view...'
-                  : `Search ${providerLabel} tasks...`
-              }
-              // Why: GitHub items seed the field with a preset query, so a bare
-              // value.length check would always show clear. Project mode shows clear
-              // for draft text or a non-empty applied override — not for applied ''
-              // (explicit unfiltered after clear), or the button sticks forever.
-              showClear={
-                isGithubProjectSearch
-                  ? githubProjectSearch.length > 0 ||
-                    (appliedGithubProjectSearch !== undefined &&
-                      appliedGithubProjectSearch.length > 0)
-                  : provider === 'github'
-                    ? query.trim() !== getTaskPresetQuery(githubPreset).trim()
-                    : undefined
-              }
-              editable={taskUiReady}
-              onSubmitEditing={() => {
-                if (!taskUiReady) {
-                  return
-                }
-                if (isGithubProjectSearch) {
-                  applyGitHubProjectSearch()
-                  return
-                }
-                const nextQuery =
-                  provider === 'github' ? scopeGitHubTaskSearch(query, githubKind) : query.trim()
-                setQuery(nextQuery)
-                setAppliedQuery(nextQuery)
-                if (provider === 'github') {
-                  persistTaskResumeState({
-                    githubItemsPreset:
-                      nextQuery.trim() === getTaskPresetQuery(githubPreset) ? githubPreset : null,
-                    githubItemsQuery: nextQuery.trim()
-                  })
-                } else if (provider === 'linear') {
-                  persistTaskResumeState({ linearQuery: nextQuery.trim() })
-                }
-              }}
-              onBlur={() => {
-                if (isGithubProjectSearch) {
-                  applyGitHubProjectSearch()
-                }
-              }}
-              // Why: Project clear means unfiltered results ('' override when the view
-              // has a default filter), not restore view default. GitHub items clear
-              // restores the preset query. Linear clears and persists empty resume.
-              onClear={() => {
-                if (isGithubProjectSearch) {
-                  const viewFilter = githubProjectTable?.selectedView.filter ?? ''
-                  setGithubProjectSearch('')
-                  // Why: undefined = use view default; '' = explicit unfiltered override.
-                  setAppliedGithubProjectSearch(viewFilter ? '' : undefined)
-                  return
-                }
-                if (provider === 'github') {
-                  const nextQuery = getTaskPresetQuery(githubPreset)
-                  setQuery(nextQuery)
-                  setAppliedQuery(nextQuery)
-                  persistTaskResumeState({
-                    githubItemsPreset: githubPreset,
-                    githubItemsQuery: nextQuery
-                  })
-                  return
-                }
-                setQuery('')
-                setAppliedQuery('')
-                if (provider === 'linear') {
-                  persistTaskResumeState({ linearQuery: '' })
-                }
-              }}
-            />
+          <View style={[styles.searchBar, taskScreenStyles.searchBar]}>
+            <View
+              style={[
+                taskScreenStyles.searchField,
+                searchFocused && taskScreenStyles.searchFieldFocused
+              ]}
+            >
+              <Search
+                size={20}
+                strokeWidth={2}
+                color={searchFocused ? taskScreenPalette.brand : taskScreenPalette.textSecondary}
+              />
+              <TextInput
+                accessibilityLabel={searchPlaceholder}
+                maxFontSizeMultiplier={1.3}
+                value={searchValue}
+                onChangeText={isGithubProjectSearch ? setGithubProjectSearch : setQuery}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={taskScreenPalette.textTertiary}
+                selectionColor={taskScreenPalette.brand}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                style={taskScreenStyles.searchInput}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => {
+                  setSearchFocused(false)
+                  if (isGithubProjectSearch) {
+                    applyGitHubProjectSearch()
+                  }
+                }}
+                onSubmitEditing={submitTaskSearch}
+                editable={taskUiReady}
+              />
+              {showSearchClear ? (
+                <Pressable
+                  accessibilityLabel="清除搜索"
+                  accessibilityRole="button"
+                  onPress={clearTaskSearch}
+                  style={({ pressed }) => [
+                    taskScreenStyles.clearButton,
+                    pressed && taskScreenStyles.clearButtonPressed
+                  ]}
+                >
+                  <X size={16} strokeWidth={2} color={taskScreenPalette.textSecondary} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         )}
       </View>
@@ -9218,12 +9365,27 @@ export default function MobileTasksScreen() {
         </View>
       ) : null}
 
+      {showTaskListSummary ? (
+        <View style={taskScreenStyles.listHeading}>
+          <Text maxFontSizeMultiplier={1.3} style={taskScreenStyles.listHeadingTitle}>
+            待处理
+          </Text>
+          <Text
+            accessibilityLiveRegion="polite"
+            maxFontSizeMultiplier={1.3}
+            style={taskScreenStyles.listHeadingCount}
+          >
+            {loading || githubProjectLoading ? '正在加载' : `${visibleTaskCount} 项`}
+          </Text>
+        </View>
+      ) : null}
+
       {!tasksSupported ? (
         tasksUnsupported ? (
           <View style={styles.centered}>
-            <Text style={styles.emptyText}>Update Orca desktop</Text>
+            <Text style={styles.emptyText}>{productNameText('请更新 Orca 桌面端')}</Text>
             <Text style={styles.centeredHint}>
-              This mobile Tasks view needs a newer desktop runtime.
+              当前移动端任务中心需要新版桌面运行时，更新后即可继续使用现有任务功能。
             </Text>
           </View>
         ) : (
@@ -9293,8 +9455,14 @@ export default function MobileTasksScreen() {
             keyExtractor={(entry) =>
               entry.type === 'group' ? `group:${entry.group.key}` : entry.row.id
             }
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            contentContainerStyle={[styles.list, { paddingBottom: spacing.lg + insets.bottom }]}
+            ItemSeparatorComponent={() => (
+              <View style={[styles.separator, taskScreenStyles.separator]} />
+            )}
+            contentContainerStyle={[
+              styles.list,
+              taskScreenStyles.list,
+              { paddingBottom: spacing.lg + insets.bottom }
+            ]}
             refreshing={githubProjectLoading}
             onRefresh={refreshGitHubProject}
             renderItem={({ item: entry }) => {
@@ -9330,7 +9498,12 @@ export default function MobileTasksScreen() {
               const repo = findProjectRowRepo(row)
               return (
                 <Pressable
-                  style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}
+                  style={({ pressed }) => [
+                    styles.taskRow,
+                    taskScreenStyles.taskRow,
+                    pressed && styles.taskRowPressed,
+                    pressed && taskScreenStyles.taskRowPressed
+                  ]}
                   onPress={() => {
                     triggerMediumImpact()
                     setProjectRowItem(row)
@@ -9496,16 +9669,20 @@ export default function MobileTasksScreen() {
             }
             ItemSeparatorComponent={({ leadingItem, trailingItem }) =>
               leadingItem?.type === 'section' || trailingItem?.type === 'section' ? null : (
-                <View style={styles.separator} />
+                <View style={[styles.separator, taskScreenStyles.separator]} />
               )
             }
-            contentContainerStyle={[styles.list, { paddingBottom: spacing.lg + insets.bottom }]}
+            contentContainerStyle={[
+              styles.list,
+              taskScreenStyles.list,
+              { paddingBottom: spacing.lg + insets.bottom }
+            ]}
             refreshing={refreshing}
             onRefresh={refreshTasks}
             renderItem={({ item: entry }) => {
               if (entry.type === 'section') {
                 return (
-                  <View style={styles.repoSectionHeader}>
+                  <View style={[styles.repoSectionHeader, taskScreenStyles.sectionHeader]}>
                     <View
                       style={[styles.repoSectionDot, { backgroundColor: entry.section.color }]}
                     />
@@ -9523,7 +9700,12 @@ export default function MobileTasksScreen() {
               >
               return (
                 <Pressable
-                  style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}
+                  style={({ pressed }) => [
+                    styles.taskRow,
+                    taskScreenStyles.taskRow,
+                    pressed && styles.taskRowPressed,
+                    pressed && taskScreenStyles.taskRowPressed
+                  ]}
                   onPress={() => {
                     triggerMediumImpact()
                     setActionItem(linearTask)
@@ -9595,10 +9777,14 @@ export default function MobileTasksScreen() {
           keyExtractor={(entry) => entry.key}
           ItemSeparatorComponent={({ leadingItem, trailingItem }) =>
             leadingItem?.type === 'section' || trailingItem?.type === 'section' ? null : (
-              <View style={styles.separator} />
+              <View style={[styles.separator, taskScreenStyles.separator]} />
             )
           }
-          contentContainerStyle={[styles.list, { paddingBottom: spacing.lg + insets.bottom }]}
+          contentContainerStyle={[
+            styles.list,
+            taskScreenStyles.list,
+            { paddingBottom: spacing.lg + insets.bottom }
+          ]}
           refreshing={refreshing}
           onRefresh={refreshTasks}
           ListFooterComponent={
@@ -9678,7 +9864,7 @@ export default function MobileTasksScreen() {
           renderItem={({ item: entry }) => {
             if (entry.type === 'section') {
               return (
-                <View style={styles.repoSectionHeader}>
+                <View style={[styles.repoSectionHeader, taskScreenStyles.sectionHeader]}>
                   <View style={[styles.repoSectionDot, { backgroundColor: entry.color }]} />
                   <Text style={styles.repoSectionTitle} numberOfLines={1}>
                     {entry.label}
@@ -9694,7 +9880,12 @@ export default function MobileTasksScreen() {
             const branchSummary = hostedBranchSummary(item)
             return (
               <Pressable
-                style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}
+                style={({ pressed }) => [
+                  styles.taskRow,
+                  taskScreenStyles.taskRow,
+                  pressed && styles.taskRowPressed,
+                  pressed && taskScreenStyles.taskRowPressed
+                ]}
                 onPress={() => {
                   triggerMediumImpact()
                   if (item.provider === 'gitlabTodo') {
@@ -9748,7 +9939,10 @@ export default function MobileTasksScreen() {
                         <View
                           style={[
                             styles.prSignalChip,
-                            getPrSignalToneStyle(getHostedReviewSignalTone(item.source, 'review'))
+                            getPrSignalToneStyle(
+                              styles,
+                              getHostedReviewSignalTone(item.source, 'review')
+                            )
                           ]}
                         >
                           <Text style={styles.prSignalText} numberOfLines={1}>
@@ -9761,7 +9955,10 @@ export default function MobileTasksScreen() {
                       <View
                         style={[
                           styles.prSignalChip,
-                          getPrSignalToneStyle(getHostedReviewSignalTone(item.source, 'checks'))
+                          getPrSignalToneStyle(
+                            styles,
+                            getHostedReviewSignalTone(item.source, 'checks')
+                          )
                         ]}
                       >
                         <Text style={styles.prSignalText} numberOfLines={1}>
@@ -9772,7 +9969,10 @@ export default function MobileTasksScreen() {
                         <View
                           style={[
                             styles.prSignalChip,
-                            getPrSignalToneStyle(getHostedReviewSignalTone(item.source, 'merge'))
+                            getPrSignalToneStyle(
+                              styles,
+                              getHostedReviewSignalTone(item.source, 'merge')
+                            )
                           ]}
                         >
                           <Text style={styles.prSignalText} numberOfLines={1}>
@@ -9800,45 +10000,10 @@ export default function MobileTasksScreen() {
 
       <PickerModal
         visible={taskUiReady && showProviderPicker}
-        title="Task Source"
+        title="任务来源"
         options={providerOptions}
         selected={provider}
-        onSelect={(next) => {
-          const resume = taskResumeRef.current
-          persistTaskSource(next)
-          setProvider(next)
-          setItems([])
-          if (next === 'github') {
-            const nextMode = resume.githubMode === 'project' ? 'project' : 'items'
-            setGithubMode(nextMode)
-            if (nextMode === 'project') {
-              setQuery('')
-              setAppliedQuery('')
-              return
-            }
-            const preset =
-              resume.githubItemsPreset === null
-                ? githubPreset
-                : normalizeGitHubPreset(resume.githubItemsPreset ?? githubPreset)
-            const nextQuery =
-              resume.githubItemsPreset === null
-                ? (resume.githubItemsQuery ?? '')
-                : getTaskPresetQuery(preset)
-            const nextKind = githubKindFromQuery(nextQuery, preset)
-            setGithubPreset(preset)
-            setGithubKind(nextKind)
-            setQuery(nextQuery)
-            setAppliedQuery(scopeGitHubTaskSearch(nextQuery, nextKind))
-          } else if (next === 'linear') {
-            const nextQuery = resume.linearQuery ?? ''
-            setLinearFilter(normalizeLinearFilter(resume.linearPreset))
-            setQuery(nextQuery)
-            setAppliedQuery(nextQuery.trim())
-          } else {
-            setQuery('')
-            setAppliedQuery('')
-          }
-        }}
+        onSelect={selectTaskProvider}
         onClose={() => setShowProviderPicker(false)}
       />
 
@@ -10309,7 +10474,9 @@ export default function MobileTasksScreen() {
         onSelect={(viewId) => {
           const view = githubProjectViews.find((candidate) => candidate.id === viewId)
           if (view && view.layout !== 'TABLE_LAYOUT') {
-            setGithubProjectError("Orca doesn't support this GitHub Project layout yet.")
+            setGithubProjectError(
+              productNameText("Orca doesn't support this GitHub Project layout yet.")
+            )
             return
           }
           if (pendingGitHubProjectViewSelection) {
@@ -11605,9 +11772,10 @@ export default function MobileTasksScreen() {
         {projectRepoNotInOrca ? (
           <View>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Repository not in Orca</Text>
+              <Text style={styles.sheetTitle}>{productNameText('Repository not in Orca')}</Text>
               <Text style={styles.sheetSubtitle}>
-                {projectRepoNotInOrca.owner}/{projectRepoNotInOrca.repo} is not added to Orca. Add
+                {projectRepoNotInOrca.owner}/{projectRepoNotInOrca.repo}{' '}
+                {productNameText('is not added to Orca. Add')}
                 this repository from the desktop app, then refresh mobile Tasks.
               </Text>
             </View>
@@ -12332,6 +12500,8 @@ export default function MobileTasksScreen() {
                                       contents={prFileContents[file.path]}
                                       commentDrafts={prFileCommentDrafts}
                                       disabled={projectMutating}
+                                      colors={colors}
+                                      styles={styles}
                                       onCommentDraftChange={(draftKey, next) =>
                                         setPrFileCommentDrafts((current) => ({
                                           ...current,
@@ -12466,7 +12636,7 @@ export default function MobileTasksScreen() {
                                 ) : (
                                   <>
                                     <MobileMarkdown content={comment.body} />
-                                    {renderCommentReactions(comment)}
+                                    {renderCommentReactions(comment, styles)}
                                     {SHOW_MOBILE_COMMENT_THREAD_TOOLS ? (
                                       <View style={styles.inlineActionRow}>
                                         {projectRowType(projectRowItem) === 'pr' &&
@@ -12675,7 +12845,7 @@ export default function MobileTasksScreen() {
                   </Pressable>
                   {!projectRowHostedRepo ? (
                     <Text style={styles.emptyInlineText}>
-                      Merge requires this repository in Orca.
+                      {productNameText('Merge requires this repository in Orca.')}
                     </Text>
                   ) : null}
                 </>
@@ -13278,6 +13448,8 @@ export default function MobileTasksScreen() {
                                     contents={prFileContents[file.path]}
                                     commentDrafts={prFileCommentDrafts}
                                     disabled={mutatingStatus}
+                                    colors={colors}
+                                    styles={styles}
                                     onCommentDraftChange={(draftKey, next) =>
                                       setPrFileCommentDrafts((current) => ({
                                         ...current,
@@ -13343,7 +13515,7 @@ export default function MobileTasksScreen() {
                                 <View
                                   style={[
                                     styles.pipelineStatusChip,
-                                    getGitLabPipelineStatusStyle(job.status)
+                                    getGitLabPipelineStatusStyle(styles, job.status)
                                   ]}
                                 >
                                   <Text style={styles.pipelineStatusText}>{job.status}</Text>
@@ -13748,1391 +13920,1221 @@ export default function MobileTasksScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase
-  },
-  topChrome: {
-    backgroundColor: colors.bgPanel,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  statusBar: {
-    minHeight: 38,
-    paddingTop: spacing.xs,
-    paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.xs
-  },
-  titleWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 0
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary
-  },
-  iconButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2
-  },
-  toolbarScroll: {
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle
-  },
-  segmentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.button,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs
-  },
-  segmentIconButton: {
-    width: 32,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.button
-  },
-  segmentCountPill: {
-    minWidth: 32,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.button,
-    paddingHorizontal: spacing.sm
-  },
-  segmentRepoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4
-  },
-  segmentButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textPrimary
-  },
-  segmentSecondaryText: {
-    fontSize: 12,
-    color: colors.textSecondary
-  },
-  searchBar: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle
-  },
-  errorBanner: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.bgPanel,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  errorText: {
-    color: colors.statusRed,
-    fontSize: 13
-  },
-  sourceErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.bgPanel,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  sourceErrorCopy: {
-    flex: 1,
-    minWidth: 0
-  },
-  sourceErrorText: {
-    color: colors.statusAmber,
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  sourceErrorSlug: {
-    fontFamily: typography.monoFamily,
-    color: colors.textPrimary
-  },
-  sourceErrorMessage: {
-    marginTop: 2,
-    color: colors.textSecondary,
-    fontSize: 12
-  },
-  sourceErrorRetry: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.button,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs
-  },
-  sourceErrorRetryText: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  sourceNoticeBanner: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.bgPanel,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  sourceNoticeText: {
-    color: colors.statusAmber,
-    fontSize: 13
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize
-  },
-  centeredHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: spacing.sm,
-    maxWidth: 280,
-    textAlign: 'center'
-  },
-  centerActionButton: {
-    marginTop: spacing.md,
-    minWidth: 160
-  },
-  list: {
-    paddingTop: spacing.xs
-  },
-  repoSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
-    backgroundColor: colors.bgBase
-  },
-  repoSectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4
-  },
-  repoSectionTitle: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.borderSubtle,
-    marginLeft: spacing.lg + 26,
-    marginRight: spacing.lg
-  },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2
-  },
-  taskRowPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  taskIcon: {
-    width: 20,
-    paddingTop: 3,
-    marginRight: spacing.sm,
-    alignItems: 'center'
-  },
-  taskMain: {
-    flex: 1,
-    minWidth: 0,
-    marginRight: spacing.sm
-  },
-  taskTitleRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-start'
-  },
-  taskTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    lineHeight: 18
-  },
-  updatedAt: {
-    fontSize: 11,
-    color: colors.textMuted,
-    paddingTop: 2
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: spacing.xs
-  },
-  repoDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4
-  },
-  pickerRepoDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5
-  },
-  subtitle: {
-    flex: 1,
-    fontSize: 11,
-    color: colors.textSecondary
-  },
-  branchMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: 3,
-    minWidth: 0
-  },
-  branchMetaText: {
-    flexShrink: 1,
-    minWidth: 0,
-    maxWidth: 180,
-    fontSize: 11,
-    color: colors.textPrimary
-  },
-  branchMetaBase: {
-    flexShrink: 1,
-    minWidth: 0,
-    fontSize: 10,
-    color: colors.textMuted
-  },
-  prSignalRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs + 1
-  },
-  prSignalChip: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgPanel,
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 2
-  },
-  prSignalSuccess: {
-    borderColor: colors.statusGreen
-  },
-  prSignalWarning: {
-    borderColor: colors.statusAmber
-  },
-  prSignalDanger: {
-    borderColor: colors.statusRed
-  },
-  prSignalText: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    fontWeight: '600'
-  },
-  statusPill: {
-    maxWidth: 112,
-    backgroundColor: colors.bgRaised,
-    borderRadius: 999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  statusPillSelf: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.bgRaised,
-    borderRadius: 999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    marginTop: spacing.sm
-  },
-  linearStatePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs
-  },
-  linearStateDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4
-  },
-  linearListTrailing: {
-    alignItems: 'flex-end',
-    gap: spacing.xs
-  },
-  taskRowTrailing: {
-    alignItems: 'flex-end',
-    gap: spacing.xs
-  },
-  statusText: {
-    fontSize: 11,
-    color: colors.textSecondary
-  },
-  statusTextFlex: {
-    flex: 1,
-    minWidth: 0
-  },
-  paginationFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm
-  },
-  paginationButton: {
-    width: 44,
-    minHeight: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised,
-    paddingVertical: spacing.sm
-  },
-  paginationButtonDisabled: {
-    opacity: 0.45
-  },
-  paginationLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    textAlign: 'center'
-  },
-  paginationLabelButton: {
-    flex: 1,
-    alignItems: 'center',
-    borderRadius: radii.button,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.sm
-  },
-  boardContainer: {
-    gap: spacing.md,
-    padding: spacing.md
-  },
-  boardColumn: {
-    width: 280,
-    maxHeight: '100%',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgPanel,
-    overflow: 'hidden'
-  },
-  boardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle
-  },
-  boardTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  boardCount: {
-    color: colors.textMuted,
-    fontSize: 11
-  },
-  boardCard: {
-    margin: spacing.sm,
-    marginBottom: 0,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgBase,
-    padding: spacing.md
-  },
-  repoPickerGroup: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12,
-    overflow: 'hidden'
-  },
-  pagePickerList: {
-    maxHeight: 420,
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12
-  },
-  projectPickerControls: {
-    gap: spacing.sm,
-    marginBottom: spacing.md
-  },
-  projectWarningBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.statusAmber,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgPanel
-  },
-  projectWarningTextWrap: {
-    flex: 1,
-    minWidth: 0
-  },
-  projectWarningTitle: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  projectWarningText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 2
-  },
-  projectDataNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.bgPanel,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  projectDataNoticeText: {
-    flex: 1,
-    color: colors.statusAmber,
-    fontSize: 13
-  },
-  projectGroupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.bgPanel
-  },
-  projectGroupChevronCollapsed: {
-    transform: [{ rotate: '-90deg' }]
-  },
-  projectGroupTitle: {
-    flex: 1,
-    minWidth: 0,
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  projectGroupMeta: {
-    color: colors.textMuted,
-    fontSize: 11
-  },
-  projectFieldPillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs
-  },
-  projectFieldPill: {
-    maxWidth: '100%',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: 999,
-    backgroundColor: colors.bgPanel,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2
-  },
-  projectFieldPillText: {
-    color: colors.textSecondary,
-    fontSize: 11
-  },
-  projectFieldPillEmptyText: {
-    color: colors.textMuted
-  },
-  projectPasteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  projectPasteInput: {
-    flex: 1
-  },
-  projectPasteButton: {
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md + 2,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
-  pickerRowSelected: {
-    backgroundColor: colors.bgRaised
-  },
-  pickerRowContent: {
-    flex: 1,
-    minWidth: 0
-  },
-  pickerRowLabel: {
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  },
-  pickerRowSubtitle: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 1
-  },
-  pickerRowWithAction: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  pickerRowMain: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md + 2,
-    paddingVertical: spacing.md
-  },
-  pickerCheck: {
-    width: 18,
-    alignItems: 'center'
-  },
-  pickerContent: {
-    flex: 1,
-    minWidth: 0
-  },
-  pickerLabel: {
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  },
-  monoText: {
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
-  },
-  pickerSubtitle: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 1
-  },
-  iconActionButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  groupSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginHorizontal: spacing.md
-  },
-  repoPickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md + 2,
-    paddingVertical: spacing.md
-  },
-  repoPickerTextWrap: {
-    flex: 1,
-    minWidth: 0
-  },
-  repoPickerTitle: {
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  },
-  repoPickerSubtitle: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 1
-  },
-  sheetHeader: {
-    paddingHorizontal: spacing.xs,
-    marginBottom: spacing.md
-  },
-  sheetTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  sheetTitle: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    lineHeight: 20
-  },
-  sheetSubtitle: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2
-  },
-  actionGroup: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12,
-    overflow: 'hidden'
-  },
-  detailGroup: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    gap: spacing.md
-  },
-  detailLoading: {
-    paddingVertical: spacing.lg,
-    alignItems: 'center'
-  },
-  detailLoadingInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  detailError: {
-    color: colors.statusRed,
-    fontSize: 13
-  },
-  detailMetaGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm
-  },
-  detailMetaItem: {
-    minWidth: 96,
-    flexGrow: 1
-  },
-  detailMetaLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginBottom: 2
-  },
-  detailMetaValue: {
-    fontSize: 13,
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs
-  },
-  detailChip: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgRaised,
-    borderRadius: 999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2
-  },
-  detailChipSelected: {
-    borderColor: colors.accentBlue,
-    backgroundColor: colors.bgRaised
-  },
-  detailChipText: {
-    fontSize: 11,
-    color: colors.textSecondary
-  },
-  issueTypeChipContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs
-  },
-  issueTypeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 999
-  },
-  detailSection: {
-    gap: spacing.xs
-  },
-  detailSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm
-  },
-  detailSectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  detailSectionMeta: {
-    flexShrink: 0,
-    fontSize: 11,
-    color: colors.textMuted
-  },
-  fieldButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle
-  },
-  fieldButtonDisabled: {
-    opacity: 0.55
-  },
-  fieldButtonPlaceholder: {
-    color: colors.textMuted
-  },
-  fieldButtonText: {
-    flex: 1,
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  },
-  workspaceCreateForm: {
-    gap: 0
-  },
-  workspaceCreateField: {
-    marginBottom: spacing.md
-  },
-  workspaceCreateLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs
-  },
-  workspaceCreateLabelHint: {
-    fontWeight: '400',
-    color: colors.textMuted
-  },
-  workspaceAdvancedToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.xs
-  },
-  workspaceAdvancedText: {
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textSecondary
-  },
-  workspaceCreateActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacing.sm
-  },
-  workspaceCreateButton: {
-    minWidth: 160,
-    paddingHorizontal: spacing.lg
-  },
-  sshConnectCard: {
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.input,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs
-  },
-  sshStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  sshStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 999
-  },
-  sshStatusDotConnected: {
-    backgroundColor: colors.statusGreen
-  },
-  sshStatusDotProgress: {
-    backgroundColor: colors.statusAmber
-  },
-  sshStatusDotDisconnected: {
-    backgroundColor: colors.statusRed
-  },
-  sshStatusCopy: {
-    flex: 1,
-    minWidth: 0
-  },
-  sshStatusTitle: {
-    fontSize: typography.bodySize,
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  reviewerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs
-  },
-  reviewerAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgRaised
-  },
-  reviewerAvatarText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textSecondary
-  },
-  reviewerInfo: {
-    flex: 1,
-    minWidth: 0
-  },
-  reviewerName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textPrimary
-  },
-  reviewerMeta: {
-    fontSize: 11,
-    color: colors.textMuted
-  },
-  reviewerState: {
-    flexShrink: 0,
-    fontSize: 11,
-    color: colors.textSecondary
-  },
-  projectFieldCard: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    padding: spacing.sm,
-    gap: spacing.xs
-  },
-  projectFieldName: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textPrimary
-  },
-  projectFieldValue: {
-    maxWidth: 140,
-    fontSize: 12,
-    color: colors.textMuted
-  },
-  projectIterationList: {
-    gap: spacing.xs
-  },
-  projectIterationCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2
-  },
-  detailLine: {
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.textSecondary
-  },
-  fileActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingVertical: 2
-  },
-  fileCard: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    padding: spacing.sm,
-    gap: spacing.xs
-  },
-  pipelineStatusChip: {
-    flexShrink: 0,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: 999,
-    backgroundColor: colors.bgRaised,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2
-  },
-  pipelineStatusSuccess: {
-    borderColor: colors.statusGreen
-  },
-  pipelineStatusWarning: {
-    borderColor: colors.statusAmber
-  },
-  pipelineStatusDanger: {
-    borderColor: colors.statusRed
-  },
-  pipelineStatusActive: {
-    borderColor: colors.accentBlue
-  },
-  pipelineStatusText: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    textTransform: 'uppercase'
-  },
-  filePreview: {
-    gap: spacing.xs,
-    marginTop: spacing.xs
-  },
-  fileDiff: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.row,
-    overflow: 'hidden'
-  },
-  diffLineBlock: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.borderSubtle,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    gap: spacing.xs
-  },
-  diffLineAdded: {
-    borderLeftColor: colors.statusGreen
-  },
-  diffLineRemoved: {
-    borderLeftColor: colors.statusRed
-  },
-  diffCodeRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    alignItems: 'flex-start'
-  },
-  diffLineNumbers: {
-    width: 76,
-    flexShrink: 0,
-    fontFamily: typography.monoFamily,
-    fontSize: 10,
-    lineHeight: 16,
-    color: colors.textMuted
-  },
-  codeLine: {
-    flex: 1,
-    fontFamily: typography.monoFamily,
-    fontSize: 11,
-    lineHeight: 16,
-    color: colors.textSecondary
-  },
-  diffCodeAdded: {
-    color: colors.statusGreen
-  },
-  diffCodeRemoved: {
-    color: colors.statusRed
-  },
-  detailMuted: {
-    fontSize: 12,
-    color: colors.textSecondary
-  },
-  commentBlock: {
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    paddingTop: spacing.sm
-  },
-  commentThreadGroup: {
-    gap: spacing.xs
-  },
-  commentReplyBlock: {
-    marginLeft: spacing.md,
-    paddingLeft: spacing.sm,
-    borderLeftWidth: 1,
-    borderLeftColor: colors.borderSubtle
-  },
-  commentResolvedBlock: {
-    opacity: 0.6
-  },
-  resolvedCommentSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgPanel,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm
-  },
-  resolvedCommentTitle: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 12,
-    color: colors.textSecondary
-  },
-  commentSource: {
-    fontSize: 11,
-    lineHeight: 15,
-    color: colors.textSecondary,
-    marginBottom: 2
-  },
-  commentMeta: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginBottom: 2
-  },
-  commentControls: {
-    gap: spacing.xs,
-    marginTop: spacing.sm
-  },
-  reactionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs
-  },
-  reactionChip: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgRaised,
-    borderRadius: 999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2
-  },
-  reactionText: {
-    fontSize: 11,
-    color: colors.textSecondary
-  },
-  inlineActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.xs
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md + 2,
-    paddingVertical: spacing.md
-  },
-  actionText: {
-    flex: 1,
-    fontSize: typography.bodySize,
-    color: colors.textPrimary
-  },
-  actionSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginHorizontal: spacing.md
-  },
-  setupPromptBox: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    gap: spacing.xs
-  },
-  setupPromptCommand: {
-    fontFamily: typography.monoFamily,
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.textPrimary
-  },
-  linearStatesBlock: {
-    paddingTop: spacing.sm
-  },
-  linearStatesTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: spacing.md + 2,
-    paddingBottom: spacing.xs
-  },
-  emptyInlineText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    paddingHorizontal: spacing.md + 2,
-    paddingBottom: spacing.md
-  },
-  createForm: {
-    gap: spacing.sm
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary
-  },
-  inlineTextLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs
-  },
-  inlineTextLinkText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    textDecorationLine: 'underline'
-  },
-  securityHintRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.xs
-  },
-  securityHintText: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: 11,
-    lineHeight: 16
-  },
-  targetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2
-  },
-  targetButtonText: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize
-  },
-  issueSourceBox: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgPanel,
-    padding: spacing.sm,
-    gap: spacing.xs
-  },
-  issueSourceHint: {
-    fontSize: 12,
-    color: colors.textSecondary
-  },
-  issueSourceSegment: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.input,
-    backgroundColor: colors.bgBase,
-    padding: 2,
-    gap: 2
-  },
-  issueSourceSegmentButton: {
-    flex: 1,
-    borderRadius: radii.input - 2,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs
-  },
-  issueSourceSegmentButtonActive: {
-    backgroundColor: colors.bgRaised
-  },
-  issueSourceSegmentText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textMuted
-  },
-  issueSourceSegmentTextActive: {
-    color: colors.textPrimary
-  },
-  issueSourceSlug: {
-    marginTop: 1,
-    fontSize: 10,
-    color: colors.textMuted
-  },
-  drawerLoadingRow: {
-    paddingVertical: spacing.lg,
-    alignItems: 'center'
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize
-  },
-  bodyInput: {
-    minHeight: 88
-  },
-  monoInput: {
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
-  },
-  commentInput: {
-    minHeight: 72,
-    marginTop: spacing.sm
-  },
-  commentComposer: {
-    position: 'relative',
-    marginTop: spacing.sm
-  },
-  commentComposerInput: {
-    minHeight: 40,
-    maxHeight: 120,
-    marginTop: 0,
-    paddingRight: 44
-  },
-  commentComposerSend: {
-    position: 'absolute',
-    right: spacing.xs,
-    bottom: spacing.xs,
-    width: 32,
-    height: 32,
-    borderRadius: radii.button,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgRaised
-  },
-  commentComposerSendPressed: {
-    opacity: 0.75
-  },
-  commentComposerSendDisabled: {
-    opacity: 0.5
-  },
-  replyInput: {
-    minHeight: 48,
-    marginTop: spacing.xs
-  },
-  stackedInput: {
-    marginTop: spacing.sm
-  },
-  inlineSaveButton: {
-    alignSelf: 'flex-start',
-    marginTop: spacing.sm,
-    borderRadius: radii.button,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs
-  },
-  inlineSaveButtonCompact: {
-    alignSelf: 'flex-start',
-    borderRadius: radii.button,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs
-  },
-  inlineSaveText: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  inlineButtonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs
-  },
-  drawerActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  secondaryActionButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.button,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    paddingVertical: spacing.sm
-  },
-  secondaryActionText: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  primaryActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    borderRadius: radii.button,
-    backgroundColor: colors.textPrimary,
-    paddingVertical: spacing.sm
-  },
-  primaryActionText: {
-    color: colors.bgBase,
-    fontSize: typography.bodySize,
-    fontWeight: '700'
-  },
-  inlineDeleteText: {
-    color: colors.statusRed,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  createButton: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.textPrimary,
-    borderRadius: radii.button,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center'
-  },
-  createButtonDisabled: {
-    opacity: 0.5
-  },
-  createButtonText: {
-    color: colors.bgBase,
-    fontSize: typography.bodySize,
-    fontWeight: '700'
+function createStyles(theme: MobileTheme) {
+  const colors = createMobileTaskCompatColors(theme)
+  const legacyStyles = StyleSheet.create({
+    list: {
+      paddingTop: spacing.xs
+    },
+    repoSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xs,
+      backgroundColor: colors.bgBase
+    },
+    repoSectionDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4
+    },
+    repoSectionTitle: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5
+    },
+    separator: {
+      height: 1,
+      backgroundColor: colors.borderSubtle,
+      marginLeft: spacing.lg + 26,
+      marginRight: spacing.lg
+    },
+    taskRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + 2
+    },
+    taskRowPressed: {
+      backgroundColor: colors.bgRaised
+    },
+    taskIcon: {
+      width: 20,
+      paddingTop: 3,
+      marginRight: spacing.sm,
+      alignItems: 'center'
+    },
+    taskMain: {
+      flex: 1,
+      minWidth: 0,
+      marginRight: spacing.sm
+    },
+    taskTitleRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      alignItems: 'flex-start'
+    },
+    taskTitle: {
+      ...theme.typography.sectionTitle,
+      flex: 1,
+      color: colors.textPrimary
+    },
+    updatedAt: {
+      ...theme.typography.caption,
+      color: colors.textMuted,
+      paddingTop: theme.spacing.space4
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 4,
+      gap: spacing.xs
+    },
+    repoDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4
+    },
+    pickerRepoDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 4.5
+    },
+    subtitle: {
+      ...theme.typography.meta,
+      flex: 1,
+      color: colors.textSecondary
+    },
+    branchMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginTop: 3,
+      minWidth: 0
+    },
+    branchMetaText: {
+      ...theme.typography.code,
+      flexShrink: 1,
+      minWidth: 0,
+      maxWidth: 180,
+      color: colors.textPrimary
+    },
+    branchMetaBase: {
+      ...theme.typography.caption,
+      flexShrink: 1,
+      minWidth: 0,
+      color: colors.textMuted
+    },
+    prSignalRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.xs + 1
+    },
+    prSignalChip: {
+      alignSelf: 'flex-start',
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.button,
+      backgroundColor: colors.bgPanel,
+      paddingHorizontal: spacing.xs + 2,
+      paddingVertical: 2
+    },
+    prSignalSuccess: {
+      borderColor: colors.statusGreen
+    },
+    prSignalWarning: {
+      borderColor: colors.statusAmber
+    },
+    prSignalDanger: {
+      borderColor: colors.statusRed
+    },
+    prSignalText: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      fontWeight: '600'
+    },
+    statusPill: {
+      maxWidth: '40%',
+      minHeight: theme.spacing.space24,
+      justifyContent: 'center',
+      backgroundColor: colors.bgRaised,
+      borderRadius: theme.radii.circle,
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle
+    },
+    statusPillSelf: {
+      alignSelf: 'flex-start',
+      minHeight: theme.spacing.space24,
+      justifyContent: 'center',
+      backgroundColor: colors.bgRaised,
+      borderRadius: theme.radii.circle,
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      marginTop: spacing.sm
+    },
+    linearStatePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs
+    },
+    linearStateDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4
+    },
+    linearListTrailing: {
+      alignItems: 'flex-end',
+      gap: spacing.xs
+    },
+    taskRowTrailing: {
+      alignItems: 'flex-end',
+      gap: spacing.xs
+    },
+    statusText: {
+      ...theme.typography.caption,
+      color: colors.textSecondary
+    },
+    statusTextFlex: {
+      flex: 1,
+      minWidth: 0
+    },
+    paginationFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.sm
+    },
+    paginationButton: {
+      width: 44,
+      minHeight: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.button,
+      backgroundColor: colors.bgRaised,
+      paddingVertical: spacing.sm
+    },
+    paginationButtonDisabled: {
+      opacity: 0.45
+    },
+    paginationLabel: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textAlign: 'center'
+    },
+    paginationLabelButton: {
+      flex: 1,
+      alignItems: 'center',
+      borderRadius: radii.button,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.sm
+    },
+    boardContainer: {
+      gap: spacing.md,
+      padding: spacing.md
+    },
+    boardColumn: {
+      width: 280,
+      maxHeight: '100%',
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.card,
+      backgroundColor: colors.bgPanel,
+      overflow: 'hidden'
+    },
+    boardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderSubtle
+    },
+    boardTitle: {
+      flex: 1,
+      color: colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '600'
+    },
+    boardCount: {
+      color: colors.textMuted,
+      fontSize: 11
+    },
+    boardCard: {
+      margin: spacing.sm,
+      marginBottom: 0,
+      borderRadius: radii.card,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.bgBase,
+      padding: spacing.md
+    },
+    repoPickerGroup: {
+      backgroundColor: colors.bgPanel,
+      borderRadius: 12,
+      overflow: 'hidden'
+    },
+    pagePickerList: {
+      maxHeight: 420,
+      backgroundColor: colors.bgPanel,
+      borderRadius: 12
+    },
+    projectPickerControls: {
+      gap: spacing.sm,
+      marginBottom: spacing.md
+    },
+    projectWarningBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.statusAmber,
+      borderRadius: radii.card,
+      backgroundColor: colors.bgPanel
+    },
+    projectWarningTextWrap: {
+      flex: 1,
+      minWidth: 0
+    },
+    projectWarningTitle: {
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '600'
+    },
+    projectWarningText: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      marginTop: 2
+    },
+    projectDataNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.bgPanel,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderSubtle
+    },
+    projectDataNoticeText: {
+      flex: 1,
+      color: colors.statusAmber,
+      fontSize: 13
+    },
+    projectGroupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.bgPanel
+    },
+    projectGroupChevronCollapsed: {
+      transform: [{ rotate: '-90deg' }]
+    },
+    projectGroupTitle: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '600'
+    },
+    projectGroupMeta: {
+      color: colors.textMuted,
+      fontSize: 11
+    },
+    projectFieldPillRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.xs
+    },
+    projectFieldPill: {
+      maxWidth: '100%',
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: 999,
+      backgroundColor: colors.bgPanel,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2
+    },
+    projectFieldPillText: {
+      color: colors.textSecondary,
+      fontSize: 11
+    },
+    projectFieldPillEmptyText: {
+      color: colors.textMuted
+    },
+    projectPasteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm
+    },
+    projectPasteInput: {
+      flex: 1
+    },
+    projectPasteButton: {
+      minHeight: 40,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    pickerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md + 2,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderSubtle
+    },
+    pickerRowSelected: {
+      backgroundColor: colors.bgRaised
+    },
+    pickerRowContent: {
+      flex: 1,
+      minWidth: 0
+    },
+    pickerRowLabel: {
+      fontSize: typography.bodySize,
+      color: colors.textPrimary
+    },
+    pickerRowSubtitle: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginTop: 1
+    },
+    pickerRowWithAction: {
+      flexDirection: 'row',
+      alignItems: 'center'
+    },
+    pickerRowMain: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md + 2,
+      paddingVertical: spacing.md
+    },
+    pickerCheck: {
+      width: 18,
+      alignItems: 'center'
+    },
+    pickerContent: {
+      flex: 1,
+      minWidth: 0
+    },
+    pickerLabel: {
+      fontSize: typography.bodySize,
+      color: colors.textPrimary
+    },
+    monoText: {
+      fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
+    },
+    pickerSubtitle: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginTop: 1
+    },
+    iconActionButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    groupSeparator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.borderSubtle,
+      marginHorizontal: spacing.md
+    },
+    repoPickerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md + 2,
+      paddingVertical: spacing.md
+    },
+    repoPickerTextWrap: {
+      flex: 1,
+      minWidth: 0
+    },
+    repoPickerTitle: {
+      fontSize: typography.bodySize,
+      color: colors.textPrimary
+    },
+    repoPickerSubtitle: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginTop: 1
+    },
+    sheetHeader: {
+      paddingHorizontal: spacing.xs,
+      marginBottom: spacing.md
+    },
+    sheetTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm
+    },
+    sheetTitle: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      lineHeight: 20
+    },
+    sheetSubtitle: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 2
+    },
+    actionGroup: {
+      backgroundColor: colors.bgPanel,
+      borderRadius: 12,
+      overflow: 'hidden'
+    },
+    detailGroup: {
+      backgroundColor: colors.bgPanel,
+      borderRadius: 12,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      gap: spacing.md
+    },
+    detailLoading: {
+      paddingVertical: spacing.lg,
+      alignItems: 'center'
+    },
+    detailLoadingInline: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm
+    },
+    detailError: {
+      color: colors.statusRed,
+      fontSize: 13
+    },
+    detailMetaGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm
+    },
+    detailMetaItem: {
+      minWidth: 96,
+      flexGrow: 1
+    },
+    detailMetaLabel: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginBottom: 2
+    },
+    detailMetaValue: {
+      fontSize: 13,
+      color: colors.textPrimary,
+      fontWeight: '600'
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs
+    },
+    detailChip: {
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.bgRaised,
+      borderRadius: 999,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2
+    },
+    detailChipSelected: {
+      borderColor: colors.accentBlue,
+      backgroundColor: colors.bgRaised
+    },
+    detailChipText: {
+      fontSize: 11,
+      color: colors.textSecondary
+    },
+    issueTypeChipContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs
+    },
+    issueTypeDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999
+    },
+    detailSection: {
+      gap: spacing.xs
+    },
+    detailSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm
+    },
+    detailSectionTitle: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5
+    },
+    detailSectionMeta: {
+      flexShrink: 0,
+      fontSize: 11,
+      color: colors.textMuted
+    },
+    fieldButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.bgRaised,
+      borderRadius: radii.input,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle
+    },
+    fieldButtonDisabled: {
+      opacity: 0.55
+    },
+    fieldButtonPlaceholder: {
+      color: colors.textMuted
+    },
+    fieldButtonText: {
+      flex: 1,
+      fontSize: typography.bodySize,
+      color: colors.textPrimary
+    },
+    workspaceCreateForm: {
+      gap: 0
+    },
+    workspaceCreateField: {
+      marginBottom: spacing.md
+    },
+    workspaceCreateLabel: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      marginBottom: spacing.xs
+    },
+    workspaceCreateLabelHint: {
+      fontWeight: '400',
+      color: colors.textMuted
+    },
+    workspaceAdvancedToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.xs
+    },
+    workspaceAdvancedText: {
+      fontSize: typography.bodySize,
+      fontWeight: '500',
+      color: colors.textSecondary
+    },
+    workspaceCreateActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: spacing.sm
+    },
+    workspaceCreateButton: {
+      minWidth: 160,
+      paddingHorizontal: spacing.lg
+    },
+    sshConnectCard: {
+      backgroundColor: colors.bgRaised,
+      borderRadius: radii.input,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      gap: spacing.xs
+    },
+    sshStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm
+    },
+    sshStatusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 999
+    },
+    sshStatusDotConnected: {
+      backgroundColor: colors.statusGreen
+    },
+    sshStatusDotProgress: {
+      backgroundColor: colors.statusAmber
+    },
+    sshStatusDotDisconnected: {
+      backgroundColor: colors.statusRed
+    },
+    sshStatusCopy: {
+      flex: 1,
+      minWidth: 0
+    },
+    sshStatusTitle: {
+      fontSize: typography.bodySize,
+      color: colors.textPrimary,
+      fontWeight: '600'
+    },
+    reviewerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.card,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs
+    },
+    reviewerAvatar: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.bgRaised
+    },
+    reviewerAvatarText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textSecondary
+    },
+    reviewerInfo: {
+      flex: 1,
+      minWidth: 0
+    },
+    reviewerName: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textPrimary
+    },
+    reviewerMeta: {
+      fontSize: 11,
+      color: colors.textMuted
+    },
+    reviewerState: {
+      flexShrink: 0,
+      fontSize: 11,
+      color: colors.textSecondary
+    },
+    projectFieldCard: {
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.card,
+      padding: spacing.sm,
+      gap: spacing.xs
+    },
+    projectFieldName: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textPrimary
+    },
+    projectFieldValue: {
+      maxWidth: 140,
+      fontSize: 12,
+      color: colors.textMuted
+    },
+    projectIterationList: {
+      gap: spacing.xs
+    },
+    projectIterationCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2
+    },
+    detailLine: {
+      fontSize: 12,
+      lineHeight: 17,
+      color: colors.textSecondary
+    },
+    fileActionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      paddingVertical: 2
+    },
+    fileCard: {
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.card,
+      padding: spacing.sm,
+      gap: spacing.xs
+    },
+    pipelineStatusChip: {
+      flexShrink: 0,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: 999,
+      backgroundColor: colors.bgRaised,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2
+    },
+    pipelineStatusSuccess: {
+      borderColor: colors.statusGreen
+    },
+    pipelineStatusWarning: {
+      borderColor: colors.statusAmber
+    },
+    pipelineStatusDanger: {
+      borderColor: colors.statusRed
+    },
+    pipelineStatusActive: {
+      borderColor: colors.accentBlue
+    },
+    pipelineStatusText: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      fontWeight: '600',
+      textTransform: 'uppercase'
+    },
+    filePreview: {
+      gap: spacing.xs,
+      marginTop: spacing.xs
+    },
+    fileDiff: {
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.row,
+      overflow: 'hidden'
+    },
+    diffLineBlock: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderSubtle,
+      borderLeftWidth: 2,
+      borderLeftColor: colors.borderSubtle,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.xs,
+      gap: spacing.xs
+    },
+    diffLineAdded: {
+      borderLeftColor: colors.statusGreen
+    },
+    diffLineRemoved: {
+      borderLeftColor: colors.statusRed
+    },
+    diffCodeRow: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+      alignItems: 'flex-start'
+    },
+    diffLineNumbers: {
+      width: 76,
+      flexShrink: 0,
+      fontFamily: typography.monoFamily,
+      fontSize: 10,
+      lineHeight: 16,
+      color: colors.textMuted
+    },
+    codeLine: {
+      flex: 1,
+      fontFamily: typography.monoFamily,
+      fontSize: 11,
+      lineHeight: 16,
+      color: colors.textSecondary
+    },
+    diffCodeAdded: {
+      color: colors.statusGreen
+    },
+    diffCodeRemoved: {
+      color: colors.statusRed
+    },
+    detailMuted: {
+      fontSize: 12,
+      color: colors.textSecondary
+    },
+    commentBlock: {
+      borderTopWidth: 1,
+      borderTopColor: colors.borderSubtle,
+      paddingTop: spacing.sm
+    },
+    commentThreadGroup: {
+      gap: spacing.xs
+    },
+    commentReplyBlock: {
+      marginLeft: spacing.md,
+      paddingLeft: spacing.sm,
+      borderLeftWidth: 1,
+      borderLeftColor: colors.borderSubtle
+    },
+    commentResolvedBlock: {
+      opacity: 0.6
+    },
+    resolvedCommentSummary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.card,
+      backgroundColor: colors.bgPanel,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm
+    },
+    resolvedCommentTitle: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 12,
+      color: colors.textSecondary
+    },
+    commentSource: {
+      fontSize: 11,
+      lineHeight: 15,
+      color: colors.textSecondary,
+      marginBottom: 2
+    },
+    commentMeta: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginBottom: 2
+    },
+    commentControls: {
+      gap: spacing.xs,
+      marginTop: spacing.sm
+    },
+    reactionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.xs
+    },
+    reactionChip: {
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.bgRaised,
+      borderRadius: 999,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2
+    },
+    reactionText: {
+      fontSize: 11,
+      color: colors.textSecondary
+    },
+    inlineActionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: spacing.xs
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md + 2,
+      paddingVertical: spacing.md
+    },
+    actionText: {
+      flex: 1,
+      fontSize: typography.bodySize,
+      color: colors.textPrimary
+    },
+    actionSeparator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.borderSubtle,
+      marginHorizontal: spacing.md
+    },
+    setupPromptBox: {
+      backgroundColor: colors.bgPanel,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      gap: spacing.xs
+    },
+    setupPromptCommand: {
+      fontFamily: typography.monoFamily,
+      fontSize: 12,
+      lineHeight: 17,
+      color: colors.textPrimary
+    },
+    linearStatesBlock: {
+      paddingTop: spacing.sm
+    },
+    linearStatesTitle: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      paddingHorizontal: spacing.md + 2,
+      paddingBottom: spacing.xs
+    },
+    emptyInlineText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      paddingHorizontal: spacing.md + 2,
+      paddingBottom: spacing.md
+    },
+    createForm: {
+      gap: spacing.sm
+    },
+    fieldLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary
+    },
+    inlineTextLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      alignSelf: 'flex-start',
+      paddingVertical: spacing.xs
+    },
+    inlineTextLinkText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textDecorationLine: 'underline'
+    },
+    securityHintRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.xs
+    },
+    securityHintText: {
+      flex: 1,
+      color: colors.textMuted,
+      fontSize: 11,
+      lineHeight: 16
+    },
+    targetButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.bgPanel,
+      borderRadius: radii.input,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2
+    },
+    targetButtonText: {
+      flex: 1,
+      color: colors.textPrimary,
+      fontSize: typography.bodySize
+    },
+    issueSourceBox: {
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.card,
+      backgroundColor: colors.bgPanel,
+      padding: spacing.sm,
+      gap: spacing.xs
+    },
+    issueSourceHint: {
+      fontSize: 12,
+      color: colors.textSecondary
+    },
+    issueSourceSegment: {
+      flexDirection: 'row',
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: radii.input,
+      backgroundColor: colors.bgBase,
+      padding: 2,
+      gap: 2
+    },
+    issueSourceSegmentButton: {
+      flex: 1,
+      borderRadius: radii.input - 2,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs
+    },
+    issueSourceSegmentButtonActive: {
+      backgroundColor: colors.bgRaised
+    },
+    issueSourceSegmentText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textMuted
+    },
+    issueSourceSegmentTextActive: {
+      color: colors.textPrimary
+    },
+    issueSourceSlug: {
+      marginTop: 1,
+      fontSize: 10,
+      color: colors.textMuted
+    },
+    drawerLoadingRow: {
+      paddingVertical: spacing.lg,
+      alignItems: 'center'
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.bgPanel,
+      borderRadius: radii.input,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      color: colors.textPrimary,
+      fontSize: typography.bodySize
+    },
+    bodyInput: {
+      minHeight: 88
+    },
+    monoInput: {
+      fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
+    },
+    commentInput: {
+      minHeight: 72,
+      marginTop: spacing.sm
+    },
+    commentComposer: {
+      position: 'relative',
+      marginTop: spacing.sm
+    },
+    commentComposerInput: {
+      minHeight: 40,
+      maxHeight: 120,
+      marginTop: 0,
+      paddingRight: 44
+    },
+    commentComposerSend: {
+      position: 'absolute',
+      right: spacing.xs,
+      bottom: spacing.xs,
+      width: 32,
+      height: 32,
+      borderRadius: radii.button,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.bgRaised
+    },
+    commentComposerSendPressed: {
+      opacity: 0.75
+    },
+    commentComposerSendDisabled: {
+      opacity: 0.5
+    },
+    replyInput: {
+      minHeight: 48,
+      marginTop: spacing.xs
+    },
+    stackedInput: {
+      marginTop: spacing.sm
+    },
+    inlineSaveButton: {
+      alignSelf: 'flex-start',
+      marginTop: spacing.sm,
+      borderRadius: radii.button,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs
+    },
+    inlineSaveButtonCompact: {
+      alignSelf: 'flex-start',
+      borderRadius: radii.button,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs
+    },
+    inlineSaveText: {
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '600'
+    },
+    inlineButtonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.xs
+    },
+    drawerActionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm
+    },
+    secondaryActionButton: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.button,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      paddingVertical: spacing.sm
+    },
+    secondaryActionText: {
+      color: colors.textPrimary,
+      fontSize: typography.bodySize,
+      fontWeight: '600'
+    },
+    primaryActionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      borderRadius: radii.button,
+      backgroundColor: colors.textPrimary,
+      paddingVertical: spacing.sm
+    },
+    primaryActionText: {
+      color: colors.bgBase,
+      fontSize: typography.bodySize,
+      fontWeight: '700'
+    },
+    inlineDeleteText: {
+      color: colors.statusRed,
+      fontSize: 12,
+      fontWeight: '600'
+    },
+    createButton: {
+      marginTop: spacing.sm,
+      backgroundColor: colors.textPrimary,
+      borderRadius: radii.button,
+      paddingVertical: spacing.sm + 2,
+      alignItems: 'center'
+    },
+    createButtonDisabled: {
+      opacity: 0.5
+    },
+    createButtonText: {
+      color: colors.bgBase,
+      fontSize: typography.bodySize,
+      fontWeight: '700'
+    }
+  })
+  return {
+    ...createMobileTaskScreenChromeStyles(theme),
+    ...legacyStyles,
+    ...createMobileTaskScreenStyles(theme)
   }
-})
+}
 
-function getPrSignalToneStyle(tone: 'neutral' | 'success' | 'warning' | 'danger') {
+function getPrSignalToneStyle(
+  styles: TaskScreenStyles,
+  tone: 'neutral' | 'success' | 'warning' | 'danger'
+) {
   if (tone === 'success') {
     return styles.prSignalSuccess
   }
@@ -15145,7 +15147,7 @@ function getPrSignalToneStyle(tone: 'neutral' | 'success' | 'warning' | 'danger'
   return null
 }
 
-function getGitLabPipelineStatusStyle(status: string) {
+function getGitLabPipelineStatusStyle(styles: TaskScreenStyles, status: string) {
   switch (status) {
     case 'success':
       return styles.pipelineStatusSuccess

@@ -9,6 +9,7 @@ import type {
   SkillDeleteResult
 } from '../shared/skill-delete-contract'
 import type { AppIdentity } from '../shared/app-identity'
+import { HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, type HiveAccountState } from '../shared/hive-account'
 import type { MacCapturedDigitRowChord } from '../shared/macos-symbolic-hotkeys'
 import type { ComputerAwakeStatus } from '../shared/computer-awake-mode'
 import type {
@@ -635,6 +636,23 @@ const api = {
     orgMemberChangeRole: (args) => ipcRenderer.invoke('orcaProfiles:orgMemberChangeRole', args),
     orgMemberRemove: (args) => ipcRenderer.invoke('orcaProfiles:orgMemberRemove', args)
   } satisfies PreloadApi['orcaProfiles'],
+
+  hiveAccount: {
+    getState: () => ipcRenderer.invoke('hiveAccount:getState'),
+    signIn: (options) => ipcRenderer.invoke('hiveAccount:signIn', options),
+    startSmsSignIn: (options) => ipcRenderer.invoke('hiveAccount:startSmsSignIn', options),
+    cancelSmsSignIn: () => ipcRenderer.invoke('hiveAccount:cancelSmsSignIn'),
+    completeSmsSignIn: (options) => ipcRenderer.invoke('hiveAccount:completeSmsSignIn', options),
+    refresh: () => ipcRenderer.invoke('hiveAccount:refresh'),
+    signOut: () => ipcRenderer.invoke('hiveAccount:signOut'),
+    onStateChanged: (callback: (state: HiveAccountState) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: HiveAccountState): void => {
+        callback(state)
+      }
+      ipcRenderer.on(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, listener)
+      return () => ipcRenderer.removeListener(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, listener)
+    }
+  } satisfies PreloadApi['hiveAccount'],
 
   platform: {
     get: () => ({

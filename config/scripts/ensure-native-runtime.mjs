@@ -19,6 +19,7 @@ const NATIVE_MODULES = [
     : [])
 ]
 const NODE_PTY_CONPTY_RUNTIME_FILES = ['conpty.dll', 'OpenConsole.exe']
+const DIRECT_NODE_GYP_MODULES = new Set(['windows-native-registry'])
 const CHILD_CHECK_FLAG = '--check-only'
 
 if (process.argv.includes(CHILD_CHECK_FLAG)) {
@@ -77,8 +78,41 @@ function ensureNodeRuntime() {
     `[native-runtime] ${formatRuntimeLabel('node')} cannot load native modules; rebuilding ${failedModules.join(', ')} for Node.`
   )
   printCheckError(initial)
-  runPnpm(['rebuild', ...failedModules])
+  rebuildNodeModules(failedModules)
   verifyNodeRuntimeAfterRebuild()
+}
+
+function rebuildNodeModules(moduleNames) {
+  const pnpmModules = []
+  for (const moduleName of moduleNames) {
+    if (DIRECT_NODE_GYP_MODULES.has(moduleName)) {
+      runNodeGypRebuild(moduleName)
+    } else {
+      pnpmModules.push(moduleName)
+    }
+  }
+  if (pnpmModules.length > 0) {
+    runPnpm(['rebuild', ...pnpmModules])
+  }
+}
+
+function runNodeGypRebuild(moduleName) {
+  const modulePackagePath = require.resolve(`${moduleName}/package.json`)
+  const nodeGypPackagePath = require.resolve('node-gyp/package.json')
+  const moduleDir = resolve(modulePackagePath, '..')
+  const nodeGypScript = resolve(nodeGypPackagePath, '..', 'bin', 'node-gyp.js')
+  const result = spawnSync(process.execPath, [nodeGypScript, 'rebuild'], {
+    cwd: moduleDir,
+    stdio: 'inherit'
+  })
+
+  if (result.error || result.status !== 0) {
+    console.error(`[native-runtime] node-gyp rebuild failed for ${moduleName}.`)
+    if (result.error) {
+      console.error(formatError(result.error))
+    }
+    process.exit(result.status ?? 1)
+  }
 }
 
 function verifyNodeRuntimeAfterRebuild() {

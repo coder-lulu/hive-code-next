@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME, applyProductBranding } from '@/product-brand'
 import { AddRepoHostSelector } from './AddRepoHostSelector'
 
 vi.mock('@/components/ui/popover', () => ({
@@ -55,7 +56,7 @@ describe('AddRepoHostSelector', () => {
     expect(html).toContain('Add SSH host')
     expect(html).toContain('Use an existing machine over SSH.')
     expect(html).toContain('Add remote server')
-    expect(html).toContain('Pair with Orca running on another computer.')
+    expect(html).toContain(applyProductBranding('Pair with Orca running on another computer.'))
   })
 
   it('shows disconnected SSH hosts with a connect action in Add Project', () => {
@@ -109,7 +110,7 @@ describe('AddRepoHostSelector', () => {
           {
             id: 'runtime:old-server',
             label: 'Old server',
-            detail: 'Orca server',
+            detail: `${APP_DISPLAY_NAME} server`,
             kind: 'runtime',
             health: 'blocked',
             presence: 'active',
@@ -130,8 +131,10 @@ describe('AddRepoHostSelector', () => {
     )
 
     expect(html).toContain('Update needed')
-    expect(html).toContain('The selected Orca server is too old for this client.')
-    expect(html).toContain('Update Orca on the server.')
+    expect(html).toContain(
+      applyProductBranding('The selected Orca server is too old for this client.')
+    )
+    expect(html).toContain(applyProductBranding('Update Orca on the server.'))
     expect(html).toContain('aria-disabled="true"')
   })
 })

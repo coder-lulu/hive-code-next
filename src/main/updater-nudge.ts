@@ -1,5 +1,10 @@
-import { net } from 'electron'
+import { cancelUnreadResponseBody } from './lib/unread-response-body'
+import { getProductExternalServiceEndpoints } from './product/product-external-service-endpoints'
+import { fetchWithProductUpdaterSession } from './product/product-updater-session'
 import { compareVersions, isValidVersion } from './updater-fallback'
+import { readResponseTextWithLimit } from './updater-response-body'
+
+const MAX_NUDGE_RESPONSE_BYTES = 64 * 1024
 
 export type NudgeConfig = {
   id: string
@@ -8,15 +13,25 @@ export type NudgeConfig = {
 }
 
 export async function fetchNudge(): Promise<NudgeConfig | null> {
+  const nudgeUrl = getProductExternalServiceEndpoints().nudge
+  if (!nudgeUrl) {
+    return null
+  }
   try {
-    const res = await net.fetch('https://onorca.dev/whats-new/nudge.json', {
+    const res = await fetchWithProductUpdaterSession(nudgeUrl, {
+      redirect: 'error',
       signal: AbortSignal.timeout(5000)
     })
     if (!res.ok) {
+      await cancelUnreadResponseBody(res)
       return null
     }
 
-    const json: unknown = await res.json()
+    const body = await readResponseTextWithLimit(res, MAX_NUDGE_RESPONSE_BYTES)
+    if (body === null) {
+      return null
+    }
+    const json: unknown = JSON.parse(body)
     if (!json || typeof json !== 'object' || Array.isArray(json)) {
       return null
     }

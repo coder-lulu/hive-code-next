@@ -16,7 +16,9 @@ describe('release E2E dispatch contract', () => {
 
     expect(releaseWorkflow.jobs.e2e).toBeUndefined()
     expect(dispatchJob.needs).toEqual(['cut', 'publish-release'])
-    expect(dispatchJob.if).toBe("${{ needs.cut.outputs.tag != '' }}")
+    expect(dispatchJob.if).toBe(
+      "${{ github.repository == 'stablyai/orca' && needs.cut.outputs.tag != '' }}"
+    )
     expect(dispatchJob.permissions.actions).toBe('write')
     expect(dispatchStep.env.TAG).toBe('${{ needs.cut.outputs.tag }}')
     expect(dispatchStep.run).toContain('gh workflow run e2e.yml')

@@ -11,6 +11,7 @@ import {
   assertPublishedCommit,
   assertSourceDerivationsAgree,
   assertSourcemapPolicy,
+  diffFolders,
   firstDifferenceIndex,
   formatCheckFailure,
   lockfilePatchHashIsStale,
@@ -60,22 +61,8 @@ async function writeTree(root, files) {
   }
 }
 
-/** The three exported diff pieces, composed the way the generator composes them. */
-function diffFolders(folderA, folderB) {
-  let stdout
-  try {
-    stdout = execFileSync('git', [...PNPM_DIFF_FLAGS, folderA, folderB], {
-      encoding: 'utf8',
-      env: pnpmDiffEnvironment(),
-      stdio: ['ignore', 'pipe', 'pipe']
-    })
-  } catch (error) {
-    if (error.status !== 1) {
-      throw error
-    }
-    stdout = error.stdout
-  }
-  return normalizePnpmDiff(stdout, folderA, folderB)
+async function readNormalized(filePath) {
+  return (await readFile(filePath, 'utf8')).replace(/\r\n/g, '\n')
 }
 
 const PRISTINE = {
@@ -210,11 +197,15 @@ describe('round-trip stability', () => {
     await writeTree(replay, PRISTINE)
     const patchFile = path.join(root, 'round-trip.patch')
     await writeFile(patchFile, patch)
-    execFileSync('git', ['apply', '-p1', '--whitespace=nowarn', patchFile], { cwd: replay })
-
-    expect(await readFile(path.join(replay, 'lib/widget.js'), 'utf8')).toBe(
-      PATCHED['lib/widget.js']
+    execFileSync(
+      'git',
+      ['-c', 'core.autocrlf=false', 'apply', '-p1', '--whitespace=nowarn', patchFile],
+      {
+        cwd: replay
+      }
     )
+
+    expect(await readNormalized(path.join(replay, 'lib/widget.js'))).toBe(PATCHED['lib/widget.js'])
     expect(diffFolders(folderA, replay)).toBe(patch)
   })
 
@@ -229,14 +220,16 @@ describe('round-trip stability', () => {
 
     const replay = path.join(root, 'replay')
     await writeTree(replay, PRISTINE)
-    execFileSync('git', ['apply', '-p1', '--whitespace=nowarn', patchFile], { cwd: replay })
+    execFileSync(
+      'git',
+      ['-c', 'core.autocrlf=false', 'apply', '-p1', '--whitespace=nowarn', patchFile],
+      {
+        cwd: replay
+      }
+    )
 
-    expect(await readFile(path.join(replay, 'src/Widget.ts'), 'utf8')).toBe(
-      PATCHED['src/Widget.ts']
-    )
-    expect(await readFile(path.join(replay, 'lib/widget.js'), 'utf8')).toBe(
-      PRISTINE['lib/widget.js']
-    )
+    expect(await readNormalized(path.join(replay, 'src/Widget.ts'))).toBe(PATCHED['src/Widget.ts'])
+    expect(await readNormalized(path.join(replay, 'lib/widget.js'))).toBe(PRISTINE['lib/widget.js'])
   })
 })
 

@@ -19,6 +19,7 @@ import {
   installRuntimeFileClientEnvironment
 } from './runtime-file-client-test-harness'
 import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
+import { applyProductBranding } from '@/product-brand'
 
 installRuntimeFileClientEnvironment()
 
@@ -306,7 +307,9 @@ describe('runtime file client', () => {
         { query: 'target', limit: 32 }
       )
     ).rejects.toThrow(
-      'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'
+      applyProductBranding(
+        'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'
+      )
     )
   })
 

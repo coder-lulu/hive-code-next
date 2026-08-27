@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react-native'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { MobileCommitFailureRecovery } from './mobile-commit-failure-recovery'
 import type { MobileCommitFailureRecoveryAction } from './use-mobile-commit-failure-recovery'
-import { styles } from './mobile-source-control-styles'
+import { createMobileSourceControlStyles } from './mobile-source-control-styles'
 
 type Props = {
   failure: MobileCommitFailureRecovery
@@ -12,6 +12,8 @@ type Props = {
 }
 
 export function MobileCommitFailurePanel({ failure, action }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileSourceControlStyles)
   const [expanded, setExpanded] = useState(false)
   const Chevron = expanded ? ChevronDown : ChevronRight
   const detailsText = failure.error.trim()
@@ -20,9 +22,9 @@ export function MobileCommitFailurePanel({ failure, action }: Props) {
     <View style={styles.commitFailurePanel}>
       <View style={styles.commitFailureHeader}>
         <View style={styles.commitFailureTextBlock}>
-          <Text style={styles.commitFailureTitle}>Commit failed</Text>
+          <Text style={styles.commitFailureTitle}>提交失败</Text>
           <Text style={styles.commitFailureSummary} numberOfLines={2}>
-            {action.summary ?? 'Commit failed.'}
+            {action.summary ?? '提交失败。'}
           </Text>
         </View>
         <Pressable
@@ -34,14 +36,14 @@ export function MobileCommitFailurePanel({ failure, action }: Props) {
           onPress={() => void action.launch()}
           disabled={action.launching}
           accessibilityRole="button"
-          accessibilityLabel="Fix commit failure with AI"
+          accessibilityLabel="使用 AI 修复提交失败"
         >
           {action.launching ? (
-            <ActivityIndicator color={colors.bgBase} />
+            <ActivityIndicator color={theme.color.text.inverse} />
           ) : (
-            <Sparkles size={14} color={colors.bgBase} strokeWidth={2.2} />
+            <Sparkles size={16} color={theme.color.text.inverse} strokeWidth={2} />
           )}
-          <Text style={styles.commitFailureFixButtonText}>Fix</Text>
+          <Text style={styles.commitFailureFixButtonText}>修复</Text>
         </Pressable>
       </View>
       {action.hasDetails && detailsText ? (
@@ -53,13 +55,11 @@ export function MobileCommitFailurePanel({ failure, action }: Props) {
             ]}
             onPress={() => setExpanded((current) => !current)}
             accessibilityRole="button"
-            accessibilityLabel={
-              expanded ? 'Hide commit failure details' : 'Show commit failure details'
-            }
+            accessibilityLabel={expanded ? '隐藏提交失败详情' : '显示提交失败详情'}
           >
-            <Chevron size={14} color={colors.textSecondary} strokeWidth={2.2} />
+            <Chevron size={16} color={theme.color.text.secondary} strokeWidth={2} />
             <Text style={styles.commitFailureDetailsButtonText}>
-              {expanded ? 'Hide details' : 'Show details'}
+              {expanded ? '隐藏详情' : '显示详情'}
             </Text>
           </Pressable>
           {expanded ? <Text style={styles.commitFailureDetailsText}>{detailsText}</Text> : null}

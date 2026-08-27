@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SshConfigHostResolution } from '../../../../shared/ssh-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const toastMocks = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), toastMocks) }))
@@ -168,11 +169,11 @@ describe('SSH config picker tombstoned hosts', () => {
 
     const removed = await screen.findByRole('button', { name: /removed/ })
     expect(removed.hasAttribute('disabled')).toBe(false)
-    expect(removed.textContent).toContain('Removed from Orca')
+    expect(removed.textContent).toContain(`Removed from ${APP_DISPLAY_NAME}`)
 
     const kept = screen.getByRole('button', { name: /kept/ })
     expect(kept.hasAttribute('disabled')).toBe(true)
-    expect(kept.textContent).toContain('In Orca')
+    expect(kept.textContent).toContain(`In ${APP_DISPLAY_NAME}`)
   })
 
   it('never claims the config is empty when every host is only tombstoned', async () => {
@@ -192,9 +193,11 @@ describe('SSH config picker tombstoned hosts', () => {
     await openPickerWith({ hosts: [], totalHostCount: 0, newHostCount: 0, matchCount: 0 })
 
     expect(await screen.findByText('No hosts in ~/.ssh/config')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Add all to Orca' }).hasAttribute('disabled')).toBe(
-      true
-    )
+    expect(
+      screen
+        .getByRole('button', { name: `Add all to ${APP_DISPLAY_NAME}` })
+        .hasAttribute('disabled')
+    ).toBe(true)
   })
 })
 
@@ -202,7 +205,7 @@ describe('SSH config picker bulk add', () => {
   it('adds only new hosts and never re-adopts deleted aliases', async () => {
     const user = await openPicker()
 
-    await user.click(screen.getByRole('button', { name: /Add all 2 to Orca/ }))
+    await user.click(screen.getByRole('button', { name: `Add all 2 to ${APP_DISPLAY_NAME}` }))
 
     await waitFor(() => expect(importConfig).toHaveBeenCalled())
     expect(importConfig).toHaveBeenCalledWith()

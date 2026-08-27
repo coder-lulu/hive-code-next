@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 import { Check, Download } from 'lucide-react-native'
 import { BottomDrawer } from './BottomDrawer'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { RpcClient } from '../transport/rpc-client'
 import { triggerError, triggerSuccess } from '../platform/haptics'
 import { useDictationSetupPoller } from '../dictation/use-dictation-setup-poller'
@@ -35,6 +36,8 @@ function formatSize(bytes: number | null): string {
 // Lets the user enable dictation and download a speech model on the paired
 // desktop, from the phone. Polls while a download is in flight.
 export function MobileDictationSetupSheet({ visible, client, onClose, onReady }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [setup, setSetup] = useState<MobileSpeechSetup | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -129,150 +132,276 @@ export function MobileDictationSetupSheet({ visible, client, onClose, onReady }:
       {/* Why: BottomDrawer already scrolls its children in a keyboard-aware container;
           a nested capped ScrollView cut off the lower controls. */}
       <View>
-        <Text style={styles.heading}>Set up voice dictation</Text>
-        <Text style={styles.subtitle}>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.heading}>
+          Set up voice dictation
+        </Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.subtitle}>
           Download a model and enable dictation on your desktop — all from here.
         </Text>
 
         {setup === null ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={colors.textSecondary} />
+            <ActivityIndicator
+              accessibilityLabel="Loading voice dictation setup"
+              color={theme.color.text.secondary}
+            />
           </View>
         ) : (
           <>
             <View style={styles.enableRow}>
-              <Text style={styles.enableLabel}>Dictation enabled</Text>
-              <Switch value={setup.enabled} onValueChange={(v) => void handleToggleEnabled(v)} />
+              <Text maxFontSizeMultiplier={1.3} style={styles.enableLabel}>
+                Dictation enabled
+              </Text>
+              <Switch
+                accessibilityLabel="Dictation enabled"
+                accessibilityState={{ checked: setup.enabled }}
+                ios_backgroundColor={theme.color.bg.subtle}
+                thumbColor={theme.color.bg.surface}
+                trackColor={{
+                  false: theme.color.bg.subtle,
+                  true: theme.color.bg.selected
+                }}
+                value={setup.enabled}
+                onValueChange={(value) => void handleToggleEnabled(value)}
+              />
             </View>
 
-            {setup.models.map((model) => {
-              const isSelected = model.id === setup.selectedModelId
-              const inFlight = isModelInFlight(model)
-              const rowBusy = busy === model.id
-              return (
-                <View key={model.id} style={styles.modelRow}>
-                  <View style={styles.modelInfo}>
-                    <View style={styles.modelTitleRow}>
-                      <Text style={styles.modelLabel}>{model.label}</Text>
-                      {model.recommended ? (
-                        <Text style={styles.recommended}>Recommended</Text>
-                      ) : null}
-                    </View>
-                    <Text style={styles.modelMeta}>
-                      {model.provider === 'openai' ? 'OpenAI API' : formatSize(model.sizeBytes)}
-                      {inFlight && model.progress != null
-                        ? ` · ${Math.round(model.progress * 100)}%`
-                        : model.status === 'extracting'
-                          ? ' · extracting…'
-                          : ''}
-                    </Text>
-                  </View>
-                  {model.provider === 'openai' ? (
-                    <Text style={styles.modelStateText}>
-                      {model.status === 'ready' ? 'API key set' : 'Set up on desktop'}
-                    </Text>
-                  ) : model.status === 'ready' ? (
-                    isSelected ? (
-                      <View style={styles.selectedTag}>
-                        <Check size={14} color={colors.statusGreen} strokeWidth={2.4} />
-                        <Text style={styles.selectedText}>In use</Text>
+            <View style={styles.models}>
+              {setup.models.map((model, index) => {
+                const isSelected = model.id === setup.selectedModelId
+                const inFlight = isModelInFlight(model)
+                const rowBusy = busy === model.id
+                return (
+                  <View key={model.id}>
+                    {index > 0 ? <View style={styles.divider} /> : null}
+                    <View style={styles.modelRow}>
+                      <View style={styles.modelInfo}>
+                        <View style={styles.modelTitleRow}>
+                          <Text maxFontSizeMultiplier={1.3} style={styles.modelLabel}>
+                            {model.label}
+                          </Text>
+                          {model.recommended ? (
+                            <View style={styles.recommendedBadge}>
+                              <Text maxFontSizeMultiplier={1.3} style={styles.recommended}>
+                                Recommended
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text maxFontSizeMultiplier={1.3} style={styles.modelMeta}>
+                          {model.provider === 'openai' ? 'OpenAI API' : formatSize(model.sizeBytes)}
+                          {inFlight && model.progress != null
+                            ? ` · ${Math.round(model.progress * 100)}%`
+                            : model.status === 'extracting'
+                              ? ' · extracting…'
+                              : ''}
+                        </Text>
                       </View>
-                    ) : (
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.actionButton,
-                          pressed && styles.actionPressed
-                        ]}
-                        disabled={rowBusy}
-                        onPress={() => void handleUseModel(model)}
-                      >
-                        <Text style={styles.actionText}>Use</Text>
-                      </Pressable>
-                    )
-                  ) : inFlight ? (
-                    <ActivityIndicator size="small" color={colors.textSecondary} />
-                  ) : (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.actionButton,
-                        pressed && styles.actionPressed
-                      ]}
-                      disabled={rowBusy}
-                      onPress={() => void handleDownload(model)}
-                    >
-                      {rowBusy ? (
-                        <ActivityIndicator size="small" color={colors.textSecondary} />
+                      {model.provider === 'openai' ? (
+                        <Text maxFontSizeMultiplier={1.3} style={styles.modelStateText}>
+                          {model.status === 'ready' ? 'API key set' : 'Set up on desktop'}
+                        </Text>
+                      ) : model.status === 'ready' ? (
+                        isSelected ? (
+                          <View
+                            accessibilityLabel={`${model.label}, in use`}
+                            accessibilityRole="text"
+                            style={styles.selectedTag}
+                          >
+                            <Check size={16} color={theme.color.status.success} strokeWidth={2} />
+                            <Text maxFontSizeMultiplier={1.3} style={styles.selectedText}>
+                              In use
+                            </Text>
+                          </View>
+                        ) : (
+                          <Pressable
+                            accessibilityLabel={`Use voice model ${model.label}`}
+                            accessibilityRole="button"
+                            accessibilityState={{ busy: rowBusy, disabled: rowBusy }}
+                            style={({ pressed }) => [
+                              styles.actionButton,
+                              pressed && styles.actionPressed,
+                              rowBusy && styles.disabled
+                            ]}
+                            disabled={rowBusy}
+                            onPress={() => void handleUseModel(model)}
+                          >
+                            {rowBusy ? (
+                              <ActivityIndicator size="small" color={theme.color.text.secondary} />
+                            ) : (
+                              <Text maxFontSizeMultiplier={1.3} style={styles.actionText}>
+                                Use
+                              </Text>
+                            )}
+                          </Pressable>
+                        )
+                      ) : inFlight ? (
+                        <ActivityIndicator
+                          accessibilityLabel={`Downloading voice model ${model.label}`}
+                          size="small"
+                          color={theme.color.text.secondary}
+                        />
                       ) : (
-                        <>
-                          <Download size={13} color={colors.textSecondary} strokeWidth={2.2} />
-                          <Text style={styles.actionText}>Download</Text>
-                        </>
+                        <Pressable
+                          accessibilityLabel={`Download voice model ${model.label}`}
+                          accessibilityRole="button"
+                          accessibilityState={{ busy: rowBusy, disabled: rowBusy }}
+                          style={({ pressed }) => [
+                            styles.actionButton,
+                            pressed && styles.actionPressed,
+                            rowBusy && styles.disabled
+                          ]}
+                          disabled={rowBusy}
+                          onPress={() => void handleDownload(model)}
+                        >
+                          {rowBusy ? (
+                            <ActivityIndicator size="small" color={theme.color.text.secondary} />
+                          ) : (
+                            <>
+                              <Download
+                                size={16}
+                                color={theme.color.text.secondary}
+                                strokeWidth={2}
+                              />
+                              <Text maxFontSizeMultiplier={1.3} style={styles.actionText}>
+                                Download
+                              </Text>
+                            </>
+                          )}
+                        </Pressable>
                       )}
-                    </Pressable>
-                  )}
-                </View>
-              )
-            })}
+                    </View>
+                  </View>
+                )
+              })}
+            </View>
           </>
         )}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.error}>
+            {error}
+          </Text>
+        ) : null}
       </View>
     </BottomDrawer>
   )
 }
 
-const styles = StyleSheet.create({
-  heading: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '700'
-  },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md
-  },
-  loading: { paddingVertical: spacing.xl, alignItems: 'center' },
-  enableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
-    marginBottom: spacing.sm
-  },
-  enableLabel: { color: colors.textPrimary, fontSize: typography.bodySize },
-  modelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  modelInfo: { flex: 1, minWidth: 0 },
-  modelTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  modelLabel: { color: colors.textPrimary, fontSize: typography.bodySize },
-  recommended: {
-    color: colors.statusGreen,
-    fontSize: 10,
-    fontWeight: '700'
-  },
-  modelMeta: { color: colors.textMuted, fontSize: typography.metaSize, marginTop: 2 },
-  modelStateText: { color: colors.textMuted, fontSize: typography.metaSize },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised
-  },
-  actionPressed: { opacity: 0.7 },
-  actionText: { color: colors.textSecondary, fontSize: typography.metaSize, fontWeight: '600' },
-  selectedTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  selectedText: { color: colors.statusGreen, fontSize: typography.metaSize, fontWeight: '600' },
-  error: { color: colors.statusRed, fontSize: typography.metaSize, marginTop: spacing.md }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    heading: {
+      ...theme.typography.sectionTitle,
+      color: theme.color.text.primary
+    },
+    subtitle: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      marginTop: theme.spacing.space4,
+      marginBottom: theme.spacing.space16
+    },
+    loading: { paddingVertical: theme.spacing.space24, alignItems: 'center' },
+    enableRow: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing.space12,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space8,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface,
+      marginBottom: theme.spacing.space12
+    },
+    enableLabel: {
+      ...theme.typography.body,
+      flex: 1,
+      color: theme.color.text.primary
+    },
+    models: {
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    divider: {
+      height: 1,
+      marginLeft: theme.spacing.space16,
+      backgroundColor: theme.color.border.subtle
+    },
+    modelRow: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing.space12,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space12
+    },
+    modelInfo: { flex: 1, minWidth: 0 },
+    modelTitleRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    modelLabel: { ...theme.typography.body, color: theme.color.text.primary },
+    recommendedBadge: {
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4,
+      borderRadius: theme.radii.small,
+      backgroundColor: theme.color.bg.subtle
+    },
+    recommended: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary,
+      fontWeight: '500'
+    },
+    modelMeta: {
+      ...theme.typography.meta,
+      color: theme.color.text.tertiary,
+      marginTop: theme.spacing.space4
+    },
+    modelStateText: {
+      ...theme.typography.meta,
+      maxWidth: '40%',
+      color: theme.color.text.secondary,
+      textAlign: 'right'
+    },
+    actionButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: theme.spacing.space4,
+      paddingHorizontal: theme.spacing.space12,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    actionPressed: { backgroundColor: theme.color.bg.subtle },
+    disabled: { opacity: 0.4 },
+    actionText: {
+      ...theme.typography.label,
+      color: theme.color.text.primary
+    },
+    selectedTag: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4
+    },
+    selectedText: {
+      ...theme.typography.meta,
+      color: theme.color.status.success
+    },
+    error: {
+      ...theme.typography.meta,
+      color: theme.color.status.danger,
+      marginTop: theme.spacing.space12
+    }
+  })
+}

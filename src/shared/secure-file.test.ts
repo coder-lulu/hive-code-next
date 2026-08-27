@@ -9,10 +9,12 @@ import {
   __resetSecureFileWindowsUserSidForTests,
   hardenExistingSecureFile,
   hardenSecurePath,
+  writeDurableSecureJsonFile,
   writeSecureFile
 } from './secure-file'
 
 const posixModeIt = process.platform === 'win32' ? it.skip : it
+const windowsIt = process.platform === 'win32' ? it : it.skip
 
 vi.mock('child_process', () => ({
   execFileSync: vi.fn(),
@@ -378,6 +380,14 @@ describe('hardenSecurePath', () => {
       (call) => getPowerShellTarget(call) === userDataPath
     )
     expect(dirCalls).toHaveLength(1)
+  })
+
+  windowsIt('durably writes a secure file through a Windows-compatible fsync handle', () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-secure-file-'))
+    tempDirs.push(userDataPath)
+    const targetPath = join(userDataPath, 'durable.json')
+
+    expect(() => writeDurableSecureJsonFile(targetPath, { ok: true })).not.toThrow()
   })
 
   // win32-only guard: on non-win32 platforms no PowerShell is ever spawned (sync or async);

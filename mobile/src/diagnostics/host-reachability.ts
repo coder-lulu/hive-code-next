@@ -64,7 +64,7 @@ export function formatEndpoint(endpoint: string): string {
 // toggling the VPN) — point at that instead of a bare "Cannot reach".
 export function unreachableHostDetail(endpoint: string): string {
   if (isTailscaleEndpoint(endpoint)) {
-    return `Cannot reach ${formatEndpoint(endpoint)} — check Tailscale`
+    return `无法连接 ${formatEndpoint(endpoint)}，请检查 Tailscale`
   }
-  return `Cannot reach ${formatEndpoint(endpoint)}`
+  return `无法连接 ${formatEndpoint(endpoint)}`
 }

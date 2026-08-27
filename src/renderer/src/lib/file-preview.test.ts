@@ -26,10 +26,10 @@ const mocks = vi.hoisted(() => ({
   createBrowserTab: vi.fn(),
   createEmptySplitGroup: vi.fn(() => 'group-2'),
   createWebRuntimeSessionBrowserTab: vi.fn(),
+  toastError: vi.fn(),
   environmentId: null as string | null,
   connectionId: null as string | null,
-  layoutByWorktree: {} as Record<string, unknown>,
-  toastError: vi.fn()
+  layoutByWorktree: {} as Record<string, unknown>
 }))
 
 vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
@@ -72,7 +72,7 @@ beforeEach(() => {
 })
 
 describe('openFileInBrowserTab', () => {
-  it('opens a local file URL in the Orca browser with the filename as title', () => {
+  it('opens a local file URL in the HiveCode browser with the filename as title', () => {
     openFileInBrowserTab({
       filePath: '/tmp/example file.html',
       worktreeId: 'wt-1'
@@ -156,7 +156,7 @@ describe('openFileInBrowserTab', () => {
     })
 
     await vi.waitFor(() =>
-      expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in Orca Browser.')
+      expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in HiveCode Browser.')
     )
     expect(mocks.closeEmptyGroup).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()
@@ -231,7 +231,7 @@ describe('openFileInBrowserTab', () => {
       sourceGroupId: 'group-1'
     })
 
-    expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in Orca Browser.')
+    expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in HiveCode Browser.')
     expect(mocks.createEmptySplitGroup).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()
     expect(mocks.createWebRuntimeSessionBrowserTab).not.toHaveBeenCalled()
@@ -279,9 +279,23 @@ describe('openFileInBrowserTab', () => {
     expect(result).toEqual({
       status: 'unsupported',
       reason: 'remote-worktree',
-      message: REMOTE_FILE_BROWSER_UNSUPPORTED_MESSAGE
+      message: 'Open in HiveCode Browser is only available for local files.'
     })
+    expect(REMOTE_FILE_BROWSER_UNSUPPORTED_MESSAGE).toBe(
+      'Open in HiveCode Browser is only available for local files.'
+    )
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()
+  })
+
+  it('brands paired-runtime browser failures', async () => {
+    mocks.environmentId = 'runtime-1'
+    mocks.createWebRuntimeSessionBrowserTab.mockResolvedValue(false)
+
+    openFileInBrowserTab({ filePath: '/srv/repo/example.html', worktreeId: 'wt-1' })
+
+    await vi.waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in HiveCode Browser.')
+    })
   })
 })
 

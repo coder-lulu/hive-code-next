@@ -1,34 +1,17 @@
-import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { runOxlintPluginOnSource } from './oxlint-plugin-test-runner.mjs'
 
 const pluginPath = path.resolve('config/oxlint-plugins/mobile-pairing-qrcode-import.mjs')
-const oxlintPath = path.resolve(
-  process.platform === 'win32' ? 'node_modules/.bin/oxlint.cmd' : 'node_modules/.bin/oxlint'
-)
 
 function lintSource(source) {
-  const directory = mkdtempSync(path.join(tmpdir(), 'orca-qrcode-import-lint-'))
-  const sourcePath = path.join(directory, 'sample.ts')
-  const configPath = path.join(directory, 'oxlint.json')
-  writeFileSync(sourcePath, source)
-  writeFileSync(
-    configPath,
-    JSON.stringify({
-      categories: { correctness: 'off' },
-      jsPlugins: [{ name: 'mobile-pairing', specifier: pluginPath }],
-      rules: { 'mobile-pairing/no-eager-qrcode-import': 'error' }
-    })
-  )
-  const result = spawnSync(oxlintPath, ['--config', configPath, '--format', 'json', sourcePath], {
-    encoding: 'utf8'
+  return runOxlintPluginOnSource({
+    pluginName: 'mobile-pairing',
+    pluginPath,
+    rules: { 'mobile-pairing/no-eager-qrcode-import': 'error' },
+    source,
+    extension: 'ts'
   })
-  if (result.error) {
-    throw result.error
-  }
-  return JSON.parse(result.stdout).diagnostics
 }
 
 describe('mobile pairing qrcode import rule', () => {

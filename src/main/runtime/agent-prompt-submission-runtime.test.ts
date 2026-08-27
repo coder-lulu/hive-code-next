@@ -4,14 +4,11 @@ import {
   buildAgentPromptPasteBytes,
   getAgentPromptSubmitDelayMs
 } from '../../shared/agent-prompt-injection'
-import {
-  AGENT_PROMPT_TEST_WORKTREE_PATH,
-  createAgentPromptSubmissionRuntime
-} from './agent-prompt-submission-runtime-test-fixture'
+import { AGENT_PROMPT_TEST_WORKTREE_PATH } from './agent-prompt-submission-runtime-test-fixture'
 import { OrcaRuntimeService } from './orca-runtime'
 import { makeStore } from './runtime-rpc-worktree-store-fixtures'
 
-const createPromptRuntime = createAgentPromptSubmissionRuntime
+const WORKTREE_PATH = '/tmp/worktree-a'
 
 vi.mock('../git/worktree', () => ({
   listWorktrees: vi.fn().mockResolvedValue([
@@ -34,18 +31,37 @@ vi.mock('../git/worktree', () => ({
   ])
 }))
 
+async function createPromptRuntime(
+  onWrite: (runtime: OrcaRuntimeService, data: string, writeIndex: number) => void
+): Promise<{ runtime: OrcaRuntimeService; handle: string; writes: string[] }> {
+  const runtime = new OrcaRuntimeService(makeStore() as never)
+  const writes: string[] = []
+  runtime.setPtyController({
+    spawn: vi.fn().mockResolvedValue({ id: 'pty-prompt' }),
+    write: (_ptyId, data) => {
+      writes.push(data)
+      onWrite(runtime, data, writes.length)
+      return true
+    },
+    kill: () => true,
+    getForegroundProcess: async () => null
+  })
+  const terminal = await runtime.createTerminal(`path:${WORKTREE_PATH}`, {
+    launchAgent: 'aider'
+  })
+  return { runtime, handle: terminal.handle, writes }
+}
+
 describe('agent prompt submission runtime', () => {
   afterEach(() => vi.useRealTimers())
 
   it('submits exactly once after an observed lifecycle transition', async () => {
     vi.useFakeTimers()
-    const { runtime, handle, writes } = await createAgentPromptSubmissionRuntime(
-      (runtime, data) => {
-        if (data === '\r') {
-          runtime.onPtyData('pty-prompt', '\x1b]0;Codex working\x07', Date.now())
-        }
+    const { runtime, handle, writes } = await createPromptRuntime((runtime, data) => {
+      if (data === '\r') {
+        runtime.onPtyData('pty-prompt', '\x1b]0;Codex working\x07', Date.now())
       }
-    )
+    })
 
     const submission = runtime.sendTerminalAgentPrompt(handle, 'review this')
     await vi.runAllTimersAsync()
@@ -360,11 +376,8 @@ describe('agent prompt submission runtime', () => {
       kill: () => true,
       getForegroundProcess: async () => null
     })
-    handle = (
-      await runtime.createTerminal(`path:${AGENT_PROMPT_TEST_WORKTREE_PATH}`, {
-        launchAgent: 'aider'
-      })
-    ).handle
+    handle = (await runtime.createTerminal(`path:${WORKTREE_PATH}`, { launchAgent: 'aider' }))
+      .handle
     runtime.onPtyData(
       'pty-prompt',
       'Permission required\nAllow once\nAllow always\nReject\n' +

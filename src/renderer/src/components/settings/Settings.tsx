@@ -60,7 +60,7 @@ import { OrchestrationPane } from './OrchestrationPane'
 import { ArtifactsSettingsPane } from './ArtifactsSettingsPane'
 import { ShareSkillsSettingsPane } from './ShareSkillsSettingsPane'
 import { AutomationsSettingsPane } from './AutomationsSettingsPane'
-import { OrcaAccountSettingsPane } from './OrcaAccountSettingsPane'
+import { HiveAccountSettingsPane } from './HiveAccountSettingsPane'
 import { LinearAgentSkillPane } from './LinearAgentSkillPane'
 import { AccountsPane } from './AccountsPane'
 import { StatsPane } from '../stats/StatsPane'
@@ -1352,14 +1352,17 @@ function Settings(): React.JSX.Element {
                 {showDesktopOnlySettings ? (
                   <SettingsSection
                     id="orca-account"
-                    title={translate('auto.components.settings.orcaAccount.title', 'Orca Account')}
+                    title={translate(
+                      'auto.components.settings.orcaAccount.title',
+                      'HiveCloud Account'
+                    )}
                     description={translate(
                       'auto.components.settings.orcaAccount.description',
-                      'Share work instantly and reach your desktop from Orca Mobile wherever you are.'
+                      'Sign in securely, review this device, and manage the current HiveCloud session.'
                     )}
                     searchEntries={getSectionSearchEntries('orca-account')}
                   >
-                    {isSectionMounted('orca-account') ? <OrcaAccountSettingsPane /> : null}
+                    {isSectionMounted('orca-account') ? <HiveAccountSettingsPane /> : null}
                   </SettingsSection>
                 ) : null}
 

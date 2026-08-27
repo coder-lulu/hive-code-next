@@ -1,6 +1,6 @@
 // xterm.js WebView document + default Tokyonight theme; extracted from TerminalWebView.tsx for the max-lines budget.
 import type { RuntimeMobileTerminalTheme } from '../../../src/shared/runtime-types'
-import { colors } from '../theme/mobile-theme'
+import { darkTheme } from '../theme/mobile-theme'
 import { TERMINAL_TEXT_SCALES } from '../storage/preferences'
 import { TERMINAL_PATH_TAP_JS } from './terminal-path-tap-injected'
 import { TERMINAL_KEYBOARD_AVOIDANCE_METRICS_JS } from './terminal-keyboard-avoidance-metrics-injected'
@@ -16,30 +16,7 @@ import { TERMINAL_MOUSE_CLICK_DRAG_JS } from './terminal-webview-mouse-click-dra
 import { TERMINAL_MOUSE_REPORT_CELL_JS } from './terminal-webview-mouse-report-cell-injected'
 import { TERMINAL_WHEEL_SCROLL_JS } from './terminal-webview-wheel-scroll-injected'
 
-const DEFAULT_TERMINAL_THEME: RuntimeMobileTerminalTheme['theme'] = {
-  background: colors.terminalBg,
-  foreground: '#c0caf5',
-  cursor: '#c0caf5',
-  cursorAccent: colors.terminalBg,
-  selectionBackground: '#33467c',
-  selectionForeground: '#c0caf5',
-  black: '#15161e',
-  red: '#f7768e',
-  green: '#9ece6a',
-  yellow: '#e0af68',
-  blue: '#7aa2f7',
-  magenta: '#bb9af7',
-  cyan: '#7dcfff',
-  white: '#a9b1d6',
-  brightBlack: '#414868',
-  brightRed: '#f7768e',
-  brightGreen: '#9ece6a',
-  brightYellow: '#e0af68',
-  brightBlue: '#7aa2f7',
-  brightMagenta: '#bb9af7',
-  brightCyan: '#7dcfff',
-  brightWhite: '#c0caf5'
-}
+const DEFAULT_TERMINAL_THEME: RuntimeMobileTerminalTheme['theme'] = darkTheme.terminal
 
 export const MOBILE_TERMINAL_CARET_OPTIONS = {
   cursorBlink: false,
@@ -66,7 +43,7 @@ window.onerror = function(msg) {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    background: ${colors.terminalBg};
+    background: ${darkTheme.terminal.background};
     overflow: hidden;
     width: 100%;
     height: 100%;
@@ -119,7 +96,7 @@ window.onerror = function(msg) {
     width: 3px;
     min-height: 24px;
     border-radius: 999px;
-    background: ${colors.textSecondary};
+    background: var(--terminal-scroll-thumb, ${darkTheme.terminal.brightBlack});
     will-change: transform, height;
   }
   /* Why: selection overlay sits in unscaled viewport coords, above the
@@ -146,9 +123,9 @@ window.onerror = function(msg) {
     left: 50%; top: 22px;
     transform: translateX(-50%);
     width: 14px; height: 14px;
-    background: #7aa2f7;
+    background: var(--terminal-accent, ${darkTheme.terminal.blue});
     border-radius: 50%;
-    border: 2px solid #c0caf5;
+    border: 2px solid var(--terminal-foreground, ${darkTheme.terminal.foreground});
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   }
   .sel-handle.start::before { top: 8px; }
@@ -158,7 +135,7 @@ window.onerror = function(msg) {
     left: 50%; top: 22px;
     transform: translateX(-50%);
     width: 2px; height: 16px;
-    background: #7aa2f7;
+    background: var(--terminal-accent, ${darkTheme.terminal.blue});
   }
   .sel-handle.end::before { top: 22px; }
   .sel-handle.end::after {
@@ -167,12 +144,12 @@ window.onerror = function(msg) {
     left: 50%; top: 6px;
     transform: translateX(-50%);
     width: 2px; height: 16px;
-    background: #7aa2f7;
+    background: var(--terminal-accent, ${darkTheme.terminal.blue});
   }
   #sel-menu {
     position: absolute;
     pointer-events: auto;
-    background: #2a2f4a;
+    background: var(--terminal-menu-background, ${darkTheme.terminal.selectionBackground});
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     display: flex;
@@ -185,13 +162,17 @@ window.onerror = function(msg) {
   #sel-menu button {
     background: transparent;
     border: none;
-    color: #c0caf5;
+    color: var(--terminal-foreground, ${darkTheme.terminal.foreground});
     font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     padding: 10px 16px;
     cursor: pointer;
   }
-  #sel-menu button:active { background: #414868; }
-  #sel-menu button + button { border-left: 1px solid #414868; }
+  #sel-menu button:active {
+    background: var(--terminal-menu-active, ${darkTheme.terminal.brightBlack});
+  }
+  #sel-menu button + button {
+    border-left: 1px solid var(--terminal-menu-active, ${darkTheme.terminal.brightBlack});
+  }
 </style>
 </head>
 <body>

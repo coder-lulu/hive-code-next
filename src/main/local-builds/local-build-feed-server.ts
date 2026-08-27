@@ -48,6 +48,7 @@ export async function startLocalBuildFeed(candidate: LocalBuildCandidate): Promi
     }
     response.writeHead(200, {
       'Cache-Control': 'no-store',
+      'Content-Length': String(artifact.size),
       'Content-Type': 'application/zip'
     })
     const stream = artifact.file.createReadStream({

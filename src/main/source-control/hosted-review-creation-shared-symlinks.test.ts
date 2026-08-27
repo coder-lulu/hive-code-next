@@ -92,7 +92,7 @@ import { createHostedReview } from './hosted-review-creation'
 // worktree's symlink, so Git reports it untracked. Without the exclusion the
 // dirty preflight blocks Create PR and tells the user to commit an entry they
 // cannot commit — it is a symlink Orca created.
-describe('createHostedReview with shared symlinks', () => {
+describe.skipIf(process.platform === 'win32')('createHostedReview with shared symlinks', () => {
   let worktree: string
   let statusOutput: string
 

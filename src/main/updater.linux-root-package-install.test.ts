@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import type * as UpdaterModule from './updater'
 import type * as RecoveryModule from './linux-package-update-recovery'
 import type { UpdateStatus } from '../shared/update-status-types'
+import { applyProductBranding } from '../shared/brand'
 import { PRE_COMMIT_INSTALL_FAILURE } from './updater-test-harness'
 
 const {
@@ -18,6 +19,7 @@ const {
   armExitWatchdogMock,
   disarmExitWatchdogMock,
   fetchNewerReleaseTagsMock,
+  linuxRootPackageInstallPolicy,
   moduleFactories,
   resetUpdaterMocks
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
@@ -35,6 +37,14 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
+vi.mock('./linux-root-package-install-policy', () =>
+  moduleFactories.linuxRootPackageInstallPolicy()
+)
 
 type RevalidationVerdict = Awaited<
   ReturnType<typeof RecoveryModule.revalidateLinuxPackageForInstall>
@@ -233,6 +243,7 @@ describe('updater', () => {
       getLinuxRootPackageTypeMock.mockReturnValue(packageType)
       vi.useFakeTimers()
       fetchNewerReleaseTagsMock.mockResolvedValue({ tags: ['v1.0.61'], state: 'ready' })
+      autoUpdaterMock.downloadUpdate.mockResolvedValue([])
       autoUpdaterMock.checkForUpdates.mockImplementation(() => {
         autoUpdaterMock.emit('checking-for-update')
         queueMicrotask(() => autoUpdaterMock.emit('update-available', { version: '1.0.61' }))
@@ -252,6 +263,7 @@ describe('updater', () => {
     ): Promise<void> => {
       updater.checkForUpdatesFromMenu()
       await vi.advanceTimersByTimeAsync(0)
+      updater.downloadUpdate()
       autoUpdaterMock.emit('update-downloaded', event)
       if (process.platform === 'darwin') {
         const nativeReady = nativeUpdaterMock.on.mock.calls.find(
@@ -278,7 +290,54 @@ describe('updater', () => {
       }
     })
 
-    it('keeps interactive install-on-quit when no root-package marker is present', async () => {
+    it('routes root packages to manual recovery without invoking the privileged sink', async () => {
+      linuxRootPackageInstallPolicy.manual = true
+      const { send, updater } = await startUpdater('deb')
+      await reachDownloaded(updater, downloadedEvent())
+
+      expect(updater.quitAndInstall()).toBe(false)
+      await settleQuitAndInstall()
+
+      expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+      expect(killAllPtyMock).not.toHaveBeenCalled()
+      expect(updater.isQuittingForUpdate()).toBe(false)
+      expect(updater.getRemoteServerUpdateSupport()).toMatchObject({
+        automatic: false,
+        reason: 'manual-service-update-required'
+      })
+      expect(send).toHaveBeenCalledWith('updater:quitAndInstallAborted')
+      expect(send).toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message:
+          'Automatic installation is disabled for Linux system packages. Copy the verified install command or show the package to install it manually.',
+        recovery: {
+          kind: 'linux-package-install',
+          packageType: 'deb',
+          reason: 'manual-install-required',
+          version: '1.0.61'
+        }
+      })
+    })
+
+    it('fails closed before the privileged sink when the root package was not retained', async () => {
+      linuxRootPackageInstallPolicy.manual = true
+      const { send, updater } = await startUpdater('deb')
+      await reachDownloaded(updater, downloadedEvent({ downloadedFile: undefined, files: [] }))
+
+      expect(updater.quitAndInstall()).toBe(false)
+      await settleQuitAndInstall()
+
+      expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+      expect(killAllPtyMock).not.toHaveBeenCalled()
+      expect(lastStatus(send)).toEqual({
+        state: 'error',
+        message: expect.stringContaining(
+          'Automatic installation is disabled for Linux system packages'
+        )
+      })
+    })
+
+    it('keeps automatic install-on-quit disabled when no root-package marker is present', async () => {
       autoUpdaterMock.autoInstallOnAppQuit = false
       const { setupAutoUpdater } = await import('./updater')
 
@@ -287,7 +346,7 @@ describe('updater', () => {
         installMode: 'interactive'
       })
 
-      expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(true)
+      expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(false)
     })
 
     it('leaves headless serve installs supervisor-controlled', async () => {
@@ -401,7 +460,9 @@ describe('updater', () => {
       expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message: 'Could not restart to install the update. Quit and reopen Orca, then try again.'
+        message: applyProductBranding(
+          'Could not restart to install the update. Quit and reopen Orca, then try again.'
+        )
       })
       expect(updater.isQuittingForUpdate()).toBe(false)
     })
@@ -447,6 +508,7 @@ describe('updater', () => {
     it('retries the automatic install without redownloading the package', async () => {
       const { send, updater } = await startUpdater('deb')
       await reachDownloaded(updater, downloadedEvent())
+      autoUpdaterMock.downloadUpdate.mockClear()
       autoUpdaterMock.quitAndInstall.mockImplementation(() => {
         autoUpdaterMock.emit('error', new Error(EXIT_127))
       })
@@ -500,8 +562,9 @@ describe('updater', () => {
       expect(updater.isQuittingForUpdate()).toBe(false)
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message:
+        message: applyProductBranding(
           'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.'
+        )
       })
       expect(recordUpdaterLifecycleMock).toHaveBeenCalledWith(
         'linux_package_revalidation_failed',
@@ -526,8 +589,9 @@ describe('updater', () => {
       expect(updater.isQuittingForUpdate()).toBe(false)
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message:
+        message: applyProductBranding(
           'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.'
+        )
       })
       expect(send).toHaveBeenCalledWith('updater:quitAndInstallAborted')
       expect(recordUpdaterLifecycleMock).toHaveBeenCalledWith(
@@ -609,8 +673,9 @@ describe('updater', () => {
       expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1)
       expect(lastStatus(send)).toEqual({
         state: 'error',
-        message:
-          'Orca could not read the downloaded package. Download the update again, or get it from the official release page.',
+        message: applyProductBranding(
+          'Orca could not read the downloaded package. Download the update again, or get it from the official release page.'
+        ),
         recovery: {
           kind: 'linux-package-install',
           packageType: 'deb',
@@ -636,8 +701,9 @@ describe('updater', () => {
       expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
       expect(lastStatus(send)).toMatchObject({
         state: 'error',
-        message:
+        message: applyProductBranding(
           'Orca could not read the downloaded package. Download the update again, or get it from the official release page.'
+        )
       })
 
       updater.quitAndInstall()

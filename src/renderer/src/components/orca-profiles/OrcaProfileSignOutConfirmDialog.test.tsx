@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { OrcaProfileSignOutConfirmDialog } from './OrcaProfileSignOutConfirmDialog'
 
 vi.mock('@/components/ui/dialog', () => ({
@@ -29,9 +30,9 @@ describe('OrcaProfileSignOutConfirmDialog', () => {
       />
     )
 
-    expect(html).toContain('Sign out of Orca?')
+    expect(html).toContain(`Sign out of ${APP_DISPLAY_NAME}?`)
     expect(html).toContain(
-      'Artifacts and Orca Relay will be unavailable until you sign in again. Your local projects and worktrees won&#x27;t be affected.'
+      `Artifacts and ${APP_DISPLAY_NAME} Relay will be unavailable until you sign in again. Your local projects and worktrees won&#x27;t be affected.`
     )
     expect(html).not.toContain('Personal')
     expect(html).not.toContain('alert-triangle')

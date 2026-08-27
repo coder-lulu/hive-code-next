@@ -19,6 +19,7 @@ import { readFile } from 'node:fs/promises'
 import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { applyProductBranding } from '../../shared/brand'
 
 // Why: write the diag log to userData, not world-readable /tmp, so only the current user can read it.
 let _diagLog: string | null = null
@@ -1542,8 +1543,9 @@ async function importCookiesFromSafari(
     if (isPermError) {
       return {
         ok: false,
-        reason:
+        reason: applyProductBranding(
           'macOS denied access to Safari cookies. Grant Full Disk Access to Orca in System Settings → Privacy & Security → Full Disk Access.'
+        )
       }
     }
     return { ok: false, reason: 'Could not read Safari cookies.' }

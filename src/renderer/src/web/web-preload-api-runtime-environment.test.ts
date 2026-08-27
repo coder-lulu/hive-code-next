@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { MIN_COMPATIBLE_RUNTIME_SERVER_VERSION } from '../../../shared/protocol-version'
+import { APP_DISPLAY_NAME } from '../product-brand'
 import {
   encodePairingCode,
   installBrowserGlobals,
@@ -17,6 +18,49 @@ describe('web runtime environment identity', () => {
     vi.doUnmock('./web-runtime-client')
   })
 
+  it('keeps a Cloud-managed bootstrap volatile across Runtime status updates', async () => {
+    const constructedWith: unknown[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        constructor(connection: unknown) {
+          constructedWith.push(connection)
+        }
+
+        call(method: string): Promise<RuntimeRpcResponse<unknown>> {
+          return Promise.resolve({
+            id: method,
+            ok: true,
+            result: { runtimeId: 'runtime-cloud' },
+            _meta: { runtimeId: 'runtime-cloud' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+    const globals = installBrowserGlobals('Linux')
+    const bootstrap = {
+      protocolVersion: 'cloud-launch/v1' as const,
+      managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
+      runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+      websocketUrl: 'wss://runtime.example/_hive/runtime-rpc',
+      serverPublicKeyB64: 'server-public-key',
+      sessionToken: 'A'.repeat(43),
+      expiresAt: '2026-08-25T09:00:00.000Z'
+    }
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi(bootstrap)
+
+    const [environment] = await globals.window.api.runtimeEnvironments.list()
+    await globals.window.api.runtimeEnvironments.getStatus({ selector: environment!.id })
+
+    expect(constructedWith).toEqual([bootstrap])
+    expect(globals.storage.getItem('orca.web.runtimeEnvironment.v1')).toBeNull()
+    expect(JSON.stringify(await globals.window.api.runtimeEnvironments.list())).not.toContain(
+      bootstrap.sessionToken
+    )
+  })
+
   it('does not resolve an old server selector through a differently keyed server', async () => {
     const globals = installBrowserGlobals('Linux')
     writeStoredRuntimeEnvironment(globals.storage, 'web-server-a')
@@ -30,7 +74,7 @@ describe('web runtime environment identity', () => {
 
     await expect(
       globals.window.api.runtimeEnvironments.resolve({ selector: 'web-server-a' })
-    ).rejects.toThrow('Unknown Orca runtime environment: web-server-a')
+    ).rejects.toThrow(`Unknown ${APP_DISPLAY_NAME} runtime environment: web-server-a`)
   })
 
   it('keeps pairing state separate from generic Active Server settings writes', async () => {
@@ -118,7 +162,7 @@ describe('web runtime environment identity', () => {
       globals.window.api.settings.setActiveRuntimeEnvironmentPreference({
         environmentId: 'unknown-server'
       })
-    ).rejects.toThrow('Unknown Orca runtime environment: unknown-server')
+    ).rejects.toThrow(`Unknown ${APP_DISPLAY_NAME} runtime environment: unknown-server`)
     expect(JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}')).toMatchObject({
       activeRuntimeEnvironmentId: paired.environment.id
     })
@@ -153,7 +197,7 @@ describe('web runtime environment identity', () => {
 
     await expect(
       globals.window.api.runtimeEnvironments.resolve({ selector: 'web-server-old' })
-    ).rejects.toThrow('Unknown Orca runtime environment: web-server-old')
+    ).rejects.toThrow(`Unknown ${APP_DISPLAY_NAME} runtime environment: web-server-old`)
   })
 
   it('ignores malformed persisted paired device identity', async () => {
@@ -416,7 +460,7 @@ describe('web runtime environment identity', () => {
     ).resolves.toMatchObject({
       ok: false,
       kind: 'environment-save-failed',
-      message: 'Orca verified the host but could not save it. Check browser storage and try again.'
+      message: `${APP_DISPLAY_NAME} verified the host but could not save it. Check browser storage and try again.`
     })
     await expect(globals.window.api.runtimeEnvironments.list()).resolves.toMatchObject([
       { id: 'web-server-a' }

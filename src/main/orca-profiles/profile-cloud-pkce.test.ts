@@ -14,6 +14,7 @@ vi.mock('electron', () => ({
 }))
 
 import { beginOrcaCloudPkceFlow } from './profile-cloud-pkce'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 type HttpResponse = {
   body: string
@@ -97,7 +98,7 @@ describe('Orca cloud PKCE flow', () => {
     expect(validResponse.statusCode).toBe(200)
     expect(validResponse.headers['cache-control']).toBe('no-store')
     expect(validResponse.headers['content-security-policy']).toContain("default-src 'none'")
-    expect(validResponse.body).toContain('<h1>Signed in to Orca</h1>')
+    expect(validResponse.body).toContain(`<h1>Signed in to ${APP_DISPLAY_NAME}</h1>`)
     expect(validResponse.body).toContain('You can close this tab and return to the app.')
     expect(validResponse.body).not.toContain('class="brand"')
     await expect(flow).resolves.toMatchObject({

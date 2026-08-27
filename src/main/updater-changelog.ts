@@ -1,6 +1,9 @@
-import { net } from 'electron'
 import type { ChangelogData } from '../shared/update-status-types'
+import { cancelUnreadResponseBody } from './lib/unread-response-body'
+import { getProductExternalServiceEndpoints } from './product/product-external-service-endpoints'
+import { fetchWithProductUpdaterSession } from './product/product-updater-session'
 import { compareVersions } from './updater-fallback'
+import { readResponseTextWithLimit } from './updater-response-body'
 
 type ChangelogEntry = {
   version: string
@@ -10,19 +13,49 @@ type ChangelogEntry = {
   releaseNotesUrl: string
 }
 
-const CHANGELOG_URL = 'https://onorca.dev/changelog'
+const CHANGELOG_FEED_URL = getProductExternalServiceEndpoints().changelog
+const MAX_CHANGELOG_BYTES = 1024 * 1024
+const MAX_CHANGELOG_ENTRIES = 100
+
+function isApprovedChangelogPayloadUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !CHANGELOG_FEED_URL) {
+    return false
+  }
+  try {
+    const feedUrl = new URL(CHANGELOG_FEED_URL)
+    const payloadUrl = new URL(value)
+    return (
+      payloadUrl.protocol === 'https:' &&
+      payloadUrl.origin === feedUrl.origin &&
+      payloadUrl.username.length === 0 &&
+      payloadUrl.password.length === 0
+    )
+  } catch {
+    return false
+  }
+}
 
 function isValidEntry(entry: ChangelogEntry): boolean {
   return (
+    typeof entry.version === 'string' &&
     typeof entry.title === 'string' &&
     typeof entry.description === 'string' &&
-    typeof entry.releaseNotesUrl === 'string'
+    isApprovedChangelogPayloadUrl(entry.releaseNotesUrl) &&
+    (entry.mediaUrl === undefined || isApprovedChangelogPayloadUrl(entry.mediaUrl))
   )
 }
 
 /** Returns true when the entry has showcase media (gif/screenshot) worth demoing. */
 function hasRichContent(entry: ChangelogEntry): boolean {
   return Boolean(entry.mediaUrl)
+}
+
+function toRendererSafeRelease(entry: ChangelogEntry): ChangelogData['release'] {
+  return {
+    description: entry.description,
+    releaseNotesUrl: entry.releaseNotesUrl,
+    title: entry.title
+  }
 }
 
 /**
@@ -35,25 +68,39 @@ function hasRichContent(entry: ChangelogEntry): boolean {
  *    release notes link points to the generic changelog page instead of a
  *    version-specific URL.
  *
- * Why net.fetch instead of fetch: Electron's `net` module respects the app's
- * proxy/certificate settings and has no CORS restrictions.
+ * The dedicated updater session respects Electron proxy/certificate settings,
+ * has no CORS restriction, and keeps this request inside the updater partition.
  */
 export async function fetchChangelog(
   incomingVersion: string,
   localVersion: string
 ): Promise<ChangelogData | null> {
-  const res = await net.fetch('https://onorca.dev/whats-new/changelog.json', {
+  if (!CHANGELOG_FEED_URL) {
+    return null
+  }
+  const res = await fetchWithProductUpdaterSession(CHANGELOG_FEED_URL, {
+    redirect: 'error',
     signal: AbortSignal.timeout(5000)
   })
   if (!res.ok) {
+    await cancelUnreadResponseBody(res)
     return null
   }
-  const json: unknown = await res.json()
+  const body = await readResponseTextWithLimit(res, MAX_CHANGELOG_BYTES)
+  if (body === null) {
+    return null
+  }
+  let json: unknown
+  try {
+    json = JSON.parse(body)
+  } catch {
+    return null
+  }
 
   // Why: the JSON endpoint is external and could serve malformed data.
   // Validate the shape before indexing into it to avoid runtime errors
   // that would propagate up and delay the 'available' status broadcast.
-  if (!Array.isArray(json)) {
+  if (!Array.isArray(json) || json.length > MAX_CHANGELOG_ENTRIES) {
     return null
   }
   const entries = json as ChangelogEntry[]
@@ -71,8 +118,7 @@ export async function fetchChangelog(
           : localIndex - incomingIndex > 0
             ? localIndex - incomingIndex
             : null
-      const { version: _, ...release } = entry
-      return { release, releasesBehind }
+      return { release: toRendererSafeRelease(entry), releasesBehind }
     }
   }
 
@@ -124,10 +170,9 @@ export async function fetchChangelog(
         : localIndex - effectiveIncomingIndex > 0
           ? localIndex - effectiveIncomingIndex
           : null
-    const { version: _, ...release } = candidate
-    // Why: the shown content is from an older entry, not the incoming version.
-    // Point to the generic changelog page so the link doesn't mislead.
-    return { release: { ...release, releaseNotesUrl: CHANGELOG_URL }, releasesBehind }
+    // The product feed owns the explicit release-notes destination; avoid
+    // synthesizing an unconfigured product website URL.
+    return { release: toRendererSafeRelease(candidate), releasesBehind }
   }
 
   return null

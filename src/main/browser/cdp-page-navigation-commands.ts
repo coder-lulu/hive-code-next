@@ -1,5 +1,6 @@
 import type { WebSocket } from 'ws'
 import type { WebContents } from 'electron'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { CdpClientResponseWriter } from './cdp-client-response-writer'
 import type { CdpSyntheticSessionRegistry } from './cdp-synthetic-session-registry'
 import type { CdpDebuggerChannel } from './cdp-debugger-channel'
@@ -42,7 +43,7 @@ export class CdpPageNavigationCommands {
     if (unsupportedParam) {
       this.responder.sendError(
         clientId,
-        `Page.reload parameter "${unsupportedParam}" is not supported for Orca tab reloads`,
+        `Page.reload parameter "${unsupportedParam}" is not supported for ${APP_DISPLAY_NAME} tab reloads`,
         client
       )
       return

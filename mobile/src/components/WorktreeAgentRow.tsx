@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
-import { colors, spacing } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
 import { agentDisplayLabel, agentDotState, formatTimeAgo } from '../worktree/agent-row-display'
 import { AgentStateDot } from './AgentStateDot'
 import { MobileAgentIcon } from './MobileAgentIcon'
@@ -12,6 +12,7 @@ type Props = {
   agent: RuntimeWorktreeAgentRow
   depth: number
   now: number
+  theme: MobileTheme
   // Bold/foreground until the user has visited the worktree, mirroring desktop's
   // unvisited rule (the workspace title and its agent rows share one signal).
   unvisited: boolean
@@ -19,7 +20,8 @@ type Props = {
 
 // One inline agent row: state dot → identity → last message/prompt → time ago.
 // Mirrors desktop DashboardAgentRow's compact in-card layout.
-function WorktreeAgentRowComponent({ agent, depth, now, unvisited }: Props) {
+function WorktreeAgentRowComponent({ agent, depth, now, theme, unvisited }: Props) {
+  const styles = createStyles(theme)
   const dotState = agentDotState(agent, now)
   const label = agentDisplayLabel(agent, now)
   const ts = formatTimeAgo(agent.stateStartedAt, now)
@@ -40,24 +42,26 @@ function WorktreeAgentRowComponent({ agent, depth, now, unvisited }: Props) {
 
 export const WorktreeAgentRow = memo(WorktreeAgentRowComponent)
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: 3
-  },
-  label: {
-    flex: 1,
-    fontSize: 11,
-    color: colors.textMuted
-  },
-  labelUnvisited: {
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  time: {
-    fontSize: 10,
-    color: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4,
+      marginTop: theme.spacing.space4
+    },
+    label: {
+      ...theme.typography.caption,
+      flex: 1,
+      color: theme.color.text.secondary
+    },
+    labelUnvisited: {
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    time: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary
+    }
+  })
+}

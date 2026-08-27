@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
 
 const NOTIFICATION_AGENT_LABEL_MAX_LENGTH = 40
@@ -35,8 +36,8 @@ export function buildNotificationOptions(args: NotificationDispatchRequest): {
 
   if (args.source === 'test') {
     return {
-      title: 'Orca notifications are on',
-      body: 'This is a test notification from Orca.'
+      title: `${APP_DISPLAY_NAME} notifications are on`,
+      body: `This is a test notification from ${APP_DISPLAY_NAME}.`
     }
   }
 

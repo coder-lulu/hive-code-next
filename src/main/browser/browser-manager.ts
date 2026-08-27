@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 
 import { shell, webContents } from 'electron'
 import { ORCA_BROWSER_BLANK_URL } from '../../shared/constants'
+import { applyProductBranding } from '../../shared/brand'
 import {
   normalizeBrowserNavigationUrl,
   normalizeExternalBrowserUrl,
@@ -1428,7 +1429,7 @@ export class BrowserManager {
     // Cancel all active grab ops before tearing down registrations
     this.grabSessionController.cancelAll('evicted')
     for (const downloadId of this.downloadsById.keys()) {
-      this.cancelDownloadInternal(downloadId, 'Orca is shutting down.')
+      this.cancelDownloadInternal(downloadId, applyProductBranding('Orca is shutting down.'))
     }
     browserDownloadDestinationReservations.clear()
     for (const browserTabId of this.webContentsIdByTabId.keys()) {

@@ -127,6 +127,79 @@ describe('Windows CLI launcher', () => {
     }
   })
 
+  itWindows('launches HiveCode.exe and preserves the canonical command identity', () => {
+    const appRoot = mkdtempSync(join(tmpdir(), 'hivecode cli launcher '))
+    try {
+      const resourcesPath = join(appRoot, 'resources')
+      const launcherPath = join(resourcesPath, 'bin', 'hivecode.exe')
+      const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
+      mkdirSync(dirname(launcherPath), { recursive: true })
+      mkdirSync(dirname(cliPath), { recursive: true })
+      copyFileSync(process.execPath, join(appRoot, 'HiveCode.exe'))
+      writeFileSync(
+        cliPath,
+        `process.stdout.write(JSON.stringify({
+  argv: process.argv.slice(2),
+  command: process.env.ORCA_CLI_COMMAND,
+  electronRunAsNode: process.env.ELECTRON_RUN_AS_NODE
+}))\n`,
+        'utf8'
+      )
+
+      const build = spawnSync(
+        process.execPath,
+        ['config/scripts/build-windows-cli-launcher.mjs', '--output', launcherPath],
+        { cwd: projectRoot, encoding: 'utf8' }
+      )
+      expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0)
+
+      const launch = spawnSync(launcherPath, ['--help'], { encoding: 'utf8' })
+      expect(launch.status, launch.stderr).toBe(0)
+      expect(JSON.parse(launch.stdout)).toEqual({
+        argv: ['--help'],
+        command: 'hivecode',
+        electronRunAsNode: '1'
+      })
+    } finally {
+      removeFixtureTree(appRoot)
+    }
+  })
+
+  itWindows('preserves the orca and orca-ide compatibility command identities', () => {
+    const appRoot = mkdtempSync(join(tmpdir(), 'hivecode cli aliases '))
+    try {
+      const resourcesPath = join(appRoot, 'resources')
+      const binPath = join(resourcesPath, 'bin')
+      const canonicalLauncherPath = join(binPath, 'hivecode.exe')
+      const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
+      mkdirSync(binPath, { recursive: true })
+      mkdirSync(dirname(cliPath), { recursive: true })
+      copyFileSync(process.execPath, join(appRoot, 'HiveCode.exe'))
+      writeFileSync(
+        cliPath,
+        'process.stdout.write(process.env.ORCA_CLI_COMMAND ?? "missing")\n',
+        'utf8'
+      )
+
+      const build = spawnSync(
+        process.execPath,
+        ['config/scripts/build-windows-cli-launcher.mjs', '--output', canonicalLauncherPath],
+        { cwd: projectRoot, encoding: 'utf8' }
+      )
+      expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0)
+
+      for (const alias of ['orca', 'orca-ide']) {
+        const aliasPath = join(binPath, `${alias}.exe`)
+        copyFileSync(canonicalLauncherPath, aliasPath)
+        const launch = spawnSync(aliasPath, [], { encoding: 'utf8' })
+        expect(launch.status, launch.stderr).toBe(0)
+        expect(launch.stdout).toBe(alias)
+      }
+    } finally {
+      removeFixtureTree(appRoot)
+    }
+  })
+
   itWindows('survives an inherited environment block containing PATH and Path', () => {
     const appRoot = mkdtempSync(join(tmpdir(), 'orca duplicate path launcher '))
     try {

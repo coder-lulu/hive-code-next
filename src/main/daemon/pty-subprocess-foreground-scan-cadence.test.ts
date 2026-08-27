@@ -126,7 +126,12 @@ describe('daemon pty foreground scan cadence', () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: targetPlatform })
     const proc = mockPtyProcess(shellProcessName)
     spawnMock.mockReturnValue(proc)
-    const handle = await createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
+    const handle = await createPtySubprocess({
+      sessionId: 'test',
+      cols: 80,
+      rows: 24,
+      shellOverride: targetPlatform === 'darwin' ? 'zsh' : undefined
+    })
     return { proc, handle }
   }
 

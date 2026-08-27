@@ -1,7 +1,9 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { app } from 'electron'
 
 vi.mock('electron', () => ({
   app: { isPackaged: false },
@@ -103,6 +105,39 @@ afterEach(async () => {
 })
 
 describe('ArtifactCloudService record authorization', () => {
+  it('fails closed for packaged product builds before profile or fetch access', async () => {
+    const userDataPath = await mkdtemp(join(tmpdir(), 'orca-artifact-service-'))
+    createdPaths.push(userDataPath)
+    const service = new ArtifactCloudService(userDataPath)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const mutableApp = app as unknown as { isPackaged: boolean }
+    const previousPackaged = mutableApp.isPackaged
+    mutableApp.isPackaged = true
+
+    try {
+      await expect(
+        service.list({ apiUrl: 'https://share.onorca.dev', authToken: 'token-a' })
+      ).resolves.toEqual({
+        status: 'unconfigured',
+        message: 'Artifact sharing is not configured for this product.'
+      })
+      await expect(
+        service.share({
+          ...writeRequest,
+          apiUrl: 'https://share.onorca.dev'
+        })
+      ).resolves.toEqual({
+        status: 'unconfigured',
+        message: 'Artifact sharing is not configured for this product.'
+      })
+      expect(fetchMock).not.toHaveBeenCalled()
+      await expect(readdir(userDataPath)).resolves.toEqual([])
+    } finally {
+      mutableApp.isPackaged = previousPackaged
+    }
+  })
+
   it('passes an opaque cursor and returns the complete list page', async () => {
     const { service } = await setup()
     const fetchMock = vi.fn().mockResolvedValue(
@@ -306,6 +341,7 @@ describe('ArtifactCloudService record authorization', () => {
     const { service, profileId, userDataPath } = await setup()
     vi.stubEnv('ORCA_CLOUD_API_URL', 'http://localhost:4100')
     vi.stubEnv('ORCA_CLOUD_CLIENT_ID', 'desktop-client')
+    vi.stubEnv('ORCA_RELAY_URL', 'http://localhost:4200')
     saveOrcaCloudSession(profileId, userDataPath, {
       accessToken: 'access-old',
       refreshToken: 'refresh-old',

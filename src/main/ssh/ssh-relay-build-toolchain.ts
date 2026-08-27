@@ -1,4 +1,5 @@
 import { execCommand } from './ssh-relay-deploy-helpers'
+import { applyProductBranding } from '../../shared/brand'
 import type { SshConnection } from './ssh-connection'
 import { isWindowsRemoteHost, type RemoteHostPlatform } from './ssh-remote-platform'
 
@@ -157,7 +158,7 @@ export function formatMissingToolchainError(
     '',
     `Underlying install error: ${underlyingError}`
   ]
-  return lines.join('\n')
+  return applyProductBranding(lines.join('\n'))
 }
 
 // Best-effort: returns null on Windows hosts (node-pty ships win32 prebuilds, so

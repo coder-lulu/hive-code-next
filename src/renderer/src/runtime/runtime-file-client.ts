@@ -23,6 +23,7 @@ import {
 } from './runtime-rpc-client'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { basename, joinPath, normalizeRelativePath } from '@/lib/path'
+import { applyProductBranding } from '@/product-brand'
 import {
   isWindowsAbsolutePathLike,
   relativePathInsideRoot
@@ -76,7 +77,9 @@ export type RuntimeFileOperationArgs = {
 }
 
 const QUICK_OPEN_REMOTE_UPDATE_REQUIRED_MESSAGE =
-  'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'
+  applyProductBranding(
+    'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'
+  )
 
 function assertExternalSshReadOwnership(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
@@ -166,8 +169,9 @@ type RuntimeFileWatchEvent =
 
 const REMOTE_UPLOAD_BASE64_CHUNK_CHARS = 512 * 1024
 const REMOTE_DOWNLOAD_CHUNK_BYTES = 384 * 1024
-const REMOTE_DOWNLOAD_UPDATE_REQUIRED_MESSAGE =
+const REMOTE_DOWNLOAD_UPDATE_REQUIRED_MESSAGE = applyProductBranding(
   'Remote file download requires a newer Orca server. Update the headless server and try again.'
+)
 
 type RemoteFileDownloadArgs = NonNullable<ReturnType<typeof getRemoteFileArgs>>
 type RuntimeFileMutationTarget = { kind: 'environment'; environmentId: string }

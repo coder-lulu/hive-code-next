@@ -47,8 +47,8 @@ describe('PR workflow parallelism', () => {
     expect(workflow.permissions).toEqual({ contents: 'read' })
   })
 
-  it('shards the general test suite across Node 24 and Node 26', () => {
-    expect(workflow.jobs.test.strategy.matrix.node).toEqual(['24', '26'])
+  it('shards the general test suite on the pinned Node 24 runtime', () => {
+    expect(workflow.jobs.test.strategy.matrix.node).toEqual(['24.18.0'])
     expect(workflow.jobs.test.strategy.matrix.shard).toEqual(
       Array.from({ length: 16 }, (_, index) => index + 1)
     )
@@ -157,6 +157,9 @@ describe('PR workflow parallelism', () => {
 
   it('keeps every real-zsh test in the dedicated shell lane', () => {
     const discoveredFiles = globSync(testFilePatterns)
+      // Why: fast-glob returns host-native separators on Windows, while the
+      // workflow contract and fixture list use repository-relative POSIX paths.
+      .map((testFile) => testFile.replaceAll('\\', '/'))
       // Why this file is excluded: it carries the detector pattern as a literal
       // and would otherwise match itself.
       .filter((testFile) => testFile !== 'config/scripts/pr-workflow-parallelism.test.mjs')

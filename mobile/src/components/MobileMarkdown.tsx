@@ -1,7 +1,8 @@
 import { Fragment, memo, useMemo, type ReactNode } from 'react'
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
+import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { normalizeMobileMarkdownPreviewHtml } from './mobile-markdown-preview-html'
-import { styles } from './mobile-markdown-styles'
+import { createMobileMarkdownStyles, type MobileMarkdownStyles } from './mobile-markdown-styles'
 import {
   detectFilePathSegments,
   isFilePathCodeSpan,
@@ -52,6 +53,7 @@ function openMarkdownHref(href: string, onOpenFile?: (pathText: string) => void)
 function renderTextRun(
   text: string,
   keyPrefix: string,
+  styles: MobileMarkdownStyles,
   onOpenFile?: (pathText: string) => void
 ): ReactNode {
   if (!onOpenFile) {
@@ -77,7 +79,11 @@ function renderTextRun(
   })
 }
 
-function renderInline(text: string, onOpenFile?: (pathText: string) => void): ReactNode[] {
+function renderInline(
+  text: string,
+  styles: MobileMarkdownStyles,
+  onOpenFile?: (pathText: string) => void
+): ReactNode[] {
   const parts: ReactNode[] = []
   const pattern =
     /(!\[[^\]]*\]\([^)]+\)|`[^`]+`|~~[^~]+~~|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s<]+)/g
@@ -96,7 +102,7 @@ function renderInline(text: string, onOpenFile?: (pathText: string) => void): Re
     }
     if (match.index > pendingStart) {
       parts.push(
-        renderTextRun(text.slice(pendingStart, match.index), `t${pendingStart}`, onOpenFile)
+        renderTextRun(text.slice(pendingStart, match.index), `t${pendingStart}`, styles, onOpenFile)
       )
     }
     pendingStart = pattern.lastIndex
@@ -147,31 +153,32 @@ function renderInline(text: string, onOpenFile?: (pathText: string) => void): Re
     } else if (token.startsWith('~~')) {
       parts.push(
         <Text key={key} style={styles.strike}>
-          {renderTextRun(token.slice(2, -2), `${key}i`, onOpenFile)}
+          {renderTextRun(token.slice(2, -2), `${key}i`, styles, onOpenFile)}
         </Text>
       )
     } else if (token.startsWith('**') || token.startsWith('__')) {
       parts.push(
         <Text key={key} style={styles.bold}>
-          {renderTextRun(token.slice(2, -2), `${key}i`, onOpenFile)}
+          {renderTextRun(token.slice(2, -2), `${key}i`, styles, onOpenFile)}
         </Text>
       )
     } else {
       parts.push(
         <Text key={key} style={styles.italic}>
-          {renderTextRun(token.slice(1, -1), `${key}i`, onOpenFile)}
+          {renderTextRun(token.slice(1, -1), `${key}i`, styles, onOpenFile)}
         </Text>
       )
     }
   }
 
   if (pendingStart < text.length) {
-    parts.push(renderTextRun(text.slice(pendingStart), `t${pendingStart}`, onOpenFile))
+    parts.push(renderTextRun(text.slice(pendingStart), `t${pendingStart}`, styles, onOpenFile))
   }
   return parts
 }
 
 function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile }: Props) {
+  const styles = useMobileThemeStyles(createMobileMarkdownStyles)
   const text = content?.trim() ?? ''
   const previewText = useMemo(() => normalizeMobileMarkdownPreviewHtml(text), [text])
   const blocks = useMemo(() => parseMobileMarkdown(previewText), [previewText])
@@ -194,14 +201,14 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
               key={index}
               style={[styles.heading, block.level <= 2 ? styles.headingLarge : null]}
             >
-              {renderInline(block.text, onOpenFile)}
+              {renderInline(block.text, styles, onOpenFile)}
             </Text>
           )
         }
         if (block.type === 'quote') {
           return (
             <View key={index} style={styles.quote}>
-              <Text style={styles.quoteText}>{renderInline(block.text, onOpenFile)}</Text>
+              <Text style={styles.quoteText}>{renderInline(block.text, styles, onOpenFile)}</Text>
             </View>
           )
         }
@@ -252,7 +259,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
                 <View style={styles.tableRow}>
                   {visibleHeaders.map((header, cellIndex) => (
                     <Text key={cellIndex} style={[styles.tableCell, styles.tableHeader]}>
-                      {renderInline(header, onOpenFile)}
+                      {renderInline(header, styles, onOpenFile)}
                     </Text>
                   ))}
                 </View>
@@ -260,7 +267,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
                   <View key={rowIndex} style={styles.tableRow}>
                     {visibleHeaders.map((_, cellIndex) => (
                       <Text key={cellIndex} style={styles.tableCell}>
-                        {renderInline(row[cellIndex] ?? '', onOpenFile)}
+                        {renderInline(row[cellIndex] ?? '', styles, onOpenFile)}
                       </Text>
                     ))}
                   </View>
@@ -291,7 +298,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
                         : '[ ]'}
                   </Text>
                   <Text style={[styles.listText, listScale]}>
-                    {renderInline(item.text, onOpenFile)}
+                    {renderInline(item.text, styles, onOpenFile)}
                   </Text>
                 </View>
               ))}
@@ -306,7 +313,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
             {block.text.split('\n').map((line, lineIndex) => (
               <Fragment key={lineIndex}>
                 {lineIndex > 0 ? '\n' : null}
-                {renderInline(line, onOpenFile)}
+                {renderInline(line, styles, onOpenFile)}
               </Fragment>
             ))}
           </Text>

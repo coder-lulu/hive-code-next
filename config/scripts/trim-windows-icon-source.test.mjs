@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PNG } from 'pngjs'
 import {
   buildWindowsIcoFromPng,
   cropImage,
@@ -9,6 +9,9 @@ import {
   resizeImage,
   squareWithMargin
 } from './trim-windows-icon-source.mjs'
+
+const require = createRequire(import.meta.url)
+const { PNG } = require('pngjs')
 
 const scriptDir = import.meta.dirname
 const projectDir = dirname(dirname(scriptDir))

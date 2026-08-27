@@ -11,6 +11,12 @@ const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
 const { FileMatcher } = require('app-builder-lib/out/fileMatcher')
 const electronBuilderNativeRebuild = require('./electron-builder-native-rebuild.cjs')
+const expectedPackagedMetadata = {
+  name: 'hivecode',
+  productName: 'HiveCode',
+  description: 'HiveCode',
+  author: { name: 'HiveCode' }
+}
 const {
   createPackagedRuntimeNodeModuleResources,
   findAsarEntry,
@@ -23,6 +29,37 @@ const {
 } = require('../packaged-runtime-node-modules.cjs')
 
 describe('electron-builder config', () => {
+  it('replaces upstream npm metadata in packaged application identity', () => {
+    expect(electronBuilderConfig.extraMetadata).toEqual(expectedPackagedMetadata)
+  })
+
+  it('uses the branded product name for Windows shell entries', () => {
+    expect(electronBuilderConfig.productName).toBe('HiveCode')
+    expect(electronBuilderConfig.win.executableName).toBe('HiveCode')
+    expect(electronBuilderConfig.nsis).toMatchObject({
+      artifactName: 'hivecode-windows-setup.${ext}',
+      shortcutName: '${productName}',
+      uninstallDisplayName: '${productName}',
+      oneClick: false,
+      allowToChangeInstallationDirectory: true,
+      runAfterFinish: false,
+      license: 'installer-license.txt'
+    })
+  })
+
+  it('keeps the Windows installer notice beside the NSIS build resources', async () => {
+    const notice = await readFile(
+      join(process.cwd(), 'resources', 'build', 'installer-license.txt'),
+      'utf8'
+    )
+    const normalizedNotice = notice.replace(/\r\n/g, '\n')
+    expect(normalizedNotice).toContain('HiveCode 安装许可、隐私与用户须知')
+    expect(normalizedNotice).toContain('设置 > 隐私与遥测')
+    expect(normalizedNotice).toContain('Settings >\nPrivacy & Telemetry')
+    expect(normalizedNotice).not.toMatch(/onorca\.dev|github\.com\/stablyai\/orca/i)
+    expect(normalizedNotice).toContain('正式商业发布前，请由法务审核')
+  })
+
   it('keeps the packaged app identity aligned with local-build validation', () => {
     expect(electronBuilderConfig.appId).toBe(
       require('../../src/shared/local-build-compatibility-contract.json').appId
@@ -106,6 +143,15 @@ describe('electron-builder config', () => {
       })
       expect(electronBuilderConfig[platform].extraResources).toEqual(
         expect.arrayContaining([bundledPluginResources])
+      )
+      expect(electronBuilderConfig[platform].extraResources).toEqual(
+        expect.arrayContaining([
+          {
+            from: 'resources/onboarding/feature-wall',
+            to: 'onboarding/feature-wall',
+            filter: ['tile-01.*', 'tile-02.*', 'tile-04.*', 'tile-08.*', 'tile-11.*']
+          }
+        ])
       )
     }
     expect(electronBuilderConfig.mac.extraResources).toEqual(
@@ -208,11 +254,10 @@ describe('electron-builder config', () => {
   })
 
   it('unpacks the replaceable WSL transcript filesystem process entry', async () => {
-    const entryFilename = 'wsl-transcript-fs-process-entry.js'
-    expect(electronBuilderConfig.asarUnpack).toContain(`out/main/${entryFilename}`)
+    expect(electronBuilderConfig.asarUnpack).toContain('out/main/wsl-transcript-fs-process-entry.js')
 
     const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
-    expect(viteConfig).toMatch(new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`))
+    expect(viteConfig).toMatch(/'wsl-transcript-fs-process-entry':\s*resolve\(/)
   })
 
   // Why: the scanner service is forked with ELECTRON_RUN_AS_NODE, so asar is
@@ -249,16 +294,17 @@ describe('electron-builder config', () => {
   })
 
   it('matches the Linux desktop entry to Electron window class', () => {
-    expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca')
+    expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('hivecode')
   })
 
-  it('uses AppImage and deb as local Linux targets without changing existing artifact names', () => {
+  it('uses HiveCode artifact and package names for Linux targets', () => {
     expect(electronBuilderConfig.linux.target).toEqual(['AppImage', 'deb'])
-    expect(electronBuilderConfig.appImage.artifactName).toBe('orca-linux.${ext}')
-    expect(electronBuilderConfig.deb.artifactName).toBe('orca-ide_${version}_${arch}.${ext}')
+    expect(electronBuilderConfig.linux.executableName).toBe('hivecode')
+    expect(electronBuilderConfig.appImage.artifactName).toBe('hivecode-linux.${ext}')
+    expect(electronBuilderConfig.deb.artifactName).toBe('hivecode_${version}_${arch}.${ext}')
     expect(electronBuilderConfig.rpm).toMatchObject({
-      packageName: 'orca-ide',
-      artifactName: 'orca-ide-${version}.${arch}.${ext}'
+      packageName: 'hivecode',
+      artifactName: 'hivecode-${version}.${arch}.${ext}'
     })
   })
 
@@ -269,7 +315,7 @@ describe('electron-builder config', () => {
       delete require.cache[configPath]
       process.env.ORCA_LINUX_ARM64_RELEASE = '1'
       expect(require('../electron-builder.config.cjs').appImage.artifactName).toBe(
-        'orca-linux-arm64.${ext}'
+        'hivecode-linux-arm64.${ext}'
       )
     } finally {
       if (original === undefined) {
@@ -291,6 +337,7 @@ describe('electron-builder config', () => {
       delete process.env.ORCA_MAC_RELEASE
       process.env.ORCA_LOCAL_BUILD_VERSION = '1.4.159-rc.0.local.123.abc'
       expect(require('../electron-builder.config.cjs').extraMetadata).toEqual({
+        ...expectedPackagedMetadata,
         version: '1.4.159-rc.0.local.123.abc'
       })
     } finally {
@@ -317,7 +364,9 @@ describe('electron-builder config', () => {
       delete require.cache[configPath]
       process.env.ORCA_LOCAL_BUILD_VERSION = '1.4.159-local.123.abc'
       process.env.ORCA_MAC_RELEASE = '1'
-      expect(require('../electron-builder.config.cjs').extraMetadata).toBeUndefined()
+      expect(require('../electron-builder.config.cjs').extraMetadata).toEqual(
+        expectedPackagedMetadata
+      )
     } finally {
       if (originalLocalVersion === undefined) {
         delete process.env.ORCA_LOCAL_BUILD_VERSION

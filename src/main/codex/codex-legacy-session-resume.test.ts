@@ -372,10 +372,22 @@ describe('per-account resume repin', () => {
 
   function rolloutCandidate(filePath: string, codexHome: string) {
     const stat = statSync(filePath)
+    // Why: NTFS exposes file indexes above Number.MAX_SAFE_INTEGER through
+    // Node's numeric Stats API. The production identity helper deliberately
+    // rejects that lossy representation, so use one deterministic fixture
+    // identity here to keep this repin test focused on alias ranking rather
+    // than the host's inode serialization width.
+    const hardlinkIdentity =
+      Number.isSafeInteger(stat.dev) &&
+      Number.isSafeInteger(stat.ino) &&
+      Number.isSafeInteger(stat.nlink)
+        ? undefined
+        : 'fixture:shared-hardlink'
     return {
       filePath,
       codexHome,
-      file: { dev: stat.dev, ino: stat.ino, nlink: stat.nlink }
+      file: { dev: stat.dev, ino: stat.ino, nlink: stat.nlink },
+      ...(hardlinkIdentity ? { hardlinkIdentity } : {})
     }
   }
 })
@@ -384,8 +396,10 @@ const rolloutCandidateAccessors = {
   isCodex: () => true,
   getFilePath: (candidate: { filePath: string }) => candidate.filePath,
   getCodexHome: (candidate: { codexHome: string }) => candidate.codexHome,
-  getHardlinkIdentity: (candidate: { file: { dev: number; ino: number; nlink: number } }) =>
-    codexRolloutHardlinkIdentity(candidate.file)
+  getHardlinkIdentity: (candidate: {
+    file: { dev: number; ino: number; nlink: number }
+    hardlinkIdentity?: string
+  }) => candidate.hardlinkIdentity ?? codexRolloutHardlinkIdentity(candidate.file)
 }
 
 function rootPlaceholder(): string {

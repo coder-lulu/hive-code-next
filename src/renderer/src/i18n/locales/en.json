@@ -310,7 +310,7 @@
         "b411ec0069": "Connect",
         "2cf9e5a294": "Clear saved server",
         "4a4c017be1": "Endpoint:",
-        "27393856e4": "orca://pair?code=...",
+        "27393856e4": "hivecode://pair?code=...",
         "7a566540de": "Pairing URL or code",
         "cb4d287238": "Server name",
         "3affe7de3a": "Paste a pairing URL from an Orca server that this browser can reach.",
@@ -2454,7 +2454,8 @@
             "1aa7c952b9": "Project view",
             "f352abf7c3": "Repository list is updating.",
             "1ce21b8cff": "This item is outside the selected repositories.",
-            "030de75bc5": "This item matches multiple selected repositories."
+            "030de75bc5": "This item matches multiple selected repositories.",
+            "unsupportedView": "{{value0}} — Orca doesn't support {{value1}} project views yet."
           },
           "slug": {
             "dialog": {
@@ -4082,7 +4083,6 @@
         "share": {
           "card": {
             "utils": {
-              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "output",
               "5d66fdd7c2": "input",
               "7080aeaebb": "Reasoning",
@@ -5166,6 +5166,24 @@
           "keepDefaultBranch": "Except default branch",
           "keepDefaultBranchAria": "Keep the default branch visible while hiding sleeping workspaces"
         },
+        "SidebarFooter": {
+          "accountMenu": "{{value0}} account menu",
+          "account": "Account",
+          "appearance": "Appearance",
+          "activity": "Activity",
+          "notifications": "Notifications",
+          "checkingAccount": "Checking account…",
+          "signIn": "Sign in",
+          "signInAgain": "Sign in again",
+          "accountUnavailable": "Account unavailable",
+          "connected": "Signed in",
+          "signInSuccess": "Signed in to HiveCloud",
+          "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+          "signOut": "Sign out",
+          "localSignOut": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+          "signOutSuccess": "Signed out of HiveCloud",
+          "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again."
+        },
         "SidebarHeader": {
           "25a95899c9": "Add Project",
           "92154beb7e": "New workspace",
@@ -5221,7 +5239,7 @@
           "c4f8e1b72a": "X"
         },
         "SidebarToolbar": {
-          "87d0064026": "Workspace board moved to the bottom bar",
+          "87d0064026": "Workspace board moved to the top bar",
           "a30e34eb5c": "Close workspace board",
           "49f62c5665": "Workspace board",
           "19e32d0e5f": "Open folder picker to add a project",
@@ -5966,9 +5984,9 @@
           "serverName": "Server name",
           "serverNamePlaceholder": "Dev box",
           "pairingCode": "Pairing code",
-          "pairingCodePlaceholder": "orca://pair?code=...",
+          "pairingCodePlaceholder": "hivecode://pair?code=...",
           "pairingHelpPrefix": "Run",
-          "pairingCommand": "orca serve --pairing-address <host>",
+          "pairingCommand": "hivecode serve --pairing-address <host>",
           "pairingHelpSuffix": "on the server and paste the printed pairing URL.",
           "sshImportAlreadySynced": "~/.ssh/config already in sync.",
           "sshImportSynced": "Added {{value0}} host{{value1}} to Orca.",
@@ -6999,7 +7017,8 @@
           "31fd7150cf": "Checking for updates...",
           "3394d1f663": "checking",
           "d69a09b672": "Updates are checked automatically on launch.",
-          "7173352632": "idle"
+          "7173352632": "idle",
+          "updatesNotConfigured": "Online updates are not configured. Option/Alt-click to install a local build."
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "Choose apps available from a workspace's Open in menu.",
@@ -7838,9 +7857,9 @@
           "9a3758d983": "No saved servers.",
           "9bee6bbeeb": "Add Server",
           "55fcc964cd": "on the server and paste the printed pairing URL.",
-          "960e901ae4": "orca serve --pairing-address <host>",
+          "960e901ae4": "hivecode serve --pairing-address <host>",
           "163671f7b5": "Run",
-          "c3d772c514": "orca://pair?code=...",
+          "c3d772c514": "hivecode://pair?code=...",
           "9bc9b83474": "Pairing code",
           "e038625857": "Dev box",
           "54ebacc600": "Server name",
@@ -11219,7 +11238,7 @@
           "namePlaceholder": "Linux workstation",
           "nameHelp": "This only changes how the computer appears in Orca.",
           "accessLink": "Access link",
-          "accessLinkPlaceholder": "orca://pair?code=...",
+          "accessLinkPlaceholder": "hivecode://pair?code=...",
           "accessLinkHelp": "Orca shows the destination before connecting. Credentials stay hidden.",
           "destination": "Link destination",
           "loopbackTitle": "This link points back to this device",
@@ -11238,7 +11257,7 @@
           "advanced": "Advanced",
           "sshTunnel": "I am using an SSH tunnel to this local address",
           "sshTunnelHelp": "Keep the tunnel active while using this connection.",
-          "headlessHelp": "Using headless orca serve? Run orca serve --pairing-address <reachable-host> on the other computer.",
+          "headlessHelp": "Using headless hivecode serve? Run hivecode serve --pairing-address <reachable-host> on the other computer.",
           "cancel": "Cancel",
           "addWithTunnel": "Add host using tunnel",
           "addHost": "Add host",
@@ -11327,25 +11346,73 @@
         },
         "orcaAccount": {
           "connected": "Connected",
+          "connectedDescription": "This desktop is securely linked to HiveCloud.",
           "reconnectRequired": "Your session expired. Sign in again to use cloud features.",
-          "unavailable": "Orca sign-in is unavailable in this build.",
-          "signedOut": "Sign in to extend Orca with cloud features, including Artifacts and Orca Relay.",
+          "unavailable": "HiveCloud sign-in is unavailable in this build.",
+          "signedOut": "Sign in with an existing HiveCloud account. Local projects and provider accounts stay separate.",
           "checking": "Checking account status…",
-          "account": "Orca account",
+          "account": "HiveCloud account",
+          "authorizationCancelled": "Sign-in was cancelled.",
+          "authorizationFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+          "authorizationTimeout": "Sign-in timed out before the browser callback completed.",
+          "cancel": "Cancel",
+          "credentialUnreadable": "The encrypted account credential cannot be read. Repair secure storage before signing in.",
+          "defaultDevice": "Desktop",
+          "device": "Device",
+          "localSignOutToast": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+          "networkUnavailable": "HiveCloud is temporarily unreachable. Local work remains available.",
+          "refresh": "Refresh",
+          "refreshedToast": "HiveCloud session refreshed",
+          "secureStorageUnavailable": "Cloud sign-in is disabled because operating-system secure storage is unavailable.",
+          "serverUnavailable": "HiveCloud is temporarily unavailable. Local work remains available.",
+          "sessionExpired": "This session has expired. Refresh it or sign in again.",
+          "sessionExpires": "Session expires",
+          "sessionRejected": "HiveCloud rejected this session. Sign in again.",
+          "signedInToast": "Signed in to HiveCloud",
           "signOut": "Sign out",
+          "signOutConfirmDescription": "This device's local credential will be removed. Local projects, worktrees, and provider accounts will not be affected.",
+          "signOutConfirmTitle": "Sign out of HiveCloud?",
+          "signedOutToast": "Signed out of HiveCloud",
           "signingIn": "Signing in…",
           "signInAgain": "Sign in again",
-          "signIn": "Sign in to Orca",
-          "title": "Orca Account",
-          "description": "Share work instantly and reach your desktop from Orca Mobile wherever you are.",
-          "searchDescription": "Sign in or out of the account used by Artifacts and Orca Relay.",
+          "signIn": "Sign in to HiveCloud",
+          "title": "HiveCloud Account",
+          "description": "Sign in securely, review this device, and manage the current HiveCloud session.",
+          "searchDescription": "Sign in, refresh, or sign out of the application-wide HiveCloud account.",
+          "unknown": "Unknown",
           "benefitsTitle": "Included with your account",
           "artifactsTitle": "Artifact sharing",
           "artifactsDescription": "Publish HTML and Markdown files, then manage every shared link from Orca.",
           "relayTitle": "Orca Relay",
           "relayDescription": "Connect Orca Mobile to this desktop across cellular or any Wi-Fi.",
           "skillsTitle": "Skill sharing",
-          "skillsDescription": "Share one skill or a whole set behind an unlisted link, and install them on any machine you use."
+          "skillsDescription": "Share one skill or a whole set behind an unlisted link, and install them on any machine you use.",
+          "trustedSession": "Trusted device",
+          "temporarySession": "Temporary device",
+          "signInConfirmTitle": "Approve HiveCloud sign-in",
+          "signInConfirmDescription": "Review this request before the desktop app opens the secure browser sign-in.",
+          "smsSignInDescription": "Verify your phone number to sign in without opening a browser.",
+          "approvalSecurityTitle": "Short access credentials remain protected",
+          "approvalSecurityDescription": "The app rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.",
+          "requestStatus": "Status",
+          "pendingApproval": "Pending approval",
+          "requestApplication": "Application",
+          "requestApplicationName": "Desktop application",
+          "requestDevice": "Requesting device",
+          "currentDesktop": "This desktop app",
+          "trustThisDevice": "Trust this device",
+          "trustedApprovalDescription": "Keep an operating-system-encrypted sign-in for up to 90 days.",
+          "temporaryApprovalDescription": "Use a temporary sign-in for up to 24 hours; closing the app removes it.",
+          "cancelRequest": "Cancel request",
+          "approveSignIn": "Approve sign-in",
+          "smsLogin": "Phone verification",
+          "browserLogin": "Browser sign-in",
+          "phoneNumber": "Phone number",
+          "smsCode": "SMS code",
+          "smsExpiry": "Code expires in {seconds}s.",
+          "smsTerms": "I agree to the Terms of Service and Privacy Policy",
+          "verifySms": "Verify and sign in",
+          "sendSms": "Send verification code"
         },
         "automations": {
           "showButton": "Show Automations Button",
@@ -16157,7 +16224,11 @@
         "53c4b8e148": "No usable authentication agent answered the privileged install request.",
         "c732bcbf8f": "Checking package...",
         "aa57fa4f80": "Command copied. Run it in a system terminal to install {{value0}}, then quit and reopen Orca.",
-        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point."
+        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point.",
+        "manualTitle": "Manual Install Required",
+        "manualSummary": "Automatic installation is disabled for Linux system packages because the privileged installer cannot preserve the verified file identity.",
+        "manualExplainer": "Copy the inode-pinned command and run it in a POSIX shell. After it finishes, quit and reopen the app to run the new version.",
+        "manualTrustNote": "The copied command opens the package first, verifies SHA-512 through that file descriptor, and installs the same descriptor-backed file."
       },
       "pr-check-counts": {
         "passingChip": "{{value0}} passing",
@@ -16962,5 +17033,11 @@
   },
   "quickOpen": {
     "moreMatchesAvailable": "More matches may be available. Refine your search to narrow the results."
+  },
+  "web": {
+    "cloudLaunchFailure": "This Cloud launch link is invalid or has expired. Create a new launch from HiveCloud.",
+    "runtime": {
+      "cloudWebSocket": "Cloud WSS"
+    }
   }
 }

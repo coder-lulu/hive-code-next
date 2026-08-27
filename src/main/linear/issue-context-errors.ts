@@ -1,3 +1,4 @@
+import { applyProductBranding } from '../../shared/brand'
 import type { LinearErrorCode, LinearIncludeErrorCode } from '../../shared/linear/agent-access'
 
 export class LinearAgentAccessError extends Error {
@@ -5,7 +6,7 @@ export class LinearAgentAccessError extends Error {
   readonly data?: unknown
 
   constructor(code: LinearErrorCode, message: string, data?: unknown) {
-    super(message)
+    super(applyProductBranding(message))
     this.name = 'LinearAgentAccessError'
     this.code = code
     this.data = data

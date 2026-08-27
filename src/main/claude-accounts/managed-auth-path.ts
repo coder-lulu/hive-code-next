@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import { app } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
 
 const MANAGED_AUTH_MARKER = '.orca-managed-claude-auth'
@@ -78,7 +79,7 @@ export function writeClaudeManagedAuthFile(
 ): void {
   const filePath = resolve(managedAuthPath, filename)
   if (existsSync(filePath) && !isOwnedChildFile(managedAuthPath, filePath)) {
-    throw new Error('Managed Claude auth child file is not owned by Orca.')
+    throw new Error(applyProductBranding('Managed Claude auth child file is not owned by Orca.'))
   }
   writeFileAtomically(filePath, contents, { mode: 0o600 })
 }

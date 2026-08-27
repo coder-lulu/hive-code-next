@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ProductUpdateSource } from './updater-test-harness'
 
-const { appMock, autoUpdaterMock, fetchNewerReleaseTagsMock, moduleFactories, resetUpdaterMocks } =
-  await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
+const {
+  appMock,
+  autoUpdaterMock,
+  fetchNewerReleaseTagsMock,
+  productUpdateSourceState,
+  moduleFactories,
+  resetUpdaterMocks
+} = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -16,10 +23,26 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
+vi.mock('./linux-root-package-install-policy', () =>
+  moduleFactories.linuxRootPackageInstallPolicy()
+)
+
+function useProductChannel(channel: ProductUpdateSource['channel']): void {
+  productUpdateSourceState.value = {
+    ...productUpdateSourceState.value!,
+    channel
+  }
+}
 
 describe('updater', () => {
   beforeEach(() => {
     resetUpdaterMocks()
+    useProductChannel('rc')
   })
 
   it('retries a prerelease check once against the previous feed tag when the manifest is missing', async () => {
@@ -666,6 +689,7 @@ describe('updater', () => {
   // Why: /releases/latest/download is a moving redirect; a relative ZIP URL from an old manifest can resolve against a newer release and 404.
   it('pins the generic feed to a concrete stable tag for a stable user', async () => {
     appMock.getVersion.mockReturnValue('1.3.17')
+    useProductChannel('stable')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.18'])
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
 
@@ -691,6 +715,7 @@ describe('updater', () => {
   // Why: native GitHub provider can pick cancelled prerelease tags with missing manifests, so keep the manifest-probed generic feed.
   it('uses the manifest-probed generic feed after a Shift-click RC opt-in', async () => {
     appMock.getVersion.mockReturnValue('1.3.17')
+    useProductChannel('stable')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.18-rc.1'])
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
 

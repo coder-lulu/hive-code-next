@@ -25,8 +25,9 @@ export type RemoteServerUpdaterSnapshot = {
 }
 
 export type RemoteServerUpdateInstallResult = {
-  accepted: true
+  accepted: boolean
   fromVersion: string
   targetVersion: string
   runtimeId: string
+  reason?: string
 }

@@ -1,6 +1,7 @@
 import { app, dialog, type BrowserWindow } from 'electron'
 import { SCHEMA_VERSION } from '../../shared/constants'
 import { compareAppVersions } from '../../shared/app-version'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { assertLocalBuildCompatibility } from './local-build-compatibility'
 import { loadLocalBuildCandidate, type LocalBuildCandidate } from './local-build-candidate'
 
@@ -8,10 +9,10 @@ export async function chooseLocalBuild(
   window: BrowserWindow | null
 ): Promise<LocalBuildCandidate | null> {
   const openDialogOptions: Electron.OpenDialogOptions = {
-    title: 'Choose a Local Orca Build',
+    title: `Choose a Local ${APP_DISPLAY_NAME} Build`,
     buttonLabel: 'Choose Build',
     properties: ['openFile'],
-    filters: [{ name: 'Orca update manifest', extensions: ['yml'] }]
+    filters: [{ name: `${APP_DISPLAY_NAME} update manifest`, extensions: ['yml'] }]
   }
   const selection = await (window
     ? dialog.showOpenDialog(window, openDialogOptions)
@@ -36,9 +37,9 @@ export async function chooseLocalBuild(
           } will reconnect after restart.`
     const messageBoxOptions: Electron.MessageBoxOptions = {
       type: 'question',
-      title: 'Use Local Orca Build?',
+      title: `Use Local ${APP_DISPLAY_NAME} Build?`,
       message: `${app.getVersion()} → ${candidate.version}`,
-      detail: `${terminalSummary}\nWorkspace cards and settings are compatible with state schema ${SCHEMA_VERSION}.\n\nThe build must have the same valid code signature as Orca or installation will stop.`,
+      detail: `${terminalSummary}\nWorkspace cards and settings are compatible with state schema ${SCHEMA_VERSION}.\n\nThe build must have the same valid code signature as ${APP_DISPLAY_NAME} or installation will stop.`,
       buttons: ['Use Local Build', 'Cancel'],
       defaultId: 0,
       cancelId: 1,

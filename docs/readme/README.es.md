@@ -1,14 +1,10 @@
 <h1 align="center">
-  <a href="https://onOrca.dev"><img src="../../resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
+  <img src="../../resources/build/icon.png" alt="HiveCode" width="64" valign="middle" /> HiveCode
 </h1>
 
 <p align="center">
-  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="Estrellas en GitHub" /></a>
-  <a href="https://github.com/stablyai/orca/releases"><img src="../assets/readme-downloads.svg" alt="Descargas totales en todas las versiones" /></a>
-  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="Licencia: MIT" />
-  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Únete al Discord de Orca" /></a>
-  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="Sigue a Orca en X" /></a>
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Plataformas compatibles: macOS, Windows y Linux" />
+  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Supported platforms: macOS, Windows, and Linux" />
 </p>
 
 <p align="center">
@@ -20,10 +16,11 @@
   Ejecuta Codex, Claude Code, OpenCode u Pi en paralelo — cada uno en su propio worktree, supervisados desde un solo lugar.
 </p>
 
-<h3 align="center"><a href="https://onorca.dev/download"><ins>Descargar Orca</ins></a></h3>
+> [!IMPORTANT]
+> HiveCode es actualmente un fork de ingeniería sin enlaces públicos aprobados de descarga, actualización, nube, soporte o comunidad. Los enlaces de funciones y las capturas siguientes proceden de Orca upstream como referencias de compatibilidad; no son enlaces de publicación de HiveCode.
 
 <p align="center">
-  <img src="../assets/readme-hero.jpg" alt="La app de escritorio de Orca ejecutando agentes en worktrees paralelos, con la app companion móvil de Orca en la esquina" width="960" />
+  <img src="../assets/readme-hero.jpg" alt="Referencia upstream de la interfaz de escritorio y móvil de Orca" width="960" />
 </p>
 
 ## Características
@@ -36,11 +33,11 @@
 
 Supervisa y dirige a tus agentes desde el teléfono — recibe una notificación cuando un agente termine y envía instrucciones de seguimiento desde cualquier lugar.
 
-[App Store de iOS](https://apps.apple.com/us/app/orca-ide/id6766130217) · [APK para Android](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.44/app-release.apk) · [Docs →](https://www.onorca.dev/docs/mobile)
+[Documentación upstream de compatibilidad móvil de Orca →](https://www.onorca.dev/docs/mobile)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca de escritorio con la app companion móvil" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="HiveCode de escritorio con la app companion móvil" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -96,7 +93,7 @@ Explora PRs, issues y tableros de proyecto dentro de la app — abre un worktree
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../assets/feature-wall/github-linear.gif" type="image/gif"><img src="../assets/feature-wall/github-linear.jpg" alt="Flujos de trabajo de GitHub y Linear en Orca" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../assets/feature-wall/github-linear.gif" type="image/gif"><img src="../assets/feature-wall/github-linear.jpg" alt="Flujos de trabajo de GitHub y Linear en HiveCode" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -118,7 +115,7 @@ Ejecuta agentes en una máquina remota potente con edición completa de archivos
 
 ### Anotar diffs de IA
 
-Deja comentarios en cualquier línea de un diff y envíalos de vuelta al agente — revisa, edita y haz commit sin salir de Orca.
+Deja comentarios en cualquier línea de un diff y envíalos de vuelta al agente — revisa, edita y haz commit sin salir de HiveCode.
 
 [Docs →](https://www.onorca.dev/docs/review/annotate-ai-diff)
 
@@ -144,15 +141,15 @@ El editor de VS Code con autoguardado en todas partes — arrastra archivos o im
 <tr>
 <td width="50%" valign="middle">
 
-### Orca CLI
+### HiveCode CLI
 
-Los agentes también manejan Orca — automatiza cualquier flujo de trabajo con `orca worktree create`, `snapshot`, `click` y `fill`.
+Los agentes también manejan HiveCode — automatiza cualquier flujo de trabajo con `hivecode worktree create`, `snapshot`, `click` y `fill`.
 
 [Docs →](https://www.onorca.dev/docs/cli/overview)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../assets/feature-wall/orca-cli.gif" type="image/gif"><img src="../assets/feature-wall/orca-cli.jpg" alt="Automatiza Orca desde la CLI" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../assets/feature-wall/orca-cli.gif" type="image/gif"><img src="../assets/feature-wall/orca-cli.jpg" alt="Automatiza HiveCode desde la CLI" width="100%" /></picture></a>
 </td>
 </tr>
 </table>
@@ -164,13 +161,12 @@ Los agentes también manejan Orca — automatiza cualquier flujo de trabajo con 
 - **[Previews ricos del repo](https://www.onorca.dev/docs/editing/markdown)** — Previsualiza Markdown, imágenes, PDFs y documentos del repo en el workspace.
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — Deja que los agentes manejen apps de escritorio y UI visible cuando un flujo de trabajo necesita interacción real.
 - **[Notificaciones y estado de no leído](https://www.onorca.dev/docs/notifications)** — Entérate cuando un agente termine o necesite tu atención, y marca hilos como no leídos para retomarlos después.
-- **Y muchas, muchas más** — lanzamos a diario, así que esta lista siempre va atrasada. El [changelog](https://github.com/stablyai/orca/releases) es la verdadera lista de funciones.
 
 ---
 
 ## Agentes compatibles
 
-Funciona con **cualquier agente CLI** — si corre en una terminal, corre en Orca.
+Funciona con **cualquier agente CLI** — si corre en una terminal, corre en HiveCode.
 
 <p>
   <a href="https://docs.anthropic.com/claude/docs/claude-code"><kbd><img src="../assets/claude-logo.svg" alt="Claude Code logo" width="16" valign="middle" /> Claude Code</kbd></a> &nbsp;
@@ -207,48 +203,27 @@ Funciona con **cualquier agente CLI** — si corre en una terminal, corre en Orc
 
 ## Instalación
 
-### Escritorio — macOS, Windows, Linux
+HiveCode no publica actualmente binarios aprobados para escritorio o móvil. No uses los enlaces upstream de HiveCode para releases, App Store, TestFlight, Homebrew, AUR o APK como instrucciones de instalación de HiveCode.
 
-- **[Descarga desde onOrca.dev](https://onorca.dev/download)**
-- O descarga un build directamente: [macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [Todos los builds](https://github.com/stablyai/orca/releases/latest)
-
-_O mediante un gestor de paquetes:_
+Para desarrollo local:
 
 ```bash
-# macOS (Homebrew)
-brew install --cask stablyai/orca/orca
-
-# Arch Linux (AUR) — or stably-orca-git to build from source
-yay -S stably-orca-bin
+pnpm install
+pnpm dev
+pnpm typecheck
+pnpm test
 ```
 
-### App companion móvil — iOS, Android
+Compila la aplicación de escritorio con `pnpm run build:desktop`. Los builds nativos dependen de la plataforma; consulta los scripts de `config/scripts/`.
 
-Vincúlala con tu app de escritorio para supervisar y dirigir a tus agentes desde el teléfono.
+## Compatibilidad
 
-- **iOS:** [Descargar desde App Store](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [Descargar el APK](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.44/app-release.apk)
-
----
-
-## Comunidad y soporte
-
-- **Discord:** Únete a la comunidad en **[Discord](https://discord.gg/fzjDKHxv8Q)**.
-- **Twitter / X:** Sigue a **[@orca_build](https://x.com/orca_build)** para novedades y anuncios.
-- **Feedback e ideas:** Lanzamos rápido. ¿Te falta algo? [Pide una nueva feature](https://github.com/stablyai/orca/issues).
-- **Privacidad:** Consulta la [documentación de privacidad y telemetría](https://www.onorca.dev/docs/telemetry) para saber qué datos anónimos de uso recopila Orca y cómo desactivar su envío.
-- **Muéstranos tu apoyo:** Dale una [estrella](https://github.com/stablyai/orca) a este repo para seguir nuestros lanzamientos diarios.
-
----
+Los identificadores `orca`, `orca-ide`, `orca://`, `ORCA_*`, los directorios heredados `.orca` y los identificadores de plugins upstream se conservan para no romper instalaciones ni datos existentes. Son superficies de compatibilidad, no la marca del producto.
 
 ## Desarrollo
 
-¿Quieres contribuir o ejecutar Orca localmente? Consulta nuestra guía [CONTRIBUTING.md](../../.github/CONTRIBUTING.md).
+Consulta la [guía de contribución](../../.github/CONTRIBUTING.md) para las reglas de contribución y sincronización con upstream.
 
-<a href="https://github.com/stablyai/orca/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Contribuidores de Orca" />
-</a>
+## Atribución y licencia
 
-## Licencia
-
-Orca es libre y de código abierto bajo la [Licencia MIT](../../LICENSE).
+HiveCode se basa en el proyecto open source [Orca](https://github.com/stablyai/orca) de Stably AI y se distribuye bajo la [licencia MIT](../../LICENSE).

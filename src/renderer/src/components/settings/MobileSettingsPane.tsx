@@ -7,13 +7,10 @@ import {
   getMobileSettingsPaneSearchEntries
 } from './mobile-settings-search'
 import { translate } from '@/i18n/i18n'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 import { useAppStore } from '@/store'
 import { MobileRelayBetaNotice } from './MobileRelayBetaNotice'
 export { getMobileSettingsPaneSearchEntries }
-
-const ORCA_IOS_APP_STORE_URL = 'https://apps.apple.com/app/orca-ide/id6766130217'
-const ORCA_ANDROID_APK_URL =
-  'https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.44/app-release.apk'
 
 export function MobileSettingsPane(): React.JSX.Element {
   const showMobileButton = useAppStore((s) => s.settings?.showMobileButton !== false)
@@ -31,36 +28,44 @@ export function MobileSettingsPane(): React.JSX.Element {
         className="space-y-3 py-2"
       >
         <div className="space-y-2 text-xs text-muted-foreground">
-          <p>
-            {translate(
-              'auto.components.settings.MobileSettingsPane.installIntro',
-              'Install Orca Mobile from the'
-            )}{' '}
-            <button
-              type="button"
-              onClick={() => void window.api.shell.openUrl(ORCA_IOS_APP_STORE_URL)}
-              className="cursor-pointer underline underline-offset-2 hover:text-foreground"
-            >
-              {translate('auto.components.settings.MobileSettingsPane.b5a2ed83ff', 'App Store')}
-            </button>
-            {' · '}
-            <button
-              type="button"
-              // Why: Android is moving to Google Play soon, but until then
-              // link directly to the pinned APK asset for the current mobile release.
-              onClick={() => void window.api.shell.openUrl(ORCA_ANDROID_APK_URL)}
-              className="cursor-pointer underline underline-offset-2 hover:text-foreground"
-            >
+          {PRODUCT_PUBLIC_LINKS.iosDownload || PRODUCT_PUBLIC_LINKS.androidDownload ? (
+            <p>
               {translate(
-                'auto.components.settings.MobileSettingsPane.androidApkLabel',
-                'Android APK'
+                'auto.components.settings.MobileSettingsPane.installIntro',
+                'Install Orca Mobile from the'
+              )}{' '}
+              {PRODUCT_PUBLIC_LINKS.iosDownload ? (
+                <button
+                  type="button"
+                  onClick={() => void window.api.shell.openUrl(PRODUCT_PUBLIC_LINKS.iosDownload!)}
+                  className="cursor-pointer underline underline-offset-2 hover:text-foreground"
+                >
+                  {translate('auto.components.settings.MobileSettingsPane.b5a2ed83ff', 'App Store')}
+                </button>
+              ) : null}
+              {PRODUCT_PUBLIC_LINKS.iosDownload && PRODUCT_PUBLIC_LINKS.androidDownload
+                ? ' · '
+                : null}
+              {PRODUCT_PUBLIC_LINKS.androidDownload ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void window.api.shell.openUrl(PRODUCT_PUBLIC_LINKS.androidDownload!)
+                  }
+                  className="cursor-pointer underline underline-offset-2 hover:text-foreground"
+                >
+                  {translate(
+                    'auto.components.settings.MobileSettingsPane.androidApkLabel',
+                    'Android APK'
+                  )}
+                </button>
+              ) : null}
+              {translate(
+                'auto.components.settings.MobileSettingsPane.installOutro',
+                ', then pair below.'
               )}
-            </button>
-            {translate(
-              'auto.components.settings.MobileSettingsPane.installOutro',
-              ', then pair below.'
-            )}
-          </p>
+            </p>
+          ) : null}
           <MobileRelayBetaNotice />
         </div>
       </SearchableSetting>

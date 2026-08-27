@@ -1,7 +1,7 @@
 import { ListChecks } from 'lucide-react-native'
 import { MobileAgentSessionHistoryIcon } from '../agent-history/MobileAgentSessionHistoryIcon'
 import { ActionSheetModal } from '../components/ActionSheetModal'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 
 type Props = {
   visible: boolean
@@ -20,6 +20,8 @@ export function MobileSessionHeaderMoreActionsSheet({
   onOpenChecks,
   onClose
 }: Props) {
+  const theme = useMobileTheme()
+
   return (
     <ActionSheetModal
       visible={visible}
@@ -27,13 +29,13 @@ export function MobileSessionHeaderMoreActionsSheet({
         ...(showAgentSessionHistory
           ? [
               {
-                label: 'Agent History',
-                hint: 'Browse and resume agent sessions',
+                label: 'Agent 会话历史',
+                hint: '浏览并继续 Agent 会话',
                 renderIcon: () => (
                   <MobileAgentSessionHistoryIcon
-                    size={16}
-                    color={colors.textSecondary}
-                    strokeWidth={2.1}
+                    size={theme.spacing.space20}
+                    color={theme.color.text.secondary}
+                    strokeWidth={2}
                   />
                 ),
                 onPress: onOpenAgentSessionHistory
@@ -43,8 +45,8 @@ export function MobileSessionHeaderMoreActionsSheet({
         ...(showChecks
           ? [
               {
-                label: 'Checks',
-                hint: 'Open pull request checks',
+                label: '检查',
+                hint: '打开拉取请求检查',
                 icon: ListChecks,
                 onPress: onOpenChecks
               }

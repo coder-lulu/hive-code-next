@@ -2,6 +2,8 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileHostCard } from './MobileHostCard'
+import { APP_DISPLAY_NAME } from '@/product-brand'
+import { lightTheme } from '../theme/mobile-theme'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -44,6 +46,7 @@ describe('MobileHostCard', () => {
     await act(async () => {
       renderer = create(
         createElement(MobileHostCard, {
+          theme: lightTheme,
           host: {
             id: 'desk',
             name: 'Desk',
@@ -66,11 +69,11 @@ describe('MobileHostCard', () => {
     const buttons = renderer.root.findAllByType('Pressable')
     expect(buttons).toHaveLength(2)
     expect(buttons[0].props.accessibilityRole).toBe('button')
-    expect(buttons[0].props.accessibilityLabel).toBe('Open Desk, Disconnected')
+    expect(buttons[0].props.accessibilityLabel).toBe('打开 Desk, 未连接')
     expect(buttons[1].props.accessibilityRole).toBe('button')
-    expect(buttons[1].props.accessibilityLabel).toBe('Actions for Desk')
+    expect(buttons[1].props.accessibilityLabel).toBe('Desk 的更多操作')
     expect(buttons[1].props.hitSlop).toBe(8)
-    expect(buttons[1].props.style({ pressed: false })[0]).toMatchObject({ width: 40, height: 40 })
+    expect(buttons[1].props.style({ pressed: false })[0]).toMatchObject({ width: 44, height: 44 })
     expect(renderer.root.findAllByType('MoreVertical')).toHaveLength(1)
     expect(renderer.root.findAllByType('ChevronRight')).toHaveLength(0)
 
@@ -89,6 +92,7 @@ describe('MobileHostCard', () => {
     await act(async () => {
       renderer = create(
         createElement(MobileHostCard, {
+          theme: lightTheme,
           host: {
             id: 'desk',
             name: 'Desk',
@@ -117,7 +121,7 @@ describe('MobileHostCard', () => {
 
     const navigationButton = renderer.root.findAllByType('Pressable')[0]
     expect(navigationButton.props.accessibilityLabel).toBe(
-      'Open Desk, Connected, Direct via Tailscale, 3 worktrees, 2 active'
+      '打开 Desk, 已连接, 直连，Tailscale, 3 个工作区，2 个活跃'
     )
   })
 
@@ -126,6 +130,7 @@ describe('MobileHostCard', () => {
     await act(async () => {
       renderer = create(
         createElement(MobileHostCard, {
+          theme: lightTheme,
           host: {
             id: 'desk',
             name: 'Desk',
@@ -154,12 +159,10 @@ describe('MobileHostCard', () => {
 
     const navigationButton = renderer.root.findAllByType('Pressable')[0]
     expect(navigationButton.props.accessibilityLabel).toBe(
-      'Open Desk, Connected, Orca Relay, Worktree list unavailable'
+      `打开 Desk, 已连接, ${APP_DISPLAY_NAME} 安全中继, 工作区列表不可用`
     )
     expect(
-      renderer.root
-        .findAllByType('Text')
-        .some((node) => node.children.includes('Worktree list unavailable'))
+      renderer.root.findAllByType('Text').some((node) => node.children.includes('工作区列表不可用'))
     ).toBe(true)
   })
 
@@ -168,6 +171,7 @@ describe('MobileHostCard', () => {
     await act(async () => {
       renderer = create(
         createElement(MobileHostCard, {
+          theme: lightTheme,
           host: {
             id: 'desk',
             name: 'Desk',
@@ -193,7 +197,7 @@ describe('MobileHostCard', () => {
 
     const navigationButton = renderer.root.findAllByType('Pressable')[0]
     expect(navigationButton.props.accessibilityLabel).toBe(
-      "Open Desk, Can't reach desktop, Update desktop Orca and sign in to connect from anywhere"
+      `打开 Desk, 无法访问桌面端, 更新桌面端 ${APP_DISPLAY_NAME} 并登录，以便随时随地连接`
     )
   })
 })

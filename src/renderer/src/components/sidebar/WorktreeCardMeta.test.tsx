@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { WorktreeCardDetailsHover, WorktreeCardMetaBadges } from './WorktreeCardMeta'
 
 vi.mock('@/components/ui/hover-card', () => ({
@@ -137,7 +138,7 @@ describe('WorktreeCardDetailsHover', () => {
     )
 
     const moreActionsIndex = markup.indexOf('aria-label="More PR actions"')
-    const openInOrcaIndex = markup.indexOf('aria-label="Open in Orca"')
+    const openInOrcaIndex = markup.indexOf(`aria-label="Open in ${APP_DISPLAY_NAME}"`)
     const viewOnGitHubIndex = markup.indexOf('aria-label="View on GitHub"')
 
     expect(moreActionsIndex).toBeGreaterThan(-1)
@@ -174,7 +175,7 @@ describe('WorktreeCardDetailsHover', () => {
     const moreActionsIndex = markup.indexOf('aria-label="More issue actions"')
     const copyLinkIndex = markup.indexOf('Copy link')
     const editIssueIndex = markup.indexOf('aria-label="Edit issue"')
-    const openInOrcaIndex = markup.indexOf('aria-label="Open in Orca"')
+    const openInOrcaIndex = markup.indexOf(`aria-label="Open in ${APP_DISPLAY_NAME}"`)
     const viewOnGitHubIndex = markup.indexOf('aria-label="View on GitHub"')
 
     expect(moreActionsIndex).toBeGreaterThan(-1)

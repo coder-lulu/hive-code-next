@@ -23,6 +23,14 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
+vi.mock('./linux-root-package-install-policy', () =>
+  moduleFactories.linuxRootPackageInstallPolicy()
+)
 
 describe('updater', () => {
   beforeEach(() => {
@@ -35,6 +43,7 @@ describe('updater', () => {
 
     fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })
     shouldApplyNudgeMock.mockReturnValue(true)
+    fetchNewerReleaseTagsMock.mockResolvedValueOnce(['v1.0.61']).mockResolvedValue(['v1.0.62'])
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
       return Promise.resolve(undefined)
@@ -87,6 +96,7 @@ describe('updater', () => {
   it('preserves the pending nudge marker across a later background check', async () => {
     const sendMock = vi.fn()
     const mainWindow = { webContents: { send: sendMock } }
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.61'])
 
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')

@@ -3,3 +3,22 @@
 /config/scripts/*localization*.mjs @brennanb2025
 /config/scripts/*locale*.mjs @brennanb2025
 /config/i18next.config.ts @brennanb2025
+
+# HiveCode fork-boundary review. This account was selected during the
+# convergence review and must remain a verified repository owner.
+/src/main/runtime/ @coder-lulu
+/src/shared/ @coder-lulu
+/src/relay/ @coder-lulu
+/src/main/orca-profiles/ @coder-lulu
+/mobile/src/transport/ @coder-lulu
+/config/hivecode-brand-allowlist.json @coder-lulu
+/config/product/hivecode.product.json @coder-lulu
+/config/upstream-sync-boundary.json @coder-lulu
+/config/scripts/audit-fork-delta.mjs @coder-lulu
+/config/scripts/audit-fork-delta.test.mjs @coder-lulu
+/config/scripts/check-hivecode-brand-boundary.mjs @coder-lulu
+/config/scripts/check-hivecode-brand-boundary.test.mjs @coder-lulu
+/docs/engineering/fork-boundary-policy.md @coder-lulu
+/.gitignore @coder-lulu
+/.gitattributes @coder-lulu
+/.github/CODEOWNERS @coder-lulu

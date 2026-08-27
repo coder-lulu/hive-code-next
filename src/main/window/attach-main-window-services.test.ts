@@ -13,17 +13,19 @@ const {
   systemPreferencesGetMediaAccessStatusMock,
   registerRepoHandlersMock,
   setRepoRemoteClientNotifierMock,
-  setWorktreeCatalogRemoteClientNotifierMock,
   registerWorktreeHandlersMock,
   registerPtyHandlersMock,
   hydrateLocalPtyRegistryAtBootMock,
   setupAutoUpdaterMock,
+  releaseUpdatesConfiguredMock,
   browserManagerUnregisterAllMock,
   runWorktreeChangeInvalidatorsMock,
   acknowledgePendingTccPromptNoticeMock,
   consumePendingTccPromptNoticeMock,
   dismissTccPromptNoticeMock,
-  releasePendingTccPromptNoticeMock
+  releasePendingTccPromptNoticeMock,
+  scheduleWorktreeBaseDirectoryWatcherSyncMock,
+  setWorktreeBaseDirectoryWatcherSyncContextMock
 } = vi.hoisted(() => ({
   onMock: vi.fn(),
   removeAllListenersMock: vi.fn(),
@@ -36,17 +38,19 @@ const {
   systemPreferencesGetMediaAccessStatusMock: vi.fn(),
   registerRepoHandlersMock: vi.fn(),
   setRepoRemoteClientNotifierMock: vi.fn(),
-  setWorktreeCatalogRemoteClientNotifierMock: vi.fn(),
   registerWorktreeHandlersMock: vi.fn(),
   registerPtyHandlersMock: vi.fn(),
   hydrateLocalPtyRegistryAtBootMock: vi.fn(),
   setupAutoUpdaterMock: vi.fn(),
+  releaseUpdatesConfiguredMock: vi.fn(),
   browserManagerUnregisterAllMock: vi.fn(),
   runWorktreeChangeInvalidatorsMock: vi.fn(),
   acknowledgePendingTccPromptNoticeMock: vi.fn(),
   consumePendingTccPromptNoticeMock: vi.fn(),
   dismissTccPromptNoticeMock: vi.fn(),
-  releasePendingTccPromptNoticeMock: vi.fn()
+  releasePendingTccPromptNoticeMock: vi.fn(),
+  scheduleWorktreeBaseDirectoryWatcherSyncMock: vi.fn(),
+  setWorktreeBaseDirectoryWatcherSyncContextMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -70,19 +74,17 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../ipc/repos', () => ({
-  registerRepoHandlers: registerRepoHandlersMock
-}))
-
-vi.mock('../ipc/repos/repos-changed-notification', () => ({
+  registerRepoHandlers: registerRepoHandlersMock,
   setRepoRemoteClientNotifier: setRepoRemoteClientNotifierMock
-}))
-
-vi.mock('../ipc/watched-worktree-catalog-notification', () => ({
-  setWorktreeCatalogRemoteClientNotifier: setWorktreeCatalogRemoteClientNotifierMock
 }))
 
 vi.mock('../ipc/worktrees', () => ({
   registerWorktreeHandlers: registerWorktreeHandlersMock
+}))
+
+vi.mock('../ipc/worktree-base-directory-watcher', () => ({
+  scheduleWorktreeBaseDirectoryWatcherSync: scheduleWorktreeBaseDirectoryWatcherSyncMock,
+  setWorktreeBaseDirectoryWatcherSyncContext: setWorktreeBaseDirectoryWatcherSyncContextMock
 }))
 
 vi.mock('../ipc/worktree-change-invalidators', () => ({
@@ -110,6 +112,10 @@ vi.mock('../updater', () => ({
   quitAndInstall: vi.fn(),
   dismissNudge: vi.fn(),
   setupAutoUpdater: setupAutoUpdaterMock
+}))
+
+vi.mock('../../shared/product-update-policy', () => ({
+  hasConfiguredProductUpdateChannel: releaseUpdatesConfiguredMock
 }))
 
 vi.mock('../macos-tcc-prompt-notice', () => ({
@@ -222,38 +228,19 @@ async function fireReadyToShow(mainWindow: MainWindowStub): Promise<void> {
 
 describe('attachMainWindowServices', () => {
   beforeEach(() => {
-    onMock.mockReset()
-    removeAllListenersMock.mockReset()
-    removeListenerMock.mockReset()
-    handleMock.mockReset()
-    removeHandlerMock.mockReset()
-    setPermissionRequestHandlerMock.mockReset()
-    setPermissionCheckHandlerMock.mockReset()
-    systemPreferencesAskForMediaAccessMock.mockReset()
-    systemPreferencesGetMediaAccessStatusMock.mockReset()
-    registerRepoHandlersMock.mockReset()
-    setRepoRemoteClientNotifierMock.mockReset()
-    setWorktreeCatalogRemoteClientNotifierMock.mockReset()
-    registerWorktreeHandlersMock.mockReset()
-    registerPtyHandlersMock.mockReset()
-    hydrateLocalPtyRegistryAtBootMock.mockReset()
-    setupAutoUpdaterMock.mockReset()
-    browserManagerUnregisterAllMock.mockReset()
-    acknowledgePendingTccPromptNoticeMock.mockReset()
-    consumePendingTccPromptNoticeMock.mockReset()
-    dismissTccPromptNoticeMock.mockReset()
-    releasePendingTccPromptNoticeMock.mockReset()
+    vi.resetAllMocks()
+    releaseUpdatesConfiguredMock.mockReturnValue(true)
     systemPreferencesAskForMediaAccessMock.mockResolvedValue(true)
     systemPreferencesGetMediaAccessStatusMock.mockReturnValue('granted')
   })
 
-  it('gives host-local catalog notifiers the runtime', () => {
+  // #11994: without this wiring, host-local repo IPC mutations never reach paired clients.
+  it('gives the repo IPC handlers the runtime so repo changes reach paired clients', () => {
     const runtime = createRuntime()
 
     attachMainWindowServices(createMainWindow() as never, createStore(), runtime as never)
 
     expect(setRepoRemoteClientNotifierMock).toHaveBeenCalledWith(runtime)
-    expect(setWorktreeCatalogRemoteClientNotifierMock).toHaveBeenCalledWith(runtime)
   })
 
   it('reloads the app renderer through main and marks expected renderer teardown', async () => {
@@ -344,6 +331,16 @@ describe('attachMainWindowServices', () => {
     await setupAutoUpdaterMock.mock.calls[0][1].onBeforeQuit()
 
     expect(store.flushPendingAsync).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not initialize the online updater when HiveCode has no configured channel', async () => {
+    releaseUpdatesConfiguredMock.mockReturnValue(false)
+    const mainWindow = createMainWindow()
+
+    attachMainWindowServices(mainWindow as never, createStore(), createRuntime() as never)
+    await fireReadyToShow(mainWindow)
+
+    expect(setupAutoUpdaterMock).not.toHaveBeenCalled()
   })
 
   it('replaces the TCC handlers when the main window is reattached', () => {

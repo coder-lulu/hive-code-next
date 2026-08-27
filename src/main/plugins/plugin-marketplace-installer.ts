@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { applyProductBranding } from '../../shared/brand'
 import type { PluginManifest } from '../../shared/plugins/plugin-manifest'
 import { getUserPluginsDir } from './plugin-discovery'
 import { checkoutPluginGitSource } from './plugin-git-repository'
@@ -102,7 +103,10 @@ export class PluginMarketplaceInstaller {
     const blockedReason =
       listing.blockedByKillList?.reason ?? this.blockedPluginReason(preview.pluginKey)
     if (blockedReason) {
-      return { ok: false, error: `plugin is blocked by Orca's safety list: ${blockedReason}` }
+      return {
+        ok: false,
+        error: applyProductBranding(`plugin is blocked by Orca's safety list: ${blockedReason}`)
+      }
     }
     if (listing.marketplaceCommit !== preview.marketplaceCommit) {
       return { ok: false, error: 'marketplace changed after preview; review the plugin again' }

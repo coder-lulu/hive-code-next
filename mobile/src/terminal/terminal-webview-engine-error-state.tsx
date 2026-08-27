@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { colors } from '../theme/mobile-theme'
+import { darkTheme } from '../theme/mobile-theme'
+import type { MobileTerminalTheme } from './terminal-webview-contract'
 
 export type NativeWebViewEngineEvent = {
   readonly nativeEvent?: object
@@ -9,6 +10,7 @@ export type NativeWebViewEngineEvent = {
 
 type TerminalWebViewEngineErrorOverlayProps = {
   readonly message: string
+  readonly terminalTheme?: MobileTerminalTheme
   readonly onReload: () => void
 }
 
@@ -76,8 +78,17 @@ export function describeNativeWebViewEngineError(
 
 export function TerminalWebViewEngineErrorOverlay({
   message,
+  terminalTheme,
   onReload
 }: TerminalWebViewEngineErrorOverlayProps) {
+  const background = terminalTheme?.theme.background ?? darkTheme.terminal.background
+  const foreground = terminalTheme?.theme.foreground ?? darkTheme.terminal.foreground
+  const secondary = terminalTheme?.theme.brightBlack ?? darkTheme.terminal.brightBlack
+  const styles = useMemo(
+    () => createTerminalWebViewEngineErrorStyles(background, foreground, secondary),
+    [background, foreground, secondary]
+  )
+
   return (
     <View style={styles.errorOverlay}>
       <Text style={styles.errorTitle}>Terminal failed to load</Text>
@@ -85,46 +96,52 @@ export function TerminalWebViewEngineErrorOverlay({
         {message}
       </Text>
       <Pressable accessibilityRole="button" style={styles.reloadButton} onPress={onReload}>
-        <RefreshCw size={16} color={colors.terminalBg} />
+        <RefreshCw size={16} color={background} />
         <Text style={styles.reloadButtonText}>Reload</Text>
       </Pressable>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  errorOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    padding: 24,
-    backgroundColor: colors.terminalBg
-  },
-  errorTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center'
-  },
-  errorDetail: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center'
-  },
-  reloadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minHeight: 36,
-    paddingHorizontal: 14,
-    borderRadius: 6,
-    backgroundColor: colors.surfaceBright
-  },
-  reloadButtonText: {
-    color: colors.terminalBg,
-    fontSize: 14,
-    fontWeight: '700'
-  }
-})
+function createTerminalWebViewEngineErrorStyles(
+  background: string,
+  foreground: string,
+  secondary: string
+) {
+  return StyleSheet.create({
+    errorOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      padding: 24,
+      backgroundColor: background
+    },
+    errorTitle: {
+      color: foreground,
+      fontSize: 16,
+      fontWeight: '700',
+      textAlign: 'center'
+    },
+    errorDetail: {
+      color: secondary,
+      fontSize: 13,
+      lineHeight: 18,
+      textAlign: 'center'
+    },
+    reloadButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      minHeight: 44,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      backgroundColor: foreground
+    },
+    reloadButtonText: {
+      color: background,
+      fontSize: 14,
+      fontWeight: '700'
+    }
+  })
+}

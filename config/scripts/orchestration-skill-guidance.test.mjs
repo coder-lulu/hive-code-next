@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { applyProductBranding } from '../../src/shared/brand'
+import { brandGuideMarkdown } from './generate-bundled-skill-guides.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 // Why: orchestration now ships a hybrid discovery stub, so its version-sensitive command
@@ -10,7 +12,7 @@ const guidePath = join(projectDir, 'skill-guides', 'orchestration.md')
 const stubPath = join(projectDir, 'skills', 'orchestration', 'SKILL.md')
 
 function readSkill() {
-  return readFileSync(guidePath, 'utf8')
+  return brandGuideMarkdown(readFileSync(guidePath, 'utf8'))
 }
 
 function getSection(markdown, heading) {
@@ -38,9 +40,13 @@ describe('orchestration skill guidance', () => {
       '`coordinator-start`, `coordinator-stop`, `run`, and `run-stop` are retired scheduler commands'
     )
     expect(toolBoundary).toContain(
-      'Do not substitute non-Orca subagent tools, generic agent-spawn APIs, or chat-only parallel worker features'
+      applyProductBranding(
+        'Do not substitute non-Orca subagent tools, generic agent-spawn APIs, or chat-only parallel worker features'
+      )
     )
-    expect(toolBoundary).toContain('do not create Orca task/dispatch provenance')
+    expect(toolBoundary).toContain(
+      applyProductBranding('do not create Orca task/dispatch provenance')
+    )
     expect(toolBoundary).toContain('injected lifecycle preambles')
     expect(toolBoundary).toContain('`worker_done` authority')
     expect(toolBoundary).toContain('decision gates')
@@ -113,7 +119,9 @@ describe('orchestration skill guidance', () => {
       'read the worker terminal after prompt delivery except to avoid losing the initial prompt'
     )
     expect(skill).toContain(
-      '`--no-parent` only controls Orca lineage; it does not choose the Git base.'
+      applyProductBranding(
+        '`--no-parent` only controls Orca lineage; it does not choose the Git base.'
+      )
     )
     expect(skill).toContain(
       'never base it on the current feature branch unless the user explicitly asks'
@@ -122,7 +130,9 @@ describe('orchestration skill guidance', () => {
       'orca worktree create --name <task-name> --no-parent --agent codex --prompt'
     )
     expect(fullHandoffs).toContain(
-      'Before creating a new worktree from an active feature branch, decide and state whether the desired Orca lineage is child or top-level'
+      applyProductBranding(
+        'Before creating a new worktree from an active feature branch, decide and state whether the desired Orca lineage is child or top-level'
+      )
     )
     expect(fullHandoffs).toContain(
       'Use child worktree lineage only when the new work is conceptually stacked under or dependent on the active worktree'
@@ -256,8 +266,10 @@ describe('orchestration skill guidance', () => {
       'read the `worker.agent_terminal_handle` field of `worker-show --dispatch <dispatch_id> --json`'
     )
     expect(workerLoop).toContain(
-      'orca orchestration worker-start --task <next_task_id> --terminal <handle> --json` so Orca ' +
-        'transfers cleanup ownership to the new Dispatch'
+      applyProductBranding(
+        'orca orchestration worker-start --task <next_task_id> --terminal <handle> --json` so Orca ' +
+          'transfers cleanup ownership to the new Dispatch'
+      )
     )
     expect(workerLoop).toContain(
       'Run `worker-release` after both succeeded and failed `worker_done` reports unless the user ' +
@@ -400,7 +412,7 @@ describe('orchestration install stub', () => {
     const frontmatter = (text) => /^---\n[\s\S]*?\n---\n/u.exec(text)[0]
 
     expect(frontmatter(readFileSync(stubPath, 'utf8'))).toBe(
-      frontmatter(readFileSync(guidePath, 'utf8'))
+      frontmatter(brandGuideMarkdown(readFileSync(guidePath, 'utf8')))
     )
   })
 })

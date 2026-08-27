@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { applyProductBranding } from '../../shared/brand'
 import { addNodePtyRecoveryHint, parseNodePtyDiagnostic } from './node-pty-error-hints'
 
-const PTY_ALLOCATION_HINT = [
-  'Your system cannot allocate any more pty devices.',
-  '',
-  'Orca requires a pty device to launch a new terminal. This error is usually due to having too many terminal windows or terminal sessions open, either in Orca or another program.',
-  '',
-  'Free up some pty devices and try again.'
-].join('\n')
+const PTY_ALLOCATION_HINT = applyProductBranding(
+  [
+    'Your system cannot allocate any more pty devices.',
+    '',
+    'Orca requires a pty device to launch a new terminal. This error is usually due to having too many terminal windows or terminal sessions open, either in Orca or another program.',
+    '',
+    'Free up some pty devices and try again.'
+  ].join('\n')
+)
 
 const TERMINAL_PROCESS_LIMIT_HINT = [
   'Your system cannot start another terminal process.',
@@ -24,7 +27,7 @@ describe('node-pty diagnostic error hints', () => {
 
     expect(parseNodePtyDiagnostic(message)).toEqual({ step: 'posix_spawn', errno: 2 })
     expect(addNodePtyRecoveryHint(message)).toBe(
-      `Daemon's node-pty install is gone (worktree deleted?). Restart Orca. ${message}`
+      `Daemon's node-pty install is gone (worktree deleted?). Restart HiveCode. ${message}`
     )
   })
 

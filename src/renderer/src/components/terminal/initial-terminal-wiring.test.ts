@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 const TERMINAL_PATH = 'src/renderer/src/components/Terminal.tsx'
 
 function readSource(relativePath: string): string {
-  return readFileSync(join(process.cwd(), relativePath), 'utf8')
+  return readFileSync(join(process.cwd(), relativePath), 'utf8').replace(/\r\n/g, '\n')
 }
 
 describe('Terminal auto-create wiring', () => {

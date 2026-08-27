@@ -7,6 +7,7 @@ import type {
   OrcaCloudOrgSummary,
   OrcaProfileCloudSummary
 } from '../../shared/orca-profiles'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { OrcaCloudSessionExchangeResponse } from './profile-cloud-session-exchange'
 
 const {
@@ -78,6 +79,7 @@ const organizations: OrcaCloudOrgSummary[] = [
 function configureCloudEnv(): void {
   vi.stubEnv('ORCA_CLOUD_API_URL', 'https://orca-cloud.example')
   vi.stubEnv('ORCA_CLOUD_CLIENT_ID', 'desktop-client')
+  vi.stubEnv('ORCA_RELAY_URL', 'https://orca-relay.example')
 }
 
 function futureExpiresAt(): number {
@@ -190,7 +192,7 @@ describe('Orca cloud profile service', () => {
       state: 'unconfigured',
       persistence: 'encrypted',
       cloud: cloudSummary,
-      setupMessage: 'Orca Cloud sign-in is not configured for this build.'
+      setupMessage: `${APP_DISPLAY_NAME} Cloud sign-in is not configured for this build.`
     })
     expect(getCurrentOrcaProfileAuthStatus(userDataPath).organizations).toBeUndefined()
     expect(getCurrentOrcaProfileAuthStatus(userDataPath).capabilities).toBeUndefined()

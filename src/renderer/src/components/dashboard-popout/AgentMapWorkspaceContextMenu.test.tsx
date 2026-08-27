@@ -11,6 +11,7 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import type { DashboardCard } from '../../../../shared/dashboard-snapshot'
 import { AgentMap } from './AgentMap'
 import * as StoreSelectors from '@/store/selectors'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const NOW = 2_000_000_000
 const EXECUTION_HOST_ID = 'runtime:env-1' as const
@@ -314,7 +315,9 @@ describe('Agent Map workspace context menu', () => {
       clientX: 100,
       clientY: 110
     })
-    fireEvent.click(await screen.findByText('Create new worktree for Orca', {}, { timeout: 5_000 }))
+    fireEvent.click(
+      await screen.findByText(`Create new worktree for ${APP_DISPLAY_NAME}`, {}, { timeout: 5_000 })
+    )
 
     expect(useAppStore.getState().activeModal).toBe('new-workspace-composer')
     expect(useAppStore.getState().modalData).toEqual({
@@ -367,11 +370,15 @@ describe('Agent Map workspace context menu', () => {
 
     fireEvent.contextMenu(container.querySelector('[data-agent-map-project]')!)
     await act(async () => new Promise((resolve) => window.setTimeout(resolve, 0)))
-    expect(screen.queryByText('Create new worktree for Orca')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(`Create new worktree for ${APP_DISPLAY_NAME}`)
+    ).not.toBeInTheDocument()
 
     act(() => {
       useAppStore.setState({ repos: [repo] })
     })
-    expect(screen.queryByText('Create new worktree for Orca')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(`Create new worktree for ${APP_DISPLAY_NAME}`)
+    ).not.toBeInTheDocument()
   })
 })

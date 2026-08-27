@@ -2,11 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as GithubApiRepositoryModule from './github-api-repository'
 import type * as GitHubEnterpriseRepositoryModule from './github-enterprise-repository'
 
-const { clientMocks, moduleMocks } = await vi.hoisted(async () => {
+const { clientMocks, moduleMocks, getProductStarRepositoryMock } = await vi.hoisted(async () => {
   const moduleMocks = await import('./client-test-mocks')
-  return { clientMocks: moduleMocks.createGitHubClientMocks(), moduleMocks }
+  return {
+    clientMocks: moduleMocks.createGitHubClientMocks(),
+    moduleMocks,
+    getProductStarRepositoryMock: vi.fn()
+  }
 })
 
+vi.mock('../product/product-external-service-endpoints', () => ({
+  getProductStarRepository: getProductStarRepositoryMock
+}))
 vi.mock('./gh-utils', () => moduleMocks.ghUtilsModuleMock(clientMocks))
 vi.mock('../git/runner', () => moduleMocks.gitRunnerModuleMock(clientMocks))
 vi.mock('../providers/ssh-git-dispatch', () => moduleMocks.sshGitDispatchModuleMock(clientMocks))
@@ -26,7 +33,7 @@ vi.mock('./github-api-repository', async (importOriginal) =>
   )
 )
 
-import { checkOrcaStarred } from './client'
+import { checkOrcaStarred, starOrca } from './client'
 import { resetOriginRepositoryCache } from './client-test-harness'
 
 const { execFileAsyncMock, acquireMock, releaseMock } = clientMocks
@@ -38,6 +45,26 @@ describe('checkOrcaStarred', () => {
     acquireMock.mockReset()
     releaseMock.mockReset()
     acquireMock.mockResolvedValue(undefined)
+    getProductStarRepositoryMock.mockReset()
+    getProductStarRepositoryMock.mockReturnValue('stablyai/orca')
+  })
+
+  it('fails closed without invoking gh when the product star repository is null', async () => {
+    getProductStarRepositoryMock.mockReturnValue(null)
+
+    await expect(checkOrcaStarred()).resolves.toBeNull()
+
+    expect(execFileAsyncMock).not.toHaveBeenCalled()
+    expect(acquireMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects the star write without invoking gh when product authority is null', async () => {
+    getProductStarRepositoryMock.mockReturnValue(null)
+
+    await expect(starOrca()).resolves.toBe(false)
+
+    expect(execFileAsyncMock).not.toHaveBeenCalled()
+    expect(acquireMock).not.toHaveBeenCalled()
   })
 
   it('returns true only for an included successful GitHub response', async () => {

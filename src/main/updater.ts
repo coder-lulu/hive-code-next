@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import { app, BrowserWindow, powerMonitor } from 'electron'
 import { is } from '@electron-toolkit/utils'
+import { parse } from 'yaml'
 import type {
   LinuxPackageInstallInstructions,
   LinuxPackageInstallRecovery,
@@ -13,6 +14,17 @@ import type {
   RemoteServerUpdaterSnapshot,
   RemoteServerUpdateSupport
 } from '../shared/remote-server-update'
+import { hasConfiguredProductUpdateChannel } from '../shared/product-update-policy'
+import {
+  resolveProductUpdateFeedUrl,
+  resolveProductUpdateSource
+} from '../shared/product-update-source'
+import { applyProductBranding } from '../shared/brand'
+import {
+  installProductUpdaterNetworkBoundary,
+  type ProductUpdaterHttpExecutor
+} from './product/product-updater-network-boundary'
+import { getProductExternalServiceEndpoints } from './product/product-external-service-endpoints'
 import {
   isWindowsSignatureCheckUnavailableFailure,
   isWindowsSignatureMismatchFailure
@@ -25,7 +37,9 @@ import { runWithLaunchPath } from './startup/hydrate-shell-path'
 import {
   beginMacUpdateDownload,
   deferMacQuitUntilInstallerReady,
+  hasMacInstallAuthority,
   isMacInstallerReady,
+  isWaitingForMacInstallerReadiness,
   markMacQuitAndInstallInFlight,
   resetMacInstallState
 } from './updater-mac-install'
@@ -36,6 +50,7 @@ import {
 import { registerAutoUpdaterHandlers } from './updater-events'
 import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
 import { getLinuxRootPackageType } from './linux-update-package-type'
+import { requiresManualLinuxRootPackageInstall } from './linux-root-package-install-policy'
 import {
   beginLinuxPackageInstallDiagnosticCapture,
   createUpdaterDiagnosticLogger,
@@ -57,6 +72,7 @@ import {
 import {
   compareVersions,
   isBenignCheckFailure,
+  isValidVersion,
   isMissingUpdateManifestFailure,
   isPrereleaseVersion,
   statusesEqual
@@ -66,6 +82,9 @@ import {
   getReleaseDownloadUrl
 } from './updater-prerelease-feed'
 import { fetchNudge, shouldApplyNudge } from './updater-nudge'
+import { cancelUnreadResponseBody } from './lib/unread-response-body'
+import { fetchWithProductUpdaterSession } from './product/product-updater-session'
+import { readResponseTextWithLimit } from './updater-response-body'
 import {
   failServeUpdateHandoff,
   getServeUpdateHandoffFailure,
@@ -89,7 +108,21 @@ type CheckFailureSource = 'event' | 'promise' | 'fallback-promise'
 type MissingManifestPrereleaseFallbackResult = { userInitiated: boolean }
 type PrimaryEventSuppression = { failureKey: string; error: unknown }
 type UpdateCheckVariant = 'default' | 'prerelease' | 'perf'
-type ReleaseFeedPreflightFailure = 'manifest-unavailable' | 'release-not-ready'
+type UpdateCandidateIdentity = {
+  generation: number
+  authorityEpoch: number
+  kind: 'release' | 'local' | 'pinned'
+  provider: 'github' | 'hivecloud' | null
+  source: 'release' | UpdateSource
+  repository: string | null
+  sourceChannel: 'stable' | 'beta' | 'rc' | null
+  checkChannel: UpdateCheckVariant | ReleaseChannel | 'local'
+  tag: string
+  version: string
+  feedUrl: string
+  overrideChannel: ReleaseChannel | null
+}
+type ReleaseFeedPreflightFailure = 'feed-unavailable' | 'manifest-unavailable' | 'release-not-ready'
 // Why: expected preflight outcomes need typed context so UI routing never depends on matching error text.
 class ReleaseFeedPreflightError extends Error {
   constructor(
@@ -101,13 +134,15 @@ class ReleaseFeedPreflightError extends Error {
     this.name = 'ReleaseFeedPreflightError'
   }
 }
-type ReleaseFeedPreflightResult = 'ready' | 'not-available'
+type ReleaseFeedPreflightResult = 'ready' | 'not-available' | 'superseded'
 export type UpdateInstallMode =
   | 'interactive'
   | 'supervised-headless-serve'
   | 'unsupported-headless-serve'
 
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+const MAX_GENERIC_UPDATE_MANIFEST_BYTES = 256 * 1024
+const GENERIC_UPDATE_PREFLIGHT_TIMEOUT_MS = 5000
 const AUTO_UPDATE_RETRY_INTERVAL_MS = 60 * 60 * 1000
 // Why: a persistently-failing feed used to re-arm the retry at a fixed 1h cadence forever (issue #7576); backoff doubles per failure up to this cap, any completed check resets.
 const MAX_AUTO_UPDATE_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000
@@ -117,14 +152,17 @@ const QUIT_AND_INSTALL_DELAY_MS = 100
 const PRE_QUIT_CLEANUP_TIMEOUT_MS = 2_500
 const UPDATE_CHECK_SILENT_SETTLE_DELAY_MS = 1_000
 const UPDATE_CHECK_STALL_TIMEOUT_MS = 45_000
+const MANUAL_LINUX_PACKAGE_INSTALL_MESSAGE =
+  'Automatic installation is disabled for Linux system packages. Copy the verified install command or show the package to install it manually.'
+const MANUAL_LINUX_PACKAGE_UNAVAILABLE_MESSAGE =
+  'Automatic installation is disabled for Linux system packages, and the downloaded package could not be retained for a verified manual install. Download the update again.'
 
 let mainWindowRef: BrowserWindow | null = null
 let currentStatus: UpdateStatus = { state: 'idle' }
 let userInitiatedCheck = false
 let onBeforeQuitCleanup: (() => void | Promise<void>) | null = null
 let autoUpdaterInitialized = false
-// Why: modifier-clicking "Check for Updates" targets prerelease manifests; the feed still pins a concrete tag so cancelled prereleases without manifests are skipped.
-let includePrereleaseActive = false
+let releaseUpdaterServicesInitialized = false
 let availableVersion: string | null = null
 let availableReleaseUrl: string | null = null
 let pendingCheckFailureKey: string | null = null
@@ -165,6 +203,7 @@ let publishingWindowLastGoodCheck: { lastGoodTag: string } | null = null
 let pendingPrereleaseFallback: {
   primaryTag: string
   fallbackTag: string
+  variant: UpdateCheckVariant
   // Why: primary promise cleanup can run after fallback starts; fallback events need this attempt-scoped state, not the mutable global.
   userInitiated: boolean
   suppressedPrimaryPromiseFailureKey: string | null
@@ -187,6 +226,8 @@ let quittingForUpdate = false
 let autoUpdater: ElectronAutoUpdater | null = null
 let activeUpdateSource: 'release' | UpdateSource = 'release'
 let activeLocalBuildFeed: LocalBuildFeed | null = null
+let activeReleaseFeedUrl: string | null = null
+let updateAuthorityEpoch = 0
 let localBuildSelectionInProgress = false
 // Why: a dev channel/tag jump may target an older build, so it needs allowDowngrade
 // like local builds — but off a real release feed, not a loopback server.
@@ -195,6 +236,21 @@ let pinnedBuildSelectionInProgress = false
 // deliberate downgrade, so newer-only gates must yield to it too.
 let isPinnedBuildActive = false
 let getReleaseChannelOverride: (() => ReleaseChannel | null) | null = null
+let expectedUpdateOffer: UpdateCandidateIdentity | null = null
+let availableUpdateCandidate: UpdateCandidateIdentity | null = null
+let downloadingUpdateCandidate: UpdateCandidateIdentity | null = null
+let downloadedUpdateCandidate: UpdateCandidateIdentity | null = null
+
+function getProductUpdaterNetworkMode(): 'release' | 'local' {
+  return activeUpdateSource === 'local' ? 'local' : 'release'
+}
+
+function advanceUpdateAuthorityEpoch(): void {
+  if (updateAuthorityEpoch >= Number.MAX_SAFE_INTEGER) {
+    throw new Error('Updater authority epoch exhausted')
+  }
+  updateAuthorityEpoch += 1
+}
 
 function getAutoUpdater(): ElectronAutoUpdater {
   if (!autoUpdater) {
@@ -206,6 +262,9 @@ function getAutoUpdater(): ElectronAutoUpdater {
 function clearAvailableUpdateContext(): void {
   availableVersion = null
   availableReleaseUrl = null
+  availableUpdateCandidate = null
+  downloadingUpdateCandidate = null
+  downloadedUpdateCandidate = null
 }
 
 function closeLocalBuildFeed(): void {
@@ -217,15 +276,19 @@ function closeLocalBuildFeed(): void {
 }
 
 function restoreReleaseUpdateSource(): void {
+  clearAvailableUpdateContext()
   closeLocalBuildFeed()
+  advanceUpdateAuthorityEpoch()
   activeUpdateSource = 'release'
+  activeReleaseFeedUrl = null
   isPinnedBuildActive = false
   if (autoUpdater) {
     autoUpdater.allowDowngrade = false
-    autoUpdater.disableDifferentialDownload = false
-    // Why: a pinned jump forces allowPrerelease on; leaving it set would opt
-    // every later background check into the RC channel behind the user's back.
-    autoUpdater.allowPrerelease = includePrereleaseActive
+    // Security: 6.8.9 differential downloaders bypass the audited executor wrapper.
+    autoUpdater.disableDifferentialDownload = true
+    // Why: every release check reapplies its own variant. Restoring a pinned/local
+    // source must not leak prerelease acceptance into a later stable check.
+    autoUpdater.allowPrerelease = false
   }
 }
 
@@ -274,7 +337,12 @@ function decorateStatusWithActiveNudge(status: UpdateStatus): UpdateStatus {
   if (!activeUpdateNudgeId) {
     return status
   }
-  if (status.state === 'idle' || status.state === 'checking' || status.state === 'not-available') {
+  if (
+    status.state === 'idle' ||
+    status.state === 'disabled' ||
+    status.state === 'checking' ||
+    status.state === 'not-available'
+  ) {
     return status
   }
   return { ...status, activeNudgeId: activeUpdateNudgeId }
@@ -282,16 +350,21 @@ function decorateStatusWithActiveNudge(status: UpdateStatus): UpdateStatus {
 
 /** `force` re-delivers a status the renderer must not miss even when it repeats the current one. */
 function sendStatus(status: UpdateStatus, options?: { force?: boolean }): void {
+  if (status.state === 'error') {
+    status = { ...status, message: applyProductBranding(status.message) }
+  }
   const pendingUserInitiatedCheckVariant = pendingUserInitiatedCheckAfterInFlight
   const shouldLaunchPendingUserInitiatedCheck =
     pendingUserInitiatedCheckVariant !== null &&
     (status.state === 'idle' ||
+      status.state === 'disabled' ||
       status.state === 'not-available' ||
       status.state === 'available' ||
       status.state === 'error')
   const shouldPreserveNudgeForPublishingWindow =
     publishingWindowLastGoodCheck !== null &&
     (status.state === 'idle' ||
+      status.state === 'disabled' ||
       status.state === 'not-available' ||
       status.state === 'available' ||
       status.state === 'error')
@@ -305,6 +378,7 @@ function sendStatus(status: UpdateStatus, options?: { force?: boolean }): void {
       }
     } else if (
       status.state === 'idle' ||
+      status.state === 'disabled' ||
       status.state === 'not-available' ||
       status.state === 'error'
     ) {
@@ -331,6 +405,7 @@ function sendStatus(status: UpdateStatus, options?: { force?: boolean }): void {
 
   if (
     status.state === 'idle' ||
+    status.state === 'disabled' ||
     status.state === 'not-available' ||
     status.state === 'available' ||
     status.state === 'error'
@@ -342,7 +417,8 @@ function sendStatus(status: UpdateStatus, options?: { force?: boolean }): void {
   if (
     decoratedStatus.state === 'downloading' ||
     decoratedStatus.state === 'error' ||
-    decoratedStatus.state === 'idle'
+    decoratedStatus.state === 'idle' ||
+    decoratedStatus.state === 'disabled'
   ) {
     downloadInFlight = false
   }
@@ -380,13 +456,22 @@ function getUpdateCheckVariant(options?: UpdateCheckOptions): UpdateCheckVariant
   if (options?.includePrerelease) {
     return 'prerelease'
   }
-  // Why: a persisted 'rc' override makes every routine check follow the RC series
-  // without the user re-holding shift; the dev channels need an explicit tag, so
-  // neither is a routine-check variant.
-  if (getReleaseChannelOverride?.() === 'rc') {
-    return 'prerelease'
+  // A user override wins over the product default. Historical dev channels require
+  // an explicit tag and therefore cannot become a routine-check variant.
+  const override = getReleaseChannelOverride?.()
+  if (override === 'stable' || override === 'rc') {
+    return override === 'rc' ? 'prerelease' : 'default'
   }
-  return 'default'
+  const configuredChannel = resolveProductUpdateSource()?.channel
+  if (
+    configuredChannel === 'stable' ||
+    configuredChannel === 'beta' ||
+    configuredChannel === 'rc'
+  ) {
+    return configuredChannel === 'stable' ? 'default' : 'prerelease'
+  }
+  // Defensive compatibility for a legacy RC install whose manifest has no source.
+  return isPrereleaseVersion(app.getVersion()) ? 'prerelease' : 'default'
 }
 
 function launchPendingUserInitiatedCheckAfterInFlight(variant: UpdateCheckVariant): void {
@@ -429,6 +514,7 @@ function finishActiveUpdateCheckAttempt(): void {
   activeUpdateCheckAttemptId = null
   activeUpdateCheckLaunchAttemptId = null
   activeUpdateCheckEventAttemptId = null
+  expectedUpdateOffer = null
   clearUpdateCheckTimers()
 }
 
@@ -507,6 +593,7 @@ function armUpdateCheckStallTimer(attemptId: number): void {
 
 function beginUpdateCheckAttempt(): number {
   finishActiveUpdateCheckAttempt()
+  clearAvailableUpdateContext()
   updateAvailableEventPendingAttemptId = null
   updateCheckAttemptSequence += 1
   activeUpdateCheckAttemptId = updateCheckAttemptSequence
@@ -514,6 +601,109 @@ function beginUpdateCheckAttempt(): number {
   // Why: issue #7576 warnings recurred at retry cadence; timestamp each attempt to confirm or rule out the updater.
   writeMainThreadDiagnosticMarker('updater-check-attempt')
   return activeUpdateCheckAttemptId
+}
+
+function setExpectedUpdateOffer(candidate: UpdateCandidateIdentity): void {
+  if (isActiveUpdateCheckAttempt(candidate.generation)) {
+    expectedUpdateOffer = candidate
+  }
+}
+
+function isExpectedUpdateOffer(attemptId: number, version: string): boolean {
+  return expectedUpdateOffer?.generation === attemptId && expectedUpdateOffer.version === version
+}
+
+function acceptAvailableUpdateCandidate(version: string): void {
+  if (
+    !expectedUpdateOffer ||
+    !isActiveUpdateCheckAttempt(expectedUpdateOffer.generation) ||
+    expectedUpdateOffer.version !== version ||
+    !isUpdateCandidateCurrent(expectedUpdateOffer)
+  ) {
+    clearAvailableUpdateContext()
+    return
+  }
+  availableVersion = version
+  availableUpdateCandidate = expectedUpdateOffer
+  downloadingUpdateCandidate = null
+  downloadedUpdateCandidate = null
+}
+
+function isUpdateCandidateCurrent(candidate: UpdateCandidateIdentity): boolean {
+  if (candidate.authorityEpoch !== updateAuthorityEpoch) {
+    return false
+  }
+  if (candidate.kind === 'local') {
+    return activeUpdateSource === 'local' && activeLocalBuildFeed?.url === candidate.feedUrl
+  }
+  const source = hasConfiguredProductUpdateChannel() ? resolveProductUpdateSource() : null
+  if (!source) {
+    return false
+  }
+  if (candidate.kind === 'pinned') {
+    return isPinnedBuildActive && activeUpdateSource === candidate.source
+  }
+  if (source.provider === 'hivecloud') {
+    return (
+      activeUpdateSource === 'release' &&
+      !isPinnedBuildActive &&
+      candidate.provider === 'hivecloud' &&
+      candidate.repository === null &&
+      candidate.sourceChannel === source.channel &&
+      candidate.feedUrl === activeReleaseFeedUrl &&
+      candidate.overrideChannel === (getReleaseChannelOverride?.() ?? null)
+    )
+  }
+  if (!source.github) {
+    return false
+  }
+  return (
+    activeUpdateSource === 'release' &&
+    !isPinnedBuildActive &&
+    candidate.provider === 'github' &&
+    candidate.repository === source.github.repo &&
+    candidate.sourceChannel === source.channel &&
+    candidate.overrideChannel === (getReleaseChannelOverride?.() ?? null)
+  )
+}
+
+function acceptDownloadedUpdateCandidate(version: string): boolean {
+  if (
+    !downloadingUpdateCandidate ||
+    downloadingUpdateCandidate.version !== version ||
+    !isUpdateCandidateCurrent(downloadingUpdateCandidate)
+  ) {
+    clearAvailableUpdateContext()
+    return false
+  }
+  downloadedUpdateCandidate = downloadingUpdateCandidate
+  return true
+}
+
+function rejectUnexpectedUpdateOffer(
+  attemptId: number,
+  version: string,
+  wasUserInitiated: boolean
+): void {
+  if (!isActiveUpdateCheckAttempt(attemptId)) {
+    return
+  }
+  const shouldRestoreRelease = activeUpdateSource === 'local' || isPinnedBuildActive
+  finishActiveUpdateCheckAttempt()
+  backgroundCheckLaunchPending = false
+  backgroundCheckPromotedToUserInitiated = false
+  userInitiatedCheck = false
+  clearAvailableUpdateContext()
+  scheduleAutomaticUpdateCheck(AUTO_UPDATE_RETRY_INTERVAL_MS)
+  sendStatus({
+    state: 'error',
+    message: 'Update metadata did not match the verified release tag.',
+    userInitiated: wasUserInitiated || undefined
+  })
+  recordUpdaterLifecycle('update_offer_identity_rejected', { version })
+  if (shouldRestoreRelease) {
+    restoreReleaseUpdateSource()
+  }
 }
 
 function rearmActiveUpdateCheckStallTimer(): void {
@@ -530,6 +720,7 @@ function getSettledCheckUserInitiated(): boolean | undefined {
 function isUpdateCheckResultState(state: UpdateStatus['state']): boolean {
   return (
     state === 'idle' ||
+    state === 'disabled' ||
     state === 'not-available' ||
     state === 'available' ||
     state === 'error' ||
@@ -617,6 +808,7 @@ function shouldHandleUpdaterErrorEvent(): boolean {
 }
 
 function sendErrorStatus(message: string, userInitiated?: boolean): void {
+  message = applyProductBranding(message)
   if (
     currentStatus.state === 'error' &&
     currentStatus.message === message &&
@@ -640,11 +832,12 @@ function getKnownReleaseUrl(): string | undefined {
 
 function hasInstallableDownloadedVersion(): boolean {
   return (
-    availableVersion !== null &&
+    downloadedUpdateCandidate !== null &&
+    availableVersion === downloadedUpdateCandidate.version &&
+    isUpdateCandidateCurrent(downloadedUpdateCandidate) &&
     // Why: local builds and pinned dev jumps may intentionally move backwards.
-    (activeUpdateSource !== 'release' ||
-      isPinnedBuildActive ||
-      compareVersions(availableVersion, app.getVersion()) > 0)
+    (downloadedUpdateCandidate.kind !== 'release' ||
+      compareVersions(downloadedUpdateCandidate.version, app.getVersion()) > 0)
   )
 }
 
@@ -713,6 +906,12 @@ async function performQuitAndInstall(): Promise<void> {
   if (pendingQuitAndInstallTimer) {
     clearTimeout(pendingQuitAndInstallTimer)
     pendingQuitAndInstallTimer = null
+  }
+
+  if (!hasInstallablePendingUpdate()) {
+    recordUpdaterLifecycle('quit_and_install_ignored', { reason: 'no-downloaded-update' })
+    mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
+    return
   }
 
   const pendingVersion = getPendingInstallVersion()
@@ -1150,7 +1349,9 @@ async function sendCheckFailureStatus(
 function isRetryableReleaseFeedPreflightFailure(sourceError: unknown): boolean {
   return (
     sourceError instanceof ReleaseFeedPreflightError &&
-    (sourceError.reason === 'release-not-ready' || sourceError.reason === 'manifest-unavailable')
+    (sourceError.reason === 'feed-unavailable' ||
+      sourceError.reason === 'release-not-ready' ||
+      sourceError.reason === 'manifest-unavailable')
   )
 }
 
@@ -1163,7 +1364,17 @@ function isStableReleaseNotReadyFailure(sourceError: unknown): boolean {
 }
 
 export function getUpdateStatus(): UpdateStatus {
+  if (
+    !hasConfiguredProductUpdateChannel() &&
+    (currentStatus.state === 'idle' || currentStatus.state === 'not-available')
+  ) {
+    return { state: 'disabled', reason: 'not-configured' }
+  }
   return currentStatus
+}
+
+export function reportReleaseUpdatesDisabled(): void {
+  sendStatus({ state: 'disabled', reason: 'not-configured' })
 }
 
 export function getRemoteServerUpdateSupport(): RemoteServerUpdateSupport {
@@ -1174,7 +1385,11 @@ export function getRemoteServerUpdateSupport(): RemoteServerUpdateSupport {
       reason: 'unpackaged-build'
     }
   }
-  if (!autoUpdaterInitialized) {
+  if (
+    !autoUpdaterInitialized ||
+    !releaseUpdaterServicesInitialized ||
+    !hasConfiguredProductUpdateChannel()
+  ) {
     return {
       installMode: updateInstallMode,
       automatic: false,
@@ -1182,6 +1397,13 @@ export function getRemoteServerUpdateSupport(): RemoteServerUpdateSupport {
     }
   }
   if (updateInstallMode === 'unsupported-headless-serve') {
+    return {
+      installMode: updateInstallMode,
+      automatic: false,
+      reason: 'manual-service-update-required'
+    }
+  }
+  if (getLinuxRootPackageType() && requiresManualLinuxRootPackageInstall()) {
     return {
       installMode: updateInstallMode,
       automatic: false,
@@ -1210,6 +1432,17 @@ export function checkForRemoteServerUpdate(
   runtimeId: string,
   options?: UpdateCheckOptions
 ): RemoteServerUpdaterSnapshot {
+  if (options?.localBuild) {
+    if (!autoUpdaterInitialized) {
+      throw new Error('remote_update_manual_required')
+    }
+    checkForUpdatesFromMenu(options)
+    return getRemoteServerUpdaterSnapshot(runtimeId)
+  }
+  if (!releaseUpdaterServicesInitialized || !hasConfiguredProductUpdateChannel()) {
+    reportReleaseUpdatesDisabled()
+    return getRemoteServerUpdaterSnapshot(runtimeId)
+  }
   assertRemoteServerUpdateAvailable()
   checkForUpdatesFromMenu(options)
   return getRemoteServerUpdaterSnapshot(runtimeId)
@@ -1226,18 +1459,29 @@ export function downloadRemoteServerUpdate(runtimeId: string): RemoteServerUpdat
 
 export function installRemoteServerUpdate(runtimeId: string): RemoteServerUpdateInstallResult {
   assertRemoteServerUpdateAvailable()
-  if (currentStatus.state !== 'downloaded') {
+  const updateStatus = currentStatus
+  if (
+    updateStatus.state !== 'downloaded' &&
+    !(
+      updateStatus.state === 'downloading' &&
+      isWaitingForMacInstallerReadiness(updateStatus, hasInstallableDownloadedVersion())
+    )
+  ) {
     throw new Error('remote_update_not_downloaded')
   }
-  const targetVersion = currentStatus.version
-  const result: RemoteServerUpdateInstallResult = {
-    accepted: true,
+  const targetVersion = updateStatus.version
+  const accepted = quitAndInstall()
+  const rejectionReason =
+    getActiveLinuxPackageRecovery()?.reason === 'manual-install-required'
+      ? 'manual_linux_package_install_required'
+      : 'quit_and_install_rejected_preflight'
+  return {
+    accepted,
     fromVersion: app.getVersion(),
     targetVersion,
-    runtimeId
+    runtimeId,
+    ...(accepted ? {} : { reason: rejectionReason })
   }
-  quitAndInstall()
-  return result
 }
 
 let consecutiveAutomaticRetrySchedules = 0
@@ -1354,15 +1598,151 @@ function markMissingManifestPrereleaseFallbackPromiseHandled(message: string): v
   )
 }
 
-async function pinDefaultReleaseFeed(
-  variant: UpdateCheckVariant = 'default'
+function canCommitReleaseFeedForAttempt(attemptId: number): boolean {
+  return (
+    isActiveUpdateCheckAttempt(attemptId) &&
+    activeUpdateSource === 'release' &&
+    !isPinnedBuildActive &&
+    !localBuildSelectionInProgress &&
+    !pinnedBuildSelectionInProgress
+  )
+}
+
+function commitReleaseFeedForAttempt(
+  attemptId: number,
+  url: string,
+  tag: string,
+  variant: UpdateCheckVariant
+): boolean {
+  if (!canCommitReleaseFeedForAttempt(attemptId)) {
+    return false
+  }
+  const source = resolveProductUpdateSource()
+  if (!source?.github) {
+    return false
+  }
+  advanceUpdateAuthorityEpoch()
+  activeReleaseFeedUrl = url
+  getAutoUpdater().setFeedURL({ provider: 'generic', url })
+  setExpectedUpdateOffer({
+    generation: attemptId,
+    authorityEpoch: updateAuthorityEpoch,
+    kind: 'release',
+    provider: 'github',
+    source: 'release',
+    repository: source.github.repo,
+    sourceChannel: source.channel,
+    checkChannel: variant,
+    tag,
+    version: tag.replace(/^v/, ''),
+    feedUrl: url,
+    overrideChannel: getReleaseChannelOverride?.() ?? null
+  })
+  return true
+}
+
+function getGenericUpdateManifestName(): string {
+  if (process.platform === 'darwin') {
+    return 'latest-mac.yml'
+  }
+  if (process.platform === 'linux') {
+    return 'latest-linux.yml'
+  }
+  return 'latest.yml'
+}
+
+async function prepareHiveCloudReleaseFeed(
+  variant: UpdateCheckVariant,
+  attemptId: number
 ): Promise<ReleaseFeedPreflightResult> {
-  const autoUpdater = getAutoUpdater()
-  // Why: the latest/download redirect can move between check and download, so pin the concrete tag (prerelease users resolve any channel, stable only stable).
+  const source = resolveProductUpdateSource()
+  if (source?.provider !== 'hivecloud' || source.github !== null) {
+    throw new Error('HiveCloud update source is not configured')
+  }
+  const feedUrl = resolveProductUpdateFeedUrl(source, process.platform, process.arch)
+  if (!feedUrl) {
+    throw new Error('HiveCloud updates are unavailable for this platform')
+  }
+  if (!canCommitReleaseFeedForAttempt(attemptId)) {
+    return 'superseded'
+  }
+
+  advanceUpdateAuthorityEpoch()
+  activeReleaseFeedUrl = feedUrl
+  getAutoUpdater().setFeedURL({ provider: 'generic', url: feedUrl })
+
+  const manifestUrl = new URL(getGenericUpdateManifestName(), feedUrl).href
+  const response = await fetchWithProductUpdaterSession(manifestUrl, {
+    redirect: 'error',
+    signal: AbortSignal.timeout(GENERIC_UPDATE_PREFLIGHT_TIMEOUT_MS)
+  })
+  if (!response.ok) {
+    await cancelUnreadResponseBody(response)
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      variant,
+      'Unable to resolve the HiveCloud update feed'
+    )
+  }
+  const manifestText = await readResponseTextWithLimit(response, MAX_GENERIC_UPDATE_MANIFEST_BYTES)
+  if (manifestText === null) {
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      variant,
+      'HiveCloud update metadata exceeded the size limit'
+    )
+  }
+
+  let version: unknown
+  try {
+    version = (parse(manifestText) as { version?: unknown } | null)?.version
+  } catch {
+    version = null
+  }
+  if (typeof version !== 'string' || !isValidVersion(version)) {
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      variant,
+      'HiveCloud update metadata did not contain a valid version'
+    )
+  }
+  if (!canCommitReleaseFeedForAttempt(attemptId)) {
+    return 'superseded'
+  }
+
+  setExpectedUpdateOffer({
+    generation: attemptId,
+    authorityEpoch: updateAuthorityEpoch,
+    kind: 'release',
+    provider: 'hivecloud',
+    source: 'release',
+    repository: null,
+    sourceChannel: source.channel,
+    checkChannel: variant,
+    tag: version,
+    version,
+    feedUrl,
+    overrideChannel: getReleaseChannelOverride?.() ?? null
+  })
+  return 'ready'
+}
+
+async function pinDefaultReleaseFeed(
+  variant: UpdateCheckVariant,
+  attemptId: number
+): Promise<ReleaseFeedPreflightResult> {
+  const source = resolveProductUpdateSource()
+  if (source?.provider === 'hivecloud') {
+    clearPrereleaseFallbackContext()
+    clearPublishingWindowLastGoodCheck()
+    return prepareHiveCloudReleaseFeed(variant, attemptId)
+  }
+  if (source?.provider !== 'github' || !source.github) {
+    throw new Error('Product update source is not configured')
+  }
   const currentVersion = app.getVersion()
   const isPerfCheck = variant === 'perf'
-  const includePrerelease =
-    isPerfCheck || includePrereleaseActive || isPrereleaseVersion(currentVersion)
+  const includePrerelease = variant !== 'default'
   const releaseTagsResult = await fetchNewerReleaseTagsWithReadiness(
     currentVersion,
     includePrerelease ? 2 : 1,
@@ -1371,6 +1751,10 @@ async function pinDefaultReleaseFeed(
       ...(isPerfCheck ? { releaseFilter: 'perf' as const } : {})
     }
   )
+  if (!canCommitReleaseFeedForAttempt(attemptId)) {
+    return 'superseded'
+  }
+
   const newerTag = releaseTagsResult.tags[0] ?? null
   const fallbackTag = includePrerelease ? (releaseTagsResult.tags[1] ?? null) : null
   pendingPrereleaseFallback =
@@ -1378,6 +1762,7 @@ async function pinDefaultReleaseFeed(
       ? {
           primaryTag: newerTag,
           fallbackTag,
+          variant,
           userInitiated: false,
           suppressedPrimaryPromiseFailureKey: null,
           suppressedPrimaryEventFailure: null,
@@ -1388,68 +1773,77 @@ async function pinDefaultReleaseFeed(
           retryLaunched: false
         }
       : null
-  // Why: console.info is captured by Console.app/--enable-logging — our only field visibility into the updater.
+
   if (newerTag) {
     clearPublishingWindowLastGoodCheck()
     const url = getReleaseDownloadUrl(newerTag)
+    if (!url) {
+      throw new Error('Product update tag download base is not configured')
+    }
+    if (!commitReleaseFeedForAttempt(attemptId, url, newerTag, variant)) {
+      return 'superseded'
+    }
     console.info(
       `[updater] release feed pinned: current=${currentVersion} includePrerelease=${includePrerelease} → ${url}`
     )
-    autoUpdater.setFeedURL({ provider: 'generic', url })
     return 'ready'
-  } else if (releaseTagsResult.state === 'not-ready') {
-    clearPrereleaseFallbackContext()
+  }
+
+  clearPrereleaseFallbackContext()
+  if (releaseTagsResult.state === 'not-ready') {
     if (releaseTagsResult.lastGoodTag) {
-      // Why: during a publish window the newest tag is unsafe; a verified last-good concrete feed lets electron-updater emit a real result.
       const url = getReleaseDownloadUrl(releaseTagsResult.lastGoodTag)
+      if (!url) {
+        throw new Error('Product update tag download base is not configured')
+      }
+      if (!commitReleaseFeedForAttempt(attemptId, url, releaseTagsResult.lastGoodTag, variant)) {
+        return 'superseded'
+      }
+      publishingWindowLastGoodCheck = { lastGoodTag: releaseTagsResult.lastGoodTag }
       console.info(
         `[updater] release feed pinned to last-good: current=${currentVersion} includePrerelease=${includePrerelease} → ${url}`
       )
-      publishingWindowLastGoodCheck = { lastGoodTag: releaseTagsResult.lastGoodTag }
-      autoUpdater.setFeedURL({ provider: 'generic', url })
       return 'ready'
     }
     clearPublishingWindowLastGoodCheck()
-    console.info(
-      `[updater] release feed deferred: current=${currentVersion} includePrerelease=${includePrerelease}; newest release assets are not ready`
-    )
     throw new ReleaseFeedPreflightError(
       'release-not-ready',
-      isPerfCheck ? 'perf' : includePrerelease ? 'prerelease' : 'default',
+      variant,
       'Latest release artifacts are not ready'
     )
-  } else if (
-    releaseTagsResult.state === 'unavailable' &&
-    releaseTagsResult.unavailableReason === 'manifest' &&
-    !includePrerelease
-  ) {
-    clearPrereleaseFallbackContext()
-    clearPublishingWindowLastGoodCheck()
-    throw new ReleaseFeedPreflightError(
-      'manifest-unavailable',
-      'default',
-      'Unable to find latest version on GitHub'
-    )
-  } else if (isPerfCheck) {
-    clearPrereleaseFallbackContext()
-    clearPublishingWindowLastGoodCheck()
-    if (releaseTagsResult.state === 'no-newer') {
-      console.info(
-        `[updater] perf release not found: current=${currentVersion} includePrerelease=${includePrerelease}`
-      )
-      return 'not-available'
-    }
-    throw new Error('Could not resolve perf update feed')
-  } else {
-    clearPrereleaseFallbackContext()
-    clearPublishingWindowLastGoodCheck()
-    const url = 'https://github.com/stablyai/orca/releases/latest/download'
-    console.info(
-      `[updater] release feed fallback: current=${currentVersion} includePrerelease=${includePrerelease} → ${url}`
-    )
-    autoUpdater.setFeedURL({ provider: 'generic', url })
-    return 'ready'
   }
+
+  clearPublishingWindowLastGoodCheck()
+  if (releaseTagsResult.state === 'no-newer') {
+    if (releaseTagsResult.currentTag) {
+      const url = getReleaseDownloadUrl(releaseTagsResult.currentTag)
+      if (!url) {
+        throw new Error('Product update tag download base is not configured')
+      }
+      if (!commitReleaseFeedForAttempt(attemptId, url, releaseTagsResult.currentTag, variant)) {
+        return 'superseded'
+      }
+      return 'ready'
+    }
+    console.info(
+      `[updater] release not found: current=${currentVersion} includePrerelease=${includePrerelease}`
+    )
+    return 'not-available'
+  }
+  if (releaseTagsResult.state === 'unavailable') {
+    throw new ReleaseFeedPreflightError(
+      releaseTagsResult.unavailableReason === 'manifest'
+        ? 'manifest-unavailable'
+        : 'feed-unavailable',
+      variant,
+      'Unable to resolve a verified update feed'
+    )
+  }
+  throw new ReleaseFeedPreflightError(
+    'feed-unavailable',
+    variant,
+    'Unable to resolve a verified update feed'
+  )
 }
 
 function retryPrereleaseFallbackAfterMissingManifest(
@@ -1471,6 +1865,12 @@ function retryPrereleaseFallbackAfterMissingManifest(
     return false
   }
 
+  const { primaryTag, fallbackTag } = pendingPrereleaseFallback
+  const url = getReleaseDownloadUrl(fallbackTag)
+  if (!url || !canCommitReleaseFeedForAttempt(attemptId)) {
+    return false
+  }
+
   // Why: a published tag can briefly lack its platform manifest mid-release; walk back once to the previous feed for a normal not-available result.
   pendingPrereleaseFallback.retryLaunched = true
   pendingPrereleaseFallback.userInitiated = Boolean(userInitiated)
@@ -1479,13 +1879,15 @@ function retryPrereleaseFallbackAfterMissingManifest(
   pendingPrereleaseFallback.suppressedPrimaryEventFailure =
     source === 'promise' ? { failureKey, error: sourceError } : null
   pendingPrereleaseFallback.fallbackCheckingForUpdateSeen = false
-  const { primaryTag, fallbackTag } = pendingPrereleaseFallback
-  const url = getReleaseDownloadUrl(fallbackTag)
   console.info(
     `[updater] prerelease manifest missing for ${primaryTag}; retrying once against ${url}`
   )
   const autoUpdater = getAutoUpdater()
-  autoUpdater.setFeedURL({ provider: 'generic', url })
+  if (
+    !commitReleaseFeedForAttempt(attemptId, url, fallbackTag, pendingPrereleaseFallback.variant)
+  ) {
+    return false
+  }
   userInitiatedCheck = Boolean(userInitiated)
   backgroundCheckLaunchPending = !userInitiated
   armUpdateCheckStallTimer(attemptId)
@@ -1514,6 +1916,9 @@ function retryPrereleaseFallbackAfterMissingManifest(
 function runBackgroundUpdateCheck(
   nudgeId: string | null = getPersistedPendingUpdateNudgeId()
 ): boolean {
+  if (!releaseUpdaterServicesInitialized || !hasConfiguredProductUpdateChannel()) {
+    return false
+  }
   // Why: a pinned dev jump owns the feed until it settles; a background check
   // would repoint it mid-flight and download the wrong build.
   if (
@@ -1537,6 +1942,8 @@ function runBackgroundUpdateCheck(
   backgroundCheckLaunchPending = true
   backgroundCheckPromotedToUserInitiated = false
   const attemptId = beginUpdateCheckAttempt()
+  const checkVariant = getUpdateCheckVariant()
+  applyUpdateCheckVariant(checkVariant)
   // Don't send 'checking' here — the 'checking-for-update' handler does; sending from both dupes notifications (issue #35).
   const autoUpdater = getAutoUpdater()
   const launch = (): Promise<unknown> | undefined => {
@@ -1546,7 +1953,19 @@ function runBackgroundUpdateCheck(
     markUpdateCheckLaunched(attemptId)
     return autoUpdater.checkForUpdates()
   }
-  const run = pinDefaultReleaseFeed().then(launch)
+  const run = pinDefaultReleaseFeed(checkVariant, attemptId).then((preflightResult) => {
+    if (preflightResult === 'ready') {
+      return launch()
+    }
+    if (preflightResult === 'not-available' && isActiveUpdateCheckAttempt(attemptId)) {
+      backgroundCheckLaunchPending = false
+      finishActiveUpdateCheckAttempt()
+      recordCompletedUpdateCheck()
+      sendStatus({ state: 'not-available' })
+      scheduleAutomaticUpdateCheck(AUTO_UPDATE_CHECK_INTERVAL_MS)
+    }
+    return undefined
+  })
   void Promise.resolve(run)
     .then(() => handleSettledUpdateCheckPromise(attemptId))
     .catch((err) => {
@@ -1572,17 +1991,10 @@ export function checkForUpdates(): void {
   })
 }
 
-function enablePrereleaseManifestChecks(): void {
-  getAutoUpdater().allowPrerelease = true
-}
-
-function enableIncludePrerelease(): void {
-  if (includePrereleaseActive) {
-    return
-  }
-  // Why: this flag makes electron-updater accept prerelease manifests; we keep the manifest-probed generic feed over the native GitHub provider because cancelled RCs can appear without assets.
-  enablePrereleaseManifestChecks()
-  includePrereleaseActive = true
+function applyUpdateCheckVariant(variant: UpdateCheckVariant): void {
+  // Why: electron-updater keeps this mutable process-wide. Assign on every attempt
+  // so RC, perf, stable, and restored local/pinned checks cannot contaminate one another.
+  getAutoUpdater().allowPrerelease = variant !== 'default'
 }
 
 /** Menu-triggered check — delegates feedback to renderer toasts via userInitiated flag */
@@ -1593,6 +2005,10 @@ export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
   }
   if (options?.localBuild) {
     void checkForLocalBuildFromMenu()
+    return
+  }
+  if (!releaseUpdaterServicesInitialized || !hasConfiguredProductUpdateChannel()) {
+    reportReleaseUpdatesDisabled()
     return
   }
   if (options?.targetTag && options.channel) {
@@ -1611,13 +2027,11 @@ export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
   restoreReleaseUpdateSource()
 
   const checkVariant = getUpdateCheckVariant(options)
+  applyUpdateCheckVariant(checkVariant)
   if (checkVariant === 'prerelease') {
     clearPrereleaseFallbackContext()
-    enableIncludePrerelease()
   } else if (checkVariant === 'perf') {
     clearPrereleaseFallbackContext()
-    // Why: perf checks need prerelease manifests now, but must not opt future default/background checks into the RC channel.
-    enablePrereleaseManifestChecks()
   }
 
   const checkAlreadyInFlight = backgroundCheckLaunchPending || currentStatus.state === 'checking'
@@ -1645,7 +2059,7 @@ export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
     markUpdateCheckLaunched(attemptId)
     return autoUpdater.checkForUpdates()
   }
-  const run = pinDefaultReleaseFeed(checkVariant).then((preflightResult) => {
+  const run = pinDefaultReleaseFeed(checkVariant, attemptId).then((preflightResult) => {
     if (preflightResult === 'not-available') {
       if (!isActiveUpdateCheckAttempt(attemptId)) {
         return false
@@ -1700,8 +2114,10 @@ async function checkForLocalBuildFromMenu(): Promise<void> {
     }
     closeLocalBuildFeed()
     const feed = await startLocalBuildFeed(candidate)
+    advanceUpdateAuthorityEpoch()
     activeLocalBuildFeed = feed
     activeUpdateSource = 'local'
+    activeReleaseFeedUrl = null
     clearPrereleaseFallbackContext()
     clearPublishingWindowLastGoodCheck()
     clearAvailableUpdateContext()
@@ -1714,6 +2130,20 @@ async function checkForLocalBuildFromMenu(): Promise<void> {
     updater.disableDifferentialDownload = true
     updater.setFeedURL({ provider: 'generic', url: feed.url })
     const attemptId = beginUpdateCheckAttempt()
+    setExpectedUpdateOffer({
+      generation: attemptId,
+      authorityEpoch: updateAuthorityEpoch,
+      kind: 'local',
+      provider: null,
+      source: 'local',
+      repository: null,
+      sourceChannel: null,
+      checkChannel: 'local',
+      tag: `local:${candidate.version}`,
+      version: candidate.version,
+      feedUrl: feed.url,
+      overrideChannel: null
+    })
     markUpdateCheckLaunched(attemptId)
     await updater.checkForUpdates()
     handleSettledUpdateCheckPromise(attemptId)
@@ -1726,6 +2156,9 @@ async function checkForLocalBuildFromMenu(): Promise<void> {
 }
 
 export async function listAvailableReleaseBuilds(channel: ReleaseChannel): Promise<ReleaseBuild[]> {
+  if (!releaseUpdaterServicesInitialized || !hasConfiguredProductUpdateChannel()) {
+    return []
+  }
   return listReleaseBuilds(channel)
 }
 
@@ -1799,9 +2232,25 @@ async function checkForPinnedBuild(channel: ReleaseChannel, tag: string): Promis
     updater.disableDifferentialDownload = true
     updater.allowPrerelease = true
     console.info(`[updater] pinned to ${channel} build ${target.tag} → ${target.feedUrl}`)
+    advanceUpdateAuthorityEpoch()
+    activeReleaseFeedUrl = target.feedUrl
     updater.setFeedURL({ provider: 'generic', url: target.feedUrl })
     availableReleaseUrl = target.feedUrl
     const attemptId = beginUpdateCheckAttempt()
+    setExpectedUpdateOffer({
+      generation: attemptId,
+      authorityEpoch: updateAuthorityEpoch,
+      kind: 'pinned',
+      provider: resolveProductUpdateSource()?.provider ?? null,
+      source: activeUpdateSource,
+      repository: resolveProductUpdateSource()?.github?.repo ?? null,
+      sourceChannel: resolveProductUpdateSource()?.channel ?? null,
+      checkChannel: channel,
+      tag: target.tag,
+      version: target.version,
+      feedUrl: target.feedUrl,
+      overrideChannel: getReleaseChannelOverride?.() ?? null
+    })
     markUpdateCheckLaunched(attemptId)
     await updater.checkForUpdates()
     handleSettledUpdateCheckPromise(attemptId)
@@ -1830,6 +2279,69 @@ function getActiveLinuxPackageRecovery(): LinuxPackageInstallRecovery | null {
   return currentStatus.recovery?.kind === 'linux-package-install' ? currentStatus.recovery : null
 }
 
+/**
+ * electron-updater gives the privileged package manager a mutable cache path, not the file
+ * descriptor whose bytes were verified. Fail closed to the revalidated manual actions instead of
+ * claiming that a path stat/chmod closes the final open-after-check race.
+ */
+function routeLinuxRootPackageToManualInstall(): boolean {
+  if (!requiresManualLinuxRootPackageInstall()) {
+    return false
+  }
+  const packageType = getLinuxRootPackageType()
+  if (!packageType) {
+    return false
+  }
+  const artifact = getTrackedLinuxPackageArtifact()
+  const version = getPendingInstallVersion()
+  if (
+    !artifact ||
+    artifact.packageType !== packageType ||
+    !version ||
+    artifact.version !== version
+  ) {
+    recordUpdaterLifecycle('linux_package_manual_install_unavailable', {
+      reason: 'artifact-not-retained',
+      packageType,
+      ...(version ? { version } : {})
+    })
+    sendInstallFailureStatus({
+      state: 'error',
+      message: MANUAL_LINUX_PACKAGE_UNAVAILABLE_MESSAGE
+    })
+    mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
+    return true
+  }
+
+  const recovery: LinuxPackageInstallRecovery = {
+    kind: 'linux-package-install',
+    packageType,
+    reason: 'manual-install-required',
+    version
+  }
+  recordUpdaterLifecycle('linux_package_manual_install_required', { packageType, version })
+  sendInstallFailureStatus({
+    state: 'error',
+    message: MANUAL_LINUX_PACKAGE_INSTALL_MESSAGE,
+    recovery
+  })
+  mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
+  return true
+}
+
+function hasInstallablePendingUpdate(): boolean {
+  if (!hasInstallableDownloadedVersion()) {
+    return false
+  }
+  if (isWaitingForMacInstallerReadiness(currentStatus, true)) {
+    return true
+  }
+  return (
+    (currentStatus.state === 'downloaded' || getActiveLinuxPackageRecovery() !== null) &&
+    hasMacInstallAuthority()
+  )
+}
+
 const LINUX_PACKAGE_RECOVERY_MESSAGES: Record<LinuxPackageRecoveryUnavailableReason, string> = {
   missing:
     'The downloaded package is no longer in the update cache. Download the update again, or get it from the official release page.',
@@ -1844,6 +2356,12 @@ const LINUX_PACKAGE_RECOVERY_MESSAGES: Record<LinuxPackageRecoveryUnavailableRea
     'No sudo command was found in the system directories, so Orca cannot build a safe install command. Show the package and install it with your package manager.',
   'no-package-manager':
     'No supported package manager was found in the system directories, so Orca cannot build a safe install command. Show the package and install it with your package manager.',
+  'no-integrity-checker':
+    'No trusted SHA-512 utility was found in the system directories, so the app cannot build a verified install command. Show the package and install it with your package manager.',
+  'no-secure-staging-tools':
+    'The system is missing a trusted shell or file-copy utility required to create a root-owned verified package. The app will not build a privileged install command; show the package and install it with your package manager.',
+  'invalid-package-digest':
+    'The downloaded package digest is invalid, so the app will not build an install command. Download the update again, or get it from the official release page.',
   // Defensive: capture only ever tracks absolute cache paths, so this reports a bug rather than a machine state.
   'invalid-package-path':
     'The downloaded package is not at a usable path, so Orca cannot build a safe install command. Show the package and install it with your package manager.'
@@ -1916,11 +2434,23 @@ async function proveRetainedLinuxPackage(pendingVersion: string): Promise<boolea
   const recovery = getActiveLinuxPackageRecovery()
   const cycle = getInstallCycleSignature()
   const reason = await revalidateRetainedLinuxPackage(artifact)
-  if (!reason) {
-    return true
+  if (reason) {
+    reportLinuxPackageRevalidationFailure({ artifact, recovery, reason, cycle })
+    return false
   }
-  reportLinuxPackageRevalidationFailure({ artifact, recovery, reason, cycle })
-  return false
+  // TOCTOU mitigation: after the fresh SHA-512 passes, lock the file down so
+  // same-UID code cannot trivially replace it before the root package manager opens it.
+  // Only Linux root-package installs (dpkg/rpm) have this user-writable cache window;
+  // the chmod is a best-effort mitigation — any failure is non-fatal.
+  if (process.platform === 'linux') {
+    try {
+      const fs = await import('node:fs/promises')
+      await fs.chmod(artifact.path, 0o444)
+    } catch {
+      // Best-effort: chmod may fail on test paths or network mounts; proceed.
+    }
+  }
+  return true
 }
 
 /** The failing reason, or null when the retained package still matches its release digest. */
@@ -1973,6 +2503,16 @@ function reportLinuxPackageRevalidationFailure({
   if (clearsArtifact && getTrackedLinuxPackageArtifact() === artifact) {
     clearTrackedLinuxPackageArtifact()
   }
+  // Why: a read failure is not evidence that the retained bytes changed. Keep a capability that
+  // can retry the same artifact, while every retry still re-proves the digest before root install.
+  const retryRecovery: LinuxPackageInstallRecovery | null = clearsArtifact
+    ? null
+    : (recovery ?? {
+        kind: 'linux-package-install',
+        packageType: artifact.packageType,
+        reason: 'package-install-failed',
+        version: artifact.version
+      })
   // Why: same reasoning as failLinuxPackageRecovery — a verdict from a cycle that has since been
   // replaced must not clobber whatever card the user is looking at now.
   if (getInstallCycleSignature() !== cycle) {
@@ -1983,7 +2523,7 @@ function reportLinuxPackageRevalidationFailure({
     message: LINUX_PACKAGE_RECOVERY_MESSAGES[reason],
     // Why: an unreadable file is not evidence the bytes changed, so the recovery card and its
     // Copy/Show actions survive a transient I/O failure exactly as they do elsewhere.
-    ...(recovery && !clearsArtifact ? { recovery } : {})
+    ...(retryRecovery ? { recovery: retryRecovery } : {})
   })
 }
 
@@ -2030,7 +2570,7 @@ export async function showLinuxPackage(): Promise<void> {
   }
 }
 
-export function quitAndInstall(): void {
+export function quitAndInstall(): boolean {
   if (
     localBuildSelectionInProgress ||
     pinnedBuildSelectionInProgress ||
@@ -2040,7 +2580,17 @@ export function quitAndInstall(): void {
     // without this a second click would schedule a parallel install of the same package.
     linuxPackageRevalidationInFlight
   ) {
-    return
+    return false
+  }
+
+  if (!hasInstallablePendingUpdate()) {
+    recordUpdaterLifecycle('quit_and_install_ignored', { reason: 'no-downloaded-update' })
+    mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
+    return false
+  }
+
+  if (routeLinuxRootPackageToManualInstall()) {
+    return false
   }
 
   const retriedRecovery = getActiveLinuxPackageRecovery()
@@ -2053,7 +2603,7 @@ export function quitAndInstall(): void {
   }
 
   if (deferHeadlessServeInstall('install', getPendingInstallVersion())) {
-    return
+    return false
   }
 
   if (
@@ -2064,13 +2614,16 @@ export function quitAndInstall(): void {
       sendStatus
     )
   ) {
-    return
+    // The request is durably armed and will hand off once the matching Squirrel
+    // readiness signal arrives. Public IPC/RPC callers must not retry it as a rejection.
+    return true
   }
 
   // Why: defer the quit a tick so the renderer can flush dismissals/state before windows start closing.
   pendingQuitAndInstallTimer = setTimeout(() => {
     void performQuitAndInstall()
   }, QUIT_AND_INSTALL_DELAY_MS)
+  return true
 }
 
 async function checkForUpdateNudge(): Promise<void> {
@@ -2172,6 +2725,7 @@ export function setupAutoUpdater(
     setDismissedUpdateNudgeId?: (id: string | null) => void
     getReleaseChannelOverride?: () => ReleaseChannel | null
     installMode?: UpdateInstallMode
+    localOnly?: boolean
   }
 ): void {
   mainWindowRef = mainWindow
@@ -2207,12 +2761,13 @@ export function setupAutoUpdater(
   autoUpdater.autoDownload = false
   if (activeUpdateSource === 'release') {
     autoUpdater.allowDowngrade = false
-    autoUpdater.disableDifferentialDownload = false
   }
-  // Why: supervised serve installs require an explicit handoff; ordinary service quits must never install implicitly.
-  // Root Linux packages also opt out: an implicit quit-time escalation would fail after the UI is gone, leaving no recovery surface.
-  autoUpdater.autoInstallOnAppQuit =
-    updateInstallMode === 'interactive' && getLinuxRootPackageType() === null
+  // Security: differential range requests bypass the guarded executor and have
+  // weaker blockmap bounds in 6.8.9. Full downloads remain on the audited sink.
+  autoUpdater.disableDifferentialDownload = true
+  // Security: every install must pass the explicit source/generation/re-proof gate in quitAndInstall.
+  // electron-updater's quit-time fallback does not carry that product identity into its sink.
+  autoUpdater.autoInstallOnAppQuit = false
   // Why: MacUpdater ignores quitAndInstall arguments; the surviving CLI supervisor must be the only serve relaunch owner.
   autoUpdater.autoRunAppAfterInstall = updateInstallMode === 'interactive'
 
@@ -2222,64 +2777,103 @@ export function setupAutoUpdater(
 
   // Security: never re-add a verifyUpdateCodeSignature override — a no-op disables electron-updater's built-in Authenticode check and accepts any installer.
 
-  // Why: generic provider avoids the native GitHub provider's RC-channel filtering; per-check repinning to a concrete /releases/download/<tag>/ URL avoids /latest redirect drift between check and download.
-  if (activeUpdateSource === 'release') {
-    autoUpdater.setFeedURL({
-      provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
+  if (!autoUpdaterInitialized) {
+    autoUpdaterInitialized = true
+    registerAutoUpdaterHandlers({
+      autoUpdater,
+      clearAvailableUpdateContext,
+      consumeMissingManifestPrereleaseFallbackResult,
+      getMissingManifestPrereleaseFallbackUserInitiated,
+      getPublishingWindowLastGoodCheck,
+      getActiveUpdateCheckEventAttemptId,
+      getCurrentStatus: () => currentStatus,
+      getKnownReleaseUrl,
+      getPendingInstallVersion,
+      getUserInitiatedCheck: () => userInitiatedCheck,
+      handleQuitAndInstallFailure,
+      isQuitAndInstallHandoffActive,
+      hasInstallableDownloadedVersion,
+      isLocalBuildCheck: () => activeUpdateSource === 'local',
+      // Why: pinned jumps are deliberate, so update-available/-downloaded must not
+      // reject them for being older than the running version.
+      isPinnedBuildCheck: () => isPinnedBuildActive,
+      isExpectedUpdateOffer,
+      rejectUnexpectedUpdateOffer,
+      acceptDownloadedUpdateCandidate,
+      shouldHandleUpdaterErrorEvent,
+      performQuitAndInstall,
+      clearUpdateAvailableEventPending,
+      isActiveUpdateCheckAttempt,
+      markUpdateCheckEventAttempt,
+      markUpdateAvailableEventPending,
+      sendCheckFailureStatus,
+      sendErrorStatus,
+      markMissingManifestPrereleaseFallbackChecking,
+      shouldDeferMacQuitForInstall: () => updateInstallMode === 'interactive',
+      shouldSuppressMissingManifestPrereleaseFallbackEvent,
+      suppressMissingManifestPrereleaseFallbackPromiseFailure,
+      recordCompletedUpdateCheck,
+      restoreReleaseUpdateSource,
+      sendStatus,
+      scheduleAutomaticUpdateCheck,
+      clearBackgroundCheckLaunchPending,
+      setAvailableReleaseUrl: (releaseUrl) => {
+        availableReleaseUrl = releaseUrl
+      },
+      setAvailableVersion: (version) => {
+        if (version === null) {
+          clearAvailableUpdateContext()
+        } else {
+          acceptAvailableUpdateCandidate(version)
+        }
+      },
+      setUserInitiatedCheck: (value) => {
+        userInitiatedCheck = value
+      }
     })
   }
 
-  if (autoUpdaterInitialized) {
+  const productUpdateSource =
+    !opts?.localOnly && hasConfiguredProductUpdateChannel() ? resolveProductUpdateSource() : null
+  const hasValidProviderShape =
+    (productUpdateSource?.provider === 'github' && productUpdateSource.github !== null) ||
+    (productUpdateSource?.provider === 'hivecloud' && productUpdateSource.github === null)
+  const configuredReleaseFeedUrl =
+    productUpdateSource && hasValidProviderShape
+      ? resolveProductUpdateFeedUrl(productUpdateSource, process.platform, process.arch)
+      : null
+  if (activeUpdateSource === 'release') {
+    activeReleaseFeedUrl = configuredReleaseFeedUrl
+  }
+  installProductUpdaterNetworkBoundary(
+    productUpdateSource?.github?.repo ?? null,
+    getProductUpdaterNetworkMode,
+    (autoUpdater as unknown as { httpExecutor?: ProductUpdaterHttpExecutor }).httpExecutor ?? null,
+    () => activeLocalBuildFeed?.url ?? null,
+    () => {
+      const { changelog, nudge } = getProductExternalServiceEndpoints()
+      return [changelog, nudge].filter((url): url is string => url !== null)
+    },
+    () => activeReleaseFeedUrl,
+    () => updateAuthorityEpoch
+  )
+
+  if (
+    opts?.localOnly ||
+    releaseUpdaterServicesInitialized ||
+    !productUpdateSource ||
+    !configuredReleaseFeedUrl
+  ) {
     return
   }
-  autoUpdaterInitialized = true
+  releaseUpdaterServicesInitialized = true
 
-  registerAutoUpdaterHandlers({
-    autoUpdater,
-    clearAvailableUpdateContext,
-    consumeMissingManifestPrereleaseFallbackResult,
-    getMissingManifestPrereleaseFallbackUserInitiated,
-    getPublishingWindowLastGoodCheck,
-    getActiveUpdateCheckEventAttemptId,
-    getCurrentStatus: () => currentStatus,
-    getKnownReleaseUrl,
-    getPendingInstallVersion,
-    getUserInitiatedCheck: () => userInitiatedCheck,
-    handleQuitAndInstallFailure,
-    isQuitAndInstallHandoffActive,
-    hasInstallableDownloadedVersion,
-    isLocalBuildCheck: () => activeUpdateSource === 'local',
-    // Why: pinned jumps are deliberate, so update-available/-downloaded must not
-    // reject them for being older than the running version.
-    isPinnedBuildCheck: () => isPinnedBuildActive,
-    shouldHandleUpdaterErrorEvent,
-    performQuitAndInstall,
-    clearUpdateAvailableEventPending,
-    isActiveUpdateCheckAttempt,
-    markUpdateCheckEventAttempt,
-    markUpdateAvailableEventPending,
-    sendCheckFailureStatus,
-    sendErrorStatus,
-    markMissingManifestPrereleaseFallbackChecking,
-    shouldDeferMacQuitForInstall: () => updateInstallMode === 'interactive',
-    shouldSuppressMissingManifestPrereleaseFallbackEvent,
-    suppressMissingManifestPrereleaseFallbackPromiseFailure,
-    recordCompletedUpdateCheck,
-    restoreReleaseUpdateSource,
-    sendStatus,
-    scheduleAutomaticUpdateCheck,
-    clearBackgroundCheckLaunchPending,
-    setAvailableReleaseUrl: (releaseUrl) => {
-      availableReleaseUrl = releaseUrl
-    },
-    setAvailableVersion: (version) => {
-      availableVersion = version
-    },
-    setUserInitiatedCheck: (value) => {
-      userInitiatedCheck = value
-    }
-  })
+  if (activeUpdateSource === 'release') {
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: configuredReleaseFeedUrl
+    })
+  }
 
   void checkForUpdateNudge()
   scheduleUpdateNudgeCheck()
@@ -2323,7 +2917,9 @@ export function downloadUpdate(): void {
   // Why: allow retry from 'error' (availableVersion stays cached) so the error card's Retry Download button works.
   const canStart =
     currentStatus.state === 'available' ||
-    (currentStatus.state === 'error' && hasInstallableDownloadedVersion())
+    (currentStatus.state === 'error' &&
+      availableUpdateCandidate !== null &&
+      isUpdateCandidateCurrent(availableUpdateCandidate))
   if (!canStart) {
     return
   }
@@ -2331,6 +2927,17 @@ export function downloadUpdate(): void {
   if (!version) {
     return
   }
+  if (
+    !availableUpdateCandidate ||
+    availableUpdateCandidate.version !== version ||
+    !isUpdateCandidateCurrent(availableUpdateCandidate)
+  ) {
+    clearAvailableUpdateContext()
+    sendErrorStatus('Update source changed before download could start.', true)
+    return
+  }
+  downloadingUpdateCandidate = availableUpdateCandidate
+  downloadedUpdateCandidate = null
   if (deferHeadlessServeInstall('download', version)) {
     return
   }

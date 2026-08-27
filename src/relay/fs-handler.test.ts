@@ -17,47 +17,26 @@ vi.mock('@parcel/watcher', () => ({
   subscribe: mockSubscribe
 }))
 
+type HandlerContext = { clientId: number; isStale: () => boolean }
+type RequestHandler = (
+  params: Record<string, unknown>,
+  context?: HandlerContext
+) => Promise<unknown>
+type NotificationHandler = (params: Record<string, unknown>, context?: HandlerContext) => void
+
 function createMockDispatcher() {
-  const requestHandlers = new Map<
-    string,
-    (
-      params: Record<string, unknown>,
-      context?: { clientId: number; isStale: () => boolean }
-    ) => Promise<unknown>
-  >()
-  const notificationHandlers = new Map<
-    string,
-    (
-      params: Record<string, unknown>,
-      context?: { clientId: number; isStale: () => boolean }
-    ) => void
-  >()
+  const requestHandlers = new Map<string, RequestHandler>()
+  const notificationHandlers = new Map<string, NotificationHandler>()
   const detachListeners = new Set<(clientId: number) => void>()
   const notifications: { method: string; params?: Record<string, unknown> }[] = []
 
   return {
-    onRequest: vi.fn(
-      (
-        method: string,
-        handler: (
-          params: Record<string, unknown>,
-          context?: { clientId: number; isStale: () => boolean }
-        ) => Promise<unknown>
-      ) => {
-        requestHandlers.set(method, handler)
-      }
-    ),
-    onNotification: vi.fn(
-      (
-        method: string,
-        handler: (
-          params: Record<string, unknown>,
-          context?: { clientId: number; isStale: () => boolean }
-        ) => void
-      ) => {
-        notificationHandlers.set(method, handler)
-      }
-    ),
+    onRequest: vi.fn((method: string, handler: RequestHandler) => {
+      requestHandlers.set(method, handler)
+    }),
+    onNotification: vi.fn((method: string, handler: NotificationHandler) => {
+      notificationHandlers.set(method, handler)
+    }),
     notify: vi.fn((method: string, params?: Record<string, unknown>) => {
       notifications.push({ method, params })
     }),
@@ -72,7 +51,7 @@ function createMockDispatcher() {
     async callRequest(
       method: string,
       params: Record<string, unknown> = {},
-      context?: { clientId?: number; isStale: () => boolean }
+      context?: Partial<HandlerContext>
     ) {
       const handler = requestHandlers.get(method)
       if (!handler) {
@@ -86,7 +65,7 @@ function createMockDispatcher() {
     callNotification(
       method: string,
       params: Record<string, unknown> = {},
-      context?: { clientId: number; isStale: () => boolean }
+      context?: HandlerContext
     ) {
       const handler = notificationHandlers.get(method)
       if (!handler) {
@@ -384,27 +363,30 @@ describe('FsHandler', () => {
     await expect(fs.readFile(filePath, 'utf-8')).resolves.toBe('abcdef')
   })
 
-  it('writeTerminalArtifact rejects a retargeted symlink before writing outside temp', async () => {
-    const filePath = path.join(tmpDir, 'artifact-link.json')
-    const outsidePath = path.join(tmpDir, 'outside.json')
-    writeFileSync(filePath, '{"ok":true}')
-    writeFileSync(outsidePath, '{"secret":true}')
-    const stats = await fs.stat(filePath)
-    const expectedRealPath = await fs.realpath(filePath)
-    await fs.rm(filePath)
-    symlinkSync(outsidePath, filePath)
+  it.skipIf(process.platform === 'win32')(
+    'writeTerminalArtifact rejects a retargeted symlink before writing outside temp',
+    async () => {
+      const filePath = path.join(tmpDir, 'artifact-link.json')
+      const outsidePath = path.join(tmpDir, 'outside.json')
+      writeFileSync(filePath, '{"ok":true}')
+      writeFileSync(outsidePath, '{"secret":true}')
+      const stats = await fs.stat(filePath)
+      const expectedRealPath = await fs.realpath(filePath)
+      await fs.rm(filePath)
+      symlinkSync(outsidePath, filePath)
 
-    await expect(
-      dispatcher.callRequest('fs.writeTerminalArtifact', {
-        filePath,
-        content: '{"ok":false}',
-        expectedRealPath,
-        expectedStatIdentity: statIdentity(stats),
-        maxBytes: 512 * 1024
-      })
-    ).rejects.toThrow('terminal_file_grant_stale')
-    await expect(fs.readFile(outsidePath, 'utf-8')).resolves.toBe('{"secret":true}')
-  })
+      await expect(
+        dispatcher.callRequest('fs.writeTerminalArtifact', {
+          filePath,
+          content: '{"ok":false}',
+          expectedRealPath,
+          expectedStatIdentity: statIdentity(stats),
+          maxBytes: 512 * 1024
+        })
+      ).rejects.toThrow('terminal_file_grant_stale')
+      await expect(fs.readFile(outsidePath, 'utf-8')).resolves.toBe('{"secret":true}')
+    }
+  )
 
   it('writeTerminalArtifact rejects hard-linked files before writing', async () => {
     const outsidePath = path.join(tmpDir, 'outside-hardlink.json')
@@ -459,18 +441,21 @@ describe('FsHandler', () => {
     expect(result.type).toBe('directory')
   })
 
-  it('lstat returns symlink type without following links', async () => {
-    const targetFile = path.join(tmpDir, 'target.txt')
-    const linkPath = path.join(tmpDir, 'link.txt')
-    writeFileSync(targetFile, 'target')
-    symlinkSync(targetFile, linkPath)
+  it.skipIf(process.platform === 'win32')(
+    'lstat returns symlink type without following links',
+    async () => {
+      const targetFile = path.join(tmpDir, 'target.txt')
+      const linkPath = path.join(tmpDir, 'link.txt')
+      writeFileSync(targetFile, 'target')
+      symlinkSync(targetFile, linkPath)
 
-    const result = (await dispatcher.callRequest('fs.lstat', { filePath: linkPath })) as {
-      type: string
+      const result = (await dispatcher.callRequest('fs.lstat', { filePath: linkPath })) as {
+        type: string
+      }
+
+      expect(result.type).toBe('symlink')
     }
-
-    expect(result.type).toBe('symlink')
-  })
+  )
 
   it('workspaceSpaceScan returns bounded top-level size details', async () => {
     mkdirSync(path.join(tmpDir, 'node_modules'))
@@ -618,7 +603,7 @@ describe('FsHandler', () => {
     expect(content).toBe('existing')
   })
 
-  it('realpath resolves symlinks', async () => {
+  it.skipIf(process.platform === 'win32')('realpath resolves symlinks', async () => {
     const realFile = path.join(tmpDir, 'real.txt')
     const linkPath = path.join(tmpDir, 'link.txt')
     writeFileSync(realFile, 'real')

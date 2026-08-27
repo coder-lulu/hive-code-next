@@ -1,9 +1,15 @@
 import { defineConfig } from 'vitest/config'
+import { resolve } from 'node:path'
 
 const vitestOxcConfig = { tsconfig: false } as never
 
 export default defineConfig({
   root: import.meta.dirname,
+  resolve: {
+    alias: {
+      '@': resolve(import.meta.dirname, 'src')
+    }
+  },
   // Why: the app tsconfig intentionally excludes tests; Vite 8's OXC transform
   // otherwise fails before Vitest can run the test modules.
   oxc: vitestOxcConfig,

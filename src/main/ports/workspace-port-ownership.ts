@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { applyProductBranding } from '../../shared/brand'
 import type { Store } from '../persistence'
 import { splitWorktreeId, splitWorktreeIdForFilesystem } from '../../shared/worktree/id'
 import { isFolderRepo } from '../../shared/repo-kind'
@@ -100,7 +101,7 @@ export async function killWorkspacePort(
     return { ok: false, reason: 'The owning process is unknown.' }
   }
   if (pid === process.pid) {
-    return { ok: false, reason: 'Orca cannot stop its own process.' }
+    return { ok: false, reason: applyProductBranding('Orca cannot stop its own process.') }
   }
 
   try {

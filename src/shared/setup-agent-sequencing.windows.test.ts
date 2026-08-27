@@ -62,23 +62,16 @@ describe.skipIf(process.platform !== 'win32')('Windows setup-agent sequencing', 
         waitTimeoutSeconds: 2
       })
 
-      const setupExit = await waitForExit(
-        spawnWindowsCommand(dirname(tempDir), 'run setup.cmd', commands.setupCommand)
-      )
-      expect(setupExit.code).toBe(0)
+      const setupExit = await waitForExit(spawnWindowsCommand(commands.setupCommand))
+      expect(setupExit.code, setupExit.stderr).toBe(0)
       expect(readFileSync(`${runnerScriptPath}.windows-sequence.done`, 'utf8')).toBe(
         'windows-sequence:0\r\n'
       )
 
       const startupExit = await waitForExit(
-        spawnWindowsCommand(
-          dirname(tempDir),
-          'run startup.cmd',
-          commands.startupCommand,
-          commands.startupEnv
-        )
+        spawnWindowsCommand(commands.startupCommand, commands.startupEnv)
       )
-      expect(startupExit.code).toBe(0)
+      expect(startupExit.code, startupExit.stderr).toBe(0)
       expect(startupExit.stderr).toContain('Waiting for setup to finish before starting agent...')
       expect(readFileSync(logPath, 'utf8')).toBe(`setup-done\r\n${prompt}\r\n`)
     },
@@ -121,21 +114,14 @@ describe.skipIf(process.platform !== 'win32')('Windows setup-agent sequencing', 
         waitTimeoutSeconds: 2
       })
 
-      const setupExit = await waitForExit(
-        spawnWindowsCommand(dirname(tempDir), 'run failed setup.cmd', commands.setupCommand)
-      )
+      const setupExit = await waitForExit(spawnWindowsCommand(commands.setupCommand))
       expect(setupExit.code).toBe(37)
       expect(readFileSync(`${runnerScriptPath}.failed-windows-sequence.done`, 'utf8')).toBe(
         'failed-windows-sequence:37\r\n'
       )
 
       const startupExit = await waitForExit(
-        spawnWindowsCommand(
-          dirname(tempDir),
-          'run blocked startup.cmd',
-          commands.startupCommand,
-          commands.startupEnv
-        )
+        spawnWindowsCommand(commands.startupCommand, commands.startupEnv)
       )
       expect(startupExit.code).toBe(37)
       expect(startupExit.stderr).toContain('Setup failed; skipping agent startup.')
@@ -154,14 +140,10 @@ function makeTempDir(directoryName: string): string {
 }
 
 function spawnWindowsCommand(
-  dir: string,
-  filename: string,
   command: string,
   env: Record<string, string> = {}
 ): ReturnType<typeof spawn> {
-  const scriptPath = join(dir, filename)
-  writeFileSync(scriptPath, `@echo off\r\n${command}\r\nexit /b %ERRORLEVEL%\r\n`, 'utf8')
-  return spawn('cmd.exe', ['/d', '/c', scriptPath], {
+  return spawn('cmd.exe', ['/d', '/c', command], {
     stdio: 'pipe',
     env: { ...process.env, ...env }
   })

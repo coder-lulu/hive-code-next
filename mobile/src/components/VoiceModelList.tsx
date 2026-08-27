@@ -1,15 +1,15 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Check, Download, Trash2 } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import {
   isModelInFlight,
   type MobileSpeechModel,
   type MobileSpeechSetup
 } from '../dictation/mobile-dictation-setup'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 type Props = {
   setup: MobileSpeechSetup
-  // Disabled mirrors desktop: the model list greys out when dictation is off.
   disabled: boolean
   busyAction: { modelId: string; type: 'download' | 'select' | 'delete' } | null
   onUseModel: (model: MobileSpeechModel) => void
@@ -33,13 +33,11 @@ function modelMeta(model: MobileSpeechModel): string {
     return `${formatSize(model.sizeBytes)} · ${Math.round(model.progress * 100)}%`
   }
   if (model.status === 'extracting') {
-    return `${formatSize(model.sizeBytes)} · extracting…`
+    return `${formatSize(model.sizeBytes)} · 正在解压…`
   }
   return formatSize(model.sizeBytes)
 }
 
-// Renders the speech-model rows shared between the setup sheet and the Voice
-// settings page: size/progress, recommended badge, selected check, download, delete.
 export function VoiceModelList({
   setup,
   disabled,
@@ -48,9 +46,12 @@ export function VoiceModelList({
   onDownload,
   onDelete
 }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
+
   return (
     <View style={disabled ? styles.disabled : undefined} pointerEvents={disabled ? 'none' : 'auto'}>
-      {setup.models.map((model, idx) => {
+      {setup.models.map((model, index) => {
         const anyBusy = busyAction !== null
         const isSelected = model.id === setup.selectedModelId
         const inFlight = isModelInFlight(model)
@@ -60,70 +61,98 @@ export function VoiceModelList({
         const deleteBusy = rowBusy && busyAction?.type === 'delete'
         return (
           <View key={model.id}>
-            {idx > 0 && <View style={styles.separator} />}
+            {index > 0 ? <View style={styles.divider} /> : null}
             <View style={styles.modelRow}>
               <View style={styles.modelInfo}>
                 <View style={styles.modelTitleRow}>
-                  <Text style={styles.modelLabel} numberOfLines={1}>
+                  <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.modelLabel}>
                     {model.label}
                   </Text>
-                  {model.recommended ? <Text style={styles.recommended}>Recommended</Text> : null}
+                  {model.recommended ? (
+                    <View style={styles.recommendedBadge}>
+                      <Text maxFontSizeMultiplier={1.3} style={styles.recommendedText}>
+                        推荐
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-                <Text style={styles.modelMeta}>{modelMeta(model)}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.modelMeta}>
+                  {modelMeta(model)}
+                </Text>
               </View>
               {model.provider === 'openai' ? (
-                <Text style={styles.modelStateText}>
-                  {model.status === 'ready' ? 'API key set' : 'Set up on desktop'}
+                <Text maxFontSizeMultiplier={1.3} style={styles.modelStateText}>
+                  {model.status === 'ready' ? '已设置 API 密钥' : '请在电脑端设置'}
                 </Text>
               ) : model.status === 'ready' ? (
                 <View style={styles.readyActions}>
                   {isSelected ? (
-                    <View style={styles.selectedTag}>
-                      <Check size={14} color={colors.statusGreen} strokeWidth={2.4} />
-                      <Text style={styles.selectedText}>In use</Text>
+                    <View style={styles.selectedState}>
+                      <Check size={16} color={theme.color.status.success} strokeWidth={2} />
+                      <Text maxFontSizeMultiplier={1.3} style={styles.selectedText}>
+                        使用中
+                      </Text>
                     </View>
                   ) : (
                     <Pressable
+                      accessibilityLabel={`使用语音模型 ${model.label}`}
+                      accessibilityRole="button"
+                      accessibilityState={{ busy: selectBusy, disabled: anyBusy }}
                       style={({ pressed }) => [
                         styles.actionButton,
-                        pressed && styles.actionPressed
+                        pressed && styles.actionPressed,
+                        anyBusy && styles.disabled
                       ]}
                       disabled={anyBusy}
                       onPress={() => onUseModel(model)}
                     >
                       {selectBusy ? (
-                        <ActivityIndicator size="small" color={colors.textSecondary} />
+                        <ActivityIndicator size="small" color={theme.color.text.secondary} />
                       ) : (
-                        <Text style={styles.actionText}>Use</Text>
+                        <Text maxFontSizeMultiplier={1.3} style={styles.actionText}>
+                          使用
+                        </Text>
                       )}
                     </Pressable>
                   )}
                   <Pressable
-                    style={({ pressed }) => [styles.iconButton, pressed && styles.actionPressed]}
+                    accessibilityLabel={`删除语音模型 ${model.label}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ busy: deleteBusy, disabled: anyBusy }}
+                    style={({ pressed }) => [
+                      styles.iconButton,
+                      pressed && styles.actionPressed,
+                      anyBusy && styles.disabled
+                    ]}
                     disabled={anyBusy}
                     onPress={() => onDelete(model)}
-                    accessibilityLabel={'Delete ' + model.label}
                   >
                     {deleteBusy ? (
-                      <ActivityIndicator size="small" color={colors.statusRed} />
+                      <ActivityIndicator size="small" color={theme.color.status.danger} />
                     ) : (
-                      <Trash2 size={18} color={colors.statusRed} strokeWidth={2.2} />
+                      <Trash2 size={20} color={theme.color.status.danger} strokeWidth={2} />
                     )}
                   </Pressable>
                 </View>
               ) : inFlight ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
+                <ActivityIndicator size="small" color={theme.color.text.secondary} />
               ) : (
                 <Pressable
-                  style={({ pressed }) => [styles.iconButton, pressed && styles.actionPressed]}
+                  accessibilityLabel={`下载语音模型 ${model.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: downloadBusy, disabled: anyBusy }}
+                  style={({ pressed }) => [
+                    styles.iconButton,
+                    pressed && styles.actionPressed,
+                    anyBusy && styles.disabled
+                  ]}
                   disabled={anyBusy}
                   onPress={() => onDownload(model)}
-                  accessibilityLabel={'Download ' + model.label}
                 >
                   {downloadBusy ? (
-                    <ActivityIndicator size="small" color={colors.textSecondary} />
+                    <ActivityIndicator size="small" color={theme.color.text.secondary} />
                   ) : (
-                    <Download size={18} color={colors.textSecondary} strokeWidth={2.2} />
+                    <Download size={20} color={theme.color.text.secondary} strokeWidth={2} />
                   )}
                 </Pressable>
               )}
@@ -135,52 +164,73 @@ export function VoiceModelList({
   )
 }
 
-const styles = StyleSheet.create({
-  disabled: { opacity: 0.5 },
-  modelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  modelInfo: { flex: 1, minWidth: 0 },
-  modelTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  modelLabel: {
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    flexShrink: 1
-  },
-  recommended: { color: colors.statusGreen, fontSize: 10, fontWeight: '700' },
-  modelMeta: { color: colors.textMuted, fontSize: typography.metaSize, marginTop: 2 },
-  modelStateText: { color: colors.textMuted, fontSize: typography.metaSize },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised
-  },
-  actionPressed: { opacity: 0.7 },
-  actionText: { color: colors.textSecondary, fontSize: typography.metaSize, fontWeight: '600' },
-  iconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.button,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgRaised
-  },
-  readyActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  selectedTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  selectedText: { color: colors.statusGreen, fontSize: typography.metaSize, fontWeight: '600' },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginHorizontal: spacing.md
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    disabled: { opacity: 0.4 },
+    divider: {
+      height: 1,
+      marginLeft: theme.spacing.space16,
+      backgroundColor: theme.color.border.subtle
+    },
+    modelRow: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing.space12,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space12
+    },
+    modelInfo: { flex: 1, minWidth: 0 },
+    modelTitleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space8 },
+    modelLabel: {
+      ...theme.typography.body,
+      flexShrink: 1,
+      color: theme.color.text.primary
+    },
+    recommendedBadge: {
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4,
+      borderRadius: theme.radii.small,
+      backgroundColor: theme.color.bg.subtle
+    },
+    recommendedText: { ...theme.typography.caption, color: theme.color.text.secondary },
+    modelMeta: {
+      ...theme.typography.meta,
+      color: theme.color.text.tertiary,
+      marginTop: theme.spacing.space4
+    },
+    modelStateText: {
+      ...theme.typography.meta,
+      maxWidth: '40%',
+      color: theme.color.text.secondary,
+      textAlign: 'right'
+    },
+    readyActions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space4 },
+    selectedState: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space4
+    },
+    selectedText: { ...theme.typography.meta, color: theme.color.status.success },
+    actionButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space12,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.surface
+    },
+    actionPressed: { backgroundColor: theme.color.bg.subtle },
+    actionText: { ...theme.typography.label, color: theme.color.text.primary },
+    iconButton: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control
+    }
+  })
+}

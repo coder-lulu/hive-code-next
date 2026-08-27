@@ -65,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest]
+        os: [ubuntu-22.04, windows-2022]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -227,7 +227,7 @@ jobs:
 
   windows:
     if: github.event_name != 'pull_request'
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       ORCA_COMPUTER_E2E: '1'
     steps:

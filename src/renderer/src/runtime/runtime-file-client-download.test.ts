@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { downloadRuntimeFile } from './runtime-file-client'
 import {
   fsSaveDownloadedFile,
@@ -233,7 +234,7 @@ describe('runtime file client', () => {
         '/remote/repo/archive.zip',
         'archive.zip'
       )
-    ).rejects.toThrow('Remote file download requires a newer Orca server')
+    ).rejects.toThrow(`Remote file download requires a newer ${APP_DISPLAY_NAME} server`)
 
     expect(fsStartDownloadedFile).not.toHaveBeenCalled()
     expect(fsSaveDownloadedFile).not.toHaveBeenCalled()

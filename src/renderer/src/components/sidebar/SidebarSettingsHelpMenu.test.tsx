@@ -4,6 +4,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { SidebarSettingsHelpMenu } from './SidebarSettingsHelpMenu'
 
 const mocks = vi.hoisted(() => ({
@@ -227,47 +228,17 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(html).toContain('Onboarding')
   })
 
-  it('renders Restart Orca by default', () => {
+  it('renders the configured product name in the restart action', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('Restart Orca')
+    expect(html).toContain(`Restart ${APP_DISPLAY_NAME}`)
   })
 
-  it('renders Docs link', () => {
+  it('hides public help links when no official product authorities are configured', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('Docs')
-  })
-
-  it('renders Changelog link', () => {
-    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('Changelog')
-  })
-
-  it('renders GitHub link', () => {
-    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('GitHub')
-  })
-
-  it('renders Discord link', () => {
-    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('Discord')
-    expect(html).toContain('viewBox="0 0 20 20"')
-    expect(html).toContain('M16.0742 4.45014C14.9244 3.92097 13.7106 3.54556 12.4638 3.3335')
-  })
-
-  it('opens Discord invite through the shell bridge', async () => {
-    const container = await renderMenu()
-    const discordButton = findMenuItem(container, 'Discord')
-
-    await act(async () => {
-      discordButton.click()
-    })
-
-    expect(mocks.shellOpenUrl).toHaveBeenCalledWith('https://discord.gg/fzjDKHxv8Q')
-  })
-
-  it('renders X link', () => {
-    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('>X<')
+    for (const label of ['Docs', 'Changelog', 'GitHub', 'Discord', '>X<']) {
+      expect(html).not.toContain(label)
+    }
+    expect(mocks.shellOpenUrl).not.toHaveBeenCalled()
   })
 
   it('renders Check for Updates menu item', () => {

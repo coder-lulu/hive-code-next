@@ -5,12 +5,18 @@ import Sidebar from '../components/Sidebar'
 import RightSidebar from '../components/right-sidebar'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
 import { FloatingTerminalToggleButton } from '../components/floating-terminal/FloatingTerminalToggleButton'
+import { SidebarSettingsHelpMenu } from '../components/sidebar/SidebarSettingsHelpMenu'
 import { TerminalWorkbenchContainer } from '../components/TerminalWorkbenchContainer'
 import type { VirtualizedScrollAnchor } from '../hooks/useVirtualizedScrollAnchor'
+import {
+  useWorkspaceBoardPanel,
+  type WorkspaceBoardPanelState
+} from '../components/sidebar/useWorkspaceBoardPanel'
 import { TitlebarLeftControls } from './TitlebarLeftControls'
 import { RightSidebarToggle, TitlebarMainStrip } from './TitlebarMainStrip'
 import type { AppChromeLayout } from './use-app-chrome-layout'
 import type { FloatingWorkspacePanelState } from './use-floating-workspace-panel'
+import { resolveSettingsHelpPlacement } from './titlebar-settings-help-placement'
 
 const Landing = lazy(() => import('../components/Landing'))
 const WorktreeCreationPanel = lazy(
@@ -33,10 +39,12 @@ type WorktreeSidebarScrollRefs = {
 
 function WorktreeSidebar({
   layout,
-  scrollRefs
+  scrollRefs,
+  workspaceBoardPanel
 }: {
   layout: AppChromeLayout
   scrollRefs: WorktreeSidebarScrollRefs
+  workspaceBoardPanel: WorkspaceBoardPanelState
 }): React.JSX.Element {
   return (
     <RecoverableRenderErrorBoundary
@@ -59,6 +67,7 @@ function WorktreeSidebar({
       <Sidebar
         worktreeScrollOffsetRef={scrollRefs.scrollOffsetRef}
         worktreeScrollAnchorRef={scrollRefs.scrollAnchorRef}
+        workspaceBoardPanel={workspaceBoardPanel}
       />
     </RecoverableRenderErrorBoundary>
   )
@@ -93,8 +102,26 @@ export function AppWorkspaceShell(props: {
   floatingWorkspace: FloatingWorkspacePanelState
 }): React.JSX.Element {
   const { layout, floatingWorkspace } = props
-  const titlebarLeftControls = <TitlebarLeftControls layout={layout} />
-  const titlebarMainStrip = <TitlebarMainStrip layout={layout} />
+  const workspaceBoardPanel = useWorkspaceBoardPanel()
+  const stackedMainStripMounted =
+    layout.stackedSidebarOpen &&
+    layout.activeView !== 'automations' &&
+    layout.activeView !== 'artifacts'
+  const settingsHelpPlacement = resolveSettingsHelpPlacement({
+    creationLayoutActive: layout.creationLayoutActive,
+    mainStripMounted: !layout.leftTitlebarChromeLayout.shouldMount || stackedMainStripMounted,
+    workspaceChromeActive: layout.workspaceChromeActive,
+    rightSidebarVisible: layout.showRightSidebarControls && layout.rightSidebarOpen
+  })
+  const titlebarLeftControls = (
+    <TitlebarLeftControls layout={layout} workspaceBoardPanel={workspaceBoardPanel} />
+  )
+  const titlebarMainStrip = (
+    <TitlebarMainStrip
+      layout={layout}
+      showSettingsHelpControls={settingsHelpPlacement === 'main-strip'}
+    />
+  )
   // Why: keep virtualized scroll memory above the sidebar's workspace/landing remount so the left list doesn't restart at scrollTop 0.
   const scrollOffsetRef = useRef(0)
   const scrollAnchorRef = useRef<VirtualizedScrollAnchor>(null)
@@ -147,23 +174,27 @@ export function AppWorkspaceShell(props: {
                   </div>
                   {/* Why: flex-1/min-h-0 slot needed under the fixed 36px header, else the sidebar collapses to content height and loses its scroll viewport. */}
                   <div className="flex min-h-0 flex-1">
-                    <WorktreeSidebar layout={layout} scrollRefs={sidebarScrollRefs} />
+                    <WorktreeSidebar
+                      layout={layout}
+                      scrollRefs={sidebarScrollRefs}
+                      workspaceBoardPanel={workspaceBoardPanel}
+                    />
                   </div>
                 </div>
               ) : (
-                <WorktreeSidebar layout={layout} scrollRefs={sidebarScrollRefs} />
+                <WorktreeSidebar
+                  layout={layout}
+                  scrollRefs={sidebarScrollRefs}
+                  workspaceBoardPanel={workspaceBoardPanel}
+                />
               )
             ) : null}
             <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
               {/* Why: automations/artifacts own their page headers; the stacked titlebar would be an empty 36px stripe. */}
-              {layout.stackedSidebarOpen &&
-              layout.activeView !== 'automations' &&
-              layout.activeView !== 'artifacts' ? (
-                <div className="titlebar">{titlebarMainStrip}</div>
-              ) : null}
+              {stackedMainStripMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}
               <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden">
                 {/* Why: match the RightSidebar header's 36px/top-0 so the toggle's vertical center is identical open vs closed — else the icon jitters. */}
-                {layout.workspaceChromeActive && !layout.rightSidebarOpen && (
+                {settingsHelpPlacement === 'shell-overlay' && (
                   <div
                     className="absolute top-0 z-10 flex items-center h-[36px]"
                     style={
@@ -174,6 +205,7 @@ export function AppWorkspaceShell(props: {
                       } as React.CSSProperties
                     }
                   >
+                    <SidebarSettingsHelpMenu />
                     {layout.showRightSidebarControls ? <RightSidebarToggle /> : null}
                   </div>
                 )}
@@ -240,7 +272,7 @@ export function AppWorkspaceShell(props: {
               'Retry the sidebar or switch tabs to reload this surface.'
             )}
           >
-            <RightSidebar />
+            <RightSidebar showSettingsHelpControls={settingsHelpPlacement === 'right-sidebar'} />
           </RecoverableRenderErrorBoundary>
         ) : null}
       </div>

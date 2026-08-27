@@ -1,3 +1,4 @@
+import { applyProductBranding } from '../../shared/brand'
 import {
   loadWindowsNativeRegistry,
   WINDOWS_REG_EXPAND_SZ,
@@ -93,7 +94,7 @@ export class WindowsUserPathRegistryReader {
       if (!key || typeof key !== 'object') {
         return {
           state: 'unknown',
-          detail: 'Orca could not read the Windows user PATH registry key.'
+          detail: applyProductBranding('Orca could not read the Windows user PATH registry key.')
         }
       }
 
@@ -120,7 +121,7 @@ export class WindowsUserPathRegistryReader {
     } catch {
       return {
         state: 'unknown',
-        detail: 'Orca could not read the Windows user PATH registry value.'
+        detail: applyProductBranding('Orca could not read the Windows user PATH registry value.')
       }
     }
   }

@@ -7,7 +7,7 @@ import {
   SSH_AI_VAULT_LIST_SESSIONS_METHOD,
   SSH_AI_VAULT_RESOLVE_SESSION_TITLES_METHOD
 } from '../shared/ssh-ai-vault-relay'
-import { getRemoteHostPlatform } from '../main/ssh/ssh-remote-platform'
+import { getRemoteHostPlatform, joinRemotePath } from '../main/ssh/ssh-remote-platform'
 import type { RemoteHostPlatform } from '../main/ssh/ssh-remote-platform'
 import { scanRemoteAiVaultSessions } from '../main/ai-vault/remote-session-scanner'
 import { readAiVaultSessionTitlesFromFiles } from '../main/ai-vault/session-title-file-reader'
@@ -119,7 +119,16 @@ describe('AiVaultHandler', () => {
       executionHostPlatform: 'linux',
       sessionId: 'ssh-session',
       title: 'Scan on the SSH target',
-      filePath: transcriptPath
+      filePath: joinRemotePath(
+        getRemoteHostPlatform('linux-x64'),
+        remoteHome,
+        '.codex',
+        'sessions',
+        '2026',
+        '07',
+        '26',
+        'rollout-test.jsonl'
+      )
     })
   })
 

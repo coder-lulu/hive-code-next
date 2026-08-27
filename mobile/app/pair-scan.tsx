@@ -1,54 +1,62 @@
-import { useState, useRef, useCallback } from 'react'
+import { productNameText } from '@/product-brand'
+import { CameraView, useCameraPermissions } from 'expo-camera'
+import { useRouter } from 'expo-router'
 import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
+  AlertTriangle,
+  ChevronLeft,
+  ClipboardPaste,
+  QrCode,
+  RefreshCw,
+  Settings
+} from 'lucide-react-native'
+import { useCallback, useRef, useState } from 'react'
+import {
   ActivityIndicator,
   Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
   type LayoutChangeEvent
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { CameraView, useCameraPermissions } from 'expo-camera'
-import { useRouter } from 'expo-router'
-import { ChevronLeft, Clipboard as ClipboardIcon, QrCode } from 'lucide-react-native'
+import { ConnectionLog } from '../src/components/ConnectionLog'
+import { PairingActionButton } from '../src/components/pairing/PairingActionButton'
+import { PairingCodeSheet } from '../src/components/pairing/PairingCodeSheet'
+import { resolvePairScanCameraSize } from '../src/components/pairing/pair-scan-camera-size'
+import {
+  PairingConnectingState,
+  PairingScreenContent,
+  PairingSecurityNotice
+} from '../src/components/pairing/PairingScreenContent'
+import { MobileIconButton } from '../src/components/ui/MobileIconButton'
+import { MobileScreenHeader } from '../src/components/ui/MobileScreenHeader'
+import {
+  loadMobileOnboardingSteps,
+  mobileOnboardingDestination
+} from '../src/onboarding/mobile-onboarding-plan'
+import type { MobileTheme } from '../src/theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
+import { useRefreshHostClient } from '../src/transport/client-context'
 import { decodePairingUrl, parsePairingCode } from '../src/transport/pairing'
 import {
   startPreProfilePairing,
   type PreProfilePairingAttempt
 } from '../src/transport/pre-profile-pairing-coordinator'
 import type { ConnectionLogEntry, PairingOffer } from '../src/transport/types'
-import { useRefreshHostClient } from '../src/transport/client-context'
-import { colors, spacing, radii, typography } from '../src/theme/mobile-theme'
-import { TextInputModal } from '../src/components/TextInputModal'
-import { ConnectionLog } from '../src/components/ConnectionLog'
-import {
-  loadMobileOnboardingSteps,
-  mobileOnboardingDestination
-} from '../src/onboarding/mobile-onboarding-plan'
 
-// Why: see pair-confirm.tsx — cap initial-pair "Connecting…" so a broken
-// route surfaces as a real error with the log visible instead of a
-// silent infinite spinner.
 const PAIRING_OVERALL_TIMEOUT_MS = 25_000
-const SCAN_RETICLE_SCALE = 0.62
-const SCAN_RETICLE_MAX_SIZE = 360
-
-function Step({ number, text }: { number: number; text: string }) {
-  return (
-    <View style={styles.step}>
-      <View style={styles.stepBadge}>
-        <Text style={styles.stepNumber}>{number}</Text>
-      </View>
-      <Text style={styles.stepText}>{text}</Text>
-    </View>
-  )
-}
+const SCAN_RETICLE_SCALE = 0.3
+const SCAN_RETICLE_MAX_SIZE = 64
 
 export default function PairScanScreen() {
   const router = useRouter()
   const refreshHostClient = useRefreshHostClient()
   const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
+  const viewportWidth = useWindowDimensions().width
   const [permission, requestPermission] = useCameraPermissions()
   const [status, setStatus] = useState<'scanning' | 'connecting' | 'error'>('scanning')
   const [errorMessage, setErrorMessage] = useState('')
@@ -65,32 +73,25 @@ export default function PairScanScreen() {
       mountedRef.current = true
       return
     }
-    // Why: pairing attempts can outlive the visible route; dispose them when
-    // the scan screen detaches without a passive cleanup-only Effect.
-    mountedRef.current = false
     activePairingAttemptRef.current?.dispose()
     activePairingAttemptRef.current = null
+    mountedRef.current = false
   }, [])
 
-  const handleBarCodeScanned = useCallback(
-    ({ data }: { data: string }) => {
-      if (processingRef.current) {
-        return
-      }
-      processingRef.current = true
-
-      const offer = decodePairingUrl(data)
-      if (!offer) {
-        setStatus('error')
-        setErrorMessage('Not a valid Orca QR code')
-        processingRef.current = false
-        return
-      }
-
-      void testAndSave(offer)
-    },
-    [router]
-  )
+  const handleBarCodeScanned = useCallback(({ data }: { data: string }) => {
+    if (processingRef.current) {
+      return
+    }
+    processingRef.current = true
+    const offer = decodePairingUrl(data)
+    if (!offer) {
+      setStatus('error')
+      setErrorMessage(productNameText('Not a valid Orca QR code'))
+      processingRef.current = false
+      return
+    }
+    void testAndSave(offer)
+  }, [])
 
   const handlePasteSubmit = useCallback((input: string) => {
     setPasteVisible(false)
@@ -98,24 +99,19 @@ export default function PairScanScreen() {
       return
     }
     processingRef.current = true
-
     const offer = parsePairingCode(input)
     if (!offer) {
       setStatus('error')
-      setErrorMessage('Not a valid pairing code — copy it from your computer and paste again')
+      setErrorMessage(productNameText('配对码无效，请从电脑版 Orca 重新复制后再试。'))
       processingRef.current = false
       return
     }
-
     void testAndSave(offer)
   }, [])
 
   const handleCameraLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout
-    const nextBounds = {
-      width: Math.round(width),
-      height: Math.round(height)
-    }
+    const nextBounds = { width: Math.round(width), height: Math.round(height) }
     setCameraBounds((currentBounds) =>
       currentBounds.width === nextBounds.width && currentBounds.height === nextBounds.height
         ? currentBounds
@@ -153,17 +149,13 @@ export default function PairScanScreen() {
       if (!mountedRef.current || !attemptIsCurrent) {
         return
       }
-      // Why: re-pairing the same desktop now reuses its existing host id
-      // (STA-1840 dedup), so a client cached under that id from an earlier
-      // pairing would keep the stale endpoint/relay. Close it so the
-      // Refresh any cached client from the newly persisted pairing profile.
       refreshHostClient(hostId)
       const onboardingSteps = await loadMobileOnboardingSteps()
       if (!mountedRef.current) {
         return
       }
       router.replace(mobileOnboardingDestination(onboardingSteps, hostId))
-    } catch (err) {
+    } catch (error) {
       const timedOut = attempt.timedOut
       const attemptIsCurrent = activePairingAttemptRef.current === attempt
       attempt.dispose()
@@ -173,18 +165,20 @@ export default function PairScanScreen() {
       if (!mountedRef.current || !attemptIsCurrent) {
         return
       }
-      console.warn('[pair] connect failed', err)
+      console.warn('[pair] connect failed', error)
       setStatus('error')
       setErrorMessage(
         timedOut
-          ? `Couldn't connect within ${PAIRING_OVERALL_TIMEOUT_MS / 1000}s — see log below for where it stalled`
-          : `Pairing failed: ${err instanceof Error ? err.message : String(err)}`
+          ? `连接在 ${PAIRING_OVERALL_TIMEOUT_MS / 1000} 秒内未完成，请查看下方日志后重试。`
+          : `配对失败：${error instanceof Error ? error.message : String(error)}`
       )
       processingRef.current = false
     }
   }
 
   function retry() {
+    activePairingAttemptRef.current?.dispose()
+    activePairingAttemptRef.current = null
     setStatus('scanning')
     setErrorMessage('')
     logsRef.current = []
@@ -192,24 +186,33 @@ export default function PairScanScreen() {
     processingRef.current = false
   }
 
-  // Why: bottom inset accounts for Android 3-button nav bars and iOS
-  // home-indicator areas that would otherwise overlap the 'Or paste
-  // pairing code' button at the bottom of the scan screen.
-  const containerPadding = {
-    paddingTop: insets.top + spacing.sm,
-    paddingBottom: insets.bottom + spacing.sm
-  }
-  // Why: iPad camera previews are often rectangular, but QR guides should
-  // stay square so the corners still describe the code shape.
   const reticleSize = Math.min(
     Math.round(Math.min(cameraBounds.width, cameraBounds.height) * SCAN_RETICLE_SCALE),
     SCAN_RETICLE_MAX_SIZE
   )
+  const cameraSize = resolvePairScanCameraSize(viewportWidth, theme.spacing.space20)
+  const bottomPadding = { paddingBottom: insets.bottom + theme.spacing.space20 }
+  const header = (
+    <MobileScreenHeader
+      leading={
+        <MobileIconButton
+          accessibilityLabel="返回"
+          icon={ChevronLeft}
+          onPress={() => router.back()}
+        />
+      }
+      title="连接电脑"
+    />
+  )
 
   if (!permission) {
     return (
-      <View ref={setPairScanRootRef} style={[styles.container, containerPadding]}>
-        <ActivityIndicator color={colors.textSecondary} />
+      <View ref={setPairScanRootRef} style={styles.container}>
+        {header}
+        <View style={styles.centered}>
+          <ActivityIndicator color={theme.color.text.secondary} size="large" />
+          <Text style={styles.loadingText}>正在准备相机…</Text>
+        </View>
       </View>
     )
   }
@@ -217,76 +220,69 @@ export default function PairScanScreen() {
   if (!permission.granted) {
     const canAskAgain = permission.canAskAgain !== false
     return (
-      <View ref={setPairScanRootRef} style={[styles.container, containerPadding]}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={22} color={colors.textSecondary} />
-        </Pressable>
-        <View style={styles.centered}>
-          <Text style={styles.title}>
-            {canAskAgain ? 'Pair with desktop' : 'Camera Access Disabled'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {canAskAgain
-              ? 'Scan the QR code from Orca on your desktop, or paste the pairing code instead.'
-              : 'Enable camera access in Settings, or paste the pairing code instead.'}
-          </Text>
-          <Pressable
-            style={styles.primaryButton}
-            onPress={canAskAgain ? requestPermission : () => void Linking.openSettings()}
+      <View ref={setPairScanRootRef} style={styles.container}>
+        {header}
+        <ScrollView contentContainerStyle={[styles.scrollCentered, bottomPadding]}>
+          <PairingScreenContent
+            description={
+              canAskAgain
+                ? productNameText(
+                    '允许相机访问以扫描电脑版 Orca 显示的二维码，也可以直接输入配对码。'
+                  )
+                : productNameText(
+                    '请在系统设置中开启相机权限，或直接输入电脑版 Orca 显示的配对码。'
+                  )
+            }
+            icon={QrCode}
+            title={canAskAgain ? '扫描桌面端二维码' : '相机权限已关闭'}
           >
-            {canAskAgain && <QrCode size={16} color={colors.bgBase} />}
-            <Text style={styles.primaryButtonText}>
-              {canAskAgain ? 'Continue' : 'Open Settings'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.pasteButton, pressed && styles.pasteButtonPressed]}
-            onPress={() => setPasteVisible(true)}
-          >
-            <ClipboardIcon size={16} color={colors.textSecondary} />
-            <Text style={styles.pasteButtonText}>Paste code instead</Text>
-          </Pressable>
-        </View>
-        <TextInputModal
-          visible={pasteVisible}
-          title="Paste pairing code"
-          message="Copy the code shown under the QR on your computer."
-          placeholder="orca://pair?code=... or paste the code"
-          onSubmit={handlePasteSubmit}
+            <View style={styles.actions}>
+              <PairingActionButton
+                icon={canAskAgain ? QrCode : Settings}
+                label={canAskAgain ? '允许相机访问' : '打开系统设置'}
+                onPress={canAskAgain ? requestPermission : () => void Linking.openSettings()}
+              />
+              <PairingActionButton
+                icon={ClipboardPaste}
+                label="输入配对码"
+                onPress={() => setPasteVisible(true)}
+                variant="secondary"
+              />
+            </View>
+            <PairingSecurityNotice />
+          </PairingScreenContent>
+        </ScrollView>
+        <PairingCodeSheet
           onCancel={() => setPasteVisible(false)}
+          onSubmit={handlePasteSubmit}
+          visible={pasteVisible}
         />
       </View>
     )
   }
 
   return (
-    <View ref={setPairScanRootRef} style={[styles.container, containerPadding]}>
-      <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <ChevronLeft size={22} color={colors.textSecondary} />
-      </Pressable>
-
-      <View style={styles.steps}>
-        <Step number={1} text="Open Orca on your computer" />
-        <Step number={2} text="Go to Settings → Mobile" />
-        <Step number={3} text="Scan the QR code" />
-      </View>
-
-      {status === 'scanning' && (
-        <>
-          {/* Why: unmount the camera while the paste sheet is open. The
-              user has clearly chosen the paste path; keeping the camera
-              streaming behind a sheet wastes power and looks weird if
-              they cancel the sheet and the QR was scanned silently in
-              the meantime. */}
-          {!pasteVisible && (
-            <View style={styles.cameraWrap} onLayout={handleCameraLayout}>
-              <CameraView
-                style={styles.camera}
-                facing="back"
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                onBarcodeScanned={handleBarCodeScanned}
-              />
-              <View style={styles.reticle} pointerEvents="none">
+    <View ref={setPairScanRootRef} style={styles.container}>
+      {header}
+      {status === 'scanning' ? (
+        <ScrollView contentContainerStyle={[styles.scannerContent, bottomPadding]}>
+          <View style={styles.cameraStage}>
+            <View
+              accessibilityLabel="二维码扫描区域"
+              onLayout={handleCameraLayout}
+              style={[styles.cameraWrap, { width: cameraSize, height: cameraSize }]}
+            >
+              {!pasteVisible ? (
+                <CameraView
+                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                  facing="back"
+                  onBarcodeScanned={handleBarCodeScanned}
+                  style={styles.camera}
+                />
+              ) : (
+                <View style={styles.cameraPlaceholder} />
+              )}
+              <View pointerEvents="none" style={styles.reticle}>
                 <View style={[styles.reticleFrame, { width: reticleSize, height: reticleSize }]}>
                   <View style={[styles.corner, styles.cornerTL]} />
                   <View style={[styles.corner, styles.cornerTR]} />
@@ -295,247 +291,188 @@ export default function PairScanScreen() {
                 </View>
               </View>
             </View>
-          )}
-          {pasteVisible && <View style={styles.cameraPlaceholder} />}
-          <Pressable
-            style={({ pressed }) => [styles.pasteButton, pressed && styles.pasteButtonPressed]}
-            onPress={() => setPasteVisible(true)}
-          >
-            <ClipboardIcon size={16} color={colors.textSecondary} />
-            <Text style={styles.pasteButtonText}>Or paste pairing code</Text>
-          </Pressable>
-        </>
-      )}
-
-      {status === 'connecting' && (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.textSecondary} />
-          <Text style={styles.connectingText}>Connecting…</Text>
-          <View style={styles.logSlot}>
-            <ConnectionLog entries={logs} title="Pairing log" />
+            <Text accessibilityRole="header" style={styles.scanTitle}>
+              扫描桌面端二维码
+            </Text>
+            <Text style={styles.scanDescription}>
+              二维码只用于交换配对信息，不包含你的代码内容。
+            </Text>
           </View>
-        </View>
-      )}
-
-      {status === 'error' && (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-          {logs.length > 0 && (
-            <View style={styles.logSlot}>
-              <ConnectionLog entries={logs} title="Pairing log" />
-            </View>
-          )}
-          <View style={styles.errorActions}>
-            <Pressable style={styles.primaryButton} onPress={retry}>
-              <Text style={styles.primaryButtonText}>Try Again</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.pasteButtonPressed
-              ]}
-              onPress={() => {
-                retry()
-                setPasteVisible(true)
-              }}
+          <View style={styles.bottomActions}>
+            <View
+              accessibilityLiveRegion="polite"
+              accessibilityRole="text"
+              style={styles.scanStatus}
             >
-              <Text style={styles.secondaryButtonText}>Paste code instead</Text>
-            </Pressable>
+              <QrCode color={theme.color.text.inverse} size={20} strokeWidth={2} />
+              <Text style={styles.scanStatusText}>正在扫描</Text>
+            </View>
+            <PairingActionButton
+              label="无法使用相机？"
+              onPress={() => setPasteVisible(true)}
+              variant="ghost"
+            />
           </View>
-        </View>
-      )}
+        </ScrollView>
+      ) : null}
 
-      <TextInputModal
-        visible={pasteVisible}
-        title="Paste pairing code"
-        message="Copy the code shown under the QR on your computer."
-        placeholder="orca://pair?code=... or paste the code"
-        onSubmit={handlePasteSubmit}
+      {status === 'connecting' ? (
+        <ScrollView contentContainerStyle={[styles.scrollCentered, bottomPadding]}>
+          <PairingConnectingState>
+            {logs.length > 0 ? (
+              <View style={styles.logSlot}>
+                <ConnectionLog entries={logs} title="配对日志" />
+              </View>
+            ) : null}
+          </PairingConnectingState>
+        </ScrollView>
+      ) : null}
+
+      {status === 'error' ? (
+        <ScrollView contentContainerStyle={[styles.scrollCentered, bottomPadding]}>
+          <PairingScreenContent
+            description={errorMessage}
+            icon={AlertTriangle}
+            title="无法连接电脑"
+            tone="danger"
+          >
+            {logs.length > 0 ? (
+              <View style={styles.logSlot}>
+                <ConnectionLog entries={logs} title="配对日志" />
+              </View>
+            ) : null}
+            <View style={styles.actions}>
+              <PairingActionButton icon={RefreshCw} label="重新扫描" onPress={retry} />
+              <PairingActionButton
+                icon={ClipboardPaste}
+                label="输入配对码"
+                onPress={() => {
+                  retry()
+                  setPasteVisible(true)
+                }}
+                variant="secondary"
+              />
+            </View>
+          </PairingScreenContent>
+        </ScrollView>
+      ) : null}
+
+      <PairingCodeSheet
         onCancel={() => setPasteVisible(false)}
+        onSubmit={handlePasteSubmit}
+        visible={pasteVisible}
       />
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase,
-    padding: spacing.lg
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm
-  },
-  steps: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-    marginLeft: 7
-  },
-  step: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  stepBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.bgRaised,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  stepNumber: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary
-  },
-  stepText: {
-    fontSize: typography.bodySize,
-    color: colors.textSecondary
-  },
-  cameraWrap: {
-    flex: 1,
-    borderRadius: radii.camera,
-    overflow: 'hidden'
-  },
-  // Why: holds the layout slot while the camera is unmounted during
-  // paste, so the bottom action button doesn't snap up to fill the
-  // empty space.
-  cameraPlaceholder: {
-    flex: 1,
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.camera
-  },
-  camera: {
-    ...StyleSheet.absoluteFillObject
-  },
-  reticle: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  reticleFrame: {
-    position: 'relative'
-  },
-  corner: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderColor: 'rgba(255,255,255,0.7)'
-  },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 2.5,
-    borderLeftWidth: 2.5,
-    borderTopLeftRadius: 6
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 2.5,
-    borderRightWidth: 2.5,
-    borderTopRightRadius: 6
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 2.5,
-    borderLeftWidth: 2.5,
-    borderBottomLeftRadius: 6
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 2.5,
-    borderRightWidth: 2.5,
-    borderBottomRightRadius: 6
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  title: {
-    fontSize: typography.titleSize,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: spacing.sm
-  },
-  subtitle: {
-    maxWidth: 310,
-    fontSize: typography.bodySize,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-    lineHeight: 20
-  },
-  connectingText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    marginTop: spacing.lg
-  },
-  logSlot: {
-    width: '100%',
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.sm
-  },
-  errorText: {
-    color: colors.statusRed,
-    fontSize: typography.bodySize,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-    lineHeight: 20
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.textPrimary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.button
-  },
-  primaryButtonText: {
-    color: colors.bgBase,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  pasteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button
-  },
-  pasteButtonPressed: {
-    opacity: 0.6
-  },
-  pasteButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    fontWeight: '500'
-  },
-  errorActions: {
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  secondaryButton: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button
-  },
-  secondaryButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    fontWeight: '500'
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.color.bg.canvas },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    loadingText: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      marginTop: theme.spacing.space16
+    },
+    scrollCentered: {
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space20,
+      paddingTop: theme.spacing.space24
+    },
+    scannerContent: {
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.space20,
+      paddingTop: 0
+    },
+    cameraStage: {
+      width: '100%',
+      maxWidth: 400,
+      minHeight: 470,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    cameraWrap: {
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    cameraPlaceholder: { flex: 1, backgroundColor: theme.color.bg.subtle },
+    camera: { ...StyleSheet.absoluteFillObject },
+    reticle: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    reticleFrame: { position: 'relative' },
+    corner: {
+      position: 'absolute',
+      width: theme.spacing.space16,
+      height: theme.spacing.space16,
+      borderColor: theme.color.brand.primary
+    },
+    cornerTL: {
+      top: 0,
+      left: 0,
+      borderTopWidth: 3,
+      borderLeftWidth: 3,
+      borderTopLeftRadius: theme.radii.small
+    },
+    cornerTR: {
+      top: 0,
+      right: 0,
+      borderTopWidth: 3,
+      borderRightWidth: 3,
+      borderTopRightRadius: theme.radii.small
+    },
+    cornerBL: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: 3,
+      borderLeftWidth: 3,
+      borderBottomLeftRadius: theme.radii.small
+    },
+    cornerBR: {
+      right: 0,
+      bottom: 0,
+      borderRightWidth: 3,
+      borderBottomWidth: 3,
+      borderBottomRightRadius: theme.radii.small
+    },
+    scanTitle: {
+      ...theme.typography.pageTitle,
+      color: theme.color.text.primary,
+      textAlign: 'center',
+      marginTop: theme.spacing.space20
+    },
+    scanDescription: {
+      ...theme.typography.meta,
+      maxWidth: 340,
+      color: theme.color.text.secondary,
+      textAlign: 'center',
+      marginTop: theme.spacing.space8
+    },
+    actions: { width: '100%', gap: theme.spacing.space8, marginTop: theme.spacing.space24 },
+    bottomActions: { width: '100%', maxWidth: 400 },
+    scanStatus: {
+      width: '100%',
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: theme.spacing.space8,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.selected,
+      paddingHorizontal: theme.spacing.space20,
+      paddingVertical: theme.spacing.space12
+    },
+    scanStatusText: { ...theme.typography.label, color: theme.color.text.inverse },
+    logSlot: { width: '100%', marginTop: theme.spacing.space20 }
+  })
+}

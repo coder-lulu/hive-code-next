@@ -1,4 +1,5 @@
 import type { RemoteHostPlatform } from './ssh-remote-platform'
+import { applyProductBranding } from '../../shared/brand'
 import { isWindowsRemoteHost, joinRemotePath } from './ssh-remote-platform'
 import { powerShellCommand, powerShellLiteral, powerShellNativeArg } from './ssh-remote-powershell'
 
@@ -22,7 +23,7 @@ export type RemoteCliInstallPlan = {
   postWriteCommands: string[]
 }
 
-const WINDOWS_REMOTE_CLI_LAUNCHER_SOURCE = String.raw`using System;
+const WINDOWS_REMOTE_CLI_LAUNCHER_SOURCE = applyProductBranding(String.raw`using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -148,7 +149,7 @@ internal static class OrcaRemoteCliLauncher
         return quoted.ToString();
     }
 }
-`
+`)
 
 function quoteSh(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`
@@ -175,21 +176,23 @@ function createWindowsLauncherCompileCommand(
   ]
     .map(powerShellNativeArg)
     .join(' ')
-  return powerShellCommand(
-    [
-      `Set-Location -ErrorAction Stop -LiteralPath ${powerShellLiteral(binDir)}`,
-      '$windowsDirectory = if ($env:WINDIR) { $env:WINDIR } else { $env:SystemRoot }',
-      `$compilerCandidates = @((Join-Path $windowsDirectory 'Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe'), (Join-Path $windowsDirectory 'Microsoft.NET\\Framework\\v4.0.30319\\csc.exe'))`,
-      '$compiler = $compilerCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1',
-      "if (-not $compiler) { Write-Error 'Unable to find the .NET Framework C# compiler required for the Orca SSH CLI launcher.'; exit 1 }",
-      `& $compiler ${compilerArgs}`,
-      'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
-      `if (-not (Test-Path -LiteralPath ${powerShellLiteral(launcherPath)} -PathType Leaf)) { Write-Error 'The Orca SSH CLI launcher compiler produced no executable.'; exit 1 }`,
-      // Why: remove the legacy %* bridge only after a successful compile, so a
-      // host missing csc.exe keeps its existing CLI (orca.exe shadows orca.cmd).
-      `Remove-Item -LiteralPath ${powerShellLiteral(legacyShimPath)} -Force -ErrorAction SilentlyContinue`,
-      `Remove-Item -LiteralPath ${powerShellLiteral(sourcePath)} -Force`
-    ].join('; ')
+  return applyProductBranding(
+    powerShellCommand(
+      [
+        `Set-Location -ErrorAction Stop -LiteralPath ${powerShellLiteral(binDir)}`,
+        '$windowsDirectory = if ($env:WINDIR) { $env:WINDIR } else { $env:SystemRoot }',
+        `$compilerCandidates = @((Join-Path $windowsDirectory 'Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe'), (Join-Path $windowsDirectory 'Microsoft.NET\\Framework\\v4.0.30319\\csc.exe'))`,
+        '$compiler = $compilerCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1',
+        "if (-not $compiler) { Write-Error 'Unable to find the .NET Framework C# compiler required for the Orca SSH CLI launcher.'; exit 1 }",
+        `& $compiler ${compilerArgs}`,
+        'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+        `if (-not (Test-Path -LiteralPath ${powerShellLiteral(launcherPath)} -PathType Leaf)) { Write-Error 'The Orca SSH CLI launcher compiler produced no executable.'; exit 1 }`,
+        // Why: remove the legacy %* bridge only after a successful compile, so a
+        // host missing csc.exe keeps its existing CLI (orca.exe shadows orca.cmd).
+        `Remove-Item -LiteralPath ${powerShellLiteral(legacyShimPath)} -Force -ErrorAction SilentlyContinue`,
+        `Remove-Item -LiteralPath ${powerShellLiteral(sourcePath)} -Force`
+      ].join('; ')
+    )
   )
 }
 
@@ -225,20 +228,22 @@ export function createRemoteCliInstallPlan(env: RemoteCliInstallEnv): RemoteCliI
     files: [
       {
         path: launcherPath,
-        contents: [
-          '#!/usr/bin/env sh',
-          'set -eu',
-          `ORCA_RELAY_NODE_PATH=\${ORCA_RELAY_NODE_PATH:-${quoteSh(env.nodePath)}}`,
-          `ORCA_RELAY_DIR=\${ORCA_RELAY_DIR:-${quoteSh(env.relayDir)}}`,
-          `ORCA_RELAY_SOCKET_PATH=\${ORCA_RELAY_SOCKET_PATH:-${quoteSh(env.sockPath)}}`,
-          `ORCA_RELAY_CREDENTIAL_FILE=\${ORCA_RELAY_CREDENTIAL_FILE:-${quoteSh(env.credentialFile ?? `${env.sockPath}.credential`)}}`,
-          'if [ ! -S "$ORCA_RELAY_SOCKET_PATH" ]; then',
-          '  echo "Orca SSH CLI bridge cannot find the relay socket: $ORCA_RELAY_SOCKET_PATH" >&2',
-          '  exit 1',
-          'fi',
-          'exec "$ORCA_RELAY_NODE_PATH" "$ORCA_RELAY_DIR/relay.js" --sock-path "$ORCA_RELAY_SOCKET_PATH" --credential-file "$ORCA_RELAY_CREDENTIAL_FILE" --orca-cli "$@"',
-          ''
-        ].join('\n')
+        contents: applyProductBranding(
+          [
+            '#!/usr/bin/env sh',
+            'set -eu',
+            `ORCA_RELAY_NODE_PATH=\${ORCA_RELAY_NODE_PATH:-${quoteSh(env.nodePath)}}`,
+            `ORCA_RELAY_DIR=\${ORCA_RELAY_DIR:-${quoteSh(env.relayDir)}}`,
+            `ORCA_RELAY_SOCKET_PATH=\${ORCA_RELAY_SOCKET_PATH:-${quoteSh(env.sockPath)}}`,
+            `ORCA_RELAY_CREDENTIAL_FILE=\${ORCA_RELAY_CREDENTIAL_FILE:-${quoteSh(env.credentialFile ?? `${env.sockPath}.credential`)}}`,
+            'if [ ! -S "$ORCA_RELAY_SOCKET_PATH" ]; then',
+            '  echo "Orca SSH CLI bridge cannot find the relay socket: $ORCA_RELAY_SOCKET_PATH" >&2',
+            '  exit 1',
+            'fi',
+            'exec "$ORCA_RELAY_NODE_PATH" "$ORCA_RELAY_DIR/relay.js" --sock-path "$ORCA_RELAY_SOCKET_PATH" --credential-file "$ORCA_RELAY_CREDENTIAL_FILE" --orca-cli "$@"',
+            ''
+          ].join('\n')
+        )
       }
     ],
     // Surface chmod failures: a non-executable launcher must fail install loudly, not silently.

@@ -3,7 +3,6 @@ import {
   View,
   Pressable,
   StyleSheet,
-  Platform,
   useWindowDimensions,
   Keyboard,
   BackHandler
@@ -20,11 +19,12 @@ import Animated, {
   interpolate,
   Extrapolation
 } from 'react-native-reanimated'
-import { colors, spacing } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 // Why: mount-before-commit logic is anchor-agnostic, so the X-axis drawer reuses
 // the exact same gate as BottomDrawer rather than duplicating it.
 import { resolveBottomDrawerMounted } from './bottom-drawer-mount-state'
 import { resolveRightDrawerPanelWidth } from './right-drawer-panel-width'
+import { createRightDrawerStyles } from './right-drawer-styles'
 import { useResponsiveLayout } from '../layout/responsive-layout'
 
 const DISMISS_THRESHOLD = 80
@@ -84,6 +84,8 @@ function MountedRightDrawer({
   zIndex = 1000,
   widthPx
 }: MountedRightDrawerProps) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createRightDrawerStyles)
   const translateX = useSharedValue(0)
   const progress = useSharedValue(0)
   const scrollOffsetY = useSharedValue(0)
@@ -177,7 +179,12 @@ function MountedRightDrawer({
     >
       <GestureHandlerRootView style={styles.root}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+          <Pressable
+            accessibilityLabel="Close side panel"
+            accessibilityRole="button"
+            style={StyleSheet.absoluteFill}
+            onPress={dismiss}
+          />
         </Animated.View>
 
         <View style={styles.anchor} pointerEvents="box-none">
@@ -187,9 +194,9 @@ function MountedRightDrawer({
                 styles.drawer,
                 {
                   width: panelWidth,
-                  paddingTop: insets.top + spacing.md,
-                  paddingBottom: insets.bottom + spacing.lg,
-                  paddingRight: insets.right
+                  paddingTop: insets.top + theme.spacing.space12,
+                  paddingBottom: insets.bottom + theme.spacing.space16,
+                  paddingRight: insets.right + theme.spacing.space12
                 },
                 drawerStyle
               ]}
@@ -212,40 +219,3 @@ function MountedRightDrawer({
     </Animated.View>
   )
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1000
-  },
-  root: {
-    flex: 1
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)'
-  },
-  anchor: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'flex-end'
-  },
-  drawer: {
-    height: '100%',
-    backgroundColor: colors.bgBase,
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
-    paddingHorizontal: spacing.md,
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderLeftColor: colors.borderSubtle,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: -2, height: 0 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10
-      },
-      android: { elevation: 8 }
-    })
-  }
-})

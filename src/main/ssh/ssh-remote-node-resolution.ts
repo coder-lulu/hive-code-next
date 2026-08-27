@@ -14,6 +14,7 @@ import {
   nodeToolchainVersionsMeetRequirements
 } from './ssh-remote-node-toolchain-probe'
 import { isSshSessionLimitError } from './ssh-session-limit-error'
+import { applyProductBranding } from '../../shared/brand'
 import { buildSshLoginShellCommand } from './ssh-login-shell-command'
 
 // Why: the login-shell fallback catches custom PATH setups in ~/.profile that
@@ -288,7 +289,9 @@ function throwWindowsNodeNotFound(options?: RemoteNodeResolutionOptions): never 
   throwIfAborted(options)
   throw new Error(
     [
-      'Node.js not found on remote host. Orca relay requires Node.js 18+ and npm.',
+      applyProductBranding(
+        'Node.js not found on remote host. Orca relay requires Node.js 18+ and npm.'
+      ),
       '',
       'Install Node.js 18+ on the remote host, then reconnect:',
       '  winget install OpenJS.NodeJS.LTS',

@@ -1,18 +1,24 @@
 import type { SkillCloudOperation, SkillCloudOptions } from '../../shared/skill-cloud-contract'
 import { ensureActiveOrcaProfile } from '../orca-profiles/profile-index-store'
-import { getOrcaCloudAuthConfig } from '../orca-profiles/profile-cloud-auth-config'
 import { runWithFreshOrcaCloudSession } from '../orca-profiles/profile-cloud-session-refresh'
-import {
-  allowsArtifactCloudAuthOverride,
-  resolveArtifactCloudApiUrl
-} from '../artifacts/artifact-cloud-config'
+import { getProductArtifactCloudConfig } from '../product/product-artifact-cloud-config'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
+import { allowsArtifactCloudAuthOverride } from '../artifacts/artifact-cloud-config'
 
 export async function runSkillCloudOperation<T>(input: {
   userDataPath: string
   options: SkillCloudOptions
   operation(token: string, apiUrl: string): Promise<T>
 }): Promise<SkillCloudOperation<T>> {
-  const apiUrl = resolveArtifactCloudApiUrl(input.options.apiUrl)
+  const override = input.options.authToken?.trim() || process.env.ORCA_CLOUD_AUTH_TOKEN?.trim()
+  if (override && !allowsArtifactCloudAuthOverride()) {
+    throw new Error('Skill authentication overrides are available only in development builds.')
+  }
+  const artifactConfig = getProductArtifactCloudConfig(input.options.apiUrl)
+  if (!artifactConfig.configured) {
+    return { status: 'unconfigured', message: artifactConfig.setupMessage }
+  }
+  const apiUrl = artifactConfig.apiUrl
   const active = ensureActiveOrcaProfile(input.userDataPath)
   const stamp = {
     profileId: active.profile.id,
@@ -31,16 +37,12 @@ export async function runSkillCloudOperation<T>(input: {
       throw new Error('The signed-in Orca account changed during the skill request.')
     }
   }
-  const override = input.options.authToken?.trim() || process.env.ORCA_CLOUD_AUTH_TOKEN?.trim()
   if (override) {
-    if (!allowsArtifactCloudAuthOverride()) {
-      throw new Error('Skill authentication overrides are available only in development builds.')
-    }
     const value = await input.operation(override, apiUrl)
     assertCurrent()
     return { status: 'ok', value }
   }
-  const config = getOrcaCloudAuthConfig()
+  const config = getProductCloudAuthConfig()
   if (!config.configured) {
     return { status: 'unconfigured', message: config.setupMessage }
   }

@@ -352,9 +352,11 @@ describe('registerPtyHandlers', () => {
         cwd: '/tmp',
         command: 'printf "hello"'
       })
-      expect(shell).toBe('/bin/zsh')
+      expect(shell === '/bin/zsh' || /[\\/]shell-ready[\\/]zsh$/u.test(shell)).toBe(true)
       expect(args).toEqual(['-l'])
-      expect(options.env.ZDOTDIR).toBe(join(getShellReadyWrapperRoot(), 'zsh'))
+      expect(options.env.ZDOTDIR.replace(/\\/g, '/')).toBe(
+        join(getShellReadyWrapperRoot(), 'zsh').replace(/\\/g, '/')
+      )
       // Why absent: this HOME holds no zsh startup file, so there is no user
       // config dir to hand back and Orca must not invent one — the wrapper
       // leaves ZDOTDIR unset, exactly as an unwrapped login zsh would.

@@ -324,6 +324,9 @@ describe('in-guest wrapper root resolution', () => {
   })
 
   it('resolves the published root ahead of the legacy path under a real shell', () => {
+    if (process.platform === 'win32' && !canRunWslSh()) {
+      return
+    }
     const script = buildWslInteractiveLoginShellCommand()
     // Run only the root-resolution prologue, then report what it picked.
     const prologue = script.split('_orca_wsl_shell_name=')[0] as string
@@ -334,7 +337,12 @@ describe('in-guest wrapper root resolution', () => {
       prologue,
       'printf "%s" "$_orca_shell_ready_root"'
     ].join('\n')
-    const result = spawnSync('sh', ['-c', probe], { encoding: 'utf8' })
+    const result =
+      process.platform === 'win32'
+        ? spawnSync('wsl.exe', buildWslExecArgs(undefined, ['sh', '-c', probe]), {
+            encoding: 'utf8'
+          })
+        : spawnSync('sh', ['-c', probe], { encoding: 'utf8' })
     expect(result.status).toBe(0)
     expect(result.stdout).toBe('/mnt/c/ud/shell-wrappers/deadbeefdeadbeef/shell-ready')
   })

@@ -1,5 +1,12 @@
 import { vi } from 'vitest'
 import type { Mock } from 'vitest'
+import { applyProductBranding } from '../shared/brand'
+import {
+  createProductUpdaterTestMocks,
+  type ProductUpdaterModuleFactories,
+  type ProductUpdaterTestState
+} from './updater-product-test-harness'
+export type { ProductUpdateSource } from './updater-product-test-harness'
 
 /** Loose spy signature for the electron/electron-updater calls the suites only assert on. */
 type UpdaterSpy = Mock<(...args: unknown[]) => unknown>
@@ -12,6 +19,7 @@ type AutoUpdaterMock = {
   allowDowngrade: boolean
   disableDifferentialDownload: boolean
   logger: { error: (message: unknown) => void } | undefined
+  httpExecutor: { request: UpdaterSpy; doApiRequest: UpdaterSpy; doDownload: UpdaterSpy }
   on: Mock<(event: string, handler: (...args: unknown[]) => void) => AutoUpdaterMock>
   checkForUpdates: UpdaterSpy
   downloadUpdate: UpdaterSpy
@@ -53,11 +61,11 @@ type UpdaterModuleFactories = {
   }
   updaterPrereleaseFeed: () => {
     fetchNewerReleaseTagsWithReadiness: (...args: unknown[]) => Promise<unknown>
-    getReleaseDownloadUrl: (tag: string) => string
+    getReleaseDownloadUrl: (tag: string) => string | null
   }
   localBuildSwitch: () => { chooseLocalBuild: UpdaterSpy }
   localBuildFeedServer: () => { startLocalBuildFeed: UpdaterSpy }
-}
+} & ProductUpdaterModuleFactories
 
 export type UpdaterMocks = {
   appMock: AppMock
@@ -80,13 +88,15 @@ export type UpdaterMocks = {
   closeLocalBuildFeedMock: UpdaterSpy
   moduleFactories: UpdaterModuleFactories
   resetUpdaterMocks: () => void
-}
+} & ProductUpdaterTestState
 
 // Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
 export const PRE_COMMIT_INSTALL_FAILURE =
   process.platform === 'darwin'
-    ? 'Could not restart to install the update. Quit and reopen Orca, then try again.'
-    : 'Could not start the update installer. Orca remains open.'
+    ? applyProductBranding(
+        'Could not restart to install the update. Quit and reopen Orca, then try again.'
+      )
+    : applyProductBranding('Could not start the update installer. Orca remains open.')
 
 /**
  * Builds the electron/electron-updater mock graph `updater.ts` runs against, plus the module
@@ -138,6 +148,9 @@ export function createUpdaterMocks(): UpdaterMocks {
     autoUpdaterMock.disableDifferentialDownload = false
     autoUpdaterMock.autoRunAppAfterInstall = true
     autoUpdaterMock.logger = undefined
+    autoUpdaterMock.httpExecutor.request.mockReset()
+    autoUpdaterMock.httpExecutor.doApiRequest.mockReset()
+    autoUpdaterMock.httpExecutor.doDownload.mockReset()
     delete (autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature
   }
 
@@ -150,6 +163,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     disableDifferentialDownload: false,
     // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
     logger: undefined as { error: (message: unknown) => void } | undefined,
+    httpExecutor: { request: vi.fn(), doApiRequest: vi.fn(), doDownload: vi.fn() },
     on,
     checkForUpdates: vi.fn(),
     downloadUpdate: vi.fn(),
@@ -187,6 +201,9 @@ export function createUpdaterMocks(): UpdaterMocks {
   const chooseLocalBuildMock = vi.fn()
   const startLocalBuildFeedMock = vi.fn()
   const closeLocalBuildFeedMock = vi.fn()
+  const { productUpdaterModuleFactories, resetProductUpdaterMocks, ...productUpdaterTestState } =
+    createProductUpdaterTestMocks()
+  const { productUpdateSourceState } = productUpdaterTestState
 
   /** One factory per module `updater.ts` pulls in; test files pass these to their own `vi.mock`. */
   const moduleFactories: UpdaterModuleFactories = {
@@ -213,16 +230,37 @@ export function createUpdaterMocks(): UpdaterMocks {
     }),
     updaterPrereleaseFeed: () => ({
       fetchNewerReleaseTagsWithReadiness: async (...args: unknown[]) => {
-        const result = await fetchNewerReleaseTagsMock(...args)
+        const result = (await fetchNewerReleaseTagsMock(...args)) as
+          | unknown[]
+          | { state?: string; currentTag?: string }
+        const currentVersion = typeof args[0] === 'string' ? args[0] : null
+        const options = args[2] as
+          | { includePrerelease?: boolean; releaseFilter?: string }
+          | undefined
+        const currentMatchesFilter =
+          currentVersion !== null &&
+          (options?.releaseFilter === 'perf'
+            ? currentVersion.includes('.perf')
+            : options?.includePrerelease || !currentVersion.includes('-'))
+        const noNewerResult = currentMatchesFilter
+          ? { tags: [], state: 'no-newer', currentTag: `v${currentVersion}` }
+          : { tags: [], state: 'no-newer' }
         return Array.isArray(result)
-          ? { tags: result, state: result.length > 0 ? 'ready' : 'no-newer' }
-          : result
+          ? result.length > 0
+            ? { tags: result, state: 'ready' }
+            : noNewerResult
+          : result?.state === 'no-newer' && !result.currentTag
+            ? { ...result, ...noNewerResult }
+            : result
       },
-      getReleaseDownloadUrl: (tag: string) =>
-        `https://github.com/stablyai/orca/releases/download/${tag}`
+      getReleaseDownloadUrl: (tag: string) => {
+        const github = productUpdateSourceState.value?.github
+        return github ? `${github.releasesDownloadBase}/${tag}` : null
+      }
     }),
     localBuildSwitch: () => ({ chooseLocalBuild: chooseLocalBuildMock }),
-    localBuildFeedServer: () => ({ startLocalBuildFeed: startLocalBuildFeedMock })
+    localBuildFeedServer: () => ({ startLocalBuildFeed: startLocalBuildFeedMock }),
+    ...productUpdaterModuleFactories
   }
 
   /** Shared `beforeEach` body: fresh module registry plus every mock back to its default. */
@@ -236,6 +274,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     appMock.getVersion.mockReturnValue('1.0.51')
     appMock.quit.mockReset()
     appMock.isPackaged = true
+    resetProductUpdaterMocks()
     isMock.dev = false
     killAllPtyMock.mockReset()
     armExitWatchdogMock.mockReset()
@@ -276,6 +315,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     chooseLocalBuildMock,
     startLocalBuildFeedMock,
     closeLocalBuildFeedMock,
+    ...productUpdaterTestState,
     moduleFactories,
     resetUpdaterMocks
   }

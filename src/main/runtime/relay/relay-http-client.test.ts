@@ -235,6 +235,42 @@ describe('relay HTTP client', () => {
     ).rejects.toMatchObject({ name: 'TimeoutError' })
   })
 
+  it('rejects non-TLS token exchange endpoints before sending the bearer', async () => {
+    const keypair = nacl.box.keyPair()
+    const fetch = vi.fn<typeof globalThis.fetch>()
+
+    await expect(
+      exchangeRelayAuthorization({
+        endpoint: 'http://auth.example/v1/desktop/auth/relay-token',
+        accessToken: 'ordinary-access-token',
+        keypair: {
+          ...keypair,
+          publicKeyB64: Buffer.from(keypair.publicKey).toString('base64')
+        },
+        fetch
+      })
+    ).rejects.toThrow('relay_token-exchange_failed_400')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('disables redirects for token exchange requests', async () => {
+    const keypair = nacl.box.keyPair()
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({ relayToken: 'scoped-relay-token', expiresAt: Date.now() + 300_000 })
+    )
+
+    await exchangeRelayAuthorization({
+      endpoint: 'https://auth.example/v1/desktop/auth/relay-token',
+      accessToken: 'ordinary-access-token',
+      keypair: {
+        ...keypair,
+        publicKeyB64: Buffer.from(keypair.publicKey).toString('base64')
+      },
+      fetch
+    })
+    expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('error')
+  })
+
   it('rejects data-plane supplied non-origin URLs', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       Response.json({

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { BrowserLoadFailureOverlay } from './browser-load-failure-overlay'
 import { BROWSER_GUEST_RECOVERY_ERROR_CODE } from '../host-guest/browser-page-guest-recovery'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const callbacks = {
   onRetry: vi.fn(),
@@ -85,7 +86,7 @@ describe('BrowserLoadFailureOverlay', () => {
     expect(screen.getByText("Connection isn't secure")).toBeInTheDocument()
     expect(
       screen.getByText(
-        "Orca doesn't trust the authority that issued the certificate for localhost:3443."
+        `${APP_DISPLAY_NAME} doesn't trust the authority that issued the certificate for localhost:3443.`
       )
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Proceed Anyway (Unsafe)' })).toBeNull()

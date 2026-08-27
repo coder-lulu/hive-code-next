@@ -1,4 +1,5 @@
 import { ORCHESTRATION_CONTRACT_VERSION } from './protocol-version'
+import { applyProductBranding } from './brand'
 
 export type OrchestrationMigrationReason =
   | 'client_contract_missing'
@@ -71,7 +72,9 @@ export function orchestrationSkillRecoveryData(): {
     guide: { topic: 'orchestration', full: true },
     nextCommandArgs: ORCHESTRATION_SKILL_COMMAND_ARGS,
     nextSteps: [
-      'Using this same Orca CLI executable, run: skills get orchestration --full',
+      applyProductBranding(
+        'Using this same Orca CLI executable, run: skills get orchestration --full'
+      ),
       'Read the returned guide completely and do not retry the previous command unchanged.'
     ]
   }

@@ -34,34 +34,30 @@ afterEach(() => {
 })
 
 describe('electron-builder dev-channel identity', () => {
-  it('keeps the SignPath publisherName on stable Windows builds', () => {
+  it('keeps stable Windows packaging non-publishing without invented signing identity', () => {
     const config = loadConfigWithEnv({})
 
-    expect(config.win.signtoolOptions.publisherName).toBe('SignPath Foundation')
+    expect(config.win.signtoolOptions?.publisherName).toBeUndefined()
     expect(config.win.verifyUpdateCodeSignature).toBeUndefined()
-    expect(config.publish.repo).toBe('orca')
-    expect(config.publish.releaseType).toBe('release')
+    expect(config.publish).toBeNull()
   })
 
-  // The whole point of the change: an unsigned build that advertised a
-  // publisherName would Authenticode-verify — and reject — every installer it
-  // ever downloaded, including its own way back to stable.
-  it('drops the publisherName and disables update signature checks on Windows dev builds', () => {
+  it('keeps unconfigured Windows dev-channel packaging fail closed', () => {
     const config = loadConfigWithEnv(WIN_ADHOC_ENV)
 
     expect(config.win.signtoolOptions?.publisherName).toBeUndefined()
-    expect(config.win.verifyUpdateCodeSignature).toBe(false)
+    expect(config.win.verifyUpdateCodeSignature).toBeUndefined()
+    expect(config.publish).toBeNull()
   })
 
   it.each([
-    ['hourly', { ORCA_WIN_HOURLY: '1' }, 'orca-hourly'],
-    ['daily', { ORCA_WIN_DAILY: '1' }, 'orca-daily'],
-    ['adhoc', { ORCA_WIN_ADHOC: '1' }, 'orca-adhoc']
-  ])('publishes %s Windows builds to its own repo as a prerelease', (_channel, env, repo) => {
+    ['hourly', { ORCA_WIN_HOURLY: '1' }],
+    ['daily', { ORCA_WIN_DAILY: '1' }],
+    ['adhoc', { ORCA_WIN_ADHOC: '1' }]
+  ])('does not publish unconfigured %s Windows builds', (_channel, env) => {
     const config = loadConfigWithEnv(env)
 
-    expect(config.publish.repo).toBe(repo)
-    expect(config.publish.releaseType).toBe('prerelease')
+    expect(config.publish).toBeNull()
   })
 
   // Why: ORCA_MAC_* gates hardened runtime, notarization, and root-level
@@ -82,7 +78,7 @@ describe('electron-builder dev-channel identity', () => {
     })
 
     expect(config.mac.notarize).toBe(true)
-    expect(config.publish.repo).toBe('orca-adhoc')
+    expect(config.publish).toBeNull()
   })
 })
 

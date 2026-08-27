@@ -353,20 +353,31 @@ const CODED_TRANSPORT_ERRORS: TransportErrorPair[] = [
 
 /** Untyped producers that still depend on the message-fragment fallback. */
 const CODELESS_TRANSPORT_ERRORS: (TransportErrorPair & { recoverable: boolean })[] = [
+  // Compatibility corpus: older web clients may still hand us pre-fork copy.
   {
-    producer: 'web-runtime-client.ts:117 / :328',
+    producer: 'legacy web-runtime-client.ts (pre-HiveCode)',
     message: 'Remote Orca runtime is not connected.',
     recoverable: true
   },
   {
-    producer: 'web-runtime-client.ts:359 / :360 / :591',
+    producer: 'legacy web-runtime-client.ts (pre-HiveCode)',
     message: 'Remote Orca runtime connection closed.',
+    recoverable: true
+  },
+  {
+    producer: 'web-runtime-client.ts:117 / :328',
+    message: 'Remote HiveCode runtime is not connected.',
+    recoverable: true
+  },
+  {
+    producer: 'web-runtime-client.ts:359 / :360 / :591',
+    message: 'Remote HiveCode runtime connection closed.',
     recoverable: true
   },
   {
     producer: 'web-runtime-client.ts:437 / :601',
     message: withRemoteRuntimeTailscaleHint(
-      'Could not connect to the remote Orca runtime.',
+      'Could not connect to the remote HiveCode runtime.',
       'https://desk.example.com'
     ),
     recoverable: true
@@ -378,7 +389,7 @@ const CODELESS_TRANSPORT_ERRORS: (TransportErrorPair & { recoverable: boolean })
   },
   {
     producer: 'remote-runtime-terminal-multiplexer.ts:511',
-    message: 'Remote Orca runtime closed the connection.',
+    message: 'Remote HiveCode runtime closed the connection.',
     recoverable: true
   },
   {

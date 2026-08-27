@@ -46,8 +46,13 @@ import { stat } from 'node:fs/promises'
 import { subscribe as subscribeParcelWatcher } from '@parcel/watcher'
 import { subscribeViaWatcherProcess } from './parcel-watcher-process'
 import { WatcherProcessFailure } from './parcel-watcher-process-failure'
+import { join, resolve } from 'node:path'
 
 type HandlerMap = Record<string, (_event: unknown, args: unknown) => unknown>
+
+const TEST_ROOT = resolve('/tmp/repo')
+const OTHER_ROOT = resolve('/tmp/other')
+const RETRY_FILE = join(TEST_ROOT, 'retry.txt')
 
 describe('local filesystem watcher unsubscribe cleanup', () => {
   const handlers: HandlerMap = {}
@@ -598,11 +603,11 @@ describe('local filesystem watcher unsubscribe cleanup', () => {
 
     await Promise.all([firstWatch, replacementWatch])
     expect(subscribeViaWatcherProcess).toHaveBeenCalledTimes(2)
-    replacementCallback(null, [{ type: 'update', path: '/tmp/repo/retry.txt' }] as never)
+    replacementCallback(null, [{ type: 'update', path: RETRY_FILE }] as never)
     await vi.waitFor(() =>
       expect(replacementSender.send).toHaveBeenCalledWith('fs:changed', {
-        worktreePath: '/tmp/repo',
-        events: [{ kind: 'update', absolutePath: '/tmp/repo/retry.txt', isDirectory: true }]
+        worktreePath: TEST_ROOT,
+        events: [{ kind: 'update', absolutePath: RETRY_FILE, isDirectory: true }]
       })
     )
   })
@@ -639,7 +644,7 @@ describe('local filesystem watcher unsubscribe cleanup', () => {
 
     await vi.waitFor(() => expect(subscribeViaWatcherProcess).toHaveBeenCalledTimes(1))
     handlers['fs:unwatchWorktree']({ sender: firstSender }, { worktreePath: '/tmp/repo' })
-    expect(installs.get('/tmp/repo')?.signal?.aborted).toBe(true)
+    expect(installs.get(TEST_ROOT)?.signal?.aborted).toBe(true)
 
     const joiner = handlers['fs:watchWorktree'](
       { sender: joinerSender },
@@ -652,15 +657,15 @@ describe('local filesystem watcher unsubscribe cleanup', () => {
     ) as Promise<unknown>
     await vi.waitFor(() => expect(subscribeViaWatcherProcess).toHaveBeenCalledTimes(2))
 
-    installs.get('/tmp/repo')?.resolve({ unsubscribe: lateUnsubscribe })
-    installs.get('/tmp/other')?.resolve({ unsubscribe: vi.fn() })
+    installs.get(TEST_ROOT)?.resolve({ unsubscribe: lateUnsubscribe })
+    installs.get(OTHER_ROOT)?.resolve({ unsubscribe: vi.fn() })
     await Promise.all([first, joiner, reopen])
 
     expect(subscribeViaWatcherProcess).toHaveBeenCalledTimes(2)
     expect(
       vi
         .mocked(subscribeViaWatcherProcess)
-        .mock.calls.filter(([rootPath]) => rootPath.endsWith('/tmp/repo'))
+        .mock.calls.filter(([rootPath]) => rootPath === TEST_ROOT)
     ).toHaveLength(1)
     await vi.waitFor(() => expect(lateUnsubscribe).toHaveBeenCalledTimes(1))
   })

@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import type { RuntimeSpeechSetupState } from '../../../src/shared/runtime-types'
 import type { RpcClient } from '../transport/rpc-client'
 import { LogicalClientCutoverError } from '../transport/stable-logical-rpc-client'
@@ -10,8 +11,9 @@ export type MobileSpeechModel = RuntimeSpeechSetupState['models'][number]
 // configured. Mapping them lets the mic entry point open the setup sheet
 // instead of dead-ending on a toast.
 const SETUP_REQUIRED_CODES = new Set(['voice_dictation_disabled', 'voice_model_not_selected'])
-const LEGACY_DESKTOP_SPEECH_SETUP_MESSAGE =
+const LEGACY_DESKTOP_SPEECH_SETUP_MESSAGE = productNameText(
   'Update the paired desktop Orca app to use mobile voice settings.'
+)
 
 // Why: mobile can pair with older desktop runtimes that predate speech.models.list;
 // show upgrade guidance instead of leaking the raw denial or not-found error.

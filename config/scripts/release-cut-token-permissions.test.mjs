@@ -190,7 +190,9 @@ describe('release-cut token permissions', () => {
     for (const [jobName] of releaseTagExecutionJobs(workflow)) {
       if (!PUBLISH_TAG_JOBS.has(jobName)) {
         expect(workflow.jobs[jobName].needs).toBe('cut')
-        expect(workflow.jobs[jobName].if).toBe("needs.cut.outputs.should_release == 'true'")
+        expect(workflow.jobs[jobName].if).toBe(
+          "github.repository == 'stablyai/orca' && needs.cut.outputs.should_release == 'true'"
+        )
       }
     }
     for (const jobName of REUSABLE_CALL_JOBS) {

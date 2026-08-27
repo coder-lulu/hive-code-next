@@ -10,14 +10,13 @@ import type {
   ArtifactWriteRequest
 } from '../../shared/artifacts'
 import { assertArtifactSharingAllowed } from '../../shared/artifact-sharing-gate'
+import { applyProductBranding } from '../../shared/brand'
 import { ensureActiveOrcaProfile } from '../orca-profiles/profile-index-store'
-import { getOrcaCloudAuthConfig } from '../orca-profiles/profile-cloud-auth-config'
 import { prepareArtifactCloudUse } from '../orca-profiles/profile-artifact-cloud-cleanup'
 import { runWithFreshOrcaCloudSession } from '../orca-profiles/profile-cloud-session-refresh'
-import {
-  allowsArtifactCloudAuthOverride,
-  resolveArtifactCloudApiUrl
-} from './artifact-cloud-config'
+import { getProductArtifactCloudConfig } from '../product/product-artifact-cloud-config'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
+import { allowsArtifactCloudAuthOverride } from './artifact-cloud-config'
 import {
   type ArtifactShareScope,
   captureArtifactShareLifecycle,
@@ -29,34 +28,12 @@ import {
 import type { ActiveOrcaProfileState } from '../orca-profiles/profile-index-store'
 import { artifactRequest, artifactWriteBody } from './artifact-cloud-request'
 import { ArtifactPublisher } from './artifact-publisher'
-import { OrcaCloudRequestError } from '../orca-profiles/profile-cloud-client'
+import { deleteArtifactRequest } from './artifact-cloud-delete-request'
 
 type ArtifactAuthContext = {
   profileId: string
   scope: ArtifactShareScope
   assertCurrent: () => void
-}
-
-async function deleteArtifactRequest(
-  apiUrl: string,
-  token: string,
-  path: string,
-  editToken?: string
-): Promise<void> {
-  try {
-    await artifactRequest<void>(apiUrl, token, path, {
-      method: 'DELETE',
-      ...(editToken ? { editToken } : {})
-    })
-  } catch (error) {
-    if (
-      !(error instanceof OrcaCloudRequestError) ||
-      error.statusCode !== 404 ||
-      error.errorCode !== 'artifact_not_found'
-    ) {
-      throw error
-    }
-  }
 }
 
 function tokenFingerprint(token: string): string {
@@ -86,7 +63,9 @@ function authContext(
         !isArtifactShareLifecycleCurrent(active.profile.id, userDataPath, lifecycleGeneration)
       ) {
         throw new Error(
-          'The signed-in Orca account changed while the artifact request was running.'
+          applyProductBranding(
+            'The signed-in Orca account changed while the artifact request was running.'
+          )
         )
       }
     }
@@ -99,7 +78,9 @@ function storedSessionAuthContext(
   userDataPath: string
 ): ArtifactAuthContext {
   if (!active.profile.cloud) {
-    throw new Error('The active Orca profile is not linked to a cloud account.')
+    throw new Error(
+      applyProductBranding('The active Orca profile is not linked to a cloud account.')
+    )
   }
   return authContext(
     active,
@@ -147,7 +128,9 @@ export class ArtifactCloudService {
    */
   constructor(
     private readonly userDataPath: string,
-    private readonly isSharingEnabled: () => boolean
+    // Why default denied: callers that only inspect an unconfigured product can omit
+    // the capability resolver, while any configured publishing path still fails closed.
+    private readonly isSharingEnabled: () => boolean = () => false
   ) {
     this.publisher = new ArtifactPublisher(userDataPath)
   }
@@ -176,6 +159,10 @@ export class ArtifactCloudService {
   // Why async: the gate must surface as a rejection, not a synchronous throw, so every caller's
   // promise chain handles it the same way.
   async share(request: ArtifactWriteRequest): Promise<ArtifactCloudOperation<ArtifactListItem>> {
+    const endpoint = getProductArtifactCloudConfig(request.apiUrl)
+    if (!endpoint.configured) {
+      return { status: 'unconfigured', message: endpoint.setupMessage }
+    }
     assertArtifactSharingAllowed(this.isSharingEnabled)
     const idempotencyKey = randomUUID()
     return this.withAuth(request, (token, apiUrl, auth) =>
@@ -186,6 +173,10 @@ export class ArtifactCloudService {
   async publish(
     request: ArtifactWriteRequest
   ): Promise<ArtifactCloudOperation<ArtifactPublishResult>> {
+    const endpoint = getProductArtifactCloudConfig(request.apiUrl)
+    if (!endpoint.configured) {
+      return { status: 'unconfigured', message: endpoint.setupMessage }
+    }
     assertArtifactSharingAllowed(this.isSharingEnabled)
     const idempotencyKey = randomUUID()
     return this.withAuth(request, (token, apiUrl, auth) =>
@@ -194,6 +185,10 @@ export class ArtifactCloudService {
   }
 
   async update(request: ArtifactWriteRequest): Promise<ArtifactCloudOperation<ArtifactListItem>> {
+    const endpoint = getProductArtifactCloudConfig(request.apiUrl)
+    if (!endpoint.configured) {
+      return { status: 'unconfigured', message: endpoint.setupMessage }
+    }
     assertArtifactSharingAllowed(this.isSharingEnabled)
     return this.withAuth(request, (token, apiUrl, auth) =>
       this.publisher.runForSource(request.sourceKey, auth, async () => {
@@ -205,7 +200,9 @@ export class ArtifactCloudService {
           auth.scope
         )
         if (!record) {
-          throw new Error('This file has not been shared from the active Orca profile.')
+          throw new Error(
+            applyProductBranding('This file has not been shared from the active Orca profile.')
+          )
         }
         return this.publisher.runForSlug(record.slug, auth, async () => {
           auth.assertCurrent()
@@ -247,7 +244,9 @@ export class ArtifactCloudService {
           auth.scope
         )
         if (!record) {
-          throw new Error('This file has not been shared from the active Orca profile.')
+          throw new Error(
+            applyProductBranding('This file has not been shared from the active Orca profile.')
+          )
         }
         return this.publisher.runForSlug(record.slug, auth, async () => {
           auth.assertCurrent()
@@ -277,7 +276,11 @@ export class ArtifactCloudService {
     options: ArtifactCloudOptions,
     operation: (token: string, apiUrl: string, auth: ArtifactAuthContext) => Promise<T>
   ): Promise<ArtifactCloudOperation<T>> {
-    const apiUrl = resolveArtifactCloudApiUrl(options.apiUrl)
+    const endpoint = getProductArtifactCloudConfig(options.apiUrl)
+    if (!endpoint.configured) {
+      return { status: 'unconfigured', message: endpoint.setupMessage }
+    }
+    const apiUrl = endpoint.apiUrl
     const active = ensureActiveOrcaProfile(this.userDataPath)
     prepareArtifactCloudUse(active.profile, this.userDataPath)
     if (options.authToken?.trim()) {
@@ -295,7 +298,7 @@ export class ArtifactCloudService {
         value
       }
     }
-    const config = getOrcaCloudAuthConfig()
+    const config = getProductCloudAuthConfig()
     if (!config.configured) {
       return { status: 'unconfigured', message: config.setupMessage }
     }

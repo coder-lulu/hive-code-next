@@ -2,12 +2,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ORIGINAL_PLATFORM = process.platform
 
-const { netFetchMock } = vi.hoisted(() => ({
-  netFetchMock: vi.fn()
+const { fromPartitionMock, netFetchMock, sessionFetchMock, updateSourceState } = vi.hoisted(() => ({
+  fromPartitionMock: vi.fn(),
+  netFetchMock: vi.fn(),
+  sessionFetchMock: vi.fn(),
+  updateSourceState: {
+    value: {
+      channel: 'stable',
+      feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+      github: {
+        repo: 'stablyai/orca',
+        atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+        releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+      }
+    } as unknown
+  }
 }))
 
 vi.mock('electron', () => ({
-  net: { fetch: netFetchMock }
+  net: { fetch: netFetchMock },
+  session: { fromPartition: fromPartitionMock }
+}))
+
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => updateSourceState.value
 }))
 
 function buildAtomFeed(tags: string[]): string {
@@ -89,10 +108,94 @@ describe('fetchNewerReleaseTag', () => {
   beforeEach(() => {
     vi.resetModules()
     netFetchMock.mockReset()
+    sessionFetchMock.mockReset()
+    sessionFetchMock.mockImplementation((...args: unknown[]) => netFetchMock(...args))
+    fromPartitionMock.mockReset()
+    fromPartitionMock.mockReturnValue({ fetch: sessionFetchMock })
+    updateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+      github: {
+        repo: 'stablyai/orca',
+        atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+        releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+      }
+    }
   })
 
   afterEach(() => {
     setPlatformForTest(ORIGINAL_PLATFORM)
+  })
+
+  it('performs no network request when the product update source is disabled', async () => {
+    updateSourceState.value = null
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.3.19')).resolves.toBeNull()
+    expect(netFetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects automatic redirects for the GitHub Atom metadata request', async () => {
+    netFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(buildAtomFeed([]))
+    })
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await fetchNewerReleaseTag('1.3.19')
+
+    expect(netFetchMock).toHaveBeenCalledWith(
+      'https://github.com/stablyai/orca/releases.atom',
+      expect.objectContaining({ redirect: 'error' })
+    )
+  })
+
+  it('uses the isolated electron-updater session instead of default net.fetch', async () => {
+    sessionFetchMock.mockReset().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: () => Promise.resolve(buildAtomFeed([]))
+    })
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await fetchNewerReleaseTag('1.3.19')
+
+    expect(fromPartitionMock).toHaveBeenCalledWith('electron-updater', { cache: false })
+    expect(sessionFetchMock).toHaveBeenCalledTimes(1)
+    expect(netFetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects an oversized Atom feed before reading its body', async () => {
+    const text = vi.fn(() => Promise.resolve(buildAtomFeed(['v9.0.0'])))
+    netFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-length' ? '10000000' : null)
+      },
+      text
+    })
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.3.19')).resolves.toBeNull()
+    expect(text).not.toHaveBeenCalled()
+  })
+
+  it('cancels an unread Atom body when GitHub returns a non-success status', async () => {
+    const cancel = vi.fn(() => Promise.resolve())
+    netFetchMock.mockResolvedValue({
+      ok: false,
+      status: 503,
+      headers: { get: () => null },
+      body: { cancel }
+    })
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.3.19')).resolves.toBeNull()
+    expect(cancel).toHaveBeenCalledTimes(1)
   })
 
   it('returns the newest stable tag when the user is on an RC and a newer stable exists', async () => {
@@ -217,8 +320,35 @@ describe('fetchNewerReleaseTag', () => {
       fetchNewerReleaseTagsWithReadiness('1.4.121-rc.5', 1, { includePrerelease: true })
     ).resolves.toEqual({
       tags: [],
-      state: 'no-newer'
+      state: 'no-newer',
+      currentTag: 'v1.4.121-rc.5'
     })
+  })
+
+  it('ignores non-RC prerelease channels during a regular RC check', async () => {
+    respondWithAtom([
+      'v1.4.122-hourly.202608070100',
+      'v1.4.122-adhoc.20260807010102',
+      'v1.4.122-beta.1',
+      'v1.4.121-rc.6',
+      'v1.4.121-rc.5'
+    ])
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.4.121-rc.5', { includePrerelease: true })).resolves.toBe(
+      'v1.4.121-rc.6'
+    )
+  })
+
+  it('rejects non-canonical stable tags during a stable check', async () => {
+    respondWithAtom(['V1.4.2', 'v1.4.2+build.1', '1.4.2', 'v1.4.1'])
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTag('1.4.0', { includePrerelease: false })).resolves.toBe(
+      'v1.4.1'
+    )
   })
 
   it('picks the semver-newest perf-tagged prerelease', async () => {

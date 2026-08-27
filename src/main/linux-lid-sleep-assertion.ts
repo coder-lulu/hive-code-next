@@ -1,4 +1,5 @@
 import { spawn as nodeSpawn } from 'node:child_process'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 export const LINUX_LID_SLEEP_ASSERTION_RETRY_MS = 30_000
 
@@ -71,7 +72,7 @@ export class LinuxLidSleepAssertion {
         'systemd-inhibit',
         [
           '--what=sleep:handle-lid-switch',
-          '--who=Orca',
+          `--who=${APP_DISPLAY_NAME}`,
           '--why=Agents are working',
           '--mode=block',
           'sleep',

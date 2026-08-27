@@ -115,7 +115,10 @@ afterEach(() => {
 const SPAWNED_INTERPRETER_TIMEOUT_MS = 240_000
 
 describe.each([
-  ['POSIX', posix] as const,
+  ...((process.platform === 'win32' ? [] : [['POSIX', posix] as const]) as (readonly [
+    string,
+    RemoteHostPlatform
+  ])[]),
   ...((powerShellExecutable ? [['PowerShell', windows] as const] : []) as (readonly [
     string,
     RemoteHostPlatform
@@ -232,7 +235,7 @@ describe.each([
   }
 )
 
-describe('POSIX ownership race fencing', () => {
+describe.skipIf(process.platform === 'win32')('POSIX ownership race fencing', () => {
   it('restores a replacement directory and preserves the original moved aside before claim', () => {
     const pool = createPool()
     const destination = join(pool, 'destination')

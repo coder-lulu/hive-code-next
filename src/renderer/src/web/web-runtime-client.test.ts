@@ -92,7 +92,52 @@ describe('WebRuntimeClient', () => {
     })
 
     client.close()
-    await expect(call).rejects.toThrow('Remote Orca runtime connection closed.')
+    await expect(call).rejects.toThrow('Remote HiveCode runtime connection closed.')
+  })
+
+  it('sends the Cloud token only in the encrypted auth frame', async () => {
+    const client = new WebRuntimeClient({
+      protocolVersion: 'cloud-launch/v1',
+      managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
+      runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+      websocketUrl: 'wss://runtime.example/_hive/runtime-rpc',
+      serverPublicKeyB64: Buffer.alloc(32).toString('base64'),
+      sessionToken: 'A'.repeat(43),
+      expiresAt: '2026-08-25T09:00:00.000Z'
+    })
+    const call = client.call('status.get', {})
+    const socket = fakeSockets[0]!
+    socket.readyState = FakeWebSocket.OPEN
+    socket.onopen?.()
+    socket.onmessage?.({ data: JSON.stringify({ type: 'e2ee_ready' }) })
+    const sharedKey = (client as unknown as { sharedKey: Uint8Array }).sharedKey
+
+    expect(JSON.parse(decrypt(String(socket.send.mock.calls[1]?.[0]), sharedKey)!)).toEqual({
+      type: 'e2ee_auth',
+      principalKind: 'cloud_managed_web_session',
+      managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
+      runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+      sessionToken: 'A'.repeat(43),
+      clientCapabilities: [
+        SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+        AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
+        WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
+        WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
+      ]
+    })
+
+    socket.onmessage?.({
+      data: encrypt(JSON.stringify({ type: 'e2ee_authenticated' }), sharedKey)
+    })
+    await vi.waitFor(() => expect(socket.send.mock.calls.length).toBeGreaterThanOrEqual(3))
+    const rpc = JSON.parse(decrypt(String(socket.send.mock.calls[2]?.[0]), sharedKey)!)
+    expect(rpc).toMatchObject({ method: 'status.get', params: {} })
+    expect(rpc).not.toHaveProperty('sessionToken')
+    expect(rpc).not.toHaveProperty('deviceToken')
+    expect(rpc).not.toHaveProperty('authToken')
+
+    client.close()
+    await expect(call).rejects.toThrow('Remote HiveCode runtime connection closed.')
   })
 
   it('closes child subscription clients when the owning client closes', () => {
@@ -205,7 +250,7 @@ describe('WebRuntimeClient', () => {
 
       client.close()
 
-      await expect(callPromise).rejects.toThrow('Remote Orca runtime connection closed.')
+      await expect(callPromise).rejects.toThrow('Remote HiveCode runtime connection closed.')
       expect(vi.getTimerCount()).toBe(0)
     } finally {
       vi.useRealTimers()
@@ -738,8 +783,10 @@ describe('WebRuntimeClient', () => {
       publicKeyB64: Buffer.alloc(32).toString('base64')
     })
     const internals = client as unknown as {
-      waitForConnected: (timeoutMs?: number) => Promise<void>
-      sendEncrypted: (message: unknown) => boolean
+      transport: {
+        connectionWaiters: { wait: (timeoutMs?: number) => Promise<void> }
+        sendEncrypted: (message: unknown) => boolean
+      }
       subscribeOnCurrentConnection: (
         method: string,
         params: unknown,
@@ -747,9 +794,9 @@ describe('WebRuntimeClient', () => {
         options?: { buildUnsubscribe?: (params: unknown) => unknown }
       ) => Promise<{ unsubscribe: () => void }>
     }
-    vi.spyOn(internals, 'waitForConnected').mockResolvedValue(undefined)
+    internals.transport.connectionWaiters.wait = vi.fn().mockResolvedValue(undefined)
     const sent: unknown[] = []
-    vi.spyOn(internals, 'sendEncrypted').mockImplementation((message) => {
+    internals.transport.sendEncrypted = vi.fn((message) => {
       sent.push(message)
       return true
     })

@@ -30,31 +30,16 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorktreeVisibilityDefaults } from '../../../../../../shared/global-settings-types'
 import { isGitRepoKind } from '../../../../../../shared/repo-kind'
 import {
-  effectiveExternalWorktreeVisibility,
-  isLegacyRepoForExternalWorktreeVisibility
-} from '../../../../../../shared/worktree/ownership'
-import {
   REPO_HEADER_ACTION_BUTTON_CLASS,
   REPO_HEADER_ACTION_REVEAL_CLASS
 } from '../../repo-header-action-button-class'
 import type { getRepoHeaderCreateState } from '../../repo-header-create-state'
+import { getWorktreeVisibilityMenuLabel } from '../worktree-visibility-menu-label'
 import {
   handleRepoHeaderActionPointerDown,
   stopRepoHeaderKeyboardToggle,
   stopRepoHeaderMenuEvent
 } from './header-event-guards'
-
-function getWorktreeVisibilityMenuLabel(
-  repo: Repo,
-  visibilityDefaults?: WorktreeVisibilityDefaults
-): string {
-  const visibility = effectiveExternalWorktreeVisibility(
-    repo,
-    isLegacyRepoForExternalWorktreeVisibility(repo),
-    visibilityDefaults
-  )
-  return visibility === 'show' ? 'Hide non-Orca worktrees' : 'Show hidden worktrees'
-}
 
 export type RepoHeaderProjectActions = {
   getWorktreeVisibilityDefaults: (repo: Repo) => WorktreeVisibilityDefaults | undefined

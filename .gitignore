@@ -100,6 +100,7 @@ docs/**
 !docs/agent-skill-sharing-implementation-checklist.md
 !docs/mobile-terminal-shortcut-bar.md
 !docs/reference/
+!docs/reference/build-toolchain.md
 !docs/reference/git-compatibility.md
 !docs/reference/headless-linux-server.md
 !docs/reference/linux-glibc-compatibility.md
@@ -112,6 +113,8 @@ docs/**
 !docs/reference/ssh-host-key-verification.md
 !docs/reference/ssh-reconnect-source-recovery.md
 !docs/reference/windows-setup-shell.md
+!docs/engineering/
+!docs/engineering/**
 !docs/reference/worktree-scan-fingerprint.md
 !docs/reference/wsl-command-execution.md
 !docs/reference/xterm-patch-regeneration.md

@@ -14,7 +14,9 @@ describe('nested runtime ProxyJump fixture', () => {
     fixture = createNestedRuntimeProxyJumpFixture()
     fixture.writeConfig('Host destination\n  HostName 127.0.0.1\n')
 
-    expect(statSync(fixture.wrapperPath).mode & 0o111).not.toBe(0)
+    if (process.platform !== 'win32') {
+      expect(statSync(fixture.wrapperPath).mode & 0o111).not.toBe(0)
+    }
     expect(readFileSync(fixture.configPath, 'utf8')).toContain('Host destination')
 
     const directory = fixture.directory

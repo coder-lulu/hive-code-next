@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
 import { ArrowRight, ExternalLink, Pencil } from 'lucide-react-native'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import type { PRInfo } from '../../../../src/shared/github/pull-request-types'
 import type { GitHubWorkItemDetails } from '../../../../src/shared/github/work-item-types'
 import type { MobilePrTitleAction } from '../../session/use-mobile-pr-title-action'
@@ -9,8 +9,8 @@ import { prStateBadge } from './pr-checks-presentation'
 import { statusColor } from './pr-sidebar-status-color'
 import { canEditPRTitle } from '../../session/pr-title-edit'
 import { openMobilePrUrl } from '../mobile-pr-url'
-import { mobilePrSidebarStyles as styles } from './mobile-pr-sidebar-styles'
-import { prCommentComposerStyles as composerStyles } from './pr-comment-composer-styles'
+import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
+import { createPrCommentComposerStyles } from './pr-comment-composer-styles'
 
 type Props = {
   pr: PRInfo
@@ -32,9 +32,11 @@ export function PRSidebarHeader({
   showOpenOnWeb = true,
   bare = false
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
   const item = details?.item
   const badge = prStateBadge(pr.state)
-  const badgeColor = statusColor(badge.token)
+  const badgeColor = statusColor(badge.token, theme)
   const title = item?.title ?? pr.title
   const author = item?.author ?? null
   const baseRef = item?.baseRefName ?? null
@@ -50,7 +52,7 @@ export function PRSidebarHeader({
             onPress={openPr}
             disabled={!openPr}
             accessibilityRole="link"
-            accessibilityLabel={`Open pull request #${pr.number} on the web`}
+            accessibilityLabel={`在网页中打开拉取请求 #${pr.number}`}
             style={({ pressed }) => [
               styles.badge,
               { borderColor: badgeColor },
@@ -63,7 +65,7 @@ export function PRSidebarHeader({
             style={styles.prMetaStrong}
             onPress={openPr}
             accessibilityRole="link"
-            accessibilityLabel={`Open pull request #${pr.number} on the web`}
+            accessibilityLabel={`在网页中打开拉取请求 #${pr.number}`}
           >
             #{pr.number}
           </Text>
@@ -74,10 +76,10 @@ export function PRSidebarHeader({
             onPress={openPr}
             hitSlop={8}
             accessibilityRole="link"
-            accessibilityLabel={`Open pull request #${pr.number} in browser`}
+            accessibilityLabel={`在浏览器中打开拉取请求 #${pr.number}`}
             style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.6 }]}
           >
-            <ExternalLink size={16} color={colors.textSecondary} strokeWidth={2.2} />
+            <ExternalLink size={16} color={theme.color.text.secondary} strokeWidth={2.2} />
           </Pressable>
         ) : null}
       </View>
@@ -87,7 +89,7 @@ export function PRSidebarHeader({
           <Text style={styles.branchPill} numberOfLines={1}>
             {headRef}
           </Text>
-          <ArrowRight size={12} color={colors.textSecondary} strokeWidth={2.2} />
+          <ArrowRight size={12} color={theme.color.text.secondary} strokeWidth={2.2} />
           <Text style={styles.branchPill} numberOfLines={1}>
             {baseRef}
           </Text>
@@ -115,6 +117,9 @@ function PRTitle({
   editable: boolean
   titleAction: MobilePrTitleAction
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
+  const composerStyles = useMobileThemeStyles(createPrCommentComposerStyles)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)
 
@@ -143,7 +148,7 @@ function PRTitle({
           style={composerStyles.input}
           value={draft}
           onChangeText={setDraft}
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={theme.color.text.tertiary}
           editable={!titleAction.saving}
           autoFocus
         />
@@ -154,21 +159,21 @@ function PRTitle({
             onPress={cancel}
             disabled={titleAction.saving}
             accessibilityRole="button"
-            accessibilityLabel="Cancel editing title"
+            accessibilityLabel="取消编辑标题"
           >
-            <Text style={composerStyles.cancelText}>Cancel</Text>
+            <Text style={composerStyles.cancelText}>取消</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [composerStyles.submit, pressed && composerStyles.pressed]}
             onPress={() => void save()}
             disabled={titleAction.saving}
             accessibilityRole="button"
-            accessibilityLabel="Save title"
+            accessibilityLabel="保存标题"
           >
             {titleAction.saving ? (
-              <ActivityIndicator size="small" color={colors.bgBase} />
+              <ActivityIndicator size="small" color={theme.color.text.inverse} />
             ) : (
-              <Text style={composerStyles.submitText}>Save</Text>
+              <Text style={composerStyles.submitText}>保存</Text>
             )}
           </Pressable>
         </View>
@@ -182,12 +187,12 @@ function PRTitle({
       onPress={editable ? startEdit : undefined}
       disabled={!editable}
       accessibilityRole={editable ? 'button' : undefined}
-      accessibilityLabel={editable ? 'Edit pull request title' : undefined}
+      accessibilityLabel={editable ? '编辑拉取请求标题' : undefined}
     >
       <Text style={styles.prTitle}>{title}</Text>
       {editable ? (
         <View style={styles.titleEditButton}>
-          <Pencil size={14} color={colors.textSecondary} strokeWidth={2} />
+          <Pencil size={14} color={theme.color.text.secondary} strokeWidth={2} />
         </View>
       ) : null}
     </Pressable>

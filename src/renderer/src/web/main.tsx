@@ -1,6 +1,6 @@
 import '../assets/main.css'
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import ReactDOM from 'react-dom/client'
 import { useTranslation } from 'react-i18next'
@@ -19,8 +19,20 @@ import {
 import { installWebPreloadApi } from './web-preload-api'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { translate } from '../i18n/i18n'
+import { APP_DISPLAY_NAME } from '../product-brand'
+import {
+  clearCloudLaunchCredentialFromAddressBar,
+  readCloudLaunchFragment,
+  type CloudLaunchCredential
+} from './cloud-launch-fragment'
+import { exchangeCloudLaunchCredential, type CloudLaunchBootstrap } from './cloud-launch-bootstrap'
 
+document.title = `${APP_DISPLAY_NAME} Web`
 const App = lazy(() => import('../App'))
+const initialCloudLaunch = readCloudLaunchFragment(window.location)
+if (initialCloudLaunch.kind !== 'absent') {
+  clearCloudLaunchCredentialFromAddressBar()
+}
 
 function WebRoot(): React.JSX.Element {
   const initialPairingInput = useMemo(() => readPairingInputFromLocation(window.location), [])
@@ -43,7 +55,7 @@ function WebRoot(): React.JSX.Element {
     if (startupDecision.kind === 'auto-save-runtime-offer') {
       saveStoredWebRuntimeEnvironment(
         createStoredWebRuntimeEnvironment({
-          name: 'Orca Server',
+          name: `${APP_DISPLAY_NAME} Server`,
           offer: startupDecision.offer,
           previousEnvironment: readStoredWebRuntimeEnvironment()
         })
@@ -52,6 +64,13 @@ function WebRoot(): React.JSX.Element {
     }
     return startupDecision.kind === 'use-stored-environment'
   })
+
+  if (initialCloudLaunch.kind === 'invalid') {
+    return <CloudLaunchFailure />
+  }
+  if (initialCloudLaunch.kind === 'valid') {
+    return <CloudLaunchRoot credential={initialCloudLaunch.credential} />
+  }
 
   if (!hasEnvironment) {
     return (
@@ -69,6 +88,56 @@ function WebRoot(): React.JSX.Element {
     <Suspense fallback={<div className="min-h-dvh bg-background" />}>
       <App />
     </Suspense>
+  )
+}
+
+function CloudLaunchRoot({ credential }: { credential: CloudLaunchCredential }): React.JSX.Element {
+  const [bootstrap, setBootstrap] = useState<CloudLaunchBootstrap | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void exchangeCloudLaunchCredential(credential)
+      .then((result) => {
+        if (!active) {
+          return
+        }
+        installWebPreloadApi(result)
+        setBootstrap(result)
+      })
+      .catch(() => {
+        if (active) {
+          setFailed(true)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [credential])
+
+  if (failed) {
+    return <CloudLaunchFailure />
+  }
+  if (!bootstrap) {
+    return <div className="min-h-dvh bg-background" />
+  }
+  return (
+    <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+      <App />
+    </Suspense>
+  )
+}
+
+function CloudLaunchFailure(): React.JSX.Element {
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
+      <p>
+        {translate(
+          'web.cloudLaunchFailure',
+          'This Cloud launch link is invalid or has expired. Create a new launch from HiveCloud.'
+        )}
+      </p>
+    </main>
   )
 }
 

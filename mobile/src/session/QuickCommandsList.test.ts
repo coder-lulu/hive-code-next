@@ -27,6 +27,14 @@ vi.mock('lucide-react-native', () => ({
 
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }))
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+
 vi.mock('../components/MobileAgentIcon', () => ({ MobileAgentIcon: 'MobileAgentIcon' }))
 
 describe('QuickCommandsList search', () => {

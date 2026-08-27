@@ -1,7 +1,18 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type * as osModule from 'node:os'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { homedirMock } = vi.hoisted(() => ({
+  homedirMock: vi.fn<() => string>()
+}))
+
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof osModule>()
+  return { ...actual, homedir: homedirMock.mockImplementation(actual.homedir) }
+})
+
 import { KimiHookService } from './hook-service'
 import { KIMI_HOOK_EVENTS } from './kimi-hook-config-toml'
 
@@ -15,6 +26,7 @@ let originalKimiHome: string | undefined
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'orca-kimi-hook-'))
+  homedirMock.mockReturnValue(home)
   originalHome = process.env.HOME
   originalKimiHome = process.env.KIMI_CODE_HOME
   process.env.HOME = home

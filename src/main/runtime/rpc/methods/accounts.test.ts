@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { OrcaRuntimeService } from '../../orca-runtime'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { isStreamingMethod } from '../core'
 import { ACCOUNT_METHODS } from './accounts'
 
@@ -64,7 +65,7 @@ describe('account RPC methods', () => {
 
     for (const clientKind of ['mobile', 'runtime'] as const) {
       await expect(addMethod.handler(params, { runtime, clientKind })).rejects.toThrow(
-        /only available on the Orca host runtime/
+        `only available on the ${APP_DISPLAY_NAME} host runtime`
       )
     }
     expect(runtime.addClaudeAccountFromConfigDir).not.toHaveBeenCalled()

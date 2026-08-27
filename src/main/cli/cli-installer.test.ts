@@ -19,7 +19,7 @@ vi.mock('node:child_process', () => ({
 
 import { CliInstaller } from './cli-installer'
 import { buildAppImageCliWrapper } from './appimage-cli-wrapper'
-import { makeFixture } from './cli-installer-test-fixtures'
+import { createPackagedMacLauncher, makeFixture } from './cli-installer-test-fixtures'
 
 describe('CliInstaller', () => {
   beforeEach(() => {
@@ -84,7 +84,7 @@ describe('CliInstaller', () => {
 
       const installed = await installer.install()
       expect(installed.state).toBe('installed')
-      expect(installed.commandName).toBe('orca-ide')
+      expect(installed.commandName).toBe('hivecode')
       expect(installed.pathConfigured).toBe(false)
       expect(installed.detail).toContain('.local')
 
@@ -159,7 +159,7 @@ describe('CliInstaller', () => {
       const installed = await installer.install()
       expect(installed).toMatchObject({
         state: 'installed',
-        commandName: 'orca-ide',
+        commandName: 'hivecode',
         installMethod: 'wrapper',
         launcherPath: appImagePath,
         currentTarget: appImagePath,
@@ -227,12 +227,14 @@ describe('CliInstaller', () => {
       const homePath = join(fixture.root, 'home')
       const commandDir = join(homePath, '.local', 'bin')
       const resourcesPath = join(fixture.root, 'resources')
-      const launcherPath = join(resourcesPath, 'bin', 'orca-ide')
+      const launcherPath = join(resourcesPath, 'bin', 'hivecode')
+      const compatibilityLauncherPath = join(resourcesPath, 'bin', 'orca-ide')
       const oldLauncherPath = join(resourcesPath, 'bin', 'orca')
       const legacyCommandPath = join(commandDir, 'orca')
       await mkdir(commandDir, { recursive: true })
       await mkdir(join(resourcesPath, 'bin'), { recursive: true })
       await writeFile(launcherPath, '#!/usr/bin/env bash\n', 'utf8')
+      await writeFile(compatibilityLauncherPath, '#!/usr/bin/env bash\n', 'utf8')
       await writeFile(oldLauncherPath, '#!/usr/bin/env bash\n', 'utf8')
       await symlink(oldLauncherPath, legacyCommandPath)
 
@@ -245,13 +247,13 @@ describe('CliInstaller', () => {
       })
 
       const installed = await installer.install()
-      expect(installed.commandPath).toBe(join(commandDir, 'orca-ide'))
+      expect(installed.commandPath).toBe(join(commandDir, 'hivecode'))
       await expect(lstat(legacyCommandPath)).rejects.toMatchObject({ code: 'ENOENT' })
     }
   )
 
   it.skipIf(process.platform === 'win32')(
-    'removes a legacy linux orca symlink when installing an AppImage wrapper',
+    'preserves an unproven appimage-shaped legacy linux orca symlink',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
@@ -263,7 +265,8 @@ describe('CliInstaller', () => {
         encoding: 'utf8',
         mode: 0o755
       })
-      await symlink(join('/tmp', '.mount_Orca1234', 'resources', 'bin', 'orca'), legacyCommandPath)
+      const unprovenTarget = join('/tmp', '.mount_Orca1234', 'resources', 'bin', 'orca')
+      await symlink(unprovenTarget, legacyCommandPath)
 
       const installer = new CliInstaller({
         platform: 'linux',
@@ -274,8 +277,118 @@ describe('CliInstaller', () => {
       })
 
       const installed = await installer.install()
-      expect(installed.commandPath).toBe(join(commandDir, 'orca-ide'))
-      await expect(lstat(legacyCommandPath)).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(installed.commandPath).toBe(join(commandDir, 'hivecode'))
+      await expect(readlink(legacyCommandPath)).resolves.toBe(unprovenTarget)
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'installs and removes HiveCode compatibility aliases on packaged macOS',
+    async () => {
+      const fixture = await makeFixture()
+      const resourcesPath = await createPackagedMacLauncher(fixture.root)
+      const commandDir = join(fixture.root, 'usr', 'local', 'bin')
+      const primaryPath = join(commandDir, 'hivecode')
+      await mkdir(commandDir, { recursive: true })
+
+      const installer = new CliInstaller({
+        platform: 'darwin',
+        isPackaged: true,
+        resourcesPath,
+        userDataPath: fixture.userDataPath,
+        homePath: join(fixture.root, 'home'),
+        defaultMacCommandPath: primaryPath,
+        processPathEnv: commandDir
+      })
+
+      await expect(installer.install()).resolves.toMatchObject({
+        commandName: 'hivecode',
+        commandPath: primaryPath,
+        state: 'installed'
+      })
+      for (const command of ['hivecode', 'orca', 'orca-ide']) {
+        await expect(readlink(join(commandDir, command))).resolves.toBe(
+          join(resourcesPath, 'bin', command)
+        )
+      }
+
+      await expect(installer.remove()).resolves.toMatchObject({ state: 'not_installed' })
+      for (const command of ['hivecode', 'orca', 'orca-ide']) {
+        await expect(lstat(join(commandDir, command))).rejects.toMatchObject({ code: 'ENOENT' })
+      }
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'installs hivecode and orca-ide without claiming bare orca on packaged Linux',
+    async () => {
+      const fixture = await makeFixture()
+      const homePath = join(fixture.root, 'home')
+      const commandDir = join(homePath, '.local', 'bin')
+      const resourcesPath = join(fixture.root, 'resources')
+      await mkdir(join(resourcesPath, 'bin'), { recursive: true })
+      for (const command of ['hivecode', 'orca-ide']) {
+        await writeFile(join(resourcesPath, 'bin', command), '#!/usr/bin/env bash\n', {
+          encoding: 'utf8',
+          mode: 0o755
+        })
+      }
+
+      const installer = new CliInstaller({
+        platform: 'linux',
+        isPackaged: true,
+        resourcesPath,
+        userDataPath: fixture.userDataPath,
+        homePath,
+        processPathEnv: commandDir
+      })
+
+      await expect(installer.install()).resolves.toMatchObject({
+        commandName: 'hivecode',
+        commandPath: join(commandDir, 'hivecode'),
+        state: 'installed'
+      })
+      await expect(readlink(join(commandDir, 'hivecode'))).resolves.toBe(
+        join(resourcesPath, 'bin', 'hivecode')
+      )
+      await expect(readlink(join(commandDir, 'orca-ide'))).resolves.toBe(
+        join(resourcesPath, 'bin', 'orca-ide')
+      )
+      await expect(lstat(join(commandDir, 'orca'))).rejects.toMatchObject({ code: 'ENOENT' })
+
+      await installer.remove()
+      await expect(lstat(join(commandDir, 'hivecode'))).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(lstat(join(commandDir, 'orca-ide'))).rejects.toMatchObject({ code: 'ENOENT' })
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'installs hivecode and orca-ide AppImage wrappers without bare orca',
+    async () => {
+      const fixture = await makeFixture()
+      const homePath = join(fixture.root, 'home')
+      const commandDir = join(homePath, '.local', 'bin')
+      const appImagePath = join(fixture.root, 'HiveCode.AppImage')
+      await writeFile(appImagePath, '#!/usr/bin/env bash\n', {
+        encoding: 'utf8',
+        mode: 0o755
+      })
+
+      const installer = new CliInstaller({
+        platform: 'linux',
+        isPackaged: true,
+        appImagePath,
+        homePath,
+        processPathEnv: commandDir
+      })
+
+      await installer.install()
+      for (const command of ['hivecode', 'orca-ide']) {
+        await expect(readFile(join(commandDir, command), 'utf8')).resolves.toBe(
+          buildAppImageCliWrapper(appImagePath)
+        )
+      }
+      await expect(lstat(join(commandDir, 'orca'))).rejects.toMatchObject({ code: 'ENOENT' })
     }
   )
 

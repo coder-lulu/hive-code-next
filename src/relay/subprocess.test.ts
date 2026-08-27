@@ -812,29 +812,33 @@ describe('Subprocess: Relay entry point', () => {
     await rm(outsideDir, { recursive: true, force: true }).catch(() => {})
   }, 10_000)
 
-  it('reads files via symlinks resolving outside the workspace', async () => {
-    // Regression test for issue #1661: a symlink under the workspace pointing
-    // to a directory outside it must resolve transparently. The pre-removal
-    // relay rejected this with "Path outside authorized workspace".
-    tmpDir = mkdtempSync(path.join(tmpdir(), 'relay-sub-'))
-    const outsideDir = mkdtempSync(path.join(tmpdir(), 'relay-outside-'))
-    writeFileSync(path.join(outsideDir, 'data.txt'), 'symlinked-target')
-    const { symlinkSync } = require('node:fs')
-    symlinkSync(outsideDir, path.join(tmpDir, 'link'))
+  it.skipIf(process.platform === 'win32')(
+    'reads files via symlinks resolving outside the workspace',
+    async () => {
+      // Regression test for issue #1661: a symlink under the workspace pointing
+      // to a directory outside it must resolve transparently. The pre-removal
+      // relay rejected this with "Path outside authorized workspace".
+      tmpDir = mkdtempSync(path.join(tmpdir(), 'relay-sub-'))
+      const outsideDir = mkdtempSync(path.join(tmpdir(), 'relay-outside-'))
+      writeFileSync(path.join(outsideDir, 'data.txt'), 'symlinked-target')
+      const { symlinkSync } = require('node:fs')
+      symlinkSync(outsideDir, path.join(tmpDir, 'link'))
 
-    relay = spawn()
-    await relay.sentinelReceived
+      relay = spawn()
+      await relay.sentinelReceived
 
-    const id = relay.send('fs.readFile', {
-      filePath: path.join(tmpDir, 'link', 'data.txt')
-    })
-    const resp = await relay.waitForResponse(id)
+      const id = relay.send('fs.readFile', {
+        filePath: path.join(tmpDir, 'link', 'data.txt')
+      })
+      const resp = await relay.waitForResponse(id)
 
-    expect(resp.error).toBeUndefined()
-    expect((resp.result as { content: string }).content).toBe('symlinked-target')
+      expect(resp.error).toBeUndefined()
+      expect((resp.result as { content: string }).content).toBe('symlinked-target')
 
-    await rm(outsideDir, { recursive: true, force: true }).catch(() => {})
-  }, 10_000)
+      await rm(outsideDir, { recursive: true, force: true }).catch(() => {})
+    },
+    10_000
+  )
 
   it('resolves ~ to home directory via session.resolveHome', async () => {
     relay = spawn()

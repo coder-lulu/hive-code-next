@@ -51,4 +51,23 @@ describe('serve desktop activation wiring', () => {
   it('keeps the headless install policy after desktop promotion', () => {
     expect(source).toContain('updateInstallMode: resolveUpdateInstallMode(isServeMode)')
   })
+
+  it('registers protocol handlers for hivecode and orca schemes after setName', () => {
+    expect(source).toContain('registerProtocolHandlers({')
+    expect(source).toContain('onUrl: handleProtocolUrl')
+    expect(source).toContain('extractProtocolUrlFromArgv(argv)')
+  })
+
+  it('delivers pending protocol URL on first window load', () => {
+    expect(source).toContain("window.webContents.send('protocol:pairing-url'")
+    expect(source).toContain('pendingProtocolUrl = null')
+  })
+
+  it('routes pairing URLs through handleProtocolUrl when received via argv', () => {
+    const activateFnIndex = source.indexOf('function requestDesktopActivation')
+    const protocolIndex = source.indexOf('extractProtocolUrlFromArgv(argv)', activateFnIndex)
+    const handleIndex = source.indexOf('handleProtocolUrl(protocolUrl)', activateFnIndex)
+    expect(protocolIndex).toBeGreaterThan(activateFnIndex)
+    expect(handleIndex).toBeGreaterThan(protocolIndex)
+  })
 })

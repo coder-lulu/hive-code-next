@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { LogicalClientCutoverError } from '../transport/stable-logical-rpc-client'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcFailure, RpcResponse, RpcSuccess } from '../transport/types'
 import {
@@ -132,7 +133,7 @@ describe('rpc wrappers', () => {
     ])
 
     await expect(fetchDictationSetup(client)).rejects.toThrow(
-      'Update the paired desktop Orca app to use mobile voice settings.'
+      `Update the paired desktop ${APP_DISPLAY_NAME} app to use mobile voice settings.`
     )
   })
 
@@ -145,7 +146,7 @@ describe('rpc wrappers', () => {
     ])
 
     await expect(fetchDictationSetup(client)).rejects.toThrow(
-      'Update the paired desktop Orca app to use mobile voice settings.'
+      `Update the paired desktop ${APP_DISPLAY_NAME} app to use mobile voice settings.`
     )
   })
 

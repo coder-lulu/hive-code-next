@@ -37,6 +37,14 @@ vi.mock('lucide-react-native', () => ({
   Square: 'Square'
 }))
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+
 vi.mock('./MobileNativeChatMessage', () => ({ MobileNativeChatMessage: 'ChatMessage' }))
 vi.mock('./MobileNativeChatAsk', () => ({ MobileNativeChatAsk: 'ChatAsk' }))
 vi.mock('./MobileNativeChatPermission', () => ({ MobileNativeChatPermission: 'ChatPermission' }))
@@ -218,7 +226,7 @@ describe('MobileNativeChatView', () => {
       await act(async () => vi.advanceTimersByTime(600))
 
       expect(composer().props.disabled).toBe(true)
-      expect(composer().props.placeholder).toBe('Waiting for terminal…')
+      expect(composer().props.placeholder).toBe('正在等待终端…')
     } finally {
       vi.useRealTimers()
     }
@@ -236,7 +244,7 @@ describe('MobileNativeChatView', () => {
       await act(async () => vi.advanceTimersByTime(1))
 
       expect(composer().props.disabled).toBe(false)
-      expect(composer().props.placeholder).toBe('Message, @files, /commands')
+      expect(composer().props.placeholder).toBe('输入消息，支持 @文件、/命令')
     } finally {
       vi.useRealTimers()
     }

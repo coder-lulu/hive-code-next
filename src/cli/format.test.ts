@@ -17,6 +17,7 @@ import {
 } from './format'
 import type { ComputerActionResult, RuntimeWorktreeRecord } from '../shared/runtime-types'
 import type { Automation } from '../shared/automations-types'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 let testScreenshotDir: string | null = null
 
@@ -119,6 +120,7 @@ describe('formatCliError', () => {
   })
 
   it('preserves orchestration migration recovery in human and JSON errors', () => {
+    const migrationNextStep = `Using this same ${APP_DISPLAY_NAME} CLI executable, run: skills get orchestration --full`
     const error = new RuntimeRpcFailureError({
       id: 'req_migration',
       ok: false,
@@ -128,15 +130,13 @@ describe('formatCliError', () => {
         data: {
           effectsApplied: false,
           nextCommandArgs: ['skills', 'get', 'orchestration', '--full'],
-          nextSteps: ['Using this same Orca CLI executable, run: skills get orchestration --full']
+          nextSteps: [migrationNextStep]
         }
       },
       _meta: { runtimeId: 'runtime-1' }
     })
 
-    expect(formatCliError(error)).toContain(
-      'Next step: Using this same Orca CLI executable, run: skills get orchestration --full'
-    )
+    expect(formatCliError(error)).toContain(`Next step: ${migrationNextStep}`)
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     reportCliError(error, true)
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
@@ -144,7 +144,8 @@ describe('formatCliError', () => {
         code: 'orchestration_migration_required',
         data: {
           effectsApplied: false,
-          nextCommandArgs: ['skills', 'get', 'orchestration', '--full']
+          nextCommandArgs: ['skills', 'get', 'orchestration', '--full'],
+          nextSteps: [migrationNextStep]
         }
       }
     })

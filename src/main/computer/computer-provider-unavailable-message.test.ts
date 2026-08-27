@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { computerProviderUnavailableMessage } from './computer-provider-unavailable-message'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 describe('computerProviderUnavailableMessage', () => {
   it('gives macOS developers the helper build and restart step', () => {
     expect(computerProviderUnavailableMessage('darwin')).toContain(
-      'run pnpm build:computer-macos and restart Orca from this worktree'
+      `run pnpm build:computer-macos and restart ${APP_DISPLAY_NAME} from this worktree`
     )
     expect(computerProviderUnavailableMessage('darwin')).toContain(
-      'Orca Computer Use.app was not found or this macOS version is unsupported'
+      `${APP_DISPLAY_NAME} Computer Use.app was not found or this macOS version is unsupported`
     )
   })
 

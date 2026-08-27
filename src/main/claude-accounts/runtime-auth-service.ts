@@ -2,6 +2,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { app } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
 import type { Store } from '../persistence'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
@@ -259,7 +260,9 @@ export class ClaudeRuntimeAuthService {
     if (activeAccount.managedAuthRuntime === 'wsl') {
       if (!(await this.getOwnedManagedAuthPath(activeAccount))) {
         console.warn(
-          '[claude-runtime-auth] Active WSL managed account is not owned by Orca, restoring system default'
+          applyProductBranding(
+            '[claude-runtime-auth] Active WSL managed account is not owned by Orca, restoring system default'
+          )
         )
         const nextSelection = setSelectedClaudeAccountIdForTarget(
           normalizeClaudeRuntimeSelection(settings),
@@ -297,7 +300,9 @@ export class ClaudeRuntimeAuthService {
 
     if (!(await this.getOwnedManagedAuthPath(activeAccount))) {
       console.warn(
-        '[claude-runtime-auth] Active managed account is not owned by Orca, restoring system default'
+        applyProductBranding(
+          '[claude-runtime-auth] Active managed account is not owned by Orca, restoring system default'
+        )
       )
       if (this.lastSyncedAccountId !== null) {
         if (
@@ -1025,7 +1030,7 @@ export class ClaudeRuntimeAuthService {
   ): Promise<void> {
     const managedAuthPath = await this.getOwnedManagedAuthPath(account)
     if (!managedAuthPath) {
-      throw new Error('Managed Claude auth storage is not owned by Orca.')
+      throw new Error(applyProductBranding('Managed Claude auth storage is not owned by Orca.'))
     }
     if (process.platform === 'darwin') {
       await writeManagedClaudeKeychainCredentials(account.id, credentialsJson)

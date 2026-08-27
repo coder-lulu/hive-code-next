@@ -6,6 +6,7 @@ const {
   fetchNudgeMock,
   shouldApplyNudgeMock,
   fetchNewerReleaseTagsMock,
+  productUpdateSourceState,
   moduleFactories,
   resetUpdaterMocks
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
@@ -23,6 +24,14 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
+vi.mock('./linux-root-package-install-policy', () =>
+  moduleFactories.linuxRootPackageInstallPolicy()
+)
 
 describe('updater', () => {
   beforeEach(() => {
@@ -32,6 +41,10 @@ describe('updater', () => {
   // Why: native github provider + allowPrerelease traps RC users on the RC channel, so resolve the newest tag ourselves and pin the generic feed to it.
   it('repins the generic feed to the newest RC tag for a prerelease user', async () => {
     appMock.getVersion.mockReturnValue('1.3.17-rc.1')
+    productUpdateSourceState.value = {
+      ...productUpdateSourceState.value!,
+      channel: 'rc'
+    }
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.3.17-rc.2'])
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
 
@@ -83,8 +96,7 @@ describe('updater', () => {
     expect(autoUpdaterMock.allowPrerelease).not.toBe(true)
   })
 
-  // Why: if the atom resolver fails or finds nothing newer, fall back to /releases/latest/download so the check completes as "not-available" instead of erroring.
-  it('falls back to /releases/latest/download when the atom resolver returns null', async () => {
+  it('does not launch a moving feed when the resolver finds no stable tag', async () => {
     appMock.getVersion.mockReturnValue('1.3.19-rc.6')
     fetchNewerReleaseTagsMock.mockResolvedValue([])
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
@@ -97,12 +109,13 @@ describe('updater', () => {
     checkForUpdatesFromMenu()
 
     await vi.waitFor(() => {
-      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('updater:status', {
+        state: 'not-available',
+        userInitiated: true
+      })
     })
-    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
-      provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
-    })
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledTimes(1)
   })
 
   it('keeps unavailable release probes on generic copy without launching a moving feed', async () => {
@@ -137,7 +150,7 @@ describe('updater', () => {
     ])
   })
 
-  it('keeps Atom feed outages on the existing moving-feed fallback', async () => {
+  it('fails closed when the Atom feed is unavailable', async () => {
     appMock.getVersion.mockReturnValue('1.4.141')
     fetchNewerReleaseTagsMock.mockResolvedValue({
       tags: [],
@@ -151,17 +164,16 @@ describe('updater', () => {
     setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
     checkForUpdatesFromMenu()
 
+    const feedCallsBeforeCheck = autoUpdaterMock.setFeedURL.mock.calls.length
     await vi.waitFor(() => {
-      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+      expect(sendMock).toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message: "Couldn't reach the update server. Try again in a few minutes.",
+        userInitiated: true
+      })
     })
-    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
-      provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
-    })
-    expect(sendMock).not.toHaveBeenCalledWith(
-      'updater:status',
-      expect.objectContaining({ state: 'error' })
-    )
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledTimes(feedCallsBeforeCheck)
   })
 
   it('uses last-good concrete feed when a user-initiated check lands during publishing', async () => {
@@ -426,6 +438,12 @@ describe('updater', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-05-24T21:40:00Z'))
       appMock.getVersion.mockReturnValue(version)
+      if (includePrerelease) {
+        productUpdateSourceState.value = {
+          ...productUpdateSourceState.value!,
+          channel: 'rc'
+        }
+      }
       fetchNudgeMock.mockResolvedValueOnce({ id: 'campaign-1', minVersion: '1.0.0' })
       fetchNudgeMock.mockResolvedValue(null)
       shouldApplyNudgeMock.mockReturnValue(true)
@@ -495,7 +513,7 @@ describe('updater', () => {
         state: 'not-ready',
         lastGoodTag: 'v1.4.26'
       })
-      .mockResolvedValueOnce(['v1.4.27'])
+      .mockResolvedValue(['v1.4.27'])
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
       if (autoUpdaterMock.checkForUpdates.mock.calls.length === 1) {

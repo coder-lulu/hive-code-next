@@ -6,6 +6,7 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { AGENT_CATALOG } from '@/lib/agent-catalog'
 import { useAppStore } from '../../store'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { getAgentGeneratedTabTitlesTitle } from './agent-generated-tab-title-copy'
 import { getAgentStatusHooksTitle } from './agent-status-hooks-copy'
 import { getAgentAwakeDescription, getAgentAwakeTitle } from './agent-awake-copy'
@@ -245,7 +246,7 @@ describe('AgentsPane', () => {
     expect(markup).not.toContain('aria-label="Agent runtime"')
     expect(markup).toContain('Keep computer awake')
     expect(markup).toContain(
-      'Choose On, Agent, or Off. Agent mode stays awake while agents are working. Orca also asks this device to stay awake when the lid is closed, subject to its power policy.'
+      `Choose On, Agent, or Off. Agent mode stays awake while agents are working. ${APP_DISPLAY_NAME} also asks this device to stay awake when the lid is closed, subject to its power policy.`
     )
     expect(markup).toContain('role="radiogroup"')
     expect(markup).toContain('>Agent<')

@@ -254,10 +254,10 @@ export function buildSettingsNavigationMetadata({
       ? [
           {
             id: 'orca-account',
-            title: translate('auto.components.settings.orcaAccount.title', 'Orca Account'),
+            title: translate('auto.components.settings.orcaAccount.title', 'HiveCloud Account'),
             description: translate(
               'auto.components.settings.orcaAccount.description',
-              'Share work instantly and reach your desktop from Orca Mobile wherever you are.'
+              'Sign in securely, review this device, and manage the current HiveCloud session.'
             ),
             icon: CircleUserRound,
             searchEntries: getOrcaAccountSettingsSearchEntries(),

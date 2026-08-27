@@ -1,7 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fetchMock = vi.fn()
-vi.mock('electron', () => ({ net: { fetch: (...args: unknown[]) => fetchMock(...args) } }))
+const { defaultNetFetchMock, fetchMock, fromPartitionMock } = vi.hoisted(() => ({
+  defaultNetFetchMock: vi.fn(),
+  fetchMock: vi.fn(),
+  fromPartitionMock: vi.fn()
+}))
+vi.mock('electron', () => ({
+  net: { fetch: defaultNetFetchMock },
+  session: { fromPartition: fromPartitionMock }
+}))
+
+const updateSourceState = vi.hoisted(() => ({
+  value: {
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  } as unknown
+}))
+
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => updateSourceState.value
+}))
 
 const { listReleaseBuilds, resolveTargetBuild } = await import('./updater-release-builds')
 
@@ -9,7 +33,8 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
   return {
     ok: init.ok ?? true,
     status: init.status ?? 200,
-    json: () => Promise.resolve(body)
+    headers: { get: () => null },
+    text: () => Promise.resolve(JSON.stringify(body))
   }
 }
 
@@ -36,44 +61,83 @@ const release = (tag: string, extra: Record<string, unknown> = {}) => ({
 describe('listReleaseBuilds', () => {
   beforeEach(() => {
     fetchMock.mockReset()
+    defaultNetFetchMock.mockReset()
+    defaultNetFetchMock.mockImplementation((...args: unknown[]) => fetchMock(...args))
+    fromPartitionMock.mockReset()
+    fromPartitionMock.mockReturnValue({ fetch: fetchMock })
+    updateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+      github: {
+        repo: 'stablyai/orca',
+        atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+        releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+      }
+    }
   })
 
-  it('lists hourly builds from the dedicated repo, newest first', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse([
-        release('v1.4.160-hourly.202607280900'),
-        release('v1.4.160-hourly.202607281400'),
-        release('v1.4.160-hourly.202607281000')
-      ])
-    )
+  it('performs no network request when the product update source is disabled', async () => {
+    updateSourceState.value = null
 
-    const builds = await listReleaseBuilds('hourly', 'darwin')
-
-    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca-hourly')
-    expect(builds.map((build) => build.version)).toEqual([
-      '1.4.160-hourly.202607281400',
-      '1.4.160-hourly.202607281000',
-      '1.4.160-hourly.202607280900'
-    ])
+    await expect(listReleaseBuilds('stable')).resolves.toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('lists daily builds from the dedicated repo, newest first', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse([
-        release('v1.4.160-daily.202607271300'),
-        release('v1.4.160-daily.202607291300'),
-        release('v1.4.160-daily.202607281300')
-      ])
-    )
+  it('uses the isolated electron-updater session instead of default net.fetch', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([]))
 
-    const builds = await listReleaseBuilds('daily', 'darwin')
+    await expect(listReleaseBuilds('stable')).resolves.toEqual([])
 
-    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca-daily')
-    expect(builds.map((build) => build.version)).toEqual([
-      '1.4.160-daily.202607291300',
-      '1.4.160-daily.202607281300',
-      '1.4.160-daily.202607271300'
-    ])
+    expect(fromPartitionMock).toHaveBeenCalledWith('electron-updater', { cache: false })
+    expect(defaultNetFetchMock).not.toHaveBeenCalled()
+  })
+
+  it('cancels an unread release API body before reporting a non-success status', async () => {
+    const cancel = vi.fn(() => Promise.resolve())
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 503,
+      body: { cancel }
+    })
+
+    await expect(listReleaseBuilds('stable')).rejects.toThrow('HTTP 503')
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects an oversized release API body before parsing it', async () => {
+    const json = vi.fn(() => Promise.resolve([]))
+    const text = vi.fn(() => Promise.resolve('[]'))
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-length' ? '10000000' : null)
+      },
+      json,
+      text
+    })
+
+    await expect(listReleaseBuilds('stable')).rejects.toThrow(/too large/i)
+    expect(json).not.toHaveBeenCalled()
+    expect(text).not.toHaveBeenCalled()
+  })
+
+  it('performs no network request for a channel without a configured product repository', async () => {
+    updateSourceState.value = {
+      channel: 'stable',
+      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
+      github: {
+        repo: 'coder-lulu/hive-code',
+        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
+        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
+      }
+    }
+    await expect(listReleaseBuilds('hourly')).resolves.toEqual([])
+    await expect(listReleaseBuilds('daily')).resolves.toEqual([])
+    await expect(listReleaseBuilds('adhoc')).resolves.toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   // Why: the main repo serves stable and rc from one endpoint, so an unfiltered
@@ -111,89 +175,89 @@ describe('listReleaseBuilds', () => {
     expect(builds.map((build) => build.version)).toEqual(['1.4.159'])
   })
 
-  // Why: the hourly workflow composes the release title and the picker renders it
-  // verbatim, so the two can never drift. A title that only repeats the tag says
-  // nothing the version beside it does not, and must not become a picker row
-  // reading "v1.4.163-hourly.202607311933".
-  it('keeps a composed release title and drops one that repeats the tag', async () => {
+  it('derives release links from the approved repository instead of trusting API html_url', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
-        release('v1.4.163-hourly.202607312054', { name: '1.4.163 • 01 • 07-31 13:54 • e698241' }),
-        release('v1.4.163-hourly.202607311933', { name: 'v1.4.163-hourly.202607311933' }),
-        release('v1.4.163-hourly.202607311835', { name: '   ' }),
-        release('v1.4.163-hourly.202607311735', { name: 42 })
+        release('v1.4.159', {
+          html_url: 'https://evil.example.test/phishing'
+        })
       ])
     )
 
-    const builds = await listReleaseBuilds('hourly', 'darwin')
-    expect(builds.map((build) => build.name)).toEqual([
-      '1.4.163 • 01 • 07-31 13:54 • e698241',
-      null,
-      null,
-      null
+    await expect(listReleaseBuilds('stable')).resolves.toEqual([
+      expect.objectContaining({
+        releaseUrl: 'https://github.com/stablyai/orca/releases/tag/v1.4.159'
+      })
     ])
   })
 
-  // Why: the mac and Windows legs publish into one release independently, and
-  // either can fail. Offering a row the running platform has no artifact for
-  // sends the user into a download that 404s after they commit to it.
+  // Why: the picker renders a release title verbatim. A title that only repeats
+  // the tag says nothing the version beside it does not.
+  it('keeps a composed release title and drops one that repeats the tag', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        release('v1.4.163', { name: 'Product 1.4.163' }),
+        release('v1.4.162', { name: 'v1.4.162' }),
+        release('v1.4.161', { name: '   ' }),
+        release('v1.4.160', { name: 42 })
+      ])
+    )
+
+    const builds = await listReleaseBuilds('stable')
+    expect(builds.map((build) => build.name)).toEqual(['Product 1.4.163', null, null, null])
+  })
+
+  // Why: a release can publish one platform before another. The picker must not
+  // offer a row whose current platform download would 404.
   it('hides builds that published no artifact for this platform', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
-        release('v1.4.163-hourly.202607312054'),
-        release('v1.4.163-hourly.202607311933', {
+        release('v1.4.163'),
+        release('v1.4.162', {
           assets: [{ name: 'latest-mac.yml' }, { name: 'orca-macos-arm64.dmg' }]
         })
       ])
     )
 
     await expect(
-      listReleaseBuilds('hourly', 'win32').then((builds) => builds.map((build) => build.version))
-    ).resolves.toEqual(['1.4.163-hourly.202607312054'])
+      listReleaseBuilds('stable', 'win32').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.163'])
   })
 
-  // The mac-only releases every dev channel published before Windows builds
-  // existed must simply not appear on Windows, rather than erroring.
   it('returns an empty list when no build has this platform artifact', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse([
-        release('v1.4.163-hourly.202607312054', { assets: [{ name: 'latest-mac.yml' }] })
-      ])
+      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest-mac.yml' }] })])
     )
 
-    await expect(listReleaseBuilds('hourly', 'win32')).resolves.toEqual([])
+    await expect(listReleaseBuilds('stable', 'win32')).resolves.toEqual([])
   })
 
   it('keeps mac builds visible on macOS regardless of the Windows leg', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse([
-        release('v1.4.163-hourly.202607312054', { assets: [{ name: 'latest-mac.yml' }] })
-      ])
+      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest-mac.yml' }] })])
     )
 
     await expect(
-      listReleaseBuilds('hourly', 'darwin').then((builds) => builds.map((build) => build.version))
-    ).resolves.toEqual(['1.4.163-hourly.202607312054'])
+      listReleaseBuilds('stable', 'darwin').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.163'])
   })
 
-  // Why: on Windows a signed stable cannot reach a dev channel through the
-  // updater, so the picker needs a direct download to hand the user instead.
   it('resolves the platform installer download url', async () => {
-    fetchMock.mockResolvedValue(jsonResponse([release('v1.4.163-hourly.202607312054')]))
+    fetchMock.mockResolvedValue(jsonResponse([release('v1.4.163')]))
 
-    const [build] = await listReleaseBuilds('hourly', 'win32')
+    const [build] = await listReleaseBuilds('stable', 'win32')
 
     expect(build.installerUrl).toBe(
-      'https://github.com/stablyai/orca-hourly/releases/download/v1.4.163-hourly.202607312054/orca-windows-setup.exe'
+      'https://github.com/stablyai/orca/releases/download/v1.4.163/orca-windows-setup.exe'
     )
   })
 
   it('leaves the installer url null when the release published no installer', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse([release('v1.4.163-hourly.202607312054', { assets: [{ name: 'latest.yml' }] })])
+      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest.yml' }] })])
     )
 
-    const [build] = await listReleaseBuilds('hourly', 'win32')
+    const [build] = await listReleaseBuilds('stable', 'win32')
 
     expect(build.installerUrl).toBeNull()
   })
@@ -201,48 +265,51 @@ describe('listReleaseBuilds', () => {
   it('tolerates a release whose assets are missing or malformed', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
-        release('v1.4.163-hourly.202607312054', { assets: undefined }),
-        release('v1.4.163-hourly.202607311933', { assets: [null, { name: 7 }] })
+        release('v1.4.163', { assets: undefined }),
+        release('v1.4.162', { assets: [null, { name: 7 }] })
       ])
     )
 
-    await expect(listReleaseBuilds('hourly', 'win32')).resolves.toEqual([])
+    await expect(listReleaseBuilds('stable', 'win32')).resolves.toEqual([])
   })
 
   it('surfaces a rate limit as an actionable message', async () => {
     fetchMock.mockResolvedValue(jsonResponse(null, { ok: false, status: 403 }))
-    await expect(listReleaseBuilds('hourly', 'darwin')).rejects.toThrow(/rate limit/i)
+    await expect(listReleaseBuilds('stable')).rejects.toThrow(/rate limit/i)
   })
 
-  it('reports a missing hourly repo distinctly', async () => {
+  it('reports a missing configured releases repository distinctly', async () => {
     fetchMock.mockResolvedValue(jsonResponse(null, { ok: false, status: 404 }))
-    await expect(listReleaseBuilds('hourly', 'darwin')).rejects.toThrow(/No releases repository/i)
+    await expect(listReleaseBuilds('stable')).rejects.toThrow(/No releases repository/i)
   })
 })
 
 describe('resolveTargetBuild', () => {
-  it('pins an hourly tag at the hourly repo download path', () => {
-    expect(resolveTargetBuild('hourly', 'v1.4.160-hourly.202607281400')).toEqual({
-      tag: 'v1.4.160-hourly.202607281400',
-      version: '1.4.160-hourly.202607281400',
-      feedUrl:
-        'https://github.com/stablyai/orca-hourly/releases/download/v1.4.160-hourly.202607281400'
-    })
+  it('rejects a target from an unconfigured dev channel', () => {
+    expect(() => resolveTargetBuild('hourly', 'v1.4.160-hourly.202607281400')).toThrow(
+      /not configured/i
+    )
   })
 
-  it('pins a daily tag at the daily repo download path', () => {
-    expect(resolveTargetBuild('daily', 'v1.4.160-daily.202607281300')).toEqual({
-      tag: 'v1.4.160-daily.202607281300',
-      version: '1.4.160-daily.202607281300',
-      feedUrl:
-        'https://github.com/stablyai/orca-daily/releases/download/v1.4.160-daily.202607281300'
-    })
+  it('rejects a daily tag while no product daily repository is configured', () => {
+    expect(() => resolveTargetBuild('daily', 'v1.4.160-daily.202607281300')).toThrow(
+      /not configured/i
+    )
   })
 
   it('pins a stable tag at the main repo download path', () => {
     expect(resolveTargetBuild('stable', 'v1.4.159').feedUrl).toBe(
       'https://github.com/stablyai/orca/releases/download/v1.4.159'
     )
+  })
+
+  it.each([
+    ['stable', 'v1.4.160-rc.2'],
+    ['rc', 'v1.4.159'],
+    ['stable', 'v1.4.160-hourly.202607281400'],
+    ['rc', 'v1.4.160-adhoc.20260728140533']
+  ] as const)('rejects a %s request for the mismatched tag %s', (channel, tag) => {
+    expect(() => resolveTargetBuild(channel, tag)).toThrow(/does not belong to the .* channel/i)
   })
 
   it('rejects a tag that is not a version', () => {

@@ -78,7 +78,6 @@ beforeEach(() => {
     dispatchEvent: vi.fn()
   })
 })
-
 describe('repo catalog refresh identity', () => {
   it('keeps the projects and host setups arrays and entries across a no-op refetch', async () => {
     const store = createTestStore()

@@ -89,6 +89,38 @@ describe('registerNotificationHandlers', () => {
     }
   })
 
+  it('opens the packaged HiveCode notification settings entry by default', async () => {
+    const originalPlatform = process.platform
+    const originalBundleId = process.env.ORCA_DEV_MACOS_BUNDLE_ID
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    delete process.env.ORCA_DEV_MACOS_BUNDLE_ID
+    try {
+      registerNotificationHandlers({
+        getSettings: () => ({
+          notifications: {
+            enabled: true,
+            agentTaskComplete: true,
+            terminalBell: true,
+            suppressWhenFocused: true
+          }
+        })
+      } as never)
+
+      getOpenSystemSettingsHandler()({})
+
+      expect(shellOpenExternalMock).toHaveBeenCalledWith(
+        'x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=com.hivekernel.hivecode.desktop'
+      )
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+      if (originalBundleId === undefined) {
+        delete process.env.ORCA_DEV_MACOS_BUNDLE_ID
+      } else {
+        process.env.ORCA_DEV_MACOS_BUNDLE_ID = originalBundleId
+      }
+    }
+  })
+
   it('opens Windows notification settings', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })

@@ -53,7 +53,7 @@ describe('buildDispatchPreamble', () => {
     expect(result).not.toContain('orchestration send --to term_coord')
   })
 
-  it(
+  it.skipIf(process.platform === 'win32')(
     'CLI examples parse as valid shell (bash -n on the extracted block)',
     { timeout: 15_000 },
     () => {

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { safeStorage } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import { writeSecureJsonFile } from '../../shared/secure-file'
 import type {
   OrcaCloudCapabilities,
@@ -219,7 +220,7 @@ export function readOrcaCloudSession(
     return {
       status: 'decrypt-failed',
       persistence: 'none',
-      error: 'Could not decrypt saved Orca account session.'
+      error: applyProductBranding('Could not decrypt saved Orca account session.')
     }
   }
 }

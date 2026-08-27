@@ -64,7 +64,7 @@ describe('ensureShellReadyWrappersAt', () => {
   })
 })
 
-describe('shell-ready wrapper root resolution', () => {
+describePosix('shell-ready wrapper root resolution', () => {
   // Why: daemon-entry fork is plain Node (no electron), so the wrapper root resolves from ORCA_USER_DATA_PATH, not app.getPath.
   it('resolves the wrapper root from ORCA_USER_DATA_PATH', async () => {
     const root = mkdtempSync(join(tmpdir(), 'orca-userdata-env-'))

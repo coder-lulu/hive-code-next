@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../product-brand'
 import { buildConnectionDiagnosticsReport } from './connection-diagnostics-report'
 
 const NOW = Date.UTC(2026, 6, 9, 22, 0, 0)
@@ -25,7 +26,7 @@ describe('buildConnectionDiagnosticsReport', () => {
       nowMs: NOW
     })
 
-    expect(report).toContain('App: Orca Mobile 0.0.29 · ios 26.5.1')
+    expect(report).toContain(`App: ${APP_DISPLAY_NAME} Mobile 0.0.29 · ios 26.5.1`)
     expect(report).toContain('Endpoint: 100.65.9.106:6768 (Tailscale)')
     expect(report).toContain('State: reconnecting (reconnect attempts: 12)')
     expect(report).toContain('(5m 0s ago)')

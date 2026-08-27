@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 type Display = { workArea: { x: number; y: number; width: number; height: number } }
 
@@ -191,7 +192,7 @@ describe('createOrFocusDashboardPopout', () => {
 
     expect(instances).toHaveLength(1)
     const opts = instances[0].options
-    expect(opts.title).toBe('Orca Agent Dashboard')
+    expect(opts.title).toBe(`${APP_DISPLAY_NAME} Agent Dashboard`)
     expect(opts.minWidth).toBe(480)
     expect(opts.minHeight).toBe(360)
     // Native frame: neither a custom titleBarStyle nor frame:false is set.

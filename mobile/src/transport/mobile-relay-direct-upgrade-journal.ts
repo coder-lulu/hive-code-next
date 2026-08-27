@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { Platform } from 'react-native'
 import { z } from 'zod'
 import { hashMobileRelayCredential } from './mobile-relay-credential-hash'
@@ -82,6 +83,6 @@ function encodeBase64Url(value: Uint8Array): string {
 
 function requireNativeSecretStore(): void {
   if (Platform.OS === 'web') {
-    throw new Error('Orca Relay upgrade state requires a native secret store')
+    throw new Error(productNameText('Orca Relay upgrade state requires a native secret store'))
   }
 }

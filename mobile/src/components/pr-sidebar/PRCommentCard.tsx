@@ -6,13 +6,13 @@ import type {
   GitHubReactionContent,
   PRComment
 } from '../../../../src/shared/github/comment-types'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import { canEditComment, isResolvableComment } from '../../session/pr-comment-actions'
 import { ConfirmModal } from '../ConfirmModal'
 import { CommentMarkdown } from './CommentMarkdown'
 import { PRCommentComposer } from './PRCommentComposer'
 import { formatPrCommentRelativeTime } from '../../../../src/shared/pr-comment-time'
-import { prCommentsStyles as styles } from './pr-comments-styles'
+import { createPrCommentsStyles } from './pr-comments-styles'
 
 export type PRCommentRepoSlug = { owner: string; repo: string; host?: string }
 
@@ -43,6 +43,7 @@ const REACTION_EMOJI: Record<GitHubReactionContent, string> = {
 }
 
 function Reactions({ reactions }: { reactions?: GitHubReaction[] }) {
+  const styles = useMobileThemeStyles(createPrCommentsStyles)
   const visible = (reactions ?? []).filter((r) => r.count > 0)
   if (visible.length === 0) {
     return null
@@ -72,6 +73,8 @@ export const PRCommentCard = memo(function PRCommentCard({
   isReply?: boolean
   actions?: PRCommentCardActions
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createPrCommentsStyles)
   const [replyOpen, setReplyOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -134,7 +137,7 @@ export const PRCommentCard = memo(function PRCommentCard({
         ) : null}
         {comment.isResolved ? (
           <View style={styles.resolvedChip}>
-            <Text style={styles.resolvedChipText}>resolved</Text>
+            <Text style={styles.resolvedChipText}>已解决</Text>
           </View>
         ) : null}
         {comment.url ? (
@@ -143,17 +146,17 @@ export const PRCommentCard = memo(function PRCommentCard({
             onPress={() => void Linking.openURL(comment.url).catch(() => {})}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Open comment on GitHub"
+            accessibilityLabel="在 GitHub 上打开评论"
           >
-            <ExternalLink size={14} color={colors.textSecondary} strokeWidth={2.2} />
+            <ExternalLink size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
           </Pressable>
         ) : null}
       </View>
       {editOpen && actions ? (
         <View style={styles.composer}>
           <PRCommentComposer
-            placeholder="Edit comment…"
-            submitLabel="Save"
+            placeholder="编辑评论…"
+            submitLabel="保存"
             submitting={editBusy}
             initialBody={comment.body}
             onSubmit={submitEdit}
@@ -175,10 +178,10 @@ export const PRCommentCard = memo(function PRCommentCard({
             disabled={replyBusy}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="Reply to comment"
+            accessibilityLabel="回复评论"
           >
-            <CornerDownRight size={13} color={colors.textSecondary} strokeWidth={2.2} />
-            <Text style={styles.actionButtonText}>Reply</Text>
+            <CornerDownRight size={13} color={theme.color.text.secondary} strokeWidth={2.2} />
+            <Text style={styles.actionButtonText}>回复</Text>
           </Pressable>
           {canMutate ? (
             <Pressable
@@ -191,23 +194,29 @@ export const PRCommentCard = memo(function PRCommentCard({
               disabled={editBusy}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel="Edit comment"
+              accessibilityLabel="编辑评论"
             >
-              <Pencil size={13} color={colors.textSecondary} strokeWidth={2.2} />
-              <Text style={styles.actionButtonText}>Edit</Text>
+              <Pencil size={13} color={theme.color.text.secondary} strokeWidth={2.2} />
+              <Text style={styles.actionButtonText}>编辑</Text>
             </Pressable>
           ) : null}
           {canMutate ? (
             <Pressable
-              style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.actionButtonDanger,
+                pressed && styles.actionButtonPressed
+              ]}
               onPress={() => setConfirmDelete(true)}
               disabled={deleteBusy}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel="Delete comment"
+              accessibilityLabel="删除评论"
             >
-              <Trash2 size={13} color={colors.textSecondary} strokeWidth={2.2} />
-              <Text style={styles.actionButtonText}>{deleteBusy ? '…' : 'Delete'}</Text>
+              <Trash2 size={13} color={theme.color.status.danger} strokeWidth={2.2} />
+              <Text style={[styles.actionButtonText, styles.actionButtonDangerText]}>
+                {deleteBusy ? '…' : '删除'}
+              </Text>
             </Pressable>
           ) : null}
           {canResolve ? (
@@ -217,15 +226,15 @@ export const PRCommentCard = memo(function PRCommentCard({
               disabled={resolveBusy}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel={comment.isResolved ? 'Unresolve thread' : 'Resolve thread'}
+              accessibilityLabel={comment.isResolved ? '取消解决讨论串' : '解决讨论串'}
             >
               {comment.isResolved ? (
-                <Undo2 size={13} color={colors.textSecondary} strokeWidth={2.2} />
+                <Undo2 size={13} color={theme.color.text.secondary} strokeWidth={2.2} />
               ) : (
-                <Check size={13} color={colors.textSecondary} strokeWidth={2.2} />
+                <Check size={13} color={theme.color.text.secondary} strokeWidth={2.2} />
               )}
               <Text style={styles.actionButtonText}>
-                {resolveBusy ? '…' : comment.isResolved ? 'Unresolve' : 'Resolve'}
+                {resolveBusy ? '…' : comment.isResolved ? '取消解决' : '解决'}
               </Text>
             </Pressable>
           ) : null}
@@ -234,8 +243,8 @@ export const PRCommentCard = memo(function PRCommentCard({
       {replyOpen && !editOpen && actions ? (
         <View style={styles.composer}>
           <PRCommentComposer
-            placeholder="Write a reply…"
-            submitLabel="Reply"
+            placeholder="撰写回复…"
+            submitLabel="回复"
             submitting={replyBusy}
             onSubmit={submitReply}
             onCancel={() => setReplyOpen(false)}
@@ -246,9 +255,9 @@ export const PRCommentCard = memo(function PRCommentCard({
       {actions ? (
         <ConfirmModal
           visible={confirmDelete}
-          title="Delete comment?"
-          message="This permanently deletes the comment on GitHub."
-          confirmLabel="Delete"
+          title="删除评论？"
+          message="此操作会永久删除 GitHub 上的评论。"
+          confirmLabel="删除"
           destructive
           onConfirm={() => void actions.deleteComment(comment.id)}
           onCancel={() => setConfirmDelete(false)}

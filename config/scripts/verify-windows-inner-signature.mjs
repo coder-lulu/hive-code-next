@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
+import { isAbsolute, win32 } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const DEFAULT_EXPECTED_SIGNER =
@@ -129,10 +130,72 @@ export function validateExecutablePath(executablePath) {
   }
 }
 
-export function getPowerShellSignatureJson(executablePath, spawnSyncImpl = spawnSync) {
+export function resolvePowerShellExecutable({
+  configured = process.env.HIVECODE_WINDOWS_POWERSHELL_EXECUTABLE,
+  environment = process.env,
+  existsSyncImpl = existsSync,
+  statSyncImpl = statSync,
+  platform = process.platform
+} = {}) {
+  if (platform !== 'win32' && !configured?.trim()) {
+    throw new Error('Windows Authenticode verification requires a Windows PowerShell executable.')
+  }
+
+  const candidates = configured?.trim()
+    ? [configured.trim()]
+    : [
+        environment.ProgramFiles
+          ? win32.join(environment.ProgramFiles, 'PowerShell', '7', 'pwsh.exe')
+          : null,
+        environment.SystemRoot
+          ? win32.join(
+              environment.SystemRoot,
+              'System32',
+              'WindowsPowerShell',
+              'v1.0',
+              'powershell.exe'
+            )
+          : null,
+        environment.WINDIR
+          ? win32.join(
+              environment.WINDIR,
+              'System32',
+              'WindowsPowerShell',
+              'v1.0',
+              'powershell.exe'
+            )
+          : null
+      ].filter(Boolean)
+
+  for (const candidate of new Set(candidates)) {
+    if (
+      (isAbsolute(candidate) || win32.isAbsolute(candidate)) &&
+      existsSyncImpl(candidate) &&
+      statSyncImpl(candidate).isFile()
+    ) {
+      return candidate
+    }
+  }
+
+  if (configured?.trim()) {
+    throw new Error(
+      'HIVECODE_WINDOWS_POWERSHELL_EXECUTABLE must reference an existing absolute file.'
+    )
+  }
+  throw new Error(
+    'No trusted absolute PowerShell executable was found for Authenticode verification.'
+  )
+}
+
+export function getPowerShellSignatureJson(
+  executablePath,
+  spawnSyncImpl = spawnSync,
+  powershellExecutable = resolvePowerShellExecutable()
+) {
+  const verifiedPowerShell = resolvePowerShellExecutable({ configured: powershellExecutable })
   // Why: pwsh -Command does not reliably expose trailing process args to string commands.
   const result = spawnSyncImpl(
-    'pwsh',
+    verifiedPowerShell,
     [
       '-NoLogo',
       '-NoProfile',
@@ -172,6 +235,7 @@ export function verifyWindowsInnerSignature({
   executablePath,
   platform = process.platform,
   spawnSyncImpl = spawnSync,
+  powershellExecutable,
   expectedSigners = parseExpectedSigners(),
   expectedThumbprints = parseExpectedThumbprints()
 }) {
@@ -181,7 +245,13 @@ export function verifyWindowsInnerSignature({
     throw new Error('Windows inner executable signature verification requires Windows.')
   }
 
-  const signature = parseSignatureJson(getPowerShellSignatureJson(executablePath, spawnSyncImpl))
+  const signature = parseSignatureJson(
+    getPowerShellSignatureJson(
+      executablePath,
+      spawnSyncImpl,
+      powershellExecutable ?? resolvePowerShellExecutable({ platform })
+    )
+  )
   const classification = classifySignature(signature, { expectedSigners, expectedThumbprints })
   if (!classification.ok) {
     throw new Error(`${classification.message}\n${formatSignatureSummary(signature)}`)

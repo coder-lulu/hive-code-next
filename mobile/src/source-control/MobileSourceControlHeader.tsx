@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native'
 import { ChevronLeft, ExternalLink, RefreshCw, X } from 'lucide-react-native'
-import { colors } from '../theme/mobile-theme'
-import { styles } from './mobile-source-control-styles'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { createMobileSourceControlStyles } from './mobile-source-control-styles'
 
 type Props = {
   embedded: boolean
@@ -24,23 +24,25 @@ export function MobileSourceControlHeader({
   onOpenPrWeb,
   prNumber = null
 }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileSourceControlStyles)
   return (
     <View style={styles.topBar}>
       <Pressable
         style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
         onPress={onBack}
         hitSlop={8}
-        accessibilityLabel={embedded ? 'Close source control' : 'Back to session'}
+        accessibilityLabel={embedded ? '关闭源码控制' : '返回会话'}
       >
         {embedded ? (
-          <X size={22} color={colors.textSecondary} strokeWidth={2.2} />
+          <X size={20} color={theme.color.text.secondary} strokeWidth={2} />
         ) : (
-          <ChevronLeft size={22} color={colors.textSecondary} strokeWidth={2.2} />
+          <ChevronLeft size={20} color={theme.color.text.secondary} strokeWidth={2} />
         )}
       </Pressable>
       <View style={styles.titleBlock}>
         <Text style={styles.title} numberOfLines={1}>
-          Source Control
+          源码控制
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
           {worktreeLabel}
@@ -53,12 +55,10 @@ export function MobileSourceControlHeader({
           hitSlop={8}
           accessibilityRole="link"
           accessibilityLabel={
-            prNumber != null
-              ? `Open pull request #${prNumber} on the web`
-              : 'Open pull request on the web'
+            prNumber != null ? `在网页中打开拉取请求 #${prNumber}` : '在网页中打开拉取请求'
           }
         >
-          <ExternalLink size={18} color={colors.textSecondary} strokeWidth={2.1} />
+          <ExternalLink size={20} color={theme.color.text.secondary} strokeWidth={2} />
         </Pressable>
       ) : null}
       <Pressable
@@ -70,9 +70,9 @@ export function MobileSourceControlHeader({
         onPress={onRefresh}
         disabled={ioBusy}
         hitSlop={8}
-        accessibilityLabel="Refresh source control"
+        accessibilityLabel="刷新源码控制"
       >
-        <RefreshCw size={18} color={colors.textSecondary} strokeWidth={2.1} />
+        <RefreshCw size={20} color={theme.color.text.secondary} strokeWidth={2} />
       </Pressable>
     </View>
   )

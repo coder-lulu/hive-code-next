@@ -474,10 +474,13 @@ describe('buildSections', () => {
       displayName: 'Zed'
     })
 
-    expect(sortWorktrees([accentRepo, plainRepo], 'repo').map((item) => item.worktreeId)).toEqual([
-      'plain-repo',
-      'accent-repo'
-    ])
+    const expectedOrder = [accentRepo, plainRepo]
+      .sort((left, right) => left.repo.localeCompare(right.repo))
+      .map((item) => item.worktreeId)
+
+    expect(sortWorktrees([accentRepo, plainRepo], 'repo').map((item) => item.worktreeId)).toEqual(
+      expectedOrder
+    )
   })
 
   it('keeps a desktop-ranked parent and child stack above unrelated active rows', () => {

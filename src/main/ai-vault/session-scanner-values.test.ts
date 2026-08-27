@@ -77,15 +77,21 @@ describe('AI Vault session scanner text values', () => {
   })
 
   it('expands Pi and OMP agent homes to their session directories', () => {
-    expect(normalizeAgentSessionsDir('/agents/.pi', '.pi')).toBe('/agents/.pi/agent/sessions')
-    expect(normalizeAgentSessionsDir('/agents/.pi/agent', '.pi')).toBe('/agents/.pi/agent/sessions')
+    expect(normalizeAgentSessionsDir('/agents/.pi', '.pi')).toBe(
+      join('/agents/.pi', 'agent', 'sessions')
+    )
+    expect(normalizeAgentSessionsDir('/agents/.pi/agent', '.pi')).toBe(
+      join('/agents/.pi/agent', 'sessions')
+    )
     expect(normalizeAgentSessionsDir('/agents/.pi/agent/sessions', '.pi')).toBe(
       '/agents/.pi/agent/sessions'
     )
 
-    expect(normalizeAgentSessionsDir('/agents/.omp', '.omp')).toBe('/agents/.omp/agent/sessions')
+    expect(normalizeAgentSessionsDir('/agents/.omp', '.omp')).toBe(
+      join('/agents/.omp', 'agent', 'sessions')
+    )
     expect(normalizeAgentSessionsDir('/agents/.omp/agent', '.omp')).toBe(
-      '/agents/.omp/agent/sessions'
+      join('/agents/.omp/agent', 'sessions')
     )
     expect(normalizeAgentSessionsDir('/agents/.omp/agent/sessions', '.omp')).toBe(
       '/agents/.omp/agent/sessions'
@@ -95,18 +101,26 @@ describe('AI Vault session scanner text values', () => {
   // Prime Agent's env var is its agent dir verbatim and the CLI writes to
   // `<agentDir>/sessions`, so every configured dir maps to that child.
   it('maps any Prime Agent agent dir to its sessions child', () => {
-    expect(normalizePrimeAgentSessionsDir('/tmp/prime-agent')).toBe('/tmp/prime-agent/sessions')
-    expect(normalizePrimeAgentSessionsDir('/tmp/prime-agent///')).toBe('/tmp/prime-agent/sessions')
-    expect(normalizePrimeAgentSessionsDir('/agents/.prime')).toBe('/agents/.prime/sessions')
+    expect(normalizePrimeAgentSessionsDir('/tmp/prime-agent')).toBe(
+      join('/tmp/prime-agent', 'sessions')
+    )
+    expect(normalizePrimeAgentSessionsDir('/tmp/prime-agent///')).toBe(
+      join('/tmp/prime-agent', 'sessions')
+    )
+    expect(normalizePrimeAgentSessionsDir('/agents/.prime')).toBe(
+      join('/agents/.prime', 'sessions')
+    )
     expect(normalizePrimeAgentSessionsDir('/agents/.prime/agent')).toBe(
-      '/agents/.prime/agent/sessions'
+      join('/agents/.prime/agent', 'sessions')
     )
   })
 
   // Why: the CLI appends `sessions` unconditionally, so an agent dir that is itself
   // named `sessions` nests one deeper rather than being taken as the transcripts root.
   it('still appends sessions when the agent dir is itself named sessions', () => {
-    expect(normalizePrimeAgentSessionsDir('/data/sessions')).toBe('/data/sessions/sessions')
+    expect(normalizePrimeAgentSessionsDir('/data/sessions')).toBe(
+      join('/data/sessions', 'sessions')
+    )
   })
 
   it('expands a leading tilde in the agent dir', () => {
@@ -147,7 +161,7 @@ describe('AI Vault session scanner text values', () => {
 
     it('appends sessions to a configured agent dir', () => {
       expect(primeAgentSessionsDirFromEnv({ PRIME_AGENT_CODING_AGENT_DIR: '/opt/prime' })).toBe(
-        '/opt/prime/sessions'
+        join('/opt/prime', 'sessions')
       )
     })
 
@@ -176,7 +190,7 @@ describe('AI Vault session scanner text values', () => {
 
     it('expands a tilde and rejects a non-absolute sessions-root override', () => {
       expect(primeAgentSessionsDirFromEnv({ PRIME_AGENT_SESSION_DIR: '~/t' })).toBe(
-        join(homedir(), 't')
+        `${homedir()}/t`
       )
       // Why: '.' would otherwise scan the main-process cwd outright.
       for (const value of ['/', '.', '..', 'rel/path', '   ', 'C:foo']) {

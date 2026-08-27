@@ -51,7 +51,7 @@ describe('buildMobilePrChipSummary', () => {
       return
     }
     expect(summary.number).toBe(7701)
-    expect(summary.stateLabel).toBe('Draft')
+    expect(summary.stateLabel).toBe('草稿')
   })
 
   // Why: a skipped job is a deliberate "not applicable" — desktop and the tasks grid call this 3/3.

@@ -1,4 +1,5 @@
 import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
+import { applyProductBranding } from './brand'
 import {
   SKILL_BUNDLE_INSTALL_CAPABILITY,
   SKILL_DELETE_CAPABILITY,
@@ -119,8 +120,9 @@ export const AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY =
 export const AGENT_SESSION_KIMI_RESUME_RUNTIME_CAPABILITY = 'agent-session.kimi-resume.v1' as const
 // Why: older runtimes strip mutation owner fields, so clients must fence writes before RPC.
 export const FILE_MUTATION_OWNERSHIP_RUNTIME_CAPABILITY = 'files.mutation-ownership.v1' as const
-export const FILE_MUTATION_OWNERSHIP_UPDATE_REQUIRED_MESSAGE =
+export const FILE_MUTATION_OWNERSHIP_UPDATE_REQUIRED_MESSAGE = applyProductBranding(
   'Remote file changes require a newer Orca server. Update the HUB and try again.'
+)
 export const WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY =
   'worktree.visibility-defaults.v1' as const
 export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =

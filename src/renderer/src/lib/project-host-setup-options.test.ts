@@ -11,6 +11,7 @@ import {
 import type { ProjectHostSetup } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
 import { buildProjectHostSetupOptions } from './project-host-setup-options'
+import { applyProductBranding } from '@/product-brand'
 
 const FULL_HOST_MODEL_RUNTIME_CAPABILITIES = [
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
@@ -527,7 +528,7 @@ describe('buildProjectHostSetupOptions', () => {
         id: 'needs-setup:runtime:gpu',
         kind: 'needs-setup',
         label: 'GPU VM',
-        detail: 'Orca server version is incompatible',
+        detail: applyProductBranding('Orca server version is incompatible'),
         isAvailable: false
       })
     ])
@@ -544,7 +545,7 @@ describe('buildProjectHostSetupOptions', () => {
     expect(options.at(-1)).toMatchObject({
       id: 'needs-setup:runtime:gpu',
       kind: 'needs-setup',
-      detail: 'Update Orca on this host to set up projects',
+      detail: applyProductBranding('Update Orca on this host to set up projects'),
       isAvailable: false
     })
   })
@@ -566,7 +567,7 @@ describe('buildProjectHostSetupOptions', () => {
     expect(options.at(-1)).toMatchObject({
       id: 'needs-setup:runtime:gpu',
       kind: 'needs-setup',
-      detail: 'Update Orca on this host to set up projects',
+      detail: applyProductBranding('Update Orca on this host to set up projects'),
       isAvailable: false
     })
   })

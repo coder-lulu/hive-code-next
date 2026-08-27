@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
-import { Pressable } from 'react-native'
-import { colors } from '../theme/mobile-theme'
-import { styles } from './mobile-session-styles'
+import { Pressable, StyleSheet } from 'react-native'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 type HeaderIconProps = {
   size?: number
@@ -22,18 +22,42 @@ export function MobileSessionHeaderIconButton({
   icon: Icon,
   onPress
 }: MobileSessionHeaderIconButtonProps) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
+
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.filesButton,
-        pressed && styles.filesButtonPressed,
-        active && styles.filesButtonActive
+        styles.button,
+        active && styles.buttonActive,
+        pressed && styles.buttonPressed
       ]}
       onPress={onPress}
-      hitSlop={8}
+      hitSlop={theme.spacing.space4}
+      accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected: active }}
     >
-      <Icon size={18} color={colors.textSecondary} strokeWidth={2.1} />
+      <Icon
+        size={theme.spacing.space20}
+        color={active ? theme.color.text.inverse : theme.color.text.secondary}
+        strokeWidth={2}
+      />
     </Pressable>
   )
+}
+
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    button: {
+      minWidth: theme.size.minimumTouchTarget,
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: theme.spacing.space4,
+      borderRadius: theme.radii.control
+    },
+    buttonActive: { backgroundColor: theme.color.bg.selected },
+    buttonPressed: { opacity: 0.72 }
+  })
 }

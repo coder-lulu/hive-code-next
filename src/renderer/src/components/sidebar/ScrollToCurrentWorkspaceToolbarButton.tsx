@@ -5,7 +5,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { requestScrollToCurrentWorkspaceReveal } from '@/lib/scroll-to-current-workspace-status'
 import { translate } from '@/i18n/i18n'
 
-export function ScrollToCurrentWorkspaceToolbarButton(): React.JSX.Element {
+export function ScrollToCurrentWorkspaceToolbarButton({
+  tooltipSide = 'top'
+}: {
+  tooltipSide?: 'top' | 'bottom'
+}): React.JSX.Element {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -23,7 +27,7 @@ export function ScrollToCurrentWorkspaceToolbarButton(): React.JSX.Element {
           <Crosshair className="size-3.5" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={4}>
+      <TooltipContent side={tooltipSide} sideOffset={tooltipSide === 'bottom' ? 6 : 4}>
         {translate(
           'auto.components.sidebar.ScrollToCurrentWorkspaceToolbarButton.23989bb663',
           'Reveal active workspace'

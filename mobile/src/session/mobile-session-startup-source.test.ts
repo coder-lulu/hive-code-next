@@ -4,15 +4,15 @@ import { describe, expect, it } from 'vitest'
 const source = readFileSync(
   new URL('../../app/h/[hostId]/session/[worktreeId].tsx', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 const reconciliationHookSource = readFileSync(
   new URL('./use-mobile-session-tabs-reconciliation.ts', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 const autoCreateHookSource = readFileSync(
   new URL('./use-initial-session-terminal-autocreate.ts', import.meta.url),
   'utf8'
-)
+).replace(/\r\n?/g, '\n')
 
 function sliceBetween(startPattern: string, endPattern: string): string {
   const start = source.indexOf(startPattern)
@@ -90,7 +90,7 @@ describe('mobile session startup', () => {
   it('loads session tabs without waiting for desktop activation', () => {
     const startupEffect = sliceBetween(
       'void (async () => {',
-      'return () => {\n      disposed = true'
+      'return () => {\n      timerRegistry.dispose()'
     )
 
     expect(startupEffect).toContain("void client\n          .sendRequest('worktree.activate'")
@@ -103,7 +103,9 @@ describe('mobile session startup', () => {
       startupEffect.indexOf('await ensureSessionTabs()')
     )
     expect(startupEffect).toContain('headlessActivationNeedsHostRenderer(response.result)')
-    expect(startupEffect).toContain("showToast('Open Orca on the host to wake sleeping agents.'")
+    expect(startupEffect).toContain(
+      "showToast(productNameText('Open Orca on the host to wake sleeping agents.')"
+    )
   })
 
   it('fails runtime capability gates closed before probing a replacement client', () => {

@@ -51,6 +51,14 @@ describe('mobile terminal-webview contrast floor gate', () => {
     expect(resolveTerminalContrastFloor('rgba(255,255,255,0.9)')).toBe(LIGHT_FLOOR)
   })
 
+  it('composites transparent light themes over the light app surface', () => {
+    const { resolveTerminalContrastFloor } = loadThemeInjected() as {
+      resolveTerminalContrastFloor: (bg: unknown, mode?: string) => number
+    }
+
+    expect(resolveTerminalContrastFloor('transparent', 'light')).toBe(LIGHT_FLOOR)
+  })
+
   it('defaults unparseable backgrounds to the dark floor so output never stays invisible', () => {
     const { resolveTerminalContrastFloor } = loadThemeInjected() as {
       resolveTerminalContrastFloor: (bg: unknown) => number

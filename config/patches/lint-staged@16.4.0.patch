@@ -3,9 +3,9 @@ index 3a32d6a9cd65c7ecb6b3cbccfce5a15c96530435..363513128bf7302eab73ea775102bb8a
 --- a/lib/gitWorkflow.js
 +++ b/lib/gitWorkflow.js
 @@ -50,6 +50,9 @@ export const STASH = 'lint-staged automatic backup'
- 
+
  const PATCH_UNSTAGED = 'lint-staged_unstaged.patch'
- 
+
 +const BACKUP_REF_PREFIX = 'refs/worktree/lint-staged-backups'
 +const ZERO_OID = '0000000000000000000000000000000000000000'
 +
@@ -18,7 +18,7 @@ index 3a32d6a9cd65c7ecb6b3cbccfce5a15c96530435..363513128bf7302eab73ea775102bb8a
      this.topLevelDir = topLevelDir
 +    this.backupOid = null
 +    this.backupRef = null
- 
+
      /**
       * These three files hold state about an ongoing git merge
 @@ -122,6 +127,17 @@ export class GitWorkflow {
@@ -50,7 +50,7 @@ index 3a32d6a9cd65c7ecb6b3cbccfce5a15c96530435..363513128bf7302eab73ea775102bb8a
 +          await this.execGit(['update-ref', this.backupRef, this.backupOid, ZERO_OID])
 +          ctx.backupRef = this.backupRef
          }
- 
+
 -        task.title = `Backed up original state in git stash (${ctx.backupHash})`
 +        task.title = `Backed up original state (${ctx.backupHash})`
          debugLog(task.title)
@@ -90,7 +90,7 @@ index 75eeacee48759ef90249df5524639d61bce10918..24b4852eba9b14e05e10c3df8a2b2dae
 +          logger.error(restoreStashExample(ctx.backupHash, ctx.backupRef) + '\n')
          }
        }
- 
+
 diff --git a/lib/messages.js b/lib/messages.js
 index 993f8d81cac48132b5ae2ebdc8ca452c7217caad..2dc2291bc82451eacc5babfc8ce408051e1101e3 100644
 --- a/lib/messages.js
@@ -98,7 +98,7 @@ index 993f8d81cac48132b5ae2ebdc8ca452c7217caad..2dc2291bc82451eacc5babfc8ce40805
 @@ -66,9 +66,12 @@ export const PREVENTED_EMPTY_COMMIT = `
    Use the --allow-empty option to continue, or check your task configuration`)}
  `
- 
+
 -export const restoreStashExample = (
 -  hash = 'h0a0s0h0'
 -) => `Any lost modifications can be restored from a git stash:
@@ -108,7 +108,7 @@ index 993f8d81cac48132b5ae2ebdc8ca452c7217caad..2dc2291bc82451eacc5babfc8ce40805
 +
 +  > git stash apply --index ${backupRef}`
 +    : `Any lost modifications can be restored from a git stash:
- 
+
    > git stash list --format="%h %s"
    ${hash} On main: lint-staged automatic backup
 diff --git a/lib/state.js b/lib/state.js

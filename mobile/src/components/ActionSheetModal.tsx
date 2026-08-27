@@ -1,7 +1,8 @@
 import { useRef, type ReactNode } from 'react'
 import { ActivityIndicator, View, Text, Pressable, StyleSheet } from 'react-native'
 import { Edit3, Trash2, type LucideIcon } from 'lucide-react-native'
-import { colors, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { BottomDrawer } from './BottomDrawer'
 
 export type ActionSheetAction = {
@@ -43,6 +44,8 @@ type ContentProps = {
 }
 
 export function ActionSheetContent({ title, message, actions, onClose }: ContentProps) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <>
       {(title || message) && (
@@ -79,8 +82,10 @@ export function ActionSheetContent({ title, message, actions, onClose }: Content
               >
                 {customIcon ?? (
                   <Icon
-                    size={16}
-                    color={action.destructive ? colors.statusRed : colors.textSecondary}
+                    size={20}
+                    color={
+                      action.destructive ? theme.color.status.danger : theme.color.text.secondary
+                    }
                   />
                 )}
                 <View style={styles.actionTextBlock}>
@@ -96,7 +101,7 @@ export function ActionSheetContent({ title, message, actions, onClose }: Content
                   {action.hint ? <Text style={styles.actionHint}>{action.hint}</Text> : null}
                 </View>
                 {action.loading ? (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <ActivityIndicator size="small" color={theme.color.text.secondary} />
                 ) : null}
               </Pressable>
             </View>
@@ -143,62 +148,67 @@ export function ActionSheetModal({ visible, title, message, actions, onClose }: 
   )
 }
 
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.xs,
-    paddingBottom: spacing.sm
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textMuted
-  },
-  message: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2
-  },
-  actionGroup: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: 12,
-    overflow: 'hidden'
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginHorizontal: spacing.md
-  },
-  action: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  actionDisabled: {
-    opacity: 0.58
-  },
-  actionPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  actionTextBlock: {
-    flex: 1,
-    minWidth: 0
-  },
-  actionText: {
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textPrimary
-  },
-  actionTextDisabled: {
-    color: colors.textSecondary
-  },
-  actionTextDestructive: {
-    color: colors.statusRed
-  },
-  actionHint: {
-    marginTop: 2,
-    fontSize: typography.metaSize,
-    color: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    header: {
+      paddingHorizontal: theme.spacing.space4,
+      paddingBottom: theme.spacing.space12
+    },
+    title: {
+      ...theme.typography.label,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    message: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary,
+      marginTop: theme.spacing.space4
+    },
+    actionGroup: {
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.subtle,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      marginHorizontal: theme.spacing.space16,
+      backgroundColor: theme.color.border.subtle
+    },
+    action: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space12,
+      paddingVertical: theme.spacing.space12,
+      paddingHorizontal: theme.spacing.space16
+    },
+    actionDisabled: {
+      opacity: 0.58
+    },
+    actionPressed: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    actionTextBlock: {
+      flex: 1,
+      minWidth: 0
+    },
+    actionText: {
+      ...theme.typography.body,
+      color: theme.color.text.primary,
+      fontWeight: '500'
+    },
+    actionTextDisabled: {
+      color: theme.color.text.secondary
+    },
+    actionTextDestructive: {
+      color: theme.color.status.danger
+    },
+    actionHint: {
+      ...theme.typography.caption,
+      marginTop: theme.spacing.space4,
+      color: theme.color.text.tertiary
+    }
+  })
+}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applyProductBranding } from '@/product-brand'
 import { getSettingOwnershipSummary } from './setting-ownership'
 
 describe('getSettingOwnershipSummary', () => {
@@ -34,7 +35,7 @@ describe('getSettingOwnershipSummary', () => {
     const summary = getSettingOwnershipSummary('terminalQuickCommands')
 
     expect(summary.ownership).toBe('host-collection')
-    expect(summary.description).toContain('selected Orca host')
+    expect(summary.description).toContain(applyProductBranding('selected Orca host'))
     expect(summary.description).toContain('remain available in remote workspaces')
   })
 })

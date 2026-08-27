@@ -1,27 +1,37 @@
 // Why: this channel keeps E2EE framing out of RPC handlers, which consume plaintext across transports.
 import type { WebSocket } from 'ws'
-import { deriveSharedKey, encrypt, decrypt, encryptBytes, decryptBytes } from './e2ee-crypto'
-import {
+import { encrypt, decrypt, encryptBytes, decryptBytes } from './e2ee-crypto'
+import type {
   DesktopMobileE2EEV2Session,
-  type DesktopMobileE2EEV2Context
+  DesktopMobileE2EEV2Context
 } from './mobile-e2ee-v2-desktop-session'
 import type { DesktopMobileE2EEV2OutboundItem as V2OutboundItem } from './mobile-e2ee-v2-desktop-outbound'
 import { handleDesktopMobileE2EEV2Inbound } from './mobile-e2ee-v2-desktop-inbound'
-import { authenticateMobileE2EE, decodeMobileE2EEPublicKey } from './mobile-e2ee-auth-validation'
 import {
   isMobileE2EEBinaryPayloadWithinLimit,
   isMobileE2EEOutboundItemWithinLimit,
   isMobileE2EETextPayloadWithinLimit
 } from './mobile-e2ee-outbound-admission'
-import { parseRemoteRuntimeJsonText } from '../../../shared/remote-runtime-request-frames'
 import type { MobileE2EEOutboundMemoryBudget } from './mobile-e2ee-outbound-memory-budget'
 import { MobileE2EEDesktopOutboundOwner } from './mobile-e2ee-desktop-outbound-owner'
-import { parseRuntimeClientCapabilities } from './runtime-client-capabilities'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
-import type { EventProps } from '../../../shared/telemetry-events'
-import { track } from '../../telemetry/client'
+import {
+  authenticateE2EEChannel,
+  rejectE2EEAuthentication,
+  type E2EEAuthenticatedCloudSession,
+  type E2EEAuthenticatedDevice,
+  type E2EECloudManagedSessionResolver
+} from './e2ee-channel-authentication'
+import { resolveE2EEChannelHello } from './e2ee-channel-hello'
+import {
+  reportE2EEOutboundBudgetClose,
+  type OutboundBudgetEmitter
+} from './e2ee-channel-budget-close'
 
-type OutboundBudgetEmitter = EventProps<'remote_outbound_budget_close'>['emitter']
+export type {
+  E2EEAuthenticatedCloudSession,
+  E2EEAuthenticatedDevice
+} from './e2ee-channel-authentication'
 
 const HANDSHAKE_TIMEOUT_MS = 10_000
 const MAX_CONSECUTIVE_DECRYPT_FAILURES = 5
@@ -30,16 +40,16 @@ export type E2EEChannelOptions = {
   serverSecretKey: Uint8Array
   resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | null
   onReady: (channel: E2EEChannel, device: E2EEAuthenticatedDevice) => void
-  onError: (code: number, reason: string) => void
+  resolveCloudManagedSession?: E2EECloudManagedSessionResolver
+  onCloudReady?: (channel: E2EEChannel, principal: E2EEAuthenticatedCloudSession) => void
+  onError: (
+    code: number,
+    reason: string,
+    principalKind?: 'paired_device' | 'cloud_managed_web_session'
+  ) => void
   transportContext?: DesktopMobileE2EEV2Context
   requireV2?: boolean
   outboundMemoryBudget?: MobileE2EEOutboundMemoryBudget
-}
-
-export type E2EEAuthenticatedDevice = {
-  deviceId: string
-  deviceToken: string
-  scope: 'mobile' | 'runtime'
 }
 
 export class E2EEChannel {
@@ -51,7 +61,11 @@ export class E2EEChannel {
   private readonly serverSecretKey: Uint8Array
   private readonly resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | null
   private readonly onReady: (channel: E2EEChannel, device: E2EEAuthenticatedDevice) => void
-  private readonly onError: (code: number, reason: string) => void
+  private readonly resolveCloudManagedSession: E2EECloudManagedSessionResolver | undefined
+  private readonly onCloudReady:
+    | ((channel: E2EEChannel, principal: E2EEAuthenticatedCloudSession) => void)
+    | undefined
+  private readonly onError: E2EEChannelOptions['onError']
   private readonly transportContext: DesktopMobileE2EEV2Context
   private readonly requireV2: boolean
   private readonly outbound: MobileE2EEDesktopOutboundOwner
@@ -68,6 +82,7 @@ export class E2EEChannel {
 
   deviceToken: string | null = null
   authenticatedDevice: E2EEAuthenticatedDevice | null = null
+  authenticatedCloudSession: E2EEAuthenticatedCloudSession | null = null
   clientCapabilities: readonly RuntimeCapability[] = []
 
   constructor(ws: WebSocket, options: E2EEChannelOptions) {
@@ -75,6 +90,8 @@ export class E2EEChannel {
     this.serverSecretKey = options.serverSecretKey
     this.resolveAuthenticatedDevice = options.resolveAuthenticatedDevice
     this.onReady = options.onReady
+    this.resolveCloudManagedSession = options.resolveCloudManagedSession
+    this.onCloudReady = options.onCloudReady
     this.onError = options.onError
     this.transportContext = options.transportContext ?? { transport: 'direct' }
     this.requireV2 = options.requireV2 ?? false
@@ -187,86 +204,59 @@ export class E2EEChannel {
   }
 
   private handleHello(raw: string): void {
-    let hello: Record<string, unknown>
-    try {
-      hello = parseRemoteRuntimeJsonText(raw) as Record<string, unknown>
-    } catch {
-      this.onError(4001, 'Invalid handshake message')
+    const result = resolveE2EEChannelHello({
+      raw,
+      serverSecretKey: this.serverSecretKey,
+      transportContext: this.transportContext,
+      requireV2: this.requireV2
+    })
+    if (!result.ok) {
+      this.onError(4001, result.reason)
       return
     }
-
-    if (hello.type === 'e2ee_hello' && hello.v === 2) {
-      const session = DesktopMobileE2EEV2Session.create({
-        hello,
-        serverSecretKey: this.serverSecretKey,
-        expectedContext: this.transportContext
-      })
-      if (!session) {
-        this.onError(4001, 'Invalid e2ee_hello v2')
-        return
-      }
-      this.v2Session = session
-      this.state = 'awaiting_auth'
-      if (this.ws.readyState === this.ws.OPEN) {
-        this.ws.send(JSON.stringify(session.ready))
-      }
-      return
-    }
-
-    if (this.requireV2) {
-      this.onError(4001, 'E2EE v2 required')
-      return
-    }
-    if (hello.type !== 'e2ee_hello' || typeof hello.publicKeyB64 !== 'string') {
-      this.onError(4001, 'Invalid e2ee_hello')
-      return
-    }
-
-    // Why: derive the shared key from our secret + client's public key.
-    // Both sides compute the same shared secret via ECDH.
-    const clientPublicKey = decodeMobileE2EEPublicKey(hello.publicKeyB64)
-    if (!clientPublicKey) {
-      this.onError(4001, 'Invalid public key')
-      return
-    }
-
-    this.sharedKey = deriveSharedKey(this.serverSecretKey, clientPublicKey)
+    this.sharedKey = result.sharedKey
+    this.v2Session = result.v2Session
     this.state = 'awaiting_auth'
-
-    // Why: send e2ee_ready as plaintext — the client needs it to know the
-    // key exchange succeeded before it can send encrypted authentication.
     if (this.ws.readyState === this.ws.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'e2ee_ready' }))
+      this.ws.send(JSON.stringify(result.ready))
     }
   }
 
   private handleAuth(plaintext: string): void {
-    const authentication = authenticateMobileE2EE({
+    const authentication = authenticateE2EEChannel({
       plaintext,
       v2Session: this.v2Session,
-      resolveDevice: this.resolveAuthenticatedDevice
+      resolveDevice: this.resolveAuthenticatedDevice,
+      resolveCloudSession: this.resolveCloudManagedSession
     })
     if (!authentication.ok) {
-      this.sendEncryptedControl({ type: 'e2ee_error', error: { code: authentication.code } })
-      this.onError(4001, authentication.code === 'bad_auth' ? 'Invalid e2ee_auth' : 'Unauthorized')
+      rejectE2EEAuthentication(
+        authentication.code,
+        authentication.principalKind,
+        (message) => this.sendEncryptedControl(message),
+        this.onError
+      )
       return
     }
-    const authenticatedDevice = authentication.device
+    this.clientCapabilities = authentication.clientCapabilities
+    if (authentication.principalKind === 'cloud_managed_web_session') {
+      this.authenticatedCloudSession = authentication.principal
+      this.completeAuthentication(() => this.onCloudReady?.(this, authentication.principal))
+    } else {
+      this.deviceToken = authentication.principal.deviceToken
+      this.authenticatedDevice = authentication.principal
+      this.completeAuthentication(() => this.onReady(this, authentication.principal))
+    }
+  }
 
-    this.clientCapabilities = parseRuntimeClientCapabilities(authentication.auth.clientCapabilities)
-    this.deviceToken = authenticatedDevice.deviceToken
-    this.authenticatedDevice = authenticatedDevice
+  private completeAuthentication(onReady: () => void): void {
     this.state = 'ready'
-
     if (this.handshakeTimer) {
       clearTimeout(this.handshakeTimer)
       this.handshakeTimer = null
     }
-
-    // Why: transport-bound identity checks must complete before the peer sees
-    // authentication success; relay sockets additionally bind this context to
-    // their immutable relayDeviceId in the resolver.
-    this.onReady(this, authenticatedDevice)
+    // Why: bind the resolved principal before the peer can observe authentication success.
+    onReady()
     this.sendEncryptedControl(
       this.v2Session
         ? {
@@ -308,15 +298,8 @@ export class E2EEChannel {
     return this.outbound.enqueueV2(item, this.v2Session, () => this.closeForOutboundBudget('queue'))
   }
 
-  // Why: this close kills the whole remote session. `size` means a producer emitted something
-  // too big and should fall to zero once producers cap themselves; `queue` means a backed-up link.
   private closeForOutboundBudget(emitter: OutboundBudgetEmitter): void {
-    try {
-      track('remote_outbound_budget_close', { emitter })
-    } catch {
-      // Telemetry is best-effort; closing the unsafe socket remains authoritative.
-    }
-    this.onError(1013, 'Outbound reply buffer overflow')
+    reportE2EEOutboundBudgetClose(emitter, this.onError)
   }
 
   private sendEncryptedControl(message: unknown): void {

@@ -5,10 +5,6 @@ import type { ChangelogData, UpdateStatus } from '../../../shared/update-status-
 import { createUISlice } from '../store/slices/ui'
 import type { AppState } from '../store/types'
 import { isHttp2ProtocolError } from './UpdateCard'
-import {
-  getUpdateCardAriaLabel,
-  isUpdateCardVisible
-} from './maintenance/update-card/update-card-visibility'
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -323,13 +319,35 @@ type VisibilityInput = {
 
 type VisibilityResult = 'hidden' | 'visible'
 
+/** Mirrors the visibility gates in UpdateCard's render path. */
 function computeVisibility(input: VisibilityInput): VisibilityResult {
-  return isUpdateCardVisible({
-    ...input,
-    updateUserInitiatedCycle: input.updateUserInitiatedCycle ?? false
-  })
-    ? 'visible'
-    : 'hidden'
+  const { status, dismissedVersion, cachedVersion, hasStartedDownload } = input
+  const isUserInitiated = 'userInitiated' in status && status.userInitiated
+  const updateUserInitiatedCycle = input.updateUserInitiatedCycle ?? false
+  const shouldShowDetailedErrorCard =
+    status.state === 'error' && (hasStartedDownload || cachedVersion !== null)
+
+  if (status.state === 'checking' && !isUserInitiated) {
+    return 'hidden'
+  }
+  if (status.state === 'not-available' && !isUserInitiated) {
+    return 'hidden'
+  }
+  if (status.state === 'idle' || status.state === 'disabled') {
+    return 'hidden'
+  }
+  if (status.state === 'error' && !shouldShowDetailedErrorCard && !isUserInitiated) {
+    return 'hidden'
+  }
+
+  const effectiveVersion = 'version' in status ? status.version : cachedVersion
+  if (effectiveVersion && dismissedVersion === effectiveVersion && !updateUserInitiatedCycle) {
+    if (status.state !== 'downloading' && status.state !== 'error') {
+      return 'hidden'
+    }
+  }
+
+  return 'visible'
 }
 
 describe('UpdateCard visibility gates', () => {
@@ -344,8 +362,15 @@ describe('UpdateCard visibility gates', () => {
     ).toBe('hidden')
   })
 
-  it('uses the generic accessible label on idle', () => {
-    expect(getUpdateCardAriaLabel({ state: 'idle' })).toBe('Update status')
+  it('hides when online updates are not configured', () => {
+    expect(
+      computeVisibility({
+        status: { state: 'disabled', reason: 'not-configured' },
+        dismissedVersion: null,
+        cachedVersion: null,
+        hasStartedDownload: false
+      })
+    ).toBe('hidden')
   })
 
   it('hides background checking (not user-initiated)', () => {

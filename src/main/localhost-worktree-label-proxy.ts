@@ -3,6 +3,7 @@ import https from 'node:https'
 import net from 'node:net'
 import type { Duplex } from 'node:stream'
 import { URL } from 'node:url'
+import { applyProductBranding } from '../shared/brand'
 import type {
   LocalhostWorktreeLabelResult,
   LocalhostWorktreeLabelRoute
@@ -125,7 +126,7 @@ export class LocalhostWorktreeLabelProxy {
     const route = this.routeForRequest(request)
     if (!route) {
       response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
-      response.end('Unknown Orca localhost label.')
+      response.end(applyProductBranding('Unknown Orca localhost label.'))
       return
     }
 

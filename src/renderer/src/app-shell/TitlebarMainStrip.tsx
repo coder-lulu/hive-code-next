@@ -3,6 +3,7 @@ import { translate } from '@/i18n/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { TOGGLE_TERMINAL_PANE_EXPAND_EVENT } from '@/constants/terminal'
 import { ActivityTitlebarControls } from '../components/activity/ActivityTitlebarControls'
+import { SidebarSettingsHelpMenu } from '../components/sidebar/SidebarSettingsHelpMenu'
 import { useShortcutLabel } from '../hooks/useShortcutLabel'
 import { useAppStore } from '../store'
 import { hasCustomTitleBar } from './app-window-chrome'
@@ -32,7 +33,13 @@ export function RightSidebarToggle(): React.JSX.Element {
 }
 
 /** The titlebar's center/right strip: the tab-strip portal slot and the trailing chrome buttons. */
-export function TitlebarMainStrip({ layout }: { layout: AppChromeLayout }): React.JSX.Element {
+export function TitlebarMainStrip({
+  layout,
+  showSettingsHelpControls
+}: {
+  layout: AppChromeLayout
+  showSettingsHelpControls: boolean
+}): React.JSX.Element {
   const handleToggleExpand = (): void => {
     if (!layout.effectiveActiveTabId) {
       return
@@ -71,6 +78,7 @@ export function TitlebarMainStrip({ layout }: { layout: AppChromeLayout }): Reac
           </TooltipContent>
         </Tooltip>
       )}
+      {showSettingsHelpControls ? <SidebarSettingsHelpMenu /> : null}
       {/* Why: the open right sidebar's header renders its own close button, so hide this duplicate. */}
       {layout.showRightSidebarControls && !layout.rightSidebarOpen ? <RightSidebarToggle /> : null}
       {/* Why: reserve space so the Windows/Linux window-controls overlay doesn't obscure content. */}

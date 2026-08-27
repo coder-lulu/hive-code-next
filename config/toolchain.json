@@ -1,0 +1,20 @@
+{
+  "node": "24.18.0",
+  "pnpm": "10.24.0",
+  "electron": "43.1.0",
+  "vitest": "4.1.5",
+  "native": {
+    "windows": {
+      "runner": "windows-2022",
+      "compiler": "MSVC v143 (Visual Studio 2022)"
+    },
+    "macos": {
+      "runner": "macos-15",
+      "compiler": "Xcode Command Line Tools / swiftc"
+    },
+    "linux": {
+      "runner": "ubuntu-22.04",
+      "glibcFloor": "2.31"
+    }
+  }
+}

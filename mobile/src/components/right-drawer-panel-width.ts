@@ -1,10 +1,9 @@
 // Pure X-axis panel-width resolution for RightDrawer, kept native-import-free so
 // it is unit-testable under the node Vitest config (no RN render harness exists).
 
-// Why: cap the panel on wide canvases so it doesn't stretch across a tablet.
-export const WIDE_PANEL_MAX_WIDTH = 420
-// Why: on a phone the panel leaves a thin gutter so the backdrop stays tappable.
-export const NARROW_BACKDROP_GUTTER = 48
+// Graphite drawer contract: 80% on phones, capped at 400dp on larger canvases.
+export const NARROW_PANEL_WIDTH_RATIO = 0.8
+export const WIDE_PANEL_MAX_WIDTH = 400
 
 export function resolveRightDrawerPanelWidth(
   windowWidth: number,
@@ -12,11 +11,10 @@ export function resolveRightDrawerPanelWidth(
   widthPx: number | undefined
 ): number {
   if (widthPx != null) {
-    // Clamp to [0, windowWidth] so a negative explicit width can't yield a negative panel.
-    return Math.max(Math.min(widthPx, windowWidth), 0)
+    return Math.max(Math.min(widthPx, windowWidth, WIDE_PANEL_MAX_WIDTH), 0)
   }
   if (isWideLayout) {
     return Math.min(WIDE_PANEL_MAX_WIDTH, windowWidth)
   }
-  return Math.max(windowWidth - NARROW_BACKDROP_GUTTER, 0)
+  return Math.max(Math.min(windowWidth * NARROW_PANEL_WIDTH_RATIO, WIDE_PANEL_MAX_WIDTH), 0)
 }

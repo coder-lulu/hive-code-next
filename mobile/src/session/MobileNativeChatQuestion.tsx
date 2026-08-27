@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { ArrowUp, Check, CircleHelp } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { formatQuestionAnswer, type MobileChatQuestion } from './mobile-native-chat-question'
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
  *  the user answer freely (the escape hatch) when the heuristic misreads the
  *  options or none apply. */
 export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [selected, setSelected] = useState<string[]>([])
   const [freeText, setFreeText] = useState('')
   const [sending, setSending] = useState(false)
@@ -75,7 +78,7 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <CircleHelp size={15} color={colors.accentBlue} strokeWidth={2.2} />
+        <CircleHelp size={16} color={theme.color.brand.primary} strokeWidth={2} />
         <Text style={styles.question}>{question.question}</Text>
       </View>
 
@@ -97,7 +100,9 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
               >
                 {question.multiSelect ? (
                   <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                    {isSelected ? <Check size={13} color={colors.bgBase} strokeWidth={3} /> : null}
+                    {isSelected ? (
+                      <Check size={12} color={theme.color.text.inverse} strokeWidth={3} />
+                    ) : null}
                   </View>
                 ) : null}
                 <Text style={styles.optionText}>{label}</Text>
@@ -109,7 +114,7 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
 
       {question.multiSelect && hasOptions ? (
         <Pressable
-          accessibilityLabel="Submit selected options"
+          accessibilityLabel="提交已选选项"
           style={({ pressed }) => [
             styles.submit,
             !canSubmitMulti && styles.submitDisabled,
@@ -119,7 +124,7 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
           disabled={!canSubmitMulti}
         >
           <Text style={[styles.submitText, !canSubmitMulti && styles.submitTextDisabled]}>
-            Submit{selected.length > 0 ? ` (${selected.length})` : ''}
+            提交{selected.length > 0 ? `（${selected.length}）` : ''}
           </Text>
         </Pressable>
       ) : null}
@@ -129,15 +134,15 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
           style={styles.freeInput}
           value={freeText}
           onChangeText={setFreeText}
-          placeholder={hasOptions ? 'Or type a reply…' : 'Type your reply…'}
-          placeholderTextColor={colors.textMuted}
-          selectionColor={colors.accentBlue}
+          placeholder={hasOptions ? '或输入回复…' : '输入你的回复…'}
+          placeholderTextColor={theme.color.text.tertiary}
+          selectionColor={theme.color.brand.primary}
           onSubmitEditing={submitFreeText}
           returnKeyType="send"
           multiline
         />
         <Pressable
-          accessibilityLabel="Send reply"
+          accessibilityLabel="发送回复"
           style={({ pressed }) => [
             styles.freeSend,
             !canSendFreeText && styles.freeSendDisabled,
@@ -148,7 +153,7 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
         >
           <ArrowUp
             size={18}
-            color={canSendFreeText ? colors.bgBase : colors.textMuted}
+            color={canSendFreeText ? theme.color.text.inverse : theme.color.text.tertiary}
             strokeWidth={2.6}
           />
         </Pressable>
@@ -157,112 +162,113 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.sm,
-    padding: spacing.md,
-    gap: spacing.sm,
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  question: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize + 1,
-    fontWeight: '600',
-    lineHeight: typography.bodySize + 7
-  },
-  options: {
-    gap: spacing.xs
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.button,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle
-  },
-  optionSelected: {
-    borderColor: colors.accentBlue
-  },
-  optionText: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize + 1
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: radii.button,
-    borderWidth: 1.5,
-    borderColor: colors.textMuted,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  checkboxOn: {
-    backgroundColor: colors.accentBlue,
-    borderColor: colors.accentBlue
-  },
-  submit: {
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.button,
-    backgroundColor: colors.accentBlue
-  },
-  submitDisabled: {
-    backgroundColor: colors.bgRaised
-  },
-  submitText: {
-    color: colors.onMergeGreen,
-    fontSize: typography.bodySize + 1,
-    fontWeight: '600'
-  },
-  submitTextDisabled: {
-    color: colors.textMuted
-  },
-  freeTextRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.sm
-  },
-  freeInput: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 120,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize + 1,
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm
-  },
-  freeSend: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.textPrimary
-  },
-  freeSendDisabled: {
-    backgroundColor: colors.bgRaised
-  },
-  pressed: {
-    opacity: 0.7
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    card: {
+      marginHorizontal: theme.spacing.space16,
+      marginVertical: theme.spacing.space8,
+      padding: theme.spacing.space16,
+      gap: theme.spacing.space8,
+      backgroundColor: theme.color.bg.surface,
+      borderRadius: theme.radii.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    question: {
+      ...theme.typography.sectionTitle,
+      flex: 1,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    options: {
+      gap: theme.spacing.space4
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      minHeight: theme.size.minimumTouchTarget,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space8,
+      backgroundColor: theme.color.bg.elevated,
+      borderRadius: theme.radii.control,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.default
+    },
+    optionSelected: {
+      borderColor: theme.color.brand.primary
+    },
+    optionText: {
+      ...theme.typography.body,
+      flex: 1,
+      color: theme.color.text.primary
+    },
+    checkbox: {
+      width: theme.spacing.space20,
+      height: theme.spacing.space20,
+      borderRadius: theme.radii.small,
+      borderWidth: 1.5,
+      borderColor: theme.color.text.tertiary,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    checkboxOn: {
+      backgroundColor: theme.color.brand.primary,
+      borderColor: theme.color.brand.primary
+    },
+    submit: {
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.selected
+    },
+    submitDisabled: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    submitText: {
+      ...theme.typography.label,
+      color: theme.color.text.inverse,
+      fontWeight: '600'
+    },
+    submitTextDisabled: {
+      color: theme.color.text.tertiary
+    },
+    freeTextRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: theme.spacing.space8
+    },
+    freeInput: {
+      ...theme.typography.body,
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      maxHeight: 120,
+      color: theme.color.text.primary,
+      backgroundColor: theme.color.bg.subtle,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space12,
+      paddingTop: theme.spacing.space8,
+      paddingBottom: theme.spacing.space8
+    },
+    freeSend: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.color.bg.selected
+    },
+    freeSendDisabled: {
+      backgroundColor: theme.color.bg.subtle
+    },
+    pressed: {
+      opacity: 0.7
+    }
+  })
+}

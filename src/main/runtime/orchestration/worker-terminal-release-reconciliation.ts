@@ -63,7 +63,12 @@ async function reconcileRequestedWorkerTerminalReleasesOnce(
   runtime: OrcaRuntimeService
 ): Promise<WorkerTerminalReleaseReconciliationResult> {
   const db = runtime.getOrchestrationDb()
-  const backlog = db.listWorkerTerminalReleaseBacklog()
+  // Older test/runtime adapters may not expose the optional release backlog
+  // reader yet; reconciliation is safe to skip until that capability exists.
+  const backlog =
+    typeof db.listWorkerTerminalReleaseBacklog === 'function'
+      ? db.listWorkerTerminalReleaseBacklog()
+      : []
   const result = { ...emptyResult(), attempted: backlog.length }
   for (const resource of backlog) {
     try {

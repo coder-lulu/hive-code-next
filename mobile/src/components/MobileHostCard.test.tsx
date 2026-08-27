@@ -9,6 +9,7 @@ import {
   type HostWorktreeInfo
 } from '../worktree/home-worktree-info'
 import { MobileHostCard } from './MobileHostCard'
+import { lightTheme } from '../theme/mobile-theme'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -56,6 +57,7 @@ describe('MobileHostCard', () => {
     await act(async () => {
       renderer = create(
         createElement(MobileHostCard, {
+          theme: lightTheme,
           host,
           state: overrides?.state ?? 'connected',
           verdict: overrides?.verdict ?? verdict,
@@ -74,20 +76,20 @@ describe('MobileHostCard', () => {
   }
 
   it('renders the counts the host proved', async () => {
-    expect(await renderCard(loaded)).toContain('12 worktrees · 2 active')
+    expect(await renderCard(loaded)).toContain('12 个工作区 · 2 个活跃')
   })
 
   it('keeps rendering the last proven counts after a failed refresh', async () => {
     // The regression this card shipped once: the caller dropped the counts the
     // failure path deliberately preserved.
     expect(await renderCard(markHomeWorktreeCatalogUnavailable(loaded, 'host-1'))).toContain(
-      'Last known: 12 worktrees · 2 active'
+      '上次状态：12 个工作区 · 2 个活跃'
     )
   })
 
   it('never asserts a count for a catalog that failed with nothing proven', async () => {
     expect(await renderCard(markHomeWorktreeCatalogUnavailable(undefined, 'host-1'))).toContain(
-      'Worktree list unavailable'
+      '工作区列表不可用'
     )
   })
 
@@ -98,8 +100,8 @@ describe('MobileHostCard', () => {
       path: 'relay'
     })
 
-    expect(lines).toContain('Connecting via Relay…')
-    expect(lines).not.toContain(' · Orca Relay')
+    expect(lines).toContain('正在通过安全中继连接…')
+    expect(lines).not.toContain(' · Orca 安全中继')
   })
 
   it('names the relay while a failed direct dial is still retrying', async () => {
@@ -109,8 +111,8 @@ describe('MobileHostCard', () => {
       path: 'relay'
     })
 
-    expect(lines).toContain('Connecting via Relay…')
-    expect(lines).not.toContain(' · Orca Relay')
+    expect(lines).toContain('正在通过安全中继连接…')
+    expect(lines).not.toContain(' · Orca 安全中继')
   })
 
   it('leaves an idle disconnected host unlabelled', async () => {
@@ -120,7 +122,7 @@ describe('MobileHostCard', () => {
       path: 'relay'
     })
 
-    expect(lines).not.toContain(' · Orca Relay')
+    expect(lines).not.toContain(' · Orca 安全中继')
   })
 
   it('does not guess a direct path before the dial resolves', async () => {
@@ -130,14 +132,14 @@ describe('MobileHostCard', () => {
       path: 'lan'
     })
 
-    expect(lines).not.toContain(' · Direct · LAN')
+    expect(lines).not.toContain(' · 直连 · 局域网')
   })
 
   it('shows no worktree line before the first read lands', async () => {
     const lines = await renderCard(undefined)
 
-    expect(lines).not.toContain('0 worktrees')
-    expect(lines).not.toContain('Worktree list unavailable')
+    expect(lines).not.toContain('0 个工作区')
+    expect(lines).not.toContain('工作区列表不可用')
   })
 
   it('offers re-pairing when the credential is missing', async () => {
@@ -147,9 +149,9 @@ describe('MobileHostCard', () => {
       credentialStatus: 'missing'
     })
 
-    expect(lines).toContain('Pairing invalid')
-    expect(lines).toContain('Tap to re-pair with your desktop')
-    expect(lines).not.toContain('12 worktrees · 2 active')
+    expect(lines).toContain('配对已失效')
+    expect(lines).toContain('点击与桌面端重新配对')
+    expect(lines).not.toContain('12 个工作区 · 2 个活跃')
   })
 
   it('offers a retry without declaring a transient read failure invalid', async () => {
@@ -159,8 +161,8 @@ describe('MobileHostCard', () => {
       credentialStatus: 'temporarily-unavailable'
     })
 
-    expect(lines).toContain('Pairing temporarily unavailable')
-    expect(lines).toContain('Unlock your phone, then tap to retry')
-    expect(lines).not.toContain('Pairing invalid')
+    expect(lines).toContain('配对凭据暂时不可用')
+    expect(lines).toContain('解锁手机后点击重试')
+    expect(lines).not.toContain('配对已失效')
   })
 })

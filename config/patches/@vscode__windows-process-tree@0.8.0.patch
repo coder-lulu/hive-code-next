@@ -13,13 +13,15 @@ index 855bd4b86f0a3c18c7594212c0e42b6e35bc4001..5f15551cb1520af996f216500a83ac68
          ['OS=="win"', {
 @@ -16,9 +16,6 @@
            ],
-           "include_dirs": [],
+-          "include_dirs": [],
            "libraries": [ 'psapi.lib' ],
 -          "msvs_configuration_attributes": {
 -            "SpectreMitigation": "Spectre"
 -          },
            "msvs_settings": {
              "VCCLCompilerTool": {
++              "ExceptionHandling": 1,
++              "EnablePREfast": "true",
                "AdditionalOptions": [
 diff --git a/src/process.cc b/src/process.cc
 index 3eea92077c4d1d433119361d5c432881859131e9..1998f4addd4d7e9aba946ea6f7f7a4a5d13291bc 100644
@@ -32,5 +34,5 @@ index 3eea92077c4d1d433119361d5c432881859131e9..1998f4addd4d7e9aba946ea6f7f7a4a5
 -    } while (process_count < 1024 && Process32Next(snapshot_handle, &process_entry));
 +    } while (Process32Next(snapshot_handle, &process_entry));
    }
- 
+
    CloseHandle(snapshot_handle);

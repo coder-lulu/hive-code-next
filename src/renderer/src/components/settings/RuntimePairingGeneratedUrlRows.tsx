@@ -2,6 +2,7 @@ import { Check, Copy } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { translate } from '@/i18n/i18n'
+import { canonicalizePairingUrl } from '../../../../shared/pairing'
 
 export function GeneratedUrlRow({
   label,
@@ -14,21 +15,22 @@ export function GeneratedUrlRow({
   description?: string
   value: string
   copied: boolean
-  onCopy: () => void
+  onCopy: (value: string) => void
 }): React.JSX.Element {
+  const displayValue = canonicalizePairingUrl(value)
   return (
     <div className="space-y-1">
       <Label>{label}</Label>
       {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
       <div className="flex min-w-0 items-center gap-2 rounded-md border border-border/60 bg-background/70 px-2 py-1.5">
         <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-[11px] text-muted-foreground">
-          {value}
+          {displayValue}
         </code>
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
-          onClick={onCopy}
+          onClick={() => onCopy(displayValue)}
           aria-label={translate(
             'auto.components.settings.RuntimePairingGeneratedUrlRows.0495f68959',
             'Copy {{value0}}',

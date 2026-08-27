@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 import { stringify } from 'yaml'
 import type { LocalBuildCompatibility } from '../../shared/local-build-compatibility'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { loadLocalBuildCandidate } from './local-build-candidate'
 import { startLocalBuildFeed } from './local-build-feed-server'
 
@@ -16,7 +17,7 @@ const execFileAsync = promisify(execFile)
 function compatibility(): LocalBuildCompatibility {
   return {
     formatVersion: 1,
-    appId: 'com.stablyai.orca',
+    appId: 'com.hivekernel.hivecode.desktop',
     buildId: '1.2.3-local.1-abc-arm64',
     version: '1.2.3-local.1',
     commit: 'abc',
@@ -93,7 +94,7 @@ describe('loadLocalBuildCandidate', () => {
     ).rejects.toThrow('invalid file entry')
   })
 
-  it('rejects symlinked artifacts', async () => {
+  it.runIf(process.platform !== 'win32')('rejects symlinked artifacts', async () => {
     const { artifactPath, directory, manifestPath } = await fixture()
     const realArtifact = join(directory, 'real.zip')
     await writeFile(realArtifact, 'signed-zip-placeholder')
@@ -167,6 +168,6 @@ describe('loadLocalBuildCandidate', () => {
       loadLocalBuildCandidate(manifestPath, 'x64', {
         readCompatibility: async () => compatibility()
       })
-    ).rejects.toThrow('exactly one x64 Orca ZIP')
+    ).rejects.toThrow(`exactly one x64 ${APP_DISPLAY_NAME} ZIP`)
   })
 })

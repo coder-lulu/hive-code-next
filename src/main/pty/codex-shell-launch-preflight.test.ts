@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, isAbsolute, join } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { afterEach, describe, expect, it } from 'vitest'
+import { getBundledLauncherPath } from '../cli/bundled-cli-launcher-path'
 import {
   getFishCodexShellLaunchPreflight,
   getPosixCodexShellLaunchPreflight,
@@ -282,12 +283,12 @@ describe('Codex shell launch preflight command', () => {
   }
 
   it.each([
-    { platform: 'darwin' as const, bundled: 'orca' },
-    { platform: 'linux' as const, bundled: 'orca-ide' },
-    { platform: 'win32' as const, bundled: 'orca.exe' }
+    { platform: 'darwin' as const },
+    { platform: 'linux' as const },
+    { platform: 'win32' as const }
   ])('carries the verified bundled $platform launcher as an absolute path', (config) => {
     const { userDataPath, resourcesPath } = makeCliRoot()
-    const launcherPath = join(resourcesPath, 'bin', config.bundled)
+    const launcherPath = getBundledLauncherPath(config.platform, resourcesPath)!
     writeExecutable(launcherPath, '#!/bin/sh\nexit 0\n')
 
     expect(
@@ -321,7 +322,7 @@ describe('Codex shell launch preflight command', () => {
 
   it('never returns an unqualified command name that a profile-rewritten PATH could hijack', () => {
     const { userDataPath, resourcesPath } = makeCliRoot()
-    writeExecutable(join(resourcesPath, 'bin', 'orca'), '#!/bin/sh\nexit 0\n')
+    writeExecutable(getBundledLauncherPath('darwin', resourcesPath)!, '#!/bin/sh\nexit 0\n')
     writeExecutable(join(userDataPath, 'cli', 'bin', 'orca-dev'), '#!/bin/sh\nexit 0\n')
 
     for (const isPackaged of [true, false]) {
@@ -343,8 +344,12 @@ describe('Codex shell launch preflight command', () => {
     { label: 'the launcher is not executable', create: 0o644 },
     { label: 'the launcher path is a directory', create: 'directory' as const }
   ])('skips the preflight when $label', (config) => {
+    // Windows has no POSIX executable bit; a readable launcher is valid there.
+    if (process.platform === 'win32' && config.create === 0o644) {
+      return
+    }
     const { userDataPath, resourcesPath } = makeCliRoot()
-    const launcherPath = join(resourcesPath, 'bin', 'orca')
+    const launcherPath = getBundledLauncherPath('darwin', resourcesPath)!
     if (config.create === 'directory') {
       mkdirSync(launcherPath)
     } else if (config.create !== null) {
@@ -385,7 +390,7 @@ describe('Codex shell launch preflight command', () => {
     { hooksEnabled: true, isWsl: false, managedHomePath: null }
   ])('does not enable an unsupported preflight for %o', (options) => {
     const { userDataPath, resourcesPath } = makeCliRoot()
-    writeExecutable(join(resourcesPath, 'bin', 'orca'), '#!/bin/sh\nexit 0\n')
+    writeExecutable(getBundledLauncherPath('darwin', resourcesPath)!, '#!/bin/sh\nexit 0\n')
 
     expect(
       resolveCodexShellLaunchPreflightCommand({

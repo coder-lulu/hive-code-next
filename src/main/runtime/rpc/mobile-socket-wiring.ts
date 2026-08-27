@@ -2,14 +2,20 @@ import { randomBytes } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { DeviceEntry, DeviceRegistry } from '../device-registry'
 import type { E2EEKeypair } from '../e2ee-keypair'
-import { E2EEChannel, type E2EEAuthenticatedDevice } from './e2ee-channel'
+import {
+  E2EEChannel,
+  type E2EEAuthenticatedCloudSession,
+  type E2EEAuthenticatedDevice
+} from './e2ee-channel'
 import { createMobileE2EEOutboundMemoryBudget } from './mobile-e2ee-outbound-memory-budget'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
+import type { CloudManagedE2EEAuth } from './cloud-managed-e2ee-auth-validation'
+import type { WebSocketConnectionRequest } from './ws-transport'
 
 type MobileSocketPayload = string | Uint8Array<ArrayBufferLike>
 
 export type MobileSocketTransportMetadata =
-  | { transport: 'direct' }
+  | { transport: 'direct'; request?: WebSocketConnectionRequest }
   | {
       transport: 'relay'
       relayHostId: string
@@ -41,6 +47,14 @@ export type AuthenticatedMobileSocket = {
   transport: MobileSocketTransportMetadata
 }
 
+export type AuthenticatedCloudManagedSocket = {
+  ws: WebSocket
+  connectionId: string
+  principal: E2EEAuthenticatedCloudSession
+  clientCapabilities: readonly RuntimeCapability[]
+  transport: Extract<MobileSocketTransportMetadata, { transport: 'direct' }>
+}
+
 type MobileSocketWiringOptions = {
   deviceRegistry: DeviceRegistry
   e2eeKeypair: E2EEKeypair
@@ -53,6 +67,22 @@ type MobileSocketWiringOptions = {
   onBinary: (socket: AuthenticatedMobileSocket, bytes: Uint8Array<ArrayBufferLike>) => void
   onClose: (socket: AuthenticatedMobileSocket | null, hasOtherConnections: boolean) => void
   onReady?: (socket: AuthenticatedMobileSocket) => void
+  resolveCloudManagedSession?: (
+    auth: CloudManagedE2EEAuth,
+    metadata: MobileSocketTransportMetadata
+  ) => E2EEAuthenticatedCloudSession | null
+  onCloudText?: (
+    socket: AuthenticatedCloudManagedSocket,
+    plaintext: string,
+    reply: (response: string) => void,
+    sendBinary: (response: Uint8Array<ArrayBufferLike>) => boolean | void
+  ) => void
+  onCloudBinary?: (
+    socket: AuthenticatedCloudManagedSocket,
+    bytes: Uint8Array<ArrayBufferLike>
+  ) => void
+  onCloudClose?: (socket: AuthenticatedCloudManagedSocket, hasOtherConnections: boolean) => void
+  onCloudReady?: (socket: AuthenticatedCloudManagedSocket) => void
   // Why: stale keys and missing registry entries both fail before RPC can explain the re-pair action.
   onUnpairedDeviceAuthFailure?: (metadata: MobileSocketTransportMetadata) => void
 }
@@ -73,9 +103,15 @@ export class MobileSocketWiring {
   private readonly onClose: MobileSocketWiringOptions['onClose']
   private readonly onReady: MobileSocketWiringOptions['onReady']
   private readonly onUnpairedDeviceAuthFailure: MobileSocketWiringOptions['onUnpairedDeviceAuthFailure']
+  private readonly resolveCloudManagedSession: MobileSocketWiringOptions['resolveCloudManagedSession']
+  private readonly onCloudText: MobileSocketWiringOptions['onCloudText']
+  private readonly onCloudBinary: MobileSocketWiringOptions['onCloudBinary']
+  private readonly onCloudClose: MobileSocketWiringOptions['onCloudClose']
+  private readonly onCloudReady: MobileSocketWiringOptions['onCloudReady']
   private readonly channels = new Map<WebSocket, E2EEChannel>()
   private readonly connectionIds = new Map<WebSocket, string>()
   private readonly authenticatedSockets = new Map<WebSocket, AuthenticatedMobileSocket>()
+  private readonly authenticatedCloudSockets = new Map<WebSocket, AuthenticatedCloudManagedSocket>()
   private readonly transports = new Set<MobileSocketTransport>()
   private readonly outboundMemoryBudget = createMobileE2EEOutboundMemoryBudget()
 
@@ -87,6 +123,11 @@ export class MobileSocketWiring {
     this.onClose = options.onClose
     this.onReady = options.onReady
     this.onUnpairedDeviceAuthFailure = options.onUnpairedDeviceAuthFailure
+    this.resolveCloudManagedSession = options.resolveCloudManagedSession
+    this.onCloudText = options.onCloudText
+    this.onCloudBinary = options.onCloudBinary
+    this.onCloudClose = options.onCloudClose
+    this.onCloudReady = options.onCloudReady
   }
 
   attachTransport(
@@ -130,6 +171,14 @@ export class MobileSocketWiring {
     return terminated
   }
 
+  terminateCloudSessionConnections(managedWebSessionId: string): number {
+    let terminated = 0
+    for (const transport of this.transports) {
+      terminated += transport.terminateClientConnections(cloudSessionClientId(managedWebSessionId))
+    }
+    return terminated
+  }
+
   private handleRawMessage(
     transport: MobileSocketTransport,
     ws: WebSocket,
@@ -160,6 +209,24 @@ export class MobileSocketWiring {
           }
           return toAuthenticatedDevice(device)
         },
+        ...(this.resolveCloudManagedSession && metadata.transport === 'direct'
+          ? {
+              resolveCloudManagedSession: (auth: CloudManagedE2EEAuth) =>
+                this.resolveCloudManagedSession?.(auth, metadata) ?? null,
+              onCloudReady: (channel: E2EEChannel, principal: E2EEAuthenticatedCloudSession) => {
+                const socket = {
+                  ws,
+                  connectionId,
+                  principal,
+                  clientCapabilities: channel.clientCapabilities,
+                  transport: metadata
+                }
+                this.authenticatedCloudSockets.set(ws, socket)
+                transport.setClientId(ws, cloudSessionClientId(principal.managedWebSessionId))
+                this.onCloudReady?.(socket)
+              }
+            }
+          : {}),
         onReady: (channel, device) => {
           const socket = {
             ws,
@@ -174,8 +241,11 @@ export class MobileSocketWiring {
           this.deviceRegistry.updateLastSeenDeferred(device.deviceId)
           this.onReady?.(socket)
         },
-        onError: (code, reason) => {
-          const reportUnpairedDevice = code === 4001 && reason === 'Unauthorized'
+        onError: (code, reason, principalKind) => {
+          const reportUnpairedDevice =
+            code === 4001 &&
+            reason === 'Unauthorized' &&
+            principalKind !== 'cloud_managed_web_session'
           this.channels.get(ws)?.destroy()
           this.channels.delete(ws)
           ws.close(code, reason)
@@ -193,12 +263,22 @@ export class MobileSocketWiring {
         const socket = this.authenticatedSockets.get(ws)
         if (socket) {
           this.onText(socket, plaintext, reply, sendBinary)
+          return
+        }
+        const cloudSocket = this.authenticatedCloudSockets.get(ws)
+        if (cloudSocket) {
+          this.onCloudText?.(cloudSocket, plaintext, reply, sendBinary)
         }
       })
       channel.onBinaryMessage((bytes) => {
         const socket = this.authenticatedSockets.get(ws)
         if (socket) {
           this.onBinary(socket, bytes)
+          return
+        }
+        const cloudSocket = this.authenticatedCloudSockets.get(ws)
+        if (cloudSocket) {
+          this.onCloudBinary?.(cloudSocket, bytes)
         }
       })
       this.channels.set(ws, channel)
@@ -208,7 +288,9 @@ export class MobileSocketWiring {
 
   private handleClose(ws: WebSocket): void {
     const socket = this.authenticatedSockets.get(ws) ?? null
+    const cloudSocket = this.authenticatedCloudSockets.get(ws) ?? null
     this.authenticatedSockets.delete(ws)
+    this.authenticatedCloudSockets.delete(ws)
     this.channels.get(ws)?.destroy()
     this.channels.delete(ws)
     this.connectionIds.delete(ws)
@@ -218,5 +300,16 @@ export class MobileSocketWiring {
         (candidate) => candidate.device.deviceToken === socket.device.deviceToken
       )
     this.onClose(socket, hasOtherConnections)
+    if (cloudSocket) {
+      const hasOtherCloudConnections = Array.from(this.authenticatedCloudSockets.values()).some(
+        (candidate) =>
+          candidate.principal.managedWebSessionId === cloudSocket.principal.managedWebSessionId
+      )
+      this.onCloudClose?.(cloudSocket, hasOtherCloudConnections)
+    }
   }
+}
+
+function cloudSessionClientId(managedWebSessionId: string): string {
+  return `cloud-managed:${managedWebSessionId}`
 }

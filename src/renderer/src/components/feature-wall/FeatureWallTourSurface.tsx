@@ -12,6 +12,7 @@ import { getWorkbenchSteps, type WorkbenchStepId } from '../../../../shared/work
 import { getReviewSteps, type ReviewStepId } from '../../../../shared/review-steps'
 import type { FeatureWallOpenSourceTelemetry } from '../../../../shared/telemetry-events'
 import type { FeatureWallTourDepthSummary } from '../../../../shared/feature-wall-tour-depth'
+import { applyProductBranding } from '../../../../shared/brand'
 import { track } from '@/lib/telemetry'
 import { useAppStore } from '@/store'
 import { ORCA_CLI_SKILL_NAME, ORCHESTRATION_SKILL_NAME } from '@/lib/agent-feature-install-commands'
@@ -54,7 +55,7 @@ export function FeatureWallTourSurface({
   className,
   panelClassName,
   doneLabel = 'Done',
-  footerText = 'Reopen any time from Help > Explore Orca.',
+  footerText = applyProductBranding('Reopen any time from Help > Explore Orca.'),
   enableKeyboardShortcut = true,
   compactRail = false,
   detachedFooter = false,

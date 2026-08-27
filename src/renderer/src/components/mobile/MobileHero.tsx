@@ -196,16 +196,18 @@ export function HeroFlow({
                   <span className="mp-channel-tagline">{getChannelTagline(iosChannel)}</span>
                 </div>
               ) : null}
-              <div className="mp-inline-actions">
-                <button type="button" className="mp-ghost-action" onClick={onOpenInstallUrl}>
-                  {installCopy.ctaLabel}
-                </button>
-                <button type="button" className="mp-text-link" onClick={onCopyInstallUrl}>
-                  <Copy className="size-3.5" />
-                  {translate('auto.components.mobile.MobileHero.aa97420ba4', 'Copy install link')}
-                </button>
-              </div>
-              {platform === 'android' ? (
+              {installCopy.url ? (
+                <div className="mp-inline-actions">
+                  <button type="button" className="mp-ghost-action" onClick={onOpenInstallUrl}>
+                    {installCopy.ctaLabel}
+                  </button>
+                  <button type="button" className="mp-text-link" onClick={onCopyInstallUrl}>
+                    <Copy className="size-3.5" />
+                    {translate('auto.components.mobile.MobileHero.aa97420ba4', 'Copy install link')}
+                  </button>
+                </div>
+              ) : null}
+              {installCopy.url && platform === 'android' ? (
                 <MobileAndroidInstallHelp onOpenGuide={onOpenAndroidInstallGuide} />
               ) : null}
             </div>

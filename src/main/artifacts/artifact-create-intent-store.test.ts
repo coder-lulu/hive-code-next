@@ -13,6 +13,7 @@ import {
   removeArtifactCreateIntent
 } from './artifact-create-intent-store'
 import type { ArtifactShareScope } from './artifact-share-record-store'
+import { __resetSecureFileWindowsUserSidForTests } from '../../shared/secure-file'
 
 vi.mock('node:child_process', () => ({ execFile: vi.fn(), execFileSync: vi.fn() }))
 
@@ -167,6 +168,7 @@ describe('artifact create intent store', () => {
   it('hardens one Windows journal directory without per-file PowerShell launches', async () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+    __resetSecureFileWindowsUserSidForTests()
     vi.mocked(execFileSync).mockImplementation((file) =>
       String(file).endsWith('whoami.exe') ? '"USER","S-1-5-21-1000"' : ''
     )
@@ -199,6 +201,7 @@ describe('artifact create intent store', () => {
         Object.defineProperty(process, 'platform', originalPlatform)
       }
       vi.mocked(execFileSync).mockReset()
+      __resetSecureFileWindowsUserSidForTests()
     }
   })
 

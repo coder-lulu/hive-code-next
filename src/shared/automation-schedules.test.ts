@@ -195,6 +195,12 @@ describe('automation schedules', () => {
     expect(formatAutomationSchedule('30 12 * * 7')).toBe(`Sundays at ${formatTimeForTest(12, 30)}`)
   })
 
+  it('formats weekly RRULE schedules with stable English weekday labels', () => {
+    expect(formatAutomationSchedule('FREQ=WEEKLY;BYDAY=SU;BYHOUR=12;BYMINUTE=30')).toBe(
+      `Sundays at ${formatTimeForTest(12, 30)}`
+    )
+  })
+
   it('tokenizes pasted cron whitespace without regex field splitting', () => {
     const split = vi.spyOn(String.prototype, 'split')
     const schedule = ['15', String.fromCharCode(160), '10\n*\t*\rMON-FRI'].join('')

@@ -15,7 +15,7 @@ ConPTYs) died together with the main process, severing the console pipe.
 
 The fix re-architected the daemon into a standalone, relocated
 `orca-terminal-daemon.exe` (see
-[`src/main/daemon/daemon-host-relocation.ts`](../../src/main/daemon/daemon-host-relocation.ts))
+[`src/main/daemon/daemon-host-relocation.ts`](../../../src/main/daemon/daemon-host-relocation.ts))
 that is spawned **detached** and **survives main-process death**.
 
 There is already a harness proving the daemon survives a Windows **update**

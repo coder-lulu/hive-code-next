@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import WebSocket from 'ws'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { CdpWsProxy } from './cdp-ws-proxy'
 import {
   connect,
@@ -505,7 +506,7 @@ describe('CdpWsProxy', () => {
       id: 16,
       error: {
         code: -32000,
-        message: 'Page.reload parameter "loaderId" is not supported for Orca tab reloads'
+        message: `Page.reload parameter "loaderId" is not supported for ${APP_DISPLAY_NAME} tab reloads`
       }
     })
     expect(mock.webContents.reload).not.toHaveBeenCalled()

@@ -6,7 +6,7 @@ import type { LocalBuildCandidate } from './local-build-candidate'
 import { startLocalBuildFeed } from './local-build-feed-server'
 
 describe('startLocalBuildFeed', () => {
-  it('serves only tokenized manifest and validated artifact routes', async () => {
+  it('serves tokenized routes with an exact artifact Content-Length', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'orca-local-feed-'))
     const artifactPath = join(directory, 'orca-macos-arm64.zip')
     await writeFile(artifactPath, 'zip')
@@ -22,9 +22,9 @@ describe('startLocalBuildFeed', () => {
       await expect(
         fetch(`${feed.url}latest-mac.yml`).then((response) => response.text())
       ).resolves.toContain('1.2.3-local.1')
-      await expect(
-        fetch(`${feed.url}orca-macos-arm64.zip`).then((response) => response.text())
-      ).resolves.toBe('zip')
+      const artifactResponse = await fetch(`${feed.url}orca-macos-arm64.zip`)
+      expect(artifactResponse.headers.get('content-length')).toBe('3')
+      await expect(artifactResponse.text()).resolves.toBe('zip')
       const baseUrl = new URL(feed.url)
       await expect(
         fetch(`${baseUrl.origin}/latest-mac.yml`).then((response) => response.status)

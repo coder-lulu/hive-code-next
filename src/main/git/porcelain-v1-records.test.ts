@@ -31,10 +31,10 @@ describe('parsePorcelainV1Records', () => {
   })
 
   it('keeps paths containing spaces and quotes intact', () => {
-    const repo = createRepo()
-    writeFileSync(join(repo, 'a file "quoted".txt'), 'x')
-
-    const records = parsePorcelainV1Records(git(['status', '--porcelain', '-z'], repo))
+    // Windows filenames cannot contain quotes, but porcelain records from a
+    // remote/other-platform repository still can. Exercise the parser contract
+    // directly instead of asking the host filesystem to create an invalid name.
+    const records = parsePorcelainV1Records('?? a file "quoted".txt\0')
 
     expect(records).toEqual([{ xy: '??', path: 'a file "quoted".txt' }])
   })

@@ -1,4 +1,5 @@
 import { powerShellCommand, powerShellLiteral } from './ssh-remote-powershell'
+import { applyProductBranding } from '../../shared/brand'
 import {
   RELAY_UPLOAD_IDENTITY_FILE_NAME,
   RELAY_UPLOAD_OWNER_FILE_NAME,
@@ -38,7 +39,7 @@ export function reserveWindowsRelayUploadStageCommand(poolDir: string, owner: st
       'exit 0',
       '} catch { continue }',
       '}',
-      `throw ${powerShellLiteral(`Orca relay upload staging quota is full; reconnect after 40 minutes or inspect .orca-remote/${RELAY_UPLOAD_STAGE_POOL_NAME}`)}`
+      `throw ${powerShellLiteral(applyProductBranding(`Orca relay upload staging quota is full; reconnect after 40 minutes or inspect .orca-remote/${RELAY_UPLOAD_STAGE_POOL_NAME}`))}`
     ].join('\n')
   )
 }

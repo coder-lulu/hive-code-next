@@ -22,6 +22,14 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
+vi.mock('./linux-root-package-install-policy', () =>
+  moduleFactories.linuxRootPackageInstallPolicy()
+)
 
 describe('updater', () => {
   beforeEach(() => {

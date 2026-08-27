@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer, type Server, type ServerResponse } from 'node:http'
 import { shell } from 'electron'
+import { applyProductBranding } from '../../shared/brand'
 import type { OrcaCloudAuthConfig } from './profile-cloud-auth-config'
 import {
   ORCA_CLOUD_CALLBACK_RESPONSE_HEADERS,
@@ -78,7 +79,7 @@ export function beginOrcaCloudPkceFlow(
 
     function writeInvalidCallback(response: ServerResponse): void {
       response.writeHead(400)
-      response.end('Invalid Orca sign-in response.')
+      response.end(applyProductBranding('Invalid Orca sign-in response.'))
     }
 
     const server = createServer((request, response) => {
@@ -98,7 +99,7 @@ export function beginOrcaCloudPkceFlow(
         }
         if (url.searchParams.has('error')) {
           response.writeHead(400)
-          response.end('Orca sign-in was cancelled.')
+          response.end(applyProductBranding('Orca sign-in was cancelled.'))
           rejectFlow(new Error('orca_cloud_auth_denied'))
           return
         }

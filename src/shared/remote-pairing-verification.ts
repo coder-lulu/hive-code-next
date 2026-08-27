@@ -2,6 +2,7 @@ import { evaluateRuntimeCompat } from './protocol-compat'
 import { MIN_COMPATIBLE_RUNTIME_SERVER_VERSION, RUNTIME_PROTOCOL_VERSION } from './protocol-version'
 import type { PublicKnownRuntimeEnvironment } from './runtime-environments'
 import type { RuntimeStatus } from './runtime-types'
+import { applyProductBranding } from './brand'
 
 export type RemotePairingFailureKind =
   | 'host-unreachable'
@@ -66,7 +67,9 @@ export function verifyRemotePairingRuntimeStatus(
     return {
       ok: false,
       kind: 'access-link-invalid',
-      message: 'This link grants mobile-only access. Generate a link for another Orca client.'
+      message: applyProductBranding(
+        'This link grants mobile-only access. Generate a link for another Orca client.'
+      )
     }
   }
   const versionFields = [
@@ -99,8 +102,8 @@ export function verifyRemotePairingRuntimeStatus(
       kind: 'protocol-incompatible',
       message:
         compatibility.reason === 'client-too-old'
-          ? 'Update this Orca client before adding the remote host.'
-          : 'Update Orca on the remote host before adding it.'
+          ? applyProductBranding('Update this Orca client before adding the remote host.')
+          : applyProductBranding('Update Orca on the remote host before adding it.')
     }
   }
   if (!hasValidRuntimeStatusShape(status)) {

@@ -1,6 +1,12 @@
 import type { DeviceScope } from '../../../shared/runtime-types'
+import { hivecodeProductConfig } from '../../../shared/generated/product-config'
 
 const PAIRING_OFFER_VERSION = 2
+const SUPPORTED_PAIRING_PROTOCOLS = new Set<string>(
+  [hivecodeProductConfig.schemes.primary, ...hivecodeProductConfig.schemes.aliases].map(
+    (scheme) => `${scheme}:`
+  )
+)
 
 export type WebPairingOffer = {
   v: typeof PAIRING_OFFER_VERSION
@@ -23,7 +29,7 @@ export function parseWebPairingInput(input: string): WebPairingOffer | null {
   }
 
   try {
-    if (trimmed.toLowerCase().startsWith('orca://')) {
+    if (hasSupportedPairingScheme(trimmed)) {
       const code = extractPairingCodeFromUrl(trimmed)
       return code ? decodePairingPayload(code) : null
     }
@@ -46,7 +52,7 @@ export function readPairingInputFromLocation(location: Location): string | null 
   if (!hash) {
     return null
   }
-  if (hash.startsWith('orca://pair')) {
+  if (hasSupportedPairingScheme(hash)) {
     return hash
   }
   const hashParams = new URLSearchParams(hash)
@@ -125,9 +131,15 @@ function extractPairingCodeFromUrl(url: string): string | null {
   } catch {
     return null
   }
-  // Why: prefix checks accepted routes like `orca://pairing?...`; only the
+  // Why: prefix checks accepted routes like `hivecode://pairing?...`; only the
   // pairing deep-link host may carry runtime auth material.
-  if (parsed.protocol !== 'orca:' || parsed.hostname !== 'pair') {
+  if (
+    !SUPPORTED_PAIRING_PROTOCOLS.has(parsed.protocol) ||
+    parsed.hostname !== 'pair' ||
+    parsed.username ||
+    parsed.password ||
+    parsed.port
+  ) {
     return null
   }
   if (parsed.pathname !== '' && parsed.pathname !== '/') {
@@ -138,6 +150,11 @@ function extractPairingCodeFromUrl(url: string): string | null {
     return code
   }
   return parsed.hash ? parsed.hash.slice(1) || null : null
+}
+
+function hasSupportedPairingScheme(value: string): boolean {
+  const match = /^([a-z][a-z0-9+.-]*):\/\//i.exec(value)
+  return match ? SUPPORTED_PAIRING_PROTOCOLS.has(`${match[1]?.toLowerCase()}:`) : false
 }
 
 function base64UrlToBytes(value: string): Uint8Array {

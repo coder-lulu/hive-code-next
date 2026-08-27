@@ -1,0 +1,75 @@
+name: HiveCode Windows x64 hardware-signed package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hivecode-windows-hardware-sign-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-sign:
+    name: Build and hardware-sign HiveCode Windows x64
+    if: github.ref_protected == true
+    runs-on: [self-hosted, windows, x64]
+    environment: hivecode-windows-signing
+    timeout-minutes: 120
+    env:
+      HIVECODE_WINDOWS_SIGNING_EXECUTABLE: ${{ vars.HIVECODE_WINDOWS_SIGNING_EXECUTABLE }}
+      HIVECODE_WINDOWS_SIGNING_ARGUMENTS: ${{ vars.HIVECODE_WINDOWS_SIGNING_ARGUMENTS }}
+      HIVECODE_WINDOWS_SIGNING_TIMEOUT_MS: ${{ vars.HIVECODE_WINDOWS_SIGNING_TIMEOUT_MS }}
+      HIVECODE_WINDOWS_EXPECTED_SIGNERS: ${{ vars.HIVECODE_WINDOWS_EXPECTED_SIGNERS }}
+      HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS: ${{ vars.HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS }}
+      HIVECODE_WINDOWS_POWERSHELL_EXECUTABLE: ${{ vars.HIVECODE_WINDOWS_POWERSHELL_EXECUTABLE }}
+    steps:
+      - name: Checkout requested revision
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Preflight protected hardware signing boundary
+        shell: pwsh
+        run: node config/scripts/build-windows-x64-hardware-signed.mjs --preflight-only
+
+      - name: Install locked dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and sign HiveCode Windows x64
+        shell: pwsh
+        run: pnpm run build:win:x64:hardware-signed
+
+      - name: Verify final signed installer
+        shell: pwsh
+        run: |
+          $artifact = 'dist/hivecode-windows-setup.exe'
+          if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+            throw "Signed HiveCode installer was not produced: $artifact"
+          }
+          pnpm run verify:windows:hardware -- $artifact
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload verified HiveCode Windows artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: hivecode-windows-x64-${{ github.sha }}
+          path: |
+            dist/hivecode-windows-setup.exe
+            dist/hivecode-windows-setup.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+          retention-days: 14

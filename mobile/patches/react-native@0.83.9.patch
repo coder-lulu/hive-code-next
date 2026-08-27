@@ -15,9 +15,9 @@ index a9bc219f8bf729111e907423ca61b991fd712b46..60e9c6f54edb295295d6e48d1d554499
 --- a/ReactCommon/react/renderer/components/textinput/TextInputEventEmitter.cpp
 +++ b/ReactCommon/react/renderer/components/textinput/TextInputEventEmitter.cpp
 @@ -24,6 +24,10 @@ static jsi::Value textInputMetricsPayload(
- 
+
    payload.setProperty(runtime, "eventCount", textInputMetrics.eventCount);
- 
+
 +  if (textInputMetrics.isComposing.has_value()) {
 +    payload.setProperty(runtime, "isComposing", *textInputMetrics.isComposing);
 +  }
@@ -30,16 +30,16 @@ index a3f2e01c130c1a53aee0b39e72927d21f2a6973d..c9d34f8b42644800b5c85e5be45b6ebf
 --- a/ReactCommon/react/renderer/components/textinput/TextInputEventEmitter.h
 +++ b/ReactCommon/react/renderer/components/textinput/TextInputEventEmitter.h
 @@ -7,6 +7,8 @@
- 
+
  #pragma once
- 
+
 +#include <optional>
 +
  #include <react/renderer/attributedstring/AttributedString.h>
  #include <react/renderer/components/view/ViewEventEmitter.h>
- 
+
 @@ -18,6 +20,7 @@ class TextInputEventEmitter : public ViewEventEmitter {
- 
+
    struct Metrics {
      std::string text;
 +    std::optional<bool> isComposing;

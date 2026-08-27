@@ -6,6 +6,15 @@ import type { PluginKillList } from '../../shared/plugins/plugin-kill-list'
 import { fetchPluginKillList, PluginKillListService } from './plugin-kill-list-service'
 import type { PluginKillListStore } from './plugin-kill-list-store'
 
+vi.mock('../product/product-external-service-endpoints', () => ({
+  getProductExternalServiceEndpoints: () => ({
+    feedback: null,
+    pluginKillList: 'https://onorca.dev/plugins/kill-list.json',
+    changelog: null,
+    nudge: null
+  })
+}))
+
 const roots: string[] = []
 
 async function tempRoot(): Promise<string> {

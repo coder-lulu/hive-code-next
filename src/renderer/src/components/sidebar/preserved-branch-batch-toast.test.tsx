@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import type { PreservedBranchCleanup } from '@/lib/preserved-branch-cleanup'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import PreservedBranchBatchReviewModal from './PreservedBranchBatchReviewModal'
 import {
   forceDeletePreservedBranchBatch,
@@ -118,7 +119,9 @@ describe('showPreservedBranchBatchToast', () => {
       expect.objectContaining({ dismissible: true, duration: Infinity })
     )
     expect(body.textContent).toContain('Kept branches do not retain workspace folders')
-    expect(body.textContent).toContain('Orca may continue freeing workspace disk space')
+    expect(body.textContent).toContain(
+      `${APP_DISPLAY_NAME} may continue freeing workspace disk space`
+    )
 
     await clickButton(body, 'Review 2 Branches')
 

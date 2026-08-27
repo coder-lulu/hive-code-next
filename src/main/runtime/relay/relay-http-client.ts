@@ -97,6 +97,23 @@ function isAllowedRelayOrigin(value: string): boolean {
   }
 }
 
+function isAllowedRelayEndpoint(value: string): boolean {
+  try {
+    const url = new URL(value)
+    const loopback =
+      url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]'
+    return (
+      url.username === '' &&
+      url.password === '' &&
+      url.search === '' &&
+      url.hash === '' &&
+      (url.protocol === 'https:' || (url.protocol === 'http:' && loopback))
+    )
+  } catch {
+    return false
+  }
+}
+
 export async function exchangeRelayAuthorization(input: {
   endpoint: string
   accessToken: string
@@ -104,9 +121,13 @@ export async function exchangeRelayAuthorization(input: {
   fetch?: typeof globalThis.fetch
   requestDeadlineMs?: number
 }): Promise<RelayAuthorization> {
+  if (!isAllowedRelayEndpoint(input.endpoint)) {
+    throw new RelayHttpError('token-exchange', 400)
+  }
   const relayHostId = deriveRelayHostId(input.keypair.publicKey)
   const response = await (input.fetch ?? globalThis.fetch)(input.endpoint, {
     method: 'POST',
+    redirect: 'error',
     headers: {
       authorization: `Bearer ${input.accessToken}`,
       'content-type': 'application/json'

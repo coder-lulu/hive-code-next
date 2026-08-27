@@ -38,6 +38,7 @@ import {
 
 const posix = getRemoteHostPlatform('linux-x64')
 const windows = getRemoteHostPlatform('win32-x64')
+const posixShellIt = process.platform === 'win32' ? it.skip : it
 const powerShellExecutable = [
   process.env.ORCA_POWERSHELL_EXECUTABLE,
   ...(process.platform === 'win32' ? ['pwsh.exe', 'powershell.exe'] : ['pwsh'])
@@ -274,27 +275,31 @@ describe('ssh remote command builders', () => {
     )
   })
 
-  it('bounds real POSIX GC output with more than the exec-cap stage population', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'orca-relay-gc-scale-'))
-    try {
-      for (let index = 0; index < 15_197; index += 1) {
-        mkdirSync(join(root, `relay-0.1.0+abc.upload-${String(index).padStart(12, '0')}`))
+  posixShellIt(
+    'bounds real POSIX GC output with more than the exec-cap stage population',
+    async () => {
+      const root = mkdtempSync(join(tmpdir(), 'orca-relay-gc-scale-'))
+      try {
+        for (let index = 0; index < 15_197; index += 1) {
+          mkdirSync(join(root, `relay-0.1.0+abc.upload-${String(index).padStart(12, '0')}`))
+        }
+        mkdirSync(join(root, 'relay-0.1.0+aaa'))
+        mkdirSync(join(root, 'relay-0.1.0+bbb'))
+
+        const output = await runShellCommand(listRelayBaseDirsCommand(posix, root))
+        const entries = output.trim().split('\n')
+
+        expect(entries).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
+        expect(Buffer.byteLength(output)).toBeLessThan(1_024)
+        expect(entries.length).toBeLessThanOrEqual(MAX_RELAY_GC_LISTING_ENTRIES)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
       }
-      mkdirSync(join(root, 'relay-0.1.0+aaa'))
-      mkdirSync(join(root, 'relay-0.1.0+bbb'))
+    },
+    30_000
+  )
 
-      const output = await runShellCommand(listRelayBaseDirsCommand(posix, root))
-      const entries = output.trim().split('\n')
-
-      expect(entries).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
-      expect(Buffer.byteLength(output)).toBeLessThan(1_024)
-      expect(entries.length).toBeLessThanOrEqual(MAX_RELAY_GC_LISTING_ENTRIES)
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  }, 30_000)
-
-  it('fails closed when real POSIX GC enumeration fails', async () => {
+  posixShellIt('fails closed when real POSIX GC enumeration fails', async () => {
     const root = mkdtempSync(join(tmpdir(), 'orca-relay-gc-failure-'))
     try {
       const command = `find() { return 23; }\n${listRelayBaseDirsCommand(posix, root)}`

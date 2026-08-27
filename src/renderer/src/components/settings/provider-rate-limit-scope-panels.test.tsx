@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import { GitHubRateLimitPanel } from '@/components/github/github-rate-limit-display'
 import { GitLabRateLimitPanel } from '@/components/gitlab/gitlab-rate-limit-display'
+import { applyProductBranding } from '@/product-brand'
 
 const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
 
@@ -38,7 +39,9 @@ describe('provider rate-limit panels account scope', () => {
 
     expect(markup).toContain(`Budget scope: ${LOCAL_HOST_LABEL}`)
     expect(markup).toContain(
-      'GitHub API budget is fetched from the CLI on this desktop client. Use Settings &gt; Remote Orca Servers &gt; Advanced to view server-owned budgets.'
+      applyProductBranding(
+        'GitHub API budget is fetched from the CLI on this desktop client. Use Settings &gt; Remote Orca Servers &gt; Advanced to view server-owned budgets.'
+      )
     )
     expect(markup).toContain('Open Remote Servers')
   })
@@ -54,7 +57,9 @@ describe('provider rate-limit panels account scope', () => {
 
     expect(markup).toContain('Budget scope: Remote server: runtime-1')
     expect(markup).toContain(
-      'GitLab API budget is fetched from the CLI on this remote server. Use Settings &gt; Remote Orca Servers &gt; Advanced to view another default runtime budget.'
+      applyProductBranding(
+        'GitLab API budget is fetched from the CLI on this remote server. Use Settings &gt; Remote Orca Servers &gt; Advanced to view another default runtime budget.'
+      )
     )
   })
 })

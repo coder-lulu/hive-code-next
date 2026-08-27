@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
 import { Check } from 'lucide-react-native'
-import { colors } from '../../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
 import type { GitHubAssignableUser } from '../../../../src/shared/github/pull-request-types'
 import type { RpcClient } from '../../transport/rpc-client'
 import { fetchAssignableUsers } from '../../session/github-pr-rpc'
 import { BottomDrawer } from '../BottomDrawer'
-import { mobilePrSidebarStyles as styles } from './mobile-pr-sidebar-styles'
+import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
+import { createReviewerPickerStyles } from './reviewer-picker-styles'
 
 type Props = {
   visible: boolean
@@ -39,6 +40,9 @@ export function ReviewerPickerDrawer({
   isRequested,
   onToggle
 }: Props) {
+  const theme = useMobileTheme()
+  const shared = useMobileThemeStyles(createMobilePrSidebarStyles)
+  const styles = useMobileThemeStyles(createReviewerPickerStyles)
   const [load, setLoad] = useState<LoadState>({ status: 'idle' })
   const [query, setQuery] = useState('')
 
@@ -61,7 +65,7 @@ export function ReviewerPickerDrawer({
       })
       .catch(() => {
         if (!cancelled) {
-          setLoad({ status: 'error', message: 'Failed to load people' })
+          setLoad({ status: 'error', message: '无法加载用户' })
         }
       })
     return () => {
@@ -91,48 +95,48 @@ export function ReviewerPickerDrawer({
 
   return (
     <BottomDrawer visible={visible} onClose={onClose} dragContentToDismiss={false}>
-      <Text style={styles.pickerTitle}>Reviewers</Text>
+      <Text style={styles.title}>审阅者</Text>
       <TextInput
-        style={styles.pickerSearch}
+        style={styles.search}
         value={query}
         onChangeText={setQuery}
-        placeholder="Search people"
-        placeholderTextColor={colors.textMuted}
+        placeholder="搜索用户"
+        placeholderTextColor={theme.color.text.tertiary}
         autoCapitalize="none"
         autoCorrect={false}
       />
       {load.status === 'loading' ? (
-        <View style={styles.pickerStateArea}>
-          <ActivityIndicator color={colors.textSecondary} />
+        <View style={styles.stateArea}>
+          <ActivityIndicator color={theme.color.text.secondary} />
         </View>
       ) : load.status === 'error' ? (
-        <View style={styles.pickerStateArea}>
-          <Text style={styles.emptyText}>{load.message}</Text>
+        <View style={styles.stateArea}>
+          <Text style={shared.emptyText}>{load.message}</Text>
         </View>
       ) : ordered.length === 0 ? (
-        <View style={styles.pickerStateArea}>
-          <Text style={styles.emptyText}>No matching people</Text>
+        <View style={styles.stateArea}>
+          <Text style={shared.emptyText}>没有匹配的用户</Text>
         </View>
       ) : (
-        <View style={styles.pickerList}>
+        <View style={styles.list}>
           {ordered.map((item) => {
             const requested = isRequested(item.login)
             return (
               <Pressable
                 key={item.login}
-                style={styles.pickerRow}
+                style={styles.row}
                 onPress={() => onToggle(item.login)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: requested }}
-                accessibilityLabel={`${requested ? 'Remove' : 'Request'} ${item.login}`}
+                accessibilityLabel={`${requested ? '移除' : '请求审阅'} ${item.login}`}
               >
-                <View style={styles.rowTrailing}>
+                <View style={shared.rowTrailing}>
                   {requested ? (
-                    <Check size={16} color={colors.textPrimary} strokeWidth={2.4} />
+                    <Check size={16} color={theme.color.text.primary} strokeWidth={2.4} />
                   ) : null}
                 </View>
-                <View style={styles.pickerRowMain}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
+                <View style={styles.rowMain}>
+                  <Text style={shared.rowTitle} numberOfLines={1}>
                     {item.name ? `${item.name} (${item.login})` : item.login}
                   </Text>
                 </View>

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcFailure, RpcResponse, RpcSuccess } from '../transport/types'
 import type { HostedReviewCreationEligibility } from '../../../src/shared/hosted-review'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { shouldOpenChecksPanelCreateComposer } from '../../../src/renderer/src/components/right-sidebar/checks-panel-review-creation'
 import {
   buildMobilePrCreateParams,
@@ -141,7 +142,7 @@ describe('mobile create form gating parity', () => {
         blockedReason: null
       })
     ).toBe(
-      'Orca could not confirm whether this branch already has a pull request. Try again in a moment.'
+      `${APP_DISPLAY_NAME} could not confirm whether this branch already has a pull request. Try again in a moment.`
     )
     expect(
       getMobilePrCreateBlockMessage({
@@ -153,7 +154,7 @@ describe('mobile create form gating parity', () => {
         blockedReason: 'needs_push'
       })
     ).toBe(
-      'Orca could not confirm whether this branch already has a pull request. Try again in a moment.'
+      `${APP_DISPLAY_NAME} could not confirm whether this branch already has a pull request. Try again in a moment.`
     )
   })
 
@@ -197,7 +198,7 @@ describe('mobile create form gating parity', () => {
         reviewLookupOutcome: 'unavailable'
       })
     ).toBe(
-      'Orca could not confirm whether this branch already has a pull request. Try again in a moment.'
+      `${APP_DISPLAY_NAME} could not confirm whether this branch already has a pull request. Try again in a moment.`
     )
   })
 

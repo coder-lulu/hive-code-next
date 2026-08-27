@@ -3,6 +3,7 @@ import type { AccountsSnapshot } from '../components/AccountUsage'
 import { MobileHomeQuickActions } from '../components/MobileHomeQuickActions'
 import type { TaskProvider } from '../tasks/mobile-task-providers'
 import { colors, spacing } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 import type { HostProfile } from '../transport/types'
 import type { HomeResumeCard } from '../worktree/home-resume-card'
 import { MobileHomeAccountUsageCards } from './MobileHomeAccountUsageCards'
@@ -21,6 +22,7 @@ export function MobileHomeListFooter(props: {
   onOpenTasks: (provider?: TaskProvider) => void
   onPairDesktop: () => void
 }) {
+  const theme = useMobileTheme()
   return (
     <View>
       {props.resumeCard ? (
@@ -36,6 +38,7 @@ export function MobileHomeListFooter(props: {
         onOpen={props.onOpenTasks}
       />
       <MobileHomeQuickActions
+        theme={theme}
         connectedHosts={props.connectedHosts}
         onPairDesktop={props.onPairDesktop}
         onCreateWorkspace={props.onCreateWorkspace}

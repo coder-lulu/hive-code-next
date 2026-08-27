@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { applyProductBranding } from '../../src/shared/brand'
+import { brandGuideMarkdown } from './generate-bundled-skill-guides.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 // Why: orca-cli now ships a hybrid discovery stub, so its version-sensitive command
@@ -14,15 +16,17 @@ const orchestrationSkillPath = join(projectDir, 'skill-guides', 'orchestration.m
 const emulatorSkillPath = join(projectDir, 'skill-guides', 'orca-emulator.md')
 
 function readSkill(path = guidePath) {
-  return readFileSync(path, 'utf8')
+  return brandGuideMarkdown(readFileSync(path, 'utf8'))
 }
 
 describe('orca CLI skill guidance', () => {
   it('keeps independent worktree lineage separate from Git base selection', () => {
     const skill = readSkill()
 
-    expect(skill).toContain('`--no-parent` only controls Orca lineage')
-    expect(skill).toContain('omit `--base-branch` so Orca uses the repo default base')
+    expect(skill).toContain(applyProductBranding('`--no-parent` only controls Orca lineage'))
+    expect(skill).toContain(
+      applyProductBranding('omit `--base-branch` so Orca uses the repo default base')
+    )
     expect(skill).toContain('Never base it on the current feature branch')
   })
 

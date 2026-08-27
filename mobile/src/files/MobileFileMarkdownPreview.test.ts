@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileFileMarkdownPreview } from './MobileFileMarkdownPreview'
+import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -23,12 +24,13 @@ vi.mock('./MobileFilePreviewSourceText', () => ({
   MobileFilePreviewTruncatedNote: 'MobileFilePreviewTruncatedNote'
 }))
 
-vi.mock('../theme/mobile-theme', () => ({
-  colors: { textPrimary: '#fff', textSecondary: '#999' }
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileTheme: () => lightTheme,
+  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
 }))
 
 vi.mock('./mobile-file-preview-styles', () => ({
-  filePreviewStyles: {}
+  createFilePreviewStyles: () => ({})
 }))
 
 type PreviewProps = Parameters<typeof MobileFileMarkdownPreview>[0]
@@ -88,18 +90,18 @@ describe('MobileFileMarkdownPreview', () => {
     }
     renderer = await renderPreview(baseProps)
 
-    expect(isSelected(renderer, 'View rendered Markdown preview')).toBe(true)
-    await selectMode(renderer, 'View Markdown source')
-    expect(isSelected(renderer, 'View Markdown source')).toBe(true)
+    expect(isSelected(renderer, '查看 Markdown 预览')).toBe(true)
+    await selectMode(renderer, '查看 Markdown 源码')
+    expect(isSelected(renderer, '查看 Markdown 源码')).toBe(true)
 
     // Content updates alone preserve the user's explicitly selected mode.
     await updatePreview(renderer, { ...baseProps, content: '# First updated' })
-    expect(isSelected(renderer, 'View Markdown source')).toBe(true)
+    expect(isSelected(renderer, '查看 Markdown 源码')).toBe(true)
 
     await updatePreview(renderer, { ...baseProps, relativePath: 'notes/second.md' })
-    expect(isSelected(renderer, 'View rendered Markdown preview')).toBe(true)
+    expect(isSelected(renderer, '查看 Markdown 预览')).toBe(true)
 
     await updatePreview(renderer, { ...baseProps, relativePath: 'notes/second.md', initialLine: 8 })
-    expect(isSelected(renderer, 'View Markdown source')).toBe(true)
+    expect(isSelected(renderer, '查看 Markdown 源码')).toBe(true)
   })
 })

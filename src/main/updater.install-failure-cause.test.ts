@@ -2,6 +2,7 @@ import os from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as TracerModule from './observability/tracer'
 import type * as UpdaterModule from './updater'
+import { applyProductBranding } from '../shared/brand'
 
 const {
   appMock,
@@ -84,6 +85,24 @@ vi.mock('electron', () => ({
   net: { fetch: vi.fn() }
 }))
 
+vi.mock('./product/product-updater-network-boundary', () => ({
+  installProductUpdaterNetworkBoundary: vi.fn()
+}))
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    provider: 'github',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  }),
+  resolveProductUpdateFeedUrl: (source: { feedUrl: string }) => source.feedUrl
+}))
+
 vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))
 vi.mock('./electron-updater-loader', () => ({
   loadElectronAutoUpdater: () => autoUpdaterMock
@@ -97,6 +116,15 @@ vi.mock('./updater-nudge', () => ({
   fetchNudge: vi.fn().mockResolvedValue(null),
   shouldApplyNudge: vi.fn().mockReturnValue(false)
 }))
+vi.mock('./updater-prerelease-feed', () => ({
+  fetchNewerReleaseTagsWithReadiness: vi.fn().mockResolvedValue({
+    tags: ['v1.4.163'],
+    state: 'ready'
+  }),
+  getReleaseDownloadUrl: vi.fn(
+    (tag: string) => `https://github.com/stablyai/orca/releases/download/${tag}`
+  )
+}))
 vi.mock('./updater-lifecycle-diagnostics', () => ({
   recordUpdaterLifecycle: recordUpdaterLifecycleMock
 }))
@@ -106,8 +134,9 @@ const DEB_ELEVATION_ERROR =
   'Error: Command failed: /usr/bin/pkexec --disable-internal-agent "/bin/bash" "-c" "dpkg -i \'/home/u/.cache/orca-updater/pending/orca-ide_1.4.163_amd64.deb\'"\npkexec must be setuid root'
 
 // electron-updater's ERR_UPDATER_INVALID_SIGNATURE text, which drives its own card in UpdateCard.
-const WINDOWS_SIGNATURE_MISMATCH_ERROR =
+const WINDOWS_SIGNATURE_MISMATCH_ERROR = applyProductBranding(
   'New version 1.4.163 is not signed by the application owner: publisherNames: Orca, Inc.'
+)
 
 type CapturedSpan = {
   readonly name: string
@@ -154,6 +183,8 @@ async function reachDownloaded(): Promise<typeof UpdaterModule> {
   autoUpdaterMock.emit('checking-for-update')
   autoUpdaterMock.emit('update-available', { version: '1.4.163' })
   await new Promise((resolve) => setTimeout(resolve, 0))
+  autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+  updater.downloadUpdate()
   autoUpdaterMock.emit('update-downloaded', { version: '1.4.163' })
   expect(updater.getUpdateStatus().state).toBe('downloaded')
   return updater

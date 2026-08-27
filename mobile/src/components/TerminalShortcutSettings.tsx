@@ -1,20 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AppState,
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Switch,
-  type AppStateStatus
-} from 'react-native'
+import { AppState, StyleSheet, Switch, Text, View, type AppStateStatus } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { ChevronRight, X } from 'lucide-react-native'
 import type Animated from 'react-native-reanimated'
 import type { AnimatedRef, SharedValue } from 'react-native-reanimated'
 import { CustomKeyModal, loadCustomKeys, saveCustomKeys, type CustomKey } from './CustomKeyModal'
 import { DragReorderList } from './DragReorderList'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { MobileGroupedList, MobileGroupedListRow, MobileIconButton } from './ui'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import {
   TERMINAL_ACCESSORY_KEYS,
   type TerminalAccessoryKey
@@ -41,19 +35,28 @@ function ShortcutBarRow({
   visible: boolean
   onToggle: (visible: boolean) => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
+  const keyName = shortcutKey.accessibilityLabel ?? shortcutKey.label
+
   return (
     <View style={styles.reorderRowContent}>
       <View style={styles.keycap}>
-        <Text style={styles.keycapText}>{shortcutKey.label}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.keycapText}>
+          {shortcutKey.label}
+        </Text>
       </View>
       <View style={styles.rowContent}>
-        <Text style={styles.rowLabel}>{shortcutKey.accessibilityLabel ?? shortcutKey.label}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.rowLabel}>
+          {keyName}
+        </Text>
       </View>
       <Switch
+        accessibilityLabel={`${keyName}，${visible ? '已显示' : '已隐藏'}`}
         value={visible}
         onValueChange={onToggle}
-        trackColor={{ false: colors.borderSubtle, true: colors.textSecondary }}
-        thumbColor={colors.textPrimary}
+        trackColor={{ false: theme.color.bg.subtle, true: theme.color.bg.selected }}
+        thumbColor={visible ? theme.color.text.inverse : theme.color.text.secondary}
       />
     </View>
   )
@@ -72,6 +75,8 @@ export function TerminalShortcutSettings({
   scrollContentHeight,
   onDragActiveChange
 }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const [customKeys, setCustomKeys] = useState<CustomKey[]>([])
   const [showCustomKeyModal, setShowCustomKeyModal] = useState(false)
   const [shortcutLayout, setShortcutLayout] = useState<TerminalAccessoryLayout>(
@@ -137,7 +142,7 @@ export function TerminalShortcutSettings({
   const handleDeleteCustomKey = useCallback(
     (key: CustomKey) => {
       setCustomKeys((current) => {
-        const updated = current.filter((k) => k.id !== key.id)
+        const updated = current.filter((candidate) => candidate.id !== key.id)
         persistCustomKeys(updated)
         return updated
       })
@@ -153,8 +158,8 @@ export function TerminalShortcutSettings({
   )
 
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (s: AppStateStatus) => {
-      if (s === 'active') {
+    const sub = AppState.addEventListener('change', (status: AppStateStatus) => {
+      if (status === 'active') {
         refreshShortcutLayout()
         refreshCustomKeys()
       }
@@ -222,95 +227,109 @@ export function TerminalShortcutSettings({
 
   return (
     <>
-      <Text style={[styles.groupHeading, styles.groupTopGap]}>SHORTCUT BAR</Text>
-      <Text style={styles.groupDescription}>
-        Toggle keys to show or hide them, and hold the grip to drag a key into the order you want on
-        the terminal shortcut bar.
-      </Text>
-      <View style={[styles.section, styles.sectionTopGap]}>
-        <DragReorderList
-          items={orderedAccessoryKeys}
-          itemKey={(shortcutKey) => shortcutKey.id}
-          rowHeight={REORDER_ROW_HEIGHT}
-          scrollRef={scrollRef}
-          scrollOffsetY={scrollOffsetY}
-          scrollContentHeight={scrollContentHeight}
-          onDragActiveChange={onDragActiveChange}
-          onReorder={reorderBuiltInKeys}
-          renderRow={(shortcutKey) => (
-            <ShortcutBarRow
-              shortcutKey={shortcutKey}
-              visible={visibleBuiltInSet.has(shortcutKey.id)}
-              onToggle={(visible) => toggleBuiltInKey(shortcutKey.id, visible)}
-            />
-          )}
-        />
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={resetBuiltInKeys}
-        >
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Reset Defaults</Text>
-            <Text style={styles.rowSublabel}>
-              Show every built-in shortcut key in the original order
-            </Text>
-          </View>
-        </Pressable>
-      </View>
-
-      <Text style={[styles.groupHeading, styles.groupTopGap]}>CUSTOM SHORTCUTS</Text>
-      <View style={[styles.section, styles.sectionTopGap]}>
-        {customKeys.length === 0 ? (
-          <>
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No custom shortcuts defined yet.</Text>
+      <View style={styles.groups}>
+        <View style={styles.settingsGroup}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.groupHeading}>
+            快捷键栏
+          </Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.groupDescription}>
+            切换内置按键的显示状态；长按拖动手柄，可调整它们在终端快捷键栏中的顺序。
+          </Text>
+          <MobileGroupedList>
+            <View>
+              <DragReorderList
+                items={orderedAccessoryKeys}
+                itemKey={(shortcutKey) => shortcutKey.id}
+                rowHeight={REORDER_ROW_HEIGHT}
+                scrollRef={scrollRef}
+                scrollOffsetY={scrollOffsetY}
+                scrollContentHeight={scrollContentHeight}
+                onDragActiveChange={onDragActiveChange}
+                onReorder={reorderBuiltInKeys}
+                renderRow={(shortcutKey) => (
+                  <ShortcutBarRow
+                    shortcutKey={shortcutKey}
+                    visible={visibleBuiltInSet.has(shortcutKey.id)}
+                    onToggle={(visible) => toggleBuiltInKey(shortcutKey.id, visible)}
+                  />
+                )}
+              />
+              <MobileGroupedListRow
+                detail="显示所有内置快捷键，并还原初始顺序"
+                onPress={resetBuiltInKeys}
+                title="恢复默认设置"
+              />
             </View>
-            <View style={styles.separator} />
-          </>
-        ) : (
-          <DragReorderList
-            items={customKeys}
-            itemKey={(key) => key.id}
-            rowHeight={REORDER_ROW_HEIGHT}
-            scrollRef={scrollRef}
-            scrollOffsetY={scrollOffsetY}
-            scrollContentHeight={scrollContentHeight}
-            onDragActiveChange={onDragActiveChange}
-            onReorder={reorderCustomKeys}
-            renderRow={(key) => (
-              <View style={styles.reorderRowContent}>
-                <View style={styles.keycap}>
-                  <Text style={styles.keycapText}>{key.label}</Text>
-                </View>
-                <View style={styles.rowContent}>
-                  <Text style={styles.rowLabel}>{key.label}</Text>
-                  <Text style={styles.rowSublabel} numberOfLines={1} ellipsizeMode="tail">
-                    {key.bytes.replace(/\r/g, ' ↵')}
-                  </Text>
-                </View>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.deleteButton,
-                    pressed && styles.deleteButtonPressed
-                  ]}
-                  onPress={() => handleDeleteCustomKey(key)}
-                >
-                  <X size={16} color={colors.statusRed} />
-                </Pressable>
-              </View>
-            )}
-          />
-        )}
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => setShowCustomKeyModal(true)}
-        >
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Add Custom Shortcut…</Text>
-            <Text style={styles.rowSublabel}>Create key combo or text macro</Text>
-          </View>
-          <ChevronRight size={16} color={colors.textMuted} />
-        </Pressable>
+          </MobileGroupedList>
+        </View>
+
+        <View style={styles.settingsGroup}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.groupHeading}>
+            自定义快捷键
+          </Text>
+          <MobileGroupedList>
+            <View>
+              {customKeys.length === 0 ? (
+                <>
+                  <View style={styles.emptyContainer}>
+                    <Text maxFontSizeMultiplier={1.3} style={styles.emptyText}>
+                      尚未添加自定义快捷键。
+                    </Text>
+                  </View>
+                  <View style={styles.separator} />
+                </>
+              ) : (
+                <DragReorderList
+                  items={customKeys}
+                  itemKey={(key) => key.id}
+                  rowHeight={REORDER_ROW_HEIGHT}
+                  scrollRef={scrollRef}
+                  scrollOffsetY={scrollOffsetY}
+                  scrollContentHeight={scrollContentHeight}
+                  onDragActiveChange={onDragActiveChange}
+                  onReorder={reorderCustomKeys}
+                  renderRow={(key) => (
+                    <View style={styles.reorderRowContent}>
+                      <View style={styles.keycap}>
+                        <Text maxFontSizeMultiplier={1.3} style={styles.keycapText}>
+                          {key.label}
+                        </Text>
+                      </View>
+                      <View style={styles.rowContent}>
+                        <Text maxFontSizeMultiplier={1.3} style={styles.rowLabel}>
+                          {key.label}
+                        </Text>
+                        <Text
+                          maxFontSizeMultiplier={1.3}
+                          style={styles.rowSublabel}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {key.bytes.replace(/\r/g, ' ↵')}
+                        </Text>
+                      </View>
+                      <MobileIconButton
+                        accessibilityLabel={`删除自定义快捷键 ${key.label}`}
+                        icon={X}
+                        iconSize={20}
+                        onPress={() => handleDeleteCustomKey(key)}
+                        tone="danger"
+                      />
+                    </View>
+                  )}
+                />
+              )}
+              <MobileGroupedListRow
+                detail="创建组合键或文本宏"
+                onPress={() => setShowCustomKeyModal(true)}
+                title="添加自定义快捷键…"
+                trailing={
+                  <ChevronRight color={theme.color.text.tertiary} size={20} strokeWidth={2} />
+                }
+              />
+            </View>
+          </MobileGroupedList>
+        </View>
       </View>
 
       <CustomKeyModal
@@ -327,102 +346,75 @@ export function TerminalShortcutSettings({
   )
 }
 
-const styles = StyleSheet.create({
-  groupHeading: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-    paddingHorizontal: spacing.xs
-  },
-  groupTopGap: {
-    marginTop: spacing.xl
-  },
-  groupDescription: {
-    fontSize: typography.bodySize - 1,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    paddingHorizontal: spacing.xs
-  },
-  section: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.card,
-    overflow: 'hidden'
-  },
-  sectionTopGap: {
-    marginTop: spacing.sm
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  rowPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  // Why: rows inside DragReorderList get a fixed height and a trailing grip
-  // handle from the list itself, so content only pads on the left.
-  reorderRowContent: {
-    flex: 1,
-    height: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-    paddingLeft: spacing.md + 2
-  },
-  rowContent: {
-    flex: 1
-  },
-  rowLabel: {
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textPrimary
-  },
-  rowSublabel: {
-    fontSize: typography.bodySize - 2,
-    color: colors.textSecondary,
-    marginTop: 2
-  },
-  keycap: {
-    minWidth: 62,
-    alignItems: 'center',
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.button,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs
-  },
-  keycapText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontFamily: typography.monoFamily
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginHorizontal: spacing.md
-  },
-  emptyContainer: {
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  emptyText: {
-    fontSize: typography.bodySize,
-    color: colors.textSecondary,
-    padding: spacing.md
-  },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)'
-  },
-  deleteButtonPressed: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)'
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    groups: {
+      gap: theme.spacing.space24
+    },
+    settingsGroup: {
+      gap: theme.spacing.space8
+    },
+    groupHeading: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      paddingHorizontal: theme.spacing.space4
+    },
+    groupDescription: {
+      ...theme.typography.body,
+      color: theme.color.text.secondary,
+      paddingHorizontal: theme.spacing.space4
+    },
+    reorderRowContent: {
+      flex: 1,
+      height: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space12,
+      paddingLeft: theme.spacing.space16
+    },
+    rowContent: {
+      flex: 1,
+      minWidth: 0
+    },
+    rowLabel: {
+      ...theme.typography.body,
+      color: theme.color.text.primary
+    },
+    rowSublabel: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary,
+      marginTop: theme.spacing.space4
+    },
+    keycap: {
+      minWidth: theme.spacing.space64,
+      alignItems: 'center',
+      backgroundColor: theme.color.bg.subtle,
+      borderWidth: 1,
+      borderColor: theme.color.border.subtle,
+      borderRadius: theme.radii.control,
+      paddingHorizontal: theme.spacing.space8,
+      paddingVertical: theme.spacing.space4
+    },
+    keycapText: {
+      ...theme.typography.code,
+      color: theme.color.text.secondary
+    },
+    separator: {
+      height: 1,
+      backgroundColor: theme.color.border.subtle,
+      marginHorizontal: theme.spacing.space16
+    },
+    emptyContainer: {
+      minHeight: theme.size.groupedListRowMinHeight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space12
+    },
+    emptyText: {
+      ...theme.typography.body,
+      color: theme.color.text.secondary,
+      textAlign: 'center'
+    }
+  })
+}

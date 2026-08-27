@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   resolveDefaultHermesSkillsRoot,
@@ -10,14 +10,16 @@ import {
 
 describe('skill provider runtime roots', () => {
   it('maps Claude and Grok config homes to their global skill roots', () => {
+    const claudeConfig = resolve('/srv', 'claude')
+    const grokHome = resolve('/srv', 'grok')
     expect(
       resolveEnvironmentSkillProviderRoots({
-        CLAUDE_CONFIG_DIR: join('/srv', 'claude'),
-        GROK_HOME: join('/srv', 'grok')
+        CLAUDE_CONFIG_DIR: claudeConfig,
+        GROK_HOME: grokHome
       })
     ).toEqual({
-      claude: join('/srv', 'claude', 'skills'),
-      grok: join('/srv', 'grok', 'skills')
+      claude: join(claudeConfig, 'skills'),
+      grok: join(grokHome, 'skills')
     })
   })
 
@@ -27,8 +29,9 @@ describe('skill provider runtime roots', () => {
       GROK_HOME: '../grok'
     })
     expect(roots).toEqual({})
-    expect(withClaudeSkillProviderRoot(roots, join('/managed', 'claude'))).toEqual({
-      claude: join('/managed', 'claude', 'skills')
+    const managedClaudeConfig = resolve('/managed', 'claude')
+    expect(withClaudeSkillProviderRoot(roots, managedClaudeConfig)).toEqual({
+      claude: join(managedClaudeConfig, 'skills')
     })
   })
 

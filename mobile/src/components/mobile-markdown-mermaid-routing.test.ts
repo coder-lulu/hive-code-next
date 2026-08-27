@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileMarkdown } from './MobileMarkdown'
+import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
 
 vi.mock('react-native', () => ({
   Linking: { openURL: vi.fn() },
@@ -12,6 +13,9 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 vi.mock('./pr-sidebar/MermaidDiagram', () => ({ MermaidDiagram: 'MermaidDiagram' }))
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
+}))
 
 let renderer: ReactTestRenderer | undefined
 

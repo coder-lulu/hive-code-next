@@ -12,6 +12,14 @@ vi.mock('react-native', () => ({
 
 vi.mock('lucide-react-native', () => ({ ShieldQuestion: 'ShieldQuestion' }))
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+
 describe('MobileNativeChatPermission', () => {
   let renderer: ReactTestRenderer | null = null
 

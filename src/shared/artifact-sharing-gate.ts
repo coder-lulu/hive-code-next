@@ -1,16 +1,18 @@
 // Why: publishing an artifact mints a URL anyone can open, so agents get the capability only
 // after the user grants it. The gate lives here so main, the CLI, and Settings share one contract.
 import type { GlobalSettings } from './global-settings-types'
+import { applyProductBranding } from './brand'
 
 export const ARTIFACT_SHARING_DISABLED_CODE = 'artifact_sharing_disabled'
 
 // Why device-wide wording: the gate has no caller identity, so `orca artifacts share` typed by a
 // human is denied exactly like an agent's. Copy that blames agents alone would misdescribe it.
-export const ARTIFACT_SHARING_DISABLED_MESSAGE =
+export const ARTIFACT_SHARING_DISABLED_MESSAGE = applyProductBranding(
   'Publishing artifacts is off for this device. Nothing running here — agents or the orca CLI — can mint public artifact links until you allow it.'
+)
 
 export const ARTIFACT_SHARING_DISABLED_NEXT_STEPS: readonly string[] = [
-  'Open Settings → Artifacts in the Orca desktop app on this device.',
+  applyProductBranding('Open Settings → Artifacts in the Orca desktop app on this device.'),
   'Turn on "Allow publishing public artifact links".',
   'Run the share command again.'
 ]

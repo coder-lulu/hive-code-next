@@ -132,11 +132,29 @@ describe('discoverCommitMessageModelsLocal', () => {
         { id: 'haiku', label: 'Haiku' }
       ]
     })
-    expect(spawnMock).toHaveBeenCalledWith(
-      'claude',
-      ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'],
-      expect.objectContaining({ windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
-    )
+    const expectedArgs = [
+      '-p',
+      '--input-format',
+      'stream-json',
+      '--output-format',
+      'stream-json',
+      '--verbose'
+    ]
+    if (process.platform === 'win32') {
+      const [spawnCommand, spawnArgs, spawnOptions] = spawnMock.mock.calls[0]
+      expect(spawnCommand).toMatch(/cmd\.exe$/i)
+      expect(spawnArgs.slice(0, 3)).toEqual(['/d', '/c', expect.stringMatching(/claude\.cmd$/i)])
+      expect(spawnArgs.slice(3)).toEqual(expectedArgs)
+      expect(spawnOptions).toEqual(
+        expect.objectContaining({ windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+      )
+    } else {
+      expect(spawnMock).toHaveBeenCalledWith(
+        'claude',
+        expectedArgs,
+        expect.objectContaining({ windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+      )
+    }
     expect(child.stdin.end).toHaveBeenCalledWith(expect.stringContaining('"list_models"'))
   })
 

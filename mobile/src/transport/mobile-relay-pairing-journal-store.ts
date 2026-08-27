@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Platform } from 'react-native'
 import {
@@ -142,7 +143,7 @@ function parseSecrets(raw: string) {
 
 function requireNativeSecretStore(): void {
   if (Platform.OS === 'web') {
-    throw new Error('Orca Relay pairing requires a native secret store')
+    throw new Error(productNameText('Orca Relay pairing requires a native secret store'))
   }
 }
 

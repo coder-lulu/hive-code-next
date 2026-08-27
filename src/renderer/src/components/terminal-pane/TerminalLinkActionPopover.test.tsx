@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BROWSER_TERMINAL_LINK_ACTIONS_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { TerminalLinkActionRequest } from './terminal-link-action-request'
 
 const mocks = vi.hoisted(() => ({
@@ -133,7 +134,7 @@ describe('TerminalLinkActionPopover', () => {
       anchorY: 200,
       destination: 'https://example.com',
       kind: 'url',
-      primary: { external: false, label: 'Orca Browser', run: vi.fn() },
+      primary: { external: false, label: `${APP_DISPLAY_NAME} Browser`, run: vi.fn() },
       alternate: { external: true, label: 'System Browser', run: vi.fn() },
       focusTerminal: vi.fn()
     }
@@ -141,7 +142,10 @@ describe('TerminalLinkActionPopover', () => {
     render(<TerminalLinkActionPopover request={request} onClose={vi.fn()} />)
 
     expect(
-      screen.getByText('Orca Browser').closest('button')?.querySelector('.lucide-globe')
+      screen
+        .getByText(`${APP_DISPLAY_NAME} Browser`)
+        .closest('button')
+        ?.querySelector('.lucide-globe')
     ).toBeTruthy()
     expect(
       screen.getByText('System Browser').closest('button')?.querySelector('.lucide-external-link')

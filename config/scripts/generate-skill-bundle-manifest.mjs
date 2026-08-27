@@ -6,8 +6,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { isDeepStrictEqual } from 'node:util'
 
-// Why: the three artifacts version independently — bumping one shape must not
-// rewrite the others or bypass the registry's schema-gated append-only guard.
+// Artifacts version independently; a schema bump must not rewrite another artifact.
 const CURRENT_MANIFEST_SCHEMA_VERSION = 2
 const SNAPSHOT_REGISTRY_SCHEMA_VERSION = 1
 const RELEASE_MAPPING_SCHEMA_VERSION = 1
@@ -18,9 +17,7 @@ const OUTPUT_ROOT = path.join(REPO_ROOT, 'resources', 'skills')
 const CURRENT_MANIFEST_PATH = path.join(OUTPUT_ROOT, 'current-manifest.json')
 const SNAPSHOT_REGISTRY_PATH = path.join(OUTPUT_ROOT, 'snapshot-registry.json')
 const RELEASE_MAPPING_PATH = path.join(OUTPUT_ROOT, 'release-mapping.json')
-// Why: the manifest and registry are content-addressed — they describe skill
-// bytes. The mapping is provenance: which already-committed revision a tag
-// shipped. A release cut may append the second without regenerating the first.
+// Manifests are content-addressed; mapping records release provenance independently.
 const CONTENT_ADDRESSED_PATHS = [CURRENT_MANIFEST_PATH, SNAPSHOT_REGISTRY_PATH]
 const ALL_ARTIFACT_PATHS = [...CONTENT_ADDRESSED_PATHS, RELEASE_MAPPING_PATH]
 
@@ -570,11 +567,9 @@ async function readCommittedReleaseMapping() {
     return null
   }
 }
-
 function serialized(value) {
   return `${JSON.stringify(value, null, 2)}\n`
 }
-
 async function writeArtifacts(artifacts, paths = ALL_ARTIFACT_PATHS) {
   const values = new Map([
     [CURRENT_MANIFEST_PATH, artifacts.currentManifest],
@@ -627,7 +622,7 @@ async function verifyArtifacts(artifacts, paths = ALL_ARTIFACT_PATHS) {
   for (const [filePath, value, tolerated] of expected) {
     try {
       await access(filePath, constants.R_OK)
-      const committedText = await readFile(filePath, 'utf8')
+      const committedText = (await readFile(filePath, 'utf8')).replace(/\r\n?/g, '\n')
       if (committedText !== serialized(value) && !tolerated?.(committedText, artifacts)) {
         stale.push(filePath)
       }
@@ -643,7 +638,6 @@ async function verifyArtifacts(artifacts, paths = ALL_ARTIFACT_PATHS) {
     )
   }
 }
-
 async function main() {
   const argv = process.argv.slice(2)
   const rebuildFromTags = argv.includes('--rebuild-from-tags')

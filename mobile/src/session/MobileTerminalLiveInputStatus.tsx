@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
-import { colors, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 type DictationStatus = {
   readonly isStarting: boolean
@@ -18,48 +19,61 @@ export function MobileTerminalLiveInputStatus({
   isAttaching,
   liveInputText
 }: MobileTerminalLiveInputStatusProps) {
+  const styles = useMobileThemeStyles(createStyles)
   const title = dictation.isRecording
-    ? 'Listening'
+    ? '正在聆听'
     : dictation.isProcessing
-      ? 'Processing'
+      ? '正在处理'
       : dictation.isStarting
-        ? 'Starting mic'
-        : 'Live input'
+        ? '正在启动麦克风'
+        : '实时输入'
   const detail = dictation.isRecording
-    ? 'Tap mic to stop'
+    ? '轻点麦克风停止'
     : dictation.isProcessing
-      ? 'Transcribing on desktop'
+      ? '正在电脑上转写'
       : dictation.isStarting
-        ? 'Preparing microphone'
+        ? '正在准备麦克风'
         : isAttaching
-          ? 'Uploading image to host'
-          : liveInputText || 'Tap to show keyboard'
+          ? '正在将图片上传到电脑'
+          : liveInputText || '轻点显示键盘'
 
   return (
-    <View style={styles.status}>
-      <Text style={styles.title} numberOfLines={1}>
+    <View
+      accessible
+      accessibilityLabel={`${title}：${detail}`}
+      accessibilityLiveRegion="polite"
+      accessibilityRole="text"
+      style={styles.status}
+    >
+      <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.title}>
         {title}
       </Text>
-      <Text style={styles.detail} numberOfLines={1} ellipsizeMode="head">
+      <Text
+        ellipsizeMode="head"
+        maxFontSizeMultiplier={1.3}
+        numberOfLines={1}
+        style={styles.detail}
+      >
         {detail}
       </Text>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  status: {
-    flex: 1,
-    gap: 1
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.metaSize,
-    fontWeight: '600'
-  },
-  detail: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize,
-    fontFamily: typography.monoFamily
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    status: {
+      flex: 1,
+      gap: theme.spacing.space4
+    },
+    title: {
+      ...theme.typography.meta,
+      color: theme.color.text.primary,
+      fontWeight: '600'
+    },
+    detail: {
+      ...theme.typography.code,
+      color: theme.color.text.secondary
+    }
+  })
+}

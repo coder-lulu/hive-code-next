@@ -2,8 +2,12 @@
 /config/scripts/orca-dev.mjs text eol=lf
 /config/scripts/latest-stable-release.mjs text eol=lf
 /config/scripts/publish-complete-draft-releases.mjs text eol=lf
+/config/scripts/regenerate-xterm-patches.mjs text eol=lf
+/config/scripts/regenerate-xterm-patches.test.mjs text eol=lf
 /config/scripts/release-rc-history.mjs text eol=lf
 /config/scripts/run-internal-dev-setup.mjs text eol=lf
+/config/scripts/trim-windows-icon-source.mjs text eol=lf
+/config/scripts/trim-windows-icon-source.test.mjs text eol=lf
 /config/scripts/verify-cli-bin.mjs text eol=lf
 /config/scripts/verify-release-required-assets.mjs text eol=lf
 /skill-guides/*.md text eol=lf
@@ -14,6 +18,7 @@
 /resources/plugins/** text eol=lf
 # pnpm hashes every patch byte-for-byte, so a CRLF checkout breaks the install.
 /config/patches/*.patch -text
+/pnpm-lock.yaml text eol=lf
 # The xterm bundle hunks also make a diff nobody can read; review the hand-written
 # source patch under xterm-src/ instead. The sibling patches stay diffable.
 /config/patches/@xterm__xterm@*.patch -diff
@@ -22,3 +27,7 @@
 # the reviewable change, and pin LF because they are compared byte-for-byte.
 # Not -diff: the shell diff is the review surface when a wrapper does change.
 /src/main/__fixtures__/shell-wrapper-snapshots/*.txt linguist-generated=true text eol=lf
+# Linux package hooks and CLI launchers are executed directly by the kernel.
+# Pin LF even when the repository is prepared on Windows.
+/resources/linux/**/*.sh text eol=lf
+/resources/linux/bin/* text eol=lf

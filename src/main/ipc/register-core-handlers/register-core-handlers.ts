@@ -55,6 +55,7 @@ import { registerEmulatorVideoStreamHandlers } from '../emulator-video-stream'
 import { registerSpeechHandlers } from '../speech'
 import { registerTerminalRenderDesyncEvidenceHandler } from '../terminal-render-desync-evidence'
 import { registerOrcaProfileHandlers } from '../orca-profiles'
+import { registerHiveAccountHandlers } from '../hive-account'
 import { registerCodexAccountHandlers } from '../codex-accounts'
 import { registerAgentHookHandlers } from '../agent-hooks'
 import { registerCodexConfigSyncHandlers } from '../codex-config-sync'
@@ -91,6 +92,8 @@ import {
 } from '../../ai-vault/runtime-session-scanner'
 import type { PluginService } from '../../plugins/plugin-service'
 import type { PluginMarketplaceHandlerServices } from '../plugin-marketplaces'
+import type { HiveAccountService } from '../../hive-account/hive-account-service'
+import type { HiveAccountState } from '../../../shared/hive-account'
 
 let registered = false
 
@@ -102,6 +105,8 @@ type CoreHandlerLifecycleOptions = {
   prepareAiVaultSessionResume?: (
     args: AiVaultPrepareSessionResumeArgs
   ) => Promise<AiVaultPrepareSessionResumeResult>
+  hiveAccountService?: HiveAccountService
+  hiveAccountStartupState?: Promise<HiveAccountState>
 }
 
 export function registerCoreHandlers(
@@ -190,6 +195,16 @@ export function registerCoreHandlers(
     registerPluginHandlers(store, pluginService, runtime, marketplaceServices)
   }
   registerTelemetryHandlers(store)
+  registerHiveAccountHandlers(
+    lifecycleOptions.hiveAccountService
+      ? {
+          service: lifecycleOptions.hiveAccountService,
+          ...(lifecycleOptions.hiveAccountStartupState
+            ? { startupState: lifecycleOptions.hiveAccountStartupState }
+            : {})
+        }
+      : undefined
+  )
   registerOrcaProfileHandlers(store, {
     onBeforeRelaunch: lifecycleOptions.onBeforeRelaunch,
     onAuthMutation: lifecycleOptions.onOrcaProfileAuthMutation,

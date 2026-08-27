@@ -8,9 +8,11 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import en from '@/i18n/locales/en.json'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const DISCLOSURE_TITLE = "Google logins aren't imported"
-const DISCLOSURE_DESCRIPTION = 'Sign in to Google directly in Orca.'
+const DISCLOSURE_DESCRIPTION = `Sign in to Google directly in ${APP_DISPLAY_NAME}.`
+const CATALOG_DESCRIPTION = 'Sign in to Google directly in Orca.'
 
 vi.mock('@/components/ui/dropdown-menu', () => dropdownMenuStubs())
 vi.mock('../ui/dropdown-menu', () => dropdownMenuStubs())
@@ -114,7 +116,7 @@ describe('cookie-import Google disclosure footer', () => {
       DISCLOSURE_TITLE
     )
     expect(catalogEntry('auto.components.BrowserCookieImportDisclosure.description')).toBe(
-      DISCLOSURE_DESCRIPTION
+      CATALOG_DESCRIPTION
     )
   })
 })

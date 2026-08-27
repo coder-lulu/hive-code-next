@@ -6,6 +6,13 @@ import { parse } from 'yaml'
 
 const SCRIPT_DIR = import.meta.dirname
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
+const PRODUCT_PACKAGE = JSON.parse(await readFile(path.join(REPO_ROOT, 'package.json'), 'utf8'))
+const PRODUCT_DISPLAY_NAME = JSON.parse(
+  await readFile(
+    path.join(REPO_ROOT, 'config', 'product', `${PRODUCT_PACKAGE.name}.product.json`),
+    'utf8'
+  )
+).displayName
 
 const CANONICAL_GUIDE_NAMES = [
   'computer-use',
@@ -13,6 +20,7 @@ const CANONICAL_GUIDE_NAMES = [
   'orca-cli',
   'orca-emulator',
   'orca-emulator-android',
+  'hivecode-android-ui',
   'orca-linear',
   'orca-per-workspace-env',
   'orchestration'
@@ -26,6 +34,7 @@ const GUIDE_ALIASES = {
   'orca-cli': [],
   'orca-emulator': [],
   'orca-emulator-android': [],
+  'hivecode-android-ui': [],
   'orca-linear': [],
   'orca-per-workspace-env': [],
   orchestration: []
@@ -42,6 +51,7 @@ const STUB_TOPICS = [
   'orca-cli',
   'orca-emulator',
   'orca-emulator-android',
+  'hivecode-android-ui',
   'orca-linear',
   'orca-per-workspace-env',
   'orchestration'
@@ -49,6 +59,14 @@ const STUB_TOPICS = [
 
 function normalizeMarkdown(markdown) {
   return markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+}
+
+function brandGuideMarkdown(markdown) {
+  const gnomeOrcaToken = '__GNOME_ORCA_SCREEN_READER__'
+  return markdown
+    .replaceAll('GNOME Orca', gnomeOrcaToken)
+    .replace(/\bOrca\b/g, () => PRODUCT_DISPLAY_NAME)
+    .replaceAll(gnomeOrcaToken, 'GNOME Orca')
 }
 
 function parseFrontmatter(markdown, sourcePath) {
@@ -198,7 +216,7 @@ async function buildArtifacts(repoRoot = REPO_ROOT) {
     const sourcePath = path.join(guideRoot, `${name}.md`)
     // Why: Git may render text with native EOLs despite repository policy; the
     // embedded guide and generated projection must have one platform-neutral identity.
-    const markdown = normalizeMarkdown(await readFile(sourcePath, 'utf8'))
+    const markdown = brandGuideMarkdown(normalizeMarkdown(await readFile(sourcePath, 'utf8')))
     const frontmatter = parseFrontmatter(markdown, toPosixRelativePath(repoRoot, sourcePath))
     if (frontmatter.name !== name) {
       throw new Error(`Guide source ${name}.md declares mismatched name ${frontmatter.name}`)
@@ -209,7 +227,11 @@ async function buildArtifacts(repoRoot = REPO_ROOT) {
     guides.push({ name, description: frontmatter.description, markdown, aliases })
     const stubPath = path.join(repoRoot, 'skill-stubs', `${name}.md`)
     const content = stubTopics.has(name)
-      ? composeStubProjection(markdown, await readFile(stubPath, 'utf8'), `skill-stubs/${name}.md`)
+      ? composeStubProjection(
+          markdown,
+          brandGuideMarkdown(await readFile(stubPath, 'utf8')),
+          `skill-stubs/${name}.md`
+        )
       : markdown
     projections.push({
       path: path.join(repoRoot, 'skills', name, 'SKILL.md'),
@@ -272,6 +294,7 @@ export {
   GUIDE_ALIASES,
   STUB_TOPICS,
   assertAliasContract,
+  brandGuideMarkdown,
   buildArtifacts,
   composeStubProjection,
   frontmatterBlock,

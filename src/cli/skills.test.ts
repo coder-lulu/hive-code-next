@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delimiter, join } from 'node:path'
 import type * as CodexCliCommandModule from '../shared/node-cli-command-resolution'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../shared/brand'
 import { WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL } from '../shared/windows-batch-spawn'
 
 const {
@@ -213,7 +214,7 @@ describe('orca skills CLI', () => {
     await main(['--help'], '/tmp/repo')
 
     expect(String(logSpy.mock.calls[0]?.[0])).toContain(
-      'Usage: orca skills get <topic> [--full] [--json]'
+      `Usage: ${PRIMARY_CLI_COMMAND} skills get <topic> [--full] [--json]`
     )
     expect(String(logSpy.mock.calls[1]?.[0])).toContain(
       'Commands:\n  installed          List installed skill selectors'
@@ -222,10 +223,10 @@ describe('orca skills CLI', () => {
       'get                Print a version-matched skill guide'
     )
     expect(String(logSpy.mock.calls[1]?.[0])).toContain(
-      'install            Install bundled Orca skills'
+      `install            Install bundled ${APP_DISPLAY_NAME} skills`
     )
     expect(String(logSpy.mock.calls[1]?.[0])).toContain(
-      'update             Update already-installed Orca skills'
+      `update             Update already-installed ${APP_DISPLAY_NAME} skills`
     )
     expect(String(logSpy.mock.calls[2]?.[0])).toContain('Skills:\n  skills installed')
     expect(String(logSpy.mock.calls[2]?.[0])).toContain('skills update')
@@ -256,8 +257,8 @@ describe('orca skills CLI', () => {
         '  gamma',
         '  zeta',
         '',
-        'Usage: orca skills install --skill <name> [--skill <name> ...]',
-        '   or: orca skills install --all',
+        `Usage: ${PRIMARY_CLI_COMMAND} skills install --skill <name> [--skill <name> ...]`,
+        `   or: ${PRIMARY_CLI_COMMAND} skills install --all`,
         ''
       ].join('\n')
     )
@@ -573,8 +574,8 @@ describe('orca skills CLI', () => {
         '  gamma',
         '  zeta',
         '',
-        'Usage: orca skills update --skill <name> [--skill <name> ...]',
-        '   or: orca skills update --all',
+        `Usage: ${PRIMARY_CLI_COMMAND} skills update --skill <name> [--skill <name> ...]`,
+        `   or: ${PRIMARY_CLI_COMMAND} skills update --all`,
         ''
       ].join('\n')
     )

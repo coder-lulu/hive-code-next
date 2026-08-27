@@ -1,12 +1,12 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { ChevronRight, FileText, Minus, Plus, Trash2 } from 'lucide-react-native'
 import type { SectionListRenderItem } from 'react-native'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { MOBILE_GIT_STATUS_LABELS, type MobileSourceControlSection } from './mobile-git-status'
 import { formatMobileBranchEntryMeta } from './mobile-branch-entry-format'
 import { statusColor, type MobileGitStatusEntryView } from './mobile-source-control-screen-state'
 import type { MobileSourceControlState } from './use-mobile-source-control-state'
-import { styles } from './mobile-source-control-styles'
+import { createMobileSourceControlStyles } from './mobile-source-control-styles'
 
 type RowState = Pick<
   MobileSourceControlState,
@@ -27,6 +27,8 @@ export function makeRenderFileRow(
   const { busyAction, openingPath, openingBranchPath, openFile, runGitAction, setDiscardTarget } =
     state
   return function FileRow({ item }) {
+    const theme = useMobileTheme()
+    const styles = useMobileThemeStyles(createMobileSourceControlStyles)
     const rowBusy =
       busyAction === item.stageActionId ||
       busyAction === item.unstageActionId ||
@@ -45,17 +47,17 @@ export function makeRenderFileRow(
         ]}
         onPress={() => void openFile(item)}
         disabled={rowDisabled}
-        accessibilityLabel={`Open changed file ${item.path}`}
+        accessibilityLabel={`打开已更改文件 ${item.path}`}
       >
         <View style={styles.statusBadge}>
-          <Text style={[styles.statusBadgeText, { color: statusColor(item.status) }]}>
+          <Text style={[styles.statusBadgeText, { color: statusColor(item.status, theme) }]}>
             {MOBILE_GIT_STATUS_LABELS[item.status]}
           </Text>
         </View>
         <FileText
           size={16}
-          color={item.canOpen ? colors.textSecondary : colors.textMuted}
-          strokeWidth={2.1}
+          color={item.canOpen ? theme.color.text.secondary : theme.color.text.tertiary}
+          strokeWidth={2}
         />
         <View style={styles.fileTextBlock}>
           <Text
@@ -66,16 +68,16 @@ export function makeRenderFileRow(
           </Text>
           {item.oldPath ? (
             <Text style={styles.fileMeta} numberOfLines={1}>
-              from {item.oldPath}
+              来自 {item.oldPath}
             </Text>
           ) : item.conflictStatus === 'unresolved' ? (
             <Text style={styles.fileMeta} numberOfLines={1}>
-              Unresolved conflict
+              冲突尚未解决
             </Text>
           ) : null}
         </View>
         {rowBusy ? (
-          <ActivityIndicator size="small" color={colors.textSecondary} />
+          <ActivityIndicator size="small" color={theme.color.text.secondary} />
         ) : item.area === 'staged' ? (
           <Pressable
             style={({ pressed }) => [
@@ -88,9 +90,9 @@ export function makeRenderFileRow(
               void runGitAction(item.unstageActionId, 'git.unstage', { filePath: item.path })
             }
             hitSlop={8}
-            accessibilityLabel={`Unstage ${item.path}`}
+            accessibilityLabel={`取消暂存 ${item.path}`}
           >
-            <Minus size={16} color={colors.textSecondary} strokeWidth={2.2} />
+            <Minus size={16} color={theme.color.text.secondary} strokeWidth={2} />
           </Pressable>
         ) : item.canStage || item.canDiscard ? (
           <View style={styles.rowActions}>
@@ -106,9 +108,9 @@ export function makeRenderFileRow(
                   void runGitAction(item.stageActionId, 'git.stage', { filePath: item.path })
                 }
                 hitSlop={8}
-                accessibilityLabel={`Stage ${item.path}`}
+                accessibilityLabel={`暂存 ${item.path}`}
               >
-                <Plus size={16} color={colors.textSecondary} strokeWidth={2.2} />
+                <Plus size={16} color={theme.color.text.secondary} strokeWidth={2} />
               </Pressable>
             ) : null}
             {item.canDiscard ? (
@@ -121,15 +123,15 @@ export function makeRenderFileRow(
                 disabled={ioBusy}
                 onPress={() => setDiscardTarget(item)}
                 hitSlop={8}
-                accessibilityLabel={`Discard ${item.path}`}
+                accessibilityLabel={`丢弃 ${item.path} 的更改`}
               >
-                <Trash2 size={16} color={colors.statusRed} strokeWidth={2.1} />
+                <Trash2 size={16} color={theme.color.status.danger} strokeWidth={2} />
               </Pressable>
             ) : null}
           </View>
         ) : null}
         {!rowBusy && item.canOpen ? (
-          <ChevronRight size={16} color={colors.textMuted} strokeWidth={2.1} />
+          <ChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
         ) : null}
       </Pressable>
     )
@@ -150,6 +152,8 @@ type FooterState = Pick<
 >
 
 export function BranchCompareFooter({ state }: { state: FooterState }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileSourceControlStyles)
   const {
     shouldShowBranchCompareSection,
     branchCompareSummaryText,
@@ -169,10 +173,10 @@ export function BranchCompareFooter({ state }: { state: FooterState }) {
     <View style={styles.branchCompareBlock}>
       <View style={styles.sectionHeader}>
         <View style={styles.branchSectionTitleBlock}>
-          <Text style={styles.sectionTitle}>Committed on Branch</Text>
+          <Text style={styles.sectionTitle}>分支上的已提交更改</Text>
           {branchCompareSummaryText ? (
             <Text style={styles.branchSectionSubtitle} numberOfLines={1}>
-              {branchCompareSummaryText}
+              {localizeBranchCompareSummary(branchCompareSummaryText)}
             </Text>
           ) : null}
         </View>
@@ -180,8 +184,8 @@ export function BranchCompareFooter({ state }: { state: FooterState }) {
       </View>
       {branchCompareState.kind === 'loading' ? (
         <View style={styles.branchStateRow}>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
-          <Text style={styles.branchStateText}>Loading committed changes...</Text>
+          <ActivityIndicator size="small" color={theme.color.text.secondary} />
+          <Text style={styles.branchStateText}>正在加载已提交更改...</Text>
         </View>
       ) : branchCompareState.kind === 'error' ? (
         <View style={styles.branchStateRow}>
@@ -190,7 +194,7 @@ export function BranchCompareFooter({ state }: { state: FooterState }) {
       ) : branchCompareResult && branchCompareResult.summary.status !== 'ready' ? (
         <View style={styles.branchStateRow}>
           <Text style={styles.branchStateText}>
-            {branchCompareResult.summary.errorMessage ?? 'Committed changes unavailable.'}
+            {branchCompareResult.summary.errorMessage ?? '暂时无法查看已提交更改。'}
           </Text>
         </View>
       ) : (
@@ -213,17 +217,17 @@ export function BranchCompareFooter({ state }: { state: FooterState }) {
               ]}
               onPress={() => void openBranchDiff(entry)}
               disabled={rowDisabled}
-              accessibilityLabel={`Open committed change ${entry.path}`}
+              accessibilityLabel={`打开已提交更改 ${entry.path}`}
             >
               <View style={styles.statusBadge}>
-                <Text style={[styles.statusBadgeText, { color: statusColor(entry.status) }]}>
+                <Text style={[styles.statusBadgeText, { color: statusColor(entry.status, theme) }]}>
                   {MOBILE_GIT_STATUS_LABELS[entry.status]}
                 </Text>
               </View>
               <FileText
                 size={16}
-                color={entry.canOpen ? colors.textSecondary : colors.textMuted}
-                strokeWidth={2.1}
+                color={entry.canOpen ? theme.color.text.secondary : theme.color.text.tertiary}
+                strokeWidth={2}
               />
               <View style={styles.fileTextBlock}>
                 <Text
@@ -234,14 +238,14 @@ export function BranchCompareFooter({ state }: { state: FooterState }) {
                 </Text>
                 {meta ? (
                   <Text style={styles.fileMeta} numberOfLines={1}>
-                    {meta}
+                    {meta.replace(/^from /, '来自 ')}
                   </Text>
                 ) : null}
               </View>
               {rowBusy ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
+                <ActivityIndicator size="small" color={theme.color.text.secondary} />
               ) : entry.canOpen ? (
-                <ChevronRight size={16} color={colors.textMuted} strokeWidth={2.1} />
+                <ChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
               ) : null}
             </Pressable>
           )
@@ -249,4 +253,12 @@ export function BranchCompareFooter({ state }: { state: FooterState }) {
       )}
     </View>
   )
+}
+
+function localizeBranchCompareSummary(summary: string): string {
+  return summary
+    .replace(/(\d+) files?/, '$1 个文件')
+    .replace(/(\d+) commits?/, '$1 个提交')
+    .replace(/ - vs /, ' · 对比 ')
+    .replace(/ - /, ' · ')
 }

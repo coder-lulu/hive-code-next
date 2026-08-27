@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { prStateToken } from './pr-state-token'
 import { prStateBadge } from './pr-sidebar/pr-checks-presentation'
 import { statusColor } from './pr-sidebar/pr-sidebar-status-color'
-import { colors } from '../theme/mobile-theme'
+import { darkTheme, lightTheme } from '../theme/mobile-theme'
 
 describe('prStateToken', () => {
   it('maps PR states to the desktop-matching status palette', () => {
@@ -19,10 +19,12 @@ describe('prStateToken', () => {
   })
 
   it('resolves to the expected concrete colors', () => {
-    expect(statusColor(prStateToken('merged'))).toBe(colors.statusPurple)
-    expect(statusColor(prStateToken('open'))).toBe(colors.statusGreen)
-    expect(statusColor(prStateToken('closed'))).toBe(colors.statusRed)
-    expect(statusColor(prStateToken('draft'))).toBe(colors.textSecondary)
+    for (const theme of [lightTheme, darkTheme]) {
+      expect(statusColor(prStateToken('merged'), theme)).toBe(theme.color.brand.primary)
+      expect(statusColor(prStateToken('open'), theme)).toBe(theme.color.status.success)
+      expect(statusColor(prStateToken('closed'), theme)).toBe(theme.color.status.danger)
+      expect(statusColor(prStateToken('draft'), theme)).toBe(theme.color.text.secondary)
+    }
   })
 })
 

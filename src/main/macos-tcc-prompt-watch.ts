@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { createInterface, type Interface } from 'node:readline'
 import type { Readable } from 'node:stream'
+import { hivecodeProductConfig } from '../shared/generated/product-config'
 
 /** Why: stdin is 'ignore', so this is narrower than ChildProcessWithoutNullStreams. */
 export type LogStreamChild = ChildProcessByStdio<null, Readable, Readable>
@@ -26,6 +27,18 @@ const ORCA_RESPONSIBLE_IDENTIFIERS = new Set([
   'com.stablyai.orca.local',
   'com.stablyai.orca.local.helper'
 ])
+const HIVECODE_APP_ID = hivecodeProductConfig.desktop.appId
+
+function isProductResponsibleIdentifier(identifier: string): boolean {
+  return (
+    ORCA_RESPONSIBLE_IDENTIFIERS.has(identifier) ||
+    (HIVECODE_APP_ID !== null &&
+      (identifier === HIVECODE_APP_ID ||
+        identifier === `${HIVECODE_APP_ID}.helper` ||
+        identifier === `${HIVECODE_APP_ID}.dev` ||
+        identifier.startsWith(`${HIVECODE_APP_ID}.dev.`)))
+  )
+}
 
 /** Why: the prompt classes #9756 is about — other-apps' data plus the protected home folders agents sweep. */
 const WATCHED_SERVICES = new Set([
@@ -75,7 +88,7 @@ export function parseTccPromptEvent(line: string): TccPromptEvent | null {
 /** True when this dialog is one macOS raised in Orca's name for a watched file-access service. */
 export function isOrcaAttributedPrompt(event: TccPromptEvent): boolean {
   return (
-    ORCA_RESPONSIBLE_IDENTIFIERS.has(event.responsibleIdentifier) &&
+    isProductResponsibleIdentifier(event.responsibleIdentifier) &&
     WATCHED_SERVICES.has(event.service)
   )
 }

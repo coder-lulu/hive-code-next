@@ -7,8 +7,8 @@ describe('packaged Windows CLI launcher asset', () => {
     const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'orca.cmd')
     const launcher = readFileSync(launcherPath, 'utf8')
 
-    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%orca.exe"')
-    expect(launcher).toContain('orca.cmd cannot safely forward orchestration message bodies')
+    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%%~n0.exe"')
+    expect(launcher).toContain('%~nx0 cannot safely forward orchestration message bodies')
     expect(launcher).not.toContain('"%ELECTRON%" "%CLI%" %*')
   })
 
@@ -24,7 +24,15 @@ describe('packaged Windows CLI launcher asset', () => {
     expect(source).toContain(
       'string requestedCliCommand = Environment.GetEnvironmentVariable("ORCA_CLI_COMMAND");'
     )
-    expect(source).toContain('requestedCliCommand == "orca-ide" ? "orca-ide" : "orca"')
+    expect(source).toContain(
+      'Environment.SetEnvironmentVariable("ORCA_CLI_COMMAND", ResolveCliCommand(requestedCliCommand));'
+    )
+    expect(source).toContain(
+      'private static string ResolveCliCommand(string requestedCliCommand)'
+    )
+    expect(source).toContain('return requestedCliCommand;')
+    expect(source).toContain('Path.GetFileNameWithoutExtension(')
+    expect(source).toContain('return launcherName;')
     expect(source).toContain('child.WaitForExit();')
     expect(source).toContain('return child.ExitCode;')
   })

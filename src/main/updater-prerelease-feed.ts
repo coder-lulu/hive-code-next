@@ -1,19 +1,26 @@
-import { net } from 'electron'
 import { parse } from 'yaml'
-import { compareVersions, isPrereleaseVersion, isValidVersion } from './updater-fallback'
+import { resolveProductUpdateSource } from '../shared/product-update-source'
+import { cancelUnreadResponseBody } from './lib/unread-response-body'
+import { fetchWithProductUpdaterSession } from './product/product-updater-session'
+import { fetchReleaseResourceWithApprovedRedirects } from './updater-approved-redirects'
+import { compareVersions, isValidVersion } from './updater-fallback'
+import { readResponseTextWithLimit } from './updater-response-body'
 
-const ATOM_FEED_URL = 'https://github.com/stablyai/orca/releases.atom'
-const RELEASES_DOWNLOAD_BASE = 'https://github.com/stablyai/orca/releases/download'
 const FETCH_TIMEOUT_MS = 5000
+const MAX_ATOM_FEED_BYTES = 1024 * 1024
+const MAX_MANIFEST_BYTES = 256 * 1024
 const MAX_MANIFEST_PROBE_CANDIDATES = 6
+const MAX_MANIFEST_ASSETS = 16
+const RELEASE_ASSET_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+() -]{0,254}$/
 
 // Why: GitHub's atom feed lists every release (prerelease or stable) in a
 // single flat list. Each entry has a /releases/tag/<tag> URL we can mine
 // without any channel filtering.
-const TAG_HREF_RE = /href="https:\/\/github\.com\/stablyai\/orca\/releases\/tag\/([^"]+)"/g
+const TAG_HREF_RE = /href="https:\/\/github\.com\/([^/"]+)\/([^/"]+)\/releases\/tag\/([^"]+)"/g
 
-export function getReleaseDownloadUrl(tag: string): string {
-  return `${RELEASES_DOWNLOAD_BASE}/${encodeURIComponent(tag)}`
+export function getReleaseDownloadUrl(tag: string): string | null {
+  const github = resolveProductUpdateSource()?.github
+  return github ? `${github.releasesDownloadBase}/${encodeURIComponent(tag)}` : null
 }
 
 function getPlatformManifestName(): string {
@@ -26,12 +33,14 @@ function getPlatformManifestName(): string {
   return 'latest.yml'
 }
 
-function getReleaseManifestUrl(tag: string): string {
-  return `${getReleaseDownloadUrl(tag)}/${getPlatformManifestName()}`
+function getReleaseManifestUrl(tag: string): string | null {
+  const releaseDownloadUrl = getReleaseDownloadUrl(tag)
+  return releaseDownloadUrl ? `${releaseDownloadUrl}/${getPlatformManifestName()}` : null
 }
 
-function getReleaseAssetUrl(tag: string, assetName: string): string {
-  return `${getReleaseDownloadUrl(tag)}/${encodeURIComponent(assetName)}`
+function getReleaseAssetUrl(tag: string, assetName: string): string | null {
+  const releaseDownloadUrl = getReleaseDownloadUrl(tag)
+  return releaseDownloadUrl ? `${releaseDownloadUrl}/${encodeURIComponent(assetName)}` : null
 }
 
 export function normalizeTagToVersion(tag: string): string {
@@ -44,28 +53,42 @@ type ReleaseFeedTag = {
 }
 
 export function isPerfPrereleaseTag(tag: string): boolean {
-  const version = normalizeTagToVersion(tag)
-  const match = version.match(/^\d+\.\d+\.\d+-([0-9A-Za-z-.]+)(?:\+[0-9A-Za-z-.]+)?$/)
-  const identifiers = match?.[1]?.split('.') ?? []
-  return (
-    identifiers.length === 3 &&
-    identifiers[0] === 'rc' &&
-    /^\d+$/.test(identifiers[1]) &&
-    identifiers[2] === 'perf'
-  )
+  return /^v\d+\.\d+\.\d+-rc\.\d+\.perf$/.test(tag)
+}
+
+function isCanonicalStableTag(tag: string): boolean {
+  return /^v\d+\.\d+\.\d+$/.test(tag)
+}
+
+function isCanonicalRcTag(tag: string): boolean {
+  return /^v\d+\.\d+\.\d+-rc\.\d+$/.test(tag)
 }
 
 async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
+  const github = resolveProductUpdateSource()?.github
+  if (!github) {
+    return null
+  }
   try {
-    const res = await net.fetch(ATOM_FEED_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+    const res = await fetchWithProductUpdaterSession(github.atomFeedUrl, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    })
     if (!res.ok) {
+      await cancelUnreadResponseBody(res)
       return null
     }
-    const body = await res.text()
+    const body = await readResponseTextWithLimit(res, MAX_ATOM_FEED_BYTES)
+    if (body === null) {
+      return null
+    }
     const tags: ReleaseFeedTag[] = []
 
     for (const match of body.matchAll(TAG_HREF_RE)) {
-      const tag = match[1]
+      if (`${match[1]}/${match[2]}` !== github.repo) {
+        continue
+      }
+      const tag = match[3]
       const version = normalizeTagToVersion(tag)
       if (isValidVersion(version)) {
         tags.push({ tag, version })
@@ -105,12 +128,20 @@ function getManifestAssetNames(manifestText: string): string[] {
 
 type ReleaseReadiness = 'ready' | 'not-ready' | 'unavailable'
 
+function resolveApprovedReleaseAssetUrl(tag: string, assetName: string): string | null {
+  if (!RELEASE_ASSET_NAME_PATTERN.test(assetName)) {
+    return null
+  }
+  return getReleaseAssetUrl(tag, assetName)
+}
+
 async function isReleaseAssetAvailable(tag: string, assetName: string): Promise<ReleaseReadiness> {
   try {
-    const assetUrl = assetName.startsWith('http')
-      ? assetName
-      : getReleaseAssetUrl(tag, assetName.split('/').findLast(Boolean) ?? assetName)
-    const res = await net.fetch(assetUrl, {
+    const assetUrl = resolveApprovedReleaseAssetUrl(tag, assetName)
+    if (!assetUrl) {
+      return 'unavailable'
+    }
+    const res = await fetchReleaseResourceWithApprovedRedirects(assetUrl, {
       method: 'HEAD',
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
     })
@@ -126,22 +157,34 @@ async function getPlatformManifestReadiness(tag: string): Promise<ReleaseReadine
     // they have updater manifests or the ZIP/exe/AppImage assets referenced by
     // those manifests. Pinning to those tags makes download clicks 404.
     const manifestUrl = getReleaseManifestUrl(tag)
-    const res = await net.fetch(manifestUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+    if (!manifestUrl) {
+      return 'unavailable'
+    }
+    const res = await fetchReleaseResourceWithApprovedRedirects(manifestUrl, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    })
     if (res.status === 404) {
       return 'not-ready'
     }
     if (!res.ok) {
       return 'unavailable'
     }
-    const manifestText = await res.text()
+    const manifestText = await readResponseTextWithLimit(res, MAX_MANIFEST_BYTES)
+    if (manifestText === null) {
+      return 'unavailable'
+    }
     let assetNames: string[]
     try {
       assetNames = getManifestAssetNames(manifestText)
     } catch {
       return 'not-ready'
     }
+    assetNames = [...new Set(assetNames)]
     if (assetNames.length === 0) {
       return 'not-ready'
+    }
+    if (assetNames.length > MAX_MANIFEST_ASSETS) {
+      return 'unavailable'
     }
     const assetResults = await Promise.all(
       assetNames.map((assetName) => isReleaseAssetAvailable(tag, assetName))
@@ -176,7 +219,7 @@ type FetchNewerReleaseTagOptions = {
 
 export type FetchNewerReleaseTagsResult =
   | { tags: string[]; state: 'ready' }
-  | { tags: string[]; state: 'no-newer' }
+  | { tags: string[]; state: 'no-newer'; currentTag?: string }
   | { tags: string[]; state: 'not-ready'; lastGoodTag?: string }
   | { tags: string[]; state: 'unavailable'; unavailableReason: 'feed' | 'manifest' }
 
@@ -215,13 +258,25 @@ export async function fetchNewerReleaseTagsWithReadiness(
     options.releaseFilter === 'perf'
       ? tags.filter(({ tag }) => isPerfPrereleaseTag(tag))
       : includePrerelease
-        ? tags.filter(({ tag }) => !isPerfPrereleaseTag(tag))
-        : tags.filter(({ version }) => !isPrereleaseVersion(version))
+        ? tags.filter(({ tag }) => isCanonicalStableTag(tag) || isCanonicalRcTag(tag))
+        : tags.filter(({ tag }) => isCanonicalStableTag(tag))
   const newestNewerIndex = candidates.findIndex(
     ({ version }) => compareVersions(version, currentVersion) > 0
   )
   if (newestNewerIndex === -1) {
-    return { tags: [], state: 'no-newer' }
+    const currentTag = candidates.find(
+      ({ version }) => compareVersions(version, currentVersion) === 0
+    )?.tag
+    if (!currentTag) {
+      return { tags: [], state: 'no-newer' }
+    }
+    const readiness = await getPlatformManifestReadiness(currentTag)
+    if (readiness === 'ready') {
+      return { tags: [], state: 'no-newer', currentTag }
+    }
+    return readiness === 'unavailable'
+      ? { tags: [], state: 'unavailable', unavailableReason: 'manifest' }
+      : { tags: [], state: 'not-ready' }
   }
 
   // Why: a cancelled release can leave several feed entries without manifests,

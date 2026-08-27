@@ -95,33 +95,34 @@ export class SkillSharePreparationService {
         input.sources ?? (input.sourceDirectory ? [{ sourceDirectory: input.sourceDirectory }] : [])
       const sources = await Promise.all(
         requestedSources.map(async (source) => {
-          if (
-            (this.options.platform ?? process.platform) !== 'win32' ||
-            !this.options.installStateDirectory
-          ) {
+          if ((this.options.platform ?? process.platform) !== 'win32') {
             return source
           }
-          let receipt = await readSkillInstallReceipt(
-            this.options.installStateDirectory,
-            source.sourceDirectory
-          )
-          if (!receipt) {
-            const physicalSource = await realpath(source.sourceDirectory).catch(() => null)
-            if (physicalSource) {
-              receipt = await readSkillInstallReceipt(
+          // Canonicalize only the provider root; package observation still rejects nested links.
+          const physicalSource = await realpath(source.sourceDirectory).catch(() => null)
+          let receipt = this.options.installStateDirectory
+            ? await readSkillInstallReceipt(
                 this.options.installStateDirectory,
-                physicalSource
+                source.sourceDirectory
               )
-            }
+            : null
+          if (!receipt && physicalSource && this.options.installStateDirectory) {
+            receipt = await readSkillInstallReceipt(
+              this.options.installStateDirectory,
+              physicalSource
+            )
           }
-          return receipt?.fileModes
-            ? {
-                ...source,
-                executablePaths: new Set(
-                  receipt.fileModes.filter((file) => file.executable).map((file) => file.path)
-                )
-              }
-            : source
+          return {
+            ...source,
+            sourceDirectory: physicalSource ?? source.sourceDirectory,
+            ...(receipt?.fileModes
+              ? {
+                  executablePaths: new Set(
+                    receipt.fileModes.filter((file) => file.executable).map((file) => file.path)
+                  )
+                }
+              : {})
+          }
         })
       )
       const created = await createSkillBundleArchive({

@@ -14,15 +14,16 @@ import {
 import { isImageRefBlock, isTextBlock } from '../../../src/shared/native-chat-types'
 import type { NativeChatBlock, NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { MobileMarkdown } from '../components/MobileMarkdown'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { isRenderableImageUri } from './mobile-native-chat-image-preview'
-import { styles, TEXT_SIZE } from './mobile-native-chat-message-styles'
+import { createMobileNativeChatMessageStyles } from './mobile-native-chat-message-styles'
 import { nativeChatMessageText } from './mobile-native-chat-message-text'
 
 const MAX_VISIBLE_TOOL_PAIRS = 6
 const MAX_TOOL_RUN_DIFF_ROWS = 240
 
 function DiffView({ lines }: { lines: DiffLine[] }): React.JSX.Element {
+  const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   return (
     <View style={styles.diff}>
       {lines.map((line, i) => (
@@ -55,6 +56,7 @@ function ResultBody({
   isError?: boolean
   diff: DiffLine[] | null
 }): React.JSX.Element {
+  const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   if (diff) {
     return <DiffView lines={diff} />
   }
@@ -78,9 +80,11 @@ function ToolLine({
   diffLineLimit: number
   onOpenFile?: (relativePath: string) => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   const [expanded, setExpanded] = useState(defaultExpanded)
   const { call, result } = pair
-  const name = call ? call.name : 'Result'
+  const name = call ? call.name : '结果'
   const inputDisplay = call ? createToolInputDisplay(call.input) : null
   const preview = inputDisplay?.label ?? result?.output.split('\n')[0]?.slice(0, 80) ?? ''
   // Why: collapsed tool rows are the common path; defer bounded diff parsing
@@ -103,11 +107,13 @@ function ToolLine({
         style={styles.toolLine}
         onPress={() => hasDetail && setExpanded((v) => !v)}
         hitSlop={6}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showDetail }}
       >
         {showDetail ? (
-          <ChevronDown size={15} color={colors.textMuted} strokeWidth={2} />
+          <ChevronDown size={16} color={theme.color.text.tertiary} strokeWidth={2} />
         ) : (
-          <SquareChevronRight size={15} color={colors.textMuted} strokeWidth={2} />
+          <SquareChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
         )}
         <Text style={styles.toolName}>{name}</Text>
         {preview ? (
@@ -145,12 +151,24 @@ function Prose({
   fontScale: number
   onOpenFile?: (relativePath: string) => void
 }): React.JSX.Element | null {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   if (isTextBlock(block)) {
     // Inverted (user) bubbles use a fixed dark-on-light text rather than the
     // markdown renderer's light-on-dark palette.
     if (invert) {
       return (
-        <Text style={[styles.userText, { fontSize: TEXT_SIZE * fontScale }]}>{block.text}</Text>
+        <Text
+          style={[
+            styles.userText,
+            {
+              fontSize: theme.typography.body.fontSize * fontScale,
+              lineHeight: theme.typography.body.lineHeight * fontScale
+            }
+          ]}
+        >
+          {block.text}
+        </Text>
       )
     }
     return (
@@ -167,13 +185,21 @@ function Prose({
           source={{ uri }}
           style={styles.imageThumb}
           resizeMode="contain"
-          accessibilityLabel={block.alt ?? 'Attached image'}
+          accessibilityLabel={block.alt ?? '已附加图片'}
         />
       )
     }
     return (
-      <Text style={[styles.imageRef, { fontSize: TEXT_SIZE * fontScale }]}>
-        🖼 {block.alt ?? block.path ?? block.url ?? 'image'}
+      <Text
+        style={[
+          styles.imageRef,
+          {
+            fontSize: theme.typography.body.fontSize * fontScale,
+            lineHeight: theme.typography.body.lineHeight * fontScale
+          }
+        ]}
+      >
+        图片：{block.alt ?? block.path ?? block.url ?? '图像'}
       </Text>
     )
   }
@@ -194,6 +220,8 @@ function ToolRun({
   trailing?: React.ReactNode
   onOpenFile?: (relativePath: string) => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   const [open, setOpen] = useState(defaultExpanded)
   const pairs = pairToolBlocks(blocks, MAX_VISIBLE_TOOL_PAIRS)
   const diffLineLimit = Math.max(1, Math.floor(MAX_TOOL_RUN_DIFF_ROWS / (pairs.length * 2 || 1)))
@@ -208,15 +236,22 @@ function ToolRun({
   return (
     <View style={styles.toolRun}>
       <View style={styles.toolRunHeader}>
-        <Pressable style={styles.toolRunToggle} onPress={() => setOpen((v) => !v)} hitSlop={6}>
+        <Pressable
+          style={styles.toolRunToggle}
+          onPress={() => setOpen((v) => !v)}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={`${callCount} 次工具调用`}
+        >
           {open ? (
-            <ChevronDown size={15} color={colors.textMuted} strokeWidth={2} />
+            <ChevronDown size={16} color={theme.color.text.tertiary} strokeWidth={2} />
           ) : (
-            <SquareChevronRight size={15} color={colors.textMuted} strokeWidth={2} />
+            <SquareChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
           )}
           <Text style={styles.toolRunCount}>{callCount}×</Text>
           <Text style={styles.toolRunLabel} numberOfLines={1}>
-            {summary || `${callCount} tool ${callCount === 1 ? 'call' : 'calls'}`}
+            {summary || `${callCount} 次工具调用`}
           </Text>
         </Pressable>
         {trailing}
@@ -233,7 +268,7 @@ function ToolRun({
             />
           ))}
           {callCount > pairs.length ? (
-            <Text style={styles.toolPreview}>… {callCount - pairs.length} more tool calls</Text>
+            <Text style={styles.toolPreview}>还有 {callCount - pairs.length} 次工具调用</Text>
           ) : null}
         </View>
       ) : null}
@@ -250,24 +285,26 @@ function AgentControls({
   onCopy: () => void
   onScrollToTop?: () => void
 }): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   return (
     <View style={styles.controls}>
       <Pressable
         style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}
         onPress={onCopy}
         hitSlop={8}
-        accessibilityLabel="Copy message"
+        accessibilityLabel="复制消息"
       >
-        <Copy size={14} color={colors.textMuted} strokeWidth={2} />
+        <Copy size={16} color={theme.color.text.tertiary} strokeWidth={2} />
       </Pressable>
       {onScrollToTop ? (
         <Pressable
           style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}
           onPress={onScrollToTop}
           hitSlop={8}
-          accessibilityLabel="Scroll this message to top"
+          accessibilityLabel="将此消息滚动到顶部"
         >
-          <ArrowUp size={14} color={colors.textMuted} strokeWidth={2} />
+          <ArrowUp size={16} color={theme.color.text.tertiary} strokeWidth={2} />
         </Pressable>
       ) : null}
     </View>
@@ -292,6 +329,7 @@ function MobileNativeChatMessageImpl({
   onScrollToMessage?: (index: number) => void
   onOpenFile?: (relativePath: string) => void
 }): React.JSX.Element {
+  const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   const isUser = message.role === 'user'
   const isReasoning = message.role === 'reasoning'
   const isAgent = !isUser

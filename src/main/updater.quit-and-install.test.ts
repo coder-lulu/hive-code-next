@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PRE_COMMIT_INSTALL_FAILURE } from './updater-test-harness'
+import type * as UpdaterModule from './updater'
 
 const {
   nativeUpdaterMock,
@@ -11,10 +12,6 @@ const {
   moduleFactories,
   resetUpdaterMocks
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
-
-const { launchPathScope } = vi.hoisted(() => ({
-  launchPathScope: { active: false, calls: 0 }
-}))
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -29,23 +26,54 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
-vi.mock('./startup/hydrate-shell-path', () => ({
-  runWithLaunchPath: (action: () => unknown): unknown => {
-    launchPathScope.active = true
-    launchPathScope.calls += 1
-    try {
-      return action()
-    } finally {
-      launchPathScope.active = false
-    }
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
+vi.mock('./linux-root-package-install-policy', () =>
+  moduleFactories.linuxRootPackageInstallPolicy()
+)
+
+async function reachVerifiedAvailableUpdate(
+  updater: typeof UpdaterModule,
+  version: string
+): Promise<void> {
+  fetchNewerReleaseTagsMock.mockResolvedValue({ tags: [`v${version}`], state: 'ready' })
+  autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+  autoUpdaterMock.checkForUpdates.mockImplementationOnce(() => {
+    autoUpdaterMock.emit('checking-for-update')
+    queueMicrotask(() => autoUpdaterMock.emit('update-available', { version }))
+    return Promise.resolve(undefined)
+  })
+  updater.checkForUpdatesFromMenu()
+  await vi.waitFor(() => {
+    expect(updater.getUpdateStatus()).toEqual(
+      expect.objectContaining({ state: 'available', version })
+    )
+  })
+}
+
+async function reachVerifiedDownloadedUpdate(version: string): Promise<void> {
+  const updater = await import('./updater')
+  if (updater.getUpdateStatus().state !== 'available') {
+    await reachVerifiedAvailableUpdate(updater, version)
   }
-}))
+  autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+  updater.downloadUpdate()
+  autoUpdaterMock.emit('update-downloaded', { version })
+  if (process.platform === 'darwin') {
+    const ready = nativeUpdaterMock.on.mock.calls.find(
+      ([eventName]) => eventName === 'update-downloaded'
+    )?.[1] as (() => void) | undefined
+    ready?.()
+  }
+  await Promise.resolve()
+}
 
 describe('updater', () => {
   beforeEach(() => {
     resetUpdaterMocks()
-    launchPathScope.active = false
-    launchPathScope.calls = 0
   })
 
   it('still surfaces updater error events while a download is in flight', async () => {
@@ -135,12 +163,8 @@ describe('updater', () => {
     expect(autoUpdaterMock.downloadUpdate).toHaveBeenCalledTimes(2)
   })
 
-  it('defers quitAndInstall and runs its launcher within the launch PATH scope', async () => {
+  it('rejects quitAndInstall when no downloaded update or recovery exists', async () => {
     vi.useFakeTimers()
-    let launcherSawLaunchPathScope = false
-    autoUpdaterMock.quitAndInstall.mockImplementation(() => {
-      launcherSawLaunchPathScope = launchPathScope.active
-    })
 
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
@@ -154,11 +178,8 @@ describe('updater', () => {
     expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(1)
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1)
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true)
-    expect(launcherSawLaunchPathScope).toBe(true)
-    expect(launchPathScope.calls).toBe(1)
-    expect(launchPathScope.active).toBe(false)
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+    expect(killAllPtyMock).not.toHaveBeenCalled()
   })
 
   it('runs pre-quit cleanup before local PTY cleanup during update install', async () => {
@@ -168,7 +189,11 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never, { onBeforeQuit })
+    setupAutoUpdater(mainWindow as never, {
+      onBeforeQuit,
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -186,7 +211,8 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
     quitAndInstall()
 
@@ -208,7 +234,11 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never, { onBeforeQuit })
+    setupAutoUpdater(mainWindow as never, {
+      onBeforeQuit,
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -239,7 +269,8 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: sendMock } }
     const { setupAutoUpdater, quitAndInstall, isQuittingForUpdate } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -287,7 +318,7 @@ describe('updater', () => {
       })
     })
 
-    autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
+    await reachVerifiedDownloadedUpdate('1.0.61')
 
     // Why: on macOS install commits only once Squirrel is ready; mark it ready so this test covers the post-commit path on all platforms.
     if (process.platform === 'darwin') {
@@ -345,7 +376,7 @@ describe('updater', () => {
       })
     })
 
-    autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     // Why: on macOS install commits only once Squirrel is ready; mark it ready so this test covers the committed path on all platforms.
     if (process.platform === 'darwin') {
       const nativeDownloadedHandler = nativeUpdaterMock.on.mock.calls.find(
@@ -379,7 +410,8 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const { setupAutoUpdater, quitAndInstall, isQuittingForUpdate } = await import('./updater')
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
 
     await vi.advanceTimersByTimeAsync(100)
@@ -408,6 +440,7 @@ describe('updater', () => {
       onBeforeQuit,
       getLastUpdateCheckAt: () => Date.now()
     })
+    await reachVerifiedDownloadedUpdate('1.0.61')
     quitAndInstall()
     await vi.advanceTimersByTimeAsync(100)
 

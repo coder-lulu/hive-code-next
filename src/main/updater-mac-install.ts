@@ -4,6 +4,9 @@ import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
 
 const MAC_INSTALL_READY_TIMEOUT_MS = 15000
 
+/** Epoch that binds macOS installer readiness to a specific download cycle. */
+let macDownloadGeneration = 0
+
 /** Whether Squirrel.Mac has finished downloading the update from the localhost proxy. */
 let squirrelReady = false
 /** Remembers a user/app quit request that arrived before Squirrel.Mac had a
@@ -18,6 +21,15 @@ let quitAndInstallInFlight = false
 let bypassMacInstallGuardOnce = false
 let pendingInstallTimeout: ReturnType<typeof setTimeout> | null = null
 
+/**
+ * Electron's native macOS updater emits no version/request identity. Consequently only one physical
+ * download generation can ever be authorized in a process: after reset, overlap, or an unexpected
+ * extra native signal, no later signal can be proven to belong to the current package.
+ */
+let macNativeReadyLifetimeGeneration: number | null = null
+let pendingMacNativeReadyGeneration: number | null = null
+let macNativeReadyPoisoned = false
+
 function clearPendingInstallTimeout(): void {
   if (pendingInstallTimeout) {
     clearTimeout(pendingInstallTimeout)
@@ -26,6 +38,11 @@ function clearPendingInstallTimeout(): void {
 }
 
 export function resetMacInstallState(): void {
+  if (macNativeReadyLifetimeGeneration !== null) {
+    poisonMacNativeReadiness('state-reset-after-physical-download')
+  }
+  macDownloadGeneration += 1
+  squirrelReady = false
   installRequestedAfterSquirrelReady = false
   quitAndInstallInFlight = false
   bypassMacInstallGuardOnce = false
@@ -34,7 +51,55 @@ export function resetMacInstallState(): void {
 
 export function beginMacUpdateDownload(): void {
   resetMacInstallState()
+}
+
+export function getMacDownloadGeneration(): number {
+  return macDownloadGeneration
+}
+
+function poisonMacNativeReadiness(reason: string): void {
+  if (macNativeReadyPoisoned) {
+    return
+  }
+  macNativeReadyPoisoned = true
+  pendingMacNativeReadyGeneration = null
   squirrelReady = false
+  recordUpdaterLifecycle(
+    'macos_native_ready_poisoned',
+    { reason, currentGeneration: macDownloadGeneration },
+    {
+      level: 'warn',
+      message: 'macOS native updater readiness became ambiguous; restart required before retrying'
+    }
+  )
+}
+
+export function captureMacDownloadGenerationForNativeReady(): number {
+  if (macNativeReadyPoisoned) {
+    return macDownloadGeneration
+  }
+  if (macNativeReadyLifetimeGeneration === null) {
+    macNativeReadyLifetimeGeneration = macDownloadGeneration
+    pendingMacNativeReadyGeneration = macDownloadGeneration
+    return macDownloadGeneration
+  }
+  if (macNativeReadyLifetimeGeneration !== macDownloadGeneration) {
+    poisonMacNativeReadiness('multiple-physical-download-generations')
+  }
+  return macDownloadGeneration
+}
+
+export function consumePendingMacNativeReadyGeneration(): number | null {
+  if (macNativeReadyPoisoned) {
+    return null
+  }
+  if (pendingMacNativeReadyGeneration === null) {
+    poisonMacNativeReadiness('unexpected-or-duplicate-native-ready')
+    return null
+  }
+  const generation = pendingMacNativeReadyGeneration
+  pendingMacNativeReadyGeneration = null
+  return generation
 }
 
 export function markMacQuitAndInstallInFlight(): void {
@@ -57,14 +122,23 @@ export function isMacQuitAndInstallInFlight(): boolean {
 }
 
 export function isMacInstallerReady(): boolean {
-  return squirrelReady
+  return squirrelReady && !macNativeReadyPoisoned
+}
+
+export function hasMacInstallAuthority(): boolean {
+  return process.platform !== 'darwin' || isMacInstallerReady()
 }
 
 export function isWaitingForMacInstallerReadiness(
   currentStatus: UpdateStatus,
   hasNewerDownloadedVersion: boolean
 ): boolean {
-  if (process.platform !== 'darwin' || squirrelReady || !hasNewerDownloadedVersion) {
+  if (
+    process.platform !== 'darwin' ||
+    squirrelReady ||
+    macNativeReadyPoisoned ||
+    !hasNewerDownloadedVersion
+  ) {
     return false
   }
 
@@ -117,18 +191,32 @@ export function deferMacQuitUntilInstallerReady(
 }
 
 export function handleMacInstallerReady(
+  generation: number,
   hasNewerDownloadedVersion: boolean,
   onReadyToInstall: () => void | Promise<void>,
   onReadyToReportDownloaded: () => void
 ): void {
+  // Why: a late native-ready signal from an older download cycle must not arm
+  // install for a different candidate that replaced it.
+  if (macNativeReadyPoisoned || generation !== macDownloadGeneration) {
+    recordUpdaterLifecycle('macos_installer_ready_ignored', {
+      reason: macNativeReadyPoisoned ? 'ambiguous-native-ready' : 'stale-generation',
+      eventGeneration: generation,
+      currentGeneration: macDownloadGeneration,
+      hasNewerDownloadedVersion
+    })
+    return
+  }
   squirrelReady = true
   clearPendingInstallTimeout()
   recordUpdaterLifecycle('macos_installer_ready', {
     deferredInstallRequested: installRequestedAfterSquirrelReady,
-    hasNewerDownloadedVersion
+    hasNewerDownloadedVersion,
+    generation
   })
 
   if (installRequestedAfterSquirrelReady && hasNewerDownloadedVersion) {
+    onReadyToReportDownloaded()
     void Promise.resolve()
       .then(() => onReadyToInstall())
       .catch((error) => {

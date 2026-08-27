@@ -2,6 +2,7 @@ import type { MessageType, MessageRow } from '../../types'
 import { exposeMessageTimestamps, exposeMessageListTimestamps } from '../utc-timestamp'
 import { addLifecycleRejectionMarker } from '../lifecycle-rejection-marker'
 import type { OrchestrationDb } from '../orchestration-db'
+import { APP_DISPLAY_NAME } from '../../../../../shared/brand'
 
 const MESSAGE_ID_UPDATE_BATCH_SIZE = 500
 const MESSAGE_MUTATION_SAVEPOINT = 'message_id_mutation'
@@ -72,7 +73,7 @@ export function convertLifecycleMessageToRejection(
   }
 
   const originalBody = message.body ? `\n\nOriginal body:\n${message.body}` : ''
-  const body = `Orca rejected this ${message.type}: ${reason}${originalBody}`
+  const body = `${APP_DISPLAY_NAME} rejected this ${message.type}: ${reason}${originalBody}`
   const payload = addLifecycleRejectionMarker(message.payload, code, reason)
   // Why: rejected lifecycle signals stay auditable but must not reach read paths as actionable completion/liveness events.
   this.db

@@ -6,6 +6,7 @@
 import { app } from 'electron'
 import { homedir, platform } from 'node:os'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 function getUserDataDir(): string {
   try {
@@ -15,12 +16,12 @@ function getUserDataDir(): string {
     // fallback so callers can resolve the path without the Electron runtime.
     const home = homedir()
     if (platform() === 'darwin') {
-      return join(home, 'Library', 'Application Support', 'Orca')
+      return join(home, 'Library', 'Application Support', APP_DISPLAY_NAME)
     }
     if (platform() === 'win32') {
-      return join(process.env.APPDATA ?? home, 'Orca')
+      return join(process.env.APPDATA ?? home, APP_DISPLAY_NAME)
     }
-    return join(home, '.config', 'Orca')
+    return join(home, '.config', APP_DISPLAY_NAME)
   }
 }
 

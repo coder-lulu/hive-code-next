@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@vscode/windows-process-tree@0.8.0':
-    hash: 73a90530e6b95c05dac50f2c48787fb51cb292587773016ebe57eb05e41075a0
+    hash: 275e4b23de329307437a6633e35e5d2128b10daf767e013f9dfeb261fa3ffae2
     path: config/patches/@vscode__windows-process-tree@0.8.0.patch
   '@xterm/addon-ligatures@0.11.0-beta.287':
     hash: 47405b9994b5acf1b4e90b49250358c1ca03649854d59560e7732b72fe336920
@@ -24,10 +24,10 @@ patchedDependencies:
     hash: 46796c152f3b73e28238f44499eaf5a867a863809bc7b470b159526a41e354f7
     path: config/patches/@xterm__xterm@6.1.0-beta.287.patch
   lint-staged@16.4.0:
-    hash: 7333b3837f80a7fbd045964db6d76ba4fc118e49134bdbabb00585b6b7b60673
+    hash: bdd871d794e360f5cd1969b627c168f3a1f5dbbb3fa57dcf767bb4fd6a54849f
     path: config/patches/lint-staged@16.4.0.patch
   node-pty@1.1.0:
-    hash: 9c665d9e41571341cb8986607d531b953a7f32c0dd60e1e74e633c098d80f2c1
+    hash: abfd86abce11317deea20c2e1e001b0a1e28d56ba605f285aea785b698585ebb
     path: config/patches/node-pty@1.1.0.patch
 
 importers:
@@ -59,7 +59,7 @@ importers:
         specifier: ~0.27.0
         version: 0.27.0
       electron-updater:
-        specifier: ^6.8.9
+        specifier: 6.8.9
         version: 6.8.9
       i18next:
         specifier: ^26.3.1
@@ -69,7 +69,7 @@ importers:
         version: 3.3.1
       node-pty:
         specifier: ^1.1.0
-        version: 1.1.0(patch_hash=9c665d9e41571341cb8986607d531b953a7f32c0dd60e1e74e633c098d80f2c1)
+        version: 1.1.0(patch_hash=abfd86abce11317deea20c2e1e001b0a1e28d56ba605f285aea785b698585ebb)
       posthog-node:
         specifier: ^5.33.3
         version: 5.33.3
@@ -246,7 +246,7 @@ importers:
         specifier: ^3.4.13
         version: 3.4.13
       electron:
-        specifier: ^43.1.0
+        specifier: 43.1.0
         version: 43.1.0
       electron-builder:
         specifier: ^26.15.3
@@ -280,7 +280,7 @@ importers:
         version: 0.16.45
       lint-staged:
         specifier: ^16.4.0
-        version: 16.4.0(patch_hash=7333b3837f80a7fbd045964db6d76ba4fc118e49134bdbabb00585b6b7b60673)
+        version: 16.4.0(patch_hash=bdd871d794e360f5cd1969b627c168f3a1f5dbbb3fa57dcf767bb4fd6a54849f)
       lowlight:
         specifier: ^3.3.0
         version: 3.3.0
@@ -393,7 +393,7 @@ importers:
         specifier: npm:rolldown-vite@7.3.1
         version: rolldown-vite@7.3.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.8.4)
       vitest:
-        specifier: ^4.1.5
+        specifier: 4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.9.5)(happy-dom@20.9.0)(msw@2.14.3(@types/node@25.9.5)(typescript@7.0.2))(rolldown-vite@7.3.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.8.4))
       vscode-oniguruma:
         specifier: ^2.0.1
@@ -407,7 +407,7 @@ importers:
     optionalDependencies:
       '@vscode/windows-process-tree':
         specifier: 0.8.0
-        version: 0.8.0(patch_hash=73a90530e6b95c05dac50f2c48787fb51cb292587773016ebe57eb05e41075a0)
+        version: 0.8.0(patch_hash=275e4b23de329307437a6633e35e5d2128b10daf767e013f9dfeb261fa3ffae2)
       sherpa-onnx-darwin-arm64:
         specifier: 1.12.37
         version: 1.12.37
@@ -3390,6 +3390,7 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xterm/addon-fit@0.12.0-beta.287':
     resolution: {integrity: sha512-2MDj+J4x67bjOS/SuBPxSYEWH38NbX6ENV18RbKVOhfRYCX3yERnuHBOrgH9hYdY8rCtsLQmuVgF6cmvCJiV2w==}
@@ -9605,7 +9606,7 @@ snapshots:
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.0
 
-  '@vscode/windows-process-tree@0.8.0(patch_hash=73a90530e6b95c05dac50f2c48787fb51cb292587773016ebe57eb05e41075a0)':
+  '@vscode/windows-process-tree@0.8.0(patch_hash=275e4b23de329307437a6633e35e5d2128b10daf767e013f9dfeb261fa3ffae2)':
     dependencies:
       node-addon-api: 7.1.0
     optional: true
@@ -11395,7 +11396,7 @@ snapshots:
 
   linkifyjs@4.3.2: {}
 
-  lint-staged@16.4.0(patch_hash=7333b3837f80a7fbd045964db6d76ba4fc118e49134bdbabb00585b6b7b60673):
+  lint-staged@16.4.0(patch_hash=bdd871d794e360f5cd1969b627c168f3a1f5dbbb3fa57dcf767bb4fd6a54849f):
     dependencies:
       commander: 14.0.3
       listr2: 9.0.5
@@ -12046,7 +12047,7 @@ snapshots:
 
   node-int64@0.4.0: {}
 
-  node-pty@1.1.0(patch_hash=9c665d9e41571341cb8986607d531b953a7f32c0dd60e1e74e633c098d80f2c1):
+  node-pty@1.1.0(patch_hash=abfd86abce11317deea20c2e1e001b0a1e28d56ba605f285aea785b698585ebb):
     dependencies:
       node-addon-api: 7.1.1
 

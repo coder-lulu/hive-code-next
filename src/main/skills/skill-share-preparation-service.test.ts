@@ -122,6 +122,33 @@ describe('SkillSharePreparationService', () => {
     expect(prepared.skills?.[0]?.executablePaths).toEqual(['run.sh'])
   })
 
+  it('rejects nested links below a Windows provider junction', async () => {
+    const { root, source } = await createSource()
+    const outside = join(root, 'outside')
+    await mkdir(outside)
+    await writeFile(join(outside, 'payload.txt'), 'outside\n')
+    await symlink(
+      outside,
+      join(source, 'nested-link'),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    )
+    const providerSource = join(root, 'provider-source')
+    await symlink(
+      await realpath(source),
+      providerSource,
+      process.platform === 'win32' ? 'junction' : 'dir'
+    )
+    const service = new SkillSharePreparationService(
+      join(root, 'preparations'),
+      { publishVersion: vi.fn(), createShare: vi.fn() },
+      { platform: 'win32' }
+    )
+
+    await expect(service.prepare({ sourceDirectory: providerSource })).rejects.toThrow(
+      'skill-package-link'
+    )
+  })
+
   it('retries initialization after a transient failure', async () => {
     const { root, source } = await createSource()
     const preparationRoot = join(root, 'preparations')

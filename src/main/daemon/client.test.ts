@@ -10,6 +10,7 @@ import { encodeNdjson, NDJSON_MAX_LINE_BYTES, NdjsonLineTooLongError } from './n
 import { DaemonConnectionLostError } from './types'
 import type { HelloMessage, DaemonRequest, DaemonEvent } from './types'
 import { getDaemonSocketPath } from './daemon-spawner'
+import { applyProductBranding } from '../../shared/brand'
 
 function createTestDir(): string {
   return mkdtempSync(join(tmpdir(), 'daemon-client-test-'))
@@ -508,7 +509,9 @@ describe('DaemonClient', () => {
       await client.ensureConnected()
 
       await expect(client.request('listSessions', undefined)).rejects.toThrow(
-        "Daemon's node-pty install is gone (worktree deleted?). Restart Orca. node-pty: posix_spawn failed: ENOENT"
+        applyProductBranding(
+          "Daemon's node-pty install is gone (worktree deleted?). Restart Orca. node-pty: posix_spawn failed: ENOENT"
+        )
       )
     })
   })

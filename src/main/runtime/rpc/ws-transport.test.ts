@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it, afterEach, vi } from 'vitest'
 import WebSocket from 'ws'
 import { WebSocketTransport } from './ws-transport'
+import { rejectWebSocketOverCapacity } from './ws-connection-admission'
 import { loadOrCreateTlsCertificate } from '../tls-certificate'
 
 // Why: disable TLS verification for self-signed certs in tests.
@@ -93,6 +94,54 @@ describe('WebSocketTransport', () => {
 
     await transport.start()
     await transport.stop()
+  })
+
+  it('retains the upgrade path and Origin for principal-specific authentication', async () => {
+    const { transport } = await createTransport()
+    let observed: ReturnType<WebSocketTransport['getConnectionRequest']> | null = null
+    transport.onMessage((_message, reply, ws) => {
+      observed = transport.getConnectionRequest(ws)
+      transport.setClientId(ws, 'test-client')
+      reply('ok')
+    })
+    await transport.start()
+    const ws = await new Promise<WebSocket>((resolve, reject) => {
+      const socket = new WebSocket(`wss://127.0.0.1:${transport.resolvedPort}/_hive/runtime-rpc`, {
+        rejectUnauthorized: false,
+        origin: 'https://code.hivekernel.com'
+      })
+      socket.once('open', () => resolve(socket))
+      socket.once('error', reject)
+    })
+
+    await expect(sendAndReceive(ws, 'probe')).resolves.toBe('ok')
+    expect(observed).toEqual({
+      pathname: '/_hive/runtime-rpc',
+      origin: 'https://code.hivekernel.com'
+    })
+    ws.close()
+  })
+
+  it('does not treat a query-bearing upgrade target as an exact Cloud socket path', async () => {
+    const { transport } = await createTransport()
+    let observed: ReturnType<WebSocketTransport['getConnectionRequest']> | null = null
+    transport.onMessage((_message, reply, ws) => {
+      observed = transport.getConnectionRequest(ws)
+      reply('ok')
+    })
+    await transport.start()
+    const ws = await new Promise<WebSocket>((resolve, reject) => {
+      const socket = new WebSocket(
+        `wss://127.0.0.1:${transport.resolvedPort}/_hive/runtime-rpc?credential=forbidden`,
+        { rejectUnauthorized: false, origin: 'https://code.hivekernel.com' }
+      )
+      socket.once('open', () => resolve(socket))
+      socket.once('error', reject)
+    })
+
+    await expect(sendAndReceive(ws, 'probe')).resolves.toBe('ok')
+    expect(observed).toEqual({ pathname: null, origin: 'https://code.hivekernel.com' })
+    ws.close()
   })
 
   it('arms heartbeat only while accepted connections exist', async () => {
@@ -441,9 +490,7 @@ describe('WebSocketTransport', () => {
 
     vi.useFakeTimers()
     try {
-      ;(transport as unknown as { rejectOverCapacity(ws: WebSocket): void }).rejectOverCapacity(
-        serverSocket!
-      )
+      rejectWebSocketOverCapacity(serverSocket!)
       vi.advanceTimersByTime(1_000)
     } finally {
       vi.useRealTimers()

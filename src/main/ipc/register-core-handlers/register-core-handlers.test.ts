@@ -65,7 +65,8 @@ const {
   registerLocalhostWorktreeLabelHandlersMock,
   registerNativeChatHandlersMock,
   registerEmulatorFrameStreamHandlersMock,
-  registerEmulatorVideoStreamHandlersMock
+  registerEmulatorVideoStreamHandlersMock,
+  registerHiveAccountHandlersMock
 } = vi.hoisted(() => ({
   getPathMock: vi.fn(() => '/test/user-data'),
   listEnvironmentsMock: vi.fn(() => []),
@@ -131,13 +132,18 @@ const {
   registerLocalhostWorktreeLabelHandlersMock: vi.fn(),
   registerNativeChatHandlersMock: vi.fn(),
   registerEmulatorFrameStreamHandlersMock: vi.fn(),
-  registerEmulatorVideoStreamHandlersMock: vi.fn()
+  registerEmulatorVideoStreamHandlersMock: vi.fn(),
+  registerHiveAccountHandlersMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
   app: {
     getPath: getPathMock
   }
+}))
+
+vi.mock('./hive-account', () => ({
+  registerHiveAccountHandlers: registerHiveAccountHandlersMock
 }))
 
 vi.mock('../../shared/runtime-environment-store', () => ({
@@ -454,6 +460,7 @@ describe('registerCoreHandlers', () => {
     registerNativeChatHandlersMock.mockReset()
     registerEmulatorFrameStreamHandlersMock.mockReset()
     registerEmulatorVideoStreamHandlersMock.mockReset()
+    registerHiveAccountHandlersMock.mockReset()
   })
 
   it('passes the store through to handler registrars that need it', async () => {
@@ -540,6 +547,7 @@ describe('registerCoreHandlers', () => {
     expect(registerWorkspacePortHandlersMock).toHaveBeenCalledWith(store)
     expect(registerLocalhostWorktreeLabelHandlersMock).toHaveBeenCalledWith(store)
     expect(registerTelemetryHandlersMock).toHaveBeenCalledWith(store)
+    expect(registerHiveAccountHandlersMock).toHaveBeenCalledWith(undefined)
     expect(registerOrcaProfileHandlersMock).toHaveBeenCalledWith(store, { onBeforeRelaunch })
     expect(registerSessionHandlersMock).toHaveBeenCalledWith(store)
     expect(registerUIHandlersMock).toHaveBeenCalledWith(store, {

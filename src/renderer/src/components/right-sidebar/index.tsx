@@ -27,10 +27,15 @@ import { RightSidebarTopActivityBar } from './right-sidebar-top-activity-bar'
 import { useRightSidebarActivityItems } from './use-right-sidebar-activity-items'
 import { useRightSidebarTabRouting } from './use-right-sidebar-tab-routing'
 import { useWindowWidth } from './use-window-width'
+import { SidebarSettingsHelpMenu } from '../sidebar/SidebarSettingsHelpMenu'
 
 const ACTIVITY_BAR_SIDE_WIDTH = 40
 
-function RightSidebarInner(): React.JSX.Element {
+function RightSidebarInner({
+  showSettingsHelpControls = false
+}: {
+  showSettingsHelpControls?: boolean
+}): React.JSX.Element {
   const hasDesktopWindowChrome = shouldRenderDesktopWindowChrome({
     platform: getRendererAppPlatform(),
     isWebClient: isPairedWebClientWindow()
@@ -135,6 +140,7 @@ function RightSidebarInner(): React.JSX.Element {
       </TooltipContent>
     </Tooltip>
   ) : null
+  const settingsHelpControls = showSettingsHelpControls ? <SidebarSettingsHelpMenu /> : null
 
   return (
     <div
@@ -165,6 +171,7 @@ function RightSidebarInner(): React.JSX.Element {
             onSelectTab={selectActivityTab}
             checksStatus={checksStatus}
             closeButton={closeButton}
+            settingsHelpControls={settingsHelpControls}
             activityBarPosition={activityBarPosition}
             onChangeActivityBarPosition={setActivityBarPosition}
           />
@@ -181,7 +188,10 @@ function RightSidebarInner(): React.JSX.Element {
               {visibleItems.find((item) => item.id === effectiveTab)?.title ?? ''}
             </span>
             <TooltipProvider delayDuration={400}>
-              <div className="flex items-center">{closeButton}</div>
+              <div className="flex items-center">
+                {settingsHelpControls}
+                {closeButton}
+              </div>
             </TooltipProvider>
           </div>
         )}

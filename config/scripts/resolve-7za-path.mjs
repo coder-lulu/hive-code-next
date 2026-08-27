@@ -1,5 +1,5 @@
-#!/usr/bin/env node
-
+// Invoked explicitly with Node; staying shebang-free also lets Vitest import
+// the resolver without Vite relocating `#!` below its generated imports.
 // Why: electron-builder 26.9+ dropped the bundled `7zip-bin` package in favour of a
 // toolset downloaded at build time, so the hardcoded `node_modules/7zip-bin/...` path
 // the release signing gates used silently stopped resolving (#6487).

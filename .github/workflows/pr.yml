@@ -116,6 +116,14 @@ jobs:
       - name: Enforce max-lines ratchet
         run: pnpm run check:max-lines-ratchet
 
+      - name: Enforce product brand boundary
+        run: pnpm run check:brand-boundary
+
+      - name: Verify product config
+        run: pnpm run verify:product-config
+
+      - name: Verify documentation governance
+        run: pnpm run verify:documentation-governance
       - name: Enforce runtime Electron-import ratchet
         run: pnpm run check:runtime-electron-ratchet
 
@@ -433,11 +441,13 @@ jobs:
     name: tests node ${{ matrix.node }} ${{ matrix.shard }}/${{ matrix.shard_total }}
     needs: [code_paths]
     if: needs.code_paths.outputs.should_run == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
-        node: ['24', '26']
+        # Keep the CI runtime identical to local development. Legacy Node 18
+        # behavior is covered by the managed_hook_node18 compatibility lane below.
+        node: ['24.18.0']
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         shard_total: [16]
 
@@ -548,7 +558,7 @@ jobs:
           tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts
 
   managed_hook_node18:
-    name: managed hooks on Node 18
+    name: managed hooks on legacy Node 18
     needs: [code_paths]
     if: needs.code_paths.outputs.should_run == 'true'
     runs-on: ubuntu-latest
@@ -564,7 +574,8 @@ jobs:
       - name: Build relay companions
         run: pnpm run build:relay
 
-      - name: Setup Node 18 runtime
+      # This is an intentional compatibility exception, not a build/test runtime.
+      - name: Setup legacy Node 18 runtime
         uses: actions/setup-node@v6
         with:
           node-version: '18'
@@ -576,7 +587,7 @@ jobs:
     name: package
     needs: [code_paths]
     if: needs.code_paths.outputs.should_run == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout

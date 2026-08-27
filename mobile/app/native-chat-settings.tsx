@@ -1,126 +1,81 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from 'react-native'
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../src/theme/mobile-theme'
+import {
+  MobileGroupedList,
+  MobileGroupedListRow,
+  MobileIconButton,
+  MobileScreenHeader
+} from '../src/components/ui'
 import { useMobileDefaultSessionViewPreference } from '../src/session/use-mobile-default-session-view-preference'
+import type { MobileTheme } from '../src/theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
 
-export default function NativeChatSettingsScreen() {
+export default function NativeChatSettingsScreen(): React.JSX.Element {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const { defaultView, setDefaultView } = useMobileDefaultSessionViewPreference()
   const chatDefault = defaultView === 'chat'
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
-      <View style={styles.topRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ChevronLeft size={22} color={colors.textSecondary} />
-        </Pressable>
-        <Text style={styles.heading}>Chat UI</Text>
-      </View>
+    <View style={styles.screen}>
+      <MobileScreenHeader
+        leading={
+          <MobileIconButton
+            accessibilityLabel="返回"
+            icon={ChevronLeft}
+            iconSize={24}
+            onPress={() => router.back()}
+          />
+        }
+        title="聊天界面"
+      />
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.lg }}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + theme.spacing.space32 }
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.groupHeading}>DEFAULT VIEW</Text>
-        <Text style={styles.groupDescription}>
-          Choose how supported agent sessions (Claude, Codex, and other chat-capable agents) open on
-          this device. Terminal shows the raw CLI; Chat UI shows a chat interface like the desktop
-          app. You can still switch any individual session from its long-press menu.
+        <Text maxFontSizeMultiplier={1.3} style={styles.description}>
+          选择支持聊天界面的智能体会话在此设备上的默认打开方式。终端会显示原始命令行，聊天界面则以消息形式呈现；你仍可从单个会话的长按菜单中切换视图。
         </Text>
-        <View style={[styles.section, styles.sectionTopGap]}>
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Open sessions in Chat UI</Text>
-              <Text style={styles.rowSublabel}>{chatDefault ? 'On' : 'Off'}</Text>
-            </View>
-            <Switch
-              accessibilityLabel="Open sessions in Chat UI"
-              value={chatDefault}
-              onValueChange={(next) => setDefaultView(next ? 'chat' : 'terminal')}
-              trackColor={{ false: colors.bgRaised, true: colors.textSecondary }}
-              thumbColor={colors.textPrimary}
-            />
-          </View>
-        </View>
+
+        <MobileGroupedList title="默认视图">
+          <MobileGroupedListRow
+            detail={chatDefault ? '已开启' : '已关闭'}
+            title="默认以聊天界面打开"
+            trailing={
+              <Switch
+                accessibilityLabel="默认以聊天界面打开"
+                value={chatDefault}
+                onValueChange={(next) => setDefaultView(next ? 'chat' : 'terminal')}
+                trackColor={{
+                  false: theme.color.bg.subtle,
+                  true: theme.color.bg.selected
+                }}
+                thumbColor={chatDefault ? theme.color.text.inverse : theme.color.text.secondary}
+              />
+            }
+          />
+        </MobileGroupedList>
       </ScrollView>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgBase,
-    paddingHorizontal: spacing.lg
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textPrimary
-  },
-  groupHeading: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-    paddingHorizontal: spacing.xs
-  },
-  groupDescription: {
-    fontSize: typography.bodySize - 1,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    paddingHorizontal: spacing.xs
-  },
-  section: {
-    backgroundColor: colors.bgPanel,
-    borderRadius: radii.card,
-    overflow: 'hidden'
-  },
-  sectionTopGap: {
-    marginTop: spacing.sm
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md + 2
-  },
-  rowContent: {
-    flex: 1
-  },
-  rowLabel: {
-    fontSize: typography.bodySize,
-    fontWeight: '500',
-    color: colors.textPrimary
-  },
-  rowSublabel: {
-    fontSize: typography.bodySize - 2,
-    color: colors.textSecondary,
-    marginTop: 2
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.color.bg.canvas },
+    content: {
+      gap: theme.spacing.space16,
+      paddingHorizontal: theme.spacing.space20,
+      paddingTop: theme.spacing.space20
+    },
+    description: { ...theme.typography.body, color: theme.color.text.secondary }
+  })
+}

@@ -1,4 +1,5 @@
 import type { Dirent } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { MarkdownDocumentListingCapacityError } from './markdown-document-listing-limits'
 import { discoverMarkdownRelativePaths } from './node-markdown-document-discovery'
@@ -30,7 +31,7 @@ describe('bounded Markdown document discovery', () => {
           entry('docs', 'directory'),
           entry('linked', 'symlink')
         ],
-        '/repo/docs': [entry('guide.mdx'), entry('app.ts')]
+        [join('/repo', 'docs')]: [entry('guide.mdx'), entry('app.ts')]
       }),
       shouldDescend: (_relativePath, name) => name !== '.git'
     })
@@ -65,7 +66,7 @@ describe('bounded Markdown document discovery', () => {
         limits: { maxDepth: 1 },
         readDirectory: reader({
           '/repo': [entry('one', 'directory')],
-          '/repo/one': [entry('two', 'directory')]
+          [join('/repo', 'one')]: [entry('two', 'directory')]
         }),
         shouldDescend: () => true
       })

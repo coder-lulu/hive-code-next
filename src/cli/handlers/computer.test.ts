@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 const callMock = vi.fn()
 
@@ -50,7 +51,7 @@ describe('orca computer observation CLI handlers', () => {
 
     const output = vi.mocked(console.log).mock.calls[0][0]
     expect(output).toContain(
-      'orca computer permissions [--id <accessibility|screenshots>] [--json]'
+      `${PRIMARY_CLI_COMMAND} computer permissions [--id <accessibility|screenshots>] [--json]`
     )
     expect(output).toContain('--id <id>')
     expect(output).toContain('Identifier for a target item or permission')
@@ -140,7 +141,7 @@ describe('orca computer observation CLI handlers', () => {
     expect(callMock).toHaveBeenCalledTimes(1)
     expect(callMock).toHaveBeenCalledWith('computer.permissions', {})
     const output = vi.mocked(console.log).mock.calls[0][0]
-    expect(output).toContain('Opened Orca Computer Use permission setup')
+    expect(output).toContain(`Opened ${APP_DISPLAY_NAME} Computer Use permission setup`)
     expect(output).toContain('/Applications/Orca Computer Use.app')
   })
 

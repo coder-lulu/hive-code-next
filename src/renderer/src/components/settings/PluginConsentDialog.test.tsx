@@ -4,6 +4,7 @@ import { act, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginHostListEntry } from '../../../../preload/api-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { PluginConsentDialog } from './PluginConsentDialog'
 
 const plugin: PluginHostListEntry = {
@@ -133,7 +134,7 @@ describe('PluginConsentDialog', () => {
     )
 
     expect(document.body.textContent).toContain(
-      "These permissions limit how the plugin uses Orca's API. This plugin has no background worker."
+      `These permissions limit how the plugin uses ${APP_DISPLAY_NAME}'s API. This plugin has no background worker.`
     )
     expect(document.body.textContent).not.toContain('full access to your files')
   })
@@ -153,7 +154,7 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).toContain('Review plugin')
     expect(document.body.textContent).toContain('Declarative')
     expect(document.body.textContent).toContain(
-      "This plugin contributes validated content only. It does not run a background worker or receive access to Orca's API."
+      `This plugin contributes validated content only. It does not run a background worker or receive access to ${APP_DISPLAY_NAME}'s API.`
     )
     expect(document.body.textContent).not.toContain('These permissions limit')
   })

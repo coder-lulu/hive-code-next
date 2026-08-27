@@ -1,7 +1,7 @@
 import { ORCA_BROWSER_PARTITION } from './constants'
 import type { ExecutionHostId } from './execution-host'
 
-export const ORCA_PROFILE_INDEX_SCHEMA_VERSION = 1
+export const ORCA_PROFILE_INDEX_SCHEMA_VERSION = 2
 export const DEFAULT_LOCAL_ORCA_PROFILE_ID = 'local-default'
 export const DEFAULT_LOCAL_ORCA_PROFILE_NAME = 'Personal'
 const LEGACY_ORCA_BROWSER_SESSION_PARTITION_PREFIX = 'persist:orca-browser-session-'

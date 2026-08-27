@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { join } from 'node:path'
 import { getRemoteHostPlatform } from '../main/ssh/ssh-remote-platform'
 import {
   AiVaultServiceTestChild,
@@ -293,7 +294,7 @@ describe('RelayAiVaultServiceClient', () => {
 
   it('resolves the sidecar beside each bundled relay', () => {
     expect(relayAiVaultServiceEntryPath('/opt/orca/relay')).toBe(
-      '/opt/orca/relay/relay-ai-vault-service.js'
+      join('/opt/orca/relay', 'relay-ai-vault-service.js')
     )
   })
 })

@@ -16,6 +16,8 @@ export function statusesEqual(left: UpdateStatus, right: UpdateStatus): boolean 
   switch (left.state) {
     case 'idle':
       return right.state === 'idle'
+    case 'disabled':
+      return right.state === 'disabled' && left.reason === right.reason
     case 'checking':
       return right.state === 'checking' && left.userInitiated === right.userInitiated
     case 'not-available':

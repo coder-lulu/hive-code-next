@@ -3,16 +3,7 @@ import { existsSync, statSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { isAbsolute, join } from 'node:path'
 import os from 'node:os'
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  ipcMain,
-  nativeTheme,
-  powerMonitor,
-  type Tray,
-  session
-} from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor, type Tray } from 'electron'
 import { initTccPromptNotice, stopTccPromptNotice } from './macos-tcc-prompt-notice'
 import { electronApp, is } from '@electron-toolkit/utils'
 import {
@@ -21,26 +12,13 @@ import {
   getCanonicalUserDataPath,
   migrateMobilePairingDataToCanonicalUserDataPath
 } from './persistence'
-import { setAppEnvironment } from '../shared/app-environment'
-import { ElectronAppEnvironment } from './host/electron-app-environment'
-import { setPtyHostBindings } from './ipc/pty-host-bindings'
-import { electronRuntimeDesktopSurface } from './host/electron-runtime-desktop-surface'
-import { setRuntimeDesktopSurface } from './runtime/runtime-desktop-surface'
-import { electronRuntimeBrowserCommandsFactory } from './host/electron-browser-commands'
-import { setRuntimeBrowserCommandsFactory } from './runtime/runtime-browser-commands-factory'
-import { electronHttpClient } from './host/electron-http-client'
-import { setMainHttpClient } from './network/http-client'
-import { electronSpeechServiceFactories } from './host/electron-speech-services'
-import { setSpeechServiceFactories } from './speech/speech-runtime-service'
-import { setWorktreeWatcherRemoval } from './ipc/worktree-watcher-removal'
-import { setSecretStore } from '../shared/secret-store'
-import { ElectronSecretStore } from './host/electron-secret-store'
-import { reportSecretProtectionGap } from './host/secret-protection-report'
 import { initSessionParseCachePersistence } from './ai-vault/session-parse-cache-persistence'
 import { ensureActiveOrcaProfile, initOrcaProfilePaths } from './orca-profiles/profile-index-store'
-import { getOrcaCloudAuthConfig } from './orca-profiles/profile-cloud-auth-config'
+import { getProductCloudAuthConfig } from './product/product-cloud-config'
+import { getProductExternalServiceEndpoints } from './product/product-external-service-endpoints'
 import { getProfileUserDataPath } from './orca-profiles/profile-storage-paths'
 import { applyAppIcon } from './app-icon'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import { relaunchApp } from './app-relaunch'
 import { StatsCollector, initStatsPath } from './stats/collector'
 import { initSshHostKeyStoreFile } from './ssh/ssh-host-key-store'
@@ -72,7 +50,7 @@ import {
   isCodexPaneHomeRouteProvenAwayFromSharedHome,
   reconcileCodexPaneAccountsWithLivePtys
 } from './codex/codex-pane-account-registry'
-import { closeAllWatchers, desktopWorktreeWatcherRemoval } from './ipc/filesystem-watcher'
+import { closeAllWatchers } from './ipc/filesystem-watcher'
 import { disposeWorktreeBaseDirectoryWatchers } from './ipc/worktree-base-directory-watcher'
 import { stopFolderRepoGitUpgradeWatch } from './ipc/folder-repo-git-upgrade'
 import { registerCoreHandlers } from './ipc/register-core-handlers/register-core-handlers'
@@ -91,7 +69,6 @@ import {
   applyAgentStatusHooksEnabled,
   isAgentStatusHooksEnabled,
   removeManagedAgentHooks,
-  removeManagedAgentHooksAsync,
   shouldContinueManagedHookStartup
 } from './agent-hooks/managed-agent-hook-controls'
 import { initCohortClassifier } from './telemetry/cohort-classifier'
@@ -99,6 +76,13 @@ import { initOnboardingCohortClassifier } from './telemetry/onboarding-cohort-cl
 import { resolveConsent } from './telemetry/consent'
 import { triggerStartupNotificationRegistration } from './ipc/startup-notification-registration'
 import { OrcaRuntimeService, type RuntimeWorktreeLifecycleEvent } from './runtime/orca-runtime'
+import { HiveAccountService } from './hive-account/hive-account-service'
+import { getHiveRuntimeCloudConfig } from './hive-runtime-cloud/hive-runtime-cloud-config'
+import { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud/hive-runtime-cloud-presence-service'
+import { createHiveRuntimeCloudReport } from './hive-runtime-cloud/hive-runtime-cloud-report'
+import { HiveRuntimeCloudWebLaunchService } from './hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
+import { HiveRuntimeCloudWebSessionControlService } from './hive-runtime-cloud/hive-runtime-cloud-web-session-control-service'
+import type { HiveAccountState } from '../shared/hive-account'
 import { ArtifactCloudService } from './artifacts/artifact-cloud-service'
 import { SkillCloudService } from './skills/skill-cloud-service'
 import { recoverPendingSkillTransactions } from './skills/skill-transaction-startup-recovery'
@@ -138,10 +122,12 @@ import {
   getRemoteServerUpdaterSnapshot,
   installRemoteServerUpdate,
   isQuittingForUpdate,
+  reportReleaseUpdatesDisabled,
   resolveUpdateInstallMode
 } from './updater'
 import { configureRemoteServerUpdater } from './runtime/remote-server-updater'
 import type { UpdateCheckOptions } from '../shared/update-status-types'
+import { hasConfiguredProductUpdateChannel } from '../shared/product-update-policy'
 import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
 import {
   installServeSupervisorDisconnectQuit,
@@ -194,6 +180,12 @@ import { startFirstWindowStartupServices } from './startup/first-window-startup-
 import { recoverLegacyWorkerTerminalsForRendererStartup } from './startup/legacy-worker-renderer-recovery'
 import { createWslCliReconciliationStartupBarrier } from './startup/wsl-cli-reconciliation-startup-barrier'
 import { getDevInstanceIdentity, shouldApplyPreReadyAppName } from './startup/dev-instance-identity'
+import {
+  completeUserDataMigration,
+  migrateUserDataFromOrca,
+  validateUserDataMigration
+} from './startup/hivecode-user-data-migration'
+import { resolveUserDataMigrationStartupAction } from './startup/user-data-migration-startup-policy'
 import { hydrateShellPath, mergePathSegments } from './startup/hydrate-shell-path'
 import { createWindowsShellPathHydration } from './startup/windows-shell-path-hydration'
 import {
@@ -209,6 +201,7 @@ import {
   shouldSkipSingleInstanceLock,
   SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE
 } from './startup/single-instance-lock'
+import { registerProtocolHandlers, extractProtocolUrlFromArgv } from './startup/protocol-handler'
 import { startEventLoopStallProbe } from './startup/event-loop-stall-probe'
 import { startMainThreadChurnProbe } from './diagnostics/main-thread-churn-probe'
 import { settledDiffCache } from './git/source-control/git-read-cache-invalidation'
@@ -239,7 +232,6 @@ import {
   ensureAutoUpdaterConfigured
 } from './window/attach-main-window-services'
 import { createMainWindow, loadMainWindow } from './window/createMainWindow'
-import { shutdownPairedRuntimeBrowserClientHosts } from './browser/paired-runtime-browser-client-host-runtime'
 import {
   getDashboardPopoutWindow,
   zoomDashboardPopoutIfFocused
@@ -318,16 +310,14 @@ import { browserCertificateTrustController, browserManager } from './browser/bro
 import { RpcDispatcher } from './runtime/rpc/dispatcher'
 import { OffscreenBrowserBackend } from './browser/offscreen-browser-backend'
 import { initializeBrowserSessionsForApp } from './browser/browser-session-startup'
-import { initializeBrowserClientHostId } from './browser/browser-client-host-id'
 import { setUnreadDockBadgeCount } from './dock/unread-badge'
 import { AutomationService } from './automations/service'
 import { createHeadlessAutomationOutputSnapshotBuffer } from './automations/headless-dispatch'
 import { buildHeadlessAutomationWorktreeCreateArgs } from './automations/headless-workspace-create'
-import { createRuntimeAutomationRunTerminalObserver } from './automations/runtime-terminal-run-observer'
 import { AgentAwakeService } from './agent-awake-service'
 import { normalizeComputerAwakeMode } from '../shared/computer-awake-mode'
 import { registerSystemResumeBroadcast } from './system-resume-broadcast'
-import { settleTeardownWithinDeadline, settleWithinMs } from './quit-teardown-deadline'
+import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
 import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh-shutdown-drain'
 import { PluginService } from './plugins/plugin-service'
@@ -385,10 +375,7 @@ import {
 } from '../shared/runtime-types'
 import { LocalPtyProvider } from './providers/local-pty-provider'
 import { KeybindingService } from './keybindings/keybinding-service'
-import {
-  applyElectronProxySettings,
-  setDefaultProxySessionResolver
-} from './network/proxy-settings'
+import { applyElectronProxySettings } from './network/proxy-settings'
 import { preserveAgentAuthBeforeRestart } from './agent-auth-restart-preservation'
 import { CliInstaller } from './cli/cli-installer'
 import { installLinuxBareOrcaDispatcher } from './cli/linux-bare-orca-dispatcher'
@@ -410,12 +397,34 @@ let claudeRuntimeAuth: ClaudeRuntimeAuthService | null = null
 let runtime: OrcaRuntimeService | null = null
 let rateLimits: RateLimitService | null = null
 let runtimeRpc: OrcaRuntimeRpcServer | null = null
+let hiveAccountService: HiveAccountService | null = null
+let hiveAccountStartupState: Promise<HiveAccountState> | null = null
+let runtimeCloudPresence: HiveRuntimeCloudPresenceService | null = null
+let runtimeCloudWebLaunch: HiveRuntimeCloudWebLaunchService | null = null
+let runtimeCloudWebSessionControl: HiveRuntimeCloudWebSessionControlService | null = null
+let unsubscribeRuntimeCloudAuthorization: (() => void) | null = null
 const serveReadinessPublisher = new ServeReadinessPublisher()
 let desktopRelayService: DesktopRelayService | null = null
 let desktopRelayStatus: RelayBrokerStatus = 'offline'
 let pendingUnpairedDeviceAuthFailure = false
+let userDataMigrationNeedsValidation = false
+let userDataMigrationNeedsCompletion = false
+let userDataMigrationSkippedUnsafeSource = false
 // Why: gates whether headless serve installs the offscreen browser backend (and advertises browser pane support).
 let headlessBrowserDisplayAvailable = false
+
+function completePendingUserDataMigration(): void {
+  if (!userDataMigrationNeedsCompletion) {
+    return
+  }
+  if (completeUserDataMigration(getCanonicalUserDataPath())) {
+    userDataMigrationNeedsCompletion = false
+    return
+  }
+  // Why: target data is already Store-validated. Keep the validated marker so
+  // the next launch can retry completion without restoring old bytes.
+  console.warn('[hivecode] User data migration completion remains pending')
+}
 
 let starNag: StarNagService | null = null
 let agentAwakeService: AgentAwakeService | null = null
@@ -700,7 +709,12 @@ installUnhandledRejectionLogging()
 process.env.ORCA_APP_VERSION = app.getVersion()
 configureRemoteServerUpdater({
   getSnapshot: getRemoteServerUpdaterSnapshot,
-  check: checkForRemoteServerUpdate,
+  check: (runtimeId, options) => {
+    if (options?.localBuild || hasConfiguredProductUpdateChannel()) {
+      ensureAutoUpdaterConfigured({ localOnly: options?.localBuild === true })
+    }
+    return checkForRemoteServerUpdate(runtimeId, options)
+  },
   download: downloadRemoteServerUpdate,
   install: installRemoteServerUpdate
 })
@@ -710,15 +724,7 @@ if (app.isPackaged && process.platform !== 'win32') {
   void hydrateShellPath().then((result) => {
     if (result.ok) {
       mergePathSegments(result.segments)
-      return
     }
-    // Why: on failure the seeded fallbacks stay in front. For an nvm user that is
-    // now their `default` version rather than the newest install, so it is usually
-    // survivable — but it is still not what their shell would have resolved. Name
-    // the reason so it shows up in a log bundle instead of as a missing CLI.
-    console.warn(
-      `[shell-path] login-shell probe failed (${result.failureReason}); using seeded PATH`
-    )
   })
 }
 configureDevUserDataPath(is.dev)
@@ -762,11 +768,19 @@ function requestDesktopActivation(argv: readonly string[] = []): void {
   if (!shouldActivateDesktopForSecondInstance(argv)) {
     return
   }
+  // Why: extract and route protocol URLs (hivecode://, orca://) from
+  // second-instance argv before activating the desktop window.
+  const protocolUrl = extractProtocolUrlFromArgv(argv)
+  if (protocolUrl) {
+    handleProtocolUrl(protocolUrl)
+  }
   desktopActivationGate.requestActivation()
 }
 
 app.on('open-url', (event, url) => {
   if (!parseSkillShareId(url)) {
+    handleProtocolUrl(url)
+    event.preventDefault()
     return
   }
   event.preventDefault()
@@ -774,6 +788,45 @@ app.on('open-url', (event, url) => {
 })
 
 skillShareDeepLinks.capture(process.argv)
+
+/**
+ * Route a deep-link URL (hivecode:// or orca://) to the appropriate consumer.
+ * Currently forwards pairing URLs to the renderer; future URL types
+ * (e.g. workspace open, settings navigation) can be added here.
+ */
+function handleProtocolUrl(url: string): void {
+  // Why: validate the URL has a supported scheme before processing.
+  try {
+    const parsed = new URL(url)
+    const protocol = parsed.protocol.replace(/:$/, '')
+    const ALL_SCHEMES: readonly string[] = ['hivecode', 'orca']
+    if (!ALL_SCHEMES.includes(protocol)) {
+      console.warn(`[protocol] Ignoring unsupported scheme: ${protocol}`)
+      return
+    }
+  } catch {
+    console.warn(`[protocol] Ignoring malformed URL: ${url.slice(0, 128)}`)
+    return
+  }
+
+  // Route pairing URLs (hivecode://pair?code=...) to the renderer for consumption.
+  if (url.includes('://pair')) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('protocol:pairing-url', url)
+    } else {
+      // Why: the window may not exist yet (cold launch from a protocol link).
+      // Store the URL for delivery when the renderer is ready.
+      pendingProtocolUrl = url
+    }
+    return
+  }
+
+  // Unknown URL type — log but don't error; new URL patterns are expected over time.
+  console.log(`[protocol] Unrecognised URL pattern: ${url.slice(0, 128)}`)
+}
+
+/** Deep-link URL that arrived before the renderer was ready. Delivered on first window load. */
+let pendingProtocolUrl: string | null = null
 
 const handleMacAppActivation = createMacAppActivationHandler({
   getWindow: () => mainWindow,
@@ -898,39 +951,6 @@ if (!hasSingleInstanceLock) {
 
 // Why: when another process holds the lock we've already exited; skip file-writing side effects so this transient process never touches userData.
 if (hasSingleInstanceLock) {
-  // Why first: both accessors throw until installed, and everything below this line
-  // may resolve a path or read a credential. Neither constructor touches `app` or
-  // `safeStorage` — they resolve lazily per call — so installing here changes no
-  // timing, in particular not the pre-ready Keychain service-name resolution and
-  // the app.setName ordering the userData captures below depend on.
-  setAppEnvironment(new ElectronAppEnvironment())
-  setSecretStore(new ElectronSecretStore())
-  // Why at process level, not per-window: pty.ts registers against injected surfaces so
-  // it can load without electron, and an Electron main process always has ipcMain —
-  // whether a window exists is irrelevant. Installing this in attachMainWindowServices
-  // meant `orca serve` registered its PTY handlers against no-ops before any window
-  // attached, so a paired desktop owner never received them.
-  setPtyHostBindings({ ipc: ipcMain, power: powerMonitor })
-  // Why also at process level: the runtime's notification, window-lookup and
-  // tab-create-reply channel are desktop-only. A Node host installs none and the
-  // runtime routes notifications to paired clients instead.
-  setRuntimeDesktopSurface(electronRuntimeDesktopSurface)
-  // Why here: constructing RuntimeBrowserCommands is what pulls the Chromium browser
-  // cluster into the graph. The desktop installs it; a Node host installs none and every
-  // browser RPC rejects, which capability filtering already tells clients about.
-  setRuntimeBrowserCommandsFactory(electronRuntimeBrowserCommandsFactory)
-  // Why here: proxy-settings only needed electron for `session.defaultSession`. The
-  // desktop supplies it; a Node host has no Chromium proxy config to consult, so the
-  // environment variables are the whole answer there.
-  setDefaultProxySessionResolver(() => session.defaultSession)
-  // Why here: integrations use Chromium's network stack on the desktop. A Node host
-  // falls back to the platform default, which is a real behavioural difference (proxy
-  // read from the environment, Node's user agent) rather than a transparent swap.
-  setMainHttpClient(electronHttpClient)
-  // Why here: constructing the speech services is what pulls Electron's streaming net
-  // request in. A host without them rejects speech calls rather than pretending.
-  setSpeechServiceFactories(electronSpeechServiceFactories)
-  setWorktreeWatcherRemoval(desktopWorktreeWatcherRemoval)
   // Why: couple to dev-parent only for electron-vite desktop runs; `orca serve`'s parent (CLI shim/background shell) isn't the intended server lifetime.
   const shouldCoupleToDevParent = is.dev && !isServeMode
   installDevParentDisconnectQuit(shouldCoupleToDevParent)
@@ -961,6 +981,33 @@ if (hasSingleInstanceLock) {
   // Why: must precede app.whenReady() so Crashpad is installed before the
   // first renderer spawns; a CHECK before this point is still exit-code-only.
   startCrashpadCapture()
+  // Why: build a sanitized, copy-only profile snapshot before Store loads. The
+  // prepared marker is validated after Store construction and completed only
+  // after startup services initialize, so interrupted starts remain recoverable.
+  if (app.isPackaged) {
+    const migrationResult = migrateUserDataFromOrca({
+      hiveCodeUserData: getCanonicalUserDataPath()
+    })
+    const migrationAction = resolveUserDataMigrationStartupAction(migrationResult)
+    if (migrationResult.migrated) {
+      console.log(`[hivecode] Prepared ${migrationResult.copiedCount} sanitized migration files`)
+    }
+    if (migrationAction === 'validate-and-complete') {
+      userDataMigrationNeedsValidation = true
+      userDataMigrationNeedsCompletion = true
+    } else if (migrationAction === 'complete') {
+      userDataMigrationNeedsCompletion = true
+    } else if (migrationAction === 'start-clean') {
+      userDataMigrationSkippedUnsafeSource = true
+      console.warn('[hivecode] Legacy user data migration skipped: unsafe-source')
+    } else if (migrationAction === 'block' && !migrationResult.migrated) {
+      // Why: continuing would create or mutate target profile data and could
+      // make a safe retry impossible. Do not expose filesystem paths in errors.
+      throw new Error(
+        `[hivecode] User data migration blocked startup: ${migrationResult.reason}:${migrationResult.errorCode ?? 'none'}`
+      )
+    }
+  }
   crashReports = CrashReportStore.fromUserData()
   recordCrashBreadcrumb('app_started', {
     packaged: app.isPackaged,
@@ -1389,7 +1436,11 @@ function quitFromSystemTray(): void {
 
 // Why: menu/tray are clickable before anything else configures the updater.
 function runUserInitiatedUpdateCheck(options?: UpdateCheckOptions): void {
-  ensureAutoUpdaterConfigured()
+  if (!options?.localBuild && !hasConfiguredProductUpdateChannel()) {
+    reportReleaseUpdatesDisabled()
+    return
+  }
+  ensureAutoUpdaterConfigured({ localOnly: options?.localBuild === true })
   checkForUpdatesFromMenu(options)
 }
 
@@ -1564,6 +1615,12 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
     clearExpectedRendererReload(rendererWebContentsId)
     recordCrashBreadcrumb('main_window_loaded')
     logStartupMilestone('did-finish-load')
+    // Why: deliver any protocol URL that arrived before the renderer was ready
+    // (e.g. cold-launch from hivecode:// link on macOS).
+    if (pendingProtocolUrl) {
+      window.webContents.send('protocol:pairing-url', pendingProtocolUrl)
+      pendingProtocolUrl = null
+    }
     if (!store) {
       return
     }
@@ -1595,6 +1652,8 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
     crashReports ?? undefined,
     keybindings,
     {
+      ...(hiveAccountService ? { hiveAccountService } : {}),
+      ...(hiveAccountStartupState ? { hiveAccountStartupState } : {}),
       getAdditionalAiVaultCodexHomePaths: () =>
         codexRuntimeHome ? codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery() : [],
       prepareAiVaultSessionResume: (args) =>
@@ -1605,6 +1664,8 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       onBeforeRelaunch: async () => {
         isQuitting = true
         desktopRelayService?.fenceAndCloseNow()
+        runtimeCloudPresence?.setRuntimeReady(false)
+        runtimeCloudPresence?.setAuthorization(null)
         await preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
       },
       onOrcaProfileAuthMutation: () => desktopRelayService?.authMutated(),
@@ -1637,8 +1698,11 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       isRecoveryReloadInFlight,
       onCodexHomePtySpawned: handleCodexHomePtySpawned,
       onPtyExit: handlePtyExit,
-      onBeforeUpdateQuit: () =>
-        preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store }),
+      onBeforeUpdateQuit: () => {
+        runtimeCloudPresence?.setRuntimeReady(false)
+        runtimeCloudPresence?.setAuthorization(null)
+        return preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
+      },
       updateInstallMode: resolveUpdateInstallMode(isServeMode),
       onWorktreeLifecycle: emitPluginWorktreeLifecycle
     }
@@ -1808,9 +1872,9 @@ async function presentRendererRecoveryPrompt(recentRecoveryCount: number): Promi
     buttons: ['Reload', 'Quit'],
     defaultId: 0,
     cancelId: 1,
-    title: 'Orca keeps failing to load',
+    title: `${APP_DISPLAY_NAME} keeps failing to load`,
     message: 'The app window crashed repeatedly and stopped reloading automatically.',
-    detail: `Orca tried to recover ${recentRecoveryCount} times in a row without success. This is often a graphics-driver or installation problem. Reload to try again, or quit and relaunch Orca.`
+    detail: `${APP_DISPLAY_NAME} tried to recover ${recentRecoveryCount} times in a row without success. This is often a graphics-driver or installation problem. Reload to try again, or quit and relaunch ${APP_DISPLAY_NAME}.`
   }
   const { response } = window
     ? await dialog.showMessageBox(window, options)
@@ -1934,8 +1998,7 @@ function recordProcessGoneCrash(
     reason,
     exitCode,
     expectedTeardown: getExpectedTeardownScope(webContentsId),
-    details,
-    ...(webContentsId !== undefined ? { webContentsId } : {})
+    details
   })
 }
 
@@ -2294,6 +2357,12 @@ void app.whenReady().then(async () => {
   // safeStorage note above); this call stays unconditional so packaged builds keep their
   // existing post-ready rename, which lands after the Keychain name is already resolved.
   app.setName(devInstanceIdentity.appName)
+  // Why: register hivecode:// and orca:// protocol handlers AFTER setName so
+  // Electron ties the scheme to the correct app identity on macOS/Windows.
+  registerProtocolHandlers({
+    app,
+    onUrl: handleProtocolUrl
+  })
   updateGpuAccelerationAboutPanel()
 
   // Why: managed WSL launchers live outside the Windows app bundle, so keep their launcher/bridge contract synced across app updates.
@@ -2327,19 +2396,7 @@ void app.whenReady().then(async () => {
   )
 
   const activeOrcaProfile = ensureActiveOrcaProfile()
-  // Why this early: the first window stamps the hosting id into its renderer's argv, so the durable
-  // read has to have happened by then or the renderer and the browser-host lease disagree.
-  initializeBrowserClientHostId(activeOrcaProfile.profileDirectory)
-  store = new Store({
-    dataFile: activeOrcaProfile.dataFile,
-    storageAuthority: isServeMode ? 'runtime' : 'desktop'
-  })
-  // Why here and not at install time: the report remembers what it last said, and that
-  // state lives beside the profile data file, which does not exist until now.
-  reportSecretProtectionGap({
-    dataFile: activeOrcaProfile.dataFile,
-    force: process.env.ORCA_ALWAYS_REPORT_SECRET_PROTECTION === '1'
-  })
+  store = new Store({ dataFile: activeOrcaProfile.dataFile })
   // Why here: the host key store is a sidecar of the same profile, and every SSH connect consults
   // it. Left unbound it reports nothing trusted, which is safe but silently discards our own
   // accept records on every launch.
@@ -2363,6 +2420,12 @@ void app.whenReady().then(async () => {
         settings.terminalWindowsPowerShellImplementation
       )
     }
+  }
+  if (userDataMigrationNeedsValidation) {
+    if (!validateUserDataMigration(getCanonicalUserDataPath())) {
+      throw new Error('[hivecode] Could not validate prepared user data migration')
+    }
+    userDataMigrationNeedsValidation = false
   }
   wslHookRelayManager.setManagedHookSettingsResolver(() => store?.getSettings() ?? null)
   logStartupMilestone('store-loaded')
@@ -2433,19 +2496,18 @@ void app.whenReady().then(async () => {
   } catch {
     console.warn('[proxy] Failed to apply network proxy settings')
   }
+  // Why: account ownership is process-wide. Start one refresh after proxy setup so desktop IPC
+  // and headless Runtime Presence cannot race separate session generations.
+  const processHiveAccountService = new HiveAccountService(app.getPath('userData'))
+  hiveAccountService = processHiveAccountService
+  hiveAccountStartupState = processHiveAccountService
+    .refresh()
+    .then((result) => result.state)
+    .catch(() => processHiveAccountService.getState())
   // Why: browser sessions serve desktop webviews and runtime profile commands, so init at app startup rather than via a renderer IPC path.
   initializeBrowserSessionsForApp({
     orcaProfileId: activeOrcaProfile.profile.id,
-    profileDirectory: activeOrcaProfile.profileDirectory,
-    // Why: local direct-SSH partitions are scoped to targets, and the orphan
-    // sweep must see the live target list or it would clear their cookie jars.
-    listLocalSshTargetIds: () => {
-      if (!store) {
-        // Why: an empty list would read as "every SSH jar is an orphan"; throwing skips the sweep.
-        throw new Error('ssh target store unavailable at partition sweep')
-      }
-      return store.getSshTargets().map((target) => target.id)
-    }
+    profileDirectory: activeOrcaProfile.profileDirectory
   })
   unsubscribeSystemResumeBroadcast = registerSystemResumeBroadcast()
   agentAwakeService = new AgentAwakeService()
@@ -2756,14 +2818,7 @@ void app.whenReady().then(async () => {
       agentHookServer.attestCompatibilityAuthority(candidate),
     retireAgentHookCompatibilityAuthority: (paneKey) =>
       agentHookServer.retirePaneAuthority(paneKey),
-    reconcileAgentStatusForEndedProcess: (paneKeys) => {
-      agentHookServer.reconcileEndedProcessForPaneKeys(paneKeys)
-    },
     canRecoverPersistentLocalPtys: () => getDaemonProvider() !== null,
-    // Why: evaluated per call, not captured — the RPC server that owns the device registry is
-    // constructed with this runtime and does not exist yet at this point.
-    getPairedDeviceName: (pairedDeviceId) =>
-      runtimeRpc?.getDeviceRegistry()?.getDevice(pairedDeviceId)?.name ?? null,
     // Why: source codex-home here (runs in window AND serve) so aiVault.listSessions includes managed-Codex sessions; registerCoreHandlers is window-only.
     getAdditionalAiVaultCodexHomePaths: () =>
       codexRuntimeHome ? codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery() : [],
@@ -2778,10 +2833,29 @@ void app.whenReady().then(async () => {
     skillTransactionRecovery
   })
   runtime = runtimeService
+  const runtimeCloudConfig = getHiveRuntimeCloudConfig()
+  const processRuntimeCloudPresence = new HiveRuntimeCloudPresenceService(
+    runtimeCloudConfig,
+    app.getPath('userData'),
+    {
+      getReport: () =>
+        createHiveRuntimeCloudReport(
+          runtimeService,
+          app.getVersion(),
+          runtimeCloudConfig.enabled ? runtimeCloudConfig.webLaunch : undefined
+        )
+    }
+  )
+  runtimeCloudPresence = processRuntimeCloudPresence
+  if (hiveAccountService) {
+    unsubscribeRuntimeCloudAuthorization = hiveAccountService.subscribeRuntimeCloudAuthorization(
+      (authorization) => {
+        processRuntimeCloudPresence.setAuthorization(authorization)
+      }
+    )
+    processRuntimeCloudPresence.setAuthorization(hiveAccountService.getRuntimeCloudAuthorization())
+  }
   runtimeService.prepareLegacyWorkerTerminalRecovery()
-  // Why before anything can attach: a client host that reattaches to a restarted runtime is only
-  // handed its pages back if the runtime found them first.
-  runtimeService.rehydrateClientHostedBrowserPages()
   publishProviderSessionChanges(agentHookServer.getProviderSessionIdentities())
   browserManager.setBrowserGuestStateChangedListener((worktreeId) => {
     runtimeService.notifyMobileSessionTabsChanged(worktreeId)
@@ -2789,8 +2863,6 @@ void app.whenReady().then(async () => {
   automations = new AutomationService(store, {
     claudeUsage,
     codexUsage,
-    terminalObserver: createRuntimeAutomationRunTerminalObserver(runtimeService),
-    onAutomationsChanged: (payload) => runtimeService.notifyAutomationsChanged(payload),
     // Why: desktop clients mirror remote-host automations, but only a server process should execute remote_host_service-owned schedules.
     allowRemoteHostScheduling: isServeMode,
     headlessDispatcher: isServeMode
@@ -2898,12 +2970,17 @@ void app.whenReady().then(async () => {
     pluginsDataDir: getPluginsDataDir(app.getPath('userData'))
   })
   await pluginKillListService.initialize()
+  const officialMarketplaceUrl = getProductExternalServiceEndpoints().pluginMarketplace
+  const officialMarketplaceSource = officialMarketplaceUrl
+    ? ({ kind: 'git', url: officialMarketplaceUrl, ref: 'main' } as const)
+    : null
   pluginMarketplaceService = new PluginMarketplaceService({
     pluginsDataDir: getPluginsDataDir(app.getPath('userData')),
-    getKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null
+    getKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null,
+    officialSource: officialMarketplaceSource
   })
   const requestOfficialMarketplaceSeed = (): void => {
-    if (store?.getSettings().pluginSystemEnabled !== true) {
+    if (!officialMarketplaceSource || store?.getSettings().pluginSystemEnabled !== true) {
       return
     }
     void pluginMarketplaceService?.seedOfficialSource().catch((error) => {
@@ -3246,6 +3323,26 @@ void app.whenReady().then(async () => {
       : {}),
     webClientRoot: getBundledWebClientRoot()
   })
+  if (runtimeCloudConfig.enabled && runtimeCloudConfig.webLaunch) {
+    const processRuntimeCloudWebLaunch = new HiveRuntimeCloudWebLaunchService({
+      apiBaseUrl: runtimeCloudConfig.apiBaseUrl,
+      config: runtimeCloudConfig.webLaunch,
+      presence: processRuntimeCloudPresence,
+      getServerPublicKey: () => runtimeRpc?.getE2EEPublicKey() ?? null,
+      terminateSessionConnections: (managedWebSessionId) => {
+        runtimeRpc?.terminateCloudWebSessionConnections(managedWebSessionId)
+      }
+    })
+    runtimeCloudWebLaunch = processRuntimeCloudWebLaunch
+    runtimeRpc.setCloudWebLaunchService(processRuntimeCloudWebLaunch)
+    const processRuntimeCloudWebSessionControl = new HiveRuntimeCloudWebSessionControlService({
+      apiBaseUrl: runtimeCloudConfig.apiBaseUrl,
+      presence: processRuntimeCloudPresence,
+      target: processRuntimeCloudWebLaunch
+    })
+    runtimeCloudWebSessionControl = processRuntimeCloudWebSessionControl
+    processRuntimeCloudWebSessionControl.start()
+  }
   registerMobileHandlers(runtimeRpc, {
     getRelayStatus: () => desktopRelayStatus,
     consumePendingUnpairedDeviceAuthFailure: (webContentsId) => {
@@ -3323,6 +3420,7 @@ void app.whenReady().then(async () => {
       console.error('[runtime] Failed to start headless RPC transport:', error)
       throw error
     })
+    runtimeCloudPresence?.setRuntimeReady(true)
     settleServeDesktopActivation()
     // Why: every attempt must reach app.quit(); a page beforeunload can veto an earlier signal.
     registerServeSignalHandlers(process, () => app.quit())
@@ -3368,6 +3466,7 @@ void app.whenReady().then(async () => {
     // armed from the main window — without this, a quit mid-removal leaks the tree until a desktop launch.
     scheduleAllPendingHistoryTreeRemovals()
     await printServeReady(serveOptions)
+    completePendingUserDataMigration()
     return
   }
 
@@ -3390,9 +3489,36 @@ void app.whenReady().then(async () => {
   ])
   if (!runtimeRpcStartResult.ok) {
     void showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
+  } else {
+    runtimeCloudPresence?.setRuntimeReady(true)
+  }
+  if (userDataMigrationSkippedUnsafeSource) {
+    userDataMigrationSkippedUnsafeSource = false
+    const showMigrationWarning = (): void => {
+      void dialog
+        .showMessageBox(win, {
+          type: 'warning',
+          buttons: ['OK'],
+          defaultId: 0,
+          title: `${APP_DISPLAY_NAME} started with a new profile`,
+          message: 'Data from an older app version could not be imported safely.',
+          detail: `Your existing data was not changed. ${APP_DISPLAY_NAME} started with a new local profile instead.`
+        })
+        .catch((error) => {
+          console.warn(
+            '[hivecode] Could not show legacy data migration warning:',
+            error instanceof Error ? error.message : String(error)
+          )
+        })
+    }
+    if (win.isVisible()) {
+      showMigrationWarning()
+    } else {
+      win.once('show', showMigrationWarning)
+    }
   }
 
-  const cloudAuth = getOrcaCloudAuthConfig()
+  const cloudAuth = getProductCloudAuthConfig()
   if (cloudAuth.configured) {
     try {
       const relayService = new DesktopRelayService({
@@ -3436,6 +3562,7 @@ void app.whenReady().then(async () => {
       triggerStartupNotificationRegistration(store)
     }
   })
+  completePendingUserDataMigration()
 })
 
 // Why: app.exit() skips Electron quit events, so keep its log child from surviving forced exits.
@@ -3449,6 +3576,8 @@ app.on('before-quit', () => {
   }
   isQuitting = true
   desktopRelayService?.fenceAndCloseNow()
+  runtimeCloudPresence?.setRuntimeReady(false)
+  runtimeCloudPresence?.setAuthorization(null)
   runtimeRpc?.setMobileRelayPairingProvider(null)
   unsubscribeAgentAwakeStatusChanges?.()
   unsubscribeAgentAwakeStatusChanges = null
@@ -3460,9 +3589,6 @@ app.on('before-quit', () => {
 
 // Why: will-quit fires twice — first pass preventDefaults and runs teardown; second pass exits.
 let daemonDisconnectDone = false
-// Why 2s: a config delete is best-effort, not durable state.
-const GROK_HOOK_CLEANUP_DEADLINE_MS = 2_000
-
 app.on('will-quit', (e) => {
   // Why return instead of re-running teardown: the second pass is Electron re-firing after
   // our own app.quit(), so every step below already ran and every durable write already
@@ -3492,6 +3618,17 @@ app.on('will-quit', (e) => {
   }
   // Why: before-quit can still be aborted by renderer beforeunload; only remove the Windows tray icon on the committed quit path.
   destroySystemTray()
+  unsubscribeRuntimeCloudAuthorization?.()
+  unsubscribeRuntimeCloudAuthorization = null
+  const runtimeCloudWebSessionControlShutdown =
+    runtimeCloudWebSessionControl?.stop() ?? Promise.resolve()
+  runtimeCloudWebSessionControl = null
+  runtimeCloudWebLaunch?.close()
+  runtimeCloudWebLaunch = null
+  const runtimeCloudPresenceShutdown = runtimeCloudPresence?.stop() ?? Promise.resolve()
+  runtimeCloudPresence = null
+  hiveAccountService = null
+  hiveAccountStartupState = null
   // Why: an agent still working at quit gets no terminating hook, so stats.flushAsync() closes those sessions out synchronously (only the write is deferred) — otherwise their duration is lost.
   starNag?.stop()
   automations?.stop()
@@ -3508,31 +3645,6 @@ app.on('will-quit', (e) => {
   pluginService = null
   setUnreadDockBadgeCount(0)
   agentHookServer.stop()
-  // Why Windows only: POSIX hooks short-circuit on ORCA_PANE_KEY, while Windows must register a
-  // bare script path that cannot express the guard and would otherwise keep spawning after quit.
-  // Why bounded here: every other teardown member carries its own ceiling, and this one reaches
-  // $GROK_HOME -- which can be a stalled network mount, where the fs calls never settle and the
-  // shared 20s deadline becomes the only thing ending the quit.
-  const grokHookCleanup =
-    process.platform === 'win32'
-      ? settleWithinMs(
-          removeManagedAgentHooksAsync({ agents: ['grok'] }),
-          GROK_HOOK_CLEANUP_DEADLINE_MS
-        ).then((settled) => {
-          if (settled.outcome === 'timed-out') {
-            console.warn('[agent-hooks] Grok hook cleanup on quit timed out')
-            return
-          }
-          if (settled.outcome === 'failed') {
-            console.warn('[agent-hooks] Grok hook cleanup on quit failed:', settled.error)
-            return
-          }
-          // Why: removers report failures as statuses, so inspect details even after fulfillment.
-          for (const status of settled.value.filter((entry) => entry.detail)) {
-            console.warn(`[agent-hooks] ${status.agent} hook cleanup on quit: ${status.detail}`)
-          }
-        })
-      : Promise.resolve()
   // Why: cancels relay restart/reinstall timers and kills wsl.exe children deterministically, not via stdio-pipe teardown.
   wslHookRelayManager.disposeAll()
   const statsFlush = stats?.flushAsync() ?? Promise.resolve()
@@ -3564,7 +3676,6 @@ app.on('will-quit', (e) => {
     codexUsage?.flush(),
     openCodeUsage?.flush()
   ]).then(() => {})
-  const browserClientHostShutdown = shutdownPairedRuntimeBrowserClientHosts()
   const skillUploadShutdown = runtime?.disposeSkillUploadSessions() ?? Promise.resolve()
 
   // Why: capture pid/runtimeId synchronously (before any await) so a later teardown path can't null them out mid-chain.
@@ -3597,14 +3708,14 @@ app.on('will-quit', (e) => {
     { name: 'daemon', promise: daemonTeardown },
     { name: 'browser', promise: browserShutdown },
     { name: 'runtime-rpc', promise: rpcStopAndClear },
+    { name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown },
+    { name: 'runtime-cloud-web-session-control', promise: runtimeCloudWebSessionControlShutdown },
+    { name: 'local-ssh-browser-routes', promise: localSshRouteShutdown },
     { name: 'watchers', promise: watcherShutdown },
     { name: 'emulator', promise: emulatorShutdown },
-    { name: 'browser-client-hosts', promise: browserClientHostShutdown },
-    { name: 'local-ssh-browser-routes', promise: localSshRouteShutdown },
     { name: 'ssh', promise: sshShutdown },
     { name: 'plugin-hosts', promise: pluginHostShutdown },
     { name: 'skill-uploads', promise: skillUploadShutdown },
-    { name: 'grok-hooks', promise: grokHookCleanup },
     { name: 'codex-backfill-recovery', promise: codexBackfillRecoveryShutdown },
     { name: 'usage-cache', promise: usageCacheFlush },
     { name: 'stats', promise: statsFlush },

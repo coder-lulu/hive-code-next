@@ -60,7 +60,7 @@ describe('buildMobileCreatePrAction', () => {
 
   it('uses merge-request copy for GitLab', () => {
     const { descriptor } = action({
-      eligibility: eligibility({ provider: 'gitlab' as HostedReviewProvider })
+      eligibility: eligibility({ provider: 'gitlab' })
     })
 
     expect(descriptor.label).toBe('Create Merge Request')

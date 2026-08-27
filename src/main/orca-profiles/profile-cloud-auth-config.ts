@@ -16,9 +16,6 @@ export type OrcaCloudAuthConfig = {
 }
 
 const DEFAULT_SCOPE = 'openid profile email offline_access'
-const PRODUCTION_API_BASE_URL = 'https://login.onorca.dev'
-const PRODUCTION_CLIENT_ID = 'orca-desktop'
-const PRODUCTION_RELAY_DIRECTOR_URL = 'https://relay.onorca.dev'
 
 // Why: packaged main bundles never define NODE_ENV, so packaged-ness is the
 // only reliable production signal for gating dev-only auth escape hatches.
@@ -63,63 +60,81 @@ function cleanOrigin(value: string | undefined, allowLoopbackHttp: boolean): str
   return parsed.pathname === '/' && !parsed.search && !parsed.hash ? parsed.origin : null
 }
 
+export type ProductCloudDefaults = {
+  /** Production API base URL when no ORCA_CLOUD_API_URL env override; null = cloud is unavailable. */
+  apiBaseUrl: string | null
+  /** Production OAuth client id when no ORCA_CLOUD_CLIENT_ID env override. */
+  clientId: string | null
+  /** Production relay director URL when no ORCA_RELAY_URL env override. */
+  relayDirectorUrl: string | null
+  /** Product OAuth scopes when no ORCA_CLOUD_AUTH_SCOPE env override. */
+  scope: string
+  /** Label used in setupMessage when cloud is unconfigured in this product. */
+  productLabel: string
+}
+
 export function getOrcaCloudAuthConfig(
   env: NodeJS.ProcessEnv = process.env,
-  packaged: boolean = isPackagedOrcaBuild()
+  packaged: boolean = isPackagedOrcaBuild(),
+  productDefaults: ProductCloudDefaults
 ): { configured: true; config: OrcaCloudAuthConfig } | { configured: false; setupMessage: string } {
   // Why: loopback HTTP endpoints are a local-development convenience only;
   // packaged builds must not accept plain-HTTP token endpoints via env vars.
   const allowLoopbackHttp = !packaged
+  const configEnv = packaged ? {} : env
   const cleanEndpointUrl = (value: string | undefined): string | null =>
     cleanUrl(value, allowLoopbackHttp)
-  const configuredApiBaseUrl = env.ORCA_CLOUD_API_URL?.trim()
+  const configuredApiBaseUrl = configEnv.ORCA_CLOUD_API_URL?.trim()
   // Why: packaged releases cannot depend on launch-time environment injection;
-  // these first-party endpoints and the public OAuth client ID are not secrets.
+  // each product must explicitly supply its own non-secret production defaults.
   const apiBaseUrl = configuredApiBaseUrl
     ? cleanEndpointUrl(configuredApiBaseUrl)
     : packaged
-      ? PRODUCTION_API_BASE_URL
+      ? productDefaults.apiBaseUrl
       : null
-  const clientId = env.ORCA_CLOUD_CLIENT_ID?.trim() || (packaged ? PRODUCTION_CLIENT_ID : undefined)
-  if (!apiBaseUrl || !clientId) {
+  const clientId =
+    configEnv.ORCA_CLOUD_CLIENT_ID?.trim() || (packaged ? productDefaults.clientId : undefined)
+  const relayDirectorUrl =
+    cleanOrigin(configEnv.ORCA_RELAY_URL, allowLoopbackHttp) ?? productDefaults.relayDirectorUrl
+  if (!apiBaseUrl || !clientId || !relayDirectorUrl) {
     return {
       configured: false,
-      setupMessage: 'Orca Cloud sign-in is not configured for this build.'
+      setupMessage: `${productDefaults.productLabel} sign-in is not configured for this build.`
     }
   }
 
-  const authBaseUrl = cleanEndpointUrl(env.ORCA_CLOUD_AUTH_URL) ?? apiBaseUrl
+  const authBaseUrl = cleanEndpointUrl(configEnv.ORCA_CLOUD_AUTH_URL) ?? apiBaseUrl
   return {
     configured: true,
     config: {
       apiBaseUrl,
       authorizeEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_AUTHORIZE_URL) ??
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_AUTHORIZE_URL) ??
         endpoint(authBaseUrl, '/v1/desktop/auth/authorize'),
       sessionEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_SESSION_URL) ??
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_SESSION_URL) ??
         endpoint(apiBaseUrl, '/v1/desktop/auth/session'),
       refreshEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_REFRESH_URL) ??
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_REFRESH_URL) ??
         endpoint(apiBaseUrl, '/v1/desktop/auth/refresh'),
       capabilitiesEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_CAPABILITIES_URL) ??
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_CAPABILITIES_URL) ??
         endpoint(apiBaseUrl, '/v1/desktop/auth/capabilities'),
       profileEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_PROFILE_URL) ??
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_PROFILE_URL) ??
         endpoint(apiBaseUrl, '/v1/desktop/auth/profile'),
       orgEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_ORG_URL) ?? endpoint(apiBaseUrl, '/v1/desktop/auth/org'),
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_ORG_URL) ??
+        endpoint(apiBaseUrl, '/v1/desktop/auth/org'),
       logoutEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_LOGOUT_URL) ??
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_LOGOUT_URL) ??
         endpoint(apiBaseUrl, '/v1/desktop/auth/logout'),
       relayTokenEndpoint:
-        cleanEndpointUrl(env.ORCA_CLOUD_RELAY_TOKEN_URL) ??
+        cleanEndpointUrl(configEnv.ORCA_CLOUD_RELAY_TOKEN_URL) ??
         endpoint(apiBaseUrl, '/v1/desktop/auth/relay-token'),
-      relayDirectorUrl:
-        cleanOrigin(env.ORCA_RELAY_URL, allowLoopbackHttp) ?? PRODUCTION_RELAY_DIRECTOR_URL,
+      relayDirectorUrl,
       clientId,
-      scope: env.ORCA_CLOUD_AUTH_SCOPE?.trim() || DEFAULT_SCOPE
+      scope: configEnv.ORCA_CLOUD_AUTH_SCOPE?.trim() || productDefaults.scope || DEFAULT_SCOPE
     }
   }
 }

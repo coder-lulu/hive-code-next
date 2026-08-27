@@ -60,6 +60,12 @@ describe('parseMarkdownBlocks', () => {
     ])
   })
 
+  it('uses a localized label when details has no summary', () => {
+    expect(parseMarkdownBlocks('<details>Hidden text.</details>')).toEqual([
+      { kind: 'details', summary: '详情', body: [{ kind: 'paragraph', text: 'Hidden text.' }] }
+    ])
+  })
+
   it('keeps text around an HTML block in order and strips stray inline tags', () => {
     const blocks = parseMarkdownBlocks('Before.\n<blockquote>q</blockquote>\nAfter <kbd>X</kbd>.')
     expect(blocks).toEqual([

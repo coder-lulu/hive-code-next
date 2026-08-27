@@ -1,10 +1,10 @@
-# Orca Mobile
+# HiveCode Mobile
 
-React Native companion app for Orca. Monitor worktrees, view terminal output, and send commands from your phone.
+React Native companion app for HiveCode. Monitor worktrees, view terminal output, and send commands from your phone.
 
 Local development uses two processes:
 
-- Orca desktop/Electron from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
+- HiveCode desktop/Electron from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
 - Expo Metro from `mobile/`. This serves the React Native app on port `8081`.
 
 Unless a command says otherwise, run mobile app commands from the `mobile/` directory.
@@ -17,7 +17,7 @@ Unless a command says otherwise, run mobile app commands from the `mobile/` dire
 - Expo Go on your phone, or a development client build when native modules are needed
 - Phone and desktop on the same LAN when testing a physical phone
 
-## Start Desktop Orca
+## Start HiveCode Desktop
 
 From the repository root:
 
@@ -52,9 +52,9 @@ pnpm exec expo run:ios
 pnpm start --dev-client
 ```
 
-## Pair With Desktop Orca
+## Pair With HiveCode Desktop
 
-1. Open Orca desktop.
+1. Open HiveCode desktop.
 2. Go to Settings > Mobile.
 3. Scan the pairing QR code from the mobile app.
 4. Confirm the mobile host endpoint is `ws://<desktop-ip>:6768`.
@@ -116,6 +116,15 @@ readSawMarker: true
 
 If this repro fails, debug the desktop runtime/PTY path before the mobile WebView. If it passes but the phone is blank, debug the session screen or `TerminalWebView` readiness/queueing path.
 
+### Stable Terminal And Recovery Behavior
+
+The authoritative cross-product behavior lives in [`docs/engineering/product-design.md`](../docs/engineering/product-design.md). Mobile changes must preserve these local contracts:
+
+- The first focus for a terminal handle uses direct input. Users can opt into buffered input, and switching sessions does not open the keyboard automatically.
+- Output received before the terminal WebView is ready is queued with a bound and replayed in order. Reconnect establishes a fresh PTY subscription.
+- Foreground and network handoffs probe liveness and replace a dead physical client. A disconnected socket is not proof that the remote session exited.
+- Expected relay migration keeps loaded content visible and presents a connecting/reconnecting state instead of an empty grey surface.
+
 ## Terminal Color Repro Without A Phone
 
 Use this when terminal colors disappear after switching tabs. Open a Claude Code terminal and at least one other terminal in the target worktree, then run:
@@ -173,7 +182,7 @@ To exercise the block screen locally: set `MIN_COMPATIBLE_DESKTOP_VERSION = 999`
 
 ## Mock Server
 
-Develop the mobile app without a running Orca desktop instance:
+Develop the mobile app without a running HiveCode desktop instance:
 
 ```bash
 pnpm mock-server           # starts mock WebSocket server on port 6768
@@ -194,10 +203,10 @@ Read on every request, so behaviour can be flipped mid-session without a restart
 - `MOCK_TERMINAL_LIST_MODE_FILE` (default `orca-mock-terminal-list-mode` in the system temporary directory) — `omit` returns an empty terminal list, `other` returns a list that omits the chat handle, anything else lists it.
 - `MOCK_TERMINAL_STREAM_MODE_FILE` (default `orca-mock-terminal-stream-mode` in the system temporary directory) — `dead` answers a subscribe with `subscribed` then `end` (a gone PTY), which is what exercises the rearm bound and terminal prune; anything else streams normally.
 
-## Connecting to Real Orca
+## Connect to HiveCode Desktop
 
-1. Start Orca desktop with WebSocket transport enabled
-2. In Orca, go to Settings > Mobile and scan the QR code with this app
+1. Start HiveCode desktop with WebSocket transport enabled
+2. In HiveCode, go to Settings > Mobile and scan the QR code with this app
 3. The QR encodes the connection endpoint, device token, and TLS fingerprint
 
 ## Project Structure

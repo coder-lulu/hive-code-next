@@ -75,7 +75,28 @@ vi.mock('electron', () => ({
   BrowserWindow: browserWindowMock,
   autoUpdater: nativeUpdaterMock,
   powerMonitor: { on: vi.fn() },
-  net: { fetch: netFetchMock }
+  net: { fetch: netFetchMock },
+  session: {
+    fromPartition: vi.fn(() => ({ fetch: netFetchMock }))
+  }
+}))
+
+vi.mock('./product/product-updater-network-boundary', () => ({
+  installProductUpdaterNetworkBoundary: vi.fn()
+}))
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    provider: 'github',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  }),
+  resolveProductUpdateFeedUrl: (source: { feedUrl: string }) => source.feedUrl
 }))
 
 vi.mock('electron-updater', () => ({
@@ -105,6 +126,15 @@ const FRIENDLY_MESSAGE = "Couldn't reach the update server. Try again in a few m
 const RELEASE_NOT_READY_MESSAGE =
   "A newer release isn't available for this device yet. Check again later."
 const NOT_READY_DIAGNOSTIC = 'Latest release artifacts are not ready'
+const CURRENT_RELEASE_ATOM =
+  '<feed><entry><link rel="alternate" type="text/html" href="https://github.com/stablyai/orca/releases/tag/v1.0.51"/><title>v1.0.51</title></entry></feed>'
+const CURRENT_RELEASE_MANIFEST = [
+  'version: 1.0.51',
+  'files:',
+  '  - url: orca-1.0.51.zip',
+  '    sha512: test',
+  'path: orca-1.0.51.zip'
+].join('\n')
 
 type NotReadyProbe = {
   assetStatus?: number
@@ -168,10 +198,13 @@ describe('updater check failure handling', () => {
     killAllPtyMock.mockReset()
     vi.unstubAllGlobals()
     vi.useRealTimers()
-    netFetchMock.mockReset().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () => Promise.resolve('<feed></feed>')
+    netFetchMock.mockReset().mockImplementation((url: string, init?: { method?: string }) => {
+      const body = url.endsWith('/releases.atom') ? CURRENT_RELEASE_ATOM : CURRENT_RELEASE_MANIFEST
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(init?.method === 'HEAD' ? '' : body)
+      })
     })
   })
 

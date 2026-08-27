@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { PRIMARY_SCHEME } from './brand'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from './pairing'
 import {
   EPHEMERAL_VM_RECIPE_JSON_STRUCTURE_LIMITS,
@@ -221,7 +222,7 @@ describe('parseEphemeralVmRecipeResult', () => {
       )
     ).toEqual({
       ok: false,
-      error: 'Recipe result pairingCode is not a valid Orca pairing code.'
+      error: 'Recipe result pairingCode is not a valid HiveCode pairing code.'
     })
   })
 
@@ -303,7 +304,7 @@ describe('parseEphemeralVmRecipeResult', () => {
       })
     ).toEqual({
       schemaVersion: 1,
-      pairingCode: 'orca://pair?code=[redacted]',
+      pairingCode: `${PRIMARY_SCHEME}://pair?code=[redacted]`,
       projectRoot: '/workspace/repo',
       userData: {
         providerResourceId: 'sandbox-123',

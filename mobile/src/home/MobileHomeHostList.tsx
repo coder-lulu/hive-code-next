@@ -4,6 +4,7 @@ import type { ListRenderItemInfo } from 'react-native'
 import { MobileHostCard } from '../components/MobileHostCard'
 import type { HomeStatsSummary } from '../stats/home-stats-total'
 import { spacing } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 import { classifyConnection } from '../transport/connection-health'
 import { resolveHomeHostConnectionState } from '../transport/home-host-auto-connect'
 import type { MobileConnectionPath } from '../transport/stable-logical-rpc-client'
@@ -102,6 +103,7 @@ type MobileHomeHostRowProps = Pick<
 
 const MobileHomeHostRow = memo(function MobileHomeHostRow(props: MobileHomeHostRowProps) {
   const { item, onLongPress, onOpen, onOpenActions } = props
+  const theme = useMobileTheme()
   const state = resolveHomeHostConnectionState(
     item.id,
     props.hostStates[item.id],
@@ -125,6 +127,7 @@ const MobileHomeHostRow = memo(function MobileHomeHostRow(props: MobileHomeHostR
       credentialStatus={item.credentialStatus}
       state={state}
       verdict={verdict}
+      theme={theme}
       path={props.hostPaths[item.id] ?? 'lan'}
       worktreeInfo={props.worktreeInfo[item.id]}
       onPress={open}

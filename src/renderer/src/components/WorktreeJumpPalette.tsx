@@ -1779,9 +1779,9 @@ function WorktreeJumpPaletteContent({
   }, [openSettingsPage, openSettingsTarget])
 
   const buildQuickActionContext = useCallback(
-    () =>
+    (state = useAppStore.getState()) =>
       buildCmdJQuickActionContext({
-        state: useAppStore.getState(),
+        state,
         activeGroupSnapshot: activeGroupSnapshotRef.current,
         openNewBrowserTab: openNewBrowserTabInActiveWorkspace,
         openNewMarkdownFile: openNewMarkdownInActiveWorkspace,
@@ -1800,11 +1800,9 @@ function WorktreeJumpPaletteContent({
     ]
   )
 
-  // Why: filtering via buildQuickActionContext() inside a memo with stable primitive deps
-  // instead of calling it inline every render — a fresh context object as a useMemo dep
-  // defeated the middleItems memo (new identity every keystroke).
-  const quickActionAvailabilityInputs = useMemo(
+  const quickActionAvailabilityState = useMemo(
     () => ({
+      ...useAppStore.getState(),
       activeView,
       activeWorktreeId,
       worktreesByRepo,
@@ -1812,28 +1810,28 @@ function WorktreeJumpPaletteContent({
       sshConnectionStates,
       activeGroupIdByWorktree,
       groupsByWorktree,
-      isLoading,
-      activeRuntimeEnvironmentId: settings?.activeRuntimeEnvironmentId,
+      settings,
       runtimeStatusByEnvironmentId
     }),
     [
+      activeGroupIdByWorktree,
       activeView,
       activeWorktreeId,
-      worktreesByRepo,
-      repos,
-      sshConnectionStates,
-      activeGroupIdByWorktree,
       groupsByWorktree,
-      isLoading,
-      settings?.activeRuntimeEnvironmentId,
-      runtimeStatusByEnvironmentId
+      repos,
+      runtimeStatusByEnvironmentId,
+      settings,
+      sshConnectionStates,
+      worktreesByRepo
     ]
   )
+
+  // Why: pass a snapshot built from the subscribed availability fields so the memo
+  // remains stable across unrelated store updates without serving stale actions.
   const availableActionResults = useMemo(() => {
-    void quickActionAvailabilityInputs
-    const ctx = buildQuickActionContext()
+    const ctx = buildQuickActionContext(quickActionAvailabilityState)
     return actionResults.filter((action) => action.isAvailable(ctx).available)
-  }, [actionResults, buildQuickActionContext, quickActionAvailabilityInputs])
+  }, [actionResults, buildQuickActionContext, quickActionAvailabilityState])
 
   const middleItems = useMemo<(SettingsPaletteItem | QuickActionPaletteItem)[]>(
     () =>

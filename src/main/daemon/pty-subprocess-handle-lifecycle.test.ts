@@ -331,24 +331,31 @@ describe('createPtySubprocess', () => {
       }
     })
 
-    it('dispose() neutralizes proc.kill on POSIX before calling destroy()', async () => {
-      const proc = mockPtyProcess() as ReturnType<typeof mockPtyProcess> & {
-        destroy: ReturnType<typeof vi.fn>
+    // Why: the production path validates macOS's native spawn-helper before
+    // every simulated darwin spawn. Windows node-pty packages do not ship a
+    // macOS spawn-helper, so this contract needs a real POSIX host (the Linux
+    // neutralization case above does not perform that macOS-only preflight).
+    it.skipIf(process.platform === 'win32')(
+      'dispose() neutralizes proc.kill on POSIX before calling destroy()',
+      async () => {
+        const proc = mockPtyProcess() as ReturnType<typeof mockPtyProcess> & {
+          destroy: ReturnType<typeof vi.fn>
+        }
+        proc.destroy = vi.fn()
+        spawnMock.mockReturnValue(proc)
+        const origPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+        Object.defineProperty(process, 'platform', { value: 'darwin' })
+        const originalKill = proc.kill
+        try {
+          const handle = await createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
+          handle.dispose()
+          expect(proc.kill).not.toBe(originalKill)
+          expect(proc.destroy).toHaveBeenCalledOnce()
+        } finally {
+          restorePlatform(origPlatform)
+        }
       }
-      proc.destroy = vi.fn()
-      spawnMock.mockReturnValue(proc)
-      const origPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
-      Object.defineProperty(process, 'platform', { value: 'darwin' })
-      const originalKill = proc.kill
-      try {
-        const handle = await createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
-        handle.dispose()
-        expect(proc.kill).not.toBe(originalKill)
-        expect(proc.destroy).toHaveBeenCalledOnce()
-      } finally {
-        restorePlatform(origPlatform)
-      }
-    })
+    )
 
     it('dispose() on Windows calls destroy() without neutralizing kill', async () => {
       const proc = mockPtyProcess() as ReturnType<typeof mockPtyProcess> & {

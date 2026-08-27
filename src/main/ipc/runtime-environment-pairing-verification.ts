@@ -9,7 +9,7 @@ import {
 } from '../../shared/remote-pairing-verification'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime-client'
-import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/protocol-version'
+import { applyProductBranding } from '../../shared/brand'
 import { redactRuntimeEnvironment } from '../../shared/runtime-environments'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 
@@ -41,10 +41,7 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
       parsed.value.pairing,
       'status.get',
       undefined,
-      15_000,
-      undefined,
-      undefined,
-      ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES
+      15_000
     )
     if (!response.ok) {
       return {
@@ -75,8 +72,10 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
       kind: 'environment-save-failed',
       message:
         error instanceof RuntimeEnvironmentStoreError && error.code === 'invalid_argument'
-          ? error.message
-          : 'Orca verified the host but could not save it. Check local settings storage and try again.'
+          ? applyProductBranding(error.message)
+          : applyProductBranding(
+              'Orca verified the host but could not save it. Check local settings storage and try again.'
+            )
     }
   }
   return {
@@ -105,7 +104,9 @@ function classifyPairingVerificationError(
       return {
         ok: false,
         kind: 'host-identity-mismatch',
-        message: `Orca reached ${endpoint}, but that host does not match this access link.`
+        message: applyProductBranding(
+          `Orca reached ${endpoint}, but that host does not match this access link.`
+        )
       }
     }
     if (error.pairingStage === 'runtime') {
@@ -139,6 +140,8 @@ function unreachableHostResult(endpoint: string): VerifyAndAddRuntimeEnvironment
   return {
     ok: false,
     kind: 'host-unreachable',
-    message: `Cannot reach Orca at ${endpoint}. Confirm the other host is running and reachable.`
+    message: applyProductBranding(
+      `Cannot reach Orca at ${endpoint}. Confirm the other host is running and reachable.`
+    )
   }
 }

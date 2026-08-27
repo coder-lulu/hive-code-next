@@ -4,11 +4,18 @@ import { cn } from '@/lib/utils'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { applyProductBranding } from '@/product-brand'
 
 const EMULATOR_EXAMPLE_PROMPTS = [
-  'Using Orca CLI, attach to the active iPhone simulator, sign in with the test account, complete onboarding, and tell me where the flow feels confusing.',
-  'With Orca CLI, run through the mobile checkout flow from product search to confirmation, capture any broken screens, and summarize the exact step that fails.',
-  'Using Orca CLI, grant camera permission, scan a test QR code or inject a camera fixture, finish the account-linking flow, and report whether the app reaches the success state.'
+  applyProductBranding(
+    'Using Orca CLI, attach to the active iPhone simulator, sign in with the test account, complete onboarding, and tell me where the flow feels confusing.'
+  ),
+  applyProductBranding(
+    'With Orca CLI, run through the mobile checkout flow from product search to confirmation, capture any broken screens, and summarize the exact step that fails.'
+  ),
+  applyProductBranding(
+    'Using Orca CLI, grant camera permission, scan a test QR code or inject a camera fixture, finish the account-linking flow, and report whether the app reaches the success state.'
+  )
 ] as const
 
 async function copyPrompt(prompt: string): Promise<void> {

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { parsePairingCode } from './pairing'
 import { MAX_SSH_RELAY_GRACE_PERIOD_SECONDS, MIN_SSH_RELAY_GRACE_PERIOD_SECONDS } from './ssh-types'
 import { assertJsonTextStructureWithinLimits } from './json-text-structure-limit'
+import { applyProductBranding } from './brand'
 
 const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([
@@ -169,7 +170,10 @@ export function parseEphemeralVmRecipeResult(stdout: string): EphemeralVmRecipeR
   }
   const connection = getEphemeralVmRecipeResultConnection(result.data)
   if (connection.type === 'orca-server' && !parsePairingCode(connection.pairingCode)) {
-    return { ok: false, error: 'Recipe result pairingCode is not a valid Orca pairing code.' }
+    return {
+      ok: false,
+      error: applyProductBranding('Recipe result pairingCode is not a valid Orca pairing code.')
+    }
   }
   if (!isAbsoluteRuntimePath(connection.projectRoot)) {
     return { ok: false, error: 'Recipe result projectRoot must be an absolute runtime path.' }

@@ -11,6 +11,9 @@ const {
   prunePackagedRuntimeNodeModules,
   verifyPackagedMainRuntimeDeps
 } = require('./packaged-runtime-node-modules.cjs')
+const {
+  verifyPackagedUpdaterSecurityBoundary
+} = require('./packaged-updater-security-boundary.cjs')
 const { verifyLinuxGlibcFloor } = require('./scripts/verify-linux-glibc-floor.cjs')
 const { writeMacBuildCompatibility } = require('./scripts/mac-build-compatibility.cjs')
 const { verifyPackagedPluginResources } = require('./scripts/verify-packaged-plugin-resources.cjs')
@@ -18,6 +21,7 @@ const {
   verifyPackagedNodePtyJobOwnership
 } = require('./scripts/verify-packaged-node-pty-job-ownership.cjs')
 const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.cjs')
+const productManifest = require('./product/hivecode.product.json')
 
 // Why: dev-channel builds must carry the *release* identity — same bundle id,
 // Developer ID signature, and notarization ticket — or Squirrel.Mac refuses to
@@ -25,6 +29,7 @@ const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.
 const isMacHourly = process.env.ORCA_MAC_HOURLY === '1'
 const isMacDaily = process.env.ORCA_MAC_DAILY === '1'
 const isMacAdhoc = process.env.ORCA_MAC_ADHOC === '1'
+const isHeadlessRuntimeDeb = process.env.HIVECODE_HEADLESS_RUNTIME_DEB === '1'
 // Why a second set of variables rather than making the mac ones platform-neutral:
 // the mac ones gate `isMacRelease` below, which turns on hardened runtime,
 // notarization, and root-level `forceCodeSigning`. A Windows dev build that
@@ -34,6 +39,7 @@ const isWinHourly = process.env.ORCA_WIN_HOURLY === '1'
 const isWinDaily = process.env.ORCA_WIN_DAILY === '1'
 const isWinAdhoc = process.env.ORCA_WIN_ADHOC === '1'
 const isWinDevChannel = isWinHourly || isWinDaily || isWinAdhoc
+const isHardwareWindowsSigning = process.env.HIVECODE_WINDOWS_HARDWARE_SIGNING === '1'
 const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
 const localBuildVersion =
@@ -48,23 +54,26 @@ const devChannelBuildVersion = isHourlyChannel
     : isAdhocChannel
       ? process.env.ORCA_ADHOC_BUILD_VERSION
       : undefined
-// Why each dev channel gets its own repo rather than tagging into the main one:
-// the releases atom feed exposes only the 10 newest entries, so 24 hourly tags a
-// day would evict every stable/RC entry and strand users on a feed with nothing
-// to install. Keeping adhoc/daily separate from hourly too means a branch build
-// or a once-a-day cut cannot be picked up by someone who only meant to ride
-// main's hourlies.
-const devChannelRepo = isHourlyChannel
-  ? 'orca-hourly'
-  : isDailyChannel
-    ? 'orca-daily'
-    : isAdhocChannel
-      ? 'orca-adhoc'
-      : null
-const appId = 'com.stablyai.orca'
+const appId = productManifest.desktop.appId
+if (!appId) {
+  throw new Error('HiveCode desktop appId must be configured before packaging')
+}
+// Why: the development package keeps its upstream-compatible internal name, but those
+// fields also feed app.asar package metadata and Windows PE version resources. Override
+// the packaged copy so no upstream owner or product identity leaks into shipped files.
+const packagedMetadata = {
+  name: productManifest.slug,
+  productName: productManifest.displayName,
+  description: productManifest.displayName,
+  author: { name: productManifest.displayName }
+}
+const packagedVersion = devChannelBuildVersion ?? localBuildVersion
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
-  to: 'onboarding/feature-wall'
+  to: 'onboarding/feature-wall',
+  // Why: the remaining upstream recordings contain baked-in Orca screenshots.
+  // Do not ship those binaries until the tiles are re-recorded with HiveCode.
+  filter: ['tile-01.*', 'tile-02.*', 'tile-04.*', 'tile-08.*', 'tile-11.*']
 }
 // Why: freshness detection needs immutable identity metadata from this exact
 // app build, but never needs the skill package bytes or a runtime network read.
@@ -106,13 +115,21 @@ const winSpeechNativeResource = {
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
-  productName: 'Orca',
-  protocols: [{ name: 'Orca', schemes: ['orca'] }],
-  ...(devChannelBuildVersion
-    ? { extraMetadata: { version: devChannelBuildVersion } }
-    : localBuildVersion
-      ? { extraMetadata: { version: localBuildVersion } }
-      : {}),
+  productName: productManifest.displayName,
+  protocols: [
+    {
+      name: productManifest.displayName,
+      schemes: [productManifest.schemes.primary, ...productManifest.schemes.aliases]
+    }
+  ],
+  // Why: undefined lets electron-builder infer a GitHub publisher from package metadata
+  // or the current Git remote. The product manifest has no approved release authority,
+  // so make every packaging channel explicitly non-publishing.
+  publish: null,
+  extraMetadata: {
+    ...packagedMetadata,
+    ...(packagedVersion ? { version: packagedVersion } : {})
+  },
   directories: {
     buildResources: 'resources/build'
   },
@@ -140,6 +157,9 @@ module.exports = {
     // it is gitignored, but exclude it defensively so a stray local capture at
     // package time never bloats app.asar.
     '!pr-evidence{,/**/*}',
+    // Why: local clean-build rehearsals may place pnpm's content-addressed store
+    // under the repository root. It is never a runtime input and can exceed 2 GiB.
+    '!.pnpm-store{,/**/*}',
     '!Casks{,/**/*}',
     '!{AGENTS.md,CLAUDE.md,DEVELOPING.md,bundle-size-progress.md,ORCHESTRATION_IMPLEMENTATION_CHECKLIST.md,ORCHESTRATION_STRUCTURED_OUTPUT_DESIGN.md}',
     '!out/**/*.test.js',
@@ -261,6 +281,7 @@ module.exports = {
     }
     prunePackagedRuntimeNodeModules(resourcesDir, context.electronPlatformName, context.arch)
     verifyPackagedMainRuntimeDeps(resourcesDir)
+    verifyPackagedUpdaterSecurityBoundary(resourcesDir)
     // Why: boot the packaged daemon-entry under plain Node, but only for the
     // slice matching the packaging host's arch — daemon-entry.js is JS, yet it
     // require()s the native (N-API) node-pty for the TARGET arch, which the host
@@ -324,32 +345,42 @@ module.exports = {
     }
   },
   win: {
-    executableName: 'Orca',
-    // Why: Windows installers are signed after electron-builder packaging by
-    // SignPath, so the packager cannot infer the updater publisherName.
-    //
-    // Why dev channels drop it instead: they ship unsigned, because SignPath's
-    // approval waits are budgeted in hours and cannot fit an hourly cadence.
-    // electron-updater Authenticode-verifies every installer it downloads
-    // against the publisherName baked into the *installed* app's app-update.yml
-    // (NsisUpdater.verifySignature), and skips verification entirely when that
-    // name is absent. An unsigned build that still claimed 'SignPath Foundation'
-    // would therefore reject its own channel's next build — and its way back to
-    // stable with it. Dropping it is what makes dev→dev and dev→stable work.
-    ...(isWinDevChannel
-      ? { verifyUpdateCodeSignature: false }
-      : { signtoolOptions: { publisherName: 'SignPath Foundation' } }),
+    executableName: productManifest.desktop.executableName,
+    ...(isHardwareWindowsSigning
+      ? {
+          signtoolOptions: {
+            sign: './config/scripts/sign-windows-artifact.mjs',
+            signingHashAlgorithms: ['sha256']
+          }
+        }
+      : {}),
     extraResources: [
       ...commonExtraResources,
       ...createPackagedRuntimeNodeModuleResources('win32'),
       winSpeechNativeResource,
       {
+        from: 'resources/win32/bin/hivecode.cmd',
+        to: 'bin/hivecode.cmd'
+      },
+      {
         from: 'resources/win32/bin/orca.cmd',
         to: 'bin/orca.cmd'
       },
       {
+        from: 'resources/win32/bin/orca-ide.cmd',
+        to: 'bin/orca-ide.cmd'
+      },
+      {
+        from: 'native/windows-cli-launcher/.build/orca.exe',
+        to: 'bin/hivecode.exe'
+      },
+      {
         from: 'native/windows-cli-launcher/.build/orca.exe',
         to: 'bin/orca.exe'
+      },
+      {
+        from: 'native/windows-cli-launcher/.build/orca.exe',
+        to: 'bin/orca-ide.exe'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-win32-x64.exe',
@@ -363,9 +394,19 @@ module.exports = {
     ]
   },
   nsis: {
-    artifactName: 'orca-windows-setup.${ext}',
+    artifactName: 'hivecode-windows-setup.${ext}',
     shortcutName: '${productName}',
     uninstallDisplayName: '${productName}',
+    // Why: the assisted NSIS wizard must require users to review the
+    // installation, privacy, and usage terms before continuing.
+    license: 'installer-license.txt',
+    // Why: assisted installs let users review and change the destination instead
+    // of silently writing to the default per-user location.
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    // Why: installation should finish inside the wizard; an implicit first launch
+    // can surface startup windows while the installer is still tearing down.
+    runAfterFinish: false,
     createDesktopShortcut: 'always',
     // Why: on a real uninstall, stop and remove the relocated terminal daemon
     // (which lives outside the install dir under LOCALAPPDATA by design). Guarded
@@ -376,21 +417,29 @@ module.exports = {
     icon: 'resources/build/icon.icns',
     entitlements: 'resources/build/entitlements.mac.plist',
     entitlementsInherit: 'resources/build/entitlements.mac.plist',
+    // Why: register hivecode:// as the primary deep-link scheme and orca://
+    // for backward compatibility so existing pairing QR codes keep working.
+    protocols: [
+      {
+        name: 'HiveCode',
+        schemes: [productManifest.schemes.primary, ...productManifest.schemes.aliases]
+      }
+    ],
     extendInfo: {
       NSAppleEventsUsageDescription:
-        'Orca allows terminal-launched developer tools to automate local apps when you request it.',
+        'HiveCode allows terminal-launched developer tools to automate local apps when you request it.',
       NSBluetoothAlwaysUsageDescription:
-        'Orca allows terminal-launched developer tools to access Bluetooth devices when you request it.',
+        'HiveCode allows terminal-launched developer tools to access Bluetooth devices when you request it.',
       NSBluetoothPeripheralUsageDescription:
-        'Orca allows terminal-launched developer tools to access Bluetooth devices when you request it.',
+        'HiveCode allows terminal-launched developer tools to access Bluetooth devices when you request it.',
       NSCameraUsageDescription: "Application requests access to the device's camera.",
       NSLocationUsageDescription:
-        'Orca allows terminal-launched developer tools to access location when you request it.',
+        'HiveCode allows terminal-launched developer tools to access location when you request it.',
       NSLocalNetworkUsageDescription:
-        'Orca allows terminal-launched developer tools to discover and connect to local development servers when you request it.',
+        'HiveCode allows terminal-launched developer tools to discover and connect to local development servers when you request it.',
       NSMicrophoneUsageDescription: "Application requests access to the device's microphone.",
       NSAudioCaptureUsageDescription:
-        'Orca allows terminal-launched developer tools to capture desktop audio when you request it.',
+        'HiveCode allows terminal-launched developer tools to capture desktop audio when you request it.',
       NSBonjourServices: ['_http._tcp', '_https._tcp'],
       NSDocumentsFolderUsageDescription:
         "Application requests access to the user's Documents folder.",
@@ -415,8 +464,16 @@ module.exports = {
       ...createPackagedRuntimeNodeModuleResources('darwin'),
       macSpeechNativeResource,
       {
+        from: 'resources/darwin/bin/hivecode',
+        to: 'bin/hivecode'
+      },
+      {
         from: 'resources/darwin/bin/orca',
         to: 'bin/orca'
+      },
+      {
+        from: 'resources/darwin/bin/orca-ide',
+        to: 'bin/orca-ide'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-darwin-${arch}',
@@ -460,28 +517,38 @@ module.exports = {
   },
   // Why: release builds should fail if signing is unavailable instead of
   // silently downgrading to ad-hoc artifacts that look shippable in CI logs.
-  forceCodeSigning: isMacRelease,
+  forceCodeSigning: isMacRelease || isHardwareWindowsSigning,
   dmg: {
-    artifactName: 'orca-macos-${arch}.${ext}'
+    artifactName: 'hivecode-macos-${arch}.${ext}'
   },
   linux: {
     // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca.
     // The Linux installer should not claim those system package/file names.
-    executableName: 'orca-ide',
+    executableName: 'hivecode',
     // Why: the icns source lets electron-builder emit standard hicolor PNG
     // sizes; a single 1024px PNG is ignored by some Linux docks/launchers.
     icon: 'resources/build/icon.icns',
     desktop: {
       entry: {
-        // Why: Electron reports WM_CLASS=orca for the visible Linux window;
-        // GNOME docks need an exact match to group it with orca-ide.desktop.
-        StartupWMClass: 'orca'
+        StartupWMClass: 'hivecode'
       }
     },
     extraResources: [
       ...commonExtraResources,
       ...createPackagedRuntimeNodeModuleResources('linux'),
       linuxSpeechNativeResource,
+      ...(isHeadlessRuntimeDeb
+        ? [
+            {
+              from: 'resources/linux/systemd',
+              to: 'systemd'
+            }
+          ]
+        : []),
+      {
+        from: 'resources/linux/bin/hivecode',
+        to: 'bin/hivecode'
+      },
       {
         from: 'resources/linux/bin/orca-ide',
         to: 'bin/orca-ide'
@@ -497,19 +564,41 @@ module.exports = {
       featureWallResources
     ],
     target: ['AppImage', 'deb'],
-    maintainer: 'stablyai',
+    maintainer: 'HiveKernel',
     category: 'Utility'
   },
   appImage: {
-    artifactName: isLinuxArm64Release ? 'orca-linux-arm64.${ext}' : 'orca-linux.${ext}'
+    artifactName: isLinuxArm64Release ? 'hivecode-linux-arm64.${ext}' : 'hivecode-linux.${ext}'
   },
   deb: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide_${version}_${arch}.${ext}',
+    packageName: isHeadlessRuntimeDeb ? 'hivecode-runtime' : 'hivecode',
+    artifactName: isHeadlessRuntimeDeb
+      ? 'hivecode-runtime_${version}_${arch}.${ext}'
+      : 'hivecode_${version}_${arch}.${ext}',
     // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
     depends: [
+      'libgtk-3-0',
+      'libnotify4',
+      'libnspr4',
+      'libnss3',
+      'libxss1',
+      'libxtst6',
+      'xdg-utils',
+      'libatspi2.0-0',
+      'libuuid1',
+      'libsecret-1-0',
+      'libatk1.0-0',
+      'libatk-bridge2.0-0',
+      'libcups2',
+      'libcairo2',
+      'libpango-1.0-0',
+      'libxcomposite1',
+      'libxdamage1',
+      'libxrandr2',
+      'libgbm1',
+      'libasound2',
       'python3',
       'python3-gi',
       'gir1.2-atspi-2.0',
@@ -526,8 +615,8 @@ module.exports = {
     afterRemove: 'resources/linux/packaging/after-remove.sh'
   },
   rpm: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide-${version}.${arch}.${ext}',
+    packageName: 'hivecode',
+    artifactName: 'hivecode-${version}.${arch}.${ext}',
     // Why: see deb depends. RPM distros ship Xvfb as xorg-x11-server-Xvfb (there
     // is no `xvfb` package), so the name differs from the deb here.
     depends: [
@@ -549,20 +638,16 @@ module.exports = {
   // packages arm64 binaries into the x64 DMG, causing "posix_spawnp failed"
   // on Intel Macs. The beforeBuild hook performs Orca's targeted rebuild and
   // returns false so electron-builder does not rebuild optional cpu-features.
-  npmRebuild: true,
-  publish: {
-    provider: 'github',
-    owner: 'stablyai',
-    repo: devChannelRepo ?? 'orca',
-    releaseType: devChannelRepo ? 'prerelease' : 'release'
-  }
+  npmRebuild: true
+  // No publish target is configured until HiveCode owns a verified release repository
+  // and update channel. Falling back to the upstream release repository would cross the fork boundary.
 }
 
 function chmodUnixCliLaunchers(resourcesDir, electronPlatformName) {
   if (electronPlatformName === 'win32') {
     return
   }
-  for (const launcherName of ['orca', 'orca-ide']) {
+  for (const launcherName of ['hivecode', 'orca', 'orca-ide']) {
     const launcherPath = join(resourcesDir, 'bin', launcherName)
     if (!existsSync(launcherPath)) {
       continue
@@ -593,7 +678,7 @@ function chmodMacServeSimHelpers(resourcesDir, electronPlatformName) {
 async function signMacComputerUseHelper(helperAppPath, packager) {
   if (!existsSync(helperAppPath)) {
     if (isMacRelease) {
-      throw new Error(`Missing Orca Computer Use helper app at ${helperAppPath}`)
+      throw new Error(`Missing HiveCode Computer Use helper app at ${helperAppPath}`)
     }
     return
   }
@@ -607,7 +692,7 @@ async function signMacComputerUseHelper(helperAppPath, packager) {
     findInstalledMacSigningIdentity(codeSigningInfo?.keychainFile) ??
     (isMacRelease ? null : '-')
   if (!identity) {
-    throw new Error('Missing signing identity for Orca Computer Use helper app')
+    throw new Error('Missing signing identity for HiveCode Computer Use helper app')
   }
   // Why: TCC grants attach to this nested app's code identity. Sign it before
   // the outer Orca.app is sealed so production builds preserve that identity.

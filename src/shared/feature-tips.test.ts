@@ -6,6 +6,7 @@ import {
   normalizeFeatureTipIds,
   type FeatureTipId
 } from './feature-tips'
+import { applyProductBranding } from './brand'
 
 describe('feature tips', () => {
   it('orders new unseen tips before older unseen tips', () => {
@@ -92,7 +93,7 @@ describe('feature tips', () => {
 
     expect(cliTip).toMatchObject({
       action: 'setup-cli',
-      title: 'Let agents drive Orca with the Orca CLI',
+      title: applyProductBranding('Let agents drive Orca with the Orca CLI'),
       ctaLabel: 'Install CLI & Skills'
     })
     expect(cliTip?.description).toContain('coordinate child worktrees')

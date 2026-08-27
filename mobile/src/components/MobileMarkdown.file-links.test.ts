@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer, type ReactTestInstance } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MobileMarkdown } from './MobileMarkdown'
+import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
 
 const openURL = vi.fn(() => Promise.resolve())
 
@@ -14,6 +15,9 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 vi.mock('./pr-sidebar/MermaidDiagram', () => ({ MermaidDiagram: 'MermaidDiagram' }))
+vi.mock('../theme/mobile-theme-provider', () => ({
+  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
+}))
 
 function flattenText(node: ReactTestInstance): string {
   return node.children

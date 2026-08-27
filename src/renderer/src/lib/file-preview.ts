@@ -11,11 +11,15 @@ import { observeE2eWebRuntimeBrowserCreation } from '@/runtime/web-runtime-brows
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import { findSiblingGroupId } from '@/store/slices/tabs'
+import { applyProductBranding } from '@/product-brand'
 
 export type PreviewableLanguage = 'html'
-export const REMOTE_FILE_BROWSER_UNSUPPORTED_MESSAGE =
+export const REMOTE_FILE_BROWSER_UNSUPPORTED_MESSAGE = applyProductBranding(
   'Open in Orca Browser is only available for local files.'
-const FILE_BROWSER_OPEN_FAILED_MESSAGE = 'Unable to open this file in Orca Browser.'
+)
+const FILE_BROWSER_OPEN_FAILED_MESSAGE = applyProductBranding(
+  'Unable to open this file in Orca Browser.'
+)
 
 type WorkspaceFileBrowserActionMode = 'local-client' | 'paired-runtime' | null
 

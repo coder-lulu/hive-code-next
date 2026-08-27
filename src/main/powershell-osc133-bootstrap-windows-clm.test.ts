@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -17,9 +17,14 @@ for (const shell of WINDOWS_POWERSHELLS) {
       (languageMode) => {
         const cwd = mkdtempSync(join(tmpdir(), 'orca-powershell-clm-'))
         try {
-          expect(runBootstrap(shell, languageMode, cwd)).toContain(
-            `mode=${languageMode};codexHome=${MANAGED_CODEX_HOME};orcaHome=${MANAGED_CODEX_HOME};startupCount=2;cwd=${cwd}`
+          const output = runBootstrap(shell, languageMode, cwd).trim()
+          expect(output).toContain(
+            `mode=${languageMode};codexHome=${MANAGED_CODEX_HOME};orcaHome=${MANAGED_CODEX_HOME};startupCount=2;cwd=`
           )
+          const reportedCwd = output.slice(output.lastIndexOf(';cwd=') + ';cwd='.length)
+          const expectedStat = statSync(cwd)
+          const reportedStat = statSync(reportedCwd)
+          expect([reportedStat.dev, reportedStat.ino]).toEqual([expectedStat.dev, expectedStat.ino])
         } finally {
           rmSync(cwd, { recursive: true, force: true })
         }

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { aiVaultSessionDeleteBlockedReason } from './ai-vault-session-deletability'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 // translate() with no loaded catalog returns the English fallback, so these
 // assertions pin the English copy as well as the gate order.
 const NON_LOCAL = 'Only sessions on this device can be deleted.'
-const SYNTHETIC = "This session can't be deleted from Orca."
+const SYNTHETIC = `This session can't be deleted from ${APP_DISPLAY_NAME}.`
 
 const localGeminiSession = {
   agent: 'gemini' as const,
@@ -52,7 +53,7 @@ describe('aiVaultSessionDeleteBlockedReason', () => {
         executionHostId: 'local',
         filePath: '/home/user/.opencode/sessions/log.jsonl'
       })
-    ).toBe("OpenCode sessions can't be deleted from Orca.")
+    ).toBe(`OpenCode sessions can't be deleted from ${APP_DISPLAY_NAME}.`)
   })
 
   it('gives a multi-cause agent (antigravity) the same single sentence', () => {
@@ -62,7 +63,7 @@ describe('aiVaultSessionDeleteBlockedReason', () => {
         executionHostId: 'local',
         filePath: '/home/user/.antigravity/brain/conv-1/.system_generated/logs/transcript.jsonl'
       })
-    ).toBe("Antigravity sessions can't be deleted from Orca.")
+    ).toBe(`Antigravity sessions can't be deleted from ${APP_DISPLAY_NAME}.`)
   })
 
   it('prioritizes the host gate over the unsupported-agent reason', () => {

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
@@ -8,16 +8,17 @@ vi.mock('electron', () => ({
 }))
 
 import { installLinuxBareOrcaDispatcher } from './linux-bare-orca-dispatcher'
+import { getBundledLauncherPath } from './bundled-cli-launcher-path'
 
 const created: string[] = []
+const bundledLinuxLauncher = basename(getBundledLauncherPath('linux', '/')!)
 
 async function makeFixture(): Promise<{ homePath: string; resourcesPath: string }> {
   const root = await mkdtemp(join(tmpdir(), 'orca-bare-dispatcher-'))
   created.push(root)
   const resourcesPath = join(root, 'resources')
-  // The bundled orca-ide launcher must exist for the dispatcher to be written.
   await mkdir(join(resourcesPath, 'bin'), { recursive: true })
-  await writeFile(join(resourcesPath, 'bin', 'orca-ide'), '#!/usr/bin/env bash\n', 'utf8')
+  await writeFile(join(resourcesPath, 'bin', bundledLinuxLauncher), '#!/usr/bin/env bash\n', 'utf8')
   return { homePath: join(root, 'home'), resourcesPath }
 }
 
@@ -26,7 +27,7 @@ afterEach(async () => {
 })
 
 describe('installLinuxBareOrcaDispatcher', () => {
-  it('writes an executable bare-orca dispatcher that execs the bundled orca-ide launcher', async () => {
+  it('writes an executable bare-orca dispatcher that execs the bundled product launcher', async () => {
     const { homePath, resourcesPath } = await makeFixture()
 
     const result = await installLinuxBareOrcaDispatcher({
@@ -35,7 +36,7 @@ describe('installLinuxBareOrcaDispatcher', () => {
       appImagePath: null
     })
 
-    const expectedTarget = join(resourcesPath, 'bin', 'orca-ide')
+    const expectedTarget = join(resourcesPath, 'bin', bundledLinuxLauncher)
     expect(result.state).toBe('installed')
     expect(result.target).toBe(expectedTarget)
     expect(result.dispatcherPath).toBe(join(homePath, '.local', 'bin', 'orca'))
@@ -45,8 +46,10 @@ describe('installLinuxBareOrcaDispatcher', () => {
     // Single-quoted so a resources path with shell metacharacters can't break out.
     expect(content).toContain(`exec '${expectedTarget}' "$@"`)
 
-    const mode = (await stat(result.dispatcherPath)).mode & 0o777
-    expect(mode & 0o111).not.toBe(0)
+    if (process.platform !== 'win32') {
+      const mode = (await stat(result.dispatcherPath)).mode & 0o777
+      expect(mode & 0o111).not.toBe(0)
+    }
   })
 
   it('is idempotent — a second install rewrites its own dispatcher without throwing', async () => {
@@ -72,7 +75,11 @@ describe('installLinuxBareOrcaDispatcher', () => {
     created.push(root)
     const resourcesPath = join(root, 'App Support', 'resources')
     await mkdir(join(resourcesPath, 'bin'), { recursive: true })
-    await writeFile(join(resourcesPath, 'bin', 'orca-ide'), '#!/usr/bin/env bash\n', 'utf8')
+    await writeFile(
+      join(resourcesPath, 'bin', bundledLinuxLauncher),
+      '#!/usr/bin/env bash\n',
+      'utf8'
+    )
 
     const result = await installLinuxBareOrcaDispatcher({
       resourcesPath,
@@ -81,7 +88,7 @@ describe('installLinuxBareOrcaDispatcher', () => {
     })
 
     const content = await readFile(result.dispatcherPath, 'utf8')
-    expect(content).toContain(`exec '${join(resourcesPath, 'bin', 'orca-ide')}' "$@"`)
+    expect(content).toContain(`exec '${join(resourcesPath, 'bin', bundledLinuxLauncher)}' "$@"`)
   })
 
   it('execs the stable AppImage (not the ephemeral mount) when running from an AppImage', async () => {
@@ -114,7 +121,7 @@ describe('installLinuxBareOrcaDispatcher', () => {
     expect(await readFile(dispatcherPath, 'utf8')).toBe('#!/bin/sh\necho my own orca\n')
   })
 
-  it('skips when the bundled orca-ide launcher is missing from the build', async () => {
+  it('skips when the bundled product launcher is missing from the build', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-bare-dispatcher-nolauncher-'))
     created.push(root)
 

@@ -18,7 +18,7 @@ describe('web pairing input', () => {
   }
 
   it('parses query-form pairing URLs', () => {
-    expect(parseWebPairingInput(`orca://pair?code=${encodeOffer()}`)).toEqual(offer)
+    expect(parseWebPairingInput(`hivecode://pair?code=${encodeOffer()}`)).toEqual(offer)
   })
 
   it('still parses legacy hash-form pairing URLs', () => {

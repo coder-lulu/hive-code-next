@@ -1,6 +1,7 @@
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
+import { applyProductBranding } from '../../shared/brand'
 
 type HostCodexManagedHomeOwnershipOptions = {
   candidatePath: string
@@ -156,7 +157,10 @@ function evaluate({
     // Why: the marker is required, so its definitive absence is structural — but
     // an unreadable marker is not evidence of anything.
     if (isDefinitiveAbsence(error)) {
-      return { kind: 'untrusted', reason: 'Managed Codex home is missing Orca ownership marker.' }
+      return {
+        kind: 'untrusted',
+        reason: applyProductBranding('Managed Codex home is missing Orca ownership marker.')
+      }
     }
     return { kind: 'indeterminate', error }
   }

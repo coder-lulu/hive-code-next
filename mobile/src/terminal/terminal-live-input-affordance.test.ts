@@ -52,10 +52,10 @@ describe('terminal live input affordance', () => {
   })
 
   it('makes the live keyboard target visible instead of status-only chrome', () => {
-    expect(liveInputStatusSource).toContain("'Tap to show keyboard'")
-    expect(liveInputStatusSource).toContain("liveInputText || 'Tap to show keyboard'")
+    expect(liveInputStatusSource).toContain("'轻点显示键盘'")
+    expect(liveInputStatusSource).toContain("liveInputText || '轻点显示键盘'")
     expect(liveInputStatusSource).toContain('ellipsizeMode="head"')
-    expect(commandInputStylesSource).toContain('backgroundColor: colors.bgRaised')
+    expect(commandInputStylesSource).toContain('backgroundColor: theme.color.bg.canvas')
     expect(commandInputStylesSource).toContain('borderWidth: 1')
     expect(commandInputStylesSource).toContain('liveInputFocusTargetPressed')
   })

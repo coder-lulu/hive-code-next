@@ -1,4 +1,5 @@
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -27,6 +28,7 @@ import {
 } from './native-chat'
 
 let tempRoots: string[] = []
+const canonicalTempDir = realpathSync.native(tmpdir())
 
 beforeEach(() => {
   handlers.clear()
@@ -73,7 +75,7 @@ describe('nativeChat:readSession handler', () => {
     const result = (await invokeReadSession({
       agent: 'claude',
       sessionId: 'missing-session',
-      transcriptPath: join(tmpdir(), 'orca-native-chat-ipc-does-not-exist.jsonl')
+      transcriptPath: join(canonicalTempDir, 'orca-native-chat-ipc-does-not-exist.jsonl')
     })) as { error?: string; notFound?: true }
 
     expect(result.error).toBeDefined()
@@ -81,13 +83,14 @@ describe('nativeChat:readSession handler', () => {
   })
 
   it('resolves a Claude transcript and returns the full conversation', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-ipc-'))
+    const root = await mkdtemp(join(canonicalTempDir, 'orca-native-chat-ipc-'))
     tempRoots.push(root)
     const projectsDir = join(root, '.claude', 'projects')
     const projectDir = join(projectsDir, '-repo')
     await mkdir(projectDir, { recursive: true })
+    const transcriptPath = join(projectDir, 'sess-ipc.jsonl')
     await writeFile(
-      join(projectDir, 'sess-ipc.jsonl'),
+      transcriptPath,
       jsonLines([
         {
           type: 'user',
@@ -104,28 +107,20 @@ describe('nativeChat:readSession handler', () => {
       ])
     )
 
-    // Point homedir-derived Claude root at our fixture via HOME so the resolver
-    // (which reads homedir() internally) finds the transcript.
-    const previousHome = process.env.HOME
-    process.env.HOME = root
-    try {
-      const result = (await invokeReadSession({ agent: 'claude', sessionId: 'sess-ipc' })) as {
-        messages?: unknown[]
-        error?: string
-      }
-      expect(result.error).toBeUndefined()
-      expect(result.messages).toHaveLength(2)
-    } finally {
-      if (previousHome === undefined) {
-        delete process.env.HOME
-      } else {
-        process.env.HOME = previousHome
-      }
+    const result = (await invokeReadSession({
+      agent: 'claude',
+      sessionId: 'sess-ipc',
+      transcriptPath
+    })) as {
+      messages?: unknown[]
+      error?: string
     }
+    expect(result.error).toBeUndefined()
+    expect(result.messages).toHaveLength(2)
   })
 
   it('windows to the most-recent `limit` turns and pages older history when raised', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-ipc-limit-'))
+    const root = await mkdtemp(join(canonicalTempDir, 'orca-native-chat-ipc-limit-'))
     tempRoots.push(root)
     const projectDir = join(root, '.claude', 'projects', '-repo')
     await mkdir(projectDir, { recursive: true })
@@ -137,35 +132,28 @@ describe('nativeChat:readSession handler', () => {
       timestamp: `2026-06-01T10:00:0${n}.000Z`,
       message: { role: 'user', content: `m${n}` }
     }))
-    await writeFile(join(projectDir, 'sess-limit.jsonl'), jsonLines(records))
+    const transcriptPath = join(projectDir, 'sess-limit.jsonl')
+    await writeFile(transcriptPath, jsonLines(records))
 
-    const previousHome = process.env.HOME
-    process.env.HOME = root
-    try {
-      const windowed = (await invokeReadSession({
-        agent: 'claude',
-        sessionId: 'sess-limit',
-        limit: 2
-      })) as { messages: { id: string }[] }
-      expect(windowed.messages.map((m) => m.id)).toEqual(['u-4', 'u-5'])
+    const windowed = (await invokeReadSession({
+      agent: 'claude',
+      sessionId: 'sess-limit',
+      limit: 2,
+      transcriptPath
+    })) as { messages: { id: string }[] }
+    expect(windowed.messages.map((m) => m.id)).toEqual(['u-4', 'u-5'])
 
-      const wider = (await invokeReadSession({
-        agent: 'claude',
-        sessionId: 'sess-limit',
-        limit: 4
-      })) as { messages: { id: string }[] }
-      expect(wider.messages.map((m) => m.id)).toEqual(['u-2', 'u-3', 'u-4', 'u-5'])
-    } finally {
-      if (previousHome === undefined) {
-        delete process.env.HOME
-      } else {
-        process.env.HOME = previousHome
-      }
-    }
+    const wider = (await invokeReadSession({
+      agent: 'claude',
+      sessionId: 'sess-limit',
+      limit: 4,
+      transcriptPath
+    })) as { messages: { id: string }[] }
+    expect(wider.messages.map((m) => m.id)).toEqual(['u-2', 'u-3', 'u-4', 'u-5'])
   })
 
   it('emits snapshot and appended frames and tears down on destroy', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-ipc-sub-'))
+    const root = await mkdtemp(join(canonicalTempDir, 'orca-native-chat-ipc-sub-'))
     tempRoots.push(root)
     const projectsDir = join(root, '.claude', 'projects')
     const projectDir = join(projectsDir, '-repo')
@@ -200,56 +188,47 @@ describe('nativeChat:readSession handler', () => {
       send: (channel: string, payload: unknown) => sent.push({ channel, payload })
     }
 
-    const previousHome = process.env.HOME
-    process.env.HOME = root
-    try {
-      subscribe!(
-        { sender },
-        {
-          subscriptionId: 'sub-1',
-          agent: 'claude',
-          sessionId: 'sess-sub'
-        }
-      )
-
-      // The listener dispatches handleSubscribe fire-and-forget; give it a beat
-      // to resolve the path and install the watcher before we append.
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-      await appendFile(
-        filePath,
-        `${JSON.stringify({
-          type: 'assistant',
-          uuid: 'a-1',
-          timestamp: '2026-06-01T10:00:01.000Z',
-          message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] }
-        })}\n`
-      )
-
-      // The first frame is a bounded snapshot and later frames are appends.
-      // Collect ids across both and assert the new turn shows up.
-      const appendedIds = (): string[] =>
-        sent
-          .filter((s) => s.channel === 'nativeChat:appended')
-          .flatMap((s) =>
-            (s.payload as { frame: { messages: { id: string }[] } }).frame.messages.map((m) => m.id)
-          )
-      await waitFor(() => appendedIds().includes('a-1'))
-      const appendedEvent = sent.find((s) => s.channel === 'nativeChat:appended')!
-      const payload = appendedEvent.payload as { subscriptionId: string }
-      expect(payload.subscriptionId).toBe('sub-1')
-      expect(appendedIds()).toContain('a-1')
-
-      // Destroyed window tears down the watcher without error.
-      expect(destroyedCb).toBeDefined()
-      destroyedCb!()
-    } finally {
-      if (previousHome === undefined) {
-        delete process.env.HOME
-      } else {
-        process.env.HOME = previousHome
+    subscribe!(
+      { sender },
+      {
+        subscriptionId: 'sub-1',
+        agent: 'claude',
+        sessionId: 'sess-sub',
+        transcriptPath: filePath
       }
-    }
+    )
+
+    // The listener dispatches handleSubscribe fire-and-forget; give it a beat
+    // to resolve the path and install the watcher before we append.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    await appendFile(
+      filePath,
+      `${JSON.stringify({
+        type: 'assistant',
+        uuid: 'a-1',
+        timestamp: '2026-06-01T10:00:01.000Z',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] }
+      })}\n`
+    )
+
+    // The first frame is a bounded snapshot and later frames are appends.
+    // Collect ids across both and assert the new turn shows up.
+    const appendedIds = (): string[] =>
+      sent
+        .filter((s) => s.channel === 'nativeChat:appended')
+        .flatMap((s) =>
+          (s.payload as { frame: { messages: { id: string }[] } }).frame.messages.map((m) => m.id)
+        )
+    await waitFor(() => appendedIds().includes('a-1'))
+    const appendedEvent = sent.find((s) => s.channel === 'nativeChat:appended')!
+    const payload = appendedEvent.payload as { subscriptionId: string }
+    expect(payload.subscriptionId).toBe('sub-1')
+    expect(appendedIds()).toContain('a-1')
+
+    // Destroyed window tears down the watcher without error.
+    expect(destroyedCb).toBeDefined()
+    destroyedCb!()
   })
 
   it('settles the view with a pending frame while the transcript is unflushed', async () => {
@@ -301,12 +280,13 @@ describe('nativeChat:readSession handler', () => {
   })
 
   it('drops cleanup registration when sender is destroyed before subscribe completes', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-ipc-destroy-race-'))
+    const root = await mkdtemp(join(canonicalTempDir, 'orca-native-chat-ipc-destroy-race-'))
     tempRoots.push(root)
     const projectDir = join(root, '.claude', 'projects', '-repo')
     await mkdir(projectDir, { recursive: true })
+    const transcriptPath = join(projectDir, 'sess-race.jsonl')
     await writeFile(
-      join(projectDir, 'sess-race.jsonl'),
+      transcriptPath,
       `${jsonLines([
         {
           type: 'user',
@@ -334,35 +314,26 @@ describe('nativeChat:readSession handler', () => {
       send: vi.fn()
     }
 
-    const previousHome = process.env.HOME
-    process.env.HOME = root
-    try {
-      subscribe!(
-        { sender },
-        {
-          subscriptionId: 'sub-race',
-          agent: 'claude',
-          sessionId: 'sess-race'
-        }
-      )
-
-      expect(destroyedCb).toBeDefined()
-      destroyed = true
-      destroyedCb!()
-
-      await waitFor(() => _getNativeChatSenderCleanupCountForTest() === 0)
-      expect(sender.send).not.toHaveBeenCalled()
-    } finally {
-      if (previousHome === undefined) {
-        delete process.env.HOME
-      } else {
-        process.env.HOME = previousHome
+    subscribe!(
+      { sender },
+      {
+        subscriptionId: 'sub-race',
+        agent: 'claude',
+        sessionId: 'sess-race',
+        transcriptPath
       }
-    }
+    )
+
+    expect(destroyedCb).toBeDefined()
+    destroyed = true
+    destroyedCb!()
+
+    await waitFor(() => _getNativeChatSenderCleanupCountForTest() === 0)
+    expect(sender.send).not.toHaveBeenCalled()
   })
 
   it('returns an error for an unknown session without throwing', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-ipc-missing-'))
+    const root = await mkdtemp(join(canonicalTempDir, 'orca-native-chat-ipc-missing-'))
     tempRoots.push(root)
     const previousHome = process.env.HOME
     process.env.HOME = root

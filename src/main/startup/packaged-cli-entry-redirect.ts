@@ -1,6 +1,7 @@
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
+import { applyProductBranding } from '../../shared/brand'
 
 type RedirectResult =
   | {
@@ -58,11 +59,15 @@ export function maybeRedirectPackagedCliEntryLaunch(options: RedirectOptions = {
     return { redirected: false }
   }
   if (env[REDIRECT_ATTEMPT_ENV] === '1') {
-    process.stderr.write('Unable to start the Orca CLI through Electron node mode.\n')
+    process.stderr.write(
+      applyProductBranding('Unable to start the Orca CLI through Electron node mode.\n')
+    )
     return { redirected: true, status: 1 }
   }
   if (!exists(cliEntryPath)) {
-    process.stderr.write(`Unable to locate the Orca CLI entrypoint at ${cliEntryPath}\n`)
+    process.stderr.write(
+      applyProductBranding(`Unable to locate the Orca CLI entrypoint at ${cliEntryPath}\n`)
+    )
     return { redirected: true, status: 1 }
   }
 

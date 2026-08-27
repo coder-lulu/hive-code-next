@@ -5,9 +5,10 @@ import {
   type PluginKillList,
   type PluginKillListEntry
 } from '../../shared/plugins/plugin-kill-list'
+import { getProductExternalServiceEndpoints } from '../product/product-external-service-endpoints'
 import { PluginKillListStore } from './plugin-kill-list-store'
 
-export const PLUGIN_KILL_LIST_URL = 'https://onorca.dev/plugins/kill-list.json'
+export const PLUGIN_KILL_LIST_URL = getProductExternalServiceEndpoints().pluginKillList
 const PLUGIN_KILL_LIST_DOWNLOAD_LIMIT = 4 * 1024 * 1024
 
 type PluginKillListFetcher = () => Promise<PluginKillList>
@@ -98,6 +99,9 @@ export async function fetchPluginKillList(
   fetcher: typeof fetch = fetch,
   url = PLUGIN_KILL_LIST_URL
 ): Promise<PluginKillList> {
+  if (!url) {
+    throw new Error('plugin kill-list endpoint is not configured for this build')
+  }
   const response = await fetcher(url, { cache: 'no-store' })
   if (!response.ok) {
     throw new Error(`plugin kill-list request failed with HTTP ${response.status}`)

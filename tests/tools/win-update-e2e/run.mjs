@@ -1,9 +1,9 @@
 // win-update-e2e — packaged NSIS update proof harness.
 //
-// Given two Orca Windows installers (version N and N+1), proves what happens to
+// Given two Windows installers (version N and N+1), proves what happens to
 // the terminal daemon and its sessions across a real silent update, with
-// machine-checkable assertions. Windows-only. See README.md for usage and the
-// design context in docs/windows-terminal-update-survival-plan.md (Phase 0).
+// machine-checkable assertions. Windows-only. See README.md for usage and
+// design context.
 
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'

@@ -8,9 +8,9 @@ import {
   MessageSquare,
   X
 } from 'lucide-react-native'
-import { colors } from '../theme/mobile-theme'
-import { statusColor } from '../components/pr-sidebar/pr-sidebar-status-color'
-import { hubStyles } from './mobile-source-control-hub-styles'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { createMobileSourceControlHubStyles } from './mobile-source-control-hub-styles'
 import type { MobilePrChipRollup, MobilePrChipSummary } from './mobile-pr-chip-summary'
 
 type Props = {
@@ -22,6 +22,8 @@ type Props = {
 // Pull Request segment. Rendered only when the repo supports hosted review — the
 // parent gates on that, so this component always has something meaningful to show.
 export function MobileSourceControlPrChip({ summary, onPress }: Props) {
+  const theme = useMobileTheme()
+  const hubStyles = useMobileThemeStyles(createMobileSourceControlHubStyles)
   return (
     <Pressable
       style={({ pressed }) => [hubStyles.chip, pressed && hubStyles.chipPressed]}
@@ -30,45 +32,55 @@ export function MobileSourceControlPrChip({ summary, onPress }: Props) {
       accessibilityLabel={chipAccessibilityLabel(summary)}
     >
       <View style={hubStyles.chipIcon}>
-        <GitPullRequest size={15} color={colors.textSecondary} strokeWidth={2.1} />
+        <GitPullRequest size={16} color={theme.color.text.secondary} strokeWidth={2} />
       </View>
       {summary.kind === 'loading' ? (
         <>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
+          <ActivityIndicator size="small" color={theme.color.text.secondary} />
           <Text style={hubStyles.chipMutedText} numberOfLines={1}>
-            Loading pull request…
+            正在加载拉取请求…
           </Text>
         </>
       ) : summary.kind === 'none' ? (
         <>
-          <Text style={hubStyles.chipCreateText}>Create pull request</Text>
+          <Text style={hubStyles.chipCreateText}>创建拉取请求</Text>
           <View style={hubStyles.chipSpacer} />
-          <ChevronRight size={16} color={colors.textMuted} strokeWidth={2.1} />
+          <ChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
         </>
       ) : summary.kind === 'unavailable' ? (
         <>
           <Text style={hubStyles.chipMutedText} numberOfLines={1}>
             {summary.message}
           </Text>
-          <ChevronRight size={16} color={colors.textMuted} strokeWidth={2.1} />
+          <ChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
         </>
       ) : (
         <>
           <Text style={hubStyles.chipNumber}>#{summary.number}</Text>
-          <View style={[hubStyles.statePill, { borderColor: statusColor(summary.stateToken) }]}>
-            <Text style={[hubStyles.statePillText, { color: statusColor(summary.stateToken) }]}>
-              {summary.stateLabel}
+          <View
+            style={[
+              hubStyles.statePill,
+              { borderColor: mobilePrStatusColor(theme, summary.stateToken) }
+            ]}
+          >
+            <Text
+              style={[
+                hubStyles.statePillText,
+                { color: mobilePrStatusColor(theme, summary.stateToken) }
+              ]}
+            >
+              {localizePrStateLabel(summary.stateLabel)}
             </Text>
           </View>
           <ChipRollup rollup={summary.rollup} />
           {summary.commentCount != null && summary.commentCount > 0 ? (
             <View style={hubStyles.comment}>
-              <MessageSquare size={13} color={colors.textSecondary} strokeWidth={2.1} />
+              <MessageSquare size={16} color={theme.color.text.secondary} strokeWidth={2} />
               <Text style={hubStyles.commentText}>{summary.commentCount}</Text>
             </View>
           ) : null}
           <View style={hubStyles.chipSpacer} />
-          <ChevronRight size={16} color={colors.textMuted} strokeWidth={2.1} />
+          <ChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
         </>
       )}
     </Pressable>
@@ -76,11 +88,13 @@ export function MobileSourceControlPrChip({ summary, onPress }: Props) {
 }
 
 function ChipRollup({ rollup }: { rollup: MobilePrChipRollup }) {
-  const color = statusColor(rollup.token)
+  const theme = useMobileTheme()
+  const hubStyles = useMobileThemeStyles(createMobileSourceControlHubStyles)
+  const color = mobilePrStatusColor(theme, rollup.token)
   return (
     <View style={hubStyles.rollup}>
       <RollupIcon kind={rollup.kind} color={color} />
-      <Text style={[hubStyles.rollupText, { color }]}>{rollup.text}</Text>
+      <Text style={[hubStyles.rollupText, { color }]}>{localizeRollupText(rollup.text)}</Text>
     </View>
   )
 }
@@ -105,17 +119,55 @@ function RollupIcon({ kind, color }: { kind: MobilePrChipRollup['kind']; color: 
 function chipAccessibilityLabel(summary: MobilePrChipSummary): string {
   switch (summary.kind) {
     case 'loading':
-      return 'Loading pull request'
+      return '正在加载拉取请求'
     case 'none':
-      return 'Create pull request'
+      return '创建拉取请求'
     case 'unavailable':
-      return `Pull request unavailable: ${summary.message}`
+      return `拉取请求不可用：${summary.message}`
     case 'ready': {
       const comments =
         summary.commentCount != null && summary.commentCount > 0
-          ? `, ${summary.commentCount} unresolved comments`
+          ? `，${summary.commentCount} 条未解决评论`
           : ''
-      return `Pull request #${summary.number}, ${summary.stateLabel}, ${summary.rollup.text}${comments}. Open pull request.`
+      return `拉取请求 #${summary.number}，${localizePrStateLabel(summary.stateLabel)}，${localizeRollupText(summary.rollup.text)}${comments}。打开拉取请求。`
     }
   }
+}
+
+function mobilePrStatusColor(theme: MobileTheme, token: MobilePrChipRollup['token']): string {
+  switch (token) {
+    case 'statusGreen':
+      return theme.color.status.success
+    case 'statusAmber':
+      return theme.color.status.warning
+    case 'statusRed':
+      return theme.color.status.danger
+    case 'statusPurple':
+      return theme.color.brand.primary
+    default:
+      return theme.color.text.secondary
+  }
+}
+
+function localizePrStateLabel(label: string): string {
+  const labels: Readonly<Record<string, string>> = {
+    Open: '开放',
+    Draft: '草稿',
+    Closed: '已关闭',
+    Merged: '已合并'
+  }
+  return labels[label] ?? label
+}
+
+function localizeRollupText(text: string): string {
+  if (text === 'Conflicts') {
+    return '存在冲突'
+  }
+  if (text === 'No checks') {
+    return '无检查项'
+  }
+  if (text === 'Unresolved checks') {
+    return '检查未完成'
+  }
+  return text.replace(/^(\d+) failing$/, '$1 项失败').replace(/^(\d+) running$/, '$1 项进行中')
 }

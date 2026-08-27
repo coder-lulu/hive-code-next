@@ -1,11 +1,11 @@
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { MobileFilePreviewResult } from './mobile-file-preview-request'
 import { MobileFileMarkdownPreview } from './MobileFileMarkdownPreview'
 import { MobileFilePreviewEditableSource } from './MobileFilePreviewEditableSource'
 import { MobileFilePreviewSourceText } from './MobileFilePreviewSourceText'
 import type { MobileFilePreviewLineColumn } from './mobile-file-preview-line-column'
-import { filePreviewStyles as styles } from './mobile-file-preview-styles'
+import { createFilePreviewStyles } from './mobile-file-preview-styles'
 
 type Props = {
   preview: MobileFilePreviewResult
@@ -23,10 +23,12 @@ type Props = {
 }
 
 export function MobileFilePreviewBody({ preview, ...options }: Props) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createFilePreviewStyles)
   if (preview.status === 'loading') {
     return (
       <View style={styles.state}>
-        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <ActivityIndicator size="small" color={theme.color.text.secondary} />
         <Text style={styles.stateText}>{preview.message}</Text>
       </View>
     )
@@ -36,7 +38,7 @@ export function MobileFilePreviewBody({ preview, ...options }: Props) {
       <View style={styles.state}>
         <Text style={styles.errorText}>{preview.message}</Text>
         <Pressable style={styles.retryButton} onPress={options.onRetry}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>重试</Text>
         </Pressable>
       </View>
     )
@@ -46,7 +48,7 @@ export function MobileFilePreviewBody({ preview, ...options }: Props) {
       <EditablePreviewSource {...options} />
     ) : (
       <View style={styles.state}>
-        <Text style={styles.stateText}>Empty file</Text>
+        <Text style={styles.stateText}>空文件</Text>
       </View>
     )
   }
@@ -65,7 +67,7 @@ export function MobileFilePreviewBody({ preview, ...options }: Props) {
             style={[styles.image, { width: options.imageWidth, height: options.imageHeight }]}
             resizeMode="contain"
             onError={options.onImageError}
-            accessibilityLabel={`${options.title} image`}
+            accessibilityLabel={`${options.title} 图片`}
           />
         </ScrollView>
       </View>

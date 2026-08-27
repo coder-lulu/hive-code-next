@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { hostedReviewCopy } from './hosted-review-copy'
 import {
   buildMobileHostedReviewCreateParams,
@@ -35,7 +36,7 @@ export function getMobilePrCreateSuccessWarning(
       : `${copy.titleLabel} is already open.`
   }
   if (outcome.linkError) {
-    return `${copy.titleLabel} created, but Orca could not refresh it yet.`
+    return productNameText(`${copy.titleLabel} created, but Orca could not refresh it yet.`)
   }
   return undefined
 }
@@ -49,7 +50,9 @@ export function getMobilePrCreateBlockMessage(prefill: MobilePrPrefill): string 
     // mobile has no refresh/review-lookup signal of its own, so it must not
     // offer create, or the needs_push Push & Create path would slip through.
     if (prefill.reviewLookupOutcome !== 'not_found') {
-      return `Orca could not confirm whether this branch already has a ${copy.reviewLabel}. Try again in a moment.`
+      return productNameText(
+        `Orca could not confirm whether this branch already has a ${copy.reviewLabel}. Try again in a moment.`
+      )
     }
     return null
   }

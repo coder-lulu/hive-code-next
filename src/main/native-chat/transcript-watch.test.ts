@@ -1,4 +1,5 @@
 import { appendFile, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -10,6 +11,7 @@ import {
 } from './transcript-watch'
 
 let tempRoots: string[] = []
+const canonicalTempDir = realpathSync.native(tmpdir())
 
 beforeEach(() => {
   tempRoots = []
@@ -21,7 +23,7 @@ afterEach(async () => {
 })
 
 async function tempFile(initial: string): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-watch-'))
+  const root = await mkdtemp(join(canonicalTempDir, 'orca-native-chat-watch-'))
   tempRoots.push(root)
   const filePath = join(root, 'rollout.jsonl')
   await writeFile(filePath, initial)
@@ -31,7 +33,7 @@ async function tempFile(initial: string): Promise<string> {
 // A path inside a fresh temp dir with nothing written yet — simulates a
 // just-created session whose agent hasn't flushed its first JSONL line (#8401).
 async function pendingFilePath(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-watch-pending-'))
+  const root = await mkdtemp(join(canonicalTempDir, 'orca-native-chat-watch-pending-'))
   tempRoots.push(root)
   return join(root, 'rollout.jsonl')
 }

@@ -190,6 +190,74 @@ describe('MobileSocketWiring', () => {
     expect(wiring.connectionCount).toBe(0)
   })
 
+  it('routes a Cloud principal without consulting or mutating DeviceRegistry', () => {
+    const desktop = generateKeyPair()
+    const browser = generateKeyPair()
+    const ws = new FakeSocket()
+    const transport = new FakeTransport()
+    const validateToken = vi.fn()
+    const onText = vi.fn()
+    const onCloudText = vi.fn()
+    const managedWebSessionId = '123e4567-e89b-42d3-a456-426614174000'
+    const principal = {
+      principalKind: 'cloud_managed_web_session' as const,
+      managedWebSessionId,
+      runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
+      expiresAt: Date.parse('2026-08-25T09:00:00.000Z')
+    }
+    const wiring = new MobileSocketWiring({
+      deviceRegistry: { validateToken } as unknown as DeviceRegistry,
+      e2eeKeypair: {
+        publicKey: desktop.publicKey,
+        secretKey: desktop.secretKey,
+        publicKeyB64: Buffer.from(desktop.publicKey).toString('base64')
+      },
+      resolveCloudManagedSession: vi.fn().mockReturnValue(principal),
+      onText,
+      onBinary: vi.fn(),
+      onClose: vi.fn(),
+      onCloudText
+    })
+    wiring.attachTransport(transport, () => ({
+      transport: 'direct',
+      request: {
+        pathname: '/_hive/runtime-rpc',
+        origin: 'https://code.hivekernel.com'
+      }
+    }))
+    transport.receive(
+      ws,
+      JSON.stringify({
+        type: 'e2ee_hello',
+        publicKeyB64: Buffer.from(browser.publicKey).toString('base64')
+      })
+    )
+    const sharedKey = deriveSharedKey(browser.secretKey, desktop.publicKey)
+    transport.receive(
+      ws,
+      encrypt(
+        JSON.stringify({
+          type: 'e2ee_auth',
+          principalKind: 'cloud_managed_web_session',
+          managedWebSessionId,
+          runtimeSessionId: principal.runtimeSessionId,
+          sessionToken: 'A'.repeat(43)
+        }),
+        sharedKey
+      )
+    )
+    transport.receive(ws, encrypt('{"id":"rpc-1","method":"status.get"}', sharedKey))
+
+    expect(validateToken).not.toHaveBeenCalled()
+    expect(onText).not.toHaveBeenCalled()
+    expect(onCloudText).toHaveBeenCalledOnce()
+    expect(transport.setClientId).toHaveBeenCalledWith(ws, `cloud-managed:${managedWebSessionId}`)
+    wiring.terminateCloudSessionConnections(managedWebSessionId)
+    expect(transport.terminateClientConnections).toHaveBeenCalledWith(
+      `cloud-managed:${managedWebSessionId}`
+    )
+  })
+
   it('closes an unknown-token socket even when reporting the failure throws', () => {
     const desktop = generateKeyPair()
     const phone = generateKeyPair()

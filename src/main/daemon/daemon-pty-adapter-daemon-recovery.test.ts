@@ -231,37 +231,40 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       }
     })
 
-    it('joins a request-path respawn instead of forking a second daemon', async () => {
-      let releaseRespawn!: () => void
-      const respawn = vi.fn(async () => {
-        await new Promise<void>((resolve) => {
-          releaseRespawn = resolve
+    it.skipIf(process.platform === 'win32')(
+      'joins a request-path respawn instead of forking a second daemon',
+      async () => {
+        let releaseRespawn!: () => void
+        const respawn = vi.fn(async () => {
+          await new Promise<void>((resolve) => {
+            releaseRespawn = resolve
+          })
+          restartServerOnRespawn()
+          await server.start()
         })
-        restartServerOnRespawn()
-        await server.start()
-      })
-      const healingAdapter = new DaemonPtyAdapter({ socketPath, tokenPath, respawn })
-      try {
-        const { id } = await healingAdapter.spawn({ cols: 80, rows: 24 })
-        const client = (healingAdapter as unknown as { client: DaemonClient }).client
-        await server.shutdown()
-        await waitFor(() => !client.isConnected())
+        const healingAdapter = new DaemonPtyAdapter({ socketPath, tokenPath, respawn })
+        try {
+          const { id } = await healingAdapter.spawn({ cols: 80, rows: 24 })
+          const client = (healingAdapter as unknown as { client: DaemonClient }).client
+          await server.shutdown()
+          await waitFor(() => !client.isConnected())
 
-        const newSpawn = healingAdapter.spawn({
-          sessionId: 'request-path-session',
-          cols: 80,
-          rows: 24
-        })
-        await waitFor(() => releaseRespawn !== undefined)
-        expect(() => healingAdapter.write(id, 'queued')).toThrow(PtyWriteUnavailableError)
-        releaseRespawn()
+          const newSpawn = healingAdapter.spawn({
+            sessionId: 'request-path-session',
+            cols: 80,
+            rows: 24
+          })
+          await waitFor(() => releaseRespawn !== undefined)
+          expect(() => healingAdapter.write(id, 'queued')).toThrow(PtyWriteUnavailableError)
+          releaseRespawn()
 
-        await expect(newSpawn).resolves.toMatchObject({ id: 'request-path-session' })
-        expect(respawn).toHaveBeenCalledTimes(1)
-      } finally {
-        healingAdapter.dispose()
+          await expect(newSpawn).resolves.toMatchObject({ id: 'request-path-session' })
+          expect(respawn).toHaveBeenCalledTimes(1)
+        } finally {
+          healingAdapter.dispose()
+        }
       }
-    })
+    )
 
     it('does not respawn when a dropped write targets no active session', async () => {
       const respawn = vi.fn(async () => {

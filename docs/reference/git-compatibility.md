@@ -2,14 +2,14 @@
 
 ## Scope
 
-Orca executes the user's Git binary on three kinds of execution host: native,
+HiveCode executes the user's Git binary on three kinds of execution host: native,
 WSL, and SSH. Each host can have a different Git version, so compatibility
 state must be scoped to the host that actually runs the command.
 
 Git 2.25 is the core-workflow compatibility baseline for command selection. It
-is the oldest line that covers Orca's baseline use of porcelain v2, `branch
+is the oldest line that covers HiveCode's baseline use of porcelain v2, `branch
 --show-current`, `restore`, and sparse checkout. Optional features that need a
-newer Git must degrade safely and cache the missing capability. Orca does not
+newer Git must degrade safely and cache the missing capability. HiveCode does not
 currently block older Git at startup, but new command construction should not
 assume features introduced after this baseline.
 
@@ -22,7 +22,7 @@ When a newer Git feature materially improves correctness or performance:
 3. Run the preferred command through `GitCapabilityCache` so a rejection is
    remembered for the native host, WSL distro, or SSH provider that produced it.
 4. Retry after the cache interval so an in-place Git upgrade self-heals without
-   restarting Orca.
+   restarting HiveCode.
 5. Test the first fallback, later calls that skip the rejected probe, concurrent
    probe coalescing, and execution-host isolation where applicable.
 
@@ -33,21 +33,21 @@ authority.
 
 ## Current Capabilities
 
-| Capability                  | Preferred behavior                                                      | Compatibility behavior                                                                                                                                                                                     |
-| --------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fetch-no-write-fetch-head` | Fetch a private rebase ref without changing worktree-local `FETCH_HEAD` | Serialize all Orca fetch/pull operations per worktree Git directory before Git 2.29                                                                                                                        |
-| `worktree-list-z`           | NUL-delimited worktree paths with `prunable` marks                      | Line-block parser for Git before `worktree list -z` (2.36); the `prunable`/`locked` annotations still parse on Git 2.31–2.35, and a path-existence probe restores `prunable` detection for Git before 2.31 |
-| `rev-parse-path-format`     | Absolute repo metadata paths                                            | Resolve legacy relative output against the scanned repo                                                                                                                                                    |
-| `for-each-ref-exclude`      | Exclude remote HEAD before the output limit                             | Request extra refs, then filter remote HEAD in Orca                                                                                                                                                        |
-| `merge-tree-write-tree`     | Derive real-merge conflicts and no-op tree proofs                       | Omit the conflict summary and keep conservative branch cleanup behavior before Git 2.38                                                                                                                    |
-| `merge-tree-merge-base`     | Supply the already-resolved merge base                                  | Use the older two-commit `merge-tree --write-tree` form                                                                                                                                                    |
+| Capability              | Preferred behavior                                | Compatibility behavior                                                                  |
+| ----------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `fetch-no-write-fetch-head` | Fetch a private rebase ref without changing worktree-local `FETCH_HEAD` | Serialize all HiveCode fetch/pull operations per worktree Git directory before Git 2.29 |
+| `worktree-list-z`       | NUL-delimited worktree paths with `prunable` marks | Line-block parser for Git before `worktree list -z` (2.36); the `prunable`/`locked` annotations still parse on Git 2.31–2.35, and a path-existence probe restores `prunable` detection for Git before 2.31 |
+| `rev-parse-path-format` | Absolute repo metadata paths                      | Resolve legacy relative output against the scanned repo                                 |
+| `for-each-ref-exclude`  | Exclude remote HEAD before the output limit       | Request extra refs, then filter remote HEAD in HiveCode                                 |
+| `merge-tree-write-tree` | Derive real-merge conflicts and no-op tree proofs | Omit the conflict summary and keep conservative branch cleanup behavior before Git 2.38 |
+| `merge-tree-merge-base` | Supply the already-resolved merge base            | Use the older two-commit `merge-tree --write-tree` form                                 |
 
 ## Why Not `simple-git`
 
 `simple-git` is a process wrapper around the installed Git binary. Its custom
 options and `raw` API pass arguments through to Git, so it cannot make a newer
-flag work on an older binary or choose Orca's semantic fallback automatically.
-It provides version reporting and subprocess queueing, but Orca already needs
+flag work on an older binary or choose HiveCode's semantic fallback automatically.
+It provides version reporting and subprocess queueing, but HiveCode already needs
 its own WSL/SSH routing, cancellation, tracing, redaction, process cleanup, and
 bounded output handling. Replacing the runner would move—not remove—the
 capability problem.
@@ -55,7 +55,7 @@ capability problem.
 ## CI Contract
 
 PR checks run the capability contract against real Git 2.25.5, 2.38.1, and
-2.49.1 binaries. This spans the pre-2.29 serialized `FETCH_HEAD` fallback, the transitional
+2.49.1 binaries. This spans the core-workflow baseline, the transitional
 `merge-tree --write-tree` behavior before `--merge-base`, and current Git.
 
 Keep the unit tests alongside that matrix. They cover concurrent probes,

@@ -206,16 +206,22 @@ export function materializeReleaseCheckout(ref: string): ReleaseCheckout {
 
   mkdirSync(CACHE_ROOT, { recursive: true })
   const staging = join(CACHE_ROOT, `.staging-${label}-${process.pid}`)
+  const archive = join(staging, 'checkout.tar')
   rmSync(staging, { recursive: true, force: true })
   mkdirSync(staging, { recursive: true })
   try {
-    // `git archive | tar -x` keeps the extraction independent of the working tree,
-    // so an injected violation in the working tree cannot leak into the old side.
+    // A file-backed archive avoids shell path rewriting on Windows while keeping
+    // the extraction independent of the working tree.
     execFileSync(
-      'sh',
-      ['-c', `git archive ${commit} ${ARCHIVE_PATHS.join(' ')} | tar -x -C "${staging}"`],
+      'git',
+      ['archive', '--format=tar', `--output=${archive}`, commit, ...ARCHIVE_PATHS],
       { cwd: REPO_ROOT, stdio: ['ignore', 'ignore', 'pipe'] }
     )
+    execFileSync('tar', ['-xf', archive, '-C', staging], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'ignore', 'pipe']
+    })
+    rmSync(archive)
     prepareExtractedTree(staging)
     writeFileSync(
       join(staging, 'checkout-stamp.json'),

@@ -2,6 +2,7 @@ import type { SshConnection } from './ssh-connection'
 import { createSshOperationAbortError } from './ssh-connection-utils'
 import { execCommand } from './ssh-relay-deploy-helpers'
 import { isSshSessionLimitError } from './ssh-session-limit-error'
+import { applyProductBranding } from '../../shared/brand'
 
 export type RemoteNodeResolutionOptions = {
   rethrowSessionLimitErrors?: boolean
@@ -56,7 +57,9 @@ function formatNodeInstallHints(detectedBin: string | null): string {
     ? NODE_PACKAGE_MANAGER_HINTS.find((hint) => hint.bin === detectedBin)
     : null
   const lines = [
-    'Node.js not found on remote host. Orca relay requires Node.js 18+ and npm.',
+    applyProductBranding(
+      'Node.js not found on remote host. Orca relay requires Node.js 18+ and npm.'
+    ),
     '',
     'Install Node.js 18+ with npm on the remote host, then reconnect:'
   ]

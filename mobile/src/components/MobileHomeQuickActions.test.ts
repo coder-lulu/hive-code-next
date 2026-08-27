@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { HostProfile } from '../transport/types'
+import { lightTheme } from '../theme/mobile-theme'
 import { MobileHomeQuickActions } from './MobileHomeQuickActions'
 
 vi.mock('react-native', () => ({
@@ -48,6 +49,7 @@ describe('MobileHomeQuickActions', () => {
     const onCreateWorkspace = vi.fn()
     const quickActions = (hosts: HostProfile[]) =>
       createElement(MobileHomeQuickActions, {
+        theme: lightTheme,
         connectedHosts: hosts,
         onPairDesktop,
         onCreateWorkspace
@@ -105,7 +107,7 @@ describe('MobileHomeQuickActions', () => {
 
     expect(callbacks.onCreateWorkspace).not.toHaveBeenCalled()
     expect(picker().props.visible).toBe(true)
-    expect(picker().props.title).toBe('Create Workspace On')
+    expect(picker().props.title).toBe('选择电脑')
     expect(picker().props.options).toEqual([
       { value: 'desk', label: 'Desk', subtitle: '192.168.1.2:6768' },
       { value: 'laptop', label: 'Laptop', subtitle: 'relay.example.com' }

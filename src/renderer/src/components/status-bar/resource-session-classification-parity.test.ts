@@ -12,7 +12,7 @@ const SEGMENT_PATH = resolve(__dirname, 'ResourceUsageStatusSegment.tsx')
  */
 describe('resource session classification parity', () => {
   it('feeds the row merge the same binding inputs as the bulk selector', () => {
-    const source = readFileSync(SEGMENT_PATH, 'utf8')
+    const source = readFileSync(SEGMENT_PATH, 'utf8').replace(/\r\n/g, '\n')
     const mergeCall = source.slice(
       source.indexOf('mergeSnapshotAndSessions(resourceSnapshot'),
       source.indexOf('worktreeById\n          })')
@@ -32,7 +32,7 @@ describe('resource session classification parity', () => {
   })
 
   it('keeps every binding source in the one object both paths read', () => {
-    const source = readFileSync(SEGMENT_PATH, 'utf8')
+    const source = readFileSync(SEGMENT_PATH, 'utf8').replace(/\r\n/g, '\n')
     const bindings = source.slice(
       source.indexOf('const resourceSessionBindings = useMemo'),
       source.indexOf('const popoverBodyRef')

@@ -1,3 +1,4 @@
+import { productNameText } from '@/product-brand'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   Animated,
@@ -277,9 +278,13 @@ import {
   dismissMobileSessionCreateWarningState,
   reconcileMobileSessionCreateWarningState
 } from '../../../../src/session/mobile-session-create-warning-state'
-import { colors } from '../../../../src/theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../../../src/theme/mobile-theme-provider'
 import { QuickCommandsTabButton } from '../../../../src/session/QuickCommandsTabButton'
-import { styles } from '../../../../src/session/mobile-session-styles'
+import {
+  createMobileSessionStyles,
+  resolveMobileSessionTheme
+} from '../../../../src/session/mobile-session-styles'
+import { resolveMobileTerminalTheme } from '../../../../src/terminal/mobile-terminal-theme'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
 import type { TerminalQuickCommand } from '../../../../../src/shared/terminal-quick-command-types'
 import type {
@@ -332,6 +337,8 @@ function DiffLineRow({
   onSubmitComment: (lineNumber: number) => void
   onDeleteComment: (commentId: string) => void
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileSessionStyles)
   const commentLine = line.newLineNumber
   const isCommenting = commentLine !== undefined && activeCommentLine === commentLine
   const canComment = commentLine !== undefined
@@ -378,7 +385,7 @@ function DiffLineRow({
             }}
             accessibilityLabel={`Add note on line ${commentLine}`}
           >
-            <Plus size={12} color={colors.textSecondary} strokeWidth={2.3} />
+            <Plus size={16} color={theme.color.text.secondary} strokeWidth={2} />
           </Pressable>
         ) : null}
       </View>
@@ -387,7 +394,7 @@ function DiffLineRow({
           {comments.map((comment) => (
             <View key={comment.id} style={styles.diffCommentCard}>
               <View style={styles.diffCommentHeader}>
-                <MessageSquare size={12} color={colors.textMuted} strokeWidth={2.2} />
+                <MessageSquare size={16} color={theme.color.text.tertiary} strokeWidth={2} />
                 <Text style={styles.diffCommentMeta}>Line {comment.lineNumber}</Text>
                 <Pressable
                   style={styles.diffCommentDeleteButton}
@@ -395,7 +402,7 @@ function DiffLineRow({
                   onPress={() => onDeleteComment(comment.id)}
                   accessibilityLabel={`Delete note on line ${comment.lineNumber}`}
                 >
-                  <X size={12} color={colors.textMuted} strokeWidth={2.2} />
+                  <X size={16} color={theme.color.text.tertiary} strokeWidth={2} />
                 </Pressable>
               </View>
               <Text style={styles.diffCommentBody}>{comment.body}</Text>
@@ -410,7 +417,7 @@ function DiffLineRow({
             value={commentDraft}
             onChangeText={onDraftChange}
             placeholder="Add review note"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={theme.color.text.tertiary}
             editable={!commentsBusy}
             multiline
             textAlignVertical="top"
@@ -458,6 +465,8 @@ function FileReader({
   language?: string
   diffCommentActions?: DiffCommentActions
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createMobileSessionStyles)
   const syntaxLanguage = useMemo(
     () => resolveMobileSyntaxLanguage(relativePath || title, language),
     [language, relativePath, title]
@@ -585,7 +594,7 @@ function FileReader({
   if (!doc || doc.status === 'loading') {
     return (
       <View style={styles.markdownState}>
-        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <ActivityIndicator size="small" color={theme.color.text.secondary} />
       </View>
     )
   }
@@ -611,7 +620,7 @@ function FileReader({
         {diffCommentActions ? (
           <View style={styles.diffNotesToolbar}>
             <View style={styles.diffNotesTitleRow}>
-              <MessageSquare size={14} color={colors.textSecondary} strokeWidth={2.2} />
+              <MessageSquare size={16} color={theme.color.text.secondary} strokeWidth={2} />
               <Text style={styles.diffNotesTitle}>
                 {commentCount === 0
                   ? 'No review notes'
@@ -628,7 +637,7 @@ function FileReader({
                 onPress={() => void diffCommentActions.onCopyAll()}
                 accessibilityLabel="Copy review notes"
               >
-                <Copy size={13} color={colors.textSecondary} strokeWidth={2.2} />
+                <Copy size={16} color={theme.color.text.secondary} strokeWidth={2} />
                 <Text style={styles.diffNotesActionText}>Copy</Text>
               </Pressable>
               <Pressable
@@ -640,7 +649,7 @@ function FileReader({
                 onPress={diffCommentActions.onSendAll}
                 accessibilityLabel="Send review notes to AI"
               >
-                <Send size={13} color={colors.textSecondary} strokeWidth={2.2} />
+                <Send size={16} color={theme.color.text.secondary} strokeWidth={2} />
                 <Text style={styles.diffNotesActionText}>Send</Text>
               </Pressable>
             </View>
@@ -715,7 +724,30 @@ function FileReader({
   return renderSourceText(doc.content)
 }
 
+function createEffectTimerRegistry() {
+  let disposed = false
+  const timers = new Set<ReturnType<typeof setTimeout>>()
+
+  return {
+    get disposed() {
+      return disposed
+    },
+    schedule(callback: () => void, delayMs: number) {
+      if (disposed) {
+        return
+      }
+      timers.add(setTimeout(callback, delayMs))
+    },
+    dispose() {
+      disposed = true
+      timers.forEach(clearTimeout)
+      timers.clear()
+    }
+  }
+}
+
 export default function SessionScreen() {
+  const theme = useMobileTheme()
   const {
     hostId,
     worktreeId,
@@ -2647,18 +2679,15 @@ export default function SessionScreen() {
     }
     // Why: clear the initialized flag so the reconnect scrollback replaces stale content instead of being dropped.
     initializedHandlesRef.current.clear()
-    let disposed = false
-    const timers: ReturnType<typeof setTimeout>[] = []
-    function addTimer(fn: () => void, ms: number) {
-      if (disposed) {
-        return
-      }
-      timers.push(setTimeout(fn, ms))
-    }
+    const timerRegistry = createEffectTimerRegistry()
     void (async () => {
       const reportActivationOutcome = (response: RpcSuccess | null): void => {
-        if (!disposed && response && headlessActivationNeedsHostRenderer(response.result)) {
-          showToast('Open Orca on the host to wake sleeping agents.', 3000)
+        if (
+          !timerRegistry.disposed &&
+          response &&
+          headlessActivationNeedsHostRenderer(response.result)
+        ) {
+          showToast(productNameText('Open Orca on the host to wake sleeping agents.'), 3000)
         }
       }
       if (client && created !== '1' && !isFloatingWorkspaceRoute) {
@@ -2672,21 +2701,21 @@ export default function SessionScreen() {
           .then((response) => reportActivationOutcome(response.ok ? response : null))
           .catch(() => null)
       }
-      if (disposed) {
+      if (timerRegistry.disposed) {
         return
       }
       await ensureSessionTabs().catch(() => null)
-      if (disposed) {
+      if (timerRegistry.disposed) {
         return
       }
       await fetchTerminals({ allowEmptyLoaded: false })
-      if (disposed) {
+      if (timerRegistry.disposed) {
         return
       }
-      addTimer(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
-      addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
+      timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
+      timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
       if (client && created === '1' && !isFloatingWorkspaceRoute) {
-        addTimer(() => {
+        timerRegistry.schedule(() => {
           if (activeHandleRef.current) {
             return
           }
@@ -2699,20 +2728,17 @@ export default function SessionScreen() {
               })
               .catch(() => null)
             reportActivationOutcome(activationResponse?.ok ? activationResponse : null)
-            if (disposed) {
+            if (timerRegistry.disposed) {
               return
             }
             await fetchTerminals({ allowEmptyLoaded: true })
-            addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
+            timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
           })()
         }, 1800)
       }
     })()
     return () => {
-      disposed = true
-      for (const t of timers) {
-        clearTimeout(t)
-      }
+      timerRegistry.dispose()
     }
   }, [
     client,
@@ -4108,6 +4134,8 @@ export default function SessionScreen() {
     activeSessionTab?.type === 'terminal' && typeof activeSessionTab.terminal !== 'string'
       ? activeSessionTab
       : null
+  const sessionTheme = resolveMobileSessionTheme(theme, activeSessionTab?.type)
+  const styles = useMemo(() => createMobileSessionStyles(sessionTheme), [sessionTheme])
   const isPendingTerminalRecoveryParked =
     pendingTerminalRecoveryContextKey !== null &&
     pendingTerminalRecoveryContextKey === parkedPendingTerminalContext
@@ -4361,7 +4389,7 @@ export default function SessionScreen() {
               hitSlop={8}
               accessibilityLabel="Back to worktrees"
             >
-              <ChevronLeft size={22} color={colors.textSecondary} strokeWidth={2.2} />
+              <ChevronLeft size={24} color={sessionTheme.color.text.secondary} strokeWidth={2} />
             </Pressable>
 
             <View style={styles.sessionTitleBlock}>
@@ -4454,18 +4482,26 @@ export default function SessionScreen() {
                   >
                     <View style={styles.tabLabelRow}>
                       {t.type === 'browser' && (
-                        <Globe size={13} color={colors.textSecondary} strokeWidth={2.1} />
+                        <Globe
+                          size={16}
+                          color={sessionTheme.color.text.secondary}
+                          strokeWidth={2}
+                        />
                       )}
                       {t.type === 'markdown' && (
-                        <FileText size={13} color={colors.textSecondary} strokeWidth={2.1} />
+                        <FileText
+                          size={16}
+                          color={sessionTheme.color.text.secondary}
+                          strokeWidth={2}
+                        />
                       )}
                       {t.type === 'file' && (
-                        <File size={13} color={colors.textSecondary} strokeWidth={2.1} />
+                        <File size={16} color={sessionTheme.color.text.secondary} strokeWidth={2} />
                       )}
                       {t.type === 'terminal' &&
                         (() => {
                           const agentId = resolveMobileTerminalTabAgentId(t)
-                          return agentId ? <MobileAgentIcon agentId={agentId} size={13} /> : null
+                          return agentId ? <MobileAgentIcon agentId={agentId} size={16} /> : null
                         })()}
                       <Text
                         style={[
@@ -4497,7 +4533,7 @@ export default function SessionScreen() {
                 }}
                 accessibilityLabel="New tab"
               >
-                <Plus size={16} color={colors.textSecondary} strokeWidth={2.2} />
+                <Plus size={20} color={sessionTheme.color.text.secondary} strokeWidth={2} />
               </Pressable>
               {/* Why: stable placement matters, while old hosts must stay gated because they strip agentPrompt. */}
               <QuickCommandsTabButton
@@ -4526,7 +4562,11 @@ export default function SessionScreen() {
           <View style={styles.sessionContentMain}>
             {createWarning ? (
               <View style={styles.createWarningBanner}>
-                <AlertTriangle size={16} color={colors.statusAmber} strokeWidth={2.2} />
+                <AlertTriangle
+                  size={20}
+                  color={sessionTheme.color.status.warning}
+                  strokeWidth={2}
+                />
                 <Text style={styles.createWarningText}>{createWarning}</Text>
                 <Pressable
                   style={styles.createWarningDismiss}
@@ -4534,14 +4574,14 @@ export default function SessionScreen() {
                   accessibilityLabel="Dismiss workspace creation warning"
                   hitSlop={8}
                 >
-                  <X size={16} color={colors.textMuted} strokeWidth={2.2} />
+                  <X size={20} color={sessionTheme.color.text.tertiary} strokeWidth={2} />
                 </Pressable>
               </View>
             ) : null}
 
             {showLoadingState ? (
               <View style={styles.emptyState}>
-                <ActivityIndicator size="small" color={colors.textSecondary} />
+                <ActivityIndicator size="small" color={sessionTheme.color.text.secondary} />
               </View>
             ) : showEmptyState ? (
               <View style={styles.emptyState}>
@@ -4631,7 +4671,7 @@ export default function SessionScreen() {
             ) : activePendingTerminalTab ? (
               <View style={styles.emptyState}>
                 {!isPendingTerminalRecoveryParked && (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <ActivityIndicator size="small" color={sessionTheme.color.text.secondary} />
                 )}
                 <Text style={styles.emptyText}>
                   {isPendingTerminalRecoveryParked
@@ -4670,7 +4710,7 @@ export default function SessionScreen() {
                     handle={terminal.handle}
                     active={terminal.handle === activeHandle}
                     keyboardLift={terminal.handle === activeHandle ? activeTerminalKeyboardLift : 0}
-                    terminalTheme={terminal.terminalTheme}
+                    terminalTheme={resolveMobileTerminalTheme(theme, terminal.terminalTheme)}
                     textScale={terminalTextScale}
                     onTextScaleChange={(scale) => {
                       // Why: pinch-to-zoom reports a new preset; persist it so the size sticks across panes and launches.
@@ -4738,11 +4778,15 @@ export default function SessionScreen() {
                       accessibilityHint="Hides the software keyboard and keeps the current terminal session open."
                     >
                       <View style={styles.keyboardDismissGlyph}>
-                        <KeyboardIcon size={15} color={colors.textSecondary} strokeWidth={2} />
+                        <KeyboardIcon
+                          size={16}
+                          color={sessionTheme.color.text.secondary}
+                          strokeWidth={2}
+                        />
                         <ChevronDown
-                          size={10}
-                          color={colors.textSecondary}
-                          strokeWidth={2.5}
+                          size={16}
+                          color={sessionTheme.color.text.secondary}
+                          strokeWidth={2}
                           style={styles.keyboardDismissChevron}
                         />
                       </View>
@@ -4776,13 +4820,21 @@ export default function SessionScreen() {
                     >
                       {isTerminalPhoneDisplayMode(activeHandle, terminalModes) ? (
                         <Monitor
-                          size={14}
-                          color={canSend ? colors.textSecondary : colors.textMuted}
+                          size={16}
+                          color={
+                            canSend
+                              ? sessionTheme.color.text.secondary
+                              : sessionTheme.color.text.tertiary
+                          }
                         />
                       ) : (
                         <Smartphone
-                          size={14}
-                          color={canSend ? colors.textSecondary : colors.textMuted}
+                          size={16}
+                          color={
+                            canSend
+                              ? sessionTheme.color.text.secondary
+                              : sessionTheme.color.text.tertiary
+                          }
                         />
                       )}
                     </Pressable>
@@ -4803,13 +4855,13 @@ export default function SessionScreen() {
                       }
                     >
                       <ChevronsRight
-                        size={14}
+                        size={16}
                         color={
                           liveInputEnabled
-                            ? colors.bgBase
+                            ? sessionTheme.color.text.inverse
                             : canCompose
-                              ? colors.textSecondary
-                              : colors.textMuted
+                              ? sessionTheme.color.text.secondary
+                              : sessionTheme.color.text.tertiary
                         }
                       />
                     </Pressable>
@@ -4910,7 +4962,7 @@ export default function SessionScreen() {
                       onPress={() => setShowCustomKeyModal(true)}
                       accessibilityLabel="Add custom shortcut"
                     >
-                      <Plus size={14} color={colors.textSecondary} strokeWidth={2.2} />
+                      <Plus size={16} color={sessionTheme.color.text.secondary} strokeWidth={2} />
                     </Pressable>
                   </ScrollView>
                 </View>
@@ -4930,7 +4982,11 @@ export default function SessionScreen() {
                       accessibilityLabel="Show keyboard for live terminal input"
                       accessibilityHint="Typed text is sent directly to the active terminal"
                     >
-                      <KeyboardIcon size={16} color={colors.textSecondary} strokeWidth={2} />
+                      <KeyboardIcon
+                        size={16}
+                        color={sessionTheme.color.text.secondary}
+                        strokeWidth={2}
+                      />
                       <MobileTerminalLiveInputStatus
                         dictation={dictation}
                         isAttaching={isAttaching}
@@ -4993,7 +5049,7 @@ export default function SessionScreen() {
                       // Why: iOS kills active dictation/IME if JS writes a value differing from native text; store raw, normalize at send.
                       onChangeText={setInput}
                       placeholder="Type a command…"
-                      placeholderTextColor={colors.textMuted}
+                      placeholderTextColor={sessionTheme.color.text.tertiary}
                       autoCapitalize="none"
                       autoCorrect={autocompleteEnabled}
                       spellCheck={autocompleteEnabled}
@@ -5030,7 +5086,7 @@ export default function SessionScreen() {
                       onPress={() => void handleSend()}
                       accessibilityLabel="Send command"
                     >
-                      <ArrowUp size={18} color={colors.textSecondary} strokeWidth={2.5} />
+                      <ArrowUp size={20} color={sessionTheme.color.text.inverse} strokeWidth={2} />
                     </Pressable>
                   </View>
                 )}

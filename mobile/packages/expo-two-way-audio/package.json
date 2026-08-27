@@ -1,5 +1,5 @@
 {
-  "name": "@orca/expo-two-way-audio",
+  "name": "@hivecode/expo-two-way-audio",
   "version": "0.0.1",
   "private": true,
   "description": "Native module for two way audio streaming",
@@ -9,17 +9,8 @@
     "expo-two-way-audio",
     "react-native"
   ],
-  "homepage": "https://github.com/stablyai/orca/tree/main/mobile/packages/expo-two-way-audio",
-  "bugs": {
-    "url": "https://github.com/stablyai/orca/issues"
-  },
   "license": "MIT",
-  "author": "Orca contributors",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/stablyai/orca.git",
-    "directory": "mobile/packages/expo-two-way-audio"
-  },
+  "author": "HiveCode contributors",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {

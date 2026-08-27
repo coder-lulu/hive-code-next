@@ -6,10 +6,11 @@ import type {
   OrcaProfileOrgMemberRemoveArgs,
   OrcaProfileOrgMembersListResult
 } from '../../shared/orca-profiles'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
 import type { ActiveOrcaProfileState } from './profile-index-store'
 import { ensureActiveOrcaProfile } from './profile-index-store'
 import type { OrcaCloudAuthConfig } from './profile-cloud-auth-config'
-import { getOrcaCloudAuthConfig, isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
+import { isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
 import type { OrcaCloudSession } from './profile-cloud-session-store'
 import { OrcaCloudRequestError } from './profile-cloud-client'
 import { runWithFreshOrcaCloudSession } from './profile-cloud-session-refresh'
@@ -116,7 +117,7 @@ export async function listOrcaProfileOrgMembers(
   if (isOrcaCloudDevAuthEnabled()) {
     return { status: 'ok', roster: listDevOrcaCloudOrgMembers(orgId) }
   }
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured' }
   }
@@ -143,7 +144,7 @@ export async function inviteOrcaProfileOrgMember(
   if (isOrcaCloudDevAuthEnabled()) {
     return inviteDevOrcaCloudOrgMember(args)
   }
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured' }
   }
@@ -162,7 +163,7 @@ export async function revokeOrcaProfileOrgInvite(
   if (isOrcaCloudDevAuthEnabled()) {
     return revokeDevOrcaCloudOrgInvite(args)
   }
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured' }
   }
@@ -181,7 +182,7 @@ export async function changeOrcaProfileOrgMemberRole(
   if (isOrcaCloudDevAuthEnabled()) {
     return changeDevOrcaCloudOrgMemberRole(args)
   }
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured' }
   }
@@ -200,7 +201,7 @@ export async function removeOrcaProfileOrgMember(
   if (isOrcaCloudDevAuthEnabled()) {
     return removeDevOrcaCloudOrgMember(args)
   }
-  const configState = getOrcaCloudAuthConfig()
+  const configState = getProductCloudAuthConfig()
   if (!configState.configured) {
     return { status: 'unconfigured' }
   }

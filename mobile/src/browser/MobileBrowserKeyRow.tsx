@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { Delete } from 'lucide-react-native'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 const BROWSER_KEYS = ['Enter', 'Backspace', 'Tab', 'Escape'] as const
 
@@ -9,6 +11,8 @@ type Props = {
 }
 
 export function MobileBrowserKeyRow({ disabled, onKeypress }: Props): React.JSX.Element {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   return (
     <View style={styles.keyRow}>
       {BROWSER_KEYS.map((key) => (
@@ -21,44 +25,54 @@ export function MobileBrowserKeyRow({ disabled, onKeypress }: Props): React.JSX.
           ]}
           disabled={disabled}
           onPress={() => onKeypress(key)}
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
+          accessibilityLabel={`Send ${key} key to browser`}
         >
-          <Text style={[styles.keyButtonText, disabled && styles.disabledText]}>
-            {key === 'Backspace' ? '⌫' : key === 'Escape' ? 'Esc' : key}
-          </Text>
+          {key === 'Backspace' ? (
+            <Delete size={16} strokeWidth={2} color={theme.color.text.secondary} />
+          ) : (
+            <Text style={[styles.keyButtonText, disabled && styles.disabledText]}>
+              {key === 'Escape' ? 'Esc' : key}
+            </Text>
+          )}
         </Pressable>
       ))}
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  keyRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.xs
-  },
-  keyButton: {
-    minHeight: 30,
-    minWidth: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.button,
-    backgroundColor: colors.bgRaised,
-    paddingHorizontal: spacing.sm
-  },
-  keyButtonPressed: {
-    backgroundColor: colors.borderSubtle
-  },
-  keyButtonText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontFamily: typography.monoFamily
-  },
-  disabled: {
-    opacity: 0.35
-  },
-  disabledText: {
-    color: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    keyRow: {
+      flexDirection: 'row',
+      gap: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space12,
+      paddingTop: theme.spacing.space8
+    },
+    keyButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      minWidth: theme.size.minimumTouchTarget,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.subtle,
+      paddingHorizontal: theme.spacing.space8
+    },
+    keyButtonPressed: {
+      backgroundColor: theme.color.border.default
+    },
+    keyButtonText: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary,
+      fontWeight: '500'
+    },
+    disabled: {
+      opacity: 0.45
+    },
+    disabledText: {
+      color: theme.color.text.tertiary
+    }
+  })
+}

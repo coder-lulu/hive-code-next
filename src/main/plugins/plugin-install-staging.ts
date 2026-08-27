@@ -8,6 +8,7 @@ import {
   satisfiesOrcaEngineRange,
   type PluginManifest
 } from '../../shared/plugins/plugin-manifest'
+import { applyProductBranding } from '../../shared/brand'
 import { fingerprintPluginConsent } from '../../shared/plugins/plugin-consent-fingerprint'
 import type {
   PluginInstallSource,
@@ -73,7 +74,9 @@ async function readInstallManifest(
   if (!satisfiesOrcaEngineRange(hostVersion, parsed.manifest.engines.orca)) {
     return {
       ok: false,
-      error: `plugin requires Orca ${parsed.manifest.engines.orca} (this is ${hostVersion})`
+      error: applyProductBranding(
+        `plugin requires Orca ${parsed.manifest.engines.orca} (this is ${hostVersion})`
+      )
     }
   }
   return { ok: true, manifest: parsed.manifest }
@@ -140,7 +143,10 @@ export async function installStagedPluginTree(input: {
   }
   const blockedReason = input.blockedPluginReason?.(sourceInspection.pluginKey)
   if (blockedReason) {
-    return { ok: false, error: `plugin is blocked by Orca's safety list: ${blockedReason}` }
+    return {
+      ok: false,
+      error: applyProductBranding(`plugin is blocked by Orca's safety list: ${blockedReason}`)
+    }
   }
   let manifest = sourceInspection.manifest
   const pluginKey = sourceInspection.pluginKey
