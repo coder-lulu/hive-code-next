@@ -271,7 +271,7 @@ describe('remote hook service installers', () => {
       hooks: Record<string, { hooks: { command: string }[] }[]>
     }
     expect(hooks.hooks.Stop?.[0]?.hooks?.[0]?.command).toContain(
-      '/home/dev/.orca/agent-hooks/codex-hook.sh'
+      '/home/dev/.local/share/orca/codex-runtime-home/home/.orca/agent-hooks/codex-hook.sh'
     )
     const toml = fs.files.get(`${runtimeHome}/config.toml`)
     expect(toml).toContain('model = "gpt-5.2-codex"')
