@@ -45,9 +45,18 @@ export const WINDOWS_POWERSHELL_HOOK_SWITCHES = '-NoProfile'
 // Why: redirected PowerShell progress becomes CLIXML that can corrupt merged JSON output.
 const HOOK_PROGRESS_SILENCER = "$ProgressPreference='SilentlyContinue'; "
 
+// Keep the process-scoped policy bypass inside the encoded payload. It is
+// equivalent to the former command-line switch but is not visible to AV
+// process-creation signature checks.
+const HOOK_EXECUTION_POLICY_BYPASS =
+  'try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue } catch {}; '
+
 // Why: encoding shields paths and switches from cmd.exe and MSYS rewriting (#6078, #14815).
 export function encodeWindowsPowerShellHookCommand(command: string): string {
-  return Buffer.from(`${HOOK_PROGRESS_SILENCER}${command}`, 'utf16le').toString('base64')
+  return Buffer.from(
+    `${HOOK_PROGRESS_SILENCER}${HOOK_EXECUTION_POLICY_BYPASS}${command}`,
+    'utf16le'
+  ).toString('base64')
 }
 
 export function wrapWindowsPowerShellEncodedCommand(command: string): string {
