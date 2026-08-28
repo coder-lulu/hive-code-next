@@ -310,7 +310,7 @@
         "b411ec0069": "Connect",
         "2cf9e5a294": "Clear saved server",
         "4a4c017be1": "Endpoint:",
-        "27393856e4": "hivecode://pair?code=...",
+        "27393856e4": "orca://pair?code=...",
         "7a566540de": "Pairing URL or code",
         "cb4d287238": "Server name",
         "3affe7de3a": "Paste a pairing URL from an Orca server that this browser can reach.",
@@ -928,6 +928,11 @@
       },
       "ephemeralVmWorktreeCreation": {
         "sparseCheckoutUnsupported": "Provisioned-root recipes do not support sparse checkout."
+      },
+      "file": {
+        "preview": {
+          "pairedOutsideWorktree": "Files outside the workspace can't be previewed on a paired server yet."
+        }
       }
     },
     "hooks": {
@@ -1086,6 +1091,13 @@
         "description": "Running Orca terminals are hosted by a daemon started by a previous Orca installation. macOS may not apply Orca’s Accessibility, Automation, or protected-file permissions to them. Restart the daemon from Manage Sessions to restore access. This will close all running Orca terminals.",
         "openManageSessions": "Open Manage Sessions",
         "dismiss": "Dismiss"
+      },
+      "ipc": {
+        "events": {
+          "browserStateIpcBridge": {
+            "docPreviewLinkFailed": "Could not open this link in Orca Browser."
+          }
+        }
       }
     },
     "components": {
@@ -2457,8 +2469,7 @@
             "1aa7c952b9": "Project view",
             "f352abf7c3": "Repository list is updating.",
             "1ce21b8cff": "This item is outside the selected repositories.",
-            "030de75bc5": "This item matches multiple selected repositories.",
-            "unsupportedView": "{{value0}} — Orca doesn't support {{value1}} project views yet."
+            "030de75bc5": "This item matches multiple selected repositories."
           },
           "slug": {
             "dialog": {
@@ -3076,7 +3087,9 @@
             "copyLink": "Copy link",
             "copied": "Copied",
             "copiedLink": "Copied link",
-            "copyLinkFailed": "Failed to copy link"
+            "copyLinkFailed": "Failed to copy link",
+            "downloadOpenWithDefaultApp": "Download & open with default app",
+            "downloadOpenFailed": "Failed to download '{{value0}}'."
           },
           "TerminalSessionStateSaveFailureDialog": {
             "6bee0c8f17": "Open Disk Space Analyzer",
@@ -4086,6 +4099,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "output",
               "5d66fdd7c2": "input",
               "7080aeaebb": "Reasoning",
@@ -4381,7 +4395,8 @@
           "3af85f6add": "Done",
           "readyDescriptionV2": "Anyone with this unlisted link can inspect and install the skills.",
           "descriptionV2": "Review the exact files, then publish an immutable version behind an unlisted link.",
-          "publishBundle": "Publish bundle"
+          "publishBundle": "Publish bundle",
+          "cancelRequestFailed": "Orca could not send the cancellation request. The upload may still finish."
         },
         "SkillCard": {
           "d25a1b8ae6": "Share skill",
@@ -4674,6 +4689,23 @@
           "showMore": "Show more"
         },
         "install": {
+          "authorizing": "Authorizing package access…",
+          "installing": "Downloading, verifying, and installing…",
+          "selectSkill": "Select at least one skill.",
+          "chooseWorkspace": "Choose a workspace.",
+          "reconnectBeforeInstalling": "Reconnect your Orca account before installing.",
+          "bundleVerificationFailed": "Installation failed before Orca could verify the requested bundle.",
+          "destinationAlreadyFinished": "The destination had already finished this installation.",
+          "enterShareLink": "Enter an Orca skill share link.",
+          "shareUnavailable": "This share is unavailable. The link may be invalid, expired, or revoked.",
+          "requestedVersionVerificationFailed": "Installation failed before Orca could verify the requested version.",
+          "versionVerificationFailed": "Orca could not verify the requested version.",
+          "inspectManagedFailed": "Orca could not inspect managed installs on this machine.",
+          "reconnectForVersionHistory": "Reconnect your Orca account to load version history.",
+          "versionHistoryUnavailable": "Version history is unavailable for this skill.",
+          "bundleSkillsMissing": "This version does not contain any of the installed bundle skills.",
+          "reconnectBeforeVersionChange": "Reconnect your Orca account before changing versions.",
+          "removeFailed": "Orca could not safely remove this skill.",
           "agentsLabel": "Agents",
           "agentsCanonical": "Always installed for {{value0}}, which read {{value1}}.",
           "agentsNoneChosen": "No extra agents",
@@ -5151,24 +5183,6 @@
           "keepDefaultBranch": "Except default branch",
           "keepDefaultBranchAria": "Keep the default branch visible while hiding sleeping workspaces"
         },
-        "SidebarFooter": {
-          "accountMenu": "{{value0}} account menu",
-          "account": "Account",
-          "appearance": "Appearance",
-          "activity": "Activity",
-          "notifications": "Notifications",
-          "checkingAccount": "Checking account…",
-          "signIn": "Sign in",
-          "signInAgain": "Sign in again",
-          "accountUnavailable": "Account unavailable",
-          "connected": "Signed in",
-          "signInSuccess": "Signed in to HiveCloud",
-          "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
-          "signOut": "Sign out",
-          "localSignOut": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
-          "signOutSuccess": "Signed out of HiveCloud",
-          "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again."
-        },
         "SidebarHeader": {
           "25a95899c9": "Add Project",
           "92154beb7e": "New workspace",
@@ -5224,7 +5238,7 @@
           "c4f8e1b72a": "X"
         },
         "SidebarToolbar": {
-          "87d0064026": "Workspace board moved to the top bar",
+          "87d0064026": "Workspace board moved to the bottom bar",
           "a30e34eb5c": "Close workspace board",
           "49f62c5665": "Workspace board",
           "19e32d0e5f": "Open folder picker to add a project",
@@ -5969,9 +5983,9 @@
           "serverName": "Server name",
           "serverNamePlaceholder": "Dev box",
           "pairingCode": "Pairing code",
-          "pairingCodePlaceholder": "hivecode://pair?code=...",
+          "pairingCodePlaceholder": "orca://pair?code=...",
           "pairingHelpPrefix": "Run",
-          "pairingCommand": "hivecode serve --pairing-address <host>",
+          "pairingCommand": "orca serve --pairing-address <host>",
           "pairingHelpSuffix": "on the server and paste the printed pairing URL.",
           "sshImportAlreadySynced": "~/.ssh/config already in sync.",
           "sshImportSynced": "Added {{value0}} host{{value1}} to Orca.",
@@ -7002,8 +7016,7 @@
           "31fd7150cf": "Checking for updates...",
           "3394d1f663": "checking",
           "d69a09b672": "Updates are checked automatically on launch.",
-          "7173352632": "idle",
-          "updatesNotConfigured": "Online updates are not configured. Option/Alt-click to install a local build."
+          "7173352632": "idle"
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "Choose apps available from a workspace's Open in menu.",
@@ -7463,7 +7476,9 @@
           "9bedd2a6e5": "Enables agents to hand off context and coordinate work through Orca.",
           "07641b9768": "Orchestration skill",
           "2aacdb0517": "Coordinate coding agents across handoffs, worktree handovers, and child-agent work.",
-          "191ac34567": "Agent Orchestration"
+          "191ac34567": "Agent Orchestration",
+          "nestedWorkerDepthTitle": "Nested worker depth",
+          "nestedWorkerDepthDescription": "How many generations of dispatched workers may spawn their own workers. 1 keeps the agent tree flat: a coordinator dispatches workers, and those workers do not dispatch."
         },
         "OrchestrationSetupCard": {
           "e7d2a5146c": "Enables agents to hand off context and coordinate work through Orca.",
@@ -7840,9 +7855,9 @@
           "9a3758d983": "No saved servers.",
           "9bee6bbeeb": "Add Server",
           "55fcc964cd": "on the server and paste the printed pairing URL.",
-          "960e901ae4": "hivecode serve --pairing-address <host>",
+          "960e901ae4": "orca serve --pairing-address <host>",
           "163671f7b5": "Run",
-          "c3d772c514": "hivecode://pair?code=...",
+          "c3d772c514": "orca://pair?code=...",
           "9bc9b83474": "Pairing code",
           "e038625857": "Dev box",
           "54ebacc600": "Server name",
@@ -11221,7 +11236,7 @@
           "namePlaceholder": "Linux workstation",
           "nameHelp": "This only changes how the computer appears in Orca.",
           "accessLink": "Access link",
-          "accessLinkPlaceholder": "hivecode://pair?code=...",
+          "accessLinkPlaceholder": "orca://pair?code=...",
           "accessLinkHelp": "Orca shows the destination before connecting. Credentials stay hidden.",
           "destination": "Link destination",
           "loopbackTitle": "This link points back to this device",
@@ -11240,7 +11255,7 @@
           "advanced": "Advanced",
           "sshTunnel": "I am using an SSH tunnel to this local address",
           "sshTunnelHelp": "Keep the tunnel active while using this connection.",
-          "headlessHelp": "Using headless hivecode serve? Run hivecode serve --pairing-address <reachable-host> on the other computer.",
+          "headlessHelp": "Using headless orca serve? Run orca serve --pairing-address <reachable-host> on the other computer.",
           "cancel": "Cancel",
           "addWithTunnel": "Add host using tunnel",
           "addHost": "Add host",
@@ -11329,73 +11344,25 @@
         },
         "orcaAccount": {
           "connected": "Connected",
-          "connectedDescription": "This desktop is securely linked to HiveCloud.",
           "reconnectRequired": "Your session expired. Sign in again to use cloud features.",
-          "unavailable": "HiveCloud sign-in is unavailable in this build.",
-          "signedOut": "Sign in with an existing HiveCloud account. Local projects and provider accounts stay separate.",
+          "unavailable": "Orca sign-in is unavailable in this build.",
+          "signedOut": "Sign in to extend Orca with cloud features, including Artifacts and Orca Relay.",
           "checking": "Checking account status…",
-          "account": "HiveCloud account",
-          "authorizationCancelled": "Sign-in was cancelled.",
-          "authorizationFailed": "HiveCloud sign-in failed. Try again or check the service status.",
-          "authorizationTimeout": "Sign-in timed out before the browser callback completed.",
-          "cancel": "Cancel",
-          "credentialUnreadable": "The encrypted account credential cannot be read. Repair secure storage before signing in.",
-          "defaultDevice": "Desktop",
-          "device": "Device",
-          "localSignOutToast": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
-          "networkUnavailable": "HiveCloud is temporarily unreachable. Local work remains available.",
-          "refresh": "Refresh",
-          "refreshedToast": "HiveCloud session refreshed",
-          "secureStorageUnavailable": "Cloud sign-in is disabled because operating-system secure storage is unavailable.",
-          "serverUnavailable": "HiveCloud is temporarily unavailable. Local work remains available.",
-          "sessionExpired": "This session has expired. Refresh it or sign in again.",
-          "sessionExpires": "Session expires",
-          "sessionRejected": "HiveCloud rejected this session. Sign in again.",
-          "signedInToast": "Signed in to HiveCloud",
+          "account": "Orca account",
           "signOut": "Sign out",
-          "signOutConfirmDescription": "This device's local credential will be removed. Local projects, worktrees, and provider accounts will not be affected.",
-          "signOutConfirmTitle": "Sign out of HiveCloud?",
-          "signedOutToast": "Signed out of HiveCloud",
           "signingIn": "Signing in…",
           "signInAgain": "Sign in again",
-          "signIn": "Sign in to HiveCloud",
-          "title": "HiveCloud Account",
-          "description": "Sign in securely, review this device, and manage the current HiveCloud session.",
-          "searchDescription": "Sign in, refresh, or sign out of the application-wide HiveCloud account.",
-          "unknown": "Unknown",
+          "signIn": "Sign in to Orca",
+          "title": "Orca Account",
+          "description": "Share work instantly and reach your desktop from Orca Mobile wherever you are.",
+          "searchDescription": "Sign in or out of the account used by Artifacts and Orca Relay.",
           "benefitsTitle": "Included with your account",
           "artifactsTitle": "Artifact sharing",
           "artifactsDescription": "Publish HTML and Markdown files, then manage every shared link from Orca.",
           "relayTitle": "Orca Relay",
           "relayDescription": "Connect Orca Mobile to this desktop across cellular or any Wi-Fi.",
           "skillsTitle": "Skill sharing",
-          "skillsDescription": "Share one skill or a whole set behind an unlisted link, and install them on any machine you use.",
-          "trustedSession": "Trusted device",
-          "temporarySession": "Temporary device",
-          "signInConfirmTitle": "Approve HiveCloud sign-in",
-          "signInConfirmDescription": "Review this request before the desktop app opens the secure browser sign-in.",
-          "smsSignInDescription": "Verify your phone number to sign in without opening a browser.",
-          "approvalSecurityTitle": "Short access credentials remain protected",
-          "approvalSecurityDescription": "The app rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.",
-          "requestStatus": "Status",
-          "pendingApproval": "Pending approval",
-          "requestApplication": "Application",
-          "requestApplicationName": "Desktop application",
-          "requestDevice": "Requesting device",
-          "currentDesktop": "This desktop app",
-          "trustThisDevice": "Trust this device",
-          "trustedApprovalDescription": "Keep an operating-system-encrypted sign-in for up to 90 days.",
-          "temporaryApprovalDescription": "Use a temporary sign-in for up to 24 hours; closing the app removes it.",
-          "cancelRequest": "Cancel request",
-          "approveSignIn": "Approve sign-in",
-          "smsLogin": "Phone verification",
-          "browserLogin": "Browser sign-in",
-          "phoneNumber": "Phone number",
-          "smsCode": "SMS code",
-          "smsExpiry": "Code expires in {seconds}s.",
-          "smsTerms": "I agree to the Terms of Service and Privacy Policy",
-          "verifySms": "Verify and sign in",
-          "sendSms": "Send verification code"
+          "skillsDescription": "Share one skill or a whole set behind an unlisted link, and install them on any machine you use."
         },
         "automations": {
           "showButton": "Show Automations Button",
@@ -11520,6 +11487,9 @@
         },
         "shortcutDefinitionCatalog": {
           "missionControlConflict": "Blocked by Mission Control. Remap here or change it in System Settings."
+        },
+        "NativeChatSupportedAgents": {
+          "label": "Supported agents:"
         }
       },
       "right": {
@@ -14725,14 +14695,16 @@
           "d5a8c2f1b9": "Start the default AI agent to fix this check",
           "e2b4d7c8a1": "Choose an agent for this check",
           "f1c9e3a6d4": "Choose agent to fix check",
-          "actionRequired": "Action required"
+          "actionRequired": "Action required",
+          "copyOutput": "Copy output"
         },
         "CheckRunJobs": {
           "1c0a4d7e02": "succeeded",
           "2d3b8f1a55": "skipped",
           "3e6c9a2b71": "pending",
           "4f7d0c3e88": "steps failed",
-          "5a8e1d4f23": " · "
+          "5a8e1d4f23": " · ",
+          "copy": "Copy jobs"
         },
         "check": {
           "run": {
@@ -14812,6 +14784,34 @@
           "insertColumnRight": "Insert column right",
           "deleteRow": "Delete row",
           "deleteColumn": "Delete column"
+        },
+        "CheckRunAnnotations": {
+          "copy": "Copy annotations"
+        },
+        "CheckRunCopyButton": {
+          "copied": "Copied",
+          "failed": "Couldn't copy",
+          "empty": "Nothing to copy"
+        },
+        "HtmlDocPreview": {
+          "documentTooLargePanel": "This document is too large to preview. Open it in the editor instead.",
+          "documentUnreadablePanel": "Orca could not read this file from the workspace.",
+          "multipleAssetsFailedNotice": "{{count}} files in this document could not be loaded.",
+          "assetTooLargeNotice": "{{path}} is too large to load in this preview.",
+          "assetUnsupportedNotice": "This workspace cannot send {{path}} to a preview.",
+          "assetUnreadableNotice": "Orca could not read {{path}} from the workspace.",
+          "previewAriaLabel": "HTML preview",
+          "reloadPreviewControl": "Reload preview",
+          "previewUnavailableTitle": "Preview unavailable",
+          "copyDocumentPathControl": "Copy file path",
+          "documentPathCopied": "Copied",
+          "workspaceFileChipLabel": "Workspace file",
+          "previewMenuControl": "Preview options",
+          "openSourceControl": "Open source file",
+          "openExternallyControl": "Open with default app",
+          "copyDocumentRelativePathControl": "Copy relative path",
+          "openExternallyUnknownHostError": "Can't open '{{value0}}': the host that owns it is no longer known.",
+          "downloadBlockedNotice": "Downloads are disabled in document previews."
         }
       },
       "diff": {
@@ -15131,7 +15131,8 @@
             "6e776f9ef9": "Download failed",
             "756bfc25c9": "Open",
             "09a9489aa5": "Show",
-            "2a4c4b8e1f": "Copy"
+            "2a4c4b8e1f": "Copy",
+            "fileUrlUnsupported": "This browser tab cannot open local files. Use \"Open Preview to the Side\" on the file instead."
           },
           "BrowserToolbarMenu": {
             "429ef481f9": "Cancel",
@@ -16211,11 +16212,7 @@
         "53c4b8e148": "No usable authentication agent answered the privileged install request.",
         "c732bcbf8f": "Checking package...",
         "aa57fa4f80": "Command copied. Run it in a system terminal to install {{value0}}, then quit and reopen Orca.",
-        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point.",
-        "manualTitle": "Manual Install Required",
-        "manualSummary": "Automatic installation is disabled for Linux system packages because the privileged installer cannot preserve the verified file identity.",
-        "manualExplainer": "Copy the inode-pinned command and run it in a POSIX shell. After it finishes, quit and reopen the app to run the new version.",
-        "manualTrustNote": "The copied command opens the package first, verifies SHA-512 through that file descriptor, and installs the same descriptor-backed file."
+        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point."
       },
       "pr-check-counts": {
         "passingChip": "{{value0}} passing",
@@ -17027,11 +17024,5 @@
   },
   "quickOpen": {
     "moreMatchesAvailable": "More matches may be available. Refine your search to narrow the results."
-  },
-  "web": {
-    "cloudLaunchFailure": "This Cloud launch link is invalid or has expired. Create a new launch from HiveCloud.",
-    "runtime": {
-      "cloudWebSocket": "Cloud WSS"
-    }
   }
 }
