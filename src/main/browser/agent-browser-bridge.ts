@@ -72,6 +72,8 @@ type SessionState = {
   // Why: track active interception patterns so they can be re-enabled after session restart
   activeInterceptPatterns: string[]
   activeCapture: boolean
+  // Why: the daemon retires itself once idle; the gap since the last command is how the bridge notices.
+  lastCommandAt: number
   // Why: verify the tab is alive at execution time, not just enqueue time — queue delay can destroy it in between.
   webContentsId: number
   activeProcess: ChildProcess | null
@@ -587,6 +589,8 @@ export class AgentBrowserBridge {
   private screenshotTurn: Promise<void> = Promise.resolve()
   private readonly agentBrowserBin: string
   private readonly agentBrowserEnv: NodeJS.ProcessEnv
+  private readonly ownsAgentBrowserSocketDirectory: boolean
+  private readonly agentBrowserIdleTimeoutMs: number | null
   // Why: stash intercept patterns from a swap-destroyed session, keyed by name, so the next session restores them.
   private readonly pendingInterceptRestore = new Map<string, string[]>()
   // Why: promise-lock so two concurrent ensureSession calls don't both create the session entry.
@@ -601,11 +605,15 @@ export class AgentBrowserBridge {
     private readonly options: AgentBrowserBridgeOptions = {}
   ) {
     this.agentBrowserBin = resolveAgentBrowserBinary()
-    this.agentBrowserEnv = createAgentBrowserProcessEnvironment({
+    const processEnvironment = createAgentBrowserProcessEnvironment({
       inheritedEnv: process.env,
       platform: process.platform,
       userDataPath: app.getPath('userData')
     })
+    this.agentBrowserEnv = processEnvironment.env
+    this.ownsAgentBrowserSocketDirectory = processEnvironment.ownsSocketDirectory
+    const idleTimeoutMs = Number(this.agentBrowserEnv.AGENT_BROWSER_IDLE_TIMEOUT_MS)
+    this.agentBrowserIdleTimeoutMs = idleTimeoutMs > 0 ? idleTimeoutMs : null
   }
 
   // ── Tab tracking ──
@@ -2360,6 +2368,7 @@ export class AgentBrowserBridge {
         consecutiveTimeouts: 0,
         activeInterceptPatterns: [],
         activeCapture: false,
+        lastCommandAt: Date.now(),
         webContentsId,
         activeProcess: null
       })
@@ -2506,6 +2515,19 @@ export class AgentBrowserBridge {
     }
   }
 
+  private reinitializeIfDaemonIdledOut(sessionName: string, session: SessionState): void {
+    if (
+      this.agentBrowserIdleTimeoutMs === null ||
+      Date.now() - session.lastCommandAt < this.agentBrowserIdleTimeoutMs
+    ) {
+      return
+    }
+    session.initialized = false
+    if (session.activeInterceptPatterns.length > 0) {
+      this.pendingInterceptRestore.set(sessionName, [...session.activeInterceptPatterns])
+    }
+  }
+
   private assertCommandAdmission(): void {
     if (this.shutdownStarted) {
       throw new BrowserError('browser_owner_unavailable', 'Browser runtime is shutting down')
@@ -2528,6 +2550,9 @@ export class AgentBrowserBridge {
       await this.destroySession(sessionName)
       throw this.createPageUnavailableError(sessionName)
     }
+
+    this.reinitializeIfDaemonIdledOut(sessionName, session)
+    session.lastCommandAt = Date.now()
 
     const args = ['--session', sessionName]
     const managesInterceptRoutes =

@@ -3159,6 +3159,9 @@ void app.whenReady().then(async () => {
       onTabsChanged: (worktreeId) => runtimeService.notifyMobileSessionTabsChanged(worktreeId)
     })
   )
+  // Reclaim helpers left behind by a crashed previous process before any new
+  // tab can reuse their named session.
+  void runtimeService.getAgentBrowserBridge()?.sweepOrphanedSessions?.()
 
   // Emulator bridge (serve-sim). macOS-only feature (gated in CLI/runtime); always ship like agent-browser.
   // Why: externally started serve-sim processes must stay independent — only Orca-managed/attached helpers belong to a workspace.
@@ -3659,9 +3662,12 @@ app.on('will-quit', (e) => {
   wslHookRelayManager.disposeAll()
   const statsFlush = stats?.flushAsync() ?? Promise.resolve()
   // Why: agent-browser daemon processes would otherwise linger after quit, holding ports and stale session state on disk.
-  runtime?.getAgentBrowserBridge()?.destroyAllSessions()
-  // Why: headless offscreen browser windows are main-process owned; tear them down explicitly on quit.
-  runtime?.getOffscreenBrowserBackend()?.destroyAll?.()
+  // Why: join both visible and offscreen browser owners before app.quit(), so
+  // helper daemons cannot outlive the process that owns their pages.
+  const browserShutdown = (async (): Promise<void> => {
+    await runtime?.getOffscreenBrowserBackend()?.destroyAll?.()
+    await runtime?.getAgentBrowserBridge()?.destroyAllSessions()
+  })()
   browserManager.setBrowserGuestStateChangedListener(null)
   const emulatorShutdown = runtime?.getEmulatorBridge()?.destroyAllSessions() ?? Promise.resolve()
   // Why immediately before store.flushAsync() with no await in between: beginSshShutdown() marks every
@@ -3706,6 +3712,7 @@ app.on('will-quit', (e) => {
   // Losing at most the last debounce interval beats a quit that never completes, and the
   // temp+rename swap means a write cut short by the deadline leaves the old file intact.
   settleTeardownWithinDeadline([
+    { name: 'browser', promise: browserShutdown },
     { name: 'daemon', promise: daemonTeardown },
     { name: 'runtime-rpc', promise: rpcStopAndClear },
     { name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown },
