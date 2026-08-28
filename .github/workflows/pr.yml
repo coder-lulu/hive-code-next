@@ -765,6 +765,7 @@ jobs:
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
       test_files: ${{ steps.filter.outputs.test_files }}
+      ssh_source_changed: ${{ steps.filter.outputs.ssh_source_changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -786,7 +787,9 @@ jobs:
           # Source routes are executable contracts so a test can prove exact
           # authorities, exclusions, and sentinels without evaluating workflow shell.
           TEST_FILES_JSON="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs)"
+          SSH_SOURCE_CHANGED="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs --ssh-source)"
           echo "test_files=$TEST_FILES_JSON" >> "$GITHUB_OUTPUT"
+          echo "ssh_source_changed=$SSH_SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
           if [ "$TEST_FILES_JSON" != '[]' ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "Changed E2E specs: $TEST_FILES_JSON"
@@ -805,6 +808,7 @@ jobs:
     uses: ./.github/workflows/e2e.yml
     with:
       test_files: ${{ needs.e2e-paths.outputs.test_files }}
+      ssh_source_changed: ${{ needs.e2e-paths.outputs.ssh_source_changed }}
 
   verify:
     if: always()

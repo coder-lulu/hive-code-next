@@ -160,6 +160,32 @@
     {
       "upstreamSha": "8dd7d6060c7d724c4cdb85f3072a1e502e47dc54",
       "type": "BUG",
+      "applied": "已移植",
+      "dependencies": ["bf5660df51950ab88f37b86914b997dc91837558"],
+      "conflictReason": "native patch 与 HiveCode 既有 Windows 路径、job ownership 和 glibc patch 冲突",
+      "adaptation": "按 hunk 合并 node-pty/@vscode patch、逐模块 node-gyp rebuild、ConPTY artifact 校验及 lockfile hash，保留 HiveCode 原生边界",
+      "regressionTests": [
+        "native runtime",
+        "Windows native build patch contract",
+        "frozen lockfile install"
+      ]
+    },
+    {
+      "upstreamSha": "971d987c4b99e84c18fc1447ca4ee18d02eb308a",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": ["2ac23c29be2a00c55263ead03f249e936e52e319"],
+      "conflictReason": "SSH Docker lane 与 HiveCode 专用 gate/workflow 需要逐 job 合并",
+      "adaptation": "增加 SSH source trigger、Docker-gated spec 全量 claim、workspace restore route 和 restart tab identity 回归，保留产品 gate 与安全检查",
+      "regressionTests": [
+        "PR E2E gate contract",
+        "SSH source routing",
+        "SSH restart tab accumulation"
+      ]
+    },
+    {
+      "upstreamSha": "8dd7d6060c7d724c4cdb85f3072a1e502e47dc54",
+      "type": "BUG",
       "applied": "暂缓",
       "dependencies": ["bf5660df51950ab88f37b86914b997dc91837558"],
       "conflictReason": "native patch、lockfile、Windows artifact 规则与 HiveCode product patch 冲突",

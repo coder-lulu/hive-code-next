@@ -17,6 +17,10 @@ on:
         description: JSON array of changed specs; empty runs the full suite
         required: false
         type: string
+      ssh_source_changed:
+        description: '"true" when the PR touches SSH execution source; gates the Docker-SSH lane'
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       ref:
@@ -231,12 +235,13 @@ jobs:
     needs: build
     if: >-
       inputs.test_files == '' ||
+      inputs.ssh_source_changed == 'true' ||
       contains(inputs.test_files, 'tests/e2e/ssh-startup-exec-readiness.spec.ts') ||
       contains(inputs.test_files, 'tests/e2e/paired-startup-exec-readiness.spec.ts')
     runs-on: ubuntu-22.04
-    # Why 35: the parking, retention, startup-exec, and paired parity specs run
-    # serially on isolated Electron/SSH fixtures after watcher isolation.
-    timeout-minutes: 35
+    # Why 60: this lane also runs the remaining Docker-SSH specs serially; several
+    # budget multiple minutes each and no longer fit the old 35-minute bound.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -267,6 +272,12 @@ jobs:
       - name: Run Docker SSH terminal parking + startup readiness E2E
         if: always()
         run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:ssh-docker-terminal-parking
+
+      # Keep all Docker-gated SSH specs on the lane that sets ORCA_E2E_SSH_DOCKER;
+      # sharded lanes intentionally do not set it and would otherwise report silent skips.
+      - name: Run remaining Docker SSH E2E
+        if: always()
+        run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:ssh-docker
 
       - name: Upload watcher isolation traces
         if: failure()

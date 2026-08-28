@@ -1,9 +1,14 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parse as parseJsonc } from 'jsonc-parser'
 import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
-import { PR_E2E_SOURCE_ROUTES, selectPrE2eSpecs } from './pr-e2e-source-routing.mjs'
+import {
+  hasSshSourceChange,
+  PR_E2E_SOURCE_ROUTES,
+  selectPrE2eSpecs,
+  SSH_SOURCE_ROUTE_IDS
+} from './pr-e2e-source-routing.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const prWorkflow = parseYaml(readFileSync(join(projectDir, '.github/workflows/pr.yml'), 'utf8'))
@@ -14,6 +19,10 @@ const reliabilityManifest = parseJsonc(
 const playwrightConfig = readFileSync(join(projectDir, 'tests/playwright.config.ts'), 'utf8')
 const sshDockerRunner = readFileSync(
   join(projectDir, 'config/scripts/run-ssh-docker-terminal-parking-e2e.mjs'),
+  'utf8'
+)
+const sshDockerFullRunner = readFileSync(
+  join(projectDir, 'config/scripts/run-ssh-docker-e2e.mjs'),
   'utf8'
 )
 
@@ -206,6 +215,8 @@ describe('PR E2E gate contract', () => {
       'src/main/providers/ssh-',
       'src/main/ipc/pty',
       'src/relay/',
+      'src/shared/ssh-',
+      'src/renderer/src/store/slices/direct-ssh-',
       'src/renderer/src/components/terminal-pane/remote-runtime-'
     ]
     for (const authority of sshSourceAuthorities) {
@@ -214,10 +225,22 @@ describe('PR E2E gate contract', () => {
       )
     }
 
+    for (const file of [
+      'src/main/runtime/public-ssh-state.ts',
+      'src/renderer/src/startup/ssh-startup-reconnect.ts',
+      'src/renderer/src/store/slices/ssh.ts'
+    ]) {
+      expect(selectPrE2eSpecs([file]), file).toContain(
+        'tests/e2e/ssh-docker-reconnect-pane-restore.spec.ts'
+      )
+    }
+
     const mappedSpecs = [
       'tests/e2e/pty-input-write-queue-ssh.spec.ts',
       'tests/e2e/ssh-cold-activation-restore.spec.ts',
       'tests/e2e/ssh-docker-reconnect-pane-restore.spec.ts',
+      'tests/e2e/ssh-port-forward-lifecycle.spec.ts',
+      'tests/e2e/ssh-reconnect-tab-destruction.spec.ts',
       'tests/e2e/ssh-startup-exec-readiness.spec.ts',
       'tests/e2e/ssh-terminal-window-wake-stale-grid-repro.spec.ts'
     ]
@@ -244,6 +267,109 @@ describe('PR E2E gate contract', () => {
       step.name.startsWith('Install native build')
     )
     expect(changedInstall.run).toContain('openssh-client')
+  })
+
+  it('routes direct-SSH workspace and tab restore from unnamed source seams', () => {
+    for (const file of [
+      'src/renderer/src/hooks/remote-workspace-session-merge.ts',
+      'src/main/ipc/remote-workspace-snapshot-normalization.ts',
+      'src/renderer/src/lib/worktree-initial-terminal-seeding.ts',
+      'src/renderer/src/lib/worktree-default-terminal-tabs.ts',
+      'src/shared/remote-workspace-session-projection.ts',
+      'src/renderer/src/components/terminal/initial-terminal.ts'
+    ]) {
+      const specs = selectPrE2eSpecs([file])
+      expect(specs, file).toContain('tests/e2e/ssh-cold-activation-restore.spec.ts')
+      expect(specs, file).toContain('tests/e2e/ssh-reconnect-tab-destruction.spec.ts')
+    }
+    expect(
+      selectPrE2eSpecs(['src/renderer/src/hooks/remote-workspace-session-merge.test.ts'])
+    ).toEqual([])
+  })
+
+  it('triggers the Docker-SSH lane from SSH source rather than a spec name', () => {
+    for (const file of [
+      'src/main/ssh/connection.ts',
+      'src/relay/pty-handler.ts',
+      'src/renderer/src/store/slices/direct-ssh-pane-retry-ledger.ts',
+      'src/renderer/src/hooks/remote-workspace-session-merge.ts',
+      'src/main/ipc/remote-workspace-snapshot-normalization.ts'
+    ]) {
+      expect(hasSshSourceChange([file]), file).toBe(true)
+    }
+    for (const file of [
+      'src/main/git/git-status.ts',
+      'src/renderer/src/components/tab-bar/BrowserTab.tsx',
+      'src/main/ssh/connection.test.ts'
+    ]) {
+      expect(hasSshSourceChange([file]), file).toBe(false)
+    }
+    for (const id of SSH_SOURCE_ROUTE_IDS) {
+      expect(
+        PR_E2E_SOURCE_ROUTES.map((route) => route.id),
+        id
+      ).toContain(id)
+    }
+    const sshLaneCondition = e2eWorkflow.jobs['ssh-docker-watcher-isolation'].if
+    expect(sshLaneCondition).toContain("inputs.ssh_source_changed == 'true' ||")
+    expect(e2eWorkflow.on.workflow_call.inputs.ssh_source_changed.type).toBe('string')
+    expect(prWorkflow.jobs['e2e-paths'].outputs.ssh_source_changed).toBe(
+      '${{ steps.filter.outputs.ssh_source_changed }}'
+    )
+    expect(prWorkflow.jobs.e2e.with.ssh_source_changed).toBe(
+      '${{ needs.e2e-paths.outputs.ssh_source_changed }}'
+    )
+    expect(filterStep.run).toContain('pr-e2e-source-routing.mjs --ssh-source')
+    expect(filterStep.run).toContain('ssh_source_changed=$SSH_SOURCE_CHANGED')
+  })
+
+  it('gives every Docker-gated SSH spec a lane that runs it', () => {
+    const unreachableSpecs = new Set([
+      'tests/e2e/ssh-docker-relay-perf.spec.ts',
+      'tests/e2e/ssh-codex-display-artifacts-repro.spec.ts',
+      'tests/e2e/ssh-docker-bulk-open-freeze-repro.spec.ts'
+    ])
+    const stripComments = (text) =>
+      text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const laneRunners = [
+      sshDockerFullRunner,
+      readFileSync(
+        join(projectDir, 'config/scripts/run-ssh-docker-watcher-isolation-e2e.mjs'),
+        'utf8'
+      ),
+      readFileSync(
+        join(projectDir, 'config/scripts/run-ssh-docker-terminal-parking-e2e.mjs'),
+        'utf8'
+      )
+    ].map(stripComments)
+    const dockerGateExpression = /ORCA_E2E_SSH_DOCKER\s*[!=]==\s*['"]1['"]/
+    const dockerGatedSpecs = readdirSync(join(projectDir, 'tests/e2e'))
+      .filter((file) => file.endsWith('.spec.ts'))
+      .map((file) => `tests/e2e/${file}`)
+      .filter((spec) => dockerGateExpression.test(readFileSync(join(projectDir, spec), 'utf8')))
+    expect(dockerGatedSpecs.length).toBeGreaterThan(0)
+    const unclaimed = dockerGatedSpecs.filter(
+      (spec) => !unreachableSpecs.has(spec) && !laneRunners.some((runner) => runner.includes(spec))
+    )
+    expect(
+      unclaimed,
+      `Docker-gated specs claimed by no lane runner: ${unclaimed.join(', ')}`
+    ).toEqual([])
+    for (const spec of unreachableSpecs) {
+      expect(dockerGatedSpecs, spec).toContain(spec)
+      for (const runner of laneRunners) {
+        expect(runner.includes(spec), `${spec} is exempt but still invoked by a lane runner`).toBe(
+          false
+        )
+      }
+    }
+    const laneStep = e2eWorkflow.jobs['ssh-docker-watcher-isolation'].steps.find(
+      (step) => step.name === 'Run remaining Docker SSH E2E'
+    )
+    expect(laneStep.run).toContain('test:e2e:ssh-docker')
+    expect(
+      e2eWorkflow.jobs['ssh-docker-watcher-isolation']['timeout-minutes']
+    ).toBeGreaterThanOrEqual(60)
   })
 
   it('scopes the VM rollback oracle to the PR range and recipe schema authorities', () => {
