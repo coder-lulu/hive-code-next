@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "platforms": {
+    "windows": [
+      "pnpm exec vitest run --config config/vitest.config.ts src/main src/shared",
+      "pnpm exec tsc -p config/tsconfig.tc.cli.json --noEmit"
+    ],
+    "macos": ["pnpm exec vitest run --config config/vitest.config.ts src/main src/shared"],
+    "linux": ["pnpm exec vitest run --config config/vitest.config.ts src/main src/shared"],
+    "mobile": ["pnpm exec vitest run --config mobile/vitest.config.ts"]
+  },
+  "criticalAreas": [
+    "session reconnect",
+    "host authority",
+    "WSL",
+    "SSH",
+    "mobile relay",
+    "Codex trust",
+    "Windows launcher"
+  ]
+}
