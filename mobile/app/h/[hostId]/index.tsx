@@ -71,8 +71,9 @@ import { WorkspaceDetailPlaceholder } from '../../../src/components/WorkspaceDet
 import { getCachedWorktrees, setCachedWorktrees } from '../../../src/cache/worktree-cache'
 import { setCachedRepos } from '../../../src/cache/repo-cache'
 import { colors, spacing } from '../../../src/theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../../../src/theme/mobile-theme-provider'
 import { useResponsiveLayout } from '../../../src/layout/responsive-layout'
-import { hostScreenStyles as styles } from '../../../src/host-screen/host-screen-styles'
+import { createHostScreenStyles } from '../../../src/host-screen/host-screen-styles'
 import { leaveHostRoute } from '../../../src/host-route-exit'
 import { loadPinnedIds, savePinnedIds } from '../../../src/storage/preferences'
 import {
@@ -130,6 +131,8 @@ export function HostScreen({
   action: actionProp,
   onHideSidebar
 }: HostScreenProps = {}) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createHostScreenStyles)
   const params = useLocalSearchParams<{ hostId: string; action?: string; notice?: string }>()
   const hostId = hostIdProp ?? params.hostId
   const action = actionProp ?? params.action
@@ -1132,6 +1135,7 @@ export function HostScreen({
         displayCount={displayWorktrees.length}
         sectionCount={sections.length}
         catalogError={catalogError}
+        theme={theme}
         search={search}
         activeFilterCount={activeFilterCount}
       />
@@ -1188,7 +1192,7 @@ export function HostScreen({
               </Pressable>
             )
           }}
-          ItemSeparatorComponent={ListSeparator}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
           // Why (#8498): manual pull-to-refresh forces a fresh snapshot after a stale-cache reconnect.
           refreshControl={
             <RefreshControl
@@ -1200,6 +1204,7 @@ export function HostScreen({
           }
           renderItem={({ item }) => (
             <WorktreeListRow
+              theme={theme}
               item={item}
               isReadOnly={isReadOnly}
               now={now}
@@ -1217,7 +1222,11 @@ export function HostScreen({
 
       {/* Floating "new workspace" button — phone only; embedded sidebars keep the toolbar +. */}
       {!embedded && (
-        <NewWorkspaceFab onPress={openNewWorktreeModal} disabled={connState !== 'connected'} />
+        <NewWorkspaceFab
+          theme={theme}
+          onPress={openNewWorktreeModal}
+          disabled={connState !== 'connected'}
+        />
       )}
 
       <PickerModal
@@ -1418,8 +1427,4 @@ export default function HostWorktreeRoute() {
     return <WorkspaceDetailPlaceholder />
   }
   return <HostScreen />
-}
-
-function ListSeparator() {
-  return <View style={styles.separator} />
 }

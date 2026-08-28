@@ -73,6 +73,8 @@ export function parseSession(value: unknown): MobileSession {
 function decodeAccessTokenClaims(accessToken: string): {
   readonly sessionId: string
   readonly sessionSecurityVersion: number
+  readonly deviceId?: string
+  readonly deviceSecurityVersion?: number
 } | null {
   try {
     const parts = accessToken.split('.')
@@ -85,6 +87,8 @@ function decodeAccessTokenClaims(accessToken: string): {
     }
     const sessionId = payload.session_id
     const version = payload.session_security_version
+    const deviceId = payload.device_id
+    const deviceVersion = payload.device_security_version
     if (
       typeof sessionId !== 'string' ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -95,6 +99,20 @@ function decodeAccessTokenClaims(accessToken: string): {
       version < 0
     ) {
       return null
+    }
+    if (
+      typeof deviceId === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId) &&
+      typeof deviceVersion === 'number' &&
+      Number.isSafeInteger(deviceVersion) &&
+      deviceVersion >= 0
+    ) {
+      return {
+        sessionId,
+        sessionSecurityVersion: version,
+        deviceId,
+        deviceSecurityVersion: deviceVersion
+      }
     }
     return { sessionId, sessionSecurityVersion: version }
   } catch {
@@ -123,12 +141,22 @@ export async function revokeMobileSession(session: MobileSession): Promise<void>
   if (!claims) {
     return
   }
+  if (claims.deviceId && claims.deviceSecurityVersion !== undefined) {
+    await request(
+      `/hive/v1/cloud-account-devices/${claims.deviceId}/revoke`,
+      { expectedSecurityVersion: claims.deviceSecurityVersion },
+      {
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+          'Idempotency-Key': randomToken()
+        }
+      }
+    )
+    return
+  }
   await request(
     `/hive/v1/cloud-sessions/${claims.sessionId}/revoke`,
-    {
-      expectedSecurityVersion: claims.sessionSecurityVersion,
-      reason: 'owner_sign_out'
-    },
+    { expectedSecurityVersion: claims.sessionSecurityVersion, reason: 'owner_sign_out' },
     {
       headers: {
         Authorization: `Bearer ${session.accessToken}`,

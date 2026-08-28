@@ -10,29 +10,10 @@ import {
   UserRound,
   MessageCircleQuestion
 } from 'lucide-react-native'
-import { useCallback, useEffect, useState, type ComponentType } from 'react'
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View
-} from 'react-native'
-import Animated, {
-  cancelAnimation,
-  Easing,
-  Extrapolation,
-  interpolate,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming
-} from 'react-native-reanimated'
+import type { ComponentType } from 'react'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { OrcaLogo } from '../components/OrcaLogo'
-import { resolveBottomDrawerMounted } from '../components/bottom-drawer-mount-state'
-import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
+import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { productNameText } from '../product-brand'
 import type { MobileTheme } from '../theme/mobile-theme'
 
@@ -42,7 +23,6 @@ interface MobileHomeDrawerProps {
   readonly pairedComputerCount: number
   readonly canOpenHostActions: boolean
   readonly onClose: () => void
-  readonly onAfterClose?: () => void
   readonly onAccount: () => void
   readonly onHome: () => void
   readonly onComputers: () => void
@@ -68,7 +48,6 @@ export function MobileHomeDrawer({
   pairedComputerCount,
   canOpenHostActions,
   onClose,
-  onAfterClose,
   onAccount,
   onHome,
   onComputers,
@@ -78,56 +57,8 @@ export function MobileHomeDrawer({
   onSettings,
   onFeedback
 }: MobileHomeDrawerProps) {
+  const { hydrated, session } = useMobileAuthSession()
   const styles = createStyles(theme)
-  const { width: windowWidth } = useWindowDimensions()
-  const reducedMotionEnabled = useReducedMotionEnabled()
-  const [mounted, setMounted] = useState(visible)
-  const progress = useSharedValue(0)
-  const panelWidth = Math.min(windowWidth * 0.82, 340)
-  const resolvedMounted = resolveBottomDrawerMounted(visible, mounted)
-
-  if (resolvedMounted !== mounted) {
-    setMounted(resolvedMounted)
-  }
-
-  const finishClose = useCallback(() => {
-    setMounted(false)
-    onAfterClose?.()
-  }, [onAfterClose])
-
-  useEffect(() => {
-    if (visible) {
-      cancelAnimation(progress)
-      progress.value = withTiming(1, {
-        duration: reducedMotionEnabled ? 0 : 240,
-        easing: Easing.out(Easing.cubic)
-      })
-      return
-    }
-
-    cancelAnimation(progress)
-    progress.value = withTiming(
-      0,
-      {
-        duration: reducedMotionEnabled ? 0 : 180,
-        easing: Easing.out(Easing.cubic)
-      },
-      (finished) => {
-        if (finished) {
-          runOnJS(finishClose)()
-        }
-      }
-    )
-  }, [finishClose, progress, reducedMotionEnabled, visible])
-
-  const panelStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: interpolate(progress.value, [0, 1], [-panelWidth, 0], Extrapolation.CLAMP) }
-    ]
-  }))
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 1], [0, 1], Extrapolation.CLAMP)
-  }))
   const rows: readonly DrawerRow[] = [
     { key: 'home', label: '首页', Icon: Home, onPress: onHome },
     {
@@ -163,29 +94,23 @@ export function MobileHomeDrawer({
     }
   ]
 
-  if (!resolvedMounted) {
-    return null
-  }
-
   return (
     <Modal
-      animationType="none"
+      animationType="fade"
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
       statusBarTranslucent
       transparent
-      visible={mounted}
+      visible={visible}
     >
-      <View pointerEvents={visible ? 'auto' : 'none'} style={styles.backdrop}>
-        <Animated.View style={[styles.backdropLayer, backdropStyle]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="关闭导航菜单"
-            onPress={onClose}
-            style={styles.backdropDismiss}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.panel, { width: panelWidth }, panelStyle]}>
+      <View style={styles.backdrop}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="关闭导航菜单"
+          onPress={onClose}
+          style={styles.backdropDismiss}
+        />
+        <View style={styles.panel}>
           <View style={styles.header}>
             <Pressable
               accessibilityRole="button"
@@ -196,10 +121,16 @@ export function MobileHomeDrawer({
                 <OrcaLogo size={30} />
               </View>
               <View style={styles.accountCopy}>
-                <Text style={styles.accountTitle}>{productNameText('登录 Orca')}</Text>
+                <Text style={styles.accountTitle}>
+                  {hydrated && session
+                    ? session.account.displayName
+                    : productNameText('登录 HiveCode')}
+                </Text>
                 <View style={styles.accountSupportingRow}>
                   <LogIn size={14} color={theme.color.text.secondary} />
-                  <Text style={styles.accountSupporting}>登录后同步账号设置</Text>
+                  <Text style={styles.accountSupporting}>
+                    {hydrated && session ? '账号已同步' : '登录后同步账号设置'}
+                  </Text>
                 </View>
               </View>
             </Pressable>
@@ -241,7 +172,7 @@ export function MobileHomeDrawer({
           </ScrollView>
 
           <Text style={styles.versionLabel}>{productNameText('Orca Mobile')}</Text>
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   )
@@ -280,13 +211,11 @@ function DrawerNavRow({
 
 function createStyles(theme: MobileTheme) {
   return StyleSheet.create({
-    backdrop: { flex: 1, flexDirection: 'row' },
-    backdropLayer: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: theme.color.overlay
-    },
+    backdrop: { flex: 1, flexDirection: 'row', backgroundColor: theme.color.overlay },
     backdropDismiss: { ...StyleSheet.absoluteFillObject },
     panel: {
+      width: '82%',
+      maxWidth: 340,
       height: '100%',
       paddingTop: 24,
       paddingHorizontal: theme.spacing.space20,

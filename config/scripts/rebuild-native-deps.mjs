@@ -20,6 +20,7 @@
 
 import { rebuild } from '@electron/rebuild'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import {
   copyFileSync,
   existsSync,
@@ -31,7 +32,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { platform as osPlatform } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 const projectDir = process.cwd()
 let cliOptions
@@ -132,6 +133,10 @@ if (!ignoreModules.includes('cpu-features')) {
   }
 }
 
+if (rebuildPlatform === 'win32' && modulesToRebuild.includes('@vscode/windows-process-tree')) {
+  prepareWindowsProcessTreeBuild()
+}
+
 try {
   await rebuild({
     buildPath: projectDir,
@@ -165,6 +170,83 @@ try {
     }
   }
   process.exit(1)
+}
+
+/**
+ * Prepare the patched process-tree addon before @electron/rebuild invokes
+ * node-gyp. pnpm resolves the package through a store junction; the upstream
+ * binding.gyp dependency then gets evaluated from the store realpath and
+ * generates a broken nested MSBuild project. Inline the addon-api headers and
+ * remove that dependency so the generated project stays self-contained.
+ */
+function prepareWindowsProcessTreeBuild() {
+  const packageDir = resolve(projectDir, 'node_modules', '@vscode', 'windows-process-tree')
+  const bindingPath = join(packageDir, 'binding.gyp')
+  const processPath = join(packageDir, 'src', 'process.cc')
+  const packageJsonPath = join(packageDir, 'package.json')
+  if (!existsSync(bindingPath) || !existsSync(packageJsonPath)) {
+    console.warn(
+      `[rebuild] @vscode/windows-process-tree is not materialized at ${packageDir}; ` +
+        'skipping build preparation.'
+    )
+    return
+  }
+
+  const nodeAddonApiDir = dirname(
+    createRequire(packageJsonPath).resolve('node-addon-api/package.json')
+  )
+  const stagedHeaderDir = join(packageDir, 'deps', 'node-addon-api')
+  let bindingGyp = readFileSync(bindingPath, 'utf8')
+  let processCc = readFileSync(processPath, 'utf8')
+  const originalBinding = bindingGyp
+  const originalProcess = processCc
+
+  for (const dynamicDependency of [
+    String.raw`<!(node -p \"require('node-addon-api').targets\"):node_addon_api_except`,
+    String.raw`<!(node -p \"require.resolve('node-addon-api/node_addon_api.gyp')\"):node_addon_api_except`,
+    '../../node-addon-api/node_addon_api.gyp:node_addon_api_except'
+  ]) {
+    bindingGyp = bindingGyp.replace(`"${dynamicDependency}",`, '')
+  }
+  bindingGyp = bindingGyp.replace(
+    '"include_dirs": []',
+    '"include_dirs": ["deps/node-addon-api"],\n          "defines": ["NAPI_CPP_EXCEPTIONS", "_HAS_EXCEPTIONS=1"]'
+  )
+  const intermediateDirectory = String.raw`"msvs_configuration_attributes": {
+            "IntermediateDirectory": "$(TEMP)\\hivecode-wpt\\$(ProjectGuid)\\$(Platform)\\$(Configuration)"
+          },`
+  if (!bindingGyp.includes('"ExceptionHandling": 1')) {
+    bindingGyp = bindingGyp.replace(
+      '"VCCLCompilerTool": {',
+      '"VCCLCompilerTool": {\n              "ExceptionHandling": 1,'
+    )
+  }
+  bindingGyp = bindingGyp.replace(
+    /\r?\n\s*"msvs_configuration_attributes": \{\s*"SpectreMitigation": "Spectre"\s*\},?/s,
+    `\n          ${intermediateDirectory}`
+  )
+  if (!bindingGyp.includes('"IntermediateDirectory"')) {
+    bindingGyp = bindingGyp.replace(
+      '"libraries": [',
+      `${intermediateDirectory}\n          "libraries": [`
+    )
+  }
+  processCc = processCc.replace(/process_count < 1024 && /, '')
+
+  if (bindingGyp !== originalBinding) {
+    writeFileSync(bindingPath, bindingGyp)
+  }
+  if (processCc !== originalProcess) {
+    writeFileSync(processPath, processCc)
+  }
+
+  mkdirSync(stagedHeaderDir, { recursive: true })
+  for (const header of ['napi.h', 'napi-inl.h', 'napi-inl.deprecated.h']) {
+    copyFileSync(join(nodeAddonApiDir, header), join(stagedHeaderDir, header))
+  }
+  if (bindingGyp !== originalBinding || processCc !== originalProcess) {
+    console.warn('[rebuild] Repaired windows-process-tree build settings for pnpm.')
+  }
 }
 
 function restoreNodePtyWindowsConptyRuntime() {

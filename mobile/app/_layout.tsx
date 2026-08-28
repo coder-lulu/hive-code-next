@@ -177,9 +177,6 @@ function ThemedRootLayout() {
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <Stack
           screenOptions={{
-            // Keep ordinary route changes spatially continuous. Modal routes
-            // below override this with their own presentation-specific motion.
-            animation: 'slide_from_right',
             headerStyle: { backgroundColor: theme.color.bg.surface },
             headerTintColor: theme.color.text.primary,
             headerTitleStyle: { fontSize: 16, fontWeight: '600' },
@@ -199,26 +196,12 @@ function ThemedRootLayout() {
               headerTitle: () => <OrcaLogo size={22} />
             }}
           />
-          <Stack.Screen
-            name="pair-scan"
-            options={{ headerShown: false, animation: 'slide_from_bottom' }}
-          />
-          <Stack.Screen
-            name="pair"
-            options={{ headerShown: false, animation: 'slide_from_bottom' }}
-          />
-          <Stack.Screen
-            name="pair-confirm"
-            options={{ headerShown: false, animation: 'slide_from_bottom' }}
-          />
+          <Stack.Screen name="pair-scan" options={{ headerShown: false }} />
+          <Stack.Screen name="pair" options={{ headerShown: false }} />
+          <Stack.Screen name="pair-confirm" options={{ headerShown: false }} />
           <Stack.Screen
             name="mobile-onboarding"
-            options={{
-              animation: 'slide_from_bottom',
-              headerShown: false,
-              presentation: 'modal',
-              gestureEnabled: false
-            }}
+            options={{ headerShown: false, presentation: 'modal', gestureEnabled: false }}
           />
           <Stack.Screen name="settings" options={{ headerShown: false }} />
           <Stack.Screen name="account" options={{ headerShown: false }} />

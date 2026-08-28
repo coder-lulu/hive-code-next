@@ -91,7 +91,7 @@ vi.mock('../settings/HiveAccountSignInConfirmDialog', () => ({
     onConfirm: (sessionProfile: 'TEMPORARY' | 'TRUSTED') => void
   }) =>
     open ? (
-      <button type="button" onClick={() => onConfirm('TEMPORARY')}>
+      <button type="button" onClick={() => onConfirm('TRUSTED')}>
         Approve sign-in
       </button>
     ) : null
@@ -177,7 +177,7 @@ describe('SidebarFooter', () => {
     const container = await renderFooter()
     const accountTrigger = container.querySelector<HTMLElement>('[data-sidebar-account-trigger]')
 
-    expect(accountTrigger?.textContent).toContain('Sign in')
+    expect(accountTrigger?.textContent).toContain('登录')
     expect(accountTrigger?.className).toContain('bg-transparent')
     expect(accountTrigger?.className).toContain('hover:bg-worktree-sidebar-foreground/7')
     expect(container.querySelector('button[aria-label="Notifications"]')).not.toBeNull()
@@ -206,7 +206,7 @@ describe('SidebarFooter', () => {
 
     await act(async () => approve?.click())
 
-    expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TEMPORARY' })
+    expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TRUSTED' })
     expect(container.querySelector('[data-sidebar-account-trigger]')?.textContent).toContain('Ada')
     expect(container.querySelector('[data-sidebar-account-trigger]')?.textContent).toContain(
       'Signed in'
@@ -266,9 +266,7 @@ describe('SidebarFooter', () => {
     await act(async () => confirm?.click())
 
     expect(mocks.signOut).toHaveBeenCalledOnce()
-    expect(container.querySelector('[data-sidebar-account-trigger]')?.textContent).toContain(
-      'Sign in'
-    )
+    expect(container.querySelector('[data-sidebar-account-trigger]')?.textContent).toContain('登录')
   })
 
   it('keeps the authoritative account state and reports an IPC sign-out failure', async () => {
@@ -325,9 +323,7 @@ describe('SidebarFooter', () => {
 
     expect(mocks.toastWarning).toHaveBeenCalledOnce()
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
-    expect(container.querySelector('[data-sidebar-account-trigger]')?.textContent).toContain(
-      'Sign in'
-    )
+    expect(container.querySelector('[data-sidebar-account-trigger]')?.textContent).toContain('登录')
   })
 
   it('updates immediately when the main process broadcasts an account state change', async () => {

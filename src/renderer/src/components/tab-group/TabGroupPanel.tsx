@@ -233,7 +233,13 @@ export default function TabGroupPanel({
         data-terminal-focus-release-surface="true"
         data-worktree-id={worktreeId}
       >
-        <div className="flex h-full items-stretch pr-1.5">
+        <div
+          className={`tab-group-strip-content flex h-full items-stretch pr-1.5${
+            reserveClosedExplorerToggleSpace
+              ? ' tab-group-strip-content-reserves-window-chrome'
+              : ''
+          }`}
+        >
           {/* Why: Electron drag hit-test respects no-drag only on DOM descendants, not z-index siblings, so this no-drag spacer keeps the collapsed left-sidebar's floating toggle clickable. */}
           {reserveCollapsedSidebarHeaderSpace && !sidebarOpen ? (
             <div

@@ -113,6 +113,9 @@ function applyWindowsProcessTreeBuildFixes() {
     '"include_dirs": []',
     '"include_dirs": ["deps/node-addon-api"],\n          "defines": ["NAPI_CPP_EXCEPTIONS", "_HAS_EXCEPTIONS=1"]'
   )
+  const intermediateDirectory = String.raw`"msvs_configuration_attributes": {
+            "IntermediateDirectory": "$(TEMP)\\hivecode-wpt\\$(ProjectGuid)\\$(Platform)\\$(Configuration)"
+          },`
   if (!bindingGyp.includes('"ExceptionHandling": 1')) {
     bindingGyp = bindingGyp.replace(
       '"VCCLCompilerTool": {',
@@ -121,8 +124,14 @@ function applyWindowsProcessTreeBuildFixes() {
   }
   bindingGyp = bindingGyp.replace(
     /\r?\n\s*"msvs_configuration_attributes": \{\s*"SpectreMitigation": "Spectre"\s*\},?/s,
-    ''
+    `\n          ${intermediateDirectory}`
   )
+  if (!bindingGyp.includes('"IntermediateDirectory"')) {
+    bindingGyp = bindingGyp.replace(
+      '"libraries": [',
+      `${intermediateDirectory}\n          "libraries": [`
+    )
+  }
   processCc = processCc.replace(/process_count < 1024 && /, '')
 
   if (bindingGyp !== originalBinding) {

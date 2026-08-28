@@ -202,7 +202,11 @@ export function AppWorkspaceShell(props: {
             <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
               {/* Why: automations/artifacts own their page headers; the stacked titlebar would be an empty 36px stripe. */}
               {stackedMainStripMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}
-              <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden">
+              <div
+                className={`relative flex flex-1 min-w-0 min-h-0 overflow-hidden${
+                  settingsHelpPlacement === 'shell-overlay' ? ' shell-overlay-chrome-active' : ''
+                }`}
+              >
                 {/* Why: match the RightSidebar header's 36px/top-0 so the toggle's vertical center is identical open vs closed — else the icon jitters. */}
                 {settingsHelpPlacement === 'shell-overlay' && (
                   <div

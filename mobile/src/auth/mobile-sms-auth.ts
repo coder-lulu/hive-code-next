@@ -23,7 +23,10 @@ export type { MobileSession } from './mobile-sms-session'
 
 export const MOBILE_CLIENT_ID = 'hivecode-mobile'
 export const MOBILE_REDIRECT_URI = 'hivecode://auth/callback'
-export const MOBILE_SESSION_PROFILE = 'TEMPORARY'
+// Mobile keeps its device key in OS-secure storage, so it can safely opt into
+// the persistent trusted-device profile. The cloud console can revoke the
+// resulting device at any time; a subsequent SMS login reactivates it.
+export const MOBILE_SESSION_PROFILE = 'TRUSTED'
 
 const PENDING_SMS_FLOWS_KEY = 'hivecode.mobile.auth.pending-sms-flows'
 

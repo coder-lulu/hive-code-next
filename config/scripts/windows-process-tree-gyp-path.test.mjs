@@ -29,6 +29,12 @@ describe('windows-process-tree node-addon-api gyp path', () => {
       "createRequire(join(PACKAGE_DIR, 'package.json')).resolve('node-addon-api/package.json')"
     )
     expect(buildScript).toContain('Repaired un-applied pnpm patch hunks before build.')
+    const rebuildScript = readFileSync(
+      join(projectDir, 'config/scripts/rebuild-native-deps.mjs'),
+      'utf8'
+    )
+    expect(rebuildScript).toContain('prepareWindowsProcessTreeBuild()')
+    expect(rebuildScript).toContain('$(TEMP)\\\\hivecode-wpt\\\\$(ProjectGuid)')
   })
 
   it('resolves node_addon_api.gyp to a real file from the package directory', () => {

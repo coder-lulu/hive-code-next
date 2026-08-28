@@ -5,6 +5,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useOpenMobileAccounts } from '../accounts/use-open-mobile-accounts'
 import { getProvenCachedWorktrees } from '../cache/worktree-cache'
 import { ActionSheetModal } from '../components/ActionSheetModal'
+import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { getHostListActionSheetActions } from '../host-list-action-sheet-actions'
 import { hostNewWorktreeRoute } from '../host-route-action-state'
@@ -30,7 +31,6 @@ import type { HomeWorktreeSummary } from '../worktree/home-worktree-info'
 import { isResumeTargetConfirmedMissing, type HomeResumeCard } from '../worktree/home-resume-card'
 import { MobileCloudWorkPreview } from './MobileCloudWorkPreview'
 import { MobileComputerEmptyState } from './MobileComputerEmptyState'
-import { MobileHomeModeTransition } from './MobileHomeModeTransition'
 import { MobileHomeHostList } from './MobileHomeHostList'
 import { MobileHomeListFooter } from './MobileHomeListFooter'
 import { MobileHomeDrawer } from './MobileHomeDrawer'
@@ -45,6 +45,7 @@ import { useMobileHomeData } from './use-mobile-home-data'
 export function MobileHomeScreen() {
   const data = useMobileHomeData()
   const theme = useMobileTheme()
+  const { session } = useMobileAuthSession()
   const insets = useSafeAreaInsets()
   const { isWideLayout, contentMaxWidth } = useResponsiveLayout()
   const openMobileHostEdit = useOpenMobileHostEdit()
@@ -57,9 +58,7 @@ export function MobileHomeScreen() {
   const [actionTarget, setActionTarget] = useState<HostProfile | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null)
   const [homeMode, setHomeMode] = useState<MobileHomeMode | null>(null)
-  const [homeModeHydrated, setHomeModeHydrated] = useState(false)
   const [drawerVisible, setDrawerVisible] = useState(false)
-  const pendingDrawerActionRef = useRef<(() => void) | null>(null)
   const homeModeHydratedRef = useRef(false)
 
   useEffect(() => {
@@ -70,7 +69,6 @@ export function MobileHomeScreen() {
     void loadInitialMobileHomeMode(AsyncStorage, data.hostCatalog.length > 0).then((mode) => {
       if (active && !homeModeHydratedRef.current) {
         homeModeHydratedRef.current = true
-        setHomeModeHydrated(true)
         setHomeMode(mode)
       }
     })
@@ -88,18 +86,11 @@ export function MobileHomeScreen() {
   const effectiveHomeMode = homeMode ?? 'cloud'
 
   const closeDrawer = useCallback(() => {
-    pendingDrawerActionRef.current = null
     setDrawerVisible(false)
   }, [])
 
   const closeDrawerAfter = useCallback((action?: () => void) => {
-    pendingDrawerActionRef.current = action ?? null
     setDrawerVisible(false)
-  }, [])
-
-  const handleDrawerAfterClose = useCallback(() => {
-    const action = pendingDrawerActionRef.current
-    pendingDrawerActionRef.current = null
     action?.()
   }, [])
 
@@ -179,90 +170,83 @@ export function MobileHomeScreen() {
         onOpenMenu={() => setDrawerVisible(true)}
         theme={theme}
       />
-      <MobileHomeModeTransition
-        key={homeModeHydrated ? 'hydrated' : 'boot'}
-        mode={effectiveHomeMode}
-        renderMode={(mode) =>
-          mode === 'cloud' ? (
-            <MobileCloudWorkPreview
-              bottomInset={insets.bottom}
-              onMore={() => setDrawerVisible(true)}
-              onNewTask={() => {
-                if (data.primaryHost) {
-                  openTasks()
-                } else {
-                  data.router.push('/pair-scan')
-                }
-              }}
-              onOpenProject={() => {
-                if (data.primaryHost) {
-                  data.router.push(`/h/${data.primaryHost.id}`)
-                } else {
-                  data.router.push('/pair-scan')
-                }
-              }}
-              onOpenWorkspace={() => {
-                if (data.primaryHost) {
-                  data.router.push(hostNewWorktreeRoute(data.primaryHost.id))
-                } else {
-                  data.router.push('/pair-scan')
-                }
-              }}
-              theme={theme}
+      {effectiveHomeMode === 'cloud' ? (
+        <MobileCloudWorkPreview
+          bottomInset={insets.bottom}
+          onMore={() => setDrawerVisible(true)}
+          onNewTask={() => {
+            if (data.primaryHost) {
+              openTasks()
+            } else {
+              data.router.push('/pair-scan')
+            }
+          }}
+          onOpenProject={() => {
+            if (data.primaryHost) {
+              data.router.push(`/h/${data.primaryHost.id}`)
+            } else {
+              data.router.push('/pair-scan')
+            }
+          }}
+          onOpenWorkspace={() => {
+            if (data.primaryHost) {
+              data.router.push(hostNewWorktreeRoute(data.primaryHost.id))
+            } else {
+              data.router.push('/pair-scan')
+            }
+          }}
+          theme={theme}
+        />
+      ) : data.hostCatalog.length === 0 ? (
+        <MobileComputerEmptyState
+          bottomInset={insets.bottom}
+          maxWidth={isWideLayout ? contentMaxWidth : undefined}
+          onEnterCode={() => data.router.push('/pair')}
+          onScan={() => data.router.push('/pair-scan')}
+          theme={theme}
+        />
+      ) : (
+        <MobileHomeHostList
+          autoConnectHostIds={data.autoConnectHostIds}
+          bottomInset={insets.bottom}
+          contentMaxWidth={contentMaxWidth}
+          footer={
+            <MobileHomeListFooter
+              accountsHosts={data.accountsHosts}
+              connectedHosts={data.connectedHosts}
+              primaryHost={data.primaryHost}
+              primaryTaskProviders={data.primaryTaskProviders}
+              resumeCard={data.resumeCard}
+              onCreateWorkspace={(hostId) => data.router.push(hostNewWorktreeRoute(hostId))}
+              onOpenAccounts={openMobileAccounts}
+              onOpenResume={openResume}
+              onOpenTasks={openTasks}
+              onPairDesktop={() => data.router.push('/pair-scan')}
             />
-          ) : data.hostCatalog.length === 0 ? (
-            <MobileComputerEmptyState
-              bottomInset={insets.bottom}
-              maxWidth={isWideLayout ? contentMaxWidth : undefined}
-              onEnterCode={() => data.router.push('/pair')}
-              onScan={() => data.router.push('/pair-scan')}
-              theme={theme}
-            />
-          ) : (
-            <MobileHomeHostList
-              autoConnectHostIds={data.autoConnectHostIds}
-              bottomInset={insets.bottom}
-              contentMaxWidth={contentMaxWidth}
-              footer={
-                <MobileHomeListFooter
-                  accountsHosts={data.accountsHosts}
-                  connectedHosts={data.connectedHosts}
-                  primaryHost={data.primaryHost}
-                  primaryTaskProviders={data.primaryTaskProviders}
-                  resumeCard={data.resumeCard}
-                  onCreateWorkspace={(hostId) => data.router.push(hostNewWorktreeRoute(hostId))}
-                  onOpenAccounts={openMobileAccounts}
-                  onOpenResume={openResume}
-                  onOpenTasks={openTasks}
-                  onPairDesktop={() => data.router.push('/pair-scan')}
-                />
-              }
-              hostAttempts={data.hostAttempts}
-              hostLastConnected={data.hostLastConnected}
-              hostPairingRejected={data.hostPairingRejected}
-              hostPaths={data.hostPaths}
-              hostPendingPaths={data.hostPendingPaths}
-              hosts={data.sortedHostCatalog}
-              hostStates={data.hostStates}
-              isWideLayout={isWideLayout}
-              stats={data.stats}
-              worktreeInfo={data.worktreeInfo}
-              onOpen={openHost}
-              onLongPress={(host) => {
-                triggerMediumImpact()
-                openHostActions(host)
-              }}
-              onOpenActions={openHostActions}
-            />
-          )
-        }
-      />
+          }
+          hostAttempts={data.hostAttempts}
+          hostLastConnected={data.hostLastConnected}
+          hostPairingRejected={data.hostPairingRejected}
+          hostPaths={data.hostPaths}
+          hostPendingPaths={data.hostPendingPaths}
+          hosts={data.sortedHostCatalog}
+          hostStates={data.hostStates}
+          isWideLayout={isWideLayout}
+          stats={data.stats}
+          worktreeInfo={data.worktreeInfo}
+          onOpen={openHost}
+          onLongPress={(host) => {
+            triggerMediumImpact()
+            openHostActions(host)
+          }}
+          onOpenActions={openHostActions}
+        />
+      )}
       <MobileHomeDrawer
         canOpenHostActions={data.primaryHost != null}
         onAccount={() => {
-          closeDrawerAfter(() => data.router.push('/login'))
+          closeDrawerAfter(() => data.router.push(session ? '/account' : '/login'))
         }}
-        onAfterClose={handleDrawerAfterClose}
         onClose={closeDrawer}
         onComputers={() => {
           closeDrawerAfter(() => changeHomeMode('computer'))

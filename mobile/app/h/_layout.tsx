@@ -28,13 +28,7 @@ function clampSidebarToWindow(width: number, windowWidth: number): number {
   return Math.min(hardMax, Math.max(HOST_SIDEBAR_MIN_WIDTH, Math.round(width)))
 }
 
-function HostStack({
-  animation,
-  theme
-}: {
-  animation: 'none' | 'slide_from_right'
-  theme: MobileTheme
-}) {
+function HostStack({ animation, theme }: { animation: 'none' | 'default'; theme: MobileTheme }) {
   return (
     <Stack
       screenOptions={{
@@ -163,7 +157,7 @@ export default function HostGroupLayout() {
           </View>
         ) : null}
         <View style={styles.detail}>
-          <HostStack animation={showSidebar ? 'none' : 'slide_from_right'} theme={theme} />
+          <HostStack animation={showSidebar ? 'none' : 'default'} theme={theme} />
         </View>
       </View>
     </HostProtocolGate>

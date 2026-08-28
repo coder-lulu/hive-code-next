@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { KeyRound, Loader2, Monitor } from 'lucide-react'
+import { Globe2, Loader2, Monitor, ShieldCheck } from 'lucide-react'
+import mascotUrl from '../../../../../resources/desktop-home-mascot-float.png'
+import githubIconUrl from '../../../../../mobile/assets/auth-icons/github.png'
+import wechatIconUrl from '../../../../../mobile/assets/auth-icons/wechat.png'
+import qqIconUrl from '../../../../../mobile/assets/auth-icons/qq.png'
+import { PRODUCT_LOGO_URL } from '@/product-brand'
 import type { HiveAccountSignInOptions } from '../../../../shared/hive-account'
 import type { HiveAccountSmsChallenge } from '../../../../shared/hive-account'
 import { Button } from '@/components/ui/button'
@@ -8,7 +13,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -35,7 +39,6 @@ export function HiveAccountSignInConfirmDialog({
   onSmsComplete?: (challengeId: string, smsCode: string) => Promise<void>
   signingIn: boolean
 }): React.JSX.Element {
-  const [trusted, setTrusted] = useState(false)
   const [method, setMethod] = useState<'sms' | 'browser'>('sms')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [smsCode, setSmsCode] = useState('')
@@ -48,7 +51,6 @@ export function HiveAccountSignInConfirmDialog({
 
   useEffect(() => {
     if (!open) {
-      setTrusted(false)
       setMethod('sms')
       setPhoneNumber('')
       setSmsCode('')
@@ -59,21 +61,28 @@ export function HiveAccountSignInConfirmDialog({
   }, [open])
 
   const startSms = async (): Promise<void> => {
-    if (!onSmsStart || !/^\+?[0-9]{6,20}$/.test(phoneNumber.trim()) || !smsTermsAccepted) {
-      setSmsError('Enter a valid phone number and accept the terms.')
+    if (!onSmsStart || !/^\+?[0-9]{6,20}$/.test(phoneNumber.trim())) {
+      setSmsError('请输入有效手机号。')
+      return
+    }
+    if (!smsTermsAccepted) {
+      setSmsError('请先同意《服务条款》和《隐私政策》。')
       return
     }
     const attempt = ++smsAttempt.current
     setSmsError(null)
     setStartingSms(true)
     try {
-      const nextChallenge = await onSmsStart(phoneNumber.trim(), trusted ? 'TRUSTED' : 'TEMPORARY')
+      // The profile is part of the device-authorization request and must be
+      // selected before the SMS exchange. Keep the login flow persistent by
+      // default; the modal no longer exposes a pre-auth trust toggle.
+      const nextChallenge = await onSmsStart(phoneNumber.trim(), 'TRUSTED')
       if (attempt === smsAttempt.current) {
         setChallenge(nextChallenge)
       }
     } catch {
       if (attempt === smsAttempt.current) {
-        setSmsError('Unable to send a code. Try again.')
+        setSmsError('验证码发送失败，请稍后重试。')
       }
     } finally {
       setStartingSms(false)
@@ -82,14 +91,14 @@ export function HiveAccountSignInConfirmDialog({
 
   const completeSms = async (): Promise<void> => {
     if (!challenge || !/^\d{6}$/.test(smsCode)) {
-      setSmsError('Enter the 6-digit SMS code.')
+      setSmsError('请输入 6 位验证码。')
       return
     }
     setSmsError(null)
     try {
       await onSmsComplete?.(challenge.challengeId, smsCode)
     } catch {
-      setSmsError('The code is invalid or expired.')
+      setSmsError('验证码无效或已过期。')
     }
   }
 
@@ -113,231 +122,234 @@ export function HiveAccountSignInConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[440px]">
-        <DialogHeader>
-          <DialogTitle>
-            {translate(
-              'auto.components.settings.orcaAccount.signInConfirmTitle',
-              'Approve HiveCloud sign-in'
-            )}
-          </DialogTitle>
-          <DialogDescription>
-            {method === 'sms'
-              ? translate(
-                  'auto.components.settings.orcaAccount.smsSignInDescription',
-                  'Verify your phone number to sign in without opening a browser.'
-                )
-              : translate(
-                  'auto.components.settings.orcaAccount.signInConfirmDescription',
-                  'Review this request before the desktop app opens the secure browser sign-in.'
-                )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex gap-2 border-b border-border/70 pb-3">
-          <Button
-            type="button"
-            size="sm"
-            variant={method === 'sms' ? 'default' : 'outline'}
-            onClick={() => switchMethod('sms')}
-          >
-            {translate('auto.components.settings.orcaAccount.smsLogin', 'Phone verification')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={method === 'browser' ? 'default' : 'outline'}
-            onClick={() => switchMethod('browser')}
-          >
-            {translate('auto.components.settings.orcaAccount.browserLogin', 'Browser sign-in')}
-          </Button>
-        </div>
-
-        {method === 'sms' ? (
-          <div className="space-y-3 rounded-lg border border-border/70 p-4">
-            <div className="space-y-1">
-              <Label htmlFor="hive-account-phone">
-                {translate('auto.components.settings.orcaAccount.phoneNumber', 'Phone number')}
-              </Label>
-              <input
-                id="hive-account-phone"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                value={phoneNumber}
-                onChange={(event) => setPhoneNumber(event.target.value)}
-                disabled={Boolean(challenge) || smsBusy}
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="13800138000"
-              />
-            </div>
-            {challenge ? (
-              <div className="space-y-1">
-                <Label htmlFor="hive-account-sms-code">
-                  {translate('auto.components.settings.orcaAccount.smsCode', 'SMS code')}
-                </Label>
-                <input
-                  id="hive-account-sms-code"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm tracking-[0.3em]"
-                  value={smsCode}
-                  onChange={(event) =>
-                    setSmsCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-                  }
-                  disabled={smsBusy}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="••••••"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {translate(
-                    'auto.components.settings.orcaAccount.smsExpiry',
-                    'Code expires in {seconds}s.'
-                  ).replace('{seconds}', String(challenge.expiresInSeconds))}
-                </p>
+      <DialogContent
+        showCloseButton
+        overlayClassName="hive-account-overlay"
+        className="hive-account-dialog"
+      >
+        <div className="hive-account-dialog-shell">
+          <aside className="hive-account-brand-panel">
+            <div className="hive-account-brand-lockup">
+              <img src={PRODUCT_LOGO_URL} alt="" />
+              <div>
+                <strong>HiveCloud</strong>
+                <span>云端控制面</span>
               </div>
-            ) : null}
-            <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-              <Checkbox
-                checked={smsTermsAccepted}
-                onCheckedChange={(checked) => setSmsTermsAccepted(checked === true)}
-                disabled={smsBusy}
-              />
-              <span>
-                {translate(
-                  'auto.components.settings.orcaAccount.smsTerms',
-                  'I agree to the Terms of Service and Privacy Policy'
-                )}
-              </span>
-            </label>
-            {smsError ? (
-              <p className="text-xs text-destructive" role="alert">
-                {smsError}
-              </p>
-            ) : null}
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => void (challenge ? completeSms() : startSms())}
-              disabled={smsBusy}
-            >
-              {smsBusy ? <Loader2 className="size-4 animate-spin" /> : null}
-              {challenge
-                ? translate('auto.components.settings.orcaAccount.verifySms', 'Verify and sign in')
-                : translate(
-                    'auto.components.settings.orcaAccount.sendSms',
-                    'Send verification code'
-                  )}
-            </Button>
-          </div>
-        ) : null}
-
-        <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-700 dark:text-emerald-300">
-          <KeyRound className="mt-0.5 size-4 shrink-0" />
-          <div className="space-y-1 text-xs leading-5">
-            <p className="font-medium">
-              {translate(
-                'auto.components.settings.orcaAccount.approvalSecurityTitle',
-                'Short access credentials remain protected'
-              )}
-            </p>
-            <p>
-              {translate(
-                'auto.components.settings.orcaAccount.approvalSecurityDescription',
-                'The app rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.'
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-border/70 p-4 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground">
-              {translate('auto.components.settings.orcaAccount.requestStatus', 'Status')}
-            </p>
-            <p className="font-medium">
-              {translate(
-                'auto.components.settings.orcaAccount.pendingApproval',
-                'Pending approval'
-              )}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">
-              {translate('auto.components.settings.orcaAccount.requestApplication', 'Application')}
-            </p>
-            <p className="font-medium">
-              {translate(
-                'auto.components.settings.orcaAccount.requestApplicationName',
-                'Desktop application'
-              )}
-            </p>
-          </div>
-          <div className="col-span-2 flex items-center gap-2">
-            <Monitor className="size-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">
-                {translate(
-                  'auto.components.settings.orcaAccount.requestDevice',
-                  'Requesting device'
-                )}
-              </p>
-              <p className="font-medium">
-                {translate(
-                  'auto.components.settings.orcaAccount.currentDesktop',
-                  'This desktop app'
-                )}
-              </p>
             </div>
-          </div>
-        </div>
+            <div className="hive-account-mascot-wrap">
+              <img src={mascotUrl} alt="HiveCode 机器人小蜜蜂" />
+            </div>
+            <div className="hive-account-brand-copy">
+              <h2>安全连接，高效协同</h2>
+              <p>登录后可管理 Runtime、设备与会话。</p>
+              <small>关闭窗口后仍可继续使用 HiveCode 本地功能。</small>
+            </div>
+          </aside>
 
-        <div className="flex items-start gap-3 rounded-lg border border-border/70 p-3">
-          <Checkbox
-            id="hive-account-trusted-device"
-            checked={trusted}
-            onCheckedChange={(checked) => setTrusted(checked === true)}
-            disabled={signingIn}
-          />
-          <div className="space-y-1">
-            <Label htmlFor="hive-account-trusted-device">
-              {translate(
-                'auto.components.settings.orcaAccount.trustThisDevice',
-                'Trust this device'
-              )}
-            </Label>
-            <p className="text-xs leading-5 text-muted-foreground">
-              {trusted
-                ? translate(
-                    'auto.components.settings.orcaAccount.trustedApprovalDescription',
-                    'Keep an operating-system-encrypted sign-in for up to 90 days.'
-                  )
-                : translate(
-                    'auto.components.settings.orcaAccount.temporaryApprovalDescription',
-                    'Use a temporary sign-in for up to 24 hours; closing the app removes it.'
-                  )}
-            </p>
-          </div>
-        </div>
+          <section className="hive-account-form-panel">
+            <DialogHeader className="hive-account-form-header">
+              <DialogTitle>
+                {translate(
+                  'auto.components.settings.orcaAccount.signInConfirmTitle',
+                  '登录 HiveCloud'
+                )}
+              </DialogTitle>
+              <DialogDescription>
+                {method === 'sms'
+                  ? translate(
+                      'auto.components.settings.orcaAccount.smsSignInDescription',
+                      '验证手机号即可继续，无需离开当前应用。'
+                    )
+                  : translate(
+                      'auto.components.settings.orcaAccount.signInConfirmDescription',
+                      '将在系统浏览器中完成安全认证。认证完成后会自动返回 HiveCode。'
+                    )}
+              </DialogDescription>
+            </DialogHeader>
 
-        {method === 'browser' ? (
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={signingIn}
-            >
-              {translate('auto.components.settings.orcaAccount.cancelRequest', 'Cancel request')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => onConfirm(trusted ? 'TRUSTED' : 'TEMPORARY')}
-              disabled={signingIn}
-            >
-              {signingIn ? <Loader2 className="size-4 animate-spin" /> : null}
-              {translate('auto.components.settings.orcaAccount.approveSignIn', 'Approve sign-in')}
-            </Button>
-          </DialogFooter>
-        ) : null}
+            <div className="hive-account-method-switch" role="tablist" aria-label="登录方式">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={method === 'sms'}
+                className={method === 'sms' ? 'is-active' : ''}
+                onClick={() => switchMethod('sms')}
+              >
+                手机验证码
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={method === 'browser'}
+                className={method === 'browser' ? 'is-active' : ''}
+                onClick={() => switchMethod('browser')}
+              >
+                浏览器登录
+              </button>
+            </div>
+
+            {method === 'sms' ? (
+              <div className="hive-account-login-body">
+                {!challenge ? (
+                  <div className="hive-account-field">
+                    <Label htmlFor="hive-account-phone">手机号</Label>
+                    <div
+                      className={`hive-account-phone-input${smsError && !smsTermsAccepted ? ' has-error' : ''}`}
+                    >
+                      <span className="hive-account-country">+86</span>
+                      <span className="hive-account-country-chevron" aria-hidden="true" />
+                      <span className="hive-account-input-divider" aria-hidden="true" />
+                      <input
+                        id="hive-account-phone"
+                        value={phoneNumber}
+                        onChange={(event) => {
+                          setPhoneNumber(event.target.value)
+                          setSmsError(null)
+                        }}
+                        disabled={smsBusy}
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder="请输入手机号"
+                        aria-invalid={Boolean(smsError && !smsTermsAccepted)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="hive-account-code-summary">
+                    <span>验证码已发送至</span>
+                    <strong>
+                      {phoneNumber.replace(/^(\+?86)?(\d{3})\d{4}(\d{4})$/, '$2 **** $3')}
+                    </strong>
+                  </div>
+                )}
+                {challenge ? (
+                  <div className="hive-account-field">
+                    <Label htmlFor="hive-account-sms-code">验证码</Label>
+                    <input
+                      id="hive-account-sms-code"
+                      className="hive-account-text-input hive-account-code-input"
+                      value={smsCode}
+                      onChange={(event) =>
+                        setSmsCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                      }
+                      disabled={smsBusy}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="请输入 6 位验证码"
+                    />
+                    <p className="hive-account-code-hint">
+                      {challenge.expiresInSeconds} 秒后重新发送
+                    </p>
+                  </div>
+                ) : null}
+                {!challenge ? (
+                  <label className="hive-account-terms-row">
+                    <Checkbox
+                      checked={smsTermsAccepted}
+                      onCheckedChange={(checked) => setSmsTermsAccepted(checked === true)}
+                      disabled={smsBusy}
+                    />
+                    <span>
+                      我已阅读并同意 <a href="#terms">《服务条款》</a> 和{' '}
+                      <a href="#privacy">《隐私政策》</a>
+                    </span>
+                  </label>
+                ) : null}
+                {smsError ? (
+                  <p className="hive-account-error" role="alert">
+                    {smsError}
+                  </p>
+                ) : null}
+                <Button
+                  type="button"
+                  className="hive-account-primary"
+                  onClick={() => void (challenge ? completeSms() : startSms())}
+                  disabled={smsBusy}
+                >
+                  {smsBusy ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {challenge ? '确认登录' : smsBusy ? '正在发送…' : '获取验证码'}
+                </Button>
+              </div>
+            ) : (
+              <div className="hive-account-browser-body">
+                <div className="hive-account-browser-icon">
+                  <Globe2 aria-hidden="true" />
+                </div>
+                <strong>将在系统浏览器中完成安全认证</strong>
+                <p>认证完成后会自动返回 HiveCode。</p>
+                <Button
+                  type="button"
+                  className="hive-account-primary"
+                  onClick={() => onConfirm('TRUSTED')}
+                  disabled={signingIn}
+                >
+                  {signingIn ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {signingIn ? '正在打开…' : '在浏览器中继续'}
+                </Button>
+                <button
+                  type="button"
+                  className="hive-account-link-button"
+                  onClick={() => void onConfirm('TRUSTED')}
+                  disabled={signingIn}
+                >
+                  复制登录链接
+                </button>
+              </div>
+            )}
+
+            {method === 'sms' && !challenge ? (
+              <>
+                <div className="hive-account-divider">
+                  <span>其他登录方式</span>
+                </div>
+                <div className="hive-account-socials" aria-label="其他登录方式">
+                  <button
+                    type="button"
+                    aria-label="使用 GitHub 登录"
+                    data-tooltip="使用 GitHub 登录"
+                    onClick={() => {}}
+                  >
+                    <img src={githubIconUrl} alt="" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="使用微信登录"
+                    data-tooltip="使用微信登录"
+                    onClick={() => {}}
+                  >
+                    <img src={wechatIconUrl} alt="" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="使用 QQ 登录"
+                    data-tooltip="使用 QQ 登录"
+                    onClick={() => {}}
+                  >
+                    <img src={qqIconUrl} alt="" />
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            <div className="hive-account-security-bar">
+              <ShieldCheck aria-hidden="true" />
+              <div>
+                <strong>设备凭据受到保护</strong>
+                <span>登录成功后，凭据将安全保存在当前设备。</span>
+              </div>
+            </div>
+            <details className="hive-account-context">
+              <summary>
+                <span>HiveCode Desktop · 当前设备 · 受保护会话</span>
+                <span className="hive-account-context-chevron" aria-hidden="true" />
+              </summary>
+              <div className="hive-account-context-detail">
+                <Monitor aria-hidden="true" />
+                <span>当前设备将保存加密凭据，后续可在账户设置中撤销。</span>
+              </div>
+            </details>
+          </section>
+        </div>
       </DialogContent>
     </Dialog>
   )

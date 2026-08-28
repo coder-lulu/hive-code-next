@@ -33,19 +33,6 @@ export default function LoginScreen() {
 
   return (
     <>
-      <MobileLoginBottomSheet
-        agreed={agreed}
-        busyActionKey={busyActionKey}
-        configuration={mobileLoginMockupConfiguration}
-        onAction={(action) => void handleAction(action)}
-        onAgreementChange={setAgreed}
-        onAgreementRequired={() =>
-          Alert.alert('请先同意协议', '请阅读并同意《服务协议》和《隐私政策》后继续。')
-        }
-        onClose={() => router.back()}
-        onOpenPrivacy={() => router.push({ pathname: '/legal', params: { document: 'privacy' } })}
-        onOpenTerms={() => router.push({ pathname: '/legal', params: { document: 'terms' } })}
-      />
       {smsFormVisible ? (
         <MobileSmsLoginForm
           onClose={() => setSmsFormVisible(false)}
@@ -56,7 +43,21 @@ export default function LoginScreen() {
           }}
           termsAccepted={agreed}
         />
-      ) : null}
+      ) : (
+        <MobileLoginBottomSheet
+          agreed={agreed}
+          busyActionKey={busyActionKey}
+          configuration={mobileLoginMockupConfiguration}
+          onAction={(action) => void handleAction(action)}
+          onAgreementChange={setAgreed}
+          onAgreementRequired={() =>
+            Alert.alert('请先同意协议', '请阅读并同意《服务协议》和《隐私政策》后继续。')
+          }
+          onClose={() => router.back()}
+          onOpenPrivacy={() => router.push({ pathname: '/legal', params: { document: 'privacy' } })}
+          onOpenTerms={() => router.push({ pathname: '/legal', params: { document: 'terms' } })}
+        />
+      )}
     </>
   )
 }

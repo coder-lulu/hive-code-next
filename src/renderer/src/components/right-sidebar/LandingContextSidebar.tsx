@@ -53,9 +53,9 @@ export function LandingContextSidebar({
     >
       {rightSidebarOpen ? (
         <>
-          <header className="landing-context-header right-sidebar-header-drag">
+          <header className="landing-context-header right-sidebar-header-inset right-sidebar-header-drag">
             <span>当前上下文</span>
-            <div className="flex items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-1">
               {showSettingsHelpControls ? <SidebarSettingsHelpMenu /> : null}
               <button
                 type="button"

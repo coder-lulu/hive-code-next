@@ -1,13 +1,5 @@
 import { Menu } from 'lucide-react-native'
-import { useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming
-} from 'react-native-reanimated'
-import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
 import type { MobileTheme } from '../theme/mobile-theme'
 import type { MobileHomeMode } from './mobile-home-mode'
 
@@ -27,20 +19,6 @@ export function MobileHomeToolbar({
   onChangeMode
 }: MobileHomeToolbarProps) {
   const styles = createStyles(theme)
-  const reducedMotionEnabled = useReducedMotionEnabled()
-  const activeSegmentX = useSharedValue(mode === 'computer' ? 92 : 0)
-
-  useEffect(() => {
-    activeSegmentX.value = withTiming(mode === 'computer' ? 92 : 0, {
-      duration: reducedMotionEnabled ? 0 : 180,
-      easing: Easing.out(Easing.cubic)
-    })
-  }, [activeSegmentX, mode, reducedMotionEnabled])
-
-  const activeSegmentStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: activeSegmentX.value }]
-  }))
-
   return (
     <View style={styles.toolbar}>
       <Pressable
@@ -54,7 +32,6 @@ export function MobileHomeToolbar({
       </Pressable>
 
       <View accessibilityRole="tablist" style={styles.segmentedControl}>
-        <Animated.View style={[styles.segmentIndicator, activeSegmentStyle]} />
         <ModeOption
           active={mode === 'cloud'}
           icon="none"
@@ -97,7 +74,11 @@ function ModeOption({
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={({ pressed }) => [styles.segment, pressed && styles.segmentPressed]}
+      style={({ pressed }) => [
+        styles.segment,
+        active && styles.segmentActive,
+        pressed && styles.segmentPressed
+      ]}
     >
       {icon === 'computer' ? (
         <View style={[styles.onlineDot, !online && styles.offlineDot]} />
@@ -159,15 +140,7 @@ function createStyles(theme: MobileTheme) {
       paddingHorizontal: theme.spacing.space8,
       borderRadius: theme.radii.control
     },
-    segmentIndicator: {
-      position: 'absolute',
-      top: 3,
-      left: 3,
-      width: 92,
-      height: 36,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.selected
-    },
+    segmentActive: { backgroundColor: theme.color.bg.selected },
     segmentPressed: { opacity: 0.78 },
     segmentLabel: { ...theme.typography.meta, fontWeight: '600' },
     onlineDot: {
