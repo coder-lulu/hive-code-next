@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { View, Text, StyleSheet, SectionList, Pressable, Alert, RefreshControl } from 'react-native'
+import { View, Text, SectionList, Pressable, Alert, RefreshControl } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router'
 import {
@@ -63,15 +63,16 @@ import { ConfirmModal } from '../../../src/components/ConfirmModal'
 import { BottomDrawer } from '../../../src/components/BottomDrawer'
 import { useHostProtocolGates } from '../../../src/components/HostProtocolGate'
 import { AuthFailedBanner } from '../../../src/components/AuthFailedBanner'
+import { HostDiagnosticsLink } from '../../../src/components/HostDiagnosticsLink'
 import { HostRouteNoticeBanner } from '../../../src/components/HostRouteNoticeBanner'
 import { visibleHostRouteNotice } from '../../../src/host-route-notice'
 import { MobileSearchField } from '../../../src/components/MobileSearchField'
 import { WorkspaceDetailPlaceholder } from '../../../src/components/WorkspaceDetailPlaceholder'
 import { getCachedWorktrees, setCachedWorktrees } from '../../../src/cache/worktree-cache'
 import { setCachedRepos } from '../../../src/cache/repo-cache'
-import type { MobileTheme } from '../../../src/theme/mobile-theme'
-import { useMobileTheme } from '../../../src/theme/mobile-theme-provider'
+import { colors, spacing } from '../../../src/theme/mobile-theme'
 import { useResponsiveLayout } from '../../../src/layout/responsive-layout'
+import { hostScreenStyles as styles } from '../../../src/host-screen/host-screen-styles'
 import { leaveHostRoute } from '../../../src/host-route-exit'
 import { loadPinnedIds, savePinnedIds } from '../../../src/storage/preferences'
 import {
@@ -107,7 +108,6 @@ import {
 import type { RepoSummary } from '../../../src/worktree/host-worktree-rpc-types'
 import type { WorkspaceStatusDefinition } from '../../../../src/shared/worktree/types'
 import { DEFAULT_MOBILE_WORKSPACE_STATUSES } from '../../../src/worktree/mobile-workspace-statuses'
-import { createMobileHostScreenDesignTokens } from '../../../src/worktree/mobile-host-screen-design-tokens'
 
 function isErrorVerdict(v: ConnectionVerdict): boolean {
   return v.kind === 'warning' || v.kind === 'unreachable' || v.kind === 'auth-failed'
@@ -130,8 +130,6 @@ export function HostScreen({
   action: actionProp,
   onHideSidebar
 }: HostScreenProps = {}) {
-  const theme = useMobileTheme()
-  const { colors, spacing, styles } = useMemo(() => createHostScreenDesign(theme), [theme])
   const params = useLocalSearchParams<{ hostId: string; action?: string; notice?: string }>()
   const hostId = hostIdProp ?? params.hostId
   const action = actionProp ?? params.action
@@ -141,10 +139,12 @@ export function HostScreen({
   const router = useRouter()
   const pathname = usePathname()
   const insets = useSafeAreaInsets()
+  // Why: cap and center the list on wide/tablet canvases; on phones isWideLayout is false so it stays edge-to-edge.
   const { isWideLayout, contentMaxWidth } = useResponsiveLayout()
   const [initialCache] = useState(() =>
     hostId ? (getCachedWorktrees(hostId) as Worktree[] | null) : null
   )
+  // Shared client per host owned by RpcClientProvider. See docs/mobile-shared-client-per-host.md.
   const { client, state: connState } = useHostClient(hostId)
   const reconnectAttempts = useReconnectAttempt(hostId)
   const lastConnectedAt = useLastConnectedAt(hostId)
@@ -170,6 +170,7 @@ export function HostScreen({
   const [optimisticActiveWorktreeIdentity, setOptimisticActiveWorktreeIdentity] = useState<
     string | null
   >(null)
+  // One tick drives every visible agent row's relative timestamp.
   const now = useNow(30_000)
   const [repoColorsByName, setRepoColorsByName] = useState<Map<string, string>>(new Map())
   const [repoIconsByName, setRepoIconsByName] = useState<Map<string, RepoIcon>>(new Map())
@@ -189,6 +190,7 @@ export function HostScreen({
   const [workspaceStatuses, setWorkspaceStatuses] = useState<readonly WorkspaceStatusDefinition[]>(
     DEFAULT_MOBILE_WORKSPACE_STATUSES
   )
+  // displayName → repo id: filters key on repo id, but section headers/rows key on displayName, so bridge the two.
   const [repoIdsByName, setRepoIdsByName] = useState<Map<string, string>>(new Map())
   const [showSortPicker, setShowSortPicker] = useState(false)
   const [showGroupPicker, setShowGroupPicker] = useState(false)
@@ -232,6 +234,7 @@ export function HostScreen({
     }
   }, [groupMode, sortMode, filters, collapsedGroups, workspaceStatuses])
 
+  // Apply a MobileViewState onto the individual states and the snapshot ref in one shot.
   const applyViewState = useCallback((next: MobileViewState) => {
     viewStateRef.current = next
     setGroupMode(next.groupMode)
@@ -246,6 +249,7 @@ export function HostScreen({
     })
   }, [])
 
+  // Apply the change locally, then push full settings to the desktop's shared store (ui.set) so both apps stay in sync.
   const persistViewSettings = useCallback(
     (patch: Partial<MobileViewState>) => {
       const next: MobileViewState = { ...viewStateRef.current, ...patch }
@@ -281,6 +285,7 @@ export function HostScreen({
   }, [])
 
   const resolvedRouteActionState = resolveHostRouteActionState(routeActionState, action)
+  // Why: resolve `action=newWorktree` before commit, but don't reopen after the user closes while the URL persists.
   if (resolvedRouteActionState !== routeActionState) {
     setRouteActionState(resolvedRouteActionState)
   }
@@ -289,6 +294,7 @@ export function HostScreen({
     setRouteActionState((current) => setHostRouteNewWorktreeVisible(current, visible))
   }, [])
 
+  // Load persisted pins from local cache; view settings are no longer local (they sync via ui.get).
   useEffect(() => {
     if (!hostId) {
       return
@@ -306,6 +312,7 @@ export function HostScreen({
     }
   }, [hostId])
 
+  // Merge the desktop's shared view settings (PersistedUIState) onto local state so desktop changes appear here.
   const syncViewSettingsFromDesktop = useCallback(async () => {
     if (!client || connState !== 'connected') {
       return
@@ -327,6 +334,7 @@ export function HostScreen({
     }
   }, [client, connState, hostId, applyViewState])
 
+  // Why: mirror client into a ref so imperative call sites read it without re-subscribing.
   useEffect(() => {
     clientRef.current = client
   }, [client])
@@ -531,6 +539,7 @@ export function HostScreen({
     }, [embedded, startWorktreeRefresh])
   )
 
+  // Why: the embedded sidebar is never the focused route, so wire its refresh lifecycle from a mount effect.
   useEffect(() => {
     if (embedded) {
       return startWorktreeRefresh()
@@ -720,7 +729,7 @@ export function HostScreen({
     return count
   }, [filters])
   const selectedSortLabel =
-    SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? '最近活动'
+    SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? 'Recent'
 
   const handleGroupChange = useCallback(
     (value: MobileGroupMode) => {
@@ -799,9 +808,9 @@ export function HostScreen({
             return (
               <>
                 <View style={styles.hostIdentity}>
-                  <StatusDot state={connState} verdict={headerVerdict} theme={theme} />
+                  <StatusDot state={connState} verdict={headerVerdict} />
                   <Text style={styles.hostNameText} numberOfLines={1}>
-                    {hostName || '电脑'}
+                    {hostName || 'Host'}
                   </Text>
                 </View>
                 {connState !== 'connected' &&
@@ -819,7 +828,7 @@ export function HostScreen({
                         onPress={() => void forceReconnectHost(hostId!)}
                         hitSlop={8}
                       >
-                        <Text style={styles.reconnectButtonText}>重新连接</Text>
+                        <Text style={styles.reconnectButtonText}>Reconnect</Text>
                       </Pressable>
                     )
                   })()}
@@ -857,6 +866,7 @@ export function HostScreen({
           ) : null}
         </View>
 
+        {/* Filter/sort/group toolbar */}
         {embedded ? (
           <View style={styles.embeddedToolbar}>
             <View style={styles.embeddedToolbarRow}>
@@ -881,7 +891,7 @@ export function HostScreen({
                   ]}
                   numberOfLines={1}
                 >
-                  筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ''}
+                  Filter{activeFilterCount > 0 ? ` ${activeFilterCount}` : ''}
                 </Text>
               </Pressable>
 
@@ -906,11 +916,11 @@ export function HostScreen({
                 <Layers size={14} color={colors.textSecondary} />
                 <Text style={styles.sortLabel} numberOfLines={1}>
                   {groupMode === 'none'
-                    ? '分组'
+                    ? 'Group'
                     : groupMode === 'workspaceStatus'
-                      ? '状态'
+                      ? 'Status'
                       : groupMode === 'repo'
-                        ? '仓库'
+                        ? 'Repo'
                         : 'PR'}
                 </Text>
               </Pressable>
@@ -1013,7 +1023,7 @@ export function HostScreen({
                   activeFilterCount > 0 && styles.filterChipTextActive
                 ]}
               >
-                筛选{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
               </Text>
             </Pressable>
 
@@ -1028,11 +1038,11 @@ export function HostScreen({
               <Layers size={14} color={colors.textSecondary} />
               <Text style={styles.sortLabel} numberOfLines={1}>
                 {groupMode === 'none'
-                  ? '分组'
+                  ? 'Group'
                   : groupMode === 'workspaceStatus'
-                    ? '状态'
+                    ? 'Status'
                     : groupMode === 'repo'
-                      ? '仓库'
+                      ? 'Repo'
                       : 'PR'}
               </Text>
             </Pressable>
@@ -1072,6 +1082,7 @@ export function HostScreen({
         )}
       </View>
 
+      {/* Auth failed: a latched relay rejection must reach the same re-pair affordance. */}
       {(connState === 'auth-failed' || relayRecovery.pairingRejected) && (
         <AuthFailedBanner
           canRetry={!!hostId}
@@ -1081,6 +1092,18 @@ export function HostScreen({
         />
       )}
 
+      {connState !== 'connected' &&
+      !relayRecovery.pairingRejected &&
+      reconnectAttempts >= 3 &&
+      hostId ? (
+        <HostDiagnosticsLink
+          onPress={() =>
+            router.push({ pathname: '/connection-log', params: { hostId: String(hostId) } })
+          }
+        />
+      ) : null}
+
+      {/* Why a bounced route landed here (e.g. the workspace was deleted on the desktop). */}
       {routeNotice && (
         <HostRouteNoticeBanner
           message={routeNotice}
@@ -1088,12 +1111,13 @@ export function HostScreen({
         />
       )}
 
+      {/* Search bar */}
       {showSearch && (
         <View style={styles.searchBar}>
           <MobileSearchField
             value={search}
             onChangeText={setSearch}
-            placeholder="搜索工作区…"
+            placeholder="Search worktrees…"
             autoFocus
             // Why: new key per open remounts the focus effect across rapid toggles so the keyboard reappears.
             focusKey={showSearch}
@@ -1103,7 +1127,6 @@ export function HostScreen({
       )}
 
       <HostWorkspaceListStates
-        theme={theme}
         connState={connState}
         worktreesLoaded={worktreesLoaded}
         displayCount={displayWorktrees.length}
@@ -1165,7 +1188,7 @@ export function HostScreen({
               </Pressable>
             )
           }}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={ListSeparator}
           // Why (#8498): manual pull-to-refresh forces a fresh snapshot after a stale-cache reconnect.
           refreshControl={
             <RefreshControl
@@ -1177,7 +1200,6 @@ export function HostScreen({
           }
           renderItem={({ item }) => (
             <WorktreeListRow
-              theme={theme}
               item={item}
               isReadOnly={isReadOnly}
               now={now}
@@ -1193,17 +1215,14 @@ export function HostScreen({
         />
       )}
 
+      {/* Floating "new workspace" button — phone only; embedded sidebars keep the toolbar +. */}
       {!embedded && (
-        <NewWorkspaceFab
-          theme={theme}
-          onPress={openNewWorktreeModal}
-          disabled={connState !== 'connected'}
-        />
+        <NewWorkspaceFab onPress={openNewWorktreeModal} disabled={connState !== 'connected'} />
       )}
 
       <PickerModal
         visible={showSortPicker}
-        title="排序方式"
+        title="Sort By"
         options={SORT_OPTIONS}
         selected={sortMode}
         onSelect={handleSortChange}
@@ -1212,7 +1231,7 @@ export function HostScreen({
 
       <PickerModal
         visible={showGroupPicker}
-        title="分组方式"
+        title="Group By"
         options={GROUP_OPTIONS}
         selected={groupMode}
         onSelect={handleGroupChange}
@@ -1221,30 +1240,30 @@ export function HostScreen({
 
       <BottomDrawer visible={showFilterModal} onClose={() => setShowFilterModal(false)}>
         <View style={styles.filterModalHeader}>
-          <Text style={styles.filterModalTitle}>筛选</Text>
+          <Text style={styles.filterModalTitle}>Filter</Text>
           {activeFilterCount > 0 && (
             <Pressable onPress={clearFilters}>
-              <Text style={styles.clearFiltersText}>清除筛选</Text>
+              <Text style={styles.clearFiltersText}>Clear filters</Text>
             </Pressable>
           )}
         </View>
 
-        <Text style={styles.filterSectionLabel}>工作区</Text>
+        <Text style={styles.filterSectionLabel}>Workspaces</Text>
         <View style={styles.filterGroup}>
           <Pressable style={styles.filterRow} onPress={toggleHideSleeping}>
-            <Text style={styles.filterRowText}>隐藏休眠工作区</Text>
+            <Text style={styles.filterRowText}>Hide sleeping</Text>
             {filters.hideSleeping && <Check size={14} color={colors.textPrimary} />}
           </Pressable>
           <View style={styles.filterSeparator} />
           <Pressable style={styles.filterRow} onPress={toggleHideDefaultBranch}>
-            <Text style={styles.filterRowText}>隐藏默认分支</Text>
+            <Text style={styles.filterRowText}>Hide default branch</Text>
             {filters.hideDefaultBranch && <Check size={14} color={colors.textPrimary} />}
           </Pressable>
         </View>
 
         {uniqueRepos.length > 1 && (
           <>
-            <Text style={styles.filterSectionLabel}>代码仓库</Text>
+            <Text style={styles.filterSectionLabel}>Repositories</Text>
             <View style={styles.filterGroup}>
               {uniqueRepos.map((repo, i) => (
                 <View key={repo.id}>
@@ -1265,6 +1284,7 @@ export function HostScreen({
         )}
       </BottomDrawer>
 
+      {/* Worktree long-press action sheet (inline confirm to avoid double-Modal lag) */}
       <BottomDrawer
         visible={actionTarget != null}
         onClose={() => {
@@ -1275,10 +1295,9 @@ export function HostScreen({
         {confirmDelete ? (
           <View>
             <View style={styles.confirmContent}>
-              <Text style={styles.confirmTitle}>删除工作区</Text>
+              <Text style={styles.confirmTitle}>Delete Worktree</Text>
               <Text style={styles.confirmMessage}>
-                确定删除“{confirmDelete.displayName || confirmDelete.repo}”（
-                {confirmDelete.branch}）吗？
+                Delete "{confirmDelete.displayName || confirmDelete.repo}" ({confirmDelete.branch})?
               </Text>
             </View>
             <View style={styles.confirmButtons}>
@@ -1290,7 +1309,7 @@ export function HostScreen({
                 ]}
                 onPress={() => setConfirmDelete(null)}
               >
-                <Text style={styles.confirmBtnCancelText}>取消</Text>
+                <Text style={styles.confirmBtnCancelText}>Cancel</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [
@@ -1306,7 +1325,7 @@ export function HostScreen({
                   setActionTarget(null)
                 }}
               >
-                <Text style={styles.confirmBtnDestructiveText}>删除</Text>
+                <Text style={styles.confirmBtnDestructiveText}>Delete</Text>
               </Pressable>
             </View>
           </View>
@@ -1322,12 +1341,11 @@ export function HostScreen({
                       worktreeId: actionTarget.worktreeId,
                       worktreeName: actionTarget.displayName || actionTarget.repo,
                       hostCapabilities,
-                      iconColor: theme.color.text.secondary,
                       navigate: navigateFromHostList,
                       onDone: () => setActionTarget(null)
                     }),
                     {
-                      label: '休眠',
+                      label: 'Sleep',
                       icon: Moon,
                       onPress: () => {
                         if (client) {
@@ -1344,14 +1362,14 @@ export function HostScreen({
                       }
                     },
                     {
-                      label: isWorktreePinned(actionTarget, pinnedIds) ? '取消置顶' : '置顶',
+                      label: isWorktreePinned(actionTarget, pinnedIds) ? 'Unpin' : 'Pin',
                       onPress: () => {
                         togglePin(actionTarget.worktreeId)
                         setActionTarget(null)
                       }
                     },
                     {
-                      label: '删除',
+                      label: 'Delete',
                       destructive: true,
                       onPress: () => setConfirmDelete(actionTarget)
                     }
@@ -1362,11 +1380,12 @@ export function HostScreen({
         )}
       </BottomDrawer>
 
+      {/* Host remove confirmation */}
       <ConfirmModal
         visible={confirmRemoveHost}
-        title="移除电脑"
-        message={`确定移除“${hostName}”吗？之后仍可重新配对。`}
-        confirmLabel="移除"
+        title="Remove Host"
+        message={`Remove "${hostName}"? You can re-pair later.`}
+        confirmLabel="Remove"
         destructive
         onConfirm={() => void handleRemoveHost()}
         onCancel={() => setConfirmRemoveHost(false)}
@@ -1392,6 +1411,7 @@ export function HostScreen({
   )
 }
 
+// On wide layouts the sidebar hosts the list, so this route is just the empty detail pane.
 export default function HostWorktreeRoute() {
   const { isWideLayout } = useResponsiveLayout()
   if (isWideLayout) {
@@ -1400,321 +1420,6 @@ export default function HostWorktreeRoute() {
   return <HostScreen />
 }
 
-function createHostScreenDesign(theme: MobileTheme) {
-  const { colors, spacing } = createMobileHostScreenDesignTokens(theme)
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.bgBase
-    },
-    topChrome: {
-      backgroundColor: colors.bgPanel,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSubtle
-    },
-    statusBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      minHeight: theme.size.navigationBarHeight,
-      paddingTop: spacing.xs,
-      paddingHorizontal: theme.spacing.space20
-    },
-    backButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.xs
-    },
-    sidebarCollapseButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.control,
-      marginLeft: spacing.xs
-    },
-    hostIdentity: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      minWidth: 0,
-      marginRight: spacing.md
-    },
-    hostNameText: {
-      flex: 1,
-      ...theme.typography.label,
-      fontWeight: '600',
-      color: colors.textPrimary
-    },
-    reconnectButton: {
-      minHeight: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: spacing.md,
-      borderRadius: theme.radii.control,
-      backgroundColor: colors.bgPanel,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.borderSubtle
-    },
-    reconnectButtonText: {
-      color: colors.textPrimary,
-      ...theme.typography.caption,
-      fontWeight: '600'
-    },
-    toolbar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      minHeight: theme.size.navigationBarHeight,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      gap: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSubtle
-    },
-    embeddedToolbar: {
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.sm,
-      gap: spacing.xs,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSubtle
-    },
-    embeddedToolbarRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm
-    },
-    embeddedFilterChip: {
-      flex: 1,
-      minWidth: 0,
-      minHeight: theme.size.minimumTouchTarget,
-      justifyContent: 'center',
-      paddingHorizontal: spacing.xs,
-      paddingVertical: spacing.xs
-    },
-    embeddedModeButton: {
-      flex: 1,
-      minWidth: 0,
-      minHeight: theme.size.minimumTouchTarget,
-      justifyContent: 'center',
-      paddingHorizontal: spacing.xs,
-      paddingVertical: spacing.xs
-    },
-    filterChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      minHeight: theme.size.minimumTouchTarget,
-      gap: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: theme.radii.control,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.borderSubtle
-    },
-    filterChipActive: {
-      borderColor: colors.textSecondary,
-      backgroundColor: colors.bgRaised
-    },
-    filterChipText: {
-      ...theme.typography.caption,
-      color: colors.textSecondary
-    },
-    filterChipTextActive: {
-      color: colors.textPrimary
-    },
-    modeButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexShrink: 1,
-      minWidth: 0,
-      minHeight: theme.size.minimumTouchTarget,
-      gap: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs
-    },
-    sortLabel: {
-      flexShrink: 1,
-      minWidth: 0,
-      ...theme.typography.caption,
-      color: colors.textSecondary
-    },
-    toolbarSpacer: {
-      flex: 1
-    },
-    floatingWorkspaceHeaderButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: spacing.xs
-    },
-    embeddedToolbarIconButton: {
-      flex: 1,
-      minHeight: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.control
-    },
-    toolbarIconDisabled: {
-      opacity: 0.6
-    },
-    searchToggle: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.control
-    },
-    searchBar: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSubtle,
-      backgroundColor: colors.bgPanel
-    },
-    centered: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    errorText: {
-      ...theme.typography.body,
-      color: colors.statusRed,
-      textAlign: 'center'
-    },
-    list: {
-      paddingBottom: spacing.lg
-    },
-    sectionHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.xs
-    },
-    sectionIcon: {
-      marginRight: spacing.xs
-    },
-    sectionRepoIcon: {
-      marginRight: spacing.xs
-    },
-    sectionTitle: {
-      ...theme.typography.caption,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.4
-    },
-    sectionCount: {
-      ...theme.typography.caption,
-      color: colors.textSecondary,
-      marginLeft: spacing.xs
-    },
-    separator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: colors.borderSubtle,
-      marginLeft: theme.spacing.space40,
-      marginRight: theme.spacing.space20
-    },
-    filterModalHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.xs,
-      marginBottom: spacing.md
-    },
-    filterModalTitle: {
-      ...theme.typography.sectionTitle,
-      fontWeight: '600',
-      color: colors.textPrimary
-    },
-    clearFiltersText: {
-      ...theme.typography.meta,
-      color: colors.textSecondary
-    },
-    filterSectionLabel: {
-      ...theme.typography.caption,
-      fontWeight: '600',
-      color: colors.textMuted,
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
-      marginBottom: spacing.xs,
-      paddingHorizontal: spacing.xs
-    },
-    filterGroup: {
-      backgroundColor: colors.bgPanel,
-      borderRadius: theme.radii.card,
-      overflow: 'hidden',
-      marginBottom: spacing.md
-    },
-    filterRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      minHeight: theme.size.groupedListRowMinHeight,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      gap: spacing.sm
-    },
-    filterRowText: {
-      flex: 1,
-      ...theme.typography.body,
-      color: colors.textPrimary
-    },
-    filterSeparator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: colors.borderSubtle,
-      marginHorizontal: spacing.md
-    },
-    filterRepoDot: {
-      width: 8,
-      height: 8,
-      borderRadius: theme.radii.circle
-    },
-    confirmContent: {
-      paddingBottom: spacing.lg
-    },
-    confirmTitle: {
-      ...theme.typography.sectionTitle,
-      fontWeight: '700',
-      color: colors.textPrimary
-    },
-    confirmMessage: {
-      ...theme.typography.body,
-      color: colors.textSecondary,
-      marginTop: spacing.xs,
-      lineHeight: theme.typography.body.lineHeight
-    },
-    confirmButtons: {
-      flexDirection: 'row',
-      gap: spacing.sm
-    },
-    confirmBtn: {
-      flex: 1,
-      minHeight: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.control,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    confirmBtnCancel: {
-      backgroundColor: colors.bgPanel
-    },
-    confirmBtnDestructive: {
-      backgroundColor: colors.statusRed
-    },
-    confirmBtnPressed: {
-      opacity: 0.7
-    },
-    confirmBtnCancelText: {
-      ...theme.typography.label,
-      fontWeight: '600',
-      color: colors.textSecondary
-    },
-    confirmBtnDestructiveText: {
-      ...theme.typography.label,
-      fontWeight: '600',
-      color: colors.onAccent
-    }
-  })
-  return { colors, spacing, styles }
+function ListSeparator() {
+  return <View style={styles.separator} />
 }
