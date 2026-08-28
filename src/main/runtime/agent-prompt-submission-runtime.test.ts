@@ -408,7 +408,8 @@ describe('agent prompt submission runtime', () => {
         runtime.onPtyData(
           'pty-prompt',
           '\x1b]9999;{"state":"working","agentType":"aider"}\x07',
-          Date.now()
+          Date.now(),
+          0
         )
       }
     })
@@ -417,7 +418,8 @@ describe('agent prompt submission runtime', () => {
     runtime.onPtyData(
       'pty-prompt',
       '\x1b]9999;{"state":"working","agentType":"aider"}\x07',
-      Date.now()
+      Date.now(),
+      0
     )
 
     const submission = runtime.sendTerminalAgentPrompt(handle, 'review this')
