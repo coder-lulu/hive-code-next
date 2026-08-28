@@ -113,6 +113,96 @@
       "regressionTests": ["browser popup"]
     },
     {
+      "upstreamSha": "9a0a2b1c316be50c7da27f53f558069d9623eeee",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "reliability gate 仅有产品配置差异",
+      "adaptation": "采用 worker release null-safe membership 行为，保留 HiveCode gate 配置",
+      "regressionTests": ["worker release", "session terminal persistence"]
+    },
+    {
+      "upstreamSha": "913509edeb0ada8e6a8c57f3b2360dd60d424de1",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "runtime-rpc 与 HiveCode browser-host classifier 手工合并",
+      "adaptation": "采用 worker-start budgets、recovery receipts 与 long-poll keepalive，保留品牌与 host policy",
+      "regressionTests": ["orchestration recovery", "runtime RPC", "CLI"]
+    },
+    {
+      "upstreamSha": "de73ac89c63714f99ed4ce0bec58dda908810e4c",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": ["06272109daa309c3e015e11862f186eb0188ac35"],
+      "conflictReason": "bridge 中既有 probe 逻辑与上游 fold 冲突",
+      "adaptation": "将 reconnect re-probe fold 到 runtime-status refresh，保留现有环境订阅与 browser-host 行为",
+      "regressionTests": ["runtime status", "reconnect probe"]
+    },
+    {
+      "upstreamSha": "1485aa4de2e1b60110fbd0fb37a7c2bc142ec372",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "无",
+      "adaptation": "采用上游 query/reply 顺序修复，保留现有 PTY renderer 边界",
+      "regressionTests": ["PTY capability replies", "terminal query reply"]
+    },
+    {
+      "upstreamSha": "9e0704b9d46209885e95f1a24292a486b041dc73",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "E2E workflow 原有 native toolchain 步骤与 composite action 合并",
+      "adaptation": "保留 HiveCode Linux native toolchain，同时使用 node runtime composite install",
+      "regressionTests": ["E2E gate contract"]
+    },
+    {
+      "upstreamSha": "8dd7d6060c7d724c4cdb85f3072a1e502e47dc54",
+      "type": "BUG",
+      "applied": "暂缓",
+      "dependencies": ["bf5660df51950ab88f37b86914b997dc91837558"],
+      "conflictReason": "native patch、lockfile、Windows artifact 规则与 HiveCode product patch 冲突",
+      "adaptation": "待按 node-pty/@vscode patch、ensure-native-runtime、lockfile 三层手工合并",
+      "regressionTests": ["native runtime", "Windows PTY capability"]
+    },
+    {
+      "upstreamSha": "350423b7cbb640cf47e46c55187d5d3b85eee511",
+      "type": "重构",
+      "applied": "暂缓",
+      "dependencies": ["8dd7d6060c7d724c4cdb85f3072a1e502e47dc54"],
+      "conflictReason": "大型 CI cache/workflow 改造依赖 8dd native 最终形态",
+      "adaptation": "先完成 native patch，再逐步吸收 cache scope 与 path-skip",
+      "regressionTests": ["PR workflow", "native cache"]
+    },
+    {
+      "upstreamSha": "ebe6b559eff3385db7e456a0c76c02ea1ecca3d2",
+      "type": "重构",
+      "applied": "暂缓",
+      "dependencies": ["f96dfd58103cd822a7d399a377421591094dc8d5"],
+      "conflictReason": "PR native cache fan-out 与现有 product workflow 需要逐 job 合并",
+      "adaptation": "保留现有产品安全检查，待 8dd/350 完成后吸收 cache prime",
+      "regressionTests": ["PR workflow parallelism"]
+    },
+    {
+      "upstreamSha": "971d987c4b99e84c18fc1447ca4ee18d02eb308a",
+      "type": "BUG",
+      "applied": "暂缓",
+      "dependencies": ["2ac23c29be2a00c55263ead03f249e936e52e319"],
+      "conflictReason": "SSH Docker E2E source routing 与 HiveCode 专用 gate 需要手工合并",
+      "adaptation": "保留现有 SSH/产品 workflow，后续补齐 source-trigger 与 gated spec claim",
+      "regressionTests": ["SSH Docker E2E", "PR E2E gate contract"]
+    },
+    {
+      "upstreamSha": "6f8c5888b3acc4011c09498cda27cf3906edd91a",
+      "type": "重构",
+      "applied": "暂缓",
+      "dependencies": ["3d796b82cba90ffec6018410931bfd40e2287318"],
+      "conflictReason": "Node 26 daily compatibility workflow 尚未纳入产品 CI 规划",
+      "adaptation": "保留现有 Node 24 PR gate，另行评估 daily Node 26 lane",
+      "regressionTests": ["Node compatibility"]
+    },
+    {
       "upstreamSha": "8217e6838ff51deac804d93b7ce0a01de3412bca",
       "type": "重构",
       "applied": "暂缓",
