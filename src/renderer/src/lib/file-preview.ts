@@ -174,7 +174,7 @@ function openDocPreviewTab(
   }
   // Why reuse and not a second tab: previewing a document already on screen is a request to look at
   // it, and two tabs of one document would each hold their own grant on the same file.
-  const existing = (state.browserTabsByWorktree[params.worktreeId] ?? []).find((tab) =>
+  const existing = (state.browserTabsByWorktree?.[params.worktreeId] ?? []).find((tab) =>
     browserPageDocLocationsEqual(tab.docLocation ?? null, docLocation)
   )
   if (existing) {
