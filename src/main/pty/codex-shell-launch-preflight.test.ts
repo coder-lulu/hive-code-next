@@ -346,7 +346,7 @@ describe('Codex shell launch preflight command', () => {
 
   it('carries the packaged Windows launcher for WSLENV path translation', () => {
     const { userDataPath, resourcesPath } = makeCliRoot()
-    const launcherPath = join(resourcesPath, 'bin', 'orca.exe')
+    const launcherPath = getBundledLauncherPath('win32', resourcesPath)!
     writeExecutable(launcherPath, '#!/bin/sh\nexit 0\n')
 
     expect(
@@ -386,9 +386,6 @@ describe('Codex shell launch preflight command', () => {
     { label: 'the launcher path is a directory', create: 'directory' as const }
   ])('skips the preflight when $label', (config) => {
     // Windows has no POSIX executable bit; a readable launcher is valid there.
-    if (process.platform === 'win32' && config.create === 0o644) {
-      return
-    }
     const { userDataPath, resourcesPath } = makeCliRoot()
     const launcherPath = getBundledLauncherPath('darwin', resourcesPath)!
     if (config.create === 'directory') {
@@ -411,7 +408,7 @@ describe('Codex shell launch preflight command', () => {
     'skips the preflight when the launcher is not executable',
     () => {
       const { userDataPath, resourcesPath } = makeCliRoot()
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const launcherPath = getBundledLauncherPath('darwin', resourcesPath)!
       writeFileSync(launcherPath, '#!/bin/sh\nexit 0\n')
       chmodSync(launcherPath, 0o644)
 

@@ -74,7 +74,10 @@ import {
   promoteCodexRuntimeHookApprovalsToSystem,
   snapshotCodexRuntimeHookTrustProvenance
 } from './hook-trust-promotion'
-import { grantManagedCodexHookTrust } from './codex-hook-trust-grant'
+import {
+  grantManagedCodexHookTrust,
+  grantManagedCodexHookTrustAsync
+} from './codex-hook-trust-grant'
 import { readCurrentCodexTrustGrantLedgerHome } from './codex-trust-grant-host'
 import {
   getCodexLedgerTrustedHash,
@@ -860,7 +863,7 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
   ].join('\n')
 }
 
-function installManagedHooksIntoWslRuntime(
+function installManagedHooksIntoWslRuntimeSync(
   plan: CodexWslRuntimeHookInstallPlan
 ): AgentHookInstallStatus {
   const config = readHooksJson(plan.configPath)
@@ -948,6 +951,91 @@ function installManagedHooksIntoWslRuntime(
     }
   }
 
+  return {
+    agent: 'codex',
+    state: 'installed',
+    configPath: plan.configPath,
+    managedHooksPresent: true,
+    detail: null
+  }
+}
+
+// Async counterpart used by restart-time WSL repair. It intentionally mirrors
+// the synchronous launch lane above so the existing product launch contract
+// remains unchanged while the repair path can await Codex's app-server.
+async function installManagedHooksIntoWslRuntime(
+  plan: CodexWslRuntimeHookInstallPlan
+): Promise<AgentHookInstallStatus> {
+  const config = readHooksJson(plan.configPath)
+  if (!config) {
+    return {
+      agent: 'codex',
+      state: 'error',
+      configPath: plan.configPath,
+      managedHooksPresent: false,
+      detail: 'Could not parse Codex hooks.json'
+    }
+  }
+  const isManagedCommand = createManagedCommandMatcher('codex-hook.sh')
+  const command = wrapReadablePosixHookCommand(plan.commandScriptPath)
+  const nextHooks = { ...config.hooks }
+  const managedEvents = new Set<string>(CODEX_EVENTS)
+  for (const [eventName, definitions] of Object.entries(nextHooks)) {
+    if (managedEvents.has(eventName) || !Array.isArray(definitions)) {
+      continue
+    }
+    const cleaned = removeManagedCommands(definitions, isManagedCommand)
+    if (cleaned.length === 0) {
+      delete nextHooks[eventName]
+    } else {
+      nextHooks[eventName] = cleaned
+    }
+  }
+  const trustEntries: CodexTrustEntry[] = []
+  for (const eventName of CODEX_EVENTS) {
+    const current = Array.isArray(nextHooks[eventName]) ? nextHooks[eventName] : []
+    const cleaned = removeManagedCommands(current, isManagedCommand)
+    nextHooks[eventName] = [{ hooks: [buildManagedCommandHook(command)] }, ...cleaned]
+    trustEntries.push({
+      sourcePath: plan.trustConfigPath,
+      eventLabel: CODEX_EVENT_LABEL[eventName],
+      groupIndex: 0,
+      handlerIndex: 0,
+      command,
+      timeoutSec: MANAGED_HOOK_TIMEOUT_SECONDS
+    })
+  }
+  config.hooks = nextHooks
+  writeManagedScript(plan.scriptPath, getManagedScript('posix'))
+  writeCodexHooksJson(plan.configPath, nextHooks)
+  try {
+    const runtimeHomePath = pathWin32.dirname(plan.tomlPath)
+    const previousLedgerHome = readCodexTrustGrantLedgerHomeForReconciliation(runtimeHomePath)
+    removeStaleWslRuntimeManagedHookTrustEntries(
+      plan.tomlPath,
+      trustEntries,
+      previousLedgerHome ? [previousLedgerHome] : []
+    )
+    const grant = await grantManagedCodexHookTrustAsync({
+      runtimeHomePath,
+      tomlPath: plan.tomlPath,
+      managedCommand: command,
+      managedEntries: trustEntries,
+      host: { kind: 'wsl', distro: plan.wslDistro, linuxRuntimeHome: plan.linuxRuntimeHome },
+      telemetryLane: 'managed'
+    })
+    if (grant.lane === 'fallback') {
+      upsertHookTrustEntries(plan.tomlPath, trustEntries)
+    }
+  } catch (error) {
+    return {
+      agent: 'codex',
+      state: 'error',
+      configPath: plan.configPath,
+      managedHooksPresent: true,
+      detail: `Hooks installed but trust entries could not be written: ${error instanceof Error ? error.message : String(error)}. Run /hooks in Codex to approve.`
+    }
+  }
   return {
     agent: 'codex',
     state: 'installed',
@@ -1055,7 +1143,7 @@ export class CodexHookService {
   installForRuntimeHome(
     runtimeHomePath: string | null | undefined,
     target?: CodexWslRuntimeHookTarget
-  ): AgentHookInstallStatus | null {
+  ): AgentHookInstallStatus | Promise<AgentHookInstallStatus | null> | null {
     const generation = this.supersedeWslReconciliation(runtimeHomePath)
     let installedTrustConfigPath: string | null = null
     // Why: JS is single-threaded, so the synchronous install below finishes
@@ -1099,7 +1187,7 @@ export class CodexHookService {
       if (!resolvedPlan) {
         return
       }
-      const status = installManagedHooksIntoWslRuntime(resolvedPlan)
+      const status = installManagedHooksIntoWslRuntimeSync(resolvedPlan)
       if (status.state === 'error') {
         console.warn('[codex-hook-service] failed to reconcile WSL hook path', status.detail)
         return
@@ -1114,7 +1202,7 @@ export class CodexHookService {
       onCanonicalPathSettled
     )
     installedTrustConfigPath = wslPlan?.trustConfigPath ?? null
-    const status = wslPlan ? installManagedHooksIntoWslRuntime(wslPlan) : null
+    const status = wslPlan ? installManagedHooksIntoWslRuntimeSync(wslPlan) : null
     installSucceeded = status?.state === 'installed'
     return status
   }
@@ -1132,7 +1220,17 @@ export class CodexHookService {
     if (active) {
       return active
     }
-    const install = this.installForRuntimeHome(runtimeHomePath, target)
+    // The shell preflight is already asynchronous and must not block the main
+    // thread on wsl.exe. Keep the legacy synchronous launch contract for
+    // callers that invoke installForRuntimeHome directly, but use the async
+    // Codex grant lane for the real serialized WSL repair path.
+    const install =
+      target?.runtime === 'wsl' &&
+      this.installForRuntimeHome === CodexHookService.prototype.installForRuntimeHome
+        ? Promise.resolve(createCodexWslRuntimeHookInstallPlan(runtimeHomePath, target)).then(
+            (plan) => (plan ? installManagedHooksIntoWslRuntime(plan) : null)
+          )
+        : Promise.resolve(this.installForRuntimeHome(runtimeHomePath, target))
     this.wslInstallsInFlight.set(key, install)
     const clear = (): void => {
       if (this.wslInstallsInFlight.get(key) === install) {

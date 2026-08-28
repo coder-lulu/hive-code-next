@@ -1,5 +1,7 @@
+/* eslint-disable max-lines -- synchronous and asynchronous trust lanes share verification invariants. */
 import {
   isCodexAppServerUnsupportedError,
+  runCodexHookTrustGrantSession,
   type CodexHookTrustGrantRequest,
   type CodexHookTrustGrantSessionResult
 } from './codex-app-server-client'
@@ -30,6 +32,7 @@ import {
 } from './config-toml-trust'
 import { getCodexHookTrustSignature } from './codex-hook-identity'
 import { captureCodexTrustConfig, restoreCodexTrustConfig } from './codex-trust-config-rollback'
+import { runExclusivelyForCodexTrustConfig } from './codex-trust-config-mutation-queue'
 import {
   readCodexTrustGrantLedgerHomeMatchingStamp,
   resolveCodexTrustGrantHost,
@@ -82,6 +85,10 @@ type GrantSessionRunnerSync = (
 ) => CodexHookTrustGrantSessionResult
 
 let runSessionSync: GrantSessionRunnerSync = runCodexHookTrustGrantSessionSync
+type GrantSessionRunner = (
+  request: CodexHookTrustGrantRequest
+) => Promise<CodexHookTrustGrantSessionResult>
+let runSession: GrantSessionRunner = runCodexHookTrustGrantSession
 
 function fallback(
   plan: CodexManagedTrustGrantPlan,
@@ -329,7 +336,141 @@ export function grantManagedCodexHookTrust(
   }
 }
 
+/**
+ * Asynchronous trust-grant lane used by WSL just-in-time repair.  The native
+ * launch path retains its synchronous bridge for compatibility, while WSL
+ * callers avoid blocking Electron's main thread during `wsl.exe` startup.
+ */
+export async function grantManagedCodexHookTrustAsync(
+  plan: CodexManagedTrustGrantPlan
+): Promise<CodexManagedTrustGrantOutcome> {
+  try {
+    if (process.env[DISABLE_ENV_FLAG] === '1') {
+      return fallback(plan, 'disabled')
+    }
+    if (plan.managedEntries.length === 0) {
+      return fallback(plan, 'no-managed-entries')
+    }
+    const expected = buildExpectedEntries(plan)
+    const resolvedHost = resolveCodexTrustGrantHost(plan.host)
+    const currentStamp = resolvedHost.binaryStamp
+    const ledgerEntries = findLedgerGrant(plan, expected, currentStamp)
+    if (ledgerEntries !== null) {
+      diagnostics.ledgerHits += 1
+      return { lane: 'rpc', entries: ledgerEntries }
+    }
+    if (isCodexStateDbBackfillPending(plan.runtimeHomePath)) {
+      return fallback(plan, 'retry-cached')
+    }
+    const hostKey = getCodexAppServerHostKey(plan.host)
+    if (!codexAppServerCapabilityCache.shouldTry(hostKey)) {
+      return fallback(plan, 'unsupported-cached')
+    }
+    const retryAfter = transientRetryAfterByHost.get(hostKey)
+    if (retryAfter !== undefined && Date.now() < retryAfter) {
+      return fallback(plan, 'retry-cached')
+    }
+    transientRetryAfterByHost.delete(hostKey)
+    return await runExclusivelyForCodexTrustConfig(plan.tomlPath, async () => {
+      const configSnapshot = captureCodexTrustConfig(plan.tomlPath)
+      try {
+        removeSelfComputedTrustBeforeGrant(plan)
+        const result = await runSession(
+          resolvedHost.buildRequest({
+            runtimeHomePath: plan.runtimeHomePath,
+            managedCommand: plan.managedCommand,
+            expectedTrustKeys: expected.map(({ normalizedKey }) => normalizedKey),
+            useDefaultCodexHome: plan.useDefaultCodexHome
+          })
+        )
+        if (result.outcome === 'verify-failed') {
+          restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
+          transientRetryAfterByHost.set(
+            hostKey,
+            Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
+          )
+          return fallback(plan, 'verify-failed', result.reason, result.reasonClass)
+        }
+        const byKey = new Map(expected.map((item) => [item.normalizedKey, item]))
+        const seen = new Set<string>()
+        const grantedEntries: CodexTrustEntry[] = []
+        const ledgerRecord: Record<string, CodexTrustGrantLedgerEntry> = {}
+        for (const granted of result.entries) {
+          const match = byKey.get(granted.normalizedKey)
+          if (!match) {
+            restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
+            return fallback(
+              plan,
+              'verify-failed',
+              `unexpected granted key ${granted.key}`,
+              'unexpected-key'
+            )
+          }
+          if (seen.has(granted.normalizedKey)) {
+            restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
+            return fallback(
+              plan,
+              'verify-failed',
+              `duplicate granted key ${granted.key}`,
+              'duplicate-key'
+            )
+          }
+          seen.add(granted.normalizedKey)
+          grantedEntries.push({ ...match.entry, trustedHash: granted.trustedHash })
+          ledgerRecord[granted.normalizedKey] = {
+            signature: match.signature,
+            trustedHash: granted.trustedHash
+          }
+        }
+        if (seen.size !== expected.length) {
+          restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
+          return fallback(
+            plan,
+            'verify-failed',
+            'granted entry set did not cover expected entries',
+            'coverage'
+          )
+        }
+        codexAppServerCapabilityCache.rememberSupported(hostKey)
+        transientRetryAfterByHost.delete(hostKey)
+        try {
+          writeCodexTrustGrantLedgerHome(plan.runtimeHomePath, {
+            binary: currentStamp,
+            entries: ledgerRecord
+          })
+        } catch (error) {
+          console.warn('[codex-trust-grant] failed to persist grant ledger', error)
+        }
+        diagnostics.granted += 1
+        emitCodexTrustGrantTelemetry({
+          outcome: 'granted',
+          hostKind: plan.host.kind,
+          lane: plan.telemetryLane
+        })
+        return { lane: 'rpc', entries: grantedEntries }
+      } catch (error) {
+        restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
+        if (isCodexAppServerUnsupportedError(error)) {
+          transientRetryAfterByHost.delete(hostKey)
+          codexAppServerCapabilityCache.rememberUnsupported(hostKey)
+          return fallback(plan, 'unsupported', error)
+        }
+        transientRetryAfterByHost.set(
+          hostKey,
+          Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
+        )
+        return fallback(plan, 'error', error)
+      }
+    })
+  } catch (error) {
+    return fallback(plan, 'error', error)
+  }
+}
+
 export const _internals = {
+  setGrantSessionRunner(runner: GrantSessionRunner | null): void {
+    runSession = runner ?? runCodexHookTrustGrantSession
+  },
   setGrantSessionRunnerSync(runner: GrantSessionRunnerSync | null): void {
     runSessionSync = runner ?? runCodexHookTrustGrantSessionSync
   },

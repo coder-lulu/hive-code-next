@@ -96,6 +96,7 @@ import {
   isAgentStatusHooksEnabled,
   removeManagedAgentHooks
 } from './agent-hooks/managed-agent-hook-controls'
+import type { AgentHookInstallStatus } from '../shared/agent-hook-types'
 import { initCohortClassifier } from './telemetry/cohort-classifier'
 import { initOnboardingCohortClassifier } from './telemetry/onboarding-cohort-classifier'
 import { resolveConsent } from './telemetry/consent'
@@ -1297,13 +1298,18 @@ function prepareCodexRuntimeHomeForLaunch(
         codexHookService.install(runtimeHomePath ?? undefined))
       : (codexHookService.refreshRuntimeUserHooksForRuntimeHome(runtimeHomePath, hookTarget) ??
         codexHookService.refreshRuntimeUserHooks(runtimeHomePath ?? undefined))
-    if (status.state === 'error') {
-      console.warn(
-        `[codex-hook-service] failed to ${
-          hooksEnabled ? 'refresh' : 'refresh user'
-        } runtime hooks before launch`,
-        status.detail
-      )
+    const reportStatus = (resolved: AgentHookInstallStatus | null): void => {
+      if (resolved?.state === 'error') {
+        console.warn(
+          `[codex-hook-service] failed to ${hooksEnabled ? 'refresh' : 'refresh user'} runtime hooks before launch`,
+          resolved.detail
+        )
+      }
+    }
+    if (status && typeof status === 'object' && 'then' in status) {
+      void status.then(reportStatus)
+    } else {
+      reportStatus(status)
     }
   } catch (error) {
     // Why: hook install is best-effort launch prep; a malformed hooks file must not block Codex from starting.
