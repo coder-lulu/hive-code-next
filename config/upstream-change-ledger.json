@@ -195,11 +195,20 @@
     {
       "upstreamSha": "ebe6b559eff3385db7e456a0c76c02ea1ecca3d2",
       "type": "重构",
-      "applied": "暂缓",
+      "applied": "已移植",
       "dependencies": ["f96dfd58103cd822a7d399a377421591094dc8d5"],
-      "conflictReason": "PR native cache fan-out 与现有 product workflow 需要逐 job 合并",
-      "adaptation": "保留现有产品安全检查，待 8dd/350 完成后吸收 cache prime",
-      "regressionTests": ["PR workflow parallelism"]
+      "conflictReason": "完整 fan-out/classifier 与 HiveCode PR gate 拓扑不同",
+      "adaptation": "吸收 pnpm 版本固定、native cache 输入哈希和单 Node24 primer；保留现有十六分片矩阵与产品 required gates",
+      "regressionTests": ["native cache action contract", "PR scope/workflow contract"]
+    },
+    {
+      "upstreamSha": "b63c006ae9fad412ede61c2070f64354c7426db8",
+      "type": "新功能",
+      "applied": "需要产品决定",
+      "dependencies": [],
+      "conflictReason": "上游链接指向 stablyai/orca 的 Android 0.0.46 制品，HiveCode 当前 androidDownload 为 null 且没有对应发布制品",
+      "adaptation": "暂不替换 README 或桌面端下载入口；待 HiveCode Android 制品仓库、版本号和发布签名确认后，再统一更新多语言文档与 MobileSettingsPane",
+      "regressionTests": ["Android download URL consistency"]
     },
     {
       "upstreamSha": "6f8c5888b3acc4011c09498cda27cf3906edd91a",
