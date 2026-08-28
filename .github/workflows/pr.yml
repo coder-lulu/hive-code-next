@@ -49,8 +49,30 @@ jobs:
           echo "Changed paths:"
           printf '%s\n' "$CHANGED"
           SHOULD_RUN="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-code-change-scope.mjs)"
+          NATIVE_CACHE_CHANGED="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-code-change-scope.mjs --native-cache)"
           echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+          echo "native_cache_changed=$NATIVE_CACHE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "should_run=$SHOULD_RUN"
+          echo "native_cache_changed=$NATIVE_CACHE_CHANGED"
+
+  # Cache-key input changes would otherwise make every test shard compile the
+  # same native addon concurrently. Prime the single supported PR Node ABI first.
+  test_native_cache:
+    name: prepare test native cache node 24
+    needs: [code_paths]
+    if: needs.code_paths.outputs.native_cache_changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+          node-version: '24.18.0'
 
   static_analysis:
     name: static analysis
@@ -439,8 +461,11 @@ jobs:
 
   test:
     name: tests node ${{ matrix.node }} ${{ matrix.shard }}/${{ matrix.shard_total }}
-    needs: [code_paths]
-    if: needs.code_paths.outputs.should_run == 'true'
+    needs: [code_paths, test_native_cache]
+    if: >-
+      always() &&
+      needs.code_paths.outputs.should_run == 'true' &&
+      (needs.test_native_cache.result == 'success' || needs.test_native_cache.result == 'skipped')
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -774,6 +799,7 @@ jobs:
       contents: read
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
+      native_cache_changed: ${{ steps.filter.outputs.native_cache_changed }}
       test_files: ${{ steps.filter.outputs.test_files }}
       ssh_source_changed: ${{ steps.filter.outputs.ssh_source_changed }}
     steps:

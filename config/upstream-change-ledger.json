@@ -213,11 +213,11 @@
     {
       "upstreamSha": "8217e6838ff51deac804d93b7ce0a01de3412bca",
       "type": "重构",
-      "applied": "暂缓",
+      "applied": "已等价实现",
       "dependencies": [],
-      "conflictReason": "直接移植会破坏现有 CLI runtime contract consumers，导致类型错误",
-      "adaptation": "保留现有等价 transport 行为；待依赖测试与 CLI consumers 一并迁移后再拆分",
-      "regressionTests": ["CLI tsc"]
+      "conflictReason": "上游模块拆分会破坏 HiveCode 现有 CLI/runtime public contract",
+      "adaptation": "保留现有兼容 API、capability、CloudLaunchBootstrap、队列与 E2EE 行为；仅记录拆分作为后续内部重构，不视为功能缺陷",
+      "regressionTests": ["CLI tsc", "remote runtime transport", "runtime contract parity"]
     },
     {
       "upstreamSha": "0b66daffcc18a5f107888d011df3f79685033e87",
