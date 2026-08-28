@@ -2469,7 +2469,8 @@
             "1aa7c952b9": "Project view",
             "f352abf7c3": "Repository list is updating.",
             "1ce21b8cff": "This item is outside the selected repositories.",
-            "030de75bc5": "This item matches multiple selected repositories."
+            "030de75bc5": "This item matches multiple selected repositories.",
+            "unsupportedView": "{{value0}} — Orca doesn't support {{value1}} project views yet."
           },
           "slug": {
             "dialog": {
@@ -6155,6 +6156,15 @@
           "projectOnly": "Added in this project only.",
           "useGlobalFor": "Use global for {{value0}}",
           "useGlobal": "Use global"
+        },
+        "SidebarFooter": {
+          "signInSuccess": "Signed in to HiveCloud",
+          "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+          "localSignOut": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+          "signOutSuccess": "Signed out of HiveCloud",
+          "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again.",
+          "activity": "Activity",
+          "notifications": "Notifications"
         }
       },
       "shared": {
@@ -7016,7 +7026,8 @@
           "31fd7150cf": "Checking for updates...",
           "3394d1f663": "checking",
           "d69a09b672": "Updates are checked automatically on launch.",
-          "7173352632": "idle"
+          "7173352632": "idle",
+          "updatesNotConfigured": "Online updates are not configured. Option/Alt-click to install a local build."
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "Choose apps available from a workspace's Open in menu.",
@@ -11362,7 +11373,31 @@
           "relayTitle": "Orca Relay",
           "relayDescription": "Connect Orca Mobile to this desktop across cellular or any Wi-Fi.",
           "skillsTitle": "Skill sharing",
-          "skillsDescription": "Share one skill or a whole set behind an unlisted link, and install them on any machine you use."
+          "skillsDescription": "Share one skill or a whole set behind an unlisted link, and install them on any machine you use.",
+          "secureStorageUnavailable": "Cloud sign-in is disabled because operating-system secure storage is unavailable.",
+          "credentialUnreadable": "The encrypted account credential cannot be read. Repair secure storage before signing in.",
+          "sessionExpired": "This session has expired. Refresh it or sign in again.",
+          "networkUnavailable": "HiveCloud is temporarily unreachable. Local work remains available.",
+          "sessionRejected": "HiveCloud rejected this session. Sign in again.",
+          "authorizationCancelled": "Sign-in was cancelled.",
+          "authorizationTimeout": "Sign-in timed out before the browser callback completed.",
+          "serverUnavailable": "HiveCloud is temporarily unavailable. Local work remains available.",
+          "authorizationFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+          "connectedDescription": "This desktop is securely linked to HiveCloud.",
+          "unknown": "Unknown",
+          "signedInToast": "Signed in to HiveCloud",
+          "refreshedToast": "HiveCloud session refreshed",
+          "localSignOutToast": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+          "signedOutToast": "Signed out of HiveCloud",
+          "refresh": "Refresh",
+          "device": "Device",
+          "defaultDevice": "Desktop",
+          "sessionExpires": "Sign-in authorization valid until",
+          "trustedSession": "Trusted device",
+          "temporarySession": "Temporary device",
+          "signOutConfirmTitle": "Sign out of HiveCloud?",
+          "signOutConfirmDescription": "This device's local credential will be removed. Local projects, worktrees, and provider accounts will not be affected.",
+          "cancel": "Cancel"
         },
         "automations": {
           "showButton": "Show Automations Button",
@@ -15484,7 +15519,8 @@
           "rowActions": "Automation actions",
           "tableLastRun": "Last run",
           "noListMatches": "No automations match.",
-          "destinationProjectUnavailable": "Choose a project owned by the selected automation destination."
+          "destinationProjectUnavailable": "Choose a project owned by the selected automation destination.",
+          "destinationUnavailable": "The selected automation destination is not ready. Reconnect it and try again."
         },
         "AutomationsPageSkeleton": {
           "55527b7bcf": "Loading automations"
@@ -16219,7 +16255,11 @@
         "53c4b8e148": "No usable authentication agent answered the privileged install request.",
         "c732bcbf8f": "Checking package...",
         "aa57fa4f80": "Command copied. Run it in a system terminal to install {{value0}}, then quit and reopen Orca.",
-        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point."
+        "b7e7c5bc95": "Orca checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca cannot vouch for the file after that point.",
+        "manualTitle": "Manual Install Required",
+        "manualSummary": "Automatic installation is disabled for Linux system packages because the privileged installer cannot preserve the verified file identity.",
+        "manualExplainer": "Copy the inode-pinned command and run it in a POSIX shell. After it finishes, quit and reopen the app to run the new version.",
+        "manualTrustNote": "The copied command opens the package first, verifies SHA-512 through that file descriptor, and installs the same descriptor-backed file."
       },
       "pr-check-counts": {
         "passingChip": "{{value0}} passing",
@@ -16436,6 +16476,179 @@
     }
   },
   "components": {
+    "desktopHome": {
+      "sceneCode": "Cloud work",
+      "sceneAutomation": "Automation",
+      "sceneCollaboration": "Agent collaboration",
+      "placeholderCode": "Describe the development task to complete…",
+      "placeholderAutomation": "Describe the repetitive work to automate…",
+      "placeholderCollaboration": "Describe the task that needs multiple agents…",
+      "heroTitle": "{{app}} — start today's development",
+      "heroDescription": "AI-powered development assistance to help you build better software, faster.",
+      "helpBubble": "Here whenever you need help",
+      "mascotAlt": "{{app}} assistant",
+      "workModes": "Work modes",
+      "capabilities": "Common capabilities",
+      "capability": {
+        "analyzeCode": "Analyze codebase",
+        "implementFeature": "Implement a feature",
+        "fixIssue": "Fix an issue",
+        "addTests": "Add tests",
+        "scheduledBuild": "Check builds on a schedule",
+        "summarizeChanges": "Summarize changes",
+        "batchTasks": "Process tasks in bulk",
+        "breakDownRequirements": "Break down requirements",
+        "parallelReview": "Review code in parallel",
+        "planDelivery": "Plan delivery"
+      },
+      "newTask": "New task",
+      "taskDescription": "Task description",
+      "workOverview": "Work overview",
+      "recentWorkspaces": "Recent workspaces",
+      "manageProjects": "Manage projects",
+      "noProjects": "No projects yet",
+      "noProjectsDescription": "Add a code repository to see workspaces here.",
+      "quickStart": "Quick start",
+      "addProject": "Add project",
+      "addProjectDescription": "Connect a local or remote repository",
+      "newWorkspace": "New workspace",
+      "newWorkspaceDescription": "Isolate branches and agent sessions",
+      "continueWork": "Continue working",
+      "sessions": "Sessions",
+      "recentActivity": "Recent activity",
+      "enterWorkspace": "Open workspace",
+      "noContinue": "Nothing to continue",
+      "noContinueDescription": "Create a workspace to return here quickly.",
+      "projectStats": "{{projects}} projects · {{workspaces}} workspaces",
+      "projectStatsLabel": "Project statistics",
+      "unnamedBranch": "Unnamed branch",
+      "host": {
+        "local": "Local",
+        "ssh": "SSH",
+        "cloud": "Cloud"
+      },
+      "time": {
+        "unused": "Not used yet",
+        "justNow": "Just now",
+        "minutesAgo": "{{value}} min ago",
+        "hoursAgo": "{{value}} hr ago",
+        "daysAgo": "{{value}} days ago"
+      },
+      "preflight": {
+        "dismiss": "Dismiss notice"
+      },
+      "composer": {
+        "addContext": "Add context",
+        "selectWorkspace": "Select workspace",
+        "selectAgent": "Select agent",
+        "permission": "Permission mode",
+        "permissionDefault": "Default",
+        "permissionAsk": "Always ask",
+        "permissionAuto": "Auto-approve",
+        "attach": "Add attachment",
+        "voice": "Voice input",
+        "send": "Send task"
+      }
+    },
+    "landingContext": {
+      "currentContext": "Current context",
+      "closeContext": "Close current context",
+      "workspace": "Workspace",
+      "branch": "Branch",
+      "location": "Location",
+      "sessions": "Sessions",
+      "activity": "Activity",
+      "openFiles": "Open files",
+      "unsaved": "Unsaved",
+      "noOpenFiles": "No files are open in this workspace.",
+      "suggestedActions": "Suggested actions",
+      "continueWork": "Continue previous work",
+      "newWorkspaceFromProject": "Create a workspace from this project",
+      "noContext": "No context selected",
+      "noContextDescription": "Add a project and create a workspace to see branches, files, and recommended actions here."
+    },
+    "hiveAccountSignIn": {
+      "title": "Sign in to HiveCloud",
+      "smsDescription": "Verify your phone number to continue without leaving the app.",
+      "invalidPhone": "Enter a valid phone number.",
+      "acceptTermsError": "Please accept the Terms of Service and Privacy Policy first.",
+      "sendCodeFailed": "Could not send the code. Try again later.",
+      "invalidCode": "Enter the 6-digit code.",
+      "codeExpired": "The code is invalid or expired.",
+      "cloudConsole": "Cloud control plane",
+      "mascotAlt": "HiveCode robot bee",
+      "brandTitle": "Secure connection, efficient collaboration",
+      "brandDescription": "Manage Runtimes, devices, and sessions after signing in.",
+      "brandNote": "HiveCode local features remain available after you close this window.",
+      "loginMethods": "Sign-in methods",
+      "smsTab": "Phone code",
+      "browserTab": "Browser",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "Enter your phone number",
+      "codeSentTo": "Code sent to",
+      "codeLabel": "Verification code",
+      "codePlaceholder": "Enter the 6-digit code",
+      "resendCountdown": "Resend in {{seconds}}s",
+      "termsPrefix": "I have read and agree to",
+      "terms": "Terms of Service",
+      "and": "and",
+      "privacy": "Privacy Policy",
+      "confirm": "Sign in",
+      "sending": "Sending…",
+      "getCode": "Get code",
+      "browserTitle": "Complete secure authentication in your browser",
+      "browserDescription": "You will return to HiveCode automatically after authentication.",
+      "opening": "Opening…",
+      "continueBrowser": "Continue in browser",
+      "copyLink": "Copy sign-in link",
+      "otherMethods": "Other sign-in methods",
+      "github": "Sign in with GitHub",
+      "wechat": "Sign in with WeChat",
+      "qq": "Sign in with QQ",
+      "securityTitle": "Device credentials are protected",
+      "securityDescription": "After sign-in, credentials are stored securely on this device.",
+      "contextSummary": "HiveCode Desktop · Current device · Protected session",
+      "contextDetails": "Encrypted credentials are stored on this device and can be revoked in Account settings."
+    },
+    "sidebarAccount": {
+      "connected": "HiveCloud connected",
+      "signInSuccess": "Signed in to HiveCloud",
+      "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+      "localSignOut": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+      "signOutSuccess": "Signed out of HiveCloud",
+      "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again.",
+      "activity": "Activity",
+      "statusUnknown": "Connection status pending",
+      "localMode": "Local mode",
+      "accountCopied": "Account information copied",
+      "menuLabel": "Account menu: {{name}}",
+      "signIn": "Sign in to HiveCloud",
+      "openCenter": "Open account center",
+      "cloudAccount": "HiveCloud account",
+      "localWorkspace": "HiveCode local workspace",
+      "workAccount": "HiveKernel · Work account",
+      "notConnected": "Cloud account not connected",
+      "copyAccount": "Copy account information",
+      "localFeatures": "HiveCode local projects, terminals, and agent features remain available.",
+      "cloudBenefits": "Sign in to manage cross-device Runtimes, sessions, and organization resources.",
+      "accountCenter": "Account center",
+      "cloudConnection": "HiveCloud connection",
+      "devicesSessions": "Devices and sessions",
+      "viewDetails": "View details",
+      "storageResources": "Storage and resources",
+      "settings": "Settings",
+      "appearance": "Appearance",
+      "theme": "Theme",
+      "themeSystem": "System",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "notifications": "Notifications",
+      "noUnread": "No unread",
+      "helpFeedback": "Help and feedback",
+      "checkUpdates": "Check for updates",
+      "upToDate": "Up to date",
+      "signOut": "Sign out"
+    },
     "native-chat": {
       "composer": {
         "imageUnsupported": "Image paste is not supported for this agent.",
@@ -17038,5 +17251,11 @@
   },
   "quickOpen": {
     "moreMatchesAvailable": "More matches may be available. Refine your search to narrow the results."
+  },
+  "web": {
+    "cloudLaunchFailure": "This Cloud launch link is invalid or has expired. Create a new launch from HiveCloud.",
+    "runtime": {
+      "cloudWebSocket": "Cloud WSS"
+    }
   }
 }

@@ -1,4 +1,7 @@
+/* eslint-disable max-lines -- The desktop home keeps its orchestration and cards together for predictable layout state. */
+
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowRight,
   Braces,
@@ -26,33 +29,41 @@ import { DesktopHomeComposerFooter } from './landing/DesktopHomeComposerFooter'
 import {
   buildDesktopHomeModel,
   formatHomeRelativeTime,
+  type HomeRelativeTimeLabels,
   type DesktopHomeWorkspace
 } from './landing/desktop-home-model'
 import mascotUrl from '../../../../resources/desktop-home-mascot-float.png'
+import { translate } from '@/i18n/i18n'
 
 type HomeScene = 'code' | 'automation' | 'collaboration'
-const SCENES: { id: HomeScene; label: string; icon: typeof Braces; placeholder: string }[] = [
-  { id: 'code', label: '云端工作', icon: Braces, placeholder: '描述要完成的开发任务…' },
+const SCENES: { id: HomeScene; icon: typeof Braces; labelKey: string; placeholderKey: string }[] = [
+  { id: 'code', icon: Braces, labelKey: 'sceneCode', placeholderKey: 'placeholderCode' },
   {
     id: 'automation',
-    label: '自动化',
     icon: WandSparkles,
-    placeholder: '描述要自动执行的重复工作…'
+    labelKey: 'sceneAutomation',
+    placeholderKey: 'placeholderAutomation'
   },
   {
     id: 'collaboration',
-    label: 'Agent 协作',
     icon: UsersRound,
-    placeholder: '描述需要多角色协作的任务…'
+    labelKey: 'sceneCollaboration',
+    placeholderKey: 'placeholderCollaboration'
   }
 ]
 const CAPABILITIES: Record<HomeScene, string[]> = {
-  code: ['分析代码库', '实现新功能', '修复问题', '补充测试'],
-  automation: ['定时检查构建', '整理变更摘要', '批量处理任务'],
-  collaboration: ['拆解复杂需求', '并行审查代码', '制定交付方案']
+  code: ['analyzeCode', 'implementFeature', 'fixIssue', 'addTests'],
+  automation: ['scheduledBuild', 'summarizeChanges', 'batchTasks'],
+  collaboration: ['breakDownRequirements', 'parallelReview', 'planDelivery']
 }
 
-function WorkspaceRow({ workspace }: { workspace: DesktopHomeWorkspace }): React.JSX.Element {
+function WorkspaceRow({
+  workspace,
+  timeLabels
+}: {
+  workspace: DesktopHomeWorkspace
+  timeLabels: HomeRelativeTimeLabels
+}): React.JSX.Element {
   return (
     <button
       type="button"
@@ -71,13 +82,15 @@ function WorkspaceRow({ workspace }: { workspace: DesktopHomeWorkspace }): React
         </span>
         <span className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
           <GitBranch className="size-3" />
-          {workspace.branch}
+          {workspace.branch === 'unnamed'
+            ? translate('components.desktopHome.unnamedBranch', 'Unnamed branch')
+            : workspace.branch}
           <span aria-hidden>·</span>
-          {workspace.hostLabel}
+          {translate(`components.desktopHome.host.${workspace.hostLabel}`, workspace.hostLabel)}
         </span>
       </span>
       <span className="shrink-0 text-[11px] text-muted-foreground">
-        {formatHomeRelativeTime(workspace.lastActivityAt)}
+        {formatHomeRelativeTime(workspace.lastActivityAt, Date.now(), timeLabels)}
       </span>
       <ArrowRight className="size-3.5 -translate-x-1 text-muted-foreground opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" />
     </button>
@@ -85,6 +98,7 @@ function WorkspaceRow({ workspace }: { workspace: DesktopHomeWorkspace }): React
 }
 
 export default function Landing(): React.JSX.Element {
+  useTranslation()
   const repos = useAppStore((state) => state.repos)
   const worktreesByRepo = useAppStore((state) => state.worktreesByRepo)
   const tabsByWorktree = useAppStore((state) => state.tabsByWorktree)
@@ -118,6 +132,16 @@ export default function Landing(): React.JSX.Element {
   const selectedWorkspace =
     model.recentWorkspaces.find((workspace) => workspace.id === workspaceId) ??
     model.currentWorkspace
+  const homeTimeLabels = {
+    unused: translate('components.desktopHome.time.unused', 'Not used yet'),
+    justNow: translate('components.desktopHome.time.justNow', 'Just now'),
+    minutesAgo: (value: number) =>
+      translate('components.desktopHome.time.minutesAgo', '{{value}} min ago', { value }),
+    hoursAgo: (value: number) =>
+      translate('components.desktopHome.time.hoursAgo', '{{value}} hr ago', { value }),
+    daysAgo: (value: number) =>
+      translate('components.desktopHome.time.daysAgo', '{{value}} days ago', { value })
+  }
 
   const submit = (): void => {
     const prompt = draft.trim()
@@ -150,13 +174,34 @@ export default function Landing(): React.JSX.Element {
             <div className="desktop-home-hero-brand">
               <img src={PRODUCT_LOGO_URL} alt="" aria-hidden />
               <div className="min-w-0 flex-1">
-                <h1 id="desktop-home-title">{APP_DISPLAY_NAME}，开始今天的开发工作</h1>
-                <p>AI 驱动的开发助手，帮你更快地构建更好的软件。</p>
+                <h1 id="desktop-home-title">
+                  {translate(
+                    'components.desktopHome.heroTitle',
+                    "{{app}} — start today's development",
+                    {
+                      app: APP_DISPLAY_NAME
+                    }
+                  )}
+                </h1>
+                <p>
+                  {translate(
+                    'components.desktopHome.heroDescription',
+                    'AI-powered development assistance to help you build better software, faster.'
+                  )}
+                </p>
               </div>
             </div>
             <div className="desktop-home-mascot-wrap">
-              <span className="desktop-home-help-bubble">随时为你提供帮助</span>
-              <img className="desktop-home-mascot" src={mascotUrl} alt={`${APP_DISPLAY_NAME} 助手`} />
+              <span className="desktop-home-help-bubble">
+                {translate('components.desktopHome.helpBubble', 'Here whenever you need help')}
+              </span>
+              <img
+                className="desktop-home-mascot"
+                src={mascotUrl}
+                alt={translate('components.desktopHome.mascotAlt', '{{app}} assistant', {
+                  app: APP_DISPLAY_NAME
+                })}
+              />
             </div>
           </section>
 
@@ -164,7 +209,11 @@ export default function Landing(): React.JSX.Element {
             <LandingPreflightBanner issues={preflightIssues} repos={repos} />
           ) : null}
 
-          <div className="desktop-home-scene-tabs" role="tablist" aria-label="工作模式">
+          <div
+            className="desktop-home-scene-tabs"
+            role="tablist"
+            aria-label={translate('components.desktopHome.workModes', 'Work modes')}
+          >
             {SCENES.map((entry) => {
               const Icon = entry.icon
               return (
@@ -177,21 +226,40 @@ export default function Landing(): React.JSX.Element {
                   onClick={() => setScene(entry.id)}
                 >
                   <Icon className="size-3.5" />
-                  {entry.label}
+                  {translate(
+                    `components.desktopHome.${entry.labelKey}`,
+                    entry.id === 'code'
+                      ? 'Cloud work'
+                      : entry.id === 'automation'
+                        ? 'Automation'
+                        : 'Agent collaboration'
+                  )}
                 </button>
               )
             })}
           </div>
-          <div className="desktop-home-capabilities" aria-label="常用能力">
-            {CAPABILITIES[scene].map((capability) => (
-              <button type="button" key={capability} onClick={() => setDraft(capability)}>
-                <Sparkles className="size-3" />
-                {capability}
-              </button>
-            ))}
+          <div
+            className="desktop-home-capabilities"
+            aria-label={translate('components.desktopHome.capabilities', 'Common capabilities')}
+          >
+            {CAPABILITIES[scene].map((capabilityKey) => {
+              const capability = translate(
+                `components.desktopHome.capability.${capabilityKey}`,
+                capabilityKey
+              )
+              return (
+                <button type="button" key={capabilityKey} onClick={() => setDraft(capability)}>
+                  <Sparkles className="size-3" />
+                  {capability}
+                </button>
+              )
+            })}
           </div>
 
-          <section className="desktop-home-composer" aria-label="新任务">
+          <section
+            className="desktop-home-composer"
+            aria-label={translate('components.desktopHome.newTask', 'New task')}
+          >
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -201,8 +269,15 @@ export default function Landing(): React.JSX.Element {
                   submit()
                 }
               }}
-              placeholder={activeScene.placeholder}
-              aria-label="任务描述"
+              placeholder={translate(
+                `components.desktopHome.${activeScene.placeholderKey}`,
+                activeScene.id === 'code'
+                  ? 'Describe the development task to complete…'
+                  : activeScene.id === 'automation'
+                    ? 'Describe the repetitive work to automate…'
+                    : 'Describe the task that needs multiple agents…'
+              )}
+              aria-label={translate('components.desktopHome.taskDescription', 'Task description')}
             />
             <DesktopHomeComposerFooter
               model={model}
@@ -218,29 +293,43 @@ export default function Landing(): React.JSX.Element {
             />
           </section>
 
-          <section className="desktop-home-grid" aria-label="工作概览">
+          <section
+            className="desktop-home-grid"
+            aria-label={translate('components.desktopHome.workOverview', 'Work overview')}
+          >
             <article className="desktop-home-card desktop-home-card-wide">
               <header>
                 <div>
                   <span className="desktop-home-card-icon">
                     <Clock3 />
                   </span>
-                  <h2>最近工作区</h2>
+                  <h2>
+                    {translate('components.desktopHome.recentWorkspaces', 'Recent workspaces')}
+                  </h2>
                 </div>
                 <button type="button" onClick={() => openModal('add-repo')}>
-                  管理项目
+                  {translate('components.desktopHome.manageProjects', 'Manage projects')}
                 </button>
               </header>
               <div className="desktop-home-card-body">
                 {model.recentWorkspaces.length ? (
                   model.recentWorkspaces.map((workspace) => (
-                    <WorkspaceRow key={workspace.id} workspace={workspace} />
+                    <WorkspaceRow
+                      key={workspace.id}
+                      workspace={workspace}
+                      timeLabels={homeTimeLabels}
+                    />
                   ))
                 ) : (
                   <div className="desktop-home-empty">
                     <FolderGit2 />
-                    <p>还没有项目</p>
-                    <span>添加代码仓库后，工作区会显示在这里。</span>
+                    <p>{translate('components.desktopHome.noProjects', 'No projects yet')}</p>
+                    <span>
+                      {translate(
+                        'components.desktopHome.noProjectsDescription',
+                        'Add a code repository to see workspaces here.'
+                      )}
+                    </span>
                   </div>
                 )}
               </div>
@@ -251,15 +340,20 @@ export default function Landing(): React.JSX.Element {
                   <span className="desktop-home-card-icon">
                     <Play />
                   </span>
-                  <h2>快速开始</h2>
+                  <h2>{translate('components.desktopHome.quickStart', 'Quick start')}</h2>
                 </div>
               </header>
               <div className="desktop-home-action-list">
                 <button type="button" onClick={() => openModal('add-repo')}>
                   <FolderPlus />
                   <span>
-                    <strong>添加项目</strong>
-                    <small>连接本地或远程仓库</small>
+                    <strong>{translate('components.desktopHome.addProject', 'Add project')}</strong>
+                    <small>
+                      {translate(
+                        'components.desktopHome.addProjectDescription',
+                        'Connect a local or remote repository'
+                      )}
+                    </small>
                   </span>
                   <ArrowRight />
                 </button>
@@ -271,8 +365,15 @@ export default function Landing(): React.JSX.Element {
                 >
                   <GitBranchPlus />
                   <span>
-                    <strong>新建工作区</strong>
-                    <small>隔离分支与 Agent 会话</small>
+                    <strong>
+                      {translate('components.desktopHome.newWorkspace', 'New workspace')}
+                    </strong>
+                    <small>
+                      {translate(
+                        'components.desktopHome.newWorkspaceDescription',
+                        'Isolate branches and agent sessions'
+                      )}
+                    </small>
                   </span>
                   <ArrowRight />
                 </button>
@@ -284,7 +385,7 @@ export default function Landing(): React.JSX.Element {
                   <span className="desktop-home-card-icon">
                     <Layers3 />
                   </span>
-                  <h2>继续工作</h2>
+                  <h2>{translate('components.desktopHome.continueWork', 'Continue working')}</h2>
                 </div>
               </header>
               <div className="desktop-home-continue">
@@ -303,12 +404,20 @@ export default function Landing(): React.JSX.Element {
                     </div>
                     <dl>
                       <div>
-                        <dt>会话</dt>
+                        <dt>{translate('components.desktopHome.sessions', 'Sessions')}</dt>
                         <dd>{model.currentWorkspace.sessionCount}</dd>
                       </div>
                       <div>
-                        <dt>最近活动</dt>
-                        <dd>{formatHomeRelativeTime(model.currentWorkspace.lastActivityAt)}</dd>
+                        <dt>
+                          {translate('components.desktopHome.recentActivity', 'Recent activity')}
+                        </dt>
+                        <dd>
+                          {formatHomeRelativeTime(
+                            model.currentWorkspace.lastActivityAt,
+                            Date.now(),
+                            homeTimeLabels
+                          )}
+                        </dd>
                       </div>
                     </dl>
                     <button
@@ -316,21 +425,37 @@ export default function Landing(): React.JSX.Element {
                       className="desktop-home-secondary-button"
                       onClick={() => activateAndRevealWorkspace(model.currentWorkspace!.id)}
                     >
-                      进入工作区 <ArrowRight />
+                      {translate('components.desktopHome.enterWorkspace', 'Open workspace')}{' '}
+                      <ArrowRight />
                     </button>
                   </>
                 ) : (
                   <div className="desktop-home-empty">
                     <Layers3 />
-                    <p>暂无可继续的工作</p>
-                    <span>创建工作区后可从这里快速返回。</span>
+                    <p>{translate('components.desktopHome.noContinue', 'Nothing to continue')}</p>
+                    <span>
+                      {translate(
+                        'components.desktopHome.noContinueDescription',
+                        'Create a workspace to return here quickly.'
+                      )}
+                    </span>
                   </div>
                 )}
               </div>
             </article>
           </section>
-          <div className="desktop-home-meta" aria-label="项目统计">
-            {model.projectCount} 个项目 · {model.workspaceCount} 个工作区
+          <div
+            className="desktop-home-meta"
+            aria-label={translate('components.desktopHome.projectStatsLabel', 'Project statistics')}
+          >
+            {translate(
+              'components.desktopHome.projectStats',
+              '{{projects}} projects · {{workspaces}} workspaces',
+              {
+                projects: model.projectCount,
+                workspaces: model.workspaceCount
+              }
+            )}
           </div>
         </div>
       </div>

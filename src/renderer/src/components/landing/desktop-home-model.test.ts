@@ -38,7 +38,7 @@ describe('buildDesktopHomeModel', () => {
     expect(model.currentWorkspace).toMatchObject({
       id: 'newer',
       branch: 'feature/desktop-home',
-      hostLabel: '云端',
+      hostLabel: 'cloud',
       sessionCount: 2
     })
     expect(model.currentFiles.map((file) => file.relativePath)).toEqual(['src/App.tsx'])
@@ -61,7 +61,7 @@ describe('buildDesktopHomeModel', () => {
 
 describe('formatHomeRelativeTime', () => {
   it('formats recent values without absolute fake timestamps', () => {
-    expect(formatHomeRelativeTime(1_000, 31_000)).toBe('刚刚')
-    expect(formatHomeRelativeTime(1_000, 121_000)).toBe('2 分钟前')
+    expect(formatHomeRelativeTime(1_000, 31_000)).toBe('Just now')
+    expect(formatHomeRelativeTime(1_000, 121_000)).toBe('2 min ago')
   })
 })

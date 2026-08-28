@@ -136,12 +136,12 @@ const SidebarFooter = React.memo(function SidebarFooter() {
       if (result.status === 'signed-in') {
         setSignInOpen(false)
         toast.success(
-          translate('auto.components.sidebar.SidebarFooter.signInSuccess', 'Signed in to HiveCloud')
+          translate('components.sidebarAccount.signInSuccess', 'Signed in to HiveCloud')
         )
       } else if (result.status === 'failed') {
         toast.error(
           translate(
-            'auto.components.sidebar.SidebarFooter.signInFailed',
+            'components.sidebarAccount.signInFailed',
             'HiveCloud sign-in failed. Try again or check the service status.'
           )
         )
@@ -149,7 +149,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
     } catch {
       toast.error(
         translate(
-          'auto.components.sidebar.SidebarFooter.signInFailed',
+          'components.sidebarAccount.signInFailed',
           'HiveCloud sign-in failed. Try again or check the service status.'
         )
       )
@@ -198,12 +198,12 @@ const SidebarFooter = React.memo(function SidebarFooter() {
       if (result.status === 'signed-in') {
         setSignInOpen(false)
         toast.success(
-          translate('auto.components.sidebar.SidebarFooter.signInSuccess', 'Signed in to HiveCloud')
+          translate('components.sidebarAccount.signInSuccess', 'Signed in to HiveCloud')
         )
       } else if (result.status === 'failed') {
         toast.error(
           translate(
-            'auto.components.sidebar.SidebarFooter.signInFailed',
+            'components.sidebarAccount.signInFailed',
             'HiveCloud sign-in failed. Try again or check the service status.'
           )
         )
@@ -211,7 +211,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
     } catch {
       toast.error(
         translate(
-          'auto.components.sidebar.SidebarFooter.signInFailed',
+          'components.sidebarAccount.signInFailed',
           'HiveCloud sign-in failed. Try again or check the service status.'
         )
       )
@@ -232,22 +232,19 @@ const SidebarFooter = React.memo(function SidebarFooter() {
       if (result.status === 'local-only') {
         toast.warning(
           translate(
-            'auto.components.sidebar.SidebarFooter.localSignOut',
+            'components.sidebarAccount.localSignOut',
             'Signed out locally. Revoke the remote session from HiveCloud Security when online.'
           )
         )
       } else {
         toast.success(
-          translate(
-            'auto.components.sidebar.SidebarFooter.signOutSuccess',
-            'Signed out of HiveCloud'
-          )
+          translate('components.sidebarAccount.signOutSuccess', 'Signed out of HiveCloud')
         )
       }
     } catch {
       toast.error(
         translate(
-          'auto.components.sidebar.SidebarFooter.signOutFailed',
+          'components.sidebarAccount.signOutFailed',
           "Couldn't sign out of HiveCloud. Check file permissions and try again."
         )
       )
@@ -263,10 +260,10 @@ const SidebarFooter = React.memo(function SidebarFooter() {
 
   const accountDisplayName = accountState?.account?.displayName || APP_DISPLAY_NAME
   const accountStatusLabel = connected
-    ? 'HiveCloud 已连接'
+    ? translate('components.sidebarAccount.connected', 'HiveCloud connected')
     : accountState?.status === 'error'
-      ? '连接状态待确认'
-      : '本地模式'
+      ? translate('components.sidebarAccount.statusUnknown', 'Connection status pending')
+      : translate('components.sidebarAccount.localMode', 'Local mode')
   const accountStatusTone = connected
     ? 'is-connected'
     : accountState?.status === 'error'
@@ -276,7 +273,9 @@ const SidebarFooter = React.memo(function SidebarFooter() {
   const openAccountCenter = (): void => openSettingsPane('orca-account')
   const copyAccountName = (): void => {
     void navigator.clipboard?.writeText(accountDisplayName)
-    toast.success('账号信息已复制')
+    toast.success(
+      translate('components.sidebarAccount.accountCopied', 'Account information copied')
+    )
   }
 
   return (
@@ -287,7 +286,13 @@ const SidebarFooter = React.memo(function SidebarFooter() {
             <button
               type="button"
               className={`hive-account-trigger flex h-14 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-worktree-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-worktree-sidebar-ring/50${accountState === null ? ' cursor-wait opacity-70' : ''}`}
-              aria-label={`账户菜单：${accountDisplayName}`}
+              aria-label={translate(
+                'components.sidebarAccount.menuLabel',
+                'Account menu: {{name}}',
+                {
+                  name: accountDisplayName
+                }
+              )}
               data-account-status={connected ? 'signed-in' : 'signed-out'}
               data-sidebar-account-trigger=""
               disabled={accountState === null}
@@ -297,11 +302,15 @@ const SidebarFooter = React.memo(function SidebarFooter() {
               </span>
               <span className="flex min-w-0 flex-1 flex-col justify-center leading-none">
                 <span className="truncate text-[13px] font-semibold">
-                  {connected ? accountDisplayName : '本地模式'}
+                  {connected
+                    ? accountDisplayName
+                    : translate('components.sidebarAccount.localMode', 'Local mode')}
                 </span>
                 <span className={`hive-account-trigger-status ${accountStatusTone}`}>
                   <span className="hive-account-status-dot" aria-hidden="true" />
-                  {connected ? accountStatusLabel : '登录 HiveCloud'}
+                  {connected
+                    ? accountStatusLabel
+                    : translate('components.sidebarAccount.signIn', 'Sign in to HiveCloud')}
                 </span>
               </span>
             </button>
@@ -318,23 +327,53 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                 type="button"
                 className="hive-account-popover-identity"
                 onClick={openAccountCenter}
-                aria-label="打开账户中心"
+                aria-label={translate(
+                  'components.sidebarAccount.openCenter',
+                  'Open account center'
+                )}
               >
                 <span className="hive-account-popover-avatar">
                   <img src={accountMascot} alt="" aria-hidden="true" />
                 </span>
                 <span className="hive-account-popover-identity-copy">
-                  <strong>{connected ? accountDisplayName : '本地模式'}</strong>
-                  <span>{connected ? 'HiveCloud 账户' : 'HiveCode 本地工作区'}</span>
-                  <em>{connected ? '蜂核智能 · 工作账号' : '未连接云端账户'}</em>
+                  <strong>
+                    {connected
+                      ? accountDisplayName
+                      : translate('components.sidebarAccount.localMode', 'Local mode')}
+                  </strong>
+                  <span>
+                    {connected
+                      ? translate('components.sidebarAccount.cloudAccount', 'HiveCloud account')
+                      : translate(
+                          'components.sidebarAccount.localWorkspace',
+                          'HiveCode local workspace'
+                        )}
+                  </span>
+                  <em>
+                    {connected
+                      ? translate(
+                          'components.sidebarAccount.workAccount',
+                          'HiveKernel · Work account'
+                        )
+                      : translate(
+                          'components.sidebarAccount.notConnected',
+                          'Cloud account not connected'
+                        )}
+                  </em>
                 </span>
               </button>
               {connected ? (
                 <button
                   type="button"
                   className="hive-account-icon-button"
-                  aria-label="复制账号信息"
-                  data-tooltip="复制账号信息"
+                  aria-label={translate(
+                    'components.sidebarAccount.copyAccount',
+                    'Copy account information'
+                  )}
+                  data-tooltip={translate(
+                    'components.sidebarAccount.copyAccount',
+                    'Copy account information'
+                  )}
                   onClick={copyAccountName}
                 >
                   <Copy className="size-4" />
@@ -344,24 +383,38 @@ const SidebarFooter = React.memo(function SidebarFooter() {
 
             {!connected ? (
               <div className="hive-account-local-cta">
-                <p>HiveCode 的本地项目、终端与 Agent 功能可正常使用。</p>
+                <p>
+                  {translate(
+                    'components.sidebarAccount.localFeatures',
+                    'HiveCode local projects, terminals, and agent features remain available.'
+                  )}
+                </p>
                 <button type="button" className="hive-account-primary" onClick={requestSignIn}>
                   <LogIn className="size-4" />
-                  登录 HiveCloud
+                  {translate('components.sidebarAccount.signIn', 'Sign in to HiveCloud')}
                 </button>
-                <span>登录后可管理跨设备 Runtime、会话和组织资源。</span>
+                <span>
+                  {translate(
+                    'components.sidebarAccount.cloudBenefits',
+                    'Sign in to manage cross-device Runtimes, sessions, and organization resources.'
+                  )}
+                </span>
               </div>
             ) : null}
 
             <div className="hive-account-menu-group">
               <DropdownMenuItem className="hive-account-menu-item" onSelect={openAccountCenter}>
                 <UserRound className="hive-account-menu-icon" />
-                <span>账户中心</span>
+                <span>
+                  {translate('components.sidebarAccount.accountCenter', 'Account center')}
+                </span>
                 <ChevronRight className="hive-account-menu-chevron" />
               </DropdownMenuItem>
               <DropdownMenuItem className="hive-account-menu-item" onSelect={openAccountCenter}>
                 <Cloud className="hive-account-menu-icon" />
-                <span>HiveCloud 连接</span>
+                <span>
+                  {translate('components.sidebarAccount.cloudConnection', 'HiveCloud connection')}
+                </span>
                 <span className={`hive-account-menu-value ${accountStatusTone}`}>
                   <span className="hive-account-status-dot" aria-hidden="true" />
                   {accountStatusLabel}
@@ -372,14 +425,28 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                 <>
                   <DropdownMenuItem className="hive-account-menu-item" onSelect={openAccountCenter}>
                     <MonitorSmartphone className="hive-account-menu-icon" />
-                    <span>设备与会话</span>
-                    <span className="hive-account-menu-value">查看详情</span>
+                    <span>
+                      {translate(
+                        'components.sidebarAccount.devicesSessions',
+                        'Devices and sessions'
+                      )}
+                    </span>
+                    <span className="hive-account-menu-value">
+                      {translate('components.sidebarAccount.viewDetails', 'View details')}
+                    </span>
                     <ChevronRight className="hive-account-menu-chevron" />
                   </DropdownMenuItem>
                   <DropdownMenuItem className="hive-account-menu-item" onSelect={openAccountCenter}>
                     <Database className="hive-account-menu-icon" />
-                    <span>存储与资源</span>
-                    <span className="hive-account-menu-value">查看详情</span>
+                    <span>
+                      {translate(
+                        'components.sidebarAccount.storageResources',
+                        'Storage and resources'
+                      )}
+                    </span>
+                    <span className="hive-account-menu-value">
+                      {translate('components.sidebarAccount.viewDetails', 'View details')}
+                    </span>
                     <ChevronRight className="hive-account-menu-chevron" />
                   </DropdownMenuItem>
                 </>
@@ -392,13 +459,17 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                 onSelect={() => openSettingsPane('appearance')}
               >
                 <Settings className="hive-account-menu-icon" />
-                <span>设置</span>
+                <span>{translate('components.sidebarAccount.settings', 'Settings')}</span>
                 <ChevronRight className="hive-account-menu-chevron" />
               </DropdownMenuItem>
               <div className="hive-account-menu-item hive-account-theme-row">
                 <Sun className="hive-account-menu-icon" />
-                <span>外观</span>
-                <div className="hive-account-theme-switch" role="group" aria-label="外观主题">
+                <span>{translate('components.sidebarAccount.appearance', 'Appearance')}</span>
+                <div
+                  className="hive-account-theme-switch"
+                  role="group"
+                  aria-label={translate('components.sidebarAccount.theme', 'Theme')}
+                >
                   {(['system', 'light', 'dark'] as const).map((theme) => (
                     <button
                       type="button"
@@ -406,26 +477,37 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                       className={activeTheme === theme ? 'is-active' : ''}
                       onClick={() => void updateSettings({ theme })}
                     >
-                      {theme === 'system' ? '系统' : theme === 'light' ? '浅色' : '深色'}
+                      {translate(
+                        `components.sidebarAccount.theme${theme[0].toUpperCase()}${theme.slice(1)}`,
+                        theme
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
               <DropdownMenuItem className="hive-account-menu-item" onSelect={openNotifications}>
                 <Bell className="hive-account-menu-icon" />
-                <span>通知中心</span>
-                <span className="hive-account-menu-value">无未读</span>
+                <span>{translate('components.sidebarAccount.notifications', 'Notifications')}</span>
+                <span className="hive-account-menu-value">
+                  {translate('components.sidebarAccount.noUnread', 'No unread')}
+                </span>
                 <ChevronRight className="hive-account-menu-chevron" />
               </DropdownMenuItem>
               <DropdownMenuItem className="hive-account-menu-item">
                 <CircleHelp className="hive-account-menu-icon" />
-                <span>帮助与反馈</span>
+                <span>
+                  {translate('components.sidebarAccount.helpFeedback', 'Help and feedback')}
+                </span>
                 <ChevronRight className="hive-account-menu-chevron" />
               </DropdownMenuItem>
               <DropdownMenuItem className="hive-account-menu-item">
                 <RefreshCw className="hive-account-menu-icon" />
-                <span>检查更新</span>
-                <span className="hive-account-menu-value">已是最新版本</span>
+                <span>
+                  {translate('components.sidebarAccount.checkUpdates', 'Check for updates')}
+                </span>
+                <span className="hive-account-menu-value">
+                  {translate('components.sidebarAccount.upToDate', 'Up to date')}
+                </span>
                 <ChevronRight className="hive-account-menu-chevron" />
               </DropdownMenuItem>
             </div>
@@ -437,7 +519,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                   onSelect={() => setSignOutOpen(true)}
                 >
                   <LogOut className="hive-account-menu-icon" />
-                  <span>退出登录</span>
+                  <span>{translate('components.sidebarAccount.signOut', 'Sign out')}</span>
                 </DropdownMenuItem>
               </div>
             ) : null}
@@ -453,11 +535,8 @@ const SidebarFooter = React.memo(function SidebarFooter() {
               className="relative shrink-0 text-muted-foreground"
               aria-label={
                 showActivity
-                  ? translate('auto.components.sidebar.SidebarFooter.activity', 'Activity')
-                  : translate(
-                      'auto.components.sidebar.SidebarFooter.notifications',
-                      'Notifications'
-                    )
+                  ? translate('components.sidebarAccount.activity', 'Activity')
+                  : translate('components.sidebarAccount.notifications', 'Notifications')
               }
               onClick={openNotifications}
             >
@@ -466,8 +545,8 @@ const SidebarFooter = React.memo(function SidebarFooter() {
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}>
             {showActivity
-              ? translate('auto.components.sidebar.SidebarFooter.activity', 'Activity')
-              : translate('auto.components.sidebar.SidebarFooter.notifications', 'Notifications')}
+              ? translate('components.sidebarAccount.activity', 'Activity')
+              : translate('components.sidebarAccount.notifications', 'Notifications')}
           </TooltipContent>
         </Tooltip>
 

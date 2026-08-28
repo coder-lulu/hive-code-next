@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ExternalLink, X } from 'lucide-react'
 import type { Repo } from '../../../../shared/repo-types'
 import type { PreflightIssue } from '../landing-preflight-issues'
@@ -7,6 +8,7 @@ import {
   githubProjectKeys,
   isPreflightIssueDismissed
 } from '../landing-preflight-dismissal'
+import { translate } from '@/i18n/i18n'
 
 export function LandingPreflightBanner({
   issues,
@@ -15,6 +17,7 @@ export function LandingPreflightBanner({
   issues: PreflightIssue[]
   repos: readonly Repo[]
 }): React.JSX.Element | null {
+  useTranslation()
   const githubKey = githubProjectKeys(repos).join('|')
   const [dismissed, setDismissed] = useState<Set<string>>(
     () =>
@@ -64,7 +67,7 @@ export function LandingPreflightBanner({
             <button
               type="button"
               className="desktop-home-icon-button"
-              aria-label="关闭提示"
+              aria-label={translate('components.desktopHome.preflight.dismiss', 'Dismiss notice')}
               onClick={() => {
                 dismissPreflightIssue(issue.id, repos)
                 setDismissed((current) => new Set(current).add(issue.id))

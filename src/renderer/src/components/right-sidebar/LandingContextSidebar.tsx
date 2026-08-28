@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowRight, Bot, FileCode2, FolderGit2, GitBranch, PanelRight, Play } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useSidebarResize } from '@/hooks/useSidebarResize'
@@ -7,6 +8,8 @@ import {
   buildDesktopHomeModel,
   formatHomeRelativeTime
 } from '@/components/landing/desktop-home-model'
+import type { HomeRelativeTimeLabels } from '@/components/landing/desktop-home-model'
+import { translate } from '@/i18n/i18n'
 import { SidebarSettingsHelpMenu } from '@/components/sidebar/SidebarSettingsHelpMenu'
 import { useWindowWidth } from './use-window-width'
 import {
@@ -20,6 +23,7 @@ export function LandingContextSidebar({
 }: {
   showSettingsHelpControls?: boolean
 }): React.JSX.Element {
+  useTranslation()
   const rightSidebarOpen = useAppStore((state) => state.rightSidebarOpen)
   const rightSidebarWidth = useAppStore((state) => state.rightSidebarWidth)
   const setRightSidebarWidth = useAppStore((state) => state.setRightSidebarWidth)
@@ -44,24 +48,37 @@ export function LandingContextSidebar({
     setWidth: setRightSidebarWidth
   })
   const workspace = model.currentWorkspace
+  const timeLabels: HomeRelativeTimeLabels = {
+    unused: translate('components.desktopHome.time.unused', 'Not used yet'),
+    justNow: translate('components.desktopHome.time.justNow', 'Just now'),
+    minutesAgo: (value) =>
+      translate('components.desktopHome.time.minutesAgo', '{{value}} min ago', { value }),
+    hoursAgo: (value) =>
+      translate('components.desktopHome.time.hoursAgo', '{{value}} hr ago', { value }),
+    daysAgo: (value) =>
+      translate('components.desktopHome.time.daysAgo', '{{value}} days ago', { value })
+  }
 
   return (
     <aside
       ref={containerRef}
       className={`landing-context-sidebar${rightSidebarOpen ? ' is-open' : ''}`}
-      aria-label="当前上下文"
+      aria-label={translate('components.landingContext.currentContext', 'Current context')}
     >
       {rightSidebarOpen ? (
         <>
           <header className="landing-context-header right-sidebar-header-inset right-sidebar-header-drag">
-            <span>当前上下文</span>
+            <span>{translate('components.landingContext.currentContext', 'Current context')}</span>
             <div className="flex shrink-0 items-center gap-1">
               {showSettingsHelpControls ? <SidebarSettingsHelpMenu /> : null}
               <button
                 type="button"
                 className="sidebar-toggle"
                 onClick={toggleRightSidebar}
-                aria-label="关闭当前上下文"
+                aria-label={translate(
+                  'components.landingContext.closeContext',
+                  'Close current context'
+                )}
               >
                 <PanelRight size={16} />
               </button>
@@ -71,7 +88,9 @@ export function LandingContextSidebar({
             {workspace ? (
               <>
                 <section className="landing-context-section">
-                  <p className="landing-context-label">工作区</p>
+                  <p className="landing-context-label">
+                    {translate('components.landingContext.workspace', 'Workspace')}
+                  </p>
                   <button
                     type="button"
                     className="landing-context-workspace"
@@ -90,59 +109,75 @@ export function LandingContextSidebar({
                     <div>
                       <dt>
                         <GitBranch />
-                        分支
+                        {translate('components.landingContext.branch', 'Branch')}
                       </dt>
                       <dd>{workspace.branch}</dd>
                     </div>
                     <div>
                       <dt>
                         <FolderGit2 />
-                        位置
+                        {translate('components.landingContext.location', 'Location')}
                       </dt>
                       <dd title={workspace.path}>{workspace.path}</dd>
                     </div>
                     <div>
                       <dt>
                         <Play />
-                        会话
+                        {translate('components.landingContext.sessions', 'Sessions')}
                       </dt>
                       <dd>{workspace.sessionCount}</dd>
                     </div>
                     <div>
                       <dt>
                         <Bot />
-                        活动
+                        {translate('components.landingContext.activity', 'Activity')}
                       </dt>
-                      <dd>{formatHomeRelativeTime(workspace.lastActivityAt)}</dd>
+                      <dd>
+                        {formatHomeRelativeTime(workspace.lastActivityAt, Date.now(), timeLabels)}
+                      </dd>
                     </div>
                   </dl>
                 </section>
 
                 <section className="landing-context-section">
-                  <p className="landing-context-label">当前打开的文件</p>
+                  <p className="landing-context-label">
+                    {translate('components.landingContext.openFiles', 'Open files')}
+                  </p>
                   {model.currentFiles.length ? (
                     <div className="landing-context-files">
                       {model.currentFiles.map((file) => (
                         <div key={file.id}>
                           <FileCode2 />
                           <span title={file.relativePath}>{file.relativePath}</span>
-                          {file.isDirty ? <i aria-label="未保存" /> : null}
+                          {file.isDirty ? (
+                            <i
+                              aria-label={translate('components.landingContext.unsaved', 'Unsaved')}
+                            />
+                          ) : null}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="landing-context-muted">该工作区尚未打开文件。</p>
+                    <p className="landing-context-muted">
+                      {translate(
+                        'components.landingContext.noOpenFiles',
+                        'No files are open in this workspace.'
+                      )}
+                    </p>
                   )}
                 </section>
 
                 <section className="landing-context-section">
-                  <p className="landing-context-label">建议操作</p>
+                  <p className="landing-context-label">
+                    {translate('components.landingContext.suggestedActions', 'Suggested actions')}
+                  </p>
                   <button
                     type="button"
                     className="landing-context-primary"
                     onClick={() => activateAndRevealWorkspace(workspace.id)}
                   >
-                    继续上次工作 <ArrowRight />
+                    {translate('components.landingContext.continueWork', 'Continue previous work')}{' '}
+                    <ArrowRight />
                   </button>
                   <button
                     type="button"
@@ -154,7 +189,10 @@ export function LandingContextSidebar({
                       })
                     }
                   >
-                    基于此项目新建工作区
+                    {translate(
+                      'components.landingContext.newWorkspaceFromProject',
+                      'Create a workspace from this project'
+                    )}
                   </button>
                 </section>
               </>
@@ -163,10 +201,15 @@ export function LandingContextSidebar({
                 <span>
                   <FolderGit2 />
                 </span>
-                <h2>尚未选择上下文</h2>
-                <p>添加项目并创建工作区后，这里会显示分支、文件与推荐操作。</p>
+                <h2>{translate('components.landingContext.noContext', 'No context selected')}</h2>
+                <p>
+                  {translate(
+                    'components.landingContext.noContextDescription',
+                    'Add a project and create a workspace to see branches, files, and recommended actions here.'
+                  )}
+                </p>
                 <button type="button" onClick={() => openModal('add-repo')}>
-                  添加项目
+                  {translate('components.desktopHome.addProject', 'Add project')}
                 </button>
               </div>
             )}

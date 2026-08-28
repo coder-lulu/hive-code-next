@@ -35,9 +35,17 @@ export type DesktopHomeWorkspace = {
   path: string
   branch: string
   badgeColor: string | null
-  hostLabel: '本地' | 'SSH' | '云端'
+  hostLabel: 'local' | 'ssh' | 'cloud'
   sessionCount: number
   lastActivityAt: number
+}
+
+export type HomeRelativeTimeLabels = {
+  unused: string
+  justNow: string
+  minutesAgo: (value: number) => string
+  hoursAgo: (value: number) => string
+  daysAgo: (value: number) => string
 }
 
 export type DesktopHomeModel = {
@@ -64,7 +72,7 @@ function branchLabel(branch: string | null | undefined, isMain: boolean | undefi
   if (normalized) {
     return normalized
   }
-  return isMain ? 'main' : '未命名分支'
+  return isMain ? 'main' : 'unnamed'
 }
 
 function hostLabel(
@@ -73,12 +81,12 @@ function hostLabel(
 ): DesktopHomeWorkspace['hostLabel'] {
   const host = worktree.hostId ?? repo.executionHostId ?? ''
   if (host.startsWith('runtime:')) {
-    return '云端'
+    return 'cloud'
   }
   if (host.startsWith('ssh:') || repo.connectionId) {
-    return 'SSH'
+    return 'ssh'
   }
-  return '本地'
+  return 'local'
 }
 
 export function buildDesktopHomeModel(input: {
@@ -125,21 +133,27 @@ export function buildDesktopHomeModel(input: {
   }
 }
 
-export function formatHomeRelativeTime(value: number, now = Date.now()): string {
+export function formatHomeRelativeTime(
+  value: number,
+  now = Date.now(),
+  labels?: HomeRelativeTimeLabels
+): string {
   if (!value) {
-    return '尚未使用'
+    return labels?.unused ?? 'Not used yet'
   }
   const minutes = Math.max(0, Math.floor((now - value) / 60_000))
   if (minutes < 1) {
-    return '刚刚'
+    return labels?.justNow ?? 'Just now'
   }
   if (minutes < 60) {
-    return `${minutes} 分钟前`
+    return labels?.minutesAgo(minutes) ?? `${minutes} min ago`
   }
   const hours = Math.floor(minutes / 60)
   if (hours < 24) {
-    return `${hours} 小时前`
+    return labels?.hoursAgo(hours) ?? `${hours} hr ago`
   }
   const days = Math.floor(hours / 24)
-  return days < 30 ? `${days} 天前` : new Date(value).toLocaleDateString('zh-CN')
+  return days < 30
+    ? (labels?.daysAgo(days) ?? `${days} days ago`)
+    : new Date(value).toLocaleDateString()
 }

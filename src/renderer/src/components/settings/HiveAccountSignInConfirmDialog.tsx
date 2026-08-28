@@ -1,4 +1,7 @@
+/* eslint-disable max-lines -- The sign-in dialog keeps its two authentication modes in one accessible flow. */
+
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Globe2, Loader2, Monitor, ShieldCheck } from 'lucide-react'
 import mascotUrl from '../../../../../resources/desktop-home-mascot-float.png'
 import githubIconUrl from '../../../../../mobile/assets/auth-icons/github.png'
@@ -39,6 +42,7 @@ export function HiveAccountSignInConfirmDialog({
   onSmsComplete?: (challengeId: string, smsCode: string) => Promise<void>
   signingIn: boolean
 }): React.JSX.Element {
+  useTranslation()
   const [method, setMethod] = useState<'sms' | 'browser'>('sms')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [smsCode, setSmsCode] = useState('')
@@ -62,11 +66,18 @@ export function HiveAccountSignInConfirmDialog({
 
   const startSms = async (): Promise<void> => {
     if (!onSmsStart || !/^\+?[0-9]{6,20}$/.test(phoneNumber.trim())) {
-      setSmsError('请输入有效手机号。')
+      setSmsError(
+        translate('components.hiveAccountSignIn.invalidPhone', 'Enter a valid phone number.')
+      )
       return
     }
     if (!smsTermsAccepted) {
-      setSmsError('请先同意《服务条款》和《隐私政策》。')
+      setSmsError(
+        translate(
+          'components.hiveAccountSignIn.acceptTermsError',
+          'Please accept the Terms of Service and Privacy Policy first.'
+        )
+      )
       return
     }
     const attempt = ++smsAttempt.current
@@ -82,7 +93,12 @@ export function HiveAccountSignInConfirmDialog({
       }
     } catch {
       if (attempt === smsAttempt.current) {
-        setSmsError('验证码发送失败，请稍后重试。')
+        setSmsError(
+          translate(
+            'components.hiveAccountSignIn.sendCodeFailed',
+            'Could not send the code. Try again later.'
+          )
+        )
       }
     } finally {
       setStartingSms(false)
@@ -91,14 +107,16 @@ export function HiveAccountSignInConfirmDialog({
 
   const completeSms = async (): Promise<void> => {
     if (!challenge || !/^\d{6}$/.test(smsCode)) {
-      setSmsError('请输入 6 位验证码。')
+      setSmsError(translate('components.hiveAccountSignIn.invalidCode', 'Enter the 6-digit code.'))
       return
     }
     setSmsError(null)
     try {
       await onSmsComplete?.(challenge.challengeId, smsCode)
     } catch {
-      setSmsError('验证码无效或已过期。')
+      setSmsError(
+        translate('components.hiveAccountSignIn.codeExpired', 'The code is invalid or expired.')
+      )
     }
   }
 
@@ -133,41 +151,62 @@ export function HiveAccountSignInConfirmDialog({
               <img src={PRODUCT_LOGO_URL} alt="" />
               <div>
                 <strong>HiveCloud</strong>
-                <span>云端控制面</span>
+                <span>
+                  {translate('components.hiveAccountSignIn.cloudConsole', 'Cloud control plane')}
+                </span>
               </div>
             </div>
             <div className="hive-account-mascot-wrap">
-              <img src={mascotUrl} alt="HiveCode 机器人小蜜蜂" />
+              <img
+                src={mascotUrl}
+                alt={translate('components.hiveAccountSignIn.mascotAlt', 'HiveCode robot bee')}
+              />
             </div>
             <div className="hive-account-brand-copy">
-              <h2>安全连接，高效协同</h2>
-              <p>登录后可管理 Runtime、设备与会话。</p>
-              <small>关闭窗口后仍可继续使用 HiveCode 本地功能。</small>
+              <h2>
+                {translate(
+                  'components.hiveAccountSignIn.brandTitle',
+                  'Secure connection, efficient collaboration'
+                )}
+              </h2>
+              <p>
+                {translate(
+                  'components.hiveAccountSignIn.brandDescription',
+                  'Manage Runtimes, devices, and sessions after signing in.'
+                )}
+              </p>
+              <small>
+                {translate(
+                  'components.hiveAccountSignIn.brandNote',
+                  'HiveCode local features remain available after you close this window.'
+                )}
+              </small>
             </div>
           </aside>
 
           <section className="hive-account-form-panel">
             <DialogHeader className="hive-account-form-header">
               <DialogTitle>
-                {translate(
-                  'auto.components.settings.orcaAccount.signInConfirmTitle',
-                  '登录 HiveCloud'
-                )}
+                {translate('components.hiveAccountSignIn.title', 'Sign in to HiveCloud')}
               </DialogTitle>
               <DialogDescription>
                 {method === 'sms'
                   ? translate(
-                      'auto.components.settings.orcaAccount.smsSignInDescription',
-                      '验证手机号即可继续，无需离开当前应用。'
+                      'components.hiveAccountSignIn.smsDescription',
+                      'Verify your phone number to continue without leaving the app.'
                     )
                   : translate(
-                      'auto.components.settings.orcaAccount.signInConfirmDescription',
-                      '将在系统浏览器中完成安全认证。认证完成后会自动返回 HiveCode。'
+                      'components.hiveAccountSignIn.browserDescription',
+                      'Complete secure authentication in your system browser and return to HiveCode automatically.'
                     )}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="hive-account-method-switch" role="tablist" aria-label="登录方式">
+            <div
+              className="hive-account-method-switch"
+              role="tablist"
+              aria-label={translate('components.hiveAccountSignIn.loginMethods', 'Sign-in methods')}
+            >
               <button
                 type="button"
                 role="tab"
@@ -175,7 +214,7 @@ export function HiveAccountSignInConfirmDialog({
                 className={method === 'sms' ? 'is-active' : ''}
                 onClick={() => switchMethod('sms')}
               >
-                手机验证码
+                {translate('components.hiveAccountSignIn.smsTab', 'Phone code')}
               </button>
               <button
                 type="button"
@@ -184,7 +223,7 @@ export function HiveAccountSignInConfirmDialog({
                 className={method === 'browser' ? 'is-active' : ''}
                 onClick={() => switchMethod('browser')}
               >
-                浏览器登录
+                {translate('components.hiveAccountSignIn.browserTab', 'Browser')}
               </button>
             </div>
 
@@ -192,7 +231,9 @@ export function HiveAccountSignInConfirmDialog({
               <div className="hive-account-login-body">
                 {!challenge ? (
                   <div className="hive-account-field">
-                    <Label htmlFor="hive-account-phone">手机号</Label>
+                    <Label htmlFor="hive-account-phone">
+                      {translate('components.hiveAccountSignIn.phoneLabel', 'Phone number')}
+                    </Label>
                     <div
                       className={`hive-account-phone-input${smsError && !smsTermsAccepted ? ' has-error' : ''}`}
                     >
@@ -209,14 +250,19 @@ export function HiveAccountSignInConfirmDialog({
                         disabled={smsBusy}
                         inputMode="tel"
                         autoComplete="tel"
-                        placeholder="请输入手机号"
+                        placeholder={translate(
+                          'components.hiveAccountSignIn.phonePlaceholder',
+                          'Enter your phone number'
+                        )}
                         aria-invalid={Boolean(smsError && !smsTermsAccepted)}
                       />
                     </div>
                   </div>
                 ) : (
                   <div className="hive-account-code-summary">
-                    <span>验证码已发送至</span>
+                    <span>
+                      {translate('components.hiveAccountSignIn.codeSentTo', 'Code sent to')}
+                    </span>
                     <strong>
                       {phoneNumber.replace(/^(\+?86)?(\d{3})\d{4}(\d{4})$/, '$2 **** $3')}
                     </strong>
@@ -224,7 +270,9 @@ export function HiveAccountSignInConfirmDialog({
                 )}
                 {challenge ? (
                   <div className="hive-account-field">
-                    <Label htmlFor="hive-account-sms-code">验证码</Label>
+                    <Label htmlFor="hive-account-sms-code">
+                      {translate('components.hiveAccountSignIn.codeLabel', 'Verification code')}
+                    </Label>
                     <input
                       id="hive-account-sms-code"
                       className="hive-account-text-input hive-account-code-input"
@@ -235,10 +283,19 @@ export function HiveAccountSignInConfirmDialog({
                       disabled={smsBusy}
                       inputMode="numeric"
                       autoComplete="one-time-code"
-                      placeholder="请输入 6 位验证码"
+                      placeholder={translate(
+                        'components.hiveAccountSignIn.codePlaceholder',
+                        'Enter the 6-digit code'
+                      )}
                     />
                     <p className="hive-account-code-hint">
-                      {challenge.expiresInSeconds} 秒后重新发送
+                      {translate(
+                        'components.hiveAccountSignIn.resendCountdown',
+                        'Resend in {{seconds}}s',
+                        {
+                          seconds: challenge.expiresInSeconds
+                        }
+                      )}
                     </p>
                   </div>
                 ) : null}
@@ -250,8 +307,17 @@ export function HiveAccountSignInConfirmDialog({
                       disabled={smsBusy}
                     />
                     <span>
-                      我已阅读并同意 <a href="#terms">《服务条款》</a> 和{' '}
-                      <a href="#privacy">《隐私政策》</a>
+                      {translate(
+                        'components.hiveAccountSignIn.termsPrefix',
+                        'I have read and agree to'
+                      )}{' '}
+                      <a href="#terms">
+                        {translate('components.hiveAccountSignIn.terms', 'Terms of Service')}
+                      </a>{' '}
+                      {translate('components.hiveAccountSignIn.and', 'and')}{' '}
+                      <a href="#privacy">
+                        {translate('components.hiveAccountSignIn.privacy', 'Privacy Policy')}
+                      </a>
                     </span>
                   </label>
                 ) : null}
@@ -267,7 +333,11 @@ export function HiveAccountSignInConfirmDialog({
                   disabled={smsBusy}
                 >
                   {smsBusy ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {challenge ? '确认登录' : smsBusy ? '正在发送…' : '获取验证码'}
+                  {challenge
+                    ? translate('components.hiveAccountSignIn.confirm', 'Sign in')
+                    : smsBusy
+                      ? translate('components.hiveAccountSignIn.sending', 'Sending…')
+                      : translate('components.hiveAccountSignIn.getCode', 'Get code')}
                 </Button>
               </div>
             ) : (
@@ -275,8 +345,18 @@ export function HiveAccountSignInConfirmDialog({
                 <div className="hive-account-browser-icon">
                   <Globe2 aria-hidden="true" />
                 </div>
-                <strong>将在系统浏览器中完成安全认证</strong>
-                <p>认证完成后会自动返回 HiveCode。</p>
+                <strong>
+                  {translate(
+                    'components.hiveAccountSignIn.browserTitle',
+                    'Complete secure authentication in your browser'
+                  )}
+                </strong>
+                <p>
+                  {translate(
+                    'components.hiveAccountSignIn.browserDescription',
+                    'You will return to HiveCode automatically after authentication.'
+                  )}
+                </p>
                 <Button
                   type="button"
                   className="hive-account-primary"
@@ -284,7 +364,12 @@ export function HiveAccountSignInConfirmDialog({
                   disabled={signingIn}
                 >
                   {signingIn ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {signingIn ? '正在打开…' : '在浏览器中继续'}
+                  {signingIn
+                    ? translate('components.hiveAccountSignIn.opening', 'Opening…')
+                    : translate(
+                        'components.hiveAccountSignIn.continueBrowser',
+                        'Continue in browser'
+                      )}
                 </Button>
                 <button
                   type="button"
@@ -292,7 +377,7 @@ export function HiveAccountSignInConfirmDialog({
                   onClick={() => void onConfirm('TRUSTED')}
                   disabled={signingIn}
                 >
-                  复制登录链接
+                  {translate('components.hiveAccountSignIn.copyLink', 'Copy sign-in link')}
                 </button>
               </div>
             )}
@@ -300,29 +385,52 @@ export function HiveAccountSignInConfirmDialog({
             {method === 'sms' && !challenge ? (
               <>
                 <div className="hive-account-divider">
-                  <span>其他登录方式</span>
+                  <span>
+                    {translate(
+                      'components.hiveAccountSignIn.otherMethods',
+                      'Other sign-in methods'
+                    )}
+                  </span>
                 </div>
-                <div className="hive-account-socials" aria-label="其他登录方式">
+                <div
+                  className="hive-account-socials"
+                  aria-label={translate(
+                    'components.hiveAccountSignIn.otherMethods',
+                    'Other sign-in methods'
+                  )}
+                >
                   <button
                     type="button"
-                    aria-label="使用 GitHub 登录"
-                    data-tooltip="使用 GitHub 登录"
+                    aria-label={translate(
+                      'components.hiveAccountSignIn.github',
+                      'Sign in with GitHub'
+                    )}
+                    data-tooltip={translate(
+                      'components.hiveAccountSignIn.github',
+                      'Sign in with GitHub'
+                    )}
                     onClick={() => {}}
                   >
                     <img src={githubIconUrl} alt="" />
                   </button>
                   <button
                     type="button"
-                    aria-label="使用微信登录"
-                    data-tooltip="使用微信登录"
+                    aria-label={translate(
+                      'components.hiveAccountSignIn.wechat',
+                      'Sign in with WeChat'
+                    )}
+                    data-tooltip={translate(
+                      'components.hiveAccountSignIn.wechat',
+                      'Sign in with WeChat'
+                    )}
                     onClick={() => {}}
                   >
                     <img src={wechatIconUrl} alt="" />
                   </button>
                   <button
                     type="button"
-                    aria-label="使用 QQ 登录"
-                    data-tooltip="使用 QQ 登录"
+                    aria-label={translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')}
+                    data-tooltip={translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')}
                     onClick={() => {}}
                   >
                     <img src={qqIconUrl} alt="" />
@@ -334,18 +442,38 @@ export function HiveAccountSignInConfirmDialog({
             <div className="hive-account-security-bar">
               <ShieldCheck aria-hidden="true" />
               <div>
-                <strong>设备凭据受到保护</strong>
-                <span>登录成功后，凭据将安全保存在当前设备。</span>
+                <strong>
+                  {translate(
+                    'components.hiveAccountSignIn.securityTitle',
+                    'Device credentials are protected'
+                  )}
+                </strong>
+                <span>
+                  {translate(
+                    'components.hiveAccountSignIn.securityDescription',
+                    'After sign-in, credentials are stored securely on this device.'
+                  )}
+                </span>
               </div>
             </div>
             <details className="hive-account-context">
               <summary>
-                <span>HiveCode Desktop · 当前设备 · 受保护会话</span>
+                <span>
+                  {translate(
+                    'components.hiveAccountSignIn.contextSummary',
+                    'HiveCode Desktop · Current device · Protected session'
+                  )}
+                </span>
                 <span className="hive-account-context-chevron" aria-hidden="true" />
               </summary>
               <div className="hive-account-context-detail">
                 <Monitor aria-hidden="true" />
-                <span>当前设备将保存加密凭据，后续可在账户设置中撤销。</span>
+                <span>
+                  {translate(
+                    'components.hiveAccountSignIn.contextDetails',
+                    'Encrypted credentials are stored on this device and can be revoked in Account settings.'
+                  )}
+                </span>
               </div>
             </details>
           </section>
