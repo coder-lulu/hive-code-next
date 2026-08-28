@@ -146,6 +146,8 @@ export function MobileNativeChatView({
   const styles = useMobileThemeStyles(createMobileNativeChatViewStyles)
   const insets = useSafeAreaInsets()
   const listRef = useRef<FlatList<NativeChatMessage>>(null)
+  const scrollToIndex = (index: number) =>
+    listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true })
   const [toolsExpanded, setToolsExpanded] = useState(false)
   // Lift the composer clear of the keyboard, plus the bottom safe-area so it
   // never sits under the home indicator / nav bar (mirrors the terminal dock).
@@ -168,12 +170,13 @@ export function MobileNativeChatView({
   const { data } = useMemo(
     () =>
       buildMobileNativeChatTransientData({
+        messages,
         folded,
         streaming,
         pending,
         imagePreviewsByMessageId
       }),
-    [folded, streaming, pending, imagePreviewsByMessageId]
+    [messages, folded, streaming, pending, imagePreviewsByMessageId]
   )
 
   // Follow the tail as the conversation grows and keep the newest message above
@@ -291,13 +294,7 @@ export function MobileNativeChatView({
                   offset: info.averageItemLength * info.index,
                   animated: true
                 })
-                setTimeout(() => {
-                  listRef.current?.scrollToIndex({
-                    index: info.index,
-                    viewPosition: 0,
-                    animated: true
-                  })
-                }, 120)
+                setTimeout(() => scrollToIndex(info.index), 120)
               }}
               ListHeaderComponent={
                 hasMore ? (
