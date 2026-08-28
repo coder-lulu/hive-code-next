@@ -52,6 +52,10 @@ import { normalizeBrowserNavigationUrl } from '../../shared/browser-url'
 import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
 import { iterateBrowserTextInsertionChunks } from './browser-text-insertion'
 import { createAgentBrowserProcessEnvironment } from './agent-browser-process-environment'
+import {
+  ORCA_TAB_SESSION_PREFIX,
+  sweepOrphanedAgentBrowserSessions
+} from './agent-browser-orphan-sweep'
 
 // Why: must exceed agent-browser's internal timeouts (goto 30s, wait 60s) so the bridge never kills a command before its own timeout fires.
 const EXEC_TIMEOUT_MS = 90_000
@@ -701,9 +705,19 @@ export class AgentBrowserBridge {
 
   /** Retire a helper by its stable page identity when WebContents mapping is gone. */
   async onPageClosed(browserPageId: string): Promise<void> {
-    const sessionName = `orca-tab-${browserPageId}`
+    const sessionName = `${ORCA_TAB_SESSION_PREFIX}${browserPageId}`
     await this.destroySession(sessionName)
     this.pendingInterceptRestore.delete(sessionName)
+  }
+
+  async sweepOrphanedSessions(): Promise<string[]> {
+    return sweepOrphanedAgentBrowserSessions({
+      binaryPath: this.agentBrowserBin,
+      env: this.agentBrowserEnv,
+      ownsSocketDirectory: this.ownsAgentBrowserSocketDirectory,
+      isSessionLive: (sessionName) =>
+        this.sessions.has(sessionName) || this.pendingSessionCreation.has(sessionName)
+    })
   }
 
   async onProcessSwap(
@@ -712,7 +726,7 @@ export class AgentBrowserBridge {
     previousWebContentsId?: number
   ): Promise<void> {
     // Why: an Electron process swap keeps browserPageId but gives a new webContentsId — destroy the session so the next command recreates it.
-    const sessionName = `orca-tab-${browserPageId}`
+    const sessionName = `${ORCA_TAB_SESSION_PREFIX}${browserPageId}`
     const session = this.sessions.get(sessionName)
     const oldWebContentsId = previousWebContentsId ?? session?.webContentsId
     const owningWorktreeId = this.browserManager.getWorktreeIdForTab(browserPageId)
