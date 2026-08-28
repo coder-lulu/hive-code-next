@@ -250,7 +250,7 @@ describe('PR workflow parallelism', () => {
 
     expect(
       dependencyAction.runs.steps.find((step) => step.name === 'Use external node-gyp').if
-    ).toBe("inputs.native-runtime != 'none'")
+    ).toBe("runner.os == 'Linux' && inputs.native-runtime != 'none'")
     const dependencyInstall = dependencyAction.runs.steps.find(
       (step) => step.name === 'Install dependencies'
     )
@@ -298,12 +298,16 @@ describe('PR workflow parallelism', () => {
     // overwritten and one after the rebuild would never save a hit.
     expect(installIndex).toBeLessThan(cacheIndex)
     expect(cacheIndex).toBeLessThan(prepareIndex)
-    expect(steps[cacheIndex].if).toBe("inputs.native-runtime != 'none'")
+    expect(steps[cacheIndex].if).toBe(
+      "inputs.native-runtime != 'none' && inputs.persist-native-cache != 'false'"
+    )
     // Native artifacts are ABI-bound: a key missing either dimension serves a build
     // that cannot load, and ensure-native-runtime would recompile it anyway.
     expect(steps[cacheIndex].with.key).toContain('${{ inputs.native-runtime }}')
     expect(steps[cacheIndex].with.key).toContain('steps.requested-node.outputs.node-version')
     expect(steps[cacheIndex].with.key).toContain('config/patches/node-pty@1.1.0.patch')
+    expect(steps[cacheIndex].with.key).toContain('steps.native-cache-scope.outputs.scope')
+    expect(steps[cacheIndex].with.path).toContain('windows-native-registry')
     // No restore-keys: a partial-match key is exactly the ABI-mismatched build above.
     expect(steps[cacheIndex].with['restore-keys']).toBeUndefined()
   })
