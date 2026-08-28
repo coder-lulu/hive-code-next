@@ -204,11 +204,11 @@
     {
       "upstreamSha": "6f8c5888b3acc4011c09498cda27cf3906edd91a",
       "type": "重构",
-      "applied": "暂缓",
+      "applied": "已移植",
       "dependencies": ["3d796b82cba90ffec6018410931bfd40e2287318"],
-      "conflictReason": "Node 26 daily compatibility workflow 尚未纳入产品 CI 规划",
-      "adaptation": "保留现有 Node 24 PR gate，另行评估 daily Node 26 lane",
-      "regressionTests": ["Node compatibility"]
+      "conflictReason": "上游将 PR 主矩阵重排为 reusable workflow，与 HiveCode 现有 PR gate 不同",
+      "adaptation": "新增独立 Node 26 daily/manual reusable unit-test lane；保留 HiveCode Node 24 PR 主矩阵、16 shard 和 required gates",
+      "regressionTests": ["Node compatibility workflow contract", "PR workflow parallelism"]
     },
     {
       "upstreamSha": "8217e6838ff51deac804d93b7ce0a01de3412bca",

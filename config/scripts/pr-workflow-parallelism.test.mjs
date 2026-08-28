@@ -3,6 +3,8 @@ import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
 const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
+const unitTestWorkflow = parse(readFileSync('.github/workflows/unit-tests.yml', 'utf8'))
+const nodeNextWorkflow = parse(readFileSync('.github/workflows/node-next-compat.yml', 'utf8'))
 const dependencyAction = parse(
   readFileSync('.github/actions/install-node-dependencies/action.yml', 'utf8')
 )
@@ -38,6 +40,15 @@ const realZshUsage =
   /(?:spawnSync|execFileSync|spawn)\(\s*['"](?:\/(?:usr\/)?bin\/)?zsh['"]|spawnSync\(\s*['"]which['"]\s*,\s*\[\s*['"]zsh['"]|name:\s*['"]zsh['"]\s*,\s*path:\s*executablePath|from '[^']*zsh-startup-hook-pty-harness'/
 
 describe('PR workflow parallelism', () => {
+  it('keeps Node 26 compatibility in a scheduled reusable lane', () => {
+    expect(unitTestWorkflow.on.workflow_call.inputs.node_versions.required).toBe(true)
+    expect(unitTestWorkflow.jobs.test.strategy.matrix.shard).toHaveLength(16)
+    expect(nodeNextWorkflow.jobs.test.uses).toBe('./.github/workflows/unit-tests.yml')
+    expect(nodeNextWorkflow.jobs.test.with.node_versions).toBe('["26"]')
+    expect(nodeNextWorkflow.on.schedule).toHaveLength(1)
+    expect(nodeNextWorkflow.on.workflow_dispatch).toBeNull()
+  })
+
   it('cancels superseded runs for the same pull request', () => {
     expect(workflow.concurrency.group).toBe('pr-checks-${{ github.event.pull_request.number }}')
     expect(workflow.concurrency['cancel-in-progress']).toBe(true)
