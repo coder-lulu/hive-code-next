@@ -1,4 +1,4 @@
-import { Check, ShieldCheck, Smartphone, X } from 'lucide-react-native'
+import { Check, Smartphone, X } from 'lucide-react-native'
 import {
   ActivityIndicator,
   Pressable,
@@ -107,16 +107,6 @@ export function MobileLoginBottomSheet({
               theme={theme}
               variant="primary"
             />
-            <Text maxFontSizeMultiplier={1.3} style={styles.registrationHint}>
-              首次验证将自动注册新账号
-            </Text>
-          </View>
-
-          <View style={styles.securityLine}>
-            <ShieldCheck color={theme.color.text.secondary} size={18} strokeWidth={1.8} />
-            <Text maxFontSizeMultiplier={1.3} style={styles.securityText}>
-              账号信息将加密传输
-            </Text>
           </View>
 
           {providers.length > 0 ? (

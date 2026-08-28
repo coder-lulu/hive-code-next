@@ -8,13 +8,16 @@ import {
   type AccountsSnapshot,
   type ProviderKey
 } from '../components/AccountUsage'
-import { colors, radii, spacing } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 import type { HostProfile } from '../transport/types'
 
 export function MobileHomeAccountUsageCards(props: {
   items: { host: HostProfile; snapshot: AccountsSnapshot }[]
   onOpen: (hostId: string) => void
 }) {
+  const theme = useMobileTheme()
+  const styles = createStyles(theme)
   if (props.items.length === 0) {
     return null
   }
@@ -57,7 +60,7 @@ export function MobileHomeAccountUsageCards(props: {
                     {provider === 'claude' ? (
                       <ClaudeIcon size={18} />
                     ) : (
-                      <OpenAIIcon size={18} color={colors.textPrimary} />
+                      <OpenAIIcon size={18} color={theme.color.text.primary} />
                     )}
                   </View>
                   <View style={styles.info}>
@@ -89,45 +92,43 @@ export function MobileHomeAccountUsageCards(props: {
   )
 }
 
-const styles = StyleSheet.create({
-  sectionHeading: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.xs
-  },
-  card: {
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    gap: spacing.sm,
-    marginBottom: spacing.sm
-  },
-  cardPressed: { backgroundColor: colors.bgRaised },
-  hostLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4
-  },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
-  icon: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    backgroundColor: colors.bgRaised,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  info: { flex: 1, minWidth: 0, gap: 2 },
-  email: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  bars: { flexDirection: 'row', gap: spacing.md, marginTop: 4 }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    sectionHeading: {
+      ...theme.typography.meta,
+      marginTop: theme.spacing.space24,
+      marginBottom: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space4,
+      color: theme.color.text.secondary,
+      fontWeight: '600'
+    },
+    card: {
+      gap: theme.spacing.space12,
+      marginBottom: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.subtle,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    cardPressed: { backgroundColor: theme.color.bg.subtle },
+    hostLabel: {
+      ...theme.typography.caption,
+      color: theme.color.text.tertiary,
+      fontWeight: '500'
+    },
+    row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space12 },
+    icon: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.subtle
+    },
+    info: { flex: 1, minWidth: 0, gap: theme.spacing.space4 },
+    email: { ...theme.typography.meta, fontWeight: '600', color: theme.color.text.primary },
+    bars: { flexDirection: 'row', gap: theme.spacing.space12, marginTop: theme.spacing.space4 }
+  })
+}

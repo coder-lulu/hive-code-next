@@ -311,7 +311,7 @@ describe('useMobileNativeChatDrafts', () => {
         createElement(Harness, { tabId: 'a', messages: [assistantTextMessage('a1', 'hi')] })
       )
     )
-    const origin = state?.captureSendOrigin('look at this')
+    const origin = state?.captureSendOrigin('look at this', ['file:///a.jpg'])
     act(() => {
       if (origin) {
         state?.acceptSend(origin, 'look at this', ['file:///a.jpg'])
@@ -344,7 +344,7 @@ describe('useMobileNativeChatDrafts', () => {
         createElement(Harness, { tabId: 'a', messages: [assistantTextMessage('a1', 'hi')] })
       )
     )
-    const origin = state?.captureSendOrigin('look at this')
+    const origin = state?.captureSendOrigin('look at this', ['file:///a.jpg'])
     act(() => {
       if (origin) {
         state?.acceptSend(origin, 'look at this', ['file:///a.jpg'])

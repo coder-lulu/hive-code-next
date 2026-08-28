@@ -138,16 +138,24 @@ function normalizeMainEntry(main) {
   return normalized
 }
 
-function resolveMainProductConfigBundle(entries, mainBundle, mainSource) {
+function resolveMainProductConfigBundle(entries, mainBundle, mainSource, readEntry) {
   const candidates = entries
     .map(normalizeAsarEntryPath)
     .filter((entry) => MAIN_PRODUCT_CONFIG_ENTRY_PATTERN.test(entry))
-  if (candidates.length !== 1) {
+  // `brand.ts` imports the generated config and can be emitted as a separate
+  // shared Rollup chunk. It is not itself a runtime config export, so only
+  // count chunks that actually define the product-config CommonJS export.
+  const configCandidates = readEntry
+    ? candidates.filter((entry) =>
+        /Object\.defineProperty\(exports,\s*["']hivecodeProductConfig["']/.test(readEntry(entry))
+      )
+    : candidates
+  if (configCandidates.length !== 1) {
     throw new Error(
-      `Packaged Main must contain exactly one runtime product config chunk (found ${candidates.length})`
+      `Packaged Main must contain exactly one runtime product config chunk (found ${configCandidates.length})`
     )
   }
-  const productConfigBundle = candidates[0]
+  const productConfigBundle = configCandidates[0]
   const relativeRequirePath = `./${posix.relative(posix.dirname(mainBundle), productConfigBundle)}`
   const escapedRequirePath = relativeRequirePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const staticRequirePattern = new RegExp(`require\\(\\s*(["'])${escapedRequirePath}\\1\\s*\\)`)
@@ -549,7 +557,12 @@ function verifyPackagedUpdaterSecurityBoundary(resourcesDir, asar = require('@el
   if (mainTextEntries.length === 0) {
     throw new Error(`Packaged main text entries were not found in ${asarPath}`)
   }
-  const productConfigBundle = resolveMainProductConfigBundle(entries, mainBundle, mainSource)
+  const productConfigBundle = resolveMainProductConfigBundle(
+    entries,
+    mainBundle,
+    mainSource,
+    (entry) => extractAsarText(asar, asarPath, entries, entry)
+  )
   const productConfigSource = extractAsarText(asar, asarPath, entries, productConfigBundle)
   const generatedProductConfigBundle = 'out/shared/generated/product-config.js'
   const generatedProductConfigSource = extractAsarText(

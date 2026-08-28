@@ -141,6 +141,7 @@ const STATUS_TRANSLATIONS: Readonly<Record<string, string>> = {
   "Can't connect": '无法连接',
   "Can't connect via Relay": '无法通过安全中继连接',
   "Can't reach desktop": '无法访问桌面端',
+  'Pairing invalid': '配对已失效',
   'Pairing invalid — re-pair with your desktop': '配对已失效，请与桌面端重新配对'
 }
 

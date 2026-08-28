@@ -116,7 +116,7 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text maxFontSizeMultiplier={1.3} style={styles.subtitle}>
-            验证成功后自动登录；首次验证将自动注册新账号。
+            验证码将发送至你的手机号。
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.inputLabel}>
             手机号

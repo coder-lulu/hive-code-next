@@ -36,6 +36,8 @@ const HostedAddRepoDialog = lazyWithRetry(() => import('@/components/sidebar/Add
 
 type ComposerModalData = {
   prefilledName?: string
+  /** Optional task authored before the workspace exists (for example on the desktop home). */
+  initialPrompt?: string
   initialRepoId?: string
   initialEphemeralVmRecipeId?: string
   initialProjectGroupId?: string
@@ -127,9 +129,10 @@ function QuickTabBody({
     selectAddedProjectRepo
   } = useComposerState({
     initialName: modalData.prefilledName ?? '',
-    // Why: the modal is quick-create only now, so prompt-prefill state is
-    // intentionally ignored even if older callers still send it.
-    initialPrompt: '',
+    // Preserve a home-authored task through workspace creation. The quick composer
+    // already owns the startup-plan path; this avoids creating a terminal while the
+    // user is only drafting on the home surface.
+    initialPrompt: modalData.initialPrompt ?? '',
     initialLinkedWorkItem: modalData.linkedWorkItem ?? null,
     initialGitHubWorkItem: modalData.initialGitHubWorkItem ?? null,
     initialTaskSourceContext: modalData.taskSourceContext ?? null,

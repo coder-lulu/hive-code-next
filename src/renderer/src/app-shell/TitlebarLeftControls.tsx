@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, MoreHorizontal, PanelLeft } from 'lucide-react'
-import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
+import { APP_DISPLAY_NAME, PRODUCT_LOGO_URL as logo } from '@/product-brand'
 import { translate } from '@/i18n/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -79,10 +79,10 @@ export function TitlebarLeftControls({
             <ContextMenuTrigger asChild>
               <div
                 className="titlebar-app-name"
-                aria-label={translate('auto.App.5096cbbc86', 'Orca')}
+                aria-label={translate('auto.App.5096cbbc86', APP_DISPLAY_NAME)}
               >
                 <span className="titlebar-app-name-main">
-                  {translate('auto.App.5096cbbc86', 'Orca')}
+                  {translate('auto.App.5096cbbc86', APP_DISPLAY_NAME)}
                 </span>
               </div>
             </ContextMenuTrigger>

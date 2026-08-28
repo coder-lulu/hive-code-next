@@ -4,6 +4,7 @@ import { Terminal } from 'lucide-react-native'
 import type { TuiAgent } from '../../../src/shared/tui-agent'
 import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg'
 import { colors } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 import { MOBILE_AGENT_CATALOG } from '../tasks/mobile-agent-catalog'
 import { MOBILE_AGENT_ICON_ASSETS } from './mobile-agent-icon-assets'
 import { ClaudeIcon, OpenAIIcon } from './AgentIcons'
@@ -85,12 +86,17 @@ function AgentLetterIcon({ letter, size = 16 }: { letter: string; size?: number 
   )
 }
 
+function ThemeAwareOpenAIIcon({ size = 16 }: { size?: number }) {
+  const theme = useMobileTheme()
+  return <OpenAIIcon size={size} color={theme.color.text.primary} />
+}
+
 export function MobileAgentIcon({ agentId, size = 16 }: { agentId: string; size?: number }) {
   if (agentId === 'claude' || agentId === 'claude-agent-teams') {
     return <ClaudeIcon size={size} />
   }
   if (agentId === 'codex') {
-    return <OpenAIIcon size={size} />
+    return <ThemeAwareOpenAIIcon size={size} />
   }
   if (agentId === 'pi') {
     return <PiIcon size={size} />

@@ -7,6 +7,7 @@ import {
   mergeLandedImagePreviewEchoes,
   migrateImagePreviewMessageIds,
   normalizeReconcileText,
+  normalizeReconcileTextWithLiteralFallback,
   type UnconfirmedSend
 } from './mobile-native-chat-draft-reconcile'
 import { rebaseMobileNativeChatPendingBaselines } from './mobile-native-chat-pending-baseline'
@@ -58,7 +59,7 @@ export function useMobileNativeChatDrafts(args: {
   /** Phone-local previews rebound to the transcript message that replaced the
    *  optimistic echo, keyed by authoritative message id. */
   imagePreviewsByMessageId: Record<string, string[]>
-  captureSendOrigin: (text: string) => MobileNativeChatSendOrigin | null
+  captureSendOrigin: (text: string, images?: readonly string[]) => MobileNativeChatSendOrigin | null
   /** Launch-context text still believed to be parked on the agent's TUI input
    *  line, or null once it has been declined or retired. Send paths size their
    *  pre-clear from it, since one Ctrl+U clears only one logical line. */
@@ -133,11 +134,15 @@ export function useMobileNativeChatDrafts(args: {
   )
 
   const captureSendOrigin = useCallback(
-    (text: string) => {
+    (text: string, images?: readonly string[]) => {
       if (!draftKey) {
         return null
       }
-      const normalizedText = normalizeReconcileText(text)
+      // Without an attached image an `[Image #n]` run is the user's own text;
+      // with images it is the host's placeholder and must be stripped.
+      const normalizedText = images?.length
+        ? normalizeReconcileText(text)
+        : normalizeReconcileTextWithLiteralFallback(text)
       return {
         draftKey,
         pendingKey,

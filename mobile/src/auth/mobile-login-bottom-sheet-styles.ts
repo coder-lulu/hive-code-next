@@ -81,27 +81,12 @@ export function createMobileLoginBottomSheetStyles(theme: MobileTheme) {
     },
     actionPressed: { opacity: 0.72 },
     actionDisabled: { opacity: 0.4 },
-    registrationHint: {
-      ...theme.typography.meta,
-      color: theme.color.text.secondary,
-      textAlign: 'center',
-      marginTop: theme.spacing.space4
-    },
     primaryLabel: { ...theme.typography.body, fontWeight: '600', color: theme.color.text.inverse },
     secondaryLabel: {
       ...theme.typography.body,
       fontWeight: '500',
       color: theme.color.text.primary
     },
-    securityLine: {
-      minHeight: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: theme.spacing.space8,
-      marginTop: theme.spacing.space16
-    },
-    securityText: { ...theme.typography.meta, color: theme.color.text.secondary },
     providerSection: { marginTop: theme.spacing.space24 },
     providerHeading: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space12 },
     providerRule: {

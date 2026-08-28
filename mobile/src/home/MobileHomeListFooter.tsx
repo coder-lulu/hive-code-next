@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import type { AccountsSnapshot } from '../components/AccountUsage'
 import { MobileHomeQuickActions } from '../components/MobileHomeQuickActions'
 import type { TaskProvider } from '../tasks/mobile-task-providers'
-import { colors, spacing } from '../theme/mobile-theme'
+import { spacing } from '../theme/mobile-theme'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
 import type { HostProfile } from '../transport/types'
 import type { HomeResumeCard } from '../worktree/home-resume-card'
@@ -27,11 +27,11 @@ export function MobileHomeListFooter(props: {
     <View>
       {props.resumeCard ? (
         <>
-          <Text style={styles.sectionHeading}>Resume</Text>
+          <Text style={[styles.sectionHeading, { color: theme.color.text.secondary }]}>继续工作</Text>
           <MobileHomeResumeCard card={props.resumeCard} onOpen={props.onOpenResume} />
         </>
       ) : null}
-      <Text style={styles.sectionHeading}>Tasks</Text>
+      <Text style={[styles.sectionHeading, { color: theme.color.text.secondary }]}>任务中心</Text>
       <MobileHomeTasksCard
         enabled={props.primaryHost != null}
         providers={props.primaryTaskProviders}
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.textMuted,
+    color: '#6b7280',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginTop: spacing.lg,

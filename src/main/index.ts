@@ -2,7 +2,16 @@
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import os from 'node:os'
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor, type Tray } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  powerMonitor,
+  session,
+  type Tray
+} from 'electron'
 import { initTccPromptNotice, stopTccPromptNotice } from './macos-tcc-prompt-notice'
 import { electronApp, is } from '@electron-toolkit/utils'
 import {
@@ -11,6 +20,20 @@ import {
   getCanonicalUserDataPath,
   migrateMobilePairingDataToCanonicalUserDataPath
 } from './persistence'
+import { setAppEnvironment } from '../shared/app-environment'
+import { ElectronAppEnvironment } from './host/electron-app-environment'
+import { setPtyHostBindings } from './ipc/pty-host-bindings'
+import { electronRuntimeDesktopSurface } from './host/electron-runtime-desktop-surface'
+import { setRuntimeDesktopSurface } from './runtime/runtime-desktop-surface'
+import { electronRuntimeBrowserCommandsFactory } from './host/electron-browser-commands'
+import { setRuntimeBrowserCommandsFactory } from './runtime/runtime-browser-commands-factory'
+import { electronHttpClient } from './host/electron-http-client'
+import { setMainHttpClient } from './network/http-client'
+import { electronSpeechServiceFactories } from './host/electron-speech-services'
+import { setSpeechServiceFactories } from './speech/speech-runtime-service'
+import { setWorktreeWatcherRemoval } from './ipc/worktree-watcher-removal'
+import { setSecretStore } from '../shared/secret-store'
+import { ElectronSecretStore } from './host/electron-secret-store'
 import { initSessionParseCachePersistence } from './ai-vault/session-parse-cache-persistence'
 import { ensureActiveOrcaProfile, initOrcaProfilePaths } from './orca-profiles/profile-index-store'
 import { getProductCloudAuthConfig } from './product/product-cloud-config'
@@ -52,7 +75,7 @@ import {
   isCodexPaneHomeRouteProvenAwayFromSharedHome,
   reconcileCodexPaneAccountsWithLivePtys
 } from './codex/codex-pane-account-registry'
-import { closeAllWatchers } from './ipc/filesystem-watcher'
+import { closeAllWatchers, desktopWorktreeWatcherRemoval } from './ipc/filesystem-watcher'
 import { disposeWorktreeBaseDirectoryWatchers } from './ipc/worktree-base-directory-watcher'
 import { stopFolderRepoGitUpgradeWatch } from './ipc/folder-repo-git-upgrade'
 import { registerCoreHandlers } from './ipc/register-core-handlers'
@@ -371,7 +394,7 @@ import {
 } from '../shared/runtime-types'
 import { LocalPtyProvider } from './providers/local-pty-provider'
 import { KeybindingService } from './keybindings/keybinding-service'
-import { applyElectronProxySettings } from './network/proxy-settings'
+import { applyElectronProxySettings, setDefaultProxySessionResolver } from './network/proxy-settings'
 import { preserveAgentAuthBeforeRestart } from './agent-auth-restart-preservation'
 import { CliInstaller } from './cli/cli-installer'
 import { installLinuxBareOrcaDispatcher } from './cli/linux-bare-orca-dispatcher'
@@ -946,6 +969,19 @@ if (!hasSingleInstanceLock) {
 // Why: when another process holds the lock we've already exited; skip file-writing side effects so this transient process never touches userData.
 if (hasSingleInstanceLock) {
   // Why: couple to dev-parent only for electron-vite desktop runs; `orca serve`'s parent (CLI shim/background shell) isn't the intended server lifetime.
+  // Both accessors throw until installed. Install every Electron-backed host port
+  // before persistence, runtime construction, PTY handlers, or a window can read
+  // app paths or resolve a desktop-only capability.
+  setAppEnvironment(new ElectronAppEnvironment())
+  setSecretStore(new ElectronSecretStore())
+  setPtyHostBindings({ ipc: ipcMain, power: powerMonitor })
+  setRuntimeDesktopSurface(electronRuntimeDesktopSurface)
+  setRuntimeBrowserCommandsFactory(electronRuntimeBrowserCommandsFactory)
+  setDefaultProxySessionResolver(() => session.defaultSession)
+  setMainHttpClient(electronHttpClient)
+  setSpeechServiceFactories(electronSpeechServiceFactories)
+  setWorktreeWatcherRemoval(desktopWorktreeWatcherRemoval)
+
   const shouldCoupleToDevParent = is.dev && !isServeMode
   installDevParentDisconnectQuit(shouldCoupleToDevParent)
   installDevParentWatchdog(shouldCoupleToDevParent)
