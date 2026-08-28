@@ -20,7 +20,7 @@ const GROK_ROOT = join(HOME, '.grok', 'sessions')
 
 describe('validateAiVaultSessionDeleteTarget', () => {
   it('allows a canonical Cline manifest and removes its whole session directory', () => {
-    const root = join('/tmp', 'cline-sessions')
+    const root = resolve('/tmp', 'cline-sessions')
     const sessionId = '1786466194549_xrzrl'
     const sessionDir = join(root, sessionId)
     const result = validateAiVaultSessionDeleteTarget({
@@ -38,7 +38,7 @@ describe('validateAiVaultSessionDeleteTarget', () => {
   })
 
   it('rejects a Cline messages companion as an undiscoverable delete target', () => {
-    const root = join('/tmp', 'cline-sessions')
+    const root = resolve('/tmp', 'cline-sessions')
     const sessionId = '1786466194549_xrzrl'
     const result = validateAiVaultSessionDeleteTarget({
       agent: 'cline',
