@@ -9,7 +9,7 @@ const patches = [
     source: readFileSync(resolve(import.meta.dirname, '../patches/node-pty@1.1.0.patch'), 'utf8')
   },
   {
-    buildSettingsMarker: '+      "defines": [ "NAPI_CPP_EXCEPTIONS" ]',
+    buildSettingsMarker: '+          "defines": ["NAPI_CPP_EXCEPTIONS", "_HAS_EXCEPTIONS=1"],',
     name: 'windows-process-tree',
     source: readFileSync(
       resolve(import.meta.dirname, '../patches/@vscode__windows-process-tree@0.8.0.patch'),
@@ -27,7 +27,9 @@ describe('Windows native build patch contract', () => {
     }
   )
 
-  it('keeps process-tree intermediates below the Windows path limit', () => {
+  it('stages node-addon-api headers and keeps intermediates shallow', () => {
+    expect(patches[1].source).toContain('+          "include_dirs": ["deps/node-addon-api"],')
+    expect(patches[1].source).not.toContain('node_addon_api.gyp')
     expect(patches[1].source).toContain(
       '$(TEMP)\\\\hivecode-wpt\\\\$(ProjectGuid)\\\\$(Platform)\\\\$(Configuration)'
     )

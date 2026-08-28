@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { existsSync, readFileSync } from 'node:fs'
 import { release } from 'node:os'
-import { basename, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 
 const require = createRequire(import.meta.url)
 const { assertNodePtyJobOwnership } = require('./node-pty-job-ownership.cjs')
@@ -19,7 +19,6 @@ const NATIVE_MODULES = [
     : [])
 ]
 const NODE_PTY_CONPTY_RUNTIME_FILES = ['conpty.dll', 'OpenConsole.exe']
-const DIRECT_NODE_GYP_MODULES = new Set(['windows-native-registry'])
 const CHILD_CHECK_FLAG = '--check-only'
 
 if (process.argv.includes(CHILD_CHECK_FLAG)) {
@@ -68,7 +67,12 @@ function ensureNodeRuntime() {
     if (!initial.ok) {
       printCheckError(initial)
     }
-    runPnpm(['rebuild', 'node-pty'])
+    const failedModules = initial.failures.map((failure) => failure.moduleName)
+    const rebuildModules = [
+      'node-pty',
+      ...failedModules.filter((moduleName) => moduleName !== 'node-pty')
+    ]
+    rebuildNodeRuntimeModules(rebuildModules)
     verifyNodeRuntimeAfterRebuild()
     return
   }
@@ -78,40 +82,18 @@ function ensureNodeRuntime() {
     `[native-runtime] ${formatRuntimeLabel('node')} cannot load native modules; rebuilding ${failedModules.join(', ')} for Node.`
   )
   printCheckError(initial)
-  rebuildNodeModules(failedModules)
+  rebuildNodeRuntimeModules(failedModules)
   verifyNodeRuntimeAfterRebuild()
 }
 
-function rebuildNodeModules(moduleNames) {
-  const pnpmModules = []
+function rebuildNodeRuntimeModules(moduleNames) {
   for (const moduleName of moduleNames) {
-    if (DIRECT_NODE_GYP_MODULES.has(moduleName)) {
-      runNodeGypRebuild(moduleName)
-    } else {
-      pnpmModules.push(moduleName)
+    const moduleDir = dirname(require.resolve(`${moduleName}/package.json`))
+    console.warn(`[native-runtime] Rebuilding ${moduleName} with node-gyp.`)
+    runPnpm(['exec', 'node-gyp', 'rebuild'], { cwd: moduleDir })
+    if (moduleName === 'node-pty' && process.platform === 'win32') {
+      runNodeScript([resolve(moduleDir, 'scripts', 'post-install.js')])
     }
-  }
-  if (pnpmModules.length > 0) {
-    runPnpm(['rebuild', ...pnpmModules])
-  }
-}
-
-function runNodeGypRebuild(moduleName) {
-  const modulePackagePath = require.resolve(`${moduleName}/package.json`)
-  const nodeGypPackagePath = require.resolve('node-gyp/package.json')
-  const moduleDir = resolve(modulePackagePath, '..')
-  const nodeGypScript = resolve(nodeGypPackagePath, '..', 'bin', 'node-gyp.js')
-  const result = spawnSync(process.execPath, [nodeGypScript, 'rebuild'], {
-    cwd: moduleDir,
-    stdio: 'inherit'
-  })
-
-  if (result.error || result.status !== 0) {
-    console.error(`[native-runtime] node-gyp rebuild failed for ${moduleName}.`)
-    if (result.error) {
-      console.error(formatError(result.error))
-    }
-    process.exit(result.status ?? 1)
   }
 }
 
@@ -346,14 +328,10 @@ function getPatchedNodePtyRebuildReason() {
     return null
   }
 
-  // Why: a loadable upstream node-pty prebuild is not enough; Orca's Unix
-  // patch only lands in the source-built build/Release artifacts.
+  // Why: a loadable upstream node-pty prebuild is not enough; Orca's Unix and
+  // Windows patches only land in the source-built build/Release artifacts.
   const nodePtyDir = resolve(projectDir, 'node_modules', 'node-pty')
-  const artifactPaths = [resolve(nodePtyDir, 'build', 'Release', 'pty.node')]
-  // Why: node-pty only builds spawn-helper on macOS; Linux builds only pty.node.
-  if (process.platform === 'darwin') {
-    artifactPaths.push(resolve(nodePtyDir, 'build', 'Release', 'spawn-helper'))
-  }
+  const artifactPaths = patchedNodePtyArtifactPaths(nodePtyDir)
   const missingArtifact = artifactPaths.find((artifactPath) => !existsSync(artifactPath))
 
   if (!missingArtifact) {
@@ -363,11 +341,24 @@ function getPatchedNodePtyRebuildReason() {
   return 'Patched node-pty build artifacts are missing; rebuilding native deps.'
 }
 
-function requiresPatchedNodePtySourceBuild() {
+function patchedNodePtyArtifactPaths(nodePtyDir) {
   if (process.platform === 'win32') {
-    return false
+    const releaseDir = resolve(nodePtyDir, 'build', 'Release')
+    return [
+      resolve(releaseDir, 'conpty.node'),
+      ...NODE_PTY_CONPTY_RUNTIME_FILES.map((filename) => resolve(releaseDir, 'conpty', filename))
+    ]
   }
 
+  const artifactPaths = [resolve(nodePtyDir, 'build', 'Release', 'pty.node')]
+  // Why: node-pty only builds spawn-helper on macOS; Linux builds only pty.node.
+  if (process.platform === 'darwin') {
+    artifactPaths.push(resolve(nodePtyDir, 'build', 'Release', 'spawn-helper'))
+  }
+  return artifactPaths
+}
+
+function requiresPatchedNodePtySourceBuild() {
   const nodePtyPatchPath = resolve(projectDir, 'config', 'patches', 'node-pty@1.1.0.patch')
   if (!existsSync(nodePtyPatchPath)) {
     return false
@@ -385,16 +376,21 @@ function getWindowsBuildNumber() {
   return match && match.length === 4 ? Number.parseInt(match[3], 10) : 0
 }
 
-function runPnpm(args) {
+function runPnpm(args, { cwd = projectDir } = {}) {
   const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+  const env =
+    process.platform === 'linux' && args.includes('node-gyp')
+      ? { ...process.env, CXXFLAGS: `${process.env.CXXFLAGS ?? ''} -std=gnu++2a`.trim() }
+      : process.env
   const result = spawnSync(command, args, {
-    cwd: projectDir,
+    cwd,
     stdio: 'inherit',
-    shell: process.platform === 'win32'
+    shell: process.platform === 'win32',
+    env
   })
 
   if (result.error || result.status !== 0) {
-    console.error(`[native-runtime] ${command} ${args.join(' ')} failed.`)
+    console.error(`[native-runtime] ${command} ${args.join(' ')} failed in ${cwd}.`)
     if (result.error) {
       console.error(formatError(result.error))
     }

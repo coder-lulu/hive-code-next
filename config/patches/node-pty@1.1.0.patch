@@ -2,7 +2,7 @@ diff --git a/binding.gyp b/binding.gyp
 index 5f63978b07..5cb5f2b6d1 100644
 --- a/binding.gyp
 +++ b/binding.gyp
-@@ -2,12 +2,15 @@
+@@ -2,12 +2,18 @@
    'target_defaults': {
 -    'dependencies': [
 -      "<!(node -p \"require('node-addon-api').targets\"):node_addon_api_except",
@@ -11,7 +11,10 @@ index 5f63978b07..5cb5f2b6d1 100644
      ],
 +    'defines': [ 'NAPI_CPP_EXCEPTIONS' ],
 +    'cflags!': [ '-fno-exceptions' ],
-+    'cflags_cc!': [ '-fno-exceptions' ],
++    'cflags_cc!': [ '-fno-exceptions', '-std=gnu++20' ],
++    # Orca: GCC 9 (Ubuntu 20.04 floor) accepts C++20 as gnu++2a, but rejects
++    # the newer gnu++20 spelling emitted by Node 24's gyp flags.
++    'cflags_cc': [ '-std=gnu++2a' ],
      'conditions': [
        ['OS=="win"', {
 -        'msvs_configuration_attributes': {
@@ -76,7 +79,7 @@ diff --git a/lib/conpty_console_list_agent.js b/lib/conpty_console_list_agent.js
 index 8c4fca9022..0a01730616 100644
 --- a/lib/conpty_console_list_agent.js
 +++ b/lib/conpty_console_list_agent.js
-@@ -12,3 +12,10 @@ var getConsoleProcessList = utils_1.loadNativeModule('conpty_console_list').modu
+@@ -12,4 +12,11 @@ var getConsoleProcessList = utils_1.loadNativeModule('conpty_console_list').modu
  var shellPid = parseInt(process.argv[2], 10);
 -var consoleProcessList = getConsoleProcessList(shellPid);
 +var consoleProcessList;
@@ -108,7 +111,7 @@ diff --git a/src/conpty_console_list_agent.ts b/src/conpty_console_list_agent.ts
 index 181ccabbbe..67f31facf8 100644
 --- a/src/conpty_console_list_agent.ts
 +++ b/src/conpty_console_list_agent.ts
-@@ -12,3 +12,9 @@ const getConsoleProcessList = loadNativeModule('conpty_console_list').module.get
+@@ -12,4 +12,10 @@ const getConsoleProcessList = loadNativeModule('conpty_console_list').module.get
  const shellPid = parseInt(process.argv[2], 10);
 -const consoleProcessList = getConsoleProcessList(shellPid);
 +let consoleProcessList: number[];

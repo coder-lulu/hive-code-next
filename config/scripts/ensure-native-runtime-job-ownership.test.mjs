@@ -29,15 +29,15 @@ const PREBUILD = {
 }
 
 describe('assertNodePtyJobOwnership', () => {
-  it('keeps node-addon-api project paths absolute during Windows source builds', () => {
-    expect(NODE_PTY_PATCH).toContain(
-      `+      "<!(node -p \\"require.resolve('node-addon-api/node_addon_api.gyp')\\"):node_addon_api_except"`
-    )
+  it('inlines node-addon-api headers for Windows source builds', () => {
+    expect(NODE_PTY_PATCH).toContain("+    'include_dirs': [")
+    expect(NODE_PTY_PATCH).toContain("+    'defines': [ 'NAPI_CPP_EXCEPTIONS' ]")
+    expect(NODE_PTY_PATCH).not.toMatch(/^\+.*node-addon-api.*targets/m)
   })
 
-  it('leaves the unchanged Windows helper and fallback on their upstream prebuilds', () => {
-    expect(NODE_PTY_PATCH).toContain("-          'target_name': 'conpty_console_list'")
-    expect(NODE_PTY_PATCH).toContain("-          'target_name': 'pty'")
+  it('leaves the Windows helper and fallback targets intact', () => {
+    expect(NODE_PTY_PATCH).not.toContain("-          'target_name': 'conpty_console_list'")
+    expect(NODE_PTY_PATCH).not.toContain("-          'target_name': 'pty'")
   })
 
   it('rejects the prebuild that shipped without the job exports', () => {
