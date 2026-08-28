@@ -37,6 +37,14 @@ function patchId(sha) {
     return null
   }
 }
+function isEquivalentInHead(sha, head, headSubjects) {
+  if (hasCommit(sha, head)) {
+    return true
+  }
+  const subject = git(['show', '-s', '--format=%s', sha])
+  const candidate = headSubjects.get(subject)
+  return candidate !== undefined && patchId(candidate) === patchId(sha)
+}
 function parseArgs(argv) {
   const out = {
     upstream: 'upstream/main',
@@ -109,7 +117,9 @@ function main() {
       type: entry?.type ?? classify(subject),
       applied: entry?.applied ?? (equivalent ? '已等价实现' : '需要产品决定'),
       patchId: upstreamPatchId,
-      dependencies: parents.filter((parent) => !hasCommit(parent, options.head))
+      dependencies: parents.filter(
+        (parent) => !isEquivalentInHead(parent, options.head, headSubjects)
+      )
     }
   })
   const groups = new Map([
