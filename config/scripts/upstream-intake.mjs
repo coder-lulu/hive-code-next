@@ -79,6 +79,16 @@ function main() {
   const options = parseArgs(process.argv.slice(2))
   const ledger = JSON.parse(readFileSync(LEDGER, 'utf8'))
   const known = new Map(ledger.entries.map((entry) => [entry.upstreamSha, entry]))
+  const headSubjects = new Map()
+  for (const line of git(['log', '--format=%H%x09%s', options.head])
+    .split(/\r?\n/)
+    .filter(Boolean)) {
+    const [sha, ...subjectParts] = line.split('\t')
+    const subject = subjectParts.join('\t')
+    if (!headSubjects.has(subject)) {
+      headSubjects.set(subject, sha)
+    }
+  }
   const shas = git(['log', '--format=%H', `${options.vendor}..${options.upstream}`])
     .split(/\r?\n/)
     .filter(Boolean)
@@ -86,15 +96,19 @@ function main() {
     const subject = git(['show', '-s', '--format=%s', sha])
     const parents = git(['rev-list', '--parents', '-n', '1', sha]).split(/\s+/).slice(1)
     const entry = known.get(sha)
+    const upstreamPatchId = patchId(sha)
+    const matchingProductSha = headSubjects.get(subject)
+    const equivalentByPatch =
+      matchingProductSha !== undefined && patchId(matchingProductSha) === upstreamPatchId
     // Parent closure is a safety gate, not proof that a change is present. A commit is
     // equivalent only when the ledger records a reviewed equivalence (with patch-id).
-    const equivalent = entry?.applied === '已等价实现'
+    const equivalent = entry?.applied === '已等价实现' || equivalentByPatch
     return {
       sha,
       subject,
       type: entry?.type ?? classify(subject),
       applied: entry?.applied ?? (equivalent ? '已等价实现' : '需要产品决定'),
-      patchId: patchId(sha),
+      patchId: upstreamPatchId,
       dependencies: parents.filter((parent) => !hasCommit(parent, options.head))
     }
   })
