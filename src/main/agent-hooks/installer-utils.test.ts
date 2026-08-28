@@ -93,23 +93,20 @@ describe('readHooksJsonWithRaw', () => {
 })
 
 describe('writeHooksJson', () => {
-  it.skipIf(process.platform === 'win32')(
-    'updates a symlink target without replacing the hook config link',
-    () => {
-      const targetPath = join(tmpDir, 'dotfiles-hooks.json')
-      writeFileSync(targetPath, '{"hooks":{}}\n')
-      symlinkSync(targetPath, configPath)
+  it('updates a symlink target without replacing the hook config link', () => {
+    const targetPath = join(tmpDir, 'dotfiles-hooks.json')
+    writeFileSync(targetPath, '{"hooks":{}}\n')
+    symlinkSync(targetPath, configPath)
 
-      writeHooksJson(configPath, { hooks: { Stop: [] } })
+    writeHooksJson(configPath, { hooks: { Stop: [] } })
 
-      expect(lstatSync(configPath).isSymbolicLink()).toBe(true)
-      expect(JSON.parse(readFileSync(targetPath, 'utf-8'))).toEqual({
-        hooks: { Stop: [] }
-      })
-    }
-  )
+    expect(lstatSync(configPath).isSymbolicLink()).toBe(true)
+    expect(JSON.parse(readFileSync(targetPath, 'utf-8'))).toEqual({
+      hooks: { Stop: [] }
+    })
+  })
 
-  it.skipIf(process.platform === 'win32')('does not replace a dangling hook config symlink', () => {
+  it('does not replace a dangling hook config symlink', () => {
     const targetPath = join(tmpDir, 'missing-dotfiles-hooks.json')
     symlinkSync(targetPath, configPath)
 
@@ -149,7 +146,7 @@ describe('writeHooksJson', () => {
     expect(bak).toEqual(original)
   })
 
-  it.skipIf(process.platform === 'win32')('does not follow an existing .bak symlink', () => {
+  it('does not follow an existing .bak symlink', () => {
     const original = '{"hooks":{}}\n'
     const backupTarget = join(tmpDir, 'dotfiles-backup.json')
     writeFileSync(configPath, original, 'utf-8')
@@ -607,7 +604,7 @@ describe('wrapPosixHookCommand', () => {
 })
 
 const qualifiedWindowsPowerShellCommand =
-  /^[A-Za-z]:\/[^"]*\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand \S+$/
+  /^[A-Za-z]:\/[^"]*\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe -NoProfile -EncodedCommand \S+$/
 
 function decodeWindowsHookCommand(command: string): string {
   const encodedCommand = command.match(/ -EncodedCommand (\S+)$/)?.[1]
@@ -617,8 +614,10 @@ function decodeWindowsHookCommand(command: string): string {
 
 function expectedDecodedWindowsHookCommand(scriptPath: string): string {
   const quoted = `'${scriptPath.replaceAll("'", "''")}'`
+  // Why: the execution-policy bypass rides in the payload, not on the command
+  // line, so the launcher cannot spell the AV-blocked flag triple (#16003).
   // Why: PowerShell progress CLIXML corrupts consumers that merge stderr into JSON stdout.
-  return `$ProgressPreference='SilentlyContinue'; if (Test-Path -LiteralPath ${quoted} -PathType Leaf) { & ${quoted}; exit $LASTEXITCODE }; [Console]::In.ReadToEnd() | Out-Null; exit 0`
+  return `$ProgressPreference='SilentlyContinue'; try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue } catch {}; if (Test-Path -LiteralPath ${quoted} -PathType Leaf) { & ${quoted}; exit $LASTEXITCODE }; [Console]::In.ReadToEnd() | Out-Null; exit 0`
 }
 
 describe('wrapWindowsHookCommand', () => {
@@ -674,7 +673,7 @@ describe('wrapWindowsHookCommand', () => {
   })
 
   it.skipIf(process.platform !== 'win32')(
-    'propagates the exit code through cmd.exe when the script path contains a caret',
+    'executes a script path containing a cmd.exe caret literally',
     () => {
       const scriptDir = join(tmpDir, 'home with ^ caret', '.orca', 'agent-hooks')
       mkdirSync(scriptDir, { recursive: true })
@@ -755,6 +754,17 @@ describe('wrapRuntimeHomeHookCommand', () => {
       expect(command).not.toMatch(/\$\{[A-Za-z_][A-Za-z0-9_]*\}/)
     }
   )
+
+  it('hides the console on the Git Bash branch too, and still avoids the denied triple', () => {
+    // Why: this branch launches PowerShell from bash, where the parent has no
+    // console to inherit — Windows allocates a fresh one per hook event unless
+    // the switch says otherwise (#14815), and the AV verdict on the flag triple
+    // applies to the exact same string (#16003).
+    const command = wrapRuntimeHomeHookCommand('claude-hook')
+
+    expect(command).toContain('powershell.exe" -NoProfile -EncodedCommand ')
+    expect(command).not.toMatch(/-ExecutionPolicy/i)
+  })
 
   it('rejects a script base name that could inject shell syntax', () => {
     expect(() => wrapRuntimeHomeHookCommand('claude-hook; echo injected')).toThrow(
