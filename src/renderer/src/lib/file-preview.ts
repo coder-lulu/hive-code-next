@@ -65,7 +65,7 @@ export function getWorkspaceFilePreviewPlan(
   // Why: the doc preview needs no browser at all, so a paired runtime without the
   // screencast capability still previews documents.
   if (getRuntimeEnvironmentIdForWorktree(state, worktreeId)) {
-    const worktreeRoot = state.getKnownWorktreeById(worktreeId)?.path ?? null
+    const worktreeRoot = state.getKnownWorktreeById?.(worktreeId)?.path ?? null
     if (worktreeRoot && !getRelativePathInsideRoot(filePath, worktreeRoot)) {
       // Why: the host's files.read is worktree-scoped, so this would 404 at request time with
       // nothing telling the user which boundary they hit.
