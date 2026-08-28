@@ -184,22 +184,13 @@
       ]
     },
     {
-      "upstreamSha": "8dd7d6060c7d724c4cdb85f3072a1e502e47dc54",
-      "type": "BUG",
-      "applied": "暂缓",
-      "dependencies": ["bf5660df51950ab88f37b86914b997dc91837558"],
-      "conflictReason": "native patch、lockfile、Windows artifact 规则与 HiveCode product patch 冲突",
-      "adaptation": "待按 node-pty/@vscode patch、ensure-native-runtime、lockfile 三层手工合并",
-      "regressionTests": ["native runtime", "Windows PTY capability"]
-    },
-    {
       "upstreamSha": "350423b7cbb640cf47e46c55187d5d3b85eee511",
       "type": "重构",
-      "applied": "暂缓",
+      "applied": "已移植",
       "dependencies": ["8dd7d6060c7d724c4cdb85f3072a1e502e47dc54"],
-      "conflictReason": "大型 CI cache/workflow 改造依赖 8dd native 最终形态",
-      "adaptation": "先完成 native patch，再逐步吸收 cache scope 与 path-skip",
-      "regressionTests": ["PR workflow", "native cache"]
+      "conflictReason": "完整 path classifier 与 HiveCode 产品 gate 有边界差异",
+      "adaptation": "吸收 native cache scope、persist=false ABI 隔离、Windows launcher/native cache；保留现有产品路径分类与安全门禁",
+      "regressionTests": ["native cache action contract", "Windows launcher"]
     },
     {
       "upstreamSha": "ebe6b559eff3385db7e456a0c76c02ea1ecca3d2",
@@ -209,15 +200,6 @@
       "conflictReason": "PR native cache fan-out 与现有 product workflow 需要逐 job 合并",
       "adaptation": "保留现有产品安全检查，待 8dd/350 完成后吸收 cache prime",
       "regressionTests": ["PR workflow parallelism"]
-    },
-    {
-      "upstreamSha": "971d987c4b99e84c18fc1447ca4ee18d02eb308a",
-      "type": "BUG",
-      "applied": "暂缓",
-      "dependencies": ["2ac23c29be2a00c55263ead03f249e936e52e319"],
-      "conflictReason": "SSH Docker E2E source routing 与 HiveCode 专用 gate 需要手工合并",
-      "adaptation": "保留现有 SSH/产品 workflow，后续补齐 source-trigger 与 gated spec claim",
-      "regressionTests": ["SSH Docker E2E", "PR E2E gate contract"]
     },
     {
       "upstreamSha": "6f8c5888b3acc4011c09498cda27cf3906edd91a",
