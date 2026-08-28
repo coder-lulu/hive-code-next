@@ -19,6 +19,10 @@ import {
 import { FederationAttachStartParams } from './orchestration-federation-start-schema'
 import { failFederatedAttachmentWithReceipt } from './orchestration-federation-start-receipt'
 import { prepareFederationAttachmentWorkerStart } from './orchestration-worker-start-validation'
+import {
+  isWorkerStartTimeoutWithinTimerLimit,
+  resolveWorkerStartReadinessTimeoutMs
+} from '../../../../shared/orchestration-timing-budgets'
 
 export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
   defineMethod({
@@ -31,6 +35,13 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           'Federated worker attachment requires a durable retry request.'
         )
       }
+      if (!isWorkerStartTimeoutWithinTimerLimit(params.timeoutMs)) {
+        throw new OrchestrationError(
+          'invalid_argument',
+          '--timeout-ms is too large for worker-start transport grace; the derived timeout must fit within the timer limit.'
+        )
+      }
+      const readinessTimeoutMs = resolveWorkerStartReadinessTimeoutMs(params.timeoutMs)
       if (params.worktree === 'current' || params.worktree === 'new-child') {
         throw new OrchestrationError(
           'invalid_argument',
@@ -199,7 +210,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
         failedStage = 'agent_readiness'
         const wait = await runtime.waitForTerminal(terminalHandle, {
           condition: 'tui-idle',
-          timeoutMs: params.timeoutMs ?? 60_000
+          timeoutMs: readinessTimeoutMs
         })
         persistFederatedSetupWaitOutcome({ ...setupStage, wait })
         if (!wait.satisfied) {
