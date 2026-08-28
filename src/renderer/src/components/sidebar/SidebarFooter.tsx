@@ -272,6 +272,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
     : accountState?.status === 'error'
       ? 'is-warning'
       : 'is-local'
+  const activeTheme = settings?.theme ?? 'system'
   const openAccountCenter = (): void => openSettingsPane('orca-account')
   const copyAccountName = (): void => {
     void navigator.clipboard?.writeText(accountDisplayName)
@@ -402,7 +403,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                     <button
                       type="button"
                       key={theme}
-                      className={settings.theme === theme ? 'is-active' : ''}
+                      className={activeTheme === theme ? 'is-active' : ''}
                       onClick={() => void updateSettings({ theme })}
                     >
                       {theme === 'system' ? '系统' : theme === 'light' ? '浅色' : '深色'}
