@@ -10,16 +10,16 @@ import {
 
 describe('skill provider runtime roots', () => {
   it('maps Claude and Grok config homes to their global skill roots', () => {
-    const claudeConfig = resolve('/srv', 'claude')
-    const grokHome = resolve('/srv', 'grok')
+    const claudeRoot = resolve('/srv/claude')
+    const grokRoot = resolve('/srv/grok')
     expect(
       resolveEnvironmentSkillProviderRoots({
-        CLAUDE_CONFIG_DIR: claudeConfig,
-        GROK_HOME: grokHome
+        CLAUDE_CONFIG_DIR: claudeRoot,
+        GROK_HOME: grokRoot
       })
     ).toEqual({
-      claude: join(claudeConfig, 'skills'),
-      grok: join(grokHome, 'skills')
+      claude: join(claudeRoot, 'skills'),
+      grok: join(grokRoot, 'skills')
     })
   })
 
@@ -29,15 +29,16 @@ describe('skill provider runtime roots', () => {
       GROK_HOME: '../grok'
     })
     expect(roots).toEqual({})
-    const managedClaudeConfig = resolve('/managed', 'claude')
-    expect(withClaudeSkillProviderRoot(roots, managedClaudeConfig)).toEqual({
-      claude: join(managedClaudeConfig, 'skills')
+    const managedClaudeRoot = resolve('/managed/claude')
+    expect(withClaudeSkillProviderRoot(roots, managedClaudeRoot)).toEqual({
+      claude: join(managedClaudeRoot, 'skills')
     })
   })
 
   it('maps a relocated HERMES_HOME to its skill root and ignores relative ones', () => {
-    expect(resolveEnvironmentHermesSkillsRoot({ HERMES_HOME: join('/srv', 'hermes') })).toBe(
-      join('/srv', 'hermes', 'skills')
+    const hermesRoot = resolve('/srv/hermes')
+    expect(resolveEnvironmentHermesSkillsRoot({ HERMES_HOME: hermesRoot })).toBe(
+      join(hermesRoot, 'skills')
     )
     expect(resolveEnvironmentHermesSkillsRoot({ HERMES_HOME: '../hermes' })).toBeNull()
     expect(resolveEnvironmentHermesSkillsRoot({})).toBeNull()
@@ -55,13 +56,14 @@ describe('skill provider runtime roots', () => {
   })
 
   it('defaults the Hermes skills root under LOCALAPPDATA on Windows', () => {
+    const localAppData = resolve('/local')
     const resolved = resolveDefaultHermesSkillsRoot({
       homeDir: join('/users', 'alice'),
       platform: 'win32',
-      env: { LOCALAPPDATA: join('/local') },
-      directoryExists: (candidate) => candidate === join('/local', 'hermes')
+      env: { LOCALAPPDATA: localAppData },
+      directoryExists: (candidate) => candidate === join(localAppData, 'hermes')
     })
-    expect(resolved).toBe(join('/local', 'hermes', 'skills'))
+    expect(resolved).toBe(join(localAppData, 'hermes', 'skills'))
   })
 
   it('keeps a pre-LOCALAPPDATA Windows dotfolder install discoverable', () => {
@@ -75,13 +77,14 @@ describe('skill provider runtime roots', () => {
   })
 
   it('prefers the LOCALAPPDATA tree on Windows when both layouts exist', () => {
+    const localAppData = resolve('/local')
     const resolved = resolveDefaultHermesSkillsRoot({
       homeDir: join('/users', 'alice'),
       platform: 'win32',
-      env: { LOCALAPPDATA: join('/local') },
+      env: { LOCALAPPDATA: localAppData },
       directoryExists: () => true
     })
-    expect(resolved).toBe(join('/local', 'hermes', 'skills'))
+    expect(resolved).toBe(join(localAppData, 'hermes', 'skills'))
   })
 
   it('falls back to the dotfolder when Windows exposes no usable LOCALAPPDATA', () => {

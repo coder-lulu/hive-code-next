@@ -1,10 +1,14 @@
 <h1 align="center">
-  <img src="../../resources/build/icon.png" alt="HiveCode" width="64" valign="middle" /> HiveCode
+  <a href="https://onOrca.dev"><img src="../../resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Supported platforms: macOS, Windows, and Linux" />
+  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub Star 数" /></a>
+  <a href="https://github.com/stablyai/orca/releases"><img src="../assets/readme-downloads.svg" alt="所有版本的总下载量" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="许可证: MIT" />
+  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="加入 Orca Discord" /></a>
+  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="在 X 上关注 Orca" /></a>
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="支持的平台：macOS、Windows 和 Linux" />
 </p>
 
 <p align="center">
@@ -16,11 +20,10 @@
   并排运行 Codex、Claude Code、OpenCode 或 Pi — 每个都在自己的 worktree 中运行，并在一个地方统一跟踪。
 </p>
 
-> [!IMPORTANT]
-> HiveCode 当前是工程分支，尚无经过批准的公开下载、更新、云服务、支持或社区入口。下方功能链接和截图继承自 upstream Orca，仅用于兼容性参考，并非 HiveCode 发布链接。
+<h3 align="center"><a href="https://onorca.dev/download"><ins>下载 Orca</ins></a></h3>
 
 <p align="center">
-  <img src="../assets/readme-hero.jpg" alt="upstream Orca 桌面端和移动端界面参考" width="960" />
+  <img src="../assets/readme-hero.jpg" alt="Orca 桌面应用在并行 worktree 中运行智能体，角落里是 Orca 移动 companion 应用" width="960" />
 </p>
 
 ## 特性
@@ -33,11 +36,11 @@
 
 用手机监控并指挥你的智能体 — 智能体完成时收到通知，随时随地发送后续指令。
 
-[upstream Orca 移动端兼容性文档 →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.46/app-release.apk) · [文档 →](https://www.onorca.dev/docs/mobile)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="HiveCode 桌面端与移动 companion 应用" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca 桌面端与移动 companion 应用" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -93,7 +96,7 @@ Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然�
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../assets/feature-wall/github-linear.gif" type="image/gif"><img src="../assets/feature-wall/github-linear.jpg" alt="HiveCode 中的 GitHub 与 Linear 任务工作流" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../assets/feature-wall/github-linear.gif" type="image/gif"><img src="../assets/feature-wall/github-linear.jpg" alt="Orca 中的 GitHub 与 Linear 任务工作流" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -115,7 +118,7 @@ Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然�
 
 ### 标注 AI Diff
 
-在任意 diff 行上添加评论并发回给智能体 — 评审、编辑、提交，全程无需离开 HiveCode。
+在任意 diff 行上添加评论并发回给智能体 — 评审、编辑、提交，全程无需离开 Orca。
 
 [文档 →](https://www.onorca.dev/docs/review/annotate-ai-diff)
 
@@ -141,15 +144,15 @@ VS Code 的编辑器，处处自动保存 — 把文件或图片直接拖入智�
 <tr>
 <td width="50%" valign="middle">
 
-### HiveCode CLI
+### Orca CLI
 
-智能体也能驱动 HiveCode — 用 `hivecode worktree create`、`snapshot`、`click` 和 `fill` 把每个工作流脚本化。
+智能体也能驱动 Orca — 用 `orca worktree create`、`snapshot`、`click` 和 `fill` 把每个工作流脚本化。
 
 [文档 →](https://www.onorca.dev/docs/cli/overview)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../assets/feature-wall/orca-cli.gif" type="image/gif"><img src="../assets/feature-wall/orca-cli.jpg" alt="从 CLI 脚本化 HiveCode" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../assets/feature-wall/orca-cli.gif" type="image/gif"><img src="../assets/feature-wall/orca-cli.jpg" alt="从 CLI 脚本化 Orca" width="100%" /></picture></a>
 </td>
 </tr>
 </table>
@@ -161,12 +164,13 @@ VS Code 的编辑器，处处自动保存 — 把文件或图片直接拖入智�
 - **[丰富仓库预览](https://www.onorca.dev/docs/editing/markdown)** — 在工作区中预览 Markdown、图片、PDF 和仓库文档。
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 当工作流需要真实交互时，让智能体操作桌面应用和可见 UI。
 - **[通知与未读状态](https://www.onorca.dev/docs/notifications)** — 第一时间知道智能体何时完成或需要关注，并可将会话标记为未读，稍后再回来处理。
+- **还有很多很多** — 我们每天发布新功能，这个列表永远跟不上。[更新日志](https://github.com/stablyai/orca/releases)才是真正的功能列表。
 
 ---
 
 ## 支持的智能体
 
-适配**任何 CLI 智能体** — 只要能在终端里运行，就能在 HiveCode 里运行。
+适配**任何 CLI 智能体** — 只要能在终端里运行，就能在 Orca 里运行。
 
 <p>
   <a href="https://docs.anthropic.com/claude/docs/claude-code"><kbd><img src="../assets/claude-logo.svg" alt="Claude Code logo" width="16" valign="middle" /> Claude Code</kbd></a> &nbsp;
@@ -203,27 +207,53 @@ VS Code 的编辑器，处处自动保存 — 把文件或图片直接拖入智�
 
 ## 安装
 
-HiveCode 当前不发布经过批准的桌面端或移动端二进制文件。请勿将 upstream Orca 的 Release、App Store、TestFlight、Homebrew、AUR 或 APK 链接作为 HiveCode 安装说明。
+### 桌面端 — macOS、Windows、Linux
 
-本地开发：
+- **[从 onOrca.dev 下载](https://onorca.dev/download)**
+- 或直接获取安装包：[macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [全部构建](https://github.com/stablyai/orca/releases/latest)
+
+_也可以通过包管理器安装：_
 
 ```bash
-pnpm install
-pnpm dev
-pnpm typecheck
-pnpm test
+# macOS (Homebrew)
+brew install --cask stablyai/orca/orca
+
+# Arch Linux (AUR) — or stably-orca-git to build from source
+yay -S stably-orca-bin
 ```
 
-使用 `pnpm run build:desktop` 构建桌面应用。原生构建依赖具体平台；请参阅 `config/scripts/` 下的脚本。
+### 移动 Companion 应用 — iOS、Android
 
-## 兼容性
+与桌面应用配对，用手机监控并指挥你的智能体。
 
-为了兼容已有安装和持久化数据，`orca`、`orca-ide`、`orca://`、`ORCA_*`、旧 `.orca` 目录以及 upstream 插件标识仍会保留。这些是兼容接口，不是 HiveCode 的产品品牌。
+- **iOS:** [从 App Store 下载](https://apps.apple.com/us/app/orca-ide/id6766130217)
+- **Android:** [下载 APK](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.46/app-release.apk)
+
+---
+
+## 社区与支持
+
+- **Discord:** 加入 **[Discord](https://discord.gg/fzjDKHxv8Q)** 社区。
+- **Twitter / X:** 关注 **[@orca_build](https://x.com/orca_build)** 获取更新和公告。
+- **微信:** 扫码加入 Orca 社区微信第 7 群。如果第 7 群已满，请使用第 8 群。
+
+  <img src="../assets/wechat-qr-group7.jpg" alt="Orca 社区微信第 7 群二维码" width="160" />&nbsp;&nbsp;
+  <img src="../assets/wechat-qr-group8.jpg" alt="Orca 社区微信第 8 群二维码" width="160" />
+
+- **反馈与想法:** 我们发布很快。缺少什么功能？[提交功能请求](https://github.com/stablyai/orca/issues)。
+- **隐私:** 查看[隐私与遥测文档](https://www.onorca.dev/docs/telemetry)，了解 Orca 收集哪些匿名使用数据以及如何退出。
+- **支持我们:** 给这个仓库点 [Star](https://github.com/stablyai/orca)，关注我们的日常发布。
+
+---
 
 ## 开发
 
-产品现状、总体架构、功能设计和开发路线以[产品总设计](../engineering/product-design.md)为准。贡献和 upstream 同步边界请参阅[贡献指南](../../.github/CONTRIBUTING.md)。
+想要贡献代码或在本地运行？请参阅我们的 [CONTRIBUTING.md](../../.github/CONTRIBUTING.md) 指南。
 
-## 归属与许可证
+<a href="https://github.com/stablyai/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Orca 贡献者" />
+</a>
 
-HiveCode 基于 Stably AI 的开源 [Orca](https://github.com/stablyai/orca) 项目，并继续采用 [MIT 许可证](../../LICENSE)。
+## 许可证
+
+Orca 是自由且开源的软件，遵循 [MIT 许可证](../../LICENSE)。

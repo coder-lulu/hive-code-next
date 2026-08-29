@@ -7,6 +7,10 @@ import {
   waitForActiveTerminalManager
 } from './helpers/terminal'
 import {
+  createRemoteTerminalTab,
+  readRemoteTerminalTabs
+} from './helpers/docker-ssh-relay-terminal-tabs'
+import {
   cleanupDockerSshRelayTarget,
   DOCKER_SSH_RELAY_REMOTE_REPO_PATH,
   execDockerSshRelayTargetCommand,

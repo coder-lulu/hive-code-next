@@ -234,7 +234,7 @@ describe('agent prompt submission verification', () => {
     await rejected
   })
 
-  it('holds the longer hook window open past the default timeout', async () => {
+  it('holds the extended hook window open past the former hook timeout', async () => {
     vi.useFakeTimers()
     let current = activity()
     const verification = verifyAgentPromptSubmission({
@@ -243,7 +243,7 @@ describe('agent prompt submission verification', () => {
       timeoutMs: AGENT_PROMPT_HOOK_EFFECT_TIMEOUT_MS
     })
 
-    await vi.advanceTimersByTimeAsync(AGENT_PROMPT_EFFECT_TIMEOUT_MS + 1_000)
+    await vi.advanceTimersByTimeAsync(15_000 + 1_000)
     current = activity({ explicitWorkingStartedAt: 9_000, status: 'working' })
     await vi.advanceTimersByTimeAsync(50)
 

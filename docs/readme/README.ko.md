@@ -1,10 +1,14 @@
 <h1 align="center">
-  <img src="../../resources/build/icon.png" alt="HiveCode" width="64" valign="middle" /> HiveCode
+  <a href="https://onOrca.dev"><img src="../../resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Supported platforms: macOS, Windows, and Linux" />
+  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub 스타" /></a>
+  <a href="https://github.com/stablyai/orca/releases"><img src="../assets/readme-downloads.svg" alt="전체 릴리스 누적 다운로드 수" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="라이선스: MIT" />
+  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Orca Discord 참여" /></a>
+  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="X에서 Orca 팔로우" /></a>
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="지원 플랫폼: macOS, Windows, Linux" />
 </p>
 
 <p align="center">
@@ -16,11 +20,10 @@
   Codex, Claude Code, OpenCode, Pi를 나란히 실행하세요. — 각 에이전트는 자체 worktree에서 실행되고 한곳에서 추적됩니다.
 </p>
 
-> [!IMPORTANT]
-> HiveCode는 현재 엔지니어링 fork이며 승인된 공개 다운로드, 업데이트, 클라우드, 지원 또는 커뮤니티 엔드포인트가 없습니다. 아래 기능 링크와 스크린샷은 호환성 참고용으로 upstream Orca에서 이어받은 것이며 HiveCode 릴리스 링크가 아닙니다.
+<h3 align="center"><a href="https://onorca.dev/download"><ins>Orca 다운로드</ins></a></h3>
 
 <p align="center">
-  <img src="../assets/readme-hero.jpg" alt="upstream Orca 데스크톱 및 모바일 UI 참고 이미지" width="960" />
+  <img src="../assets/readme-hero.jpg" alt="병렬 worktree에서 에이전트를 실행 중인 Orca 데스크톱 앱과 한쪽 모서리에 보이는 Orca 모바일 companion 앱" width="960" />
 </p>
 
 ## 기능
@@ -33,11 +36,11 @@
 
 휴대폰에서 에이전트를 모니터링하고 조종하세요 — 에이전트가 완료되면 알림을 받고 어디서든 후속 지시를 보낼 수 있습니다.
 
-[upstream Orca 모바일 호환성 문서 →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [TestFlight](https://testflight.apple.com/join/YjeGMQBA) · [Android APK 0.0.46](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.46/app-release.apk) · [문서 →](https://www.onorca.dev/docs/mobile)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="HiveCode 데스크톱과 모바일 companion 앱" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca 데스크톱과 모바일 companion 앱" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -93,7 +96,7 @@ PR, issue, 프로젝트 보드를 앱 안에서 탐색하세요 — 어떤 작�
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../assets/feature-wall/github-linear.gif" type="image/gif"><img src="../assets/feature-wall/github-linear.jpg" alt="HiveCode의 GitHub 및 Linear 작업 워크플로" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../assets/feature-wall/github-linear.gif" type="image/gif"><img src="../assets/feature-wall/github-linear.jpg" alt="Orca의 GitHub 및 Linear 작업 워크플로" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -115,7 +118,7 @@ PR, issue, 프로젝트 보드를 앱 안에서 탐색하세요 — 어떤 작�
 
 ### AI Diff 주석
 
-diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내세요 — HiveCode를 떠나지 않고 리뷰하고 수정하고 커밋할 수 있습니다.
+diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내세요 — Orca를 떠나지 않고 리뷰하고 수정하고 커밋할 수 있습니다.
 
 [문서 →](https://www.onorca.dev/docs/review/annotate-ai-diff)
 
@@ -141,15 +144,15 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 <tr>
 <td width="50%" valign="middle">
 
-### HiveCode CLI
+### Orca CLI
 
-에이전트도 HiveCode를 조작할 수 있습니다 — `hivecode worktree create`, `snapshot`, `click`, `fill`로 모든 워크플로를 스크립팅하세요.
+에이전트도 Orca를 조작할 수 있습니다 — `orca worktree create`, `snapshot`, `click`, `fill`로 모든 워크플로를 스크립팅하세요.
 
 [문서 →](https://www.onorca.dev/docs/cli/overview)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../assets/feature-wall/orca-cli.gif" type="image/gif"><img src="../assets/feature-wall/orca-cli.jpg" alt="CLI에서 HiveCode 스크립팅" width="100%" /></picture></a>
+  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../assets/feature-wall/orca-cli.gif" type="image/gif"><img src="../assets/feature-wall/orca-cli.jpg" alt="CLI에서 Orca 스크립팅" width="100%" /></picture></a>
 </td>
 </tr>
 </table>
@@ -161,12 +164,13 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 - **[풍부한 리포지토리 미리보기](https://www.onorca.dev/docs/editing/markdown)** — Markdown, 이미지, PDF, 리포지토리 문서를 워크스페이스에서 미리 볼 수 있습니다.
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 워크플로에 실제 상호작용이 필요할 때 에이전트가 데스크톱 앱과 화면에 보이는 UI를 직접 조작하게 하세요.
 - **[알림과 읽지 않음 상태](https://www.onorca.dev/docs/notifications)** — 에이전트가 완료되거나 주의가 필요할 때 알림을 받고, 스레드를 읽지 않음으로 표시해 나중에 다시 확인하세요.
+- **그리고 훨씬 더 많은 기능** — 새로운 기능이 매일 출시되므로 이 목록은 늘 한 발 늦습니다. 진짜 기능은 [체인지로그](https://github.com/stablyai/orca/releases)에서 확인하세요.
 
 ---
 
 ## 지원 에이전트
 
-**모든 CLI 에이전트**와 함께 작동합니다 — 터미널에서 실행되는 에이전트라면 HiveCode에서도 실행됩니다.
+**모든 CLI 에이전트**와 함께 작동합니다 — 터미널에서 실행되는 에이전트라면 Orca에서도 실행됩니다.
 
 <p>
   <a href="https://docs.anthropic.com/claude/docs/claude-code"><kbd><img src="../assets/claude-logo.svg" alt="Claude Code logo" width="16" valign="middle" /> Claude Code</kbd></a> &nbsp;
@@ -205,27 +209,61 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 
 ## 설치
 
-HiveCode는 현재 승인된 데스크톱 또는 모바일 바이너리를 배포하지 않습니다. upstream Orca의 릴리스, App Store, TestFlight, Homebrew, AUR 또는 APK 링크를 HiveCode 설치 안내로 사용하지 마세요.
+### 데스크톱 — macOS, Windows, Linux
 
-로컬 개발:
+- **[onOrca.dev에서 다운로드](https://onorca.dev/download)**
+- 또는 빌드를 직접 받기: [macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [전체 빌드](https://github.com/stablyai/orca/releases/latest)
+- headless Linux 서버에서 `orca serve`를 실행하시나요? [Headless Linux 서버 가이드](../reference/headless-linux-server.md)를 확인하세요.
+
+_또는 패키지 매니저로 설치:_
 
 ```bash
-pnpm install
-pnpm dev
-pnpm typecheck
-pnpm test
+# macOS (Homebrew)
+brew install --cask stablyai/orca/orca
+
+# Arch Linux (AUR) — or stably-orca-git to build from source
+yay -S stably-orca-bin
 ```
 
-데스크톱 앱은 `pnpm run build:desktop`으로 빌드합니다. 네이티브 빌드는 플랫폼별로 다르므로 `config/scripts/`의 스크립트를 참조하세요.
+### 모바일 Companion — iOS, Android
 
-## 호환성
+데스크톱 앱과 페어링해 휴대폰에서 에이전트를 모니터링하고 조종하세요.
 
-기존 설치와 영구 데이터를 손상시키지 않도록 `orca`, `orca-ide`, `orca://`, `ORCA_*`, 기존 `.orca` 디렉터리 및 upstream 플러그인 ID를 유지합니다. 이는 호환성 표면이며 HiveCode 제품 브랜드가 아닙니다.
+- **iOS:** [App Store에서 다운로드](https://apps.apple.com/us/app/orca-ide/id6766130217) 또는 [TestFlight 참여](https://testflight.apple.com/join/YjeGMQBA)
+- **Android:** [APK 0.0.46 다운로드](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.46/app-release.apk) · [설치 가이드](https://www.onorca.dev/docs/android-apk)
+
+---
+
+## 커뮤니티와 지원
+
+- **Discord:** **[Discord](https://discord.gg/fzjDKHxv8Q)** 커뮤니티에 참여하세요.
+- **Twitter / X:** 업데이트와 공지는 **[@orca_build](https://x.com/orca_build)** 를 팔로우하세요.
+- **WeChat:** QR 코드를 스캔해 Orca 커뮤니티 WeChat 그룹 7에 참여하세요.
+
+  <img src="../assets/wechat-qr-group7.jpg" alt="Orca 커뮤니티 WeChat 그룹 7 QR 코드" width="160" />
+
+- **피드백과 아이디어:** 우리는 빠르게 출시합니다. 필요한 기능이 있나요? [새 기능을 요청](https://github.com/stablyai/orca/issues)하세요.
+- **개인정보 보호:** Orca가 수집하는 익명 사용 데이터와 수집 거부 방법은 [개인정보 및 텔레메트리 문서](https://www.onorca.dev/docs/telemetry)를 참고하세요.
+- **응원하기:** 이 리포지토리에 [Star](https://github.com/stablyai/orca)를 눌러 매일 공개되는 릴리스 소식을 확인해 주세요.
+
+---
 
 ## 개발
 
-기여 및 upstream 동기화 경계는 [기여 가이드](../../.github/CONTRIBUTING.md)를 참조하세요.
+기여하거나 로컬에서 실행하고 싶으신가요? [CONTRIBUTING.md](../../.github/CONTRIBUTING.md) 가이드를 확인하세요.
 
-## 귀속 및 라이선스
+<a href="https://github.com/stablyai/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Orca 기여자" />
+</a>
 
-HiveCode는 Stably AI의 오픈 소스 [Orca](https://github.com/stablyai/orca) 프로젝트를 기반으로 하며 [MIT 라이선스](../../LICENSE)에 따라 제공됩니다.
+<p align="center">
+  <img src="../assets/star-history.png" alt="stablyai/orca GitHub Star 히스토리 차트" width="880" />
+</p>
+
+## 서명된 빌드
+
+Windows 코드 서명은 [SignPath.io](https://signpath.io)가 후원·제공하며, 인증서는 [SignPath Foundation](https://signpath.org)에서 제공합니다.
+
+## 라이선스
+
+Orca는 [MIT 라이선스](../../LICENSE)에 따라 자유롭게 사용할 수 있는 오픈 소스입니다.

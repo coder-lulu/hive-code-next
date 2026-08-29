@@ -4,7 +4,6 @@ import { randomBytes } from 'node:crypto'
 import { readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RuntimeMetadata, RuntimeTransportMetadata } from '../../shared/runtime-bootstrap'
-import { applyProductBranding } from '../../shared/brand'
 import type { OrcaRuntimeService } from './orca-runtime'
 import { NETWORK_EXPOSURE_FAILED_GUIDANCE } from './network-exposure-guidance'
 import { writeRuntimeMetadata } from './runtime-metadata'
@@ -14,6 +13,7 @@ import {
   type RuntimeMetadataOwnershipWatch
 } from './runtime-metadata-ownership-watch'
 import { RpcDispatcher } from './rpc/dispatcher'
+import { ALL_RPC_METHODS } from './rpc/methods'
 import type { RpcAnyMethod, RpcRequest, RpcResponse } from './rpc/core'
 import { errorResponse } from './rpc/errors'
 import { fingerprintAuthenticatedPairingCredential } from './rpc/orchestration-mutation-executor'
@@ -27,11 +27,9 @@ import { loadOrCreateE2EEKeypair, type E2EEKeypair } from './e2ee-keypair'
 import { UnpairedDeviceAuthThrottle } from './rpc/unpaired-device-auth-throttle'
 import {
   MobileSocketWiring,
-  type AuthenticatedCloudManagedSocket,
   type AuthenticatedMobileSocket,
   type MobileSocketTransportMetadata
 } from './rpc/mobile-socket-wiring'
-import type { HiveRuntimeCloudWebLaunchService } from '../hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import type { PairingRelay } from '../../shared/mobile-relay-pairing-offer'
 import type { MobilePairingConnectionMode } from '../../shared/mobile-pairing-connection-mode'
 import type { RuntimePairingReach } from '../../shared/runtime-pairing-reach'
@@ -52,10 +50,8 @@ import type {
 } from '../../shared/mobile-relay-credential-contract'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { resolveAdvertisedPairingEndpoint } from './pairing-endpoint'
-import {
-  decodeTerminalStreamFrame,
-  type TerminalStreamFrame
-} from '../../shared/terminal-stream-protocol'
+import type { TerminalStreamFrame } from '../../shared/terminal-stream-protocol'
+import { RuntimeBinaryMessageRouter } from './runtime-binary-message-router'
 
 const DEFAULT_WS_PORT = 6768
 
@@ -63,6 +59,12 @@ const DEFAULT_WS_PORT = 6768
 // reachable from the LAN; it widens to all interfaces only on explicit pairing (or `orca serve`).
 const WS_BIND_HOST_LOOPBACK = '127.0.0.1'
 const WS_BIND_HOST_ALL_INTERFACES = '0.0.0.0'
+
+// Why brackets: `ws://::1:6768` is not a URL, and every consumer of this endpoint parses it
+// with `new URL`. An IPv6 bind address would otherwise publish an unparseable endpoint.
+function formatWsEndpoint(host: string, port: number): string {
+  return `ws://${host.includes(':') ? `[${host}]` : host}:${port}`
+}
 
 type OrcaRuntimeRpcServerOptions = {
   runtime: OrcaRuntimeService
@@ -76,13 +78,23 @@ type OrcaRuntimeRpcServerOptions = {
   // Why: STA-2370 — bind the WS listener to all interfaces at startup instead of loopback-until-paired.
   // Only `orca serve` (explicit remote opt-in) and E2E set this; the desktop app widens lazily on pairing.
   exposeNetworkByDefault?: boolean
+  /**
+   * Pin the WS listener to exactly this address for the process's whole life.
+   *
+   * Why a pin and not another default: the two paths below both widen on their own —
+   * `exposeNetworkByDefault` at startup, and a device that has connected once at every
+   * later startup. An unattended host (orcad) whose operator asked for loopback must
+   * still be on loopback after a client pairs and the service restarts, so the answer
+   * has to outrank both, and `ensureNetworkExposure()` has to refuse rather than widen.
+   */
+  pinnedBindHost?: string
   webClientRoot?: string
   // Why: test-only overrides for the two constants below; production must not pass these (defaults set by §3.1).
   keepaliveIntervalMs?: number
   longPollCap?: number
   // Why: test-only override for the ownership reclaim cadence.
   metadataOwnershipPollMs?: number
-  // Test-only protocol injection for browser/host admission coverage.
+  // Why: tests may inject inert protocol stages before production authorization registers them.
   methods?: readonly RpcAnyMethod[]
 }
 
@@ -125,12 +137,10 @@ function pairingUnavailable(
   return { available: false, reason, guidance }
 }
 
-const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE = applyProductBranding(
+const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE =
   'The pairing registry is unavailable. Verify that the Orca data directory is writable.'
-)
-const E2EE_KEY_UNAVAILABLE_GUIDANCE = applyProductBranding(
+const E2EE_KEY_UNAVAILABLE_GUIDANCE =
   'The E2EE identity is unavailable. Verify that the Orca data directory is writable.'
-)
 
 type MobileRelayPairingProvider = {
   createPairingRelay(
@@ -165,6 +175,10 @@ const LONG_POLL_CAP = 16
 // workers would otherwise hold every slot and starve the mobile/web/CLI/relay
 // clients sharing this runtime. Reserve half the budget for the other classes.
 const ASK_LONG_POLL_SHARE = 0.5
+// Why: eight host slots preserve four-host overlap for two independently paired desktops.
+const BROWSER_HOST_LONG_POLL_SHARE = 0.5
+// Why: asks and permanent hosts together retain the prior quarter-budget reservation for waits.
+const SPECIALIZED_LONG_POLL_SHARE = 0.75
 
 function createWebClientUrl(endpoint: string, pairingUrl: string): string {
   const url = new URL(endpoint)
@@ -223,6 +237,7 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'files.open',
   'files.openDiff',
   'files.read',
+  'files.readDocPreview',
   'files.readChunk',
   'files.readDir',
   'files.readPreview',
@@ -449,14 +464,18 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
 ])
 
 // Why: 'ask' is metered separately from 'wait' — same keepalive/abort wiring, its own sub-cap.
-type LongPollClass = 'ask' | 'wait'
+export type RuntimeLongPollClass = 'ask' | 'browser-host' | 'wait'
 
 // Why: single classifier for long-poll requests (handlers that block on an external event), shared by counter/abort/keepalive. See §3.1.
-function longPollClassOf(request: RpcRequest): LongPollClass | null {
+export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollClass | null {
   // Worker start waits for readiness and then verifies the submitted prompt;
-  // the complete operation can run for 90–110s. Keep the local transport alive.
+  // the complete operation can run for 90–110s. Keep every local transport
+  // (Unix sockets and Windows named pipes) alive for that long poll.
   if (request.method === 'orchestration.workerStart') {
     return 'wait'
+  }
+  if (request.method === 'browser.clientHost.attach') {
+    return 'browser-host'
   }
   if (request.method === 'terminal.wait') {
     return 'wait'
@@ -486,36 +505,6 @@ function longPollClassOf(request: RpcRequest): LongPollClass | null {
   return null
 }
 
-export type RuntimeLongPollClass = 'ask' | 'browser-host' | 'wait'
-
-export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollClass | null {
-  if (request.method === 'orchestration.workerStart') {
-    return 'wait'
-  }
-  if (request.method === 'browser.clientHost.attach') {
-    return 'browser-host'
-  }
-  if (request.method === 'terminal.wait') {
-    return 'wait'
-  }
-  if (
-    request.method === 'terminal.send' &&
-    typeof request.params === 'object' &&
-    request.params !== null &&
-    (request.params as { agentPrompt?: unknown }).agentPrompt === true
-  ) {
-    return 'wait'
-  }
-  if (request.method === 'orchestration.ask') {
-    return 'ask'
-  }
-  if (request.method === 'orchestration.check') {
-    const params = request.params as { wait?: unknown } | undefined
-    return params?.wait === true ? 'wait' : null
-  }
-  return null
-}
-
 // Why: status.get has no per-connection context in the dispatcher, so stamp the scope here at the transport boundary.
 function injectDeviceScope(response: string, scope: DeviceScope): string {
   try {
@@ -530,10 +519,6 @@ function injectDeviceScope(response: string, scope: DeviceScope): string {
   }
 }
 
-function cloudManagedClientId(managedWebSessionId: string): string {
-  return `cloud-managed:${managedWebSessionId}`
-}
-
 export class OrcaRuntimeRpcServer {
   private readonly runtime: OrcaRuntimeService
   private readonly dispatcher: RpcDispatcher
@@ -544,6 +529,7 @@ export class OrcaRuntimeRpcServer {
   private readonly wsPort: number
   private readonly preferPinnedWsPort: boolean
   private readonly exposeNetworkByDefault: boolean
+  private readonly pinnedBindHost: string | null
   private readonly webClientRoot: string | undefined
   // Why: STA-2370 — the host the WS listener is currently bound to, so pairing can widen loopback→all-interfaces once.
   private wsBoundHost: string | null = null
@@ -557,6 +543,9 @@ export class OrcaRuntimeRpcServer {
   private readonly longPollCap: number
   private readonly metadataOwnershipPollMs: number
   private readonly askLongPollCap: number
+  private readonly browserHostLongPollCap: number
+  private readonly browserHostLongPollCapPerDevice: number
+  private readonly specializedLongPollCap: number
   private readonly relayRevokeOutbox: RelayRevokeOutbox
   private deviceRegistry: DeviceRegistry | null = null
   private e2eeKeypair: E2EEKeypair | null = null
@@ -566,7 +555,6 @@ export class OrcaRuntimeRpcServer {
   private transports: RuntimeTransportMetadata[] = []
   private metadataOwnershipWatch: RuntimeMetadataOwnershipWatch | null = null
   private mobileSocketWiring: MobileSocketWiring | null = null
-  private cloudWebLaunchService: HiveRuntimeCloudWebLaunchService | null = null
   // Why: detaches the current WebSocketTransport from the session wiring so a pairing rebind can swap
   // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
   private detachWebSocketWiring: (() => void) | null = null
@@ -581,10 +569,7 @@ export class OrcaRuntimeRpcServer {
   private mobilePairingOfferGeneration = 0
   private onUnpairedDeviceAuthFailure: (() => void) | null = null
   private unpairedDeviceAuthThrottle: UnpairedDeviceAuthThrottle | null = null
-  private readonly binaryStreamHandlers = new Map<
-    string,
-    Map<number, (frame: TerminalStreamFrame) => void>
-  >()
+  private readonly binaryMessageRouter = new RuntimeBinaryMessageRouter()
   private readonly wsDispatchAbortStates = new Map<
     WebSocket,
     { controllers: Set<AbortController>; abortOnClose: () => void }
@@ -593,6 +578,8 @@ export class OrcaRuntimeRpcServer {
   private activeLongPolls = 0
   // Why: subset of activeLongPolls held by orchestration.ask, fenced by askLongPollCap.
   private activeAskLongPolls = 0
+  private activeBrowserHostLongPolls = 0
+  private readonly activeBrowserHostLongPollsByDevice = new Map<string, number>()
 
   constructor({
     runtime,
@@ -603,6 +590,7 @@ export class OrcaRuntimeRpcServer {
     wsPort = DEFAULT_WS_PORT,
     preferPinnedWsPort = false,
     exposeNetworkByDefault = false,
+    pinnedBindHost,
     webClientRoot,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
     longPollCap = LONG_POLL_CAP,
@@ -610,7 +598,7 @@ export class OrcaRuntimeRpcServer {
     methods
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
-    this.dispatcher = new RpcDispatcher({ runtime, methods })
+    this.dispatcher = new RpcDispatcher({ runtime, methods: methods ?? ALL_RPC_METHODS })
     this.userDataPath = userDataPath
     this.pid = pid
     this.platform = platform
@@ -618,12 +606,19 @@ export class OrcaRuntimeRpcServer {
     this.wsPort = wsPort
     this.preferPinnedWsPort = preferPinnedWsPort
     this.exposeNetworkByDefault = exposeNetworkByDefault
+    this.pinnedBindHost = pinnedBindHost ?? null
     this.webClientRoot = webClientRoot
     this.keepaliveIntervalMs = keepaliveIntervalMs
     this.longPollCap = longPollCap
     this.metadataOwnershipPollMs = metadataOwnershipPollMs
     // Why: derived, not configurable — the reservation must hold for whatever cap a caller picks.
     this.askLongPollCap = Math.max(1, Math.floor(longPollCap * ASK_LONG_POLL_SHARE))
+    this.browserHostLongPollCap = Math.max(
+      1,
+      Math.floor(longPollCap * BROWSER_HOST_LONG_POLL_SHARE)
+    )
+    this.browserHostLongPollCapPerDevice = Math.max(1, Math.floor(this.browserHostLongPollCap / 2))
+    this.specializedLongPollCap = Math.max(1, Math.floor(longPollCap * SPECIALIZED_LONG_POLL_SHARE))
     this.relayRevokeOutbox = new RelayRevokeOutbox(userDataPath)
   }
 
@@ -645,17 +640,6 @@ export class OrcaRuntimeRpcServer {
 
   getMobileSocketWiring(): MobileSocketWiring | null {
     return this.mobileSocketWiring
-  }
-
-  setCloudWebLaunchService(service: HiveRuntimeCloudWebLaunchService | null): void {
-    if (this.activeTransports.length > 0 || this.mobileSocketWiring) {
-      throw new Error('Cloud Web Launch must be configured before Runtime RPC starts')
-    }
-    this.cloudWebLaunchService = service
-  }
-
-  terminateCloudWebSessionConnections(managedWebSessionId: string): number {
-    return this.mobileSocketWiring?.terminateCloudSessionConnections(managedWebSessionId) ?? 0
   }
 
   getRelayRevokeOutbox(): RelayRevokeOutbox {
@@ -925,9 +909,8 @@ export class OrcaRuntimeRpcServer {
       return {
         available: false,
         reason: 'relay_mint_failed',
-        guidance: applyProductBranding(
-          'Orca Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.'
-        ),
+        guidance:
+          'Orca Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.',
         relayFailure
       }
     }
@@ -936,7 +919,7 @@ export class OrcaRuntimeRpcServer {
       return refuseAutomaticWithoutRelay({
         code: 'relay_provider_unavailable',
         stage: 'provider_missing',
-        message: applyProductBranding('Orca Relay is not available on this desktop')
+        message: 'Orca Relay is not available on this desktop'
       })
     }
     const device = this.deviceRegistry?.getDevice(direct.deviceId)
@@ -1075,37 +1058,18 @@ export class OrcaRuntimeRpcServer {
     streamId: number,
     handler: (frame: TerminalStreamFrame) => void
   ): () => void {
-    if (!connectionId || !Number.isInteger(streamId) || streamId < 0) {
-      return () => {}
-    }
-    let handlers = this.binaryStreamHandlers.get(connectionId)
-    if (!handlers) {
-      handlers = new Map()
-      this.binaryStreamHandlers.set(connectionId, handlers)
-    }
-    handlers.set(streamId, handler)
-    return () => {
-      const current = this.binaryStreamHandlers.get(connectionId)
-      if (!current || current.get(streamId) !== handler) {
-        return
-      }
-      current.delete(streamId)
-      if (current.size === 0) {
-        this.binaryStreamHandlers.delete(connectionId)
-      }
-    }
+    return this.binaryMessageRouter.registerTerminalStream(connectionId, streamId, handler)
+  }
+
+  private registerBinaryMessageHandler(
+    connectionId: string | undefined,
+    handler: (bytes: Uint8Array<ArrayBufferLike>) => void
+  ): () => void {
+    return this.binaryMessageRouter.registerRawMessage(connectionId, handler)
   }
 
   private handleWebSocketBinaryMessage(bytes: Uint8Array<ArrayBufferLike>, ws: WebSocket): void {
-    const connectionId = this.mobileSocketWiring?.getConnectionId(ws)
-    if (!connectionId) {
-      return
-    }
-    const frame = decodeTerminalStreamFrame(bytes)
-    if (!frame) {
-      return
-    }
-    this.binaryStreamHandlers.get(connectionId)?.get(frame.streamId)?.(frame)
+    this.binaryMessageRouter.dispatch(this.mobileSocketWiring?.getConnectionId(ws), bytes)
   }
 
   private registerWebSocketDispatchAbort(ws: WebSocket): {
@@ -1314,6 +1278,9 @@ export class OrcaRuntimeRpcServer {
   // A grant minted for "This computer only" is excluded: its client is a browser on this machine, so
   // counting it would republish the runtime on every interface one restart after the user declined that.
   private resolveInitialWebSocketBindHost(): string {
+    if (this.pinnedBindHost) {
+      return this.pinnedBindHost
+    }
     if (this.exposeNetworkByDefault) {
       return WS_BIND_HOST_ALL_INTERFACES
     }
@@ -1341,20 +1308,11 @@ export class OrcaRuntimeRpcServer {
       host: options.host,
       port: options.port,
       staticRoot: this.webClientRoot,
-      ...(this.cloudWebLaunchService
-        ? {
-            httpRouteHandler: (request, response) =>
-              this.cloudWebLaunchService?.handleHttpRequest(request, response) ?? false
-          }
-        : {}),
       ...(options.fallbackPort !== undefined ? { fallbackPort: options.fallbackPort } : {}),
       ...(options.preferPinnedPort ? { preferPinnedPort: true } : {})
     })
     const mobileSocketWiring = this.ensureMobileSocketWiring(deviceRegistry, e2eeKeypair)
-    this.detachWebSocketWiring = mobileSocketWiring.attachTransport(wsTransport, (ws) => ({
-      transport: 'direct',
-      request: wsTransport.getConnectionRequest(ws)
-    }))
+    this.detachWebSocketWiring = mobileSocketWiring.attachTransport(wsTransport)
 
     try {
       await wsTransport.start()
@@ -1368,7 +1326,7 @@ export class OrcaRuntimeRpcServer {
     this.wsBoundHost = options.host
     return {
       transport: wsTransport,
-      endpoint: `ws://${options.host}:${wsTransport.resolvedPort}`
+      endpoint: formatWsEndpoint(options.host, wsTransport.resolvedPort)
     }
   }
 
@@ -1390,47 +1348,6 @@ export class OrcaRuntimeRpcServer {
     const mobileSocketWiring = new MobileSocketWiring({
       deviceRegistry,
       e2eeKeypair,
-      ...(this.cloudWebLaunchService
-        ? {
-            resolveCloudManagedSession: (auth, metadata: MobileSocketTransportMetadata) =>
-              metadata.transport === 'direct'
-                ? (this.cloudWebLaunchService?.resolveSession(
-                    auth,
-                    metadata.request ?? { pathname: null, origin: null }
-                  ) ?? null)
-                : null,
-            onCloudText: (socket, plaintext, reply, sendBinary) => {
-              void this.handleWebSocketMessage(
-                plaintext,
-                reply,
-                sendBinary,
-                undefined,
-                socket.ws,
-                null,
-                undefined,
-                socket
-              )
-            },
-            onCloudBinary: (socket, bytes) => {
-              if (!this.cloudWebLaunchService?.revalidateSession(socket.principal)) {
-                this.terminateCloudWebSessionConnections(socket.principal.managedWebSessionId)
-                return
-              }
-              this.handleWebSocketBinaryMessage(bytes, socket.ws)
-            },
-            onCloudReady: () => {
-              this.runtime.activateRecentPtyPathCandidateTracking?.()
-            },
-            onCloudClose: (socket, hasOtherConnections) => {
-              this.cleanupAuthenticatedWebSocket(socket)
-              if (!hasOtherConnections) {
-                this.runtime.onClientDisconnected(
-                  cloudManagedClientId(socket.principal.managedWebSessionId)
-                )
-              }
-            }
-          }
-        : {}),
       onText: (socket, plaintext, reply, sendBinary) => {
         void this.handleWebSocketMessage(
           plaintext,
@@ -1456,7 +1373,11 @@ export class OrcaRuntimeRpcServer {
         if (!socket) {
           return
         }
-        this.cleanupAuthenticatedWebSocket(socket)
+        this.abortWebSocketDispatches(socket.ws)
+        // Why: subscriptions and binary streams are socket-scoped, but disconnect state is device-scoped across transports.
+        this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
+        this.runtime.cancelMobileDictationForConnection(socket.connectionId)
+        this.binaryMessageRouter.deleteConnection(socket.connectionId)
         if (!hasOtherConnections) {
           this.runtime.onClientDisconnected(socket.device.deviceToken)
         }
@@ -1472,21 +1393,20 @@ export class OrcaRuntimeRpcServer {
     return mobileSocketWiring
   }
 
-  private cleanupAuthenticatedWebSocket(
-    socket: AuthenticatedMobileSocket | AuthenticatedCloudManagedSocket
-  ): void {
-    this.abortWebSocketDispatches(socket.ws)
-    this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
-    this.runtime.cancelMobileDictationForConnection(socket.connectionId)
-    this.binaryStreamHandlers.delete(socket.connectionId)
-  }
-
   // Why: STA-2370 — widen the loopback listener to all interfaces so a freshly generated pairing
   // offer's advertised LAN endpoint is reachable. Idempotent, but it is no longer confined to the first
   // pairing action: a "This computer only" link never widens, so live loopback clients can already be
   // connected when a later LAN/QR offer opts in. Rebinding terminates them (ws cannot move a listener),
   // so the resolved port is reused — already-issued endpoints stay valid and clients reconnect in place.
   async ensureNetworkExposure(): Promise<void> {
+    if (this.pinnedBindHost && this.pinnedBindHost !== WS_BIND_HOST_ALL_INTERFACES) {
+      // Why throw and not return: callers widen so they can ADVERTISE a LAN endpoint. Returning
+      // quietly would let them publish one that nothing can reach; the throw lands in their
+      // existing network_exposure_failed branch, which reports the offer unavailable instead.
+      throw new Error(
+        `Runtime bind address is pinned to ${this.pinnedBindHost}; refusing to widen to all interfaces`
+      )
+    }
     if (
       !this.enableWebSocket ||
       this.stopping ||
@@ -1659,7 +1579,7 @@ export class OrcaRuntimeRpcServer {
     const request = parsed.request
 
     // Why: long-poll admission fence; short RPCs bypass the counter. See §7 risk #2.
-    const longPoll = longPollClassOf(request)
+    const longPoll = classifyRuntimeLongPoll(request)
     const rejection = this.admitLongPoll(longPoll)
     if (rejection) {
       return this.buildError(request.id, 'runtime_busy', rejection)
@@ -1681,30 +1601,68 @@ export class OrcaRuntimeRpcServer {
   // Why: one fence for both transports — the total cap protects short RPCs, the ask
   // sub-cap protects terminal.wait / check --wait from slow reply-blocked asks.
   // Returns the rejection message, or null once the slot is reserved.
-  private admitLongPoll(longPoll: LongPollClass | null): string | null {
+  private admitLongPoll(
+    longPoll: RuntimeLongPollClass | null,
+    pairedDeviceId?: string
+  ): string | null {
     if (!longPoll) {
       return null
     }
     if (this.activeLongPolls >= this.longPollCap) {
       return 'long-poll capacity reached; retry with backoff'
     }
+    if (
+      (longPoll === 'ask' || longPoll === 'browser-host') &&
+      this.activeAskLongPolls + this.activeBrowserHostLongPolls >= this.specializedLongPollCap
+    ) {
+      return longPoll === 'ask'
+        ? 'orchestration.ask capacity reached; retry with backoff'
+        : 'browser-host capacity reached; retry with backoff'
+    }
     if (longPoll === 'ask' && this.activeAskLongPolls >= this.askLongPollCap) {
       return 'orchestration.ask capacity reached; retry with backoff'
+    }
+    if (
+      longPoll === 'browser-host' &&
+      (this.activeBrowserHostLongPolls >= this.browserHostLongPollCap ||
+        (pairedDeviceId !== undefined &&
+          (this.activeBrowserHostLongPollsByDevice.get(pairedDeviceId) ?? 0) >=
+            this.browserHostLongPollCapPerDevice))
+    ) {
+      return 'browser-host capacity reached; retry with backoff'
     }
     this.activeLongPolls += 1
     if (longPoll === 'ask') {
       this.activeAskLongPolls += 1
+    } else if (longPoll === 'browser-host') {
+      this.activeBrowserHostLongPolls += 1
+      if (pairedDeviceId !== undefined) {
+        this.activeBrowserHostLongPollsByDevice.set(
+          pairedDeviceId,
+          (this.activeBrowserHostLongPollsByDevice.get(pairedDeviceId) ?? 0) + 1
+        )
+      }
     }
     return null
   }
 
-  private releaseLongPoll(longPoll: LongPollClass | null): void {
+  private releaseLongPoll(longPoll: RuntimeLongPollClass | null, pairedDeviceId?: string): void {
     if (!longPoll) {
       return
     }
     this.activeLongPolls = Math.max(0, this.activeLongPolls - 1)
     if (longPoll === 'ask') {
       this.activeAskLongPolls = Math.max(0, this.activeAskLongPolls - 1)
+    } else if (longPoll === 'browser-host') {
+      this.activeBrowserHostLongPolls = Math.max(0, this.activeBrowserHostLongPolls - 1)
+      if (pairedDeviceId !== undefined) {
+        const remaining = (this.activeBrowserHostLongPollsByDevice.get(pairedDeviceId) ?? 1) - 1
+        if (remaining > 0) {
+          this.activeBrowserHostLongPollsByDevice.set(pairedDeviceId, remaining)
+        } else {
+          this.activeBrowserHostLongPollsByDevice.delete(pairedDeviceId)
+        }
+      }
     }
   }
 
@@ -1740,8 +1698,7 @@ export class OrcaRuntimeRpcServer {
     wsTransport?: WebSocketTransport,
     ws?: WebSocket,
     authenticatedDeviceToken?: string | null,
-    authenticatedSocket?: AuthenticatedMobileSocket,
-    authenticatedCloudSocket?: AuthenticatedCloudManagedSocket
+    authenticatedSocket?: AuthenticatedMobileSocket
   ): Promise<void> {
     let request: RpcRequest
     try {
@@ -1760,52 +1717,26 @@ export class OrcaRuntimeRpcServer {
       return
     }
 
-    const requestRecord = request as unknown as Record<string, unknown>
-    if (authenticatedCloudSocket) {
-      if (
-        'deviceToken' in requestRecord ||
-        'sessionToken' in requestRecord ||
-        'authToken' in requestRecord
-      ) {
-        reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Credential mismatch')))
-        return
-      }
-      if (!this.cloudWebLaunchService?.revalidateSession(authenticatedCloudSocket.principal)) {
-        reply(
-          JSON.stringify(this.buildError(request.id, 'unauthorized', 'Managed session expired'))
-        )
-        this.terminateCloudWebSessionConnections(
-          authenticatedCloudSocket.principal.managedWebSessionId
-        )
-        return
-      }
-    }
-
     const requestToken =
       typeof (request as Record<string, unknown>).deviceToken === 'string'
         ? ((request as Record<string, unknown>).deviceToken as string)
         : null
-    if (
-      !authenticatedCloudSocket &&
-      authenticatedDeviceToken &&
-      requestToken &&
-      requestToken !== authenticatedDeviceToken
-    ) {
+    if (authenticatedDeviceToken && requestToken && requestToken !== authenticatedDeviceToken) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Device token mismatch')))
       return
     }
     // Why: E2EE already authenticated the channel; authorize by that bound identity, not a repeated request field.
-    const token = authenticatedCloudSocket ? null : (authenticatedDeviceToken ?? requestToken)
-    if (!authenticatedCloudSocket && !token) {
+    const token = authenticatedDeviceToken ?? requestToken
+    if (!token) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Missing device token')))
       return
     }
-    const device = token ? this.deviceRegistry?.validateToken(token) : null
-    if (!authenticatedCloudSocket && !device) {
+    const device = this.deviceRegistry?.validateToken(token)
+    if (!device) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Invalid device token')))
       return
     }
-    if (device?.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
+    if (device.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
       reply(
         JSON.stringify(
           this.buildError(
@@ -1819,12 +1750,12 @@ export class OrcaRuntimeRpcServer {
     }
 
     // Why: bind deviceToken to this socket so ws.on('close') knows which mobile client disconnected.
-    if (wsTransport && ws && token) {
+    if (wsTransport && ws) {
       wsTransport.setClientId(ws, token)
     }
 
-    const longPoll = longPollClassOf(request)
-    const rejection = this.admitLongPoll(longPoll)
+    const longPoll = classifyRuntimeLongPoll(request)
+    const rejection = this.admitLongPoll(longPoll, device.deviceId)
     if (rejection) {
       reply(JSON.stringify(this.buildError(request.id, 'runtime_busy', rejection)))
       return
@@ -1835,13 +1766,10 @@ export class OrcaRuntimeRpcServer {
     // Why: older pairings may lack scope metadata, so stamp the authenticated scope onto status.get.
     const replyForRequest =
       request.method === 'status.get'
-        ? (response: string): void => reply(injectDeviceScope(response, device?.scope ?? 'runtime'))
+        ? (response: string): void => reply(injectDeviceScope(response, device.scope))
         : reply
 
-    const connectionId =
-      authenticatedCloudSocket?.connectionId ??
-      authenticatedSocket?.connectionId ??
-      (ws ? this.mobileSocketWiring?.getConnectionId(ws) : undefined)
+    const connectionId = ws ? this.mobileSocketWiring?.getConnectionId(ws) : undefined
     const pairingProvider = this.mobileRelayPairingProvider
     const pairingContext =
       pairingProvider && authenticatedSocket
@@ -1867,28 +1795,26 @@ export class OrcaRuntimeRpcServer {
           }
         : undefined
     try {
-      const clientId = authenticatedCloudSocket
-        ? cloudManagedClientId(authenticatedCloudSocket.principal.managedWebSessionId)
-        : token!
       await this.dispatcher.dispatchStreaming(request, replyForRequest, {
         // Why: the validated credential preserves existing federation ownership without trusting request fields.
-        authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(clientId),
+        authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(token),
         connectionId,
-        clientId,
-        ...(device ? { pairedDeviceId: device.deviceId } : {}),
+        clientId: token,
+        pairedDeviceId: device.deviceId,
         // Why: gates the mobile-only payload diet so full-screen web/desktop clients aren't truncated.
-        clientKind: device?.scope ?? 'runtime',
-        clientCapabilities:
-          authenticatedCloudSocket?.clientCapabilities ?? authenticatedSocket?.clientCapabilities,
+        clientKind: device.scope,
+        clientCapabilities: authenticatedSocket?.clientCapabilities,
         pairing: pairingContext,
         signal: abortRegistration?.signal,
         sendBinary,
         registerBinaryStreamHandler: (streamId, handler) =>
-          this.registerBinaryStreamHandler(connectionId, streamId, handler)
+          this.registerBinaryStreamHandler(connectionId, streamId, handler),
+        registerBinaryMessageHandler: (handler) =>
+          this.registerBinaryMessageHandler(connectionId, handler)
       })
     } finally {
       abortRegistration?.dispose()
-      this.releaseLongPoll(longPoll)
+      this.releaseLongPoll(longPoll, device.deviceId)
     }
   }
 
