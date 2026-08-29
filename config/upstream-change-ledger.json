@@ -247,6 +247,132 @@
       "regressionTests": ["runtime git"]
     },
     {
+      "upstreamSha": "2b391652b1842e4c4931b33454a501d3fbc47c70",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "远程 session merge 已采用 HiveCode tombstone/close 语义",
+      "adaptation": "保留本地 UI 与 session store，沿用上游 closed-tab tombstone reconnect 规则",
+      "regressionTests": ["remote-workspace-session-merge-close-tombstones", "workspace-session-closed-tab-tombstones"]
+    },
+    {
+      "upstreamSha": "e06a8667a930b06472ce28a9b0ee0c4371a1716f",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "host authority 与恢复流程已在产品分支实现",
+      "adaptation": "执行 host 未确认时禁止 seed/resume，保留 HiveCode terminal UI",
+      "regressionTests": ["workspace-terminal-host-authority", "remote-workspace-snapshot-fresh-client-tab-seeding"]
+    },
+    {
+      "upstreamSha": "8b99c8365d6bd9cbc7e50d9d4a5a73b5005c2f80",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": ["2b391652b1842e4c4931b33454a501d3fbc47c70"],
+      "conflictReason": "remote workspace merge 已有本地存活行保护",
+      "adaptation": "主机无响应不删除未经主机确认的本地行",
+      "regressionTests": ["remote-workspace-session-merge-local-survival"]
+    },
+    {
+      "upstreamSha": "6ba6d58cd2d3d6abd4a08bfd8eaed8ae64195c08",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "agent identity/launch authority 已在 PTY 与 orchestration 链路实现",
+      "adaptation": "按 resolved identity 路由 @agent，保留 HiveCode pane/title UI",
+      "regressionTests": ["agent identity routing", "pty launch authority"]
+    },
+    {
+      "upstreamSha": "efb4050f4da3a3ffb30c6bfa02a9b9be6f9d5592",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "AI Vault scanner 已包含 Cline source/parser",
+      "adaptation": "保留 HiveCode vault UI，使用上游 Cline manifest/messages 配对规则",
+      "regressionTests": ["remote-session-scanner", "session-scanner-cline-parser"]
+    },
+    {
+      "upstreamSha": "b241a68ae4467253beaac3ed1bb6a663fd9c5a01",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "execution-host worktree identity 已在 runtime/repo scan 中统一",
+      "adaptation": "跨 host 保持 workspace identity 隔离",
+      "regressionTests": ["repo-worktree-row-resolution", "workspace-cleanup-broad-scan"]
+    },
+    {
+      "upstreamSha": "f400f8fd5f35f0f27ad4697af8789f99fd9a4fa4",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "macOS 输入偏好实现已存在",
+      "adaptation": "保留产品启动流程，应用一次性 press-and-hold 默认并尊重用户设置",
+      "regressionTests": ["macos-press-and-hold-default"]
+    },
+    {
+      "upstreamSha": "3558cf943f2284b6d3335df386d711cf1adf5b10",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "WSL hook healing 已接入 typed launch 前置流程",
+      "adaptation": "保留 HiveCode WSL host 路由，沿用异步修复避免阻塞启动",
+      "regressionTests": ["agent-hooks", "pty-daemon-spawn-wsl-runtime"]
+    },
+    {
+      "upstreamSha": "cc384c5a3d12508684156dd7ce5d3eaff121380f",
+      "type": "安全",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "POSIX hook ingest 已按 JSON payload 处理",
+      "adaptation": "保持 HiveCode hook endpoint 与 trust boundary，采用结构化 JSON 解析",
+      "regressionTests": ["server-hook-http-ingest", "hook-post-command"]
+    },
+    {
+      "upstreamSha": "f352e3e27dc887fb96a6bd3cfe77a82aae7cc38a",
+      "type": "安全",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "Cursor managed hook 已采用 Cursor 顶层 command schema",
+      "adaptation": "保留用户 hook 条目，managed hook 输出协议合法 JSON",
+      "regressionTests": ["cursor-hook-service", "agent-hook-installer"]
+    },
+    {
+      "upstreamSha": "de6fe8b7eabd220d100e4cc652413461d444d2ba",
+      "type": "BUG",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "worktree id selector 已采用 path-equivalence fallback",
+      "adaptation": "保留 HiveCode selector/UI 语义，使用上游路径等价解析",
+      "regressionTests": ["repo-worktree-row-resolution", "worktree-rm-id-selector-path-spelling"]
+    },
+    {
+      "upstreamSha": "b4ed53f7c65be1d03ba2896631fe75c62742babf",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": ["fc36d58bbb", "fd9125ea8c"],
+      "conflictReason": "结构化会话 host 接入点在 runtime 拆分冲突中遗漏",
+      "adaptation": "恢复 lazy structured-agent-session host、创建意图、重启恢复、agent tab 投影与关闭；保留 HiveCode 移动 session tab 边界",
+      "regressionTests": ["structured agent-session create intent", "structured session cold restoration", "session tab move validation"]
+    },
+    {
+      "upstreamSha": "caef20fec8dee3d5c7df6ff23600938da381a4b7",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "GitLab runtime facade 未同步分页参数与 totalPages 返回值",
+      "adaptation": "恢复 page 参数、local git options 正确传递和 totalPages，保持现有 GitLab UI 映射",
+      "regressionTests": ["GitLab RPC listIssues", "GitLab TaskPage pagination"]
+    },
+    {
+      "upstreamSha": "df95f03101e94e377659f3e511315887096c5114",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "GitHub runtime facade 缺少 draft PR ready action",
+      "adaptation": "恢复 markRepoPRReadyForReview runtime bridge，保留 HiveCode checks panel/UI",
+      "regressionTests": ["GitHub PR update RPC"]
+    },
+    {
       "upstreamSha": "673842db35b37557006d9f20d04e077780253d82",
       "type": "重构",
       "applied": "暂缓",
@@ -254,6 +380,33 @@
       "conflictReason": "后续 9c01e09 已回滚 direct-home 方案",
       "adaptation": "跟随上游最终状态，不移植已回滚的中间提交",
       "regressionTests": []
+    },
+    {
+      "upstreamSha": "6256f3d137bd443aa3ba06349d0984fb3d0af3f4",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": ["06272109daa309c3e015e11862f186eb0188ac35"],
+      "conflictReason": "产品 runtime 已拆分 session-tabs RPC，无法直接覆盖单体 runtime",
+      "adaptation": "在现有 runtime 中补回全局 change sequence、coalesced watermark 与 inventory API，保留 HiveCode 的 census/host-authority 逻辑",
+      "regressionTests": ["session-tabs inventory census race", "session restart tab persistence"]
+    },
+    {
+      "upstreamSha": "c5591d089398d25a24285f95d5b4b94ca4475c13",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "GPU fallback 与 HiveCode 启动/品牌流程冲突，按 hunk 手工合并",
+      "adaptation": "按上游方案在重启提示前持久化 safe-graphics marker，补恢复启动确认提示，保留 HiveCode 启动顺序与产品边界",
+      "regressionTests": ["gpu fallback engagement", "gpu fallback recovered launch", "gpu fallback marker"]
+    },
+    {
+      "upstreamSha": "a1f198be0d96c7152997a1fd178ad4f201fa7e67",
+      "type": "UI",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "README downloads badge 属于产品发布入口，HiveCode 当前无批准公开制品链接",
+      "adaptation": "保留 HiveCode 删除下载徽章的产品边界，不恢复上游发布暗示",
+      "regressionTests": ["documentation governance", "brand boundary"]
     }
   ]
 }
