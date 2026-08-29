@@ -27,6 +27,7 @@ import { loadOrCreateE2EEKeypair, type E2EEKeypair } from './e2ee-keypair'
 import { UnpairedDeviceAuthThrottle } from './rpc/unpaired-device-auth-throttle'
 import {
   MobileSocketWiring,
+  type AuthenticatedCloudManagedSocket,
   type AuthenticatedMobileSocket,
   type MobileSocketTransportMetadata
 } from './rpc/mobile-socket-wiring'
@@ -555,6 +556,9 @@ export class OrcaRuntimeRpcServer {
   private transports: RuntimeTransportMetadata[] = []
   private metadataOwnershipWatch: RuntimeMetadataOwnershipWatch | null = null
   private mobileSocketWiring: MobileSocketWiring | null = null
+  private cloudWebLaunchService: {
+    revalidateSession(principal: AuthenticatedCloudManagedSocket['principal']): boolean
+  } | null = null
   // Why: detaches the current WebSocketTransport from the session wiring so a pairing rebind can swap
   // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
   private detachWebSocketWiring: (() => void) | null = null
@@ -638,9 +642,8 @@ export class OrcaRuntimeRpcServer {
     return this.e2eeKeypair
   }
 
-  setCloudWebLaunchService(_service: unknown): void {
-    // The desktop HTTP server owns the launch service; this setter preserves
-    // the integration seam while the transport remains the termination owner.
+  setCloudWebLaunchService(service: unknown): void {
+    this.cloudWebLaunchService = service as typeof this.cloudWebLaunchService
   }
 
   terminateCloudWebSessionConnections(managedWebSessionId: string): number {
@@ -1707,7 +1710,8 @@ export class OrcaRuntimeRpcServer {
     wsTransport?: WebSocketTransport,
     ws?: WebSocket,
     authenticatedDeviceToken?: string | null,
-    authenticatedSocket?: AuthenticatedMobileSocket
+    authenticatedSocket?: AuthenticatedMobileSocket,
+    authenticatedCloudSocket?: AuthenticatedCloudManagedSocket
   ): Promise<void> {
     let request: RpcRequest
     try {
@@ -1723,6 +1727,40 @@ export class OrcaRuntimeRpcServer {
     }
     if (typeof request.method !== 'string' || request.method.length === 0) {
       reply(JSON.stringify(this.buildError(request.id, 'bad_request', 'Missing RPC method')))
+      return
+    }
+
+    if (authenticatedCloudSocket) {
+      const repeatedCredential = ['deviceToken', 'sessionToken', 'authToken'].some(
+        (field) => typeof (request as Record<string, unknown>)[field] === 'string'
+      )
+      if (repeatedCredential) {
+        reply(
+          JSON.stringify(
+            this.buildError(
+              request.id,
+              'unauthorized',
+              'Cloud sessions do not accept repeated credentials'
+            )
+          )
+        )
+        return
+      }
+      if (!this.cloudWebLaunchService?.revalidateSession(authenticatedCloudSocket.principal)) {
+        reply(
+          JSON.stringify(
+            this.buildError(request.id, 'unauthorized', 'Cloud session is no longer valid')
+          )
+        )
+        return
+      }
+      await this.dispatcher.dispatchStreaming(request, reply, {
+        connectionId: authenticatedCloudSocket.connectionId,
+        clientId: authenticatedCloudSocket.connectionId,
+        clientKind: 'web',
+        clientCapabilities: authenticatedCloudSocket.clientCapabilities,
+        sendBinary
+      })
       return
     }
 

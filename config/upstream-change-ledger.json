@@ -425,6 +425,15 @@
       "conflictReason": "README 下载徽章属于 HiveCode 产品发布边界，不能直接采用 Orca 制品链接",
       "adaptation": "保留 HiveCode 下载与发布入口；待产品发布制品和签名确认后单独更新",
       "regressionTests": ["brand-boundary", "documentation-governance"]
+    },
+    {
+      "upstreamSha": "fd9125ea8c7b6cb64ea1daf7f4a335c13e52f351",
+      "type": "新功能",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "结构化原生聊天与 HiveCode runtime/preload facade 存在拆分差异",
+      "adaptation": "补齐结构化会话 PTY 写入门禁、退出解绑，以及 web preload 的会话恢复和能力暴露；保留 HiveCode web API 与 UI 品牌",
+      "regressionTests": ["structured agent session PTY binding", "web preload capability parity"]
     }
   ]
 }

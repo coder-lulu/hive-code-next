@@ -83,6 +83,10 @@ import {
   type AgentSessionClaimSigner
 } from './agent-session-claim-identity'
 import { ensureStructuredAgentSessionHost as installStructuredAgentSessionHost } from './structured-agent-session-runtime'
+import {
+  agentSessionPtyWriteGate,
+  type AgentSessionPtyWriteAdmittance
+} from './agent-session-pty-write-gate'
 import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk } from './structured-agent-session-runtime'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import type { AgentSessionAttachParams } from '../native-chat/agent-session-wire/structured-agent-session-attach'
@@ -1658,6 +1662,7 @@ type TerminalCreateOptions = {
   // Why: only the host-derived structured resume path may attach provider
   // identity; opaque terminal.create commands remain ordinary shells.
   agentSessionClaim?: AgentSessionExecutionClaim
+  structuredAgentSessionId?: string
   agentSessionCreateOperationId?: string
   signal?: AbortSignal
   // Why: idempotent create operations must retain their fence after the PTY
@@ -13665,14 +13670,20 @@ export class OrcaRuntimeService {
     }
     try {
       await assertTerminalInputWithinLimitWithYield(data)
-      await this.writeTerminalInputChunks(ptyId, data, {
-        // Why: a phone can claim the floor while a paste yields between chunks.
-        beforeWrite: () => {
-          if (this.getDriver(ptyId).kind === 'mobile') {
-            throw new Error('terminal_mobile_driver_active')
+      const admitted = agentSessionPtyWriteGate.assertAdmitted(ptyId)
+      await this.writeTerminalInputChunks(
+        ptyId,
+        data,
+        {
+          // Why: a phone can claim the floor while a paste yields between chunks.
+          beforeWrite: () => {
+            if (this.getDriver(ptyId).kind === 'mobile') {
+              throw new Error('terminal_mobile_driver_active')
+            }
           }
-        }
-      })
+        },
+        admitted
+      )
       return true
     } catch {
       return false
@@ -16401,6 +16412,7 @@ export class OrcaRuntimeService {
       this.intentionalHandlelessPtyStops.has(ptyId) &&
       (intentionalStopIncarnation === null || intentionalStopIncarnation === incarnationId)
     advertisedUrlWatcher.unbindPty(ptyId)
+    agentSessionPtyWriteGate.unbindPty(ptyId)
     // Clean up new mobile state for this PTY
     this.mobileSubscribers.delete(ptyId)
     this.remoteTerminalViewSubscriberCounts.delete(ptyId)
@@ -20503,12 +20515,21 @@ export class OrcaRuntimeService {
       beforeWrite?: (ptyId: string) => void | Promise<void>
       reserveWrite?: (ptyId: string) => void
       afterWrite?: (ptyId: string) => void | Promise<void>
-    } = {}
+    } = {},
+    admitted?: AgentSessionPtyWriteAdmittance
   ): Promise<void> {
     const chunks = iterateTerminalInputChunks(text)
     let chunk = chunks.next()
+    let firstChunk = true
     while (!chunk.done) {
+      if (admitted && !firstChunk) {
+        agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+      }
+      firstChunk = false
       await options.beforeWrite?.(ptyId)
+      if (admitted) {
+        agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+      }
       options.reserveWrite?.(ptyId)
       const wrote = this.ptyController?.write(ptyId, chunk.value) ?? false
       if (!wrote) {
@@ -29600,6 +29621,9 @@ export class OrcaRuntimeService {
           leafId,
           ...(result.incarnationId ? { incarnationId: result.incarnationId } : {})
         })
+        if (launchOpts.structuredAgentSessionId) {
+          agentSessionPtyWriteGate.bindPty(result.id, launchOpts.structuredAgentSessionId)
+        }
         const pty = this.getOrCreatePtyWorktreeRecord(result.id)
         if (pty) {
           // Released again by releaseRuntimeSessionOwnershipForRendererRetiredTabs

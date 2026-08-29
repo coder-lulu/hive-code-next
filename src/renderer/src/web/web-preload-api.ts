@@ -51,6 +51,12 @@ import type { WorkspaceLineage, WorktreeLineage } from '../../../shared/worktree
 import type { DetectedWorktreeListResult, Worktree } from '../../../shared/worktree/types'
 import type { SkillDiscoveryResult } from '../../../shared/skills'
 import type { SkillFreshnessInventory } from '../../../shared/skill-freshness'
+import type {
+  SkillDeletePlan,
+  SkillDeleteRequest,
+  SkillDeleteResult
+} from '../../../shared/skill-delete-contract'
+import { SKILL_DELETE_CAPABILITY } from '../../../shared/skill-install-capability'
 import type { SshConnectionState, SshTarget } from '../../../shared/ssh-types'
 import {
   getDefaultOnboardingState,
@@ -159,6 +165,10 @@ import {
 import { normalizeContextualTourIds, type ContextualTourId } from '../../../shared/contextual-tours'
 import { translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME, applyProductBranding } from '@/product-brand'
+import {
+  GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
+  GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE
+} from '../../../shared/protocol-version'
 import { translateHostAccessLinkError } from '@/lib/remote-pairing-copy'
 import { getDefaultCreateProjectParent } from '@/components/sidebar/create-project-defaults'
 import {
@@ -314,6 +324,7 @@ type WebGitHubRouteKey =
   | 'setPRFileViewed'
   | 'updatePRTitle'
   | 'mergePR'
+  | 'markPRReadyForReview'
   | 'setPRAutoMerge'
   | 'updatePRState'
   | 'requestPRReviewers'
@@ -363,6 +374,7 @@ type WebGitHubRuntimeMethod =
   | 'github.setPRFileViewed'
   | 'github.updatePRTitle'
   | 'github.mergePR'
+  | 'github.markPRReadyForReview'
   | 'github.setPRAutoMerge'
   | 'github.updatePRState'
   | 'github.requestPRReviewers'
@@ -465,6 +477,7 @@ export const GITHUB_WEB_RPC_METHODS = {
   setPRFileViewed: 'github.setPRFileViewed',
   updatePRTitle: 'github.updatePRTitle',
   mergePR: 'github.mergePR',
+  markPRReadyForReview: 'github.markPRReadyForReview',
   setPRAutoMerge: 'github.setPRAutoMerge',
   updatePRState: 'github.updatePRState',
   requestPRReviewers: 'github.requestPRReviewers',
@@ -592,6 +605,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       // Staging already wrote through to browser storage, so there is nothing left to join.
       awaitBeforeUnloadCheckpoint: () => Promise.resolve(),
       awaitFirstWindowStartupServices: () => Promise.resolve(),
+      prepareTerminalStartupRestoration: () => Promise.resolve(),
       recoverLegacyWorkerTerminalsForRendererStartup: () => Promise.resolve(),
       startupDiagnostic: () => Promise.resolve(),
       getKeyboardInputSourceId: () => Promise.resolve(null),
@@ -985,6 +999,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       onLegacyWorkerTerminalRecovery: () => noopUnsubscribe,
       getMigrationUnsupportedSnapshot: () => Promise.resolve([]),
       drop: () => {},
+      reconcileEndedProcess: () => {},
       dropByTabPrefix: () => {},
       retirePaneAuthority: () => {},
       restorePaneAuthority: () => {},
@@ -1473,12 +1488,25 @@ function createRuntimeApi(): NonNullable<Partial<PreloadApi>['runtime']> {
     getTerminalFitOverrides: () => Promise.resolve([]),
     getTerminalDrivers: () => Promise.resolve([]),
     getBrowserDrivers: () => Promise.resolve([]),
+    subscribe: async ({ method, params }, callback) => {
+      const environment = requireActiveEnvironment()
+      const subscription = await getClientForEnvironment(environment).subscribe(method, params, {
+        onResponse: callback
+      })
+      if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
+        subscription.unsubscribe()
+        throw new Error('runtime_manually_disconnected')
+      }
+      return subscription
+    },
+    getClientHostedBrowserRows: () => Promise.resolve([]),
     restoreTerminalFit: () => Promise.resolve({ restored: false }),
     reclaimBrowserForDesktop: () => Promise.resolve({ reclaimed: false }),
     onTerminalFitOverrideChanged: () => noopUnsubscribe,
     onTerminalDriverChanged: () => noopUnsubscribe,
     onNativeChatLaunchDraftResolved: () => noopUnsubscribe,
-    onBrowserDriverChanged: () => noopUnsubscribe
+    onBrowserDriverChanged: () => noopUnsubscribe,
+    onClientHostedBrowserRowsChanged: () => noopUnsubscribe
   }
 }
 
@@ -1635,6 +1663,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
     },
     getStatus: ({ selector, timeoutMs }) =>
       callEnvironmentEnvelope<RuntimeStatus>(selector, 'status.get', undefined, timeoutMs),
+    prepareBrowserClientHostPlacement: async () => ({ kind: 'server' }),
     call: ({ selector, method, params, timeoutMs }) =>
       callEnvironmentEnvelope(selector, method, params, timeoutMs),
     subscribe: async ({ selector, method, params, timeoutMs }, callbacks) => {
@@ -2552,6 +2581,16 @@ function createGitHubApi(): WebGitHubApi {
     updatePRTitle: (args) =>
       route<WebGitHubResult<'updatePRTitle'>>(GITHUB_WEB_RPC_METHODS.updatePRTitle, args),
     mergePR: (args) => route<WebGitHubResult<'mergePR'>>(GITHUB_WEB_RPC_METHODS.mergePR, args),
+    markPRReadyForReview: async (args) => {
+      const status = await getRemoteRuntimeStatus().catch(() => null)
+      if (!status?.capabilities?.includes(GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY)) {
+        return { ok: false, error: GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE }
+      }
+      return route<WebGitHubResult<'markPRReadyForReview'>>(
+        GITHUB_WEB_RPC_METHODS.markPRReadyForReview,
+        args
+      )
+    },
     setPRAutoMerge: (args) =>
       route<WebGitHubResult<'setPRAutoMerge'>>(GITHUB_WEB_RPC_METHODS.setPRAutoMerge, args),
     updatePRState: (args) =>
@@ -3202,6 +3241,14 @@ function createSkillsApi(): NonNullable<Partial<PreloadApi>['skills']> {
     previewBundleInstall: () =>
       Promise.reject(new Error('Skill installation requires the desktop app.')),
     removeInstall: () => Promise.reject(new Error('Skill installation requires the desktop app.')),
+    deleteSupported: async () => {
+      const status = await getRemoteRuntimeStatus().catch(() => null)
+      return status?.capabilities?.includes(SKILL_DELETE_CAPABILITY) === true
+    },
+    previewDelete: (request: SkillDeleteRequest) =>
+      callRuntimeResult<SkillDeletePlan>('skills.previewDelete', request, 60_000),
+    delete: (request: SkillDeleteRequest) =>
+      callRuntimeResult<SkillDeleteResult>('skills.delete', request, 5 * 60_000),
     listManagedInstalls: () =>
       Promise.reject(new Error('Skill installation requires the desktop app.')),
     getPackage: () => Promise.reject(new Error('Skill installation requires the desktop app.')),
@@ -4268,6 +4315,7 @@ function mergeHostWebUIState(local: PersistedUIState, incoming: PairedUiState): 
   // Why `satisfies Record<...>` rather than a `Pick<...>` annotation: every member is optional in
   // PersistedUIState, so Pick would accept a literal that silently skipped a newly added member.
   const pinned = {
+    automationHostFilter: local.automationHostFilter,
     hideWorkspacesFromOtherDevices: local.hideWorkspacesFromOtherDevices === true,
     manualRepoOrder: local.manualRepoOrder,
     workspaceHostOrder: local.workspaceHostOrder
