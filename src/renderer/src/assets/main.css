@@ -846,6 +846,19 @@ html.native-shell .app-layout {
   object-fit: contain;
 }
 
+/* The landing page is the product entry point. Keep the wordmark visible in
+   the compact Windows/Linux titlebar without changing the workspace chrome
+   footprint on editor views. */
+.titlebar-home-brand {
+  flex: 0 0 auto;
+  margin: 0 8px 0 2px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
 /* Why: desktop custom title bar buttons replace hidden native OS chrome.
    Anchored to the top-right corner of the viewport so they overlay any layout
    mode (full titlebar, workspace split, etc.) and stay accessible at all times. */
@@ -1996,6 +2009,20 @@ html.native-shell .app-layout {
   color: var(--muted-foreground);
 }
 
+/* Keep global product navigation visually distinct from the project/worktree
+   tree. The two layers have different scopes and should not read as one long
+   menu on the landing page. */
+.sidebar-primary-nav {
+  border-bottom: 1px solid var(--worktree-sidebar-border);
+}
+
+.sidebar-workspace-section {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 .worktree-list {
   padding: 0 4px;
 }
@@ -3034,10 +3061,10 @@ html.native-shell .app-layout {
 }
 
 .desktop-home-canvas {
-  width: min(100%, 1120px);
+  width: min(100%, 1020px);
   min-height: 100%;
   margin: 0 auto;
-  padding: 62px 40px 34px;
+  padding: 56px 20px 32px;
 }
 
 .desktop-home-hero {
@@ -3078,8 +3105,8 @@ html.native-shell .app-layout {
 }
 
 .desktop-home-mascot {
-  width: 112px;
-  height: 112px;
+  width: 126px;
+  height: 126px;
   flex: 0 0 auto;
   object-fit: contain;
   filter: saturate(0.78) contrast(0.98);
@@ -3087,8 +3114,8 @@ html.native-shell .app-layout {
 .desktop-home-mascot-wrap {
   position: relative;
   display: flex;
-  width: 132px;
-  height: 112px;
+  width: 154px;
+  height: 128px;
   flex: 0 0 auto;
   align-items: flex-end;
   justify-content: center;
@@ -3995,30 +4022,18 @@ html.native-shell .app-layout {
 
 .desktop-home-composer {
   position: relative;
-  min-height: 190px;
-  margin-top: 22px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--foreground) 10%, var(--border));
-  border-radius: 14px;
-  background: var(--card);
-  box-shadow:
-    0 8px 28px rgba(18, 24, 40, 0.06),
-    0 1px 2px rgba(18, 24, 40, 0.04);
-  transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease;
+  min-height: 0;
+  margin-top: 16px;
+  overflow: visible;
 }
 
 .desktop-home-composer:focus-within {
-  border-color: color-mix(in srgb, #2f6bff 55%, var(--border));
-  box-shadow:
-    0 0 0 3px rgba(47, 107, 255, 0.09),
-    0 10px 30px rgba(18, 24, 40, 0.07);
+  outline: 0;
 }
 
 .desktop-home-scene-tabs {
   display: flex;
-  width: min(100%, 504px);
+  width: min(100%, 620px);
   align-items: center;
   gap: 3px;
   margin: 30px auto 0;
@@ -4029,7 +4044,7 @@ html.native-shell .app-layout {
 
 .desktop-home-scene-tab {
   display: inline-flex;
-  height: 30px;
+  height: 36px;
   align-items: center;
   gap: 6px;
   flex: 1;
@@ -4046,52 +4061,104 @@ html.native-shell .app-layout {
   color: var(--foreground);
 }
 .desktop-home-scene-tab.is-active {
-  border-color: color-mix(in srgb, var(--foreground) 8%, var(--border));
-  color: var(--foreground);
-  background: var(--background);
-  box-shadow: 0 1px 2px rgba(18, 24, 40, 0.06);
+  border-color: #17191d;
+  color: #fff;
+  background: #17191d;
+  box-shadow: none;
 }
 
 .desktop-home-composer textarea {
+  position: relative;
+  z-index: 2;
   display: block;
   width: 100%;
   height: 140px;
-  padding: 18px 18px 10px;
+  padding: 20px 20px 10px;
   resize: none;
-  border: 0;
+  border: 1px solid #dde1e6;
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
   outline: 0;
   color: var(--foreground);
-  background: transparent;
+  background: var(--card);
+  box-shadow: 0 8px 28px rgba(23, 25, 29, 0.055);
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 24px;
 }
 .desktop-home-composer textarea::placeholder {
   color: color-mix(in srgb, var(--muted-foreground) 72%, transparent);
 }
+.desktop-home-composer textarea:focus {
+  border-color: #b9d0ff;
+  box-shadow:
+    0 0 0 2px rgba(47, 107, 255, 0.08),
+    0 8px 28px rgba(23, 25, 29, 0.055);
+}
 
 .desktop-home-capabilities {
   display: flex;
-  min-height: 32px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 0;
+  padding: 0 2px;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+.desktop-home-capabilities::-webkit-scrollbar {
+  display: none;
+}
+.desktop-home-capabilities-shell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.desktop-home-capabilities-shell .desktop-home-capabilities {
+  flex: 1;
+}
+.desktop-home-capability-arrows {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+.desktop-home-capability-arrows button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  margin-top: 24px;
-  padding: 0 14px;
-  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  background: var(--card);
+}
+.desktop-home-capability-arrows button:hover:not(:disabled) {
+  color: var(--foreground);
+  background: var(--accent);
+}
+.desktop-home-capability-arrows button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.desktop-home-capability-arrows svg {
+  width: 15px;
 }
 .desktop-home-capabilities button {
   display: inline-flex;
-  height: 25px;
+  height: 34px;
   flex: 0 0 auto;
   align-items: center;
   gap: 5px;
-  padding: 0 9px;
+  padding: 0 16px;
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--muted-foreground);
   background: color-mix(in srgb, var(--muted) 58%, transparent);
-  font-size: 11px;
+  font-size: 13px;
 }
 .desktop-home-capabilities button:hover {
   border-color: color-mix(in srgb, #2f6bff 28%, var(--border));
@@ -4100,14 +4167,150 @@ html.native-shell .app-layout {
 }
 
 .desktop-home-composer-footer {
+  min-height: 104px;
+  background: transparent;
+}
+.desktop-home-composer-toolbar {
+  position: relative;
+  z-index: 2;
   display: flex;
-  min-height: 48px;
+  min-height: 52px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px 10px 8px 14px;
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--muted) 30%, var(--card));
+  padding: 9px 14px 8px;
+  border-right: 1px solid #dde1e6;
+  border-bottom: 1px solid #dde1e6;
+  border-left: 1px solid #dde1e6;
+  border-radius: 0 0 16px 16px;
+  background: var(--card);
+  box-shadow: 0 3px 12px rgba(23, 25, 29, 0.045);
+}
+.desktop-home-composer-context {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  gap: 0;
+  padding: 10px 14px 0;
+  margin-top: -12px;
+  border-right: 1px solid #e9ebef;
+  border-bottom: 1px solid #e9ebef;
+  border-left: 1px solid #e9ebef;
+  border-radius: 0 0 14px 14px;
+  border-top: 1px solid #e9ebef;
+  background: #f5f6f7;
+}
+.desktop-home-composer-context label {
+  display: flex;
+  min-width: 0;
+  height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px;
+  border-right: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+.desktop-home-composer-context label:first-child {
+  padding-left: 2px;
+}
+.desktop-home-composer-context label:last-child {
+  border-right: 0;
+}
+.desktop-home-composer-context select {
+  min-width: 0;
+  max-width: 220px;
+  appearance: none;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+}
+.desktop-home-composer-context label > svg:last-child {
+  pointer-events: none;
+}
+.desktop-home-composer-context > .desktop-home-context-trigger {
+  position: relative;
+  min-width: 0;
+  max-width: 260px;
+  height: 44px;
+  flex: 0 1 auto;
+  justify-content: flex-start;
+  padding: 0 16px;
+  border-right: 0;
+  border-radius: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 450;
+}
+.desktop-home-composer-context > .desktop-home-context-trigger:first-child {
+  padding-left: 2px;
+}
+.desktop-home-composer-context > .desktop-home-context-trigger:not(:last-child)::after {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  width: 1px;
+  height: 20px;
+  content: '';
+  background: var(--border);
+}
+.desktop-home-composer-context > .desktop-home-context-trigger:last-child {
+  border-right: 0;
+}
+.desktop-home-context-trigger:hover,
+.desktop-home-context-trigger[data-state='open'] {
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+}
+.desktop-home-composer-select {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  background: transparent;
+  font-size: 13px;
+}
+.desktop-home-composer-select:hover {
+  color: var(--foreground);
+  background: var(--accent);
+}
+.desktop-home-composer-select select {
+  min-width: 66px;
+  appearance: none;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+}
+.desktop-home-composer-select > svg:last-child {
+  pointer-events: none;
+}
+.desktop-home-composer-toolbar .desktop-home-composer-icon {
+  width: 40px;
+  height: 40px;
+}
+.desktop-home-composer-toolbar .desktop-home-send {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #2f6bff;
+}
+.desktop-home-composer-toolbar .desktop-home-send:hover:not(:disabled) {
+  background: #1f5af0;
+}
+.desktop-home-composer-toolbar .desktop-home-send:disabled {
+  background: #d8dce3;
+  opacity: 1;
+}
+.desktop-home-composer-toolbar .desktop-home-send svg {
+  width: 19px;
+  height: 19px;
 }
 .desktop-home-composer-leading,
 .desktop-home-composer-actions {
@@ -4195,12 +4398,25 @@ html.native-shell .app-layout {
   cursor: not-allowed;
   opacity: 0.28;
 }
+.desktop-home-composer-toolbar .desktop-home-send {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #2f6bff;
+}
+.desktop-home-composer-toolbar .desktop-home-send:hover:not(:disabled) {
+  background: #1f5af0;
+}
+.desktop-home-composer-toolbar .desktop-home-send:disabled {
+  background: #d8dce3;
+  opacity: 1;
+}
 
 .desktop-home-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.25fr) repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 18px;
 }
 .desktop-home-card {
   min-width: 0;
@@ -4230,7 +4446,7 @@ html.native-shell .app-layout {
   gap: 8px;
 }
 .desktop-home-card h2 {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
@@ -4252,8 +4468,8 @@ html.native-shell .app-layout {
   background: rgba(47, 107, 255, 0.08);
 }
 .desktop-home-card-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
 }
 .desktop-home-card-body {
   padding: 5px 6px;
@@ -4287,6 +4503,10 @@ html.native-shell .app-layout {
 .desktop-home-action-list {
   padding: 7px;
 }
+.desktop-home-card-quick .desktop-home-action-list > button {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
 .desktop-home-action-list > button {
   display: flex;
   width: 100%;
@@ -4316,12 +4536,20 @@ html.native-shell .app-layout {
   gap: 2px;
 }
 .desktop-home-action-list strong {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 620;
 }
 .desktop-home-action-list small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 11px;
+}
+.desktop-home-card-template .desktop-home-action-list > button {
+  padding-top: 7px;
+  padding-bottom: 7px;
 }
 .desktop-home-continue {
   padding: 14px;
@@ -4430,15 +4658,18 @@ html.native-shell .app-layout {
     min-height: 96px;
   }
   .desktop-home-mascot {
-    width: 94px;
-    height: 94px;
+    width: 116px;
+    height: 116px;
   }
   .desktop-home-mascot-wrap {
-    width: 112px;
-    height: 96px;
+    width: 140px;
+    height: 116px;
   }
   .desktop-home-grid {
-    grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr 1fr;
+  }
+  .desktop-home-card-wide {
+    grid-column: 1 / -1;
   }
 }
 
@@ -4451,9 +4682,6 @@ html.native-shell .app-layout {
   }
   .desktop-home-card-wide {
     grid-column: 1 / -1;
-  }
-  .desktop-home-capabilities button:nth-child(n + 4) {
-    display: none;
   }
 }
 

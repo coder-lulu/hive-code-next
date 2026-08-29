@@ -1,20 +1,25 @@
 /* eslint-disable max-lines -- The desktop home keeps its orchestration and cards together for predictable layout state. */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowRight,
-  Braces,
+  ChevronLeft,
+  ChevronRight,
+  Code2,
   Clock3,
   FolderGit2,
-  FolderPlus,
+  FolderInput,
   GitBranch,
   GitBranchPlus,
+  GitPullRequest,
+  LayoutTemplate,
   Layers3,
-  Play,
+  Rocket,
   Sparkles,
-  UsersRound,
-  WandSparkles
+  Cloud,
+  Workflow,
+  UsersRound
 } from 'lucide-react'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import { useAppStore } from '../store'
@@ -36,11 +41,11 @@ import mascotUrl from '../../../../resources/desktop-home-mascot-float.png'
 import { translate } from '@/i18n/i18n'
 
 type HomeScene = 'code' | 'automation' | 'collaboration'
-const SCENES: { id: HomeScene; icon: typeof Braces; labelKey: string; placeholderKey: string }[] = [
-  { id: 'code', icon: Braces, labelKey: 'sceneCode', placeholderKey: 'placeholderCode' },
+const SCENES: { id: HomeScene; icon: typeof Code2; labelKey: string; placeholderKey: string }[] = [
+  { id: 'code', icon: Code2, labelKey: 'sceneCode', placeholderKey: 'placeholderCode' },
   {
     id: 'automation',
-    icon: WandSparkles,
+    icon: Workflow,
     labelKey: 'sceneAutomation',
     placeholderKey: 'placeholderAutomation'
   },
@@ -52,7 +57,15 @@ const SCENES: { id: HomeScene; icon: typeof Braces; labelKey: string; placeholde
   }
 ]
 const CAPABILITIES: Record<HomeScene, string[]> = {
-  code: ['analyzeCode', 'implementFeature', 'fixIssue', 'addTests'],
+  code: [
+    'analyzeCode',
+    'implementFeature',
+    'fixIssue',
+    'addTests',
+    'refactorDocs',
+    'generateCommit',
+    'architecture'
+  ],
   automation: ['scheduledBuild', 'summarizeChanges', 'batchTasks'],
   collaboration: ['breakDownRequirements', 'parallelReview', 'planDelivery']
 }
@@ -105,6 +118,8 @@ export default function Landing(): React.JSX.Element {
   const openFiles = useAppStore((state) => state.openFiles)
   const settings = useAppStore((state) => state.settings)
   const openModal = useAppStore((state) => state.openModal)
+  const openSettingsPage = useAppStore((state) => state.openSettingsPage)
+  const openSettingsTarget = useAppStore((state) => state.openSettingsTarget)
   const { preflightIssues } = useLandingPreflightRuntime()
   const model = useMemo(
     () => buildDesktopHomeModel({ repos, worktreesByRepo, tabsByWorktree, openFiles }),
@@ -128,10 +143,29 @@ export default function Landing(): React.JSX.Element {
   const [agent, setAgent] = useState<TuiAgent>(initialAgent)
   const [permissionMode, setPermissionMode] = useState('default')
   const [workspaceId, setWorkspaceId] = useState(model.currentWorkspace?.id ?? '')
+  const capabilitiesRef = useRef<HTMLDivElement>(null)
+  const [capabilityScroll, setCapabilityScroll] = useState({ atStart: true, atEnd: true })
   const activeScene = SCENES.find((entry) => entry.id === scene) ?? SCENES[0]
   const selectedWorkspace =
     model.recentWorkspaces.find((workspace) => workspace.id === workspaceId) ??
     model.currentWorkspace
+  const syncCapabilityScroll = (): void => {
+    const element = capabilitiesRef.current
+    if (!element) {
+      return
+    }
+    setCapabilityScroll({
+      atStart: element.scrollLeft <= 2,
+      atEnd: element.scrollLeft + element.clientWidth >= element.scrollWidth - 2
+    })
+  }
+  const scrollCapabilities = (direction: -1 | 1): void => {
+    capabilitiesRef.current?.scrollBy({ left: direction * 260, behavior: 'smooth' })
+  }
+  useEffect(() => {
+    const frame = requestAnimationFrame(syncCapabilityScroll)
+    return () => cancelAnimationFrame(frame)
+  }, [scene])
   const homeTimeLabels = {
     unused: translate('components.desktopHome.time.unused', 'Not used yet'),
     justNow: translate('components.desktopHome.time.justNow', 'Just now'),
@@ -229,7 +263,7 @@ export default function Landing(): React.JSX.Element {
                   {translate(
                     `components.desktopHome.${entry.labelKey}`,
                     entry.id === 'code'
-                      ? 'Cloud work'
+                      ? 'Code development'
                       : entry.id === 'automation'
                         ? 'Automation'
                         : 'Agent collaboration'
@@ -238,22 +272,44 @@ export default function Landing(): React.JSX.Element {
               )
             })}
           </div>
-          <div
-            className="desktop-home-capabilities"
-            aria-label={translate('components.desktopHome.capabilities', 'Common capabilities')}
-          >
-            {CAPABILITIES[scene].map((capabilityKey) => {
-              const capability = translate(
-                `components.desktopHome.capability.${capabilityKey}`,
-                capabilityKey
-              )
-              return (
-                <button type="button" key={capabilityKey} onClick={() => setDraft(capability)}>
-                  <Sparkles className="size-3" />
-                  {capability}
-                </button>
-              )
-            })}
+          <div className="desktop-home-capabilities-shell">
+            <div
+              ref={capabilitiesRef}
+              className="desktop-home-capabilities"
+              aria-label={translate('components.desktopHome.capabilities', 'Common capabilities')}
+              onScroll={syncCapabilityScroll}
+            >
+              {CAPABILITIES[scene].map((capabilityKey) => {
+                const capability = translate(
+                  `components.desktopHome.capability.${capabilityKey}`,
+                  capabilityKey
+                )
+                return (
+                  <button type="button" key={capabilityKey} onClick={() => setDraft(capability)}>
+                    <Sparkles className="size-3.5" />
+                    {capability}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="desktop-home-capability-arrows">
+              <button
+                type="button"
+                onClick={() => scrollCapabilities(-1)}
+                disabled={capabilityScroll.atStart}
+                aria-label="向左滚动能力入口"
+              >
+                <ChevronLeft />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollCapabilities(1)}
+                disabled={capabilityScroll.atEnd}
+                aria-label="向右滚动能力入口"
+              >
+                <ChevronRight />
+              </button>
+            </div>
           </div>
 
           <section
@@ -272,7 +328,7 @@ export default function Landing(): React.JSX.Element {
               placeholder={translate(
                 `components.desktopHome.${activeScene.placeholderKey}`,
                 activeScene.id === 'code'
-                  ? 'Describe the development task to complete…'
+                  ? 'What should we build today? @ reference projects, files and branches / invoke skills and commands'
                   : activeScene.id === 'automation'
                     ? 'Describe the repetitive work to automate…'
                     : 'Describe the task that needs multiple agents…'
@@ -334,24 +390,30 @@ export default function Landing(): React.JSX.Element {
                 )}
               </div>
             </article>
-            <article className="desktop-home-card">
+            <article className="desktop-home-card desktop-home-card-quick">
               <header>
                 <div>
                   <span className="desktop-home-card-icon">
-                    <Play />
+                    <Rocket />
                   </span>
                   <h2>{translate('components.desktopHome.quickStart', 'Quick start')}</h2>
                 </div>
               </header>
               <div className="desktop-home-action-list">
-                <button type="button" onClick={() => openModal('add-repo')}>
-                  <FolderPlus />
+                <button
+                  type="button"
+                  aria-label={translate('components.desktopHome.addProject', 'Add project')}
+                  onClick={() => openModal('add-repo')}
+                >
+                  <GitPullRequest />
                   <span>
-                    <strong>{translate('components.desktopHome.addProject', 'Add project')}</strong>
+                    <strong>
+                      {translate('components.desktopHome.cloneProject', 'Clone project')}
+                    </strong>
                     <small>
                       {translate(
-                        'components.desktopHome.addProjectDescription',
-                        'Connect a local or remote repository'
+                        'components.desktopHome.cloneProjectDescription',
+                        'Clone a repository from a remote URL'
                       )}
                     </small>
                   </span>
@@ -372,6 +434,42 @@ export default function Landing(): React.JSX.Element {
                       {translate(
                         'components.desktopHome.newWorkspaceDescription',
                         'Isolate branches and agent sessions'
+                      )}
+                    </small>
+                  </span>
+                  <ArrowRight />
+                </button>
+                <button type="button" onClick={() => openModal('add-repo')}>
+                  <FolderInput />
+                  <span>
+                    <strong>
+                      {translate('components.desktopHome.importRepository', 'Import repository')}
+                    </strong>
+                    <small>
+                      {translate(
+                        'components.desktopHome.importRepositoryDescription',
+                        'Add an existing local repository'
+                      )}
+                    </small>
+                  </span>
+                  <ArrowRight />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    openSettingsTarget({ pane: 'orca-account', repoId: null })
+                    openSettingsPage()
+                  }}
+                >
+                  <Cloud />
+                  <span>
+                    <strong>
+                      {translate('components.desktopHome.connectHiveCloud', 'Connect HiveCloud')}
+                    </strong>
+                    <small>
+                      {translate(
+                        'components.desktopHome.connectHiveCloudDescription',
+                        'Sync workspaces and sessions across devices'
                       )}
                     </small>
                   </span>
@@ -441,6 +539,57 @@ export default function Landing(): React.JSX.Element {
                     </span>
                   </div>
                 )}
+              </div>
+            </article>
+            <article className="desktop-home-card desktop-home-card-template">
+              <header>
+                <div>
+                  <span className="desktop-home-card-icon">
+                    <LayoutTemplate />
+                  </span>
+                  <h2>{translate('components.desktopHome.templates', '推荐任务模板')}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft(
+                      translate('components.desktopHome.capability.analyzeCode', '分析代码库')
+                    )
+                  }
+                >
+                  {translate('components.desktopHome.more', '更多')}
+                  <ArrowRight />
+                </button>
+              </header>
+              <div className="desktop-home-action-list">
+                {[
+                  ['analyzeCode', '代码审查'],
+                  ['architecture', 'API 设计评审'],
+                  ['addTests', '单元测试生成'],
+                  ['generateCommit', '提交说明生成']
+                ].map(([key, fallback]) => (
+                  <button
+                    type="button"
+                    key={key}
+                    onClick={() =>
+                      setDraft(translate(`components.desktopHome.capability.${key}`, fallback))
+                    }
+                  >
+                    <Code2 />
+                    <span>
+                      <strong>
+                        {translate(`components.desktopHome.template.${key}`, fallback)}
+                      </strong>
+                      <small>
+                        {translate(
+                          'components.desktopHome.templateHint',
+                          '基于当前工作区生成结构化结果'
+                        )}
+                      </small>
+                    </span>
+                    <ArrowRight />
+                  </button>
+                ))}
               </div>
             </article>
           </section>
