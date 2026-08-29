@@ -831,7 +831,14 @@
         "linearDescription": "Linear 在 Orca 中的工作方式、设置清单、智能体技能和提示词示例。",
         "pluginsTitle": "插件",
         "pluginsDescription": "安装和管理实验性 Orca 插件。",
-        "tasksDescription": "连接提供商、安装 Linear 技能并选择要在任务中显示的内容。"
+        "tasksDescription": "连接提供商、安装 Linear 技能并选择要在任务中显示的内容。",
+        "artifactsTitle": "Artifacts",
+        "artifactsDescription": "与团队共享 HTML 和 Markdown 文件，并管理公开链接。",
+        "automationsTitle": "自动化",
+        "automationsDescription": "安排智能体工作，并选择是否在侧栏显示自动化。",
+        "shareSkillsTitle": "共享技能",
+        "shareSkillsDescription": "通过非公开链接共享技能，任何获得链接的人都可以安装。",
+        "floatingWorkspaceWebDescription": "全局终端和 Markdown 选项卡。"
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "粘贴内容过大。"
@@ -5351,6 +5358,64 @@
         }
       },
       "settings": {
+        "orcaAccount": {
+          "connected": "已连接",
+          "reconnectRequired": "会话已过期，请重新登录以使用云端功能。",
+          "unavailable": "此版本无法使用 HiveCode 登录。",
+          "signedOut": "登录以使用 HiveCloud 云端功能，包括 Artifacts 和 HiveCode Relay。",
+          "checking": "正在检查账户状态…",
+          "account": "HiveCloud 账户",
+          "signOut": "退出登录",
+          "signingIn": "正在登录…",
+          "signInAgain": "重新登录",
+          "signIn": "登录 HiveCloud",
+          "title": "HiveCode 账户",
+          "description": "即时共享工作内容，无论身在何处都可以通过 HiveCode Mobile 访问桌面。",
+          "searchDescription": "登录或退出用于 Artifacts 和 HiveCode Relay 的账户。",
+          "benefitsTitle": "账户包含的功能",
+          "artifactsTitle": "共享 Artifacts",
+          "artifactsDescription": "发布 HTML 和 Markdown 文件，并管理所有共享链接。",
+          "relayTitle": "HiveCode Relay",
+          "relayDescription": "通过蜂窝网络或任意 Wi-Fi 将 HiveCode Mobile 连接到此桌面。",
+          "skillsTitle": "共享技能",
+          "skillsDescription": "通过非公开链接共享单个技能或整套技能，并在使用的任意设备上安装。",
+          "secureStorageUnavailable": "操作系统安全存储不可用，云端登录已禁用。",
+          "credentialUnreadable": "无法读取加密账户凭据。请先修复安全存储，再重新登录。",
+          "sessionExpired": "此会话已过期，请刷新或重新登录。",
+          "networkUnavailable": "暂时无法访问 HiveCloud，本地工作仍可继续。",
+          "sessionRejected": "HiveCloud 拒绝了此会话，请重新登录。",
+          "authorizationCancelled": "登录已取消。",
+          "authorizationTimeout": "浏览器回调完成前登录已超时。",
+          "serverUnavailable": "HiveCloud 暂时不可用，本地工作仍可继续。",
+          "authorizationFailed": "HiveCloud 登录失败，请重试或检查服务状态。",
+          "connectedDescription": "此桌面已安全连接到 HiveCloud。",
+          "unknown": "未知",
+          "signedInToast": "已登录 HiveCloud",
+          "refreshedToast": "HiveCloud 会话已刷新",
+          "localSignOutToast": "已在本地退出登录。联网后可在 HiveCloud 安全设置中撤销远程会话。",
+          "signedOutToast": "已退出 HiveCloud",
+          "refresh": "刷新",
+          "device": "设备",
+          "defaultDevice": "桌面设备",
+          "sessionExpires": "登录授权有效期至",
+          "trustedSession": "可信设备",
+          "temporarySession": "临时设备",
+          "signOutConfirmTitle": "退出 HiveCloud？",
+          "signOutConfirmDescription": "将移除此设备上的本地凭据，不会影响本地项目、工作区和提供商账户。",
+          "cancel": "取消"
+        },
+        "artifacts": {
+          "title": "Artifacts",
+          "description": "与团队共享 HTML 和 Markdown 文件，并管理公开链接。"
+        },
+        "automations": {
+          "title": "自动化",
+          "description": "安排智能体工作，并选择是否在侧栏显示自动化。"
+        },
+        "shareSkills": {
+          "title": "共享技能",
+          "description": "通过非公开链接共享技能，任何获得链接的人都可以安装。"
+        },
         "AccountsPane": {
           "c2d2751587": "删除账户",
           "dbb9626ed1": "取消",
@@ -14584,6 +14649,7 @@
         "analyzeCode": "分析代码库",
         "implementFeature": "实现新功能",
         "fixIssue": "修复问题",
+        "addTests": "添加测试",
         "scheduledBuild": "定时检查构建",
         "summarizeChanges": "整理变更摘要",
         "batchTasks": "批量处理任务",
