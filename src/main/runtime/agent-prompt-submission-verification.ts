@@ -1,8 +1,12 @@
-export { AGENT_PROMPT_EFFECT_TIMEOUT_MS } from '../../shared/orchestration-timing-budgets'
-import { AGENT_PROMPT_EFFECT_TIMEOUT_MS } from '../../shared/orchestration-timing-budgets'
 import type { TuiAgent } from '../../shared/tui-agent'
 
-export const AGENT_PROMPT_HOOK_EFFECT_TIMEOUT_MS = AGENT_PROMPT_EFFECT_TIMEOUT_MS
+export const AGENT_PROMPT_EFFECT_TIMEOUT_MS = 5_000
+// Why: these panes prove a turn start only through the out-of-process hook — kimi has no synthetic
+// title profile and codex suppresses the hook-driven working frame (synthesizeWorkingTitle: false),
+// so the first proof lags Enter by agent startup, not by one TUI repaint. Capped so the worst case
+// (8s render gate + this wait + chunked paste) still fits RELAY_TO_CLIENT_REQUEST_TIMEOUT_MS
+// (30s, src/relay/dispatcher.ts), the budget a paired client's submission runs under.
+export const AGENT_PROMPT_HOOK_EFFECT_TIMEOUT_MS = 15_000
 const AGENT_PROMPT_EFFECT_POLL_MS = 50
 
 const HOOK_OBSERVED_TURN_START_AGENTS = new Set<TuiAgent>(['codex', 'kimi'])
@@ -65,7 +69,6 @@ export function readAgentPromptWaitText(
   cache.waitText = waitText
   return waitText
 }
-
 export async function verifyAgentPromptSubmission(
   options: AgentPromptVerificationOptions
 ): Promise<void> {

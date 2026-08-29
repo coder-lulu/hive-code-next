@@ -1,4 +1,4 @@
-// Why: centralizing the launcher keeps window suppression consistent across installers (#14815).
+// Why: centralizing the launcher keeps every installer on one command shape; #14815 and #16003 both turned on which shape it is.
 
 // Why: an absolute forward-slash path avoids PATH hijacking and survives cmd.exe and Git Bash.
 export function getWindowsSystem32Path(relativePath: string): string {
@@ -42,7 +42,12 @@ export function getWindowsPowerShellExecutablePath(): string {
  */
 export const WINDOWS_POWERSHELL_HOOK_SWITCHES = '-NoProfile'
 
-// Why: redirected PowerShell progress becomes CLIXML that can corrupt merged JSON output.
+// Why: redirected PowerShell progress becomes CLIXML that can corrupt merged JSON
+// output. It must be the FIRST statement: Set-ExecutionPolicy autoloads
+// Microsoft.PowerShell.Security, whose "Preparing modules for first use."
+// progress record is emitted before any later assignment can suppress it.
+// Measured on Windows 11: bypass-first put 616 bytes of <Objs Version="1.1.0.1">
+// on stderr and made "#< CLIXML" the first merged line; silencer-first, 0 bytes.
 const HOOK_PROGRESS_SILENCER = "$ProgressPreference='SilentlyContinue'; "
 
 // Keep the process-scoped policy bypass inside the encoded payload. It is

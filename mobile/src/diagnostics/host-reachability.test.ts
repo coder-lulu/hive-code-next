@@ -25,6 +25,10 @@ describe('unreachableHostDetail', () => {
   it('does not echo malformed endpoints that may contain credentials', () => {
     expect(formatEndpoint('not-a-url?token=secret')).toBe('invalid endpoint')
   })
+
+  it('does not echo malformed endpoints that may contain credentials', () => {
+    expect(formatEndpoint('not-a-url?token=secret')).toBe('invalid endpoint')
+  })
 })
 
 describe('testHostReachability', () => {

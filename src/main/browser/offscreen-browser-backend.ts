@@ -66,6 +66,20 @@ export class OffscreenBrowserBackend implements BrowserBackend {
 
     this.windowsByPageId.set(browserPageId, win)
 
+    // Why: if the offscreen window is destroyed out from under us (crash, app
+    // teardown), drop the registry entry so commands fail cleanly instead of
+    // resolving a dead WebContents.
+    win.webContents.once('destroyed', () => {
+      // Explicit close removes the page first and performs awaited cleanup;
+      // only an unexpected destruction still owns the bridge retirement here.
+      if (this.windowsByPageId.get(browserPageId) !== win) {
+        return
+      }
+      void this.retirePageOwner(browserPageId)
+      this.windowsByPageId.delete(browserPageId)
+      this.browserManager.unregisterGuest(browserPageId)
+    })
+
     // Why: register the guest and return immediately so the new tab appears
     // without waiting for the page to finish loading. Previously createTab
     // awaited the full navigation, so clicking "New Browser Tab" did nothing for

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- main-process entry point; owns app lifecycle, service wiring, window creation, and hook/daemon startup with no cleaner split seam. */
 import { existsSync, statSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { isAbsolute, join } from 'node:path'
 import os from 'node:os'
 import {
@@ -38,10 +39,7 @@ import { ElectronSecretStore } from './host/electron-secret-store'
 import { initSessionParseCachePersistence } from './ai-vault/session-parse-cache-persistence'
 import { ensureActiveOrcaProfile, initOrcaProfilePaths } from './orca-profiles/profile-index-store'
 import { getProductCloudAuthConfig } from './product/product-cloud-config'
-import {
-  getProductExternalServiceEndpoints,
-  getProductStarRepository
-} from './product/product-external-service-endpoints'
+import { getProductExternalServiceEndpoints } from './product/product-external-service-endpoints'
 import { getProfileUserDataPath } from './orca-profiles/profile-storage-paths'
 import { applyAppIcon } from './app-icon'
 import { APP_DISPLAY_NAME } from '../shared/brand'
@@ -79,7 +77,7 @@ import {
 import { closeAllWatchers, desktopWorktreeWatcherRemoval } from './ipc/filesystem-watcher'
 import { disposeWorktreeBaseDirectoryWatchers } from './ipc/worktree-base-directory-watcher'
 import { stopFolderRepoGitUpgradeWatch } from './ipc/folder-repo-git-upgrade'
-import { registerCoreHandlers } from './ipc/register-core-handlers'
+import { registerCoreHandlers } from './ipc/register-core-handlers/register-core-handlers'
 import { initObservability, shutdownObservability } from './observability'
 import { registerMobileHandlers } from './ipc/mobile'
 import { initTelemetry, shutdownTelemetry, trackAppOpenedOnce, track } from './telemetry/client'
@@ -94,9 +92,9 @@ import {
 import {
   applyAgentStatusHooksEnabled,
   isAgentStatusHooksEnabled,
-  removeManagedAgentHooks
+  removeManagedAgentHooks,
+  shouldContinueManagedHookStartup
 } from './agent-hooks/managed-agent-hook-controls'
-import type { AgentHookInstallStatus } from '../shared/agent-hook-types'
 import { initCohortClassifier } from './telemetry/cohort-classifier'
 import { initOnboardingCohortClassifier } from './telemetry/onboarding-cohort-classifier'
 import { resolveConsent } from './telemetry/consent'
@@ -230,6 +228,7 @@ import {
 import { registerProtocolHandlers, extractProtocolUrlFromArgv } from './startup/protocol-handler'
 import { startEventLoopStallProbe } from './startup/event-loop-stall-probe'
 import { startMainThreadChurnProbe } from './diagnostics/main-thread-churn-probe'
+import { settledDiffCache } from './git/source-control/git-read-cache-invalidation'
 import { parseSkillShareId } from '../shared/skill-share-link'
 import { SkillShareDeepLinkState } from './startup/skill-share-deep-link-state'
 import {
@@ -241,6 +240,7 @@ import { ensureWindowsUserDataAclGrant } from './startup/windows-user-data-acl'
 import { probeWindowsInstallDirAcl } from './startup/windows-install-dir-acl-probe'
 import { neutralizeLegacyTerminalShimDir } from './pty/legacy-terminal-shim-dir'
 import { shouldQuitWhenAllWindowsClosed } from './startup/window-all-closed-quit-policy'
+import { registerServeSignalHandlers } from './startup/serve-signal-handlers'
 import {
   createServeDesktopActivationGate,
   settleServeDesktopActivation as settleServeDesktopActivationGate
@@ -327,8 +327,11 @@ import { getRepoIdFromWorktreeId } from '../shared/worktree/id'
 import { parseWorkspaceKey } from '../shared/workspace-scope'
 import { setMigrationUnsupportedPtyListener } from './agent-hooks/migration-unsupported-pty-state'
 import { AgentBrowserBridge } from './browser/agent-browser-bridge'
+import { configureBrowserClientPageAutomationRuntime } from './browser/browser-client-page-automation-runtime'
+import { BrowserClientPageCommandError } from './browser/browser-client-page-command-failure'
 import { EmulatorBridge } from './emulator/emulator-bridge'
 import { browserCertificateTrustController, browserManager } from './browser/browser-manager'
+import { RpcDispatcher } from './runtime/rpc/dispatcher'
 import { OffscreenBrowserBackend } from './browser/offscreen-browser-backend'
 import { initializeBrowserSessionsForApp } from './browser/browser-session-startup'
 import { setUnreadDockBadgeCount } from './dock/unread-badge'
@@ -771,7 +774,9 @@ if (startupDiagnosticsEnabled) {
   startEventLoopStallProbe()
 }
 // Self-gated on ORCA_MAIN_THREAD_DIAGNOSTICS; runs the whole session to catch steady-state churn (issue #7576).
-startMainThreadChurnProbe()
+// Why the diff-cache counters ride along: a stamp the filesystem reports unstably makes the cache
+// look exactly like a cold start, and only the hit/miss/unprovable split tells the two apart.
+startMainThreadChurnProbe({ extraStats: () => ({ diffCache: settledDiffCache.stats() }) })
 
 function focusExistingWindow(): void {
   focusExistingMainWindow({
@@ -1158,12 +1163,17 @@ function startTerminalRuntimeStartupServices(): WindowsDesktopStartupServices {
         if (livePtyIds) {
           reconcileCodexPaneAccountsWithLivePtys(livePtyIds)
           const settings = store?.getSettings()
-          reconcileRetainedCodexHookHomes({
+          // Why (#16441): each retained home can run a codex app-server grant
+          // session. Awaiting them here delayed the first window by N sessions;
+          // a retained shell cannot invoke Codex before this provider serves.
+          void reconcileRetainedCodexHookHomes({
             hookService: codexHookService,
             hooksEnabled:
               isAgentStatusHooksEnabled(settings) &&
               settings?.disabledTuiAgents.includes('codex') !== true,
             runtimeHomePaths: codexRuntimeHome.getRetainedHostCodexHookHomePaths(livePtyIds)
+          }).catch((error: unknown) => {
+            console.warn('[codex-hook-service] retained Codex home reconcile failed:', error)
           })
         }
       }
@@ -1224,24 +1234,24 @@ function bindTerminalRuntimeStartupServices(
   localPtyProviderStartupReady = services.then((value) => value.localPtyProviderReady)
 }
 
-function prepareCodexRuntimeHomeForLaunch(
+async function prepareCodexRuntimeHomeForLaunch(
   target?: CodexAccountSelectionTarget,
   launchEnv?: NodeJS.ProcessEnv,
   launchContext?: CodexHomeLaunchContext
-): string | null {
+): Promise<string | null> {
   if (
     target?.runtime !== 'wsl' &&
     launchContext?.launchAgent === 'codex' &&
     launchContext.workspacePath
   ) {
     try {
-      // Why: renderer quick-launch cannot await trust IPC before its PTY mounts; launch prep runs synchronously before every recognized Codex spawn.
-      markCodexProjectTrusted(launchContext.workspacePath)
+      // Why: renderer quick-launch cannot await trust IPC before its PTY mounts; launch prep runs before every recognized Codex spawn.
+      await markCodexProjectTrusted(launchContext.workspacePath)
     } catch (error) {
       console.warn('[codex-project-trust] failed to pre-mark launch workspace:', error)
     }
   }
-  const ensureRealHomeHooksIfSelected = (): boolean => {
+  const ensureRealHomeHooksIfSelected = async (): Promise<boolean> => {
     if (
       target?.runtime === 'wsl' ||
       !codexRuntimeHome!.isHostSystemDefaultRealHomeSelected(launchEnv)
@@ -1252,13 +1262,13 @@ function prepareCodexRuntimeHomeForLaunch(
     // and trusted by codex's own app-server grant — in the real ~/.codex before
     // the pane spawns. An incapable grant flips the lane gate so the launch
     // below falls back to the managed home instead of a status-blind pane.
-    ensureRealHomeCodexHookState({
+    await ensureRealHomeCodexHookState({
       hooksEnabled: isAgentStatusHooksEnabled(store?.getSettings()),
       userDataPath: app.getPath('userData')
     })
     return true
   }
-  let realHomeHooksPrepared = ensureRealHomeHooksIfSelected()
+  let realHomeHooksPrepared = await ensureRealHomeHooksIfSelected()
   // Why: a ManagedCodexHomeTemporarilyUnavailableError must escape uncaught —
   // the fallbacks below all key off `null`, which means "system default", so
   // swallowing the refusal would launch the wrong account (#STA-4422).
@@ -1269,7 +1279,7 @@ function prepareCodexRuntimeHomeForLaunch(
     // Why: launch prep can reject an untrusted managed home and clear its
     // selection. Establish hook capability for that newly selected lane, then
     // re-resolve if the capability gate rejects it.
-    realHomeHooksPrepared = ensureRealHomeHooksIfSelected()
+    realHomeHooksPrepared = await ensureRealHomeHooksIfSelected()
     if (realHomeHooksPrepared) {
       runtimeHomePath = codexRuntimeHome!.prepareForCodexLaunch(target, launchEnv, {
         unavailableManagedHomePath: launchContext?.unavailableManagedHomePath
@@ -1292,24 +1302,19 @@ function prepareCodexRuntimeHomeForLaunch(
   try {
     // Why: honor the persisted off switch so post-startup launches can't reinstall removed hooks.
     const status = hooksEnabled
-      ? (codexHookService.installForRuntimeHome(runtimeHomePath, hookTarget) ??
+      ? ((await codexHookService.installForRuntimeHome(runtimeHomePath, hookTarget)) ??
         // Why: a managed account's launch home is its own self-contained
         // CODEX_HOME, so hooks/trust must install there, not the shared mirror.
-        codexHookService.install(runtimeHomePath ?? undefined))
+        (await codexHookService.install(runtimeHomePath ?? undefined)))
       : (codexHookService.refreshRuntimeUserHooksForRuntimeHome(runtimeHomePath, hookTarget) ??
-        codexHookService.refreshRuntimeUserHooks(runtimeHomePath ?? undefined))
-    const reportStatus = (resolved: AgentHookInstallStatus | null): void => {
-      if (resolved?.state === 'error') {
-        console.warn(
-          `[codex-hook-service] failed to ${hooksEnabled ? 'refresh' : 'refresh user'} runtime hooks before launch`,
-          resolved.detail
-        )
-      }
-    }
-    if (status && typeof status === 'object' && 'then' in status) {
-      void status.then(reportStatus)
-    } else {
-      reportStatus(status)
+        (await codexHookService.refreshRuntimeUserHooks(runtimeHomePath ?? undefined)))
+    if (status.state === 'error') {
+      console.warn(
+        `[codex-hook-service] failed to ${
+          hooksEnabled ? 'refresh' : 'refresh user'
+        } runtime hooks before launch`,
+        status.detail
+      )
     }
   } catch (error) {
     // Why: hook install is best-effort launch prep; a malformed hooks file must not block Codex from starting.
@@ -1396,7 +1401,7 @@ async function prepareCodexSessionResumeForLaunch(args: {
 
       if (args.workspacePath) {
         try {
-          markCodexProjectTrusted(args.workspacePath)
+          await markCodexProjectTrusted(args.workspacePath)
         } catch (error) {
           console.warn('[codex-project-trust] failed to pre-mark resumed workspace:', error)
         }
@@ -1407,11 +1412,14 @@ async function prepareCodexSessionResumeForLaunch(args: {
       const hooksEnabled = isAgentStatusHooksEnabled(settingsStore.getSettings())
       try {
         if (isSystemHome) {
-          ensureRealHomeCodexHookState({ hooksEnabled, userDataPath: app.getPath('userData') })
+          await ensureRealHomeCodexHookState({
+            hooksEnabled,
+            userDataPath: app.getPath('userData')
+          })
         } else if (hooksEnabled) {
-          codexHookService.install(resumeHome)
+          await codexHookService.install(resumeHome)
         } else {
-          codexHookService.refreshRuntimeUserHooks(resumeHome)
+          await codexHookService.refreshRuntimeUserHooks(resumeHome)
         }
       } catch (error) {
         // Why: hook repair is best-effort; session provenance must still win over the currently selected home.
@@ -2196,15 +2204,6 @@ async function printServeReady(options: ServeOptions): Promise<void> {
       : { mode: options.json ? 'json' : 'human' }
   )
   notifyServeSupervisorReady(runtime.getRuntimeId())
-}
-
-function installServeSignalHandlers(): void {
-  const quit = (): void => {
-    // Why: route SIGINT/SIGTERM through Electron's normal quit so runtime metadata, daemon checkpoints, and telemetry flush.
-    app.quit()
-  }
-  process.once('SIGINT', quit)
-  process.once('SIGTERM', quit)
 }
 
 // Why: on PTY teardown drop the spinner entry explicitly, else the shared timer keeps ticking with sendSyntheticTitle no-oping forever.
@@ -3154,14 +3153,32 @@ void app.whenReady().then(async () => {
     starNag.start()
     starNag.registerIpcHandlers()
   }
-  runtimeService.setAgentBrowserBridge(
-    new AgentBrowserBridge(browserManager, {
-      onTabsChanged: (worktreeId) => runtimeService.notifyMobileSessionTabsChanged(worktreeId)
-    })
-  )
-  // Reclaim helpers left behind by a crashed previous process before any new
-  // tab can reuse their named session.
-  void runtimeService.getAgentBrowserBridge()?.sweepOrphanedSessions?.()
+  const agentBrowserBridge = new AgentBrowserBridge(browserManager, {
+    onTabsChanged: (worktreeId) => runtimeService.notifyMobileSessionTabsChanged(worktreeId)
+  })
+  runtimeService.setAgentBrowserBridge(agentBrowserBridge)
+  // Why: daemons a crashed or SIGKILL'd previous run left behind answer to nobody; nothing else reclaims them.
+  void agentBrowserBridge.sweepOrphanedSessions()
+  const browserClientAutomationDispatcher = new RpcDispatcher({ runtime: runtimeService })
+  configureBrowserClientPageAutomationRuntime({
+    browserManager,
+    getAgentBrowserBridge: () => agentBrowserBridge,
+    executeRpc: async (method, params, signal) => {
+      const response = await browserClientAutomationDispatcher.dispatch(
+        {
+          id: randomUUID(),
+          authToken: 'local-browser-client-automation',
+          method,
+          params
+        },
+        { signal }
+      )
+      if (!response.ok) {
+        throw new BrowserClientPageCommandError(response.error.code)
+      }
+      return response.result
+    }
+  })
 
   // Emulator bridge (serve-sim). macOS-only feature (gated in CLI/runtime); always ship like agent-browser.
   // Why: externally started serve-sim processes must stay independent — only Orca-managed/attached helpers belong to a workspace.
@@ -3175,30 +3192,40 @@ void app.whenReady().then(async () => {
     console.warn('[worktrees] Failed to sweep leftover worktree directories:', error)
   })
   nativeTheme.themeSource = store.getSettings().theme ?? 'system'
-  if (codexRuntimeHome.isHostSystemDefaultRealHomeSelected()) {
-    // Why: establish capability before managed-hook reconciliation so an
-    // incapable host re-arms and completes the legacy real-home sweep now.
-    ensureRealHomeCodexHookState({
-      hooksEnabled: isAgentStatusHooksEnabled(store.getSettings()),
-      userDataPath: app.getPath('userData')
-    })
-  }
+  // Why (#16441): the real-home grant runs a codex app-server session. It stays
+  // ordered before managed-hook reconciliation — an incapable host must re-arm
+  // and complete the legacy real-home sweep first — but awaiting it inline
+  // stalled app init behind that session, so chain instead of blocking.
+  const realHomeCodexHookState = codexRuntimeHome.isHostSystemDefaultRealHomeSelected()
+    ? ensureRealHomeCodexHookState({
+        hooksEnabled: isAgentStatusHooksEnabled(store.getSettings()),
+        userDataPath: app.getPath('userData')
+      }).catch((error: unknown) => {
+        console.warn('[codex-real-home-hooks] startup ensure failed:', error)
+      })
+    : Promise.resolve()
   if (shouldInstallManagedHooks(is.dev)) {
     // Why: check the persisted off switch before any auto-install so removed hooks don't silently reappear on launch.
     if (isAgentStatusHooksEnabled(store.getSettings())) {
       const managedHookStore = store
-      void applyAgentStatusHooksEnabled(true, managedHookStore.getSettings(), {
-        shouldHydrateShellPath: app.isPackaged,
-        onInstallError: recordManagedHookInstallFailure,
-        shouldContinue: (agent) => {
-          const settings = managedHookStore.getSettings()
-          return isAgentStatusHooksEnabled(settings) && !settings.disabledTuiAgents.includes(agent)
-        }
-      }).catch((error) => {
-        console.warn('[agent-hooks] failed to reconcile managed hooks on startup:', error)
-      })
+      void realHomeCodexHookState
+        .then(() =>
+          applyAgentStatusHooksEnabled(true, managedHookStore.getSettings(), {
+            shouldHydrateShellPath: app.isPackaged,
+            onInstallError: recordManagedHookInstallFailure,
+            shouldContinue: (agent) => {
+              const settings = managedHookStore.getSettings()
+              return shouldContinueManagedHookStartup(isQuitting, settings, agent)
+            }
+          })
+        )
+        .catch((error: unknown) => {
+          console.warn('[agent-hooks] failed to reconcile managed hooks on startup:', error)
+        })
     } else {
-      removeManagedAgentHooks()
+      void removeManagedAgentHooks().catch((error: unknown) => {
+        console.warn('[agent-hooks] failed to remove managed hooks on startup:', error)
+      })
     }
   }
   // Why: process-gone metrics only see survivors; retain a recent whole-app
@@ -3426,7 +3453,11 @@ void app.whenReady().then(async () => {
     await runtime.reconcileLegacyWorkerTerminals()
     // Why: headless servers can't mount <webview> panes; use offscreen WebContents, gated on a real display so browser.headless.v1 stays honest.
     if (headlessBrowserDisplayAvailable) {
-      runtime.setOffscreenBrowserBackend(new OffscreenBrowserBackend(browserManager))
+      runtime.setOffscreenBrowserBackend(
+        new OffscreenBrowserBackend(browserManager, {
+          getAgentBrowserBridge: () => agentBrowserBridge
+        })
+      )
     }
     // Why: headless servers have no renderer graph publisher; publish an explicit empty graph so status clients see a ready server.
     runtime.syncWindowGraph(HEADLESS_RUNTIME_WINDOW_ID, { tabs: [], leaves: [] })
@@ -3436,7 +3467,8 @@ void app.whenReady().then(async () => {
     })
     runtimeCloudPresence?.setRuntimeReady(true)
     settleServeDesktopActivation()
-    installServeSignalHandlers()
+    // Why: every attempt must reach app.quit(); a page beforeunload can veto an earlier signal.
+    registerServeSignalHandlers(process, () => app.quit())
     // Why: headless serve has no renderer to run the normal cli:install flow; do it here for macOS/Linux only (Windows-excluded: install() only mutates registry PATH, not child terminals).
     if (process.platform === 'darwin' || process.platform === 'linux') {
       try {
@@ -3662,12 +3694,18 @@ app.on('will-quit', (e) => {
   wslHookRelayManager.disposeAll()
   const statsFlush = stats?.flushAsync() ?? Promise.resolve()
   // Why: agent-browser daemon processes would otherwise linger after quit, holding ports and stale session state on disk.
-  // Why: join both visible and offscreen browser owners before app.quit(), so
-  // helper daemons cannot outlive the process that owns their pages.
+  // Why the barrier below: each session's close is its own agent-browser child taking hundreds of ms,
+  // so an unawaited call reaches app.quit() first and every open tab's daemon survives the quit (#16367).
+  // Why retire headless page owners first: it closes those helpers without a duplicate close fanout.
   const browserShutdown = (async (): Promise<void> => {
     await runtime?.getOffscreenBrowserBackend()?.destroyAll?.()
     await runtime?.getAgentBrowserBridge()?.destroyAllSessions()
   })()
+  // Why (review P2-4): local SSH browser routes own loopback listeners and, on the
+  // system-ssh path, `ssh -N -D` children that would otherwise outlive the app.
+  const localSshRouteShutdown = import('./browser/local-ssh-browser-route')
+    .then((routes) => routes.closeAllLocalSshBrowserRoutes())
+    .catch(() => {})
   browserManager.setBrowserGuestStateChangedListener(null)
   const emulatorShutdown = runtime?.getEmulatorBridge()?.destroyAllSessions() ?? Promise.resolve()
   // Why immediately before store.flushAsync() with no await in between: beginSshShutdown() marks every
@@ -3717,6 +3755,7 @@ app.on('will-quit', (e) => {
     { name: 'runtime-rpc', promise: rpcStopAndClear },
     { name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown },
     { name: 'runtime-cloud-web-session-control', promise: runtimeCloudWebSessionControlShutdown },
+    { name: 'local-ssh-browser-routes', promise: localSshRouteShutdown },
     { name: 'watchers', promise: watcherShutdown },
     { name: 'emulator', promise: emulatorShutdown },
     { name: 'ssh', promise: sshShutdown },

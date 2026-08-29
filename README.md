@@ -19,6 +19,8 @@
 > [!IMPORTANT]
 > HiveCode is currently an engineering fork with no approved public download, update, cloud, support, or community endpoints. Feature links and screenshots below are inherited from upstream Orca as compatibility references; they are not HiveCode release links.
 
+Product direction and UI decisions are maintained in [the canonical product design](docs/engineering/product-design.md).
+
 <p align="center">
   <img src="docs/assets/readme-hero.jpg" alt="Upstream Orca desktop and mobile interface reference" width="960" />
 </p>

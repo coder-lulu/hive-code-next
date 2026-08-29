@@ -5,6 +5,7 @@ import {
   setRuntimeBrowserCommandsFactory,
   setRuntimeBrowserUnavailableCause
 } from './runtime-browser-commands-factory'
+import { setRuntimeTerminalUnavailableCause } from './native-terminal-availability'
 import { setRuntimeDesktopSurface } from './runtime-desktop-surface'
 import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import type * as GitUsernameModule from '../git/git-username'
@@ -698,6 +699,7 @@ function resetRuntimeTestMocks(): void {
   // browser RPCs reject rather than silently succeeding.
   setRuntimeBrowserCommandsFactory((host) => new RuntimeBrowserCommands(host))
   setRuntimeBrowserUnavailableCause(null)
+  setRuntimeTerminalUnavailableCause(null)
   // Why: the runtime's notification, window lookup and tab-create-reply channel are
   // injected now, so the electron mock alone is inert. Back the surface with the same
   // mocks so every existing expectation still holds.
@@ -1238,6 +1240,10 @@ class InMemoryOrchestrationMessages {
     | { id: string; coordinator_handle: string | null; coordinator_pane_key: string | null }
     | undefined {
     return [...this.runs.values()].find((run) => run.coordinator_pane_key === paneKey)
+  }
+
+  listWorkerTerminalReleaseBacklog(): never[] {
+    return []
   }
 
   hasUndeliveredDirectMessageForRun(runId: string, directHandle: string): boolean {
@@ -2769,6 +2775,43 @@ describe('OrcaRuntimeService', () => {
     expect(degradation?.message).toBe(
       'ORCA_BROWSER_EXECUTABLE points at a path that does not exist. (/nope/chromium)'
     )
+  })
+
+  it('reports a host that cannot load node-pty, instead of that host never answering', () => {
+    // The alternative to reporting it is the process dying inside the dynamic loader,
+    // which reaches a client as a dropped connection with no cause attached.
+    setRuntimeTerminalUnavailableCause({
+      reason: 'libc_floor',
+      detail: 'the binary requires GLIBC_2.34'
+    })
+
+    const degradations = createRuntime().getStatus().degradations ?? []
+
+    expect(degradations).toContainEqual({
+      code: 'terminal_unavailable',
+      capability: 'terminal.pty.v1',
+      reason: 'libc_floor',
+      detail: 'the binary requires GLIBC_2.34',
+      message:
+        "This host's node-pty binary was built against a newer C library than the host provides, so the dynamic loader refuses it. Rebuild node-pty on this host, or deploy a build whose prebuilt binary matches this platform's libc. (the binary requires GLIBC_2.34)"
+    })
+  })
+
+  it('reports browser and terminal loss together, because they fail independently', () => {
+    setRuntimeBrowserCommandsFactory(null)
+    setRuntimeBrowserUnavailableCause({ reason: 'unconfigured' })
+    setRuntimeTerminalUnavailableCause({ reason: 'dependency_missing' })
+
+    const codes = (createRuntime().getStatus().degradations ?? []).map((entry) => entry.code)
+
+    expect(codes).toEqual(['browser_unavailable', 'terminal_unavailable'])
+  })
+
+  it('says nothing about terminals when no precondition proved them broken', () => {
+    // Silence must mean "nothing proved it broken", never "proved working" — a host that
+    // never ran the precondition has no verdict to publish.
+    const degradations = createRuntime().getStatus().degradations ?? []
+    expect(degradations.map((entry) => entry.code)).not.toContain('terminal_unavailable')
   })
 
   it('closes a worktree’s offscreen browser pages when its metadata is removed (leak fix)', () => {
@@ -45001,6 +45044,7 @@ describe('OrcaRuntimeService', () => {
       '/tmp/workspaces/runtime-hook-test',
       'pnpm worktree:setup',
       undefined,
+      undefined,
       undefined
     )
     expect(runHook).not.toHaveBeenCalled()
@@ -45156,7 +45200,8 @@ describe('OrcaRuntimeService', () => {
       'C:\\workspaces\\runtime-hook-activate',
       'pnpm worktree:setup',
       undefined,
-      { family: 'posix' }
+      { family: 'posix' },
+      undefined
     )
     expect(result.setup).toMatchObject({
       runnerScriptPath: 'C:\\repo\\.git\\orca\\setup-runner.sh',
@@ -45235,6 +45280,7 @@ describe('OrcaRuntimeService', () => {
       expect.objectContaining({ id: 'repo-1', path: '/tmp/repo' }),
       '/tmp/workspaces/runtime-hook-skip',
       'pnpm worktree:setup',
+      undefined,
       undefined,
       undefined
     )
@@ -45439,7 +45485,8 @@ describe('OrcaRuntimeService', () => {
       'C:\\workspaces\\runtime-hook-windowless',
       'pnpm worktree:setup',
       undefined,
-      { family: 'posix' }
+      { family: 'posix' },
+      undefined
     )
     expect(runHook).not.toHaveBeenCalled()
     expect(result.setupReceipt).toMatchObject({ state: 'running' })
@@ -47597,7 +47644,8 @@ describe('OrcaRuntimeService', () => {
           updatedAt: '2026-05-22T00:00:00Z',
           author: 'alex'
         }
-      ]
+      ],
+      totalPages: 3
     })
     listGitLabTodosMock.mockResolvedValue([])
     listGitLabLabelsMock.mockResolvedValue(['bug', 'frontend'])
@@ -47642,7 +47690,7 @@ describe('OrcaRuntimeService', () => {
 
     await runtime.listGitLabRepoMRs(TEST_REPO_ID, 'closed', 2, 25, 'ambiguous selector')
     await runtime.listGitLabRepoWorkItems(TEST_REPO_ID, 'closed', 2, 25, 'ambiguous selector')
-    const issues = await runtime.listGitLabRepoIssues(TEST_REPO_ID, 'opened', '@me', 50)
+    const issues = await runtime.listGitLabRepoIssues(TEST_REPO_ID, 'opened', '@me', 50, 3)
     await runtime.listGitLabRepoTodos(TEST_REPO_ID)
     await runtime.listGitLabRepoLabels(TEST_REPO_ID)
     await runtime.createGitLabRepoIssue(TEST_REPO_ID, 'New issue', 'Body')
@@ -47697,7 +47745,9 @@ describe('OrcaRuntimeService', () => {
       'origin',
       'opened',
       '@me',
-      'ssh-1'
+      'ssh-1',
+      {},
+      3
     )
     expect(issues.items).toEqual([
       {
@@ -47713,6 +47763,7 @@ describe('OrcaRuntimeService', () => {
         repoId: TEST_REPO_ID
       }
     ])
+    expect(issues).toMatchObject({ totalPages: 3 })
     expect(listGitLabTodosMock).toHaveBeenCalledWith('/remote/repo', 'ssh-1')
     expect(listGitLabLabelsMock).toHaveBeenCalledWith('/remote/repo', 'origin', 'ssh-1')
     expect(createGitLabIssueMock).toHaveBeenCalledWith(
@@ -47883,7 +47934,8 @@ describe('OrcaRuntimeService', () => {
       'opened',
       undefined,
       null,
-      localGitOptions
+      localGitOptions,
+      1
     )
     expect(listGitLabTodosMock).toHaveBeenCalledWith(TEST_REPO_PATH, null, localGitOptions)
     expect(listGitLabLabelsMock).toHaveBeenCalledWith(
@@ -48090,9 +48142,21 @@ describe('OrcaRuntimeService', () => {
   it('normalizes runtime GitLab issue list arguments like the desktop IPC path', async () => {
     const runtime = new OrcaRuntimeService(store as never)
 
-    await runtime.listGitLabRepoIssues(TEST_REPO_ID, 'closed', 'someone-else' as never, 250.8)
-    await runtime.listGitLabRepoIssues(TEST_REPO_ID, 'all', '@me', 0.7)
-    await runtime.listGitLabRepoIssues(TEST_REPO_ID, 'unexpected' as never, '@me', Number.NaN)
+    await runtime.listGitLabRepoIssues(
+      TEST_REPO_ID,
+      'closed',
+      'someone-else' as never,
+      250.8,
+      20_000
+    )
+    await runtime.listGitLabRepoIssues(TEST_REPO_ID, 'all', '@me', 0.7, 0)
+    await runtime.listGitLabRepoIssues(
+      TEST_REPO_ID,
+      'unexpected' as never,
+      '@me',
+      Number.NaN,
+      Number.NaN
+    )
 
     expect(listGitLabIssuesMock).toHaveBeenNthCalledWith(
       1,
@@ -48101,7 +48165,9 @@ describe('OrcaRuntimeService', () => {
       undefined,
       'closed',
       undefined,
-      null
+      null,
+      {},
+      10_000
     )
     expect(listGitLabIssuesMock).toHaveBeenNthCalledWith(
       2,
@@ -48110,7 +48176,9 @@ describe('OrcaRuntimeService', () => {
       undefined,
       'all',
       '@me',
-      null
+      null,
+      {},
+      1
     )
     expect(listGitLabIssuesMock).toHaveBeenNthCalledWith(
       3,
@@ -48119,7 +48187,9 @@ describe('OrcaRuntimeService', () => {
       undefined,
       'opened',
       '@me',
-      null
+      null,
+      {},
+      1
     )
   })
 

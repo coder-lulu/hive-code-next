@@ -6194,10 +6194,9 @@
           "compareBaseBranchUpstream": "分支上游"
         },
         "HiddenExperimentalGroup": {
-          "d0f914a528": "占位符切换",
-          "1014ddbfaf": "今天什么也不做。保留作为隐藏实验选项的第一个插槽。",
-          "232cf83de8": "用于内部测试的未列出的切换。这里什么都不支持。",
-          "3e9e827ca5": "隐藏实验"
+          "7c4e18d2f6": "在本机启用粗体故障捕获手势：{{samplingShortcut}} 开始采样突发；{{captureShortcut}} 将窗格证据捕获到磁盘。",
+          "b09f24a51d": "终端渲染诊断",
+          "f2c81d904a": "隐藏实验设置"
         },
         "InputPane": {
           "db15068196": "在 Linux 和 macOS 上默认启用。 Linux使用系统选择剪贴板；其他平台使用私有缓冲区。",
@@ -14585,10 +14584,6 @@
         "analyzeCode": "分析代码库",
         "implementFeature": "实现新功能",
         "fixIssue": "修复问题",
-        "addTests": "补充测试",
-        "refactorDocs": "重构文档",
-        "generateCommit": "生成提交说明",
-        "architecture": "架构设计",
         "scheduledBuild": "定时检查构建",
         "summarizeChanges": "整理变更摘要",
         "batchTasks": "批量处理任务",
@@ -14619,12 +14614,6 @@
       "templates": "推荐任务模板",
       "more": "更多",
       "templateHint": "基于当前工作区生成结构化结果",
-      "template": {
-        "analyzeCode": "代码审查",
-        "architecture": "API 设计评审",
-        "addTests": "单元测试生成",
-        "generateCommit": "提交说明生成"
-      },
       "sessions": "会话",
       "recentActivity": "最近活动",
       "enterWorkspace": "进入工作区",
@@ -14890,28 +14879,15 @@
     "workspace": {
       "cleanup": {
         "browse": {
-          "selectionWithheldOne": "当前筛选条件隐藏了 1 个已选工作区，已取消选择。",
-          "selectionWithheld": "当前筛选条件隐藏了 {{value0}} 个已选工作区，已取消选择。",
-          "selectAllCountOne": "选择 1 个通过安全检查的工作区",
-          "selectAllCount": "选择全部 {{value0}} 个通过安全检查的工作区"
-        },
-        "scan": {
-          "readyOne": "找到 1 个工作区。",
-          "readyMany": "找到 {{value0}} 个工作区。"
-        },
-        "presentationFixtures": {
-          "reviewAlphaCleanup": "评审 Alpha 清理"
-        },
-        "presentation": {
-          "gitlabMergeRequestNumber": "MR #{{value0}}",
-          "githubPullRequestNumber": "PR #{{value0}}"
-        },
-        "browse": {
           "gitStatusCheckFailed": "Git 状态检查失败",
           "gitStatusUnverified": "无法验证 Git 状态",
           "deleteAnyway": "仍然删除",
           "forceDeleteProjectionOne": "当前有 {{count}} 个工作区显示风险，可能需要强制删除",
           "forceDeleteProjectionMany": "当前有 {{count}} 个工作区显示风险，可能需要强制删除",
+          "selectionWithheldOne": "当前筛选条件隐藏了 1 个已选工作区，已取消选择。",
+          "selectionWithheld": "当前筛选条件隐藏了 {{value0}} 个已选工作区，已取消选择。",
+          "selectAllCountOne": "选择 1 个通过安全检查的工作区",
+          "selectAllCount": "选择全部 {{value0}} 个通过安全检查的工作区",
           "appliedFilters": "已应用的筛选",
           "removeFilter": "移除筛选 {{value0}}",
           "chip": {
@@ -14958,6 +14934,17 @@
               "retainedAgents": "已完成的代理"
             }
           }
+        },
+        "scan": {
+          "readyOne": "找到 1 个工作区。",
+          "readyMany": "找到 {{value0}} 个工作区。"
+        },
+        "presentationFixtures": {
+          "reviewAlphaCleanup": "评审 Alpha 清理"
+        },
+        "presentation": {
+          "gitlabMergeRequestNumber": "MR #{{value0}}",
+          "githubPullRequestNumber": "PR #{{value0}}"
         }
       }
     },

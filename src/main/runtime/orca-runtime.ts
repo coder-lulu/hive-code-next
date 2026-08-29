@@ -669,6 +669,7 @@ import {
   configureAiVaultSessionSources,
   listAiVaultSessions
 } from '../ai-vault/cached-session-list'
+import { configureHostReadableTranscriptPathSources } from '../native-chat/host-readable-transcript-path'
 import { resolveLocalAiVaultSessionTitles } from '../ai-vault/session-title-resolver'
 import type { AiVaultListArgs, AiVaultListResult } from '../../shared/ai-vault-types'
 import type {
@@ -3921,6 +3922,9 @@ export class OrcaRuntimeService {
     // even on headless `orca serve` hosts where registerCoreHandlers never runs.
     if (deps?.getAdditionalAiVaultCodexHomePaths) {
       configureAiVaultSessionSources({
+        getAdditionalCodexHomePaths: deps.getAdditionalAiVaultCodexHomePaths
+      })
+      configureHostReadableTranscriptPathSources({
         getAdditionalCodexHomePaths: deps.getAdditionalAiVaultCodexHomePaths
       })
     }
@@ -24745,7 +24749,20 @@ export class OrcaRuntimeService {
     }
   }
 
-  private markLocalWorkspaceTrustedForAgent(agent: TuiAgent, workspacePath: string): void {
+  private markWorkspaceTrustedForAgent(
+    agent: TuiAgent,
+    connectionId: string | null | undefined,
+    workspacePath: string
+  ): Promise<void> {
+    return connectionId
+      ? this.markRemoteWorkspaceTrustedForAgent(agent, connectionId, workspacePath)
+      : this.markLocalWorkspaceTrustedForAgent(agent, workspacePath)
+  }
+
+  private async markLocalWorkspaceTrustedForAgent(
+    agent: TuiAgent,
+    workspacePath: string
+  ): Promise<void> {
     const preset = TUI_AGENT_CONFIG[agent].preflightTrust
     if (!preset) {
       return
@@ -24756,7 +24773,9 @@ export class OrcaRuntimeService {
       } else if (preset === 'copilot') {
         markCopilotFolderTrusted(workspacePath)
       } else if (preset === 'codex') {
-        markCodexProjectTrusted(workspacePath)
+        // Why: the Codex write queues behind any in-flight hook grant, so the
+        // agent must not launch until it has actually landed.
+        await markCodexProjectTrusted(workspacePath)
       }
     } catch {
       // Best-effort: the user can still accept the agent trust prompt manually.
@@ -25281,7 +25300,7 @@ export class OrcaRuntimeService {
         try {
           const startupTrustAgent = effectiveDraftPaste?.agent ?? effectiveCreatedWithAgent
           if (startupTrustAgent) {
-            this.markLocalWorkspaceTrustedForAgent(startupTrustAgent, worktree.path)
+            await this.markLocalWorkspaceTrustedForAgent(startupTrustAgent, worktree.path)
           }
           const terminal = await this.createTerminal(`id:${worktree.id}`, {
             command: effectiveStartup.command,
@@ -26074,7 +26093,7 @@ export class OrcaRuntimeService {
         // session later, matching `orca terminal create` background semantics.
         const startupTrustAgent = effectiveDraftPaste?.agent ?? effectiveCreatedWithAgent
         if (startupTrustAgent) {
-          this.markLocalWorkspaceTrustedForAgent(startupTrustAgent, worktreePath)
+          await this.markLocalWorkspaceTrustedForAgent(startupTrustAgent, worktreePath)
         }
         const terminal = await this.createTerminal(`id:${worktree.id}`, {
           command: sequencedStartup.command,
@@ -28568,11 +28587,7 @@ export class OrcaRuntimeService {
       return opts
     }
 
-    if (workspace.connectionId) {
-      await this.markRemoteWorkspaceTrustedForAgent(agent, workspace.connectionId, workspace.path)
-    } else {
-      this.markLocalWorkspaceTrustedForAgent(agent, workspace.path)
-    }
+    await this.markWorkspaceTrustedForAgent(agent, workspace.connectionId, workspace.path)
 
     return {
       ...opts,
@@ -28706,15 +28721,7 @@ export class OrcaRuntimeService {
     if (!startup) {
       throw new Error('agent_session_identity_required')
     }
-    if (workspace.connectionId) {
-      await this.markRemoteWorkspaceTrustedForAgent(
-        request.agent,
-        workspace.connectionId,
-        workspace.path
-      )
-    } else {
-      this.markLocalWorkspaceTrustedForAgent(request.agent, workspace.path)
-    }
+    await this.markWorkspaceTrustedForAgent(request.agent, workspace.connectionId, workspace.path)
     if (_caller.signal?.aborted) {
       throw new Error('client_disconnected')
     }
@@ -28875,15 +28882,7 @@ export class OrcaRuntimeService {
       if (!startup) {
         throw new Error('agent_session_identity_required')
       }
-      if (workspace.connectionId) {
-        await this.markRemoteWorkspaceTrustedForAgent(
-          request.agent,
-          workspace.connectionId,
-          workspace.path
-        )
-      } else {
-        this.markLocalWorkspaceTrustedForAgent(request.agent, workspace.path)
-      }
+      await this.markWorkspaceTrustedForAgent(request.agent, workspace.connectionId, workspace.path)
       if (caller.signal?.aborted) {
         throw new Error('client_disconnected')
       }
@@ -29515,11 +29514,7 @@ export class OrcaRuntimeService {
       throw new Error('Repository for the selected workspace is no longer available.')
     }
     const startup = this.buildStartupForAgent(repo, opts.agent, opts.prompt)
-    if (repo.connectionId) {
-      await this.markRemoteWorkspaceTrustedForAgent(opts.agent, repo.connectionId, worktree.path)
-    } else {
-      this.markLocalWorkspaceTrustedForAgent(opts.agent, worktree.path)
-    }
+    await this.markWorkspaceTrustedForAgent(opts.agent, repo.connectionId, worktree.path)
     return await this.createTerminal(`id:${worktree.id}`, {
       command: startup.startup.command,
       env: startup.startup.env,
@@ -29908,15 +29903,7 @@ export class OrcaRuntimeService {
     if (opts.agentPrompt && startupPlan.followupPrompt) {
       throw new Error(`Agent ${opts.agent} does not support startup prompt quick commands.`)
     }
-    if (workspace.connectionId) {
-      await this.markRemoteWorkspaceTrustedForAgent(
-        opts.agent,
-        workspace.connectionId,
-        workspace.path
-      )
-    } else {
-      this.markLocalWorkspaceTrustedForAgent(opts.agent, workspace.path)
-    }
+    await this.markWorkspaceTrustedForAgent(opts.agent, workspace.connectionId, workspace.path)
     return {
       command: startupPlan.launchCommand,
       env: startupPlan.env,

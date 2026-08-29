@@ -393,7 +393,7 @@ vi.mock('../native-chat', () => ({
   registerNativeChatHandlers: registerNativeChatHandlersMock
 }))
 
-import { registerCoreHandlers } from '../register-core-handlers'
+import { registerCoreHandlers } from './register-core-handlers'
 
 describe('registerCoreHandlers', () => {
   beforeEach(() => {

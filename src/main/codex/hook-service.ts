@@ -74,11 +74,9 @@ import {
   promoteCodexRuntimeHookApprovalsToSystem,
   snapshotCodexRuntimeHookTrustProvenance
 } from './hook-trust-promotion'
-import {
-  grantManagedCodexHookTrust,
-  grantManagedCodexHookTrustAsync
-} from './codex-hook-trust-grant'
-import { readCurrentCodexTrustGrantLedgerHome } from './codex-trust-grant-host'
+import { grantManagedCodexHookTrust, grantManagedCodexHookTrustAsync } from './codex-hook-trust-grant'
+import { runExclusivelyForCodexTrustConfig } from './codex-trust-config-mutation-queue'
+import { readCurrentNativeCodexTrustGrantLedgerHome } from './codex-trust-grant-host'
 import {
   getCodexLedgerTrustedHash,
   readCodexTrustGrantLedgerHomeForReconciliation,
@@ -590,7 +588,30 @@ function removeSystemManagedHookTrustEntries(systemHomePath: string, hooksJsonPa
   })
 }
 
-function cleanupLegacySystemManagedHooks(): void {
+// Why (#16441): these sequences mutate the runtime config.toml *and* the
+// system one — approval promotion, the system-config sync and the legacy sweep
+// all touch ~/.codex/config.toml — so holding only the runtime lane still lets
+// a real-home grant's capture->restore window swallow their writes. Lock order
+// is always runtime-before-system; every other holder acquires it that way too.
+function runExclusivelyForRuntimeAndSystemTrustConfig<T>(
+  runtimeHomePath: string,
+  run: () => Promise<T>
+): Promise<T> {
+  return runExclusivelyForCodexTrustConfig(getCodexConfigTomlPath(runtimeHomePath), () =>
+    runExclusivelyForCodexTrustConfig(getSystemCodexConfigTomlPath(), run)
+  )
+}
+
+function cleanupLegacySystemManagedHooks(): Promise<void> {
+  // Why: shares the real-home lane with ensureRealHomeCodexHookState — both
+  // capture, mutate and roll back the user's ~/.codex/config.toml.
+  return runExclusivelyForCodexTrustConfig(
+    getSystemCodexConfigTomlPath(),
+    sweepLegacySystemManagedHooks
+  )
+}
+
+async function sweepLegacySystemManagedHooks(): Promise<void> {
   if (systemCodexHomeHookSweepSuppressed()) {
     return
   }
@@ -655,7 +676,7 @@ function cleanupLegacySystemManagedHooks(): void {
     // Remove only stale Orca hook entries and preserve other managers' metadata.
     const hooksWritePath = resolveHooksJsonWritePath(legacyConfigPath)
     const previousMode = statSync(hooksWritePath).mode
-    mutateRealHomeHooksPreservingUserTrust({
+    await mutateRealHomeHooksPreservingUserTrust({
       sourcePath: legacyConfigPath,
       runtimeHomePath: systemHomePath,
       tomlPath: getSystemCodexConfigTomlPath(),
@@ -722,9 +743,9 @@ function cleanupLegacyCodexProfileHooks(): void {
   }
 }
 
-function cleanupLegacyManagedHookRepresentations(): void {
+async function cleanupLegacyManagedHookRepresentations(): Promise<void> {
   try {
-    cleanupLegacySystemManagedHooks()
+    await cleanupLegacySystemManagedHooks()
     cleanupLegacyCodexProfileHooks()
   } catch (error) {
     console.warn('[codex-hook-service] failed to clean legacy Codex hooks', error)
@@ -863,9 +884,20 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
   ].join('\n')
 }
 
-function installManagedHooksIntoWslRuntimeSync(
+// Why (#16441): the grant inside awaits a codex app-server session, so a
+// concurrent pane launch could write this config.toml between this run's
+// capture and its restore. One lane per file keeps the sequence atomic.
+function installManagedHooksIntoWslRuntime(
   plan: CodexWslRuntimeHookInstallPlan
-): AgentHookInstallStatus {
+): Promise<AgentHookInstallStatus> {
+  return runExclusivelyForCodexTrustConfig(plan.tomlPath, () =>
+    installManagedHooksIntoWslRuntimeExclusively(plan)
+  )
+}
+
+async function installManagedHooksIntoWslRuntimeExclusively(
+  plan: CodexWslRuntimeHookInstallPlan
+): Promise<AgentHookInstallStatus> {
   const config = readHooksJson(plan.configPath)
   if (!config) {
     return {
@@ -928,7 +960,7 @@ function installManagedHooksIntoWslRuntimeSync(
       trustEntries,
       previousLedgerHome ? [previousLedgerHome] : []
     )
-    const grant = grantManagedCodexHookTrust({
+    const grant = await grantManagedCodexHookTrust({
       runtimeHomePath,
       tomlPath: plan.tomlPath,
       managedCommand: command,
@@ -963,7 +995,7 @@ function installManagedHooksIntoWslRuntimeSync(
 // Async counterpart used by restart-time WSL repair. It intentionally mirrors
 // the synchronous launch lane above so the existing product launch contract
 // remains unchanged while the repair path can await Codex's app-server.
-async function installManagedHooksIntoWslRuntime(
+async function installManagedHooksIntoWslRuntimeAsync(
   plan: CodexWslRuntimeHookInstallPlan
 ): Promise<AgentHookInstallStatus> {
   const config = readHooksJson(plan.configPath)
@@ -1140,17 +1172,24 @@ export class CodexHookService {
     return generation
   }
 
-  installForRuntimeHome(
+  async installForRuntimeHome(
     runtimeHomePath: string | null | undefined,
     target?: CodexWslRuntimeHookTarget
-  ): AgentHookInstallStatus | Promise<AgentHookInstallStatus | null> | null {
+  ): Promise<AgentHookInstallStatus | null> {
     const generation = this.supersedeWslReconciliation(runtimeHomePath)
     let installedTrustConfigPath: string | null = null
-    // Why: JS is single-threaded, so the synchronous install below finishes
-    // before any async `wsl.exe` settlement callback runs — this flag is
-    // always set by the time the callback reads it.
     let installSucceeded = false
-    const onCanonicalPathSettled = (settlement: WslCanonicalPathSettlement): void => {
+    // Why: the install below now awaits a codex app-server session, so a
+    // settlement callback can land mid-install. This gate keeps reconciliation
+    // reading the finished install's flags, as it did when the install was
+    // synchronous and no callback could interleave with it.
+    let markPrimaryInstallSettled!: () => void
+    let reconciliationChain = new Promise<void>((resolve) => {
+      markPrimaryInstallSettled = resolve
+    })
+    const reconcileSettledWslCanonicalPath = async (
+      settlement: WslCanonicalPathSettlement
+    ): Promise<void> => {
       if (!runtimeHomePath) {
         return
       }
@@ -1187,13 +1226,20 @@ export class CodexHookService {
       if (!resolvedPlan) {
         return
       }
-      const status = installManagedHooksIntoWslRuntimeSync(resolvedPlan)
+      const status = await installManagedHooksIntoWslRuntimeAsync(resolvedPlan)
       if (status.state === 'error') {
         console.warn('[codex-hook-service] failed to reconcile WSL hook path', status.detail)
         return
       }
       installedTrustConfigPath = resolvedPlan.trustConfigPath
       installSucceeded = status.state === 'installed'
+    }
+    const onCanonicalPathSettled = (settlement: WslCanonicalPathSettlement): void => {
+      const run = (): Promise<void> => reconcileSettledWslCanonicalPath(settlement)
+      reconciliationChain = reconciliationChain.then(run, run)
+      void reconciliationChain.catch((error: unknown) => {
+        console.warn('[codex-hook-service] failed to reconcile WSL hook path', error)
+      })
     }
     const wslPlan = createCodexWslRuntimeHookInstallPlan(
       runtimeHomePath,
@@ -1202,9 +1248,13 @@ export class CodexHookService {
       onCanonicalPathSettled
     )
     installedTrustConfigPath = wslPlan?.trustConfigPath ?? null
-    const status = wslPlan ? installManagedHooksIntoWslRuntimeSync(wslPlan) : null
-    installSucceeded = status?.state === 'installed'
-    return status
+    try {
+      const status = wslPlan ? await installManagedHooksIntoWslRuntime(wslPlan) : null
+      installSucceeded = status?.state === 'installed'
+      return status
+    } finally {
+      markPrimaryInstallSettled()
+    }
   }
 
   installForRuntimeHomeSerialized(
@@ -1228,7 +1278,7 @@ export class CodexHookService {
       target?.runtime === 'wsl' &&
       this.installForRuntimeHome === CodexHookService.prototype.installForRuntimeHome
         ? Promise.resolve(createCodexWslRuntimeHookInstallPlan(runtimeHomePath, target)).then(
-            (plan) => (plan ? installManagedHooksIntoWslRuntime(plan) : null)
+            (plan) => (plan ? installManagedHooksIntoWslRuntimeAsync(plan) : null)
           )
         : Promise.resolve(this.installForRuntimeHome(runtimeHomePath, target))
     this.wslInstallsInFlight.set(key, install)
@@ -1293,7 +1343,7 @@ export class CodexHookService {
     // hashes or wrote fallback hashes. Re-resolving PATH here doubles sync launch work.
     const ledgerHome =
       recentGrantEntries === null
-        ? readCurrentCodexTrustGrantLedgerHome(runtimeHomePath, { kind: 'native' })
+        ? readCurrentNativeCodexTrustGrantLedgerHome(runtimeHomePath)
         : null
     const recentGrantHashes = new Map<string, { signature: string; trustedHash: string }>()
     for (const entry of recentGrantEntries ?? []) {
@@ -1397,7 +1447,16 @@ export class CodexHookService {
   // Why: runtimeHomePath defaults to the shared managed mirror, but a managed
   // account launching against its own self-contained CODEX_HOME passes that
   // per-account home so hooks.json/config.toml/trust land where codex reads.
-  install(runtimeHomePath: string = getOrcaManagedCodexHomePath()): AgentHookInstallStatus {
+  install(
+    runtimeHomePath: string = getOrcaManagedCodexHomePath()
+  ): Promise<AgentHookInstallStatus> {
+    // Why: same lane as the grant it performs — see installManagedHooksIntoWslRuntime.
+    return runExclusivelyForRuntimeAndSystemTrustConfig(runtimeHomePath, () =>
+      this.installExclusively(runtimeHomePath)
+    )
+  }
+
+  private async installExclusively(runtimeHomePath: string): Promise<AgentHookInstallStatus> {
     const configPath = getConfigPath(runtimeHomePath)
     const scriptPath = getManagedScriptPath()
     // Why: must run before this install rewrites hooks.json/config.toml —
@@ -1499,7 +1558,7 @@ export class CodexHookService {
       // then carry Codex's verbatim hashes into stale cleanup so it cannot
       // delete what Codex just wrote. Mirrored user trust keeps its existing
       // verbatim-carry lane either way.
-      const grant = grantManagedCodexHookTrust({
+      const grant = await grantManagedCodexHookTrust({
         runtimeHomePath,
         tomlPath,
         managedCommand: command,
@@ -1534,24 +1593,14 @@ export class CodexHookService {
       }
     }
     snapshotCodexRuntimeHookTrustProvenance(runtimeHomePath)
-    try {
-      cleanupLegacySystemManagedHooks()
-      cleanupLegacyCodexProfileHooks()
-    } catch (error) {
-      console.warn('[codex-hook-service] failed to clean legacy Codex hooks', error)
-    }
+    await cleanupLegacyManagedHookRepresentations()
     return this.getStatusAfterInstall(recentGrantEntries, runtimeHomePath)
   }
 
   async installRemote(
     sftp: SFTPWrapper,
     remoteHome: string,
-    options?: {
-      /** Explicit CODEX_HOME dir (flat layout). WSL sessions read Orca's managed runtime home, not ~/.codex, so the default location leaves them hookless. */
-      codexHomeDir?: string
-      /** Skip the trust write when config.toml is absent — the WSL launch path seeds it only-if-absent, so creating it here would cancel that seed. */
-      deferTrustUntilConfigToml?: boolean
-    }
+    options?: { codexHomeDir?: string; deferTrustUntilConfigToml?: boolean }
   ): Promise<AgentHookInstallStatus> {
     const codexHomeBase =
       options?.codexHomeDir?.replace(/\/$/, '') ?? `${remoteHome.replace(/\/$/, '')}/.codex`
@@ -1669,7 +1718,15 @@ export class CodexHookService {
 
   refreshRuntimeUserHooks(
     runtimeHomePath: string = getOrcaManagedCodexHomePath()
-  ): AgentHookInstallStatus {
+  ): Promise<AgentHookInstallStatus> {
+    return runExclusivelyForRuntimeAndSystemTrustConfig(runtimeHomePath, () =>
+      this.refreshRuntimeUserHooksExclusively(runtimeHomePath)
+    )
+  }
+
+  private async refreshRuntimeUserHooksExclusively(
+    runtimeHomePath: string
+  ): Promise<AgentHookInstallStatus> {
     const configPath = getConfigPath(runtimeHomePath)
     // Why: same as install() — capture in-Orca approvals before this refresh
     // rewrites the runtime files they are keyed against.
@@ -1677,7 +1734,7 @@ export class CodexHookService {
     const config = readHooksJson(configPath)
     if (!config) {
       // Why: disabled launch prep once called remove(); preserve that legacy cleanup even when runtime hooks.json is malformed.
-      cleanupLegacyManagedHookRepresentations()
+      await cleanupLegacyManagedHookRepresentations()
       return {
         agent: 'codex',
         state: 'error',
@@ -1726,17 +1783,23 @@ export class CodexHookService {
     }
     snapshotCodexRuntimeHookTrustProvenance(runtimeHomePath)
 
-    cleanupLegacyManagedHookRepresentations()
+    await cleanupLegacyManagedHookRepresentations()
     return this.getStatus(runtimeHomePath)
   }
 
-  remove(): AgentHookInstallStatus {
+  remove(): Promise<AgentHookInstallStatus> {
+    return runExclusivelyForRuntimeAndSystemTrustConfig(getOrcaManagedCodexHomePath(), () =>
+      this.removeExclusively()
+    )
+  }
+
+  private async removeExclusively(): Promise<AgentHookInstallStatus> {
     const configPath = getConfigPath()
     const configExists = existsSync(configPath)
     const config = readHooksJson(configPath)
     if (!config) {
       // Why: a malformed hooks.json shouldn't strand old hooks in ~/.codex or the legacy profile after disabling.
-      cleanupLegacyManagedHookRepresentations()
+      await cleanupLegacyManagedHookRepresentations()
       return {
         agent: 'codex',
         state: 'error',
@@ -1769,7 +1832,7 @@ export class CodexHookService {
     // Why: drop trust entries so config.toml doesn't accumulate dead [hooks.state] blocks across install/remove cycles.
     removeRuntimeManagedHookTrustEntries(configPath)
 
-    cleanupLegacyManagedHookRepresentations()
+    await cleanupLegacyManagedHookRepresentations()
 
     return this.getStatus()
   }

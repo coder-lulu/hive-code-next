@@ -5,6 +5,10 @@ import {
   getHostedReviewCacheKey,
   linkedReviewHintKey
 } from '../slices/hosted-review-cache-identity'
+import {
+  hasNewerHostedReviewCacheEntry,
+  withHostedReviewCacheEntry
+} from '../slices/hosted-review-cache-state'
 import type { GitHubPRFallbackSource } from './cache-model'
 
 const HOSTED_REVIEW_CACHE_MAX = 500

@@ -108,7 +108,6 @@ describe('runExclusivelyForCodexTrustConfig', () => {
     await queued
     expect(secondStarted).toBe(true)
   })
-
   it('coalesces WSL UNC aliases without folding the case-sensitive Linux path', async () => {
     const aliasGate = deferred()
     let aliasStarted = false
