@@ -638,6 +638,15 @@ export class OrcaRuntimeRpcServer {
     return this.e2eeKeypair
   }
 
+  setCloudWebLaunchService(_service: unknown): void {
+    // The desktop HTTP server owns the launch service; this setter preserves
+    // the integration seam while the transport remains the termination owner.
+  }
+
+  terminateCloudWebSessionConnections(managedWebSessionId: string): number {
+    return this.mobileSocketWiring?.terminateCloudSessionConnections(managedWebSessionId) ?? 0
+  }
+
   getMobileSocketWiring(): MobileSocketWiring | null {
     return this.mobileSocketWiring
   }
