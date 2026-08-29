@@ -135,5 +135,17 @@
     "integrationBranch": "vendor-integration",
     "productBranches": ["hivecode/main-next", "main"],
     "forbidDirectMergeToProduct": true
+  },
+  "absorptionPolicy": {
+    "historicalAndCurrent": true,
+    "requiredUpstreamBugFixes": true,
+    "requiredNonConflictingFeatures": true,
+    "rule": "Every upstream BUG or security fix, historical or current, must be absorbed or documented as already equivalent in the product tree. Every upstream feature that does not cross a product boundary must be absorbed. Product decision is required only when the change crosses a product-boundary path, changes a persisted or wire contract, or conflicts with a maintained HiveCode capability.",
+    "uiAdaptation": "When an upstream feature overlaps HiveCode UI, preserve HiveCode branding and existing UI capabilities while adopting upstream behavior and compatibility fixes.",
+    "historicalAudit": "Each synchronization audits the complete upstream history since the recorded vendor baseline, not only commits introduced since the previous synchronization.",
+    "lanes": {
+      "bugBackport": "BUG, security, stability, and data-consistency fixes are mandatory backports after dependency-closure and patch-id review.",
+      "productDecision": "New features and UI changes enter product decision only when they meet the explicit product-boundary/conflict criteria above; otherwise they are mandatory absorption candidates."
+    }
   }
 }

@@ -86,7 +86,7 @@
       "level": 6,
       "id": "orca-product-interaction",
       "label": "Pure upstream product interaction or branding",
-      "action": "Do not absorb automatically; require explicit product-boundary review.",
+      "action": "Absorb when the change does not cross a product-boundary path or maintained HiveCode capability; preserve HiveCode branding and UI while adopting upstream behavior. Require product decision only for explicit boundary conflicts.",
       "pathPatterns": [
         "^src/renderer/src/components/",
         "^src/renderer/src/i18n/",
