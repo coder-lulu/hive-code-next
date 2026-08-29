@@ -28,9 +28,9 @@ import {
 
 type TerminalOutputTarget = ForegroundTerminalOutputTarget
 
-type TerminalOutputBeforeWrite = (data: string) => void
+export type TerminalOutputBeforeWrite = (data: string) => void
 type TerminalBacklogRecoveryRequest = () => boolean
-type TerminalOutputParsedCallback = () => void
+export type TerminalOutputParsedCallback = () => void
 type ForegroundRefreshSyncResolver = () => boolean
 
 type WriteTerminalOutputOptions = {
@@ -63,7 +63,7 @@ type QueueChunk = {
   ackCredit?: () => void
 }
 
-type QueuedWrite = {
+export type QueuedWrite = {
   data: string
   foreground: boolean
   forceForegroundRefresh: boolean
@@ -75,7 +75,7 @@ type QueuedWrite = {
   ackCredits: (() => void)[]
 }
 
-type QueueEntry = {
+export type QueueEntry = {
   terminal: TerminalOutputTarget
   chunks: QueueChunk[]
   chunkIndex: number

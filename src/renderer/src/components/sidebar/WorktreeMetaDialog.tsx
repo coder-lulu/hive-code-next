@@ -140,7 +140,7 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
   prevIsOpenRef.current = isOpen
 
   const draft = useMemo<WorktreeMetaDraft>(
-    () => ({ displayNameInput, issueInput, issueProvider, prInput, commentInput }),
+    () => ({ displayNameInput, issueInput, issueProvider, reviewInput: prInput, commentInput }),
     [displayNameInput, issueInput, issueProvider, prInput, commentInput]
   )
 

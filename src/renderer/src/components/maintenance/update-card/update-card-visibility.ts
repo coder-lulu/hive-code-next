@@ -54,6 +54,8 @@ export function getUpdateCardAriaLabel(status: UpdateStatus): string {
   switch (status.state) {
     case 'idle':
       return 'Update status'
+    case 'disabled':
+      return 'Updates disabled'
     case 'checking':
       return 'Checking for updates'
     case 'not-available':

@@ -1757,7 +1757,9 @@ export class OrcaRuntimeRpcServer {
       await this.dispatcher.dispatchStreaming(request, reply, {
         connectionId: authenticatedCloudSocket.connectionId,
         clientId: authenticatedCloudSocket.connectionId,
-        clientKind: 'web',
+        // Web cloud sessions use the desktop/runtime contract: they are not
+        // mobile clients and must retain full payload/host-authority behavior.
+        clientKind: 'runtime',
         clientCapabilities: authenticatedCloudSocket.clientCapabilities,
         sendBinary
       })
