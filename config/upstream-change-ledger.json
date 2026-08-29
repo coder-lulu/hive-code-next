@@ -407,6 +407,24 @@
       "conflictReason": "README downloads badge 属于产品发布入口，HiveCode 当前无批准公开制品链接",
       "adaptation": "保留 HiveCode 删除下载徽章的产品边界，不恢复上游发布暗示",
       "regressionTests": ["documentation governance", "brand boundary"]
+    },
+    {
+      "upstreamSha": "808fc3563dbfb5d4a369d1d874cf2c94e86236bb",
+      "type": "UI",
+      "applied": "需要产品决定",
+      "dependencies": [],
+      "conflictReason": "README 下载徽章属于 HiveCode 产品发布边界，不能直接采用 Orca 制品链接",
+      "adaptation": "保留 HiveCode 下载与发布入口；待产品发布制品和签名确认后单独更新",
+      "regressionTests": ["brand-boundary", "documentation-governance"]
+    },
+    {
+      "upstreamSha": "c226a655adae4239036b319e77ec3a2be6eddeb8",
+      "type": "UI",
+      "applied": "需要产品决定",
+      "dependencies": [],
+      "conflictReason": "README 下载徽章属于 HiveCode 产品发布边界，不能直接采用 Orca 制品链接",
+      "adaptation": "保留 HiveCode 下载与发布入口；待产品发布制品和签名确认后单独更新",
+      "regressionTests": ["brand-boundary", "documentation-governance"]
     }
   ]
 }

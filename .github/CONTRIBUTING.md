@@ -60,6 +60,14 @@ upstream publication settings as part of an ordinary product change. Resolve
 product-versus-upstream conflicts deliberately, then run the boundary and test
 checks again on the promoted checkout.
 
+The synchronization boundary is mandatory for both historical and current
+upstream changes: all upstream BUG, security, stability, and data-consistency
+fixes must be absorbed or documented as already equivalent, and all upstream
+features that do not cross a product boundary must be absorbed. Product
+decision is required only for an explicit product-boundary or compatibility
+conflict. Where an upstream feature overlaps HiveCode UI, preserve HiveCode
+branding and existing UI capabilities while adopting upstream behavior.
+
 ## Compatibility Contract
 
 Do not rename or remove these without an explicit migration plan: `orca` and

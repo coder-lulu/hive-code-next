@@ -54,6 +54,7 @@
     "config/scripts/windows-native-build-patch-contract.test.mjs",
     "config/scripts/windows-process-tree-gyp-path.test.mjs",
     "config/upstream-change-ledger.json",
+    "config/upstream-change-priority.json",
     "config/upstream-sync-boundary.json",
     "docs/engineering/fork-boundary-policy.md",
     "docs/engineering/product-design.md",
