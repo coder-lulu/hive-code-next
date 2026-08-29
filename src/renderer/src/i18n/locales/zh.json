@@ -14584,10 +14584,6 @@
         "analyzeCode": "分析代码库",
         "implementFeature": "实现新功能",
         "fixIssue": "修复问题",
-        "addTests": "补充测试",
-        "refactorDocs": "重构文档",
-        "generateCommit": "生成提交说明",
-        "architecture": "架构设计",
         "scheduledBuild": "定时检查构建",
         "summarizeChanges": "整理变更摘要",
         "batchTasks": "批量处理任务",
@@ -14618,12 +14614,6 @@
       "templates": "推荐任务模板",
       "more": "更多",
       "templateHint": "基于当前工作区生成结构化结果",
-      "template": {
-        "analyzeCode": "代码审查",
-        "architecture": "API 设计评审",
-        "addTests": "单元测试生成",
-        "generateCommit": "提交说明生成"
-      },
       "sessions": "会话",
       "recentActivity": "最近活动",
       "enterWorkspace": "进入工作区",

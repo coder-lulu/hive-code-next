@@ -4383,19 +4383,10 @@
           "keepDefaultBranchAria": "スリープ中のワークスペースを非表示にしてもデフォルトのブランチは表示したままにする"
         },
         "SidebarFooter": {
-          "accountMenu": "{{value0}}アカウントメニュー",
-          "account": "アカウント",
-          "appearance": "外観",
           "activity": "アクティビティ",
           "notifications": "通知",
-          "checkingAccount": "アカウントを確認中…",
-          "signIn": "ログイン",
-          "signInAgain": "再ログイン",
-          "accountUnavailable": "アカウントを利用できません",
-          "connected": "ログイン済み",
           "signInSuccess": "HiveCloud にログインしました",
           "signInFailed": "HiveCloud へのログインに失敗しました。再試行するか、サービスの状態を確認してください。",
-          "signOut": "ログアウト",
           "localSignOut": "この端末からログアウトしました。オンライン時に HiveCloud のセキュリティ設定からリモートセッションを無効にしてください。",
           "signOutSuccess": "HiveCloud からログアウトしました",
           "signOutFailed": "HiveCloud からログアウトできませんでした。ファイルの権限を確認して、もう一度お試しください。"
