@@ -1,5 +1,13 @@
+/* eslint-disable max-lines -- The sign-in dialog keeps its two authentication modes in one accessible flow. */
+
 import { useEffect, useRef, useState } from 'react'
-import { KeyRound, Loader2, Monitor } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Globe2, Loader2, Monitor, ShieldCheck } from 'lucide-react'
+import mascotUrl from '../../../../../resources/desktop-home-mascot-float.png'
+import githubIconUrl from '../../../../../mobile/assets/auth-icons/github.png'
+import wechatIconUrl from '../../../../../mobile/assets/auth-icons/wechat.png'
+import qqIconUrl from '../../../../../mobile/assets/auth-icons/qq.png'
+import { PRODUCT_LOGO_URL } from '@/product-brand'
 import type { HiveAccountSignInOptions } from '../../../../shared/hive-account'
 import type { HiveAccountSmsChallenge } from '../../../../shared/hive-account'
 import { Button } from '@/components/ui/button'
@@ -8,7 +16,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -35,7 +42,7 @@ export function HiveAccountSignInConfirmDialog({
   onSmsComplete?: (challengeId: string, smsCode: string) => Promise<void>
   signingIn: boolean
 }): React.JSX.Element {
-  const [trusted, setTrusted] = useState(false)
+  useTranslation()
   const [method, setMethod] = useState<'sms' | 'browser'>('sms')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [smsCode, setSmsCode] = useState('')
@@ -48,7 +55,6 @@ export function HiveAccountSignInConfirmDialog({
 
   useEffect(() => {
     if (!open) {
-      setTrusted(false)
       setMethod('sms')
       setPhoneNumber('')
       setSmsCode('')
@@ -59,21 +65,40 @@ export function HiveAccountSignInConfirmDialog({
   }, [open])
 
   const startSms = async (): Promise<void> => {
-    if (!onSmsStart || !/^\+?[0-9]{6,20}$/.test(phoneNumber.trim()) || !smsTermsAccepted) {
-      setSmsError('Enter a valid phone number and accept the terms.')
+    if (!onSmsStart || !/^\+?[0-9]{6,20}$/.test(phoneNumber.trim())) {
+      setSmsError(
+        translate('components.hiveAccountSignIn.invalidPhone', 'Enter a valid phone number.')
+      )
+      return
+    }
+    if (!smsTermsAccepted) {
+      setSmsError(
+        translate(
+          'components.hiveAccountSignIn.acceptTermsError',
+          'Please accept the Terms of Service and Privacy Policy first.'
+        )
+      )
       return
     }
     const attempt = ++smsAttempt.current
     setSmsError(null)
     setStartingSms(true)
     try {
-      const nextChallenge = await onSmsStart(phoneNumber.trim(), trusted ? 'TRUSTED' : 'TEMPORARY')
+      // The profile is part of the device-authorization request and must be
+      // selected before the SMS exchange. Keep the login flow persistent by
+      // default; the modal no longer exposes a pre-auth trust toggle.
+      const nextChallenge = await onSmsStart(phoneNumber.trim(), 'TRUSTED')
       if (attempt === smsAttempt.current) {
         setChallenge(nextChallenge)
       }
     } catch {
       if (attempt === smsAttempt.current) {
-        setSmsError('Unable to send a code. Try again.')
+        setSmsError(
+          translate(
+            'components.hiveAccountSignIn.sendCodeFailed',
+            'Could not send the code. Try again later.'
+          )
+        )
       }
     } finally {
       setStartingSms(false)
@@ -82,14 +107,16 @@ export function HiveAccountSignInConfirmDialog({
 
   const completeSms = async (): Promise<void> => {
     if (!challenge || !/^\d{6}$/.test(smsCode)) {
-      setSmsError('Enter the 6-digit SMS code.')
+      setSmsError(translate('components.hiveAccountSignIn.invalidCode', 'Enter the 6-digit code.'))
       return
     }
     setSmsError(null)
     try {
       await onSmsComplete?.(challenge.challengeId, smsCode)
     } catch {
-      setSmsError('The code is invalid or expired.')
+      setSmsError(
+        translate('components.hiveAccountSignIn.codeExpired', 'The code is invalid or expired.')
+      )
     }
   }
 
@@ -113,231 +140,344 @@ export function HiveAccountSignInConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[440px]">
-        <DialogHeader>
-          <DialogTitle>
-            {translate(
-              'auto.components.settings.orcaAccount.signInConfirmTitle',
-              'Approve HiveCloud sign-in'
-            )}
-          </DialogTitle>
-          <DialogDescription>
-            {method === 'sms'
-              ? translate(
-                  'auto.components.settings.orcaAccount.smsSignInDescription',
-                  'Verify your phone number to sign in without opening a browser.'
-                )
-              : translate(
-                  'auto.components.settings.orcaAccount.signInConfirmDescription',
-                  'Review this request before the desktop app opens the secure browser sign-in.'
-                )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex gap-2 border-b border-border/70 pb-3">
-          <Button
-            type="button"
-            size="sm"
-            variant={method === 'sms' ? 'default' : 'outline'}
-            onClick={() => switchMethod('sms')}
-          >
-            {translate('auto.components.settings.orcaAccount.smsLogin', 'Phone verification')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={method === 'browser' ? 'default' : 'outline'}
-            onClick={() => switchMethod('browser')}
-          >
-            {translate('auto.components.settings.orcaAccount.browserLogin', 'Browser sign-in')}
-          </Button>
-        </div>
-
-        {method === 'sms' ? (
-          <div className="space-y-3 rounded-lg border border-border/70 p-4">
-            <div className="space-y-1">
-              <Label htmlFor="hive-account-phone">
-                {translate('auto.components.settings.orcaAccount.phoneNumber', 'Phone number')}
-              </Label>
-              <input
-                id="hive-account-phone"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                value={phoneNumber}
-                onChange={(event) => setPhoneNumber(event.target.value)}
-                disabled={Boolean(challenge) || smsBusy}
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="13800138000"
-              />
-            </div>
-            {challenge ? (
-              <div className="space-y-1">
-                <Label htmlFor="hive-account-sms-code">
-                  {translate('auto.components.settings.orcaAccount.smsCode', 'SMS code')}
-                </Label>
-                <input
-                  id="hive-account-sms-code"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm tracking-[0.3em]"
-                  value={smsCode}
-                  onChange={(event) =>
-                    setSmsCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-                  }
-                  disabled={smsBusy}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="••••••"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {translate(
-                    'auto.components.settings.orcaAccount.smsExpiry',
-                    'Code expires in {seconds}s.'
-                  ).replace('{seconds}', String(challenge.expiresInSeconds))}
-                </p>
+      <DialogContent
+        showCloseButton
+        overlayClassName="hive-account-overlay"
+        className="hive-account-dialog"
+      >
+        <div className="hive-account-dialog-shell">
+          <aside className="hive-account-brand-panel">
+            <div className="hive-account-brand-lockup">
+              <img src={PRODUCT_LOGO_URL} alt="" />
+              <div>
+                <strong>HiveCloud</strong>
+                <span>
+                  {translate('components.hiveAccountSignIn.cloudConsole', 'Cloud control plane')}
+                </span>
               </div>
-            ) : null}
-            <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-              <Checkbox
-                checked={smsTermsAccepted}
-                onCheckedChange={(checked) => setSmsTermsAccepted(checked === true)}
-                disabled={smsBusy}
-              />
-              <span>
-                {translate(
-                  'auto.components.settings.orcaAccount.smsTerms',
-                  'I agree to the Terms of Service and Privacy Policy'
-                )}
-              </span>
-            </label>
-            {smsError ? (
-              <p className="text-xs text-destructive" role="alert">
-                {smsError}
-              </p>
-            ) : null}
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => void (challenge ? completeSms() : startSms())}
-              disabled={smsBusy}
-            >
-              {smsBusy ? <Loader2 className="size-4 animate-spin" /> : null}
-              {challenge
-                ? translate('auto.components.settings.orcaAccount.verifySms', 'Verify and sign in')
-                : translate(
-                    'auto.components.settings.orcaAccount.sendSms',
-                    'Send verification code'
-                  )}
-            </Button>
-          </div>
-        ) : null}
-
-        <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-700 dark:text-emerald-300">
-          <KeyRound className="mt-0.5 size-4 shrink-0" />
-          <div className="space-y-1 text-xs leading-5">
-            <p className="font-medium">
-              {translate(
-                'auto.components.settings.orcaAccount.approvalSecurityTitle',
-                'Short access credentials remain protected'
-              )}
-            </p>
-            <p>
-              {translate(
-                'auto.components.settings.orcaAccount.approvalSecurityDescription',
-                'The app rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.'
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-border/70 p-4 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground">
-              {translate('auto.components.settings.orcaAccount.requestStatus', 'Status')}
-            </p>
-            <p className="font-medium">
-              {translate(
-                'auto.components.settings.orcaAccount.pendingApproval',
-                'Pending approval'
-              )}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">
-              {translate('auto.components.settings.orcaAccount.requestApplication', 'Application')}
-            </p>
-            <p className="font-medium">
-              {translate(
-                'auto.components.settings.orcaAccount.requestApplicationName',
-                'Desktop application'
-              )}
-            </p>
-          </div>
-          <div className="col-span-2 flex items-center gap-2">
-            <Monitor className="size-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">
-                {translate(
-                  'auto.components.settings.orcaAccount.requestDevice',
-                  'Requesting device'
-                )}
-              </p>
-              <p className="font-medium">
-                {translate(
-                  'auto.components.settings.orcaAccount.currentDesktop',
-                  'This desktop app'
-                )}
-              </p>
             </div>
-          </div>
-        </div>
+            <div className="hive-account-mascot-wrap">
+              <img
+                src={mascotUrl}
+                alt={translate('components.hiveAccountSignIn.mascotAlt', 'HiveCode robot bee')}
+              />
+            </div>
+            <div className="hive-account-brand-copy">
+              <h2>
+                {translate(
+                  'components.hiveAccountSignIn.brandTitle',
+                  'Secure connection, efficient collaboration'
+                )}
+              </h2>
+              <p>
+                {translate(
+                  'components.hiveAccountSignIn.brandDescription',
+                  'Manage Runtimes, devices, and sessions after signing in.'
+                )}
+              </p>
+              <small>
+                {translate(
+                  'components.hiveAccountSignIn.brandNote',
+                  'HiveCode local features remain available after you close this window.'
+                )}
+              </small>
+            </div>
+          </aside>
 
-        <div className="flex items-start gap-3 rounded-lg border border-border/70 p-3">
-          <Checkbox
-            id="hive-account-trusted-device"
-            checked={trusted}
-            onCheckedChange={(checked) => setTrusted(checked === true)}
-            disabled={signingIn}
-          />
-          <div className="space-y-1">
-            <Label htmlFor="hive-account-trusted-device">
-              {translate(
-                'auto.components.settings.orcaAccount.trustThisDevice',
-                'Trust this device'
-              )}
-            </Label>
-            <p className="text-xs leading-5 text-muted-foreground">
-              {trusted
-                ? translate(
-                    'auto.components.settings.orcaAccount.trustedApprovalDescription',
-                    'Keep an operating-system-encrypted sign-in for up to 90 days.'
-                  )
-                : translate(
-                    'auto.components.settings.orcaAccount.temporaryApprovalDescription',
-                    'Use a temporary sign-in for up to 24 hours; closing the app removes it.'
+          <section className="hive-account-form-panel">
+            <DialogHeader className="hive-account-form-header">
+              <DialogTitle>
+                {translate('components.hiveAccountSignIn.title', 'Sign in to HiveCloud')}
+              </DialogTitle>
+              <DialogDescription>
+                {method === 'sms'
+                  ? translate(
+                      'components.hiveAccountSignIn.smsDescription',
+                      'Verify your phone number to continue without leaving the app.'
+                    )
+                  : translate(
+                      'components.hiveAccountSignIn.browserDescription',
+                      'Complete secure authentication in your system browser and return to HiveCode automatically.'
+                    )}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div
+              className="hive-account-method-switch"
+              role="tablist"
+              aria-label={translate('components.hiveAccountSignIn.loginMethods', 'Sign-in methods')}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={method === 'sms'}
+                className={method === 'sms' ? 'is-active' : ''}
+                onClick={() => switchMethod('sms')}
+              >
+                {translate('components.hiveAccountSignIn.smsTab', 'Phone code')}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={method === 'browser'}
+                className={method === 'browser' ? 'is-active' : ''}
+                onClick={() => switchMethod('browser')}
+              >
+                {translate('components.hiveAccountSignIn.browserTab', 'Browser')}
+              </button>
+            </div>
+
+            {method === 'sms' ? (
+              <div className="hive-account-login-body">
+                {!challenge ? (
+                  <div className="hive-account-field">
+                    <Label htmlFor="hive-account-phone">
+                      {translate('components.hiveAccountSignIn.phoneLabel', 'Phone number')}
+                    </Label>
+                    <div
+                      className={`hive-account-phone-input${smsError && !smsTermsAccepted ? ' has-error' : ''}`}
+                    >
+                      <span className="hive-account-country">+86</span>
+                      <span className="hive-account-country-chevron" aria-hidden="true" />
+                      <span className="hive-account-input-divider" aria-hidden="true" />
+                      <input
+                        id="hive-account-phone"
+                        value={phoneNumber}
+                        onChange={(event) => {
+                          setPhoneNumber(event.target.value)
+                          setSmsError(null)
+                        }}
+                        disabled={smsBusy}
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder={translate(
+                          'components.hiveAccountSignIn.phonePlaceholder',
+                          'Enter your phone number'
+                        )}
+                        aria-invalid={Boolean(smsError && !smsTermsAccepted)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="hive-account-code-summary">
+                    <span>
+                      {translate('components.hiveAccountSignIn.codeSentTo', 'Code sent to')}
+                    </span>
+                    <strong>
+                      {phoneNumber.replace(/^(\+?86)?(\d{3})\d{4}(\d{4})$/, '$2 **** $3')}
+                    </strong>
+                  </div>
+                )}
+                {challenge ? (
+                  <div className="hive-account-field">
+                    <Label htmlFor="hive-account-sms-code">
+                      {translate('components.hiveAccountSignIn.codeLabel', 'Verification code')}
+                    </Label>
+                    <input
+                      id="hive-account-sms-code"
+                      className="hive-account-text-input hive-account-code-input"
+                      value={smsCode}
+                      onChange={(event) =>
+                        setSmsCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                      }
+                      disabled={smsBusy}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder={translate(
+                        'components.hiveAccountSignIn.codePlaceholder',
+                        'Enter the 6-digit code'
+                      )}
+                    />
+                    <p className="hive-account-code-hint">
+                      {translate(
+                        'components.hiveAccountSignIn.resendCountdown',
+                        'Resend in {{seconds}}s',
+                        {
+                          seconds: challenge.expiresInSeconds
+                        }
+                      )}
+                    </p>
+                  </div>
+                ) : null}
+                {!challenge ? (
+                  <label className="hive-account-terms-row">
+                    <Checkbox
+                      checked={smsTermsAccepted}
+                      onCheckedChange={(checked) => setSmsTermsAccepted(checked === true)}
+                      disabled={smsBusy}
+                    />
+                    <span>
+                      {translate(
+                        'components.hiveAccountSignIn.termsPrefix',
+                        'I have read and agree to'
+                      )}{' '}
+                      <a href="#terms">
+                        {translate('components.hiveAccountSignIn.terms', 'Terms of Service')}
+                      </a>{' '}
+                      {translate('components.hiveAccountSignIn.and', 'and')}{' '}
+                      <a href="#privacy">
+                        {translate('components.hiveAccountSignIn.privacy', 'Privacy Policy')}
+                      </a>
+                    </span>
+                  </label>
+                ) : null}
+                {smsError ? (
+                  <p className="hive-account-error" role="alert">
+                    {smsError}
+                  </p>
+                ) : null}
+                <Button
+                  type="button"
+                  className="hive-account-primary"
+                  onClick={() => void (challenge ? completeSms() : startSms())}
+                  disabled={smsBusy}
+                >
+                  {smsBusy ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {challenge
+                    ? translate('components.hiveAccountSignIn.confirm', 'Sign in')
+                    : smsBusy
+                      ? translate('components.hiveAccountSignIn.sending', 'Sending…')
+                      : translate('components.hiveAccountSignIn.getCode', 'Get code')}
+                </Button>
+              </div>
+            ) : (
+              <div className="hive-account-browser-body">
+                <div className="hive-account-browser-icon">
+                  <Globe2 aria-hidden="true" />
+                </div>
+                <strong>
+                  {translate(
+                    'components.hiveAccountSignIn.browserTitle',
+                    'Complete secure authentication in your browser'
                   )}
-            </p>
-          </div>
-        </div>
+                </strong>
+                <p>
+                  {translate(
+                    'components.hiveAccountSignIn.browserDescription',
+                    'You will return to HiveCode automatically after authentication.'
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  className="hive-account-primary"
+                  onClick={() => onConfirm('TRUSTED')}
+                  disabled={signingIn}
+                >
+                  {signingIn ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {signingIn
+                    ? translate('components.hiveAccountSignIn.opening', 'Opening…')
+                    : translate(
+                        'components.hiveAccountSignIn.continueBrowser',
+                        'Continue in browser'
+                      )}
+                </Button>
+                <button
+                  type="button"
+                  className="hive-account-link-button"
+                  onClick={() => void onConfirm('TRUSTED')}
+                  disabled={signingIn}
+                >
+                  {translate('components.hiveAccountSignIn.copyLink', 'Copy sign-in link')}
+                </button>
+              </div>
+            )}
 
-        {method === 'browser' ? (
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={signingIn}
-            >
-              {translate('auto.components.settings.orcaAccount.cancelRequest', 'Cancel request')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => onConfirm(trusted ? 'TRUSTED' : 'TEMPORARY')}
-              disabled={signingIn}
-            >
-              {signingIn ? <Loader2 className="size-4 animate-spin" /> : null}
-              {translate('auto.components.settings.orcaAccount.approveSignIn', 'Approve sign-in')}
-            </Button>
-          </DialogFooter>
-        ) : null}
+            {method === 'sms' && !challenge ? (
+              <>
+                <div className="hive-account-divider">
+                  <span>
+                    {translate(
+                      'components.hiveAccountSignIn.otherMethods',
+                      'Other sign-in methods'
+                    )}
+                  </span>
+                </div>
+                <div
+                  className="hive-account-socials"
+                  aria-label={translate(
+                    'components.hiveAccountSignIn.otherMethods',
+                    'Other sign-in methods'
+                  )}
+                >
+                  <button
+                    type="button"
+                    aria-label={translate(
+                      'components.hiveAccountSignIn.github',
+                      'Sign in with GitHub'
+                    )}
+                    data-tooltip={translate(
+                      'components.hiveAccountSignIn.github',
+                      'Sign in with GitHub'
+                    )}
+                    onClick={() => {}}
+                  >
+                    <img src={githubIconUrl} alt="" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={translate(
+                      'components.hiveAccountSignIn.wechat',
+                      'Sign in with WeChat'
+                    )}
+                    data-tooltip={translate(
+                      'components.hiveAccountSignIn.wechat',
+                      'Sign in with WeChat'
+                    )}
+                    onClick={() => {}}
+                  >
+                    <img src={wechatIconUrl} alt="" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')}
+                    data-tooltip={translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')}
+                    onClick={() => {}}
+                  >
+                    <img src={qqIconUrl} alt="" />
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            <div className="hive-account-security-bar">
+              <ShieldCheck aria-hidden="true" />
+              <div>
+                <strong>
+                  {translate(
+                    'components.hiveAccountSignIn.securityTitle',
+                    'Device credentials are protected'
+                  )}
+                </strong>
+                <span>
+                  {translate(
+                    'components.hiveAccountSignIn.securityDescription',
+                    'After sign-in, credentials are stored securely on this device.'
+                  )}
+                </span>
+              </div>
+            </div>
+            <details className="hive-account-context">
+              <summary>
+                <span>
+                  {translate(
+                    'components.hiveAccountSignIn.contextSummary',
+                    'HiveCode Desktop · Current device · Protected session'
+                  )}
+                </span>
+                <span className="hive-account-context-chevron" aria-hidden="true" />
+              </summary>
+              <div className="hive-account-context-detail">
+                <Monitor aria-hidden="true" />
+                <span>
+                  {translate(
+                    'components.hiveAccountSignIn.contextDetails',
+                    'Encrypted credentials are stored on this device and can be revoked in Account settings.'
+                  )}
+                </span>
+              </div>
+            </details>
+          </section>
+        </div>
       </DialogContent>
     </Dialog>
   )

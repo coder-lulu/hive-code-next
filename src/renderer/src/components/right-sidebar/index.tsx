@@ -28,6 +28,7 @@ import { useRightSidebarActivityItems } from './use-right-sidebar-activity-items
 import { useRightSidebarTabRouting } from './use-right-sidebar-tab-routing'
 import { useWindowWidth } from './use-window-width'
 import { SidebarSettingsHelpMenu } from '../sidebar/SidebarSettingsHelpMenu'
+import { LandingContextSidebar } from './LandingContextSidebar'
 
 const ACTIVITY_BAR_SIDE_WIDTH = 40
 
@@ -223,5 +224,18 @@ function RightSidebarInner({
   )
 }
 
-const RightSidebar = React.memo(RightSidebarInner)
+function RightSidebar({
+  showSettingsHelpControls = false,
+  mode = 'workspace'
+}: {
+  showSettingsHelpControls?: boolean
+  mode?: 'workspace' | 'landing'
+}): React.JSX.Element {
+  return mode === 'landing' ? (
+    <LandingContextSidebar showSettingsHelpControls={showSettingsHelpControls} />
+  ) : (
+    <RightSidebarInner showSettingsHelpControls={showSettingsHelpControls} />
+  )
+}
+
 export default RightSidebar

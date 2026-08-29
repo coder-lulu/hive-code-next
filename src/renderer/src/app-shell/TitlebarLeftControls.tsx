@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, MoreHorizontal, PanelLeft } from 'lucide-react'
-import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
+import { APP_DISPLAY_NAME, PRODUCT_LOGO_URL as logo } from '@/product-brand'
 import { translate } from '@/i18n/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -39,6 +39,8 @@ export function TitlebarLeftControls({
   const leftSidebarShortcutLabel = useShortcutLabel('sidebar.left.toggle')
   const historyBackShortcutLabel = useShortcutLabel('worktree.history.back')
   const historyForwardShortcutLabel = useShortcutLabel('worktree.history.forward')
+  const landingHomeActive =
+    layout.activeView === 'terminal' && !layout.activeWorktreeId && !layout.creationLayoutActive
 
   return (
     // Why: measure the ENTIRE row so TabGroupPanel's collapse spacer reserves enough width; measuring only the inner cluster left back/forward over the first tab.
@@ -56,6 +58,11 @@ export function TitlebarLeftControls({
           /* Why: Windows/Linux remove the native title bar, so render the logo plus a ··· button that pops the application menu (as Alt does). */
           <>
             <img src={logo} alt="" aria-hidden className="titlebar-logo" />
+            {landingHomeActive ? (
+              <span className="titlebar-home-brand" aria-label={APP_DISPLAY_NAME}>
+                {APP_DISPLAY_NAME}
+              </span>
+            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -79,10 +86,10 @@ export function TitlebarLeftControls({
             <ContextMenuTrigger asChild>
               <div
                 className="titlebar-app-name"
-                aria-label={translate('auto.App.5096cbbc86', 'Orca')}
+                aria-label={translate('auto.App.5096cbbc86', APP_DISPLAY_NAME)}
               >
                 <span className="titlebar-app-name-main">
-                  {translate('auto.App.5096cbbc86', 'Orca')}
+                  {translate('auto.App.5096cbbc86', APP_DISPLAY_NAME)}
                 </span>
               </div>
             </ContextMenuTrigger>

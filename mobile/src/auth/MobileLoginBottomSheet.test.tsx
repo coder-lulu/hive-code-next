@@ -7,7 +7,6 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }))
 vi.mock('lucide-react-native', () => ({
   Check: 'Check',
-  ShieldCheck: 'ShieldCheck',
   Smartphone: 'Smartphone',
   UserPlus: 'UserPlus',
   X: 'X'
@@ -94,10 +93,11 @@ describe('MobileLoginBottomSheet', () => {
     renderer = null
   })
 
-  it('removes registration and the complete provider section when unavailable', () => {
+  it('removes registration/security notices and the complete provider section when unavailable', () => {
     renderer = renderSheet()
 
-    expect(visibleText(renderer)).toContain('首次验证将自动注册新账号')
+    expect(visibleText(renderer)).not.toContain('首次验证将自动注册新账号')
+    expect(visibleText(renderer)).not.toContain('账号信息将加密传输')
     expect(visibleText(renderer)).not.toContain('其他方式登录')
     expect(renderer.root.findAllByType('MobileLoginProviderIcon')).toHaveLength(0)
   })
@@ -121,7 +121,8 @@ describe('MobileLoginBottomSheet', () => {
       '使用 QQ 登录',
       '使用微信登录'
     ])
-    expect(visibleText(renderer)).toContain('首次验证将自动注册新账号')
+    expect(visibleText(renderer)).not.toContain('首次验证将自动注册新账号')
+    expect(visibleText(renderer)).not.toContain('账号信息将加密传输')
     expect(visibleText(renderer)).toContain('其他方式登录')
   })
 

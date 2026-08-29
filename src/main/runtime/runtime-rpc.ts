@@ -453,7 +453,22 @@ type LongPollClass = 'ask' | 'wait'
 
 // Why: single classifier for long-poll requests (handlers that block on an external event), shared by counter/abort/keepalive. See §3.1.
 function longPollClassOf(request: RpcRequest): LongPollClass | null {
+  // Worker start waits for readiness and then verifies the submitted prompt;
+  // the complete operation can run for 90–110s. Keep the local transport alive.
+  if (request.method === 'orchestration.workerStart') {
+    return 'wait'
+  }
   if (request.method === 'terminal.wait') {
+    return 'wait'
+  }
+  // Agent-prompt submission waits for the PTY's lifecycle transition (up to
+  // the verification budget); keep the local socket alive for that wait.
+  if (
+    request.method === 'terminal.send' &&
+    typeof request.params === 'object' &&
+    request.params !== null &&
+    (request.params as { agentPrompt?: unknown }).agentPrompt === true
+  ) {
     return 'wait'
   }
   // Why: orchestration.ask blocks unconditionally (default 600 s) holding the
@@ -474,9 +489,26 @@ function longPollClassOf(request: RpcRequest): LongPollClass | null {
 export type RuntimeLongPollClass = 'ask' | 'browser-host' | 'wait'
 
 export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollClass | null {
-  if (request.method === 'browser.clientHost.attach') return 'browser-host'
-  if (request.method === 'terminal.wait') return 'wait'
-  if (request.method === 'orchestration.ask') return 'ask'
+  if (request.method === 'orchestration.workerStart') {
+    return 'wait'
+  }
+  if (request.method === 'browser.clientHost.attach') {
+    return 'browser-host'
+  }
+  if (request.method === 'terminal.wait') {
+    return 'wait'
+  }
+  if (
+    request.method === 'terminal.send' &&
+    typeof request.params === 'object' &&
+    request.params !== null &&
+    (request.params as { agentPrompt?: unknown }).agentPrompt === true
+  ) {
+    return 'wait'
+  }
+  if (request.method === 'orchestration.ask') {
+    return 'ask'
+  }
   if (request.method === 'orchestration.check') {
     const params = request.params as { wait?: unknown } | undefined
     return params?.wait === true ? 'wait' : null

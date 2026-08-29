@@ -47,6 +47,31 @@ function executeInstallScript(fixture) {
 }
 
 describe('install-node-dependencies action', () => {
+  it('scopes native caches to the runner image and ABI inputs', () => {
+    expect(action.inputs['persist-native-cache'].default).toBe('true')
+    expect(action.outputs['native-cache-scope'].value).toContain('native-cache-scope')
+    const scope = action.runs.steps.find((step) => step.name === 'Resolve native cache scope')
+    expect(scope.id).toBe('native-cache-scope')
+    expect(scope.run).toContain('/etc/os-release')
+    const restore = action.runs.steps.find(
+      (step) => step.name === 'Restore compiled native modules'
+    )
+    expect(restore.with.path).toContain('windows-native-registry')
+    expect(restore.with.path).toContain('@vscode+windows-process-tree')
+    expect(restore.with.key).toContain('steps.native-cache-scope.outputs.scope')
+    expect(restore.with.key).toContain('runner.arch')
+    expect(restore.with.key).toContain('node-pty@1.1.0.patch')
+    expect(restore.with.key).toContain('@vscode__windows-process-tree@0.8.0.patch')
+  })
+
+  it('restores without saving when a job will rebuild under another ABI', () => {
+    const restoreOnly = action.runs.steps.find(
+      (step) => step.name === 'Restore compiled native modules without saving'
+    )
+    expect(restoreOnly.uses).toBe('actions/cache/restore@v5')
+    expect(restoreOnly.if).toContain("inputs.persist-native-cache == 'false'")
+  })
+
   it.each([
     ['package.json', '{"name":"changed"}\n'],
     ['pnpm-lock.yaml', 'lockfileVersion: 9\nchanged: true\n']

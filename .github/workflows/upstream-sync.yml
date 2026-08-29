@@ -142,6 +142,7 @@ jobs:
           path: |
             ${{ runner.temp }}/product-conflicts.txt
             ${{ runner.temp }}/upstream-conflicts.txt
+            ${{ runner.temp }}/upstream-intake-report.md
           if-no-files-found: ignore
           retention-days: 30
 
@@ -194,6 +195,19 @@ jobs:
             --base "$VENDOR_BASE_SHA" \
             --head "$UPSTREAM_SHA" \
             --output "$RUNNER_TEMP/upstream-change-intake.md"
+
+      - name: Verify dependency closure, patch ids, and generate ledger report
+        env:
+          VENDOR_BASE_SHA: ${{ needs.sync.outputs.vendor_base_sha }}
+          UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node config/scripts/upstream-intake.mjs \
+            --vendor "${VENDOR_BASE_SHA}" \
+            --upstream "${UPSTREAM_SHA}" \
+            --head HEAD \
+            --report "$RUNNER_TEMP/upstream-intake-report.md"
 
       - uses: ./.github/actions/install-node-dependencies
 

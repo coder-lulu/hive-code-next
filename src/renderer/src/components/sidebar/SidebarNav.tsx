@@ -93,7 +93,8 @@ const SidebarNav = React.memo(function SidebarNav() {
 
   return (
     <div
-      className="flex flex-col gap-0.5 px-2 pt-2 pb-1"
+      className="sidebar-primary-nav flex flex-col gap-0.5 px-2 pt-2 pb-2"
+      aria-label={translate('components.sidebar.primaryNavigation', 'Primary navigation')}
       data-contextual-tour-target="sidebar-navigation"
     >
       <SetupGuideSidebarEntry />

@@ -7,6 +7,46 @@ import {
 } from '../slices/hosted-review-cache-identity'
 import type { GitHubPRFallbackSource } from './cache-model'
 
+const HOSTED_REVIEW_CACHE_MAX = 500
+
+function hasNewerHostedReviewCacheEntry(
+  cache: AppState['hostedReviewCache'],
+  cacheKey: string,
+  requestStartedAt: number,
+  requestStartedEntry: AppState['hostedReviewCache'][string] | undefined
+): boolean {
+  const entry = cache[cacheKey]
+  return (
+    entry !== undefined &&
+    (entry.fetchedAt > requestStartedAt ||
+      (entry.fetchedAt === requestStartedAt && entry !== requestStartedEntry))
+  )
+}
+
+function withHostedReviewCacheEntry(
+  cache: AppState['hostedReviewCache'],
+  cacheKey: string,
+  entry: AppState['hostedReviewCache'][string]
+): AppState['hostedReviewCache'] {
+  const next = { ...cache, [cacheKey]: entry }
+  const keys = Object.keys(next)
+  if (keys.length <= HOSTED_REVIEW_CACHE_MAX) {
+    return next
+  }
+  const keep = new Set(
+    keys
+      .map((key) => ({ key, fetchedAt: next[key].fetchedAt }))
+      .sort((a, b) => b.fetchedAt - a.fetchedAt)
+      .slice(0, HOSTED_REVIEW_CACHE_MAX)
+      .map((item) => item.key)
+  )
+  const pruned: AppState['hostedReviewCache'] = {}
+  for (const key of keep) {
+    pruned[key] = next[key]
+  }
+  return pruned
+}
+
 export function githubHostedReviewFallbackPRNumber(
   state: AppState,
   repoPath: string,
@@ -65,20 +105,6 @@ export function linkedReviewHintKeyForNoGitHubPR(
       : linkedReviewHintKey({ linkedGitHubPR: entry.data.number })
   }
   return entry?.linkedReviewHintKey
-}
-
-export function hasNewerHostedReviewCacheEntry(
-  cache: AppState['hostedReviewCache'],
-  cacheKey: string,
-  requestStartedAt: number,
-  requestStartedEntry: AppState['hostedReviewCache'][string] | undefined
-): boolean {
-  const entry = cache[cacheKey]
-  return (
-    entry !== undefined &&
-    (entry.fetchedAt > requestStartedAt ||
-      (entry.fetchedAt === requestStartedAt && entry !== requestStartedEntry))
-  )
 }
 
 export function syncHostedReviewCacheFromGitHubPRResult(args: {
@@ -155,18 +181,17 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
       hostedReviewEntry?.branchLookupGitHubPRNumber === args.pr.number)
       ? args.pr.number
       : undefined
+  // Why: the key embeds the branch, so this write path grows with every distinct
+  // (host, repo, branch) a session refreshes. Share the hosted-review slice's bound.
   return {
-    cache: {
-      ...args.cache,
-      [hostedReviewCacheKey]: {
-        data: args.pr ? hostedReviewInfoFromGitHubPRInfo(args.pr) : null,
-        fetchedAt: args.fetchedAt,
-        linkedReviewHintKey: args.pr
-          ? linkedReviewHintKey({ linkedGitHubPR: args.pr.number })
-          : linkedReviewHintKeyForNoGitHubPR(hostedReviewEntry),
-        ...(branchLookupGitHubPRNumber !== undefined ? { branchLookupGitHubPRNumber } : {})
-      }
-    },
+    cache: withHostedReviewCacheEntry(args.cache, hostedReviewCacheKey, {
+      data: args.pr ? hostedReviewInfoFromGitHubPRInfo(args.pr) : null,
+      fetchedAt: args.fetchedAt,
+      linkedReviewHintKey: args.pr
+        ? linkedReviewHintKey({ linkedGitHubPR: args.pr.number })
+        : linkedReviewHintKeyForNoGitHubPR(hostedReviewEntry),
+      ...(branchLookupGitHubPRNumber !== undefined ? { branchLookupGitHubPRNumber } : {})
+    }),
     accepted: true
   }
 }

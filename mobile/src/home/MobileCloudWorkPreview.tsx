@@ -191,7 +191,7 @@ export function MobileCloudWorkPreview({
             )}
           </Pressable>
         </View>
-        <Text style={styles.disclaimer}>代码在你的设备上执行</Text>
+        <Text style={styles.disclaimer}>内容由AI生成</Text>
       </View>
     </View>
   )

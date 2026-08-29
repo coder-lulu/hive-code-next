@@ -171,6 +171,30 @@ describe.skipIf(process.platform === 'win32')('Codex shell launch preflight', ()
     )
   })
 
+  it('does not trigger a preflight outside an Orca terminal', () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-codex-plain-shell-'))
+    roots.push(root)
+    const bin = join(root, 'bin')
+    const marker = join(root, 'preflight-ran')
+    mkdirSync(bin)
+    writeExecutable(join(bin, 'codex'), '#!/bin/sh\nprintf launched\n')
+    writeExecutable(join(bin, 'orca-test'), `#!/bin/sh\nprintf ran > ${JSON.stringify(marker)}\n`)
+
+    const output = execFileSync(
+      '/bin/bash',
+      ['--noprofile', '--norc', '-c', `${getPosixCodexShellLaunchPreflight()}\ncodex`],
+      {
+        encoding: 'utf-8',
+        env: {
+          PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`
+        }
+      }
+    )
+
+    expect(output.trim()).toBe('launched')
+    expect(existsSync(marker)).toBe(false)
+  })
+
   // Why a loop over it.each: an early `return` reported green on hosts without the
   // shell, so the zsh half silently never ran on Linux. skipIf reports it as a skip.
   for (const [shell, strict] of [
@@ -320,6 +344,24 @@ describe('Codex shell launch preflight command', () => {
     ).toBe(launcherPath)
   })
 
+  it('carries the packaged Windows launcher for WSLENV path translation', () => {
+    const { userDataPath, resourcesPath } = makeCliRoot()
+    const launcherPath = getBundledLauncherPath('win32', resourcesPath)!
+    writeExecutable(launcherPath, '#!/bin/sh\nexit 0\n')
+
+    expect(
+      resolveCodexShellLaunchPreflightCommand({
+        hooksEnabled: true,
+        isPackaged: true,
+        isWsl: true,
+        managedHomePath: '/home/jin/.local/share/orca/codex-runtime-home/home',
+        userDataPath,
+        resourcesPath,
+        platform: 'win32'
+      })
+    ).toBe(launcherPath)
+  })
+
   it('never returns an unqualified command name that a profile-rewritten PATH could hijack', () => {
     const { userDataPath, resourcesPath } = makeCliRoot()
     writeExecutable(getBundledLauncherPath('darwin', resourcesPath)!, '#!/bin/sh\nexit 0\n')
@@ -341,20 +383,13 @@ describe('Codex shell launch preflight command', () => {
 
   it.each([
     { label: 'the launcher file is missing', create: null },
-    { label: 'the launcher is not executable', create: 0o644 },
     { label: 'the launcher path is a directory', create: 'directory' as const }
   ])('skips the preflight when $label', (config) => {
     // Windows has no POSIX executable bit; a readable launcher is valid there.
-    if (process.platform === 'win32' && config.create === 0o644) {
-      return
-    }
     const { userDataPath, resourcesPath } = makeCliRoot()
     const launcherPath = getBundledLauncherPath('darwin', resourcesPath)!
     if (config.create === 'directory') {
       mkdirSync(launcherPath)
-    } else if (config.create !== null) {
-      writeFileSync(launcherPath, '#!/bin/sh\nexit 0\n')
-      chmodSync(launcherPath, config.create)
     }
 
     expect(
@@ -368,6 +403,27 @@ describe('Codex shell launch preflight command', () => {
       })
     ).toBeNull()
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'skips the preflight when the launcher is not executable',
+    () => {
+      const { userDataPath, resourcesPath } = makeCliRoot()
+      const launcherPath = getBundledLauncherPath('darwin', resourcesPath)!
+      writeFileSync(launcherPath, '#!/bin/sh\nexit 0\n')
+      chmodSync(launcherPath, 0o644)
+
+      expect(
+        resolveCodexShellLaunchPreflightCommand({
+          hooksEnabled: true,
+          isPackaged: true,
+          managedHomePath: '/managed/home',
+          userDataPath,
+          resourcesPath,
+          platform: 'darwin'
+        })
+      ).toBeNull()
+    }
+  )
 
   it('skips the preflight when the packaged build exposes no resources root', () => {
     const { userDataPath } = makeCliRoot()
@@ -386,7 +442,7 @@ describe('Codex shell launch preflight command', () => {
 
   it.each([
     { hooksEnabled: false, isWsl: false, managedHomePath: '/managed/home' },
-    { hooksEnabled: true, isWsl: true, managedHomePath: '/managed/home' },
+    { hooksEnabled: true, isWsl: true, managedHomePath: '/managed/home', isPackaged: false },
     { hooksEnabled: true, isWsl: false, managedHomePath: null }
   ])('does not enable an unsupported preflight for %o', (options) => {
     const { userDataPath, resourcesPath } = makeCliRoot()
@@ -395,7 +451,7 @@ describe('Codex shell launch preflight command', () => {
     expect(
       resolveCodexShellLaunchPreflightCommand({
         ...options,
-        isPackaged: true,
+        isPackaged: options.isPackaged ?? true,
         userDataPath,
         resourcesPath,
         platform: 'darwin'

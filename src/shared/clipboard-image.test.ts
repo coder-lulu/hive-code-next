@@ -3,10 +3,23 @@ import {
   CLIPBOARD_IMAGE_MAX_BASE64_CHARS,
   CLIPBOARD_IMAGE_MAX_PIXELS,
   CLIPBOARD_IMAGE_MAX_SOURCE_BYTES,
+  isClipboardImageTempFileName,
   assertClipboardImageBase64LengthWithinLimit,
   assertClipboardImageByteLengthWithinLimit,
   assertClipboardImageDimensionsWithinLimit
 } from './clipboard-image'
+
+describe('clipboard image temp file names', () => {
+  it('recognizes the HiveCode prefix and the legacy Orca prefix', () => {
+    expect(isClipboardImageTempFileName('hivecode-paste-1760000000000-id.png')).toBe(true)
+    expect(isClipboardImageTempFileName('orca-paste-1760000000000-id.png')).toBe(true)
+  })
+
+  it('does not classify arbitrary image files as clipboard temp files', () => {
+    expect(isClipboardImageTempFileName('screenshot.png')).toBe(false)
+    expect(isClipboardImageTempFileName('hivecode-paste-image.jpg')).toBe(false)
+  })
+})
 
 describe('clipboard image limits', () => {
   it('accepts image metadata within configured limits', () => {

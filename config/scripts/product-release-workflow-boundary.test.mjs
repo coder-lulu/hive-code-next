@@ -55,7 +55,7 @@ describe('HiveCloud product release workflow boundary', () => {
     expect(productManifest.desktop.updateRepository).toBeNull()
     expect(productManifest.desktop.updateProvider).toBe('hivecloud')
     expect(productManifest.endpoints.update).toBe(
-      'https://updates.hivekernel.com/hive/v1/updates/desktop/'
+      'https://updates.hive.test/hive/v1/updates/desktop/'
     )
     expect(productManifest.desktop.updateChannel).toBe('beta')
 

@@ -26,6 +26,11 @@ export type AgentPromptActivity = Readonly<{
   status: 'working' | 'permission' | 'idle' | null
 }>
 
+export type AgentPromptWaitTextCache = {
+  outputSequence?: number
+  waitText?: string
+}
+
 type AgentPromptVerificationOptions = {
   baseline: AgentPromptActivity
   readActivity: () => AgentPromptActivity
@@ -51,6 +56,19 @@ export function isAgentPromptStalledError(error: unknown): boolean {
   )
 }
 
+export function readAgentPromptWaitText(
+  cache: AgentPromptWaitTextCache,
+  outputSequence: number,
+  readWaitText: () => string
+): string {
+  if (cache.outputSequence === outputSequence && cache.waitText !== undefined) {
+    return cache.waitText
+  }
+  const waitText = readWaitText()
+  cache.outputSequence = outputSequence
+  cache.waitText = waitText
+  return waitText
+}
 export async function verifyAgentPromptSubmission(
   options: AgentPromptVerificationOptions
 ): Promise<void> {

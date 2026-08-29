@@ -3,6 +3,8 @@ import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
 const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
+const unitTestWorkflow = parse(readFileSync('.github/workflows/unit-tests.yml', 'utf8'))
+const nodeNextWorkflow = parse(readFileSync('.github/workflows/node-next-compat.yml', 'utf8'))
 const dependencyAction = parse(
   readFileSync('.github/actions/install-node-dependencies/action.yml', 'utf8')
 )
@@ -38,6 +40,15 @@ const realZshUsage =
   /(?:spawnSync|execFileSync|spawn)\(\s*['"](?:\/(?:usr\/)?bin\/)?zsh['"]|spawnSync\(\s*['"]which['"]\s*,\s*\[\s*['"]zsh['"]|name:\s*['"]zsh['"]\s*,\s*path:\s*executablePath|from '[^']*zsh-startup-hook-pty-harness'/
 
 describe('PR workflow parallelism', () => {
+  it('keeps Node 26 compatibility in a scheduled reusable lane', () => {
+    expect(unitTestWorkflow.on.workflow_call.inputs.node_versions.required).toBe(true)
+    expect(unitTestWorkflow.jobs.test.strategy.matrix.shard).toHaveLength(16)
+    expect(nodeNextWorkflow.jobs.test.uses).toBe('./.github/workflows/unit-tests.yml')
+    expect(nodeNextWorkflow.jobs.test.with.node_versions).toBe('["26"]')
+    expect(nodeNextWorkflow.on.schedule).toHaveLength(1)
+    expect(nodeNextWorkflow.on.workflow_dispatch).toBeNull()
+  })
+
   it('cancels superseded runs for the same pull request', () => {
     expect(workflow.concurrency.group).toBe('pr-checks-${{ github.event.pull_request.number }}')
     expect(workflow.concurrency['cancel-in-progress']).toBe(true)
@@ -250,7 +261,7 @@ describe('PR workflow parallelism', () => {
 
     expect(
       dependencyAction.runs.steps.find((step) => step.name === 'Use external node-gyp').if
-    ).toBe("inputs.native-runtime != 'none'")
+    ).toBe("runner.os == 'Linux' && inputs.native-runtime != 'none'")
     const dependencyInstall = dependencyAction.runs.steps.find(
       (step) => step.name === 'Install dependencies'
     )
@@ -298,12 +309,16 @@ describe('PR workflow parallelism', () => {
     // overwritten and one after the rebuild would never save a hit.
     expect(installIndex).toBeLessThan(cacheIndex)
     expect(cacheIndex).toBeLessThan(prepareIndex)
-    expect(steps[cacheIndex].if).toBe("inputs.native-runtime != 'none'")
+    expect(steps[cacheIndex].if).toBe(
+      "inputs.native-runtime != 'none' && inputs.persist-native-cache != 'false'"
+    )
     // Native artifacts are ABI-bound: a key missing either dimension serves a build
     // that cannot load, and ensure-native-runtime would recompile it anyway.
     expect(steps[cacheIndex].with.key).toContain('${{ inputs.native-runtime }}')
     expect(steps[cacheIndex].with.key).toContain('steps.requested-node.outputs.node-version')
     expect(steps[cacheIndex].with.key).toContain('config/patches/node-pty@1.1.0.patch')
+    expect(steps[cacheIndex].with.key).toContain('steps.native-cache-scope.outputs.scope')
+    expect(steps[cacheIndex].with.path).toContain('windows-native-registry')
     // No restore-keys: a partial-match key is exactly the ABI-mismatched build above.
     expect(steps[cacheIndex].with['restore-keys']).toBeUndefined()
   })

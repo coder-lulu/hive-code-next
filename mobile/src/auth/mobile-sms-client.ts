@@ -7,6 +7,7 @@ const DEVICE_ID_KEY = 'hivecode.mobile.auth.device-id'
 const DEVICE_PUBLIC_KEY = 'hivecode.mobile.auth.device-public-key'
 const DEVICE_SECRET_KEY = 'hivecode.mobile.auth.device-secret-key'
 const REQUEST_TIMEOUT_MS = 15_000
+const DEV_PRIMARY_TIMEOUT_MS = 3_000
 
 export type DeviceIdentity = {
   readonly deviceId: string
@@ -37,6 +38,20 @@ function apiBase(): string {
     throw new Error('云端登录服务未配置')
   }
   return value.replace(/\/$/, '')
+}
+
+function apiBaseCandidates(): string[] {
+  const configured = apiBase()
+  // The local HTTPS gateway intentionally binds to the host loopback address,
+  // which the Android emulator cannot resolve through the reserved `.test`
+  // domains. Development builds can therefore use the host-gateway HTTP API
+  // as a transport fallback while retaining the test-domain URL as primary.
+  const androidDev =
+    process.env.EXPO_OS === 'android' || process.env.EXPO_PUBLIC_ANDROID_EMULATOR === '1'
+  if (androidDev && process.env.NODE_ENV !== 'production') {
+    return [configured, 'http://10.0.2.2:8080']
+  }
+  return [configured]
 }
 
 export function encodeBase64Url(bytes: Uint8Array): string {
@@ -115,46 +130,57 @@ export async function request<T>(
   body: unknown,
   options: { readonly headers?: Record<string, string> } = {}
 ): Promise<T> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   let response: Response | undefined
   let payload: unknown
-  try {
-    response = await fetch(`${apiBase()}${path}`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    })
-    if (response.status === 204) {
-      return {} as T
+  let lastFailure: unknown
+  const bases = apiBaseCandidates()
+  for (const [index, base] of bases.entries()) {
+    const controller = new AbortController()
+    const timeout = setTimeout(
+      () => controller.abort(),
+      index === 0 && bases.length > 1 ? DEV_PRIMARY_TIMEOUT_MS : REQUEST_TIMEOUT_MS
+    )
+    try {
+      response = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...options.headers
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      })
+      if (response.status === 204) {
+        return {} as T
+      }
+      payload = await response.json()
+      break
+    } catch (failure) {
+      lastFailure = failure
+      response = undefined
+      payload = undefined
+      if (index === bases.length - 1) {
+        const timedOut = failure instanceof Error && failure.name === 'AbortError'
+        throw new MobileApiError(
+          timedOut ? '登录服务响应超时，请重试' : '登录服务暂时不可用，请稍后再试',
+          timedOut ? 408 : 0,
+          undefined,
+          true
+        )
+      }
+    } finally {
+      clearTimeout(timeout)
     }
-    payload = await response.json()
-  } catch (failure) {
-    const timedOut = failure instanceof Error && failure.name === 'AbortError'
-    if (response && !timedOut) {
-      throw new MobileApiError(
-        '登录服务暂时不可用，请稍后再试',
-        response.status,
-        undefined,
-        isRetryableApiError(response.status, undefined)
-      )
-    }
+  }
+  if (!response) {
+    const timedOut = lastFailure instanceof Error && lastFailure.name === 'AbortError'
     throw new MobileApiError(
       timedOut ? '登录服务响应超时，请重试' : '登录服务暂时不可用，请稍后再试',
       timedOut ? 408 : 0,
       undefined,
       true
     )
-  } finally {
-    clearTimeout(timeout)
-  }
-  if (!response) {
-    throw new MobileApiError('登录服务暂时不可用，请稍后再试', 0, undefined, true)
   }
   if (!response.ok) {
     const category = apiErrorCategory(payload)

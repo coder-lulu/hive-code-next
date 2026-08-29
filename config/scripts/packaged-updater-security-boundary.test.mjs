@@ -26,7 +26,7 @@ function validMainBundle(runtimeProductConfigChunkName = 'product-config-fixture
       updateProvider: 'hivecloud',
       updateChannel: 'beta',
       starRepository: null,
-      update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/',
+      update: 'https://updates.hive.test/hive/v1/updates/desktop/',
       telemetry: null,
       diagnostics: null,
       pluginMarketplace: null
@@ -77,10 +77,10 @@ function validProductConfig() {
       },
       endpoints: {
         artifacts: null,
-        cloud: 'https://api.hivekernel.com',
-        identityIssuer: 'https://identity.hivekernel.com/realms/hive',
+        cloud: 'https://api.hive.test',
+        identityIssuer: 'https://identity.hive.test/realms/hive',
         relay: null,
-        update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/',
+        update: 'https://updates.hive.test/hive/v1/updates/desktop/',
         telemetry: null,
         diagnostics: null,
         feedback: null,
@@ -336,7 +336,7 @@ describe('packaged updater security boundary', () => {
   it('rejects a packaged updater authority that differs from the canonical HiveCloud feed', async () => {
     const fixture = await createFixture({
       productConfig: validProductConfig().replace(
-        "update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/'",
+        "update: 'https://updates.hive.test/hive/v1/updates/desktop/'",
         "update: 'https://updates.attacker.test/hive/v1/updates/desktop/'"
       )
     })
@@ -347,10 +347,10 @@ describe('packaged updater security boundary', () => {
   })
 
   it.each([
-    ['cloud API', "cloud: 'https://api.hivekernel.com'", "cloud: 'https://cloud.attacker.test'"],
+    ['cloud API', "cloud: 'https://api.hive.test'", "cloud: 'https://cloud.attacker.test'"],
     [
       'identity issuer',
-      "identityIssuer: 'https://identity.hivekernel.com/realms/hive'",
+      "identityIssuer: 'https://identity.hive.test/realms/hive'",
       "identityIssuer: 'https://identity.attacker.test/realms/hive'"
     ]
   ])(
@@ -368,7 +368,7 @@ describe('packaged updater security boundary', () => {
 
   it('validates the exported product config rather than accepting decoy null markers', async () => {
     const exportedConfig = validProductConfig().replace(
-      "cloud: 'https://api.hivekernel.com'",
+      "cloud: 'https://api.hive.test'",
       'cloud: "https://cloud.attacker.test"'
     )
     const decoyNullMarkers = validProductConfig().replace(
@@ -387,7 +387,7 @@ describe('packaged updater security boundary', () => {
   it('rejects a malicious product config consumed by Main even when the standalone copy is safe', async () => {
     const runtimeProductConfig = validBundledMainProductConfig(
       validProductConfig().replace(
-        "cloud: 'https://api.hivekernel.com'",
+        "cloud: 'https://api.hive.test'",
         'cloud: "https://cloud.attacker.test"'
       )
     )

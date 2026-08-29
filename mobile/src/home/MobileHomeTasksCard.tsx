@@ -2,7 +2,8 @@ import { ChevronRight, ListTodo } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { TaskProviderLogo } from '../components/TaskProviderLogo'
 import type { TaskProvider } from '../tasks/mobile-task-providers'
-import { colors, radii, spacing } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
 
 const TASK_PROVIDER_LABELS: Record<TaskProvider, string> = {
   github: 'GitHub',
@@ -15,6 +16,8 @@ export function MobileHomeTasksCard(props: {
   providers: TaskProvider[]
   onOpen: (provider?: TaskProvider) => void
 }) {
+  const theme = useMobileTheme()
+  const styles = createStyles(theme)
   return (
     <Pressable
       disabled={!props.enabled}
@@ -26,14 +29,14 @@ export function MobileHomeTasksCard(props: {
       onPress={() => props.onOpen()}
     >
       <View style={styles.icon}>
-        <ListTodo size={18} color={colors.textSecondary} />
+        <ListTodo size={18} color={theme.color.text.secondary} />
       </View>
       <View style={styles.main}>
-        <Text style={styles.title}>Tasks</Text>
+        <Text style={styles.title}>任务中心</Text>
         <Text style={styles.subtitle} numberOfLines={1}>
           {props.providers.length > 0
             ? props.providers.map((provider) => TASK_PROVIDER_LABELS[provider]).join(' · ')
-            : 'No task sources connected'}
+            : '未连接任务来源'}
         </Text>
       </View>
       <View style={styles.trailing}>
@@ -58,61 +61,66 @@ export function MobileHomeTasksCard(props: {
                 props.onOpen(provider)
               }}
             >
-              <TaskProviderLogo provider={provider} size={22} color={colors.textSecondary} />
+              <TaskProviderLogo provider={provider} size={22} color={theme.color.text.secondary} />
             </Pressable>
           ))}
         </View>
       </View>
-      <ChevronRight size={16} color={colors.textMuted} />
+      <ChevronRight size={16} color={theme.color.text.tertiary} />
     </Pressable>
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bgPanel,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    minHeight: 72,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.md,
-    paddingVertical: 12
-  },
-  cardDisabled: { opacity: 0.45 },
-  cardPressed: { backgroundColor: colors.bgRaised },
-  icon: {
-    width: 46,
-    height: 46,
-    borderRadius: 13,
-    backgroundColor: colors.bgRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14
-  },
-  main: { flex: 1, minWidth: 0 },
-  title: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  subtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 3 },
-  trailing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-    marginLeft: spacing.sm
-  },
-  providerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 2
-  },
-  providerButton: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.button
-  },
-  providerButtonPressed: { backgroundColor: colors.bgRaised }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 72,
+      paddingHorizontal: theme.spacing.space12,
+      paddingVertical: theme.spacing.space12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.color.border.subtle,
+      borderRadius: theme.radii.card,
+      backgroundColor: theme.color.bg.surface
+    },
+    cardDisabled: { opacity: 0.45 },
+    cardPressed: { backgroundColor: theme.color.bg.subtle },
+    icon: {
+      width: theme.size.minimumTouchTarget,
+      height: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.space12,
+      borderRadius: theme.radii.control,
+      backgroundColor: theme.color.bg.subtle
+    },
+    main: { flex: 1, minWidth: 0 },
+    title: { ...theme.typography.label, fontWeight: '600', color: theme.color.text.primary },
+    subtitle: {
+      ...theme.typography.caption,
+      marginTop: theme.spacing.space4,
+      color: theme.color.text.secondary
+    },
+    trailing: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 0,
+      marginLeft: theme.spacing.space8
+    },
+    providerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: theme.spacing.space4
+    },
+    providerButton: {
+      width: 34,
+      height: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radii.control
+    },
+    providerButtonPressed: { backgroundColor: theme.color.bg.subtle }
+  })
+}

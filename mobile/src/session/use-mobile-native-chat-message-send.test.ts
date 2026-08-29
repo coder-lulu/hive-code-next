@@ -404,8 +404,16 @@ describe('useMobileNativeChatMessageSend', () => {
       await api!.send('  run the tests \n')
     })
     expect(sentArgs().text).toBe('  run the tests')
-    expect(captureSendOrigin).toHaveBeenCalledWith('  run the tests')
+    expect(captureSendOrigin).toHaveBeenCalledWith('  run the tests', undefined)
     expect(acceptSend.mock.calls[0]![1]).toBe('  run the tests')
+  })
+
+  it('hands attached images to the send origin for echo reconciliation', async () => {
+    mount(() => null)
+    await act(async () => {
+      await api!.send('look at this', ['file:///a.png'])
+    })
+    expect(captureSendOrigin.mock.calls[0]![1]).toEqual(['file:///a.png'])
   })
 
   it('trims trailing whitespace on a question answer too', async () => {

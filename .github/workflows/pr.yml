@@ -49,8 +49,30 @@ jobs:
           echo "Changed paths:"
           printf '%s\n' "$CHANGED"
           SHOULD_RUN="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-code-change-scope.mjs)"
+          NATIVE_CACHE_CHANGED="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-code-change-scope.mjs --native-cache)"
           echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+          echo "native_cache_changed=$NATIVE_CACHE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "should_run=$SHOULD_RUN"
+          echo "native_cache_changed=$NATIVE_CACHE_CHANGED"
+
+  # Cache-key input changes would otherwise make every test shard compile the
+  # same native addon concurrently. Prime the single supported PR Node ABI first.
+  test_native_cache:
+    name: prepare test native cache node 24
+    needs: [code_paths]
+    if: needs.code_paths.outputs.native_cache_changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+          node-version: '24.18.0'
 
   static_analysis:
     name: static analysis
@@ -439,8 +461,11 @@ jobs:
 
   test:
     name: tests node ${{ matrix.node }} ${{ matrix.shard }}/${{ matrix.shard_total }}
-    needs: [code_paths]
-    if: needs.code_paths.outputs.should_run == 'true'
+    needs: [code_paths, test_native_cache]
+    if: >-
+      always() &&
+      needs.code_paths.outputs.should_run == 'true' &&
+      (needs.test_native_cache.result == 'success' || needs.test_native_cache.result == 'skipped')
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -668,17 +693,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: package.json
-          cache: pnpm
-
       - name: Cache electron-builder downloads
         uses: actions/cache@v5
         with:
@@ -689,18 +703,22 @@ jobs:
           restore-keys: |
             electron-builder-windows-
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Why persist-native-cache false: this job later rebuilds the same path for
+      # Electron. A post-job save would store the Electron ABI under the Node key.
+      - uses: ./.github/actions/install-node-dependencies
+        id: deps
+        with:
+          native-runtime: node
+          persist-native-cache: 'false'
 
-      # Why: node-pty prefers its upstream prebuild, which does not contain
-      # Orca's Windows patch, so the job-object exports would be absent and the
-      # suite below would test an unpatched binary. build_from_source removes
-      # the prebuild, and the package's postinstall restores the ConPTY runtime
-      # files that a bare node-gyp rebuild would miss.
-      - name: Rebuild node-pty from patched source
-        env:
-          npm_config_build_from_source: 'true'
-        run: pnpm rebuild node-pty
+      - name: Save compiled Node native modules
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            node_modules/.pnpm/node-pty@*/node_modules/node-pty/build
+            node_modules/.pnpm/windows-native-registry@*/node_modules/windows-native-registry/build
+            node_modules/.pnpm/@vscode+windows-process-tree@*/node_modules/@vscode/windows-process-tree/build
+          key: native-modules-${{ runner.os }}-${{ steps.deps.outputs.native-cache-scope }}-${{ runner.arch }}-node-node${{ steps.deps.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml', 'config/patches/node-pty@1.1.0.patch', 'config/patches/@vscode__windows-process-tree@0.8.0.patch') }}
 
       - name: Test Windows-specific boundaries
         run: >-
@@ -714,6 +732,7 @@ jobs:
           src/main/providers/windows-conpty-wide-char-duplication.node-pty.test.ts
           src/main/providers/pty-repaint-wide-char-buffer.node-pty.test.ts
           src/shared/child-process/windows-command-line.win32.test.ts
+          src/main/agent-hooks/windows-hook-payload-delivery.test.ts
           src/main/windows/windows-pty-job.win32.test.ts
           src/main/windows/windows-host-job.win32.test.ts
           src/main/wsl/wsl-runner.test.ts
@@ -723,6 +742,7 @@ jobs:
           src/main/wsl/wsl-w1-w3-contract.test.ts
           src/shared/source-scan/source-tree-scan.test.ts
           src/main/cli/wsl-cli-powershell-boundary.test.ts
+          src/main/cursor/hook-service.test.ts
           src/main/orca-profiles/profile-index-store.test.ts
           src/main/runtime/repo-worktree-admin-fingerprint.test.ts
           src/main/runtime/worktree-scan-admin-fingerprint-gate.test.ts
@@ -733,8 +753,25 @@ jobs:
       # Why the :parallel variant: identical to build:release except the three
       # electron-vite targets overlap instead of running back to back. The Linux package
       # job already packages and smoke-tests an AppImage built that way.
+      - name: Cache Windows CLI launcher
+        uses: actions/cache@v5
+        with:
+          path: native/windows-cli-launcher/.build
+          key: windows-cli-launcher-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native/windows-cli-launcher/**', 'config/scripts/build-windows-cli-launcher.mjs') }}
+
       - name: Build package inputs
+        env:
+          ORCA_REUSE_WINDOWS_CLI_LAUNCHER: '1'
         run: pnpm run build:release:parallel
+
+      - name: Restore compiled Electron native modules
+        uses: actions/cache@v5
+        with:
+          path: |
+            node_modules/.pnpm/node-pty@*/node_modules/node-pty/build
+            node_modules/.pnpm/windows-native-registry@*/node_modules/windows-native-registry/build
+            node_modules/.pnpm/@vscode+windows-process-tree@*/node_modules/@vscode/windows-process-tree/build
+          key: native-modules-${{ runner.os }}-${{ steps.deps.outputs.native-cache-scope }}-${{ runner.arch }}-electron-node${{ steps.deps.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml', 'config/patches/node-pty@1.1.0.patch', 'config/patches/@vscode__windows-process-tree@0.8.0.patch') }}
 
       - name: Prepare Electron native runtime
         run: node config/scripts/ensure-native-runtime.mjs --runtime=electron
@@ -762,7 +799,9 @@ jobs:
       contents: read
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
+      native_cache_changed: ${{ steps.filter.outputs.native_cache_changed }}
       test_files: ${{ steps.filter.outputs.test_files }}
+      ssh_source_changed: ${{ steps.filter.outputs.ssh_source_changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -784,7 +823,9 @@ jobs:
           # Source routes are executable contracts so a test can prove exact
           # authorities, exclusions, and sentinels without evaluating workflow shell.
           TEST_FILES_JSON="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs)"
+          SSH_SOURCE_CHANGED="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs --ssh-source)"
           echo "test_files=$TEST_FILES_JSON" >> "$GITHUB_OUTPUT"
+          echo "ssh_source_changed=$SSH_SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
           if [ "$TEST_FILES_JSON" != '[]' ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "Changed E2E specs: $TEST_FILES_JSON"
@@ -803,6 +844,7 @@ jobs:
     uses: ./.github/workflows/e2e.yml
     with:
       test_files: ${{ needs.e2e-paths.outputs.test_files }}
+      ssh_source_changed: ${{ needs.e2e-paths.outputs.ssh_source_changed }}
 
   verify:
     if: always()

@@ -282,7 +282,6 @@ describe('OffscreenBrowserBackend lifecycle', () => {
 
     expect(peakRetirements).toBe(4)
   })
-
   it('closes the page even when daemon retirement throws', async () => {
     const browserManager = { registerOffscreenGuest: vi.fn(), unregisterGuest: vi.fn() }
     const backend = new OffscreenBrowserBackend(browserManager as never, {

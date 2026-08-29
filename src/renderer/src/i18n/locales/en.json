@@ -310,7 +310,7 @@
         "b411ec0069": "Connect",
         "2cf9e5a294": "Clear saved server",
         "4a4c017be1": "Endpoint:",
-        "27393856e4": "hivecode://pair?code=...",
+        "27393856e4": "orca://pair?code=...",
         "7a566540de": "Pairing URL or code",
         "cb4d287238": "Server name",
         "3affe7de3a": "Paste a pairing URL from an Orca server that this browser can reach.",
@@ -448,7 +448,10 @@
                 }
               }
             }
-          }
+          },
+          "createdWithoutParentNesting": "Created without nesting under \"{{value0}}\"",
+          "createdWithoutParentNestingUnnamed": "Created without nesting under the selected parent",
+          "createdWithoutParentNestingDetail": "The parent workspace was no longer available. You can set it from the workspace menu."
         },
         "repos": {
           "2975400634": "Update Orca server to open non-Git folders on this runtime.",
@@ -925,6 +928,11 @@
       },
       "ephemeralVmWorktreeCreation": {
         "sparseCheckoutUnsupported": "Provisioned-root recipes do not support sparse checkout."
+      },
+      "file": {
+        "preview": {
+          "pairedOutsideWorktree": "Files outside the workspace can't be previewed on a paired server yet."
+        }
       }
     },
     "hooks": {
@@ -1083,6 +1091,13 @@
         "description": "Running Orca terminals are hosted by a daemon started by a previous Orca installation. macOS may not apply Orca’s Accessibility, Automation, or protected-file permissions to them. Restart the daemon from Manage Sessions to restore access. This will close all running Orca terminals.",
         "openManageSessions": "Open Manage Sessions",
         "dismiss": "Dismiss"
+      },
+      "ipc": {
+        "events": {
+          "browserStateIpcBridge": {
+            "docPreviewLinkFailed": "Could not open this link in Orca Browser."
+          }
+        }
       }
     },
     "components": {
@@ -3073,7 +3088,9 @@
             "copyLink": "Copy link",
             "copied": "Copied",
             "copiedLink": "Copied link",
-            "copyLinkFailed": "Failed to copy link"
+            "copyLinkFailed": "Failed to copy link",
+            "downloadOpenWithDefaultApp": "Download & open with default app",
+            "downloadOpenFailed": "Failed to download '{{value0}}'."
           },
           "TerminalSessionStateSaveFailureDialog": {
             "6bee0c8f17": "Open Disk Space Analyzer",
@@ -4083,6 +4100,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "output",
               "5d66fdd7c2": "input",
               "7080aeaebb": "Reasoning",
@@ -5166,24 +5184,6 @@
           "keepDefaultBranch": "Except default branch",
           "keepDefaultBranchAria": "Keep the default branch visible while hiding sleeping workspaces"
         },
-        "SidebarFooter": {
-          "accountMenu": "{{value0}} account menu",
-          "account": "Account",
-          "appearance": "Appearance",
-          "activity": "Activity",
-          "notifications": "Notifications",
-          "checkingAccount": "Checking account…",
-          "signIn": "Sign in",
-          "signInAgain": "Sign in again",
-          "accountUnavailable": "Account unavailable",
-          "connected": "Signed in",
-          "signInSuccess": "Signed in to HiveCloud",
-          "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
-          "signOut": "Sign out",
-          "localSignOut": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
-          "signOutSuccess": "Signed out of HiveCloud",
-          "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again."
-        },
         "SidebarHeader": {
           "25a95899c9": "Add Project",
           "92154beb7e": "New workspace",
@@ -5239,7 +5239,7 @@
           "c4f8e1b72a": "X"
         },
         "SidebarToolbar": {
-          "87d0064026": "Workspace board moved to the top bar",
+          "87d0064026": "Workspace board moved to the bottom bar",
           "a30e34eb5c": "Close workspace board",
           "49f62c5665": "Workspace board",
           "19e32d0e5f": "Open folder picker to add a project",
@@ -5984,9 +5984,9 @@
           "serverName": "Server name",
           "serverNamePlaceholder": "Dev box",
           "pairingCode": "Pairing code",
-          "pairingCodePlaceholder": "hivecode://pair?code=...",
+          "pairingCodePlaceholder": "orca://pair?code=...",
           "pairingHelpPrefix": "Run",
-          "pairingCommand": "hivecode serve --pairing-address <host>",
+          "pairingCommand": "orca serve --pairing-address <host>",
           "pairingHelpSuffix": "on the server and paste the printed pairing URL.",
           "sshImportAlreadySynced": "~/.ssh/config already in sync.",
           "sshImportSynced": "Added {{value0}} host{{value1}} to Orca.",
@@ -6156,6 +6156,15 @@
           "projectOnly": "Added in this project only.",
           "useGlobalFor": "Use global for {{value0}}",
           "useGlobal": "Use global"
+        },
+        "SidebarFooter": {
+          "signInSuccess": "Signed in to HiveCloud",
+          "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+          "localSignOut": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+          "signOutSuccess": "Signed out of HiveCloud",
+          "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again.",
+          "activity": "Activity",
+          "notifications": "Notifications"
         }
       },
       "shared": {
@@ -7857,9 +7866,9 @@
           "9a3758d983": "No saved servers.",
           "9bee6bbeeb": "Add Server",
           "55fcc964cd": "on the server and paste the printed pairing URL.",
-          "960e901ae4": "hivecode serve --pairing-address <host>",
+          "960e901ae4": "orca serve --pairing-address <host>",
           "163671f7b5": "Run",
-          "c3d772c514": "hivecode://pair?code=...",
+          "c3d772c514": "orca://pair?code=...",
           "9bc9b83474": "Pairing code",
           "e038625857": "Dev box",
           "54ebacc600": "Server name",
@@ -11238,7 +11247,7 @@
           "namePlaceholder": "Linux workstation",
           "nameHelp": "This only changes how the computer appears in Orca.",
           "accessLink": "Access link",
-          "accessLinkPlaceholder": "hivecode://pair?code=...",
+          "accessLinkPlaceholder": "orca://pair?code=...",
           "accessLinkHelp": "Orca shows the destination before connecting. Credentials stay hidden.",
           "destination": "Link destination",
           "loopbackTitle": "This link points back to this device",
@@ -11257,7 +11266,7 @@
           "advanced": "Advanced",
           "sshTunnel": "I am using an SSH tunnel to this local address",
           "sshTunnelHelp": "Keep the tunnel active while using this connection.",
-          "headlessHelp": "Using headless hivecode serve? Run hivecode serve --pairing-address <reachable-host> on the other computer.",
+          "headlessHelp": "Using headless orca serve? Run orca serve --pairing-address <reachable-host> on the other computer.",
           "cancel": "Cancel",
           "addWithTunnel": "Add host using tunnel",
           "addHost": "Add host",
@@ -11346,40 +11355,18 @@
         },
         "orcaAccount": {
           "connected": "Connected",
-          "connectedDescription": "This desktop is securely linked to HiveCloud.",
           "reconnectRequired": "Your session expired. Sign in again to use cloud features.",
-          "unavailable": "HiveCloud sign-in is unavailable in this build.",
-          "signedOut": "Sign in with an existing HiveCloud account. Local projects and provider accounts stay separate.",
+          "unavailable": "Orca sign-in is unavailable in this build.",
+          "signedOut": "Sign in to extend Orca with cloud features, including Artifacts and Orca Relay.",
           "checking": "Checking account status…",
-          "account": "HiveCloud account",
-          "authorizationCancelled": "Sign-in was cancelled.",
-          "authorizationFailed": "HiveCloud sign-in failed. Try again or check the service status.",
-          "authorizationTimeout": "Sign-in timed out before the browser callback completed.",
-          "cancel": "Cancel",
-          "credentialUnreadable": "The encrypted account credential cannot be read. Repair secure storage before signing in.",
-          "defaultDevice": "Desktop",
-          "device": "Device",
-          "localSignOutToast": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
-          "networkUnavailable": "HiveCloud is temporarily unreachable. Local work remains available.",
-          "refresh": "Refresh",
-          "refreshedToast": "HiveCloud session refreshed",
-          "secureStorageUnavailable": "Cloud sign-in is disabled because operating-system secure storage is unavailable.",
-          "serverUnavailable": "HiveCloud is temporarily unavailable. Local work remains available.",
-          "sessionExpired": "This session has expired. Refresh it or sign in again.",
-          "sessionExpires": "Session expires",
-          "sessionRejected": "HiveCloud rejected this session. Sign in again.",
-          "signedInToast": "Signed in to HiveCloud",
+          "account": "Orca account",
           "signOut": "Sign out",
-          "signOutConfirmDescription": "This device's local credential will be removed. Local projects, worktrees, and provider accounts will not be affected.",
-          "signOutConfirmTitle": "Sign out of HiveCloud?",
-          "signedOutToast": "Signed out of HiveCloud",
           "signingIn": "Signing in…",
           "signInAgain": "Sign in again",
-          "signIn": "Sign in to HiveCloud",
-          "title": "HiveCloud Account",
-          "description": "Sign in securely, review this device, and manage the current HiveCloud session.",
-          "searchDescription": "Sign in, refresh, or sign out of the application-wide HiveCloud account.",
-          "unknown": "Unknown",
+          "signIn": "Sign in to Orca",
+          "title": "Orca Account",
+          "description": "Share work instantly and reach your desktop from Orca Mobile wherever you are.",
+          "searchDescription": "Sign in or out of the account used by Artifacts and Orca Relay.",
           "benefitsTitle": "Included with your account",
           "artifactsTitle": "Artifact sharing",
           "artifactsDescription": "Publish HTML and Markdown files, then manage every shared link from Orca.",
@@ -11387,32 +11374,30 @@
           "relayDescription": "Connect Orca Mobile to this desktop across cellular or any Wi-Fi.",
           "skillsTitle": "Skill sharing",
           "skillsDescription": "Share one skill or a whole set behind an unlisted link, and install them on any machine you use.",
+          "secureStorageUnavailable": "Cloud sign-in is disabled because operating-system secure storage is unavailable.",
+          "credentialUnreadable": "The encrypted account credential cannot be read. Repair secure storage before signing in.",
+          "sessionExpired": "This session has expired. Refresh it or sign in again.",
+          "networkUnavailable": "HiveCloud is temporarily unreachable. Local work remains available.",
+          "sessionRejected": "HiveCloud rejected this session. Sign in again.",
+          "authorizationCancelled": "Sign-in was cancelled.",
+          "authorizationTimeout": "Sign-in timed out before the browser callback completed.",
+          "serverUnavailable": "HiveCloud is temporarily unavailable. Local work remains available.",
+          "authorizationFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+          "connectedDescription": "This desktop is securely linked to HiveCloud.",
+          "unknown": "Unknown",
+          "signedInToast": "Signed in to HiveCloud",
+          "refreshedToast": "HiveCloud session refreshed",
+          "localSignOutToast": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+          "signedOutToast": "Signed out of HiveCloud",
+          "refresh": "Refresh",
+          "device": "Device",
+          "defaultDevice": "Desktop",
+          "sessionExpires": "Sign-in authorization valid until",
           "trustedSession": "Trusted device",
           "temporarySession": "Temporary device",
-          "signInConfirmTitle": "Approve HiveCloud sign-in",
-          "signInConfirmDescription": "Review this request before the desktop app opens the secure browser sign-in.",
-          "smsSignInDescription": "Verify your phone number to sign in without opening a browser.",
-          "approvalSecurityTitle": "Short access credentials remain protected",
-          "approvalSecurityDescription": "The app rotates the 10-minute access token automatically. Your choice below controls the real sign-in authorization.",
-          "requestStatus": "Status",
-          "pendingApproval": "Pending approval",
-          "requestApplication": "Application",
-          "requestApplicationName": "Desktop application",
-          "requestDevice": "Requesting device",
-          "currentDesktop": "This desktop app",
-          "trustThisDevice": "Trust this device",
-          "trustedApprovalDescription": "Keep an operating-system-encrypted sign-in for up to 90 days.",
-          "temporaryApprovalDescription": "Use a temporary sign-in for up to 24 hours; closing the app removes it.",
-          "cancelRequest": "Cancel request",
-          "approveSignIn": "Approve sign-in",
-          "smsLogin": "Phone verification",
-          "browserLogin": "Browser sign-in",
-          "phoneNumber": "Phone number",
-          "smsCode": "SMS code",
-          "smsExpiry": "Code expires in {seconds}s.",
-          "smsTerms": "I agree to the Terms of Service and Privacy Policy",
-          "verifySms": "Verify and sign in",
-          "sendSms": "Send verification code"
+          "signOutConfirmTitle": "Sign out of HiveCloud?",
+          "signOutConfirmDescription": "This device's local credential will be removed. Local projects, worktrees, and provider accounts will not be affected.",
+          "cancel": "Cancel"
         },
         "automations": {
           "showButton": "Show Automations Button",
@@ -11537,6 +11522,9 @@
         },
         "shortcutDefinitionCatalog": {
           "missionControlConflict": "Blocked by Mission Control. Remap here or change it in System Settings."
+        },
+        "NativeChatSupportedAgents": {
+          "label": "Supported agents:"
         }
       },
       "right": {
@@ -12053,7 +12041,6 @@
             "a4e93c21d7": "Current branch: {{value0}}",
             "c7d4e2f801": "Change base ref: {{value0}}",
             "f3a1b8c204": "upstream",
-            "createPrIntentEmptyGeneratedBody": "Generated review details did not include a description. Retry Create PR.",
             "createPrIntentGenerateDetailsFailed": "Could not generate review details. Retry Create PR."
           },
           "SourceControlAgentActionDialog": {
@@ -14743,14 +14730,16 @@
           "d5a8c2f1b9": "Start the default AI agent to fix this check",
           "e2b4d7c8a1": "Choose an agent for this check",
           "f1c9e3a6d4": "Choose agent to fix check",
-          "actionRequired": "Action required"
+          "actionRequired": "Action required",
+          "copyOutput": "Copy output"
         },
         "CheckRunJobs": {
           "1c0a4d7e02": "succeeded",
           "2d3b8f1a55": "skipped",
           "3e6c9a2b71": "pending",
           "4f7d0c3e88": "steps failed",
-          "5a8e1d4f23": " · "
+          "5a8e1d4f23": " · ",
+          "copy": "Copy jobs"
         },
         "check": {
           "run": {
@@ -14830,6 +14819,41 @@
           "insertColumnRight": "Insert column right",
           "deleteRow": "Delete row",
           "deleteColumn": "Delete column"
+        },
+        "CheckRunAnnotations": {
+          "copy": "Copy annotations"
+        },
+        "CheckRunCopyButton": {
+          "copied": "Copied",
+          "failed": "Couldn't copy",
+          "empty": "Nothing to copy"
+        },
+        "HtmlDocPreview": {
+          "documentTooLargePanel": "This document is too large to preview. Open it in the editor instead.",
+          "documentUnreadablePanel": "Orca could not read this file from the workspace.",
+          "multipleAssetsFailedNotice": "{{count}} files in this document could not be loaded.",
+          "assetTooLargeNotice": "{{path}} is too large to load in this preview.",
+          "assetUnsupportedNotice": "This workspace cannot send {{path}} to a preview.",
+          "assetUnreadableNotice": "Orca could not read {{path}} from the workspace.",
+          "previewAriaLabel": "HTML preview",
+          "reloadPreviewControl": "Reload preview",
+          "previewUnavailableTitle": "Preview unavailable",
+          "copyDocumentPathControl": "Copy file path",
+          "documentPathCopied": "Copied",
+          "workspaceFileChipLabel": "Workspace file",
+          "previewMenuControl": "Preview options",
+          "openSourceControl": "Open source file",
+          "openExternallyControl": "Open with default app",
+          "copyDocumentRelativePathControl": "Copy relative path",
+          "openExternallyUnknownHostError": "Can't open '{{value0}}': the host that owns it is no longer known.",
+          "downloadBlockedNotice": "Downloads are disabled in document previews.",
+          "directoryAuthorizationFailed": "Could not allow access to this directory.",
+          "directoryAccessRequest": "This preview wants to read files in {{path}}.",
+          "dismissAccessRequest": "Dismiss",
+          "allowDirectory": "Allow folder",
+          "directoryAccessRequestOverflow": "{{folders}}, and {{count}} more",
+          "directoryAccessRequestMultiple": "This preview wants to read files in {{folders}}.",
+          "allowDirectories": "Allow {{count}} folders"
         }
       },
       "diff": {
@@ -15149,7 +15173,8 @@
             "6e776f9ef9": "Download failed",
             "756bfc25c9": "Open",
             "09a9489aa5": "Show",
-            "2a4c4b8e1f": "Copy"
+            "2a4c4b8e1f": "Copy",
+            "fileUrlUnsupported": "This browser tab cannot open local files. Use \"Open Preview to the Side\" on the file instead."
           },
           "BrowserToolbarMenu": {
             "429ef481f9": "Cancel",
@@ -15272,6 +15297,7 @@
           "showMore": "Show more"
         },
         "AutomationDetail": {
+          "host": "Host",
           "007c8ad874": "Prompt",
           "a1d52c2189": "Usage coverage",
           "449fc83bf7": "Tokens",
@@ -15440,6 +15466,9 @@
           "b11170a008": "Failed to save automation.",
           "2a20596d6b": "Automation saved.",
           "244727e655": "Automation updated.",
+          "moved": "Automation moved to {host}.",
+          "moveOriginalKept": "Created on {host}, but the original could not be deleted. Remove it on the old host.",
+          "moveOriginalUnverified": "Created on {host}, but the original deletion could not be verified. Check the old host before retrying.",
           "77b81bc4ac": "Hermes automation created.",
           "08efc3ae12": "Hermes automation updated.",
           "e431bb85d4": "Choose a workspace on the same host as this Hermes automation.",
@@ -15490,7 +15519,8 @@
           "rowActions": "Automation actions",
           "tableLastRun": "Last run",
           "noListMatches": "No automations match.",
-          "destinationProjectUnavailable": "Choose a project owned by the selected automation destination."
+          "destinationProjectUnavailable": "Choose a project owned by the selected automation destination.",
+          "destinationUnavailable": "The selected automation destination is not ready. Reconnect it and try again."
         },
         "AutomationsPageSkeleton": {
           "55527b7bcf": "Loading automations"
@@ -15745,16 +15775,17 @@
           "occurrences": "{{times}} times"
         },
         "createDestination": {
-          "label": "Create on",
+          "label": "Host",
           "placeholder": "Select a host",
           "storedOn": "Stored and scheduled by {authority}.",
-          "unselected": "Choose the host this automation will be created on.",
+          "unselected": "Choose the host that stores and schedules this automation.",
           "orphan": "Automations with no host cannot hold new ones. Choose a host to create this automation on.",
           "unavailable": "That host cannot hold a new automation yet. Choose another host to create this one on.",
           "stale": "{host} changed while this form was open. Choose it again before saving.",
           "projectMismatch": "That project is not on {host}. Choose a project on that host, or another host.",
           "noProjects": "No projects are set up on {host}. Add one there, or choose another host.",
-          "updateRequired": "Update the Orca server on {hosts} to create automations there."
+          "updateRequired": "Update the Orca server on {hosts} to store automations there.",
+          "move": "Saving creates this automation on {host} and deletes the original and its run history."
         }
       },
       "agent": {
@@ -16364,6 +16395,20 @@
         "remoteLabel": "Browsers on {{value0}}",
         "clientNoteLocalStorage": "Imports read this device’s browsers. Cookies are stored locally.",
         "remoteNoteRemoteStorage": "Imports read browsers on {{value0}}. Cookies are stored on that machine, and a permission prompt may appear on its screen."
+      },
+      "ComposerParentWorktreePicker": {
+        "label": "Parent worktree",
+        "noParent": "No parent",
+        "description": "Nests this workspace under another in the sidebar. Does not change the base branch.",
+        "searchPlaceholder": "Search workspaces...",
+        "noMatches": "No matches."
+      },
+      "browserPane": {
+        "workspaceDoc": {
+          "externalLinkTitle": "Open link to {{host}}?",
+          "externalLinkConfirm": "Open link",
+          "externalLinkCancel": "Cancel"
+        }
       }
     },
     "i18n": {
@@ -16431,6 +16476,186 @@
     }
   },
   "components": {
+    "desktopHome": {
+      "sceneCode": "Cloud work",
+      "sceneAutomation": "Automation",
+      "sceneCollaboration": "Agent collaboration",
+      "placeholderCode": "Describe the development task to complete…",
+      "placeholderAutomation": "Describe the repetitive work to automate…",
+      "placeholderCollaboration": "Describe the task that needs multiple agents…",
+      "heroTitle": "{{app}} — start today's development",
+      "heroDescription": "AI-powered development assistance to help you build better software, faster.",
+      "helpBubble": "Here whenever you need help",
+      "mascotAlt": "{{app}} assistant",
+      "workModes": "Work modes",
+      "capabilities": "Common capabilities",
+      "capability": {
+        "analyzeCode": "Analyze codebase",
+        "implementFeature": "Implement a feature",
+        "fixIssue": "Fix an issue",
+        "addTests": "Add tests",
+        "scheduledBuild": "Check builds on a schedule",
+        "summarizeChanges": "Summarize changes",
+        "batchTasks": "Process tasks in bulk",
+        "breakDownRequirements": "Break down requirements",
+        "parallelReview": "Review code in parallel",
+        "planDelivery": "Plan delivery"
+      },
+      "newTask": "New task",
+      "taskDescription": "Task description",
+      "workOverview": "Work overview",
+      "workspaceSection": "Workspace",
+      "recentWorkspaces": "Recent workspaces",
+      "manageProjects": "Manage projects",
+      "noProjects": "No projects yet",
+      "noProjectsDescription": "Add a code repository to see workspaces here.",
+      "quickStart": "Quick start",
+      "addProject": "Add project",
+      "addProjectDescription": "Connect a local or remote repository",
+      "cloneProject": "Clone project",
+      "cloneProjectDescription": "Clone a repository from a remote URL",
+      "importRepository": "Import repository",
+      "importRepositoryDescription": "Add an existing local repository",
+      "connectHiveCloud": "Connect HiveCloud",
+      "connectHiveCloudDescription": "Sync workspaces and sessions across devices",
+      "newWorkspace": "New workspace",
+      "newWorkspaceDescription": "Isolate branches and agent sessions",
+      "continueWork": "Continue working",
+      "sessions": "Sessions",
+      "recentActivity": "Recent activity",
+      "enterWorkspace": "Open workspace",
+      "noContinue": "Nothing to continue",
+      "noContinueDescription": "Create a workspace to return here quickly.",
+      "projectStats": "{{projects}} projects · {{workspaces}} workspaces",
+      "projectStatsLabel": "Project statistics",
+      "unnamedBranch": "Unnamed branch",
+      "host": {
+        "local": "Local",
+        "ssh": "SSH",
+        "cloud": "Cloud"
+      },
+      "time": {
+        "unused": "Not used yet",
+        "justNow": "Just now",
+        "minutesAgo": "{{value}} min ago",
+        "hoursAgo": "{{value}} hr ago",
+        "daysAgo": "{{value}} days ago"
+      },
+      "preflight": {
+        "dismiss": "Dismiss notice"
+      },
+      "composer": {
+        "addContext": "Add context",
+        "selectWorkspace": "Select workspace",
+        "selectAgent": "Select agent",
+        "permission": "Permission mode",
+        "permissionDefault": "Default",
+        "permissionAsk": "Always ask",
+        "permissionAuto": "Auto-approve",
+        "attach": "Add attachment",
+        "voice": "Voice input",
+        "send": "Send task"
+      }
+    },
+    "landingContext": {
+      "currentContext": "Current context",
+      "closeContext": "Close current context",
+      "workspace": "Workspace",
+      "branch": "Branch",
+      "location": "Location",
+      "sessions": "Sessions",
+      "activity": "Activity",
+      "openFiles": "Open files",
+      "unsaved": "Unsaved",
+      "noOpenFiles": "No files are open in this workspace.",
+      "suggestedActions": "Suggested actions",
+      "continueWork": "Continue previous work",
+      "newWorkspaceFromProject": "Create a workspace from this project",
+      "noContext": "No context selected",
+      "noContextDescription": "Add a project and create a workspace to see branches, files, and recommended actions here."
+    },
+    "hiveAccountSignIn": {
+      "title": "Sign in to HiveCloud",
+      "smsDescription": "Verify your phone number to continue without leaving the app.",
+      "invalidPhone": "Enter a valid phone number.",
+      "acceptTermsError": "Please accept the Terms of Service and Privacy Policy first.",
+      "sendCodeFailed": "Could not send the code. Try again later.",
+      "invalidCode": "Enter the 6-digit code.",
+      "codeExpired": "The code is invalid or expired.",
+      "cloudConsole": "Cloud control plane",
+      "mascotAlt": "HiveCode robot bee",
+      "brandTitle": "Secure connection, efficient collaboration",
+      "brandDescription": "Manage Runtimes, devices, and sessions after signing in.",
+      "brandNote": "HiveCode local features remain available after you close this window.",
+      "loginMethods": "Sign-in methods",
+      "smsTab": "Phone code",
+      "browserTab": "Browser",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "Enter your phone number",
+      "codeSentTo": "Code sent to",
+      "codeLabel": "Verification code",
+      "codePlaceholder": "Enter the 6-digit code",
+      "resendCountdown": "Resend in {{seconds}}s",
+      "termsPrefix": "I have read and agree to",
+      "terms": "Terms of Service",
+      "and": "and",
+      "privacy": "Privacy Policy",
+      "confirm": "Sign in",
+      "sending": "Sending…",
+      "getCode": "Get code",
+      "browserTitle": "Complete secure authentication in your browser",
+      "browserDescription": "You will return to HiveCode automatically after authentication.",
+      "opening": "Opening…",
+      "continueBrowser": "Continue in browser",
+      "copyLink": "Copy sign-in link",
+      "otherMethods": "Other sign-in methods",
+      "github": "Sign in with GitHub",
+      "wechat": "Sign in with WeChat",
+      "qq": "Sign in with QQ",
+      "securityTitle": "Device credentials are protected",
+      "securityDescription": "After sign-in, credentials are stored securely on this device.",
+      "contextSummary": "HiveCode Desktop · Current device · Protected session",
+      "contextDetails": "Encrypted credentials are stored on this device and can be revoked in Account settings."
+    },
+    "sidebarAccount": {
+      "connected": "HiveCloud connected",
+      "signInSuccess": "Signed in to HiveCloud",
+      "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
+      "localSignOut": "Signed out locally. Revoke the remote session from HiveCloud Security when online.",
+      "signOutSuccess": "Signed out of HiveCloud",
+      "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again.",
+      "activity": "Activity",
+      "statusUnknown": "Connection status pending",
+      "localMode": "Local mode",
+      "accountCopied": "Account information copied",
+      "menuLabel": "Account menu: {{name}}",
+      "signIn": "Sign in to HiveCloud",
+      "openCenter": "Open account center",
+      "cloudAccount": "HiveCloud account",
+      "localWorkspace": "HiveCode local workspace",
+      "workAccount": "HiveKernel · Work account",
+      "notConnected": "Cloud account not connected",
+      "copyAccount": "Copy account information",
+      "localFeatures": "HiveCode local projects, terminals, and agent features remain available.",
+      "cloudBenefits": "Sign in to manage cross-device Runtimes, sessions, and organization resources.",
+      "accountCenter": "Account center",
+      "cloudConnection": "HiveCloud connection",
+      "devicesSessions": "Devices and sessions",
+      "viewDetails": "View details",
+      "storageResources": "Storage and resources",
+      "settings": "Settings",
+      "appearance": "Appearance",
+      "theme": "Theme",
+      "themeSystem": "System",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "notifications": "Notifications",
+      "noUnread": "No unread",
+      "helpFeedback": "Help and feedback",
+      "checkUpdates": "Check for updates",
+      "upToDate": "Up to date",
+      "signOut": "Sign out"
+    },
     "native-chat": {
       "composer": {
         "imageUnsupported": "Image paste is not supported for this agent.",

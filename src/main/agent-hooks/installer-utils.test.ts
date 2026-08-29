@@ -30,6 +30,7 @@ import {
   writeHooksJson,
   type HooksConfig
 } from './installer-utils'
+import { buildPosixAgentHookPostCommand } from './hook-post-command'
 import { POSIX_HOOK_STDIN_DRAIN_COMMAND } from './hook-stdin-contract'
 import { wrapRuntimeHomeHookCommand } from './runtime-home-hook-command'
 
@@ -93,23 +94,20 @@ describe('readHooksJsonWithRaw', () => {
 })
 
 describe('writeHooksJson', () => {
-  it.skipIf(process.platform === 'win32')(
-    'updates a symlink target without replacing the hook config link',
-    () => {
-      const targetPath = join(tmpDir, 'dotfiles-hooks.json')
-      writeFileSync(targetPath, '{"hooks":{}}\n')
-      symlinkSync(targetPath, configPath)
+  it('updates a symlink target without replacing the hook config link', () => {
+    const targetPath = join(tmpDir, 'dotfiles-hooks.json')
+    writeFileSync(targetPath, '{"hooks":{}}\n')
+    symlinkSync(targetPath, configPath)
 
-      writeHooksJson(configPath, { hooks: { Stop: [] } })
+    writeHooksJson(configPath, { hooks: { Stop: [] } })
 
-      expect(lstatSync(configPath).isSymbolicLink()).toBe(true)
-      expect(JSON.parse(readFileSync(targetPath, 'utf-8'))).toEqual({
-        hooks: { Stop: [] }
-      })
-    }
-  )
+    expect(lstatSync(configPath).isSymbolicLink()).toBe(true)
+    expect(JSON.parse(readFileSync(targetPath, 'utf-8'))).toEqual({
+      hooks: { Stop: [] }
+    })
+  })
 
-  it.skipIf(process.platform === 'win32')('does not replace a dangling hook config symlink', () => {
+  it('does not replace a dangling hook config symlink', () => {
     const targetPath = join(tmpDir, 'missing-dotfiles-hooks.json')
     symlinkSync(targetPath, configPath)
 
@@ -149,7 +147,7 @@ describe('writeHooksJson', () => {
     expect(bak).toEqual(original)
   })
 
-  it.skipIf(process.platform === 'win32')('does not follow an existing .bak symlink', () => {
+  it('does not follow an existing .bak symlink', () => {
     const original = '{"hooks":{}}\n'
     const backupTarget = join(tmpDir, 'dotfiles-backup.json')
     writeFileSync(configPath, original, 'utf-8')
@@ -607,7 +605,7 @@ describe('wrapPosixHookCommand', () => {
 })
 
 const qualifiedWindowsPowerShellCommand =
-  /^[A-Za-z]:\/[^"]*\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe -NoProfile -WindowStyle Hidden -EncodedCommand \S+$/
+  /^[A-Za-z]:\/[^"]*\/System32\/WindowsPowerShell\/v1\.0\/powershell\.exe -NoProfile -EncodedCommand \S+$/
 
 function decodeWindowsHookCommand(command: string): string {
   const encodedCommand = command.match(/ -EncodedCommand (\S+)$/)?.[1]
@@ -642,6 +640,17 @@ describe('wrapWindowsHookCommand', () => {
     )
   })
 
+  it('emits fallback stdout when the managed script is missing', () => {
+    const command = wrapWindowsHookCommand(
+      'C:\\hooks\\cursor-hook.cmd',
+      {},
+      { fallbackStdout: '{"permission":"allow"}' }
+    )
+    expect(decodeWindowsHookCommand(command)).toContain(
+      'Write-Output \'{"permission":"allow"}\'; exit 0'
+    )
+  })
+
   // Why: a user profile path like `C:\Users\Jane Doe` is the regression from
   // #6078 — the raw path used to be split at the space. The wrapper must keep
   // the whole path inside the encoded command so shells do not split it.
@@ -665,7 +674,7 @@ describe('wrapWindowsHookCommand', () => {
   })
 
   it.skipIf(process.platform !== 'win32')(
-    'propagates the exit code through cmd.exe when the script path contains a caret',
+    'executes a script path containing a cmd.exe caret literally',
     () => {
       const scriptDir = join(tmpDir, 'home with ^ caret', '.orca', 'agent-hooks')
       mkdirSync(scriptDir, { recursive: true })
@@ -754,7 +763,7 @@ describe('wrapRuntimeHomeHookCommand', () => {
     // applies to the exact same string (#16003).
     const command = wrapRuntimeHomeHookCommand('claude-hook')
 
-    expect(command).toContain('powershell.exe" -NoProfile -WindowStyle Hidden -EncodedCommand ')
+    expect(command).toContain('powershell.exe" -NoProfile -EncodedCommand ')
     expect(command).not.toMatch(/-ExecutionPolicy/i)
   })
 
@@ -871,6 +880,26 @@ describe('buildWindowsAgentHookPostCommand', () => {
 
     expect(command).toMatch(/^"%SystemRoot%\\System32\\curl\.exe"/)
     expect(command).not.toMatch(/^curl\.exe\b/)
+  })
+})
+
+describe('buildPosixAgentHookPostCommand', () => {
+  it('uses raw JSON only when the listener advertises support', () => {
+    const command = buildPosixAgentHookPostCommand('claude').join('\n')
+
+    expect(command).toContain('ORCA_AGENT_HOOK_TRANSPORT:-}')
+    expect(command).toContain('raw-json-v1')
+    expect(command).toContain('command -v base64')
+    expect(command).toContain('command -v tr')
+    expect(command).toContain('Content-Type: application/json')
+    expect(command).toContain('X-Orca-Agent-Hook-Meta-Encoding: base64')
+    expect(command).toContain('X-Orca-Agent-Hook-Meta: ${orca_hook_metadata}')
+    expect(command).toContain("printf '%s\\037%s\\037%s\\037%s\\037%s\\037%s'")
+    expect(command).toContain('$ORCA_PANE_KEY')
+    expect(command).toContain('$ORCA_WORKTREE_ID')
+    expect(command).toContain('--data-binary @-')
+    expect(command).toContain('Content-Type: application/x-www-form-urlencoded')
+    expect(command).toContain('--data-urlencode "payload@-"')
   })
 })
 

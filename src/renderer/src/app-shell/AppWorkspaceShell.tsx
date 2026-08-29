@@ -1,4 +1,4 @@
-import { Suspense, useRef } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
 import Sidebar from '../components/Sidebar'
@@ -17,6 +17,7 @@ import { RightSidebarToggle, TitlebarMainStrip } from './TitlebarMainStrip'
 import type { AppChromeLayout } from './use-app-chrome-layout'
 import type { FloatingWorkspacePanelState } from './use-floating-workspace-panel'
 import { resolveSettingsHelpPlacement } from './titlebar-settings-help-placement'
+import { useAppStore } from '../store'
 
 const Landing = lazy(() => import('../components/Landing'))
 const WorktreeCreationPanel = lazy(
@@ -102,6 +103,15 @@ export function AppWorkspaceShell(props: {
   floatingWorkspace: FloatingWorkspacePanelState
 }): React.JSX.Element {
   const { layout, floatingWorkspace } = props
+  const landingActive =
+    layout.activeView === 'terminal' && !layout.activeWorktreeId && !layout.creationLayoutActive
+  useEffect(() => {
+    // The context rail is secondary below the desktop-wide breakpoint. Close it
+    // once on Landing entry, while preserving an explicit user reopen afterwards.
+    if (landingActive && window.innerWidth < 1440 && useAppStore.getState().rightSidebarOpen) {
+      useAppStore.getState().setRightSidebarOpen(false)
+    }
+  }, [landingActive])
   const workspaceBoardPanel = useWorkspaceBoardPanel()
   const stackedMainStripMounted =
     layout.stackedSidebarOpen &&
@@ -192,7 +202,11 @@ export function AppWorkspaceShell(props: {
             <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
               {/* Why: automations/artifacts own their page headers; the stacked titlebar would be an empty 36px stripe. */}
               {stackedMainStripMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}
-              <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden">
+              <div
+                className={`relative flex flex-1 min-w-0 min-h-0 overflow-hidden${
+                  settingsHelpPlacement === 'shell-overlay' ? ' shell-overlay-chrome-active' : ''
+                }`}
+              >
                 {/* Why: match the RightSidebar header's 36px/top-0 so the toggle's vertical center is identical open vs closed — else the icon jitters. */}
                 {settingsHelpPlacement === 'shell-overlay' && (
                   <div
@@ -272,7 +286,10 @@ export function AppWorkspaceShell(props: {
               'Retry the sidebar or switch tabs to reload this surface.'
             )}
           >
-            <RightSidebar showSettingsHelpControls={settingsHelpPlacement === 'right-sidebar'} />
+            <RightSidebar
+              showSettingsHelpControls={settingsHelpPlacement === 'right-sidebar'}
+              mode={landingActive ? 'landing' : 'workspace'}
+            />
           </RecoverableRenderErrorBoundary>
         ) : null}
       </div>

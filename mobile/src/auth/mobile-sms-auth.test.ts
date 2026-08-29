@@ -39,7 +39,7 @@ const session = {
   refreshToken: 'refresh-token',
   expiresAt: '2030-01-01T00:00:00Z',
   sessionExpiresAt: '2030-04-01T00:00:00Z',
-  sessionProfile: 'TEMPORARY',
+  sessionProfile: 'TRUSTED',
   account: { accountId: '7f9c8c7f-9a8b-4f3c-8a33-2a6750e6a111', displayName: '用户5678' },
   authorityId: 'https://identity.hivekernel.com/realms/hive|subject-1'
 }
@@ -80,7 +80,7 @@ describe('mobile SMS authentication client', () => {
     expect(JSON.parse(String(deviceOptions.body))).toMatchObject({
       clientId: 'hivecode-mobile',
       deviceLabel: 'HiveCode Mobile',
-      sessionProfile: 'TEMPORARY'
+      sessionProfile: 'TRUSTED'
     })
     const [smsUrl, smsOptions] = fetchMock.mock.calls[1] as [string, RequestInit]
     expect(smsUrl).toBe('https://cloud.example.test/hive/v1/auth/sms-challenges')
@@ -98,6 +98,31 @@ describe('mobile SMS authentication client', () => {
       'hivecode.mobile.auth.device-secret-key',
       expect.any(String)
     )
+  })
+
+  it('falls back to the Android host gateway when the local test domain is unreachable', async () => {
+    vi.stubEnv('EXPO_PUBLIC_ANDROID_EMULATOR', '1')
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to resolve host'))
+      .mockResolvedValueOnce(
+        response(
+          {
+            expiresAt: '2030-01-01T00:05:00Z',
+            contractRevision: 'stage2a-device-authorization-v2'
+          },
+          201
+        )
+      )
+      .mockResolvedValueOnce(response(challenge))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(requestMobileSms('+8613812345678', true)).resolves.toEqual(challenge)
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'https://cloud.example.test/hive/v1/auth/device-authorizations',
+      'http://10.0.2.2:8080/hive/v1/auth/device-authorizations',
+      'https://cloud.example.test/hive/v1/auth/sms-challenges'
+    ])
   })
 
   it('verifies SMS, obtains a headless authorization code, and exchanges camelCase Hive tokens', async () => {
@@ -124,7 +149,7 @@ describe('mobile SMS authentication client', () => {
     ).resolves.toMatchObject({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
-      sessionProfile: 'TEMPORARY'
+      sessionProfile: 'TRUSTED'
     })
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
@@ -321,5 +346,29 @@ describe('mobile SMS authentication client', () => {
       expectedSecurityVersion: 13,
       reason: 'owner_sign_out'
     })
+  })
+
+  it('revokes the cloud device on trusted-device sign-out', async () => {
+    const payload = btoa(
+      JSON.stringify({
+        session_id: '3e7af3d4-5e59-4bdf-9fdf-935fed933426',
+        session_security_version: 13,
+        device_id: '2e7af3d4-5e59-4bdf-9fdf-ed9334260001',
+        device_security_version: 7
+      })
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+    const fetchMock = vi.fn().mockResolvedValue(response({ revoked: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await revokeMobileSession({ ...session, accessToken: `header.${payload}.signature` })
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe(
+      'https://cloud.example.test/hive/v1/cloud-account-devices/2e7af3d4-5e59-4bdf-9fdf-ed9334260001/revoke'
+    )
+    expect(JSON.parse(String(options.body))).toEqual({ expectedSecurityVersion: 7 })
   })
 })

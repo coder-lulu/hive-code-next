@@ -91,15 +91,15 @@ describe('HiveAccountSettingsPane', () => {
     mocks.signIn.mockResolvedValue({ status: 'signed-in', state: signedInState })
     render(<HiveAccountSettingsPane />)
 
-    await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCloud' }))
-    expect(screen.getByText('Approve HiveCloud sign-in')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Browser sign-in' }))
-    await user.click(screen.getByRole('button', { name: 'Approve sign-in' }))
-    expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TEMPORARY' })
+    await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCode' }))
+    expect(screen.getByText('登录 HiveCloud')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: '浏览器登录' }))
+    await user.click(screen.getByRole('button', { name: '在浏览器中继续' }))
+    expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TRUSTED' })
     await waitFor(() => expect(screen.getByText('Ada')).toBeInTheDocument())
   })
 
-  it('requires an explicit approval before creating a trusted session', async () => {
+  it('does not expose a pre-auth trust toggle and uses a persistent session', async () => {
     const user = userEvent.setup()
     mocks.getState.mockResolvedValue({
       configured: true,
@@ -109,10 +109,12 @@ describe('HiveAccountSettingsPane', () => {
     mocks.signIn.mockResolvedValue({ status: 'signed-in', state: signedInState })
     render(<HiveAccountSettingsPane />)
 
-    await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCloud' }))
-    await user.click(screen.getByRole('checkbox', { name: 'Trust this device' }))
-    await user.click(screen.getByRole('button', { name: 'Browser sign-in' }))
-    await user.click(screen.getByRole('button', { name: 'Approve sign-in' }))
+    await user.click(await screen.findByRole('button', { name: 'Sign in to HiveCode' }))
+    expect(
+      screen.queryByRole('checkbox', { name: /信任此设备|Trust this device/i })
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: '浏览器登录' }))
+    await user.click(screen.getByRole('button', { name: '在浏览器中继续' }))
 
     expect(mocks.signIn).toHaveBeenCalledWith({ sessionProfile: 'TRUSTED' })
   })
@@ -126,6 +128,6 @@ describe('HiveAccountSettingsPane', () => {
     })
     render(<HiveAccountSettingsPane />)
     expect(await screen.findByText(/secure storage is unavailable/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign in to HiveCloud' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sign in to HiveCode' })).toBeDisabled()
   })
 })

@@ -5,6 +5,7 @@
 // message instead of silently injecting a path that the model reads as text.
 
 import type { AgentType } from '../../../../shared/agent-status-types'
+import { isClipboardImageTempFileName } from '../../../../shared/clipboard-image'
 import { isImageDropPath } from '../terminal-pane/terminal-drop-image-path'
 
 /** How a given agent consumes a pasted image. `attachment` = bracket-paste the
@@ -50,10 +51,9 @@ export function isNativeChatImageAttachmentPath(path: string): boolean {
   return isImageDropPath(path)
 }
 
-/** True when a path is a clipboard-paste temp file (`orca-paste-<ts>-<uuid>.png`).
- *  Those names are noise in the UI, so the composer shows a friendly label
- *  instead of the basename. */
+/** True when a path is a clipboard-paste temp file. Those names are noise in
+ *  the UI, so the composer shows a friendly label instead of the basename. */
 export function isNativeChatPastedImagePath(path: string): boolean {
   const base = path.split(/[\\/]/).findLast(Boolean) ?? path
-  return /^orca-paste-.+\.png$/i.test(base)
+  return isClipboardImageTempFileName(base)
 }

@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -32,6 +33,25 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [focused, setFocused] = useState<'phone' | 'code' | null>(null)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
+  useEffect(() => {
+    // Expo SDK 55 Android runs edge-to-edge, so the window is not resized
+    // when the IME opens. Explicitly lift this content-sized sheet above the
+    // keyboard; otherwise the verification input and submit button are hidden.
+    if (Platform.OS !== 'android') {
+      return
+    }
+    const show = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(Math.max(0, event.endCoordinates.height))
+    })
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0))
+    return () => {
+      show.remove()
+      hide.remove()
+      setKeyboardHeight(0)
+    }
+  }, [])
 
   useEffect(() => {
     if (countdown <= 0) {
@@ -100,7 +120,15 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
         onPress={onClose}
         style={styles.backdrop}
       />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + theme.spacing.space24 }]}>
+      <View
+        style={[
+          styles.sheet,
+          {
+            paddingBottom: insets.bottom + theme.spacing.space24,
+            marginBottom: Platform.OS === 'android' ? keyboardHeight : 0
+          }
+        ]}
+      >
         <View style={styles.topRow}>
           <Pressable
             accessibilityLabel="返回登录方式"
@@ -116,7 +144,7 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text maxFontSizeMultiplier={1.3} style={styles.subtitle}>
-            验证成功后自动登录；首次验证将自动注册新账号。
+            验证码将发送至你的手机号。
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.inputLabel}>
             手机号

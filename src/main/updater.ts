@@ -1,6 +1,5 @@
 /* eslint-disable max-lines */
 import { app, BrowserWindow, powerMonitor } from 'electron'
-import { is } from '@electron-toolkit/utils'
 import { parse } from 'yaml'
 import type {
   LinuxPackageInstallInstructions,
@@ -1378,7 +1377,7 @@ export function reportReleaseUpdatesDisabled(): void {
 }
 
 export function getRemoteServerUpdateSupport(): RemoteServerUpdateSupport {
-  if (!app.isPackaged || is.dev) {
+  if (!app.isPackaged) {
     return {
       installMode: updateInstallMode,
       automatic: false,
@@ -1932,7 +1931,7 @@ function runBackgroundUpdateCheck(
   if (backgroundCheckLaunchPending || currentStatus.state === 'checking') {
     return false
   }
-  if (!app.isPackaged || is.dev) {
+  if (!app.isPackaged) {
     sendStatus({ state: 'not-available' })
     return false
   }
@@ -1999,7 +1998,7 @@ function applyUpdateCheckVariant(variant: UpdateCheckVariant): void {
 
 /** Menu-triggered check — delegates feedback to renderer toasts via userInitiated flag */
 export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
-  if (!app.isPackaged || is.dev) {
+  if (!app.isPackaged) {
     sendStatus({ state: 'not-available', userInitiated: true })
     return
   }
@@ -2171,7 +2170,7 @@ export async function listAvailableReleaseBuilds(channel: ReleaseChannel): Promi
  * settles so ordinary background checks never inherit it.
  */
 async function checkForPinnedBuild(channel: ReleaseChannel, tag: string): Promise<void> {
-  if (!app.isPackaged || is.dev) {
+  if (!app.isPackaged) {
     sendStatus({ state: 'not-available', userInitiated: true })
     return
   }
@@ -2627,7 +2626,7 @@ export function quitAndInstall(): boolean {
 }
 
 async function checkForUpdateNudge(): Promise<void> {
-  if (!app.isPackaged || is.dev) {
+  if (!app.isPackaged) {
     return
   }
   if (nudgeCheckInFlight) {
@@ -2750,10 +2749,7 @@ export function setupAutoUpdater(
     sendErrorStatus(`The server update did not complete: ${serveHandoffFailure}`, true)
   }
 
-  if (!app.isPackaged && !is.dev) {
-    return
-  }
-  if (is.dev) {
+  if (!app.isPackaged) {
     return
   }
 

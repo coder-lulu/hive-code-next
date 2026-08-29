@@ -1,4 +1,6 @@
-export const MOBILE_HOME_MODE_STORAGE_KEY = 'hivecode.mobile.home-mode.v1'
+// Bump the preference namespace so users who only ever saw the legacy computer
+// home are introduced to the product's current cloud-first home after upgrade.
+export const MOBILE_HOME_MODE_STORAGE_KEY = 'hivecode.mobile.home-mode.v2'
 
 export const MOBILE_HOME_MODES = ['cloud', 'computer'] as const
 
@@ -17,7 +19,7 @@ export function resolveInitialMobileHomeMode(
   storedMode: unknown,
   _hasPairedHosts: boolean
 ): MobileHomeMode {
-  return parseMobileHomeMode(storedMode) ?? 'computer'
+  return parseMobileHomeMode(storedMode) ?? 'cloud'
 }
 
 export async function loadInitialMobileHomeMode(

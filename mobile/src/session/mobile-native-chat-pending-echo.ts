@@ -1,4 +1,7 @@
-import { normalizeReconcileText } from './mobile-native-chat-draft-reconcile'
+import {
+  normalizeNativeChatUserText,
+  normalizeNativeChatUserTextWithLiteralFallback
+} from './mobile-native-chat-image-transcript-markers'
 
 export type MobileNativeChatPendingMessage = {
   id: string
@@ -25,6 +28,14 @@ export type MobileNativeChatSendOrigin = {
 
 type PendingByKey = Record<string, MobileNativeChatPendingMessage[]>
 
+/** Markers are the agent's own placeholders on a send that carried images;
+ * otherwise they are literal text and must remain part of the matching key. */
+function pendingMatchText(pending: MobileNativeChatPendingMessage): string {
+  return pending.images?.length
+    ? normalizeNativeChatUserText(pending.text)
+    : normalizeNativeChatUserTextWithLiteralFallback(pending.text)
+}
+
 export function combineMobileNativeChatPending(
   session: MobileNativeChatPendingMessage[],
   waiting: readonly MobileNativeChatPendingMessage[]
@@ -48,13 +59,13 @@ export function appendMobileNativeChatPending(
   // Count outstanding repeats with the same normalized key.
   const earlierOutstanding = current.filter(
     (pending) =>
-      normalizeReconcileText(pending.text) === origin.normalizedText &&
+      pendingMatchText(pending) === origin.normalizedText &&
       pending.expectedOccurrence > origin.baselineOccurrences
   ).length
   // Image ordinal selection and counting must share the empty-text discriminator.
   const expectedImageEchoOrdinal =
     current.filter(
-      (pending) => normalizeReconcileText(pending.text) === '' && pending.images?.length
+      (pending) => pending.images?.length && normalizeNativeChatUserText(pending.text) === ''
     ).length + 1
   return {
     ...previous,

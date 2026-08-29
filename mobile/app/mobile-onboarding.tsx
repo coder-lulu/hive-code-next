@@ -1,13 +1,6 @@
 import { productNameText } from '@/product-brand'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AccessibilityInfo,
-  Animated,
-  BackHandler,
-  Text,
-  useWindowDimensions,
-  View
-} from 'react-native'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { Animated, BackHandler, Text, useWindowDimensions, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { OrcaLogo } from '../src/components/OrcaLogo'
@@ -25,6 +18,7 @@ import {
 } from '../src/storage/session-view-preferences'
 import { savePushNotificationsEnabled } from '../src/storage/preferences'
 import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
+import { useReducedMotionEnabled } from '../src/hooks/use-reduced-motion-enabled'
 
 const SLIDE_DURATION_MS = 280
 
@@ -44,7 +38,6 @@ export default function MobileOnboardingScreen() {
     />
   )
 }
-
 function MobileOnboardingFlow({
   hostId,
   rawSteps
@@ -197,26 +190,4 @@ function MobileOnboardingFlow({
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value
-}
-
-function useReducedMotionEnabled(): boolean {
-  const [enabled, setEnabled] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-    void AccessibilityInfo.isReduceMotionEnabled()
-      .then((nextEnabled) => {
-        if (mounted) {
-          setEnabled(nextEnabled)
-        }
-      })
-      .catch(() => undefined)
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setEnabled)
-    return () => {
-      mounted = false
-      subscription.remove()
-    }
-  }, [])
-
-  return enabled
 }

@@ -554,7 +554,7 @@ describe('registerClipboardHandlers', () => {
     const png = Buffer.from([0, 1, 2, 3])
     const expectedPath = join(
       '/tmp',
-      'orca-paste-1760000000000-00000000-0000-4000-8000-000000000000.png'
+      'hivecode-paste-1760000000000-00000000-0000-4000-8000-000000000000.png'
     )
     clipboardReadImageMock.mockReturnValue({
       getSize: () => ({ height: 1, width: 1 }),
@@ -631,7 +631,7 @@ describe('registerClipboardHandlers', () => {
 
       const handler = getRegisteredHandlers().get('clipboard:saveImageAsTempFile')
       await expect(handler?.(makeClipboardEvent(), { connectionId: 'ssh-1' })).resolves.toBe(
-        '/var/tmp/orca-paste-1760000000000-00000000-0000-4000-8000-000000000000.png'
+        '/var/tmp/hivecode-paste-1760000000000-00000000-0000-4000-8000-000000000000.png'
       )
       expect(clipboardReadBufferMock).toHaveBeenCalledWith('FileNameW')
       expect(clipboardReadBufferMock).toHaveBeenCalledWith('Shell IDList Array')
@@ -639,7 +639,7 @@ describe('registerClipboardHandlers', () => {
       expect(nativeImageCreateFromBufferMock).toHaveBeenCalledWith(source)
       expect(close).toHaveBeenCalled()
       expect(writeFileBase64).toHaveBeenCalledWith(
-        '/var/tmp/orca-paste-1760000000000-00000000-0000-4000-8000-000000000000.png',
+        '/var/tmp/hivecode-paste-1760000000000-00000000-0000-4000-8000-000000000000.png',
         png.toString('base64')
       )
       expect(fsWriteFileMock).not.toHaveBeenCalled()
@@ -789,11 +789,13 @@ describe('registerClipboardHandlers', () => {
       handlers.get('clipboard:saveImageAsTempFile')?.(makeClipboardEvent(), {
         connectionId: 'ssh-1'
       })
-    ).resolves.toBe('/var/tmp/orca-paste-1760000000000-00000000-0000-4000-8000-000000000000.png')
+    ).resolves.toBe(
+      '/var/tmp/hivecode-paste-1760000000000-00000000-0000-4000-8000-000000000000.png'
+    )
     expect(getSshFilesystemProviderMock).toHaveBeenCalledWith('ssh-1')
     expect(getTempDir).toHaveBeenCalled()
     expect(writeFileBase64).toHaveBeenCalledWith(
-      '/var/tmp/orca-paste-1760000000000-00000000-0000-4000-8000-000000000000.png',
+      '/var/tmp/hivecode-paste-1760000000000-00000000-0000-4000-8000-000000000000.png',
       png.toString('base64')
     )
     expect(fsWriteFileMock).not.toHaveBeenCalled()
@@ -820,10 +822,10 @@ describe('registerClipboardHandlers', () => {
         connectionId: 'ssh-1'
       })
     ).resolves.toBe(
-      'C:\\Users\\alice\\AppData\\Local\\Temp\\orca-paste-1760000000000-00000000-0000-4000-8000-000000000000.png'
+      'C:\\Users\\alice\\AppData\\Local\\Temp\\hivecode-paste-1760000000000-00000000-0000-4000-8000-000000000000.png'
     )
     expect(writeFileBase64).toHaveBeenCalledWith(
-      'C:\\Users\\alice\\AppData\\Local\\Temp\\orca-paste-1760000000000-00000000-0000-4000-8000-000000000000.png',
+      'C:\\Users\\alice\\AppData\\Local\\Temp\\hivecode-paste-1760000000000-00000000-0000-4000-8000-000000000000.png',
       png.toString('base64')
     )
   })

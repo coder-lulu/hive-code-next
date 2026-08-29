@@ -34,6 +34,8 @@ describe('decodeGrokTranscriptLine', () => {
   })
 
   it.each([
+    'C:\\Users\\me\\AppData\\Local\\Temp\\hivecode-paste-1783675302563-2207c073-535f-4b83-a181-61127c8bbd68.png',
+    '/tmp/hivecode-paste-1783675302563-2207c073-535f-4b83-a181-61127c8bbd68.png',
     'C:\\Users\\me\\AppData\\Local\\Temp\\orca-paste-1783675302563-2207c073-535f-4b83-a181-61127c8bbd68.png',
     '/tmp/orca-paste-1783675302563-2207c073-535f-4b83-a181-61127c8bbd68.png',
     'C:\\orca-paste-1783675302563-2207c073-535f-4b83-a181-61127c8bbd68.png',

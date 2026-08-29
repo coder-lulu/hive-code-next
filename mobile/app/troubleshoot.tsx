@@ -1,17 +1,27 @@
-import { useCallback, useRef, useState } from 'react'
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from 'react-native'
+import { useState, useCallback, useRef } from 'react'
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Platform
+} from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import {
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
-  ChevronDown,
   ChevronLeft,
+  ChevronDown,
   ChevronUp,
+  Activity,
+  CheckCircle2,
   ScrollText,
-  XCircle
+  XCircle,
+  AlertTriangle
 } from 'lucide-react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { colors, spacing, typography } from '../src/theme/mobile-theme'
+import { loadHosts } from '../src/transport/host-store'
 import {
   startDiagnosticFetchTimeout,
   type DiagnosticFetchTimeout
@@ -22,10 +32,6 @@ import {
   unreachableHostDetail
 } from '../src/diagnostics/host-reachability'
 import { troubleshootCommonIssues } from '../src/diagnostics/troubleshoot-common-issues'
-import { MobileIconButton, MobileScreenHeader } from '../src/components/ui'
-import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
-import { createTroubleshootScreenStyles } from '../src/settings/troubleshoot-screen-styles'
-import { loadHosts } from '../src/transport/host-store'
 
 type DiagnosticStatus = 'idle' | 'running' | 'done'
 
@@ -36,22 +42,19 @@ type CheckResult = {
 }
 
 function StatusIcon({ status }: { status: CheckResult['status'] }) {
-  const theme = useMobileTheme()
   switch (status) {
     case 'pass':
-      return <CheckCircle2 size={20} color={theme.color.status.success} strokeWidth={2} />
+      return <CheckCircle2 size={14} color={colors.statusGreen} />
     case 'fail':
-      return <XCircle size={20} color={theme.color.status.danger} strokeWidth={2} />
+      return <XCircle size={14} color={colors.statusRed} />
     case 'warn':
-      return <AlertTriangle size={20} color={theme.color.status.warning} strokeWidth={2} />
+      return <AlertTriangle size={14} color={colors.textMuted} />
   }
 }
 
 export default function TroubleshootScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createTroubleshootScreenStyles)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [diagnosticStatus, setDiagnosticStatus] = useState<DiagnosticStatus>('idle')
   const [checks, setChecks] = useState<CheckResult[]>([])
@@ -63,7 +66,8 @@ export default function TroubleshootScreen() {
     if (node !== null) {
       return
     }
-    // Why: diagnostics can outlive the screen; cancel the active run when the route detaches.
+    // Why: diagnostics can outlive the screen; cancel the active run when the
+    // route detaches without a passive cleanup-only Effect.
     abortRef.current = true
     diagnosticRunRef.current += 1
     activeInternetCheckRef.current?.dispose()
@@ -71,7 +75,7 @@ export default function TroubleshootScreen() {
   }, [])
 
   const toggleSection = useCallback((id: string) => {
-    setExpandedId((previous) => (previous === id ? null : id))
+    setExpandedId((prev) => (prev === id ? null : id))
   }, [])
 
   const runDiagnostics = useCallback(async () => {
@@ -90,11 +94,11 @@ export default function TroubleshootScreen() {
       const hosts = await loadHosts()
       results.push(
         hosts.length > 0
-          ? { label: '已配对电脑', status: 'pass', detail: `${hosts.length} 台已配对` }
-          : { label: '已配对电脑', status: 'fail', detail: '暂无，请扫描二维码配对' }
+          ? { label: 'Paired hosts', status: 'pass', detail: `${hosts.length} paired` }
+          : { label: 'Paired hosts', status: 'fail', detail: 'None — scan a QR to pair' }
       )
     } catch {
-      results.push({ label: '已配对电脑', status: 'warn', detail: '无法读取电脑数据' })
+      results.push({ label: 'Paired hosts', status: 'warn', detail: 'Could not read host data' })
     }
 
     if (!isCurrentRun()) {
@@ -105,22 +109,22 @@ export default function TroubleshootScreen() {
     const internetCheck = startDiagnosticFetchTimeout(5000)
     activeInternetCheckRef.current = internetCheck
     try {
-      const response = await fetch('https://dns.google/resolve?name=example.com&type=A', {
+      const resp = await fetch('https://dns.google/resolve?name=example.com&type=A', {
         signal: internetCheck.signal
       })
       if (!isCurrentRun()) {
         return
       }
       results.push(
-        response.ok
-          ? { label: '互联网', status: 'pass', detail: '连接正常' }
-          : { label: '互联网', status: 'warn', detail: '响应异常' }
+        resp.ok
+          ? { label: 'Internet', status: 'pass', detail: 'Connected' }
+          : { label: 'Internet', status: 'warn', detail: 'Unexpected response' }
       )
     } catch {
       if (!isCurrentRun()) {
         return
       }
-      results.push({ label: '互联网', status: 'fail', detail: '无法连接' })
+      results.push({ label: 'Internet', status: 'fail', detail: 'No connection' })
     } finally {
       internetCheck.dispose()
       if (activeInternetCheckRef.current === internetCheck) {
@@ -147,13 +151,13 @@ export default function TroubleshootScreen() {
           label: host.name,
           status: reachable ? 'pass' : 'fail',
           detail: reachable
-            ? `可连接：${formatEndpoint(host.endpoint)}`
+            ? `Reachable at ${formatEndpoint(host.endpoint)}`
             : unreachableHostDetail(host.endpoint)
         })
         setChecks([...results])
       }
     } catch {
-      results.push({ label: '电脑连接', status: 'warn', detail: '无法执行检测' })
+      results.push({ label: 'Hosts', status: 'warn', detail: 'Could not test' })
     }
 
     if (!isCurrentRun()) {
@@ -161,7 +165,7 @@ export default function TroubleshootScreen() {
     }
 
     results.push({
-      label: '平台',
+      label: 'Platform',
       status: 'pass',
       detail: `${Platform.OS} ${Platform.Version ?? ''}`
     })
@@ -171,151 +175,241 @@ export default function TroubleshootScreen() {
   }, [])
 
   return (
-    <View ref={setTroubleshootRootRef} style={styles.screen}>
-      <MobileScreenHeader
-        leading={
-          <MobileIconButton
-            accessibilityLabel="返回"
-            icon={ChevronLeft}
-            iconSize={24}
-            onPress={() => router.back()}
-          />
-        }
-        title="故障排查"
-      />
+    <View
+      ref={setTroubleshootRootRef}
+      style={[styles.container, { paddingTop: insets.top + spacing.sm }]}
+    >
+      <View style={styles.topRow}>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ChevronLeft size={22} color={colors.textSecondary} />
+        </Pressable>
+        <Text style={styles.heading}>Troubleshooting</Text>
+      </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + theme.spacing.space32 }
-        ]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityLabel={diagnosticStatus === 'done' ? '再次运行诊断' : '运行诊断'}
-            accessibilityRole="button"
-            accessibilityState={{
-              busy: diagnosticStatus === 'running',
-              disabled: diagnosticStatus === 'running'
-            }}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.buttonPressed,
-              diagnosticStatus === 'running' && styles.buttonDisabled
-            ]}
-            onPress={runDiagnostics}
-            disabled={diagnosticStatus === 'running'}
-          >
-            {diagnosticStatus === 'running' ? (
-              <ActivityIndicator size="small" color={theme.color.text.inverse} />
-            ) : (
-              <Activity size={20} color={theme.color.text.inverse} strokeWidth={2} />
-            )}
-            <Text maxFontSizeMultiplier={1.3} style={styles.primaryButtonLabel}>
-              {diagnosticStatus === 'running'
-                ? '正在诊断…'
-                : diagnosticStatus === 'done'
-                  ? '再次运行'
-                  : '运行诊断'}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityLabel="查看连接日志"
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryPressed]}
-            onPress={() => router.push('/connection-log')}
-          >
-            <ScrollText size={20} color={theme.color.text.secondary} strokeWidth={2} />
-            <Text maxFontSizeMultiplier={1.3} style={styles.secondaryButtonLabel}>
-              查看连接日志
-            </Text>
-          </Pressable>
-        </View>
-
-        {checks.length > 0 ? (
-          <View>
-            <Text maxFontSizeMultiplier={1.3} style={styles.groupTitle}>
-              诊断结果
-            </Text>
-            <View accessibilityLiveRegion="polite" style={styles.group}>
-              {checks.map((check, index) => (
-                <View key={`${check.label}-${index}`}>
-                  {index > 0 ? <View style={styles.divider} /> : null}
-                  <View style={styles.checkRow}>
-                    <StatusIcon status={check.status} />
-                    <View style={styles.checkCopy}>
-                      <Text maxFontSizeMultiplier={1.3} style={styles.checkLabel}>
-                        {check.label}
-                      </Text>
-                      <Text
-                        maxFontSizeMultiplier={1.3}
-                        style={[
-                          styles.checkDetail,
-                          check.status === 'fail' && styles.checkDetailFail,
-                          check.status === 'warn' && styles.checkDetailWarn
-                        ]}
-                      >
-                        {check.detail}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        <View>
-          <Text maxFontSizeMultiplier={1.3} style={styles.groupTitle}>
-            常见问题
+        <Pressable
+          style={({ pressed }) => [
+            styles.diagnosticButton,
+            pressed && styles.diagnosticButtonPressed,
+            diagnosticStatus === 'running' && styles.diagnosticButtonDisabled
+          ]}
+          onPress={runDiagnostics}
+          disabled={diagnosticStatus === 'running'}
+        >
+          {diagnosticStatus === 'running' ? (
+            <ActivityIndicator size="small" color={colors.textPrimary} />
+          ) : (
+            <Activity size={16} color={colors.textPrimary} />
+          )}
+          <Text style={styles.diagnosticButtonLabel}>
+            {diagnosticStatus === 'running'
+              ? 'Running…'
+              : diagnosticStatus === 'done'
+                ? 'Run again'
+                : 'Run diagnostics'}
           </Text>
-          <View style={styles.group}>
-            {troubleshootCommonIssues.map((section, index) => {
-              const IssueIcon = section.icon
-              const expanded = expandedId === section.id
-              return (
-                <View key={section.id}>
-                  {index > 0 ? <View style={styles.divider} /> : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded }}
-                    style={({ pressed }) => [
-                      styles.accordionHeader,
-                      pressed && styles.secondaryPressed
-                    ]}
-                    onPress={() => toggleSection(section.id)}
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.diagnosticButton,
+            pressed && styles.diagnosticButtonPressed
+          ]}
+          onPress={() => router.push('/connection-log')}
+        >
+          <ScrollText size={16} color={colors.textPrimary} />
+          <Text style={styles.diagnosticButtonLabel}>View network diagnostics</Text>
+        </Pressable>
+
+        {checks.length > 0 && (
+          <View style={styles.section}>
+            {checks.map((check, i) => (
+              <View key={i}>
+                {i > 0 && <View style={styles.separator} />}
+                <View style={styles.checkRow}>
+                  <StatusIcon status={check.status} />
+                  <Text style={styles.checkLabel}>{check.label}</Text>
+                  <Text
+                    style={[styles.checkDetail, check.status === 'fail' && styles.checkDetailFail]}
                   >
-                    <IssueIcon size={20} color={theme.color.text.secondary} strokeWidth={2} />
-                    <Text maxFontSizeMultiplier={1.3} style={styles.accordionTitle}>
-                      {section.title}
-                    </Text>
-                    {expanded ? (
-                      <ChevronUp size={20} color={theme.color.text.tertiary} strokeWidth={2} />
-                    ) : (
-                      <ChevronDown size={20} color={theme.color.text.tertiary} strokeWidth={2} />
-                    )}
-                  </Pressable>
-                  {expanded ? (
-                    <View style={styles.accordionBody}>
-                      {section.steps.map((step) => (
-                        <View key={step} style={styles.stepRow}>
-                          <View style={styles.bulletDot} />
-                          <Text maxFontSizeMultiplier={1.3} style={styles.stepText}>
-                            {step}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
+                    {check.detail}
+                  </Text>
                 </View>
-              )
-            })}
+              </View>
+            ))}
           </View>
+        )}
+
+        <Text style={styles.sectionHeading}>Common issues</Text>
+
+        <View style={styles.section}>
+          {troubleshootCommonIssues.map((section, i) => (
+            <View key={section.id}>
+              {i > 0 && <View style={styles.separator} />}
+              <Pressable
+                style={({ pressed }) => [styles.accordionHeader, pressed && styles.rowPressed]}
+                onPress={() => toggleSection(section.id)}
+              >
+                {section.icon}
+                <Text style={styles.accordionTitle}>{section.title}</Text>
+                {expandedId === section.id ? (
+                  <ChevronUp size={16} color={colors.textMuted} />
+                ) : (
+                  <ChevronDown size={16} color={colors.textMuted} />
+                )}
+              </Pressable>
+              {expandedId === section.id && (
+                <View style={styles.accordionBody}>
+                  {section.steps.map((step, j) => (
+                    <View key={j} style={styles.stepRow}>
+                      <Text style={styles.bullet}>•</Text>
+                      <Text style={styles.stepText}>{step}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          ))}
         </View>
+
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgBase,
+    padding: spacing.lg
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary
+  },
+  scroll: {
+    flex: 1
+  },
+  scrollContent: {
+    paddingBottom: spacing.xl
+  },
+  diagnosticButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.bgRaised,
+    borderRadius: 10,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg
+  },
+  diagnosticButtonPressed: {
+    opacity: 0.7
+  },
+  diagnosticButtonDisabled: {
+    opacity: 0.5
+  },
+  diagnosticButtonLabel: {
+    fontSize: typography.bodySize,
+    fontWeight: '600',
+    color: colors.textPrimary
+  },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md + 2
+  },
+  checkLabel: {
+    fontSize: typography.bodySize,
+    fontWeight: '500',
+    color: colors.textPrimary
+  },
+  checkDetail: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: typography.metaSize,
+    color: colors.textMuted
+  },
+  checkDetailFail: {
+    color: colors.statusRed
+  },
+  sectionHeading: {
+    fontSize: typography.metaSize,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs
+  },
+  section: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: spacing.lg
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle,
+    marginHorizontal: spacing.md
+  },
+  rowPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2
+  },
+  accordionTitle: {
+    flex: 1,
+    fontSize: typography.bodySize,
+    fontWeight: '500',
+    color: colors.textPrimary
+  },
+  accordionBody: {
+    paddingHorizontal: spacing.md + 2,
+    paddingBottom: spacing.md,
+    gap: spacing.xs + 2
+  },
+  stepRow: {
+    flexDirection: 'row',
+    gap: spacing.sm
+  },
+  bullet: {
+    fontSize: typography.metaSize,
+    color: colors.textMuted,
+    lineHeight: 18
+  },
+  stepText: {
+    flex: 1,
+    fontSize: typography.metaSize,
+    color: colors.textMuted,
+    lineHeight: 18
+  }
+})

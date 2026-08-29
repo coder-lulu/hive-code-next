@@ -13,6 +13,7 @@ import {
 import type { ComponentType } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { OrcaLogo } from '../components/OrcaLogo'
+import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { productNameText } from '../product-brand'
 import type { MobileTheme } from '../theme/mobile-theme'
 
@@ -56,6 +57,7 @@ export function MobileHomeDrawer({
   onSettings,
   onFeedback
 }: MobileHomeDrawerProps) {
+  const { hydrated, session } = useMobileAuthSession()
   const styles = createStyles(theme)
   const rows: readonly DrawerRow[] = [
     { key: 'home', label: '首页', Icon: Home, onPress: onHome },
@@ -119,10 +121,16 @@ export function MobileHomeDrawer({
                 <OrcaLogo size={30} />
               </View>
               <View style={styles.accountCopy}>
-                <Text style={styles.accountTitle}>{productNameText('登录 Orca')}</Text>
+                <Text style={styles.accountTitle}>
+                  {hydrated && session
+                    ? session.account.displayName
+                    : productNameText('登录 HiveCode')}
+                </Text>
                 <View style={styles.accountSupportingRow}>
                   <LogIn size={14} color={theme.color.text.secondary} />
-                  <Text style={styles.accountSupporting}>登录后同步账号设置</Text>
+                  <Text style={styles.accountSupporting}>
+                    {hydrated && session ? '账号已同步' : '登录后同步账号设置'}
+                  </Text>
                 </View>
               </View>
             </Pressable>

@@ -15,9 +15,9 @@ describe('mobile home mode', () => {
     expect(parseMobileHomeMode(null)).toBeNull()
   })
 
-  it('defaults to computer mode regardless of the host catalog', () => {
-    expect(resolveInitialMobileHomeMode(null, true)).toBe('computer')
-    expect(resolveInitialMobileHomeMode(null, false)).toBe('computer')
+  it('defaults to cloud mode regardless of the host catalog', () => {
+    expect(resolveInitialMobileHomeMode(null, true)).toBe('cloud')
+    expect(resolveInitialMobileHomeMode(null, false)).toBe('cloud')
   })
 
   it('keeps an explicit preference regardless of the host catalog', () => {
@@ -25,9 +25,9 @@ describe('mobile home mode', () => {
     expect(resolveInitialMobileHomeMode('computer', false)).toBe('computer')
   })
 
-  it('falls back to computer mode when storage cannot be read', async () => {
+  it('falls back to cloud mode when storage cannot be read', async () => {
     const storage = { getItem: vi.fn().mockRejectedValue(new Error('storage unavailable')) }
-    await expect(loadInitialMobileHomeMode(storage, true)).resolves.toBe('computer')
+    await expect(loadInitialMobileHomeMode(storage, true)).resolves.toBe('cloud')
   })
 
   it('persists the selected mode under the versioned product key', async () => {

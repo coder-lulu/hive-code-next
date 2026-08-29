@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { isDocsOnlyPath, shouldRunPrChecks } from './pr-code-change-scope.mjs'
+import { hasNativeCacheInput, isDocsOnlyPath, shouldRunPrChecks } from './pr-code-change-scope.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const prWorkflow = parse(readFileSync(join(projectDir, '.github/workflows/pr.yml'), 'utf8'))
@@ -54,6 +54,13 @@ describe('docs-only path classification', () => {
   it('runs PR Checks when the diff is empty rather than skipping by accident', () => {
     expect(shouldRunPrChecks([])).toBe(true)
   })
+
+  it('primes native caches only when their inputs change', () => {
+    expect(hasNativeCacheInput([])).toBe(true)
+    expect(hasNativeCacheInput(['src/main/index.ts'])).toBe(false)
+    expect(hasNativeCacheInput(['config/patches/node-pty@1.1.0.patch'])).toBe(true)
+    expect(hasNativeCacheInput(['config/scripts/ensure-native-runtime.mjs'])).toBe(true)
+  })
 })
 
 describe('PR Checks docs-only skip wiring', () => {
@@ -77,8 +84,13 @@ describe('PR Checks docs-only skip wiring', () => {
 
   it('skips expensive jobs unless the detector says the PR has code', () => {
     for (const jobName of expensiveJobs) {
-      expect(prWorkflow.jobs[jobName].needs, jobName).toEqual(['code_paths'])
-      expect(prWorkflow.jobs[jobName].if, jobName).toBe(gatedIf)
+      if (jobName === 'test') {
+        expect(prWorkflow.jobs[jobName].needs, jobName).toEqual(['code_paths', 'test_native_cache'])
+        expect(prWorkflow.jobs[jobName].if, jobName).toContain(gatedIf)
+      } else {
+        expect(prWorkflow.jobs[jobName].needs, jobName).toEqual(['code_paths'])
+        expect(prWorkflow.jobs[jobName].if, jobName).toBe(gatedIf)
+      }
     }
   })
 

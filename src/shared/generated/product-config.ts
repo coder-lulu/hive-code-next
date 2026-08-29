@@ -44,10 +44,10 @@ export const hivecodeProductConfig = {
   },
   endpoints: {
     artifacts: null,
-    cloud: 'https://api.hivekernel.com',
-    identityIssuer: 'https://identity.hivekernel.com/realms/hive',
+    cloud: 'https://api.hive.test',
+    identityIssuer: 'https://identity.hive.test/realms/hive',
     relay: null,
-    update: 'https://updates.hivekernel.com/hive/v1/updates/desktop/',
+    update: 'https://updates.hive.test/hive/v1/updates/desktop/',
     telemetry: null,
     diagnostics: null,
     feedback: null,
