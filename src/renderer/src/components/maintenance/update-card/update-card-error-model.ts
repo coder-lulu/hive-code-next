@@ -39,7 +39,7 @@ export function buildUpdateCardErrorModel({
           title: translate('auto.components.UpdateCard.4cf109845a', 'Update Error'),
           summary: 'Could not restart to install the update.',
           detail: installError,
-          releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+          releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
           primaryAction: {
             label: translate('auto.components.UpdateCard.2c2d3e03ca', 'Try Again'),
             onClick: onInstallRetry
@@ -78,7 +78,7 @@ export function buildUpdateCardErrorModel({
         'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
       ),
       detail: compatibilitySetupError ?? status.message,
-      releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+      releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
       primaryAction: {
         label: translate('auto.components.UpdateCard.933c6fdf5b', 'Enable & Restart'),
         pendingLabel: 'Restarting...',
@@ -96,7 +96,7 @@ export function buildUpdateCardErrorModel({
         "The installer's publisher doesn't match Orca, so we stopped the update. Don't install this download; check official releases for a corrected version."
       ),
       detail: status.message,
-      releaseUrl: getReleaseNotesUrlForVersion(null),
+      releaseUrl: getReleaseNotesUrlForVersion(null) ?? undefined,
       manualLabel: translate('auto.components.UpdateCard.c9ff9b9ec2', 'Check official releases')
     }
   }
@@ -108,7 +108,7 @@ export function buildUpdateCardErrorModel({
         "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases."
       ),
       detail: status.message,
-      releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+      releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
       primaryAction: {
         label: translate('auto.components.UpdateCard.48565a32bc', 'Retry Download'),
         onClick: onRetryDownload
@@ -119,7 +119,7 @@ export function buildUpdateCardErrorModel({
     title: cachedVersion ? 'Update Error' : 'Update Check Failed',
     summary: cachedVersion ? 'Could not complete the update.' : 'Could not check for updates.',
     detail: status.message,
-    releaseUrl: getReleaseNotesUrlForVersion(cachedVersion),
+    releaseUrl: getReleaseNotesUrlForVersion(cachedVersion) ?? undefined,
     primaryAction: cachedVersion
       ? {
           label: translate('auto.components.UpdateCard.48565a32bc', 'Retry Download'),

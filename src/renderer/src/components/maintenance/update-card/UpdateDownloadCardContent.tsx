@@ -33,6 +33,7 @@ export function UpdateDownloadingContent({
   showReleaseNotes: boolean
 }): React.JSX.Element {
   const release = changelog?.release
+  const releaseNotesUrl = release?.releaseNotesUrl ?? getReleaseNotesUrlForVersion(version)
   const showMedia =
     release?.mediaUrl && !mediaFailed && !(prefersReducedMotion && isAnimatedGif(release.mediaUrl))
   return (
@@ -82,15 +83,11 @@ export function UpdateDownloadingContent({
               value0: version
             })}
       </p>
-      {showReleaseNotes && (
+      {showReleaseNotes && releaseNotesUrl && (
         <button
           type="button"
           className="text-xs text-muted-foreground underline hover:text-foreground self-start"
-          onClick={() =>
-            void window.api.shell.openUrl(
-              release ? release.releaseNotesUrl : getReleaseNotesUrlForVersion(version)
-            )
-          }
+          onClick={() => void window.api.shell.openUrl(releaseNotesUrl)}
         >
           {release
             ? translate('auto.components.UpdateCard.aad383aecc', 'Read the full release notes')

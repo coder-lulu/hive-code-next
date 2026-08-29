@@ -2660,7 +2660,11 @@ export function connectPanePty(
       })
     return claimKey
   }
-  const onExit = (ptyId: string, opts: { preserveRendererBinding?: boolean } = {}): void => {
+  const onExit = (
+    ptyId: string,
+    exitCodeOrOpts: number | { preserveRendererBinding?: boolean } = {}
+  ): void => {
+    const opts = typeof exitCodeOrOpts === 'number' ? {} : exitCodeOrOpts
     if (handledExitPtyId === ptyId) {
       return
     }

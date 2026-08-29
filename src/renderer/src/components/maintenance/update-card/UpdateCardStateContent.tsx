@@ -73,7 +73,9 @@ export function UpdateCardStateContent({
       <LinuxPackageInstallRecoveryCard
         recovery={linuxPackageRecovery.recovery}
         diagnostic={linuxPackageRecovery.diagnostic}
-        releaseUrl={isLocalBuild ? undefined : getReleaseNotesUrlForVersion(cachedVersion)}
+        releaseUrl={
+          isLocalBuild ? undefined : (getReleaseNotesUrlForVersion(cachedVersion) ?? undefined)
+        }
         onClose={onCollapse}
       />
     )
@@ -117,7 +119,7 @@ export function UpdateCardStateContent({
   }
   const releaseUrl = isLocalBuild
     ? undefined
-    : (status.releaseUrl ?? getReleaseNotesUrlForVersion(status.version))
+    : (status.releaseUrl ?? getReleaseNotesUrlForVersion(status.version) ?? undefined)
   return changelog?.release ? (
     <UpdateAvailableRichContent
       release={changelog.release}
