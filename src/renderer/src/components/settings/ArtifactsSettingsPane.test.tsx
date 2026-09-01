@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { getDefaultSettings } from '../../../../shared/constants'
 
 const mocks = vi.hoisted(() => ({
@@ -20,9 +21,15 @@ const mocks = vi.hoisted(() => ({
   }
 }))
 
-vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
-}))
+vi.mock('@/i18n/i18n', async () => {
+  const { applyProductCliBranding } = await import('../../../../shared/brand')
+  return {
+    translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
+      applyProductCliBranding(fallback).replace(/\{\{(\w+)\}\}/g, (placeholder, key: string) =>
+        options?.[key] === undefined ? placeholder : String(options[key])
+      )
+  }
+})
 
 vi.mock('@/lib/web-client-location', () => ({
   isWebClientLocation: () => mocks.state.isWebClient
@@ -71,15 +78,17 @@ describe('ArtifactsSettingsPane', () => {
     expect(
       screen.getByText('After publishing, copy the link and send it to your team.')
     ).toBeInTheDocument()
-    expect(screen.getByText('Manage it in Orca')).toBeInTheDocument()
+    expect(screen.getByText(`Manage it in ${APP_DISPLAY_NAME}`)).toBeInTheDocument()
     expect(
       screen.getByText('Preview, copy, and manage links shared through your account.')
     ).toBeInTheDocument()
     expect(
       screen.queryByText('Uploads require sign-in; public links do not.')
     ).not.toBeInTheDocument()
-    expect(screen.queryByText('Orca account')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Sign in to Orca' })).not.toBeInTheDocument()
+    expect(screen.queryByText(`${APP_DISPLAY_NAME} account`)).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: `Sign in to ${APP_DISPLAY_NAME}` })
+    ).not.toBeInTheDocument()
   })
 
   it('offers sign in for a local profile', async () => {
@@ -88,7 +97,7 @@ describe('ArtifactsSettingsPane', () => {
     render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
 
     expect(screen.getByText('Sign in to share artifacts')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Sign in to Orca' }))
+    await user.click(screen.getByRole('button', { name: `Sign in to ${APP_DISPLAY_NAME}` }))
     expect(mocks.connect).toHaveBeenCalledOnce()
   })
 
@@ -112,7 +121,7 @@ describe('ArtifactsSettingsPane', () => {
     render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
 
     expect(mocks.fetchAuthStatus).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Sign in to Orca' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: `Sign in to ${APP_DISPLAY_NAME}` })).toBeDisabled()
   })
 
   it('controls only sidebar visibility and always allows opening Artifacts', async () => {
@@ -221,7 +230,9 @@ describe('ArtifactsSettingsPane', () => {
     render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
 
     expect(
-      screen.getByText(/Open Settings → Artifacts in the Orca desktop app on the host device/)
+      screen.getByText(
+        `Open Settings → Artifacts in the ${APP_DISPLAY_NAME} desktop app on the host device and enable publishing.`
+      )
     ).toBeInTheDocument()
   })
 })

@@ -1,7 +1,20 @@
 name: HiveCode Windows x64 hardware-signed package
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Exact package version to publish, e.g. 1.5.0-beta.1'
+        required: true
+        type: string
+      publish_hivecloud_release:
+        description: 'Publish the verified installer to HiveCloud object storage'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -13,7 +26,7 @@ concurrency:
 jobs:
   build-and-sign:
     name: Build and hardware-sign HiveCode Windows x64
-    if: github.ref_protected == true
+    if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)
     runs-on: [self-hosted, windows, x64]
     environment: hivecode-windows-signing
     timeout-minutes: 120
@@ -41,6 +54,39 @@ jobs:
           node-version-file: package.json
           cache: pnpm
 
+      - name: Resolve identity and reserve Windows build number
+        shell: pwsh
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          REQUESTED_VERSION: ${{ github.event.inputs.release_version }}
+        run: |
+          $version = if (-not [string]::IsNullOrWhiteSpace($env:REQUESTED_VERSION)) {
+            $env:REQUESTED_VERSION.Trim().TrimStart('v')
+          } else {
+            '${{ github.ref_name }}'.TrimStart('v')
+          }
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -ne $packageVersion) {
+            throw "Release version $version does not match package.json version $packageVersion"
+          }
+          if ($version -match '^\d+\.\d+\.\d+-beta\.\d+$') {
+            $channel = 'beta'
+          } elseif ($version -match '^\d+\.\d+\.\d+$') {
+            $channel = 'stable'
+          } else {
+            throw "Unsupported HiveCode release version: $version"
+          }
+          $env:HIVECODE_RELEASE_PLATFORM = 'windows'
+          $env:HIVECODE_RELEASE_CHANNEL = $channel
+          $env:HIVECODE_BUILD_RESERVATION_KEY = "hivecode:windows:${channel}:${version}"
+          node config/scripts/reserve-hivecloud-build-number.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "HIVECODE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "HIVECODE_RELEASE_CHANNEL=$channel" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "HIVECODE_COMMIT_SHA=${{ github.sha }}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "HIVECODE_EMBED_RELEASE_IDENTITY=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Preflight protected hardware signing boundary
         shell: pwsh
         run: node config/scripts/build-windows-x64-hardware-signed.mjs --preflight-only
@@ -62,6 +108,27 @@ jobs:
           }
           pnpm run verify:windows:hardware -- $artifact
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $signature = Get-AuthenticodeSignature -LiteralPath $artifact
+          if ($signature.Status -ne 'Valid' -or $null -eq $signature.SignerCertificate) {
+            throw 'The final Windows installer does not have a valid Authenticode signature'
+          }
+          $fingerprint = $signature.SignerCertificate.GetCertHashString(
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256
+          )
+          "HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT=$fingerprint" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Publish verified Windows installer to HiveCloud object storage
+        if: github.event_name == 'push' || github.event.inputs.publish_hivecloud_release == 'true'
+        shell: pwsh
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECODE_DESKTOP_PLATFORM: windows
+          HIVECODE_DESKTOP_ARCHITECTURE: x64
+          HIVECODE_ARTIFACT_PATHS: x64=dist/hivecode-windows-setup.exe
+          HIVECODE_RELEASE_NOTES: ${{ github.ref_name }}
+        run: node config/scripts/publish-hivecloud-desktop-release.mjs
 
       - name: Upload verified HiveCode Windows artifacts
         uses: actions/upload-artifact@v7

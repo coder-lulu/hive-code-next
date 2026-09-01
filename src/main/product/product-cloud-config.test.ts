@@ -8,23 +8,22 @@ vi.mock('electron', () => ({
 }))
 
 describe('HiveCode cloud auth config', () => {
-  it('returns unconfigured in packaged HiveCode builds when no cloud endpoint is set', () => {
+  it('uses the grouped product manifest in packaged HiveCode builds', () => {
     const result = getProductCloudAuthConfig({}, true)
 
-    expect(result.configured).toBe(false)
-    if (!result.configured) {
-      expect(result.setupMessage).toContain('HiveCode Cloud')
-      expect(result.setupMessage).toContain('not configured')
+    expect(result.configured).toBe(true)
+    if (result.configured) {
+      expect(result.config.apiBaseUrl).toBe('https://api.hive.test')
+      expect(result.config.relayDirectorUrl).toBeNull()
     }
   })
 
   it('does not fall back to Orca production endpoints in packaged HiveCode builds', () => {
     const result = getProductCloudAuthConfig({}, true)
 
-    expect(result.configured).toBe(false)
-    // Safety: the setup message must NOT mention Orca Cloud
-    if (!result.configured) {
-      expect(result.setupMessage).not.toMatch(/orca/i)
+    expect(result.configured).toBe(true)
+    if (result.configured) {
+      expect(result.config.apiBaseUrl).not.toMatch(/onorca|orca\.dev/i)
     }
   })
 
@@ -38,7 +37,7 @@ describe('HiveCode cloud auth config', () => {
       true
     )
 
-    expect(result.configured).toBe(false)
+    expect(result.configured).toBe(true)
   })
 
   it('allows ORCA_CLOUD_* env vars in dev / unpackaged builds', () => {
@@ -98,15 +97,19 @@ describe('HiveCode cloud auth config', () => {
       true
     )
 
-    expect(result.configured).toBe(false)
+    expect(result.configured).toBe(true)
+    if (result.configured) expect(result.config.apiBaseUrl).toBe('https://api.hive.test')
   })
 
-  it('fails closed when API and client are configured without a relay endpoint', () => {
+  it('allows Cloud auth when API and client are configured without Relay', () => {
     const result = getProductCloudAuthConfig({
       ORCA_CLOUD_API_URL: 'https://hivecode-cloud.example',
       ORCA_CLOUD_CLIENT_ID: 'desktop-client'
     })
 
-    expect(result.configured).toBe(false)
+    expect(result.configured).toBe(true)
+    if (result.configured) {
+      expect(result.config.relayDirectorUrl).toBeNull()
+    }
   })
 })

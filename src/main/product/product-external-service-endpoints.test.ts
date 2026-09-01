@@ -45,6 +45,24 @@ describe('product external service endpoints', () => {
     })
   })
 
+  it('does not revive artifacts from legacy endpoints when OSS is disabled', () => {
+    expect(
+      getProductExternalServiceEndpoints({
+        endpoints: {
+          artifacts: 'https://artifacts.example.test',
+          feedback: null,
+          pluginKillList: null,
+          pluginMarketplace: null,
+          changelog: null,
+          nudge: null,
+          telemetry: null,
+          diagnostics: null
+        },
+        services: { oss: { enabled: false, endpoint: null } }
+      })
+    ).toMatchObject({ artifacts: null })
+  })
+
   it('keeps the unapproved product star repository disabled', () => {
     expect(getProductStarRepository()).toBeNull()
     expect(getProductStarRepository({ desktop: { starRepository: 'hivekernel/hivecode' } })).toBe(

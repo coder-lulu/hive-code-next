@@ -5,6 +5,7 @@ const {
   autoUpdaterMock,
   isMock,
   powerMonitorOnMock,
+  fetchNewerReleaseTagsMock,
   fetchNudgeMock,
   shouldApplyNudgeMock,
   moduleFactories,
@@ -24,10 +25,20 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
+vi.mock('./product/product-updater-session', () => moduleFactories.productUpdaterSession())
+vi.mock('./linux-root-package-install-policy', () =>
+  moduleFactories.linuxRootPackageInstallPolicy()
+)
 
 describe('updater', () => {
   beforeEach(() => {
     resetUpdaterMocks()
+    fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.61'])
   })
 
   it('does not load or configure electron-updater during dev setup', async () => {
@@ -239,10 +250,12 @@ describe('updater', () => {
       changelog: null
     })
 
-    await vi.advanceTimersByTimeAsync(23 * 60 * 60 * 1000)
+    // Stay clear of the exact boundary so the assertion is not sensitive to
+    // fake-timer microtask ordering; the following two-hour advance crosses it.
+    await vi.advanceTimersByTimeAsync(22 * 60 * 60 * 1000)
     expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(60 * 60 * 1000)
+    await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000)
     // Why: the boundary tick sweeps the updater's other timers (30-minute nudge poll, 45-second
     // stall guard) too, so pin the reschedule itself — nothing before 24h, a check once it elapses —
     // rather than an exact process-wide call total.

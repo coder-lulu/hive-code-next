@@ -16,7 +16,13 @@ describe('Hive Runtime Cloud report', () => {
   ] as const)(
     'maps %s graph readiness without publishing a web endpoint',
     (graph, state, reason) => {
-      const report = createHiveRuntimeCloudReport(runtime(graph), '1.4.178-rc.7')
+      const report = createHiveRuntimeCloudReport(
+        runtime(graph),
+        '1.4.178-rc.7',
+        undefined,
+        Date.now,
+        {}
+      )
 
       expect(report).toEqual({
         runtimeVersion: '1.4.178-rc.7',
@@ -41,7 +47,17 @@ describe('Hive Runtime Cloud report', () => {
         webClientPath: '/web-index.html',
         websocketPath: '/_hive/runtime-rpc'
       },
-      () => Date.parse('2026-08-25T08:01:00.000Z')
+      () => Date.parse('2026-08-25T08:01:00.000Z'),
+      {
+        deviceName: 'build-host',
+        osName: 'Linux',
+        osVersion: '#1 SMP',
+        osArch: 'arm64',
+        cpuModel: 'Example CPU',
+        cpuLogicalCores: 8,
+        totalMemoryBytes: 32 * 1024 ** 3,
+        freeDiskBytes: 512 * 1024 ** 3
+      }
     )
 
     expect(report.capabilities).toEqual([
@@ -54,7 +70,15 @@ describe('Hive Runtime Cloud report', () => {
       webHttpsOrigin: 'https://code.hivekernel.com',
       webClientPath: '/web-index.html',
       websocketPath: '/_hive/runtime-rpc',
-      webEndpointExpiresAt: '2026-08-25T08:02:15.000Z'
+      webEndpointExpiresAt: '2026-08-25T08:02:15.000Z',
+      deviceName: 'build-host',
+      osName: 'Linux',
+      osVersion: '#1 SMP',
+      osArch: 'arm64',
+      cpuModel: 'Example CPU',
+      cpuLogicalCores: 8,
+      totalMemoryBytes: 32 * 1024 ** 3,
+      freeDiskBytes: 512 * 1024 ** 3
     })
   })
 })

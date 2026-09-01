@@ -1,5 +1,6 @@
 import { decrypt, encrypt } from './e2ee-crypto'
 import type WebSocket from 'ws'
+import { APP_DISPLAY_NAME } from './brand'
 import { RemoteRuntimeClientError } from './remote-runtime-client'
 import { serializeRemoteRuntimePayload } from './remote-runtime-memory-limits'
 import {
@@ -25,7 +26,9 @@ export function parseSharedControlFrame(
   if (!sharedKey) {
     return {
       type: 'error',
-      error: invalidRemoteRuntimeResponseError('Remote Orca runtime returned a frame before E2EE.')
+      error: invalidRemoteRuntimeResponseError(
+        `Remote ${APP_DISPLAY_NAME} runtime returned a frame before E2EE.`
+      )
     }
   }
   const plaintext = decrypt(frame, sharedKey)
@@ -33,7 +36,7 @@ export function parseSharedControlFrame(
     return {
       type: 'error',
       error: invalidRemoteRuntimeResponseError(
-        'Remote Orca runtime returned an undecryptable frame.'
+        `Remote ${APP_DISPLAY_NAME} runtime returned an undecryptable frame.`
       )
     }
   }
@@ -101,12 +104,12 @@ export function getCleanupRequest(
 export function formatSharedControlCloseMessage(code: number, reason: Buffer): string {
   const reasonText = reason.toString().trim()
   if (code !== 1005 && code !== 1006 && reasonText) {
-    return `Remote Orca runtime closed the connection (${code}: ${reasonText}).`
+    return `Remote ${APP_DISPLAY_NAME} runtime closed the connection (${code}: ${reasonText}).`
   }
   if (code !== 1005 && code !== 1006) {
-    return `Remote Orca runtime closed the connection (${code}).`
+    return `Remote ${APP_DISPLAY_NAME} runtime closed the connection (${code}).`
   }
-  return 'Remote Orca runtime closed the connection.'
+  return `Remote ${APP_DISPLAY_NAME} runtime closed the connection.`
 }
 
 export function sendSharedControlEncrypted(args: {

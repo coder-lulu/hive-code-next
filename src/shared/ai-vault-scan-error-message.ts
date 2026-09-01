@@ -4,6 +4,8 @@
  * row and the thrown-rejection banner. Anything unrecognized passes through, so
  * scanner-authored messages (host name, remote path, cap) keep their own wording.
  */
+import { APP_DISPLAY_NAME } from './brand'
+
 const RETRY = 'Refresh to try again.'
 
 /** Electron wraps every rejected `ipcMain.handle` before the renderer sees it. */
@@ -35,7 +37,7 @@ function humanize(text: string): string | null {
     return 'Too many session scans in flight. Wait a moment, then refresh.'
   }
   if (new RegExp(String.raw`^${SCANNER} entry not found: `).test(text)) {
-    return 'The session scanner is missing from this Orca install. Reinstalling Orca restores it.'
+    return `The session scanner is missing from this ${APP_DISPLAY_NAME} install. Reinstalling ${APP_DISPLAY_NAME} restores it.`
   }
   if (new RegExp(String.raw`^${SCANNER}\b`).test(text)) {
     return `The session scanner stopped unexpectedly. ${RETRY}`

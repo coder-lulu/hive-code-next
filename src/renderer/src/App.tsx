@@ -5,6 +5,7 @@ import { PRODUCT_LOGO_URL } from '@/product-brand'
 import { ConfirmationDialogProvider } from './components/confirmation-dialog'
 import { BrowserWebAuthnAccountDialog } from './components/browser-webauthn-account-dialog'
 import { DocPreviewExternalLinkConfirmation } from './components/browser-pane/workspace-doc/doc-preview-external-link-confirmation'
+import { useStartupPreflightNotifications } from './components/landing-preflight-runtime'
 import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-preference-dialog'
 import { SkillFreshnessNudge } from './components/skills/SkillFreshnessNudge'
 import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
@@ -45,6 +46,7 @@ function App(): React.JSX.Element {
     floatingPanelVisible: floatingWorkspace.enabled && floatingWorkspace.open
   })
   useAppStartupHydration(onboardingGate.applyStartupOnboardingState)
+  useStartupPreflightNotifications()
   useAppSessionPersistence()
   useRuntimeGraphSync()
   usePersistedUIWriter()

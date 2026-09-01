@@ -2,9 +2,30 @@ import { describe, expect, it } from 'vitest'
 import { TUI_AGENT_AUTO_PICK_ORDER } from '../../../shared/tui-agent-selection'
 import { AGENT_CATALOG } from './agent-catalog'
 import {
+  filterQuickWorkspaceAgents,
   pickQuickWorkspaceAgent,
   resolveQuickWorkspaceAgentSelection
 } from './quick-workspace-agent-selection'
+
+describe('filterQuickWorkspaceAgents', () => {
+  const catalog = [
+    { id: 'claude' as const, label: 'Claude' },
+    { id: 'codex' as const, label: 'Codex' },
+    { id: 'opencode' as const, label: 'OpenCode' }
+  ]
+
+  it('keeps only detected and enabled agents while preserving catalog metadata', () => {
+    expect(filterQuickWorkspaceAgents(catalog, ['claude', 'codex'], ['claude'])).toEqual([
+      { id: 'codex', label: 'Codex' }
+    ])
+  })
+
+  it('keeps enabled catalog entries while first detection is pending', () => {
+    expect(filterQuickWorkspaceAgents(catalog, null, ['opencode']).map((entry) => entry.id)).toEqual(
+      ['claude', 'codex']
+    )
+  })
+})
 
 describe('pickQuickWorkspaceAgent', () => {
   it('keeps the fallback order in sync with the desktop agent catalog', () => {

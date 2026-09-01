@@ -88,6 +88,7 @@ import { toast } from 'sonner'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { ensureWorktreeHasInitialTerminal } from '@/lib/worktree-initial-terminal-seeding'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
+import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import {
   beginBackgroundWorktreePreparation,
   continueBackgroundWorktreeCreation,
@@ -542,6 +543,49 @@ describe('staged background worktree creation', () => {
     expect(queueWorkspaceActivationTerminalFocus).not.toHaveBeenCalled()
     expect(store.removePendingWorktreeCreation).toHaveBeenCalledWith('creation-1', {
       cleanupVm: false
+    })
+  })
+
+  it('hands the authoritative backend pane to delayed prompt delivery', async () => {
+    const leafId = '11111111-1111-4111-8111-111111111111'
+    store.createWorktree.mockResolvedValueOnce({
+      worktree: { id: 'wt-1', repoId: 'repo-1' },
+      startupTerminal: {
+        tabId: 'agent-tab',
+        paneKey: `agent-tab:${leafId}`,
+        spawned: true
+      }
+    })
+    const startupPlan = {
+      agent: 'goose' as const,
+      launchCommand: 'goose',
+      expectedProcess: 'goose',
+      followupPrompt: 'implement the task',
+      launchConfig: { agentCommand: 'goose', agentArgs: '', agentEnv: {} },
+      launchToken: 'launch-token-1',
+      agentPermissionMode: 'manual' as const
+    }
+
+    continueBackgroundWorktreeCreation(
+      'creation-1',
+      makeRequest({
+        agent: 'goose',
+        startup: {
+          command: 'goose',
+          launchAgent: 'goose',
+          launchToken: 'launch-token-1',
+          agentPermissionMode: 'manual'
+        },
+        startupPlan
+      })
+    )
+
+    await flushAsyncWorktreeCreation()
+    expect(ensureAgentStartupInTerminal).toHaveBeenCalledWith({
+      worktreeId: 'wt-1',
+      primaryTabId: 'agent-tab',
+      startupPaneKey: `agent-tab:${leafId}`,
+      startup: startupPlan
     })
   })
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import { abortSignalReason, throwIfSignalAborted } from './abort-signal-reason'
+import { APP_DISPLAY_NAME } from './brand'
 import {
   deriveSharedKey,
   encrypt,
@@ -102,7 +103,7 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
       finishError(
         new RemoteRuntimeClientError(
           'runtime_timeout',
-          'Timed out waiting for the remote Orca runtime to respond.',
+          `Timed out waiting for the remote ${APP_DISPLAY_NAME} runtime to respond.`,
           { pairingStage: router.pairingStage }
         )
       )
@@ -154,7 +155,7 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
         finishError(
           new RemoteRuntimeClientError(
             'remote_runtime_unavailable',
-            'Remote Orca runtime request was released before it could be sent.'
+            `Remote ${APP_DISPLAY_NAME} runtime request was released before it could be sent.`
           )
         )
         return
@@ -205,7 +206,7 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
       finishError(
         new RemoteRuntimeClientError(
           'remote_runtime_unavailable',
-          'Could not connect to the remote Orca runtime.',
+          `Could not connect to the remote ${APP_DISPLAY_NAME} runtime.`,
           { pairingStage: router.pairingStage }
         )
       )
@@ -231,7 +232,7 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
         finishError(
           new RemoteRuntimeClientError(
             'invalid_runtime_response',
-            'Remote Orca runtime returned an unexpected binary frame.',
+            `Remote ${APP_DISPLAY_NAME} runtime returned an unexpected binary frame.`,
             {
               pairingStage:
                 router.state === 'awaiting_ready' ? 'host-identity' : router.pairingStage

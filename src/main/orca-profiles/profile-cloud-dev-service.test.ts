@@ -90,7 +90,7 @@ describe('Orca cloud dev auth service', () => {
       persistence: 'encrypted',
       cloud: {
         cloudProfileId: 'dev-cloud-local-default',
-        email: 'dev@orca.local'
+        email: 'dev@hivecode.local'
       },
       capabilities: {
         flags: expect.objectContaining({ 'share.create': true })

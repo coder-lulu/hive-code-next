@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 vi.mock('electron', () => ({
   app: {
@@ -634,7 +634,7 @@ describe('runRemoteOrcaCli', () => {
     )
 
     expect(result.exitCode).toBe(1)
-    expect(result.stderr).toContain('orca serve')
+    expect(result.stderr).toContain(`${PRIMARY_CLI_COMMAND} serve`)
     expect(result.stderr).toContain('SSH relay bridge')
     expect(spawn).not.toHaveBeenCalled()
   })
@@ -734,6 +734,29 @@ describe('runRemoteOrcaCli', () => {
       `Unsupported SSH ${APP_DISPLAY_NAME} CLI command: worktree list`
     )
     expect(result.stderr).toContain(`full ${APP_DISPLAY_NAME} CLI bridge unavailable`)
+  })
+
+  it('preserves user-owned names in unsupported command diagnostics', async () => {
+    const { runtime } = createRuntime()
+
+    const result = await runRemoteOrcaCli(
+      runtime,
+      {
+        argv: ['emulator', 'launch', 'Orca status'],
+        cwd: '/home/alice',
+        env: {}
+      },
+      {
+        ...LEGACY_FALLBACK_OPTIONS,
+        cliEntryPath: '/customer Orca workspace/out/cli/index.js'
+      }
+    )
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain(`Unsupported SSH ${APP_DISPLAY_NAME} CLI command`)
+    expect(result.stderr).toContain('emulator launch Orca status')
+    expect(result.stderr).toContain('/customer Orca workspace/out/cli/index.js')
+    expect(result.stderr).not.toContain('customer HiveCode workspace')
   })
 
   it('does not parse Android --activity values as Linear boolean flags', async () => {

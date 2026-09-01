@@ -33,6 +33,17 @@ describe('worktree RPC schemas', () => {
     expect(parsed.success).toBe(false)
   })
 
+  it('rejects permission modes that are not attached to an agent startup', () => {
+    const parsed = WorktreeCreate.safeParse({
+      repo: 'repo-1',
+      name: 'agent-startup',
+      createdWithAgent: 'codex',
+      startupPermissionMode: 'manual'
+    })
+
+    expect(parsed.success).toBe(false)
+  })
+
   it('normalizes durable Jira linked-item metadata and rejects provider mismatches', () => {
     const linkedWorkItem = {
       provider: 'jira',

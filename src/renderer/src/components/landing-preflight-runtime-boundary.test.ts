@@ -4,10 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PreflightStatus } from '../../../preload/api-types'
 import type { Repo } from '../../../shared/repo-types'
 import { useAppStore } from '../store'
-import { useLandingPreflightRuntime } from './landing-preflight-runtime'
+import {
+  useLandingPreflightRuntime,
+  useStartupPreflightNotifications
+} from './landing-preflight-runtime'
+
+const toastWarning = vi.hoisted(() => vi.fn())
+const toastDismiss = vi.hoisted(() => vi.fn())
+
+vi.mock('sonner', () => ({
+  toast: {
+    dismiss: toastDismiss,
+    warning: toastWarning
+  }
+}))
 
 const refresh = vi.fn().mockResolvedValue(undefined)
 const invalidate = vi.fn()
+const openUrl = vi.fn().mockResolvedValue(undefined)
 
 const status = (overrides: Partial<PreflightStatus> = {}): PreflightStatus => ({
   git: { installed: true },
@@ -29,8 +43,18 @@ beforeEach(() => {
   vi.useFakeTimers()
   refresh.mockClear()
   invalidate.mockClear()
+  openUrl.mockClear()
+  toastDismiss.mockClear()
+  toastWarning.mockClear()
+  ;(window as unknown as { api: { shell: { openUrl: typeof openUrl } } }).api = {
+    shell: { openUrl }
+  }
   useAppStore.setState(useAppStore.getInitialState(), true)
-  useAppStore.setState({ refreshPreflightStatus: refresh, invalidatePreflightStatus: invalidate })
+  useAppStore.setState({
+    settings: {},
+    refreshPreflightStatus: refresh,
+    invalidatePreflightStatus: invalidate
+  } as never)
 })
 
 afterEach(() => {
@@ -40,6 +64,16 @@ afterEach(() => {
 })
 
 describe('landing preflight runtime boundary', () => {
+  it('waits for startup settings before checking the execution host', () => {
+    useAppStore.setState({ settings: null } as never)
+
+    const view = renderHook(() => useLandingPreflightRuntime())
+
+    expect(invalidate).toHaveBeenCalledTimes(1)
+    expect(refresh).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
   it('refreshes after an active runtime A to B switch without manual action', () => {
     const view = renderHook(() => useLandingPreflightRuntime())
     expect(refresh).toHaveBeenCalledTimes(1)
@@ -134,5 +168,63 @@ describe('landing preflight runtime boundary', () => {
     removeEventListener.mockRestore()
     addWindowListener.mockRestore()
     removeWindowListener.mockRestore()
+  })
+})
+
+describe('startup preflight notifications', () => {
+  it('announces a missing GitHub CLI once and keeps the install action available', () => {
+    useAppStore.setState({ repos: [githubRepo], preflightStatus: status() })
+
+    const view = renderHook(() => useStartupPreflightNotifications())
+
+    expect(toastWarning).toHaveBeenCalledTimes(1)
+    expect(toastWarning).toHaveBeenCalledWith(
+      'GitHub CLI is not installed',
+      expect.objectContaining({
+        id: 'startup-preflight:gh',
+        description: 'HiveCode uses the GitHub CLI (gh) to show pull requests, issues, and checks.',
+        duration: 12000,
+        action: expect.objectContaining({ label: 'Install GitHub CLI' })
+      })
+    )
+
+    const options = toastWarning.mock.calls[0][1] as {
+      action: { onClick: () => void }
+    }
+    options.action.onClick()
+    expect(openUrl).toHaveBeenCalledWith('https://cli.github.com')
+
+    act(() => {
+      useAppStore.setState({ preflightStatus: status() })
+    })
+    expect(toastWarning).toHaveBeenCalledTimes(1)
+    view.unmount()
+  })
+
+  it('waits for a GitHub project to hydrate and dismisses a resolved startup notice', () => {
+    useAppStore.setState({ preflightStatus: status() })
+    const view = renderHook(() => useStartupPreflightNotifications())
+
+    expect(toastWarning).not.toHaveBeenCalled()
+
+    act(() => {
+      useAppStore.setState({ repos: [githubRepo] })
+    })
+    expect(toastWarning).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      useAppStore.setState({
+        preflightStatus: status({
+          gh: { installed: true, authenticated: true }
+        })
+      })
+    })
+    expect(toastDismiss).toHaveBeenCalledWith('startup-preflight:gh')
+
+    act(() => {
+      useAppStore.setState({ preflightStatus: status() })
+    })
+    expect(toastWarning).toHaveBeenCalledTimes(1)
+    view.unmount()
   })
 })

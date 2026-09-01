@@ -1,6 +1,7 @@
 import type { AgentHookSource } from './agent-hook-relay'
 import type { AgentStatusState } from './agent-status-types'
 import type { TuiAgent } from './tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from './tui-agent-permissions'
 
 export const RESUMABLE_TUI_AGENTS = [
   'claude',
@@ -40,6 +41,10 @@ export type SleepingAgentLaunchConfig = {
   agentArgs: string
   agentEnv: Record<string, string>
   ompResumeFilePath?: string
+  /** Re-resolve command/args/env from the execution Host instead of persisting Renderer defaults. */
+  hostDefaultsAuthoritative?: true
+  /** Semantic one-launch permission choice that must survive a Host-owned resume. */
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
 }
 
 export type SleepingAgentSessionRecord = {

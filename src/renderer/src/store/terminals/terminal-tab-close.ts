@@ -145,6 +145,17 @@ export function createTerminalTabCloseActions(
             delete nextUnreadAgentCompletionPanes[paneKey]
           }
         }
+        const currentUnreadAgentCompletionCountByPane =
+          s.unreadAgentCompletionCountByPane ?? {}
+        let nextUnreadAgentCompletionCountByPane = currentUnreadAgentCompletionCountByPane
+        for (const paneKey of Object.keys(currentUnreadAgentCompletionCountByPane)) {
+          if (paneKey.startsWith(`${tabId}:`)) {
+            if (nextUnreadAgentCompletionCountByPane === currentUnreadAgentCompletionCountByPane) {
+              nextUnreadAgentCompletionCountByPane = { ...currentUnreadAgentCompletionCountByPane }
+            }
+            delete nextUnreadAgentCompletionCountByPane[paneKey]
+          }
+        }
         const nextLastTerminalInputAtByPaneKey = { ...s.lastTerminalInputAtByPaneKey }
         for (const paneKey of Object.keys(nextLastTerminalInputAtByPaneKey)) {
           if (paneKey.startsWith(`${tabId}:`)) {
@@ -238,6 +249,9 @@ export function createTerminalTabCloseActions(
             : {}),
           ...(nextUnreadAgentCompletionPanes !== s.unreadAgentCompletionPanes
             ? { unreadAgentCompletionPanes: nextUnreadAgentCompletionPanes }
+            : {}),
+          ...(nextUnreadAgentCompletionCountByPane !== currentUnreadAgentCompletionCountByPane
+            ? { unreadAgentCompletionCountByPane: nextUnreadAgentCompletionCountByPane }
             : {}),
           lastTerminalInputAtByPaneKey: nextLastTerminalInputAtByPaneKey,
           expandedPaneByTabId: nextExpanded,

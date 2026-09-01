@@ -9,10 +9,10 @@ const productManifest = JSON.parse(
 )
 const retainedUpstreamReleaseWorkflows = [
   'release-cut.yml',
-  'release-mac-build.yml',
   'hourly-mac-build.yml',
+  'daily-mac-build.yml',
   'adhoc-mac-build.yml',
-  'mobile-android-release.yml',
+  'dev-channel-win-build.yml',
   'mobile-ios-release.yml'
 ]
 const upstreamRepositoryGuard = "github.repository == 'stablyai/orca'"
@@ -82,6 +82,23 @@ describe('HiveCloud product release workflow boundary', () => {
         `${scriptName} must verify generated product configuration before packaging`
       ).toContain('verify:product-config')
     }
+  })
+
+  it('runs the HiveCloud Android publisher only in the HiveCode product repository', () => {
+    const workflow = parse(
+      readFileSync(join(repoRoot, '.github/workflows/mobile-android-release.yml'), 'utf8')
+    )
+    expect(workflow.jobs['android-build'].if).toContain(
+      "github.repository == 'coder-lulu/hive-code-next'"
+    )
+    expect(workflow.jobs['android-build'].if).not.toContain(upstreamRepositoryGuard)
+  })
+
+  it('runs the manual HiveCloud macOS publisher only in the HiveCode product repository', () => {
+    const workflow = parse(
+      readFileSync(join(repoRoot, '.github/workflows/release-mac-build.yml'), 'utf8')
+    )
+    expect(workflow.jobs['build-mac'].if).toBe("github.repository == 'coder-lulu/hive-code-next'")
   })
 })
 

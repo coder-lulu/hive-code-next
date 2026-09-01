@@ -21,11 +21,20 @@ import {
   resolveTuiAgentLaunchEnv
 } from '../../../shared/tui-agent-launch-defaults'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
+import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
+import { resolveTuiAgentLaunchPermission } from '../../../shared/tui-agent-permissions'
+import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import { repoIsRemote } from '../../../shared/agent-launch-remote'
 import { seedCommandCodeSubmittedPromptStatus } from '@/lib/command-code-prompt-status-seed'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { LaunchSource } from '../../../shared/telemetry-events'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host'
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import { resolveInitialNativeChatSessionOptions } from '@/components/native-chat/native-chat-launch-session-options'
 import { seedNativeChatAppliedSessionOptions } from '@/components/native-chat/native-chat-session-option-cache'
@@ -35,12 +44,16 @@ import { startStructuredCodexLaunch } from '@/lib/structured-agent-session-launc
 export type LaunchAgentInNewTabArgs = {
   agent: TuiAgent
   worktreeId: string
+  /** Host owner for colliding worktree IDs and FolderWorkspace scopes. */
+  executionHostId?: ExecutionHostId
   /** Tab group the user launched from; keeps split-group launches in that pane instead of the active group. */
   groupId?: string
   /** Optional initial prompt; delivery depends on `promptDelivery` and the agent's prompt mode. */
   prompt?: string
   /** Optional CLI arguments appended to the selected agent command. */
   agentArgs?: string | null
+  /** Per-launch permission policy. Defaults to the configured agent arguments and environment. */
+  agentPermissionMode?: AgentLaunchPermissionMode
   initialCwd?: string | null
   /** How to deliver the prompt: `draft` leaves it editable, `submit-after-ready` sends it once the TUI is ready. */
   promptDelivery?: 'auto-submit' | 'draft' | 'submit-after-ready'
@@ -83,9 +96,11 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
   const {
     agent,
     worktreeId,
+    executionHostId,
     groupId,
     prompt,
     agentArgs,
+    agentPermissionMode = 'default',
     initialCwd,
     promptDelivery = 'auto-submit',
     launchSource,
@@ -94,8 +109,23 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     onPromptDelivered
   } = args
   const store = useAppStore.getState()
-  const worktree = store.allWorktrees?.().find((entry: { id: string }) => entry.id === worktreeId)
-  const repo = worktree ? store.repos?.find((entry) => entry.id === worktree.repoId) : null
+  const worktree =
+    store.getKnownWorktreeById?.(worktreeId, executionHostId) ??
+    store.allWorktrees?.().find((entry: { id: string }) => entry.id === worktreeId)
+  const repoCandidates = worktree
+    ? (store.repos?.filter((entry) => entry.id === worktree.repoId) ?? [])
+    : []
+  const worktreeHostId = parseExecutionHostId(worktree?.hostId)?.id
+  const resolvedExecutionHostId =
+    executionHostId ??
+    worktreeHostId ??
+    (repoCandidates[0] ? getRepoExecutionHostId(repoCandidates[0]) : LOCAL_EXECUTION_HOST_ID)
+  const repo =
+    repoCandidates.find((entry) => getRepoExecutionHostId(entry) === resolvedExecutionHostId) ??
+    repoCandidates[0] ??
+    null
+  const parsedExecutionHost = parseExecutionHostId(resolvedExecutionHostId)
+  const remoteHost = parsedExecutionHost?.kind === 'ssh' || parsedExecutionHost?.kind === 'runtime'
   const resolvedLaunchPlatform =
     launchPlatform ??
     (repo
@@ -103,20 +133,29 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
           repo,
           repo.connectionId ? undefined : getLocalProjectExecutionRuntimeContext(store, worktreeId)
         )
-      : CLIENT_PLATFORM)
+      : remoteHost
+        ? 'linux'
+        : CLIENT_PLATFORM)
   // Why: SSH remotes deploy the shim as plain `orca`, so skip the Linux-only `orca-ide` rename for remote launches.
-  const isRemote = repo ? repoIsRemote(repo) : false
+  const isRemote = repo ? repoIsRemote(repo) || remoteHost : remoteHost
   const queuedShell = resolveLocalWindowsAgentStartupShell({
     platform: resolvedLaunchPlatform,
     isRemote,
     terminalWindowsShell: store.settings?.terminalWindowsShell
   })
   const cmdOverrides = store.settings?.agentCmdOverrides ?? {}
-  const effectiveAgentArgs =
+  const configuredAgentArgs =
     agentArgs !== undefined
       ? agentArgs
       : resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs)
-  const agentEnv = resolveTuiAgentLaunchEnv(agent, store.settings?.agentDefaultEnv)
+  const configuredAgentEnv = resolveTuiAgentLaunchEnv(agent, store.settings?.agentDefaultEnv)
+  const { agentArgs: effectiveAgentArgs, agentEnv } = resolveTuiAgentLaunchPermission({
+    agent,
+    mode: agentPermissionMode,
+    agentArgs: configuredAgentArgs,
+    agentEnv: configuredAgentEnv,
+    shell: resolveStartupShell(resolvedLaunchPlatform, queuedShell)
+  })
   const trimmedPrompt = prompt?.trim() ?? ''
   const hasPrompt = trimmedPrompt.length > 0
   const isFollowupPath = TUI_AGENT_CONFIG[agent].promptInjectionMode === 'stdin-after-start'
@@ -140,6 +179,7 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     isRemote,
     agentArgs: effectiveAgentArgs,
     agentEnv,
+    agentPermissionMode,
     sessionOptions: resolveInitialNativeChatSessionOptions(store.settings, initialViewModeOptions)
   }
   const { startupPlan, pasteDraftAfterLaunch, submitPastedPrompt } = planLaunchAgentStartupPrompt({
@@ -152,6 +192,9 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
 
   if (!startupPlan) {
     return null
+  }
+  if (agentPermissionMode !== 'default') {
+    startupPlan.agentPermissionMode = agentPermissionMode
   }
 
   const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(store, worktreeId)
@@ -167,7 +210,8 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
       promptDelivery,
       pastePromptAfterReady: pasteDraftAfterLaunch,
       submitPastedPrompt,
-      agentArgs,
+      agentArgs: agentArgs !== undefined ? effectiveAgentArgs : undefined,
+      agentPermissionMode: agentPermissionMode !== 'default' ? agentPermissionMode : undefined,
       // Why: omission means terminal locally, but would let a paired host apply
       // its own default; send the client's resolved terminal choice explicitly.
       viewMode: initialViewModeProps.viewMode ?? 'terminal',
@@ -186,6 +230,7 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
   const launchDirectStructuredChat =
     agent === 'codex' &&
     !hasPrompt &&
+    agentPermissionMode === 'default' &&
     store.settings?.experimentalNativeChat === true &&
     canUseStructuredNativeChat(store, worktreeId)
   if (launchDirectStructuredChat) {
@@ -215,6 +260,9 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     ...(startupPlan.env ? { env: startupPlan.env } : {}),
     launchConfig: startupPlan.launchConfig,
     launchAgent: agent,
+    ...(startupPlan.agentPermissionMode
+      ? { agentPermissionMode: startupPlan.agentPermissionMode }
+      : {}),
     ...(agentArgs !== undefined ? { agentArgsOverride: agentArgs } : {}),
     ...(startupPlan.sessionOptions ? { sessionOptions: startupPlan.sessionOptions } : {}),
     ...(startupPlan.startupCommandDelivery

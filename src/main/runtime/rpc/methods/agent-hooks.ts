@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { prepareManagedWslCodexHomeBeforeShellLaunch } from '../../../codex/managed-wsl-home-shell-preflight'
 import { defineMethod, type RpcMethod } from '../core'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 
 const PrepareCodexForWslPaneParams = z
   .object({
@@ -21,7 +22,9 @@ export const AGENT_HOOK_METHODS: readonly RpcMethod[] = [
     params: PrepareCodexForWslPaneParams,
     handler: async (params, { runtime, clientKind }) => {
       if (clientKind !== undefined) {
-        throw new Error('Codex hook preparation is only available to the local Orca CLI.')
+        throw new Error(
+          `Codex hook preparation is only available to the local ${APP_DISPLAY_NAME} CLI.`
+        )
       }
       const settings = runtime.getClientSettings()
       return await prepareManagedWslCodexHomeBeforeShellLaunch({

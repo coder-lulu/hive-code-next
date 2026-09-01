@@ -16,6 +16,7 @@ import {
   ORCHESTRATION_ENABLED_STORAGE_KEY,
   ORCHESTRATION_SETUP_DISMISSED_STORAGE_KEY
 } from '@/lib/orchestration-setup-state'
+import { applyProductBranding } from '@/product-brand'
 import {
   DEFAULT_ONBOARDING_FEATURE_SETUP_SELECTION,
   buildOnboardingFeatureSetupClipboardText,
@@ -374,7 +375,7 @@ describe('onboarding feature setup runner', () => {
     expect(openComputerUsePermissionSetup).not.toHaveBeenCalled()
     expect(result.warnings).toContainEqual({
       featureId: 'computerUse',
-      message: 'Orca Computer Use.app was not found'
+      message: applyProductBranding('Orca Computer Use.app was not found')
     })
   })
 
@@ -421,7 +422,10 @@ describe('onboarding feature setup runner', () => {
     )
 
     expect(result.cliTouched).toBe(false)
-    expect(result.warnings).toContainEqual({ featureId: 'cli', message: unknownStatus.detail })
+    expect(result.warnings).toContainEqual({
+      featureId: 'cli',
+      message: applyProductBranding(unknownStatus.detail ?? '')
+    })
     expect(deps.showCliRegistrationPrompt).not.toHaveBeenCalled()
     expect(deps.installCli).not.toHaveBeenCalled()
   })

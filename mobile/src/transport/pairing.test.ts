@@ -77,4 +77,13 @@ describe('pairing deep links', () => {
 
     expect(parsePairingCode(code)).toEqual(proxiedOffer)
   })
+
+  it('preserves an explicit cloud Runtime id for cross-source deduplication', () => {
+    const identifiedOffer = {
+      ...offer,
+      runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    }
+
+    expect(parsePairingCode(encodeOffer(identifiedOffer))).toEqual(identifiedOffer)
+  })
 })

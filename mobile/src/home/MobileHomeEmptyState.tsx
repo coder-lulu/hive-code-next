@@ -1,10 +1,11 @@
 import { QrCode } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { APP_DISPLAY_NAME } from '../product-brand'
 import { colors, radii, spacing } from '../theme/mobile-theme'
 
 const ONBOARDING_STEPS = [
   {
-    title: 'Open Orca desktop',
+    title: `Open ${APP_DISPLAY_NAME} desktop`,
     desc: 'Go to Settings → Mobile and generate a pairing QR code.'
   },
   {
@@ -38,8 +39,8 @@ export function MobileHomeEmptyState(props: {
       <View style={styles.emptyHero}>
         <Text style={styles.emptyTitle}>Connect your desktop</Text>
         <Text style={styles.emptyBody}>
-          Pair with Orca on your computer to check on your agents, jump into any terminal, and drive
-          work from your phone.
+          Pair with {APP_DISPLAY_NAME} on your computer to check on your agents, jump into any
+          terminal, and drive work from your phone.
         </Text>
         <Pressable style={styles.primaryButton} onPress={props.onPairDesktop}>
           <QrCode size={17} color={colors.bgBase} />

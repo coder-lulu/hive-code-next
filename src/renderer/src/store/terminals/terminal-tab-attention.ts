@@ -2,6 +2,28 @@ import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { resolveTerminalWorktreeRoute } from '@/lib/terminal-worktree-route'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
 
+function consumeAgentCompletionPatch(state: TerminalSlice, paneKey: string) {
+  const currentCounts = state.unreadAgentCompletionCountByPane ?? {}
+  const currentCount = currentCounts[paneKey] ?? 0
+  if (currentCount <= 0) {
+    return null
+  }
+
+  const nextCounts = { ...currentCounts }
+  const nextPanes = { ...state.unreadAgentCompletionPanes }
+  if (currentCount > 1) {
+    nextCounts[paneKey] = currentCount - 1
+    nextPanes[paneKey] = true
+  } else {
+    delete nextCounts[paneKey]
+    delete nextPanes[paneKey]
+  }
+  return {
+    unreadAgentCompletionCountByPane: nextCounts,
+    unreadAgentCompletionPanes: nextPanes
+  }
+}
+
 export function createTerminalTabAttentionActions(
   set: TerminalStoreSet,
   get: TerminalStoreGet
@@ -10,6 +32,9 @@ export function createTerminalTabAttentionActions(
   | 'markTerminalTabUnread'
   | 'markTerminalPaneUnread'
   | 'markAgentCompletionPaneUnread'
+  | 'incrementAgentCompletionUnread'
+  | 'consumeAgentCompletionUnread'
+  | 'consumeFirstAgentCompletionUnreadForTab'
   | 'clearTerminalTabUnread'
   | 'clearTerminalPaneUnread'
   | 'setTabCustomTitle'
@@ -53,6 +78,28 @@ export function createTerminalTabAttentionActions(
         }
       })
     },
+    incrementAgentCompletionUnread: (paneKey) => {
+      set((s) => {
+        const currentCounts = s.unreadAgentCompletionCountByPane ?? {}
+        return {
+          unreadAgentCompletionCountByPane: {
+            ...currentCounts,
+            [paneKey]: (currentCounts[paneKey] ?? 0) + 1
+          }
+        }
+      })
+    },
+    consumeAgentCompletionUnread: (paneKey) => {
+      set((s) => consumeAgentCompletionPatch(s, paneKey) ?? s)
+    },
+    consumeFirstAgentCompletionUnreadForTab: (tabId) => {
+      set((s) => {
+        const paneKey = Object.keys(s.unreadAgentCompletionCountByPane ?? {}).find((key) =>
+          key.startsWith(`${tabId}:`)
+        )
+        return paneKey ? (consumeAgentCompletionPatch(s, paneKey) ?? s) : s
+      })
+    },
     clearTerminalTabUnread: (tabId) => {
       set((s) => {
         if (!s.unreadTerminalTabs[tabId]) {
@@ -63,18 +110,39 @@ export function createTerminalTabAttentionActions(
         return { unreadTerminalTabs: copy }
       })
     },
-    clearTerminalPaneUnread: (paneKey) => {
+    clearTerminalPaneUnread: (paneKey, options) => {
       set((s) => {
-        if (!s.unreadTerminalPanes[paneKey] && !s.unreadAgentCompletionPanes[paneKey]) {
+        const consumeCompletion = options?.consumeCompletion ?? true
+        const currentCompletionCounts = s.unreadAgentCompletionCountByPane ?? {}
+        const completionCount = currentCompletionCounts[paneKey] ?? 0
+        if (
+          !s.unreadTerminalPanes[paneKey] &&
+          !s.unreadAgentCompletionPanes[paneKey] &&
+          (!consumeCompletion || completionCount === 0)
+        ) {
           return s
         }
         const nextUnreadTerminalPanes = { ...s.unreadTerminalPanes }
-        const nextUnreadAgentCompletionPanes = { ...s.unreadAgentCompletionPanes }
+        const preserveCompletionMarker = !consumeCompletion && completionCount > 0
+        const nextUnreadAgentCompletionPanes = preserveCompletionMarker
+          ? s.unreadAgentCompletionPanes
+          : { ...s.unreadAgentCompletionPanes }
         delete nextUnreadTerminalPanes[paneKey]
-        delete nextUnreadAgentCompletionPanes[paneKey]
+        const completionPatch = consumeCompletion ? consumeAgentCompletionPatch(s, paneKey) : null
+        if (completionPatch) {
+          return {
+            unreadTerminalPanes: nextUnreadTerminalPanes,
+            ...completionPatch
+          }
+        }
+        if (!preserveCompletionMarker) {
+          delete nextUnreadAgentCompletionPanes[paneKey]
+        }
         return {
           unreadTerminalPanes: nextUnreadTerminalPanes,
-          unreadAgentCompletionPanes: nextUnreadAgentCompletionPanes
+          ...(nextUnreadAgentCompletionPanes !== s.unreadAgentCompletionPanes
+            ? { unreadAgentCompletionPanes: nextUnreadAgentCompletionPanes }
+            : {})
         }
       })
     },

@@ -15,6 +15,28 @@ export const INSTALLED_AGENT_SKILL_DISCOVERY_FRESH_MS = 15_000
 type CachedDiscovery = { result: SkillDiscoveryResult; expiresAt: number }
 
 let cachedDiscoveryByTarget = new Map<string, CachedDiscovery>()
+const cacheListenersByTarget = new Map<string, Set<() => void>>()
+
+function publishCacheChange(key: string): void {
+  for (const listener of cacheListenersByTarget.get(key) ?? []) {
+    listener()
+  }
+}
+
+export function subscribeInstalledAgentSkillDiscoveryCache(
+  key: string,
+  listener: () => void
+): () => void {
+  const listeners = cacheListenersByTarget.get(key) ?? new Set()
+  listeners.add(listener)
+  cacheListenersByTarget.set(key, listeners)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      cacheListenersByTarget.delete(key)
+    }
+  }
+}
 
 function readUnexpired(key: string): CachedDiscovery | null {
   const cached = cachedDiscoveryByTarget.get(key)
@@ -60,11 +82,17 @@ export function writeInstalledAgentSkillDiscoveryCache(
       break
     }
     cachedDiscoveryByTarget.delete(oldestKey)
+    publishCacheChange(oldestKey)
   }
+  publishCacheChange(key)
 }
 
 export function clearInstalledAgentSkillDiscoveryCache(): void {
+  const changedKeys = [...cachedDiscoveryByTarget.keys()]
   cachedDiscoveryByTarget.clear()
+  for (const key of changedKeys) {
+    publishCacheChange(key)
+  }
 }
 
 export function getInstalledAgentSkillDiscoveryCacheSizeForTests(): number {
@@ -77,4 +105,5 @@ export function hasInstalledAgentSkillDiscoveryCacheEntryForTests(key: string): 
 
 export function resetInstalledAgentSkillDiscoveryCacheForTests(): void {
   cachedDiscoveryByTarget = new Map()
+  cacheListenersByTarget.clear()
 }

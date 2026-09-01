@@ -1,161 +1,32 @@
-import { createHash, createPrivateKey, randomUUID, sign } from 'node:crypto'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
+import {
+  attachSignature,
+  baseProof,
+  canonicalRuntimeHeartbeatBody,
+  fixedJsonSignatureInput,
+  heartbeatSignatureInput,
+  lfSignatureInput,
+  sha256,
+  type HiveRuntimeCloudCapability,
+  type HiveRuntimeCloudReport,
+  type ProofContext
+} from './hive-runtime-cloud-proof-core'
 
-const ALGORITHM = 'Ed25519' as const
-const METHOD = 'POST' as const
-
-export type HiveRuntimeCloudProof = Readonly<{
-  protocolVersion: string
-  algorithm: typeof ALGORITHM
-  method: typeof METHOD
-  path: string
-  authorityId: string
-  issuedAt: string
-  nonce: string
-  bodySha256: string
-  signature: string
-}>
-
-export type HiveRuntimeCloudCapability =
-  | 'connection-ticket-v1'
-  | 'pairing-v3'
-  | 'runtime-health-v1'
-  | 'shared-control-v1'
-  | 'web-launch-grant-v1'
-
-export type HiveRuntimeCloudReadinessReason =
-  | 'starting'
-  | 'healthy'
-  | 'disk_pressure'
-  | 'identity_unavailable'
-  | 'network_unavailable'
-  | 'upgrade_required'
-  | 'recovery_in_progress'
-
-export type HiveRuntimeCloudConnectionCapability =
-  | 'orca-direct'
-  | 'orca-relay'
-  | 'hive-direct'
-  | 'hive-relay'
-  | 'tailscale-embedded-evaluation'
-
-export type HiveRuntimeCloudReport = Readonly<{
-  runtimeVersion: string
-  runtimeProtocolVersion: 3
-  capabilities: readonly HiveRuntimeCloudCapability[]
-  readiness: 'STARTING' | 'READY' | 'DEGRADED' | 'RECOVERING' | 'STOPPED'
-  readinessReasonCode: HiveRuntimeCloudReadinessReason
-  startedAt: string
-  connectionCapabilities: readonly HiveRuntimeCloudConnectionCapability[]
-  webHttpsOrigin?: string
-  webClientPath?: string
-  websocketPath?: string
-  webEndpointExpiresAt?: string
-}>
-
-export type ProofContext = Readonly<{ authorityId: string; issuedAt?: string; nonce?: string }>
-
-function privateKey(identity: HiveRuntimeCloudIdentity) {
-  return createPrivateKey({
-    key: Buffer.from(identity.privateKeyPkcs8, 'base64'),
-    format: 'der',
-    type: 'pkcs8'
-  })
-}
-
-export function sha256(value: string): string {
-  return createHash('sha256').update(value, 'utf8').digest('hex')
-}
-
-export function baseProof(
-  protocolVersion: string,
-  path: string,
-  bodySha256: string,
-  context: ProofContext
-): Omit<HiveRuntimeCloudProof, 'signature'> {
-  return {
-    protocolVersion,
-    algorithm: ALGORITHM,
-    method: METHOD,
-    path,
-    authorityId: context.authorityId,
-    issuedAt: context.issuedAt ?? new Date().toISOString(),
-    nonce: context.nonce ?? randomUUID(),
-    bodySha256
-  }
-}
-
-function lfSignatureInput(proof: Omit<HiveRuntimeCloudProof, 'signature'>): string {
-  return [
-    proof.protocolVersion,
-    proof.algorithm,
-    proof.method,
-    proof.path,
-    proof.authorityId,
-    proof.issuedAt,
-    proof.nonce,
-    proof.bodySha256
-  ].join('\n')
-}
-
-function fixedJsonSignatureInput(proof: Omit<HiveRuntimeCloudProof, 'signature'>): string {
-  return JSON.stringify({
-    protocolVersion: proof.protocolVersion,
-    method: proof.method,
-    path: proof.path,
-    authorityId: proof.authorityId,
-    bodySha256: proof.bodySha256,
-    nonce: proof.nonce,
-    issuedAt: proof.issuedAt
-  })
-}
-
-function canonicalValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(canonicalValue)
-  }
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        .map(([key, item]) => [key, canonicalValue(item)])
-    )
-  }
-  return value
-}
-
-export function canonicalRuntimeHeartbeatBody(value: Record<string, unknown>): string {
-  return JSON.stringify(canonicalValue(value))
-}
-
-export function heartbeatSignatureInput(proof: Omit<HiveRuntimeCloudProof, 'signature'>): string {
-  return JSON.stringify({
-    authorityId: proof.authorityId,
-    bodySha256: proof.bodySha256,
-    issuedAt: proof.issuedAt,
-    method: proof.method,
-    nonce: proof.nonce,
-    path: proof.path,
-    protocolVersion: proof.protocolVersion
-  })
-}
-
-export function attachSignature<T extends Record<string, unknown>>(
-  body: T,
-  unsigned: Omit<HiveRuntimeCloudProof, 'signature'>,
-  signatureInput: string,
-  identity: HiveRuntimeCloudIdentity
-): T & { proof: HiveRuntimeCloudProof } {
-  return {
-    ...body,
-    proof: {
-      ...unsigned,
-      signature: sign(null, Buffer.from(signatureInput, 'utf8'), privateKey(identity)).toString(
-        'base64url'
-      )
-    }
-  }
-}
+export {
+  attachSignature,
+  baseProof,
+  canonicalRuntimeHeartbeatBody,
+  heartbeatSignatureInput,
+  sha256
+} from './hive-runtime-cloud-proof-core'
+export type {
+  HiveRuntimeCloudCapability,
+  HiveRuntimeCloudConnectionCapability,
+  HiveRuntimeCloudProof,
+  HiveRuntimeCloudReadinessReason,
+  HiveRuntimeCloudReport,
+  ProofContext
+} from './hive-runtime-cloud-proof-core'
 
 export function createRuntimeRegistrationRequest(
   identity: HiveRuntimeCloudIdentity,
@@ -194,6 +65,65 @@ export function createRuntimeRegistrationLookupRequest(
   const unsigned = baseProof(
     'hive-runtime-registration-lookup/v1',
     '/hive/v1/runtime-registrations/lookup',
+    sha256(JSON.stringify(body)),
+    context
+  )
+  return attachSignature(body, unsigned, lfSignatureInput(unsigned), identity)
+}
+
+function createRuntimeRecordProofRequest(
+  identity: HiveRuntimeCloudIdentity,
+  input: Readonly<{ runtimeRecordId: string; expectedVersion: number }>,
+  context: ProofContext,
+  operation: 'claim-capability-reissue' | 'claim-reconcile'
+) {
+  const path = `/hive/v1/runtime-records/${input.runtimeRecordId}/${
+    operation === 'claim-capability-reissue' ? 'reclaim-capabilities' : 'claim-reconcile'
+  }`
+  const body = {
+    runtimeInstanceId: identity.runtimeInstanceId,
+    identityPublicKey: identity.publicKey,
+    expectedVersion: input.expectedVersion
+  }
+  const unsigned = baseProof(
+    `hive-runtime-${operation}/v1`,
+    path,
+    sha256(JSON.stringify(body)),
+    context
+  )
+  return attachSignature(body, unsigned, lfSignatureInput(unsigned), identity)
+}
+
+export function createRuntimeClaimCapabilityReissueRequest(
+  identity: HiveRuntimeCloudIdentity,
+  input: Readonly<{ runtimeRecordId: string; expectedVersion: number }>,
+  context: ProofContext
+) {
+  return createRuntimeRecordProofRequest(identity, input, context, 'claim-capability-reissue')
+}
+
+export function createRuntimeClaimReconcileRequest(
+  identity: HiveRuntimeCloudIdentity,
+  input: Readonly<{ runtimeRecordId: string; expectedVersion: number }>,
+  context: ProofContext
+) {
+  return createRuntimeRecordProofRequest(identity, input, context, 'claim-reconcile')
+}
+
+export function createRuntimeClaimChallengeRequest(
+  identity: HiveRuntimeCloudIdentity,
+  input: Readonly<{ runtimeRecordId: string; expectedVersion: number }>,
+  context: ProofContext
+) {
+  const body = {
+    runtimeRecordId: input.runtimeRecordId,
+    runtimeInstanceId: identity.runtimeInstanceId,
+    identityPublicKey: identity.publicKey,
+    expectedVersion: input.expectedVersion
+  }
+  const unsigned = baseProof(
+    'hive-runtime-claim-challenge/v1',
+    '/hive/v1/runtime-claim-challenges',
     sha256(JSON.stringify(body)),
     context
   )
@@ -263,6 +193,20 @@ export function createRuntimeHeartbeatRequest(
       readinessReasonCode: input.report.readinessReasonCode,
       startedAt: input.report.startedAt,
       connectionCapabilities: [...input.report.connectionCapabilities],
+      ...(input.report.deviceName !== undefined ? { deviceName: input.report.deviceName } : {}),
+      ...(input.report.osName !== undefined ? { osName: input.report.osName } : {}),
+      ...(input.report.osVersion !== undefined ? { osVersion: input.report.osVersion } : {}),
+      ...(input.report.osArch !== undefined ? { osArch: input.report.osArch } : {}),
+      ...(input.report.cpuModel !== undefined ? { cpuModel: input.report.cpuModel } : {}),
+      ...(input.report.cpuLogicalCores !== undefined
+        ? { cpuLogicalCores: input.report.cpuLogicalCores }
+        : {}),
+      ...(input.report.totalMemoryBytes !== undefined
+        ? { totalMemoryBytes: input.report.totalMemoryBytes }
+        : {}),
+      ...(input.report.freeDiskBytes !== undefined
+        ? { freeDiskBytes: input.report.freeDiskBytes }
+        : {}),
       ...(hasCompleteWebEndpoint
         ? {
             webHttpsOrigin: input.report.webHttpsOrigin,

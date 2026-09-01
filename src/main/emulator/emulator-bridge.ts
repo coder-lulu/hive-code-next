@@ -4,6 +4,7 @@ import type { EmulatorSessionInfo } from './emulator-types'
 import type { SimulatorDevice } from './simctl-simulator-devices'
 import type { EmulatorBridgeOptions } from './emulator-bridge-types'
 import type { EmulatorGesturePoint } from './emulator-gesture-sender'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import { EmulatorSessionRegistry } from './emulator-session-registry'
 import {
   EmulatorStartLeaseRegistry,
@@ -292,6 +293,7 @@ export class EmulatorBridge {
 
   async onAppQuit(): Promise<void> {
     await this.destroyAllSessions()
+    await Promise.allSettled(this.backends.map(async (backend) => backend.dispose?.()))
   }
 
   private async resolveTarget(
@@ -310,7 +312,7 @@ export class EmulatorBridge {
     }
     throw new EmulatorError(
       'emulator_no_active',
-      'No active emulator for this worktree — use orca emulator attach or open the pane'
+      `No active emulator for this worktree — use ${PRIMARY_CLI_COMMAND} emulator attach or open the pane`
     )
   }
 

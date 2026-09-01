@@ -188,6 +188,30 @@ describe('EmulatorBridge helper ownership', () => {
     expect(bridge.getActiveForWorktree('wt-external')).toBeNull()
   })
 
+  it('disposes every backend after managed sessions are torn down on app quit', async () => {
+    const order: string[] = []
+    shutdownSimulatorDeviceMock.mockImplementation(async () => {
+      order.push('session-shutdown')
+    })
+    const bridge = new EmulatorBridge()
+    bridge.registerActiveEmulator('wt-managed', session('device-managed'), { managed: true })
+    const [iosBackend, androidBackend] = bridge.listBackends()
+    iosBackend.dispose = vi.fn(async () => {
+      order.push('ios-dispose')
+      throw new Error('dispose failed')
+    })
+    androidBackend.dispose = vi.fn(async () => {
+      order.push('android-dispose')
+    })
+
+    await expect(bridge.onAppQuit()).resolves.toBeUndefined()
+
+    expect(order).toEqual(['session-shutdown', 'ios-dispose', 'android-dispose'])
+    expect(iosBackend.dispose).toHaveBeenCalledOnce()
+    expect(androidBackend.dispose).toHaveBeenCalledOnce()
+    expect(bridge.getActiveForWorktree('wt-managed')).toBeNull()
+  })
+
   it('rejects a capability the resolved backend does not support', async () => {
     const bridge = new EmulatorBridge()
     // device-1 resolves to the iOS backend, which advertises no explicit-verb caps.

@@ -1,6 +1,7 @@
 import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
 import type { AiVaultSessionTitle } from '../../../../shared/ai-vault-session-title'
+import type { SessionProjectAssignment } from '../../../../shared/session-project-assignment'
 import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
 import { collectLeafIdsInOrder } from '@/components/terminal-pane/terminal-layout-leaf-ids'
 import { clearTransientTerminalState } from './terminal-helpers'
@@ -19,6 +20,7 @@ type CanonicalTerminals = {
   tabIdByPtyId: Map<string, string>
   quickCommandLabelByTabId: Map<string, string>
   aiVaultTitleByTabId: Map<string, AiVaultSessionTitle>
+  projectAssignmentByTabId: Map<string, SessionProjectAssignment>
 }
 
 export type HydrateWorkspaceTerminalRowsOptions = {
@@ -147,6 +149,11 @@ function readCanonicalTerminals(
     ),
     aiVaultTitleByTabId: new Map(
       canonicalTabs.flatMap((tab) => (tab.aiVaultTitle ? [[tab.entityId, tab.aiVaultTitle]] : []))
+    ),
+    projectAssignmentByTabId: new Map(
+      canonicalTabs.flatMap((tab) =>
+        tab.projectAssignment ? [[tab.entityId, tab.projectAssignment]] : []
+      )
     )
   }
 }
@@ -203,10 +210,12 @@ function restoreCanonicalMetadata(
   const quickCommandLabel =
     row.quickCommandLabel?.trim() || canonical.quickCommandLabelByTabId.get(row.id)
   const aiVaultTitle = row.aiVaultTitle ?? canonical.aiVaultTitleByTabId.get(row.id)
+  const projectAssignment = row.projectAssignment ?? canonical.projectAssignmentByTabId.get(row.id)
   return {
     ...clearTransientTerminalState(row, index),
     ...(quickCommandLabel ? { quickCommandLabel } : {}),
     ...(aiVaultTitle ? { aiVaultTitle } : {}),
+    ...(projectAssignment ? { projectAssignment } : {}),
     sortOrder: index,
     // Why: suppress restored mounts so only real activity updates Recent.
     pendingActivationSpawn: true

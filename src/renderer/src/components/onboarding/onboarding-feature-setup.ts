@@ -25,6 +25,7 @@ import {
   notifyOrchestrationSetupStateChanged
 } from '@/lib/orchestration-setup-state'
 import type { EventProps } from '../../../../shared/telemetry-events'
+import { APP_DISPLAY_NAME as APP, applyProductCliBranding as brand } from '@/product-brand'
 
 export type OnboardingFeatureSetupId =
   | 'browserUse'
@@ -247,13 +248,13 @@ export async function runOnboardingFeatureSetup(
     if (!status.supported) {
       warnings.push({
         featureId: 'cli',
-        message: status.detail ?? 'Orca CLI registration is not available on this platform.'
+        message: brand(status.detail ?? `${APP} CLI is not available on this platform.`)
       })
     } else if (status.pathConfigured === null) {
       // Why: an unknown registry read cannot safely drive a PATH read-modify-write.
       warnings.push({
         featureId: 'cli',
-        message: status.detail ?? 'Orca could not check your Windows user PATH.'
+        message: brand(status.detail ?? `${APP} could not check your Windows user PATH.`)
       })
     } else if (status.state !== 'installed' || status.pathConfigured === false) {
       await deps.showCliRegistrationPrompt?.()
@@ -262,10 +263,10 @@ export async function runOnboardingFeatureSetup(
       if (next.state !== 'installed') {
         warnings.push({
           featureId: 'cli',
-          message: next.detail ?? 'Orca CLI registration needs attention.'
+          message: brand(next.detail ?? `${APP} CLI registration needs attention.`)
         })
       } else if (next.pathConfigured !== true && next.detail) {
-        warnings.push({ featureId: 'cli', message: next.detail })
+        warnings.push({ featureId: 'cli', message: brand(next.detail) })
       }
     }
   } catch (error) {
@@ -283,7 +284,7 @@ export async function runOnboardingFeatureSetup(
       if (status.helperUnavailableReason) {
         warnings.push({
           featureId: 'computerUse',
-          message: status.helperUnavailableReason
+          message: brand(status.helperUnavailableReason)
         })
       } else {
         const needsMacPermissions =
@@ -315,7 +316,7 @@ export async function runOnboardingFeatureSetup(
 }
 
 function formatFeatureSetupError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return brand(error instanceof Error ? error.message : String(error))
 }
 
 async function copySkillCommands(

@@ -166,7 +166,10 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         args.visibleFolderWorkspacesForRows,
         hostLabelById,
         defaultHostId,
-        args.pinnedDisplayPolicy
+        args.pinnedDisplayPolicy,
+        // Keep the Spaces → (derived) Ungrouped space → repository hierarchy
+        // visible even before a persisted ProjectGroup is available.
+        true
       ),
     [
       args.groupBy,

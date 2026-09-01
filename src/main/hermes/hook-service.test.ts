@@ -40,7 +40,10 @@ describe('HermesHookService', () => {
       detail: null
     })
     const pluginDir = join(homeDir, 'plugins', _internals.HERMES_PLUGIN_NAME)
-    expect(readFileSync(join(pluginDir, 'plugin.yaml'), 'utf-8')).toContain('provides_hooks:')
+    const manifest = readFileSync(join(pluginDir, 'plugin.yaml'), 'utf-8')
+    expect(manifest).toContain('provides_hooks:')
+    expect(manifest).toContain('author: "HiveCode"')
+    expect(manifest).not.toContain('Managed by Orca')
     expect(readFileSync(join(pluginDir, '__init__.py'), 'utf-8')).toContain('/hook/hermes')
     const config = parse(readFileSync(join(homeDir, 'config.yaml'), 'utf-8')) as {
       plugins: { enabled: string[] }

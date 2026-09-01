@@ -175,8 +175,8 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.mac.extraResources).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          from: 'native/computer-use-macos/.build/release/Orca Computer Use.app',
-          to: 'Orca Computer Use.app'
+          from: 'native/computer-use-macos/.build/release/HiveCode Computer Use.app',
+          to: 'HiveCode Computer Use.app'
         })
       ])
     )
@@ -272,7 +272,9 @@ describe('electron-builder config', () => {
   })
 
   it('unpacks the replaceable WSL transcript filesystem process entry', async () => {
-    expect(electronBuilderConfig.asarUnpack).toContain('out/main/wsl-transcript-fs-process-entry.js')
+    expect(electronBuilderConfig.asarUnpack).toContain(
+      'out/main/wsl-transcript-fs-process-entry.js'
+    )
 
     const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
     expect(viteConfig).toMatch(/'wsl-transcript-fs-process-entry':\s*resolve\(/)

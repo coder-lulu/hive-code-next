@@ -15,6 +15,7 @@ import { stripLegacyTerminalShimEnv } from '../../../pty/legacy-terminal-shim-di
 import { resolvePathEnvKey, mergePersistedWindowsPath } from '../../../pty/windows-environment-path'
 import { resolveCodexShellLaunchPreflightCommand } from '../../../pty/codex-shell-launch-preflight'
 import { buildConfiguredProxyEnv } from '../../../../shared/network-proxy'
+import { PRIMARY_CLI_COMMAND } from '../../../../shared/brand'
 import type { BuildPtyHostEnvOptions } from './types'
 import { readInheritedPath } from './path'
 import { stripInheritedOrcaCodexHomeOverride } from './codex-home'
@@ -224,11 +225,10 @@ export function buildPtyHostEnv(
     delete baseEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
   }
 
-  // Why: WSL shells need the managed userData root for shell-ready wrappers; dev-mode terminals need the same export so `orca` targets the live dev instance.
+  // Why: WSL shells need the managed userData root for shell-ready wrappers.
   if (opts.isWsl) {
     baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
-    // Why: managed WSL registration uses `orca-ide`; exposing that literal scopes agent guidance to WSL without a bare-orca shim.
-    baseEnv.ORCA_CLI_COMMAND = opts.isPackaged ? 'orca-ide' : 'orca-dev'
+    baseEnv.ORCA_CLI_COMMAND = PRIMARY_CLI_COMMAND
   } else {
     if (!opts.isPackaged) {
       baseEnv.ORCA_USER_DATA_PATH ??= opts.userDataPath
@@ -243,14 +243,16 @@ export function buildPtyHostEnv(
     baseEnv[resolvePathEnvKey(baseEnv, process.platform)] = inheritedPath
       ? `${devCliBin}${delimiter}${inheritedPath}`
       : devCliBin
+    baseEnv.ORCA_CLI_COMMAND = PRIMARY_CLI_COMMAND
   } else if (process.platform === 'linux') {
-    // Why: bare-`orca` shim scoped to Orca PTYs — Linux CLI installs as `orca-ide` to avoid shadowing GNOME's /usr/bin/orca screen reader (stablyai/orca#7904).
+    // The shim dir exposes canonical `hive` and the scoped legacy `orca` alias.
     const shimDir = ensureLinuxTerminalOrcaCliShimDir({ userDataPath: opts.userDataPath })
     if (shimDir) {
       const inheritedEntries = readInheritedPath(baseEnv)
         .split(delimiter)
         .filter((entry) => entry.length > 0 && entry !== shimDir)
       baseEnv.PATH = [shimDir, ...inheritedEntries].join(delimiter)
+      baseEnv.ORCA_CLI_COMMAND = PRIMARY_CLI_COMMAND
     }
   } else if (
     opts.resourcesPath &&
@@ -262,6 +264,7 @@ export function buildPtyHostEnv(
     baseEnv[resolvePathEnvKey(baseEnv, process.platform)] = inheritedPath
       ? `${bundledCliBin}${delimiter}${inheritedPath}`
       : bundledCliBin
+    baseEnv.ORCA_CLI_COMMAND = PRIMARY_CLI_COMMAND
   }
 
   // Why: must run after the prepends above — they re-read PATH from the unscrubbed

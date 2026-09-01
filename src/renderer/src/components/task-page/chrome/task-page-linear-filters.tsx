@@ -145,7 +145,7 @@ export function TaskPageLinearFilters(props: TaskPageLinearFiltersProps): React.
                   <TooltipContent side="bottom" sideOffset={6}>
                     {translate(
                       'auto.components.TaskPage.linearModeHasWorktreeTooltip',
-                      'Linear tickets linked to an Orca workspace'
+                      'Linear tickets linked to a HiveCode workspace'
                     )}
                   </TooltipContent>
                 </Tooltip>
@@ -302,7 +302,7 @@ export function TaskPageLinearFilters(props: TaskPageLinearFiltersProps): React.
                 linearMode === 'in-orca'
                   ? translate(
                       'auto.components.TaskPage.linearHasWorktreeSearchPlaceholder',
-                      'Filter issues linked to an Orca workspace...'
+                      'Filter issues linked to a HiveCode workspace...'
                     )
                   : translate('auto.components.TaskPage.eec0c5c079', 'Search Linear issues...')
               }

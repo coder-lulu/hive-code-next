@@ -1,4 +1,3 @@
-import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import {
   createRuntimeHeartbeatRequest,
@@ -15,7 +14,7 @@ export type PendingHeartbeat = Parameters<typeof createRuntimeHeartbeatRequest>[
 type HeartbeatOptions = {
   client: PresenceClient
   identity: HiveRuntimeCloudIdentity
-  authorization: HiveRuntimeCloudAuthorization
+  authorityId: string
   lease: ActiveLease
   pending: PendingHeartbeat | null
   report: HiveRuntimeCloudReport
@@ -41,7 +40,7 @@ export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): 
   options.onPrepared(pending)
   const heartbeat = await options.client.heartbeat(
     createRuntimeHeartbeatRequest(options.identity, pending, {
-      authorityId: options.authorization.authorityId
+      authorityId: options.authorityId
     }),
     options.signal
   )

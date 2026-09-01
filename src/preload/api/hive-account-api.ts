@@ -1,4 +1,5 @@
 import type {
+  HiveAccountLoginCapabilities,
   HiveAccountRefreshResult,
   HiveAccountSmsChallenge,
   HiveAccountSmsSignInOptions,
@@ -6,10 +7,13 @@ import type {
   HiveAccountSignInOptions,
   HiveAccountSignInResult,
   HiveAccountSignOutResult,
-  HiveAccountState
+  HiveAccountState,
+  HiveAccountSecurity,
+  HiveAccountSecurityChallenge
 } from '../../shared/hive-account'
 
 export type HiveAccountApi = {
+  getLoginCapabilities: () => Promise<HiveAccountLoginCapabilities>
   getState: () => Promise<HiveAccountState>
   signIn: (options: HiveAccountSignInOptions) => Promise<HiveAccountSignInResult>
   startSmsSignIn?: (options: HiveAccountSmsSignInOptions) => Promise<HiveAccountSmsChallenge>
@@ -17,5 +21,11 @@ export type HiveAccountApi = {
   completeSmsSignIn?: (options: HiveAccountSmsVerifyOptions) => Promise<HiveAccountSignInResult>
   refresh: () => Promise<HiveAccountRefreshResult>
   signOut: () => Promise<HiveAccountSignOutResult>
+  accountSecurity?: () => Promise<HiveAccountSecurity>
+  setPassword?: (newPassword: string) => Promise<void>
+  startPasswordReset?: (phoneNumber: string) => Promise<HiveAccountSecurityChallenge>
+  verifyPasswordReset?: (challengeId: string, bindingId: string, smsCode: string, newPassword: string) => Promise<void>
+  startPhoneBinding?: (phoneNumber: string) => Promise<HiveAccountSecurityChallenge>
+  verifyPhoneBinding?: (challengeId: string, bindingId: string, smsCode: string) => Promise<void>
   onStateChanged: (callback: (state: HiveAccountState) => void) => () => void
 }

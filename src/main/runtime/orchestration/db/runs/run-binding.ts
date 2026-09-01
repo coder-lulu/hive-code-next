@@ -3,6 +3,7 @@ import { OrchestrationError } from '../../orchestration-error'
 import { LEGACY_CONTRACT_VERSION } from '../contract-constants'
 import { isEquivalentPaneKey } from '../pane-key-match'
 import type { OrchestrationDb } from '../orchestration-db'
+import { PRIMARY_CLI_COMMAND } from '../../../../../shared/brand'
 
 export function bindRun(
   this: OrchestrationDb,
@@ -105,7 +106,7 @@ export function bindRun(
         'This adopted Run still has live legacy work. Its attested coordinator may rebind it, or a current coordinator may explicitly use run-use --takeover-legacy.',
         {
           effectsApplied: false,
-          recoveryCommand: `orca orchestration run-use --id ${params.runId} --takeover-legacy`
+          recoveryCommand: `${PRIMARY_CLI_COMMAND} orchestration run-use --id ${params.runId} --takeover-legacy`
         }
       )
     }

@@ -1,6 +1,11 @@
 import type { PointerEvent } from 'react'
 
-import type { ProjectHeaderDragBucketKey, ProjectHeaderDragRect } from './project-header-drop'
+import type {
+  ProjectHeaderDragBucketKey,
+  ProjectHeaderDragRect,
+  ProjectHeaderDropZone
+} from './project-header-drop'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { Repo } from '../../../../shared/repo-types'
 
 export type RepoDragState = {
@@ -20,22 +25,31 @@ export type UseRepoHeaderDragArgs = {
   sidebarRepoHeaderIdsByBucket: ReadonlyMap<ProjectHeaderDragBucketKey, readonly string[]>
   repoById: ReadonlyMap<string, Repo>
   usesProjectGroupOrdering: boolean
+  canMoveAcrossProjectGroups: boolean
+  projectGroupHostIdByGroupId: ReadonlyMap<string, ExecutionHostId | null>
   onCommitRepoOrder: (orderedIds: string[]) => void
-  onCommitProjectGroupOrder: (repoId: string, projectGroupId: string | null, order: number) => void
+  onCommitProjectGroupOrder: (
+    repoId: string,
+    projectGroupId: string | null,
+    order: number,
+    sourceExecutionHostId: ExecutionHostId
+  ) => void
   getScrollContainer: () => HTMLElement | null
 }
 
 export type RepoHeaderDragController = {
   state: RepoDragState
-  onHandlePointerDown: (event: PointerEvent<HTMLElement>, repoId: string) => void
+  onHandlePointerDown: (event: PointerEvent<HTMLElement>, repo: Repo) => void
 }
 
 export type ProjectHeaderDragSession = {
   repoId: string
   bucketKey: ProjectHeaderDragBucketKey
   sidebarRepoHeaderIds: readonly string[]
+  sourceExecutionHostId: ExecutionHostId
   pointerId: number
   headerRects: ProjectHeaderDragRect[]
+  dropZones: ProjectHeaderDropZone[]
   handleEl: HTMLElement
   startX: number
   startY: number

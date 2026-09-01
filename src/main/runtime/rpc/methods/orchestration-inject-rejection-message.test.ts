@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildInjectRejectionMessage } from './orchestration-inject-rejection-message'
 import { TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
 import { recognizeAgentProcess } from '../../../../shared/agent-process-recognition'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 
 describe('buildInjectRejectionMessage', () => {
   const message = buildInjectRejectionMessage('term_a')
@@ -9,9 +10,11 @@ describe('buildInjectRejectionMessage', () => {
   it('keeps the substring callers and scripts match on', () => {
     expect(message).toContain('Cannot dispatch --inject to terminal term_a')
     expect(message).toContain('no recognized agent detected')
+    expect(message).toContain(`${APP_DISPLAY_NAME} detects these agent CLIs`)
+    expect(message).not.toContain('Orca detects')
   })
 
-  it('names every agent Orca recognizes, including agy', () => {
+  it('names every agent HiveCode recognizes, including agy', () => {
     expect(message).toMatch(/\bagy\b/)
     for (const config of Object.values(TUI_AGENT_CONFIG)) {
       expect(message).toContain(config.expectedProcess)

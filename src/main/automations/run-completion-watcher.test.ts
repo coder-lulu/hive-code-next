@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { Repo } from '../../shared/repo-types'
 import type { Automation, AutomationRun } from '../../shared/automations-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { AutomationsChangedPayload } from '../../shared/runtime-client-events'
 import { AutomationService } from './service'
 import type {
@@ -157,7 +158,7 @@ describe('authority-owned automation run completion', () => {
     })
 
     expect(readRun(store, automation.id, run.id).error).toBe(
-      'Orca stopped watching this run before it reported completion.'
+      `${APP_DISPLAY_NAME} stopped watching this run before it reported completion.`
     )
     // The token is still recoverable where it is actually useful.
     expect(logged.mock.calls.flat().map(String).join(' ')).toContain('terminal_handle_stale')

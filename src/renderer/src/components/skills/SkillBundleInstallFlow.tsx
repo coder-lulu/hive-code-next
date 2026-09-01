@@ -23,6 +23,7 @@ import { useSkillInstallProgress } from './skill-install-progress-state'
 import { translate } from '@/i18n/i18n'
 import { checklistItemsFromVersion } from './skill-package-checklist-items'
 import { summarizeSkillInstallRisk } from './skill-package-install-risk'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { retryableSkillIds } from './skill-bundle-retry-selection'
 
 type BundleVersion = SkillCloudVersion & {
@@ -195,7 +196,7 @@ export function SkillBundleInstallFlow(props: {
           operation.status === 'reconnect-required'
             ? translate(
                 'auto.components.skills.install.reconnectBeforeInstalling',
-                'Reconnect your Orca account before installing.'
+                `Reconnect your ${APP_DISPLAY_NAME} account before installing.`
               )
             : operation.message
         )

@@ -1,6 +1,7 @@
 import type { ClosedTerminalTabTombstonesByTabId } from '../../../../shared/closed-terminal-tab-tombstones'
 import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { SetupSplitDirection } from '../../../../shared/worktree/launch-types'
 import type {
   AgentProviderSessionMetadata,
@@ -31,6 +32,8 @@ export type TerminalState = {
   unreadTerminalTabs: Record<string, true>
   unreadTerminalPanes: Record<string, true>
   unreadAgentCompletionPanes: Record<string, true>
+  /** Number of unseen task completions grouped by terminal pane. */
+  unreadAgentCompletionCountByPane: Record<string, number>
   /** Scoped exit suppression and reference-counted shutdown ownership prevent teardown races. */
   suppressedPtyExitIds: Record<string, true>
   pendingPtyShutdownIds: Record<string, number>
@@ -59,6 +62,7 @@ export type TerminalState = {
       resumeProviderSession?: AgentProviderSessionMetadata
       launchToken?: string
       launchAgent?: TuiAgent
+      agentPermissionMode?: AgentExplicitLaunchPermissionMode
       agentArgsOverride?: string | null
       draftPrompt?: string
       sessionOptions?: Record<string, SessionOptionValue>

@@ -10,24 +10,22 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Optional exact mobile marketing version assertion, e.g. 0.0.22'
+        description: 'Optional exact HiveCode marketing version assertion, e.g. 1.5.0-beta.1'
         required: false
         type: string
-      publish_github_release:
-        description: 'Create or update the mobile-android-v<version> GitHub Release'
+      publish_hivecloud_release:
+        description: 'Publish the signed APK to HiveCloud object storage'
         required: false
         default: true
         type: boolean
 
 jobs:
   android-build:
-    if: github.repository == 'stablyai/orca'
+    if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/mobile-android-v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
-    # Why: the "Create GitHub Release" step below uses the default GITHUB_TOKEN
-    # to call `gh release create`, which requires contents:write. Without this,
-    # the job builds the APK fine but fails at release time with
-    # "HTTP 403: Resource not accessible by integration".
+    # The Git tag remains in GitHub as source provenance, but release artifacts
+    # are owned by HiveCloud and stored through its private OSS service.
     permissions:
       contents: write
 
@@ -57,8 +55,19 @@ jobs:
         id: release
         env:
           MOBILE_ANDROID_RELEASE_VERSION: ${{ github.event.inputs.release_version }}
-          MOBILE_ANDROID_PUBLISH_RELEASE: ${{ github.event.inputs.publish_github_release }}
+          MOBILE_ANDROID_PUBLISH_RELEASE: ${{ github.event.inputs.publish_hivecloud_release }}
         run: node scripts/prepare-android-release.mjs
+
+      - name: Reserve Android build number in HiveCloud
+        if: steps.release.outputs.publish_release == 'true'
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECODE_RELEASE_PLATFORM: android
+          HIVECODE_RELEASE_CHANNEL: beta
+          HIVECODE_BUILD_RESERVATION_KEY: hivecode:android:beta:${{ steps.release.outputs.version }}
+          HIVECODE_EXPECTED_BUILD_NUMBER: ${{ steps.release.outputs.android_version_code }}
+        run: node ../config/scripts/reserve-hivecloud-build-number.mjs
 
       - name: Setup JDK 17
         uses: actions/setup-java@v5
@@ -69,13 +78,45 @@ jobs:
       - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install
 
+      - name: Configure Android release signing
+        env:
+          HIVECODE_ANDROID_KEYSTORE_BASE64: ${{ secrets.HIVECODE_ANDROID_KEYSTORE_BASE64 }}
+          HIVECODE_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/mobile/android/app/hivecode-release.keystore
+          HIVECODE_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEYSTORE_PASSWORD }}
+          HIVECODE_ANDROID_KEY_ALIAS: ${{ secrets.HIVECODE_ANDROID_KEY_ALIAS }}
+          HIVECODE_ANDROID_KEY_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEY_PASSWORD }}
+        run: node scripts/configure-android-release-signing.mjs
+
       - name: Build Android release APK
+        env:
+          HIVECODE_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/mobile/android/app/hivecode-release.keystore
+          HIVECODE_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEYSTORE_PASSWORD }}
+          HIVECODE_ANDROID_KEY_ALIAS: ${{ secrets.HIVECODE_ANDROID_KEY_ALIAS }}
+          HIVECODE_ANDROID_KEY_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEY_PASSWORD }}
         run: cd android && ./gradlew assembleRelease
+
+      - name: Verify Android APK signature and certificate
+        env:
+          HIVECODE_ANDROID_SIGNING_FINGERPRINT: ${{ secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          apk="android/app/build/outputs/apk/release/app-release.apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          expected="$(printf '%s' "$HIVECODE_ANDROID_SIGNING_FINGERPRINT" | tr '[:upper:]' '[:lower:]' | tr -d ':')"
+          [[ "$expected" =~ ^[0-9a-f]{64}$ ]]
+          verification="$($apksigner verify --verbose --print-certs "$apk")"
+          actual="$(printf '%s\n' "$verification" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]' | tr -d ':')"
+          test "$actual" = "$expected"
+
+      - name: Remove Android signing key
+        if: always()
+        run: rm -f android/app/hivecode-release.keystore
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: orca-mobile-apk
+          name: hivecode-mobile-apk
           path: mobile/android/app/build/outputs/apk/release/*.apk
 
       - name: Ensure GitHub release tag
@@ -92,25 +133,15 @@ jobs:
           git tag "$tag" "$GITHUB_SHA"
           git push origin "refs/tags/$tag"
 
-      - name: Create GitHub Release
+      - name: Publish signed APK to HiveCloud
         if: steps.release.outputs.publish_release == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
-
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" \
-              --repo "$GITHUB_REPOSITORY" \
-              --clobber \
-              android/app/build/outputs/apk/release/*.apk
-          else
-            gh release create "$tag" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Orca Mobile Android $tag" \
-              --prerelease \
-              --latest=false \
-              --generate-notes \
-              android/app/build/outputs/apk/release/*.apk
-          fi
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECLOUD_APK_PATH: android/app/build/outputs/apk/release/app-release.apk
+          HIVECODE_VERSION: ${{ steps.release.outputs.version }}
+          HIVECODE_ANDROID_BUILD_NUMBER: ${{ steps.release.outputs.android_version_code }}
+          HIVECODE_ANDROID_ARCHITECTURE: ${{ vars.HIVECODE_ANDROID_ARCHITECTURE }}
+          HIVECODE_ANDROID_SIGNING_FINGERPRINT: ${{ secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT }}
+        run: node scripts/publish-hivecloud-release.mjs

@@ -6,6 +6,8 @@
  * it over SSH; `orcad` reaches it over a local shell. Keeping it transport-free is what
  * lets the Node-only bundle reuse it without pulling `ssh2` in behind it.
  */
+import { APP_DISPLAY_NAME } from '../../shared/brand'
+
 // Why: node-pty@1.1.0 ships no Linux prebuild, so the remote `npm install` falls
 // back to `node-gyp rebuild` and needs a C/C++ toolchain. A missing toolchain is
 // the dominant first-connect failure on Linux relays (#1693); node-gyp surfaces
@@ -153,7 +155,7 @@ export function formatMissingToolchainError(
 ): string {
   const lines = [
     `The remote host is missing the C/C++ build tools (${missingToolNames(status).join(', ')}) ` +
-      `needed to compile Orca's relay native modules (node-pty, @parcel/watcher). node-pty has no ` +
+      `needed to compile ${APP_DISPLAY_NAME}'s relay native modules (node-pty, @parcel/watcher). node-pty has no ` +
       `prebuilt binary for Linux, so they must be compiled on the remote host.`,
     '',
     'Install the build tools on the remote host, then reconnect:',

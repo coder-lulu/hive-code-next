@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import type { SimulatorDeviceRow } from './emulator-pane-types'
 import { translate } from '@/i18n/i18n'
+import { simulatorDeviceStateLabel } from './emulator-device-row-mapping'
 
 type EmulatorPaneToolbarProps = {
   displayName: string
@@ -39,7 +40,11 @@ export function EmulatorPaneToolbar({
 }: EmulatorPaneToolbarProps) {
   // Why: the toolbar chip describes Orca's preview/control stream, not the
   // lower-level CoreSimulator boot state.
-  const statusLabel = isLive ? 'Connected' : loading ? 'Working…' : 'Not connected'
+  const startingLabel = translate(
+    'auto.components.emulator.pane.emulator.pane.toolbar.starting',
+    'Starting…'
+  )
+  const statusLabel = isLive ? 'Connected' : loading ? startingLabel : 'Not connected'
   const subtleStatus = isLive || loading
   const statusClassName = subtleStatus
     ? 'text-muted-foreground'
@@ -64,7 +69,7 @@ export function EmulatorPaneToolbar({
         onValueChange={onSelectDevice}
         disabled={loading || devices.length === 0}
       >
-        <SelectTrigger className="h-7 w-[180px] text-xs">
+        <SelectTrigger className="h-7 w-[220px] text-xs">
           <SelectValue
             placeholder={translate(
               'auto.components.emulator.pane.emulator.pane.toolbar.3d836b879c',
@@ -74,8 +79,16 @@ export function EmulatorPaneToolbar({
         </SelectTrigger>
         <SelectContent position="popper" side="bottom" align="start" sideOffset={4}>
           {devices.map((d) => (
-            <SelectItem key={d.udid} value={d.udid} className="text-xs">
-              {d.name}
+            <SelectItem
+              key={d.udid}
+              value={d.udid}
+              className="text-xs [&>span:last-child]:min-w-0 [&>span:last-child]:flex-1"
+              aria-label={`${d.name}, ${simulatorDeviceStateLabel(d.state)}`}
+            >
+              <span className="min-w-0 flex-1 truncate">{d.name}</span>
+              <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                {simulatorDeviceStateLabel(d.state)}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
@@ -163,10 +176,7 @@ export function EmulatorPaneToolbar({
           disabled={loading || devices.length === 0}
         >
           {loading
-            ? translate(
-                'auto.components.emulator.pane.emulator.pane.toolbar.868c0f2938',
-                'Working…'
-              )
+            ? startingLabel
             : translate(
                 'auto.components.emulator.pane.emulator.pane.toolbar.81b3571a07',
                 'Connect'

@@ -92,6 +92,22 @@ describe('Graphite common states and overlays', () => {
     expect(calls).toEqual(['retry', 'repair', 'remove'])
   })
 
+  it('hides local removal when authentication failed for an account-only Runtime', () => {
+    act(() => {
+      renderer = create(
+        createElement(AuthFailedBanner, {
+          canRetry: true,
+          onRetry: vi.fn(),
+          onRepair: vi.fn()
+        })
+      )
+    })
+
+    expect(
+      renderer!.root.findAllByType('Pressable').map((button) => button.props.accessibilityLabel)
+    ).toEqual(['Retry authentication', 'Re-pair this computer'])
+  })
+
   it('uses a semantic dark surface and a 44dp dismiss target for route notices', () => {
     themeState.scheme = 'dark'
     const onDismiss = vi.fn()

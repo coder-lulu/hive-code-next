@@ -86,3 +86,31 @@ describe('workspace delete app command', () => {
     expect(mocks.deleteHoveredWorkspaceImmediately).not.toHaveBeenCalled()
   })
 })
+
+describe('right sidebar app command', () => {
+  it('does not claim the right-sidebar shortcut on the landing page', () => {
+    const input = shortcutInput()
+    const handler = createAppCommandHandlers(
+      shortcutState({ activeWorktreeId: null, workspaceChromeActive: false }),
+      input
+    ).get('sidebar.right.toggle')
+
+    expect(handler?.()).toBe(false)
+    expect(input.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('keeps the right-sidebar shortcut available inside a workspace', () => {
+    const input = shortcutInput()
+    const toggleRightSidebar = vi.fn()
+    const handler = createAppCommandHandlers(
+      shortcutState({
+        actions: { toggleRightSidebar } as AppShortcutState['actions']
+      }),
+      input
+    ).get('sidebar.right.toggle')
+
+    expect(handler?.()).toBe(true)
+    expect(toggleRightSidebar).toHaveBeenCalledOnce()
+    expect(input.preventDefault).toHaveBeenCalledOnce()
+  })
+})

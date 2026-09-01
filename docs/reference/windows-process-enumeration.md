@@ -1,6 +1,6 @@
 # Reading the Windows process table
 
-Orca needs three things from the Windows process table: who a PID's parent is
+HiveCode needs three things from the Windows process table: who a PID's parent is
 (descendant walks and teardown identity), what a process is running (agent
 recognition), and how much memory/CPU it uses (Resource Manager).
 
@@ -68,7 +68,7 @@ probe also blocked its caller for the full 3 s deadline first. Gating on the
 outstanding read instead bounds retention at exactly one callback, and gives up
 nothing on recovery — a probe queued behind the latch could never have observed
 recovery anyway, whereas the stuck callback firing is the drain itself. On the
-relay's bare addon, which has no queue of its own, it is also what keeps Orca
+relay's bare addon, which has no queue of its own, it is also what keeps HiveCode
 from re-entering `CreateToolhelp32Snapshot` while a call is still running.
 
 That last part is not just tidiness. The addon runs each read as a
@@ -180,7 +180,7 @@ on any other OS keeps using the scan.
 `config/patches/@vscode__windows-process-tree@0.8.0.patch` carries three hunks.
 
 1. **Spectre mitigation.** The upstream `binding.gyp` requires Spectre-mitigated
-   libraries, which Orca's Windows build agents do not install. `node-pty` is
+   libraries, which HiveCode's Windows build agents do not install. `node-pty` is
    patched the same way for the same reason.
 2. **The 1024-process cap.** `GetRawProcessList` stopped after 1024 entries.
    Measured on a real host with 1051 processes, the module returned exactly
@@ -217,15 +217,15 @@ ownership, and CPU accounting in the memory collector — still reads it through
 its own query. Those callers are not migrated.
 
 Committed private bytes have no equivalent either, and the one memory value the
-snapshot does carry is unusable for the sizes Orca now sees: `process.cc` stores
+snapshot does carry is unusable for the sizes HiveCode now sees: `process.cc` stores
 `pmc.WorkingSetSize` into a `DWORD`, so anything above 4 GB wraps. That is the
 second reason `windows-process-resource-collector.ts` still runs its own
 `Get-CimInstance` sweep — it needs `PageFileUsage` (commit) and the CPU-time
 counters in the same pass. Migrating it to the native table would cost both.
 
 Start time is a proxy for identity, not identity. The durable answer for the
-process trees Orca itself spawns is an inherited handle: a job object names the
-tree Orca created, so no start-time comparison is needed. Those readers should
+process trees HiveCode itself spawns is an inherited handle: a job object names the
+tree HiveCode created, so no start-time comparison is needed. Those readers should
 be resolved that way rather than by adding a start time to this module.
 
 Do not adopt `getProcessCpuUsage()` from the package. It takes both CPU samples

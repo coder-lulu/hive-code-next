@@ -1,11 +1,11 @@
 import React from 'react'
-import { Bell, BookOpen, CalendarClock, Files, Search } from 'lucide-react'
+import { Bell, BookOpen, CalendarClock, Files, MessageSquarePlus, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { useActivityUnreadCount } from '@/components/activity/useActivityUnreadCount'
-import { useShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
+import { useShortcutKeyComboDetails, useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { SetupGuideSidebarEntry } from './SetupGuideSidebarEntry'
@@ -59,6 +59,11 @@ const SidebarNav = React.memo(function SidebarNav() {
   // translate() preserves Orca's pseudo-localization behavior.
   useTranslation()
   const worktreePaletteShortcutCombos = useShortcutKeyComboDetails('worktree.palette')
+  const newTaskShortcutLabel = useShortcutLabel('home.newTask')
+  const openNewTaskHome = useAppStore((s) => s.openNewTaskHome)
+  const newTaskActive = useAppStore(
+    (s) => s.homeNewTaskMode && s.activeView === 'terminal' && s.activeWorkspaceKey === null
+  )
   const openAutomationsPage = useAppStore((s) => s.openAutomationsPage)
   const openActivityPage = useAppStore((s) => s.openActivityPage)
   const openArtifactsPage = useAppStore((s) => s.openArtifactsPage)
@@ -97,6 +102,20 @@ const SidebarNav = React.memo(function SidebarNav() {
       aria-label={translate('components.sidebar.primaryNavigation', 'Primary navigation')}
       data-contextual-tour-target="sidebar-navigation"
     >
+      <button
+        type="button"
+        className={cn('sidebar-new-task-button', newTaskActive && 'is-active')}
+        onClick={openNewTaskHome}
+        aria-current={newTaskActive ? 'page' : undefined}
+        aria-label={translate('components.sidebar.newTask', 'New task')}
+        title={translate('components.sidebar.newTaskWithShortcut', 'New task ({{shortcut}})', {
+          shortcut: newTaskShortcutLabel
+        })}
+      >
+        <MessageSquarePlus className="size-4" strokeWidth={1.9} />
+        <span className="flex-1">{translate('components.sidebar.newTask', 'New task')}</span>
+        <span className="sidebar-new-task-shortcut">{newTaskShortcutLabel}</span>
+      </button>
       <SetupGuideSidebarEntry />
       <SidebarTaskNavButton />
       {showArtifactsButton ? (

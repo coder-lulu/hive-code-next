@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { getDefaultSettings } from './constants'
 import {
+  ARTIFACT_SHARING_DISABLED_MESSAGE,
+  ARTIFACT_SHARING_DISABLED_NEXT_STEPS,
   ARTIFACT_SHARING_DISABLED_CODE,
   ArtifactSharingDisabledError,
   assertArtifactSharingAllowed,
@@ -33,5 +35,11 @@ describe('artifact sharing capability gate', () => {
       })
     }
     expect(() => assertArtifactSharingAllowed(() => true)).not.toThrow()
+  })
+
+  it('uses the public product and CLI names in recovery copy', () => {
+    expect(ARTIFACT_SHARING_DISABLED_MESSAGE).toContain('hive CLI')
+    expect(ARTIFACT_SHARING_DISABLED_MESSAGE).not.toMatch(/\bOrca\b|\borca CLI\b/)
+    expect(ARTIFACT_SHARING_DISABLED_NEXT_STEPS.join('\n')).toContain('HiveCode desktop app')
   })
 })

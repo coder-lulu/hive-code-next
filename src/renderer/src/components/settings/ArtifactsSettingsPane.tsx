@@ -6,6 +6,7 @@ import { SettingsSwitchRow } from './SettingsFormControls'
 import { useAppStore } from '@/store'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type HowToStep = { key: string; title: string; description: string }
 
@@ -126,7 +127,7 @@ export function ArtifactsSettingsPane({
             <p className="text-xs leading-relaxed text-muted-foreground">
               {translate(
                 'auto.components.settings.artifacts.signInDescription',
-                'Use your Orca account to upload artifacts and manage their public links.'
+                `Use your ${APP_DISPLAY_NAME} account to upload artifacts and manage their public links.`
               )}
             </p>
           </div>
@@ -140,7 +141,10 @@ export function ArtifactsSettingsPane({
               ? translate('auto.components.settings.artifacts.signingIn', 'Signing in…')
               : authStatus?.state === 'reconnect-required'
                 ? translate('auto.components.settings.artifacts.signInAgain', 'Sign in again')
-                : translate('auto.components.settings.artifacts.signIn', 'Sign in to Orca')}
+                : translate(
+                    'auto.components.settings.artifacts.signIn',
+                    `Sign in to ${APP_DISPLAY_NAME}`
+                  )}
           </Button>
         </section>
       ) : null}

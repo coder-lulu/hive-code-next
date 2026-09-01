@@ -1,9 +1,10 @@
 #!/bin/bash
 # Package-manager hooks must remain LF-only so dpkg can execute their shebangs.
-# Why: register HiveCode and the safe `orca-ide` compatibility command at
+# Why: register `hive` plus the one-release `hivecode` and safe `orca-ide`
+# compatibility commands at
 # package-install time. Never claim bare `orca`, which belongs to GNOME Orca.
 # The in-app "Install CLI" action (CliInstaller) can never run on a headless
-# server, so without these symlinks `hivecode serve` is unreachable from the shell on
+# server, so without these symlinks `hive serve` is unreachable from the shell on
 # the exact hosts that need it most. deb/rpm both run this after unpacking.
 #
 # The shim resolves the real app by walking up from its own location, so a
@@ -13,11 +14,11 @@ set -e
 
 is_managed_target() {
   case "$1" in
-    /opt/HiveCode/resources/bin/hivecode|/opt/HiveCode/resources/bin/orca-ide|\
-    /opt/hivecode/resources/bin/hivecode|/opt/hivecode/resources/bin/orca-ide|\
-    /opt/Orca/resources/bin/hivecode|/opt/Orca/resources/bin/orca-ide|\
-    /opt/orca-ide/resources/bin/hivecode|/opt/orca-ide/resources/bin/orca-ide|\
-    /opt/orca/resources/bin/hivecode|/opt/orca/resources/bin/orca-ide)
+    /opt/HiveCode/resources/bin/hive|/opt/HiveCode/resources/bin/hivecode|/opt/HiveCode/resources/bin/orca-ide|\
+    /opt/hivecode/resources/bin/hive|/opt/hivecode/resources/bin/hivecode|/opt/hivecode/resources/bin/orca-ide|\
+    /opt/Orca/resources/bin/hive|/opt/Orca/resources/bin/hivecode|/opt/Orca/resources/bin/orca-ide|\
+    /opt/orca-ide/resources/bin/hive|/opt/orca-ide/resources/bin/hivecode|/opt/orca-ide/resources/bin/orca-ide|\
+    /opt/orca/resources/bin/hive|/opt/orca/resources/bin/hivecode|/opt/orca/resources/bin/orca-ide)
       return 0
       ;;
   esac
@@ -48,9 +49,11 @@ for dir in /opt/HiveCode /opt/hivecode /opt/Orca /opt/orca-ide /opt/orca; do
     chmod 4755 "$sandbox" || true
   fi
 
+  hive_shim="$dir/resources/bin/hive"
   hivecode_shim="$dir/resources/bin/hivecode"
   orca_ide_shim="$dir/resources/bin/orca-ide"
-  if [ -x "$hivecode_shim" ] && [ -x "$orca_ide_shim" ]; then
+  if [ -x "$hive_shim" ] && [ -x "$hivecode_shim" ] && [ -x "$orca_ide_shim" ]; then
+    install_link hive "$hive_shim"
     install_link hivecode "$hivecode_shim"
     install_link orca-ide "$orca_ide_shim"
     runtime_unit="$dir/resources/systemd/hivecode-runtime.service"

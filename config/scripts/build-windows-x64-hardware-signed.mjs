@@ -65,7 +65,9 @@ export function main(argv = process.argv.slice(2), spawnSyncImpl = spawnSync) {
         '--config',
         'config/electron-builder.config.cjs',
         '--win',
-        '--x64'
+        '--x64',
+        '--publish',
+        'never'
       ],
       {
         cwd: process.cwd(),

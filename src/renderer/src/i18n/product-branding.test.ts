@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { APP_DISPLAY_NAME } from '../../../shared/brand'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import { i18n, translate } from './i18n'
 
 describe('renderer product branding', () => {
@@ -20,6 +20,21 @@ describe('renderer product branding', () => {
     expect(translate('test.profileType', 'OrcaProfile')).toBe('OrcaProfile')
     expect(translate('test.deepLink', 'orca://workspace')).toBe('orca://workspace')
     expect(translate('test.deepLinkUpper', 'ORCA://workspace')).toBe('ORCA://workspace')
+  })
+
+  it('uses the primary command in translated CLI examples', () => {
+    expect(translate('test.cliCommand', 'Run `orca status` and retry.')).toBe(
+      `Run \`${PRIMARY_CLI_COMMAND} status\` and retry.`
+    )
+  })
+
+  it('does not rewrite values interpolated into branded static copy', () => {
+    expect(
+      translate('test.dynamicProductData', 'Project "{{name}}" is ready at {{url}}.', {
+        name: 'orca status',
+        url: 'https://orca.dev'
+      })
+    ).toBe('Project "orca status" is ready at https://orca.dev.')
   })
 
   it('brands catalog values loaded from a non-English locale', async () => {

@@ -1,5 +1,6 @@
 import { dialog, type BrowserWindow, type MessageBoxOptions } from 'electron'
 
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type { RuntimeRpcStartErrorClass } from '../../shared/telemetry-events'
 import { translateMain } from '../i18n/main-i18n'
 import { track } from '../telemetry/client'
@@ -69,25 +70,23 @@ const GUIDANCE_BY_ERROR_CLASS: Readonly<
 > = {
   permission_denied: {
     key: 'runtimeRpc.startupFailure.guidance.permissionDenied',
-    fallback:
-      "Orca couldn't write its runtime file. Check permissions on Orca's data folder, then restart."
+    fallback: `${APP_DISPLAY_NAME} couldn't write its runtime file. Check permissions on ${APP_DISPLAY_NAME}'s data folder, then restart.`
   },
   storage_unavailable: {
     key: 'runtimeRpc.startupFailure.guidance.storageUnavailable',
-    fallback: 'Your disk may be full or read-only. Free up space, then restart Orca.'
+    fallback: `Your disk may be full or read-only. Free up space, then restart ${APP_DISPLAY_NAME}.`
   },
   invalid_path: {
     key: 'runtimeRpc.startupFailure.guidance.invalidPath',
-    fallback:
-      "Orca's data folder may be missing, moved, or at a path that is too long. Restore it or use a shorter path, then restart Orca."
+    fallback: `${APP_DISPLAY_NAME}'s data folder may be missing, moved, or at a path that is too long. Restore it or use a shorter path, then restart ${APP_DISPLAY_NAME}.`
   },
   address_in_use: {
     key: 'runtimeRpc.startupFailure.guidance.addressInUse',
-    fallback: 'Another process may be holding the port. Restart Orca to try again.'
+    fallback: `Another process may be holding the port. Restart ${APP_DISPLAY_NAME} to try again.`
   },
   unknown: {
     key: 'runtimeRpc.startupFailure.guidance.unknown',
-    fallback: 'Restart Orca to try again.'
+    fallback: `Restart ${APP_DISPLAY_NAME} to try again.`
   }
 }
 
@@ -100,14 +99,14 @@ function createRuntimeRpcStartupFailureDialogOptions(error: unknown): MessageBox
     defaultId: 0,
     cancelId: 0,
     noLink: true,
-    title: translateMain('runtimeRpc.startupFailure.title', 'Orca CLI unavailable'),
+    title: translateMain('runtimeRpc.startupFailure.title', `${APP_DISPLAY_NAME} CLI unavailable`),
     message: translateMain(
       'runtimeRpc.startupFailure.message',
-      "Orca couldn't start its local command transport."
+      `${APP_DISPLAY_NAME} couldn't start its local command transport.`
     ),
     detail: translateMain(
       'runtimeRpc.startupFailure.detail',
-      'Orca will continue to work, but commands such as orca status, orca terminal, and orchestration are unavailable for this session.\n\n{{guidance}}\n\nCause: {{cause}}',
+      `${APP_DISPLAY_NAME} will continue to work, but commands such as ${PRIMARY_CLI_COMMAND} status, ${PRIMARY_CLI_COMMAND} terminal, and orchestration are unavailable for this session.\n\n{{guidance}}\n\nCause: {{cause}}`,
       { cause, guidance: translateMain(key, fallback) }
     )
   }

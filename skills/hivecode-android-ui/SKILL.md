@@ -26,26 +26,26 @@ control without UI work, use `orca-emulator-android` instead.
 ## Load the full guide before acting
 
 ```text
-ORCA skills get hivecode-android-ui
+hive skills get hivecode-android-ui
 ```
 
-Resolve `ORCA` once using `ORCA_CLI_COMMAND`, then `orca-dev` in a development
-checkout exposing `ORCA_DEV_REPO_ROOT`, `orca-ide` on unmanaged Linux, or `orca`
-elsewhere. `ORCA` is a placeholder; substitute the executable and do not run it
-literally. Read the returned guide before starting an emulator or editing the
-mobile UI. It links the lower-level `orca-emulator-android` command surface.
+Use `hive` in current builds. If the compatibility environment variable
+`ORCA_CLI_COMMAND` is set, use its pinned executable instead. Older builds may
+expose `orca-dev`, `orca-ide`, or `orca`; use one only when `hive` is unavailable.
+Read the returned guide before starting an emulator or editing the mobile UI. It
+links the lower-level `orca-emulator-android` compatibility skill.
 
 ## If an older HiveCode does not recognize `skills get`
 
 Use only this bounded, read-only fallback to orient the session:
 
 ```text
-ORCA status --json
-ORCA emulator devices --json
+hive status --json
+hive emulator devices --json
 ```
 
 If those commands work, continue the UI implementation with the checked-in
 `mobile/README.md` and the Windows `adb` fallback described in the project
 documentation, then tell the user that updating HiveCode restores the full
-version-matched guide. Do not invent additional ORCA flags or silently switch
+version-matched guide. Do not invent additional HiveCode CLI flags or silently switch
 to another executable.

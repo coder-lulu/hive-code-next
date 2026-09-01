@@ -70,7 +70,7 @@ function formatDevInstanceLabel(branch, worktreeName) {
 }
 
 function createDockTitle(branch, label) {
-  return `Orca: ${branch || label || 'dev'}`
+  return `HiveCode: ${branch || label || 'dev'}`
 }
 
 function seedDevInstanceIdentityEnv() {
@@ -112,7 +112,7 @@ function sanitizeMacAppBundleName(value) {
       .join('')
       .replace(/\s+/g, ' ')
       .trim()
-      .slice(0, 120) || 'Orca'
+      .slice(0, 120) || 'HiveCode'
   )
 }
 
@@ -186,7 +186,7 @@ function prepareMacDevElectronApp() {
     electronVersion = JSON.parse(readFileSync(electronPackagePath, 'utf8')).version ?? null
   } catch {}
 
-  const title = process.env.ORCA_DEV_DOCK_TITLE || 'Orca: dev'
+  const title = process.env.ORCA_DEV_DOCK_TITLE || 'HiveCode: dev'
   const identityKey = process.env.ORCA_DEV_INSTANCE_KEY || repoRoot
   // v11: stop patching the branch title into Info.plist so every dev bundle signs to one cdhash.
   // A stale copy only emits extra fields the parser ignores, so narrowing its schema needs no bump.
@@ -206,7 +206,7 @@ function prepareMacDevElectronApp() {
   const markerPath = path.join(distDir, 'orca-dev-electron-app.json')
   // Why: one stable id for every dev instance. Per-instance ids registered a
   // new macOS Notification Settings entry for each branch × Electron version,
-  // piling up "Orca: <branch>" rows forever and breaking the notification
+  // piling up "HiveCode: <branch>" rows forever and breaking the notification
   // settings deep-link (System Settings can't resolve an id it has no entry
   // for and falls back to the root list). macOS keys notification permission
   // by bundle id, so a single id also means granting notifications to one dev

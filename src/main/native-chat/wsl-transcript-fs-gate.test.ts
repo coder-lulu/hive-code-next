@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   resetWslTranscriptFsGateForTests,
   runWslTranscriptFsTask,
@@ -10,10 +11,8 @@ import {
   WslTranscriptFsError
 } from './wsl-transcript-fs-gate'
 
-const SLOW_MESSAGE =
-  'WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart Orca if the issue continues.'
-const CAPACITY_MESSAGE =
-  'WSL transcript discovery is temporarily unavailable because too many filesystem requests are already waiting. Try again shortly or restart Orca if the issue continues.'
+const SLOW_MESSAGE = `WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart ${APP_DISPLAY_NAME} if the issue continues.`
+const CAPACITY_MESSAGE = `WSL transcript discovery is temporarily unavailable because too many filesystem requests are already waiting. Try again shortly or restart ${APP_DISPLAY_NAME} if the issue continues.`
 
 function deferred<T>(): {
   promise: Promise<T>

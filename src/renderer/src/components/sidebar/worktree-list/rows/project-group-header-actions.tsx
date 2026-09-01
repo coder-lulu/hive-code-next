@@ -1,5 +1,5 @@
 import React from 'react'
-import { Ellipsis, Plus } from 'lucide-react'
+import { Ellipsis, FolderPlus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -86,11 +86,12 @@ export function ProjectGroupCreateWorkspaceButton({
   disabled,
   onCreate
 }: {
-  projectGroup: ProjectGroup
+  /** Null represents the derived ungrouped space; it has no mutation target. */
+  projectGroup: ProjectGroup | null
   label: string
   pathStatus: FolderWorkspacePathStatus | null
   disabled: boolean
-  onCreate: (projectGroup: ProjectGroup) => void
+  onCreate: (projectGroup: ProjectGroup | null) => void
 }): React.JSX.Element {
   const createLabel = translate(
     'auto.components.sidebar.WorktreeList.bd37a57ac8',
@@ -105,6 +106,7 @@ export function ProjectGroupCreateWorkspaceButton({
           variant="ghost"
           size="icon-xs"
           data-repo-header-action=""
+          data-contextual-tour-target="workspace-create-control"
           className={cn(
             REPO_HEADER_ACTION_BUTTON_CLASS,
             disabled &&
@@ -130,6 +132,55 @@ export function ProjectGroupCreateWorkspaceButton({
         {pathStatus?.exists === false
           ? getFolderWorkspacePathStatusDescription(pathStatus)
           : createLabel}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * Adds a repository/folder source to the space represented by this row.
+ * Keeping this action on the group row makes the space hierarchy explicit:
+ * the global Spaces header only owns view/sort controls, while mutations are
+ * scoped to the selected space.
+ */
+export function ProjectGroupAddProjectButton({
+  projectGroup,
+  label,
+  onAdd
+}: {
+  /** Null represents the derived ungrouped space. */
+  projectGroup: ProjectGroup | null
+  label: string
+  onAdd: (projectGroup: ProjectGroup | null) => void
+}): React.JSX.Element {
+  const addLabel = translate(
+    'auto.components.sidebar.WorktreeList.addProjectToGroup',
+    'Add project to {{value0}}',
+    { value0: label }
+  )
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          data-repo-header-action=""
+          className={REPO_HEADER_ACTION_BUTTON_CLASS}
+          aria-label={addLabel}
+          onKeyDown={stopRepoHeaderKeyboardToggle}
+          onPointerDown={handleRepoHeaderActionPointerDown}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onAdd(projectGroup)
+          }}
+        >
+          <FolderPlus className="size-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={6}>
+        {addLabel}
       </TooltipContent>
     </Tooltip>
   )

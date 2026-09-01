@@ -12,7 +12,7 @@ import {
   normalizeHostedReviewBaseRef,
   normalizeHostedReviewHeadRef
 } from '../../shared/hosted-review-refs'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   supportsHostedReviewCreation,
   type HostedReviewCreationProvider
@@ -470,9 +470,7 @@ async function validateCurrentBranchCanCreateReview(
       return {
         ok: false,
         code: 'validation',
-        error: applyProductBranding(
-          `Create ${copy.shortLabel} failed: Orca could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`
-        )
+        error: `Create ${copy.shortLabel} failed: ${APP_DISPLAY_NAME} could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`
       }
     }
     // Why: renderer eligibility can be stale by submit time; main process is the last gate before an out-of-date create.

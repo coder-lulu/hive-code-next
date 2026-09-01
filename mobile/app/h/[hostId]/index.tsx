@@ -22,11 +22,14 @@ import {
 } from 'lucide-react-native'
 import type { RpcClient } from '../../../src/transport/rpc-client'
 import { loadHosts, updateLastConnected } from '../../../src/transport/host-store'
+import { useAccountVisibleHostCatalog } from '../../../src/runtime-directory/use-account-visible-host-catalog'
+import { hostCatalogEntryHasLocalPairing } from '../../../src/runtime-directory/account-runtime-catalog'
 import { removeHostAndCloseClient } from '../../../src/transport/host-removal-lifecycle'
 import {
   useHostClient,
   useForgetHostClient,
-  useForceReconnect
+  useForceReconnect,
+  useRefreshHostClient
 } from '../../../src/transport/client-context'
 import { useWorktreeResync } from '../../../src/transport/use-worktree-resync'
 import { startHostWorktreeRefresh } from '../../../src/worktree/host-worktree-refresh'
@@ -135,6 +138,12 @@ export function HostScreen({
   const styles = useMobileThemeStyles(createHostScreenStyles)
   const params = useLocalSearchParams<{ hostId: string; action?: string; notice?: string }>()
   const hostId = hostIdProp ?? params.hostId
+  const { catalog: accountVisibleHostCatalog, loaded: hostCatalogLoaded } =
+    useAccountVisibleHostCatalog()
+  const currentHostCatalogEntry = accountVisibleHostCatalog.find((entry) => entry.id === hostId)
+  const canRemoveHost = currentHostCatalogEntry
+    ? hostCatalogEntryHasLocalPairing(currentHostCatalogEntry)
+    : false
   const action = actionProp ?? params.action
   const [dismissedNotice, setDismissedNotice] = useState<string | null>(null)
   const noticeParam = params.notice?.trim()
@@ -164,6 +173,7 @@ export function HostScreen({
   const newWorktreeModalVisibleRef = useRef(false)
   const forgetHostClient = useForgetHostClient()
   const forceReconnectHost = useForceReconnect()
+  const refreshHostClient = useRefreshHostClient()
   const [worktrees, setWorktrees] = useState<Worktree[]>(initialCache ?? [])
   const [worktreesLoaded, setWorktreesLoaded] = useState(initialCache != null)
   // Why (STA-3123): error code of the last failed worktree.ps, so a broken catalog
@@ -206,6 +216,12 @@ export function HostScreen({
     createInitialHostRouteActionState(action)
   )
   const [sleptIds, setSleptIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!canRemoveHost) {
+      setConfirmRemoveHost(false)
+    }
+  }, [canRemoveHost])
 
   const leaveHost = useCallback(() => {
     leaveHostRoute(router)
@@ -368,18 +384,35 @@ export function HostScreen({
       if (stale) {
         return
       }
-      const host = hosts.find((h) => h.id === hostId)
-      if (!host) {
-        setError('Host not found')
+      const localHost = hosts.find((host) => host.id === hostId)
+      if (!localHost) {
         return
       }
-      setHostName(host.name)
-      void updateLastConnected(host.id)
+      setHostName(localHost.name)
+      void updateLastConnected(localHost.id)
     })
     return () => {
       stale = true
     }
   }, [hostId])
+
+  useEffect(() => {
+    if (!hostId) {
+      return
+    }
+    const host = accountVisibleHostCatalog.find((entry) => entry.id === hostId)?.profile
+    if (!host) {
+      if (hostCatalogLoaded) {
+        setError('Host not found')
+      }
+      return
+    }
+    setHostName(host.name)
+    setError((current) => (current === 'Host not found' ? '' : current))
+    if (!client && (host.accountRuntime || host.accountRuntimeFallback)) {
+      refreshHostClient(host.id)
+    }
+  }, [accountVisibleHostCatalog, client, hostCatalogLoaded, hostId, refreshHostClient])
 
   const fetchRepoMetadata = useCallback(
     async (options: { force?: boolean; queueIfInFlight?: boolean } = {}) => {
@@ -633,7 +666,8 @@ export function HostScreen({
   )
 
   const handleRemoveHost = useCallback(async () => {
-    if (!hostId) {
+    if (!hostId || !canRemoveHost) {
+      setConfirmRemoveHost(false)
       return
     }
     try {
@@ -644,7 +678,7 @@ export function HostScreen({
       setConfirmRemoveHost(true)
       Alert.alert('Could not remove host', 'Please try again.')
     }
-  }, [hostId, leaveHost, forgetHostClient])
+  }, [canRemoveHost, hostId, leaveHost, forgetHostClient])
 
   const navigateFromHostList = useCallback(
     (target: string) => {
@@ -1091,7 +1125,7 @@ export function HostScreen({
           canRetry={!!hostId}
           onRetry={() => hostId && void forceReconnectHost(hostId)}
           onRepair={() => router.push('/pair-scan')}
-          onRemove={() => setConfirmRemoveHost(true)}
+          onRemove={canRemoveHost ? () => setConfirmRemoveHost(true) : undefined}
         />
       )}
 
@@ -1391,7 +1425,7 @@ export function HostScreen({
 
       {/* Host remove confirmation */}
       <ConfirmModal
-        visible={confirmRemoveHost}
+        visible={confirmRemoveHost && canRemoveHost}
         title="Remove Host"
         message={`Remove "${hostName}"? You can re-pair later.`}
         confirmLabel="Remove"

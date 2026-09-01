@@ -1,6 +1,7 @@
 import * as pty from 'node-pty'
 import { statSync } from 'node:fs'
 import { release } from 'node:os'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import {
   ensureNodePtySpawnHelperExecutable,
   getNodePtySpawnHelperCandidates,
@@ -26,7 +27,7 @@ function formatMissingDaemonPathError(kind: 'helper' | 'cwd', path: string): Dae
   const step = kind === 'helper' ? 'posix_spawn' : 'daemon_cwd'
   const missingTarget = kind === 'helper' ? 'node-pty install' : 'working directory'
   return new DaemonProtocolError(
-    `Daemon's ${missingTarget} is gone (worktree deleted?). Restart Orca. node-pty: ${step} failed: ENOENT (errno 2, No such file or directory) - ${detailName}='${path}'${daemonEnvironmentDiagSuffix()}`
+    `Daemon's ${missingTarget} is gone (worktree deleted?). Restart ${APP_DISPLAY_NAME}. node-pty: ${step} failed: ENOENT (errno 2, No such file or directory) - ${detailName}='${path}'${daemonEnvironmentDiagSuffix()}`
   )
 }
 

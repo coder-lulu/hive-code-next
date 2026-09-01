@@ -1,19 +1,32 @@
 import { hivecodeProductConfig } from './generated/product-config'
 
-const PRODUCT_UPDATE_CHANNELS = ['stable', 'beta', 'rc'] as const
+// `rc` remains readable for clients upgrading from the legacy release stream,
+// but new HiveCode releases use beta/stable channels only.
+const PRODUCT_UPDATE_CHANNELS = ['internal', 'stable', 'beta', 'rc'] as const
 type ProductUpdateChannel = (typeof PRODUCT_UPDATE_CHANNELS)[number]
 const PRODUCT_UPDATE_PROVIDERS = ['github', 'hivecloud'] as const
 type ProductUpdateProvider = (typeof PRODUCT_UPDATE_PROVIDERS)[number]
 const HIVECLOUD_DESKTOP_UPDATE_PATH = '/hive/v1/updates/desktop/'
+const HIVECLOUD_UPDATE_CHECK_PATH = '/hive/v1/updates/check'
 
 type ProductUpdateManifestLike = {
-  desktop: {
+  desktop?: {
     updateChannel: string | null
     updateProvider: string | null
     updateRepository: string | null
   }
-  endpoints: {
+  endpoints?: {
     update: string | null
+  }
+  services?: {
+    update: {
+      enabled: boolean
+      endpoint: string | null
+      checkEndpoint?: string | null
+      provider: string | null
+      channel: string | null
+      checkIntervalHours?: number
+    }
   }
 }
 
@@ -29,6 +42,11 @@ export type ProductUpdateSource = {
   feedUrl: string
   github: ProductGitHubUpdateSource | null
   provider: ProductUpdateProvider
+}
+
+export type ProductUpdateCheckSource = {
+  endpoint: string
+  channel: ProductUpdateChannel
 }
 
 const HIVECLOUD_UPDATE_PLATFORMS: Partial<Record<NodeJS.Platform, string>> = {
@@ -74,10 +92,18 @@ function resolveGitHubUpdateSource(url: URL): ProductGitHubUpdateSource | null {
 export function resolveProductUpdateSource(
   config: ProductUpdateManifestLike = hivecodeProductConfig
 ): ProductUpdateSource | null {
-  const configuredChannel = config.desktop.updateChannel?.trim()
-  const configuredProvider = config.desktop.updateProvider?.trim()
-  const approvedRepository = config.desktop.updateRepository?.trim()
-  const endpoint = config.endpoints.update?.trim()
+  const serviceUpdate = config.services?.update
+  if (serviceUpdate && !serviceUpdate.enabled) {
+    return null
+  }
+  const configuredChannel = (
+    serviceUpdate ? serviceUpdate.channel : config.desktop?.updateChannel
+  )?.trim()
+  const configuredProvider = (
+    serviceUpdate ? serviceUpdate.provider : config.desktop?.updateProvider
+  )?.trim()
+  const approvedRepository = config.desktop?.updateRepository?.trim()
+  const endpoint = (serviceUpdate ? serviceUpdate.endpoint : config.endpoints?.update)?.trim()
   if (
     !configuredChannel ||
     !PRODUCT_UPDATE_CHANNELS.includes(configuredChannel as ProductUpdateChannel) ||
@@ -130,5 +156,37 @@ export function resolveProductUpdateSource(
     feedUrl: url.toString(),
     github: null,
     provider
+  }
+}
+
+/** Resolve the JSON control-plane endpoint used for mandatory/update preflight checks. */
+export function resolveProductUpdateCheckSource(
+  config: ProductUpdateManifestLike = hivecodeProductConfig
+): ProductUpdateCheckSource | null {
+  const serviceUpdate = config.services?.update
+  if (serviceUpdate && !serviceUpdate.enabled) {
+    return null
+  }
+  const endpoint = serviceUpdate?.checkEndpoint?.trim()
+  const channel = serviceUpdate?.channel?.trim()
+  if (!endpoint || !channel || !PRODUCT_UPDATE_CHANNELS.includes(channel as ProductUpdateChannel)) {
+    return null
+  }
+  try {
+    const url = new URL(endpoint)
+    if (
+      url.protocol !== 'https:' ||
+      url.username !== '' ||
+      url.password !== '' ||
+      url.search !== '' ||
+      url.hash !== '' ||
+      url.pathname.includes('%') ||
+      url.pathname !== HIVECLOUD_UPDATE_CHECK_PATH
+    ) {
+      return null
+    }
+    return { endpoint: url.href, channel: channel as ProductUpdateChannel }
+  } catch {
+    return null
   }
 }

@@ -2,7 +2,7 @@ import { mkdtemp, readdir, realpath, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   PLUGIN_MANIFEST_FILENAME,
   isQualifiedPluginKey
@@ -210,7 +210,7 @@ export async function rollbackInstalledPlugin(input: {
   if (blockedReason) {
     return {
       ok: false,
-      error: applyProductBranding(`plugin is blocked by Orca's safety list: ${blockedReason}`)
+      error: `plugin is blocked by ${APP_DISPLAY_NAME}'s safety list: ${blockedReason}`
     }
   }
   return serializePluginMutation(input.pluginsDir, async () => {

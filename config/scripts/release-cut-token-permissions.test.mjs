@@ -201,7 +201,9 @@ describe('release-cut token permissions', () => {
     }
 
     const macWorkflow = readWorkflow('.github/workflows/release-mac-build.yml')
-    expect(macWorkflow.jobs['build-mac'].if).toBe("github.repository == 'stablyai/orca'")
+    expect(macWorkflow.jobs['build-mac'].if).toBe(
+      "github.repository == 'coder-lulu/hive-code-next'"
+    )
     expect(checkoutRef(macWorkflow.jobs['build-mac'])).toBe('refs/tags/${{ inputs.tag }}')
 
     const e2eWorkflow = readWorkflow('.github/workflows/e2e.yml')

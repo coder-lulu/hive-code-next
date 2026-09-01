@@ -64,7 +64,7 @@ function wslOnly(
   return targetsWsl ? resolution : undefined
 }
 
-export function useActiveProjectSkillRuntime(): ActiveProjectSkillRuntime {
+export function useActiveProjectSkillRuntime(enabled = true): ActiveProjectSkillRuntime {
   const runtimeState = useAppStore(
     useShallow((state) => ({
       activeRepoId: state.activeRepoId,
@@ -76,7 +76,7 @@ export function useActiveProjectSkillRuntime(): ActiveProjectSkillRuntime {
     }))
   )
   const currentPlatform = getCurrentPlatform()
-  const windowsCapabilities = useWindowsTerminalCapabilities(currentPlatform === 'win32')
+  const windowsCapabilities = useWindowsTerminalCapabilities(enabled && currentPlatform === 'win32')
   const runtimeTarget = useActiveSkillDiscoveryRuntimeTarget()
 
   const resolved = useMemo(() => {

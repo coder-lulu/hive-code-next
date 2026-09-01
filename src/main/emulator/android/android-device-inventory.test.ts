@@ -70,12 +70,118 @@ describe('listAndroidDevices', () => {
         if (binary === SDK.adb && a === '-s emulator-5554 emu avd name') {
           return 'Pixel_7\nOK'
         }
+        if (binary === SDK.adb && a === '-s emulator-5554 shell getprop sys.boot_completed') {
+          return '1'
+        }
         return ''
       })
     )
     const devices = await listAndroidDevices(fake as unknown as AndroidCommandRunner, SDK)
     expect(devices).toHaveLength(1)
     expect(devices[0]).toMatchObject({ id: 'emulator-5554', name: 'Pixel_7', state: 'booted' })
+  })
+
+  it('classifies adb-visible transports by Android framework health', async () => {
+    const fake = vi.fn(async (binary: string, args: readonly string[]) => {
+      const joinedArgs = args.join(' ')
+      if (binary === SDK.adb && joinedArgs === 'devices -l') {
+        return ok(
+          [
+            'List of devices attached',
+            'emulator-5554\tdevice',
+            'emulator-5556\tdevice',
+            'emulator-5558\tdevice'
+          ].join('\n')
+        )
+      }
+      if (binary === SDK.emulator && joinedArgs === '-list-avds') {
+        return ok('Ready\nStarting\nStuck')
+      }
+      if (binary === SDK.adb && joinedArgs.endsWith('emu avd name')) {
+        const names: Record<string, string> = {
+          'emulator-5554': 'Ready',
+          'emulator-5556': 'Starting',
+          'emulator-5558': 'Stuck'
+        }
+        return ok(`${names[args[1]]}\nOK`)
+      }
+      if (joinedArgs === '-s emulator-5554 shell getprop sys.boot_completed') {
+        return ok('1')
+      }
+      if (joinedArgs === '-s emulator-5556 shell getprop sys.boot_completed') {
+        return ok('0')
+      }
+      if (joinedArgs === '-s emulator-5558 shell getprop sys.boot_completed') {
+        return { stdout: '', stderr: 'command timed out', code: 1 }
+      }
+      return ok('')
+    })
+
+    const devices = await listAndroidDevices(fake as unknown as AndroidCommandRunner, SDK)
+
+    expect(devices).toEqual([
+      expect.objectContaining({ id: 'emulator-5554', name: 'Ready', state: 'booted' }),
+      expect.objectContaining({ id: 'emulator-5556', name: 'Starting', state: 'booting' }),
+      expect.objectContaining({ id: 'emulator-5558', name: 'Stuck', state: 'unresponsive' })
+    ])
+    for (const serial of ['emulator-5554', 'emulator-5556', 'emulator-5558']) {
+      expect(fake).toHaveBeenCalledWith(
+        SDK.adb,
+        ['-s', serial, 'shell', 'getprop', 'sys.boot_completed'],
+        { timeoutMs: 5_000 }
+      )
+    }
+  })
+
+  it('uses a managed serial identity to dedupe an AVD when its name probe fails', async () => {
+    const fake = vi.fn(async (binary: string, args: readonly string[]) => {
+      const joinedArgs = args.join(' ')
+      if (binary === SDK.adb && joinedArgs === 'devices -l') {
+        return ok('List of devices attached\nemulator-5554\tdevice')
+      }
+      if (binary === SDK.emulator && joinedArgs === '-list-avds') {
+        return ok('Pixel_7')
+      }
+      if (joinedArgs === '-s emulator-5554 emu avd name') {
+        return { stdout: '', stderr: 'command timed out', code: 1 }
+      }
+      if (joinedArgs === '-s emulator-5554 shell getprop sys.boot_completed') {
+        return ok('1')
+      }
+      return ok('')
+    })
+
+    const devices = await listAndroidDevices(
+      fake as unknown as AndroidCommandRunner,
+      SDK,
+      new Map([['emulator-5554', 'Pixel_7']])
+    )
+
+    expect(devices).toEqual([
+      expect.objectContaining({ id: 'emulator-5554', name: 'Pixel_7', state: 'booted' })
+    ])
+    expect(fake).toHaveBeenCalledWith(SDK.adb, ['-s', 'emulator-5554', 'emu', 'avd', 'name'], {
+      timeoutMs: 5_000
+    })
+  })
+
+  it('keeps an offline emulator transport visible as unresponsive', async () => {
+    const fake = vi.fn(async (binary: string, args: readonly string[]) => {
+      const joinedArgs = args.join(' ')
+      if (binary === SDK.adb && joinedArgs === 'devices -l') {
+        return ok('List of devices attached\nemulator-5554\toffline')
+      }
+      if (binary === SDK.emulator && joinedArgs === '-list-avds') {
+        return ok('Pixel_7')
+      }
+      return { stdout: '', stderr: 'device offline', code: 1 }
+    })
+
+    const devices = await listAndroidDevices(fake as unknown as AndroidCommandRunner, SDK)
+
+    expect(devices[0]).toEqual(
+      expect.objectContaining({ id: 'emulator-5554', state: 'unresponsive' })
+    )
   })
 })
 

@@ -99,7 +99,9 @@ import {
   normalizeExecutionHostOrder,
   normalizeExecutionHostScope,
   normalizeVisibleExecutionHostIds,
-  type ExecutionHostId
+  type ExecutionHostId,
+  getRepoExecutionHostId,
+  normalizeExecutionHostId
 } from '../../../../shared/execution-host'
 import {
   WORKSPACE_BOARD_COLUMN_WIDTH_DEFAULT,
@@ -139,7 +141,11 @@ import {
 import { buildAgentNotificationId } from '../../../../shared/agent-notification-id'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { translate } from '@/i18n/i18n'
+import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
 import { getRepoHostIdentity } from './repo-host-identity'
+import type { WorkspaceScope } from '../../../../shared/folder-workspace-types'
+import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
+import { getExecutionHostIdForFolderWorkspace } from '../../lib/folder-workspace-runtime-owner'
 import {
   capturePersistedUIWriteBaseline,
   diffPersistedUIWriteFields,
@@ -152,6 +158,71 @@ export type PendingSidebarWorktreeReveal = {
   behavior: 'auto' | 'smooth'
   highlight?: boolean
   beginRename?: boolean
+}
+
+export type ActivityPageScope = 'all' | 'temporary-sessions'
+
+/** The context to return to after the user starts a task from the home surface. */
+export type HomeReturnScope = {
+  scope: WorkspaceScope
+  executionHostId: ExecutionHostId | null
+  repoId: string | null
+}
+
+export type HomePendingSessionAssignment = {
+  sessionId: string
+  tabId: string
+  title: string
+  ownerBucketKey?: string | null
+  unifiedTabId?: string | null
+  terminalTabId?: string | null
+  executionHostId?: ExecutionHostId
+}
+
+function resolveHomeScope(
+  activeWorkspaceKey: string | null | undefined,
+  activeWorktreeId: string | null | undefined
+): WorkspaceScope | null {
+  const scoped = activeWorkspaceKey ? parseWorkspaceKey(activeWorkspaceKey) : null
+  // The floating terminal uses a synthetic worktree id for storage, but it is
+  // deliberately outside the workspace hierarchy. Treat both a parsed key
+  // and the legacy/raw id as standalone so New task never records a bogus
+  // return scope that cannot be restored.
+  if (
+    (scoped?.type === 'worktree' && isFloatingTerminalWorkspaceId(scoped.worktreeId)) ||
+    isFloatingTerminalWorkspaceId(activeWorktreeId)
+  ) {
+    return null
+  }
+  if (scoped) {
+    return scoped
+  }
+  if (!activeWorktreeId) {
+    return null
+  }
+  return parseWorkspaceKey(activeWorktreeId) ?? { type: 'worktree', worktreeId: activeWorktreeId }
+}
+
+function resolveHomeReturnContext(
+  state: AppState,
+  scope: WorkspaceScope
+): Pick<HomeReturnScope, 'executionHostId' | 'repoId'> {
+  if (scope.type === 'folder') {
+    return {
+      executionHostId:
+        state.activeWorkspaceExecutionHostId ??
+        getExecutionHostIdForFolderWorkspace(state, scope.folderWorkspaceId),
+      repoId: null
+    }
+  }
+  const worktree = state.getKnownWorktreeById?.(scope.worktreeId)
+  const repoId = state.activeRepoId ?? worktree?.repoId ?? null
+  const repo = repoId ? state.repos.find((entry) => entry.id === repoId) : undefined
+  const host =
+    state.activeWorkspaceExecutionHostId ??
+    normalizeExecutionHostId(worktree?.hostId) ??
+    (repo ? getRepoExecutionHostId(repo) : null)
+  return { executionHostId: host, repoId }
 }
 
 export type PendingSidebarRowReveal = {
@@ -640,6 +711,22 @@ export type UISlice = {
   acknowledgeAgents: (paneKeys: string[]) => void
   unacknowledgeAgents: (paneKeys: string[]) => void
   activeView: TopLevelView
+  /** In-memory draft for the desktop home composer. Deliberately not persisted. */
+  homeTaskDraft: string
+  setHomeTaskDraft: (draft: string) => void
+  homePendingSessionAssignment: HomePendingSessionAssignment | null
+  setHomePendingSessionAssignment: (session: HomePendingSessionAssignment | null) => void
+  /** Snapshot used to restore the workspace that was active before New task. */
+  homeReturnScope: HomeReturnScope | null
+  /** True while the home surface was opened through the New task affordance. */
+  homeNewTaskMode: boolean
+  /** Monotonic focus request consumed by Landing's composer textarea. */
+  homeComposerFocusRequest: number
+  /** Opens the ordinary home surface without creating a New task return scope. */
+  openStartupHome: () => void
+  openNewTaskHome: () => void
+  restoreHomeReturnScope: () => boolean
+  exitNewTaskHome: () => void
   previousViewBeforeTasks:
     | 'terminal'
     | 'settings'
@@ -667,6 +754,7 @@ export type UISlice = {
     | 'skills'
     | 'artifacts'
     | 'mobile'
+  activityPageScope: ActivityPageScope
   previousViewBeforeAutomations:
     | 'terminal'
     | 'settings'
@@ -774,7 +862,10 @@ export type UISlice = {
     options?: { recordTasksInteraction?: boolean }
   ) => void
   closeTaskPage: () => void
-  openActivityPage: () => void
+  openActivityPage: {
+    (): void
+    (options: { scope?: ActivityPageScope }): void
+  }
   closeActivityPage: () => void
   selectedAutomationId: string | null
   setSelectedAutomationId: (id: string | null) => void
@@ -1319,9 +1410,95 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     }),
 
   activeView: 'terminal',
+  homeTaskDraft: '',
+  homePendingSessionAssignment: null,
+  homeReturnScope: null,
+  homeNewTaskMode: false,
+  homeComposerFocusRequest: 0,
+  setHomeTaskDraft: (draft) => set({ homeTaskDraft: draft }),
+  setHomePendingSessionAssignment: (session) => set({ homePendingSessionAssignment: session }),
+  openStartupHome: () => {
+    const state = get()
+    // Restore the full session first, then hide only its active visual scope.
+    // Tabs, PTYs, editors, and browser pages remain available when a workspace is opened.
+    if (state.activeWorktreeId || state.activeWorkspaceKey) {
+      state.setActiveWorktree(null)
+    }
+    set({
+      activeView: 'terminal',
+      activeRepoId: null,
+      homeNewTaskMode: false,
+      homePendingSessionAssignment: null,
+      homeReturnScope: null
+    })
+  },
+  openNewTaskHome: () => {
+    const state = get()
+    const scope = resolveHomeScope(state.activeWorkspaceKey, state.activeWorktreeId)
+    const returnScope = scope
+      ? { scope, ...resolveHomeReturnContext(state, scope) }
+      : state.homeNewTaskMode
+        ? state.homeReturnScope
+        : null
+
+    // Keep the existing activation/terminal lifecycle as the single owner of
+    // workspace teardown. Clearing the active scope only hides the workbench;
+    // it does not stop agents, close tabs, or delete the workspace.
+    if (state.activeWorktreeId !== null || state.activeWorkspaceKey !== null) {
+      state.setActiveWorktree(null)
+    }
+    set((current) => ({
+      activeView: 'terminal',
+      activeRepoId: null,
+      homeNewTaskMode: true,
+      homePendingSessionAssignment: null,
+      homeReturnScope: returnScope,
+      homeComposerFocusRequest: current.homeComposerFocusRequest + 1
+    }))
+  },
+  restoreHomeReturnScope: () => {
+    const returnScope = get().homeReturnScope
+    if (!returnScope) {
+      return false
+    }
+    const { scope, executionHostId, repoId } = returnScope
+    let activated = false
+    if (scope.type === 'folder') {
+      const folder = get().folderWorkspaces.find((entry) => entry.id === scope.folderWorkspaceId)
+      if (folder) {
+        const folderHost =
+          executionHostId ?? getExecutionHostIdForFolderWorkspace(get(), scope.folderWorkspaceId)
+        get().setActiveFolderWorkspace(scope.folderWorkspaceId, folderHost)
+        activated = get().activeWorkspaceKey === `folder:${scope.folderWorkspaceId}`
+      }
+    } else {
+      const worktree = get().getKnownWorktreeById(scope.worktreeId, executionHostId ?? undefined)
+      if (worktree) {
+        if (repoId && get().activeRepoId !== repoId) {
+          get().setActiveRepo(repoId)
+        }
+        activated = Boolean(get().setActiveWorktree(scope.worktreeId, executionHostId ?? undefined))
+      }
+    }
+    if (activated) {
+      set({
+        homeNewTaskMode: false,
+        homeReturnScope: null,
+        homePendingSessionAssignment: null
+      })
+    }
+    return activated
+  },
+  exitNewTaskHome: () =>
+    set({
+      homeNewTaskMode: false,
+      homeReturnScope: null,
+      homePendingSessionAssignment: null
+    }),
   previousViewBeforeTasks: 'terminal',
   previousViewBeforeSettings: 'terminal',
   previousViewBeforeActivity: 'terminal',
+  activityPageScope: 'all',
   previousViewBeforeAutomations: 'terminal',
   previousViewBeforeSpace: 'terminal',
   previousViewBeforeSkills: 'terminal',
@@ -1512,19 +1689,22 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         worktreeNavHistoryIndex: nextHistoryIndex
       }
     }),
-  openActivityPage: () => {
-    if (get().settings?.experimentalActivity !== true) {
+  openActivityPage: (options: { scope?: ActivityPageScope } = {}) => {
+    const scope = options.scope ?? 'all'
+    if (scope === 'all' && get().settings?.experimentalActivity !== true) {
       return
     }
     set((state) => ({
       activeView: 'activity',
+      activityPageScope: scope,
       previousViewBeforeActivity:
         state.activeView === 'activity' ? state.previousViewBeforeActivity : state.activeView
     }))
   },
   closeActivityPage: () =>
     set((state) => ({
-      activeView: state.previousViewBeforeActivity
+      activeView: state.previousViewBeforeActivity,
+      activityPageScope: 'all'
     })),
   selectedAutomationId: null,
   setSelectedAutomationId: (id) => set({ selectedAutomationId: id }),

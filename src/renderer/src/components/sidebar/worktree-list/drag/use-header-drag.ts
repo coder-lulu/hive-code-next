@@ -157,8 +157,15 @@ export function useWorktreeSidebarHeaderDrag(args: {
     [sidebarProjectGroupHeaderIdsByBucket]
   )
   const commitProjectGroupOrder = useCallback(
-    (repoId: string, projectGroupId: string | null, order: number) => {
-      void moveProjectToGroup(repoId, projectGroupId, order)
+    (
+      repoId: string,
+      projectGroupId: string | null,
+      order: number,
+      sourceExecutionHostId: ExecutionHostId
+    ) => {
+      void moveProjectToGroup(repoId, projectGroupId, order, {
+        hostId: sourceExecutionHostId
+      })
     },
     [moveProjectToGroup]
   )
@@ -180,6 +187,8 @@ export function useWorktreeSidebarHeaderDrag(args: {
     sidebarRepoHeaderIdsByBucket,
     repoById: repoMap,
     usesProjectGroupOrdering: hasProjectGroups,
+    canMoveAcrossProjectGroups: hasProjectGroups,
+    projectGroupHostIdByGroupId: projectGroupOwnerHostIdByGroupId,
     onCommitRepoOrder: commitRepoReorder,
     onCommitProjectGroupOrder: commitProjectGroupOrder,
     getScrollContainer: () => scrollRef.current
@@ -218,6 +227,7 @@ export function useWorktreeSidebarHeaderDrag(args: {
 
   return {
     canReorderRepoHeaders,
+    canMoveRepoHeadersAcrossGroups: canReorderRepoHeaders && hasProjectGroups,
     canReorderProjectGroupHeaders,
     orderedHostIds,
     hostDrag,

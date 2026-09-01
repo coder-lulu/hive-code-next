@@ -9,6 +9,7 @@ import {
   type AgentGenerationFailureOutput
 } from './agent-failure-output'
 import type { InternalTextGenerationResult } from './source-control-text-generation-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 export function formatAgentCliFailureMessage(
   label: string,
@@ -34,7 +35,7 @@ export function formatAgentCliFailureMessage(
 }
 
 export function userFacingUnsafeWindowsBatchArgs(label: string): string {
-  return `${label} cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so Orca sends the prompt on stdin.`
+  return `${label} cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so ${APP_DISPLAY_NAME} sends the prompt on stdin.`
 }
 
 export function finalizeFromAgentOutput(args: {

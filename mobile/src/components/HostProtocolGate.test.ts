@@ -47,6 +47,14 @@ vi.mock('../transport/client-context', () => ({
   useHostClient: () => hostClient.current
 }))
 
+vi.mock('../transport/host-store', () => ({
+  recordAuthenticatedRuntimeRecordId: vi.fn().mockResolvedValue(false)
+}))
+
+vi.mock('../transport/authenticated-runtime-host-identity', () => ({
+  HostRuntimeIdentityMismatchError: class HostRuntimeIdentityMismatchError extends Error {}
+}))
+
 function clientWithStatus(result: Record<string, unknown>): RpcClient {
   return { sendRequest: vi.fn().mockResolvedValue({ ok: true, result }) } as unknown as RpcClient
 }
@@ -116,7 +124,7 @@ describe('HostProtocolGate', () => {
     expect(output).not.toContain('HostContent')
   })
 
-  it('routes Android mobile updates to GitHub Releases', async () => {
+  it('routes Android mobile updates to HiveCloud', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     nativeTestState.platform.OS = 'android'
     hostClient.current = {

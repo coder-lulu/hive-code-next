@@ -14,7 +14,7 @@ import {
 } from '../../../../shared/feature-wall-setup-steps'
 import type { FeatureWallSetupProgress } from '../feature-wall/feature-wall-setup-progress'
 import { SetupGuideProgressRing } from '../setup-guide/SetupGuideProgressRing'
-import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
+import { useSetupGuideProgressSnapshot } from '../setup-guide/setup-guide-progress-snapshot'
 import { translate } from '@/i18n/i18n'
 
 export type SetupGuideEntryVisibilityInput = {
@@ -44,9 +44,7 @@ export function SetupGuideSidebarEntry(): React.JSX.Element | null {
   const persistedUIReady = useAppStore((s) => s.persistedUIReady)
   const setupGuideSidebarDismissed = useAppStore((s) => s.setupGuideSidebarDismissed)
   const setSetupGuideSidebarDismissed = useAppStore((s) => s.setSetupGuideSidebarDismissed)
-  // Why: the sidebar count must be warmed before click so it matches the modal
-  // count instead of changing while the lazy modal is mounting.
-  const setupProgress = useSetupGuideProgress(true, false, false)
+  const setupProgress = useSetupGuideProgressSnapshot()
   const setupComplete = isSetupGuideSidebarComplete(setupProgress)
   const setupActive = activeModal === 'setup-guide'
   const showSetupGuideEntry = shouldShowSetupGuideEntry({

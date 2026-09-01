@@ -16,6 +16,7 @@ import type { WorktreeListVirtualizer } from './use-virtualizer'
 import type { VirtualizedWorktreeViewportProps } from './viewport-props'
 import type { WorktreeVirtualRowContext } from '../rows/virtual-row-dispatch'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../../store/worktree-visibility-defaults-by-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 
 type BuildArgs = {
   props: VirtualizedWorktreeViewportProps
@@ -25,6 +26,7 @@ type BuildArgs = {
   virtualization: WorktreeListVirtualizer
   measureVirtualRowElement: (element: HTMLDivElement | null) => void
   settings: AppState['settings']
+  defaultHostId: ExecutionHostId
   worktreeVisibilityDefaultsByHost: AppState['worktreeVisibilityDefaultsByHost']
   sshConnectionStates: AppState['sshConnectionStates']
   newCardStyle: boolean
@@ -103,6 +105,8 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       onRenameProjectGroup: props.handleRenameProjectGroup,
       onDeleteProjectGroup: props.handleDeleteProjectGroup,
       onCreateFolderWorkspace: props.handleCreateFolderWorkspace,
+      onCreateWorkspaceForProjectGroup: props.handleCreateWorkspaceForProjectGroup,
+      onAddProjectToProjectGroup: props.handleAddProjectToProjectGroup,
       onWorkspaceStatusDragOver: statusDrag.handleWorkspaceStatusDragOver,
       onWorkspaceStatusDragLeave: statusDrag.handleWorkspaceStatusDragLeave,
       onWorkspacePinDragOver: statusDrag.handleWorkspacePinDragOver,
@@ -136,10 +140,12 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       onCardDragEnd: runtime.clearWorktreeDrag
     },
     folderWorkspace: {
+      defaultHostId: args.defaultHostId,
       groupBy: props.groupBy,
       newCardStyle: args.newCardStyle,
       settings: args.settings,
       activeWorktreeId: props.activeWorktreeId,
+      activeWorkspaceExecutionHostId: props.activeWorkspaceExecutionHostId,
       currentWorktreeId: props.currentWorktreeId,
       selectedWorktreeIds: props.selectedWorktreeIds,
       repoMap: props.repoMap,

@@ -406,7 +406,7 @@ exit 0
     expect(readFileSync(resultFile, 'utf8')).toBe(
       'UNSET=23\nPWD=unset\nFIRST=23\nPARENT=stale\nMISSING=1\n'
     )
-    expect(output).toContain('Orca: OMP cannot access the terminal working directory')
+    expect(output).toContain('HiveCode: OMP cannot access the terminal working directory')
   }
 
   itWithBash('rebinds a stale Bash cwd before launching OMP', async () => {

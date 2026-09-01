@@ -1,6 +1,7 @@
 import { hivecodeProductConfig } from './generated/product-config'
 
 export const APP_DISPLAY_NAME = hivecodeProductConfig.displayName
+export const PRODUCT_STORAGE_NAMESPACE = hivecodeProductConfig.slug
 export const PRODUCT_PUBLIC_LINKS = hivecodeProductConfig.publicLinks
 export const PRODUCT_SOURCE_REPOSITORY = hivecodeProductConfig.desktop.starRepository
 export const PRODUCT_SOURCE_REPOSITORY_URL = PRODUCT_SOURCE_REPOSITORY

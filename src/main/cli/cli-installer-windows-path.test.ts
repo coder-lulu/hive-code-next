@@ -80,7 +80,13 @@ describe('CliInstaller', () => {
     'rejects with a friendly message for Windows PATH denial: %s',
     async (permissionMarker) => {
       const fixture = await makeFixture()
-      const installPath = join(fixture.root, 'Programs', 'Orca', 'bin', PRIMARY_WINDOWS_COMMAND)
+      const installPath = join(
+        fixture.root,
+        'Programs',
+        'customer Orca workspace',
+        'bin',
+        PRIMARY_WINDOWS_COMMAND
+      )
       const installer = new CliInstaller({
         platform: 'win32',
         isPackaged: false,
@@ -101,6 +107,9 @@ describe('CliInstaller', () => {
 
       const result = installer.install()
       await expect(result).rejects.toThrow(/access denied|Group Policy|manually/i)
+      await expect(result).rejects.toThrow(dirname(installPath))
+      await expect(result).rejects.toThrow('customer Orca workspace')
+      await expect(result).rejects.not.toThrow('customer HiveCode workspace')
       await expect(result).rejects.not.toThrow(/Command failed: powershell/)
       await expect(result).rejects.toMatchObject({
         cause: expect.objectContaining({

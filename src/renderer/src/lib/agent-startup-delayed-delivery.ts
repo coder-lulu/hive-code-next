@@ -1,6 +1,11 @@
 import { useAppStore } from '@/store'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
-import { parsePaneKey } from '../../../shared/stable-pane-id'
+import {
+  bindHostAgentStartupLaunch,
+  worktreeStillOwnsStartupTab
+} from './agent-startup-host-pane-binding'
+import { getAgentStartupTabPtyId } from './agent-startup-tab-resolution'
+export { getAgentStartupTabPtyId, resolveAgentStartupTabId } from './agent-startup-tab-resolution'
 import {
   agentStartupDeliveryKey as deliveryKey,
   clearConsumedAgentStartupDeliveriesForTests,
@@ -16,61 +21,16 @@ type PendingAgentStartupDelivery = {
   tabId: string
   launchToken: string
   startup: AgentStartupPlan
+  hostPane?: { tabId: string; leafId: string }
   deliver: (tabId: string, ptyId: string, startup: AgentStartupPlan) => Promise<void>
 }
 
 const pendingAgentStartupDeliveries = new Map<string, PendingAgentStartupDelivery>()
 const staleStartupRecheckTimers = new Map<string, ReturnType<typeof globalThis.setTimeout>>()
+const missingStartupTabExpiryTimers = new Map<string, ReturnType<typeof globalThis.setTimeout>>()
+const observedStartupTabs = new Set<string>()
+const MISSING_STARTUP_TAB_GRACE_MS = 30_000
 let unsubscribePendingAgentStartupDeliveries: (() => void) | null = null
-
-export function resolveAgentStartupTabId(
-  state: AppStoreSnapshot,
-  worktreeId: string,
-  primaryTabId: string | null | undefined
-): string | null {
-  // Why: the caller may know the exact tab that received the queued startup
-  // command. Prefer it over focus-derived state, which can change mid-create.
-  return (
-    primaryTabId ??
-    state.activeTabIdByWorktree[worktreeId] ??
-    state.tabsByWorktree[worktreeId]?.[0]?.id ??
-    null
-  )
-}
-
-export function getAgentStartupTabPtyId(
-  state: AppStoreSnapshot,
-  tabId: string,
-  launchToken: string
-): string | null {
-  const livePtyIds = new Set(state.ptyIdsByTabId[tabId] ?? [])
-  if (livePtyIds.size === 0) {
-    return null
-  }
-  for (const [paneKey, entry] of Object.entries(state.agentLaunchConfigByPaneKey ?? {})) {
-    const identity = entry.identity
-    if (identity.tabId !== tabId || identity.launchToken !== launchToken) {
-      continue
-    }
-    const leafId = identity.leafId ?? parsePaneKey(paneKey)?.leafId
-    if (!leafId) {
-      continue
-    }
-    const ptyId = state.terminalLayoutsByTabId[tabId]?.ptyIdsByLeafId?.[leafId]
-    if (ptyId && livePtyIds.has(ptyId)) {
-      return ptyId
-    }
-  }
-  return null
-}
-
-function worktreeStillOwnsStartupTab(
-  state: AppStoreSnapshot,
-  worktreeId: string,
-  tabId: string
-): boolean {
-  return (state.tabsByWorktree[worktreeId] ?? []).some((tab) => tab.id === tabId)
-}
 
 function getPendingStartupLaunchToken(state: AppStoreSnapshot, tabId: string): string | undefined {
   return state.pendingStartupByTabId?.[tabId]?.launchToken
@@ -146,6 +106,11 @@ export function resetAgentStartupDelayedDeliveryForTests(): void {
     globalThis.clearTimeout(timer)
   }
   staleStartupRecheckTimers.clear()
+  for (const timer of missingStartupTabExpiryTimers.values()) {
+    globalThis.clearTimeout(timer)
+  }
+  missingStartupTabExpiryTimers.clear()
+  observedStartupTabs.clear()
   unsubscribePendingAgentStartupDeliveries?.()
   unsubscribePendingAgentStartupDeliveries = null
 }
@@ -162,6 +127,8 @@ export function beginAgentStartupDeliveryAttempt(args: {
   markAgentStartupDeliveryConsumed(key)
   pendingAgentStartupDeliveries.delete(key)
   clearStaleStartupRecheck(key)
+  clearMissingStartupTabExpiry(key)
+  observedStartupTabs.delete(key)
   return true
 }
 
@@ -178,21 +145,45 @@ function flushPendingAgentStartupDeliveries(): void {
   for (const [key, delivery] of pendingAgentStartupDeliveries) {
     const { tabId, launchToken } = delivery
     if (!worktreeStillOwnsStartupTab(state, delivery.worktreeId, tabId)) {
-      pendingAgentStartupDeliveries.delete(key)
+      if (observedStartupTabs.has(key)) {
+        pendingAgentStartupDeliveries.delete(key)
+        clearStaleStartupRecheck(key)
+        clearMissingStartupTabExpiry(key)
+        observedStartupTabs.delete(key)
+      } else {
+        scheduleMissingStartupTabExpiry(key)
+      }
       continue
     }
-    const queuedLaunchToken = getPendingStartupLaunchToken(state, tabId)
-    const launchRegistered = hasRegisteredStartupLaunch(state, tabId, launchToken)
+    observedStartupTabs.add(key)
+    clearMissingStartupTabExpiry(key)
+    const binding = bindHostAgentStartupLaunch({
+      worktreeId: delivery.worktreeId,
+      tabId,
+      launchToken,
+      startup: delivery.startup,
+      hostPane: delivery.hostPane
+    })
+    if (binding === 'conflict') {
+      pendingAgentStartupDeliveries.delete(key)
+      clearStaleStartupRecheck(key)
+      observedStartupTabs.delete(key)
+      continue
+    }
+    const deliveryState = binding === 'bound' ? useAppStore.getState() : state
+    const queuedLaunchToken = getPendingStartupLaunchToken(deliveryState, tabId)
+    const launchRegistered = hasRegisteredStartupLaunch(deliveryState, tabId, launchToken)
     if (queuedLaunchToken !== launchToken && !launchRegistered && queuedLaunchToken !== undefined) {
       pendingAgentStartupDeliveries.delete(key)
       clearStaleStartupRecheck(key)
+      observedStartupTabs.delete(key)
       continue
     }
     if (queuedLaunchToken === undefined && !launchRegistered) {
       scheduleStaleStartupRecheck(key)
       continue
     }
-    const ptyId = getAgentStartupTabPtyId(state, tabId, launchToken)
+    const ptyId = getAgentStartupTabPtyId(deliveryState, tabId, launchToken)
     if (!ptyId) {
       continue
     }
@@ -206,6 +197,42 @@ function flushPendingAgentStartupDeliveries(): void {
     }
   }
   stopPendingAgentStartupSubscriptionIfIdle()
+}
+
+function scheduleMissingStartupTabExpiry(key: string): void {
+  if (missingStartupTabExpiryTimers.has(key)) {
+    return
+  }
+  missingStartupTabExpiryTimers.set(
+    key,
+    globalThis.setTimeout(() => {
+      missingStartupTabExpiryTimers.delete(key)
+      const delivery = pendingAgentStartupDeliveries.get(key)
+      if (!delivery) {
+        stopPendingAgentStartupSubscriptionIfIdle()
+        return
+      }
+      if (
+        worktreeStillOwnsStartupTab(useAppStore.getState(), delivery.worktreeId, delivery.tabId)
+      ) {
+        flushPendingAgentStartupDeliveries()
+      } else {
+        pendingAgentStartupDeliveries.delete(key)
+        clearStaleStartupRecheck(key)
+        observedStartupTabs.delete(key)
+        stopPendingAgentStartupSubscriptionIfIdle()
+      }
+    }, MISSING_STARTUP_TAB_GRACE_MS)
+  )
+}
+
+function clearMissingStartupTabExpiry(key: string): void {
+  const timer = missingStartupTabExpiryTimers.get(key)
+  if (!timer) {
+    return
+  }
+  globalThis.clearTimeout(timer)
+  missingStartupTabExpiryTimers.delete(key)
 }
 
 function scheduleStaleStartupRecheck(key: string): void {
@@ -228,6 +255,7 @@ function scheduleStaleStartupRecheck(key: string): void {
         !hasRegisteredStartupLaunch(state, delivery.tabId, delivery.launchToken)
       ) {
         pendingAgentStartupDeliveries.delete(key)
+        observedStartupTabs.delete(key)
       } else {
         flushPendingAgentStartupDeliveries()
       }

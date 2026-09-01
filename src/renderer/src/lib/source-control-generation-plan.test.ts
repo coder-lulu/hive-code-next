@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   planSourceControlCommitMessageGeneration,
   planSourceControlTextGeneration
@@ -38,6 +39,7 @@ describe('planSourceControlCommitMessageGeneration', () => {
     expect(result.ok && result.commandLabel).toContain('codex exec')
     expect(result.ok && result.delivery).toContain('stdin')
     expect(result.ok && result.caveat).toContain('Windows .cmd')
+    expect(result.ok && result.caveat).toContain(APP_DISPLAY_NAME)
   })
 
   it('plans pull-request generation with pull-request variables', () => {

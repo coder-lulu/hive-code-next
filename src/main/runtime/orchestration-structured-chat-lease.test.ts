@@ -257,7 +257,7 @@ describe('orchestration while Structured Chat owns an agent session', () => {
 
     expect(db.getMessageById(message.id)?.delivered_at).not.toBeNull()
     expect(writes).toHaveBeenCalledTimes(2)
-    expect(writes.mock.calls[0]?.[1]).toContain('orca orchestration check')
+    expect(writes.mock.calls[0]?.[1]).toContain('hive orchestration check')
     expect(writes.mock.calls[1]).toEqual([WORKER.ptyId, '\r'])
   })
 

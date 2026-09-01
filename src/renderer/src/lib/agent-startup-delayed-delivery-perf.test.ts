@@ -123,6 +123,25 @@ describe('delayed agent startup subscription', () => {
     expect(deliver).toHaveBeenCalledWith('tab-background', 'pty-background', startup)
   })
 
+  it('keeps a remote follow-up queued until its mirrored tab arrives', () => {
+    seedPendingState()
+    useAppStore.setState({ tabsByWorktree: {} })
+    const deliver = vi.fn().mockResolvedValue(undefined)
+    const startup = {} as never
+
+    queuePendingAgentStartupDelivery({
+      worktreeId: 'wt-background',
+      tabId: 'tab-background',
+      launchToken: 'target-launch',
+      startup,
+      deliver
+    })
+    seedPendingState()
+    bindPendingPty()
+
+    expect(deliver).toHaveBeenCalledWith('tab-background', 'pty-background', startup)
+  })
+
   it('drops a delivery when its tab is removed before PTY binding', () => {
     seedPendingState()
     const deliver = vi.fn().mockResolvedValue(undefined)

@@ -3,6 +3,7 @@ import type { OrcaRuntimeService } from '../orca-runtime'
 import { OrchestrationError } from '../orchestration/orchestration-error'
 import { formatMessageBanner } from '../orchestration/formatter'
 import { ORCHESTRATION_MESSAGE_WAIT_DEFAULT_TIMEOUT_MS } from '../../../shared/orchestration-message-wait-timeout'
+import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import type { LegacyCompatibilityAuthority } from './orchestration-legacy-authority'
 import {
   operationIdentity,
@@ -102,7 +103,11 @@ export async function handleLegacyCheck(args: {
               authority: formattingAuthority,
               supportedActionHints: readOnly
                 ? []
-                : supportedLegacyHints(message, principal, params.compatibilityCliCommand ?? 'orca')
+                : supportedLegacyHints(
+                    message,
+                    principal,
+                    params.compatibilityCliCommand ?? PRIMARY_CLI_COMMAND
+                  )
             })
           )
           .join('\n\n')
@@ -111,8 +116,8 @@ export async function handleLegacyCheck(args: {
     principal.role === 'coordinator' && db.hasPendingCurrentDelivery(principal.run_id)
       ? {
           runId: principal.run_id,
-          checkCommand: `${params.compatibilityCliCommand ?? 'orca'} orchestration check --run ${principal.run_id}`,
-          ackCommand: `${params.compatibilityCliCommand ?? 'orca'} orchestration check --run ${principal.run_id} --ack <delivery-id>`
+          checkCommand: `${params.compatibilityCliCommand ?? PRIMARY_CLI_COMMAND} orchestration check --run ${principal.run_id}`,
+          ackCommand: `${params.compatibilityCliCommand ?? PRIMARY_CLI_COMMAND} orchestration check --run ${principal.run_id} --ack <delivery-id>`
         }
       : undefined
   return {

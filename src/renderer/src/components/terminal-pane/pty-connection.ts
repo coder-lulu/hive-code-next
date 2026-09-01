@@ -317,6 +317,7 @@ import {
   recognizeAgentProcessFromCommandLine
 } from '../../../../shared/agent-process-recognition'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { SetupSplitDirection } from '../../../../shared/worktree/launch-types'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
 import { resolveDraftPasteReadyTimeoutMs } from '../../../../shared/draft-paste-ready-timeout'
@@ -356,8 +357,9 @@ const MANUAL_AGENT_COMMAND_MAX_CHARS = 4096
 const STARTUP_DRAFT_PASTE_QUIET_MS = 1500
 // Why: the notice deliberately omits the rejected path — saved cwds can
 // contain private repo/user names; the terminal itself shows where it opened.
-export const STARTUP_CWD_FALLBACK_NOTICE =
+export const STARTUP_CWD_FALLBACK_NOTICE = applyProductBranding(
   '\r\n[Orca opened this terminal at the workspace root because its saved start folder no longer exists.]\r\n'
+)
 const HIDDEN_OUTPUT_RESTORE_PENDING_CHARS = 512 * 1024
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MS = 50
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MAX = 3
@@ -564,6 +566,8 @@ type ColdRestoreAgentResumeStartup = PendingStartupCommand & {
   resumeProviderSession: AgentProviderSessionMetadata
   launchConfig: NonNullable<ReturnType<typeof buildAgentResumeStartupPlan>>['launchConfig']
   launchToken: string
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
+  agentArgsOverride?: string | null
   useLiveEntry: boolean
   hasSleepingRecord: boolean
   sleepingRecordEntry: { paneKey: string; record: SleepingAgentSessionRecord } | null
@@ -3956,6 +3960,9 @@ export function connectPanePty(
     ...(agentLaunchPreferences ? { agentLaunchPreferences } : {}),
     ...(launchToken ? { launchToken } : {}),
     ...(paneStartup?.launchAgent ? { launchAgent: paneStartup.launchAgent } : {}),
+    ...(paneStartup?.agentPermissionMode
+      ? { agentPermissionMode: paneStartup.agentPermissionMode }
+      : {}),
     ...(paneStartup?.telemetry ? { telemetry: paneStartup.telemetry } : {}),
     onPtyExit: onExit,
     onPtySpawn,
@@ -5126,6 +5133,7 @@ export function connectPanePty(
       const launchConfig =
         (useLiveEntry && entry ? state.getAgentLaunchConfigForStatusEntry(entry) : undefined) ??
         matchingSleepingLaunchConfig
+      const hostDefaultsAuthoritative = launchConfig?.hostDefaultsAuthoritative === true
       // Why: the resume line is typed into this pane's live shell, so its quoting must
       // follow the tab's effective Windows shell, not the win32 PowerShell default.
       const resumeTarget = resolveAgentResumeLaunchTarget({
@@ -5141,16 +5149,21 @@ export function connectPanePty(
         providerSession,
         cmdOverrides: state.settings?.agentCmdOverrides ?? {},
         agentArgs:
-          launchConfig !== undefined
+          launchConfig !== undefined && !hostDefaultsAuthoritative
             ? launchConfig.agentArgs
             : resolveTuiAgentLaunchArgs(agent, state.settings?.agentDefaultArgs),
         agentEnv:
-          launchConfig !== undefined
+          launchConfig !== undefined && !hostDefaultsAuthoritative
             ? launchConfig.agentEnv
             : resolveTuiAgentLaunchEnv(agent, state.settings?.agentDefaultEnv),
-        ...(launchConfig?.agentCommand ? { agentCommand: launchConfig.agentCommand } : {}),
+        ...(!hostDefaultsAuthoritative && launchConfig?.agentCommand
+          ? { agentCommand: launchConfig.agentCommand }
+          : {}),
         ...(launchConfig?.ompResumeFilePath
           ? { ompResumeFilePath: launchConfig.ompResumeFilePath }
+          : {}),
+        ...(launchConfig?.agentPermissionMode
+          ? { agentPermissionMode: launchConfig.agentPermissionMode }
           : {}),
         platform: resumeTarget.platform,
         shell: resumeTarget.shell
@@ -5168,9 +5181,15 @@ export function connectPanePty(
           ...startupPlan.env,
           ORCA_AGENT_LAUNCH_TOKEN: coldRestoreLaunchToken
         },
-        launchConfig: startupPlan.launchConfig,
+        launchConfig: hostDefaultsAuthoritative ? launchConfig : startupPlan.launchConfig,
         resumeProviderSession: providerSession,
         launchToken: coldRestoreLaunchToken,
+        ...(launchConfig?.agentPermissionMode
+          ? { agentPermissionMode: launchConfig.agentPermissionMode }
+          : {}),
+        ...(launchConfig && !hostDefaultsAuthoritative
+          ? { agentArgsOverride: launchConfig.agentArgs }
+          : {}),
         useLiveEntry: Boolean(useLiveEntry),
         hasSleepingRecord: Boolean(sleepingRecord),
         sleepingRecordEntry
@@ -5394,6 +5413,12 @@ export function connectPanePty(
           : {}),
         ...(coldRestoreOverride ? { launchToken: coldRestoreOverride.launchToken } : {}),
         ...(coldRestoreOverride ? { launchAgent: coldRestoreOverride.agent } : {}),
+        ...(coldRestoreOverride?.agentPermissionMode
+          ? { agentPermissionMode: coldRestoreOverride.agentPermissionMode }
+          : {}),
+        ...(coldRestoreOverride?.agentArgsOverride !== undefined
+          ? { agentArgsOverride: coldRestoreOverride.agentArgsOverride }
+          : {}),
         ...(shouldDeclareHiddenAtSpawn() ? { initiallyHidden: true } : {}),
         callbacks: outputCallbacks.callbacks
       })
@@ -8920,6 +8945,12 @@ export function connectPanePty(
                 ? { launchToken: coldRestoreStartup.launchToken }
                 : {}),
               ...(coldRestoreStartup?.agent ? { launchAgent: coldRestoreStartup.agent } : {}),
+              ...(coldRestoreStartup?.agentPermissionMode
+                ? { agentPermissionMode: coldRestoreStartup.agentPermissionMode }
+                : {}),
+              ...(coldRestoreStartup?.agentArgsOverride !== undefined
+                ? { agentArgsOverride: coldRestoreStartup.agentArgsOverride }
+                : {}),
               ...(shouldDeclareHiddenAtSpawn() ? { initiallyHidden: true } : {}),
               ...(directSshRetryAttempt ? { admitPtyId: claimCapturedDirectSshRetryPty } : {}),
               callbacks: outputCallbacks.callbacks
@@ -9165,6 +9196,12 @@ export function connectPanePty(
           : {}),
         ...(coldRestoreStartup?.launchToken ? { launchToken: coldRestoreStartup.launchToken } : {}),
         ...(coldRestoreStartup?.agent ? { launchAgent: coldRestoreStartup.agent } : {}),
+        ...(coldRestoreStartup?.agentPermissionMode
+          ? { agentPermissionMode: coldRestoreStartup.agentPermissionMode }
+          : {}),
+        ...(coldRestoreStartup?.agentArgsOverride !== undefined
+          ? { agentArgsOverride: coldRestoreStartup.agentArgsOverride }
+          : {}),
         ...(shouldDeclareHiddenAtSpawn() ? { initiallyHidden: true } : {}),
         ...(directSshRetryAttempt ? { admitPtyId: claimCapturedDirectSshRetryPty } : {}),
         callbacks: outputCallbacks.callbacks

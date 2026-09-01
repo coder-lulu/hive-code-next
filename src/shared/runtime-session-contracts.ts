@@ -1,4 +1,5 @@
 import type { AgentStatusOrchestrationContext } from './agent-status-types'
+import { APP_DISPLAY_NAME } from './brand'
 import type { RemoteServerUpdateSupport } from './remote-server-update'
 import type { RemoteRuntimeSharedConnectionDiagnostics } from './remote-runtime-shared-control-types'
 import type { RuntimeCapability } from './protocol-version'
@@ -36,8 +37,7 @@ export const BROWSER_UNAVAILABLE_ERROR_CODE = 'browser_unavailable' as const
 // Why: one sentence per cause, each naming the thing the operator can change. The host
 // renders these so an older client still shows an accurate reason it cannot decode.
 const BROWSER_UNAVAILABLE_MESSAGES: Record<RuntimeBrowserUnavailableReason, string> = {
-  unconfigured:
-    'Browser automation has no backend on this host. Install the Orca desktop app, or set ORCA_BROWSER_EXECUTABLE to a Chromium executable.',
+  unconfigured: `Browser automation has no backend on this host. Install the ${APP_DISPLAY_NAME} desktop app, or set ORCA_BROWSER_EXECUTABLE to a Chromium executable.`,
   driver_missing:
     'ORCA_BROWSER_EXECUTABLE is set, but the bundled agent-browser driver is missing or not executable on this host, so Chromium cannot be driven.',
   executable_not_found: 'ORCA_BROWSER_EXECUTABLE points at a path that does not exist.',
@@ -62,6 +62,8 @@ export function browserUnavailableMessage(
 
 export type RuntimeStatus = {
   runtimeId: string
+  /** Stable Cloud directory identity, present only after this installation is claimed. */
+  runtimeRecordId?: string
   /** Authenticated requester identity. Missing for in-process callers and older hosts. */
   pairedDeviceId?: string
   rendererGraphEpoch: number

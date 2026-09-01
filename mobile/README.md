@@ -82,10 +82,10 @@ If the phone has a stale host entry, remove it from the app and pair again.
 The phone can be inspected through the connected device tooling:
 
 ```bash
-orca snapshot --json
-orca click --element @e3 --json
-orca fill --element @e1 --value "ls" --json
-orca screenshot --json
+hive snapshot --json
+hive click --element @e3 --json
+hive fill --element @e1 --value "ls" --json
+hive screenshot --json
 ```
 
 Use `snapshot` first to find the current element refs, then click/fill those refs. After mobile file edits, Metro usually hot reloads automatically, but navigating out of and back into the session screen can be useful because it re-runs `terminal.subscribe`.
@@ -176,7 +176,7 @@ Do **not** bump for additive changes:
 
 Set `MIN_COMPATIBLE_MOBILE_VERSION` (kill-switch) when desktop ships a change that requires a minimum mobile version to function safely. Same for `MIN_COMPATIBLE_DESKTOP_VERSION` from the mobile side.
 
-When a verdict is `blocked`, `mobile/src/components/ProtocolBlockScreen.tsx` renders a screen pointing the user at either the App Store (mobile too old) or GitHub Releases (desktop too old).
+When a verdict is `blocked`, `mobile/src/components/ProtocolBlockScreen.tsx` renders a screen pointing the user at either the App Store (mobile too old) or the configured HiveCloud update/store link (desktop too old).
 
 To exercise the block screen locally: set `MIN_COMPATIBLE_DESKTOP_VERSION = 999` in `mobile/src/transport/protocol-version.ts`, rebuild, pair to any desktop. Revert before merging.
 

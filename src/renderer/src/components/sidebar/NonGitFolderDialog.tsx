@@ -30,6 +30,17 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
   const connectionId = typeof modalData.connectionId === 'string' ? modalData.connectionId : ''
   const runtimeEnvironmentId =
     typeof modalData.runtimeEnvironmentId === 'string' ? modalData.runtimeEnvironmentId : ''
+  // Preserve an explicit space target across the non-Git confirmation handoff.
+  // `undefined` means this dialog was opened globally; null is the deliberate
+  // derived Ungrouped target.
+  const projectGroupId =
+    modalData.projectGroupScoped === true
+      ? typeof modalData.projectGroupId === 'string'
+        ? modalData.projectGroupId
+        : modalData.projectGroupId === null
+          ? null
+          : undefined
+      : undefined
   const runtimeEnvironmentName =
     runtimeEnvironmentId &&
     (runtimeEnvironments.find((environment) => environment.id === runtimeEnvironmentId)?.name ||
@@ -67,6 +78,15 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
             sshConnectionId: connectionId
           })
           const state = useAppStore.getState()
+          if (projectGroupId !== undefined) {
+            const moved = await state.moveProjectToGroup(repo.id, projectGroupId)
+            if (!moved) {
+              console.warn('Failed to associate added folder with its originating space', {
+                repoId: repo.id,
+                projectGroupId
+              })
+            }
+          }
           const hadProjectBeforeAdd = stateBeforeAdd.repos.length > 0
           await markOnboardingProjectAdded('addedFolder')
           const ownerOptions = worktreeRefreshOptions(undefined, connectionId)
@@ -111,11 +131,12 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
       })()
     } else if (folderPath) {
       void addNonGitFolder(folderPath, {
-        runtimeEnvironmentId: runtimeEnvironmentId || null
+        runtimeEnvironmentId: runtimeEnvironmentId || null,
+        ...(projectGroupId !== undefined ? { projectGroupId } : {})
       })
     }
     closeModal()
-  }, [addNonGitFolder, closeModal, folderPath, connectionId, runtimeEnvironmentId])
+  }, [addNonGitFolder, closeModal, folderPath, connectionId, projectGroupId, runtimeEnvironmentId])
 
   const handleOpenChange = useCallback(
     (open: boolean) => {

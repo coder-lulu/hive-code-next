@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Server,
@@ -16,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import { isHiveRuntimeControlPlaneOnline } from '../../../../shared/hive-runtime-connectivity'
 import {
   isUserManagedRuntimeEnvironment,
   type PublicKnownRuntimeEnvironment
@@ -62,6 +64,7 @@ import {
   RemoteServerUpdateStatus
 } from './RemoteServerUpdateStatus'
 import { RuntimeHostAccessForm, type RuntimeHostAccessFailure } from './RuntimeHostAccessForm'
+import { RuntimeCloudDisplayNameDialog } from './RuntimeCloudDisplayNameDialog'
 
 const LOCAL_RUNTIME_VALUE = '__local__'
 const NO_RUNTIME_VALUE = '__none__'
@@ -208,23 +211,209 @@ export function isRuntimeEnvironmentRemovalBlocked(
   return activeRuntimeEnvironmentId === environmentId
 }
 
-type RuntimeServerConnectionState = 'connected' | 'checking' | 'disconnected'
+export function supportsLocalRuntimeEnvironmentRemoval(
+  environment: Pick<PublicKnownRuntimeEnvironment, 'accessSources'>
+): boolean {
+  // Why: legacy local stores predate accessSources, so an omitted value still
+  // means a removable local pairing. Explicit account-only catalog rows never do.
+  return (
+    environment.accessSources === undefined || environment.accessSources.includes('local-pairing')
+  )
+}
+
+export function canConnectRuntimeEnvironment(
+  environment: Pick<PublicKnownRuntimeEnvironment, 'accessSources' | 'accountClaim'>
+): boolean {
+  return (
+    supportsLocalRuntimeEnvironmentRemoval(environment) ||
+    environment.accountClaim?.cloudConnectable === true
+  )
+}
+
+export function getRuntimeEnvironmentEndpointDisplay(
+  environment: Pick<PublicKnownRuntimeEnvironment, 'accessSources' | 'endpoints'>
+): string {
+  if (!supportsLocalRuntimeEnvironmentRemoval(environment)) {
+    return translate(
+      'auto.components.settings.RuntimeEnvironmentsPane.hiveCloudManagedEndpoint',
+      'Managed by HiveCloud'
+    )
+  }
+  return (
+    environment.endpoints[0]?.endpoint ??
+    translate('auto.components.settings.RuntimeEnvironmentsPane.6ef71985da', 'No endpoint')
+  )
+}
+
+export function resolveRuntimeCloudRenameEnvironment(
+  environments: readonly PublicKnownRuntimeEnvironment[],
+  environmentId: string | null,
+  selectedAccountScopeKey: string | null,
+  currentAccountScopeKey: string | null
+): PublicKnownRuntimeEnvironment | null {
+  if (
+    !environmentId ||
+    !selectedAccountScopeKey ||
+    selectedAccountScopeKey !== currentAccountScopeKey
+  ) {
+    return null
+  }
+  return (
+    environments.find(
+      (environment) =>
+        environment.id === environmentId &&
+        environment.accountClaim?.cloudDisplayNameVersion != null
+    ) ?? null
+  )
+}
+
+export function getRuntimeEnvironmentInitialDetails(
+  environment: Pick<PublicKnownRuntimeEnvironment, 'accessSources' | 'accountClaim'>,
+  current?: RuntimeHostDetails,
+  verifiedStatus?: RuntimeStatus
+): RuntimeHostDetails {
+  if (verifiedStatus) {
+    return {
+      status: 'ready',
+      runtimeStatus: verifiedStatus,
+      compatibility: evaluateHostDetails(verifiedStatus),
+      error: null
+    }
+  }
+  if (!supportsLocalRuntimeEnvironmentRemoval(environment)) {
+    return {
+      // Directory reachability means a connection may be attempted; it is not
+      // proof that this client already established an RPC transport.
+      status: 'error',
+      runtimeStatus: null,
+      compatibility: null,
+      error: null
+    }
+  }
+  return (
+    current ?? {
+      status: 'loading',
+      runtimeStatus: null,
+      compatibility: null,
+      error: null
+    }
+  )
+}
+
+type RuntimeEnvironmentRemovalPresentation = Readonly<{
+  title: string
+  description: string
+  actionLabel: string
+  actionAriaLabel: string
+  successMessage: string
+}>
+
+export function getRuntimeEnvironmentRemovalPresentation(
+  environment: Pick<PublicKnownRuntimeEnvironment, 'accessSources' | 'name'>,
+  isActive: boolean
+): RuntimeEnvironmentRemovalPresentation | null {
+  if (!supportsLocalRuntimeEnvironmentRemoval(environment)) {
+    return null
+  }
+  const retainsAccountAccess = environment.accessSources?.includes('account-claimed') === true
+  if (retainsAccountAccess) {
+    return {
+      title: translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.removeLocalPairingTitle',
+        'Remove Local Pairing'
+      ),
+      description: isActive
+        ? translate(
+            'auto.components.settings.RuntimeEnvironmentsPane.removeActiveLocalPairingDescription',
+            'Choose another Active Server in Advanced before removing this local pairing. The server remains available through your account.'
+          )
+        : translate(
+            'auto.components.settings.RuntimeEnvironmentsPane.removeLocalPairingDescription',
+            'This removes only the local pairing from HiveCode. The server remains available through your account.'
+          ),
+      actionLabel: translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.removeLocalPairingAction',
+        'Remove Local Pairing'
+      ),
+      actionAriaLabel: translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.removeLocalPairingAriaLabel',
+        'Remove local pairing for {{value0}}',
+        { value0: environment.name }
+      ),
+      successMessage: translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.removeLocalPairingSuccess',
+        'Removed local pairing for {{value0}}. Account access remains available.',
+        { value0: environment.name }
+      )
+    }
+  }
+  return {
+    title: translate(
+      'auto.components.settings.RuntimeEnvironmentsPane.bb90dd6487',
+      'Remove Server'
+    ),
+    description: isActive
+      ? translate(
+          'auto.components.settings.RuntimeEnvironmentsPane.removeActiveServerDescription',
+          'Choose another Active Server in Advanced before removing this server. Existing host sessions are left alone.'
+        )
+      : translate(
+          'auto.components.settings.RuntimeEnvironmentsPane.ed3e3f069d',
+          'This removes the saved server from Orca. It does not change the active server.'
+        ),
+    actionLabel: translate('auto.components.settings.RuntimeEnvironmentsPane.d25f0688b1', 'Remove'),
+    actionAriaLabel: translate(
+      'auto.components.settings.RuntimeEnvironmentsPane.aeb26635d2',
+      'Remove {{value0}}',
+      { value0: environment.name }
+    ),
+    successMessage: translate(
+      'auto.components.settings.RuntimeEnvironmentsPane.b5b5114cb0',
+      'Removed {{value0}}.',
+      { value0: environment.name }
+    )
+  }
+}
+
+type RuntimeServerConnectionState =
+  | 'connected'
+  | 'checking'
+  | 'disconnected'
+  | 'available'
+  | 'online-unavailable'
+  | 'degraded'
+  | 'offline'
 type RemoteServerWorkflow = 'connect' | 'cloud-vm' | 'share'
 
 export function getRuntimeServerConnectionState(
-  details: RuntimeHostDetails | undefined
+  details: RuntimeHostDetails | undefined,
+  environment?: Pick<PublicKnownRuntimeEnvironment, 'accessSources' | 'accountClaim'>
 ): RuntimeServerConnectionState {
+  if (details?.status === 'ready') {
+    return details.compatibility?.kind === 'blocked' ? 'disconnected' : 'connected'
+  }
+  if (environment && !supportsLocalRuntimeEnvironmentRemoval(environment)) {
+    const claim = environment.accountClaim
+    if (!claim) {
+      return 'checking'
+    }
+    if (isHiveRuntimeControlPlaneOnline(claim)) {
+      return claim.cloudConnectable ? 'available' : 'online-unavailable'
+    }
+    if (
+      claim.presence === 'DEGRADED' ||
+      claim.readiness === 'DEGRADED' ||
+      claim.readiness === 'STARTING' ||
+      claim.readiness === 'RECOVERING'
+    ) {
+      return 'degraded'
+    }
+    return 'offline'
+  }
   if (!details || details.status === 'loading') {
     return 'checking'
   }
-  if (details.status !== 'ready' || details.compatibility?.kind === 'blocked') {
-    return 'disconnected'
-  }
-  // Why: an attached, reachable, compatible host is "Connected" (and exposes
-  // Disconnect). Whether it is the default *active* server is a separate concept,
-  // surfaced by the Advanced > Active Server selector and the row's help text —
-  // it must not change this connection label, or the dot/label/button disagree.
-  return 'connected'
+  return 'disconnected'
 }
 
 function getRuntimeServerConnectionLabel(state: RuntimeServerConnectionState): string {
@@ -234,6 +423,20 @@ function getRuntimeServerConnectionLabel(state: RuntimeServerConnectionState): s
         'auto.components.settings.RuntimeEnvironmentsPane.serverConnected',
         'Connected'
       )
+    case 'available':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverAvailable',
+        'Available'
+      )
+    case 'online-unavailable':
+      return translate('auto.components.settings.RuntimeEnvironmentsPane.serverOnline', 'Online')
+    case 'degraded':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverDegraded',
+        'Degraded'
+      )
+    case 'offline':
+      return translate('auto.components.settings.RuntimeEnvironmentsPane.serverOffline', 'Offline')
     case 'checking':
       return translate(
         'auto.components.settings.RuntimeEnvironmentsPane.serverChecking',
@@ -250,11 +453,42 @@ function getRuntimeServerConnectionLabel(state: RuntimeServerConnectionState): s
 function getRuntimeServerDotClass(state: RuntimeServerConnectionState): string {
   switch (state) {
     case 'connected':
+    case 'available':
+    case 'online-unavailable':
       return 'bg-emerald-500'
     case 'checking':
+    case 'degraded':
       return 'bg-yellow-500'
     case 'disconnected':
+    case 'offline':
       return 'bg-muted-foreground/40'
+  }
+}
+
+function getAccountRuntimeConnectionHelp(state: RuntimeServerConnectionState): string | null {
+  switch (state) {
+    case 'available':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.accountRuntimeAvailable',
+        'Online in HiveCloud and ready to connect.'
+      )
+    case 'online-unavailable':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.accountRuntimeTransportUnavailable',
+        'Online in HiveCloud. Cross-device access is unavailable.'
+      )
+    case 'degraded':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.accountRuntimeDegraded',
+        'HiveCloud is retrying this Runtime connection.'
+      )
+    case 'offline':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.accountRuntimeOffline',
+        'Offline in HiveCloud.'
+      )
+    default:
+      return null
   }
 }
 
@@ -277,6 +511,8 @@ export function RuntimeEnvironmentsPane({
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
   const [pendingSwitchValue, setPendingSwitchValue] = useState<string | null>(null)
   const [pendingRemove, setPendingRemove] = useState<PublicKnownRuntimeEnvironment | null>(null)
+  const [pendingCloudRenameId, setPendingCloudRenameId] = useState<string | null>(null)
+  const [pendingCloudRenameScopeKey, setPendingCloudRenameScopeKey] = useState<string | null>(null)
   const [addServerFormOpen, setAddServerFormOpen] = useState(false)
   const [shareServerFormOpen, setShareServerFormOpen] = useState(true)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -293,7 +529,20 @@ export function RuntimeEnvironmentsPane({
   const setRemoteServerUpdateDialogOpen = useAppStore(
     (state) => state.setRemoteServerUpdateDialogOpen
   )
+  const accountRuntimeDirectory = useAppStore((state) => state.accountRuntimeDirectory)
+  const runtimeEnvironmentCatalog = useAppStore((state) => state.runtimeEnvironments)
+  const currentCloudRenameScopeKey =
+    accountRuntimeDirectory.accountId && accountRuntimeDirectory.sessionGeneration != null
+      ? `${accountRuntimeDirectory.accountId}\u0000${accountRuntimeDirectory.sessionGeneration}`
+      : null
+  const pendingCloudRename = resolveRuntimeCloudRenameEnvironment(
+    environments,
+    pendingCloudRenameId,
+    pendingCloudRenameScopeKey,
+    currentCloudRenameScopeKey
+  )
   const consumedAddServerIntentSignalRef = useRef(0)
+  const environmentLoadGenerationRef = useRef(0)
   const mountedRef = useMountedRef()
   const updateCheckHint = getUpdateCheckHint()
   const activeValue =
@@ -308,17 +557,24 @@ export function RuntimeEnvironmentsPane({
   const removingActiveServer = pendingRemove
     ? isRuntimeEnvironmentRemovalBlocked(settings.activeRuntimeEnvironmentId, pendingRemove.id)
     : false
+  const pendingRemovalPresentation = pendingRemove
+    ? getRuntimeEnvironmentRemovalPresentation(pendingRemove, removingActiveServer)
+    : null
   const searchEntry = canGeneratePairingUrl
     ? getRuntimeEnvironmentsSearchEntry()
     : getWebRuntimeEnvironmentsSearchEntry()
 
   const loadEnvironments = useCallback(
     async (verified?: { environmentId: string; runtimeStatus: RuntimeStatus }): Promise<void> => {
+      const loadGeneration = ++environmentLoadGenerationRef.current
       if (mountedRef.current) {
         setIsLoading(true)
       }
       try {
         const nextEnvironments = await window.api.runtimeEnvironments.list()
+        if (!mountedRef.current || loadGeneration !== environmentLoadGenerationRef.current) {
+          return
+        }
         const visibleEnvironments = nextEnvironments.filter(isUserManagedRuntimeEnvironment)
         // Why: drop store status for servers no longer saved so stale hosts don't
         // linger in the sidebar registry.
@@ -334,27 +590,22 @@ export function RuntimeEnvironmentsPane({
           setDetailsByEnvironmentId((current) => {
             const next: Record<string, RuntimeHostDetails> = {}
             for (const environment of visibleEnvironments) {
-              next[environment.id] =
-                verified?.environmentId === environment.id
-                  ? {
-                      status: 'ready',
-                      runtimeStatus: verified.runtimeStatus,
-                      compatibility: evaluateHostDetails(verified.runtimeStatus),
-                      error: null
-                    }
-                  : (current[environment.id] ?? {
-                      status: 'loading',
-                      runtimeStatus: null,
-                      compatibility: null,
-                      error: null
-                    })
+              next[environment.id] = getRuntimeEnvironmentInitialDetails(
+                environment,
+                current[environment.id],
+                verified?.environmentId === environment.id ? verified.runtimeStatus : undefined
+              )
             }
             return next
           })
         }
         await Promise.allSettled(
           visibleEnvironments
-            .filter((environment) => environment.id !== verified?.environmentId)
+            .filter(
+              (environment) =>
+                environment.id !== verified?.environmentId &&
+                supportsLocalRuntimeEnvironmentRemoval(environment)
+            )
             .map(async (environment) => {
               try {
                 const response = await window.api.runtimeEnvironments.getStatus({
@@ -362,15 +613,18 @@ export function RuntimeEnvironmentsPane({
                   timeoutMs: 10_000
                 })
                 const runtimeStatus = unwrapRuntimeRpcResult<RuntimeStatus>(response)
+                if (
+                  !mountedRef.current ||
+                  loadGeneration !== environmentLoadGenerationRef.current
+                ) {
+                  return
+                }
                 // Why: feed the live status into the store so sidebar host pickers
                 // reflect manual refreshes, not just the settings pane.
                 useAppStore.getState().setRuntimeEnvironmentStatus(environment.id, {
                   status: runtimeStatus,
                   checkedAt: Date.now()
                 })
-                if (!mountedRef.current) {
-                  return
-                }
                 setDetailsByEnvironmentId((current) => ({
                   ...current,
                   [environment.id]: {
@@ -381,15 +635,18 @@ export function RuntimeEnvironmentsPane({
                   }
                 }))
               } catch (error) {
+                if (
+                  !mountedRef.current ||
+                  loadGeneration !== environmentLoadGenerationRef.current
+                ) {
+                  return
+                }
                 // Why: record the failed probe (null status) so the sidebar can
                 // distinguish unreachable from never-checked.
                 useAppStore.getState().setRuntimeEnvironmentStatus(environment.id, {
                   status: null,
                   checkedAt: Date.now()
                 })
-                if (!mountedRef.current) {
-                  return
-                }
                 setDetailsByEnvironmentId((current) => ({
                   ...current,
                   [environment.id]: {
@@ -403,7 +660,7 @@ export function RuntimeEnvironmentsPane({
             })
         )
       } catch (error) {
-        if (mountedRef.current) {
+        if (mountedRef.current && loadGeneration === environmentLoadGenerationRef.current) {
           toast.error(
             error instanceof Error
               ? error.message
@@ -414,7 +671,7 @@ export function RuntimeEnvironmentsPane({
           )
         }
       } finally {
-        if (mountedRef.current) {
+        if (mountedRef.current && loadGeneration === environmentLoadGenerationRef.current) {
           setIsLoading(false)
         }
       }
@@ -425,6 +682,28 @@ export function RuntimeEnvironmentsPane({
   useEffect(() => {
     void loadEnvironments()
   }, [loadEnvironments])
+
+  useEffect(() => {
+    const visibleEnvironments = runtimeEnvironmentCatalog.filter(isUserManagedRuntimeEnvironment)
+    setEnvironments(visibleEnvironments)
+    setDetailsByEnvironmentId((current) => {
+      const next: Record<string, RuntimeHostDetails> = {}
+      for (const environment of visibleEnvironments) {
+        next[environment.id] = getRuntimeEnvironmentInitialDetails(
+          environment,
+          current[environment.id]
+        )
+      }
+      return next
+    })
+  }, [runtimeEnvironmentCatalog])
+
+  useEffect(() => {
+    if (pendingCloudRenameId !== null && pendingCloudRename === null) {
+      setPendingCloudRenameId(null)
+      setPendingCloudRenameScopeKey(null)
+    }
+  }, [pendingCloudRename, pendingCloudRenameId])
 
   const environmentIdsKey = environments.map((environment) => environment.id).join('\n')
   useEffect(() => {
@@ -542,6 +821,10 @@ export function RuntimeEnvironmentsPane({
   const removeEnvironment = async (
     environment: PublicKnownRuntimeEnvironment
   ): Promise<boolean> => {
+    const removalPresentation = getRuntimeEnvironmentRemovalPresentation(environment, false)
+    if (!removalPresentation) {
+      return false
+    }
     setRemovingId(environment.id)
     setRemoveError(null)
     try {
@@ -559,13 +842,7 @@ export function RuntimeEnvironmentsPane({
       await window.api.runtimeEnvironments.remove({ selector: environment.id })
       await loadEnvironments()
       if (mountedRef.current) {
-        toast.success(
-          translate(
-            'auto.components.settings.RuntimeEnvironmentsPane.b5b5114cb0',
-            'Removed {{value0}}.',
-            { value0: environment.name }
-          )
-        )
+        toast.success(removalPresentation.successMessage)
       }
       return true
     } catch (error) {
@@ -952,10 +1229,19 @@ export function RuntimeEnvironmentsPane({
                     const details = detailsByEnvironmentId[environment.id]
                     const detailsDescription = getHostDetailsDescription(details)
                     const isActive = settings.activeRuntimeEnvironmentId === environment.id
-                    const connectionState = getRuntimeServerConnectionState(details)
-                    const remoteUpdate = remoteServerUpdates.get(environment.id)
+                    const connectionState = getRuntimeServerConnectionState(details, environment)
+                    const removalPresentation = getRuntimeEnvironmentRemovalPresentation(
+                      environment,
+                      isActive
+                    )
+                    const canConnect = canConnectRuntimeEnvironment(environment)
+                    const accountConnectionHelp = getAccountRuntimeConnectionHelp(connectionState)
                     // A connected host exposes Disconnect; otherwise Connect.
                     const isReachable = connectionState === 'connected'
+                    const remoteUpdate =
+                      supportsLocalRuntimeEnvironmentRemoval(environment) || isReachable
+                        ? remoteServerUpdates.get(environment.id)
+                        : undefined
                     const actionBusy =
                       connectingId === environment.id ||
                       switchingValue === environment.id ||
@@ -983,17 +1269,18 @@ export function RuntimeEnvironmentsPane({
                             ) : null}
                           </div>
                           <p className="truncate text-xs text-muted-foreground">
-                            {environment.connectionDependency === 'ssh-tunnel'
-                              ? translate(
-                                  'auto.components.settings.RuntimeEnvironmentsPane.sshTunnelRequired',
-                                  'SSH tunnel required'
-                                )
-                              : isActive
+                            {accountConnectionHelp ??
+                              (environment.connectionDependency === 'ssh-tunnel'
                                 ? translate(
-                                    'auto.components.settings.RuntimeEnvironmentsPane.activeServerRowHelp',
-                                    'Active server for server-routed projects, terminals, and provider checks.'
+                                    'auto.components.settings.RuntimeEnvironmentsPane.sshTunnelRequired',
+                                    'SSH tunnel required'
                                   )
-                                : getHostDetailsSummary(details)}
+                                : isActive
+                                  ? translate(
+                                      'auto.components.settings.RuntimeEnvironmentsPane.activeServerRowHelp',
+                                      'Active server for server-routed projects, terminals, and provider checks.'
+                                    )
+                                  : getHostDetailsSummary(details))}
                           </p>
                           {detailsDescription ? (
                             <p
@@ -1034,6 +1321,28 @@ export function RuntimeEnvironmentsPane({
                           ) : null}
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
+                          {environment.accountClaim?.cloudDisplayNameVersion != null ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-muted-foreground"
+                              onClick={() => {
+                                if (!currentCloudRenameScopeKey) {
+                                  return
+                                }
+                                setPendingCloudRenameScopeKey(currentCloudRenameScopeKey)
+                                setPendingCloudRenameId(environment.id)
+                              }}
+                              disabled={isBusy || currentCloudRenameScopeKey === null}
+                              aria-label={translate(
+                                'auto.components.settings.RuntimeEnvironmentsPane.renameCloudRuntime',
+                                'Rename HiveCloud Runtime'
+                              )}
+                            >
+                              <Pencil className="size-3" />
+                            </Button>
+                          ) : null}
                           {remoteUpdate?.phase === 'available' ||
                           remoteUpdate?.phase === 'failed' ? (
                             <Button
@@ -1075,7 +1384,7 @@ export function RuntimeEnvironmentsPane({
                               size="xs"
                               className="gap-1.5"
                               onClick={() => void connectEnvironment(environment)}
-                              disabled={actionBusy || connectionState === 'checking'}
+                              disabled={actionBusy || connectionState === 'checking' || !canConnect}
                             >
                               {connectingId === environment.id ? (
                                 <Loader2 className="size-3 animate-spin" />
@@ -1088,28 +1397,26 @@ export function RuntimeEnvironmentsPane({
                               )}
                             </Button>
                           )}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setRemoveError(null)
-                              setPendingRemove(environment)
-                            }}
-                            className="size-7 text-muted-foreground hover:text-red-400"
-                            disabled={isBusy}
-                            aria-label={translate(
-                              'auto.components.settings.RuntimeEnvironmentsPane.aeb26635d2',
-                              'Remove {{value0}}',
-                              { value0: environment.name }
-                            )}
-                          >
-                            {removingId === environment.id ? (
-                              <Loader2 className="size-3 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-3" />
-                            )}
-                          </Button>
+                          {removalPresentation ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setRemoveError(null)
+                                setPendingRemove(environment)
+                              }}
+                              className="size-7 text-muted-foreground hover:text-red-400"
+                              disabled={isBusy}
+                              aria-label={removalPresentation.actionAriaLabel}
+                            >
+                              {removingId === environment.id ? (
+                                <Loader2 className="size-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="size-3" />
+                              )}
+                            </Button>
+                          ) : null}
                         </div>
                       </>
                     )
@@ -1209,7 +1516,11 @@ export function RuntimeEnvironmentsPane({
                       </SelectItem>
                     ) : null}
                     {environments.map((environment) => (
-                      <SelectItem key={environment.id} value={environment.id}>
+                      <SelectItem
+                        key={environment.id}
+                        value={environment.id}
+                        disabled={!canConnectRuntimeEnvironment(environment)}
+                      >
                         {environment.name}
                       </SelectItem>
                     ))}
@@ -1254,11 +1565,7 @@ export function RuntimeEnvironmentsPane({
                           </div>
                           <div className="min-w-0 space-y-0.5">
                             <div className="truncate font-mono">
-                              {environment.endpoints[0]?.endpoint ??
-                                translate(
-                                  'auto.components.settings.RuntimeEnvironmentsPane.6ef71985da',
-                                  'No endpoint'
-                                )}
+                              {getRuntimeEnvironmentEndpointDisplay(environment)}
                             </div>
                             {details?.runtimeStatus ? (
                               <div className="truncate">
@@ -1483,7 +1790,7 @@ export function RuntimeEnvironmentsPane({
       </Dialog>
 
       <Dialog
-        open={pendingRemove !== null}
+        open={pendingRemove !== null && pendingRemovalPresentation !== null}
         onOpenChange={(open) => {
           if (!open && removingId === null) {
             setRemoveError(null)
@@ -1493,23 +1800,8 @@ export function RuntimeEnvironmentsPane({
       >
         <DialogContent className="max-w-sm sm:max-w-sm" showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle className="text-sm">
-              {translate(
-                'auto.components.settings.RuntimeEnvironmentsPane.bb90dd6487',
-                'Remove Server'
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {removingActiveServer
-                ? translate(
-                    'auto.components.settings.RuntimeEnvironmentsPane.removeActiveServerDescription',
-                    'Choose another Active Server in Advanced before removing this server. Existing host sessions are left alone.'
-                  )
-                : translate(
-                    'auto.components.settings.RuntimeEnvironmentsPane.ed3e3f069d',
-                    'This removes the saved server from Orca. It does not change the active server.'
-                  )}
-            </DialogDescription>
+            <DialogTitle className="text-sm">{pendingRemovalPresentation?.title}</DialogTitle>
+            <DialogDescription>{pendingRemovalPresentation?.description}</DialogDescription>
           </DialogHeader>
           {pendingRemove ? (
             <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-xs">
@@ -1535,27 +1827,37 @@ export function RuntimeEnvironmentsPane({
             >
               {translate('auto.components.settings.RuntimeEnvironmentsPane.af53761f31', 'Cancel')}
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                const environment = pendingRemove
-                if (!environment) {
-                  return
-                }
-                void removeEnvironment(environment).then((removed) => {
-                  if (removed && mountedRef.current) {
-                    setPendingRemove(null)
+            {pendingRemovalPresentation ? (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const environment = pendingRemove
+                  if (!environment) {
+                    return
                   }
-                })
-              }}
-              disabled={removingId !== null}
-            >
-              {removingId !== null ? <Loader2 className="animate-spin" /> : <Trash2 />}
-              {translate('auto.components.settings.RuntimeEnvironmentsPane.d25f0688b1', 'Remove')}
-            </Button>
+                  void removeEnvironment(environment).then((removed) => {
+                    if (removed && mountedRef.current) {
+                      setPendingRemove(null)
+                    }
+                  })
+                }}
+                disabled={removingId !== null}
+              >
+                {removingId !== null ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                {pendingRemovalPresentation.actionLabel}
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <RuntimeCloudDisplayNameDialog
+        environment={pendingCloudRename}
+        onClose={() => {
+          setPendingCloudRenameId(null)
+          setPendingCloudRenameScopeKey(null)
+        }}
+      />
     </SearchableSetting>
   )
 }

@@ -303,11 +303,13 @@ describe('getChecksPanelReviewState — active and skipped', () => {
   })
 
   it('disconnected host row', () => {
-    expect(
-      getChecksPanelReviewState(
-        input({ refresh: { status: 'skipped', skippedReason: 'disconnected' } })
-      ).title
-    ).toBe('Host disconnected')
+    const state = getChecksPanelReviewState(
+      input({ refresh: { status: 'skipped', skippedReason: 'disconnected' } })
+    )
+    expect(state.title).toBe('Host disconnected')
+    expect(state.description).toBe(
+      `This repository's execution host is disconnected, so ${APP_DISPLAY_NAME} cannot refresh pull request status.`
+    )
   })
 })
 

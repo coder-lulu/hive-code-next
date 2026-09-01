@@ -95,6 +95,12 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
         : {}),
       ...(coldRestoreOverride ? { launchToken: coldRestoreOverride.launchToken } : {}),
       ...(coldRestoreOverride ? { launchAgent: coldRestoreOverride.agent } : {}),
+      ...(coldRestoreOverride?.agentPermissionMode
+        ? { agentPermissionMode: coldRestoreOverride.agentPermissionMode }
+        : {}),
+      ...(coldRestoreOverride?.agentArgsOverride !== undefined
+        ? { agentArgsOverride: coldRestoreOverride.agentArgsOverride }
+        : {}),
       ...(session.shouldDeclareHiddenAtSpawn() ? { initiallyHidden: true } : {}),
       shouldContinue: () => {
         const state = useAppStore.getState()

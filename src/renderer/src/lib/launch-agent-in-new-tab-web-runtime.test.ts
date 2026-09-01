@@ -135,4 +135,52 @@ describe('launchAgentInNewTab paired web runtime', () => {
     })
     expect(mocks.createTab).not.toHaveBeenCalled()
   })
+
+  it('sends a manual per-launch permission override to the host runtime', async () => {
+    store.settings.agentDefaultArgs = {
+      codex: '--dangerously-bypass-approvals-and-sandbox'
+    }
+    const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
+
+    launchAgentInNewTab({
+      agent: 'codex',
+      worktreeId: 'wt-1',
+      prompt: 'fix the spinner',
+      agentPermissionMode: 'manual'
+    })
+
+    expect(mocks.createWebRuntimeSessionTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentPermissionMode: 'manual',
+        command:
+          "codex '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write' 'fix the spinner'",
+        launchConfig: expect.objectContaining({
+          agentArgs: "'--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'"
+        })
+      })
+    )
+    expect(mocks.createWebRuntimeSessionTerminal.mock.calls[0]?.[0]).not.toHaveProperty('agentArgs')
+  })
+
+  it('retains the legacy startup payload for an unprompted permission override', async () => {
+    const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
+
+    launchAgentInNewTab({
+      agent: 'goose',
+      worktreeId: 'wt-1',
+      agentPermissionMode: 'yolo'
+    })
+
+    expect(mocks.createWebRuntimeSessionTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        launchAgent: 'goose',
+        command: 'goose',
+        env: { GOOSE_MODE: 'auto' },
+        agentPermissionMode: 'yolo',
+        launchConfig: expect.objectContaining({
+          agentEnv: { GOOSE_MODE: 'auto' }
+        })
+      })
+    )
+  })
 })

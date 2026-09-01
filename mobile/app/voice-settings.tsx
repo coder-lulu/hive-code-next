@@ -24,10 +24,10 @@ import {
 import { useDictationSetupPoller } from '../src/dictation/use-dictation-setup-poller'
 import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
 import { createVoiceSettingsStyles } from '../src/settings/voice-settings-styles'
-import { loadHosts } from '../src/transport/host-store'
+import { useAccountVisibleHostCatalog } from '../src/runtime-directory/use-account-visible-host-catalog'
+import { selectConnectableHostProfiles } from '../src/transport/host-catalog-selection'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { useFocusedSettingsHostClients } from '../src/transport/settings-host-client-connections'
-import type { HostProfile } from '../src/transport/types'
 
 const POLL_INTERVAL_MS = 1500
 
@@ -44,10 +44,8 @@ export default function VoiceSettingsScreen(): React.JSX.Element {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createVoiceSettingsStyles)
 
-  const [hosts, setHosts] = useState<HostProfile[]>([])
-  useEffect(() => {
-    void loadHosts().then(setHosts)
-  }, [])
+  const { catalog: hostCatalog } = useAccountVisibleHostCatalog()
+  const hosts = useMemo(() => selectConnectableHostProfiles(hostCatalog), [hostCatalog])
   const hostIds = useMemo(() => hosts.map((host) => host.id), [hosts])
   const { clients: hostClients, focused: routeFocused } = useFocusedSettingsHostClients(hostIds)
   // Voice dictation runs on the paired desktop, so pick the first connected host.

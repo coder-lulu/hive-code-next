@@ -4,6 +4,7 @@ import {
   AgentSkillSharingError
 } from '../../shared/agent-skill-sharing-contract'
 import type { DiscoveredSkill } from '../../shared/skills'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 export function selectDiscoveredSkills(
   skills: readonly DiscoveredSkill[],
@@ -20,14 +21,14 @@ export function selectDiscoveredSkills(
     if (named.length === 0) {
       throw new AgentSkillSharingError(
         AGENT_SKILL_SELECTOR_NOT_FOUND_CODE,
-        `Installed skill "${selector}" was not found. Run \`orca skills installed\` to list valid selectors.`,
+        `Installed skill "${selector}" was not found. Run \`${PRIMARY_CLI_COMMAND} skills installed\` to list valid selectors.`,
         { selector }
       )
     }
     if (named.length > 1) {
       throw new AgentSkillSharingError(
         AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE,
-        `More than one installed skill is named "${selector}". Use its discovery ID from \`orca skills installed\`.`,
+        `More than one installed skill is named "${selector}". Use its discovery ID from \`${PRIMARY_CLI_COMMAND} skills installed\`.`,
         { selector, matchingIds: named.map((skill) => skill.id) }
       )
     }

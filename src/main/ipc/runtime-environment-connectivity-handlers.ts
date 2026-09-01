@@ -1,7 +1,6 @@
 import { ipcMain } from 'electron'
 import {
   addEnvironmentFromPairingCode,
-  listEnvironments,
   removeEnvironment,
   resolveEnvironment
 } from '../../shared/runtime-environment-store'
@@ -14,20 +13,23 @@ import { RuntimeRpcCallQueueOverloadError } from '../../shared/runtime-rpc-call-
 import type { RuntimeRpcFailure, RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { Store } from '../persistence'
+import { getHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-account-runtime-access'
 import { clearBrowserRoutePartitionStorageForEnvironment } from '../browser/browser-route-partition-storage-runtime'
 import { retireBrowserRoutePartitionStorageForEnvironment } from '../browser/browser-route-partition-storage-retirement'
+import {
+  callEnvironmentWithCloudFallback,
+  getEnvironmentStatusWithCloudFallback,
+  listRuntimeEnvironmentCatalog,
+  resolveRuntimeEnvironmentCatalogEntry
+} from './runtime-environment-account-routing'
 import { verifyAndAddRuntimeEnvironmentFromPairingCode } from './runtime-environment-pairing-verification'
 import { closeRemoteRuntimeRequestConnection } from './runtime-environment-request-connections'
-import {
-  callRuntimeEnvironment,
-  clearSharedControlSupport,
-  getRuntimeEnvironmentStatus
-} from './runtime-environment-transport-routing'
+import { clearSharedControlSupport } from './runtime-environment-transport-routing'
 
 const manuallyDisconnectedEnvironmentIds = new Set<string>()
 
 function manuallyDisconnectedResponse(
-  environment: ReturnType<typeof resolveEnvironment>
+  environment: Pick<PublicKnownRuntimeEnvironment, 'id' | 'runtimeId' | 'runtimeRecordId'>
 ): RuntimeRpcResponse<never> {
   return {
     id: 'runtime.manualDisconnect',
@@ -36,7 +38,7 @@ function manuallyDisconnectedResponse(
       code: 'runtime_manually_disconnected',
       message: 'Runtime environment is manually disconnected.'
     },
-    _meta: { runtimeId: environment.runtimeId }
+    _meta: { runtimeId: environment.runtimeId ?? environment.runtimeRecordId ?? environment.id }
   }
 }
 
@@ -55,16 +57,17 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
   getUserDataPath,
   invalidateTransport
 }: ConnectivityHandlerOptions): void {
-  ipcMain.handle('runtimeEnvironments:list', () =>
-    listEnvironments(getUserDataPath()).map(redactRuntimeEnvironment)
-  )
+  ipcMain.handle('runtimeEnvironments:list', () => listRuntimeEnvironmentCatalog(getUserDataPath()))
   ipcMain.handle(
     'runtimeEnvironments:addFromPairingCode',
     (
       _event,
       args: { name: string; pairingCode: string }
     ): { environment: PublicKnownRuntimeEnvironment } => {
-      const environment = addEnvironmentFromPairingCode(getUserDataPath(), args)
+      const environment = addEnvironmentFromPairingCode(getUserDataPath(), {
+        name: args.name,
+        pairingCode: args.pairingCode
+      })
       manuallyDisconnectedEnvironmentIds.delete(environment.id)
       return { environment: redactRuntimeEnvironment(environment) }
     }
@@ -80,7 +83,7 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
     }
   )
   ipcMain.handle('runtimeEnvironments:resolve', (_event, args: { selector: string }) =>
-    redactRuntimeEnvironment(resolveEnvironment(getUserDataPath(), args.selector))
+    resolveRuntimeEnvironmentCatalogEntry(getUserDataPath(), args.selector)
   )
   ipcMain.handle(
     'runtimeEnvironments:remove',
@@ -111,11 +114,16 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
   ipcMain.handle(
     'runtimeEnvironments:disconnect',
     (_event, args: { selector: string }): { disconnected: PublicKnownRuntimeEnvironment } => {
-      const environment = resolveEnvironment(getUserDataPath(), args.selector)
+      const environment = resolveRuntimeEnvironmentCatalogEntry(getUserDataPath(), args.selector)
       manuallyDisconnectedEnvironmentIds.add(environment.id)
       invalidateTransport(environment.id)
+      if (environment.accountClaim) {
+        getHiveAccountRuntimeAccess()?.transport.disconnect(
+          environment.accountClaim.runtimeRecordId
+        )
+      }
       closeLegacySelectorTransport(args.selector, environment.id)
-      return { disconnected: redactRuntimeEnvironment(environment) }
+      return { disconnected: environment }
     }
   )
   ipcMain.handle(
@@ -124,9 +132,9 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
       _event,
       args: { selector: string; timeoutMs?: number }
     ): Promise<RuntimeRpcResponse<RuntimeStatus>> => {
-      const environment = resolveEnvironment(getUserDataPath(), args.selector)
+      const environment = resolveRuntimeEnvironmentCatalogEntry(getUserDataPath(), args.selector)
       manuallyDisconnectedEnvironmentIds.delete(environment.id)
-      return getRuntimeEnvironmentStatus(getUserDataPath(), environment.id, args.timeoutMs)
+      return getEnvironmentStatusWithCloudFallback(getUserDataPath(), environment, args.timeoutMs)
     }
   )
 }
@@ -151,13 +159,13 @@ function registerPassiveStatusHandler(getUserDataPath: () => string): void {
       _event,
       args: { selector: string; timeoutMs?: number }
     ): Promise<RuntimeRpcResponse<RuntimeStatus>> => {
-      const environment = resolveEnvironment(getUserDataPath(), args.selector)
+      const environment = resolveRuntimeEnvironmentCatalogEntry(getUserDataPath(), args.selector)
       if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
         return manuallyDisconnectedResponse(environment)
       }
-      const response = await getRuntimeEnvironmentStatus(
+      const response = await getEnvironmentStatusWithCloudFallback(
         getUserDataPath(),
-        environment.id,
+        environment,
         args.timeoutMs
       )
       return isRuntimeEnvironmentManuallyDisconnected(environment.id)
@@ -168,7 +176,7 @@ function registerPassiveStatusHandler(getUserDataPath: () => string): void {
 }
 
 function runtimeEnvironmentCallFailure(
-  environment: ReturnType<typeof resolveEnvironment>,
+  environment: PublicKnownRuntimeEnvironment,
   method: string,
   error: unknown
 ): RuntimeRpcFailure | null {
@@ -182,7 +190,7 @@ function runtimeEnvironmentCallFailure(
     id: method,
     ok: false,
     error: { code: error.code, message: error.message },
-    _meta: { runtimeId: environment.runtimeId }
+    _meta: { runtimeId: environment.runtimeId ?? environment.runtimeRecordId ?? environment.id }
   }
 }
 
@@ -199,29 +207,32 @@ function registerPassiveCallHandler(getUserDataPath: () => string): void {
         expectedEnvironmentPairingRevision?: number
       }
     ): Promise<RuntimeRpcResponse<unknown>> => {
-      const environment = resolveEnvironment(getUserDataPath(), args.selector)
-      if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
-        return manuallyDisconnectedResponse(environment)
+      const catalogEnvironment = resolveRuntimeEnvironmentCatalogEntry(
+        getUserDataPath(),
+        args.selector
+      )
+      if (isRuntimeEnvironmentManuallyDisconnected(catalogEnvironment.id)) {
+        return manuallyDisconnectedResponse(catalogEnvironment)
       }
       let response: RuntimeRpcResponse<unknown>
       try {
-        response = await callRuntimeEnvironment(
+        response = await callEnvironmentWithCloudFallback(
           getUserDataPath(),
-          environment.id,
+          catalogEnvironment,
           args.method,
           args.params,
           args.timeoutMs,
           args.expectedEnvironmentPairingRevision
         )
       } catch (error) {
-        const failure = runtimeEnvironmentCallFailure(environment, args.method, error)
+        const failure = runtimeEnvironmentCallFailure(catalogEnvironment, args.method, error)
         if (failure) {
           return failure
         }
         throw error
       }
-      return isRuntimeEnvironmentManuallyDisconnected(environment.id)
-        ? manuallyDisconnectedResponse(environment)
+      return isRuntimeEnvironmentManuallyDisconnected(catalogEnvironment.id)
+        ? manuallyDisconnectedResponse(catalogEnvironment)
         : response
     }
   )

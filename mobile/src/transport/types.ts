@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  PairingOfferSchema,
-  type PairingOffer
+  CANONICAL_RUNTIME_RECORD_ID_PATTERN,
+  PairingOfferSchema as SharedPairingOfferSchema
 } from '../../../src/shared/mobile-relay-pairing-offer'
 import {
   MobileAccessEndpointSchema,
@@ -10,8 +10,10 @@ import {
 } from './mobile-relay-host-overlay'
 import { MobileRelayEndpointSchema } from '../../../src/shared/mobile-relay-credential-contract'
 
-export { PairingOfferSchema }
-export type { PairingOffer }
+export const RuntimeRecordIdSchema = z.string().regex(CANONICAL_RUNTIME_RECORD_ID_PATTERN)
+
+export const PairingOfferSchema = SharedPairingOfferSchema
+export type PairingOffer = z.infer<typeof PairingOfferSchema>
 
 export type RpcRequest = {
   id: string
@@ -98,16 +100,53 @@ export type HostProfile = {
   deviceToken: string
   publicKeyB64: string
   lastConnected: number
+  runtimeRecordId?: string
   endpoints?: MobileAccessEndpoint[]
   relayHostId?: MobileRelayHostOverlay['relayHostId']
   relay?: MobileRelayHostOverlay['relay']
+  accountRuntime?: AccountRuntimeRoute
+  accountRuntimeFallback?: AccountRuntimeRoute
 }
 
-export type HostCredentialStatus = 'ready' | 'temporarily-unavailable' | 'missing'
+export type AccountRuntimeConnectionMaterial = {
+  readonly connectionIntentId: string
+  readonly ticketId: string
+  readonly ticketSecret: string
+  readonly expiresAt: string
+  readonly runtimePublicKeyB64: string
+  readonly clientKeyPair: {
+    readonly publicKey: Uint8Array
+    readonly secretKey: Uint8Array
+  }
+  readonly relay: {
+    readonly cellUrl: string
+    readonly relayHostId: string
+    readonly assignmentEpoch: number
+  }
+}
+
+export type AccountRuntimeRoute = {
+  readonly runtimeRecordId: string
+  readonly resourceVersion: number
+  readonly createConnection: (signal?: AbortSignal) => Promise<AccountRuntimeConnectionMaterial>
+}
+
+export type RuntimeAccessSource = 'manual-pairing' | 'account-claimed'
+
+export type HostCredentialStatus =
+  | 'ready'
+  | 'temporarily-unavailable'
+  | 'missing'
+  | 'cloud-offline'
+  | 'cloud-unavailable'
 
 export type HostCatalogEntry = Omit<HostProfile, 'deviceToken'> & {
   credentialStatus: HostCredentialStatus
   profile: HostProfile | null
+  accessSources?: readonly RuntimeAccessSource[]
+  cloudProfile?: HostProfile
+  accountPresence?: 'ONLINE' | 'DEGRADED' | 'OFFLINE'
+  accountReadiness?: 'STARTING' | 'READY' | 'DEGRADED' | 'RECOVERING' | 'STOPPED'
 }
 
 export const HostProfileSchema = z.object({
@@ -117,6 +156,7 @@ export const HostProfileSchema = z.object({
   deviceToken: z.string().min(1),
   publicKeyB64: z.string().min(1),
   lastConnected: z.number().finite(),
+  runtimeRecordId: RuntimeRecordIdSchema.optional(),
   endpoints: z.array(MobileAccessEndpointSchema).min(1).max(16).optional(),
   relayHostId: z
     .string()
@@ -133,7 +173,8 @@ export const StoredHostProfileSchema = z.object({
   name: z.string().min(1),
   endpoint: z.string().min(1),
   publicKeyB64: z.string().min(1),
-  lastConnected: z.number().finite()
+  lastConnected: z.number().finite(),
+  runtimeRecordId: RuntimeRecordIdSchema.optional()
 })
 
 export type StoredHostProfile = z.infer<typeof StoredHostProfileSchema>

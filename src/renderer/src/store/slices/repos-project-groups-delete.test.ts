@@ -8,6 +8,7 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const remoteRepo: Repo = {
   id: 'remote-repo',
@@ -230,7 +231,7 @@ describe('project group deletion store routing', () => {
       failedProjectRemovals: [
         {
           projectId: 'shared',
-          reason: 'Project remained in Orca after removeProject completed.'
+          reason: `Project remained in ${APP_DISPLAY_NAME} after removeProject completed.`
         }
       ]
     })
@@ -302,7 +303,7 @@ describe('project group deletion store routing', () => {
       failedProjectRemovals: [
         {
           projectId: 'nested',
-          reason: 'Project remained in Orca after removeProject completed.'
+          reason: `Project remained in ${APP_DISPLAY_NAME} after removeProject completed.`
         }
       ]
     })

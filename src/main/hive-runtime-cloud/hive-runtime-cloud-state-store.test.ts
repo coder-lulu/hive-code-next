@@ -34,6 +34,7 @@ describe('Hive Runtime Cloud registration state', () => {
       authorityGeneration: 1,
       fencingEpoch: 1,
       latestLeaseEpoch: 0,
+      authorityId: 'hive-primary',
       claimCapability: 'c'.repeat(64),
       claimExpiresAt: 1_900_000_000_000
     }
@@ -44,6 +45,25 @@ describe('Hive Runtime Cloud registration state', () => {
       value: state
     })
     expect(safeStorageMock.encryptString).toHaveBeenCalledOnce()
+  })
+
+  it('stores a claimed Runtime tuple without copying the owner account identity', () => {
+    const state = {
+      schemaVersion: 1 as const,
+      runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
+      status: 'CLAIMED' as const,
+      resourceVersion: 2,
+      authorityGeneration: 1,
+      fencingEpoch: 1,
+      latestLeaseEpoch: 0,
+      authorityId: 'hive-primary'
+    }
+
+    expect(saveHiveRuntimeCloudRegistrationState(userDataPath, state)).toBe(true)
+    expect(readHiveRuntimeCloudRegistrationState(userDataPath)).toEqual({
+      status: 'ok',
+      value: state
+    })
   })
 
   it('rejects claimed state that accidentally retains the Claim capability', () => {

@@ -2,6 +2,8 @@ import type { ComposerModel } from './composer-model'
 
 type FolderSubmitOrchestrationInput = Pick<
   ComposerModel,
+  | 'agentPermissionMode'
+  | 'agentPrompt'
   | 'clearNewWorkspaceDraft'
   | 'createFolderWorkspace'
   | 'decisions'
@@ -48,8 +50,14 @@ import {
 } from '@/lib/workspace-create-error-format'
 import { toast } from 'sonner'
 
+export function resolveFolderSubmitLaunchText(agentPrompt: string, note: string): string {
+  return agentPrompt.trim() || note
+}
+
 export function useFolderSubmitOrchestration(input: FolderSubmitOrchestrationInput) {
   const {
+    agentPermissionMode,
+    agentPrompt,
     clearNewWorkspaceDraft,
     createFolderWorkspace,
     decisions,
@@ -107,9 +115,10 @@ export function useFolderSubmitOrchestration(input: FolderSubmitOrchestrationInp
         if (isSubmissionCancelled()) {
           return
         }
+        const launchText = resolveFolderSubmitLaunchText(agentPrompt, note)
         const folderLaunchDraftText =
           agent && submitLinkedWorkItem
-            ? resolveFolderWorkspaceLaunchDraft(submitLinkedWorkItem, note)
+            ? resolveFolderWorkspaceLaunchDraft(submitLinkedWorkItem, launchText)
             : null
         const folderWorkspaceCreated = await submitFolderWorkspaceCreate({
           projectGroup: selectedProjectGroup,
@@ -117,7 +126,7 @@ export function useFolderSubmitOrchestration(input: FolderSubmitOrchestrationInp
           lastAutoName: lastAutoNameRef.current,
           linkedWorkItem: submitLinkedWorkItem,
           linkedTaskSourceContext: taskSourceContext,
-          note,
+          note: launchText,
           quickAgent: agent,
           autoRenameBranchFromWork: settings?.autoRenameBranchFromWork,
           agentCmdOverrides: settings?.agentCmdOverrides,
@@ -125,6 +134,7 @@ export function useFolderSubmitOrchestration(input: FolderSubmitOrchestrationInp
             ? resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs)
             : undefined,
           agentEnv: agent ? resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv) : undefined,
+          agentPermissionMode,
           sessionOptions: agent
             ? resolveInitialNativeChatSessionOptions(
                 {
@@ -183,6 +193,8 @@ export function useFolderSubmitOrchestration(input: FolderSubmitOrchestrationInp
       }
     },
     [
+      agentPermissionMode,
+      agentPrompt,
       clearNewWorkspaceDraft,
       createFolderWorkspace,
       canResolveFolderSmartGitHubSubmit,

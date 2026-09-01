@@ -56,6 +56,10 @@ import { registerSpeechHandlers } from '../speech'
 import { registerTerminalRenderDesyncEvidenceHandler } from '../terminal-render-desync-evidence'
 import { registerOrcaProfileHandlers } from '../orca-profiles'
 import { registerHiveAccountHandlers } from '../hive-account'
+import {
+  registerHiveRuntimeCloudHandlers,
+  type HiveRuntimeCloudHandlerServices
+} from '../hive-runtime-cloud'
 import { registerCodexAccountHandlers } from '../codex-accounts'
 import { registerAgentHookHandlers } from '../agent-hooks'
 import { registerCodexConfigSyncHandlers } from '../codex-config-sync'
@@ -107,6 +111,7 @@ type CoreHandlerLifecycleOptions = {
   ) => Promise<AiVaultPrepareSessionResumeResult>
   hiveAccountService?: HiveAccountService
   hiveAccountStartupState?: Promise<HiveAccountState>
+  hiveRuntimeCloudServices?: HiveRuntimeCloudHandlerServices
 }
 
 export function registerCoreHandlers(
@@ -205,6 +210,9 @@ export function registerCoreHandlers(
         }
       : undefined
   )
+  if (lifecycleOptions.hiveRuntimeCloudServices) {
+    registerHiveRuntimeCloudHandlers(lifecycleOptions.hiveRuntimeCloudServices)
+  }
   registerOrcaProfileHandlers(store, {
     onBeforeRelaunch: lifecycleOptions.onBeforeRelaunch,
     onAuthMutation: lifecycleOptions.onOrcaProfileAuthMutation,

@@ -22,4 +22,18 @@ describe('desktop mobile-relay pairing contract', () => {
 
     expect(schema.parse(payload)).toMatchObject({ pairedDeviceId: 'paired-device-a' })
   })
+
+  it('preserves an optional canonical Runtime record id without requiring it from old senders', () => {
+    const fixture = createMobileRelayPairingFixtures(now)[0]!
+    if (!fixture.expected) {
+      throw new Error('Expected a valid direct pairing fixture')
+    }
+    expect(schema.parse(fixture.expected)).not.toHaveProperty('runtimeRecordId')
+    expect(
+      schema.parse({
+        ...fixture.expected,
+        runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      })
+    ).toMatchObject({ runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
+  })
 })

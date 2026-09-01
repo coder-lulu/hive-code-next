@@ -22,6 +22,8 @@ export function parseAvdList(stdout: string): string[] {
 
 export type BootAvdOptions = {
   noSnapshot?: boolean
+  // Cold boot once while preserving normal snapshot saves on shutdown.
+  noSnapshotLoad?: boolean
   noWindow?: boolean
   noBootAnim?: boolean
   gpu?: string
@@ -33,6 +35,9 @@ export function bootAvdArgs(name: string, options: BootAvdOptions = {}): string[
   const args = ['-avd', name]
   if (options.noSnapshot) {
     args.push('-no-snapshot')
+  }
+  if (options.noSnapshotLoad) {
+    args.push('-no-snapshot-load')
   }
   if (options.noWindow) {
     args.push('-no-window')

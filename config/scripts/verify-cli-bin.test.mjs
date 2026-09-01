@@ -25,6 +25,7 @@ function makeProjectWithCli(
     path.join(projectDir, 'package.json'),
     JSON.stringify({
       bin: {
+        hive: './out/cli/index.js',
         hivecode: './out/cli/index.js',
         'orca-ide': './out/cli/index.js'
       },
@@ -50,7 +51,7 @@ describe('verifyPackageCliBin', () => {
 
     expect(verifyPackageCliBin({ projectDir, runHelp: true })).toMatchObject({
       binPath: cliPath,
-      commandNames: ['hivecode', 'orca-ide']
+      commandNames: ['hive', 'hivecode', 'orca-ide']
     })
   })
 
@@ -87,7 +88,7 @@ describe('verifyPackageCliBin', () => {
   it('rejects an empty package bin target', () => {
     const { projectDir } = makeProjectWithCli('')
 
-    expect(() => verifyPackageCliBin({ projectDir })).toThrow('bin.hivecode target is empty')
+    expect(() => verifyPackageCliBin({ projectDir })).toThrow('bin.hive target is empty')
   })
 
   it('rejects package bin targets without a Node shebang', () => {

@@ -91,6 +91,11 @@ function hydrateUnifiedFormat(
         .filter((tab) => tab.aiVaultTitle)
         .map((tab) => [tab.id, tab.aiVaultTitle!])
     )
+    const projectAssignmentByTerminalId = new Map(
+      (session.tabsByWorktree[worktreeId] ?? [])
+        .filter((tab) => tab.projectAssignment)
+        .map((tab) => [tab.id, tab.projectAssignment!])
+    )
     const hydratedTabs = [...tabs]
       .map((tab) => ({
         ...tab,
@@ -105,10 +110,13 @@ function hydrateUnifiedFormat(
           : quickCommandLabelByTerminalId.get(tab.entityId)
         const generatedLabel = generatedTitleByTerminalId.get(tab.entityId)
         const aiVaultTitle = tab.aiVaultTitle ?? aiVaultTitleByTerminalId.get(tab.entityId)
+        const projectAssignment =
+          tab.projectAssignment ?? projectAssignmentByTerminalId.get(tab.entityId)
         return {
           ...tab,
           ...(quickCommandLabel ? { quickCommandLabel } : {}),
           ...(aiVaultTitle ? { aiVaultTitle } : {}),
+          ...(projectAssignment ? { projectAssignment } : {}),
           ...(!tab.generatedLabel?.trim() && generatedLabel ? { generatedLabel } : {})
         }
       })

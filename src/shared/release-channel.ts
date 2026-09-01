@@ -1,15 +1,17 @@
 import { compareAppVersions, isValidAppVersion } from './app-version'
 import { resolveProductUpdateSource } from './product-update-source'
 
-export type ReleaseChannel = 'stable' | 'rc' | 'hourly' | 'daily' | 'adhoc'
+export type ReleaseChannel = 'internal' | 'stable' | 'beta' | 'rc' | 'hourly' | 'daily' | 'adhoc'
 
 // Why: hourly/daily/adhoc are retained as historical version kinds, but their upstream
 // workflows publish to repositories that the product manifest does not
 // configure. They must remain unavailable until dedicated product sources exist.
-export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'rc']
+export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['internal', 'stable', 'beta', 'rc']
 
 export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = {
+  internal: 'Internal',
   stable: 'Stable',
+  beta: 'Beta',
   rc: 'RC',
   hourly: 'Hourly',
   daily: 'Daily',
@@ -227,6 +229,9 @@ export function getVersionChannel(version: string): ReleaseChannel | null {
   }
   // Why the dev channels are tested first: they are prereleases too, so this
   // catch-all would otherwise file every one of them under rc.
+  if (normalized.includes('-beta.')) {
+    return 'beta'
+  }
   return normalized.includes('-') ? 'rc' : 'stable'
 }
 

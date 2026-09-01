@@ -4,6 +4,8 @@ import type { ConnectionState, RpcSuccess } from './types'
 import { evaluateCompat, type CompatVerdict } from './protocol-compat'
 import type { DesktopStatus } from '../worktree/host-worktree-rpc-types'
 import { normalizeHostAppVersion, recordHostAppVersion } from './host-app-version-store'
+import { recordAuthenticatedRuntimeRecordId } from './host-store'
+import { HostRuntimeIdentityMismatchError } from './authenticated-runtime-host-identity'
 
 export type HostStatusGates = {
   hostCapabilities: string[]
@@ -68,6 +70,12 @@ export function useHostStatusGates(args: {
           desktopMinCompatibleMobileVersion: status.minCompatibleMobileVersion
         })
         const desktopAppVersion = normalizeHostAppVersion(status.appVersion)
+        if (hostId && status.runtimeRecordId !== undefined) {
+          await recordAuthenticatedRuntimeRecordId(hostId, status.runtimeRecordId)
+          if (cancelled) {
+            return
+          }
+        }
         if (hostId && desktopAppVersion) {
           void recordHostAppVersion(hostId, desktopAppVersion)
         }
@@ -86,7 +94,10 @@ export function useHostStatusGates(args: {
             requiredDesktopVersion: verdict.requiredDesktopVersion
           })
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof HostRuntimeIdentityMismatchError) {
+          requestClient.close()
+        }
         // Why: a transient status failure must not trap navigation; conservative feature gates remain disabled.
         if (!cancelled) {
           settle({

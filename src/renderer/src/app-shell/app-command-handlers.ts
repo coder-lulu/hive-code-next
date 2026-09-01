@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
-import { canShowRightSidebarForView } from '@/lib/right-sidebar-visibility'
+import { canShowRightSidebar } from '@/lib/right-sidebar-visibility'
 import { isFloatingWorkspacePanelFocused } from '@/lib/floating-workspace-terminal-actions'
 import { requestScrollToCurrentWorkspaceRevealAndRename } from '@/lib/scroll-to-current-workspace-status'
 import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
@@ -63,7 +63,8 @@ export function useAppShortcutActions() {
       setRightSidebarTab: s.setRightSidebarTab,
       showRightSidebarFiles: s.showRightSidebarFiles,
       showRightSidebarSearch: s.showRightSidebarSearch,
-      openDiffNotesSendMenuForActiveWorktree: s.openDiffNotesSendMenuForActiveWorktree
+      openDiffNotesSendMenuForActiveWorktree: s.openDiffNotesSendMenuForActiveWorktree,
+      openNewTaskHome: s.openNewTaskHome
     }))
   )
 }
@@ -99,7 +100,8 @@ export function createAppCommandHandlers(
     workspaceChromeActive
   } = state
   const floatingWorkspaceFocused = isFloatingWorkspacePanelFocused()
-  const canRevealRightSidebar = !creationLayoutActive && canShowRightSidebarForView(activeView)
+  const canRevealRightSidebar =
+    !creationLayoutActive && canShowRightSidebar({ activeView, activeWorktreeId })
   const claim = (actionId: KeybindingActionId, run: () => void): boolean => {
     input?.preventDefault()
     if (
@@ -128,6 +130,13 @@ export function createAppCommandHandlers(
       : false
 
   return new Map<KeybindingActionId, () => boolean>([
+    [
+      'home.newTask',
+      () =>
+        claim('home.newTask', () => {
+          actions.openNewTaskHome()
+        })
+    ],
     [
       'worktree.history.back',
       () => {

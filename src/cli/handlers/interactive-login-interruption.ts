@@ -1,4 +1,5 @@
 import { execFile, type ChildProcess } from 'node:child_process'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 export const LOGIN_PROCESS_POSIX_GRACE_MS = 5_000
 export const LOGIN_PROCESS_CLOSE_FALLBACK_MS = 1_000
@@ -140,7 +141,7 @@ export async function withInteractiveLoginCleanup<T>(
     }
     if (session.registering) {
       console.warn(
-        '[account] Interrupted after sign-in completed; the account may still have been registered. Run `orca account list` to check.'
+        `[account] Interrupted after sign-in completed; the account may still have been registered. Run \`${PRIMARY_CLI_COMMAND} account list\` to check.`
       )
     }
     void cleanupOnce()

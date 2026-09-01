@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from './brand'
 import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 import {
   SKILL_BUNDLE_INSTALL_CAPABILITY,
@@ -114,6 +115,11 @@ export const AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY =
 export { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 export const AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY =
   'agent-session.host-authority.v1' as const
+// Why: older host-authority schemas reject this semantic launch override as an
+// unknown field, so clients must select the legacy command path unless the host
+// advertises support explicitly.
+export const AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY =
+  'agent-session.launch-permission.v1' as const
 export const AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY =
   'agent-session.omp-resume-path.v1' as const
 // Why: structured sessions are journal-backed, not PTY-backed, so a client that
@@ -131,15 +137,12 @@ export const STRUCTURED_AGENT_SESSION_HOLD_RUNTIME_CAPABILITY =
 export const AGENT_SESSION_KIMI_RESUME_RUNTIME_CAPABILITY = 'agent-session.kimi-resume.v1' as const
 // Why: older runtimes strip mutation owner fields, so clients must fence writes before RPC.
 export const FILE_MUTATION_OWNERSHIP_RUNTIME_CAPABILITY = 'files.mutation-ownership.v1' as const
-export const FILE_MUTATION_OWNERSHIP_UPDATE_REQUIRED_MESSAGE =
-  'Remote file changes require a newer Orca server. Update the HUB and try again.'
+export const FILE_MUTATION_OWNERSHIP_UPDATE_REQUIRED_MESSAGE = `Remote file changes require a newer ${APP_DISPLAY_NAME} server. Update the HUB and try again.`
 export const GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY = 'github.markPRReadyForReview' as const
-export const GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE =
-  'Marking a pull request ready requires a newer Orca server. Update the server and try again.'
+export const GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE = `Marking a pull request ready requires a newer ${APP_DISPLAY_NAME} server. Update the server and try again.`
 export const GITLAB_READY_FOR_REVIEW_RUNTIME_CAPABILITY =
   'gitlab.updateMR.readyForReview.v1' as const
-export const GITLAB_READY_FOR_REVIEW_UPDATE_REQUIRED_MESSAGE =
-  'Marking a merge request ready requires a newer Orca server. Update the server and try again.'
+export const GITLAB_READY_FOR_REVIEW_UPDATE_REQUIRED_MESSAGE = `Marking a merge request ready requires a newer ${APP_DISPLAY_NAME} server. Update the server and try again.`
 export const WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY =
   'worktree.visibility-defaults.v1' as const
 export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =
@@ -147,12 +150,10 @@ export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =
 // Why: older hosts drop automation.list's selector and answer with the whole authority, so a scoped client must not read that as one host's rows.
 export const AUTOMATION_LIST_HOST_SCOPE_RUNTIME_CAPABILITY =
   'automation.list-host-scope.v1' as const
-export const AUTOMATION_LIST_HOST_SCOPE_UPDATE_REQUIRED_MESSAGE =
-  'Filtering automations by host requires a newer Orca server. Update the HUB and try again.'
+export const AUTOMATION_LIST_HOST_SCOPE_UPDATE_REQUIRED_MESSAGE = `Filtering automations by host requires a newer ${APP_DISPLAY_NAME} server. Update the HUB and try again.`
 // Why: without server-side owner preconditions a mutation could run against a host the user never saw, so unfenced rows stay view-only.
 export const AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY = 'automation.owner-fencing.v1' as const
-export const AUTOMATION_OWNER_FENCING_UPDATE_REQUIRED_MESSAGE =
-  'Editing automations on this host requires a newer Orca server. Update the HUB and try again.'
+export const AUTOMATION_OWNER_FENCING_UPDATE_REQUIRED_MESSAGE = `Editing automations on this host requires a newer ${APP_DISPLAY_NAME} server. Update the HUB and try again.`
 export const AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY =
   'automation.create-idempotency.v1' as const
 
@@ -215,6 +216,7 @@ export const RUNTIME_CAPABILITIES = [
   AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
   REMOTE_SERVER_UPDATE_CAPABILITY,
   AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY,
+  AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
   AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_HOLD_RUNTIME_CAPABILITY,

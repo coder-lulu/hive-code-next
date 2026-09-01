@@ -1,25 +1,16 @@
+import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import type { ProjectExecutionRuntimeResolution } from '../../../shared/project-execution-runtime'
-import { isWslUncPath } from '../../../shared/wsl-paths'
-import { splitWorktreeIdForFilesystem } from '../../../shared/worktree/id'
 
-export type OrchestrationCliCommand = 'orca' | 'orca-ide'
+export type OrchestrationCliCommand = typeof PRIMARY_CLI_COMMAND | 'orca' | 'orca-ide'
 
-export function resolveTerminalOrchestrationCliCommand(args: {
+export function resolveTerminalOrchestrationCliCommand(_args: {
   connectionId: string | null
   isWsl: boolean | null | undefined
   worktreeId: string
   projectRuntime?: ProjectExecutionRuntimeResolution
 }): OrchestrationCliCommand {
-  if (args.connectionId) {
-    return 'orca'
-  }
-  if (args.isWsl !== null && args.isWsl !== undefined) {
-    return args.isWsl ? 'orca-ide' : 'orca'
-  }
-  if (args.projectRuntime?.status === 'resolved' && args.projectRuntime.runtime.kind === 'wsl') {
-    return 'orca-ide'
-  }
-
-  const worktreePath = splitWorktreeIdForFilesystem(args.worktreeId)?.worktreePath
-  return worktreePath && isWslUncPath(worktreePath) ? 'orca-ide' : 'orca'
+  // The primary launcher is now installed on every supported host, including
+  // WSL. Legacy names remain accepted aliases, but new agent instructions must
+  // not advertise them.
+  return PRIMARY_CLI_COMMAND
 }

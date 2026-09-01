@@ -16,6 +16,9 @@
 #
 set -euo pipefail
 
+echo "error: GitHub dev-channel publishing is retired; configure a HiveCloud token and OSS service instead." >&2
+exit 1
+
 ORG="stablyai"
 ADHOC_REPO="$ORG/orca-adhoc"
 MAIN_REPO="$ORG/orca"

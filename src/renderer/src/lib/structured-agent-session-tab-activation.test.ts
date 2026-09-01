@@ -86,4 +86,44 @@ describe('activateStructuredAgentSessionTab', () => {
       { worktree: 'id:wt-1', tabId: 'agent-session:session-1' }
     )
   })
+
+  it('activates a host-qualified tab bucket without leaking the host into runtime ids', () => {
+    const tab = (mocks.state.unifiedTabsByWorktree as Record<string, Tab[]>)['wt-1'][0]
+    mocks.state.unifiedTabsByWorktree = {
+      'runtime:host-a|wt-1': [{ ...tab, worktreeId: 'wt-1' }]
+    }
+
+    expect(
+      activateStructuredAgentSessionTab({
+        worktreeId: 'wt-1',
+        tabId: tab.id,
+        executionHostId: 'runtime:host-a'
+      })
+    ).toBe(true)
+    expect(mocks.focusGroup).toHaveBeenCalledWith('runtime:host-a|wt-1', 'group-1')
+    expect(mocks.activateTab).toHaveBeenCalledWith(tab.id, {
+      worktreeId: 'runtime:host-a|wt-1'
+    })
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-1' },
+      'session.tabs.activate',
+      { worktree: 'id:wt-1', tabId: 'agent-session:session-1' }
+    )
+  })
+
+  it('treats an unqualified raw bucket as the local execution host', () => {
+    expect(
+      activateStructuredAgentSessionTab({
+        worktreeId: 'wt-1',
+        tabId: 'structured-tab-1',
+        executionHostId: 'local'
+      })
+    ).toBe(true)
+
+    expect(mocks.focusGroup).toHaveBeenCalledWith('wt-1', 'group-1')
+    expect(mocks.activateTab).toHaveBeenCalledWith('structured-tab-1', {
+      worktreeId: 'wt-1'
+    })
+    expect(mocks.setActiveTabType).toHaveBeenCalledWith('agent-session')
+  })
 })

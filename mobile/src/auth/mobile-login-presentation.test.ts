@@ -9,9 +9,24 @@ import {
 const configuration: MobileLoginConfiguration = {
   registrationEnabled: true,
   providers: [
-    { id: 'github', enabled: true, accessibilityLabel: '使用 GitHub 登录' },
-    { id: 'wechat', enabled: false, accessibilityLabel: '使用微信登录' },
-    { id: 'qq', enabled: true, accessibilityLabel: '使用 QQ 登录' }
+    {
+      id: 'github',
+      enabled: true,
+      accessibilityLabel: '使用 GitHub 登录',
+      authorizationPath: '/hive/v1/auth/provider-authorizations/github'
+    },
+    {
+      id: 'wechat',
+      enabled: false,
+      accessibilityLabel: '使用微信登录',
+      authorizationPath: '/hive/v1/auth/provider-authorizations/wechat'
+    },
+    {
+      id: 'qq',
+      enabled: true,
+      accessibilityLabel: '使用 QQ 登录',
+      authorizationPath: '/hive/v1/auth/provider-authorizations/qq'
+    }
   ]
 }
 
@@ -57,5 +72,8 @@ describe('mobile login presentation', () => {
       expect(route).not.toContain(prohibited)
     }
     expect(layout).toContain("presentation: 'transparentModal'")
+    expect(route).not.toContain('mobileLoginMockupConfiguration')
+    expect(route).toContain('loadMobileLoginConfiguration')
+    expect(layout).toContain('completeMobileProviderLogin')
   })
 })

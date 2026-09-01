@@ -6,6 +6,7 @@ import {
 } from '../../../../../shared/updater-windows-signature-check'
 import { getReleaseNotesUrlForVersion } from '../../../../../shared/release-channel'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { isHttp2ProtocolError } from './update-card-visibility'
 
 export function buildUpdateCardErrorModel({
@@ -72,7 +73,7 @@ export function buildUpdateCardErrorModel({
     return {
       variant: 'http1Compatibility',
       title: translate('auto.components.UpdateCard.1339b82cee', 'HTTP/2 Download Blocked'),
-      summary: 'Orca can retry through HTTP/1.1 compatibility mode.',
+      summary: `${APP_DISPLAY_NAME} can retry through HTTP/1.1 compatibility mode.`,
       explainer: translate(
         'auto.components.UpdateCard.90559b14e3',
         'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
@@ -93,7 +94,7 @@ export function buildUpdateCardErrorModel({
       title: translate('auto.components.UpdateCard.5b309b19f3', "Update Wasn't Installed"),
       summary: translate(
         'auto.components.UpdateCard.092f09fc14',
-        "The installer's publisher doesn't match Orca, so we stopped the update. Don't install this download; check official releases for a corrected version."
+        `The installer's publisher doesn't match ${APP_DISPLAY_NAME}, so we stopped the update. Don't install this download; check official releases for a corrected version.`
       ),
       detail: status.message,
       releaseUrl: getReleaseNotesUrlForVersion(null) ?? undefined,

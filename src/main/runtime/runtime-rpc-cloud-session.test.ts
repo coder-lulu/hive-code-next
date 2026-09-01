@@ -40,9 +40,9 @@ describe('OrcaRuntimeRpcServer Cloud-managed session dispatch', () => {
       enableWebSocket: false
     })
     const revalidateSession = vi.fn().mockReturnValue(true)
-    server['cloudWebLaunchService'] = {
+    server.setCloudWebLaunchService({
       revalidateSession
-    } as unknown as HiveRuntimeCloudWebLaunchService
+    } as unknown as HiveRuntimeCloudWebLaunchService)
     const replies: Record<string, unknown>[] = []
 
     await server['handleWebSocketMessage'](
@@ -69,9 +69,9 @@ describe('OrcaRuntimeRpcServer Cloud-managed session dispatch', () => {
         enableWebSocket: false
       })
       const revalidateSession = vi.fn().mockReturnValue(true)
-      server['cloudWebLaunchService'] = {
+      server.setCloudWebLaunchService({
         revalidateSession
-      } as unknown as HiveRuntimeCloudWebLaunchService
+      } as unknown as HiveRuntimeCloudWebLaunchService)
       const replies: Record<string, unknown>[] = []
 
       await server['handleWebSocketMessage'](
@@ -92,4 +92,60 @@ describe('OrcaRuntimeRpcServer Cloud-managed session dispatch', () => {
       })
     }
   )
+
+  it('fails closed when the Cloud session is no longer current', async () => {
+    const server = new OrcaRuntimeRpcServer({
+      runtime: new OrcaRuntimeService(),
+      userDataPath: mkdtempSync(join(tmpdir(), 'hive-cloud-rpc-')),
+      enableWebSocket: false
+    })
+    server.setCloudWebLaunchService({
+      revalidateSession: vi.fn().mockReturnValue(false)
+    } as unknown as HiveRuntimeCloudWebLaunchService)
+    const replies: Record<string, unknown>[] = []
+
+    await server['handleWebSocketMessage'](
+      JSON.stringify({ id: 'cloud-expired', method: 'status.get' }),
+      (response) => replies.push(JSON.parse(response) as Record<string, unknown>),
+      () => {},
+      undefined,
+      undefined,
+      null,
+      undefined,
+      cloudSocket()
+    )
+
+    expect(replies[0]).toMatchObject({
+      ok: false,
+      error: { code: 'unauthorized' }
+    })
+  })
+
+  it('keeps Cloud ownership RPCs local-only', async () => {
+    const server = new OrcaRuntimeRpcServer({
+      runtime: new OrcaRuntimeService(),
+      userDataPath: mkdtempSync(join(tmpdir(), 'hive-cloud-rpc-')),
+      enableWebSocket: false
+    })
+    server.setCloudWebLaunchService({
+      revalidateSession: vi.fn().mockReturnValue(true)
+    } as unknown as HiveRuntimeCloudWebLaunchService)
+    const replies: Record<string, unknown>[] = []
+
+    await server['handleWebSocketMessage'](
+      JSON.stringify({ id: 'cloud-local-only', method: 'cloudRuntime.status' }),
+      (response) => replies.push(JSON.parse(response) as Record<string, unknown>),
+      () => {},
+      undefined,
+      undefined,
+      null,
+      undefined,
+      cloudSocket()
+    )
+
+    expect(replies[0]).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' }
+    })
+  })
 })

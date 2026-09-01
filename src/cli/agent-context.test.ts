@@ -63,6 +63,15 @@ describe('buildAgentContext', () => {
     expect(agentContext?.aliases).toEqual([])
     expect(agentContext?.examples).toEqual([])
   })
+
+  it('publishes the primary hive command instead of compatibility aliases', () => {
+    const schema = buildAgentContext(specs)
+    expect(schema.commands.map((command) => command.usage)).toEqual([
+      'hive agent-context',
+      'hive worktree rm'
+    ])
+    expect(formatAgentContextSummary(schema)).toContain('`hive agent-context --json`')
+  })
 })
 
 describe('agent-context over the live registry', () => {

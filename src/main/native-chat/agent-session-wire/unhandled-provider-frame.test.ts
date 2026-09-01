@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { projectStructuredItemToNativeChat } from '../../../shared/structured-agent-session-projection'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { unhandledProviderFrameJournalItem } from './unhandled-provider-frame'
 
 describe('unhandled provider frame journal fallback', () => {
@@ -207,7 +208,7 @@ describe('unhandled provider frame journal fallback', () => {
     )
 
     expect(row?.body.text).toContain('abcdefgh')
-    expect(row?.body.text).toContain('[Orca: output truncated')
+    expect(row?.body.text).toContain(`[${APP_DISPLAY_NAME}: output truncated`)
   })
 
   it('unwraps a nested sentence and falls back to the opcode when there is none', () => {

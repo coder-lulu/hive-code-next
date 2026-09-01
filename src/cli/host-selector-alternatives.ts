@@ -1,4 +1,5 @@
 import type { RuntimeClient } from './runtime-client'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 export type SshTargetSummary = { id: string; label: string }
 export type EnvironmentSummary = { id: string; name: string }
@@ -82,12 +83,12 @@ export function crossKindNextSteps(
   const environment = findEnvironmentByName(alternatives.environments, name)
   if (requested !== 'ssh' && ssh) {
     steps.push(
-      `"${name}" is an SSH target on this Orca host, not a paired server. Use --host ssh:${ssh.id}.`
+      `"${name}" is an SSH target on this ${APP_DISPLAY_NAME} host, not a paired server. Use --host ssh:${ssh.id}.`
     )
   }
   if (requested !== 'environment' && environment) {
     steps.push(
-      `"${name}" is a paired Orca server, not an SSH target. Use --environment ${environment.name}.`
+      `"${name}" is a paired ${APP_DISPLAY_NAME} server, not an SSH target. Use --environment ${environment.name}.`
     )
   }
   return steps
@@ -144,7 +145,7 @@ export async function resolveSshHostTargetId(
   }
   throw new RuntimeClientError(
     'invalid_argument',
-    `Unknown SSH target in --host ssh:${targetId}: this Orca host has no SSH target named or with id ${targetId}.`,
+    `Unknown SSH target in --host ssh:${targetId}: this ${APP_DISPLAY_NAME} host has no SSH target named or with id ${targetId}.`,
     {
       knownSshTargets: targets,
       knownEnvironments: environments,
@@ -152,7 +153,7 @@ export async function resolveSshHostTargetId(
         ...crossKindNextSteps(targetId, { sshTargets: targets, environments }, 'ssh'),
         ...(targets.length > 0
           ? [`Known SSH targets: ${targets.map((target) => target.label).join(', ')}.`]
-          : ['This Orca host has no SSH targets registered.'])
+          : [`This ${APP_DISPLAY_NAME} host has no SSH targets registered.`])
       ]
     }
   )

@@ -16,8 +16,8 @@ import {
   MobileIconButton,
   MobileScreenHeader
 } from '../src/components/ui'
-import { loadHosts } from '../src/transport/host-store'
-import type { HostProfile } from '../src/transport/types'
+import { useAccountVisibleHostCatalog } from '../src/runtime-directory/use-account-visible-host-catalog'
+import { selectConnectableHostProfiles } from '../src/transport/host-catalog-selection'
 import { useFocusedSettingsHostClients } from '../src/transport/settings-host-client-connections'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { PickerModal, type PickerOption } from '../src/components/PickerModal'
@@ -129,10 +129,8 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets()
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createTerminalSettingsScreenStyles)
-  const [hosts, setHosts] = useState<HostProfile[]>([])
-  useEffect(() => {
-    void loadHosts().then(setHosts)
-  }, [])
+  const { catalog: hostCatalog } = useAccountVisibleHostCatalog()
+  const hosts = useMemo(() => selectConnectableHostProfiles(hostCatalog), [hostCatalog])
   const hostIds = useMemo(() => hosts.map((host) => host.id), [hosts])
   const { clients: hostClients } = useFocusedSettingsHostClients(hostIds)
   const hostClientsById = useMemo(

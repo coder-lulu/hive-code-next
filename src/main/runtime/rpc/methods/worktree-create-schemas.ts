@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
+import { supportsTuiAgentLaunchPermission } from '../../../../shared/tui-agent-permissions'
 import { workspaceSourceSchema } from '../../../../shared/telemetry-events'
 import { sleepingAgentLaunchConfigSchema } from '../../../../shared/workspace-session-sleeping-agents'
 import { RUNTIME_NAVIGATION_TARGETS } from '../../../../shared/runtime-navigation'
@@ -104,10 +105,20 @@ export const WorktreeCreate = z
     startupCommand: OptionalString,
     startupEnv: z.record(z.string(), z.string()).optional(),
     startupLaunchConfig: sleepingAgentLaunchConfigSchema,
+    startupLaunchToken: z.string().min(1).max(128).optional(),
     startupCommandDelivery: z.enum(['fast', 'shell-ready']).optional(),
     // Why: CLI clients should not hardcode agent launch quoting because SSH
     // workspaces execute in a different shell than the client process.
     startupAgent: OptionalTuiAgent,
+    startupPermissionMode: z.enum(['manual', 'yolo']).optional(),
+    startupLaunchPreferences: z
+      .object({
+        model: z.string().trim().min(1).max(512).optional(),
+        effort: z.string().trim().min(1).max(512).optional(),
+        mode: z.string().trim().min(1).max(512).optional()
+      })
+      .strict()
+      .optional(),
     startupPrompt: OptionalString,
     // Why: task-driven mobile creates need desktop parity: the host chooses
     // the same default/detected agent and drafts the linked issue/PR URL into it.
@@ -140,6 +151,38 @@ export const WorktreeCreate = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'startupPrompt requires startupAgent'
+      })
+    }
+    if (
+      params.startupPermissionMode !== undefined &&
+      params.startupAgent === undefined &&
+      params.startupDraft === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'startupPermissionMode requires an agent startup'
+      })
+    }
+    if (
+      params.startupLaunchPreferences !== undefined &&
+      params.startupAgent === undefined &&
+      params.startupDraft === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'startupLaunchPreferences requires an agent startup'
+      })
+    }
+    const permissionAgent = params.startupAgent ?? params.createdWithAgent
+    if (
+      params.startupPermissionMode !== undefined &&
+      permissionAgent !== undefined &&
+      !supportsTuiAgentLaunchPermission(permissionAgent)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['startupPermissionMode'],
+        message: 'This agent does not support an explicit launch permission mode'
       })
     }
   })

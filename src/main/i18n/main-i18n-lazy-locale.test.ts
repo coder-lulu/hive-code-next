@@ -39,6 +39,15 @@ describe('main-i18n lazy locale loading', () => {
     expect(translateMain('menu.settings', 'Settings')).toBe('Settings')
   })
 
+  it('does not rewrite values interpolated into branded static copy', () => {
+    expect(
+      translateMain('missing.main.dynamicProductData', 'Project "{{name}}" is ready at {{url}}.', {
+        name: 'orca status',
+        url: 'https://orca.dev'
+      })
+    ).toBe('Project "orca status" is ready at https://orca.dev.')
+  })
+
   it('lazy-loads the Spanish catalog before changeLanguage resolves', async () => {
     const locale = await setMainUiLanguage(UI_LANGUAGE_SPANISH)
     expect(locale).toBe('es')

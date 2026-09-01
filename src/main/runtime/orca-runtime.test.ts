@@ -27,7 +27,7 @@ import type { WorkspaceLineage, WorktreeLineage } from '../../shared/worktree/li
 import type { WorktreeMeta } from '../../shared/worktree/meta-types'
 import type { Worktree } from '../../shared/worktree/types'
 import { AGENT_STATUS_STALE_AFTER_MS } from '../../shared/agent-status-types'
-import { applyProductBranding } from '../../shared/brand'
+import { applyProductBranding, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   reviewHeadRemoteRefComponent,
   REVIEW_HEAD_FETCH_TIMEOUT_MS
@@ -6677,6 +6677,7 @@ describe('OrcaRuntimeService', () => {
         repoSelector: TEST_REPO_ID,
         name: 'agent-feature',
         startupAgent: 'codex',
+        startupLaunchToken: 'remote-agent-launch-token',
         startupPrompt: 'hi',
         activate: true
       })
@@ -6685,6 +6686,9 @@ describe('OrcaRuntimeService', () => {
         expect.objectContaining({
           cwd: '/remote/agent-feature',
           command: "codex '--dangerously-bypass-approvals-and-sandbox' 'hi'",
+          env: expect.objectContaining({
+            ORCA_AGENT_LAUNCH_TOKEN: 'remote-agent-launch-token'
+          }),
           worktreeId: result.worktree.id
         })
       )
@@ -16403,7 +16407,9 @@ describe('OrcaRuntimeService', () => {
       })
       expect(created.warning).toContain('Renderer timed out')
       expect(created.warning).toContain('could not make it discoverable')
-      expect(created.warning).toContain(`orca terminal focus --terminal ${created.handle}`)
+      expect(created.warning).toContain(
+        `${PRIMARY_CLI_COMMAND} terminal focus --terminal ${created.handle}`
+      )
       const spawnCall = spawn.mock.calls[0]?.[0] as { env?: Record<string, string> } | undefined
       const spawnedEnv = spawnCall?.env ?? {}
       expectStablePaneKeyEnv(spawnedEnv)
@@ -16442,7 +16448,9 @@ describe('OrcaRuntimeService', () => {
       handle: expect.stringMatching(/^term_/)
     })
     expect(created.warning).toContain('could not make it discoverable')
-    expect(created.warning).toContain(`orca terminal focus --terminal ${created.handle}`)
+    expect(created.warning).toContain(
+      `${PRIMARY_CLI_COMMAND} terminal focus --terminal ${created.handle}`
+    )
   })
 
   it('does not warn when background presentation has no renderer notifier', async () => {
@@ -20964,7 +20972,7 @@ describe('OrcaRuntimeService', () => {
       await vi.advanceTimersByTimeAsync(500)
 
       const firstInjections = write.mock.calls.filter(
-        (c) => typeof c[1] === 'string' && c[1].includes('orca orchestration check')
+        (c) => typeof c[1] === 'string' && c[1].includes('hive orchestration check')
       ).length
       expect(firstInjections).toBe(1)
 
@@ -20973,7 +20981,7 @@ describe('OrcaRuntimeService', () => {
       await vi.advanceTimersByTimeAsync(500)
 
       const totalInjections = write.mock.calls.filter(
-        (c) => typeof c[1] === 'string' && c[1].includes('orca orchestration check')
+        (c) => typeof c[1] === 'string' && c[1].includes('hive orchestration check')
       ).length
       expect(totalInjections).toBe(1)
       db.close()
@@ -36465,7 +36473,7 @@ describe('OrcaRuntimeService', () => {
       runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 101)
       expect(write).toHaveBeenCalledWith(
         'pty-1',
-        '\nYou have 1 orchestration message. Run `orca orchestration check --run run_mailbox`.\n'
+        '\nYou have 1 orchestration message. Run `hive orchestration check --run run_mailbox`.\n'
       )
       expect(write).not.toHaveBeenCalledWith(
         'pty-1',
@@ -36481,7 +36489,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       db.close()
@@ -36541,7 +36549,7 @@ describe('OrcaRuntimeService', () => {
       const pointers = () =>
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       expect(pointers()).toHaveLength(1)
       expect(pointers()[0]?.[1]).toContain('You have 1 orchestration message')
@@ -36718,7 +36726,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       expect(pendingMailPointerRepoints(runtime)).toBe(0)
@@ -36830,7 +36838,7 @@ describe('OrcaRuntimeService', () => {
     await vi.waitFor(() => {
       expect(write).toHaveBeenCalledWith(
         'pty-1',
-        '\nYou have 1 orchestration message. Run `orca orchestration check --run run_codex_native_title`.\n'
+        '\nYou have 1 orchestration message. Run `hive orchestration check --run run_codex_native_title`.\n'
       )
     })
     db.close()
@@ -37057,7 +37065,7 @@ describe('OrcaRuntimeService', () => {
         .map(([, data]) => data)
         .filter((data): data is string => typeof data === 'string')
       expect(payloads).toContain(
-        '\nYou have 1 orchestration message. Run `orca orchestration check --run run_test`.\n'
+        '\nYou have 1 orchestration message. Run `hive orchestration check --run run_test`.\n'
       )
       expect(payloads.some((data) => data.includes('reserved completion'))).toBe(false)
       expect(status.delivered_at).toEqual(expect.any(String))
@@ -37428,7 +37436,7 @@ describe('OrcaRuntimeService', () => {
       await Promise.resolve()
 
       const pointerWrites = write.mock.calls.filter(
-        ([, payload]) => typeof payload === 'string' && payload.includes('orca orchestration check')
+        ([, payload]) => typeof payload === 'string' && payload.includes('hive orchestration check')
       )
       expect(pointerWrites).toHaveLength(1)
 
@@ -37440,7 +37448,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       db.close()
@@ -37482,7 +37490,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       expect(second.delivered_at).toBeNull()
@@ -37496,7 +37504,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(2)
       expect(write).toHaveBeenCalledWith(
@@ -46636,6 +46644,15 @@ describe('OrcaRuntimeService', () => {
       })
     ).rejects.toThrow('Selected agent is disabled. Choose an enabled agent before creating.')
 
+    await expect(
+      runtime.createManagedWorktree({
+        repoSelector: TEST_REPO_ID,
+        name: 'disabled-semantic-startup',
+        startupAgent: 'codex',
+        startupPermissionMode: 'manual'
+      })
+    ).rejects.toThrow('Selected agent is disabled. Choose an enabled agent before creating.')
+
     expect(spawn).not.toHaveBeenCalled()
     expect(addWorktree).not.toHaveBeenCalled()
   })
@@ -47202,6 +47219,7 @@ describe('OrcaRuntimeService', () => {
       name: 'runtime-explicit-draft',
       startupDraft: draftUrl,
       createdWithAgent: 'codex',
+      startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high' },
       activate: true
     })
 
@@ -47210,7 +47228,8 @@ describe('OrcaRuntimeService', () => {
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/tmp/workspaces/runtime-explicit-draft',
-        command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+        command:
+          "codex '--dangerously-bypass-approvals-and-sandbox' '-m' 'gpt-5.6-sol' '-c' 'model_reasoning_effort=high'",
         worktreeId: result.worktree.id
       })
     )

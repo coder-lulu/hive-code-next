@@ -1,6 +1,7 @@
 import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime-tailscale-hint'
 import { createWebRuntimeUnauthorizedError } from './web-runtime-client-error'
 import type { WebRuntimeConnectionState } from './web-runtime-connection-frame-router'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type WebRuntimeConnectionWaiterOptions = {
   endpoint: string
@@ -21,7 +22,7 @@ export class WebRuntimeConnectionWaiters {
       return Promise.reject(createWebRuntimeUnauthorizedError())
     }
     if (this.options.isIntentionallyClosed()) {
-      return Promise.reject(new Error('Remote Orca runtime connection closed.'))
+      return Promise.reject(new Error(`Remote ${APP_DISPLAY_NAME} runtime connection closed.`))
     }
     return new Promise((resolve, reject) => {
       const timeout = window.setTimeout(() => {
@@ -32,7 +33,7 @@ export class WebRuntimeConnectionWaiters {
         reject(
           new Error(
             withRemoteRuntimeTailscaleHint(
-              'Timed out while connecting to the remote Orca runtime.',
+              `Timed out while connecting to the remote ${APP_DISPLAY_NAME} runtime.`,
               this.options.endpoint
             )
           )
@@ -61,7 +62,7 @@ export class WebRuntimeConnectionWaiters {
     this.rejectAll(
       new Error(
         withRemoteRuntimeTailscaleHint(
-          'Could not connect to the remote Orca runtime.',
+          `Could not connect to the remote ${APP_DISPLAY_NAME} runtime.`,
           this.options.endpoint
         )
       )

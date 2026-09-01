@@ -65,17 +65,28 @@ export function buildManagedWorktreeCreateArgs(
     setupDecision: params.setupDecision,
     createdWithAgent: params.createdWithAgent ?? params.startupAgent,
     ...provenance,
-    startup: params.startupCommand
-      ? {
-          command: params.startupCommand,
-          ...(params.startupEnv ? { env: params.startupEnv } : {}),
-          ...(params.startupLaunchConfig ? { launchConfig: params.startupLaunchConfig } : {}),
-          ...(params.startupCommandDelivery
-            ? { startupCommandDelivery: params.startupCommandDelivery }
-            : {})
-        }
-      : undefined,
+    startup:
+      params.startupCommand && !params.startupPermissionMode
+        ? {
+            command: params.startupCommand,
+            ...(params.startupEnv ? { env: params.startupEnv } : {}),
+            ...(params.startupLaunchConfig ? { launchConfig: params.startupLaunchConfig } : {}),
+            ...(params.startupLaunchToken ? { launchToken: params.startupLaunchToken } : {}),
+            ...(params.startupCommandDelivery
+              ? { startupCommandDelivery: params.startupCommandDelivery }
+              : {})
+          }
+        : undefined,
     ...(params.startupAgent ? { startupAgent: params.startupAgent } : {}),
+    ...(params.startupLaunchPreferences
+      ? { startupLaunchPreferences: params.startupLaunchPreferences }
+      : {}),
+    ...(params.startupPermissionMode
+      ? { startupPermissionMode: params.startupPermissionMode }
+      : {}),
+    ...(params.startupLaunchToken && params.startupPermissionMode
+      ? { startupLaunchToken: params.startupLaunchToken }
+      : {}),
     ...(params.startupPrompt !== undefined ? { startupPrompt: params.startupPrompt } : {}),
     startupDraft: params.startupDraft,
     lineage: {

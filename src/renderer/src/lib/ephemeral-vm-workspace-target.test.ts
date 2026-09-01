@@ -4,6 +4,7 @@ import {
   type PrepareEphemeralVmWorkspaceTargetArgs
 } from './ephemeral-vm-workspace-target'
 import type { ProjectHostSetupResult } from '../../../shared/project-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   assertRuntimeEnvironmentCapability: vi.fn()
@@ -227,7 +228,7 @@ describe('prepareEphemeralVmWorkspaceTarget', () => {
 
   it('cleans up the runtime when required project setup capability is missing', async () => {
     vi.mocked(assertRuntimeEnvironmentCapability).mockRejectedValue(
-      new Error('The recipe-created Orca server does not support project setup.')
+      new Error(`The recipe-created ${APP_DISPLAY_NAME} server does not support project setup.`)
     )
     vi.mocked(window.api.ephemeralVm.provision).mockResolvedValue({
       ok: true,
@@ -274,13 +275,13 @@ describe('prepareEphemeralVmWorkspaceTarget', () => {
     expect(assertRuntimeEnvironmentCapability).toHaveBeenCalledWith(
       'env-1',
       'project-host-setup.v1',
-      'The recipe-created Orca server does not support project setup.'
+      `The recipe-created ${APP_DISPLAY_NAME} server does not support project setup.`
     )
     expect(setupExistingFolder).not.toHaveBeenCalled()
     expect(window.api.ephemeralVm.cleanup).toHaveBeenCalledWith({ runtimeId: 'runtime-1' })
     expect(result).toEqual({
       ok: false,
-      error: 'The recipe-created Orca server does not support project setup.',
+      error: `The recipe-created ${APP_DISPLAY_NAME} server does not support project setup.`,
       stderr: 'creating sandbox'
     })
   })

@@ -69,6 +69,7 @@ describe('release channel', () => {
     expect(getVersionChannel('1.4.160')).toBe('stable')
     expect(getVersionChannel('v1.4.160')).toBe('stable')
     expect(getVersionChannel('1.4.160-rc.3')).toBe('rc')
+    expect(getVersionChannel('1.5.0-beta.1')).toBe('beta')
     expect(getVersionChannel('1.4.160-hourly.202607281400')).toBe('hourly')
     expect(getVersionChannel('1.4.160-daily.202607281300')).toBe('daily')
     expect(getVersionChannel('1.4.160-adhoc.20260728140533')).toBe('adhoc')
@@ -262,11 +263,13 @@ describe('release channel', () => {
   })
 
   it('accepts only configured product channels at runtime', () => {
-    expect(RELEASE_CHANNELS).toEqual(['stable', 'rc'])
+    expect(RELEASE_CHANNELS).toEqual(['internal', 'stable', 'beta', 'rc'])
     expect(isReleaseChannel('hourly')).toBe(false)
     expect(isReleaseChannel('daily')).toBe(false)
     expect(isReleaseChannel('adhoc')).toBe(false)
     expect(isReleaseChannel('stable')).toBe(true)
+    expect(isReleaseChannel('beta')).toBe(true)
+    expect(isReleaseChannel('internal')).toBe(true)
     expect(isReleaseChannel('nightly')).toBe(false)
     expect(isReleaseChannel(null)).toBe(false)
     expect(isReleaseChannel(undefined)).toBe(false)

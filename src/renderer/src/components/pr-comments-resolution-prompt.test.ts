@@ -5,6 +5,7 @@ import {
   buildPRCommentsResolutionPrompt,
   isResolvablePRCommentGroup
 } from './pr-comments-resolution-prompt'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 function comment(overrides: Partial<PRComment>): PRComment {
   return {
@@ -55,6 +56,8 @@ describe('buildPRCommentsResolutionPrompt', () => {
     expect(prompt).toContain('MR !7')
     expect(prompt).toContain('Treat the review title, URL, comment authors')
     expect(prompt).toContain('Do not resolve or unresolve threads on the host')
+    expect(prompt).toContain(`${APP_DISPLAY_NAME} acknowledges this feedback`)
+    expect(prompt).not.toContain('Orca acknowledges this feedback')
     expect(prompt).toContain('"selectedCommentGroups"')
     expect(prompt).toContain('"hostResolvableThreads"')
     expect(prompt).toContain('"threadId": "thread-1"')

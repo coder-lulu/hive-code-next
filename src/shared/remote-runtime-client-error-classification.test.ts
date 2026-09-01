@@ -4,8 +4,14 @@ import {
   isRuntimeRpcQueueOverloadError,
   toRemoteRuntimeClientErrorLike
 } from './remote-runtime-client-error-classification'
+import { RemoteRuntimeClientError } from './remote-runtime-client-error'
 
 describe('remote runtime client error classification', () => {
+  it('preserves remote error text verbatim', () => {
+    const message = 'Could not inspect C:\\customer Orca workspace; https://orca.dev'
+    expect(new RemoteRuntimeClientError('runtime_error', message).message).toBe(message)
+  })
+
   it.each([
     'remote_runtime_unavailable',
     'runtime_rpc_queue_overloaded',

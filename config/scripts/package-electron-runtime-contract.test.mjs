@@ -172,7 +172,7 @@ describe('Electron runtime package contract', () => {
       ])
     )
     const macReleaseCommand = macWorkflow.jobs['build-mac'].steps.find(
-      (step) => step.name === 'Publish release artifacts (macOS)'
+      (step) => step.name === 'Build release artifacts (macOS)'
     ).with.command
 
     expect([...releaseCommands.keys()].sort()).toEqual(['linux-arm64', 'linux-x64', 'win'])
@@ -214,12 +214,12 @@ describe('Electron runtime package contract', () => {
 
     assertFaultGate(
       releaseWorkflow.jobs.build.steps,
-      'Publish release artifacts (Linux)',
+      'Build release artifacts (Linux)',
       "runner.os == 'Linux'"
     )
     assertFaultGate(
       macWorkflow.jobs['build-mac'].steps,
-      'Publish release artifacts (macOS)',
+      'Build release artifacts (macOS)',
       undefined
     )
   })
@@ -262,8 +262,8 @@ describe('Electron runtime package contract', () => {
       expect(names.indexOf(gate.name)).toBeLessThan(names.indexOf(publishStepName))
     }
 
-    assertRelayGate(releaseWorkflow.jobs.build.steps, 'Publish release artifacts (Linux)')
-    assertRelayGate(macWorkflow.jobs['build-mac'].steps, 'Publish release artifacts (macOS)')
+    assertRelayGate(releaseWorkflow.jobs.build.steps, 'Build release artifacts (Linux)')
+    assertRelayGate(macWorkflow.jobs['build-mac'].steps, 'Build release artifacts (macOS)')
     const releaseNames = releaseWorkflow.jobs.build.steps.map((step) => step.name)
     expect(releaseNames.indexOf('Gate SSH relay watcher process isolation')).toBeLessThan(
       releaseNames.indexOf('Build Windows release artifacts')
@@ -333,7 +333,7 @@ describe('Electron runtime package contract', () => {
     const buildMacJob = releaseMacWorkflow.jobs['build-mac']
     const checkoutStep = buildMacJob.steps.find((step) => step.name === 'Checkout')
     const publishStep = buildMacJob.steps.find(
-      (step) => step.name === 'Publish release artifacts (macOS)'
+      (step) => step.name === 'Build release artifacts (macOS)'
     )
 
     expect(releaseMacWorkflow['run-name']).toBe(
@@ -345,7 +345,7 @@ describe('Electron runtime package contract', () => {
     expect(checkoutStep.with.ref).toBe('refs/tags/${{ inputs.tag }}')
     expect(publishStep.with.command).toContain('ORCA_MAC_RELEASE=1')
     expect(publishStep.with.command).toContain('electron-builder')
-    expect(publishStep.with.command).toContain('--mac --publish always')
+    expect(publishStep.with.command).toContain('--mac --publish never')
     expect(releaseMacWorkflowText).not.toContain('signpath/')
     expect(releaseMacWorkflowText).not.toContain('SIGNPATH_')
   })
@@ -357,7 +357,7 @@ describe('Electron runtime package contract', () => {
     )
     const parsedWorkflow = parse(releaseWorkflow)
     const publishLinuxStep = parsedWorkflow.jobs.build.steps.find(
-      (step) => step.name === 'Publish release artifacts (Linux)'
+      (step) => step.name === 'Build release artifacts (Linux)'
     )
 
     expect(publishLinuxStep.if).toContain("matrix.platform == 'linux-x64'")

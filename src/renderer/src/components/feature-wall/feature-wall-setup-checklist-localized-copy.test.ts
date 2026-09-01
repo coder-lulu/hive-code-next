@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { FEATURE_WALL_SETUP_STEPS } from '../../../../shared/feature-wall-setup-steps'
 import { getLocalizedFeatureWallSetupChecklistCopy } from './feature-wall-setup-checklist-localized-copy'
-import ko from '../../i18n/locales/ko.json'
 import en from '../../i18n/locales/en.json'
+import es from '../../i18n/locales/es.json'
+import ja from '../../i18n/locales/ja.json'
+import ko from '../../i18n/locales/ko.json'
+import zh from '../../i18n/locales/zh.json'
+
+const localizedCatalogs = { es, ja, ko, zh }
 
 describe('feature-wall-setup-checklist-localized-copy', () => {
   it('returns non-empty localized name and description for all setup checklist steps', () => {
@@ -13,14 +18,20 @@ describe('feature-wall-setup-checklist-localized-copy', () => {
     }
   })
 
-  it('has valid Korean and English catalog entries for all setup checklist steps', () => {
-    const enKeys = en.auto.components.feature.wall.feature.wall.setup.checklist.localized.copy
-    const koKeys = ko.auto.components.feature.wall.feature.wall.setup.checklist.localized.copy
-    expect(Object.keys(enKeys).length).toBe(16)
-    expect(Object.keys(koKeys).length).toBe(16)
-    for (const [hash, enVal] of Object.entries(enKeys)) {
-      expect(typeof enVal).toBe('string')
-      expect((koKeys as Record<string, string>)[hash]).toBeTruthy()
+  it.each(Object.entries(localizedCatalogs))(
+    'has valid %s catalog entries for every setup checklist step',
+    (_locale, catalog) => {
+      const enKeys = en.auto.components.feature.wall.feature.wall.setup.checklist.localized.copy
+      const localizedKeys =
+        catalog.auto.components.feature.wall.feature.wall.setup.checklist.localized.copy
+
+      expect(Object.keys(enKeys)).toHaveLength(16)
+      expect(Object.keys(localizedKeys).sort()).toEqual(Object.keys(enKeys).sort())
+      for (const [hash, englishValue] of Object.entries(enKeys)) {
+        const localizedValue = (localizedKeys as Record<string, string>)[hash]
+        expect(localizedValue).toBeTruthy()
+        expect(localizedValue).not.toBe(englishValue)
+      }
     }
-  })
+  )
 })

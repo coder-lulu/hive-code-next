@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto'
 import { readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { RuntimeMetadata, RuntimeTransportMetadata } from '../../shared/runtime-bootstrap'
 import type { OrcaRuntimeService } from './orca-runtime'
 import { NETWORK_EXPOSURE_FAILED_GUIDANCE } from './network-exposure-guidance'
@@ -53,6 +54,8 @@ import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { resolveAdvertisedPairingEndpoint } from './pairing-endpoint'
 import type { TerminalStreamFrame } from '../../shared/terminal-stream-protocol'
 import { RuntimeBinaryMessageRouter } from './runtime-binary-message-router'
+import type { HiveRuntimeCloudControl } from '../hive-runtime-cloud/hive-runtime-cloud-control'
+import type { HiveRuntimeCloudWebLaunchService } from '../hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 
 const DEFAULT_WS_PORT = 6768
 
@@ -69,6 +72,7 @@ function formatWsEndpoint(host: string, port: number): string {
 
 type OrcaRuntimeRpcServerOptions = {
   runtime: OrcaRuntimeService
+  hiveRuntimeCloud?: HiveRuntimeCloudControl
   userDataPath: string
   pid?: number
   platform?: NodeJS.Platform
@@ -138,10 +142,8 @@ function pairingUnavailable(
   return { available: false, reason, guidance }
 }
 
-const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE =
-  'The pairing registry is unavailable. Verify that the Orca data directory is writable.'
-const E2EE_KEY_UNAVAILABLE_GUIDANCE =
-  'The E2EE identity is unavailable. Verify that the Orca data directory is writable.'
+const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE = `The pairing registry is unavailable. Verify that the ${APP_DISPLAY_NAME} data directory is writable.`
+const E2EE_KEY_UNAVAILABLE_GUIDANCE = `The E2EE identity is unavailable. Verify that the ${APP_DISPLAY_NAME} data directory is writable.`
 
 type MobileRelayPairingProvider = {
   createPairingRelay(
@@ -464,6 +466,15 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'worktree.sleep'
 ])
 
+// Cloud ownership mutates service-owned identity. Only the local 0600 metadata
+// transport may invoke it; paired WebSocket identities are never sufficient.
+const LOCAL_ONLY_RPC_METHODS = new Set([
+  'cloudRuntime.status',
+  'cloudRuntime.claim',
+  'cloudRuntime.claimPoll',
+  'cloudRuntime.resetIdentity'
+])
+
 // Why: 'ask' is metered separately from 'wait' — same keepalive/abort wiring, its own sub-cap.
 export type RuntimeLongPollClass = 'ask' | 'browser-host' | 'wait'
 
@@ -556,9 +567,7 @@ export class OrcaRuntimeRpcServer {
   private transports: RuntimeTransportMetadata[] = []
   private metadataOwnershipWatch: RuntimeMetadataOwnershipWatch | null = null
   private mobileSocketWiring: MobileSocketWiring | null = null
-  private cloudWebLaunchService: {
-    revalidateSession(principal: AuthenticatedCloudManagedSocket['principal']): boolean
-  } | null = null
+  private cloudWebLaunchService: HiveRuntimeCloudWebLaunchService | null = null
   // Why: detaches the current WebSocketTransport from the session wiring so a pairing rebind can swap
   // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
   private detachWebSocketWiring: (() => void) | null = null
@@ -587,6 +596,7 @@ export class OrcaRuntimeRpcServer {
 
   constructor({
     runtime,
+    hiveRuntimeCloud,
     userDataPath,
     pid = process.pid,
     platform = process.platform,
@@ -602,7 +612,11 @@ export class OrcaRuntimeRpcServer {
     methods
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
-    this.dispatcher = new RpcDispatcher({ runtime, methods: methods ?? ALL_RPC_METHODS })
+    this.dispatcher = new RpcDispatcher({
+      runtime,
+      methods: methods ?? ALL_RPC_METHODS,
+      hiveRuntimeCloud
+    })
     this.userDataPath = userDataPath
     this.pid = pid
     this.platform = platform
@@ -642,16 +656,16 @@ export class OrcaRuntimeRpcServer {
     return this.e2eeKeypair
   }
 
-  setCloudWebLaunchService(service: unknown): void {
-    this.cloudWebLaunchService = service as typeof this.cloudWebLaunchService
+  getMobileSocketWiring(): MobileSocketWiring | null {
+    return this.mobileSocketWiring
+  }
+
+  setCloudWebLaunchService(service: HiveRuntimeCloudWebLaunchService | null): void {
+    this.cloudWebLaunchService = service
   }
 
   terminateCloudWebSessionConnections(managedWebSessionId: string): number {
     return this.mobileSocketWiring?.terminateCloudSessionConnections(managedWebSessionId) ?? 0
-  }
-
-  getMobileSocketWiring(): MobileSocketWiring | null {
-    return this.mobileSocketWiring
   }
 
   getRelayRevokeOutbox(): RelayRevokeOutbox {
@@ -778,12 +792,14 @@ export class OrcaRuntimeRpcServer {
       console.error('[runtime] Failed to persist pairing credential:', error)
       return pairingUnavailable('device_registry_unavailable', DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE)
     }
+    const runtimeRecordId = this.runtime.getStatus().runtimeRecordId
     const pairingUrl = encodePairingOffer({
       v: PAIRING_OFFER_VERSION,
       endpoint,
       deviceToken: device.token,
       publicKeyB64,
       pairedDeviceId: device.deviceId,
+      ...(runtimeRecordId ? { runtimeRecordId } : {}),
       scope
     })
     return {
@@ -921,8 +937,7 @@ export class OrcaRuntimeRpcServer {
       return {
         available: false,
         reason: 'relay_mint_failed',
-        guidance:
-          'Orca Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.',
+        guidance: `${APP_DISPLAY_NAME} Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.`,
         relayFailure
       }
     }
@@ -931,7 +946,7 @@ export class OrcaRuntimeRpcServer {
       return refuseAutomaticWithoutRelay({
         code: 'relay_provider_unavailable',
         stage: 'provider_missing',
-        message: 'Orca Relay is not available on this desktop'
+        message: `${APP_DISPLAY_NAME} Relay is not available on this desktop`
       })
     }
     const device = this.deviceRegistry?.getDevice(direct.deviceId)
@@ -988,6 +1003,7 @@ export class OrcaRuntimeRpcServer {
         message: 'Could not store Relay binding for the pairing device'
       })
     }
+    const runtimeRecordId = this.runtime.getStatus().runtimeRecordId
     return {
       ...direct,
       connectionMode: 'automatic',
@@ -997,6 +1013,7 @@ export class OrcaRuntimeRpcServer {
         deviceToken: device.token,
         publicKeyB64,
         pairedDeviceId: device.deviceId,
+        ...(runtimeRecordId ? { runtimeRecordId } : {}),
         scope: 'mobile',
         relay: relayPairing.relay
       })
@@ -1320,6 +1337,8 @@ export class OrcaRuntimeRpcServer {
       host: options.host,
       port: options.port,
       staticRoot: this.webClientRoot,
+      httpRouteHandler: (request, response) =>
+        this.cloudWebLaunchService?.handleHttpRequest(request, response) ?? false,
       ...(options.fallbackPort !== undefined ? { fallbackPort: options.fallbackPort } : {}),
       ...(options.preferPinnedPort ? { preferPinnedPort: true } : {})
     })
@@ -1372,6 +1391,32 @@ export class OrcaRuntimeRpcServer {
         )
       },
       onBinary: (socket, bytes) => this.handleWebSocketBinaryMessage(bytes, socket.ws),
+      resolveCloudManagedSession: (auth, metadata) => {
+        const request = metadata.transport === 'direct' ? metadata.request : undefined
+        return request ? (this.cloudWebLaunchService?.resolveSession(auth, request) ?? null) : null
+      },
+      onCloudText: (socket, plaintext, reply, sendBinary) => {
+        void this.handleWebSocketMessage(
+          plaintext,
+          reply,
+          sendBinary,
+          undefined,
+          socket.ws,
+          null,
+          undefined,
+          socket
+        )
+      },
+      onCloudBinary: (socket, bytes) => this.handleWebSocketBinaryMessage(bytes, socket.ws),
+      onCloudReady: () => {
+        this.runtime.activateRecentPtyPathCandidateTracking?.()
+      },
+      onCloudClose: (socket) => {
+        this.abortWebSocketDispatches(socket.ws)
+        this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
+        this.runtime.cancelMobileDictationForConnection(socket.connectionId)
+        this.binaryMessageRouter.deleteConnection(socket.connectionId)
+      },
       onReady: () => {
         // Why: first authenticated mobile/remote client (direct WS and
         // cloud relay both attach here) starts path-candidate tracking.
@@ -1731,38 +1776,13 @@ export class OrcaRuntimeRpcServer {
     }
 
     if (authenticatedCloudSocket) {
-      const repeatedCredential = ['deviceToken', 'sessionToken', 'authToken'].some(
-        (field) => typeof (request as Record<string, unknown>)[field] === 'string'
+      await this.handleCloudManagedWebSocketMessage(
+        request,
+        reply,
+        sendBinary,
+        ws,
+        authenticatedCloudSocket
       )
-      if (repeatedCredential) {
-        reply(
-          JSON.stringify(
-            this.buildError(
-              request.id,
-              'unauthorized',
-              'Cloud sessions do not accept repeated credentials'
-            )
-          )
-        )
-        return
-      }
-      if (!this.cloudWebLaunchService?.revalidateSession(authenticatedCloudSocket.principal)) {
-        reply(
-          JSON.stringify(
-            this.buildError(request.id, 'unauthorized', 'Cloud session is no longer valid')
-          )
-        )
-        return
-      }
-      await this.dispatcher.dispatchStreaming(request, reply, {
-        connectionId: authenticatedCloudSocket.connectionId,
-        clientId: authenticatedCloudSocket.connectionId,
-        // Web cloud sessions use the desktop/runtime contract: they are not
-        // mobile clients and must retain full payload/host-authority behavior.
-        clientKind: 'runtime',
-        clientCapabilities: authenticatedCloudSocket.clientCapabilities,
-        sendBinary
-      })
       return
     }
 
@@ -1783,6 +1803,18 @@ export class OrcaRuntimeRpcServer {
     const device = this.deviceRegistry?.validateToken(token)
     if (!device) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Invalid device token')))
+      return
+    }
+    if (LOCAL_ONLY_RPC_METHODS.has(request.method)) {
+      reply(
+        JSON.stringify(
+          this.buildError(
+            request.id,
+            'forbidden',
+            `Method '${request.method}' is available only to local clients`
+          )
+        )
+      )
       return
     }
     if (device.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
@@ -1864,6 +1896,86 @@ export class OrcaRuntimeRpcServer {
     } finally {
       abortRegistration?.dispose()
       this.releaseLongPoll(longPoll, device.deviceId)
+    }
+  }
+
+  private async handleCloudManagedWebSocketMessage(
+    request: RpcRequest,
+    reply: (response: string) => void,
+    sendBinary: (response: Uint8Array<ArrayBufferLike>) => boolean | void,
+    ws: WebSocket | undefined,
+    socket: AuthenticatedCloudManagedSocket
+  ): Promise<void> {
+    const requestEnvelope = request as unknown as Record<string, unknown>
+    if (
+      ['deviceToken', 'sessionToken', 'authToken'].some((field) =>
+        Object.hasOwn(requestEnvelope, field)
+      )
+    ) {
+      reply(
+        JSON.stringify(
+          this.buildError(
+            request.id,
+            'unauthorized',
+            'Cloud-managed requests must not repeat authentication credentials'
+          )
+        )
+      )
+      return
+    }
+
+    let sessionIsCurrent = false
+    try {
+      sessionIsCurrent = this.cloudWebLaunchService?.revalidateSession(socket.principal) === true
+    } catch {
+      sessionIsCurrent = false
+    }
+    if (!sessionIsCurrent) {
+      reply(
+        JSON.stringify(
+          this.buildError(request.id, 'unauthorized', 'Cloud-managed session is expired or revoked')
+        )
+      )
+      return
+    }
+    if (LOCAL_ONLY_RPC_METHODS.has(request.method)) {
+      reply(
+        JSON.stringify(
+          this.buildError(
+            request.id,
+            'forbidden',
+            `Method '${request.method}' is available only to local clients`
+          )
+        )
+      )
+      return
+    }
+
+    const clientId = `cloud-managed:${socket.principal.managedWebSessionId}`
+    const longPoll = classifyRuntimeLongPoll(request)
+    const rejection = this.admitLongPoll(longPoll, clientId)
+    if (rejection) {
+      reply(JSON.stringify(this.buildError(request.id, 'runtime_busy', rejection)))
+      return
+    }
+    const abortRegistration = ws ? this.registerWebSocketDispatchAbort(ws) : null
+    try {
+      await this.dispatcher.dispatchStreaming(request, reply, {
+        authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(clientId),
+        connectionId: socket.connectionId,
+        clientId,
+        clientKind: 'runtime',
+        clientCapabilities: socket.clientCapabilities,
+        signal: abortRegistration?.signal,
+        sendBinary,
+        registerBinaryStreamHandler: (streamId, handler) =>
+          this.registerBinaryStreamHandler(socket.connectionId, streamId, handler),
+        registerBinaryMessageHandler: (handler) =>
+          this.registerBinaryMessageHandler(socket.connectionId, handler)
+      })
+    } finally {
+      abortRegistration?.dispose()
+      this.releaseLongPoll(longPoll, clientId)
     }
   }
 

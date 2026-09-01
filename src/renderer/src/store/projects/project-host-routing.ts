@@ -26,6 +26,7 @@ import {
   type RuntimeClientTarget
 } from '../../runtime/runtime-rpc-client'
 import { getRuntimeTargetHostId } from '../runtime-target-host'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function getProjectSetupRuntimeTarget(
   hostId: ProjectHostSetupExistingFolderArgs['hostId']
@@ -90,7 +91,7 @@ async function assertProjectHostSetupRuntimeCapability(target: RuntimeClientTarg
   await assertRuntimeEnvironmentCapability(
     target.environmentId,
     PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
-    'The selected Orca server does not support project host setup yet. Update Orca on the server and try again.',
+    `The selected ${APP_DISPLAY_NAME} server does not support project host setup yet. Update ${APP_DISPLAY_NAME} on the server and try again.`,
     15_000
   )
 }
@@ -128,7 +129,7 @@ export async function fetchProjectHostSetupCompatibility(
     ])
     return {
       // Why projects too: the same wire response carries them, and a remote host on another
-      // Orca version can publish a row whose declared field types do not hold.
+      // Older runtime versions can publish a row whose declared field types do not hold.
       projects: normalizeProjectRows([...projectResponse.projects]),
       setups: setupResponse.setups.map((setup) => setupWithFetchedOwner(setup, target))
     }
@@ -148,7 +149,7 @@ export async function assertProjectHostSetupMutationRuntimeCapabilities(
   await assertRuntimeEnvironmentCapability(
     target.environmentId,
     WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,
-    'The selected Orca server does not support explicit workspace run hosts yet. Update Orca on the server and try again.',
+    `The selected ${APP_DISPLAY_NAME} server does not support explicit workspace run hosts yet. Update ${APP_DISPLAY_NAME} on the server and try again.`,
     15_000
   )
 }

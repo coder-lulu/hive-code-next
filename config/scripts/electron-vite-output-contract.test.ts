@@ -204,6 +204,17 @@ describe('Electron Vite output contract', () => {
     )
   })
 
+  it('pre-bundles dependencies first discovered through lazy Settings panes', () => {
+    expect(electronViteConfig.renderer?.optimizeDeps?.include).toEqual(
+      expect.arrayContaining([
+        '@xterm/addon-ligatures',
+        '@xterm/xterm',
+        'html-to-image',
+        'react-colorful'
+      ])
+    )
+  })
+
   it('rejects prototype properties as build targets', () => {
     // Own-property check only: an inherited key like `constructor` must not select a build target.
     expect(targetConfig).toContain('Object.hasOwn(configByTarget, target)')

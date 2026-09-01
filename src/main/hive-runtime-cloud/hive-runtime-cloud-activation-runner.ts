@@ -1,22 +1,19 @@
-import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import {
-  activateHiveRuntimeCloudPresence,
+  activateClaimedHiveRuntimeCloudPresence,
   type ActivationResult
 } from './hive-runtime-cloud-activation'
 import {
+  ClaimPendingPresenceError,
   FatalPresenceError,
   type PresenceClient,
-  type PresenceDependencies,
-  type RuntimeSource
+  type PresenceDependencies
 } from './hive-runtime-cloud-presence-support'
 import type { HiveRuntimeCloudRegistrationState } from './hive-runtime-cloud-state-store'
 
 type ActivationRunnerOptions = Readonly<{
   client: PresenceClient | null
-  authorization: HiveRuntimeCloudAuthorization
   userDataPath: string
   bootId: string
-  runtimeSource: RuntimeSource
   dependencies: PresenceDependencies
   signal: AbortSignal
   assertCurrent: () => void
@@ -37,15 +34,15 @@ export async function runHiveRuntimeCloudActivation(
   if (stored.status === 'unavailable' || stored.status === 'unreadable') {
     throw new FatalPresenceError('registration_state_unavailable')
   }
-  return activateHiveRuntimeCloudPresence({
+  if (stored.status !== 'ok' || stored.value.status !== 'CLAIMED') {
+    throw new ClaimPendingPresenceError('runtime_claim_required')
+  }
+  return activateClaimedHiveRuntimeCloudPresence({
     client: options.client,
-    authorization: options.authorization,
     identity: loadedIdentity.identity,
-    stored: stored.status === 'ok' ? stored.value : null,
+    stored: stored.value,
     bootId: options.bootId,
-    report: options.runtimeSource.getReport(),
     signal: options.signal,
-    now: options.dependencies.now,
     randomUuid: options.dependencies.randomUuid,
     assertCurrent: options.assertCurrent,
     saveState: options.saveState

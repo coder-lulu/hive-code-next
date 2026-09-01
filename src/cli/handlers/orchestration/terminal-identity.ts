@@ -1,4 +1,5 @@
 import type { RuntimeClient } from '../../runtime-client'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { getOptionalStringFlag } from '../../flags'
 import { RuntimeClientError } from '../../runtime-client'
 import { getTerminalHandle } from '../../selectors'
@@ -146,6 +147,6 @@ export function throwNoActiveSenderTerminal(): never {
   throw new RuntimeClientError(
     'no_active_sender_terminal',
     'Could not determine the sender terminal for this orchestration command. ' +
-      'Pass --from <terminal-handle> or run the command inside a live Orca terminal with ORCA_TERMINAL_HANDLE set.'
+      `Pass --from <terminal-handle> or run the command inside a live ${APP_DISPLAY_NAME} terminal with ORCA_TERMINAL_HANDLE set.`
   )
 }

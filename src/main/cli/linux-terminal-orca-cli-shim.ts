@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildBareOrcaCliScript } from './linux-bare-orca-dispatcher'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 const SHIM_DIR_NAME = 'linux-orca-cli-shim'
 
@@ -17,13 +18,10 @@ export type LinuxTerminalOrcaCliShimOptions = {
   appImagePath?: string | null
 }
 
-// Why: on Linux the Orca compatibility CLI avoids shadowing the GNOME
-// Orca screen reader at /usr/bin/orca — but agent-facing surfaces (skills,
-// dispatch preambles, CLI hints) all invoke bare `orca`, so on stock Ubuntu an
-// agent inside an Orca terminal would launch the screen reader instead
-// (stablyai/orca#7904). Prepending this userData-scoped shim dir to managed-PTY
-// PATH makes bare `orca` resolve to the Orca CLI inside Orca terminals only,
-// leaving the user's own shells (and their screen reader) untouched.
+// Why: managed Linux PTYs must always expose the canonical `hive` command even
+// when global registration is absent (notably AppImage). The compatibility
+// `orca` shim remains scoped to HiveCode PTYs so it cannot shadow GNOME Orca in
+// the user's ordinary shells.
 export function ensureLinuxTerminalOrcaCliShimDir(
   options: LinuxTerminalOrcaCliShimOptions
 ): string | null {
@@ -45,15 +43,17 @@ export function ensureLinuxTerminalOrcaCliShimDir(
   }
 
   const shimDir = join(options.userDataPath, SHIM_DIR_NAME)
-  const shimPath = join(shimDir, 'orca')
   try {
-    if (readShim(shimPath) !== resolved.script) {
-      mkdirSync(shimDir, { recursive: true })
-      writeFileSync(shimPath, resolved.script, 'utf8')
+    for (const commandName of [PRIMARY_CLI_COMMAND, 'orca']) {
+      const shimPath = join(shimDir, commandName)
+      if (readShim(shimPath) !== resolved.script) {
+        mkdirSync(shimDir, { recursive: true })
+        writeFileSync(shimPath, resolved.script, 'utf8')
+      }
+      // Why: always re-assert the exec bit — a shim written by an older run (or
+      // restored from backup) with mode stripped would fail every agent CLI call.
+      chmodSync(shimPath, 0o755)
     }
-    // Why: always re-assert the exec bit — a shim written by an older run (or
-    // restored from backup) with mode stripped would fail every agent CLI call.
-    chmodSync(shimPath, 0o755)
   } catch {
     return null
   }

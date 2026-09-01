@@ -30,6 +30,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
   unreadTerminalTabs: {},
   unreadTerminalPanes: {},
   unreadAgentCompletionPanes: {},
+  unreadAgentCompletionCountByPane: {},
   suppressedPtyExitIds: {},
   pendingPtyShutdownIds: {},
   pendingCodexPaneRestartIds: {},

@@ -63,7 +63,8 @@ function createWslRunner(
     interopReady?: boolean
   } = {}
 ) {
-  const commandPath = '/home/alice/.local/bin/orca-ide'
+  const commandPath = '/home/alice/.local/bin/hive'
+  const compatibilityCommandPath = '/home/alice/.local/bin/orca-ide'
   const legacyCommandPath = '/home/alice/.local/bin/orca'
   const bridgePath = '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
   const files = new Map<string, string>()
@@ -106,9 +107,6 @@ function createWslRunner(
         )?.[1] ?? ''
       files.set(commandPath, launcher)
       files.set(bridgePath, bridge)
-      if (files.get(legacyCommandPath)?.includes('# Orca managed WSL CLI launcher')) {
-        files.delete(legacyCommandPath)
-      }
       return ''
     }
     if (command.includes('command -v powershell.exe')) {
@@ -126,6 +124,12 @@ function createWslRunner(
         files.delete(bridgePath)
       }
       if (
+        command.includes(compatibilityCommandPath) &&
+        files.get(compatibilityCommandPath)?.includes('# Orca managed WSL CLI launcher')
+      ) {
+        files.delete(compatibilityCommandPath)
+      }
+      if (
         command.includes(legacyCommandPath) &&
         files.get(legacyCommandPath)?.includes('# Orca managed WSL CLI launcher')
       ) {
@@ -139,6 +143,9 @@ function createWslRunner(
       }
       if (command.includes(bridgePath)) {
         return files.get(bridgePath) ?? '__ORCA_MISSING__'
+      }
+      if (command.includes(compatibilityCommandPath)) {
+        return files.get(compatibilityCommandPath) ?? '__ORCA_MISSING__'
       }
       if (command.includes(legacyCommandPath)) {
         return files.get(legacyCommandPath) ?? '__ORCA_MISSING__'
@@ -175,7 +182,7 @@ describe('WslCliInstaller', () => {
 
     await expect(installer.getStatus()).resolves.toMatchObject({
       state: 'not_installed',
-      commandPath: '/home/alice/.local/bin/orca-ide'
+      commandPath: '/home/alice/.local/bin/hive'
     })
 
     const installed = await installer.install()
@@ -194,15 +201,13 @@ describe('WslCliInstaller', () => {
     expect(wsl.getBridge()).toBe(_internals.buildWslBridgeScript())
     const installCommand = wsl.calls.find((command) => command.includes('cat > "$command_tmp"'))
     expect(installCommand).toBeDefined()
-    expect(installCommand).toContain("legacy_command_path='/home/alice/.local/bin/orca'")
-    expect(installCommand).toContain('rm -f "$legacy_command_path"')
+    expect(installCommand).not.toContain('legacy_command_path=')
     // Why: the new bridge accepts the old launcher's positional arguments, so
     // publishing it first keeps interrupted upgrades usable.
     const bridgePublishIndex = installCommand?.indexOf('mv -f "$bridge_tmp"') ?? -1
     const launcherPublishIndex = installCommand?.indexOf('mv -f "$command_tmp"') ?? -1
     expect(bridgePublishIndex).toBeGreaterThan(-1)
     expect(bridgePublishIndex).toBeLessThan(launcherPublishIndex)
-    expect(installCommand).toContain('[ ! -L "$legacy_command_path" ]')
   })
 
   it('continues checking WSL when the host launcher exists but host PATH is unknown', async () => {
@@ -222,11 +227,35 @@ describe('WslCliInstaller', () => {
     await expect(installer.getStatus()).resolves.toMatchObject({
       supported: true,
       state: 'not_installed',
-      commandPath: '/home/alice/.local/bin/orca-ide'
+      commandPath: '/home/alice/.local/bin/hive'
+    })
+  })
+
+  it('preserves host registration details when exposing them through WSL status', async () => {
+    const hostStatus = {
+      ...makeHostStatus(),
+      launcherPath: null,
+      supported: false,
+      state: 'unsupported',
+      unsupportedReason: 'launcher_missing',
+      detail: 'Unable to read C:\\customer Orca workspace\\hive.exe.'
+    } satisfies CliInstallStatus
+    const installer = new WslCliInstaller({
+      platform: 'win32',
+      distro: 'Ubuntu',
+      hostInstaller: { getStatus: async () => hostStatus }
+    })
+
+    await expect(installer.getStatus()).resolves.toMatchObject({
+      supported: false,
+      detail: 'Unable to read C:\\customer Orca workspace\\hive.exe.'
     })
   })
 
   it('derives the shared WSL bridge path for current and legacy command names', () => {
+    expect(_internals.getBridgePathFromCommandPath('/home/alice/.local/bin/hive')).toBe(
+      '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
+    )
     expect(_internals.getBridgePathFromCommandPath('/home/alice/.local/bin/orca-ide')).toBe(
       '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
     )
@@ -371,7 +400,7 @@ describe('WslCliInstaller', () => {
 
     await expect(installer.getStatus()).resolves.toMatchObject({
       state: 'not_installed',
-      commandPath: '/home/alice/.local/bin/orca-ide'
+      commandPath: '/home/alice/.local/bin/hive'
     })
   })
 
@@ -547,7 +576,7 @@ describe('WslCliInstaller', () => {
     expect(wsl.getFile()).toBe(currentLauncher)
   })
 
-  it('moves a legacy-only managed registration to orca-ide without touching unmanaged names', async () => {
+  it('adds hive for a legacy-only managed registration without touching unmanaged names', async () => {
     const nativeLauncher = 'C:\\Orca\\resources\\bin\\orca.exe'
     const managedLegacy = createWslRunner(null, true, {
       initialBridge: _internals.buildWslBridgeScript(),
@@ -564,7 +593,7 @@ describe('WslCliInstaller', () => {
       changed: true,
       status: { state: 'installed', currentTarget: nativeLauncher }
     })
-    expect(managedLegacy.getLegacyFile()).toBeNull()
+    expect(managedLegacy.getLegacyFile()).toBe(PRE_RC4_MANAGED_WSL_LAUNCHER)
 
     const unmanagedLegacy = createWslRunner(null, true, {
       initialLegacyFile: '#!/bin/sh\necho user-owned\n'
@@ -684,9 +713,9 @@ describe('WslCliInstaller', () => {
     expect(installCommand).toContain('committed=1')
     expect(installCommand).toContain('flock -x -w 30 9')
     // Why: the command replace must stay one atomic rename; a mv-based backup
-    // would leave a window where a concurrent shell finds no orca-ide at all.
+    // would leave a window where a concurrent shell finds no hive command at all.
     expect(installCommand).not.toContain('command_backup')
-    expect(installCommand).not.toContain(`mv -f '/home/alice/.local/bin/orca-ide'`)
+    expect(installCommand).not.toContain(`mv -f '/home/alice/.local/bin/hive'`)
   })
 
   it.skipIf(process.platform === 'win32')(
@@ -694,7 +723,7 @@ describe('WslCliInstaller', () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'orca-wsl-cli-rollback-'))
       const home = join(root, 'home with spaces')
-      const commandPath = join(home, '.local', 'bin', 'orca-ide')
+      const commandPath = join(home, '.local', 'bin', 'hive')
       const bridgePath = join(home, '.local', 'share', 'orca', 'orca-wsl-bridge.ps1')
       const bridge = _internals.buildWslBridgeScript()
       await mkdir(join(home, '.local', 'bin'), { recursive: true })

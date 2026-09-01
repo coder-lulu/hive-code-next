@@ -3,6 +3,10 @@ import {
   recordConnectionClientSessionStart
 } from './persisted-connection-log-store'
 import { loadHosts } from './host-store'
+import {
+  findAccountRuntimeProfile,
+  mergeAccountRuntimeProfiles
+} from '../runtime-directory/account-runtime-profile-registry'
 import { openHostLogicalClient } from './host-logical-client'
 import type { HostClientOpenRegistry } from './host-client-open-registry'
 import type { HostOpenRetryScheduler } from './host-open-retry-scheduler'
@@ -80,10 +84,16 @@ export async function openHostClientEntry(
     if (!host) {
       try {
         const hosts = await loadHosts()
-        host = hosts.find((candidate) => candidate.id === hostId)
+        host = mergeAccountRuntimeProfiles(hosts).find((candidate) => candidate.id === hostId)
       } catch {
-        failCurrentOpen('catalog-unavailable')
-        return null
+        // Account-followed Runtimes are held outside the local pairing store.
+        // A corrupt/unavailable local catalog must not make that independent
+        // account route disappear.
+        host = findAccountRuntimeProfile(hostId)
+        if (!host) {
+          failCurrentOpen('catalog-unavailable')
+          return null
+        }
       }
       if (!host) {
         failCurrentOpen('host-not-found')
@@ -103,7 +113,9 @@ export async function openHostClientEntry(
     let client: RpcClient
     try {
       recordConnectionClientSessionStart(hostId)
-      client = openHostLogicalClient(host, (entry) => connectionLogStore.append(hostId, entry))
+      client = await openHostLogicalClient(host, (entry) =>
+        connectionLogStore.append(hostId, entry)
+      )
     } catch {
       failCurrentOpen('client-construction')
       return null

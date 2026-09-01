@@ -19,6 +19,7 @@ import type { WebRuntimeTransportSubscription } from './web-runtime-subscription
 import { WebRuntimeSubscriptionRegistry } from './web-runtime-subscription-registry'
 import { WebRuntimeRequestRegistry } from './web-runtime-request-registry'
 import { WebRuntimeConnectionWaiters } from './web-runtime-connection-waiters'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const CONNECT_TIMEOUT_MS = 12_000
 const HANDSHAKE_TIMEOUT_MS = 10_000
@@ -90,8 +91,10 @@ export class WebRuntimeConnectionTransport {
   close(options: { notifySubscriptions?: boolean } = {}): void {
     this.intentionallyClosed = true
     this.clearTimers()
-    this.requestRegistry.rejectAll('Remote Orca runtime connection closed.')
-    this.connectionWaiters.rejectAll(new Error('Remote Orca runtime connection closed.'))
+    this.requestRegistry.rejectAll(`Remote ${APP_DISPLAY_NAME} runtime connection closed.`)
+    this.connectionWaiters.rejectAll(
+      new Error(`Remote ${APP_DISPLAY_NAME} runtime connection closed.`)
+    )
     this.subscriptionRegistry.close(options.notifySubscriptions ?? true)
     if (this.ws) {
       this.ws.close()
@@ -134,7 +137,7 @@ export class WebRuntimeConnectionTransport {
     this.clearConnectTimer()
     this.clearHandshakeTimer()
     this.heartbeat.clear()
-    this.requestRegistry.rejectAll('Remote Orca runtime connection interrupted.')
+    this.requestRegistry.rejectAll(`Remote ${APP_DISPLAY_NAME} runtime connection interrupted.`)
     this.subscriptionRegistry.handleInterrupted()
     if (this.intentionallyClosed || this.state === 'auth-failed') {
       this.setState(this.state === 'auth-failed' ? 'auth-failed' : 'disconnected')

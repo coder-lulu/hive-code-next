@@ -28,16 +28,21 @@ export class StaleRelayBrokerError extends Error {
 export class RelaySessionBroker {
   private readonly options: RelaySessionBrokerOptions
   private readonly relayHostId: string
+  private readonly relayDirectorUrl: string
   private readonly originPool: RelayOriginPool
   private authorization: RelayAuthorization | null = null
   private refreshTimer: ReturnType<typeof setTimeout> | null = null
   private closed = false
 
   private constructor(options: RelaySessionBrokerOptions) {
+    if (!options.authConfig.relayDirectorUrl) {
+      throw new Error('relay_not_configured')
+    }
     this.options = options
+    this.relayDirectorUrl = options.authConfig.relayDirectorUrl
     this.relayHostId = deriveRelayHostId(options.keypair.publicKey)
     this.originPool = new RelayOriginPool({
-      directorUrl: options.authConfig.relayDirectorUrl,
+      directorUrl: this.relayDirectorUrl,
       relayHostId: this.relayHostId,
       identity: options.identity,
       keypair: options.keypair,
@@ -89,7 +94,7 @@ export class RelaySessionBroker {
     }
     return {
       v: 1,
-      directorUrl: this.options.authConfig.relayDirectorUrl,
+      directorUrl: this.relayDirectorUrl,
       cellUrl: assignment.cellUrl,
       assignmentEpoch: assignment.assignmentEpoch,
       relayHostId: this.relayHostId,
@@ -115,7 +120,7 @@ export class RelaySessionBroker {
     this.assertCurrent()
     return {
       v: 1,
-      directorUrl: this.options.authConfig.relayDirectorUrl,
+      directorUrl: this.relayDirectorUrl,
       cellUrl: assignment.cellUrl,
       assignmentEpoch: assignment.assignmentEpoch,
       relayHostId: this.relayHostId,
@@ -209,7 +214,7 @@ export class RelaySessionBroker {
     ])
     this.assertCurrent()
     const assignment = await requestRelayAssignment({
-      directorUrl: this.options.authConfig.relayDirectorUrl,
+      directorUrl: this.relayDirectorUrl,
       relayToken: authorization.relayToken,
       relayHostId: this.relayHostId,
       // Any previously paired host likely holds a durable assignment; the

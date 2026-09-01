@@ -6,6 +6,7 @@ import {
 } from '../../../shared/execution-host'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../shared/workspace-scope'
+import { getExecutionHostIdFromWorktreeHostIdentity } from '../../../shared/worktree/host-qualified-identity'
 import {
   findIndexedFolderWorkspaceOwner,
   findIndexedProjectGroupOwner,
@@ -59,6 +60,10 @@ export function getResolvedExecutionHostIdForWorktree(
 ): ExecutionHostId | null {
   if (!worktreeId) {
     return null
+  }
+  const qualifiedHostId = getExecutionHostIdFromWorktreeHostIdentity(worktreeId)
+  if (qualifiedHostId) {
+    return qualifiedHostId
   }
   if (worktreeId === FLOATING_TERMINAL_WORKTREE_ID) {
     return LOCAL_EXECUTION_HOST_ID

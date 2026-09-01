@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { PairingOfferUnavailableReason } from '../runtime/runtime-rpc'
 import type { OrcadHealth } from '../orcad/orcad-health'
 
@@ -95,7 +96,7 @@ export function renderServeReadiness(
 
 function renderHumanReadiness(readiness: ServeReadiness): string {
   const lines = [
-    'Orca server ready',
+    `${APP_DISPLAY_NAME} server ready`,
     `Bound endpoint: ${readiness.boundEndpoint ?? 'websocket unavailable'}`,
     `Advertised endpoint: ${readiness.advertisedEndpoint ?? 'unavailable'}`
   ]

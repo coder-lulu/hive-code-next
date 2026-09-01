@@ -1,10 +1,8 @@
 import { dropAgentResumeArgvFromCommand } from '../../shared/agent-resume-argv-drop'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
 
-export const UNVERIFIED_CODEX_RESUME_ERROR = applyProductBranding(
-  'Orca could not verify the originating Codex session file, so automatic resume was stopped to avoid using a different account.'
-)
+export const UNVERIFIED_CODEX_RESUME_ERROR = `${APP_DISPLAY_NAME} could not verify the originating Codex session file, so automatic resume was stopped to avoid using a different account.`
 
 /**
  * Launch command for a Codex resume whose originating account could not be verified:

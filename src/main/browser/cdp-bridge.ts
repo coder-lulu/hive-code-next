@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: the CDP bridge owns debugger lifecycle, ref map management, command serialization, and all browser interaction logic in one module so the browser automation boundary stays coherent. */
 import { webContents } from 'electron'
-import { applyProductBranding } from '../../shared/brand'
+import { applyProductBranding, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type {
   BrowserCaptureStartResult,
   BrowserCaptureStopResult,
@@ -887,7 +887,7 @@ export class CdpBridge {
     } else {
       throw new BrowserError(
         'browser_no_tab',
-        "Multiple browser tabs are open. Run 'orca tab list' and 'orca tab switch --index <n>' to select one."
+        `Multiple browser tabs are open. Run '${PRIMARY_CLI_COMMAND} tab list' and '${PRIMARY_CLI_COMMAND} tab switch --index <n>' to select one.`
       )
     }
 
@@ -896,7 +896,7 @@ export class CdpBridge {
       this.activeWebContentsId = null
       throw new BrowserError(
         'browser_debugger_detached',
-        "The active browser tab was closed. Run 'orca tab list' to find remaining tabs."
+        `The active browser tab was closed. Run '${PRIMARY_CLI_COMMAND} tab list' to find remaining tabs.`
       )
     }
     return guest
@@ -1196,7 +1196,7 @@ export class CdpBridge {
     if (!state.snapshotResult) {
       throw new BrowserError(
         'browser_stale_ref',
-        "No snapshot exists for this tab. Run 'orca snapshot' first."
+        `No snapshot exists for this tab. Run '${PRIMARY_CLI_COMMAND} snapshot' first.`
       )
     }
 
@@ -1204,7 +1204,7 @@ export class CdpBridge {
     if (!entry) {
       throw new BrowserError(
         'browser_ref_not_found',
-        `Element ref ${ref} was not found. Run 'orca snapshot' to see available refs.`
+        `Element ref ${ref} was not found. Run '${PRIMARY_CLI_COMMAND} snapshot' to see available refs.`
       )
     }
 
@@ -1216,7 +1216,7 @@ export class CdpBridge {
         state.navigationId = null
         throw new BrowserError(
           'browser_stale_ref',
-          "The page has navigated since the last snapshot. Run 'orca snapshot' to get fresh refs."
+          `The page has navigated since the last snapshot. Run '${PRIMARY_CLI_COMMAND} snapshot' to get fresh refs.`
         )
       }
     }
@@ -1235,7 +1235,7 @@ export class CdpBridge {
       state.snapshotResult = null
       throw new BrowserError(
         'browser_stale_ref',
-        `Element ${ref} no longer exists in the DOM. Run 'orca snapshot' to get fresh refs.`
+        `Element ${ref} no longer exists in the DOM. Run '${PRIMARY_CLI_COMMAND} snapshot' to get fresh refs.`
       )
     }
   }

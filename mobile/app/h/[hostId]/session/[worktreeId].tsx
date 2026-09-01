@@ -49,7 +49,8 @@ import {
   X
 } from 'lucide-react-native'
 import type { RpcClient } from '../../../../src/transport/rpc-client'
-import { loadHosts } from '../../../../src/transport/host-store'
+import { useAccountVisibleHostCatalog } from '../../../../src/runtime-directory/use-account-visible-host-catalog'
+import { selectConnectableHostProfiles } from '../../../../src/transport/host-catalog-selection'
 import { startRuntimeCapabilityProbe } from '../../../../src/transport/runtime-capability-probe'
 import {
   loadTerminalAutocompleteEnabled,
@@ -59,7 +60,11 @@ import {
   saveTerminalTextScale,
   type MobileTerminalLinkOpenMode
 } from '../../../../src/storage/preferences'
-import { useHostClient, useForceReconnect } from '../../../../src/transport/client-context'
+import {
+  useHostClient,
+  useForceReconnect,
+  useRefreshHostClient
+} from '../../../../src/transport/client-context'
 import {
   useLastConnectedAt,
   useRelayRecoveryStatus,
@@ -770,8 +775,14 @@ export default function SessionScreen() {
   const isFloatingWorkspaceRoute = isFloatingWorkspaceWorktreeId(worktreeId)
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { catalog: accountVisibleHostCatalog } = useAccountVisibleHostCatalog()
+  const accountVisibleHosts = useMemo(
+    () => selectConnectableHostProfiles(accountVisibleHostCatalog),
+    [accountVisibleHostCatalog]
+  )
   // Why: shared client per host owned by RpcClientProvider (docs/mobile-shared-client-per-host.md).
   const { client, state: connState } = useHostClient(hostId)
+  const refreshHostClient = useRefreshHostClient()
   const reconnectAttempts = useReconnectAttempt(hostId)
   const lastConnectedAt = useLastConnectedAt(hostId)
   const relayRecovery = useRelayRecoveryStatus(hostId)
@@ -2431,21 +2442,15 @@ export default function SessionScreen() {
     if (!hostId) {
       return
     }
-    let stale = false
-    void loadHosts().then((hosts) => {
-      if (stale) {
-        return
+    const host = accountVisibleHosts.find((candidate) => candidate.id === hostId)
+    if (host) {
+      deviceTokenRef.current = host.deviceToken
+      setHostEndpoint(host.endpoint)
+      if (!client && (host.accountRuntime || host.accountRuntimeFallback)) {
+        refreshHostClient(host.id)
       }
-      const host = hosts.find((h) => h.id === hostId)
-      if (host) {
-        deviceTokenRef.current = host.deviceToken
-        setHostEndpoint(host.endpoint)
-      }
-    })
-    return () => {
-      stale = true
     }
-  }, [hostId])
+  }, [accountVisibleHosts, client, hostId, refreshHostClient])
 
   useEffect(() => {
     void loadCustomKeys().then(setCustomKeys)

@@ -16,6 +16,15 @@ function readHeaderDragSource(): string {
   )
 }
 
+function readViewportSource(): string {
+  return readFileSync(
+    fileURLToPath(
+      new URL('./worktree-list/viewport/VirtualizedWorktreeViewport.tsx', import.meta.url)
+    ),
+    'utf8'
+  )
+}
+
 describe('Project Group header drag DOM source', () => {
   it('renders concrete Project Group header drag attributes separately from repo headers', () => {
     const source = readWorktreeListSource()
@@ -59,5 +68,14 @@ describe('Project Group header drag DOM source', () => {
     expect(headerBlock).not.toMatch(
       /isDraggableRepoHeader \|\| isDraggableProjectGroupHeader\s*\?\s*'cursor-grab/
     )
+  })
+
+  it('lets the viewport short-circuit temporary-session drops before native worktree drag', () => {
+    const source = readViewportSource()
+
+    expect(source).toContain('if (props.onTemporarySessionDragOver(event))')
+    expect(source).toContain('if (props.onTemporarySessionDrop(event))')
+    expect(source).toContain('nativeDrag.handleWorktreeDragOver(event)')
+    expect(source).toContain('nativeDrag.handleWorktreeDrop(event)')
   })
 })

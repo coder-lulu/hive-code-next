@@ -16,6 +16,7 @@ import {
   type SkillManagedInstallGroup
 } from './skill-managed-install-groups'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { SkillInstallManagementDialogContent } from './SkillInstallManagementDialogContent'
 
 export function SkillInstallManagementDialog({
@@ -116,7 +117,7 @@ export function SkillInstallManagementDialog({
           operation.status === 'reconnect-required'
             ? translate(
                 'auto.components.skills.install.reconnectForVersionHistory',
-                'Reconnect your Orca account to load version history.'
+                `Reconnect your ${APP_DISPLAY_NAME} account to load version history.`
               )
             : operation.message
         )
@@ -202,7 +203,7 @@ export function SkillInstallManagementDialog({
             operation.status === 'reconnect-required'
               ? translate(
                   'auto.components.skills.install.reconnectBeforeVersionChange',
-                  'Reconnect your Orca account before changing versions.'
+                  `Reconnect your ${APP_DISPLAY_NAME} account before changing versions.`
                 )
               : operation.message
           )
@@ -231,7 +232,7 @@ export function SkillInstallManagementDialog({
           operation.status === 'reconnect-required'
             ? translate(
                 'auto.components.skills.install.reconnectBeforeVersionChange',
-                'Reconnect your Orca account before changing versions.'
+                `Reconnect your ${APP_DISPLAY_NAME} account before changing versions.`
               )
             : operation.message
         )

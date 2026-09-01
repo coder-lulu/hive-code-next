@@ -16,6 +16,9 @@ importers:
 
   .:
     dependencies:
+      '@hivecode/expo-hivecode-updater':
+        specifier: file:./packages/expo-hivecode-updater
+        version: file:packages/expo-hivecode-updater(expo@55.0.27)(react-native@0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)
       '@hivecode/expo-two-way-audio':
         specifier: file:./packages/expo-two-way-audio
         version: file:packages/expo-two-way-audio(expo@55.0.27)(react-native@0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)
@@ -1781,6 +1784,13 @@ packages:
   '@expo/xcpretty@4.4.4':
     resolution: {integrity: sha512-4aQzz9vgxcNXFfo/iyNgDDYfsU5XGKKxWxZopw0cVotHiW+U8IJbIxMaxsINs6bHhtkG3StKNPcOrn3eBuxKPw==}
     hasBin: true
+
+  '@hivecode/expo-hivecode-updater@file:packages/expo-hivecode-updater':
+    resolution: {directory: packages/expo-hivecode-updater, type: directory}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
 
   '@hivecode/expo-two-way-audio@file:packages/expo-two-way-audio':
     resolution: {directory: packages/expo-two-way-audio, type: directory}
@@ -9078,6 +9088,12 @@ snapshots:
       '@babel/code-frame': 7.29.7
       chalk: 4.1.2
       js-yaml: 4.3.1
+
+  '@hivecode/expo-hivecode-updater@file:packages/expo-hivecode-updater(expo@55.0.27)(react-native@0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)':
+    dependencies:
+      expo: 55.0.27(@babel/core@7.29.7)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.10)(expo-router@55.0.14)(react-dom@19.2.6(react@19.2.6))(react-native-webview@13.16.1(react-native@0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6))(react-native-worklets@0.8.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(react-native@0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6))(react-native@0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      react: 19.2.6
+      react-native: 0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6)
 
   '@hivecode/expo-two-way-audio@file:packages/expo-two-way-audio(expo@55.0.27)(react-native@0.83.9(patch_hash=e8b971c142bf350fc3f3f66f2c62b89e09c9c313821c41fb1757a95d59f2090f)(@babel/core@7.29.7)(@react-native/metro-config@0.85.2(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)':
     dependencies:

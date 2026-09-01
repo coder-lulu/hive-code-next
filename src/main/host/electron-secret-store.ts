@@ -1,4 +1,5 @@
 import { safeStorage } from 'electron'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { SecretStore } from '../../shared/secret-store'
 
 /**
@@ -51,6 +52,6 @@ function describeLinuxBackendGap(): string | null {
     return null
   }
   return backend === 'basic_text'
-    ? 'Secrets are obfuscated with a built-in key, not protected by the OS keyring. Install and unlock gnome-keyring or kwallet, then restart Orca, to seal them properly.'
+    ? `Secrets are obfuscated with a built-in key, not protected by the OS keyring. Install and unlock gnome-keyring or kwallet, then restart ${APP_DISPLAY_NAME}, to seal them properly.`
     : null
 }

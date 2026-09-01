@@ -53,6 +53,16 @@ export type LinuxPackageInstallInstructions =
   | { ok: true; command: string; packageFileName: string }
   | { ok: false; reason: LinuxPackageCommandUnavailableReason; message: string }
 
+export type UpdateStatusMetadata = {
+  /** HiveCloud mandatory-policy metadata; absent for local/dev-only checks. */
+  mandatory?: boolean
+  minimumSupportedBuild?: number
+  latestBuild?: number
+  releaseNotes?: string
+  channel?: string
+  blockReason?: string
+}
+
 export type UpdateStatus = (
   | { state: 'idle' }
   | { state: 'disabled'; reason: 'not-configured' }
@@ -83,7 +93,7 @@ export type UpdateStatus = (
       activeNudgeId?: string
       recovery?: LinuxPackageInstallRecovery
     }
-) & { source?: UpdateSource }
+) & { source?: UpdateSource } & UpdateStatusMetadata
 
 export type ReleaseBuildListResult =
   | { ok: true; channel: ReleaseChannel; builds: ReleaseBuild[] }

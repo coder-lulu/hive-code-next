@@ -168,31 +168,31 @@ describe('buildDispatchPreamble', () => {
     expect(result).toContain('refactor the auth module')
   })
 
-  it('uses orca CLI by default when devMode is not set', () => {
+  it('uses HiveCode CLI by default when devMode is not set', () => {
     const result = buildDispatchPreamble(baseParams())
-    expect(result).toContain('orca orchestration send')
-    expect(result).toContain('orca orchestration check')
-    expect(result).toContain('orca orchestration ask')
+    expect(result).toContain('hive orchestration send')
+    expect(result).toContain('hive orchestration check')
+    expect(result).toContain('hive orchestration ask')
   })
 
-  it('uses orca-dev CLI when devMode is true', () => {
-    const result = buildDispatchPreamble(baseParams({ devMode: true, cliCommand: 'orca-ide' }))
-    expect(result).toContain('orca-dev orchestration send')
-    expect(result).toContain('orca-dev orchestration check')
-    expect(result).toContain('orca-dev orchestration ask')
-    const fragments = result.split('orca-dev')
+  it('uses the primary CLI when devMode is true', () => {
+    const result = buildDispatchPreamble(baseParams({ devMode: true }))
+    expect(result).toContain('hive orchestration send')
+    expect(result).toContain('hive orchestration check')
+    expect(result).toContain('hive orchestration ask')
+    const fragments = result.split('hive')
     for (const fragment of fragments) {
       expect(fragment).not.toMatch(/orca orchestration/)
     }
   })
 
-  it('uses orca CLI when devMode is false', () => {
+  it('uses HiveCode CLI when devMode is false', () => {
     const result = buildDispatchPreamble(baseParams({ devMode: false }))
-    expect(result).toContain('orca orchestration send')
-    expect(result).toContain('orca orchestration check')
+    expect(result).toContain('hive orchestration send')
+    expect(result).toContain('hive orchestration check')
   })
 
-  it('uses the exact orca-ide command for packaged WSL workers', () => {
+  it('honors an explicit legacy command for compatibility runtimes', () => {
     const result = buildDispatchPreamble(baseParams({ cliCommand: 'orca-ide' }))
 
     expect(result).toContain('orca-ide orchestration send')

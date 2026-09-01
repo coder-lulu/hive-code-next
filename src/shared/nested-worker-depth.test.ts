@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  NESTED_WORKER_DEPTH_EXCEEDED_NEXT_STEPS,
   NESTED_WORKER_MAX_DEPTH_DEFAULT,
   nestedWorkerDepthExceededMessage,
   resolveNestedWorkerMaxDepth
@@ -41,5 +42,10 @@ describe('depth-exceeded message', () => {
     const message = nestedWorkerDepthExceededMessage(2, 1)
     expect(message).toContain('depth 2 (max 1)')
     expect(message).toContain('Complete this task yourself')
+  })
+
+  it('uses HiveCode branding in the settings recovery step', () => {
+    expect(NESTED_WORKER_DEPTH_EXCEEDED_NEXT_STEPS.join('\n')).toContain('HiveCode')
+    expect(NESTED_WORKER_DEPTH_EXCEEDED_NEXT_STEPS.join('\n')).not.toContain('Orca')
   })
 })

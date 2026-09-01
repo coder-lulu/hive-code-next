@@ -7,7 +7,6 @@ import {
   installProductUpdaterHttpExecutorBoundary,
   installProductUpdaterNetworkBoundary,
   isAllowedProductUpdaterRequest,
-  isAllowedProductUpdaterRedirectTarget,
   isBoundedUpdaterArtifactSize
 } from './product-updater-network-boundary'
 
@@ -53,66 +52,6 @@ describe('isAllowedProductUpdaterRequest', () => {
     'https://github.com/coder-lulu/hive-code/releases/download/v1.0.0/Product.zip'
   ])('allows an approved release updater request: %s', (url) => {
     expect(isAllowedProductUpdaterRequest(url, productRepository, 'release')).toBe(true)
-  })
-
-  it.each([
-    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/latest.yml',
-    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/latest.yml?noCache=1j4abc',
-    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/HiveCode.exe'
-  ])('allows a request within the active HiveCloud feed: %s', (url) => {
-    expect(
-      isAllowedProductUpdaterRequest(
-        url,
-        null,
-        'release',
-        null,
-        [],
-        'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
-      )
-    ).toBe(true)
-  })
-
-  it.each([
-    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/arm64/latest.yml',
-    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64-escape/HiveCode.exe',
-    'https://cdn.example/HiveCode.exe',
-    'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/latest.yml?token=secret'
-  ])('blocks a request outside the active HiveCloud feed: %s', (url) => {
-    expect(
-      isAllowedProductUpdaterRequest(
-        url,
-        null,
-        'release',
-        null,
-        [],
-        'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
-      )
-    ).toBe(false)
-  })
-
-  it('does not grant a HiveCloud feed any GitHub redirect authority', () => {
-    const feed = 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
-    expect(
-      isAllowedProductUpdaterRedirectTarget(`${feed}HiveCode.exe`, null, 'release', null, feed)
-    ).toBe(true)
-    expect(
-      isAllowedProductUpdaterRedirectTarget(
-        'https://github.com/stablyai/orca/releases/download/v1.0.0/Orca.exe',
-        null,
-        'release',
-        null,
-        feed
-      )
-    ).toBe(false)
-    expect(
-      isAllowedProductUpdaterRedirectTarget(
-        'https://release-assets.githubusercontent.com/orca/Orca.exe',
-        null,
-        'release',
-        null,
-        feed
-      )
-    ).toBe(false)
   })
 
   it.each([
@@ -186,6 +125,39 @@ describe('isAllowedProductUpdaterRequest', () => {
       isAllowedProductUpdaterRequest(
         'https://updates.hivekernel.com/whats-new/other.json',
         productRepository,
+        'release',
+        null,
+        [configured]
+      )
+    ).toBe(false)
+  })
+
+  it('allows the HiveCloud check query appended to its configured control endpoint', () => {
+    const configured = 'https://updates.hivekernel.com/hive/v1/updates/check'
+    const queried = `${configured}?product=hivecode&platform=windows&architecture=x64&channel=beta&currentVersion=1.4.178-rc.7&currentBuild=1`
+    expect(isAllowedProductUpdaterRequest(queried, null, 'release', null, [configured])).toBe(true)
+    expect(
+      isAllowedProductUpdaterRequest(
+        'https://updates.hivekernel.com/hive/v1/updates/check/other?product=hivecode',
+        null,
+        'release',
+        null,
+        [configured]
+      )
+    ).toBe(false)
+    expect(
+      isAllowedProductUpdaterRequest(
+        `${configured}?product=hivecode&platform=windows&architecture=x64&channel=beta&currentVersion=1.4.178-rc.7&currentBuild=1&token=secret`,
+        null,
+        'release',
+        null,
+        [configured]
+      )
+    ).toBe(false)
+    expect(
+      isAllowedProductUpdaterRequest(
+        `${configured}?product=hivecode&product=other&platform=windows&architecture=x64&channel=beta&currentVersion=1.4.178-rc.7&currentBuild=1`,
+        null,
         'release',
         null,
         [configured]
@@ -325,6 +297,60 @@ describe('installProductUpdaterNetworkBoundary', () => {
         responseHeaders: { 'Content-Length': [String(512 * 1024 * 1024)] },
         statusCode: 200,
         url
+      },
+      callback
+    )
+    expect(callback).toHaveBeenLastCalledWith({ cancel: false })
+  })
+
+  it('treats a HiveCloud object-storage gateway response as the final artifact', () => {
+    const feed = 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+    installProductUpdaterNetworkBoundary(
+      null,
+      () => 'release',
+      undefined,
+      () => null,
+      () => [],
+      () => feed
+    )
+    const handler = onHeadersReceivedMock.mock.calls.at(-1)?.[1] as (
+      details: { responseHeaders?: Record<string, string[]>; statusCode: number; url: string },
+      callback: (response: { cancel: boolean }) => void
+    ) => void
+    const callback = vi.fn()
+    handler(
+      {
+        responseHeaders: { 'content-length': ['123'] },
+        statusCode: 200,
+        url: 'https://updates.hivekernel.example/hive/v1/update-artifacts/4f1f7c54-06f2-4a22-b4a9-26c9c9b0c3f5/download'
+      },
+      callback
+    )
+    expect(callback).toHaveBeenLastCalledWith({ cancel: false })
+  })
+
+  it('does not let the HiveCloud feed path serve arbitrary installer bytes', () => {
+    const feed = 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+    installProductUpdaterNetworkBoundary(
+      null,
+      () => 'release',
+      undefined,
+      () => null,
+      () => [],
+      () => feed
+    )
+    const handler = onBeforeRequestMock.mock.calls.at(-1)?.[1] as (
+      details: { url: string },
+      callback: (response: { cancel: boolean }) => void
+    ) => void
+    const callback = vi.fn()
+
+    handler({ url: `${feed}HiveCode.exe` }, callback)
+    expect(callback).toHaveBeenLastCalledWith({ cancel: true })
+
+    handler(
+      {
+        url: 'https://updates.hivekernel.example/hive/v1/update-artifacts/4f1f7c54-06f2-4a22-b4a9-26c9c9b0c3f5/download'
       },
       callback
     )

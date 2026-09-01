@@ -9,7 +9,7 @@ import {
   getEphemeralVmRecipeResultConnection,
   parseEphemeralVmRecipeResult
 } from '../../shared/ephemeral-vm-recipes'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME, applyProductBranding } from '../../shared/brand'
 import { getDefaultUserDataPath } from './metadata'
 import { getMacAppBundlePath } from './mac-app-update-bundle'
 import {
@@ -246,12 +246,8 @@ function waitForRecipeJson(child: ReturnType<typeof spawnProcess>): Promise<numb
         new RuntimeClientError(
           'runtime_serve_failed',
           typeof code === 'number'
-            ? applyProductBranding(
-                `Orca serve exited before printing valid recipe JSON with code ${code}.`
-              )
-            : applyProductBranding(
-                `Orca serve exited before printing valid recipe JSON via ${signal}.`
-              )
+            ? `${APP_DISPLAY_NAME} serve exited before printing valid recipe JSON with code ${code}.`
+            : `${APP_DISPLAY_NAME} serve exited before printing valid recipe JSON via ${signal}.`
         )
       )
     }
@@ -273,7 +269,7 @@ function getExecutableSpawnOptions(executable: string): Pick<SpawnOptions, 'shel
 
 function resolveAppRoot(): string {
   // Why: dev-mode resource resolution in the Electron child may consult
-  // process.cwd(). Pin it to the app root so `orca serve` behaves the same
+  // process.cwd(). Pin it to the app root so `hive serve` behaves the same
   // regardless of the shell directory it was launched from.
   return resolve(__dirname, '../../..')
 }

@@ -3,7 +3,11 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import type { AgentHookInstallStatus } from '../../shared/agent-hook-types'
-import { AMP_PLUGIN_FILE, AMP_PLUGIN_MARKER } from './agent-status-plugin-source'
+import {
+  AMP_PLUGIN_FILE,
+  AMP_PLUGIN_MARKER,
+  LEGACY_AMP_PLUGIN_MARKER
+} from './agent-status-plugin-source'
 
 export type PluginFileState =
   | { kind: 'absent' }
@@ -21,7 +25,7 @@ export function getRemotePluginPath(remoteHome: string): string {
 }
 
 export function isManagedPlugin(content: string): boolean {
-  return content.includes(AMP_PLUGIN_MARKER)
+  return content.includes(AMP_PLUGIN_MARKER) || content.includes(LEGACY_AMP_PLUGIN_MARKER)
 }
 
 function isCompleteManagedPlugin(content: string): boolean {
@@ -78,7 +82,7 @@ export function statusFromState(
         state: 'partial',
         configPath: pluginPath,
         managedHooksPresent: false,
-        detail: 'Amp Orca status plugin exists but is not Orca-managed'
+        detail: 'Amp HiveCode status plugin exists but is not HiveCode-managed'
       }
     case 'error':
       return {

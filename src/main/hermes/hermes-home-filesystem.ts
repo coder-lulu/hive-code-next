@@ -16,6 +16,7 @@ import { parseHermesConfig, serializeHermesConfig } from './hermes-config-yaml'
 import {
   HERMES_PLUGIN_MARKER,
   HERMES_PLUGIN_NAME,
+  LEGACY_HERMES_PLUGIN_MARKER,
   getPluginInitSource,
   getPluginManifest
 } from './hermes-managed-plugin-source'
@@ -93,11 +94,13 @@ export function getPluginFilesState(pluginDir = getPluginDir()): {
   try {
     const manifest = readFileSync(manifestPath, 'utf-8')
     const init = readFileSync(initPath, 'utf-8')
-    const managed = manifest.includes(HERMES_PLUGIN_MARKER) && init.includes(HERMES_PLUGIN_MARKER)
+    const hasManagedMarker = (content: string): boolean =>
+      content.includes(HERMES_PLUGIN_MARKER) || content.includes(LEGACY_HERMES_PLUGIN_MARKER)
+    const managed = hasManagedMarker(manifest) && hasManagedMarker(init)
     return {
       present: true,
       managed,
-      detail: managed ? null : 'Hermes orca-status plugin exists but is not Orca-managed'
+      detail: managed ? null : 'Hermes orca-status plugin exists but is not managed by HiveCode'
     }
   } catch (error) {
     return {

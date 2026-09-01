@@ -1,6 +1,30 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as ProfileStoragePathsModule from '../orca-profiles/profile-storage-paths'
 import { setStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
+import type * as StructuredAgentSessionRuntimeModule from './structured-agent-session-runtime'
 import { OrcaRuntimeService } from './orca-runtime'
+
+const structuredRuntimeMocks = vi.hoisted(() => ({
+  hasPersistedStore: vi.fn<(stateDirectory: string) => boolean>(),
+  installHost: vi.fn(async () => undefined)
+}))
+
+vi.mock('./structured-agent-session-runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof StructuredAgentSessionRuntimeModule>()),
+  hasPersistedStructuredAgentSessionStore: structuredRuntimeMocks.hasPersistedStore,
+  ensureStructuredAgentSessionHost: structuredRuntimeMocks.installHost
+}))
+
+vi.mock('../orca-profiles/profile-storage-paths', async (importOriginal) => ({
+  ...(await importOriginal<typeof ProfileStoragePathsModule>()),
+  getProfileUserDataPath: () => '/test-profile'
+}))
+
+beforeEach(() => {
+  structuredRuntimeMocks.hasPersistedStore.mockReset()
+  structuredRuntimeMocks.installHost.mockReset()
+  structuredRuntimeMocks.installHost.mockResolvedValue(undefined)
+})
 
 afterEach(() => setStructuredAgentSessionHost(null))
 
@@ -8,21 +32,18 @@ describe('structured session cold restoration', () => {
   it('skips every heavy recovery step when no durable session store exists', async () => {
     const runtime = new OrcaRuntimeService()
     const refresh = vi.fn(async () => new Set<string>())
-    const ensureHost = vi.fn(async () => undefined)
     const reconcileRestartLeases = vi.fn(async () => undefined)
     const internal = runtime as unknown as {
-      hasPersistedStructuredAgentSessionStore(): boolean
       refreshMobileSessionPtyRecords(): Promise<Set<string> | null>
-      ensureStructuredAgentSessionHost(): Promise<void>
     }
-    internal.hasPersistedStructuredAgentSessionStore = () => false
+    structuredRuntimeMocks.hasPersistedStore.mockReturnValue(false)
     internal.refreshMobileSessionPtyRecords = refresh
-    internal.ensureStructuredAgentSessionHost = ensureHost
     setStructuredAgentSessionHost({ reconcileRestartLeases } as never)
 
     await runtime.prepareStructuredAgentSessionStartupRestoration()
 
-    expect(ensureHost).not.toHaveBeenCalled()
+    expect(structuredRuntimeMocks.hasPersistedStore).toHaveBeenCalledWith('/test-profile')
+    expect(structuredRuntimeMocks.installHost).not.toHaveBeenCalled()
     expect(refresh).not.toHaveBeenCalled()
     expect(reconcileRestartLeases).not.toHaveBeenCalled()
   })
@@ -30,25 +51,34 @@ describe('structured session cold restoration', () => {
   it('keeps historical journal parsing outside the terminal-safety fence', async () => {
     const runtime = new OrcaRuntimeService()
     const refresh = vi.fn(async () => new Set<string>())
-    const ensureHost = vi.fn(async () => undefined)
     const reconcileRestartLeases = vi.fn(async () => undefined)
     const restoreReadableSessions = vi.fn(async () => undefined)
     const internal = runtime as unknown as {
-      hasPersistedStructuredAgentSessionStore(): boolean
       refreshMobileSessionPtyRecords(): Promise<Set<string> | null>
-      ensureStructuredAgentSessionHost(): Promise<void>
     }
-    internal.hasPersistedStructuredAgentSessionStore = () => true
+    structuredRuntimeMocks.hasPersistedStore.mockReturnValue(true)
     internal.refreshMobileSessionPtyRecords = refresh
-    internal.ensureStructuredAgentSessionHost = ensureHost
     setStructuredAgentSessionHost({ reconcileRestartLeases, restoreReadableSessions } as never)
 
     await runtime.prepareStructuredAgentSessionStartupRestoration()
 
-    expect(ensureHost).toHaveBeenCalledOnce()
+    expect(structuredRuntimeMocks.installHost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stateDirectory: '/test-profile',
+        hostId: 'local',
+        claimKeyId: expect.any(String),
+        resolveWorkspacePath: expect.any(Function)
+      })
+    )
     expect(refresh).toHaveBeenCalledOnce()
     expect(reconcileRestartLeases).toHaveBeenCalledOnce()
     expect(restoreReadableSessions).not.toHaveBeenCalled()
+    expect(structuredRuntimeMocks.installHost.mock.invocationCallOrder[0]).toBeLessThan(
+      refresh.mock.invocationCallOrder[0] ?? Infinity
+    )
+    expect(refresh.mock.invocationCallOrder[0]).toBeLessThan(
+      reconcileRestartLeases.mock.invocationCallOrder[0] ?? Infinity
+    )
   })
 
   it('loads records, inventories PTYs, restores ownership, then projects tabs exactly once', async () => {

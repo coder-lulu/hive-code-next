@@ -7,7 +7,7 @@ description: >-
   reusable base snapshot, the coding-agent auth snapshot, credentials, and
   state), not just the per-workspace lifecycle scripts. Use to stand up
   per-workspace environments, fix an `environmentRecipes` entry in `orca.yaml`, scaffold
-  provider lifecycle scripts, or resolve an `orca vm recipe doctor` failure.
+  provider lifecycle scripts, or resolve an `hive vm recipe doctor` failure.
 ---
 
 # Per-Workspace Environments
@@ -35,7 +35,7 @@ them in order:
 
 Then the **per-workspace contract** (create/suspend/resume/destroy) runs fast (§8).
 
-**The one branch that shapes everything — connection mode:** **HiveCode-server** (`create` runs `orca serve`
+**The one branch that shapes everything — connection mode:** **HiveCode-server** (`create` runs `hive serve`
 in the env and emits a `pairingCode`; §7c/§7f) vs **SSH** (`create` runs no server and emits a
 `connection.type:"ssh"` block HiveCode dials into; §7g/§7h). Settle this first — it changes the `create`
 output shape and half the templates.
@@ -48,7 +48,7 @@ direct SSH, an ordinary non-bare/non-sparse primary checkout at `projectRoot`, a
 **Quick-start (happy path):** interview the user (connection mode HiveCode-server vs SSH, provider, agent CLI,
 git auth — §1.2) + read the provider's CLI docs → scaffold `scripts/orca-vm/` from §7 → run the
 base-snapshot script, then the auth script (you invoke these by hand; not via `orca.yaml`) → wire
-`environmentRecipes` in `orca.yaml` → `orca vm recipe doctor <id> --json` (free) → then the `--provision`
+`environmentRecipes` in `orca.yaml` → `hive vm recipe doctor <id> --json` (free) → then the `--provision`
 self-test loop (§9) until it passes.
 
 ---
@@ -63,7 +63,7 @@ a long time, or need the user at the keyboard. Never create a HiveCode workspace
 2. **Interview the user up front** — gather these choices and confirm them back before scaffolding
    anything. Don't pick for them (§11); don't guess.
    - **Connection mode:** how HiveCode attaches to the environment — a **HiveCode server** (the VM runs
-     `orca serve` and HiveCode pairs over its pairing URL; worked example §7f) or **SSH** (HiveCode connects to
+     `hive serve` and HiveCode pairs over its pairing URL; worked example §7f) or **SSH** (HiveCode connects to
      the host over SSH; §7g). This decides the recipe's connection shape, so settle it first.
    - **Checkout ownership:** do not ask by default. Only when the user requires the environment to
      create the exact final checkout, confirm `provisioned-root` and direct SSH; otherwise omit it.
@@ -95,10 +95,10 @@ token`; §5).
    until that `orca.yaml` change is committed and merged to the project's primary branch. Tell the user
    this up front: `doctor`/`--provision` validate the scripts from the working copy on any branch, but
    creating a workspace from the recipe in the picker needs it on primary.
-8. **Dry-run doctor** — `orca vm recipe doctor <recipe-id> --repo-path <repo> --json` (free, static; §9).
+8. **Dry-run doctor** — `hive vm recipe doctor <recipe-id> --repo-path <repo> --json` (free, static; §9).
    Fix every failure before going live.
 9. **[CHECKPOINT] Live self-test** — get the user's OK once, then run
-   `orca vm recipe doctor <recipe-id> --provision --json` as a loop: it runs create → validates →
+   `hive vm recipe doctor <recipe-id> --provision --json` as a loop: it runs create → validates →
    destroys, and on failure returns a full transcript. Read it, fix the scripts, and re-run yourself until
    it passes (§9). Spends cloud money; the one approval covers the loop.
 10. **[CHECKPOINT] Optional workspace test** — only if asked: create a workspace via the picker, then
@@ -135,13 +135,13 @@ shape is §7a; key points:
 - Use the VM image's package manager (`apt`/`dnf`/`apk`, per the base distro — not the provider brand).
 - Clone with the git token via `GIT_ASKPASS` (§5).
 - **Trap errors and remove the half-built sandbox** so a crash doesn't leave a paid resource running.
-- **Never snapshot a machine on which the Orca runtime has already run.** The first `orca serve` creates
+- **Never snapshot a machine on which the HiveCode runtime has already run.** The first `hive serve` creates
   the runtime's user-data dir, and everything in it gets baked into the image and shared by every VM
   booted from it: the pairing keypair and device-token registry (`orca-devices.json`,
   `orca-e2ee-keypair.json`), `agent-session-authority.key`, and the build box's logs, terminal history
   and orchestration db. Confirmed: two VMs from one such snapshot emitted **identical `deviceToken` and
   `pairedDeviceId`**. Snapshot **before** the runtime has ever run, or `rm -rf` the whole user-data dir
-  (`~/.config/orca` on Linux) first — deleting a named file list will drift as Orca adds state.
+  (`~/.config/orca` on Linux) first — deleting a named file list will drift as HiveCode adds state.
 - Snapshot the stopped sandbox, parse the snapshot id, and write it + scope/project/port/repo to state.
 
 ---
@@ -170,7 +170,7 @@ their own terminal, or via the Claude Code harness bang-prefix (`! <cmd>`, with 
 `!`). You scaffold/boot the sandbox and run steps 3–4, but **you cannot observe the interactive login
 finishing** — so **ask the user to tell you when it's done** before you verify and re-snapshot.
 
-This layer inherits §3's rule: if you started `orca serve` on the base or auth sandbox to smoke-test it,
+This layer inherits §3's rule: if you started `hive serve` on the base or auth sandbox to smoke-test it,
 delete the runtime's user-data dir (`~/.config/orca` on Linux) before re-snapshotting, or every workspace
 booted from this image shares one pairing identity and one `agent-session-authority.key`.
 
@@ -288,16 +288,16 @@ set -euo pipefail
 # 1. boot sandbox from snapshotId with a published port; capture the public URL → pairing address
 #    (an externally reachable wss:// URL); trap: remove sandbox on error
 # 2. remote exec: ensure repo at desired commit; rebuild only if commit changed (cache marker)
-# 3. remote exec: start orca serve in the background and read the recipe JSON it writes (see below)
+# 3. remote exec: start hive serve in the background and read the recipe JSON it writes (see below)
 # 4. print serve's JSON to stdout, optionally enriched with userData:
 #    { schemaVersion:1, pairingCode, projectRoot, userData:{ provider, resourceId:name, snapshotId } }
 ```
 
-**The exact `orca serve` invocation and its output (verified — do not improvise the flags).** Inside the
+**The exact `hive serve` invocation and its output (verified — do not improvise the flags).** Inside the
 VM, run:
 
 ```bash
-orca serve \
+hive serve \
   --port "$PORT" \
   --project-root "$ABS_REPO_PATH_ON_REMOTE" \
   --pairing-address "$EXTERNAL_WSS_URL" \
@@ -306,7 +306,7 @@ orca serve \
 
 **Binary name:** in a VM built from source (the Phase-2 flow), run it as `pnpm exec orca-dev serve …`
 from the repo root — `orca-dev` is the in-repo entrypoint and is what the §7f example uses. Plain
-`orca serve …` is the same command when the built CLI is installed on the VM's PATH. The flags/output
+`hive serve …` is the same command when the built CLI is installed on the VM's PATH. The flags/output
 are identical either way.
 
 There is **no `--host` flag**. `--project-root` must be an absolute directory on the remote. With
@@ -316,7 +316,7 @@ keeps serving:
 ```json
 {
   "schemaVersion": 1,
-  "pairingCode": "<orca pairing URL>",
+  "pairingCode": "<HiveCode pairing URL>",
   "projectRoot": "<the --project-root you passed>"
 }
 ```
@@ -429,7 +429,7 @@ vercel sandbox exec "$name" "${vercel_args[@]}" --timeout 20m \
       node config/scripts/run-electron-vite-build.mjs --config config/electron-vite.vm-serve.config.ts && \
       printf "%s" "$c" > .orca-built; }' >&2
 
-# 3. (remote) start orca serve in the background, writing recipe JSON to a file; poll until it parses
+# 3. (remote) start hive serve in the background, writing recipe JSON to a file; poll until it parses
 recipe_json="$(vercel sandbox exec "$name" "${vercel_args[@]}" --timeout 60s \
   --env "ORCA_PORT=$port" --env "ORCA_PROJECT_ROOT=$project_root" --env "ORCA_PAIRING_ADDRESS=$pairing_ws" \
   -- bash -lc 'set -euo pipefail; cd "$ORCA_PROJECT_ROOT"; rm -f /tmp/orca-recipe.json /tmp/orca-serve.log; \
@@ -455,7 +455,7 @@ pairing URL). If the user chose **SSH** in the §1 interview, use §7g instead.
 
 SSH mode is **fundamentally different from §7c/§7f**, not a relabeling of them:
 
-- **`create` does NOT run `orca serve` and does NOT emit a `pairingCode`.** HiveCode itself connects to the
+- **`create` does NOT run `hive serve` and does NOT emit a `pairingCode`.** HiveCode itself connects to the
   host over its SSH relay, brings up the git + filesystem providers, and imports the repo. The script's
   only job is to make the host ready and **print SSH connection details** HiveCode will dial.
 - The result uses a `connection` block with `type: "ssh"` and a `target`, **not** the flat
@@ -514,7 +514,7 @@ git checkout -B "$ORCA_REPO_BRANCH" "$ORCA_REPO_REF_HEAD"
 Fail if the requested schema is not `2`; do not silently fall back to the ordinary recipe shape.
 
 **Networking → which `target` fields to set** (how _your desktop_ reaches the box — there is no
-`orca serve` URL in SSH mode):
+`hive serve` URL in SSH mode):
 
 - Public IP / DNS, or a Tailscale/VPN address → `host`; SSH port → `port` (usually 22).
 - Key auth → `identityFile` (add `identitiesOnly: true` if the agent has many keys).
@@ -543,7 +543,7 @@ ssh_opts=(-p "$ssh_port"); [ -n "$identity_file" ] && ssh_opts+=(-i "$identity_f
 # non-interactive create. Pre-add the key (or set the option) so it can't block.
 ssh-keyscan -p "$ssh_port" "$host" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
 
-# 1. ensure the repo is present and at the right commit on the host (NO orca serve here)
+# 1. ensure the repo is present and at the right commit on the host (NO hive serve here)
 ssh "${ssh_opts[@]}" "$ssh_target" \
   "GH_TOKEN='$gh_token' GIT_TERMINAL_PROMPT=0 bash -lc '
      set -euo pipefail
@@ -551,7 +551,7 @@ ssh "${ssh_opts[@]}" "$ssh_target" \
      cd \"$project_root\" && git fetch origin \"$repo_ref\" && git checkout -B \"$repo_ref\" FETCH_HEAD
    '" >&2
 
-# 2. print the SSH connection block (NO pairingCode, NO orca serve). host/port/username tell HiveCode's
+# 2. print the SSH connection block (NO pairingCode, NO hive serve). host/port/username tell HiveCode's
 #    relay how to dial in; identityFile/jumpHost/proxyCommand/portForwards are emitted when set.
 node -e 'const [host,port,user,idf,jh,pc,root]=process.argv.slice(1);
   const target={ label:"per-workspace-host", host, port:Number(port), username:user };
@@ -567,7 +567,7 @@ sleep/wake/delete — that's separate from these scripts.)
 
 If the SSH host is instead an **ephemeral/snapshot-capable VM** (your hypervisor, or a cloud VM with
 image support), keep the §7f Phase-2/3 base-image model for provisioning, but still emit the
-`connection.type:"ssh"` block above instead of starting `orca serve`.
+`connection.type:"ssh"` block above instead of starting `hive serve`.
 
 ### 7h. Worked example — local Docker SSH (SSH connection mode)
 
@@ -652,21 +652,21 @@ environmentRecipes:
 `create` runs **locally from the repo root** and prints **one** JSON object to stdout. Its shape depends
 on the connection mode chosen in §1:
 
-**HiveCode-server mode** — boot the env, start `orca serve` in it, and print serve's result:
+**HiveCode-server mode** — boot the env, start `hive serve` in it, and print serve's result:
 
 ```json
 {
   "schemaVersion": 1,
-  "pairingCode": "orca-pairing-code-or-url",
+  "pairingCode": "<HiveCode pairing code or URL>",
   "projectRoot": "/absolute/path/to/repo/on/remote",
   "userData": { "provider": "example", "resourceId": "provider-resource-id" }
 }
 ```
 
-Here `pairingCode` (from `orca serve --recipe-json`) and `projectRoot` are required; `schemaVersion` (`1`)
+Here `pairingCode` (from `hive serve --recipe-json`) and `projectRoot` are required; `schemaVersion` (`1`)
 and `userData` are optional.
 
-**SSH mode** — do **not** run `orca serve`; print the `connection.type:"ssh"` block instead (full shape +
+**SSH mode** — do **not** run `hive serve`; print the `connection.type:"ssh"` block instead (full shape +
 worked script in §7g). `pairingCode` is **not** used in SSH mode.
 
 **Optional provisioned root** — only for direct SSH and only when explicitly requested. Add
@@ -682,7 +682,7 @@ Lifecycle hooks (all run locally):
 - `resume`: optional. Wake; reads payload on stdin and **prints fresh recipe JSON** (pairing may change).
 - `destroy`: optional unless `destroy: none`. Delete/cleanup; reads payload on stdin.
 
-Start HiveCode remotely with `orca serve --port "$PORT" --project-root "$ABS_ROOT" --pairing-address
+Start HiveCode remotely with `hive serve --port "$PORT" --project-root "$ABS_ROOT" --pairing-address
 "$EXTERNAL_WSS_URL" --recipe-json` (exact flags + output in §7c). Set `--pairing-address` to the
 externally reachable address so the emitted `pairingCode` is reachable; tunneling/port mapping is the
 script's job.
@@ -698,14 +698,14 @@ Validate in two stages — the cheap dry run first, then the live self-test.
 
 ### Dry run (free, non-destructive) — always do this first
 
-`orca vm recipe doctor <recipe-id> --repo-path <repo> --json` validates **static wiring only** — it does
+`hive vm recipe doctor <recipe-id> --repo-path <repo> --json` validates **static wiring only** — it does
 **not** boot anything. It checks: local-host execution (v1), repo path, recipe id exists,
 create/destroy/suspend/resume command paths resolve, suspend/resume are paired, and each script is
 executable (POSIX exec bit; skipped on Windows). Fix every failure here before spending any cloud money.
 
 ### Live self-test (`--provision`) — diagnose and iterate yourself
 
-`orca vm recipe doctor <recipe-id> --repo-path <repo> --provision --json` actually runs the recipe end
+`hive vm recipe doctor <recipe-id> --repo-path <repo> --provision --json` actually runs the recipe end
 to end: it executes `create`, validates the returned recipe JSON, then runs `destroy` to **tear the
 environment back down** (so the test leaves nothing running, as long as `destroy` works). It spends real
 cloud money, so get the user's OK **once** before starting — that one approval covers the whole loop

@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Mic,
   MonitorDown,
+  MonitorSmartphone,
   Palette,
   RefreshCw,
   Scale,
@@ -34,6 +35,7 @@ import {
 } from '../src/transport/host-credential-cleanup'
 import { retryPendingHostCredentialCleanup } from '../src/transport/host-store'
 import { useMobileAuthSession } from '../src/auth/mobile-auth-session'
+import { useMobileUpdate } from '../src/update/use-mobile-update'
 
 const THEME_OPTIONS: readonly { label: string; value: MobileThemePreference }[] = [
   { label: '系统', value: 'system' },
@@ -46,6 +48,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets()
   const theme = useMobileTheme()
   const { hydrated: authHydrated, session } = useMobileAuthSession()
+  const { snapshot: mobileUpdate, checkNow, install } = useMobileUpdate(false)
   const {
     preference,
     hydrated: themePreferenceHydrated,
@@ -123,6 +126,22 @@ export default function SettingsScreen() {
     [setPreference]
   )
 
+  const checkAndInstallUpdate = useCallback(async () => {
+    const result = await checkNow()
+    if (result.state === 'available') {
+      await install()
+    }
+  }, [checkNow, install])
+
+  const updateLabel =
+    mobileUpdate.state === 'checking'
+      ? '检查中'
+      : mobileUpdate.state === 'available' || mobileUpdate.state === 'downloading'
+        ? `有更新 ${mobileUpdate.version ?? ''}`.trim()
+        : mobileUpdate.state === 'error'
+          ? '检查失败，点击重试'
+          : '已是最新版本'
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
@@ -154,11 +173,18 @@ export default function SettingsScreen() {
             onPress={() => router.push('/account')}
           />
           <SettingsRow
-            last
             icon={LogIn}
             label="登录与注册"
             value={session ? '已登录' : '登录/注册'}
             onPress={() => router.push('/login')}
+          />
+          <SettingsRow
+            disabled={!session}
+            icon={MonitorSmartphone}
+            label="Runtime 会话"
+            last
+            value={session ? '查看与撤销' : '登录后可用'}
+            onPress={session ? () => router.push('/runtime-sessions') : undefined}
           />
         </SettingsGroup>
 
@@ -279,11 +305,17 @@ export default function SettingsScreen() {
         <SettingsGroup title="存储与关于">
           <SettingsRow icon={Database} label="存储空间" onPress={() => router.push('/storage')} />
           <SettingsRow disabled icon={MonitorDown} label="桌面客户端下载" value="尚未配置" />
-          <SettingsRow disabled icon={RefreshCw} label="检查更新" value="后续支持" />
+          <SettingsRow
+            icon={RefreshCw}
+            label="检查更新"
+            value={updateLabel}
+            disabled={mobileUpdate.state === 'checking' || mobileUpdate.state === 'downloading'}
+            onPress={() => void checkAndInstallUpdate()}
+          />
           <SettingsRow
             last
             icon={Info}
-            label={productNameText('关于 Orca')}
+            label={productNameText('关于 HiveCode')}
             onPress={() => router.push('/about')}
           />
         </SettingsGroup>

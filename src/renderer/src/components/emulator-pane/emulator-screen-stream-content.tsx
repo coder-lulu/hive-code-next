@@ -64,18 +64,28 @@ export function EmulatorScreenStreamContent({
     streamRotation === 0
       ? 'block h-full w-full bg-black object-contain'
       : 'absolute left-1/2 top-1/2 block max-w-none bg-black object-contain'
+  const connectingDisplayLabel = translate(
+    'auto.components.emulator.pane.emulator.screen.stream.content.connectingDisplay',
+    'Connecting display…'
+  )
 
   if (androidDeviceId && showStream && !video.error) {
     return (
-      <canvas
-        ref={video.canvasRef}
-        className={mediaClassName}
-        style={mediaStyle}
-        aria-label={translate(
-          'auto.components.emulator.pane.emulator.screen.stream.content.5ee64cd44e',
-          'Emulator screen'
-        )}
-      />
+      <>
+        <canvas
+          ref={video.canvasRef}
+          className={mediaClassName}
+          style={mediaStyle}
+          aria-hidden={!video.hasFrame}
+          aria-label={translate(
+            'auto.components.emulator.pane.emulator.screen.stream.content.5ee64cd44e',
+            'Emulator screen'
+          )}
+        />
+        {!video.hasFrame ? (
+          <EmulatorStreamLoadingState label={connectingDisplayLabel} overlay />
+        ) : null}
+      </>
     )
   }
 
@@ -105,19 +115,21 @@ export function EmulatorScreenStreamContent({
 
   const waitingForFrame = showStream && !frameStream.error && !video.error
   const displayError = streamError || Boolean(frameStream.error) || Boolean(video.error)
+  const startingEmulator = loading && !showStream
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/20 text-muted-foreground">
-      {loading || waitingForFrame ? (
-        <>
-          <Loader2 className="size-6 animate-spin text-primary" />
-          <span className="text-xs">
-            {translate(
-              'auto.components.emulator.pane.emulator.screen.stream.content.5f818f12ab',
-              'Connecting emulator…'
-            )}
-          </span>
-        </>
+      {startingEmulator || waitingForFrame ? (
+        <EmulatorStreamLoadingState
+          label={
+            startingEmulator
+              ? translate(
+                  'auto.components.emulator.pane.emulator.screen.stream.content.startingEmulator',
+                  'Starting emulator…'
+                )
+              : connectingDisplayLabel
+          }
+        />
       ) : displayError ? (
         <span className="px-6 text-center text-xs">
           {translate(
@@ -133,6 +145,28 @@ export function EmulatorScreenStreamContent({
           )}
         </span>
       )}
+    </div>
+  )
+}
+
+function EmulatorStreamLoadingState({
+  label,
+  overlay = false
+}: {
+  label: string
+  overlay?: boolean
+}) {
+  return (
+    <div
+      role="status"
+      className={
+        overlay
+          ? 'absolute inset-0 flex flex-col items-center justify-center gap-3 bg-muted/20 text-muted-foreground'
+          : 'flex flex-col items-center justify-center gap-3'
+      }
+    >
+      <Loader2 className="size-6 animate-spin text-primary" />
+      <span className="text-xs">{label}</span>
     </div>
   )
 }

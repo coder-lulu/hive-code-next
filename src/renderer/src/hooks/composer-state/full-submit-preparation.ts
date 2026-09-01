@@ -2,6 +2,7 @@ import type { ComposerModel } from './composer-model'
 
 type FullSubmitPreparationInput = Pick<
   ComposerModel,
+  | 'agentPermissionMode'
   | 'branchAutoNameRef'
   | 'branchNameOverridePreservesNameEdits'
   | 'currentIssueCommand'
@@ -39,9 +40,12 @@ import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcrip
 import type { AgentStartedTelemetry } from '@/lib/worktree-startup-payload'
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import type { PendingSmartGitHubSubmitResolution } from './source-selection-decisions'
+import { resolveTuiAgentLaunchPermission } from '../../../../shared/tui-agent-permissions'
+import { resolveStartupShell } from '../../../../shared/tui-agent-startup-shell'
 
 export function useFullSubmitPreparation(input: FullSubmitPreparationInput) {
   const {
+    agentPermissionMode,
     branchAutoNameRef,
     branchNameOverridePreservesNameEdits,
     currentIssueCommand,
@@ -179,12 +183,23 @@ export function useFullSubmitPreparation(input: FullSubmitPreparationInput) {
         !effectiveBranchNameOverride &&
         !createDisplayName
 
+      const permissionLaunchConfig = resolveTuiAgentLaunchPermission({
+        agent: tuiAgent,
+        mode: agentPermissionMode,
+        agentArgs: resolveTuiAgentLaunchArgs(tuiAgent, settings?.agentDefaultArgs),
+        agentEnv: resolveTuiAgentLaunchEnv(tuiAgent, settings?.agentDefaultEnv),
+        shell: resolveStartupShell(
+          selectedRepoAgentLaunchPlatform,
+          selectedRepoStartupShell ?? undefined
+        )
+      })
       const startupPlan = buildAgentStartupPlan({
         agent: tuiAgent,
         prompt: submitStartupPrompt,
         cmdOverrides: settings?.agentCmdOverrides ?? {},
-        agentArgs: resolveTuiAgentLaunchArgs(tuiAgent, settings?.agentDefaultArgs),
-        agentEnv: resolveTuiAgentLaunchEnv(tuiAgent, settings?.agentDefaultEnv),
+        agentArgs: permissionLaunchConfig.agentArgs,
+        agentEnv: permissionLaunchConfig.agentEnv,
+        agentPermissionMode,
         sessionOptions: resolveInitialNativeChatSessionOptions(
           {
             experimentalNativeChat: settings?.experimentalNativeChat,
@@ -202,6 +217,14 @@ export function useFullSubmitPreparation(input: FullSubmitPreparationInput) {
         shell: selectedRepoStartupShell,
         isRemote: selectedRepoIsRemote
       })
+      if (!startupPlan) {
+        throw new Error(
+          'Unable to build an agent startup command with the selected permission mode.'
+        )
+      }
+      if (agentPermissionMode !== 'default') {
+        startupPlan.agentPermissionMode = agentPermissionMode
+      }
 
       const shouldSeedInitialAgentStatus =
         tuiAgent === 'command-code' && submitStartupPrompt.trim().length > 0
@@ -220,6 +243,9 @@ export function useFullSubmitPreparation(input: FullSubmitPreparationInput) {
               ...(startupPlan.env ? { env: startupPlan.env } : {}),
               launchConfig: startupPlan.launchConfig,
               launchAgent: tuiAgent,
+              ...(startupPlan.agentPermissionMode
+                ? { agentPermissionMode: startupPlan.agentPermissionMode }
+                : {}),
               ...(startupPlan.startupCommandDelivery
                 ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
                 : {}),
@@ -244,6 +270,7 @@ export function useFullSubmitPreparation(input: FullSubmitPreparationInput) {
       })
     },
     [
+      agentPermissionMode,
       branchNameOverridePreservesNameEdits,
       currentIssueCommand,
       isSubmissionCancelled,

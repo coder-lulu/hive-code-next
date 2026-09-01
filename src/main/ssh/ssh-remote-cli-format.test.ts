@@ -5,6 +5,32 @@ import { formatRemoteCli } from './ssh-remote-cli-format'
 const meta = { runtimeId: 'runtime-test' }
 
 describe('formatRemoteCli', () => {
+  it('preserves remote error messages and next steps verbatim', () => {
+    const response: RpcResponse = {
+      id: 'rpc-error',
+      ok: false,
+      _meta: meta,
+      error: {
+        code: 'remote_error',
+        message: 'Could not inspect C:\\customer Orca workspace. Run orca status manually.',
+        data: {
+          nextSteps: [
+            'Inspect C:\\customer Orca workspace.',
+            'Run orca status against the legacy host.'
+          ]
+        }
+      }
+    }
+
+    expect(formatRemoteCli(response)).toEqual({
+      stdout: '',
+      stderr:
+        'Could not inspect C:\\customer Orca workspace. Run orca status manually.\n' +
+        'Next step: Inspect C:\\customer Orca workspace.\n' +
+        'Next step: Run orca status against the legacy host.\n'
+    })
+  })
+
   it('falls back to JSON for malformed Linear issue results', () => {
     const response: RpcResponse = {
       id: 'rpc-1',

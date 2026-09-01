@@ -1,6 +1,8 @@
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
+
 export function resolveOrchestrationCliExecutable(
   env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform
+  _platform: NodeJS.Platform = process.platform
 ): string {
   const configured = env.ORCA_CLI_COMMAND?.trim()
   if (configured) {
@@ -9,7 +11,7 @@ export function resolveOrchestrationCliExecutable(
   if (env.ORCA_DEV_REPO_ROOT) {
     return 'orca-dev'
   }
-  return platform === 'linux' ? 'orca-ide' : 'orca'
+  return PRIMARY_CLI_COMMAND
 }
 
 export function buildOrchestrationRecoveryCommand(

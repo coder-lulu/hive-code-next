@@ -151,4 +151,18 @@ describe('nativeChatLaunchDraftByTabId teardown', () => {
     expect(patch.nativeChatLaunchDraftByTabId[TAB1]).toBeUndefined()
     expect(patch.nativeChatLaunchDraftByTabId[TAB2]).toBeDefined()
   })
+
+  it('the orphan terminal cleanup patch drops swept completion counts only', () => {
+    const store = createTestStore()
+    store.setState({
+      unreadAgentCompletionCountByPane: {
+        [`${TAB1}:leaf-1`]: 2,
+        [`${TAB2}:leaf-1`]: 1
+      }
+    })
+
+    const patch = buildOrphanTerminalCleanupPatch(store.getState(), WT1, new Set([TAB1]))
+
+    expect(patch.unreadAgentCompletionCountByPane).toEqual({ [`${TAB2}:leaf-1`]: 1 })
+  })
 })

@@ -57,6 +57,57 @@ describe('buildHydratedTabState – unified format', () => {
     expect(result.activeGroupIdByWorktree.w1).toBe('g1')
   })
 
+  it('restores project assignment metadata from the persisted terminal row', () => {
+    const assignment = {
+      projectId: 'project-1',
+      projectIdentityKey: 'local|project:project-1',
+      projectGroupId: 'space-1',
+      executionHostId: 'local' as const,
+      assignedAt: 5
+    }
+    const session: WorkspaceSessionState = {
+      ...makeBaseSession(),
+      tabsByWorktree: {
+        w1: [
+          {
+            id: 't1',
+            ptyId: null,
+            worktreeId: 'w1',
+            title: 'Codex',
+            customTitle: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 1,
+            projectAssignment: assignment
+          }
+        ]
+      },
+      unifiedTabs: {
+        w1: [
+          {
+            id: 't1',
+            entityId: 't1',
+            groupId: 'g1',
+            worktreeId: 'w1',
+            contentType: 'terminal',
+            label: 'Codex',
+            customLabel: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 1
+          }
+        ]
+      },
+      tabGroups: {
+        w1: [{ id: 'g1', worktreeId: 'w1', activeTabId: 't1', tabOrder: ['t1'] }]
+      }
+    }
+
+    const result = buildHydratedTabState(session, new Set(['w1']))
+
+    expect(result.unifiedTabsByWorktree.w1?.[0]?.projectAssignment).toEqual(assignment)
+  })
+
   // Why this shape exists at all: a preview used to be an editor tab whose id encoded the document,
   // and its document was never persisted — so sessions written before previews became browser tabs
   // carry chrome for a surface no restore can produce. The reader's other tabs must be untouched.

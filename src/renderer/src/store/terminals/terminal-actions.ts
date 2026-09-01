@@ -2,6 +2,7 @@ import type { TerminalState } from './terminal-state'
 import type { Tab } from '../../../../shared/tab-types'
 import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
 import type { SetupSplitDirection } from '../../../../shared/worktree/launch-types'
 import type {
@@ -13,6 +14,7 @@ import type { StartupCommandDelivery } from '../../../../shared/codex-startup-de
 import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
 import type { AgentStartedTelemetry } from '../../lib/worktree-startup-payload'
 import type { AiVaultSessionTitle } from '../../../../shared/ai-vault-session-title'
+import type { SessionProjectAssignment } from '../../../../shared/session-project-assignment'
 import type {
   GeneratedTabTitleUpdate,
   TerminalTabTitleUpdate
@@ -106,6 +108,12 @@ export type TerminalActions = {
   updateTabTitle: (tabId: string, title: string) => void
   updateTabTitles: (updates: readonly TerminalTabTitleUpdate[]) => void
   setAiVaultTabTitle: (tabId: string, aiVaultTitle: AiVaultSessionTitle | null) => void
+  setSessionProjectAssignment: (
+    worktreeId: string,
+    tabId: string,
+    assignment: SessionProjectAssignment | null,
+    linkedTabIds?: readonly string[]
+  ) => void
   setGeneratedTabTitleFromAgentPrompt: (
     paneKey: string,
     prompt: string,
@@ -120,8 +128,11 @@ export type TerminalActions = {
   markTerminalTabUnread: (tabId: string) => void
   markTerminalPaneUnread: (paneKey: string) => void
   markAgentCompletionPaneUnread: (paneKey: string) => void
+  incrementAgentCompletionUnread: (paneKey: string) => void
+  consumeAgentCompletionUnread: (paneKey: string) => void
+  consumeFirstAgentCompletionUnreadForTab: (tabId: string) => void
   clearTerminalTabUnread: (tabId: string) => void
-  clearTerminalPaneUnread: (paneKey: string) => void
+  clearTerminalPaneUnread: (paneKey: string, options?: { consumeCompletion?: boolean }) => void
   setTabCustomTitle: (
     tabId: string,
     title: string | null,
@@ -203,6 +214,7 @@ export type TerminalActions = {
       resumeProviderSession?: AgentProviderSessionMetadata
       launchToken?: string
       launchAgent?: TuiAgent
+      agentPermissionMode?: AgentExplicitLaunchPermissionMode
       agentArgsOverride?: string | null
       draftPrompt?: string
       sessionOptions?: Record<string, SessionOptionValue>
@@ -229,6 +241,7 @@ export type TerminalActions = {
     resumeProviderSession?: AgentProviderSessionMetadata
     launchToken?: string
     launchAgent?: TuiAgent
+    agentPermissionMode?: AgentExplicitLaunchPermissionMode
     agentArgsOverride?: string | null
     draftPrompt?: string
     sessionOptions?: Record<string, SessionOptionValue>

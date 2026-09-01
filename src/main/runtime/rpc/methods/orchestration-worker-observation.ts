@@ -1,4 +1,5 @@
 import type { RuntimeTerminalInteractiveWait } from '../../../../shared/runtime-types'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { OrchestrationDb } from '../../orchestration/db'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
@@ -117,7 +118,7 @@ export function resolvePinnedFederatedServer(
   if (server.peerFingerprint !== federated.peer_fingerprint) {
     throw new OrchestrationError(
       'peer_changed',
-      `Saved environment ${federated.environment_name} now identifies a different Orca server.`
+      `Saved environment ${federated.environment_name} now identifies a different ${APP_DISPLAY_NAME} server.`
     )
   }
   return server

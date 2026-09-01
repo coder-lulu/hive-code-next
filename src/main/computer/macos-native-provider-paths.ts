@@ -7,8 +7,13 @@ export function resolveMacOSComputerUseAppPath(): string | null {
     return override
   }
 
-  const packaged = [join(process.resourcesPath ?? '', 'Orca Computer Use.app')]
+  const packaged = [
+    join(process.resourcesPath ?? '', 'HiveCode Computer Use.app'),
+    join(process.resourcesPath ?? '', 'Orca Computer Use.app')
+  ]
   const dev = [
+    join(process.cwd(), 'native/computer-use-macos/.build/release/HiveCode Computer Use.app'),
+    resolve(__dirname, '../../native/computer-use-macos/.build/release/HiveCode Computer Use.app'),
     join(process.cwd(), 'native/computer-use-macos/.build/release/Orca Computer Use.app'),
     resolve(__dirname, '../../native/computer-use-macos/.build/release/Orca Computer Use.app')
   ]

@@ -68,6 +68,8 @@ describe('shutdownWorktreeTerminals ordering', () => {
         [worktreeId]: [makeTab({ id: 'tab-1', worktreeId, ptyId: 'pty-1' })]
       },
       ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+      unreadAgentCompletionPanes: { 'tab-1:leaf-1': true },
+      unreadAgentCompletionCountByPane: { 'tab-1:leaf-1': 2 },
       dropAgentStatusByWorktree: vi.fn(() => orderHarness.events.push('agent-cleanup')),
       clearPaneForegroundAgentByWorktree: vi.fn()
     })
@@ -129,6 +131,10 @@ describe('shutdownWorktreeTerminals ordering', () => {
       'agent-cleanup',
       'deferred-exit-settlement'
     ])
+    expect(store.getState().unreadAgentCompletionCountByPane).toEqual({
+      'tab-1:leaf-1': 2
+    })
+    expect(store.getState().unreadAgentCompletionPanes['tab-1:leaf-1']).toBe(true)
     unsubscribe()
   })
 })

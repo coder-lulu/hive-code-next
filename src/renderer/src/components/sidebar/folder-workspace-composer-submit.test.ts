@@ -8,7 +8,12 @@ import type * as NewWorkspaceModule from '@/lib/new-workspace'
 
 const mocks = vi.hoisted(() => ({
   activateAndRevealFolderWorkspace: vi.fn(),
-  ensureAgentStartupInTerminal: vi.fn()
+  ensureAgentStartupInTerminal: vi.fn(),
+  assertRuntimeEnvironmentCapability: vi.fn()
+}))
+
+vi.mock('@/runtime/runtime-rpc-client', () => ({
+  assertRuntimeEnvironmentCapability: mocks.assertRuntimeEnvironmentCapability
 }))
 
 // Why: importOriginal keeps the real resolveStartupLaunchDraftText, so the
@@ -71,6 +76,7 @@ function makeFolderWorkspace(overrides: Partial<FolderWorkspace> = {}): FolderWo
 describe('submitFolderWorkspaceCreate', () => {
   beforeEach(() => {
     mocks.activateAndRevealFolderWorkspace.mockReturnValue({ primaryTabId: 'tab-1' })
+    mocks.assertRuntimeEnvironmentCapability.mockResolvedValue(undefined)
     Object.assign(window, {
       api: {
         agentTrust: {
@@ -83,8 +89,36 @@ describe('submitFolderWorkspaceCreate', () => {
   afterEach(() => {
     mocks.activateAndRevealFolderWorkspace.mockReset()
     mocks.ensureAgentStartupInTerminal.mockReset()
+    mocks.assertRuntimeEnvironmentCapability.mockReset()
     Reflect.deleteProperty(window, 'api')
     vi.restoreAllMocks()
+  })
+
+  it('preflights explicit permissions before creating a Runtime-owned folder workspace', async () => {
+    const createFolderWorkspace = vi.fn(async () => makeFolderWorkspace())
+    mocks.assertRuntimeEnvironmentCapability.mockRejectedValue(
+      new Error('Update the remote Runtime Host to use permission-aware agent launches.')
+    )
+
+    await expect(
+      submitFolderWorkspaceCreate({
+        projectGroup: makeProjectGroup(),
+        name: 'safe launch',
+        lastAutoName: '',
+        linkedWorkItem: null,
+        note: '',
+        quickAgent: 'goose',
+        autoRenameBranchFromWork: false,
+        agentCmdOverrides: {},
+        agentPermissionMode: 'manual',
+        runtimeEnvironmentId: 'env-1',
+        createFolderWorkspace,
+        onOpenChange: vi.fn()
+      })
+    ).rejects.toThrow(/permission-aware agent launches/i)
+
+    expect(createFolderWorkspace).not.toHaveBeenCalled()
+    expect(mocks.activateAndRevealFolderWorkspace).not.toHaveBeenCalled()
   })
 
   it('closes the composer after creation even when reveal fails', async () => {

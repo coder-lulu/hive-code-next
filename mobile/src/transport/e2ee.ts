@@ -31,6 +31,18 @@ export function deriveSharedKey(ourSecretKey: Uint8Array, peerPublicKey: Uint8Ar
   return u8(nacl.box.before(u8(peerPublicKey), u8(ourSecretKey)))
 }
 
+export function hasNonZeroX25519SharedSecret(
+  ourSecretKey: Uint8Array,
+  peerPublicKey: Uint8Array
+): boolean {
+  try {
+    const shared = nacl.scalarMult(u8(ourSecretKey), u8(peerPublicKey))
+    return shared.some((byte) => byte !== 0)
+  } catch {
+    return false
+  }
+}
+
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = ''
   for (let i = 0; i < bytes.length; i++) {

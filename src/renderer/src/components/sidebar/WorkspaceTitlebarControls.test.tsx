@@ -24,8 +24,12 @@ vi.mock('@/components/ui/tooltip', () => ({
     return <>{children}</>
   },
   TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  TooltipContent: ({ children }: { children: ReactNode }) =>
-    mocks.activeTooltipOpen ? <span>{children}</span> : null
+  TooltipContent: ({ children, className }: { children: ReactNode; className?: string }) =>
+    mocks.activeTooltipOpen ? (
+      <span data-testid="workspace-board-tooltip" className={className}>
+        {children}
+      </span>
+    ) : null
 }))
 
 vi.mock('./ScrollToCurrentWorkspaceToolbarButton', () => ({
@@ -88,7 +92,7 @@ describe('WorkspaceTitlebarControls', () => {
     expect(panel.toggleWorkspaceBoard).toHaveBeenCalledOnce()
   })
 
-  it('shows the top-bar relocation hint once to existing board users', async () => {
+  it('shows the relocation hint once to existing board users', async () => {
     mocks.state = {
       persistedUIReady: true,
       featureInteractions: {
@@ -98,7 +102,10 @@ describe('WorkspaceTitlebarControls', () => {
 
     const container = await renderControls()
 
-    expect(container.textContent).toContain('Workspace board moved to the top bar')
+    expect(container.textContent).toContain('Workspace board moved to the bottom bar')
+    expect(container.querySelector('[data-testid="workspace-board-tooltip"]')?.className).toContain(
+      'bg-popover'
+    )
     expect(window.localStorage.getItem('orca.workspaceBoardMovedHintSeen.v2')).toBe('true')
   })
 })

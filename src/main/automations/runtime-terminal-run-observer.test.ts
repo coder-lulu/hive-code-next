@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRuntimeAutomationRunTerminalObserver } from './runtime-terminal-run-observer'
 import type { AutomationRunTerminalHost } from './runtime-terminal-run-observer'
 import type { AutomationRunCompletionObservation } from './run-completion-watcher'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const HANDLE = 'terminal-1'
 const RUNTIME_TUI_IDLE_TIMEOUT_MS = 5 * 60 * 1000
@@ -187,6 +188,7 @@ describe('createRuntimeAutomationRunTerminalObserver', () => {
 
     await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 + RUNTIME_TUI_IDLE_TIMEOUT_MS)
     expect(run.settled[0]?.status).toBe('dispatch_failed')
+    expect(run.settled[0]?.error).toContain(APP_DISPLAY_NAME)
     expect(run.settled[0]?.error).toContain('without a completion signal')
     // 6h of 5-minute waits, not an unbounded re-arm.
     expect(runtime.waitCalls()).toBeLessThanOrEqual(80)

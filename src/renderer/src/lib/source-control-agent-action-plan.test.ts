@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { planSourceControlAgentActionLaunch } from './source-control-agent-action-plan'
 
 describe('planSourceControlAgentActionLaunch', () => {
@@ -39,7 +40,9 @@ describe('planSourceControlAgentActionLaunch', () => {
     expect(result.ok && result.delivery).toBe('paste-submit')
     expect(result.ok && result.commandLabel).toBe('codex')
     expect(result.ok && result.summary).toContain('pastes and submits')
+    expect(result.ok && result.summary).toContain(APP_DISPLAY_NAME)
     expect(result.ok && result.caveat).toContain('PATH')
+    expect(result.ok && result.caveat).toContain(APP_DISPLAY_NAME)
   })
 
   it('includes per-action CLI arguments in submit-after-ready launch plans', () => {

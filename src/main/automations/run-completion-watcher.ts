@@ -4,6 +4,7 @@ import {
   type AutomationRun,
   type AutomationRunOutputSnapshot
 } from '../../shared/automations-types'
+import { applyProductBranding } from '../../shared/brand'
 import { RetainedRunReconciler } from './retained-run-reconciliation'
 
 export type AutomationRunCompletionObservation = {
@@ -25,9 +26,9 @@ export type AutomationRunTerminalObserver = {
 /** Truthful reason for a run this authority can no longer observe; never claims completion. */
 export function describeStrandedAutomationRun(run: AutomationRun): string {
   if (run.status === 'dispatching') {
-    return 'Orca stopped before this run reported that its agent started.'
+    return applyProductBranding('Orca stopped before this run reported that its agent started.')
   }
-  return 'Orca lost the terminal for this run before it reported completion.'
+  return applyProductBranding('Orca lost the terminal for this run before it reported completion.')
 }
 
 /** Why a fixed sentence: the throws here carry internal transport tokens
@@ -35,7 +36,7 @@ export function describeStrandedAutomationRun(run: AutomationRun): string {
  *  history row is user copy. The token stays in the log, where it is useful. */
 function describeObservationError(error: unknown): string {
   console.error('[automations] run completion observation failed:', error)
-  return 'Orca stopped watching this run before it reported completion.'
+  return applyProductBranding('Orca stopped watching this run before it reported completion.')
 }
 
 export class AutomationRunCompletionWatcher {

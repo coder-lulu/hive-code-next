@@ -335,7 +335,7 @@ describe('lease transition against an in-flight write', () => {
     try {
       const { runtime, handle, write } = await makeRuntime({
         onWrite: (_ptyId, data) => {
-          if (data.includes('orca orchestration check')) {
+          if (data.includes('hive orchestration check')) {
             publish(agentSessionLeaseFixture({ runtimeFence: 8 }))
           }
         }

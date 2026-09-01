@@ -161,9 +161,12 @@ export class RelayRegionPreferenceResolver {
 }
 
 export function createRelayRegionPreferenceReader(input: {
-  authConfig: { relayDirectorUrl: string }
+  authConfig: { relayDirectorUrl: string | null }
   userDataPath: string
 }): () => Promise<RelayRegion | undefined> {
+  if (!input.authConfig.relayDirectorUrl) {
+    return async () => undefined
+  }
   const resolver = new RelayRegionPreferenceResolver({
     directorUrl: input.authConfig.relayDirectorUrl,
     userDataPath: input.userDataPath

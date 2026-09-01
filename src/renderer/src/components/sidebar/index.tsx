@@ -17,6 +17,7 @@ import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
+import SidebarSessionSection from './SidebarSessionSection'
 
 const WorktreeMetaDialog = lazyWithRetry(() => import('./WorktreeMetaDialog'))
 const RemoveFolderDialog = lazyWithRetry(() => import('./RemoveFolderDialog'))
@@ -117,11 +118,15 @@ function Sidebar({
           <>
             {/* Fixed controls */}
             <SidebarNav />
+            <SidebarSessionSection />
             <section
               className="sidebar-workspace-section"
-              aria-label={translate('components.desktopHome.workspaceSection', 'Workspaces')}
+              aria-label={translate('components.desktopHome.spaces', 'Spaces')}
             >
-              <SidebarHeader onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen} />
+              <SidebarHeader
+                sectionTitle={translate('components.desktopHome.spaces', 'Spaces')}
+                onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
+              />
 
               <WorktreeList
                 scrollOffsetRef={worktreeScrollOffsetRef}

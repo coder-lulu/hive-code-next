@@ -3,7 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as UnreadBadgeCountModule from '@/lib/unread-badge-count'
-import { makeTab, makeWorktree } from '@/store/slices/store-test-helpers'
+import { makeTab, makeUnifiedTab, makeWorktree } from '@/store/slices/store-test-helpers'
 
 const { getUnreadBadgeCount } = vi.hoisted(() => ({ getUnreadBadgeCount: vi.fn() }))
 
@@ -28,6 +28,7 @@ describe('useUnreadDockBadge', () => {
         ...initialState,
         worktreesByRepo: {},
         tabsByWorktree: {},
+        unifiedTabsByWorktree: {},
         unreadTerminalTabs: {}
       },
       true
@@ -100,7 +101,7 @@ describe('useUnreadDockBadge', () => {
     expect(getUnreadBadgeCount).toHaveBeenCalledTimes(1)
   })
 
-  it('recounts when worktree, tab, or unread references change', () => {
+  it('recounts when worktree, terminal tab, unified tab, or unread references change', () => {
     renderHook(() => useUnreadDockBadge())
     const worktree = makeWorktree({
       id: 'repo::unread',
@@ -122,5 +123,16 @@ describe('useUnreadDockBadge', () => {
     act(() => useAppStore.setState({ unreadTerminalTabs: {} }))
     expect(getUnreadBadgeCount).toHaveBeenCalledTimes(5)
     expect(setUnreadDockBadgeCount).toHaveBeenLastCalledWith(0)
+
+    const unifiedTab = makeUnifiedTab({
+      id: 'structured-unread',
+      worktreeId: worktree.id,
+      groupId: 'group-1',
+      contentType: 'agent-session'
+    })
+    act(() =>
+      useAppStore.setState({ unifiedTabsByWorktree: { [worktree.id]: [unifiedTab] } })
+    )
+    expect(getUnreadBadgeCount).toHaveBeenCalledTimes(6)
   })
 })

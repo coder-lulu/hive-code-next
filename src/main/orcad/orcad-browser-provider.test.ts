@@ -176,17 +176,25 @@ describe('ExternalChromiumBrowserProcess', () => {
 
 describe('cross-platform browser provider paths', () => {
   it('resolves installed Electron launchers on macOS, Linux, and Windows', () => {
+    expect(installedElectronCandidates('darwin', '/Users/test', {})[0]).toBe(
+      '/Applications/HiveCode.app/Contents/MacOS/HiveCode'
+    )
     expect(installedElectronCandidates('darwin', '/Users/test', {})).toContain(
       '/Users/test/Applications/Orca.app/Contents/MacOS/Orca'
+    )
+    expect(installedElectronCandidates('linux', '/home/test', {})[0]).toBe(
+      '/home/test/.local/bin/hive'
     )
     expect(installedElectronCandidates('linux', '/home/test', {})).toContain(
       '/home/test/.local/bin/orca-ide'
     )
-    expect(
-      installedElectronCandidates('win32', 'C:\\Users\\test', {
-        LOCALAPPDATA: 'C:\\Users\\test\\AppData\\Local'
-      })
-    ).toContain('C:\\Users\\test\\AppData\\Local\\Programs\\Orca\\Orca.exe')
+    const windowsCandidates = installedElectronCandidates('win32', 'C:\\Users\\test', {
+      LOCALAPPDATA: 'C:\\Users\\test\\AppData\\Local'
+    })
+    expect(windowsCandidates[0]).toBe(
+      'C:\\Users\\test\\AppData\\Local\\Programs\\HiveCode\\HiveCode.exe'
+    )
+    expect(windowsCandidates).toContain('C:\\Users\\test\\AppData\\Local\\Programs\\Orca\\Orca.exe')
   })
 
   it('uses platform-specific bundled agent-browser names', () => {

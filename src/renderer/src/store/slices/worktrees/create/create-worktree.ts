@@ -12,7 +12,10 @@ import {
   callRuntimeRpc,
   getActiveRuntimeTarget
 } from '../../../../runtime/runtime-rpc-client'
-import { WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY } from '../../../../../../shared/protocol-version'
+import {
+  AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
+  WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY
+} from '../../../../../../shared/protocol-version'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/local-base-ref-suggestion-toast'
 import { requestWorktreeBaseFallbackNotice } from '@/components/worktree-base-fallback-notice'
 import { showLocalBaseRefRefreshToast } from './local-base-ref-refresh-toast'
@@ -183,6 +186,17 @@ export function createCreateWorktree(
       }
       if (options?.provisionedRoot && target.kind !== 'local') {
         throw new Error('Provisioned-root recipes currently require a direct SSH connection.')
+      }
+      if (
+        target.kind === 'environment' &&
+        (request.startup?.agentPermissionMode ||
+          request.options?.requiresAgentLaunchPermissionCapability === true)
+      ) {
+        await assertRuntimeEnvironmentCapability(
+          target.environmentId,
+          AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
+          'Update the remote Runtime Host to use permission-aware agent launches.'
+        )
       }
       for (let attempt = 0; attempt < CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS; attempt += 1) {
         try {

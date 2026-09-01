@@ -62,7 +62,7 @@ import {
   type CachedVisibleProjectTable
 } from './project-visible-table-cache'
 import { translate } from '@/i18n/i18n'
-import { applyProductBranding } from '@/product-brand'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 import { buildTaskSourceContextFromRepo } from '../../../../shared/task-source-context'
 import {
@@ -1196,9 +1196,7 @@ function ViewTabStrip({
         if (supported) {
           return tab
         }
-        const unsupportedMessage = applyProductBranding(
-          `Orca doesn't support ${layoutLabel} project views yet.`
-        )
+        const unsupportedMessage = `${APP_DISPLAY_NAME} doesn't support ${layoutLabel} project views yet.`
         return (
           <HoverCard key={v.id} openDelay={200} closeDelay={100}>
             <HoverCardTrigger asChild>
@@ -1279,17 +1277,16 @@ function ErrorState({
       </div>
     )
   }
-  const copy = applyProductBranding(
+  const copy =
     error.type === 'too_large'
-      ? `This view has ${totalCount ?? 'many'} items — too large to render in Orca. Narrow the view's filter on GitHub.`
+      ? `This view has ${totalCount ?? 'many'} items — too large to render in ${APP_DISPLAY_NAME}. Narrow the view's filter on GitHub.`
       : error.type === 'unsupported_layout'
-        ? 'Orca only renders table views yet. This is a Board or Roadmap view.'
+        ? `${APP_DISPLAY_NAME} only renders table views yet. This is a Board or Roadmap view.`
         : error.type === 'not_found'
           ? 'Could not find this project or view.'
           : error.type === 'schema_drift'
             ? 'Could not read this project view.'
             : error.message
-  )
   return (
     <div className="flex flex-1 flex-col items-start gap-3 p-6 text-sm">
       <div className="text-muted-foreground">{copy}</div>

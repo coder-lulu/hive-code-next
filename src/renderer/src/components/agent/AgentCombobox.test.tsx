@@ -143,6 +143,25 @@ describe('AgentCombobox', () => {
     expect(markup).toContain('size-3.5!')
   })
 
+  it('allows a compact trigger to use a wider option panel', () => {
+    render(
+      <AgentCombobox
+        agents={AGENT_CATALOG}
+        value="codex"
+        onValueChange={vi.fn()}
+        allowNarrowTrigger
+        triggerClassName="w-max"
+        contentClassName="min-w-[18rem]"
+      />
+    )
+
+    fireEvent.click(screen.getByRole('combobox'))
+
+    expect(document.querySelector('[data-slot="popover-content"]')?.className).toContain(
+      'min-w-[18rem]'
+    )
+  })
+
   it('uses the same centered 14px layout for every agent mark', () => {
     for (const agent of AGENT_CATALOG) {
       const markup = renderToStaticMarkup(

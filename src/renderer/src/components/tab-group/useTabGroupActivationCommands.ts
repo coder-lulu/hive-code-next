@@ -25,6 +25,9 @@ export function useTabGroupActivationCommands({
 }) {
   const focusGroup = useAppStore((state) => state.focusGroup)
   const activateTab = useAppStore((state) => state.activateTab)
+  const consumeFirstAgentCompletionUnreadForTab = useAppStore(
+    (state) => state.consumeFirstAgentCompletionUnreadForTab
+  )
   const setActiveTab = useAppStore((state) => state.setActiveTab)
   const setActiveTabType = useAppStore((state) => state.setActiveTabType)
   const setActiveFile = useAppStore((state) => state.setActiveFile)
@@ -53,12 +56,14 @@ export function useTabGroupActivationCommands({
       }
       setActiveTab(terminalId)
       setActiveTabType('terminal')
+      consumeFirstAgentCompletionUnreadForTab(terminalId)
       const activeLeafId = worktreeState.terminalLayoutsByTabId[terminalId]?.activeLeafId ?? null
       // Why: restore xterm focus to the store-active leaf so keyboard input can't drift to a sibling pane.
       focusTerminalTabSurface(terminalId, activeLeafId)
     },
     [
       activateTab,
+      consumeFirstAgentCompletionUnreadForTab,
       focusGroup,
       groupId,
       groupTabs,
@@ -141,9 +146,11 @@ export function useTabGroupActivationCommands({
 
   const activateAgentSession = useCallback(
     (tabId: string) => {
-      activateStructuredAgentSessionTab({ worktreeId, tabId })
+      if (activateStructuredAgentSessionTab({ worktreeId, tabId })) {
+        consumeFirstAgentCompletionUnreadForTab(tabId)
+      }
     },
-    [worktreeId]
+    [consumeFirstAgentCompletionUnreadForTab, worktreeId]
   )
 
   return {

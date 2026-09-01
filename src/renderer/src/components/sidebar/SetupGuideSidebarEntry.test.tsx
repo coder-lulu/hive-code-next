@@ -10,6 +10,7 @@ import { SetupGuideSidebarEntry } from './SetupGuideSidebarEntry'
 
 const mocks = vi.hoisted(() => ({
   useSetupGuideProgress: vi.fn(),
+  useSetupGuideProgressSnapshot: vi.fn(),
   openModal: vi.fn(),
   setSetupGuideSidebarDismissed: vi.fn()
 }))
@@ -31,6 +32,10 @@ vi.mock('@/store', () => ({
 
 vi.mock('../setup-guide/use-setup-guide-progress', () => ({
   useSetupGuideProgress: mocks.useSetupGuideProgress
+}))
+
+vi.mock('../setup-guide/setup-guide-progress-snapshot', () => ({
+  useSetupGuideProgressSnapshot: mocks.useSetupGuideProgressSnapshot
 }))
 
 vi.mock('@/components/ui/context-menu', () => ({
@@ -94,6 +99,11 @@ function makeOnlyBrowserIncompleteProgress(): FeatureWallSetupProgress {
   })
 }
 
+function setSetupProgress(progress: FeatureWallSetupProgress): void {
+  mocks.useSetupGuideProgress.mockReturnValue(progress)
+  mocks.useSetupGuideProgressSnapshot.mockReturnValue(progress)
+}
+
 const mountedRoots: Root[] = []
 
 async function renderSetupGuideSidebarEntry(): Promise<{
@@ -129,7 +139,9 @@ describe('SetupGuideSidebarEntry', () => {
     setupGuideSidebarDismissed = false
     mocks.openModal.mockReset()
     mocks.setSetupGuideSidebarDismissed.mockReset()
-    mocks.useSetupGuideProgress.mockReturnValue(makeProgress())
+    mocks.useSetupGuideProgress.mockReset()
+    mocks.useSetupGuideProgressSnapshot.mockReset()
+    setSetupProgress(makeProgress())
   })
 
   it('does not render before persisted UI hydration is ready', () => {
@@ -139,13 +151,13 @@ describe('SetupGuideSidebarEntry', () => {
   })
 
   it('does not render before setup progress readiness settles', () => {
-    mocks.useSetupGuideProgress.mockReturnValue(makeProgress({ ready: false }))
+    setSetupProgress(makeProgress({ ready: false }))
 
     expect(renderToStaticMarkup(<SetupGuideSidebarEntry />)).not.toContain('Onboarding checklist')
   })
 
   it('does not flash when agent capability completion is still unresolved', () => {
-    mocks.useSetupGuideProgress.mockReturnValue(
+    setSetupProgress(
       makeAllDoneProgress({
         ready: false,
         stepDone: {
@@ -160,19 +172,19 @@ describe('SetupGuideSidebarEntry', () => {
   })
 
   it('does not render after setup is complete and progress is ready', () => {
-    mocks.useSetupGuideProgress.mockReturnValue(makeAllDoneProgress())
+    setSetupProgress(makeAllDoneProgress())
 
     expect(renderToStaticMarkup(<SetupGuideSidebarEntry />)).not.toContain('Onboarding checklist')
   })
 
   it('renders for fresh active users when only the browser step is incomplete', () => {
-    mocks.useSetupGuideProgress.mockReturnValue(makeOnlyBrowserIncompleteProgress())
+    setSetupProgress(makeOnlyBrowserIncompleteProgress())
 
     expect(renderToStaticMarkup(<SetupGuideSidebarEntry />)).toContain('Onboarding checklist')
   })
 
   it('does not render when the sidebar entry was dismissed with only browser incomplete', () => {
-    mocks.useSetupGuideProgress.mockReturnValue(makeOnlyBrowserIncompleteProgress())
+    setSetupProgress(makeOnlyBrowserIncompleteProgress())
     setupGuideSidebarDismissed = true
 
     expect(renderToStaticMarkup(<SetupGuideSidebarEntry />)).not.toContain('Onboarding checklist')
@@ -182,17 +194,24 @@ describe('SetupGuideSidebarEntry', () => {
     expect(renderToStaticMarkup(<SetupGuideSidebarEntry />)).toContain('Onboarding checklist')
   })
 
+  it('reads the root observer snapshot without starting another progress probe', () => {
+    renderToStaticMarkup(<SetupGuideSidebarEntry />)
+
+    expect(mocks.useSetupGuideProgressSnapshot).toHaveBeenCalledOnce()
+    expect(mocks.useSetupGuideProgress).not.toHaveBeenCalled()
+  })
+
   it('keeps the visible entry mounted during transient setup progress refreshes', async () => {
     const { container, rerender } = await renderSetupGuideSidebarEntry()
 
     expect(container.textContent).toContain('Onboarding checklist')
 
-    mocks.useSetupGuideProgress.mockReturnValue(makeProgress({ ready: false }))
+    setSetupProgress(makeProgress({ ready: false }))
     await rerender()
 
     expect(container.textContent).toContain('Onboarding checklist')
 
-    mocks.useSetupGuideProgress.mockReturnValue(makeAllDoneProgress())
+    setSetupProgress(makeAllDoneProgress())
     await rerender()
 
     expect(container.textContent).not.toContain('Onboarding checklist')

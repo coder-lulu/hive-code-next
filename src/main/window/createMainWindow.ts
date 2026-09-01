@@ -722,6 +722,9 @@ export function createMainWindow(
       case 'toggleQuickCommandsMenu':
         mainWindow.webContents.send('ui:toggleQuickCommandsMenu')
         return
+      case 'openNewTaskHome':
+        mainWindow.webContents.send('ui:openNewTaskHome')
+        return
       case 'openNewWorkspace':
         mainWindow.webContents.send('ui:openNewWorkspace')
         return
@@ -1026,7 +1029,7 @@ export function createMainWindow(
           title: APP_DISPLAY_NAME,
           body: translateMain(
             'tray.minimizeNotice.body',
-            'Orca is still running in the system tray'
+            `${APP_DISPLAY_NAME} is still running in the system tray`
           )
         }).show()
       } catch {

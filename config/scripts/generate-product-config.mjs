@@ -21,14 +21,18 @@ const ENDPOINT_KEYS = [
   'changelog',
   'nudge'
 ]
+const SERVICE_KEYS = ['api', 'identity', 'oss', 'update', 'relay']
 const SECRET_KEY_PATTERN = /(secret|token|password|private.?key|api.?key|credential)/i
 const CLI_NAME_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*$/
 const SLUG_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const GITHUB_REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/
-const PRODUCT_UPDATE_CHANNELS = new Set(['stable', 'beta', 'rc'])
+// Keep legacy rc readable during migration; publishing workflows must emit beta
+// or stable and never append an internal suffix to the product version.
+const PRODUCT_UPDATE_CHANNELS = new Set(['internal', 'stable', 'beta', 'rc'])
 const PRODUCT_UPDATE_PROVIDERS = new Set(['github', 'hivecloud'])
+const HIVECLOUD_UPDATE_CHECK_PATH = '/hive/v1/updates/check'
 const STRICT_HTTPS_ENDPOINTS = new Set(['artifacts', 'pluginMarketplace', 'changelog', 'nudge'])
 const ORIGIN_ONLY_ENDPOINTS = new Set(['artifacts'])
 
@@ -43,7 +47,8 @@ const REQUIRED_ROOT_KEYS = [
   'schemes',
   'desktop',
   'mobile',
-  'endpoints'
+  'endpoints',
+  'services'
 ]
 const ROOT_KEYS = new Set(['$schema', ...REQUIRED_ROOT_KEYS])
 const BRANDING_KEYS = new Set(['logoAsset', 'logoSha256'])
@@ -71,6 +76,20 @@ const DESKTOP_KEYS = new Set([
 const MOBILE_KEYS = new Set(['bundleId', 'packageId'])
 const CLI_KEYS = new Set(['primary', 'aliases'])
 const SCHEME_KEYS = new Set(['primary', 'aliases'])
+const SERVICE_GROUP_KEYS = new Set(['api', 'identity', 'oss', 'update', 'relay'])
+const SERVICE_API_KEYS = new Set(['baseUrl'])
+const SERVICE_IDENTITY_KEYS = new Set(['issuer', 'clients'])
+const SERVICE_IDENTITY_CLIENT_KEYS = new Set(['desktop', 'userWeb', 'operatorWeb'])
+const SERVICE_OSS_KEYS = new Set(['enabled', 'endpoint', 'provider'])
+const SERVICE_UPDATE_KEYS = new Set([
+  'enabled',
+  'endpoint',
+  'checkEndpoint',
+  'provider',
+  'channel',
+  'checkIntervalHours'
+])
+const SERVICE_RELAY_KEYS = new Set(['enabled', 'directorUrl'])
 
 function assertObject(value, label) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -169,9 +188,10 @@ function assertEndpoint(value, label, requireHttps = false, requireOrigin = fals
   if (requireOrigin && parsed.pathname !== '/') {
     throw new Error(`${label} must be an origin without a path`)
   }
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
   if (
-    parsed.protocol !== 'https:' &&
-    !['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
+    !['https:', 'http:'].includes(parsed.protocol) ||
+    (parsed.protocol === 'http:' && !loopback)
   ) {
     throw new Error(`${label} must use HTTPS unless it targets loopback`)
   }
@@ -229,7 +249,7 @@ function assertManifestShape(manifest) {
     manifest.desktop.updateChannel &&
     !PRODUCT_UPDATE_CHANNELS.has(manifest.desktop.updateChannel)
   ) {
-    throw new Error('desktop.updateChannel must be stable, beta, rc, or null')
+    throw new Error('desktop.updateChannel must be internal, stable, beta, rc, or null')
   }
   assertOptionalString(manifest.desktop.updateRepository, 'desktop.updateRepository')
   if (manifest.desktop.updateRepository) {
@@ -264,6 +284,119 @@ function assertManifestShape(manifest) {
       STRICT_HTTPS_ENDPOINTS.has(key),
       ORIGIN_ONLY_ENDPOINTS.has(key)
     )
+  }
+
+  assertObject(manifest.services, 'services')
+  assertKnownKeys(manifest.services, SERVICE_GROUP_KEYS, 'services')
+  assertRequiredKeys(manifest.services, SERVICE_KEYS, 'services')
+
+  const api = manifest.services.api
+  assertObject(api, 'services.api')
+  assertKnownKeys(api, SERVICE_API_KEYS, 'services.api')
+  assertRequiredKeys(api, SERVICE_API_KEYS, 'services.api')
+  assertEndpoint(api.baseUrl, 'services.api.baseUrl')
+  if (!api.baseUrl) {
+    throw new Error('services.api.baseUrl is required')
+  }
+
+  const identity = manifest.services.identity
+  assertObject(identity, 'services.identity')
+  assertKnownKeys(identity, SERVICE_IDENTITY_KEYS, 'services.identity')
+  assertRequiredKeys(identity, SERVICE_IDENTITY_KEYS, 'services.identity')
+  assertEndpoint(identity.issuer, 'services.identity.issuer')
+  if (!identity.issuer) {
+    throw new Error('services.identity.issuer is required')
+  }
+  assertObject(identity.clients, 'services.identity.clients')
+  assertKnownKeys(identity.clients, SERVICE_IDENTITY_CLIENT_KEYS, 'services.identity.clients')
+  assertRequiredKeys(identity.clients, SERVICE_IDENTITY_CLIENT_KEYS, 'services.identity.clients')
+  for (const key of SERVICE_IDENTITY_CLIENT_KEYS) {
+    assertNonEmptyString(identity.clients[key], `services.identity.clients.${key}`)
+  }
+
+  const oss = manifest.services.oss
+  assertObject(oss, 'services.oss')
+  assertKnownKeys(oss, SERVICE_OSS_KEYS, 'services.oss')
+  assertRequiredKeys(oss, SERVICE_OSS_KEYS, 'services.oss')
+  if (typeof oss.enabled !== 'boolean') {
+    throw new Error('services.oss.enabled must be boolean')
+  }
+  assertOptionalString(oss.provider, 'services.oss.provider')
+  assertEndpoint(oss.endpoint, 'services.oss.endpoint')
+  if (oss.enabled && (!oss.endpoint || !oss.provider)) {
+    throw new Error('services.oss requires endpoint and provider when enabled')
+  }
+
+  const update = manifest.services.update
+  assertObject(update, 'services.update')
+  assertKnownKeys(update, SERVICE_UPDATE_KEYS, 'services.update')
+  assertRequiredKeys(update, SERVICE_UPDATE_KEYS, 'services.update')
+  if (typeof update.enabled !== 'boolean') {
+    throw new Error('services.update.enabled must be boolean')
+  }
+  assertEndpoint(update.endpoint, 'services.update.endpoint')
+  assertEndpoint(update.checkEndpoint, 'services.update.checkEndpoint', true)
+  if (
+    update.checkEndpoint &&
+    (() => {
+      const parsed = new URL(update.checkEndpoint)
+      return parsed.pathname.includes('%') || parsed.pathname !== HIVECLOUD_UPDATE_CHECK_PATH
+    })()
+  ) {
+    throw new Error(
+      `services.update.checkEndpoint must use the canonical ${HIVECLOUD_UPDATE_CHECK_PATH} path`
+    )
+  }
+  if (update.enabled && !update.checkEndpoint) {
+    throw new Error('services.update.checkEndpoint must be an HTTPS URL when enabled')
+  }
+  assertOptionalString(update.provider, 'services.update.provider')
+  assertOptionalString(update.channel, 'services.update.channel')
+  if (update.enabled && (!update.endpoint || !update.provider || !update.channel)) {
+    throw new Error('services.update requires endpoint, provider and channel when enabled')
+  }
+  if (update.provider && !PRODUCT_UPDATE_PROVIDERS.has(update.provider)) {
+    throw new Error('services.update.provider must be github, hivecloud, or null')
+  }
+  if (update.channel && !PRODUCT_UPDATE_CHANNELS.has(update.channel)) {
+    throw new Error('services.update.channel must be internal, stable, beta, rc, or null')
+  }
+  if (
+    !Number.isInteger(update.checkIntervalHours) ||
+    update.checkIntervalHours < 1 ||
+    update.checkIntervalHours > 168
+  ) {
+    throw new Error('services.update.checkIntervalHours must be an integer between 1 and 168')
+  }
+
+  const relay = manifest.services.relay
+  assertObject(relay, 'services.relay')
+  assertKnownKeys(relay, SERVICE_RELAY_KEYS, 'services.relay')
+  assertRequiredKeys(relay, SERVICE_RELAY_KEYS, 'services.relay')
+  if (typeof relay.enabled !== 'boolean') {
+    throw new Error('services.relay.enabled must be boolean')
+  }
+  assertOptionalString(relay.directorUrl, 'services.relay.directorUrl')
+  assertEndpoint(relay.directorUrl, 'services.relay.directorUrl')
+  if (relay.enabled && !relay.directorUrl) {
+    throw new Error('services.relay.directorUrl is required when Relay is enabled')
+  }
+
+  // During the migration, keep populated legacy endpoint aliases aligned with
+  // the canonical services block. Empty legacy values remain valid so older
+  // manifests can be upgraded incrementally without reviving disabled services.
+  const legacyServiceAliases = {
+    cloud: api.baseUrl,
+    identityIssuer: identity.issuer,
+    relay: relay.enabled ? relay.directorUrl : null,
+    update: update.enabled ? update.endpoint : null,
+    artifacts: oss.enabled ? oss.endpoint : null
+  }
+  for (const [key, value] of Object.entries(legacyServiceAliases)) {
+    const legacy = manifest.endpoints[key]
+    if (legacy !== null && legacy !== undefined && legacy !== '' && legacy !== value) {
+      throw new Error(`endpoints.${key} conflicts with services configuration`)
+    }
   }
 }
 
@@ -364,7 +497,36 @@ export function normalizeProductManifest(manifest) {
     },
     endpoints: Object.fromEntries(
       ENDPOINT_KEYS.map((key) => [key, nullableString(manifest.endpoints[key])])
-    )
+    ),
+    services: {
+      api: { baseUrl: manifest.services.api.baseUrl.trim() },
+      identity: {
+        issuer: manifest.services.identity.issuer.trim(),
+        clients: Object.fromEntries(
+          [...SERVICE_IDENTITY_CLIENT_KEYS].map((key) => [
+            key,
+            manifest.services.identity.clients[key].trim()
+          ])
+        )
+      },
+      oss: {
+        enabled: manifest.services.oss.enabled,
+        endpoint: nullableString(manifest.services.oss.endpoint),
+        provider: nullableString(manifest.services.oss.provider)
+      },
+      update: {
+        enabled: manifest.services.update.enabled,
+        endpoint: nullableString(manifest.services.update.endpoint),
+        checkEndpoint: nullableString(manifest.services.update.checkEndpoint),
+        provider: nullableString(manifest.services.update.provider),
+        channel: nullableString(manifest.services.update.channel),
+        checkIntervalHours: manifest.services.update.checkIntervalHours
+      },
+      relay: {
+        enabled: manifest.services.relay.enabled,
+        directorUrl: nullableString(manifest.services.relay.directorUrl)
+      }
+    }
   }
 }
 

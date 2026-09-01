@@ -31,6 +31,16 @@ describe('beginHiveAccountPkceFlow', () => {
     const authorizeUrl = new URL(openedUrl)
     const redirectUri = authorizeUrl.searchParams.get('redirect_uri')
     expect(redirectUri).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
+    expect(authorizeUrl.searchParams.get('client_id')).toBe(HIVE_ACCOUNT_CLIENT_ID)
+    expect(authorizeUrl.searchParams.get('response_type')).toBe('code')
+    expect(authorizeUrl.searchParams.get('scope')).toBe('openid hive.session.exchange')
+    expect(authorizeUrl.searchParams.get('state')).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(authorizeUrl.searchParams.get('nonce')).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(authorizeUrl.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(authorizeUrl.searchParams.get('code_challenge_method')).toBe('S256')
+    expect(authorizeUrl.searchParams.has('acr_values')).toBe(false)
+    expect(authorizeUrl.searchParams.has('max_age')).toBe(false)
+    expect(authorizeUrl.searchParams.has('prompt')).toBe(false)
 
     const callback = new URL(redirectUri!)
     callback.searchParams.set('code', 'authorization-code')
@@ -43,5 +53,35 @@ describe('beginHiveAccountPkceFlow', () => {
       authorizationCode: 'authorization-code',
       redirectUri
     })
+  })
+
+  it('requests a fresh LoA 2 authentication only for an explicit step-up flow', async () => {
+    let openedUrl = ''
+    electronMocks.openExternal.mockImplementation(async (url) => {
+      openedUrl = url
+    })
+
+    const authorization = beginHiveAccountPkceFlow({
+      authorizationEndpoint:
+        'https://identity.hivekernel.com/realms/hive/protocol/openid-connect/auth',
+      clientId: HIVE_ACCOUNT_CLIENT_ID,
+      scope: 'openid hive.session.exchange',
+      acrValues: 'urn:hive:acr:step-up',
+      maxAgeSeconds: 0,
+      prompt: 'login',
+      prepareDeviceAuthorization: async () => undefined
+    })
+
+    await vi.waitFor(() => expect(openedUrl).not.toBe(''))
+    const authorizeUrl = new URL(openedUrl)
+    expect(authorizeUrl.searchParams.get('acr_values')).toBe('urn:hive:acr:step-up')
+    expect(authorizeUrl.searchParams.get('max_age')).toBe('0')
+    expect(authorizeUrl.searchParams.get('prompt')).toBe('login')
+
+    const callback = new URL(authorizeUrl.searchParams.get('redirect_uri')!)
+    callback.searchParams.set('code', 'step-up-code')
+    callback.searchParams.set('state', authorizeUrl.searchParams.get('state')!)
+    expect((await fetch(callback)).status).toBe(200)
+    await expect(authorization).resolves.toMatchObject({ authorizationCode: 'step-up-code' })
   })
 })

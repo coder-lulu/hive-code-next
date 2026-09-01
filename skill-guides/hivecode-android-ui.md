@@ -48,18 +48,18 @@ For HiveCode-managed device control, load the version-matched guide before
 guessing commands:
 
 ```text
-ORCA skills get orca-emulator-android
-ORCA emulator devices --json
+hive skills get orca-emulator-android
+hive emulator devices --json
 ```
 
-Resolve `ORCA` once for the session: use `ORCA_CLI_COMMAND` when set, otherwise
-`orca-dev` in a development checkout exposing `ORCA_DEV_REPO_ROOT`, `orca-ide`
-on unmanaged Linux, and `orca` elsewhere. `ORCA` is documentation notation,
-not a command to run literally. Use the device serial reported by discovery;
-never infer one from an AVD name. ORCA coordinates are normalized 0..1, while
-direct adb commands use physical pixels.
+Use `hive` in current builds. If the compatibility environment variable
+`ORCA_CLI_COMMAND` is set, use its pinned executable instead. Older builds may
+expose `orca-dev`, `orca-ide`, or `orca`; use one only when `hive` is unavailable.
+Use the device serial reported by discovery; never infer one from an AVD name.
+HiveCode coordinates are normalized 0..1, while direct adb commands use physical
+pixels.
 
-If HiveCode/ORCA is unavailable, use the Windows SDK fallback below. This is
+If the HiveCode CLI is unavailable, use the Windows SDK fallback below. This is
 also the reliable path for the local Windows Android test setup.
 
 ## Start or attach an Android emulator (Windows fallback)
@@ -239,9 +239,9 @@ unverified endpoint, clipped text, or a stale generated skill artifact.
 - **Screenshot looks stale:** force-stop the package, relaunch, wait for the
   WebSocket/Metro settle, then capture again. Do not trust a frame taken during
   Fast Refresh.
-- **ORCA command mismatch:** use the exact executable's `skills get` guide and
+- **HiveCode command mismatch:** use the exact executable's `skills get` guide and
   `--json` discovery output. Do not switch executables after an arbitrary error
   or guess undocumented flags.
 
-See also: `orca-emulator-android` for the complete ORCA Android command
+See also: `orca-emulator-android` for the complete HiveCode Android command
 surface, and `orca-cli` for HiveCode-managed terminal/worktree operations.

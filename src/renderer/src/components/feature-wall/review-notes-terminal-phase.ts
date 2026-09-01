@@ -1,4 +1,5 @@
 import { NOTE_TARGETS } from './review-animated-visual-shared'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 // Why: terminal-phase logic for the Notes panel lives here so the imperative
 // loop in ReviewNotesAnimatedVisual stays under the per-file lint cap. The
@@ -7,7 +8,7 @@ import { NOTE_TARGETS } from './review-animated-visual-shared'
 //
 // Mirrors docs/feature-wall-review-tile-mock.html: the panel auto-starts a
 // Claude Code session (no `$ claude` command, no typed prompt), shows
-// "Loaded N review notes from Orca", lists each ack with its line number,
+// "Loaded N review notes from HiveCode", lists each ack with its line number,
 // and ends on "Fixing both issues..." with a spinner.
 export type TerminalPhaseContext = {
   term: HTMLDivElement
@@ -69,7 +70,13 @@ export async function runTerminalPhase(ctx: TerminalPhaseContext): Promise<void>
   }
   const loadedEl = term.querySelector<HTMLDivElement>('[data-term-line-loaded]')
   if (loadedEl) {
-    loadedEl.innerHTML = `<span class="ravs-term-check">✓</span><span class="ravs-term-muted">Loaded ${NOTE_TARGETS.length} review notes from Orca</span>`
+    const check = document.createElement('span')
+    check.className = 'ravs-term-check'
+    check.textContent = '✓'
+    const message = document.createElement('span')
+    message.className = 'ravs-term-muted'
+    message.textContent = `Loaded ${NOTE_TARGETS.length} review notes from ${APP_DISPLAY_NAME}`
+    loadedEl.replaceChildren(check, message)
   }
   await wait(520)
   if (isCancelled()) {

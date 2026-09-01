@@ -15,6 +15,7 @@ import {
 } from '../../../shared/updater-windows-signature-check'
 import { getReleaseNotesUrlForVersion } from '../../../shared/release-channel'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ export function UpdateCard() {
   const [exiting, setExiting] = useState(false)
   const changelog: ChangelogData | null = storeChangelog
   const isLocalBuild = status.source === 'local'
+  const isMandatoryUpdate = status.mandatory === true
 
   // Why: the 'error' variant carries no version, but the card needs it for the fallback URL and dismiss; cache from states that have it.
   const versionRef = useRef<string | null>(null)
@@ -215,23 +217,34 @@ export function UpdateCard() {
   }
 
   // Error: show for user-initiated failures or failures tied to a cached version; background failures stay silent.
-  if (status.state === 'error' && !shouldShowDetailedErrorCard && !isUserInitiated) {
+  if (
+    status.state === 'error' &&
+    !isMandatoryUpdate &&
+    !shouldShowDetailedErrorCard &&
+    !isUserInitiated
+  ) {
     return null
   }
 
   // Why: the dismiss gate below keeps error cards visible, so an explicit X on the error card needs this gate to hide it.
-  if (status.state === 'error' && errorDismissed) {
+  if (status.state === 'error' && errorDismissed && !isMandatoryUpdate) {
     return null
   }
 
   // Dismiss gate: hide previously-dismissed versions for passive states, keep in-progress/error visible, and bypass for user-initiated checks.
-  if (versionRef.current && dismissedVersion === versionRef.current && !updateUserInitiatedCycle) {
+  if (
+    !isMandatoryUpdate &&
+    versionRef.current &&
+    dismissedVersion === versionRef.current &&
+    !updateUserInitiatedCycle
+  ) {
     if (status.state !== 'downloading' && status.state !== 'error') {
       return null
     }
   }
 
   if (
+    !isMandatoryUpdate &&
     collapsed &&
     (status.state === 'downloading' || status.state === 'downloaded' || status.state === 'error')
   ) {
@@ -253,6 +266,9 @@ export function UpdateCard() {
 
   // Why: the 'error' variant has no version field, so dismiss needs an explicit version override.
   const handleClose = () => {
+    if (isMandatoryUpdate) {
+      return
+    }
     // Why: dismissUpdate clears the store manual-check bypass so the dismiss gate re-engages after closing.
     if (status.state === 'error') {
       setErrorDismissed(true)
@@ -328,7 +344,7 @@ export function UpdateCard() {
           ? {
               variant: 'http1Compatibility',
               title: translate('auto.components.UpdateCard.1339b82cee', 'HTTP/2 Download Blocked'),
-              summary: 'Orca can retry through HTTP/1.1 compatibility mode.',
+              summary: `${APP_DISPLAY_NAME} can retry through HTTP/1.1 compatibility mode.`,
               explainer: translate(
                 'auto.components.UpdateCard.90559b14e3',
                 'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
@@ -352,7 +368,7 @@ export function UpdateCard() {
                 ),
                 summary: translate(
                   'auto.components.UpdateCard.092f09fc14',
-                  "The installer's publisher doesn't match Orca, so we stopped the update. Don't install this download; check official releases for a corrected version."
+                  `The installer's publisher doesn't match ${APP_DISPLAY_NAME}, so we stopped the update. Don't install this download; check official releases for a corrected version.`
                 ),
                 detail: status.message,
                 // Why: linking the rejected version would let users bypass the publisher check by re-running it.
@@ -414,6 +430,9 @@ export function UpdateCard() {
         : null
 
   const handleDismissWithAnimation = () => {
+    if (isMandatoryUpdate) {
+      return
+    }
     if (prefersReducedMotion) {
       handleClose()
       return
@@ -430,6 +449,9 @@ export function UpdateCard() {
 
   // Why: dismissing an active download would orphan it, so long-running phases minimize to the status bar.
   const handleCollapseWithAnimation = () => {
+    if (isMandatoryUpdate) {
+      return
+    }
     if (prefersReducedMotion) {
       setCollapsed(true)
       return
@@ -611,45 +633,70 @@ export function UpdateCard() {
     !reassuranceSeen && (status.state === 'available' || status.state === 'downloading')
 
   return (
-    <div
-      ref={cardRootRef}
-      className="fixed bottom-10 right-4 z-40 w-[360px] max-w-[calc(100vw-32px)] flex flex-col gap-2
-      max-[480px]:left-4 max-[480px]:right-4 max-[480px]:w-auto"
-    >
-      {showReassurance && (
-        <Card className={`py-0 gap-0 ${animationClass}`}>
-          <div className="flex items-center gap-3 p-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground">
-                {translate(
-                  'auto.components.UpdateCard.b1d867f4fb',
-                  "Your terminal sessions won't be interrupted during the update."
-                )}
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0"
-              onClick={markReassuranceSeen}
-              aria-label={translate('auto.components.UpdateCard.7274ef6e59', 'Dismiss tip')}
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-        </Card>
+    <>
+      {isMandatoryUpdate && (
+        <div
+          className="fixed inset-0 z-30 bg-black/20"
+          aria-hidden="true"
+          data-testid="mandatory-update-backdrop"
+        />
       )}
-      <Card
-        role="complementary"
-        aria-label={ariaLabel}
-        aria-live="polite"
-        tabIndex={-1}
-        onKeyDown={handleKeyDown}
-        className={`py-0 gap-0 ${animationClass}`}
+      <div
+        ref={cardRootRef}
+        className="fixed bottom-10 right-4 z-40 w-[360px] max-w-[calc(100vw-32px)] flex flex-col gap-2
+      max-[480px]:left-4 max-[480px]:right-4 max-[480px]:w-auto"
       >
-        {cardContent}
-      </Card>
-    </div>
+        {showReassurance && (
+          <Card className={`py-0 gap-0 ${animationClass}`}>
+            <div className="flex items-center gap-3 p-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">
+                  {translate(
+                    'auto.components.UpdateCard.b1d867f4fb',
+                    "Your terminal sessions won't be interrupted during the update."
+                  )}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0"
+                onClick={markReassuranceSeen}
+                aria-label={translate('auto.components.UpdateCard.7274ef6e59', 'Dismiss tip')}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
+          </Card>
+        )}
+        <Card
+          role="complementary"
+          aria-label={ariaLabel}
+          aria-live="polite"
+          tabIndex={-1}
+          onKeyDown={handleKeyDown}
+          className={`py-0 gap-0 ${animationClass}`}
+        >
+          {isMandatoryUpdate && (
+            <div className="border-b border-destructive/30 bg-destructive/10 px-3.5 py-2 text-xs text-destructive">
+              {translate(
+                'auto.components.UpdateCard.mandatoryUpdateRequired',
+                'This update is required to continue using {{product}}.',
+                { product: APP_DISPLAY_NAME }
+              )}
+              {status.latestBuild
+                ? translate(
+                    'auto.components.UpdateCard.mandatoryUpdateBuild',
+                    ' Build {{build}}.',
+                    { build: status.latestBuild }
+                  )
+                : ''}
+            </div>
+          )}
+          {cardContent}
+        </Card>
+      </div>
+    </>
   )
 }
 
@@ -780,9 +827,13 @@ function SimpleCardContent({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        {translate('auto.components.UpdateCard.05ad78a6d1', 'Orca v{{value0}} is ready.', {
-          value0: version
-        })}
+        {translate(
+          'auto.components.UpdateCard.05ad78a6d1',
+          `${APP_DISPLAY_NAME} v{{value0}} is ready.`,
+          {
+            value0: version
+          }
+        )}
       </p>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
@@ -885,9 +936,11 @@ function DownloadingContent({
       <p className="text-sm text-muted-foreground">
         {release
           ? release.description
-          : translate('auto.components.UpdateCard.93794ea932', 'Orca v{{value0}} is downloading.', {
-              value0: version
-            })}
+          : translate(
+              'auto.components.UpdateCard.93794ea932',
+              `${APP_DISPLAY_NAME} v{{value0}} is downloading.`,
+              { value0: version }
+            )}
       </p>
 
       {showReleaseNotes && releaseNotesUrl && (
@@ -942,7 +995,7 @@ function ReadyToInstallContent({
       <p className="text-sm text-muted-foreground">
         {translate(
           'auto.components.UpdateCard.6714206e5a',
-          "Orca v{{value0}} is downloaded. Restart when you're ready.",
+          `${APP_DISPLAY_NAME} v{{value0}} is downloaded. Restart when you're ready.`,
           { value0: version }
         )}
       </p>

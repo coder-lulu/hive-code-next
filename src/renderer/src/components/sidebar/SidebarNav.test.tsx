@@ -13,10 +13,12 @@ import { PSEUDO_LOCALIZATION_LOCALE } from '../../i18n/pseudo-localization'
 
 const mocks = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
+  openNewTaskHome: vi.fn(),
   openTaskPage: vi.fn(),
   openAutomationsPage: vi.fn(),
   openActivityPage: vi.fn(),
   openArtifactsPage: vi.fn(),
+  openSkillsPage: vi.fn(),
   openModal: vi.fn(),
   updateSettings: vi.fn(),
   refreshPreflightStatus: vi.fn(),
@@ -49,7 +51,8 @@ vi.mock('@/components/dashboard/useAgentBucketCounts', () => ({
 }))
 
 vi.mock('@/hooks/useShortcutLabel', () => ({
-  useShortcutKeyComboDetails: () => [{ keys: ['⌘', 'J'], doubleTap: false }]
+  useShortcutKeyComboDetails: () => [{ keys: ['⌘', 'J'], doubleTap: false }],
+  useShortcutLabel: () => '⌘N'
 }))
 
 vi.mock('../setup-guide/use-setup-guide-progress', () => ({
@@ -110,19 +113,29 @@ function folderRepo(): Repo {
 
 function setSidebarState({
   settings = getDefaultSettings('/tmp'),
-  repos = [gitRepo()]
+  repos = [gitRepo()],
+  activeView = 'worktrees',
+  homeNewTaskMode = false,
+  activeWorkspaceKey = null
 }: {
   settings?: GlobalSettings
   repos?: Repo[]
+  activeView?: string
+  homeNewTaskMode?: boolean
+  activeWorkspaceKey?: string | null
 } = {}): void {
   mocks.state = {
     settings,
     repos,
-    activeView: 'worktrees',
+    activeView,
+    homeNewTaskMode,
+    activeWorkspaceKey,
+    openNewTaskHome: mocks.openNewTaskHome,
     openTaskPage: mocks.openTaskPage,
     openAutomationsPage: mocks.openAutomationsPage,
     openActivityPage: mocks.openActivityPage,
     openArtifactsPage: mocks.openArtifactsPage,
+    openSkillsPage: mocks.openSkillsPage,
     openModal: mocks.openModal,
     updateSettings: mocks.updateSettings,
     preflightStatus: { glab: { installed: false } },
@@ -303,6 +316,48 @@ describe('SidebarNav', () => {
     await clickButton(getButtonByText(container, 'Artifacts'))
 
     expect(mocks.openArtifactsPage).toHaveBeenCalledOnce()
+  })
+
+  it('does not keep New task selected after another top-level page becomes active', async () => {
+    setSidebarState({ activeView: 'tasks', homeNewTaskMode: true })
+    const container = await renderSidebarNav()
+
+    const newTaskButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New task"]'
+    )
+    const tasksButton = getButtonByText(container, 'Tasks')
+
+    expect(newTaskButton?.className).not.toContain('is-active')
+    expect(newTaskButton?.getAttribute('aria-current')).toBeNull()
+    expect(tasksButton.getAttribute('aria-current')).toBe('page')
+  })
+
+  it('selects New task while its home surface is the active top-level view', async () => {
+    setSidebarState({ activeView: 'terminal', homeNewTaskMode: true })
+    const container = await renderSidebarNav()
+
+    const newTaskButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New task"]'
+    )
+
+    expect(newTaskButton?.className).toContain('is-active')
+    expect(newTaskButton?.getAttribute('aria-current')).toBe('page')
+  })
+
+  it('does not select New task when a workspace is active', async () => {
+    setSidebarState({
+      activeView: 'terminal',
+      homeNewTaskMode: true,
+      activeWorkspaceKey: 'worktree:wt-1'
+    })
+    const container = await renderSidebarNav()
+
+    const newTaskButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New task"]'
+    )
+
+    expect(newTaskButton?.className).not.toContain('is-active')
+    expect(newTaskButton?.getAttribute('aria-current')).toBeNull()
   })
 
   it('hides Artifacts from its context menu', async () => {

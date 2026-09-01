@@ -144,7 +144,10 @@ export function loadWindowsTerminalCapabilities(
     return Promise.resolve(cached.capabilities)
   }
   const pendingCapabilities = pendingCapabilitiesByOwnerKey.get(ownerKey)
-  if (pendingCapabilities && !options.force) {
+  if (pendingCapabilities) {
+    // Why: force bypasses a settled cache, not an identical probe already in flight. Starting a
+    // second wsl.exe/pwsh.exe probe for the same host increases Settings cold-start latency and
+    // lets the two responses race to publish the owner cache.
     return pendingCapabilities
   }
 

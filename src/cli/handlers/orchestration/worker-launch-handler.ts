@@ -3,6 +3,7 @@ import { printResult } from '../../format'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../../flags'
 import { RuntimeClientError } from '../../runtime-client'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import { callOrchestrationMutation } from './mutation-request'
 import { getOptionalPositiveIntegerValueFlag } from './numeric-flags'
@@ -22,7 +23,7 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
       ) {
         throw new RuntimeClientError(
           'incompatible_runtime',
-          'The connected Orca runtime does not support worker model or effort overrides. Update or restart Orca and try again.'
+          `The connected ${APP_DISPLAY_NAME} runtime does not support worker model or effort overrides. Update or restart ${APP_DISPLAY_NAME} and try again.`
         )
       }
     }

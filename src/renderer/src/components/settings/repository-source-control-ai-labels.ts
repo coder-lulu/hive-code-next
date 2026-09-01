@@ -11,6 +11,7 @@ import type {
 } from '../../../../shared/source-control-ai-types'
 import type { CustomAgentId } from '../../../../shared/commit-message-agent-spec'
 import { isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export const ACTION_MODE_INHERIT = 'inherit'
 export const ACTION_MODE_OVERRIDE = 'override'
@@ -82,7 +83,7 @@ export function commandTemplateStateLabel(args: {
     return 'Repository custom prompt'
   }
   return args.inheritedTemplate === DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[args.actionId]
-    ? 'Orca default prompt'
+    ? `${APP_DISPLAY_NAME} default prompt`
     : 'Global custom prompt'
 }
 

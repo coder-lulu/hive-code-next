@@ -42,7 +42,7 @@ import type {
   Row,
   WorktreeGroupBy
 } from './row-types'
-import { getRenderedNaturalAnchorRepoIds, withRepoSectionDisplayLabels } from './section-order'
+import { getRenderedNaturalAnchorRepoIds } from './section-order'
 import { buildOrderedGroups } from './worktree-grouping'
 
 export function buildRows(
@@ -70,7 +70,9 @@ export function buildRows(
   folderWorkspaces: readonly FolderWorkspace[] = [],
   hostLabelById?: ReadonlyMap<string, string>,
   defaultHostId: ExecutionHostId = LOCAL_EXECUTION_HOST_ID,
-  pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings)
+  pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings),
+  /** Render a derived space around repos when no persisted ProjectGroup exists. */
+  showUngroupedProjectGroup = false
 ): Row[] {
   const result: Row[] = []
   const projectIndex = buildProjectGroupingIndex(projectGrouping)
@@ -228,11 +230,8 @@ export function buildRows(
     cyclicLineageIds
   }
 
-  if (groupBy !== 'repo' || projectGroups.length === 0) {
-    appendOrderedGroups(
-      sectionContext,
-      groupBy === 'repo' ? withRepoSectionDisplayLabels(orderedGroups) : orderedGroups
-    )
+  if (groupBy !== 'repo') {
+    appendOrderedGroups(sectionContext, orderedGroups)
     return result
   }
 
@@ -241,7 +240,8 @@ export function buildRows(
     projectGroups,
     folderWorkspaces: renderableFolderWorkspaces,
     projectOrderBy,
-    repoOrder
+    repoOrder,
+    showUngroupedProjectGroup
   })
 
   return result

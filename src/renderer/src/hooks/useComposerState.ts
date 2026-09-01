@@ -6,6 +6,7 @@ import {
 } from '@/lib/new-workspace'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
 import type { WorkspaceStatus } from '../../../shared/worktree/types'
@@ -35,6 +36,7 @@ export type UseComposerStateOptions = {
   initialProjectGroupId?: string
   initialName?: string
   initialPrompt?: string
+  agentPermissionMode?: AgentLaunchPermissionMode
   initialLinkedWorkItem?: LinkedWorkItemSummary | null
   initialGitHubWorkItem?: GitHubWorkItem | null
   initialTaskSourceContext?: TaskSourceContext | null

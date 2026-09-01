@@ -13,7 +13,7 @@ export type EmulatorDevice = {
   backend: EmulatorBackendKind
   id: string
   name: string
-  state: 'shutdown' | 'booting' | 'booted'
+  state: 'shutdown' | 'booting' | 'booted' | 'unresponsive'
   detail?: string
   isAvailable: boolean
 }
@@ -53,6 +53,7 @@ export type EmulatorBackend = {
   readonly streamCodec: EmulatorStreamCodec
   readonly capabilities: EmulatorBackendCapabilities
 
+  dispose?(): Promise<void>
   isSupportedOnHost(): boolean
   checkAvailability(): Promise<BackendAvailability>
   listDevices(): Promise<EmulatorDevice[]>

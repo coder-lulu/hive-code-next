@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
+import { PRIMARY_CLI_COMMAND } from '@/product-brand'
 
 export const getMobileEmulatorSearchEntries = createLocalizedCatalog(() => [
   {
@@ -47,11 +48,11 @@ export const getMobileEmulatorSearchEntries = createLocalizedCatalog(() => [
       ),
       ...translateSearchKeyword(
         'auto.components.settings.mobile.emulator.search.d4b7833894',
-        'orca cli'
+        `${PRIMARY_CLI_COMMAND} cli`
       ),
       ...translateSearchKeyword(
         'auto.components.settings.mobile.emulator.search.9353854ff3',
-        'orca emulator'
+        `${PRIMARY_CLI_COMMAND} emulator`
       ),
       ...translateSearchKeyword(
         'auto.components.settings.mobile.emulator.search.ac0a985873',

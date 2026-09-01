@@ -17,6 +17,7 @@ import { mergeProjectCompatibilityForHostRepoChange } from '../repos/repo-catalo
 import { applyProjectGroupDeleteCascade } from './project-group-removal-state'
 import { repoWithFetchedOwner, settingsForRepoOwner } from '../repos/owner-routing'
 import { projectGroupWithFetchedOwner } from './project-group-owner-stamping'
+import { applyProductBranding } from '@/product-brand'
 
 export function createProjectGroupMutationActions(
   set: Parameters<StateCreator<AppState>>[0],
@@ -190,7 +191,7 @@ export function createProjectGroupMutationActions(
         if (stillExists) {
           failedProjectRemovals.push({
             projectId,
-            reason: 'Project remained in Orca after removeProject completed.'
+            reason: applyProductBranding('Project remained in Orca after removeProject completed.')
           })
         } else {
           removedProjectIds.push(projectId)
@@ -206,12 +207,19 @@ export function createProjectGroupMutationActions(
       }
     },
 
-    moveProjectToGroup: async (projectId, groupId, order) => {
+    moveProjectToGroup: async (projectId, groupId, order, options) => {
       try {
-        if (!findRepoForHost(get().repos, projectId, { settings: get().settings })) {
+        const sourceRepo = findRepoForHost(get().repos, projectId, {
+          settings: get().settings,
+          hostId: options?.hostId
+        })
+        if (!sourceRepo) {
           return false
         }
-        const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), projectId))
+        // Capture the resolved owner before the async mutation. Drag callers
+        // provide it explicitly, while legacy callers retain focused-host fallback.
+        const sourceHostId = options?.hostId ?? getRepoExecutionHostId(sourceRepo)
+        const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), projectId, sourceHostId))
         const moved =
           target.kind === 'local'
             ? await window.api.projectGroups.moveProject({
@@ -232,6 +240,9 @@ export function createProjectGroupMutationActions(
         }
         const ownedMoved = repoWithFetchedOwner(moved, target)
         const movedHostId = getRepoExecutionHostId(ownedMoved)
+        if (movedHostId !== sourceHostId) {
+          return false
+        }
         set((s) => {
           const nextRepos = s.repos.map((repo) =>
             repoMatchesHostIdentity(repo, projectId, movedHostId) ? ownedMoved : repo

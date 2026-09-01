@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Group headers own hierarchy, drag affordances, and scoped actions. */
+
 import React from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { VirtualItem } from '@tanstack/react-virtual'
@@ -27,6 +29,7 @@ import {
 } from './indentation'
 import { FolderPathStatusIndicator } from './FolderPathStatusIndicator'
 import {
+  ProjectGroupAddProjectButton,
   ProjectGroupCreateWorkspaceButton,
   ProjectGroupHeaderMenu
 } from './project-group-header-actions'
@@ -61,6 +64,8 @@ export type SectionHeaderRowContext = {
   onRenameProjectGroup: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
   onDeleteProjectGroup: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
   onCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
+  onCreateWorkspaceForProjectGroup?: (projectGroup: ProjectGroup | null) => void
+  onAddProjectToProjectGroup?: (projectGroup: ProjectGroup | null) => void
   onWorkspaceStatusDragOver: (event: React.DragEvent, status: WorkspaceStatus) => void
   onWorkspaceStatusDragLeave: (event: React.DragEvent) => void
   onWorkspacePinDragOver: (event: React.DragEvent) => void
@@ -120,7 +125,8 @@ export function renderWorktreeSectionHeaderRow(args: {
     isRepoHeader &&
     projectIdForHeader &&
     repoHeaderBucketKey &&
-    (headerDrag.sidebarRepoHeaderIdsByBucket.get(repoHeaderBucketKey)?.length ?? 0) > 1
+    ((headerDrag.sidebarRepoHeaderIdsByBucket.get(repoHeaderBucketKey)?.length ?? 0) > 1 ||
+      headerDrag.canMoveRepoHeadersAcrossGroups)
   )
   const isDraggableProjectGroupHeader = Boolean(
     headerDrag.canReorderProjectGroupHeaders &&
@@ -170,6 +176,8 @@ export function renderWorktreeSectionHeaderRow(args: {
         projectGroupId: folderBackedProjectGroup.id
       })
     : null
+  const hasRepositorySource = row.hasRepositorySource === true
+  const effectiveProjectGroupPathStatus = hasRepositorySource ? null : projectGroupPathStatus
   const isHeaderCollapsed = ctx.collapsedGroups.has(row.key)
   // Why: repo/project/status/pinned share compact section chrome; flat "All" stays a simple label.
   const showHeaderCollapseAffordance =
@@ -217,6 +225,9 @@ export function renderWorktreeSectionHeaderRow(args: {
         // cursor lives only on the title surface so … / + never inherit it.
         data-repo-header-drag-handle={isDraggableRepoHeader ? '' : undefined}
         data-project-group-header-id={projectGroupIdForHeader}
+        data-ungrouped-project-group-header={
+          isProjectGroupHeader && !row.repo && row.projectGroup?.id == null ? '' : undefined
+        }
         data-project-group-header-index={projectGroupHeaderIndex}
         data-project-group-header-bucket={projectGroupHeaderBucketKey}
         data-project-group-header-section-end={
@@ -273,7 +284,7 @@ export function renderWorktreeSectionHeaderRow(args: {
         }
         onPointerDown={
           isDraggableRepoHeader && projectIdForHeader
-            ? (event) => headerDrag.repoDrag.onHandlePointerDown(event, projectIdForHeader)
+            ? (event) => headerDrag.repoDrag.onHandlePointerDown(event, row.repo!)
             : isDraggableProjectGroupHeader && projectGroupIdForHeader
               ? (event) =>
                   headerDrag.projectGroupDrag.onHandlePointerDown(event, projectGroupIdForHeader)
@@ -367,13 +378,31 @@ export function renderWorktreeSectionHeaderRow(args: {
             />
           ) : null}
 
-          {folderBackedProjectGroup ? (
-            <ProjectGroupCreateWorkspaceButton
-              projectGroup={folderBackedProjectGroup}
+          {isProjectGroupHeader && !row.repo && ctx.onAddProjectToProjectGroup ? (
+            <ProjectGroupAddProjectButton
+              projectGroup={
+                row.projectGroup && typeof row.projectGroup.id === 'string'
+                  ? row.projectGroup
+                  : null
+              }
               label={row.label}
-              pathStatus={projectGroupPathStatus}
-              disabled={isFolderWorkspaceCreateDisabled(projectGroupPathStatus)}
-              onCreate={ctx.onCreateFolderWorkspace}
+              onAdd={ctx.onAddProjectToProjectGroup}
+            />
+          ) : null}
+
+          {isProjectGroupHeader && !row.repo && ctx.onCreateWorkspaceForProjectGroup ? (
+            <ProjectGroupCreateWorkspaceButton
+              projectGroup={
+                row.projectGroup && typeof row.projectGroup.id === 'string'
+                  ? row.projectGroup
+                  : null
+              }
+              label={row.label}
+              pathStatus={effectiveProjectGroupPathStatus}
+              disabled={
+                !hasRepositorySource && isFolderWorkspaceCreateDisabled(projectGroupPathStatus)
+              }
+              onCreate={ctx.onCreateWorkspaceForProjectGroup}
             />
           ) : null}
 

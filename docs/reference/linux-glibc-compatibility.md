@@ -84,7 +84,7 @@ app itself still launches on stock 20.04.
 
 **3. Check before loading, on hosts that ship without a compiler (`orcad`).**
 The two gates above protect the packaged desktop app, where the binary is built and
-verified by the same pipeline. `orcad` is deployed to hosts Orca never built on, so it
+verified by the same pipeline. `orcad` is deployed to hosts HiveCode never built on, so it
 adds a runtime precondition
 ([`src/main/orcad/node-pty-precondition.ts`](../../src/main/orcad/node-pty-precondition.ts)),
 run from `main.ts` before anything requires `node-pty`. It loads the addon in a **child

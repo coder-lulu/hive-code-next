@@ -8,7 +8,8 @@ const {
   mockTrack,
   store,
   storeListeners,
-  startupLeafId
+  startupLeafId,
+  runtimeEnvironmentIdByWorktree
 } = vi.hoisted(() => ({
   mockInspectRuntimeTerminalProcess: vi.fn(),
   mockSendRuntimePtyInputVerified: vi.fn(),
@@ -17,6 +18,7 @@ const {
   mockTrack: vi.fn(),
   storeListeners: new Set<(state: unknown, previousState: unknown) => void>(),
   startupLeafId: '11111111-1111-4111-8111-111111111111',
+  runtimeEnvironmentIdByWorktree: {} as Record<string, string>,
   store: {
     settings: {},
     activeTabIdByWorktree: { 'wt-1': 'tab-1' } as Record<string, string>,
@@ -54,9 +56,10 @@ const {
       {
         launchConfig: { agentCommand: string; agentArgs: string; agentEnv: Record<string, string> }
         registeredAt: number
-        identity: { tabId?: string; leafId?: string; launchToken?: string }
+        identity: { tabId?: string; leafId?: string; launchToken?: string; agentType?: string }
       }
-    >
+    >,
+    registerAgentLaunchConfig: vi.fn()
   }
 }))
 
@@ -84,6 +87,11 @@ vi.mock('@/lib/agent-paste-draft', () => ({
 
 vi.mock('@/lib/browser-uuid', () => ({
   createBrowserUuid: () => 'launch-token-1'
+}))
+
+vi.mock('@/lib/worktree-runtime-owner', () => ({
+  getRuntimeEnvironmentIdForWorktree: (_state: unknown, worktreeId: string) =>
+    runtimeEnvironmentIdByWorktree[worktreeId] ?? null
 }))
 
 vi.mock('@/lib/telemetry', () => ({
@@ -248,6 +256,9 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     storeListeners.clear()
+    for (const worktreeId of Object.keys(runtimeEnvironmentIdByWorktree)) {
+      delete runtimeEnvironmentIdByWorktree[worktreeId]
+    }
     store.settings = {}
     store.activeTabIdByWorktree = { 'wt-1': 'tab-1' }
     store.tabsByWorktree = { 'wt-1': [{ id: 'tab-1' }] }
@@ -268,6 +279,12 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
         identity: { tabId: 'tab-1', leafId: startupLeafId, launchToken: 'launch-token-1' }
       }
     }
+    store.registerAgentLaunchConfig.mockImplementation((paneKey, launchConfig, identity) => {
+      store.agentLaunchConfigByPaneKey = {
+        ...store.agentLaunchConfigByPaneKey,
+        [paneKey]: { launchConfig, registeredAt: Date.now(), identity }
+      }
+    })
     mockInspectRuntimeTerminalProcess.mockResolvedValue({
       foregroundProcess: 'aider',
       hasChildProcesses: true
@@ -514,6 +531,209 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
       forcePaste: true,
       onTimeout: expect.any(Function)
     })
+  })
+
+  it('binds a Host-created mirrored pane to the launch token before delayed delivery', async () => {
+    vi.useFakeTimers()
+    const rawTabId = 'host-agent-tab'
+    const mirroredTabId = `web-terminal-${encodeURIComponent(rawTabId)}`
+    const mirroredPaneKey = `${mirroredTabId}:${startupLeafId}`
+    runtimeEnvironmentIdByWorktree['wt-1'] = 'env-1'
+    store.tabsByWorktree = { 'wt-1': [] }
+    store.ptyIdsByTabId = {}
+    store.terminalLayoutsByTabId = {}
+    store.pendingStartupByTabId = {}
+    store.agentLaunchConfigByPaneKey = {}
+    mockInspectRuntimeTerminalProcess.mockResolvedValue({
+      foregroundProcess: 'goose',
+      hasChildProcesses: true
+    })
+    const launchConfig = { agentCommand: 'goose', agentArgs: '', agentEnv: {} }
+
+    const delivery = ensureAgentStartupInTerminal({
+      worktreeId: 'wt-1',
+      primaryTabId: rawTabId,
+      startupPaneKey: `${rawTabId}:${startupLeafId}`,
+      startup: {
+        agent: 'goose',
+        launchCommand: 'goose',
+        expectedProcess: 'goose',
+        followupPrompt: 'implement the task',
+        launchConfig,
+        launchToken: 'launch-token-1'
+      }
+    })
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await delivery
+    store.tabsByWorktree = { 'wt-1': [{ id: mirroredTabId }] }
+    store.ptyIdsByTabId = { [mirroredTabId]: ['remote:env-1@@host-pty'] }
+    store.terminalLayoutsByTabId = {
+      [mirroredTabId]: {
+        root: null,
+        activeLeafId: null,
+        expandedLeafId: null,
+        ptyIdsByLeafId: { [startupLeafId]: 'remote:env-1@@host-pty' }
+      }
+    }
+    for (const listener of storeListeners) {
+      listener(store, store)
+    }
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    expect(store.registerAgentLaunchConfig).toHaveBeenCalledWith(
+      mirroredPaneKey,
+      {
+        agentArgs: '',
+        agentEnv: {},
+        hostDefaultsAuthoritative: true
+      },
+      {
+        agentType: 'goose',
+        launchToken: 'launch-token-1',
+        tabId: mirroredTabId,
+        leafId: startupLeafId
+      }
+    )
+    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledWith(
+      {},
+      'remote:env-1@@host-pty',
+      'implement the task\r'
+    )
+  })
+
+  it('binds only the first queued launch when Host startup tokens race for one pane', async () => {
+    vi.useFakeTimers()
+    const rawTabId = 'host-agent-tab'
+    const mirroredTabId = `web-terminal-${encodeURIComponent(rawTabId)}`
+    const mirroredPaneKey = `${mirroredTabId}:${startupLeafId}`
+    runtimeEnvironmentIdByWorktree['wt-1'] = 'env-1'
+    store.tabsByWorktree = { 'wt-1': [] }
+    store.ptyIdsByTabId = {}
+    store.terminalLayoutsByTabId = {}
+    store.pendingStartupByTabId = {}
+    store.agentLaunchConfigByPaneKey = {}
+    mockInspectRuntimeTerminalProcess.mockResolvedValue({
+      foregroundProcess: 'goose',
+      hasChildProcesses: true
+    })
+
+    const first = ensureAgentStartupInTerminal({
+      worktreeId: 'wt-1',
+      primaryTabId: rawTabId,
+      startupPaneKey: `${rawTabId}:${startupLeafId}`,
+      startup: {
+        agent: 'goose',
+        launchCommand: 'goose',
+        expectedProcess: 'goose',
+        followupPrompt: 'first task',
+        launchConfig: { agentArgs: '', agentEnv: {} },
+        launchToken: 'launch-token-first'
+      }
+    })
+    const second = ensureAgentStartupInTerminal({
+      worktreeId: 'wt-1',
+      primaryTabId: rawTabId,
+      startupPaneKey: `${rawTabId}:${startupLeafId}`,
+      startup: {
+        agent: 'goose',
+        launchCommand: 'goose',
+        expectedProcess: 'goose',
+        followupPrompt: 'second task',
+        launchConfig: { agentArgs: '', agentEnv: {} },
+        launchToken: 'launch-token-second'
+      }
+    })
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await Promise.all([first, second])
+
+    store.tabsByWorktree = { 'wt-1': [{ id: mirroredTabId }] }
+    store.ptyIdsByTabId = { [mirroredTabId]: ['remote:env-1@@host-pty'] }
+    store.terminalLayoutsByTabId = {
+      [mirroredTabId]: {
+        root: null,
+        activeLeafId: null,
+        expandedLeafId: null,
+        ptyIdsByLeafId: { [startupLeafId]: 'remote:env-1@@host-pty' }
+      }
+    }
+    for (const listener of storeListeners) {
+      listener(store, store)
+    }
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    expect(store.registerAgentLaunchConfig).toHaveBeenCalledTimes(1)
+    expect(store.agentLaunchConfigByPaneKey[mirroredPaneKey]?.identity.launchToken).toBe(
+      'launch-token-first'
+    )
+    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
+    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledWith(
+      {},
+      'remote:env-1@@host-pty',
+      'first task\r'
+    )
+  })
+
+  it('does not overwrite a newer launch identity on the mirrored Host pane', async () => {
+    vi.useFakeTimers()
+    const rawTabId = 'host-agent-tab'
+    const mirroredTabId = `web-terminal-${encodeURIComponent(rawTabId)}`
+    const mirroredPaneKey = `${mirroredTabId}:${startupLeafId}`
+    runtimeEnvironmentIdByWorktree['wt-1'] = 'env-1'
+    store.tabsByWorktree = { 'wt-1': [] }
+    store.ptyIdsByTabId = {}
+    store.terminalLayoutsByTabId = {}
+    store.pendingStartupByTabId = {}
+    store.agentLaunchConfigByPaneKey = {}
+
+    const delivery = ensureAgentStartupInTerminal({
+      worktreeId: 'wt-1',
+      primaryTabId: rawTabId,
+      startupPaneKey: `${rawTabId}:${startupLeafId}`,
+      startup: {
+        agent: 'goose',
+        launchCommand: 'goose',
+        expectedProcess: 'goose',
+        followupPrompt: 'stale task',
+        launchConfig: { agentCommand: 'goose', agentArgs: '', agentEnv: {} },
+        launchToken: 'launch-token-1'
+      }
+    })
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await delivery
+    store.tabsByWorktree = { 'wt-1': [{ id: mirroredTabId }] }
+    store.ptyIdsByTabId = { [mirroredTabId]: ['remote:env-1@@host-pty'] }
+    store.terminalLayoutsByTabId = {
+      [mirroredTabId]: {
+        root: null,
+        activeLeafId: null,
+        expandedLeafId: null,
+        ptyIdsByLeafId: { [startupLeafId]: 'remote:env-1@@host-pty' }
+      }
+    }
+    store.agentLaunchConfigByPaneKey = {
+      [mirroredPaneKey]: {
+        launchConfig: { agentCommand: 'goose', agentArgs: '--newer', agentEnv: {} },
+        registeredAt: 2,
+        identity: {
+          tabId: mirroredTabId,
+          leafId: startupLeafId,
+          launchToken: 'launch-token-new'
+        }
+      }
+    }
+    store.registerAgentLaunchConfig.mockClear()
+    for (const listener of storeListeners) {
+      listener(store, store)
+    }
+
+    expect(store.registerAgentLaunchConfig).not.toHaveBeenCalled()
+    expect(store.agentLaunchConfigByPaneKey[mirroredPaneKey]?.identity.launchToken).toBe(
+      'launch-token-new'
+    )
+    expect(mockSendRuntimePtyInputVerified).not.toHaveBeenCalled()
   })
 
   it('keeps waiting when a non-startup split PTY appears before the startup PTY', async () => {

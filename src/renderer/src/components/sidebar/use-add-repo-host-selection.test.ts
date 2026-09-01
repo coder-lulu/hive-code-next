@@ -143,6 +143,21 @@ describe('useAddRepoHostSelection', () => {
     expect(setStep).toHaveBeenCalledWith('add')
   })
 
+  it('prefers the host owned by the space that opened Add Project', async () => {
+    mocks.stateValues = ['local', false]
+    mocks.storeState.settings = { activeRuntimeEnvironmentId: 'env-1' }
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    useAddRepoHostSelection({
+      isOpen: true,
+      preferredHostId: 'ssh:ssh-1',
+      setStep: vi.fn()
+    })
+
+    expect(mocks.stateSetters[0]).toHaveBeenCalledWith('ssh:ssh-1')
+    expect(mocks.stateSetters[0]).not.toHaveBeenCalledWith('runtime:env-1')
+  })
+
   it('uses the paired runtime as the only local filesystem authority in web clients', async () => {
     mocks.isWebClient = true
     mocks.stateValues = ['local', false]

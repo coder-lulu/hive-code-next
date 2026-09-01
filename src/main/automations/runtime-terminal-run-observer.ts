@@ -4,6 +4,7 @@ import type {
   AutomationRunTerminalObserver
 } from './run-completion-watcher'
 import type { AutomationRunOutputSnapshot } from '../../shared/automations-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const TERMINAL_SNAPSHOT_LIMIT = 2_000
 
@@ -188,7 +189,7 @@ export function createRuntimeAutomationRunTerminalObserver(
             return await buildUnobservedObservation(
               runtime,
               handle,
-              'Orca stopped watching this run after 6h without a completion signal.'
+              `${APP_DISPLAY_NAME} stopped watching this run after 6h without a completion signal.`
             )
           }
         }

@@ -14,6 +14,7 @@ import { SKILL_DELETE_CAPABILITY } from '../../../../shared/skill-install-capabi
 import { callRuntimeResult, getRemoteRuntimeStatus } from './web-runtime-calls'
 import { requireActiveEnvironmentOrNull } from './web-runtime-session'
 import { getBrowserPlatform } from './web-storage'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
   const fallbackStatus: PreflightStatus = {
@@ -129,7 +130,7 @@ export function createComputerUsePermissionsApi(): NonNullable<
         helperAppPath: null,
         openedSettings: false,
         launchedHelper: false,
-        nextStep: 'Computer-use permissions are managed on the Orca server.'
+        nextStep: `Computer-use permissions are managed on the ${APP_DISPLAY_NAME} server.`
       })),
     reset: () =>
       Promise.resolve({

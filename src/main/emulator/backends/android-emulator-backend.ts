@@ -9,7 +9,6 @@ import type {
 import type { AndroidSdkPaths } from '../android/android-sdk-discovery'
 import { AndroidSdkState } from '../android/android-sdk-state'
 import { parseWmSize, wmSizeArgs } from '../android/adb-devices'
-import { emuKillArgs } from '../android/avd-manager'
 import type { DeviceScreenSize } from '../android/android-input-mapping'
 import {
   androidButton,
@@ -23,12 +22,6 @@ import {
   execFileAndroidCommandRunner,
   type AndroidCommandRunner
 } from '../android/android-command-runner'
-import { ensureAdbOk } from '../android/android-adb-result'
-import {
-  findRunningAvdSerial,
-  listAndroidDevices,
-  listRunningAdbDevices
-} from '../android/android-device-inventory'
 import {
   captureAndroidLogcat,
   dumpAndroidAccessibilityTree,
@@ -37,7 +30,8 @@ import {
   setAndroidPermission
 } from '../android/android-capability-operations'
 import type { AndroidPermissionOp } from '../android/android-permissions'
-import { bootAndroidDevice } from '../android/android-avd-boot'
+import { AndroidAvdLifecycle } from '../android/android-avd-lifecycle'
+import type { AndroidManagedAvdProcesses } from '../android/android-managed-avd-processes'
 import { ensureScrcpyServerJar } from '../android/scrcpy-server-download'
 import {
   startAndroidStreamSession,
@@ -57,6 +51,7 @@ export type AndroidEmulatorBackendOptions = {
   ensureJar?: () => Promise<string>
   startStreamSession?: StartAndroidStream
   streamMaxSize?: number
+  managedAvds?: AndroidManagedAvdProcesses
 }
 
 const DEFAULT_BOOT_TIMEOUT_MS = 180_000
@@ -78,24 +73,27 @@ export class AndroidEmulatorBackend implements EmulatorBackend {
 
   private readonly runner: AndroidCommandRunner
   private readonly sdkState: AndroidSdkState
-  private readonly bootTimeoutMs: number
-  private readonly pollIntervalMs: number
-  private readonly sleep: (ms: number) => Promise<void>
   private readonly ensureJar: () => Promise<string>
   private readonly startStreamSession: StartAndroidStream
   private readonly streamMaxSize: number
   private readonly screenSizes = new Map<string, DeviceScreenSize>()
   private readonly streams: AndroidStreamController
+  private readonly avds: AndroidAvdLifecycle
 
   constructor(options: AndroidEmulatorBackendOptions = {}) {
     this.runner = options.runner ?? execFileAndroidCommandRunner
     this.sdkState = new AndroidSdkState(options.sdk !== undefined, options.sdk ?? null)
-    this.bootTimeoutMs = options.bootTimeoutMs ?? DEFAULT_BOOT_TIMEOUT_MS
-    this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
-    this.sleep = options.sleep ?? defaultSleep
     this.ensureJar = options.ensureJar ?? ensureScrcpyServerJar
     this.startStreamSession = options.startStreamSession ?? startAndroidStreamSession
     this.streamMaxSize = options.streamMaxSize ?? 1280
+    this.avds = new AndroidAvdLifecycle({
+      runner: this.runner,
+      sdk: () => this.requireSdk(),
+      bootTimeoutMs: options.bootTimeoutMs ?? DEFAULT_BOOT_TIMEOUT_MS,
+      pollIntervalMs: options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
+      sleep: options.sleep ?? defaultSleep,
+      managedAvds: options.managedAvds
+    })
     this.streams = new AndroidStreamController({
       runner: this.runner,
       sdk: () => this.requireSdk(),
@@ -138,8 +136,7 @@ export class AndroidEmulatorBackend implements EmulatorBackend {
   }
 
   async listDevices(): Promise<EmulatorDevice[]> {
-    const sdk = this.sdkState.resolve()
-    return sdk ? listAndroidDevices(this.runner, sdk) : []
+    return this.sdkState.resolve() ? this.avds.listDevices() : []
   }
 
   async ownsDevice(id: string): Promise<boolean> {
@@ -151,19 +148,7 @@ export class AndroidEmulatorBackend implements EmulatorBackend {
   }
 
   async resolveDeviceId(deviceOrName: string): Promise<string> {
-    const sdk = this.requireSdk()
-    const running = await listRunningAdbDevices(this.runner, sdk)
-    if (running.some((device) => device.serial === deviceOrName)) {
-      return deviceOrName
-    }
-    const serial = await findRunningAvdSerial(this.runner, sdk, deviceOrName, running)
-    if (serial) {
-      return serial
-    }
-    throw new EmulatorError(
-      'emulator_device_not_found',
-      `Android device "${deviceOrName}" is not running. Boot it first.`
-    )
+    return this.avds.resolveDeviceId(deviceOrName)
   }
 
   async startSession(deviceId: string): Promise<EmulatorSessionInfo> {
@@ -193,10 +178,12 @@ export class AndroidEmulatorBackend implements EmulatorBackend {
   }
 
   async shutdownDevice(deviceId: string): Promise<void> {
-    const sdk = this.requireSdk()
-    const serial = await this.resolveDeviceId(deviceId)
+    const serial = await this.avds.shutdownDevice(deviceId)
     this.screenSizes.delete(serial)
-    ensureAdbOk(await this.runner(sdk.adb, emuKillArgs(serial)), 'adb emulator shutdown')
+  }
+
+  async dispose(): Promise<void> {
+    await this.avds.dispose()
   }
 
   async isSessionReusable(info: EmulatorSessionInfo): Promise<boolean> {
@@ -304,11 +291,7 @@ export class AndroidEmulatorBackend implements EmulatorBackend {
 
   // Boots an AVD (by name) when not running and waits for boot; returns the serial.
   async ensureBooted(deviceOrName: string): Promise<string> {
-    return bootAndroidDevice(this.runner, this.requireSdk(), deviceOrName, {
-      bootTimeoutMs: this.bootTimeoutMs,
-      pollIntervalMs: this.pollIntervalMs,
-      sleep: this.sleep
-    })
+    return this.avds.ensureBooted(deviceOrName)
   }
 
   private async getScreenSize(serial: string): Promise<DeviceScreenSize> {

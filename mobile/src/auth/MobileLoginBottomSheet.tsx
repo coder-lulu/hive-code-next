@@ -48,6 +48,7 @@ export function MobileLoginBottomSheet({
   const insets = useSafeAreaInsets()
   const { height: viewportHeight } = useWindowDimensions()
   const providers = enabledMobileLoginProviders(configuration)
+  const actionPending = busyActionKey !== null
   const requestAction = (action: MobileLoginAction) => {
     if (!mobileLoginAttemptAllowed(agreed)) {
       onAgreementRequired()
@@ -100,6 +101,7 @@ export function MobileLoginBottomSheet({
           <View style={styles.actions}>
             <MobileLoginActionButton
               busy={busyActionKey === 'phone'}
+              disabled={actionPending}
               icon={Smartphone}
               label="手机号登录"
               onPress={() => requestAction({ kind: 'phone' })}
@@ -122,18 +124,19 @@ export function MobileLoginBottomSheet({
                 {providers.map((provider) => {
                   const actionKey = `provider:${provider.id}`
                   const busy = busyActionKey === actionKey
+                  const disabled = actionPending
                   return (
                     <Pressable
                       accessibilityLabel={provider.accessibilityLabel}
                       accessibilityRole="button"
-                      accessibilityState={{ busy, disabled: busy }}
-                      disabled={busy}
+                      accessibilityState={{ busy, disabled }}
+                      disabled={disabled}
                       key={provider.id}
                       onPress={() => requestAction({ kind: 'provider', providerId: provider.id })}
                       style={({ pressed }) => [
                         styles.providerButton,
                         pressed && styles.providerPressed,
-                        busy && styles.actionDisabled
+                        disabled && styles.actionDisabled
                       ]}
                     >
                       {busy ? (

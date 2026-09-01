@@ -37,6 +37,7 @@ export type WindowShortcutAction =
   | { type: 'toggleRightSidebar' }
   | { type: 'openQuickOpen' }
   | { type: 'toggleQuickCommandsMenu' }
+  | { type: 'openNewTaskHome' }
   | { type: 'openNewWorkspace' }
   | { type: 'deleteCurrentWorkspace' }
   | { type: 'openWorkspaceBoard' }
@@ -226,12 +227,16 @@ export function resolveWindowShortcutAction(
     return { type: 'openQuickOpen' }
   }
 
-  // Why: Cmd/Ctrl+N opens the new-workspace composer. Routed through the
+  // Why: Cmd/Ctrl+N opens the new-task home. Routed through the
   // main process so it reaches the renderer even when focus lives inside
   // a contentEditable surface (markdown rich editor) or a browser guest
   // webContents, both of which bypass the renderer's window-level keydown.
-  // Shift is accepted for compatibility with the former Create-from shortcut;
-  // the unified composer now exposes source switching inside the name field.
+  if (actionMatches('home.newTask', input, platform, keybindings, options)) {
+    return { type: 'openNewTaskHome' }
+  }
+
+  // Shift+Cmd/Ctrl+N opens the new-workspace composer. The explicit Shift
+  // variant keeps workspace creation distinct from starting a new task.
   if (actionMatches('workspace.create', input, platform, keybindings, options)) {
     return { type: 'openNewWorkspace' }
   }
@@ -321,6 +326,8 @@ export function getWindowShortcutActionId(action: WindowShortcutAction): Keybind
       return 'worktree.quickOpen'
     case 'toggleQuickCommandsMenu':
       return 'tab.openQuickCommandsMenu'
+    case 'openNewTaskHome':
+      return 'home.newTask'
     case 'openNewWorkspace':
       return 'workspace.create'
     case 'deleteCurrentWorkspace':

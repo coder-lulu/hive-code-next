@@ -15,6 +15,7 @@ import {
   AUTOMATION_OWNER_CONFLICT_CODES,
   AutomationOwnerConflictError
 } from './automation-owner-conflict'
+import { applyProductBranding } from './brand'
 import type { AutomationOwnerRef } from './automation-owner-ref'
 import type {
   ExternalAutomationAction,
@@ -53,8 +54,9 @@ const SCOPE_MESSAGES: Record<ExternalAutomationScopeCode, string> = {
     'That external automation provider is not supported.',
   [EXTERNAL_AUTOMATION_SCOPE_CODES.authorityNotSupported]:
     'External automation managers are available only on this computer and its SSH hosts.',
-  [EXTERNAL_AUTOMATION_SCOPE_CODES.targetHidden]:
-    'That host is managed by Orca and does not expose external automations.',
+  [EXTERNAL_AUTOMATION_SCOPE_CODES.targetHidden]: applyProductBranding(
+    'That host is managed by Orca and does not expose external automations.'
+  ),
   [EXTERNAL_AUTOMATION_SCOPE_CODES.runsUnsupported]:
     'This host does not report external automation run history.'
 }

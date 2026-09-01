@@ -4,6 +4,8 @@
 // is OMP's mutable home, so config/auth/session commands must keep the user's
 // normal source of truth.
 
+import { APP_DISPLAY_NAME } from '../../shared/brand'
+
 const OMP_SUBCOMMANDS = [
   '__complete',
   'acp',
@@ -41,7 +43,7 @@ const OMP_SUBCOMMANDS = [
 
 export function getPosixOmpShellWrapper(): string {
   const subcommands = OMP_SUBCOMMANDS.join('|')
-  return `# Why: OMP does not auto-load Orca's managed status extension; wrap only
+  return `# Why: OMP does not auto-load HiveCode's managed status extension; wrap only
 # interactive launch invocations so subcommands such as \`omp config\` keep
 # their normal argv shape.
 __orca_omp_should_skip_extension() {
@@ -81,11 +83,11 @@ __orca_omp() {
     # Why: a restored shell can retain the deleted directory inode after its path is recreated.
     (
       if [[ -z "$__orca_logical_cwd" ]]; then
-        printf 'Orca: OMP cannot start because no terminal working directory is available. Open a new terminal in an existing directory.\\n' >&2
+        printf '${APP_DISPLAY_NAME}: OMP cannot start because no terminal working directory is available. Open a new terminal in an existing directory.\\n' >&2
         return 1
       fi
       if ! builtin cd -P -- "$__orca_logical_cwd" 2>/dev/null; then
-        printf 'Orca: OMP cannot access the terminal working directory "%s". Open a new terminal in an existing directory.\\n' "$__orca_logical_cwd" >&2
+        printf '${APP_DISPLAY_NAME}: OMP cannot access the terminal working directory "%s". Open a new terminal in an existing directory.\\n' "$__orca_logical_cwd" >&2
         return 1
       fi
       __orca_omp_invoke "$__orca_use_extension" "$@"
@@ -104,7 +106,7 @@ fi
 
 export function getPowerShellOmpShellWrapper(): string {
   const subcommands = OMP_SUBCOMMANDS.map((value) => `'${value}'`).join(', ')
-  return `# Why: OMP does not auto-load Orca's managed status extension; wrap only
+  return `# Why: OMP does not auto-load HiveCode's managed status extension; wrap only
 # interactive launch invocations so subcommands such as \`omp config\` keep
 # their normal argv shape.
 function Global:__OrcaOmpShouldSkipExtension {

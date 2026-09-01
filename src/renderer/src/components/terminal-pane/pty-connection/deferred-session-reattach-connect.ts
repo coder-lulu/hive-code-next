@@ -53,6 +53,12 @@ export function startDeferredSessionReattach(
       : {}),
     ...(coldRestoreStartup?.launchToken ? { launchToken: coldRestoreStartup.launchToken } : {}),
     ...(coldRestoreStartup?.agent ? { launchAgent: coldRestoreStartup.agent } : {}),
+    ...(coldRestoreStartup?.agentPermissionMode
+      ? { agentPermissionMode: coldRestoreStartup.agentPermissionMode }
+      : {}),
+    ...(coldRestoreStartup?.agentArgsOverride !== undefined
+      ? { agentArgsOverride: coldRestoreStartup.agentArgsOverride }
+      : {}),
     ...(session.shouldDeclareHiddenAtSpawn() ? { initiallyHidden: true } : {}),
     ...(session.directSshRetryAttempt
       ? { admitPtyId: session.claimCapturedDirectSshRetryPty }

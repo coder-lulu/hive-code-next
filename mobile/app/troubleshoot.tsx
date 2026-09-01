@@ -247,33 +247,41 @@ export default function TroubleshootScreen() {
         <Text style={styles.sectionHeading}>Common issues</Text>
 
         <View style={styles.section}>
-          {troubleshootCommonIssues.map((section, i) => (
-            <View key={section.id}>
-              {i > 0 && <View style={styles.separator} />}
-              <Pressable
-                style={({ pressed }) => [styles.accordionHeader, pressed && styles.rowPressed]}
-                onPress={() => toggleSection(section.id)}
-              >
-                {section.icon}
-                <Text style={styles.accordionTitle}>{section.title}</Text>
-                {expandedId === section.id ? (
-                  <ChevronUp size={16} color={colors.textMuted} />
-                ) : (
-                  <ChevronDown size={16} color={colors.textMuted} />
+          {troubleshootCommonIssues.map((section, i) => {
+            const Icon = section.icon
+            const expanded = expandedId === section.id
+
+            return (
+              <View key={section.id}>
+                {i > 0 && <View style={styles.separator} />}
+                <Pressable
+                  accessibilityLabel={section.title}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded }}
+                  style={({ pressed }) => [styles.accordionHeader, pressed && styles.rowPressed]}
+                  onPress={() => toggleSection(section.id)}
+                >
+                  <Icon size={20} strokeWidth={1.8} color={colors.textMuted} />
+                  <Text style={styles.accordionTitle}>{section.title}</Text>
+                  {expanded ? (
+                    <ChevronUp size={16} color={colors.textMuted} />
+                  ) : (
+                    <ChevronDown size={16} color={colors.textMuted} />
+                  )}
+                </Pressable>
+                {expanded && (
+                  <View style={styles.accordionBody}>
+                    {section.steps.map((step, j) => (
+                      <View key={j} style={styles.stepRow}>
+                        <Text style={styles.bullet}>•</Text>
+                        <Text style={styles.stepText}>{step}</Text>
+                      </View>
+                    ))}
+                  </View>
                 )}
-              </Pressable>
-              {expandedId === section.id && (
-                <View style={styles.accordionBody}>
-                  {section.steps.map((step, j) => (
-                    <View key={j} style={styles.stepRow}>
-                      <Text style={styles.bullet}>•</Text>
-                      <Text style={styles.stepText}>{step}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          ))}
+              </View>
+            )
+          })}
         </View>
 
         <View style={{ height: spacing.xl }} />

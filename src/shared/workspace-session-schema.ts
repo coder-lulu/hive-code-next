@@ -65,6 +65,17 @@ const terminalPaneLayoutNodeSchema: z.ZodType<TerminalPaneLayoutNode> = z.lazy((
 
 const leafStringsSchema = salvagingRecord(z.string(), z.string())
 
+const sessionProjectAssignmentSchema = z.object({
+  projectId: z.string().min(1),
+  projectIdentityKey: z.string().min(1),
+  projectGroupId: z.string().nullable(),
+  executionHostId: z
+    .string()
+    .refine((value) => Boolean(parseExecutionHostId(value)))
+    .transform((value) => value as ExecutionHostId),
+  assignedAt: z.number().finite().nonnegative()
+})
+
 const terminalLayoutSnapshotSchema = z.object({
   root: terminalPaneLayoutNodeSchema.nullable(),
   activeLeafId: z.string().nullable(),
@@ -93,6 +104,7 @@ const terminalTabSchema = z.object({
     .nullable()
     .optional()
     .catch(undefined),
+  projectAssignment: sessionProjectAssignmentSchema.optional().catch(undefined),
   quickCommandLabel: z.string().nullable().optional(),
   customTitle: z.string().nullable(),
   color: z.string().nullable(),
@@ -139,6 +151,7 @@ const tabSchema = z.object({
     .nullable()
     .optional()
     .catch(undefined),
+  projectAssignment: sessionProjectAssignmentSchema.optional().catch(undefined),
   quickCommandLabel: z.string().nullable().optional(),
   customLabel: z.string().nullable(),
   color: z.string().nullable(),

@@ -15,6 +15,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export const COLLIDING_WORKTREE_ID = 'repo1::/shared/workspace/path'
 export const COLLIDING_WORKTREE_PATH = '/shared/workspace/path'
@@ -24,8 +25,7 @@ export const RELAY_HOST: ExecutionHostId = 'runtime:env-1'
 
 export const HOST_COLLISION_MESSAGE =
   'Error: this workspace exists on multiple hosts at the same path'
-export const HOST_UNRESOLVED_MESSAGE =
-  'Orca cannot tell which host owns this workspace. Refresh projects and review it again.'
+export const HOST_UNRESOLVED_MESSAGE = `${APP_DISPLAY_NAME} cannot tell which host owns this workspace. Refresh projects and review it again.`
 
 export type HostCheckout = { root: string; markerPath: string }
 

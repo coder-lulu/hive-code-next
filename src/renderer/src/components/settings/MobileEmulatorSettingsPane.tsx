@@ -41,7 +41,7 @@ type MobileEmulatorSettingsPaneProps = {
 const AUTOMATIC_DEVICE_VALUE = '__orca_automatic_emulator_device__'
 const AUTOMATIC_DEVICE_LABEL = 'Auto-select device'
 const SIMULATOR_STATE_SUFFIX_RE =
-  /\s+\((Booted|Booting|Creating|Shutdown|Shutting Down|Unavailable|Unknown)\)\s*$/i
+  /\s+\((Booted|Booting|Creating|Shutdown|Shutting Down|Unresponsive|Unavailable|Unknown)\)\s*$/i
 
 function statusText(availability: EmulatorAvailability | null, enabled: boolean): string {
   if (!enabled) {

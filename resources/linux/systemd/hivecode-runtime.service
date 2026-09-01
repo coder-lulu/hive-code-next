@@ -15,7 +15,7 @@ Environment=HOME=/var/lib/hivecode-runtime
 Environment=LIBGL_ALWAYS_SOFTWARE=1
 Environment=HIVECODE_RUNTIME_ARGS=
 EnvironmentFile=-/etc/hivecode/runtime.env
-ExecStart=/usr/bin/hivecode serve --port 6768 --json $HIVECODE_RUNTIME_ARGS
+ExecStart=/usr/bin/hive serve --port 6768 --json $HIVECODE_RUNTIME_ARGS
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=hivecode-runtime

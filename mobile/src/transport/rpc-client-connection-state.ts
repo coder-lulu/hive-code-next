@@ -1,4 +1,5 @@
 import { redactSocketEndpoint } from './socket-event-debug'
+import { APP_DISPLAY_NAME } from '../product-brand'
 import type { ConnectionState } from './types'
 
 type ConnectWaiter = {
@@ -79,7 +80,9 @@ export class RpcClientConnectionState {
             if (index !== -1) {
               this.waiters.splice(index, 1)
             }
-            reject(new Error('Timed out while connecting to the remote Orca runtime.'))
+            reject(
+              new Error(`Timed out while connecting to the remote ${APP_DISPLAY_NAME} runtime.`)
+            )
           },
           Math.max(0, timeoutMs)
         )

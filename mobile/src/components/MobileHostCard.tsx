@@ -27,19 +27,34 @@ export function MobileHostCard(props: {
   const styles = createStyles(props.theme)
   const credentialUnavailable = props.credentialStatus === 'temporarily-unavailable'
   const credentialMissing = props.credentialStatus === 'missing'
-  const connected = props.state === 'connected' && !credentialUnavailable && !credentialMissing
+  const cloudOffline = props.credentialStatus === 'cloud-offline'
+  const cloudUnavailable = props.credentialStatus === 'cloud-unavailable'
+  const connected =
+    props.state === 'connected' &&
+    !credentialUnavailable &&
+    !credentialMissing &&
+    !cloudOffline &&
+    !cloudUnavailable
   const isError =
     credentialMissing || ['warning', 'unreachable', 'auth-failed'].includes(props.verdict.kind)
   const statusLabel = credentialMissing
     ? '配对已失效'
     : credentialUnavailable
       ? '配对凭据暂时不可用'
-      : localizeConnectionStatus(verdictDisplayLabel(props.verdict))
+      : cloudOffline
+        ? 'Runtime 离线'
+        : cloudUnavailable
+          ? '云连接暂不可用'
+          : localizeConnectionStatus(verdictDisplayLabel(props.verdict))
   const statusVerdict: ConnectionVerdict = credentialMissing
     ? { kind: 'auth-failed', label: statusLabel }
     : credentialUnavailable
       ? { kind: 'warning', label: statusLabel }
-      : props.verdict
+      : cloudOffline
+        ? { kind: 'normal', label: statusLabel }
+        : cloudUnavailable
+          ? { kind: 'warning', label: statusLabel }
+          : props.verdict
   const worktreeSummary = homeHostWorktreeSummary(props.worktreeInfo)
   const localizedWorktreeSummary = localizeWorktreeSummary(worktreeSummary)
   const connectionPathLabel =
@@ -47,13 +62,20 @@ export function MobileHostCard(props: {
       ? localizeConnectionPath(mobileConnectionPathLabel(props.path))
       : null
   const discoveryHint =
-    props.verdict.kind === 'unreachable' && !props.host.relay
+    !cloudOffline &&
+    !cloudUnavailable &&
+    props.verdict.kind === 'unreachable' &&
+    !props.host.relay
       ? productNameText('更新桌面端 Orca 并登录，以便随时随地连接')
       : null
   const credentialHint = credentialMissing
     ? '点击与桌面端重新配对'
     : credentialUnavailable
       ? '解锁手机后点击重试'
+      : cloudOffline
+        ? 'Runtime 重新连接 HiveCloud 后即可使用'
+        : cloudUnavailable
+          ? '请更新 Runtime，或等待运营侧启用安全中继'
       : null
   const accessibilityLabel = [
     `打开 ${props.host.name}`,

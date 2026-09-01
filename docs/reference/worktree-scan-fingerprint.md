@@ -39,12 +39,12 @@ _who_ pays, not _how often_. Steady-state subprocess volume is therefore
 `repos / 30 s`, independent of poll rate, which is exactly the observed
 ~1 sweep / 30.5 s.
 
-The in-Orca mutation surface is already event-driven: create, remove, rename,
+The in-HiveCode mutation surface is already event-driven: create, remove, rename,
 folder-rename, sparse edits, repo add/update/remove, SSH reconnect, and
 mixed-version remote invalidation all call
 `invalidateWorktreeScanCacheForRepo` / `invalidateResolvedWorktreeCache`
 (≈40 call sites). The 30-second TTL exists for exactly one reason: discovering
-worktree changes made **outside** Orca (`git worktree add/remove/move/prune`,
+worktree changes made **outside** HiveCode (`git worktree add/remove/move/prune`,
 `git checkout` in another worktree, `rm -rf` of a worktree directory).
 
 That is a filesystem question, and the filesystem can answer it without a
@@ -166,7 +166,7 @@ the TTL alone would have refreshed.
 
 | Change                                                                | Before            | After             |
 | --------------------------------------------------------------------- | ----------------- | ----------------- |
-| Orca-initiated create/remove/rename/sparse/repo edit                  | immediate (event) | immediate (event) |
+| HiveCode-initiated create/remove/rename/sparse/repo edit              | immediate (event) | immediate (event) |
 | SSH reconnect / provider generation bump                              | immediate (event) | immediate (event) |
 | External `worktree add/remove/move/prune/lock`                        | ≤ 30 s            | ≤ 30 s            |
 | External `git checkout` / `commit` / `reset` in any worktree          | ≤ 30 s            | ≤ 30 s            |
@@ -176,7 +176,7 @@ the TTL alone would have refreshed.
 | SSH / WSL repos, folder workspaces                                    | unchanged         | unchanged         |
 
 The two regressions are bounded by the reconciliation interval and are both
-changes Orca does not make itself.
+changes HiveCode does not make itself.
 
 ### Main-thread cost
 
@@ -201,7 +201,7 @@ help.
 ### Residual risk
 
 A repo registered at a UNC path (`\\wsl$\...`) but executed by the local Windows
-Git runtime is still probed, because it is not WSL-routed from Orca's point of
+Git runtime is still probed, because it is not WSL-routed from HiveCode's point of
 view. The probe is correct there and strictly cheaper than the subprocess it
 replaces, but its filesystem calls cross the 9p boundary like the existing
 sparse-checkout probes already do.

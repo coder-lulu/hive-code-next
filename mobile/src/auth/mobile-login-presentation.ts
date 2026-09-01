@@ -1,7 +1,10 @@
+export type MobileLoginProviderId = 'github' | 'wechat' | 'qq'
+
 export type MobileLoginProvider = {
-  readonly id: string
+  readonly id: MobileLoginProviderId
   readonly enabled: boolean
   readonly accessibilityLabel: string
+  readonly authorizationPath: string
 }
 
 export type MobileLoginConfiguration = {
@@ -14,14 +17,9 @@ export type MobileLoginAction =
   | { readonly kind: 'register' }
   | { readonly kind: 'provider'; readonly providerId: string }
 
-// The renderer consumes the server-shaped configuration and never owns provider order.
-export const mobileLoginMockupConfiguration: MobileLoginConfiguration = {
+export const mobileLoginFallbackConfiguration: MobileLoginConfiguration = {
   registrationEnabled: false,
-  providers: [
-    { id: 'github', enabled: true, accessibilityLabel: '使用 GitHub 登录' },
-    { id: 'wechat', enabled: true, accessibilityLabel: '使用微信登录' },
-    { id: 'qq', enabled: true, accessibilityLabel: '使用 QQ 登录' }
-  ]
+  providers: []
 }
 
 export function enabledMobileLoginProviders(

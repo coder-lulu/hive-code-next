@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { useAppStore } from '@/store'
 import { ArtifactPublishedLinkPanel } from './ArtifactPublishedLinkPanel'
 import { getPublishedArtifactLink } from './artifact-published-link-client'
@@ -170,7 +171,7 @@ export function ArtifactPublishButton({
                 <p className="text-xs font-medium">
                   {translate(
                     'auto.components.artifacts.ArtifactPublishButton.accountTitle',
-                    'Orca account'
+                    `${APP_DISPLAY_NAME} account`
                   )}
                 </p>
                 <p className="text-[11px] leading-4 text-muted-foreground">

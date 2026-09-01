@@ -37,6 +37,16 @@ function isQuickWorkspaceAgentAvailable(
   return detectedAgentIds === null || hasDetectedAgent(detectedAgentIds, agent)
 }
 
+export function filterQuickWorkspaceAgents<T extends { id: TuiAgent }>(
+  agents: readonly T[],
+  detectedAgentIds: Iterable<TuiAgent> | null,
+  disabledTuiAgents?: Iterable<unknown> | null
+): T[] {
+  return agents.filter((agent) =>
+    isQuickWorkspaceAgentAvailable(agent.id, detectedAgentIds, disabledTuiAgents)
+  )
+}
+
 export function resolveQuickWorkspaceAgentSelection({
   quickAgentOverride,
   preferredQuickAgent,

@@ -30,8 +30,7 @@ import type {
   AutomationsChangedPayload,
   PublishAutomationsChanged
 } from '../../shared/runtime-client-events'
-
-const DEFAULT_TICK_MS = 60 * 1000
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 export class AutomationService {
   private readonly store: Store
@@ -48,7 +47,7 @@ export class AutomationService {
   private readonly runs: AutomationRunWriter
   private readonly completionWatcher: AutomationRunCompletionWatcher | null
   /** Installed by desktop IPC registration, where external probes live; null on
-   *  runtime servers. Orca's own automation traffic parks queued external
+   *  runtime servers. HiveCode's own automation traffic parks queued external
    *  probes behind this lease, whichever transport carried it. */
   externalProbePriority: (<T>(run: () => T) => T) | null = null
 
@@ -65,7 +64,7 @@ export class AutomationService {
     } = {}
   ) {
     this.store = store
-    this.tickMs = opts.tickMs ?? DEFAULT_TICK_MS
+    this.tickMs = opts.tickMs ?? 60 * 1000
     this.claudeUsage = opts.claudeUsage ?? null
     this.codexUsage = opts.codexUsage ?? null
     this.allowRemoteHostScheduling = opts.allowRemoteHostScheduling ?? false
@@ -256,7 +255,7 @@ export class AutomationService {
         runId: missed.id,
         status: 'skipped_missed',
         workspaceId: automation.workspaceId,
-        error: 'Orca was unavailable during the missed-run grace window.'
+        error: `${APP_DISPLAY_NAME} was unavailable during the missed-run grace window.`
       })
       this.store.advanceAutomationNextRun(automation.id, now)
       return

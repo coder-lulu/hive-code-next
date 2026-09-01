@@ -23,6 +23,7 @@ export type MobileE2EEV2Socket = {
 export class MobileE2EEV2PhysicalChannel {
   private state: ChannelState = 'awaiting-ready'
   private generation = 0
+  private disposed = false
   private inboundChain: Promise<void> = Promise.resolve()
   private readonly outboundQueue: WsOutboundBackpressureQueue<OutboundItem>
 
@@ -48,10 +49,14 @@ export class MobileE2EEV2PhysicalChannel {
             : args.session.sealBinary(item.plaintext)
         )
       },
-      byteLengthOf: (item) =>
-        (item.kind === 'text'
-          ? new TextEncoder().encode(item.plaintext).length
-          : item.plaintext.length) + 82,
+      byteLengthOf: (item) => {
+        const plaintextBytes =
+          item.kind === 'text'
+            ? new TextEncoder().encode(item.plaintext).length
+            : item.plaintext.length
+        const framedBytes = plaintextBytes + 82
+        return item.kind === 'text' ? Math.ceil(framedBytes / 3) * 4 : framedBytes
+      },
       getBufferedAmount: () => args.socket.bufferedAmount,
       isWritable: () => args.socket.readyState === args.socket.OPEN,
       onOverflow: () => args.onError(new Error('E2EE v2 outbound buffer overflow'))
@@ -59,10 +64,16 @@ export class MobileE2EEV2PhysicalChannel {
   }
 
   start(): void {
+    if (this.disposed) {
+      return
+    }
     this.args.socket.send(JSON.stringify(this.args.session.hello))
   }
 
   handleMessage(raw: unknown): Promise<void> {
+    if (this.disposed) {
+      return Promise.resolve()
+    }
     const generation = this.generation
     this.inboundChain = this.inboundChain
       .then(() => this.processMessage(raw, generation))
@@ -75,20 +86,24 @@ export class MobileE2EEV2PhysicalChannel {
   }
 
   sendText(plaintext: string): boolean {
-    return this.enqueueReady({ kind: 'text', plaintext })
+    return !this.disposed && this.enqueueReady({ kind: 'text', plaintext })
   }
 
   sendBinary(plaintext: Uint8Array): boolean {
-    return this.enqueueReady({ kind: 'binary', plaintext })
+    return !this.disposed && this.enqueueReady({ kind: 'binary', plaintext })
   }
 
   dispose(): void {
+    if (this.disposed) {
+      return
+    }
+    this.disposed = true
     this.generation++
     this.outboundQueue.dispose()
   }
 
   private async processMessage(raw: unknown, generation: number): Promise<void> {
-    if (generation !== this.generation) {
+    if (this.disposed || generation !== this.generation) {
       return
     }
     if (this.state === 'awaiting-ready') {
@@ -100,7 +115,7 @@ export class MobileE2EEV2PhysicalChannel {
       typeof raw === 'string'
         ? this.args.session.openText(raw)
         : await this.openBinary(raw, generation)
-    if (generation !== this.generation || plaintext === null) {
+    if (this.disposed || generation !== this.generation || plaintext === null) {
       return
     }
     if (this.state === 'awaiting-authenticated') {

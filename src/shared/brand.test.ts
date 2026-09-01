@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { APP_DISPLAY_NAME, applyProductBranding } from './brand'
+import {
+  APP_DISPLAY_NAME,
+  applyProductBranding,
+  applyProductCliBranding,
+  getProductCliDisplayCommand
+} from './brand'
 
 describe('applyProductBranding', () => {
   it('rebrands standalone product copy', () => {
@@ -24,6 +29,31 @@ describe('applyProductBranding', () => {
     )
     expect(applyProductBranding('Read Orca metadata from /opt/Orca/config.json.')).toBe(
       `Read ${APP_DISPLAY_NAME} metadata from /opt/Orca/config.json.`
+    )
+  })
+})
+
+describe('applyProductCliBranding', () => {
+  it('uses hive for command examples while preserving repository names', () => {
+    expect(applyProductCliBranding('orca status\nhivecode runtime claim\n--repo name:orca')).toBe(
+      'hive status\nhive runtime claim\n--repo name:orca'
+    )
+  })
+
+  it('preserves compatibility filenames while branding nearby CLI copy', () => {
+    expect(applyProductCliBranding('Run orca status, then inspect orca.yaml.')).toBe(
+      'Run hive status, then inspect orca.yaml.'
+    )
+  })
+})
+
+describe('getProductCliDisplayCommand', () => {
+  it('normalizes only exact legacy aliases', () => {
+    expect(getProductCliDisplayCommand('orca')).toBe('hive')
+    expect(getProductCliDisplayCommand('orca-ide')).toBe('hive')
+    expect(getProductCliDisplayCommand('orca-dev')).toBe('orca-dev')
+    expect(getProductCliDisplayCommand('C:\\Tools\\Orca\\orca.exe')).toBe(
+      'C:\\Tools\\Orca\\orca.exe'
     )
   })
 })

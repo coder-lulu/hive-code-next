@@ -19,6 +19,7 @@ type SettingsSectionProps = {
   children?: React.ReactNode
   className?: string
   bodyClassName?: string
+  headerClassName?: string
   badge?: string
   badgeAccessory?: React.ReactNode
   forceVisible?: boolean
@@ -44,6 +45,7 @@ export function SettingsSection({
   children,
   className,
   bodyClassName,
+  headerClassName,
   badge,
   badgeAccessory,
   forceVisible = false,
@@ -68,7 +70,12 @@ export function SettingsSection({
 
   return (
     <section id={id} data-settings-section={id} className={cn('scroll-mt-8 space-y-6', className)}>
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-5">
+      <div
+        className={cn(
+          'flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-5',
+          headerClassName
+        )}
+      >
         <div className="min-w-0 space-y-2">
           <h2
             className="flex flex-wrap items-center gap-2 text-2xl font-semibold leading-tight text-foreground"

@@ -16,6 +16,7 @@ import {
   parseAgentSessionOperationTimestamp
 } from '../../../../shared/agent-session-host-authority'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
+import { supportsTuiAgentLaunchPermission } from '../../../../shared/tui-agent-permissions'
 import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { defineMethod, type RpcAnyMethod } from '../core'
@@ -131,6 +132,7 @@ const ExplicitEnsure = z
     providerSession: ProviderSession,
     ompResumeFilePath: OmpResumeFilePath.optional(),
     agentArgs: AgentArgs.optional(),
+    agentPermissionMode: z.enum(['manual', 'yolo']).optional(),
     launchPreferences: LaunchPreferences.optional(),
     presentation: Presentation.optional(),
     placement: Placement.optional()
@@ -142,6 +144,13 @@ const ExplicitEnsure = z
         code: z.ZodIssueCode.custom,
         path: ['ompResumeFilePath'],
         message: 'OMP resume path requires the OMP agent'
+      })
+    }
+    if (value.agentPermissionMode !== undefined && !supportsTuiAgentLaunchPermission(value.agent)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['agentPermissionMode'],
+        message: 'This agent does not support an explicit launch permission mode'
       })
     }
     if (getAgentResumeArgv(value.agent, value.providerSession, value.ompResumeFilePath) === null) {
@@ -175,6 +184,7 @@ export const CreateAgentSessionParams: z.ZodType<RuntimeCreateAgentSessionReques
       .optional(),
     promptDelivery: PromptDelivery.optional(),
     agentArgs: AgentArgs.optional(),
+    agentPermissionMode: z.enum(['manual', 'yolo']).optional(),
     launchPreferences: LaunchPreferences.optional(),
     startupCwd: z.string().min(1).max(MAX_WORKTREE_SELECTOR_LENGTH).optional(),
     presentation: Presentation.optional(),
@@ -188,6 +198,13 @@ export const CreateAgentSessionParams: z.ZodType<RuntimeCreateAgentSessionReques
         code: z.ZodIssueCode.custom,
         path: ['prompt'],
         message: 'Draft delivery requires a non-empty prompt'
+      })
+    }
+    if (value.agentPermissionMode !== undefined && !supportsTuiAgentLaunchPermission(value.agent)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['agentPermissionMode'],
+        message: 'This agent does not support an explicit launch permission mode'
       })
     }
   })

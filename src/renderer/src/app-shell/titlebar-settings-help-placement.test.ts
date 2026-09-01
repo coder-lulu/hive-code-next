@@ -34,6 +34,16 @@ describe('settings and help control placement', () => {
       expected: 'right-sidebar'
     },
     {
+      name: 'landing page with the context rail open',
+      input: {
+        creationLayoutActive: false,
+        mainStripMounted: false,
+        workspaceChromeActive: false,
+        rightSidebarVisible: true
+      },
+      expected: 'right-sidebar'
+    },
+    {
       name: 'non-workspace page',
       input: {
         creationLayoutActive: false,

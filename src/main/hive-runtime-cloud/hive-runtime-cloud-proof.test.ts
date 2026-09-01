@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import {
   canonicalRuntimeHeartbeatBody,
+  createRuntimeClaimCapabilityReissueRequest,
+  createRuntimeClaimChallengeRequest,
+  createRuntimeClaimReconcileRequest,
   createRuntimeConnectionTicketConsumeRequest,
   createRuntimeHeartbeatRequest,
   createRuntimeLeaseAcquireRequest,
@@ -62,6 +65,52 @@ describe('Hive Runtime Cloud proofs', () => {
     expect(verifies(input, request.proof.signature)).toBe(true)
   })
 
+  it('binds claim recovery proofs to each frozen path and protected field order', () => {
+    const runtimeRecordId = '623e4567-e89b-42d3-a456-426614174000'
+    const inputs = [
+      createRuntimeClaimCapabilityReissueRequest(
+        identity,
+        { runtimeRecordId, expectedVersion: 2 },
+        context
+      ),
+      createRuntimeClaimReconcileRequest(
+        identity,
+        { runtimeRecordId, expectedVersion: 2 },
+        context
+      ),
+      createRuntimeClaimChallengeRequest(identity, { runtimeRecordId, expectedVersion: 2 }, context)
+    ]
+
+    for (const request of inputs) {
+      const { proof, ...body } = request
+      const signatureInput = [
+        proof.protocolVersion,
+        proof.algorithm,
+        proof.method,
+        proof.path,
+        proof.authorityId,
+        proof.issuedAt,
+        proof.nonce,
+        proof.bodySha256
+      ].join('\n')
+      expect(proof.bodySha256).toBe(
+        createHash('sha256').update(JSON.stringify(body), 'utf8').digest('hex')
+      )
+      expect(verifies(signatureInput, proof.signature)).toBe(true)
+    }
+    expect(inputs.map(({ proof }) => [proof.protocolVersion, proof.path])).toEqual([
+      [
+        'hive-runtime-claim-capability-reissue/v1',
+        `/hive/v1/runtime-records/${runtimeRecordId}/reclaim-capabilities`
+      ],
+      [
+        'hive-runtime-claim-reconcile/v1',
+        `/hive/v1/runtime-records/${runtimeRecordId}/claim-reconcile`
+      ],
+      ['hive-runtime-claim-challenge/v1', '/hive/v1/runtime-claim-challenges']
+    ])
+  })
+
   it('omits algorithm from the fixed-order Lease signature JSON', () => {
     const request = createRuntimeLeaseAcquireRequest(
       identity,
@@ -108,7 +157,15 @@ describe('Hive Runtime Cloud proofs', () => {
           readiness: 'READY',
           readinessReasonCode: 'healthy',
           startedAt: '2026-08-25T07:59:00.000Z',
-          connectionCapabilities: ['orca-direct']
+          connectionCapabilities: ['orca-direct'],
+          deviceName: 'build-host',
+          osName: 'Linux',
+          osVersion: '#1 SMP',
+          osArch: 'arm64',
+          cpuModel: 'Example CPU',
+          cpuLogicalCores: 8,
+          totalMemoryBytes: 32 * 1024 ** 3,
+          freeDiskBytes: 512 * 1024 ** 3
         }
       },
       context
@@ -123,6 +180,16 @@ describe('Hive Runtime Cloud proofs', () => {
       protocolVersion: request.proof.protocolVersion
     })
 
+    expect(request.report).toMatchObject({
+      deviceName: 'build-host',
+      osName: 'Linux',
+      osVersion: '#1 SMP',
+      osArch: 'arm64',
+      cpuModel: 'Example CPU',
+      cpuLogicalCores: 8,
+      totalMemoryBytes: 32 * 1024 ** 3,
+      freeDiskBytes: 512 * 1024 ** 3
+    })
     expect(verifies(input, request.proof.signature)).toBe(true)
   })
 
@@ -220,6 +287,7 @@ describe('Hive Runtime Cloud proofs', () => {
       webEndpointExpiresAt: '2026-08-25T08:01:15.000Z'
     })
     expect(partial.report).not.toHaveProperty('webHttpsOrigin')
+    expect(partial.report).not.toHaveProperty('deviceName')
   })
 
   it('binds control pull and revocation ack proofs to the current full tuple', () => {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import type { CliInstallStatus } from '../../../shared/cli-install-types'
+import { PRIMARY_CLI_COMMAND } from '@/product-brand'
 import {
   CLI_PREREQUISITE_REGISTRATION_TOAST,
   CLI_PREREQUISITE_REGISTRATION_TOAST_DESCRIPTION,
@@ -87,7 +88,7 @@ describe('ensureOrcaCliAvailableForAgentSkillTerminal', () => {
     const initial = cliStatus({
       platform: 'win32',
       pathConfigured: null,
-      detail: 'Orca could not read the Windows user PATH registry value.'
+      detail: 'Could not inspect C:\\customer Orca workspace\\PATH. Run hive status to retry.'
     })
     const install = vi.fn()
     vi.stubGlobal('window', {
@@ -101,7 +102,9 @@ describe('ensureOrcaCliAvailableForAgentSkillTerminal', () => {
     expect(install).not.toHaveBeenCalled()
     expect(toast.warning).toHaveBeenCalledWith(
       expect.stringMatching(/could not check/i),
-      expect.objectContaining({ description: initial.detail })
+      expect.objectContaining({
+        description: `Could not inspect C:\\customer Orca workspace\\PATH. Run ${PRIMARY_CLI_COMMAND} status to retry.`
+      })
     )
   })
 

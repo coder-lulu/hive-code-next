@@ -1,4 +1,5 @@
 import WebSocket from 'ws'
+import { APP_DISPLAY_NAME } from './brand'
 import { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import { createWsOutboundBackpressureQueue } from './ws-outbound-backpressure-queue'
 
@@ -97,7 +98,7 @@ export class RemoteRuntimeSubscriptionOutbound {
     this.options.fail(
       new RemoteRuntimeClientError(
         'remote_runtime_unavailable',
-        'Remote Orca runtime outbound memory admission failed; reconnecting.'
+        `Remote ${APP_DISPLAY_NAME} runtime outbound memory admission failed; reconnecting.`
       )
     )
     return false
@@ -133,7 +134,7 @@ export class RemoteRuntimeSubscriptionOutbound {
           this.options.fail(
             new RemoteRuntimeClientError(
               'remote_runtime_unavailable',
-              'Remote Orca runtime send buffer overflow; reconnecting.'
+              `Remote ${APP_DISPLAY_NAME} runtime send buffer overflow; reconnecting.`
             )
           ),
         ...this.options.binaryQueue,

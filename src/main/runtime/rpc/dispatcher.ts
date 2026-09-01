@@ -26,8 +26,13 @@ import { parseRpcRequestParams } from './dispatcher-request-parsing'
 import { routeDispatcherClientHostedBrowserRpc } from './dispatcher-client-browser-routing'
 import { needsLocalCallerFingerprint } from './dispatcher-caller-fingerprint'
 import { createDispatcherStreamingFeatureEmitter } from './dispatcher-streaming-feature-emitter'
+import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runtime-cloud-control'
 
-export type DispatcherOptions = { runtime: OrcaRuntimeService; methods?: readonly RpcAnyMethod[] }
+export type DispatcherOptions = {
+  runtime: OrcaRuntimeService
+  methods?: readonly RpcAnyMethod[]
+  hiveRuntimeCloud?: HiveRuntimeCloudControl
+}
 
 // oxfmt-ignore
 type DispatchCallOptions = Pick<RpcDispatchStreamingOptions, 'signal' | 'connectionId' | 'clientId' | 'clientKind' | 'clientCapabilities' | 'authenticatedCallerFingerprint'>
@@ -37,9 +42,11 @@ export class RpcDispatcher {
   private readonly registry: RpcRegistry
   private readonly orchestrationMutations: OrchestrationMutationExecutor
   private readonly legacyOrchestration: OrchestrationLegacyCompatibility
+  private readonly hiveRuntimeCloud: HiveRuntimeCloudControl | undefined
 
-  constructor({ runtime, methods = ALL_RPC_METHODS }: DispatcherOptions) {
+  constructor({ runtime, methods = ALL_RPC_METHODS, hiveRuntimeCloud }: DispatcherOptions) {
     this.runtime = runtime
+    this.hiveRuntimeCloud = hiveRuntimeCloud
     this.registry = buildRegistry(methods)
     this.orchestrationMutations = getOrchestrationMutationExecutor(runtime)
     this.legacyOrchestration = new OrchestrationLegacyCompatibility(runtime)
@@ -117,6 +124,7 @@ export class RpcDispatcher {
         const legacyCoordinatorRunId = legacyCoordinator?.revalidate()
         return method.handler(effectiveParams, {
           runtime: this.runtime,
+          hiveRuntimeCloud: this.hiveRuntimeCloud,
           signal: options?.signal,
           connectionId: options?.connectionId,
           requestId: request.id,
@@ -230,6 +238,7 @@ export class RpcDispatcher {
           const legacyCoordinatorRunId = legacyCoordinator?.revalidate()
           return method.handler(effectiveParams, {
             runtime: this.runtime,
+            hiveRuntimeCloud: this.hiveRuntimeCloud,
             signal: options?.signal,
             requestId: request.id,
             connectionId: options?.connectionId,
@@ -286,6 +295,7 @@ export class RpcDispatcher {
         parsedParams.value,
         {
           runtime: this.runtime,
+          hiveRuntimeCloud: this.hiveRuntimeCloud,
           signal: options?.signal,
           requestId: request.id,
           connectionId: options?.connectionId,

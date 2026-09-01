@@ -39,9 +39,6 @@ export function TitlebarLeftControls({
   const leftSidebarShortcutLabel = useShortcutLabel('sidebar.left.toggle')
   const historyBackShortcutLabel = useShortcutLabel('worktree.history.back')
   const historyForwardShortcutLabel = useShortcutLabel('worktree.history.forward')
-  const landingHomeActive =
-    layout.activeView === 'terminal' && !layout.activeWorktreeId && !layout.creationLayoutActive
-
   return (
     // Why: measure the ENTIRE row so TabGroupPanel's collapse spacer reserves enough width; measuring only the inner cluster left back/forward over the first tab.
     // Why: collapsed mode floats in a w-0 wrapper; w-max stops Windows Chromium from shrinking the app name to one glyph.
@@ -58,11 +55,6 @@ export function TitlebarLeftControls({
           /* Why: Windows/Linux remove the native title bar, so render the logo plus a ··· button that pops the application menu (as Alt does). */
           <>
             <img src={logo} alt="" aria-hidden className="titlebar-logo" />
-            {landingHomeActive ? (
-              <span className="titlebar-home-brand" aria-label={APP_DISPLAY_NAME}>
-                {APP_DISPLAY_NAME}
-              </span>
-            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

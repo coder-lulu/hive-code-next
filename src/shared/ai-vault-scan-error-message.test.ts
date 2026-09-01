@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from './brand'
 import { describeAiVaultScanError } from './ai-vault-scan-error-message'
 
 describe('describeAiVaultScanError', () => {
@@ -48,7 +49,7 @@ describe('describeAiVaultScanError', () => {
   it('routes a missing scanner entry to install guidance, not a retry', () => {
     const described = describeAiVaultScanError('AI Vault service entry not found: /a/b.js')
     expect(described).toBe(
-      'The session scanner is missing from this Orca install. Reinstalling Orca restores it.'
+      `The session scanner is missing from this ${APP_DISPLAY_NAME} install. Reinstalling ${APP_DISPLAY_NAME} restores it.`
     )
     expect(described).not.toContain('Refresh')
   })

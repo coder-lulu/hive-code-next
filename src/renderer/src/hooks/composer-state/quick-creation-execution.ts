@@ -8,6 +8,8 @@ type QuickCreationExecutionInput = Pick<
   | 'ephemeralVmRecipes'
   | 'ephemeralVmsEnabled'
   | 'isSubmissionCancelled'
+  | 'agentPermissionMode'
+  | 'agentPrompt'
   | 'linkedGitLabIssue'
   | 'linkedGitLabMR'
   | 'normalizedSparseDirectories'
@@ -42,13 +44,15 @@ import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import { translate } from '@/i18n/i18n'
-import { resolveQuickCreateLinkedWorkItemPrompt } from '@/lib/linked-work-item-context'
 import { buildQuickComposerStartup } from './quick-startup-plan'
 import { buildQuickCreationRequest } from './quick-creation-request'
+import { resolveQuickCreationLaunchPrompt } from './quick-creation-launch-prompt'
 import type { PendingSmartGitHubSubmitResolution } from './source-selection-decisions'
 
 export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
   const {
+    agentPermissionMode,
+    agentPrompt,
     clearNewWorkspaceDraft,
     createMultiple,
     effectivePresetId,
@@ -122,7 +126,11 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
       const promptLinkedWorkItem = agent === null ? null : submitLinkedWorkItem
 
       const { prompt: quickPrompt, draftPrompt: quickDraftPrompt } =
-        resolveQuickCreateLinkedWorkItemPrompt(promptLinkedWorkItem, trimmedNote)
+        resolveQuickCreationLaunchPrompt({
+          linkedWorkItem: promptLinkedWorkItem,
+          agentPrompt,
+          note: trimmedNote
+        })
 
       const {
         startupPlan,
@@ -133,6 +141,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         prompt: quickPrompt,
         draftPrompt: quickDraftPrompt,
         settings,
+        agentPermissionMode,
         repoConnectionId: selectedRepo.connectionId,
         platform: selectedRepoAgentLaunchPlatform,
         shell: selectedRepoStartupShell,
@@ -252,6 +261,8 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
       }
     },
     [
+      agentPermissionMode,
+      agentPrompt,
       clearNewWorkspaceDraft,
       createMultiple,
       effectivePresetId,

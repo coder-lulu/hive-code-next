@@ -49,6 +49,7 @@ describe('handleFocusTerminalPaneDetail', () => {
   it('focuses and flashes only after the target leaf resolves', () => {
     const { container, manager } = createManager()
     const acknowledgeAgents = vi.fn()
+    const consumeAgentCompletionUnread = vi.fn()
     const surfaceStaleAgentRow = vi.fn()
 
     handleFocusTerminalPaneDetail(
@@ -62,6 +63,7 @@ describe('handleFocusTerminalPaneDetail', () => {
         tabId: 'tab-1',
         manager,
         acknowledgeAgents,
+        consumeAgentCompletionUnread,
         surfaceStaleAgentRow
       }
     )
@@ -69,6 +71,7 @@ describe('handleFocusTerminalPaneDetail', () => {
     expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: true })
     expect(container.classList.contains('pane-focus-rim-flash')).toBe(true)
     expect(acknowledgeAgents).toHaveBeenCalledWith([`tab-1:${LEAF_ID}`])
+    expect(consumeAgentCompletionUnread).toHaveBeenCalledWith(`tab-1:${LEAF_ID}`)
     expect(surfaceStaleAgentRow).not.toHaveBeenCalled()
   })
 
@@ -86,6 +89,7 @@ describe('handleFocusTerminalPaneDetail', () => {
         tabId: 'tab-1',
         manager,
         acknowledgeAgents: vi.fn(),
+        consumeAgentCompletionUnread: vi.fn(),
         surfaceStaleAgentRow: vi.fn(),
         scrollToBottomIfOutputSinceLastView
       }
@@ -98,6 +102,7 @@ describe('handleFocusTerminalPaneDetail', () => {
   it('does not focus, flash, or ack when the numeric pane no longer owns the leaf', () => {
     const { container, manager } = createManager({ leafId: OTHER_LEAF_ID })
     const acknowledgeAgents = vi.fn()
+    const consumeAgentCompletionUnread = vi.fn()
     const surfaceStaleAgentRow = vi.fn()
 
     handleFocusTerminalPaneDetail(
@@ -111,6 +116,7 @@ describe('handleFocusTerminalPaneDetail', () => {
         tabId: 'tab-1',
         manager,
         acknowledgeAgents,
+        consumeAgentCompletionUnread,
         surfaceStaleAgentRow
       }
     )
@@ -118,6 +124,7 @@ describe('handleFocusTerminalPaneDetail', () => {
     expect(manager.setActivePane).not.toHaveBeenCalled()
     expect(container.classList.contains('pane-focus-rim-flash')).toBe(false)
     expect(acknowledgeAgents).not.toHaveBeenCalled()
+    expect(consumeAgentCompletionUnread).not.toHaveBeenCalled()
     expect(surfaceStaleAgentRow).toHaveBeenCalledWith('tab-1', LEAF_ID)
   })
 })

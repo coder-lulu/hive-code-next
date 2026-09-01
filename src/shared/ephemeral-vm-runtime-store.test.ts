@@ -172,7 +172,12 @@ describe('ephemeral VM runtime store', () => {
     const userDataPath = makeUserDataPath()
     writeFileSync(getEphemeralVmRuntimeStorePath(userDataPath), '{ nope', 'utf8')
 
-    expect(() => listEphemeralVmRuntimes(userDataPath)).toThrow(EphemeralVmRuntimeStoreError)
+    expect(() => listEphemeralVmRuntimes(userDataPath)).toThrow(
+      /Could not read HiveCode ephemeral VM runtimes/
+    )
+    expect(getEphemeralVmRuntimeStorePath(userDataPath)).toContain(
+      'orca-ephemeral-vm-runtimes.json'
+    )
   })
 
   it('rejects an oversized sparse runtime store before parsing it', () => {
@@ -194,7 +199,7 @@ describe('ephemeral VM runtime store', () => {
           cleanupLastError: 'x'.repeat(MAX_EPHEMERAL_VM_RUNTIME_STORE_FILE_BYTES)
         })
       )
-    ).toThrow(EphemeralVmRuntimeStoreError)
+    ).toThrow(/Could not write HiveCode ephemeral VM runtimes/)
     expect(listEphemeralVmRuntimes(userDataPath)).toEqual([])
   })
 })

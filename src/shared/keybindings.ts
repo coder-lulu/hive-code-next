@@ -33,6 +33,7 @@ export type KeybindingActionId =
   | 'worktree.navigateDown'
   | 'app.settings'
   | 'app.forceReload'
+  | 'home.newTask'
   | 'workspace.create'
   | 'workspace.rename'
   | 'workspace.delete'
@@ -257,12 +258,24 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     defaultBindings: platformBindings(['Mod+Shift+ArrowDown'])
   },
   {
+    id: 'home.newTask',
+    title: 'New task',
+    group: 'Global',
+    scope: 'global',
+    searchKeywords: ['shortcut', 'global', 'home', 'task', 'new', 'conversation'],
+    // Keep Cmd/Ctrl+N focused on starting an AI task. Workspace creation remains
+    // available on the explicit Shift variant below so the two actions do not
+    // silently open different surfaces from the same chord.
+    defaultBindings: platformBindings(['Mod+N']),
+    conflictGroup: 'menu'
+  },
+  {
     id: 'workspace.create',
     title: 'Create worktree',
     group: 'Global',
     scope: 'global',
     searchKeywords: ['shortcut', 'global', 'worktree', 'create', 'new workspace'],
-    defaultBindings: platformBindings(['Mod+N', 'Mod+Shift+N'])
+    defaultBindings: platformBindings(['Mod+Shift+N'])
   },
   {
     id: 'workspace.rename',

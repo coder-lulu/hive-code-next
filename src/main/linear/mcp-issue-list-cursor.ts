@@ -1,4 +1,5 @@
 import { linearError } from './issue-context-errors'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 export const ISSUE_LIST_CURSOR_PREFIX = 'orca.linear.v1.'
 
@@ -68,7 +69,7 @@ export function resolveIssueListCursor(request: {
   }
   if (cursor.startsWith(ISSUE_LIST_CURSOR_PREFIX)) {
     throw cursorWorkspaceError(
-      'Cursor was issued by Orca but is malformed or truncated.',
+      `Cursor was issued by ${APP_DISPLAY_NAME} but is malformed or truncated.`,
       'Re-run list-issues without --cursor, then page with the nextCursor it returns.'
     )
   }

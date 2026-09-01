@@ -12,6 +12,7 @@ import {
   effectiveExternalWorktreeVisibility,
   isLegacyRepoForExternalWorktreeVisibility
 } from '../../../../shared/external-worktree-visibility'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type RepositoryWorktreeDefaultsUpdate = Pick<Repo, 'worktreeBasePath' | 'worktreeBaseRef'> & {
   externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
@@ -62,9 +63,15 @@ export function RepositoryWorktreeDefaultsSection({
         )}
         description={translate(
           'auto.components.settings.RepositoryPane.externalWorktreesDescription',
-          'Override whether worktrees created outside Orca appear for this project.'
+          `Override whether worktrees created outside ${APP_DISPLAY_NAME} appear for this project.`
         )}
-        keywords={[repo.displayName, 'external', 'non-Orca', 'visibility', 'sidebar']}
+        keywords={[
+          repo.displayName,
+          'external',
+          `non-${APP_DISPLAY_NAME}`,
+          'visibility',
+          'sidebar'
+        ]}
         className="space-y-2"
         forceVisible={forceVisible}
       >

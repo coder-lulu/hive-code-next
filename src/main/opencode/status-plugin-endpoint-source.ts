@@ -64,7 +64,7 @@ export function getStatusPluginEndpointSource(): string[] {
     '    // pre-install case; stay silent for it.',
     '    if (err && err.code !== "ENOENT" && !warnedBadEndpoint) {',
     '      warnedBadEndpoint = true;',
-    '      console.warn("[orca-hook] failed to parse endpoint file:", err.message);',
+    '      console.warn("[hivecode-hook] failed to parse endpoint file:", err.message);',
     '    }',
     '    return null;',
     '  }',

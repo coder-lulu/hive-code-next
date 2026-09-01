@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     } as Record<string, unknown>,
     closeModal: vi.fn(),
     addNonGitFolder: vi.fn(),
+    moveProjectToGroup: vi.fn(),
     runtimeEnvironments: [{ id: 'env-1', name: 'Remote Mac' }],
     repos: [] as Repo[],
     projects: [],
@@ -154,6 +155,24 @@ describe('NonGitFolderDialog', () => {
       runtimeEnvironmentId: 'env-1'
     })
     expect(mocks.state.closeModal).toHaveBeenCalled()
+  })
+
+  it('preserves the originating space through folder confirmation', () => {
+    mocks.state.modalData = {
+      folderPath: '/srv/non-git',
+      runtimeEnvironmentId: 'env-1',
+      projectGroupScoped: true,
+      projectGroupId: 'space-1'
+    }
+    renderToStaticMarkup(<NonGitFolderDialog />)
+
+    const button = mocks.buttons.find((entry) => entry.label.includes('Open as Folder'))
+    button?.onClick?.()
+
+    expect(mocks.state.addNonGitFolder).toHaveBeenCalledWith('/srv/non-git', {
+      runtimeEnvironmentId: 'env-1',
+      projectGroupId: 'space-1'
+    })
   })
 
   it('activates only the selected SSH folder when repo IDs collide', async () => {

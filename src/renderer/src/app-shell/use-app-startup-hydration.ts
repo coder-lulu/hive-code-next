@@ -98,7 +98,8 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           window.api.onboarding.get()
         )
         onboardingPromise.catch(() => {})
-        // Why: await ui.get() (not overlap) so persisted view settings hydrate before the local catalog/session steps and first paint reflects them.
+        // Why: await ui.get() (not overlap) so persisted appearance settings hydrate before
+        // the local catalog/session steps. Startup navigation itself always begins at Home.
         const persistedUI = await timeRendererStartupStep('ui-get', () => window.api.ui.get())
         uiHydrated = timeRendererStartupSyncStep('hydrate-persisted-ui', () =>
           hydratePersistedUIAfterStartupRead({
@@ -107,6 +108,9 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
             hydratePersistedUI: actions.hydratePersistedUI
           })
         )
+        if (uiHydrated) {
+          actions.openStartupHome()
+        }
         // Why: list-runtime-session-hosts reads no repo state, so overlap it with the repo scan
         // instead of paying its IPC round-trip serially before repos. .catch marks rejections handled
         // if an earlier await throws first; the value is awaited below and surfaces any error there.
@@ -193,6 +197,9 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
             actions.hydrateTabsSession(sessionRead.session, sessionHydrationOptions)
             actions.hydrateEditorSession(sessionRead.session, sessionHydrationOptions)
             actions.hydrateBrowserSession(sessionRead.session, sessionHydrationOptions)
+            // Restore every durable surface before clearing only the visible selection. This
+            // keeps sessions resumable while making the ordinary Home page the launch target.
+            actions.openStartupHome()
           })
           await timeRendererStartupStep('prepare-terminal-startup-restoration', () =>
             window.api.app.prepareTerminalStartupRestoration()
@@ -303,6 +310,11 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           })()
         }
       } catch (error) {
+        if (!cancelled) {
+          // A partial hydration may already have restored a workspace selection. Keep the
+          // degraded shell on the same deterministic Home route as a successful startup.
+          actions.openStartupHome()
+        }
         await recoverFromDegradedStartup({
           error,
           uiHydrated,

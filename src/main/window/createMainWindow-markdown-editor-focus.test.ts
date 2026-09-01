@@ -312,9 +312,9 @@ describe('createMainWindow', () => {
     expect(webContents.send).not.toHaveBeenCalledWith('ui:toggleLeftSidebar')
 
     webContents.send.mockClear()
-    const newWorkspacePreventDefault = vi.fn()
+    const newTaskPreventDefault = vi.fn()
     windowHandlers['before-input-event'](
-      { preventDefault: newWorkspacePreventDefault } as never,
+      { preventDefault: newTaskPreventDefault } as never,
       {
         type: 'keyDown',
         code: 'KeyN',
@@ -326,8 +326,8 @@ describe('createMainWindow', () => {
       } as never
     )
 
-    expect(newWorkspacePreventDefault).toHaveBeenCalledTimes(1)
-    expect(webContents.send).toHaveBeenCalledWith('ui:openNewWorkspace')
+    expect(newTaskPreventDefault).toHaveBeenCalledTimes(1)
+    expect(webContents.send).toHaveBeenCalledWith('ui:openNewTaskHome')
   })
 
   it('still intercepts Cmd+Shift+B and Cmd+Alt+B when the markdown editor is focused', () => {

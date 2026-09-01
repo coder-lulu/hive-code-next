@@ -13,6 +13,7 @@ vi.mock('expo-crypto', () => ({
 vi.mock('expo-secure-store', () => ({ WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED' }))
 
 const now = Date.UTC(2026, 6, 13)
+const runtimeRecordId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const directOffer: PairingOffer = {
   v: 2,
   endpoint: 'ws://192.168.1.10:6768',
@@ -179,6 +180,80 @@ describe('pre-profile pairing coordinator', () => {
     expect(events).toEqual(['connect', 'save-host'])
   })
 
+  it('persists the Runtime record id proven by authenticated status', async () => {
+    const client = fakeClient([success({ version: '1.0.0', runtimeRecordId })])
+    const deps = dependencies(client, [])
+
+    const attempt = startPreProfilePairing({
+      offer: directOffer,
+      timeoutMs: 5_000,
+      dependencies: deps
+    })
+
+    await expect(attempt.result).resolves.toEqual({ hostId: `host-${now}` })
+    expect(deps.saveHost).toHaveBeenCalledWith(expect.objectContaining({ runtimeRecordId }))
+  })
+
+  it('drops an offered Runtime record id when authenticated status does not prove it', async () => {
+    const client = fakeClient([success({ version: '1.0.0' })])
+    const deps = dependencies(client, [])
+
+    const attempt = startPreProfilePairing({
+      offer: { ...directOffer, runtimeRecordId },
+      timeoutMs: 5_000,
+      dependencies: deps
+    })
+
+    await expect(attempt.result).resolves.toEqual({ hostId: `host-${now}` })
+    expect(deps.saveHost).toHaveBeenCalledWith(
+      expect.not.objectContaining({ runtimeRecordId: expect.anything() })
+    )
+  })
+
+  it('keeps an unverified Runtime record id out of the crash-recovery journal', async () => {
+    const client = fakeClient([success({ version: '1.0.0' }), failure('method_not_found')])
+    const deps = dependencies(client, [])
+
+    const attempt = startPreProfilePairing({
+      offer: { ...relayOffer, runtimeRecordId },
+      timeoutMs: 5_000,
+      dependencies: deps
+    })
+
+    await expect(attempt.result).resolves.toEqual({ hostId: `host-${now}` })
+    expect(deps.saveJournal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          host: expect.not.objectContaining({ runtimeRecordId: expect.anything() })
+        })
+      })
+    )
+    expect(deps.saveHost).toHaveBeenCalledWith(
+      expect.not.objectContaining({ runtimeRecordId: expect.anything() })
+    )
+  })
+
+  it('rejects when the offer and authenticated status identify different Runtimes', async () => {
+    const client = fakeClient([
+      success({
+        version: '1.0.0',
+        runtimeRecordId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+      })
+    ])
+    const deps = dependencies(client, [])
+
+    const attempt = startPreProfilePairing({
+      offer: { ...directOffer, runtimeRecordId },
+      timeoutMs: 5_000,
+      dependencies: deps
+    })
+
+    await expect(attempt.result).rejects.toThrow(
+      'pairing offer Runtime identity does not match the authenticated Runtime'
+    )
+    expect(deps.saveHost).not.toHaveBeenCalled()
+  })
+
   it('reuses the existing host id and name when re-pairing the same desktop key (no duplicate)', async () => {
     // STA-1840: re-pairing a desktop already stored under a different id must
     // merge into that card, not mint a new host-${now} and duplicate the row.
@@ -294,7 +369,10 @@ describe('pre-profile pairing coordinator', () => {
 
   it('tolerates an old desktop method_not_found and commits a direct-only host', async () => {
     const events: string[] = []
-    const client = fakeClient([success({ version: '1.0.0' }), failure('method_not_found')])
+    const client = fakeClient([
+      success({ version: '1.0.0', runtimeRecordId }),
+      failure('method_not_found')
+    ])
     const deps = dependencies(client, events)
 
     const attempt = startPreProfilePairing({
@@ -304,6 +382,7 @@ describe('pre-profile pairing coordinator', () => {
     })
     await expect(attempt.result).resolves.toEqual({ hostId: `host-${now}` })
 
+    expect(deps.saveHost).toHaveBeenCalledWith(expect.objectContaining({ runtimeRecordId }))
     expect(deps.saveHost).toHaveBeenCalledWith(
       expect.not.objectContaining({ endpoints: expect.anything() })
     )

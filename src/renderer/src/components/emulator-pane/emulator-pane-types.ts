@@ -1,7 +1,9 @@
+export type SimulatorDeviceState = 'Shutdown' | 'Booting' | 'Booted' | 'Unresponsive'
+
 export type SimulatorDeviceRow = {
   name: string
   udid: string
-  state: string
+  state: SimulatorDeviceState
   runtime?: string
   isAvailable?: boolean
 }

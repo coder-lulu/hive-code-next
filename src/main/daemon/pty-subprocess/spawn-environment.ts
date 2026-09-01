@@ -1,4 +1,5 @@
 import { delimiter } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { dropInheritedOrcaFishHistory } from '../../fish-history-session'
 import { removeAppImageRuntimeEnv } from '../../pty/appimage-terminal-env'
 import { stripInheritedBuildModeEnv } from '../../pty/build-mode-env'
@@ -136,7 +137,7 @@ export function createDaemonPtyEnvironment(opts: PtySubprocessOptions): Record<s
     ...mergeGitConfigEnvProtocol(stripInheritedBuildModeEnv(process.env), opts.env),
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
-    TERM_PROGRAM: 'Orca',
+    TERM_PROGRAM: APP_DISPLAY_NAME,
     TERM_PROGRAM_VERSION: process.env.ORCA_APP_VERSION ?? '0.0.0-dev',
     FORCE_HYPERLINK: '1'
   } as Record<string, string>

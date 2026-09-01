@@ -15,6 +15,7 @@ import {
   loadStoredMobileSession,
   refreshMobileSession,
   revokeMobileSession,
+  subscribeMobileSessionInvalidation,
   type MobileSession
 } from './mobile-sms-auth'
 
@@ -103,6 +104,8 @@ export function MobileAuthSessionProvider(props: PropsWithChildren) {
     }
   }, [applySession])
 
+  useEffect(() => subscribeMobileSessionInvalidation(() => applySession(null)), [applySession])
+
   const signIn = useCallback(
     (next: MobileSession) => {
       invalidateMobileSessionRefreshes()
@@ -135,6 +138,7 @@ export function MobileAuthSessionProvider(props: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     const current = sessionRef.current
+    applySession(null)
     try {
       if (current) {
         try {

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   updateSettings: vi.fn(),
   openSettingsPage: vi.fn(),
   openSettingsTarget: vi.fn(),
+  preloadHiveAccountSettings: vi.fn(),
   resolvePartition: vi.fn(),
   writeClipboardText: vi.fn(),
   openUrl: vi.fn(),
@@ -49,6 +50,10 @@ vi.mock('@/components/ui/tooltip', () => ({
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: mocks.rpc
+}))
+
+vi.mock('../settings/settings-page-loader', () => ({
+  preloadHiveAccountSettings: mocks.preloadHiveAccountSettings
 }))
 
 vi.mock('@/store', () => ({
@@ -92,6 +97,7 @@ describe('ArtifactsPage', () => {
     mocks.updateSettings.mockReset().mockResolvedValue(undefined)
     mocks.openSettingsPage.mockReset()
     mocks.openSettingsTarget.mockReset()
+    mocks.preloadHiveAccountSettings.mockReset()
     mocks.resolvePartition.mockReset().mockResolvedValue('persist:orca-default')
     mocks.writeClipboardText.mockReset().mockResolvedValue(undefined)
     mocks.openUrl.mockReset().mockResolvedValue(undefined)
@@ -255,6 +261,25 @@ describe('ArtifactsPage', () => {
 
     await screen.findByText('No shared artifacts')
     expect(screen.queryByText('Publishing is turned off')).not.toBeInTheDocument()
+  })
+
+  it('preloads the account settings chunks before opening an unconfigured account', async () => {
+    mocks.authStatus = {
+      activeProfileId: 'profile-a',
+      cloud: null,
+      configured: false,
+      state: 'disconnected'
+    }
+    render(<ArtifactsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open account settings' }))
+
+    expect(mocks.preloadHiveAccountSettings).toHaveBeenCalledOnce()
+    expect(mocks.openSettingsTarget).toHaveBeenCalledWith({ pane: 'orca-account', repoId: null })
+    expect(mocks.openSettingsPage).toHaveBeenCalledOnce()
+    expect(mocks.preloadHiveAccountSettings.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.openSettingsPage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    )
   })
 
   it('loads each cursor once and appends the next artifact page', async () => {

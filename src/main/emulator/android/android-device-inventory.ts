@@ -2,6 +2,11 @@ import type { AndroidCommandRunner } from './android-command-runner'
 import type { AndroidSdkPaths } from './android-sdk-discovery'
 import { adbDevicesArgs, parseAdbDevices, type AndroidAdbDevice } from './adb-devices'
 import { listAvdsArgs, parseAvdList } from './avd-manager'
+import {
+  ANDROID_DEVICE_PROBE_TIMEOUT_MS,
+  probeAndroidDeviceHealth,
+  type AndroidDeviceHealth
+} from './android-device-health'
 import type { EmulatorDevice } from '../backends/emulator-backend'
 
 // Android device discovery: turns raw `adb`/`emulator` output into the
@@ -14,21 +19,39 @@ export async function listRunningAdbDevices(
   sdk: AndroidSdkPaths
 ): Promise<AndroidAdbDevice[]> {
   const result = await runner(sdk.adb, adbDevicesArgs)
-  return parseAdbDevices(result.stdout).filter((device) => device.state === 'device')
+  return parseAdbDevices(result.stdout).filter(
+    (device) => device.state === 'device' || device.isEmulator
+  )
 }
 
 export async function resolveRunningAvdNames(
   runner: AndroidCommandRunner,
   sdk: AndroidSdkPaths,
-  running: AndroidAdbDevice[]
+  running: AndroidAdbDevice[],
+  knownNamesBySerial: ReadonlyMap<string, string> = new Map()
 ): Promise<Map<string, string>> {
   const names = new Map<string, string>()
+  for (const device of running) {
+    const knownName = knownNamesBySerial.get(device.serial)
+    if (knownName) {
+      names.set(device.serial, knownName)
+    }
+  }
   await Promise.all(
     running
       .filter((device) => device.isEmulator)
       .map(async (device) => {
-        const out = await runner(sdk.adb, ['-s', device.serial, 'emu', 'avd', 'name'])
-        const name = firstNonStatusLine(out.stdout)
+        const [consoleResult, propertyResult] = await Promise.all([
+          runner(sdk.adb, ['-s', device.serial, 'emu', 'avd', 'name'], {
+            timeoutMs: ANDROID_DEVICE_PROBE_TIMEOUT_MS
+          }),
+          runner(sdk.adb, ['-s', device.serial, 'shell', 'getprop', 'ro.boot.qemu.avd_name'], {
+            timeoutMs: ANDROID_DEVICE_PROBE_TIMEOUT_MS
+          })
+        ])
+        const name =
+          (consoleResult.code === 0 ? firstNonStatusLine(consoleResult.stdout) : null) ??
+          (propertyResult.code === 0 ? firstNonStatusLine(propertyResult.stdout) : null)
         if (name) {
           names.set(device.serial, name)
         }
@@ -41,9 +64,10 @@ export async function findRunningAvdSerial(
   runner: AndroidCommandRunner,
   sdk: AndroidSdkPaths,
   avdName: string,
-  running: AndroidAdbDevice[]
+  running: AndroidAdbDevice[],
+  knownNamesBySerial: ReadonlyMap<string, string> = new Map()
 ): Promise<string | null> {
-  const names = await resolveRunningAvdNames(runner, sdk, running)
+  const names = await resolveRunningAvdNames(runner, sdk, running, knownNamesBySerial)
   for (const [serial, name] of names) {
     if (name === avdName) {
       return serial
@@ -54,15 +78,24 @@ export async function findRunningAvdSerial(
 
 export async function listAndroidDevices(
   runner: AndroidCommandRunner,
-  sdk: AndroidSdkPaths
+  sdk: AndroidSdkPaths,
+  knownNamesBySerial: ReadonlyMap<string, string> = new Map()
 ): Promise<EmulatorDevice[]> {
   const [running, avdsResult] = await Promise.all([
     listRunningAdbDevices(runner, sdk),
     runner(sdk.emulator, listAvdsArgs)
   ])
   const avds = parseAvdList(avdsResult.stdout)
-  const runningAvdBySerial = await resolveRunningAvdNames(runner, sdk, running)
-  return mergeAndroidDevices(running, avds, runningAvdBySerial)
+  const [runningAvdBySerial, healthEntries] = await Promise.all([
+    resolveRunningAvdNames(runner, sdk, running, knownNamesBySerial),
+    Promise.all(
+      running.map(
+        async (device) =>
+          [device.serial, await probeAndroidDeviceHealth(runner, sdk, device.serial)] as const
+      )
+    )
+  ])
+  return mergeAndroidDevices(running, avds, runningAvdBySerial, new Map(healthEntries))
 }
 
 // `adb -s <serial> emu avd name` prints the AVD name then a trailing "OK" line.
@@ -79,25 +112,27 @@ function firstNonStatusLine(stdout: string): string | null {
 export function mergeAndroidDevices(
   running: AndroidAdbDevice[],
   avds: string[],
-  runningAvdBySerial: Map<string, string>
+  runningAvdBySerial: ReadonlyMap<string, string>,
+  healthBySerial: ReadonlyMap<string, AndroidDeviceHealth> = new Map()
 ): EmulatorDevice[] {
   const devices: EmulatorDevice[] = []
-  const bootedAvdNames = new Set(runningAvdBySerial.values())
+  const runningAvdNames = new Set(runningAvdBySerial.values())
 
   for (const device of running) {
     const avdName = runningAvdBySerial.get(device.serial)
+    const health = healthBySerial.get(device.serial) ?? 'booted'
     devices.push({
       backend: 'android',
       id: device.serial,
       name: avdName ?? device.model ?? device.serial,
-      state: 'booted',
+      state: health,
       detail: device.isEmulator ? 'emulator' : 'device',
       isAvailable: true
     })
   }
 
   for (const avd of avds) {
-    if (bootedAvdNames.has(avd)) {
+    if (runningAvdNames.has(avd)) {
       continue
     }
     devices.push({

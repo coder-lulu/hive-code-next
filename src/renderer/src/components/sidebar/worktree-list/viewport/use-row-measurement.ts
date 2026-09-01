@@ -52,10 +52,13 @@ export function useVirtualRowMeasurementSync(args: {
   const prCacheLen = useAppStore((s) => countRecordKeysByReference(s.prCache))
   const issueCacheLen = useAppStore((s) => countRecordKeysByReference(s.issueCache))
   const renderRowKeySignature = useMemo(
-    () => renderRows.map(getRenderRowKey).join('\n'),
+    () => renderRows.map((row) => getRenderRowKey(row)).join('\n'),
     [renderRows]
   )
-  const activeRenderRowKeys = useMemo(() => new Set(renderRows.map(getRenderRowKey)), [renderRows])
+  const activeRenderRowKeys = useMemo(
+    () => new Set(renderRows.map((row) => getRenderRowKey(row))),
+    [renderRows]
+  )
   const lineageRowRekeys = useMemo(() => buildLineageRowRekeyMap(renderRows), [renderRows])
   const totalSize = virtualizer.getTotalSize()
   const virtualItems = virtualizer.getVirtualItems()

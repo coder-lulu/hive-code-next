@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { KeybindingOverrides } from '../../shared/keybindings'
 import { fingerprintPluginConsent } from '../../shared/plugins/plugin-consent-fingerprint'
 import { pluginManifestSchema, type PluginManifest } from '../../shared/plugins/plugin-manifest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { PluginWorkerHandle } from './plugin-host-process'
 import { PluginService } from './plugin-service'
 import type { PluginWorkerFactory } from './plugin-worker-manager'
@@ -267,7 +268,9 @@ describe('PluginService worker reconciliation', () => {
     harness.setKilled(true)
 
     expect(harness.service.getGrantedCapabilities(pluginKey)).toBeNull()
-    expect(harness.service.activationError(pluginKey)).toContain('Security incident')
+    expect(harness.service.activationError(pluginKey)).toBe(
+      `Blocked by ${APP_DISPLAY_NAME}'s plugin safety list: Security incident`
+    )
     await expect(harness.service.invokeCommand(pluginKey, 'run')).rejects.toThrow('not enabled')
     await expect(harness.service.panels.readEntry(pluginKey, 'panel')).resolves.toBeNull()
     harness.service.emitEvent('worktree.created', {

@@ -1,9 +1,10 @@
+/* eslint-disable max-lines -- Why: the edit route keeps local-host and cloud-Runtime
+   target fencing beside the form lifecycle that owns those transitions. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
   Text,
   TextInput,
-  StyleSheet,
   Pressable,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,24 +14,40 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'
-import type { MobileTheme } from '../../../src/theme/mobile-theme'
+import {
+  normalizeHiveRuntimeDisplayName,
+  resolveHiveRuntimeDisplayName
+} from '../../../../src/shared/hive-runtime-display-name'
 import { useMobileTheme, useMobileThemeStyles } from '../../../src/theme/mobile-theme-provider'
+import { createHostEditStyles } from '../../../src/host-edit-styles'
 import { loadHosts, updateHostNameAndEndpoint } from '../../../src/transport/host-store'
 import { displayHostEndpoint } from '../../../src/transport/host-endpoint'
 import { resolveHostEndpointEdit } from '../../../src/transport/host-endpoint-edit'
 import { useForceReconnect, usePrimeHosts } from '../../../src/transport/client-context'
 import type { HostProfile } from '../../../src/transport/types'
+import { useAccountRuntimeDirectory } from '../../../src/runtime-directory/account-runtime-directory-provider'
+import type {
+  AccountRuntimeDirectoryEntry,
+  AccountRuntimeDirectoryScope
+} from '../../../src/runtime-directory/account-runtime-directory-types'
 
 export default function EditHostScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  const styles = useMobileThemeStyles(createHostEditStyles)
   const { hostId } = useLocalSearchParams<{ hostId: string }>()
   const primeHosts = usePrimeHosts()
   const forceReconnectHost = useForceReconnect()
+  const directory = useAccountRuntimeDirectory()
 
   const [host, setHost] = useState<HostProfile | null>(null)
+  const [cloudRuntime, setCloudRuntime] = useState<AccountRuntimeDirectoryEntry | null>(null)
+  const [cloudRuntimeScope, setCloudRuntimeScope] = useState<AccountRuntimeDirectoryScope | null>(
+    null
+  )
+  const [targetLoaded, setTargetLoaded] = useState(false)
+  const [initialName, setInitialName] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -39,29 +56,105 @@ export default function EditHostScreen() {
   // Why: setSaving is async, so a second trigger before the re-render could
   // still read stale state and re-enter handleSave; the ref closes that race.
   const savingRef = useRef(false)
+  const loadedTargetKeyRef = useRef<string | null>(null)
+  const nameEditedRef = useRef(false)
+
+  const hintedRuntimeRecordId = host?.runtimeRecordId ?? hostId
+  const directoryTarget = directory.state.entries.find(
+    (entry) => entry.runtimeRecordId === hintedRuntimeRecordId
+  )
+  const directoryScopeKey = directory.state.scope
+    ? `${directory.state.scope.authorityId}\u0000${directory.state.scope.accountId}`
+    : 'local'
+  const directoryTargetKey = directoryTarget
+    ? `${directoryTarget.runtimeRecordId}\u0000${directoryTarget.resourceVersion}\u0000${directoryTarget.cloudDisplayNameVersion ?? 0}\u0000${directory.pendingDisplayNames.has(directoryTarget.runtimeRecordId) ? String(directory.pendingDisplayNames.get(directoryTarget.runtimeRecordId)) : ''}`
+    : directory.state.status
+  const loadTargetKey = `${hostId ?? ''}\u0000${directoryScopeKey}\u0000${host?.runtimeRecordId ?? ''}\u0000${directoryTargetKey}`
 
   const load = useCallback(async () => {
     if (!hostId) {
       setLoadError('Missing host.')
       return
     }
+    if (loadedTargetKeyRef.current === loadTargetKey) {
+      return
+    }
+    loadedTargetKeyRef.current = loadTargetKey
+    setTargetLoaded(false)
+    setCloudRuntime(null)
+    setCloudRuntimeScope(null)
     try {
       const hosts = await loadHosts()
-      const found = hosts.find((h) => h.id === hostId) ?? null
-      if (!found) {
-        setLoadError('This host was removed from this phone.')
-        setHost(null)
+      if (loadedTargetKeyRef.current !== loadTargetKey) {
         return
       }
+      const found = hosts.find((h) => h.id === hostId) ?? null
+      const runtime = found?.runtimeRecordId
+        ? (directory.state.entries.find(
+            (entry) => entry.runtimeRecordId === found.runtimeRecordId
+          ) ?? null)
+        : (directory.state.entries.find((entry) => entry.runtimeRecordId === hostId) ?? null)
+      const directoryPending = ['loading', 'refreshing'].includes(directory.state.status)
+      if (
+        (!found && !runtime && directoryPending) ||
+        (found?.runtimeRecordId != null && !runtime && directoryPending)
+      ) {
+        loadedTargetKeyRef.current = null
+        return
+      }
+      if (!found && !runtime) {
+        setLoadError('This host was removed from this phone.')
+        setHost(null)
+        setCloudRuntime(null)
+        setCloudRuntimeScope(null)
+        setTargetLoaded(false)
+        return
+      }
+      const displayName = runtime
+        ? resolveHiveRuntimeDisplayName({
+            ...(directory.pendingDisplayNames.has(runtime.runtimeRecordId)
+              ? {
+                  pendingDesiredName: directory.pendingDisplayNames.get(runtime.runtimeRecordId)!
+                }
+              : {}),
+            cloudDisplayName: runtime.cloudDisplayName,
+            localPairedName: found?.name,
+            reportedDeviceName: runtime.deviceName,
+            runtimeRecordId: runtime.runtimeRecordId
+          })
+        : found!.name
+      const resolvedTargetKey = runtime
+        ? `${runtime.runtimeRecordId}\u0000${runtime.resourceVersion}\u0000${runtime.cloudDisplayNameVersion ?? 0}\u0000${directory.pendingDisplayNames.has(runtime.runtimeRecordId) ? String(directory.pendingDisplayNames.get(runtime.runtimeRecordId)) : ''}`
+        : directory.state.status
+      loadedTargetKeyRef.current = `${hostId}\u0000${directoryScopeKey}\u0000${found?.runtimeRecordId ?? ''}\u0000${resolvedTargetKey}`
       setHost(found)
-      setName(found.name)
-      setAddress(displayHostEndpoint(found.endpoint))
+      setCloudRuntime(runtime)
+      setCloudRuntimeScope(runtime ? directory.state.scope : null)
+      setName(displayName)
+      setInitialName(displayName)
+      nameEditedRef.current = false
+      setAddress(found ? displayHostEndpoint(found.endpoint) : '')
+      setTargetLoaded(true)
       setLoadError(null)
     } catch (err) {
+      if (loadedTargetKeyRef.current !== loadTargetKey) {
+        return
+      }
       setLoadError(err instanceof Error ? err.message : 'Failed to load host.')
       setHost(null)
+      setCloudRuntime(null)
+      setCloudRuntimeScope(null)
+      setTargetLoaded(false)
     }
-  }, [hostId])
+  }, [
+    directory.pendingDisplayNames,
+    directory.state.entries,
+    directory.state.scope,
+    directory.state.status,
+    directoryScopeKey,
+    hostId,
+    loadTargetKey
+  ])
 
   useEffect(() => {
     void load()
@@ -72,33 +165,49 @@ export default function EditHostScreen() {
     [address, host]
   )
 
-  const nameTrimmed = name.trim()
-  const nameChanged = host != null && nameTrimmed.length > 0 && nameTrimmed !== host.name
+  const normalizedName = useMemo(() => {
+    try {
+      return { value: normalizeHiveRuntimeDisplayName(name), error: null }
+    } catch {
+      return { value: null, error: '名称需为 1–128 个字符，且不能包含控制字符。' }
+    }
+  }, [name])
+  const normalizedInitialName = useMemo(() => {
+    try {
+      return normalizeHiveRuntimeDisplayName(initialName)
+    } catch {
+      return initialName
+    }
+  }, [initialName])
+  const nameChanged =
+    nameEditedRef.current &&
+    normalizedName.value != null &&
+    normalizedName.value !== normalizedInitialName
   const endpointChanged = endpointEdit?.kind === 'changed'
   const canSave =
-    host != null &&
-    endpointEdit != null &&
-    nameTrimmed.length > 0 &&
-    endpointEdit.kind !== 'invalid' &&
+    targetLoaded &&
+    (host == null || (endpointEdit != null && endpointEdit.kind !== 'invalid')) &&
+    normalizedName.value != null &&
+    (host != null || cloudRuntime?.cloudDisplayNameVersion != null) &&
     (nameChanged || endpointChanged) &&
     !saving
 
   async function handleSave() {
-    if (!host || !hostId || !endpointEdit || savingRef.current) {
+    if (!targetLoaded || !hostId || savingRef.current) {
       return
     }
-    const nextName = name.trim()
+    const nextName = normalizedName.value
     if (!nextName) {
-      setSaveError('Enter a name.')
+      setSaveError(normalizedName.error ?? 'Enter a name.')
       return
     }
-    if (endpointEdit.kind === 'invalid') {
+    if (host && endpointEdit?.kind === 'invalid') {
       setSaveError(endpointEdit.error)
       return
     }
 
-    const willRename = nextName !== host.name
-    const nextEndpoint = endpointEdit.kind === 'changed' ? endpointEdit.endpoint : undefined
+    const willRename = nameChanged
+    const nextEndpoint = endpointEdit?.kind === 'changed' ? endpointEdit.endpoint : undefined
     if (!willRename && nextEndpoint === undefined) {
       router.back()
       return
@@ -107,14 +216,36 @@ export default function EditHostScreen() {
     savingRef.current = true
     setSaving(true)
     setSaveError(null)
+    let cloudQueueFailed = false
     try {
       // Why: a single mutateStoredHosts pass so name + endpoint commit
       // atomically — a mid-save failure can never persist one without the
       // other, and a host removed mid-edit throws instead of no-oping.
-      await updateHostNameAndEndpoint(host.id, {
-        ...(willRename ? { name: nextName } : {}),
-        ...(nextEndpoint !== undefined ? { endpoint: nextEndpoint } : {})
-      })
+      if (host) {
+        await updateHostNameAndEndpoint(host.id, {
+          ...(willRename ? { name: nextName } : {}),
+          ...(nextEndpoint !== undefined ? { endpoint: nextEndpoint } : {})
+        })
+      }
+      if (willRename && cloudRuntime?.cloudDisplayNameVersion != null) {
+        try {
+          if (!cloudRuntimeScope) {
+            throw new Error('runtime_display_name_target_stale')
+          }
+          await directory.queueDisplayNameUpdate({
+            runtimeRecordId: cloudRuntime.runtimeRecordId,
+            desiredName: nextName,
+            expectedScope: cloudRuntimeScope,
+            expectedResourceVersion: cloudRuntime.resourceVersion,
+            expectedCloudDisplayNameVersion: cloudRuntime.cloudDisplayNameVersion
+          })
+        } catch (error) {
+          if (!host) {
+            throw error
+          }
+          cloudQueueFailed = true
+        }
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save host.')
       savingRef.current = false
@@ -126,10 +257,19 @@ export default function EditHostScreen() {
       // Why: the write already committed above; a re-prime failure here
       // must not be reported as a save failure — the next loadHosts() call
       // elsewhere in the app picks up the fresh state regardless.
-      const hosts = await loadHosts()
-      primeHosts(hosts)
+      if (host) {
+        const hosts = await loadHosts()
+        primeHosts(hosts)
+      }
     } catch {
       // best-effort re-prime; persisted data is unaffected
+    }
+
+    if (cloudQueueFailed) {
+      setSaveError('名称已保存到本机，但无法排队 HiveCloud 同步。请稍后重试。')
+      savingRef.current = false
+      setSaving(false)
+      return
     }
 
     savingRef.current = false
@@ -140,7 +280,46 @@ export default function EditHostScreen() {
       // Why: reconnect is a follow-on side effect of a save that already
       // committed — its failure or a hang must not be reported as a save
       // failure or block navigating back.
-      void forceReconnectHost(host.id).catch(() => {})
+      void forceReconnectHost(host!.id).catch(() => {})
+    }
+  }
+
+  async function handleClearCloudName() {
+    if (
+      !cloudRuntime ||
+      !cloudRuntimeScope ||
+      cloudRuntime.cloudDisplayNameVersion == null ||
+      savingRef.current
+    ) {
+      return
+    }
+    savingRef.current = true
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await directory.queueDisplayNameUpdate({
+        runtimeRecordId: cloudRuntime.runtimeRecordId,
+        desiredName: null,
+        expectedScope: cloudRuntimeScope,
+        expectedResourceVersion: cloudRuntime.resourceVersion,
+        expectedCloudDisplayNameVersion: cloudRuntime.cloudDisplayNameVersion
+      })
+      const fallbackName = resolveHiveRuntimeDisplayName({
+        pendingDesiredName: null,
+        localPairedName: host?.name,
+        reportedDeviceName: cloudRuntime.deviceName,
+        runtimeRecordId: cloudRuntime.runtimeRecordId
+      })
+      setName(fallbackName)
+      setInitialName(fallbackName)
+      nameEditedRef.current = false
+      savingRef.current = false
+      setSaving(false)
+      router.back()
+    } catch {
+      setSaveError('无法排队清除 HiveCloud 名称。请稍后重试。')
+      savingRef.current = false
+      setSaving(false)
     }
   }
 
@@ -176,12 +355,14 @@ export default function EditHostScreen() {
 
       {loadError ? (
         <View style={styles.errorState}>
-          <Text style={styles.errorText}>{loadError}</Text>
+          <Text style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="polite">
+            {loadError}
+          </Text>
           <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
             <Text style={styles.secondaryButtonText}>Go back</Text>
           </Pressable>
         </View>
-      ) : !host ? (
+      ) : !targetLoaded ? (
         <View style={styles.loadingState}>
           <ActivityIndicator color={theme.color.text.secondary} />
         </View>
@@ -198,9 +379,13 @@ export default function EditHostScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <Text style={styles.help}>
-              Change the display name or connection address. Address edits only switch where this
-              phone connects — they do not re-pair. Use this when the same desktop is reachable at a
-              different IP (for example home LAN vs Tailscale).
+              {host && host.runtimeRecordId && !cloudRuntime
+                ? '当前 HiveCloud 目录不可用；此次名称只保存到本机，不会排队云同步。云端恢复后请再次编辑名称。地址仍只影响本地连接。'
+                : host && cloudRuntime
+                  ? '名称会立即保存到本机，并同步到当前 HiveCloud 账号。地址修改仅影响这台手机的本地连接，不会重新配对。'
+                  : host
+                    ? '名称和地址仅保存到这台手机，不会创建或更新 HiveCloud 名称。'
+                    : '此 Runtime 来自当前 HiveCloud 账号。修改名称不会在这台手机上创建本地配对。'}
             </Text>
 
             <Text style={styles.label}>名称</Text>
@@ -209,6 +394,7 @@ export default function EditHostScreen() {
               accessibilityLabel="Name"
               value={name}
               onChangeText={(value) => {
+                nameEditedRef.current = true
                 setName(value)
                 setSaveError(null)
               }}
@@ -219,168 +405,74 @@ export default function EditHostScreen() {
               returnKeyType="next"
             />
 
-            <Text style={styles.label}>连接地址</Text>
-            <TextInput
-              style={styles.input}
-              accessibilityLabel="Address"
-              value={address}
-              onChangeText={(value) => {
-                setAddress(value)
-                setSaveError(null)
-              }}
-              placeholder="192.168.1.10:6768"
-              placeholderTextColor={theme.color.text.tertiary}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              keyboardType="url"
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                if (canSave) {
-                  void handleSave()
-                }
-              }}
-            />
-            <Text style={styles.hint}>
-              Accepts IP, host:port, or ws:// / wss://. Missing port defaults to the current port
-              (or 6768).
-            </Text>
-
-            {endpointEdit == null ? null : endpointEdit.kind !== 'invalid' ? (
-              <Text style={styles.preview} numberOfLines={2}>
-                Connects to {endpointEdit.endpoint}
-              </Text>
-            ) : address.trim().length > 0 ? (
-              <Text style={styles.previewError}>{endpointEdit.error}</Text>
+            {cloudRuntime?.cloudDisplayNameVersion != null ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  (saving || pressed) && styles.saveButtonDisabled
+                ]}
+                onPress={() => void handleClearCloudName()}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel="Clear HiveCloud name"
+              >
+                <Text style={styles.secondaryButtonText}>清除云端名称</Text>
+              </Pressable>
             ) : null}
 
-            {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
+            {host ? (
+              <>
+                <Text style={styles.label}>连接地址</Text>
+                <TextInput
+                  style={styles.input}
+                  accessibilityLabel="Address"
+                  value={address}
+                  onChangeText={(value) => {
+                    setAddress(value)
+                    setSaveError(null)
+                  }}
+                  placeholder="192.168.1.10:6768"
+                  placeholderTextColor={theme.color.text.tertiary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  keyboardType="url"
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (canSave) {
+                      void handleSave()
+                    }
+                  }}
+                />
+                <Text style={styles.hint}>
+                  Accepts IP, host:port, or ws:// / wss://. Missing port defaults to the current
+                  port (or 6768).
+                </Text>
+
+                {endpointEdit == null ? null : endpointEdit.kind !== 'invalid' ? (
+                  <Text style={styles.preview} numberOfLines={2}>
+                    Connects to {endpointEdit.endpoint}
+                  </Text>
+                ) : address.trim().length > 0 ? (
+                  <Text style={styles.previewError}>{endpointEdit.error}</Text>
+                ) : null}
+              </>
+            ) : cloudRuntime?.cloudDisplayNameVersion == null ? (
+              <Text style={styles.hint}>HiveCloud 暂未开放此 Runtime 的名称编辑。</Text>
+            ) : null}
+
+            {saveError ? (
+              <Text
+                style={styles.errorText}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {saveError}
+              </Text>
+            ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
       )}
     </View>
   )
-}
-
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.color.bg.canvas
-    },
-    flex: {
-      flex: 1
-    },
-    topRow: {
-      minHeight: theme.size.navigationBarHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: theme.spacing.space20,
-      gap: theme.spacing.space8,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.color.border.subtle
-    },
-    backButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.circle,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    heading: {
-      ...theme.typography.pageTitle,
-      flex: 1,
-      color: theme.color.text.primary
-    },
-    saveButton: {
-      minWidth: 64,
-      minHeight: theme.size.minimumTouchTarget,
-      paddingHorizontal: theme.spacing.space16,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.selected,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    saveButtonDisabled: {
-      opacity: 0.4
-    },
-    saveButtonText: {
-      ...theme.typography.label,
-      color: theme.color.text.inverse,
-      fontWeight: '600'
-    },
-    form: {
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: theme.spacing.space20,
-      gap: theme.spacing.space8
-    },
-    help: {
-      ...theme.typography.body,
-      color: theme.color.text.secondary,
-      marginBottom: theme.spacing.space8
-    },
-    label: {
-      ...theme.typography.label,
-      color: theme.color.text.secondary,
-      fontWeight: '500',
-      marginTop: theme.spacing.space12
-    },
-    input: {
-      minHeight: theme.size.minimumTouchTarget,
-      backgroundColor: theme.color.bg.surface,
-      borderWidth: 1,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      color: theme.color.text.primary,
-      ...theme.typography.body,
-      paddingHorizontal: theme.spacing.space12,
-      paddingVertical: Platform.OS === 'ios' ? 12 : 10
-    },
-    hint: {
-      ...theme.typography.caption,
-      color: theme.color.text.tertiary
-    },
-    preview: {
-      ...theme.typography.code,
-      marginTop: theme.spacing.space8,
-      color: theme.color.text.secondary,
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : theme.typography.code.fontFamily
-    },
-    previewError: {
-      ...theme.typography.body,
-      marginTop: theme.spacing.space8,
-      color: theme.color.status.danger
-    },
-    errorText: {
-      ...theme.typography.body,
-      color: theme.color.status.danger,
-      marginTop: theme.spacing.space12
-    },
-    errorState: {
-      flex: 1,
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: theme.spacing.space24,
-      gap: theme.spacing.space12
-    },
-    loadingState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    secondaryButton: {
-      alignSelf: 'flex-start',
-      minHeight: theme.size.minimumTouchTarget,
-      paddingHorizontal: theme.spacing.space16,
-      paddingVertical: theme.spacing.space8,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.subtle,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    secondaryButtonText: {
-      ...theme.typography.label,
-      color: theme.color.text.primary,
-      fontWeight: '500'
-    }
-  })
 }

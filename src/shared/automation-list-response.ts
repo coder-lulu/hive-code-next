@@ -9,6 +9,7 @@
  * selector that does not match the request is never reclassified into Self.
  */
 
+import { applyProductBranding } from './brand'
 import type { Automation } from './automations-types'
 import type { AutomationUsageSummary } from './automation-usage-summary'
 import {
@@ -28,9 +29,12 @@ export type AutomationListResponseValidation =
   | { ok: true; result: AutomationListResult; invalidRows: number }
   | { ok: false; error: AutomationListResponseFailure }
 
-const UNSUPPORTED_HOST_SCOPE_MESSAGE =
+const UNSUPPORTED_HOST_SCOPE_MESSAGE = applyProductBranding(
   'This host does not support per-host automation lists. Update the Orca server to filter by host.'
-const INVALID_RESPONSE_MESSAGE = 'This host returned an automation list Orca could not read.'
+)
+const INVALID_RESPONSE_MESSAGE = applyProductBranding(
+  'This host returned an automation list Orca could not read.'
+)
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null

@@ -391,6 +391,7 @@ describe('Browser automation pipeline (integration)', () => {
     const res = await rpc('browser.click', { element: '@e1' })
     expect(res.ok).toBe(false)
     expect((res.error as { code: string }).code).toBe('browser_stale_ref')
+    expect((res.error as { message: string }).message).toContain("Run 'hive snapshot'")
   })
 
   it('returns error for non-existent ref', async () => {
@@ -399,6 +400,7 @@ describe('Browser automation pipeline (integration)', () => {
     const res = await rpc('browser.click', { element: '@e999' })
     expect(res.ok).toBe(false)
     expect((res.error as { code: string }).code).toBe('browser_ref_not_found')
+    expect((res.error as { message: string }).message).toContain("Run 'hive snapshot'")
   })
 
   // ── Navigation ──

@@ -272,6 +272,7 @@ function createCoordinator(paneKey: string, worktreeId: string): AgentCompletion
       // task complete"; the snapshot state makes the banner read "needs input".
       dispatchTerminalNotification(worktreeId, {
         source: 'agent-task-complete',
+        agentAttentionKind: 'input-required',
         terminalTitle: title,
         paneKey,
         suppressOsNotification: !isAgentTaskCompleteNotificationEnabled(),

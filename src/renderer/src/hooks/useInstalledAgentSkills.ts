@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type {
   DiscoveredSkill,
   SkillDiscoveryResult,
@@ -16,6 +16,7 @@ import {
   getSkillDiscoveryTargetKey,
   resetSkillDiscoveryCacheForTests
 } from './installed-agent-skill-discovery'
+import { subscribeInstalledAgentSkillDiscoveryCache } from './installed-agent-skill-discovery-cache'
 import {
   INSTALLED_AGENT_SKILLS_CHANGED_EVENT,
   INSTALLED_AGENT_SKILLS_REFRESHED_EVENT
@@ -34,6 +35,7 @@ export const GLOBAL_AGENT_SKILL_SOURCE_KINDS = [
 
 type InstalledAgentSkillOptions = {
   enabled?: boolean
+  readCachedWhenDisabled?: boolean
   discoveryTarget?: SkillDiscoveryTarget
   sourceKinds?: readonly SkillSourceKind[]
 }
@@ -135,7 +137,7 @@ export function useInstalledAgentSkillNames(
   skillNames: readonly string[],
   options: InstalledAgentSkillOptions = {}
 ): InstalledAgentSkillState {
-  const { enabled = true, discoveryTarget, sourceKinds } = options
+  const { enabled = true, readCachedWhenDisabled = false, discoveryTarget, sourceKinds } = options
   const skillNamesKey = skillNames.map(normalizeSkillName).join('\n')
   const candidateSkillNames = useMemo(() => skillNamesKey.split('\n'), [skillNamesKey])
   const runtimeTarget = useActiveSkillDiscoveryRuntimeTarget()
@@ -159,7 +161,20 @@ export function useInstalledAgentSkillNames(
     latchedDiscoveryTarget.key === discoveryTargetKey
       ? latchedDiscoveryTarget.target
       : discoveryTarget
-  const cachedDiscovery = getCachedSkillDiscovery(discoveryTargetKey)
+  const subscribeToCachedDiscovery = useCallback(
+    (listener: () => void) =>
+      subscribeInstalledAgentSkillDiscoveryCache(discoveryTargetKey, listener),
+    [discoveryTargetKey]
+  )
+  const readCachedDiscovery = useCallback(
+    () => getCachedSkillDiscovery(discoveryTargetKey),
+    [discoveryTargetKey]
+  )
+  const cachedDiscovery = useSyncExternalStore(
+    subscribeToCachedDiscovery,
+    readCachedDiscovery,
+    readCachedDiscovery
+  )
   const [result, setResult] = useState<SkillDiscoveryResult | null>(cachedDiscovery)
   const [loading, setLoading] = useState(enabled && !cachedDiscovery)
   const [error, setError] = useState<string | null>(null)
@@ -288,24 +303,22 @@ export function useInstalledAgentSkillNames(
     }
   }, [enabled, refresh])
 
-  const skills = useMemo(
-    () => (enabled && resultForRender ? resultForRender.skills : []),
-    [enabled, resultForRender]
-  )
-  const sources = useMemo(
-    () => (enabled && resultForRender ? resultForRender.sources : []),
-    [enabled, resultForRender]
-  )
+  // Why: an enabled hook owns request-generation ordering, so a concurrent cache write must not
+  // bypass its stale-result guard. Passive consumers have no request of their own and read only
+  // the last completed shared scan.
+  const exposedResult = enabled ? resultForRender : readCachedWhenDisabled ? cachedDiscovery : null
+  const skills = useMemo(() => exposedResult?.skills ?? [], [exposedResult])
+  const sources = useMemo(() => exposedResult?.sources ?? [], [exposedResult])
 
   const installed = useMemo(
-    () =>
-      enabled ? hasInstalledAgentSkillNamed(skills, candidateSkillNames, { sourceKinds }) : false,
-    [candidateSkillNames, enabled, skills, sourceKinds]
+    () => hasInstalledAgentSkillNamed(skills, candidateSkillNames, { sourceKinds }),
+    [candidateSkillNames, skills, sourceKinds]
   )
 
   const incompleteScan = useMemo(
-    () => enabled && !installed && hasUnreadableAgentSkillSource(sources, sourceKinds),
-    [enabled, installed, sources, sourceKinds]
+    () =>
+      exposedResult !== null && !installed && hasUnreadableAgentSkillSource(sources, sourceKinds),
+    [exposedResult, installed, sources, sourceKinds]
   )
 
   useEffect(() => {
@@ -321,7 +334,7 @@ export function useInstalledAgentSkillNames(
   return {
     installed,
     loading: loadingForRender,
-    settled: enabled && resultForRender !== null,
+    settled: exposedResult !== null,
     error:
       errorForRender ??
       (incompleteScan

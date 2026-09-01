@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { OrcaProfileCloudSummary, OrcaProfileSummary } from '../../shared/orca-profiles'
 import { bestEffortFsyncDirectorySync, writeDurableSecureJsonFile } from '../../shared/secure-file'
 import { clearArtifactCreateIntents } from '../artifacts/artifact-create-intent-store'
@@ -118,7 +119,9 @@ function assertArtifactCloudCleanupReady(
     marker?.phase === 'prepared' &&
     marker.targetIdentity === artifactCloudIdentity(currentCloud)
   ) {
-    throw new Error('The Orca profile transition must be retried before publishing artifacts.')
+    throw new Error(
+      `The ${APP_DISPLAY_NAME} profile transition must be retried before publishing artifacts.`
+    )
   }
 }
 

@@ -7,6 +7,7 @@ import {
 import type { OrchestrationWorkerLaunchReceipt } from './orchestration-worker-launch-preferences'
 import { isAgentSessionPtyWriteRefusedError } from '../../../../shared/agent-session-pty-write-admission'
 import { structuredChatPtyWriteRefusalCopy } from '../../../../shared/agent-session-pty-write-refusal-copy'
+import { PRIMARY_CLI_COMMAND } from '../../../../shared/brand'
 
 export function failWorkerStartWithReceipt(args: {
   db: OrchestrationDb
@@ -49,8 +50,8 @@ export function failWorkerStartWithReceipt(args: {
     ...(unknown
       ? {
           nextCommands: [
-            `orca orchestration worker-show --dispatch ${args.dispatchId} --json`,
-            `orca orchestration worker-abandon --dispatch ${args.dispatchId} --json`
+            `${PRIMARY_CLI_COMMAND} orchestration worker-show --dispatch ${args.dispatchId} --json`,
+            `${PRIMARY_CLI_COMMAND} orchestration worker-abandon --dispatch ${args.dispatchId} --json`
           ]
         }
       : {})

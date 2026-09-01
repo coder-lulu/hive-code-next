@@ -11,6 +11,7 @@ import {
 } from '../../orchestration/worker-output-archive'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { describeUnconfirmedAgentStop } from '../../../../shared/pty-liveness-verdict'
+import { PRIMARY_CLI_COMMAND } from '../../../../shared/brand'
 import { inspectWorkerTerminal } from './orchestration-worker-observation'
 import { orchestrationTimestampToMs } from './orchestration-worker-output'
 
@@ -162,7 +163,7 @@ async function completeWorkerTerminalReleaseOnce(
       processAction: 'none',
       archive: archiveSummary(unknown),
       lastError: unknown.release_error ?? undefined,
-      recovery: `Inspect with: orca orchestration worker-show --dispatch ${dispatchId} --json — then repeat worker-release with the same --retry-request. Never substitute a broad terminal close.`
+      recovery: `Inspect with: ${PRIMARY_CLI_COMMAND} orchestration worker-show --dispatch ${dispatchId} --json — then repeat worker-release with the same --retry-request. Never substitute a broad terminal close.`
     }
   }
 
@@ -223,7 +224,7 @@ async function completeWorkerTerminalReleaseOnce(
         processAction: 'closed_agent_terminal',
         archive: { source: archiveSource, status: archiveStatus },
         lastError: unknown.release_error ?? reason,
-        recovery: `Inspect with: orca orchestration worker-show --dispatch ${dispatchId} --json — then repeat worker-release with the same --retry-request. Never substitute a broad terminal close.`
+        recovery: `Inspect with: ${PRIMARY_CLI_COMMAND} orchestration worker-show --dispatch ${dispatchId} --json — then repeat worker-release with the same --retry-request. Never substitute a broad terminal close.`
       }
     }
   } catch (error) {
@@ -247,7 +248,7 @@ async function completeWorkerTerminalReleaseOnce(
       processAction: 'none',
       archive: { source: archiveSource, status: archiveStatus },
       lastError: unknown.release_error ?? reason,
-      recovery: `Inspect with: orca orchestration worker-show --dispatch ${dispatchId} --json — then repeat worker-release with the same --retry-request. Never substitute a broad terminal close.`
+      recovery: `Inspect with: ${PRIMARY_CLI_COMMAND} orchestration worker-show --dispatch ${dispatchId} --json — then repeat worker-release with the same --retry-request. Never substitute a broad terminal close.`
     }
   }
   const released = db.settleWorkerTerminalRelease(resource.id)

@@ -8,6 +8,11 @@ const dependencies = vi.hoisted(() => ({
   forceReconnectHost: vi.fn(),
   loadHosts: vi.fn(),
   primeHosts: vi.fn(),
+  queueDisplayNameUpdate: vi.fn(),
+  directoryScope: { authorityId: 'hive-primary', accountId: 'account-a' },
+  directoryEntries: [] as unknown[],
+  pendingDisplayNames: new Map<string, string | null>(),
+  directoryStatus: 'ready',
   updateHostNameAndEndpoint: vi.fn(),
   hostId: 'host-1' as string | undefined
 }))
@@ -55,6 +60,18 @@ vi.mock('./transport/client-context', () => ({
   usePrimeHosts: () => dependencies.primeHosts
 }))
 
+vi.mock('./runtime-directory/account-runtime-directory-provider', () => ({
+  useAccountRuntimeDirectory: () => ({
+    state: {
+      status: dependencies.directoryStatus,
+      scope: dependencies.directoryScope,
+      entries: dependencies.directoryEntries
+    },
+    pendingDisplayNames: dependencies.pendingDisplayNames,
+    queueDisplayNameUpdate: dependencies.queueDisplayNameUpdate
+  })
+}))
+
 const HOST_FIXTURE = {
   id: 'host-1',
   name: 'Desk',
@@ -62,6 +79,27 @@ const HOST_FIXTURE = {
   deviceToken: 'token',
   publicKeyB64: 'public-key',
   lastConnected: 1
+}
+
+const CLOUD_RUNTIME_FIXTURE = {
+  runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  cloudDisplayName: 'Cloud Desk',
+  cloudDisplayNameVersion: 3,
+  deviceName: 'Reported Desk',
+  status: 'CLAIMED',
+  runtimeVersion: '1.0.0',
+  runtimeProtocolVersion: 3,
+  capabilities: [],
+  resourceVersion: 7,
+  createdAt: '2026-09-01T00:00:00Z',
+  claimedAt: '2026-09-01T00:00:00Z',
+  updatedAt: '2026-09-01T00:00:00Z',
+  lastHeartbeatAt: null,
+  presence: 'ONLINE',
+  readiness: 'READY',
+  readinessReasonCode: null,
+  freeDiskBytes: null,
+  connectionCapabilities: []
 }
 
 async function renderEditHostRoute(): Promise<ReactTestRenderer> {
@@ -132,6 +170,11 @@ describe('edit host handleSave', () => {
     dependencies.loadHosts.mockReset().mockResolvedValue([HOST_FIXTURE])
     dependencies.primeHosts.mockReset()
     dependencies.updateHostNameAndEndpoint.mockReset().mockResolvedValue(undefined)
+    dependencies.queueDisplayNameUpdate.mockReset().mockResolvedValue(undefined)
+    dependencies.directoryEntries = []
+    dependencies.directoryScope = { authorityId: 'hive-primary', accountId: 'account-a' }
+    dependencies.pendingDisplayNames = new Map()
+    dependencies.directoryStatus = 'ready'
   })
 
   afterEach(() => {
@@ -154,6 +197,289 @@ describe('edit host handleSave', () => {
     expect(dependencies.forceReconnectHost).not.toHaveBeenCalled()
     expect(dependencies.back).toHaveBeenCalledTimes(1)
 
+    act(() => renderer.unmount())
+  })
+
+  it('initializes a claimed local host from the effective account name and queues explicit edits', async () => {
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    dependencies.pendingDisplayNames = new Map([
+      [CLOUD_RUNTIME_FIXTURE.runtimeRecordId, 'Pending Desk']
+    ])
+    dependencies.loadHosts.mockResolvedValueOnce([
+      { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
+    ])
+    const renderer = await renderEditHostRoute()
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
+
+    expect(nameInput?.props.value).toBe('Pending Desk')
+    expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
+    setFieldValue(renderer, 'Name', 'Shared Desk')
+    await pressSave(renderer)
+
+    expect(dependencies.updateHostNameAndEndpoint).toHaveBeenCalledWith('host-1', {
+      name: 'Shared Desk'
+    })
+    expect(dependencies.queueDisplayNameUpdate).toHaveBeenCalledWith({
+      runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId,
+      desiredName: 'Shared Desk',
+      expectedScope: { authorityId: 'hive-primary', accountId: 'account-a' },
+      expectedResourceVersion: 7,
+      expectedCloudDisplayNameVersion: 3
+    })
+    act(() => renderer.unmount())
+  })
+
+  it('drops an account A draft before editing the same Runtime under account B', async () => {
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    dependencies.loadHosts.mockResolvedValue([
+      { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
+    ])
+    const renderer = await renderEditHostRoute()
+    setFieldValue(renderer, 'Name', 'Account A stale draft')
+
+    dependencies.directoryScope = { authorityId: 'hive-primary', accountId: 'account-b' }
+    dependencies.directoryEntries = [
+      {
+        ...CLOUD_RUNTIME_FIXTURE,
+        resourceVersion: 8,
+        cloudDisplayName: 'Account B Desk',
+        cloudDisplayNameVersion: 4
+      }
+    ]
+    await act(async () => {
+      renderer.update(createElement(EditHostScreen))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
+    expect(nameInput?.props.value).toBe('Account B Desk')
+    expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
+
+    setFieldValue(renderer, 'Name', 'Account B New Name')
+    await pressSave(renderer)
+    expect(dependencies.queueDisplayNameUpdate).toHaveBeenCalledWith({
+      runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId,
+      desiredName: 'Account B New Name',
+      expectedScope: { authorityId: 'hive-primary', accountId: 'account-b' },
+      expectedResourceVersion: 8,
+      expectedCloudDisplayNameVersion: 4
+    })
+    act(() => renderer.unmount())
+  })
+
+  it('keeps the durable local rename and reports a failed cloud queue write', async () => {
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    dependencies.loadHosts.mockResolvedValue([
+      { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
+    ])
+    dependencies.queueDisplayNameUpdate.mockRejectedValueOnce(new Error('storage full'))
+    const renderer = await renderEditHostRoute()
+    setFieldValue(renderer, 'Name', 'Local durable name')
+    await pressSave(renderer)
+
+    expect(dependencies.updateHostNameAndEndpoint).toHaveBeenCalledWith('host-1', {
+      name: 'Local durable name'
+    })
+    expect(findText(renderer, '已保存到本机，但无法排队 HiveCloud 同步')).toBe(true)
+    expect(dependencies.back).not.toHaveBeenCalled()
+    act(() => renderer.unmount())
+  })
+
+  it('waits for the account directory before binding a claimed local host', async () => {
+    dependencies.directoryStatus = 'loading'
+    dependencies.loadHosts.mockResolvedValue([
+      { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
+    ])
+    const renderer = await renderEditHostRoute()
+    expect(renderer.root.findAllByType('TextInput')).toHaveLength(0)
+
+    dependencies.directoryStatus = 'ready'
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    await act(async () => {
+      renderer.update(createElement(EditHostScreen))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    setFieldValue(renderer, 'Name', 'Directory-bound name')
+    await pressSave(renderer)
+
+    expect(dependencies.queueDisplayNameUpdate).toHaveBeenCalledWith({
+      runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId,
+      desiredName: 'Directory-bound name',
+      expectedScope: { authorityId: 'hive-primary', accountId: 'account-a' },
+      expectedResourceVersion: 7,
+      expectedCloudDisplayNameVersion: 3
+    })
+    act(() => renderer.unmount())
+  })
+
+  it('warns and keeps an explicit rename local when the account directory failed', async () => {
+    dependencies.directoryStatus = 'error'
+    dependencies.loadHosts.mockResolvedValueOnce([
+      { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
+    ])
+    const renderer = await renderEditHostRoute()
+
+    expect(findText(renderer, '此次名称只保存到本机，不会排队云同步')).toBe(true)
+    setFieldValue(renderer, 'Name', 'Offline local name')
+    await pressSave(renderer)
+
+    expect(dependencies.updateHostNameAndEndpoint).toHaveBeenCalledWith('host-1', {
+      name: 'Offline local name'
+    })
+    expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
+    act(() => renderer.unmount())
+  })
+
+  it('does not normalize or upload a legacy local name during an endpoint-only save', async () => {
+    dependencies.loadHosts.mockResolvedValueOnce([{ ...HOST_FIXTURE, name: 'Cafe\u0301' }])
+    const renderer = await renderEditHostRoute()
+    setFieldValue(renderer, 'Address', '192.168.1.20:6768')
+    await pressSave(renderer)
+
+    expect(dependencies.updateHostNameAndEndpoint).toHaveBeenCalledWith('host-1', {
+      endpoint: 'ws://192.168.1.20:6768'
+    })
+    expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
+    act(() => renderer.unmount())
+  })
+
+  it('renames an account-only Runtime without creating a local pairing or address field', async () => {
+    dependencies.hostId = CLOUD_RUNTIME_FIXTURE.runtimeRecordId
+    dependencies.loadHosts.mockResolvedValue([])
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    const renderer = await renderEditHostRoute()
+
+    expect(
+      renderer.root
+        .findAllByType('TextInput')
+        .some((node) => node.props.accessibilityLabel === 'Address')
+    ).toBe(false)
+    setFieldValue(renderer, 'Name', 'Phone Alias')
+    await pressSave(renderer)
+
+    expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
+    expect(dependencies.queueDisplayNameUpdate).toHaveBeenCalledWith({
+      runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId,
+      desiredName: 'Phone Alias',
+      expectedScope: { authorityId: 'hive-primary', accountId: 'account-a' },
+      expectedResourceVersion: 7,
+      expectedCloudDisplayNameVersion: 3
+    })
+    expect(dependencies.back).toHaveBeenCalledTimes(1)
+    act(() => renderer.unmount())
+  })
+
+  it('clears only the cloud alias and immediately falls back to the local paired name', async () => {
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    dependencies.loadHosts.mockResolvedValue([
+      { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
+    ])
+    const renderer = await renderEditHostRoute()
+    const clearButton = renderer.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
+    if (!clearButton) {
+      throw new Error('Clear HiveCloud name button not found')
+    }
+
+    await act(async () => {
+      await clearButton.props.onPress()
+    })
+
+    expect(dependencies.queueDisplayNameUpdate).toHaveBeenCalledWith({
+      runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId,
+      desiredName: null,
+      expectedScope: { authorityId: 'hive-primary', accountId: 'account-a' },
+      expectedResourceVersion: 7,
+      expectedCloudDisplayNameVersion: 3
+    })
+    expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
+    expect(nameInput?.props.value).toBe('Desk')
+    expect(dependencies.back).toHaveBeenCalledOnce()
+    act(() => renderer.unmount())
+  })
+
+  it('falls back to the reported device name when an account-only alias is cleared', async () => {
+    dependencies.hostId = CLOUD_RUNTIME_FIXTURE.runtimeRecordId
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    dependencies.loadHosts.mockResolvedValue([])
+    const renderer = await renderEditHostRoute()
+    const clearButton = renderer.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
+    if (!clearButton) {
+      throw new Error('Clear HiveCloud name button not found')
+    }
+
+    await act(async () => {
+      await clearButton.props.onPress()
+    })
+
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
+    expect(nameInput?.props.value).toBe('Reported Desk')
+    expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
+    act(() => renderer.unmount())
+  })
+
+  it('keeps the clear action recoverable when its durable queue write rejects', async () => {
+    dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+    dependencies.loadHosts.mockResolvedValue([
+      { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
+    ])
+    dependencies.queueDisplayNameUpdate.mockRejectedValueOnce(new Error('storage unavailable'))
+    const renderer = await renderEditHostRoute()
+    const clearButton = renderer.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
+    if (!clearButton) {
+      throw new Error('Clear HiveCloud name button not found')
+    }
+
+    await act(async () => {
+      clearButton.props.onPress()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(dependencies.queueDisplayNameUpdate).toHaveBeenCalledWith({
+      runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId,
+      desiredName: null,
+      expectedScope: { authorityId: 'hive-primary', accountId: 'account-a' },
+      expectedResourceVersion: 7,
+      expectedCloudDisplayNameVersion: 3
+    })
+    expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
+    expect(dependencies.back).not.toHaveBeenCalled()
+    expect(
+      renderer.root
+        .findAllByType('Text')
+        .some(
+          (node) =>
+            node.props.accessibilityRole === 'alert' &&
+            node.props.accessibilityLiveRegion === 'polite' &&
+            node.props.children === '无法排队清除 HiveCloud 名称。请稍后重试。'
+        )
+    ).toBe(true)
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
+    expect(nameInput?.props.value).toBe('Cloud Desk')
+    expect(
+      renderer.root
+        .findAllByType('Pressable')
+        .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')?.props.disabled
+    ).toBe(false)
     act(() => renderer.unmount())
   })
 
@@ -281,6 +607,10 @@ describe('edit host load() error states', () => {
     dependencies.loadHosts.mockReset().mockResolvedValue([HOST_FIXTURE])
     dependencies.primeHosts.mockReset()
     dependencies.updateHostNameAndEndpoint.mockReset().mockResolvedValue(undefined)
+    dependencies.queueDisplayNameUpdate.mockReset().mockResolvedValue(undefined)
+    dependencies.directoryEntries = []
+    dependencies.pendingDisplayNames = new Map()
+    dependencies.directoryStatus = 'ready'
   })
 
   afterEach(() => {

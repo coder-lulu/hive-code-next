@@ -13,6 +13,12 @@ export function toProcessExitStartup(
         resumeProviderSession: startup.resumeProviderSession,
         launchToken: startup.launchToken,
         launchAgent: startup.agent,
+        ...(startup.agentPermissionMode
+          ? { agentPermissionMode: startup.agentPermissionMode }
+          : {}),
+        ...(startup.agentArgsOverride !== undefined
+          ? { agentArgsOverride: startup.agentArgsOverride }
+          : {}),
         showSessionRestoredBanner: true
       }
     : startup

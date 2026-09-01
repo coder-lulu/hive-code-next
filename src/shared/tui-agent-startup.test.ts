@@ -181,6 +181,20 @@ describe('tui agent startup plans', () => {
     }
   })
 
+  it('emits the Hermes yolo permission flag only once for query startup', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'hermes',
+      prompt: 'run it',
+      cmdOverrides: { hermes: 'hermes chat' },
+      agentArgs: '--yolo',
+      agentPermissionMode: 'yolo',
+      platform: 'linux'
+    })
+
+    const script = unwrapPosixShellScript(plan?.launchCommand)
+    expect(script.match(/'--yolo'/g)).toHaveLength(1)
+  })
+
   it('uses a sh invocation that POSIX-host PowerShell can parse', () => {
     const plan = buildAgentStartupPlan({
       agent: 'hermes',
@@ -373,6 +387,70 @@ describe('tui agent startup plans', () => {
     expect(plan?.launchCommand).toBe("codex --profile work 'fix it'")
   })
 
+  it('removes canonical auto-approval from a command override in manual mode', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'claude',
+      prompt: 'fix it',
+      cmdOverrides: {
+        claude: 'FOO="$HOME/x" ~/bin/claude --dangerously-skip-permissions --model sonnet'
+      },
+      agentArgs: '--dangerously-skip-permissions',
+      agentPermissionMode: 'manual',
+      platform: 'linux'
+    })
+
+    expect(plan?.launchCommand).toBe(
+      "FOO=\"$HOME/x\" ~/bin/claude --model sonnet '--permission-mode' 'manual' 'fix it'"
+    )
+    expect(plan?.launchConfig.agentCommand).not.toContain('dangerously-skip-permissions')
+  })
+
+  it('moves canonical auto-approval before an override terminator in yolo mode', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'claude',
+      prompt: '',
+      cmdOverrides: { claude: 'claude --model sonnet -- positional' },
+      agentArgs: '--dangerously-skip-permissions',
+      agentPermissionMode: 'yolo',
+      platform: 'linux',
+      allowEmptyPromptLaunch: true
+    })
+
+    expect(plan?.launchCommand).toBe(
+      "claude --model sonnet '--dangerously-skip-permissions' -- positional"
+    )
+    expect(plan?.launchCommand.match(/dangerously-skip-permissions/g)).toHaveLength(1)
+  })
+
+  it('fails closed when a command override contains live shell syntax', () => {
+    expect(
+      buildAgentStartupPlan({
+        agent: 'claude',
+        prompt: 'fix it',
+        cmdOverrides: {
+          claude: 'claude --dangerously-skip-permissions | tee /tmp/launch.log'
+        },
+        agentPermissionMode: 'manual',
+        platform: 'linux'
+      })
+    ).toBeNull()
+  })
+
+  it('preserves quoted operator text while applying manual mode', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'claude',
+      prompt: '',
+      cmdOverrides: {
+        claude: "claude --dangerously-skip-permissions --name 'use && wisely'"
+      },
+      agentPermissionMode: 'manual',
+      platform: 'linux',
+      allowEmptyPromptLaunch: true
+    })
+
+    expect(plan?.launchCommand).toBe("claude --name 'use && wisely' '--permission-mode' 'manual'")
+  })
+
   it('builds Windows resume plans that PowerShell can invoke', () => {
     const plan = buildAgentResumeStartupPlan({
       agent: 'codex',
@@ -400,6 +478,53 @@ describe('tui agent startup plans', () => {
     expect(plan?.launchCommand).toBe(
       'grok "--permission-mode" "bypassPermissions" "--resume" "019fc272-80fa-7a91-80a2-9c461ef1a9da"'
     )
+  })
+
+  it('removes an assigned auto-approval flag from an override in manual mode', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'codex',
+      prompt: 'fix it',
+      cmdOverrides: {
+        codex: 'codex --dangerously-bypass-approvals-and-sandbox=true --profile work'
+      },
+      agentPermissionMode: 'manual',
+      platform: 'linux'
+    })
+
+    expect(plan?.launchCommand).toBe(
+      "codex --profile work '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write' 'fix it'"
+    )
+  })
+
+  it('replaces alternate Codex bypass options in an override with explicit safe options', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'codex',
+      prompt: 'fix it',
+      cmdOverrides: {
+        codex: 'codex -a never -s danger-full-access --approve-for-me --profile work'
+      },
+      agentPermissionMode: 'manual',
+      platform: 'linux'
+    })
+
+    expect(plan?.launchCommand).toBe(
+      "codex --profile work '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write' 'fix it'"
+    )
+  })
+
+  it('replaces an assigned Claude bypass mode in a command override', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'claude',
+      prompt: 'fix it',
+      cmdOverrides: {
+        claude: 'claude --permission-mode=bypassPermissions --model sonnet'
+      },
+      agentPermissionMode: 'manual',
+      platform: 'linux'
+    })
+
+    expect(plan?.launchCommand).toBe("claude --model sonnet '--permission-mode' 'manual' 'fix it'")
+    expect(plan?.launchCommand).not.toContain('bypassPermissions')
   })
 
   it('keeps cmd-quoted agentCommand aligned with cmd resume suffix', () => {
@@ -508,6 +633,46 @@ describe('tui agent startup plans', () => {
       agentArgs: '',
       agentEnv: { GOOSE_MODE: 'auto' }
     })
+  })
+
+  it.each([
+    ['posix', 'linux', 'env -u GOOSE_MODE goose'],
+    ['powershell', 'win32', 'Remove-Item Env:GOOSE_MODE -ErrorAction SilentlyContinue; goose'],
+    ['cmd', 'win32', 'set "GOOSE_MODE=" & goose']
+  ] as const)('clears inherited Goose auto mode in %s', (shell, platform, expectedCommand) => {
+    const plan = buildAgentStartupPlan({
+      agent: 'goose',
+      prompt: '',
+      cmdOverrides: {},
+      agentEnv: {},
+      agentPermissionMode: 'manual',
+      platform,
+      shell,
+      allowEmptyPromptLaunch: true
+    })
+
+    expect(plan?.launchCommand).toBe(expectedCommand)
+    expect(plan?.env).toEqual({})
+    expect(plan?.launchConfig).toEqual({
+      agentCommand: expectedCommand,
+      agentArgs: '',
+      agentEnv: {},
+      agentPermissionMode: 'manual'
+    })
+  })
+
+  it('removes an inline Goose auto-mode assignment before clearing inherited mode', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'goose',
+      prompt: '',
+      cmdOverrides: { goose: 'GOOSE_MODE=auto goose' },
+      agentEnv: {},
+      agentPermissionMode: 'manual',
+      platform: 'linux',
+      allowEmptyPromptLaunch: true
+    })
+
+    expect(plan?.launchCommand).toBe('env -u GOOSE_MODE goose')
   })
 
   it('captures empty args and env as explicit launch config values', () => {

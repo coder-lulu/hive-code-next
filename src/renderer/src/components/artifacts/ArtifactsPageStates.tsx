@@ -1,6 +1,7 @@
 import { ArrowRight, Files, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function ArtifactsPageErrorBanner({
   error,
@@ -42,7 +43,7 @@ export function ArtifactsPageAuthState({
           {needsReconnect
             ? translate(
                 'auto.components.artifacts.ArtifactsPage.reconnectHeading',
-                'Sign in to Orca again'
+                `Sign in to ${APP_DISPLAY_NAME} again`
               )
             : translate(
                 'auto.components.artifacts.ArtifactsPage.signInHeading',
@@ -57,7 +58,7 @@ export function ArtifactsPageAuthState({
               )
             : translate(
                 'auto.components.artifacts.ArtifactsPage.signInCopy',
-                'Use your Orca account to upload artifacts and manage their public links.'
+                `Use your ${APP_DISPLAY_NAME} account to upload artifacts and manage their public links.`
               )}
         </p>
       </div>
@@ -70,14 +71,17 @@ export function ArtifactsPageAuthState({
                   'auto.components.artifacts.ArtifactsPage.signInAgainAction',
                   'Sign in again'
                 )
-              : translate('auto.components.artifacts.ArtifactsPage.signIn', 'Sign in to Orca')}
+              : translate(
+                  'auto.components.artifacts.ArtifactsPage.signIn',
+                  `Sign in to ${APP_DISPLAY_NAME}`
+                )}
         </Button>
       ) : (
         <div className="flex flex-col items-center gap-2">
           <p className="max-w-sm text-xs leading-5 text-muted-foreground">
             {translate(
               'auto.components.artifacts.ArtifactsPage.unconfiguredCopy',
-              'Orca account sign-in is not configured on this machine yet.'
+              `${APP_DISPLAY_NAME} account sign-in is not configured on this machine yet.`
             )}
           </p>
           <Button variant="outline" size="sm" onClick={onOpenAccountSettings}>

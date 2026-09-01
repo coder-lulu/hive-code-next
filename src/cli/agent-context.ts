@@ -1,5 +1,6 @@
 import type { CommandSpec } from './args'
 import { effectiveAllowedFlags } from './args'
+import { CLI_COMPATIBILITY_ALIASES, PRIMARY_CLI_COMMAND } from '../shared/brand'
 
 // Why: serialize the live spec table so agent discovery cannot drift from the
 // command surface it describes.
@@ -25,6 +26,15 @@ export type AgentContextSchema = {
   commands: AgentContextCommand[]
 }
 
+function normalizeSpecUsageCommand(usage: string): string {
+  const separatorIndex = usage.indexOf(' ')
+  const command = separatorIndex === -1 ? usage : usage.slice(0, separatorIndex)
+  if (!CLI_COMPATIBILITY_ALIASES.some((alias) => alias === command)) {
+    return usage
+  }
+  return `${PRIMARY_CLI_COMMAND}${separatorIndex === -1 ? '' : usage.slice(separatorIndex)}`
+}
+
 export function buildAgentContext(specs: CommandSpec[]): AgentContextSchema {
   const commands = specs
     .map((spec) => ({
@@ -33,7 +43,7 @@ export function buildAgentContext(specs: CommandSpec[]): AgentContextSchema {
       aliases: spec.aliases ?? [],
       argumentMode: spec.argumentMode ?? 'parsed',
       summary: spec.summary,
-      usage: spec.usage,
+      usage: normalizeSpecUsageCommand(spec.usage),
       // Why: the effective accepted set (globals + conditional --page), not just
       // allowedFlags — otherwise agents treat --json/--help as unsupported.
       flags: effectiveAllowedFlags(spec),
@@ -55,6 +65,6 @@ export function formatAgentContextSummary(schema: AgentContextSchema): string {
   // point the reader at --json rather than dumping every command.
   return [
     `${schema.commandCount} commands (schema v${schema.schemaVersion}).`,
-    'Run `orca agent-context --json` for the full machine-readable command schema.'
+    `Run \`${PRIMARY_CLI_COMMAND} agent-context --json\` for the full machine-readable command schema.`
   ].join('\n')
 }

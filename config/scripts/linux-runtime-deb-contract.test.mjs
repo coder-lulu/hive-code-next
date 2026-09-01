@@ -17,7 +17,7 @@ describe('Linux Runtime deb contract', () => {
       join(root, 'resources/linux/packaging/after-install.sh'),
       'utf8'
     )
-    const launcher = readFileSync(join(root, 'resources/linux/bin/hivecode'), 'utf8')
+    const launcher = readFileSync(join(root, 'resources/linux/bin/hive'), 'utf8')
     const afterRemove = readFileSync(
       join(root, 'resources/linux/packaging/after-remove.sh'),
       'utf8'
@@ -37,7 +37,7 @@ describe('Linux Runtime deb contract', () => {
     })
     expect(unit).toContain('User=hivecode-runtime')
     expect(unit).toContain(
-      'ExecStart=/usr/bin/hivecode serve --port 6768 --json $HIVECODE_RUNTIME_ARGS'
+      'ExecStart=/usr/bin/hive serve --port 6768 --json $HIVECODE_RUNTIME_ARGS'
     )
     expect(unit).toContain('RestartPreventExitStatus=3')
     expect(unit).toContain('KillMode=mixed')
@@ -77,6 +77,7 @@ describe('Linux Runtime deb contract', () => {
 
   it('keeps every directly executed Linux package script LF-only', () => {
     for (const relativePath of [
+      'resources/linux/bin/hive',
       'resources/linux/bin/hivecode',
       'resources/linux/bin/orca-ide',
       'resources/linux/packaging/after-install.sh',

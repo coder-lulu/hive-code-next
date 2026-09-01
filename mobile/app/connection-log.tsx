@@ -7,9 +7,10 @@ import Constants from 'expo-constants'
 import { ChevronLeft, Copy, Check, Send } from 'lucide-react-native'
 import { colors, spacing, typography } from '../src/theme/mobile-theme'
 import { ConnectionLog } from '../src/components/ConnectionLog'
-import { loadHosts } from '../src/transport/host-store'
+import { useAccountVisibleHostCatalog } from '../src/runtime-directory/use-account-visible-host-catalog'
+import { selectConnectableHostProfiles } from '../src/transport/host-catalog-selection'
 import { connectionLogStore } from '../src/transport/persisted-connection-log-store'
-import { useHostClient, useRpcClientContext } from '../src/transport/client-context'
+import { useHostClient, usePrimeHosts, useRpcClientContext } from '../src/transport/client-context'
 import {
   useConnectionPathStatus,
   useReconnectAttempt
@@ -30,7 +31,8 @@ import {
 } from '../src/diagnostics/connection-diagnostics-screen-data'
 import { useHostStatusGates } from '../src/transport/host-status-gates'
 import { loadHostAppVersion } from '../src/transport/host-app-version-store'
-import type { ConnectionLogEntry, HostProfile } from '../src/transport/types'
+import { APP_DISPLAY_NAME } from '../src/product-brand'
+import type { ConnectionLogEntry } from '../src/transport/types'
 
 // Why: getSnapshot must be referentially stable when there's no data —
 // a fresh [] per call would make useSyncExternalStore re-render forever.
@@ -45,7 +47,8 @@ export default function ConnectionLogScreen() {
   const params = useLocalSearchParams<{ hostId?: string }>()
   const insets = useSafeAreaInsets()
   const routeKey = useMemo(() => ({}), [params.hostId])
-  const [hosts, setHosts] = useState<HostProfile[]>([])
+  const { catalog } = useAccountVisibleHostCatalog()
+  const hosts = useMemo(() => selectConnectableHostProfiles(catalog), [catalog])
   const [manualSelection, setManualSelection] = useState<{
     hostId: string
     requestedHostId: string | undefined
@@ -54,21 +57,14 @@ export default function ConnectionLogScreen() {
   const [copiedHostId, setCopiedHostId] = useState<string | null>(null)
   const [submissionStates, setSubmissionStates] = useState<DiagnosticsSubmissionStates>({})
 
-  useEffect(() => {
-    let stale = false
-    void loadHosts().then((loaded) => {
-      if (stale) {
-        return
-      }
-      setHosts(loaded)
-    })
-    return () => {
-      stale = true
-    }
-  }, [])
-
   const selectedId = resolveDiagnosticsHostId(hosts, params.hostId, manualSelection, routeKey)
   const selected = hosts.find((h) => h.id === selectedId) ?? null
+  const primeHosts = usePrimeHosts()
+  useEffect(() => {
+    if (selected) {
+      primeHosts([selected])
+    }
+  }, [primeHosts, selected])
   const { client, state } = useHostClient(selected?.id)
   const { desktopAppVersion: liveDesktopAppVersion } = useHostStatusGates({
     hostId: selected?.id,
@@ -256,7 +252,7 @@ export default function ConnectionLogScreen() {
                           ? 'Diagnostics sent'
                           : submissionState === 'failed'
                             ? 'Retry sending'
-                            : 'Send diagnostics to Orca'}
+                            : `Send diagnostics to ${APP_DISPLAY_NAME}`}
                     </Text>
                   </Pressable>
                 </>

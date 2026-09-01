@@ -79,13 +79,13 @@ describe('bundled skill guide generator', () => {
 
   it('keeps pre-guide fallback useful and read-only for every converted domain', async () => {
     const expectedFallbackCommands = {
-      'computer-use': ['ORCA computer capabilities --json', 'ORCA computer list-apps --json'],
-      'linear-tickets': ['ORCA linear --help', 'ORCA linear issue --current --full --json'],
-      'orca-emulator': ['ORCA emulator list --json'],
-      'orca-emulator-android': ['ORCA emulator devices --json'],
-      'orca-linear': ['ORCA linear --help', 'ORCA linear issue --current --full --json'],
-      'orca-per-workspace-env': ['ORCA vm recipe doctor <recipe-id> --repo-path <repo> --json'],
-      orchestration: ['ORCA orchestration task-list --json', 'ORCA terminal list --json']
+      'computer-use': ['hive computer capabilities --json', 'hive computer list-apps --json'],
+      'linear-tickets': ['hive linear --help', 'hive linear issue --current --full --json'],
+      'orca-emulator': ['hive emulator list --json'],
+      'orca-emulator-android': ['hive emulator devices --json'],
+      'orca-linear': ['hive linear --help', 'hive linear issue --current --full --json'],
+      'orca-per-workspace-env': ['hive vm recipe doctor <recipe-id> --repo-path <repo> --json'],
+      orchestration: ['hive orchestration task-list --json', 'hive terminal list --json']
     }
 
     for (const [name, commands] of Object.entries(expectedFallbackCommands)) {
@@ -100,7 +100,7 @@ describe('bundled skill guide generator', () => {
       for (const command of commands) {
         expect(fallback, name).toContain(command)
       }
-      expect(fallback, name).not.toContain('ORCA worktree ps --json')
+      expect(fallback, name).not.toContain('hive worktree ps --json')
     }
   })
 
@@ -171,7 +171,7 @@ describe('bundled skill guide generator', () => {
     }
   })
 
-  it('keeps CLI guide examples safe across shells and Linux command names', async () => {
+  it('uses the primary HiveCode command while preserving compatibility aliases', async () => {
     for (const name of ['orca-cli', 'computer-use', 'orca-emulator', 'orca-emulator-android']) {
       const source = await readFile(path.join(projectDir, 'skill-guides', `${name}.md`), 'utf8')
 
@@ -180,10 +180,12 @@ describe('bundled skill guide generator', () => {
       expect(source).toContain('orca-ide')
       expect(source).toContain('PowerShell')
       expect(source).toContain('cmd.exe')
-      expect(source).toMatch(/^ORCA .+--json$/mu)
-      // Why: bare command lines can launch GNOME Orca, while shell variables make
-      // the same guide unusable from PowerShell and cmd.exe.
+      expect(source).toMatch(/^hive .+--json$/mu)
+      // Why: current examples must not silently reactivate a legacy alias, especially
+      // bare `orca` on Linux where it can launch the GNOME screen reader.
+      expect(source).not.toMatch(/^ORCA /mu)
       expect(source).not.toMatch(/^orca /mu)
+      expect(source).not.toContain('using the `orca` CLI')
       expect(source).not.toMatch(/\$ORCA(?:_|\b)/u)
     }
   })

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME, applyProductBranding } from '../../shared/brand'
 /* eslint-disable max-lines -- Why: one cohesive contract (version detect, install-locked deploy, native-deps probe, launch, GC); splitting risks install/GC drift. */
 import { existsSync } from 'node:fs'
 import { app } from 'electron'
@@ -374,9 +374,7 @@ async function deployAndLaunchRelayAttempt(
   const localRelayDir = getLocalRelayPath(platform)
   if (!localRelayDir) {
     throw new Error(
-      applyProductBranding(
-        `Relay package for ${platform} not found locally. This may be a packaging issue — try reinstalling Orca.`
-      )
+      `Relay package for ${platform} not found locally. This may be a packaging issue — try reinstalling ${APP_DISPLAY_NAME}.`
     )
   }
   // Why: content-hashed version doubles as remote dir name and wire-handshake version; throws on missing rather than falling back (see docs/ssh-relay-versioned-install-dirs.md).
@@ -618,9 +616,7 @@ async function uploadRelay(
   const localRelayDir = getLocalRelayPath(platform)
   if (!localRelayDir || !existsSync(localRelayDir)) {
     throw new Error(
-      applyProductBranding(
-        `Relay package for ${platform} not found. Searched: ${getLocalRelayCandidates(platform).join(', ')}. This may be a packaging issue — try reinstalling Orca.`
-      )
+      `Relay package for ${platform} not found. Searched: ${getLocalRelayCandidates(platform).join(', ')}. This may be a packaging issue — try reinstalling ${APP_DISPLAY_NAME}.`
     )
   }
 

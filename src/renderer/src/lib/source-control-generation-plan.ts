@@ -5,6 +5,7 @@ import {
 } from '../../../shared/source-control-ai-actions'
 import type { ResolvedSourceControlAiGenerationParams } from '../../../shared/source-control-ai'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export type SourceControlGenerationPlanResult =
   | { ok: true; commandLabel: string; delivery: string; caveat: string }
@@ -88,8 +89,7 @@ export function planSourceControlTextGeneration(
     ok: true,
     commandLabel: [planned.plan.binary, ...planned.plan.args].join(' '),
     delivery,
-    caveat:
-      'This checks Orca’s planner only. It does not invoke the CLI, prove PATH or binary availability, or reproduce main-process Windows .cmd resolution.'
+    caveat: `This checks ${APP_DISPLAY_NAME}’s planner only. It does not invoke the CLI, prove PATH or binary availability, or reproduce main-process Windows .cmd resolution.`
   }
 }
 

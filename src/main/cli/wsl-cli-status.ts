@@ -1,7 +1,8 @@
 import type { CliInstallStatus } from '../../shared/cli-install-types'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import { getBridgePathFromCommandPath, getPosixDirname, quoteShell } from './wsl-cli-scripts'
 
-const WSL_COMMAND_NAME = 'orca-ide'
+const WSL_COMMAND_NAME = PRIMARY_CLI_COMMAND
 
 export type ReadyWslCliState = {
   distro: string
@@ -112,7 +113,7 @@ export async function resolveReadyWslCliState(args: {
     return {
       status: unsupportedWslCliStatus(
         hostStatus.unsupportedReason ?? 'launcher_missing',
-        hostStatus.detail ?? 'The Windows Orca CLI launcher is missing.'
+        hostStatus.detail ?? `The Windows ${APP_DISPLAY_NAME} CLI launcher is missing.`
       )
     }
   }
@@ -138,7 +139,7 @@ export async function resolveReadyWslCliState(args: {
     return {
       status: unsupportedWslCliStatus(
         'launcher_missing',
-        'WSL Windows interop is unavailable; Orca cannot launch the Windows CLI from WSL.'
+        `WSL Windows interop is unavailable; ${APP_DISPLAY_NAME} cannot launch the Windows CLI from WSL.`
       )
     }
   }

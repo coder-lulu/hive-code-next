@@ -3,7 +3,7 @@ import { sha256 } from '@noble/hashes/sha256'
 import { z } from 'zod'
 import type { PairingRelay } from '../../../src/shared/mobile-relay-pairing-offer'
 import { hashMobileRelayCredential } from './mobile-relay-credential-hash'
-import type { PairingOffer } from './types'
+import { RuntimeRecordIdSchema, type PairingOffer } from './types'
 
 const Base64Url32ByteSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 
@@ -18,7 +18,8 @@ export const MobileRelayPairingJournalMetadataSchema = z
         name: z.string().min(1),
         endpoint: z.string().min(1),
         publicKeyB64: z.string().min(1),
-        lastConnected: z.number().int().nonnegative()
+        lastConnected: z.number().int().nonnegative(),
+        runtimeRecordId: RuntimeRecordIdSchema.optional()
       })
       .strict(),
     relay: z

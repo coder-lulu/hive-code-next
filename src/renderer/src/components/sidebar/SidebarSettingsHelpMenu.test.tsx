@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
 
-import { act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import { SidebarSettingsHelpMenu } from './SidebarSettingsHelpMenu'
 
@@ -11,10 +10,10 @@ const mocks = vi.hoisted(() => ({
   openModal: vi.fn(),
   openSettingsPage: vi.fn(),
   openSettingsTarget: vi.fn(),
-  appRestart: vi.fn(),
-  updaterCheck: vi.fn(),
   shellOpenUrl: vi.fn(),
   useShortcutKeyDetails: vi.fn(),
+  useSetupGuideProgress: vi.fn(),
+  useSetupGuideProgressSnapshot: vi.fn(),
   setupProgress: {
     ready: true,
     coreDoneCount: 2,
@@ -23,16 +22,12 @@ const mocks = vi.hoisted(() => ({
   }
 }))
 
-let updateStatus = { state: 'idle' } as const
-const roots: Root[] = []
-
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({
       openModal: mocks.openModal,
       openSettingsPage: mocks.openSettingsPage,
-      openSettingsTarget: mocks.openSettingsTarget,
-      updateStatus
+      openSettingsTarget: mocks.openSettingsTarget
     })
 }))
 
@@ -40,16 +35,16 @@ vi.mock('@/hooks/useShortcutLabel', () => ({
   useShortcutKeyDetails: mocks.useShortcutKeyDetails
 }))
 
-vi.mock('@/hooks/useMountedRef', () => ({
-  useMountedRef: () => ({ current: true })
-}))
-
 vi.mock('../onboarding/show-onboarding-event', () => ({
   showOnboardingFromRenderer: vi.fn()
 }))
 
 vi.mock('../setup-guide/use-setup-guide-progress', () => ({
-  useSetupGuideProgress: () => mocks.setupProgress
+  useSetupGuideProgress: mocks.useSetupGuideProgress
+}))
+
+vi.mock('../setup-guide/setup-guide-progress-snapshot', () => ({
+  useSetupGuideProgressSnapshot: mocks.useSetupGuideProgressSnapshot
 }))
 
 vi.mock('../setup-guide/SetupGuideProgressRing', () => ({
@@ -122,38 +117,11 @@ vi.mock('./SidebarFeedbackDialog', () => ({
 function installWindowApi(): void {
   Object.assign(window, {
     api: {
-      app: {
-        restart: mocks.appRestart
-      },
       shell: {
         openUrl: mocks.shellOpenUrl
-      },
-      updater: {
-        check: mocks.updaterCheck
       }
     }
   })
-}
-
-async function renderMenu(): Promise<HTMLDivElement> {
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root = createRoot(container)
-  roots.push(root)
-
-  await act(async () => {
-    root.render(<SidebarSettingsHelpMenu />)
-  })
-
-  return container
-}
-
-function findMenuItem(container: HTMLElement, label: string): HTMLButtonElement {
-  const button = Array.from(
-    container.querySelectorAll<HTMLButtonElement>('[data-testid="menu-item"]')
-  ).find((element) => element.textContent?.includes(label))
-  expect(button).toBeDefined()
-  return button as HTMLButtonElement
 }
 
 describe('SidebarSettingsHelpMenu', () => {
@@ -162,20 +130,14 @@ describe('SidebarSettingsHelpMenu', () => {
     vi.clearAllMocks()
     installWindowApi()
     mocks.useShortcutKeyDetails.mockReturnValue({ keys: ['⌘', ','], doubleTap: false })
-    updateStatus = { state: 'idle' }
     mocks.setupProgress = {
       ready: true,
       coreDoneCount: 2,
       coreTotal: 5,
       stepDone: {}
     }
-  })
-
-  afterEach(() => {
-    roots.splice(0).forEach((root) => {
-      act(() => root.unmount())
-    })
-    document.body.replaceChildren()
+    mocks.useSetupGuideProgress.mockImplementation(() => mocks.setupProgress)
+    mocks.useSetupGuideProgressSnapshot.mockImplementation(() => mocks.setupProgress)
   })
 
   it('renders the help button with correct aria-label', () => {
@@ -212,6 +174,13 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(html).toContain('data-testid="setup-guide-progress-ring"')
   })
 
+  it('reads the root observer snapshot without starting another progress probe', () => {
+    renderToStaticMarkup(<SidebarSettingsHelpMenu />)
+
+    expect(mocks.useSetupGuideProgressSnapshot).toHaveBeenCalledOnce()
+    expect(mocks.useSetupGuideProgress).not.toHaveBeenCalled()
+  })
+
   it('hides Milestones when setup is complete', () => {
     mocks.setupProgress = {
       ready: true,
@@ -228,11 +197,6 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(html).toContain('Onboarding')
   })
 
-  it('renders the configured product name in the restart action', () => {
-    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain(`Restart ${APP_DISPLAY_NAME}`)
-  })
-
   it('hides public help links when no official product authorities are configured', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
     for (const label of ['Docs', 'Changelog', 'GitHub', 'Discord', '>X<']) {
@@ -241,46 +205,10 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(mocks.shellOpenUrl).not.toHaveBeenCalled()
   })
 
-  it('renders Check for Updates menu item', () => {
+  it('keeps update and restart actions out of the help menu', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('Check for Updates')
-    expect(html).toMatch(/(⇧\+click|Shift\+click) checks the latest RC/)
-    expect(html).toMatch(/(⌘\+click|Ctrl\+click) checks the latest perf build/)
-  })
-
-  it('passes update-check modifier options through the updater bridge', async () => {
-    const container = await renderMenu()
-    const checkButton = findMenuItem(container, 'Check for Updates')
-    const primaryModifier = navigator.userAgent.includes('Mac')
-      ? { metaKey: true }
-      : { ctrlKey: true }
-
-    await act(async () => {
-      checkButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, shiftKey: true }))
-      checkButton.click()
-    })
-    await act(async () => {
-      checkButton.dispatchEvent(
-        new MouseEvent('pointerdown', { bubbles: true, ...primaryModifier })
-      )
-      checkButton.click()
-    })
-    await act(async () => {
-      checkButton.click()
-    })
-
-    expect(mocks.updaterCheck).toHaveBeenNthCalledWith(1, {
-      includePrerelease: true,
-      includePerfPrerelease: false
-    })
-    expect(mocks.updaterCheck).toHaveBeenNthCalledWith(2, {
-      includePrerelease: false,
-      includePerfPrerelease: true
-    })
-    expect(mocks.updaterCheck).toHaveBeenNthCalledWith(3, {
-      includePrerelease: false,
-      includePerfPrerelease: false
-    })
+    expect(html).not.toContain('Check for Updates')
+    expect(html).not.toContain(`Restart ${APP_DISPLAY_NAME}`)
   })
 
   it('renders shortcut keys in the settings tooltip', () => {

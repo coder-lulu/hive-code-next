@@ -1,7 +1,7 @@
 # HiveCode Emulator (Android)
 
 This file is a discovery stub, not the usage guide. The full, version-matched HiveCode Android
-emulator reference is served by the `orca` binary itself — kept out of this file on purpose
+emulator reference is served by the `hive` binary itself — kept out of this file on purpose
 so it can never drift from the binary that will actually run your commands.
 
 Engage HiveCode whenever you drive an adb-connected Android emulator or device from inside the
@@ -14,25 +14,23 @@ and orca-cli skills.
 
 Choose the executable once and reuse it for every later command:
 
-- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. HiveCode exports this
-  for managed WSL sessions.
-- Otherwise, in a dev checkout whose session exposes `ORCA_DEV_REPO_ROOT`, use `orca-dev`.
-- Otherwise, on Linux outside a HiveCode-managed terminal, use `orca-ide`. Never run bare
-  `orca` there — outside HiveCode's terminals it normally resolves to the
+- Use `hive` in current production builds.
+- If the compatibility environment variable `ORCA_CLI_COMMAND` is set, use its value instead;
+  HiveCode exports it when a managed session must pin a specific executable.
+- Older development, Linux, or production installs may expose `orca-dev`, `orca-ide`, or
+  `orca`. Treat these as compatibility aliases and use one only when `hive` is unavailable.
+  On unmanaged Linux, never try bare `orca` first because it normally resolves to the
   GNOME Orca screen reader (`/usr/bin/orca`) and starts speech on the user's machine.
-- Otherwise, use `orca`.
 
-Below, `ORCA` is a placeholder for the executable you resolved. Substitute it before
-running anything; do not create a shell variable or run `ORCA` literally. This works the
-same way in POSIX shells, PowerShell, and cmd.exe.
-
-If the selected executable cannot run, report its exact error and stop. Do not fall through
-to another executable, which could silently target a different HiveCode build.
+Examples use the current `hive` command. Substitute the pinned executable or a legacy alias
+only when the active HiveCode build requires it. If that executable cannot run, report its
+exact error and stop; do not fall through to another executable that may target a different
+HiveCode build.
 
 ## Load the full guide before running HiveCode commands
 
 ```text
-ORCA skills get orca-emulator-android
+hive skills get orca-emulator-android
 ```
 
 That prints the complete, version-matched guide for the exact binary that will handle your
@@ -42,7 +40,7 @@ command you need.
 
 Don't guess subcommands or flags from memory or from a cached copy of this stub. They
 change between HiveCode releases, and this file deliberately no longer lists them. Confirm the
-app is up with `ORCA status --json` (start it with `ORCA open --json` if needed), and
+app is up with `hive status --json` (start it with `hive open --json` if needed), and
 prefer `--json` for agent-driven calls.
 
 ## If an older HiveCode does not recognize `skills get`
@@ -53,10 +51,10 @@ guessing or changing executables. For a confirmed pre-guide binary, use only thi
 read-only bootstrap to orient. Do not dead-end and do not invent commands:
 
 ```text
-ORCA status --json
-ORCA emulator devices --json
+hive status --json
+hive emulator devices --json
 ```
 
 Then tell the user that updating HiveCode restores the full, version-matched guide via
-`ORCA skills get orca-emulator-android`. Beyond these commands, ask the user rather than
+`hive skills get orca-emulator-android`. Beyond these commands, ask the user rather than
 guessing a command surface this older binary may not support.

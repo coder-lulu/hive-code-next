@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- The sidebar owns the virtualized hierarchy and its creation actions. */
+
 import React, { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { useShallow } from 'zustand/react/shallow'
@@ -13,6 +15,8 @@ import {
   getRepoExecutionHostId,
   getSettingsFocusedExecutionHostId
 } from '../../../../shared/execution-host'
+import { getProjectGroupSubtreeIds } from '../../../../shared/project-groups'
+import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
 import { getActiveSidebarWorkspaceId } from '../../../../shared/workspace-scope'
 import { getPinnedWorktreeDisplayPolicy } from './worktree-list/grouping/row-types'
 import { selectWorktreeListReviewCacheInputs } from './worktree-list/listing/review-cache-inputs'
@@ -37,6 +41,10 @@ import { useVisibleSidebarWorktrees } from './worktree-list/listing/use-visible-
 import { useWorktreeStatusMutations } from './worktree-list/drag/use-status-mutations'
 import { shouldFiltersHideAllRows } from './sidebar-empty-state-gate'
 import { buildWorktreeManualOrderCatalog } from './worktree-manual-order-catalog'
+import {
+  hasDesktopHomeSessionDragData,
+  readDesktopHomeSessionDragData
+} from '../landing/desktop-home-session-drag'
 
 type WorktreeListProps = {
   scrollOffsetRef: React.MutableRefObject<number>
@@ -64,6 +72,7 @@ const WorktreeList = React.memo(function WorktreeList({
   const workspaceLineageByChildKey = useAppStore((s) => s.workspaceLineageByChildKey)
   const detectedWorktreesByRepo = useAppStore((s) => s.detectedWorktreesByRepo)
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
+  const activeRepoId = useAppStore((s) => s.activeRepoId)
   const activeWorkspaceExecutionHostId = useAppStore((s) => s.activeWorkspaceExecutionHostId)
   const activeWorkspaceKey = useAppStore((s) => s.activeWorkspaceKey)
   const currentSidebarWorktreeId = useMemo(
@@ -197,6 +206,24 @@ const WorktreeList = React.memo(function WorktreeList({
     },
     [openModal]
   )
+  const handleAddProjectToProjectGroup = useCallback(
+    (projectGroup: ProjectGroup | null) => {
+      // AddRepoDialog currently owns the source/host selection flow. Preserve
+      // the originating space in modalData so the add flow can associate the
+      // resulting project without putting global actions back in the Spaces
+      // header. The derived ungrouped space intentionally carries null.
+      openModal('add-repo', {
+        projectGroupScoped: true,
+        projectGroupId: projectGroup?.id ?? null,
+        projectGroupExecutionHostId:
+          projectGroup &&
+          (projectGroup.executionHostId?.trim() || projectGroup.connectionId?.trim())
+            ? getProjectGroupHostId(projectGroup)
+            : defaultHostId
+      })
+    },
+    [defaultHostId, openModal]
+  )
   const handleOpenRepoSettings = useCallback(
     (projectId: string, sectionId?: string) => {
       openSettingsTarget({ pane: 'repo', repoId: projectId, ...(sectionId ? { sectionId } : {}) })
@@ -231,6 +258,202 @@ const WorktreeList = React.memo(function WorktreeList({
       })
     },
     [openModal]
+  )
+  const handleCreateWorkspaceForProjectGroup = useCallback(
+    (projectGroup: ProjectGroup | null) => {
+      const groupIds = projectGroup
+        ? getProjectGroupSubtreeIds(projectGroups, projectGroup.id)
+        : null
+      const knownGroupIds = new Set(projectGroups.map((group) => group.id))
+      const ownerHostId = projectGroup ? getProjectGroupHostId(projectGroup) : defaultHostId
+      const groupCandidates = repos.filter((repo) => {
+        if (!groupIds) {
+          // The derived "Ungrouped" space must not reach into a persisted
+          // space just because the active repository happens to be elsewhere.
+          // Treat missing group metadata as ungrouped during startup hydration,
+          // matching the row projection's fallback behavior.
+          return repo.projectGroupId == null || !knownGroupIds.has(repo.projectGroupId)
+        }
+        return typeof repo.projectGroupId === 'string' && groupIds.has(repo.projectGroupId)
+      })
+      const hasExplicitOwnerHost = Boolean(
+        projectGroup?.executionHostId?.trim() || projectGroup?.connectionId?.trim()
+      )
+      // Legacy groups predate host stamping. Do not strand a remote repo in
+      // those groups by treating the missing owner as local; use the source's
+      // host when the group itself has no explicit owner.
+      const hostCandidates = groupCandidates.filter(
+        (repo) => getRepoExecutionHostId(repo) === ownerHostId
+      )
+      const candidates = projectGroup && !hasExplicitOwnerHost ? groupCandidates : hostCandidates
+      const activeCandidates = projectGroup && hasExplicitOwnerHost ? candidates : groupCandidates
+      const repo =
+        (activeRepoId && activeCandidates.find((candidate) => candidate.id === activeRepoId)) ??
+        candidates.find((candidate) => getRepoExecutionHostId(candidate) === defaultHostId) ??
+        candidates[0]
+      if (repo) {
+        // A space is a container for existing repos. Its plus action always
+        // enters the canonical worktree composer with that repo preselected.
+        openModal('new-workspace-composer', {
+          initialRepoId: repo.id,
+          telemetrySource: 'sidebar'
+        })
+        return
+      }
+      const folderSourceGroupId = projectGroup
+        ? folderWorkspaces.find((workspace) => groupIds?.has(workspace.projectGroupId))
+            ?.projectGroupId
+        : undefined
+      if (folderSourceGroupId || projectGroup?.parentPath) {
+        // Folder-backed spaces can create a non-Git workspace when they have
+        // no repository source yet.
+        openModal('new-workspace-composer', {
+          initialProjectGroupId: folderSourceGroupId ?? projectGroup!.id,
+          telemetrySource: 'sidebar'
+        })
+        return
+      }
+      // A stale/empty space cannot create a worktree without a source. Keep
+      // the existing Add Project flow rather than manufacturing a repo row.
+      openModal('add-repo', {
+        projectGroupScoped: true,
+        projectGroupId: projectGroup?.id ?? null,
+        projectGroupExecutionHostId:
+          projectGroup &&
+          (projectGroup.executionHostId?.trim() || projectGroup.connectionId?.trim())
+            ? getProjectGroupHostId(projectGroup)
+            : defaultHostId
+      })
+    },
+    [activeRepoId, defaultHostId, folderWorkspaces, openModal, projectGroups, repos]
+  )
+  const handleTemporarySessionDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!hasDesktopHomeSessionDragData(event.dataTransfer)) {
+      return false
+    }
+    const targetElement =
+      event.target instanceof Element
+        ? event.target.closest(
+            '[data-repo-header-id], [data-project-group-header-id], [data-ungrouped-project-group-header]'
+          )
+        : null
+    if (!targetElement) {
+      return false
+    }
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    return true
+  }, [])
+  const handleTemporarySessionDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const payload = readDesktopHomeSessionDragData(event.dataTransfer)
+      if (!payload) {
+        return false
+      }
+      const targetElement =
+        event.target instanceof Element
+          ? event.target.closest(
+              '[data-repo-header-id], [data-project-group-header-id], [data-ungrouped-project-group-header]'
+            )
+          : null
+      if (!targetElement) {
+        return false
+      }
+      const repoId = targetElement.getAttribute('data-repo-header-id')
+      const projectGroupId = targetElement.getAttribute('data-project-group-header-id')
+      const repo = repoId ? (repos.find((entry) => entry.id === repoId) ?? null) : null
+      const projectGroup = projectGroupId
+        ? (projectGroups.find((entry) => entry.id === projectGroupId) ?? null)
+        : null
+      event.preventDefault()
+      event.stopPropagation()
+      if (repo) {
+        openModal('new-workspace-composer', {
+          initialRepoId: repo.id,
+          initialPrompt: payload.title,
+          telemetrySource: 'sidebar'
+        })
+        return true
+      }
+      if (targetElement.hasAttribute('data-ungrouped-project-group-header')) {
+        const knownGroupIds = new Set(projectGroups.map((group) => group.id))
+        const ungroupedRepos = repos.filter(
+          (candidate) =>
+            candidate.projectGroupId == null || !knownGroupIds.has(candidate.projectGroupId)
+        )
+        const hostMatchedRepos = payload.executionHostId
+          ? ungroupedRepos.filter(
+              (candidate) => getRepoExecutionHostId(candidate) === payload.executionHostId
+            )
+          : ungroupedRepos
+        const candidates = hostMatchedRepos.length > 0 ? hostMatchedRepos : ungroupedRepos
+        const selectedRepo =
+          (activeRepoId && candidates.find((candidate) => candidate.id === activeRepoId)) ??
+          candidates.find((candidate) => getRepoExecutionHostId(candidate) === defaultHostId) ??
+          candidates[0]
+        if (selectedRepo) {
+          openModal('new-workspace-composer', {
+            initialRepoId: selectedRepo.id,
+            initialPrompt: payload.title,
+            telemetrySource: 'sidebar'
+          })
+        } else {
+          openModal('add-repo', {
+            projectGroupScoped: true,
+            projectGroupId: null,
+            projectGroupExecutionHostId: defaultHostId
+          })
+        }
+        return true
+      }
+      if (projectGroup) {
+        const groupIds = getProjectGroupSubtreeIds(projectGroups, projectGroup.id)
+        const ownerHostId = getProjectGroupHostId(projectGroup)
+        const groupCandidates = repos.filter(
+          (candidate) =>
+            typeof candidate.projectGroupId === 'string' && groupIds.has(candidate.projectGroupId)
+        )
+        const hasExplicitOwnerHost = Boolean(
+          projectGroup.executionHostId?.trim() || projectGroup.connectionId?.trim()
+        )
+        const hostCandidates = groupCandidates.filter(
+          (candidate) => getRepoExecutionHostId(candidate) === ownerHostId
+        )
+        const candidates = hasExplicitOwnerHost ? hostCandidates : groupCandidates
+        const activeCandidates = hasExplicitOwnerHost ? candidates : groupCandidates
+        const selectedRepo =
+          (activeRepoId && activeCandidates.find((candidate) => candidate.id === activeRepoId)) ??
+          candidates.find((candidate) => getRepoExecutionHostId(candidate) === defaultHostId) ??
+          candidates[0]
+        if (selectedRepo) {
+          openModal('new-workspace-composer', {
+            initialRepoId: selectedRepo.id,
+            initialPrompt: payload.title,
+            telemetrySource: 'sidebar'
+          })
+          return true
+        }
+        const folderSourceGroupId = folderWorkspaces.find((workspace) =>
+          groupIds.has(workspace.projectGroupId)
+        )?.projectGroupId
+        if (folderSourceGroupId || projectGroup.parentPath) {
+          openModal('new-workspace-composer', {
+            initialProjectGroupId: folderSourceGroupId ?? projectGroup.id,
+            initialPrompt: payload.title,
+            telemetrySource: 'sidebar'
+          })
+          return true
+        }
+        openModal('add-repo', {
+          projectGroupScoped: true,
+          projectGroupId: projectGroup.id,
+          projectGroupExecutionHostId: hasExplicitOwnerHost ? ownerHostId : defaultHostId
+        })
+        return true
+      }
+      return false
+    },
+    [activeRepoId, defaultHostId, folderWorkspaces, openModal, projectGroups, repos]
   )
 
   useSidebarRevealRequests({
@@ -312,6 +535,8 @@ const WorktreeList = React.memo(function WorktreeList({
         handleRenameProjectGroup={projectGroupDialogs.handleRenameProjectGroup}
         handleDeleteProjectGroup={projectGroupDialogs.handleDeleteProjectGroup}
         handleCreateFolderWorkspace={handleCreateFolderWorkspace}
+        handleCreateWorkspaceForProjectGroup={handleCreateWorkspaceForProjectGroup}
+        handleAddProjectToProjectGroup={handleAddProjectToProjectGroup}
         activeModal={activeModal}
         pendingRevealWorktree={pendingRevealWorktree}
         pendingRevealSidebarRow={pendingRevealSidebarRow}
@@ -351,6 +576,8 @@ const WorktreeList = React.memo(function WorktreeList({
         shouldShowWorkspaceBoardDropIndicator={
           statusMutations.shouldShowWorkspaceBoardDropIndicator
         }
+        onTemporarySessionDragOver={handleTemporarySessionDragOver}
+        onTemporarySessionDrop={handleTemporarySessionDrop}
         onReorderWorktrees={statusMutations.reorderWorktrees}
         scrollOffsetRef={scrollOffsetRef}
         scrollAnchorRef={scrollAnchorRef}

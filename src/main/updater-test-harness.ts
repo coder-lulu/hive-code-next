@@ -19,7 +19,12 @@ type AutoUpdaterMock = {
   allowDowngrade: boolean
   disableDifferentialDownload: boolean
   logger: { error: (message: unknown) => void } | undefined
-  httpExecutor: { request: UpdaterSpy; doApiRequest: UpdaterSpy; doDownload: UpdaterSpy }
+  httpExecutor: {
+    request: UpdaterSpy
+    doApiRequest: UpdaterSpy
+    doDownload: UpdaterSpy
+    addRedirectHandlers: UpdaterSpy
+  }
   on: Mock<(event: string, handler: (...args: unknown[]) => void) => AutoUpdaterMock>
   checkForUpdates: UpdaterSpy
   downloadUpdate: UpdaterSpy
@@ -43,6 +48,17 @@ type UpdaterModuleFactories = {
     app: AppMock
     BrowserWindow: { getAllWindows: Mock<() => unknown[]> }
     autoUpdater: { on: UpdaterSpy }
+    session: {
+      fromPartition: Mock<
+        () => {
+          fetch: UpdaterSpy
+          webRequest: {
+            onBeforeRequest: UpdaterSpy
+            onHeadersReceived: UpdaterSpy
+          }
+        }
+      >
+    }
     powerMonitor: { on: UpdaterSpy }
     shell: { showItemInFolder: UpdaterSpy }
     net: { fetch: UpdaterSpy }
@@ -107,6 +123,32 @@ export function createUpdaterMocks(): UpdaterMocks {
   const appEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
   const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
 
+  const createHttpExecutorMock = () => ({
+    request: vi.fn(),
+    doApiRequest: vi.fn(),
+    doDownload: vi.fn(),
+    addRedirectHandlers: vi.fn()
+  })
+
+  const respondToProductUpdaterRequest = async (input: unknown): Promise<Response> => {
+    const url = input instanceof URL ? input.href : String(input)
+    if (url.includes('/hive/v1/updates/check')) {
+      return new Response(
+        JSON.stringify({
+          hasUpdate: true,
+          updateRequired: false,
+          blockReason: null,
+          currentBuild: 2,
+          minimumSupportedBuild: 1,
+          latest: null
+        }),
+        { headers: { 'content-type': 'application/json' } }
+      )
+    }
+    return new Response('version: 1.0.61\n')
+  }
+  const productUpdaterSessionFetchMock = vi.fn(respondToProductUpdaterRequest)
+
   const appOn = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
     const handlers = appEventHandlers.get(event) ?? []
     handlers.push(handler)
@@ -148,9 +190,10 @@ export function createUpdaterMocks(): UpdaterMocks {
     autoUpdaterMock.disableDifferentialDownload = false
     autoUpdaterMock.autoRunAppAfterInstall = true
     autoUpdaterMock.logger = undefined
-    autoUpdaterMock.httpExecutor.request.mockReset()
-    autoUpdaterMock.httpExecutor.doApiRequest.mockReset()
-    autoUpdaterMock.httpExecutor.doDownload.mockReset()
+    // The production network boundary replaces these methods with guarded
+    // implementations. Recreate the executor between tests instead of
+    // trying to reset functions that may no longer be Vitest mocks.
+    autoUpdaterMock.httpExecutor = createHttpExecutorMock()
     delete (autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature
   }
 
@@ -163,7 +206,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     disableDifferentialDownload: false,
     // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
     logger: undefined as { error: (message: unknown) => void } | undefined,
-    httpExecutor: { request: vi.fn(), doApiRequest: vi.fn(), doDownload: vi.fn() },
+    httpExecutor: createHttpExecutorMock(),
     on,
     checkForUpdates: vi.fn(),
     downloadUpdate: vi.fn(),
@@ -211,6 +254,15 @@ export function createUpdaterMocks(): UpdaterMocks {
       app: appMock,
       BrowserWindow: browserWindowMock,
       autoUpdater: nativeUpdaterMock,
+      session: {
+        fromPartition: vi.fn(() => ({
+          fetch: productUpdaterSessionFetchMock,
+          webRequest: {
+            onBeforeRequest: vi.fn(),
+            onHeadersReceived: vi.fn()
+          }
+        }))
+      },
       powerMonitor: { on: powerMonitorOnMock },
       shell: { showItemInFolder: vi.fn() },
       net: { fetch: vi.fn() }
@@ -265,8 +317,10 @@ export function createUpdaterMocks(): UpdaterMocks {
 
   /** Shared `beforeEach` body: fresh module registry plus every mock back to its default. */
   const resetUpdaterMocks = () => {
+    vi.clearAllTimers()
     vi.resetModules()
     autoUpdaterMock.reset()
+    productUpdaterSessionFetchMock.mockReset().mockImplementation(respondToProductUpdaterRequest)
     nativeUpdaterMock.on.mockReset()
     browserWindowMock.getAllWindows.mockReset()
     browserWindowMock.getAllWindows.mockReturnValue([])

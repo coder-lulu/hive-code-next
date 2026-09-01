@@ -12,6 +12,7 @@ import type { ProjectExecutionRuntimeResolution } from '../../../../shared/proje
 import type { EventProps } from '../../../../shared/telemetry-events'
 import type { TerminalOscColorQueryReplyColors } from '../../../../shared/terminal-osc-color-reply'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { PtyDataMeta } from './pty-dispatcher'
 import type { RemoteRuntimeSnapshotOutcome } from '../../runtime/remote-runtime-terminal-multiplexer'
@@ -155,6 +156,8 @@ export type PtyTransport = {
     resumeProviderSession?: AgentProviderSessionMetadata
     launchToken?: string
     launchAgent?: TuiAgent
+    agentPermissionMode?: AgentExplicitLaunchPermissionMode
+    agentArgsOverride?: string | null
     startupCommandDelivery?: StartupCommandDelivery
     /** Reject a stale restored identity before this transport can publish global PTY handlers. */
     admitPtyId?: (ptyId: string) => boolean
@@ -240,6 +243,7 @@ export type IpcPtyTransportOptions = {
   agentLaunchPreferences?: AgentLaunchPreferences
   launchToken?: string
   launchAgent?: TuiAgent
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
   startupCommandDelivery?: StartupCommandDelivery
   connectionId?: string | null
   executionHostId?: ExecutionHostId | null

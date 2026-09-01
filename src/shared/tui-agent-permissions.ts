@@ -1,7 +1,11 @@
 import { TUI_AGENT_CONFIG } from './tui-agent-config'
+import { rewritePermissionArgs } from './tui-agent-permission-args'
+import type { AgentStartupShell } from './tui-agent-startup-shell'
 import type { TuiAgent } from './tui-agent'
 
 export type AgentPermissionMode = 'yolo' | 'manual' | 'mixed'
+export type AgentLaunchPermissionMode = 'default' | Exclude<AgentPermissionMode, 'mixed'>
+export type AgentExplicitLaunchPermissionMode = Exclude<AgentLaunchPermissionMode, 'default'>
 
 export const YOLO_TUI_AGENT_ARGS: Partial<Record<TuiAgent, string>> = {
   claude: '--dangerously-skip-permissions',
@@ -35,12 +39,99 @@ export const YOLO_TUI_AGENT_ENV: Partial<Record<TuiAgent, Record<string, string>
   goose: { GOOSE_MODE: 'auto' }
 }
 
+const MANUAL_TUI_AGENT_ARGS: Partial<Record<TuiAgent, string>> = {
+  // Explicit CLI values override unsafe profile/config defaults for this launch.
+  claude: '--permission-mode manual',
+  'claude-agent-teams': '--permission-mode manual',
+  codex: '--ask-for-approval on-request --sandbox workspace-write',
+  gemini: '--approval-mode default',
+  grok: '--permission-mode default'
+}
+
+const TUI_AGENT_PERMISSION_ARG_ALIASES: Partial<Record<TuiAgent, readonly string[]>> = {
+  claude: ['--permission-mode bypassPermissions'],
+  'claude-agent-teams': ['--permission-mode bypassPermissions'],
+  codex: [
+    '--approve-for-me',
+    '--full-auto',
+    '--ask-for-approval on-request',
+    '-a on-request',
+    '--sandbox workspace-write',
+    '-s workspace-write'
+  ],
+  gemini: ['-y', '--approval-mode yolo'],
+  grok: ['--always-approve']
+}
+
+export function resolveTuiAgentPermissionArgForms(agent: TuiAgent): readonly string[] {
+  const canonical = YOLO_TUI_AGENT_ARGS[agent]
+  return [...(canonical ? [canonical] : []), ...(TUI_AGENT_PERMISSION_ARG_ALIASES[agent] ?? [])]
+}
+
+export function resolveTuiAgentPermissionTargetArgs(
+  agent: TuiAgent,
+  mode: AgentExplicitLaunchPermissionMode
+): string {
+  return mode === 'yolo' ? (YOLO_TUI_AGENT_ARGS[agent] ?? '') : (MANUAL_TUI_AGENT_ARGS[agent] ?? '')
+}
+
 const PERMISSION_AGENT_IDS = Object.keys(TUI_AGENT_CONFIG).filter(
   (agent): agent is TuiAgent => agent in YOLO_TUI_AGENT_ARGS || agent in YOLO_TUI_AGENT_ENV
 )
 
+export function supportsTuiAgentLaunchPermission(agent: TuiAgent): boolean {
+  return agent in YOLO_TUI_AGENT_ARGS || agent in YOLO_TUI_AGENT_ENV
+}
+
 function normalizeArgs(value: string | null | undefined): string {
   return value?.trim() ?? ''
+}
+
+function deletePermissionEnv(
+  env: Record<string, string>,
+  name: string,
+  shell: AgentStartupShell
+): void {
+  for (const candidate of Object.keys(env)) {
+    if (
+      candidate === name ||
+      (shell !== 'posix' && candidate.toLowerCase() === name.toLowerCase())
+    ) {
+      delete env[candidate]
+    }
+  }
+}
+
+export function resolveTuiAgentLaunchPermission(args: {
+  agent: TuiAgent
+  mode: AgentLaunchPermissionMode
+  agentArgs?: string | null
+  agentEnv?: Record<string, string> | null
+  shell: AgentStartupShell
+}): { agentArgs: string; agentEnv: Record<string, string> } {
+  const agentArgs = normalizeArgs(args.agentArgs)
+  const agentEnv = { ...args.agentEnv }
+  if (args.mode === 'default') {
+    return { agentArgs, agentEnv }
+  }
+
+  const permissionArgForms = resolveTuiAgentPermissionArgForms(args.agent)
+  const resolvedAgentArgs =
+    permissionArgForms.length > 0
+      ? (rewritePermissionArgs({
+          agentArgs,
+          permissionArgForms,
+          targetPermissionArgs: resolveTuiAgentPermissionTargetArgs(args.agent, args.mode),
+          shell: args.shell
+        }) ?? agentArgs)
+      : agentArgs
+  for (const [name, value] of Object.entries(YOLO_TUI_AGENT_ENV[args.agent] ?? {})) {
+    deletePermissionEnv(agentEnv, name, args.shell)
+    if (args.mode === 'yolo') {
+      agentEnv[name] = value
+    }
+  }
+  return { agentArgs: resolvedAgentArgs, agentEnv }
 }
 
 function sameEnv(

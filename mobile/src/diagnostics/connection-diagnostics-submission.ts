@@ -1,4 +1,5 @@
-const CONNECTION_DIAGNOSTICS_ENDPOINT = 'https://www.onorca.dev/v1/feedback'
+import { hivecodeProductConfig } from '../generated/product-config'
+
 const SUBMISSION_TIMEOUT_MS = 10_000
 const MAX_SUBMISSION_BYTES = 64 * 1024
 
@@ -15,11 +16,15 @@ export async function submitConnectionDiagnostics(
   submission: ConnectionDiagnosticsSubmission,
   fetchImpl: typeof fetch = fetch
 ): Promise<ConnectionDiagnosticsSubmissionResult> {
+  const endpoint = hivecodeProductConfig.endpoints.feedback
+  if (!endpoint) {
+    return { ok: false, error: 'diagnostics endpoint not configured' }
+  }
   const report = boundConnectionDiagnosticsReport(submission.report)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), SUBMISSION_TIMEOUT_MS)
   try {
-    const response = await fetchImpl(CONNECTION_DIAGNOSTICS_ENDPOINT, {
+    const response = await fetchImpl(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

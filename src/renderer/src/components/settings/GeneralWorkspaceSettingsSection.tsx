@@ -7,6 +7,7 @@ import { WorkspaceDirectorySetting } from './WorkspaceDirectorySetting'
 import { translate } from '@/i18n/i18n'
 import { GlobalWorktreeVisibilitySourcesSetting } from './GlobalWorktreeVisibilitySourcesSetting'
 import { GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type GeneralWorkspaceSettingsSectionProps = {
   settings: GlobalSettings
@@ -50,11 +51,11 @@ export function GeneralWorkspaceSettingsSection({
           )}
           description={translate(
             'auto.components.settings.GeneralWorkspaceSettingsSection.externalWorktreesDescription',
-            'Choose which worktrees created outside Orca appear by default on this host.'
+            `Choose which worktrees created outside ${APP_DISPLAY_NAME} appear by default on this host.`
           )}
           keywords={[
             'external',
-            'non-Orca',
+            `non-${APP_DISPLAY_NAME}`,
             'worktree',
             'visibility',
             'sidebar',

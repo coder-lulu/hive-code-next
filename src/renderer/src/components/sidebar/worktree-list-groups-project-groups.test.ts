@@ -46,6 +46,58 @@ describe('project groups', () => {
     ])
   })
 
+  it('aggregates descendant counts and repository sources once for parent groups', () => {
+    const parent: ProjectGroup = {
+      id: 'parent',
+      name: 'Platform',
+      parentPath: '/platform',
+      parentGroupId: null,
+      createdFrom: 'folder-scan',
+      tabOrder: 0,
+      isCollapsed: false,
+      color: null,
+      createdAt: 1,
+      updatedAt: 1
+    }
+    const child: ProjectGroup = {
+      ...parent,
+      id: 'child',
+      name: 'Services',
+      parentGroupId: parent.id,
+      parentPath: '/platform/services'
+    }
+    const groupedRepo: Repo = { ...repo, projectGroupId: child.id }
+
+    const rows = buildRows(
+      'repo',
+      [worktree],
+      new Map([[groupedRepo.id, groupedRepo]]),
+      null,
+      new Set(),
+      undefined,
+      undefined,
+      undefined,
+      {},
+      new Map([[worktree.id, worktree]]),
+      false,
+      undefined,
+      [parent, child]
+    )
+
+    expect(
+      rows.find((row) => row.type === 'header' && row.key === 'project-group:parent')
+    ).toMatchObject({
+      count: 1,
+      hasRepositorySource: true
+    })
+    expect(
+      rows.find((row) => row.type === 'header' && row.key === 'project-group:child')
+    ).toMatchObject({
+      count: 1,
+      hasRepositorySource: true
+    })
+  })
+
   it('renders grouped repos before their visible worktrees are loaded', () => {
     const group: ProjectGroup = {
       id: 'group-1',
@@ -123,7 +175,7 @@ describe('project groups', () => {
     expect(rows.filter((row) => row.type === 'header').map((row) => row.key)).toEqual([
       'project-group:group-1'
     ])
-    expect(rows[0]).toMatchObject({ label: 'Platform' })
+    expect(rows[0]).toMatchObject({ label: 'Platform', hasRepositorySource: true })
   })
 
   it('keeps sleep-filtered Project Group members as empty project headers', () => {
@@ -227,6 +279,66 @@ describe('project groups', () => {
       'project-group:group-1',
       'repo:repo-1'
     ])
+  })
+
+  it('can wrap ungrouped repos in the derived space used by the Spaces sidebar', () => {
+    const group: ProjectGroup = {
+      id: 'group-1',
+      name: 'Platform',
+      parentPath: '/platform',
+      parentGroupId: null,
+      createdFrom: 'folder-scan',
+      tabOrder: 0,
+      isCollapsed: false,
+      color: null,
+      createdAt: 1,
+      updatedAt: 1
+    }
+
+    const rows = buildRows(
+      'repo',
+      [worktree],
+      repoMap,
+      null,
+      new Set(),
+      undefined,
+      undefined,
+      undefined,
+      {},
+      new Map([[worktree.id, worktree]]),
+      false,
+      undefined,
+      [group],
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      true
+    )
+
+    const headerRows = rows.filter(
+      (row): row is Extract<typeof row, { type: 'header' }> => row.type === 'header'
+    )
+    expect(headerRows.map((row) => row.key)).toEqual([
+      'project-group:group-1',
+      'project-group:ungrouped',
+      'repo:repo-1'
+    ])
+    expect(headerRows.find((row) => row.key === 'project-group:ungrouped')).toMatchObject({
+      label: 'Ungrouped',
+      count: 1,
+      projectGroup: { id: null },
+      projectGroupDepth: 0
+    })
+    expect(rows.find((row) => row.type === 'item')).toMatchObject({
+      groupDepth: 1,
+      sectionKey: 'repo:repo-1'
+    })
   })
 
   it('renders repos whose Project Group metadata is missing as top-level repo rows', () => {

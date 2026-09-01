@@ -88,7 +88,7 @@ export function SkillInstallDialog({
       setError(
         translate(
           'auto.components.skills.install.enterShareLink',
-          'Enter an Orca skill share link.'
+          'Enter a HiveCode skill share link.'
         )
       )
       return
@@ -213,7 +213,7 @@ export function SkillInstallDialog({
           operation.status === 'reconnect-required'
             ? translate(
                 'auto.components.skills.install.reconnectBeforeInstalling',
-                'Reconnect your Orca account before installing.'
+                'Reconnect your HiveCode account before installing.'
               )
             : operation.message
         )

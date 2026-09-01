@@ -84,7 +84,7 @@ describe('CliInstaller', () => {
 
       const installed = await installer.install()
       expect(installed.state).toBe('installed')
-      expect(installed.commandName).toBe('hivecode')
+      expect(installed.commandName).toBe('hive')
       expect(installed.pathConfigured).toBe(false)
       expect(installed.detail).toContain('.local')
 
@@ -159,7 +159,7 @@ describe('CliInstaller', () => {
       const installed = await installer.install()
       expect(installed).toMatchObject({
         state: 'installed',
-        commandName: 'hivecode',
+        commandName: 'hive',
         installMethod: 'wrapper',
         launcherPath: appImagePath,
         currentTarget: appImagePath,
@@ -227,13 +227,15 @@ describe('CliInstaller', () => {
       const homePath = join(fixture.root, 'home')
       const commandDir = join(homePath, '.local', 'bin')
       const resourcesPath = join(fixture.root, 'resources')
-      const launcherPath = join(resourcesPath, 'bin', 'hivecode')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
+      const hivecodeLauncherPath = join(resourcesPath, 'bin', 'hivecode')
       const compatibilityLauncherPath = join(resourcesPath, 'bin', 'orca-ide')
       const oldLauncherPath = join(resourcesPath, 'bin', 'orca')
       const legacyCommandPath = join(commandDir, 'orca')
       await mkdir(commandDir, { recursive: true })
       await mkdir(join(resourcesPath, 'bin'), { recursive: true })
       await writeFile(launcherPath, '#!/usr/bin/env bash\n', 'utf8')
+      await writeFile(hivecodeLauncherPath, '#!/usr/bin/env bash\n', 'utf8')
       await writeFile(compatibilityLauncherPath, '#!/usr/bin/env bash\n', 'utf8')
       await writeFile(oldLauncherPath, '#!/usr/bin/env bash\n', 'utf8')
       await symlink(oldLauncherPath, legacyCommandPath)
@@ -247,7 +249,7 @@ describe('CliInstaller', () => {
       })
 
       const installed = await installer.install()
-      expect(installed.commandPath).toBe(join(commandDir, 'hivecode'))
+      expect(installed.commandPath).toBe(join(commandDir, 'hive'))
       await expect(lstat(legacyCommandPath)).rejects.toMatchObject({ code: 'ENOENT' })
     }
   )
@@ -277,7 +279,7 @@ describe('CliInstaller', () => {
       })
 
       const installed = await installer.install()
-      expect(installed.commandPath).toBe(join(commandDir, 'hivecode'))
+      expect(installed.commandPath).toBe(join(commandDir, 'hive'))
       await expect(readlink(legacyCommandPath)).resolves.toBe(unprovenTarget)
     }
   )
@@ -288,7 +290,7 @@ describe('CliInstaller', () => {
       const fixture = await makeFixture()
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const commandDir = join(fixture.root, 'usr', 'local', 'bin')
-      const primaryPath = join(commandDir, 'hivecode')
+      const primaryPath = join(commandDir, 'hive')
       await mkdir(commandDir, { recursive: true })
 
       const installer = new CliInstaller({
@@ -302,32 +304,32 @@ describe('CliInstaller', () => {
       })
 
       await expect(installer.install()).resolves.toMatchObject({
-        commandName: 'hivecode',
+        commandName: 'hive',
         commandPath: primaryPath,
         state: 'installed'
       })
-      for (const command of ['hivecode', 'orca', 'orca-ide']) {
+      for (const command of ['hive', 'hivecode', 'orca', 'orca-ide']) {
         await expect(readlink(join(commandDir, command))).resolves.toBe(
           join(resourcesPath, 'bin', command)
         )
       }
 
       await expect(installer.remove()).resolves.toMatchObject({ state: 'not_installed' })
-      for (const command of ['hivecode', 'orca', 'orca-ide']) {
+      for (const command of ['hive', 'hivecode', 'orca', 'orca-ide']) {
         await expect(lstat(join(commandDir, command))).rejects.toMatchObject({ code: 'ENOENT' })
       }
     }
   )
 
   it.skipIf(process.platform === 'win32')(
-    'installs hivecode and orca-ide without claiming bare orca on packaged Linux',
+    'installs hive with safe compatibility aliases without claiming bare orca on packaged Linux',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const commandDir = join(homePath, '.local', 'bin')
       const resourcesPath = join(fixture.root, 'resources')
       await mkdir(join(resourcesPath, 'bin'), { recursive: true })
-      for (const command of ['hivecode', 'orca-ide']) {
+      for (const command of ['hive', 'hivecode', 'orca-ide']) {
         await writeFile(join(resourcesPath, 'bin', command), '#!/usr/bin/env bash\n', {
           encoding: 'utf8',
           mode: 0o755
@@ -344,10 +346,13 @@ describe('CliInstaller', () => {
       })
 
       await expect(installer.install()).resolves.toMatchObject({
-        commandName: 'hivecode',
-        commandPath: join(commandDir, 'hivecode'),
+        commandName: 'hive',
+        commandPath: join(commandDir, 'hive'),
         state: 'installed'
       })
+      await expect(readlink(join(commandDir, 'hive'))).resolves.toBe(
+        join(resourcesPath, 'bin', 'hive')
+      )
       await expect(readlink(join(commandDir, 'hivecode'))).resolves.toBe(
         join(resourcesPath, 'bin', 'hivecode')
       )
@@ -357,13 +362,14 @@ describe('CliInstaller', () => {
       await expect(lstat(join(commandDir, 'orca'))).rejects.toMatchObject({ code: 'ENOENT' })
 
       await installer.remove()
+      await expect(lstat(join(commandDir, 'hive'))).rejects.toMatchObject({ code: 'ENOENT' })
       await expect(lstat(join(commandDir, 'hivecode'))).rejects.toMatchObject({ code: 'ENOENT' })
       await expect(lstat(join(commandDir, 'orca-ide'))).rejects.toMatchObject({ code: 'ENOENT' })
     }
   )
 
   it.skipIf(process.platform === 'win32')(
-    'installs hivecode and orca-ide AppImage wrappers without bare orca',
+    'installs hive with safe compatibility AppImage wrappers without bare orca',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
@@ -383,7 +389,7 @@ describe('CliInstaller', () => {
       })
 
       await installer.install()
-      for (const command of ['hivecode', 'orca-ide']) {
+      for (const command of ['hive', 'hivecode', 'orca-ide']) {
         await expect(readFile(join(commandDir, command), 'utf8')).resolves.toBe(
           buildAppImageCliWrapper(appImagePath)
         )

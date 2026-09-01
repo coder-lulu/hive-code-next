@@ -34,7 +34,7 @@ export function HiveAccountSignOutConfirmDialog({
           <DialogDescription>
             {translate(
               'auto.components.settings.orcaAccount.signOutConfirmDescription',
-              "This device's local credential will be removed. Local projects, worktrees, and provider accounts will not be affected."
+              'Signing out removes HiveCloud login credentials from this device. Local projects, worktrees, terminals, and AI provider accounts are not affected.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -42,12 +42,19 @@ export function HiveAccountSignOutConfirmDialog({
           <Button
             variant="ghost"
             size="sm"
+            className="h-10"
             onClick={() => onOpenChange(false)}
             disabled={signingOut}
           >
             {translate('auto.components.settings.orcaAccount.cancel', 'Cancel')}
           </Button>
-          <Button size="sm" onClick={onConfirm} disabled={signingOut}>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-10"
+            onClick={onConfirm}
+            disabled={signingOut}
+          >
             {signingOut ? <Loader2 className="size-4 animate-spin" /> : null}
             {translate('auto.components.settings.orcaAccount.signOut', 'Sign out')}
           </Button>

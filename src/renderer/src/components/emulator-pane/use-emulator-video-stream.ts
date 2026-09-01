@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { translate } from '@/i18n/i18n'
 
 // Decodes the Android H.264 stream (scrcpy access units forwarded over the
 // emulator:videoStream* IPC) with WebCodecs and paints it to a <canvas>. The
@@ -31,6 +32,12 @@ const H264_CODEC = 'avc1.640028'
 
 type StreamSize = { width: number; height: number }
 
+type EmulatorVideoStreamState = {
+  error: string | null
+  hasFrame: boolean
+  streamIdentity: string | null
+}
+
 function newVideoStreamId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
 }
@@ -40,32 +47,50 @@ export function useEmulatorVideoStream(
   streamKey: string | undefined,
   enabled: boolean,
   onSize?: (size: StreamSize) => void
-): { canvasRef: React.RefObject<HTMLCanvasElement | null>; error: string | null } {
+): {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>
+  error: string | null
+  hasFrame: boolean
+} {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [error, setError] = useState<string | null>(null)
+  const streamIdentity = enabled && deviceId ? `${deviceId}::${streamKey ?? ''}` : null
+  const [state, setState] = useState<EmulatorVideoStreamState>({
+    error: null,
+    hasFrame: false,
+    streamIdentity: null
+  })
   const onSizeRef = useRef(onSize)
   onSizeRef.current = onSize
 
   useEffect(() => {
     const api = (window as { api?: { emulator?: EmulatorVideoApi } }).api?.emulator
     if (!enabled || !deviceId) {
-      setError(null)
+      setState({ error: null, hasFrame: false, streamIdentity: null })
       return
     }
     if (!api?.startVideoStream) {
+      setState({ error: null, hasFrame: false, streamIdentity })
       return
     }
-    setError(null)
     const DecoderCtor = (globalThis as { VideoDecoder?: typeof VideoDecoder }).VideoDecoder
     const ChunkCtor = (globalThis as { EncodedVideoChunk?: typeof EncodedVideoChunk })
       .EncodedVideoChunk
     if (!DecoderCtor || !ChunkCtor) {
-      setError('This build does not support WebCodecs H.264 decoding.')
+      setState({
+        error: translate(
+          'auto.components.emulator.pane.emulator.screen.stream.content.webCodecsUnsupported',
+          'This build does not support WebCodecs H.264 decoding.'
+        ),
+        hasFrame: false,
+        streamIdentity
+      })
       return
     }
 
+    setState({ error: null, hasFrame: false, streamIdentity })
     let disposed = false
     let configured = false
+    let hasPaintedFrame = false
     let timestamp = 0
     let configBytes: Uint8Array | null = null
     const currentStreamId = newVideoStreamId()
@@ -90,6 +115,10 @@ export function useEmulatorVideoStream(
             canvas.height = frame.displayHeight
           }
           ctx.drawImage(frame, 0, 0)
+          if (!hasPaintedFrame) {
+            hasPaintedFrame = true
+            setState({ error: null, hasFrame: true, streamIdentity })
+          }
         }
         frame.close()
       },
@@ -134,7 +163,7 @@ export function useEmulatorVideoStream(
       if (disposed) {
         return
       }
-      setError(message)
+      setState({ error: message, hasFrame: false, streamIdentity })
       cleanup()
     }
 
@@ -209,7 +238,10 @@ export function useEmulatorVideoStream(
     return () => {
       cleanup()
     }
-  }, [deviceId, streamKey, enabled])
+  }, [deviceId, enabled, streamIdentity])
 
-  return { canvasRef, error }
+  if (state.streamIdentity !== streamIdentity) {
+    return { canvasRef, error: null, hasFrame: false }
+  }
+  return { canvasRef, error: state.error, hasFrame: state.hasFrame }
 }

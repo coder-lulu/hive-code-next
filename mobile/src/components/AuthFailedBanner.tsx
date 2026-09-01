@@ -16,7 +16,7 @@ export function AuthFailedBanner({
   canRetry: boolean
   onRetry: () => void
   onRepair: () => void
-  onRemove: () => void
+  onRemove?: () => void
 }) {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
@@ -61,16 +61,18 @@ export function AuthFailedBanner({
               Re-pair
             </Text>
           </Pressable>
-          <Pressable
-            accessibilityLabel="Remove this computer"
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
-            onPress={onRemove}
-          >
-            <Text maxFontSizeMultiplier={1.3} style={styles.removeText}>
-              Remove
-            </Text>
-          </Pressable>
+          {onRemove ? (
+            <Pressable
+              accessibilityLabel="Remove this computer"
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+              onPress={onRemove}
+            >
+              <Text maxFontSizeMultiplier={1.3} style={styles.removeText}>
+                Remove
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </View>

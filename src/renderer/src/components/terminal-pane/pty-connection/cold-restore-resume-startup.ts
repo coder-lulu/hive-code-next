@@ -49,6 +49,7 @@ export function bindBuildColdRestoreAgentResumeStartup(session: ConnectPanePtySe
     const launchConfig =
       (useLiveEntry && entry ? state.getAgentLaunchConfigForStatusEntry(entry) : undefined) ??
       matchingSleepingLaunchConfig
+    const hostDefaultsAuthoritative = launchConfig?.hostDefaultsAuthoritative === true
     // Why: the resume line is typed into this pane's live shell, so its quoting must
     // follow the tab's effective Windows shell, not the win32 PowerShell default.
     const resumeTarget = resolveAgentResumeLaunchTarget({
@@ -64,16 +65,21 @@ export function bindBuildColdRestoreAgentResumeStartup(session: ConnectPanePtySe
       providerSession,
       cmdOverrides: state.settings?.agentCmdOverrides ?? {},
       agentArgs:
-        launchConfig !== undefined
+        launchConfig !== undefined && !hostDefaultsAuthoritative
           ? launchConfig.agentArgs
           : resolveTuiAgentLaunchArgs(agent, state.settings?.agentDefaultArgs),
       agentEnv:
-        launchConfig !== undefined
+        launchConfig !== undefined && !hostDefaultsAuthoritative
           ? launchConfig.agentEnv
           : resolveTuiAgentLaunchEnv(agent, state.settings?.agentDefaultEnv),
-      ...(launchConfig?.agentCommand ? { agentCommand: launchConfig.agentCommand } : {}),
+      ...(!hostDefaultsAuthoritative && launchConfig?.agentCommand
+        ? { agentCommand: launchConfig.agentCommand }
+        : {}),
       ...(launchConfig?.ompResumeFilePath
         ? { ompResumeFilePath: launchConfig.ompResumeFilePath }
+        : {}),
+      ...(launchConfig?.agentPermissionMode
+        ? { agentPermissionMode: launchConfig.agentPermissionMode }
         : {}),
       platform: resumeTarget.platform,
       shell: resumeTarget.shell
@@ -91,9 +97,15 @@ export function bindBuildColdRestoreAgentResumeStartup(session: ConnectPanePtySe
         ...startupPlan.env,
         ORCA_AGENT_LAUNCH_TOKEN: coldRestoreLaunchToken
       },
-      launchConfig: startupPlan.launchConfig,
+      launchConfig: hostDefaultsAuthoritative ? launchConfig : startupPlan.launchConfig,
       resumeProviderSession: providerSession,
       launchToken: coldRestoreLaunchToken,
+      ...(launchConfig?.agentPermissionMode
+        ? { agentPermissionMode: launchConfig.agentPermissionMode }
+        : {}),
+      ...(launchConfig && !hostDefaultsAuthoritative
+        ? { agentArgsOverride: launchConfig.agentArgs }
+        : {}),
       useLiveEntry: Boolean(useLiveEntry),
       hasSleepingRecord: Boolean(sleepingRecord),
       sleepingRecordEntry

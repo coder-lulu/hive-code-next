@@ -2,6 +2,7 @@ import { lstat, mkdir, readFile, readlink, symlink, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const execFileMock = vi.hoisted(() => vi.fn())
 
@@ -34,14 +35,14 @@ describe('CliInstaller', () => {
   // must fall back to ~/.local/bin (user-writable, no sudo) rather than failing
   // silently when the parent directory is absent.
   it.skipIf(process.platform === 'win32')(
-    'falls back to ~/.local/bin/orca on macOS when /usr/local/bin does not exist',
+    'falls back to ~/.local/bin/hive on macOS when /usr/local/bin does not exist',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       // Simulate arm64: point defaultMacCommandPath at a dir that does not exist
       // in the fixture so existsSync(dirname(...)) returns false.
-      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'orca')
+      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'hive')
       const installer = new CliInstaller({
         platform: 'darwin',
         isPackaged: true,
@@ -55,13 +56,13 @@ describe('CliInstaller', () => {
       })
 
       const status = await installer.getStatus()
-      expect(status.commandPath).toBe(join(homePath, '.local', 'bin', 'orca'))
+      expect(status.commandPath).toBe(join(homePath, '.local', 'bin', 'hive'))
       expect(status.state).toBe('not_installed')
       expect(status.supported).toBe(true)
 
       const installed = await installer.install()
       expect(installed.state).toBe('installed')
-      expect(installed.commandPath).toBe(join(homePath, '.local', 'bin', 'orca'))
+      expect(installed.commandPath).toBe(join(homePath, '.local', 'bin', 'hive'))
       expect(installed.pathConfigured).toBe(true)
     }
   )
@@ -69,14 +70,14 @@ describe('CliInstaller', () => {
   // Why: on Intel Macs /usr/local/bin exists, so the installer must keep using
   // it as the canonical path and not regress to ~/.local/bin.
   it.skipIf(process.platform === 'win32')(
-    'uses /usr/local/bin/orca on macOS when /usr/local/bin exists',
+    'uses /usr/local/bin/hive on macOS when /usr/local/bin exists',
     async () => {
       const fixture = await makeFixture()
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       await mkdir(usrLocalBin, { recursive: true })
 
-      const installPath = join(usrLocalBin, 'orca')
+      const installPath = join(usrLocalBin, 'hive')
       const installer = new CliInstaller({
         platform: 'darwin',
         isPackaged: true,
@@ -95,19 +96,19 @@ describe('CliInstaller', () => {
     }
   )
 
-  // Why: users can have a managed Orca command in ~/.local/bin even when
+  // Why: users can have a managed HiveCode command in ~/.local/bin even when
   // /usr/local/bin exists; Settings must follow the shell-visible command.
   it.skipIf(process.platform === 'win32')(
-    'uses an existing managed macOS orca command from the shell PATH before /usr/local/bin',
+    'uses an existing managed macOS hive command from the shell PATH before /usr/local/bin',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await symlink(launcherPath, userInstallPath)
@@ -139,17 +140,17 @@ describe('CliInstaller', () => {
   // Why: POSIX command lookup skips broken symlinks and keeps searching PATH,
   // so a stale earlier artifact must not steal status from the install path.
   it.skipIf(process.platform === 'win32')(
-    'skips a broken managed macOS orca symlink before /usr/local/bin',
+    'skips a broken managed macOS hive symlink before /usr/local/bin',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
-      const oldLauncherPath = join(fixture.root, 'Old.app', 'Contents', 'Resources', 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
+      const oldLauncherPath = join(fixture.root, 'Old.app', 'Contents', 'Resources', 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await symlink(oldLauncherPath, userInstallPath)
@@ -182,18 +183,18 @@ describe('CliInstaller', () => {
   )
 
   // Why: PATH lookup stops at the first existing command; a later managed
-  // ~/.local/bin/orca must not steal status from /usr/local/bin/orca.
+  // ~/.local/bin/hive must not steal status from /usr/local/bin/hive.
   it.skipIf(process.platform === 'win32')(
-    'keeps the default macOS command when a managed orca appears later on PATH',
+    'keeps the default macOS command when a managed hive appears later on PATH',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await symlink(launcherPath, defaultInstallPath)
@@ -218,18 +219,18 @@ describe('CliInstaller', () => {
   )
 
   // Why: shells skip missing PATH entries, so a managed command later in PATH
-  // is still the shell-visible Orca command until the default path is installed.
+  // is still the shell-visible HiveCode command until the default path is installed.
   it.skipIf(process.platform === 'win32')(
-    'uses a later managed macOS orca command when the default command is missing',
+    'uses a later managed macOS hive command when the default command is missing',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await symlink(launcherPath, userInstallPath)
@@ -256,19 +257,19 @@ describe('CliInstaller', () => {
     }
   )
 
-  // Why: bash/zsh skip non-executable PATH entries even at Orca's configured
+  // Why: bash/zsh skip non-executable PATH entries even at HiveCode's configured
   // install slot, then keep looking for a runnable command later in PATH.
   it.skipIf(process.platform === 'win32')(
-    'uses a later managed macOS orca command when the default command is not executable',
+    'uses a later managed macOS hive command when the default command is not executable',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await writeFile(defaultInstallPath, '#!/usr/bin/env bash\necho other-orca\n', 'utf8')
@@ -296,7 +297,7 @@ describe('CliInstaller', () => {
     }
   )
 
-  // Why: a non-Orca command after an empty default install slot can be shadowed
+  // Why: a non-HiveCode command after an empty default install slot can be shadowed
   // by installing the default path without replacing the user's command.
   it.skipIf(process.platform === 'win32')(
     'installs the default macOS command instead of replacing an unmanaged later command',
@@ -306,9 +307,9 @@ describe('CliInstaller', () => {
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await writeFile(userInstallPath, '#!/usr/bin/env bash\necho other-orca\n', {
@@ -340,19 +341,19 @@ describe('CliInstaller', () => {
     }
   )
 
-  // Why: an off-PATH ~/.local/bin/orca must not hijack CLI registration and
+  // Why: an off-PATH ~/.local/bin/hive must not hijack CLI registration and
   // leave the shell-visible /usr/local/bin command missing.
   it.skipIf(process.platform === 'win32')(
-    'ignores managed macOS orca commands that are not visible on the shell PATH',
+    'ignores managed macOS hive commands that are not visible on the shell PATH',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await symlink(launcherPath, userInstallPath)
@@ -383,15 +384,15 @@ describe('CliInstaller', () => {
   )
 
   it.skipIf(process.platform === 'win32')(
-    'reports a conflict for an unmanaged macOS orca that shadows the install path',
+    'reports a conflict for an unmanaged macOS hive that shadows the install path',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await writeFile(userInstallPath, '#!/usr/bin/env bash\necho other-orca\n', {
@@ -414,7 +415,9 @@ describe('CliInstaller', () => {
       const status = await installer.getStatus()
       expect(status.commandPath).toBe(userInstallPath)
       expect(status.state).toBe('conflict')
-      await expect(installer.install()).rejects.toThrow('Refusing to replace non-Orca command')
+      await expect(installer.install()).rejects.toThrow(
+        `Refusing to replace non-${APP_DISPLAY_NAME} command`
+      )
       await expect(lstat(defaultInstallPath)).rejects.toMatchObject({ code: 'ENOENT' })
       await expect(readFile(userInstallPath, 'utf8')).resolves.toContain('other-orca')
     }
@@ -423,16 +426,16 @@ describe('CliInstaller', () => {
   // Why: bash/zsh skip non-executable PATH entries, so reporting them as a
   // conflict would block a valid later install path the shell would use.
   it.skipIf(process.platform === 'win32')(
-    'skips a non-executable unmanaged macOS orca before the install path',
+    'skips a non-executable unmanaged macOS hive before the install path',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
       const usrLocalBin = join(fixture.root, 'usr', 'local', 'bin')
       const userLocalBin = join(homePath, '.local', 'bin')
-      const defaultInstallPath = join(usrLocalBin, 'orca')
-      const userInstallPath = join(userLocalBin, 'orca')
-      const launcherPath = join(resourcesPath, 'bin', 'orca')
+      const defaultInstallPath = join(usrLocalBin, 'hive')
+      const userInstallPath = join(userLocalBin, 'hive')
+      const launcherPath = join(resourcesPath, 'bin', 'hive')
       await mkdir(usrLocalBin, { recursive: true })
       await mkdir(userLocalBin, { recursive: true })
       await writeFile(userInstallPath, '#!/usr/bin/env bash\necho other-orca\n', 'utf8')
@@ -461,15 +464,15 @@ describe('CliInstaller', () => {
     }
   )
 
-  // Why: when macCommandPath falls back to ~/.local/bin/orca on arm64, commandName
-  // must still be 'orca' (not 'orca-ide' which is Linux-only).
+  // Why: when macCommandPath falls back to ~/.local/bin/hive on arm64, commandName
+  // must remain the primary product command on every packaged platform.
   it.skipIf(process.platform === 'win32')(
-    'reports commandName as orca (not orca-ide) when falling back to ~/.local/bin on macOS',
+    'reports commandName as hive when falling back to ~/.local/bin on macOS',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
-      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'orca')
+      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'hive')
       const installer = new CliInstaller({
         platform: 'darwin',
         isPackaged: true,
@@ -483,7 +486,7 @@ describe('CliInstaller', () => {
       })
 
       const status = await installer.getStatus()
-      expect(status.commandName).toBe('orca')
+      expect(status.commandName).toBe('hive')
     }
   )
 
@@ -495,7 +498,7 @@ describe('CliInstaller', () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
       const resourcesPath = await createPackagedMacLauncher(fixture.root)
-      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'orca')
+      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'hive')
       const installer = new CliInstaller({
         platform: 'darwin',
         isPackaged: true,
@@ -515,21 +518,21 @@ describe('CliInstaller', () => {
 
       expect(s1.commandPath).toBe(s2.commandPath)
       expect(s2.commandPath).toBe(s3.commandPath)
-      expect(s1.commandPath).toBe(join(homePath, '.local', 'bin', 'orca'))
+      expect(s1.commandPath).toBe(join(homePath, '.local', 'bin', 'hive'))
     }
   )
 
   // Why: the arm64 fallback must apply for packaged builds, not just dev launchers.
   it.skipIf(process.platform === 'win32')(
-    'resolves to ~/.local/bin/orca on arm64 even when isPackaged is true',
+    'resolves to ~/.local/bin/hive on arm64 even when isPackaged is true',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
-      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'orca')
+      const absentUsrLocalBin = join(fixture.root, 'usr', 'local', 'bin', 'hive')
       const resourcesPath = join(fixture.root, 'resources')
-      const bundledLauncher = join(resourcesPath, 'bin', 'orca')
+      const bundledLauncher = join(resourcesPath, 'bin', 'hive')
       await mkdir(join(resourcesPath, 'bin'), { recursive: true })
-      await writeFile(bundledLauncher, '#!/usr/bin/env bash\necho orca\n', {
+      await writeFile(bundledLauncher, '#!/usr/bin/env bash\necho hive\n', {
         encoding: 'utf8',
         mode: 0o755
       })
@@ -547,7 +550,7 @@ describe('CliInstaller', () => {
       })
 
       const status = await installer.getStatus()
-      expect(status.commandPath).toBe(join(homePath, '.local', 'bin', 'orca'))
+      expect(status.commandPath).toBe(join(homePath, '.local', 'bin', 'hive'))
       expect(status.supported).toBe(true)
     }
   )

@@ -4,6 +4,7 @@ import type {
   LinearIssueContextResult,
   LinearIssueRequest
 } from '../../shared/linear/agent-access'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import { extractLinearInlineMedia } from '../../shared/linear/inline-media'
 import { parseLinearIssueInput } from '../../shared/linear/links'
 import {
@@ -62,7 +63,9 @@ export async function readLinearIssueContext(
 
 async function missingIssueInput(): Promise<CurrentIssueLink> {
   throw linearError('linear_issue_required', 'Pass an issue id or use --current.', {
-    nextSteps: ['Run `orca linear issue ENG-123` or retry from a linked worktree with --current.']
+    nextSteps: [
+      `Run \`${PRIMARY_CLI_COMMAND} linear issue ENG-123\` or retry from a linked worktree with --current.`
+    ]
   })
 }
 

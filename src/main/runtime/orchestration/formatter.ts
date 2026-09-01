@@ -1,5 +1,6 @@
 import type { MessageRow } from './types'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
+import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 
 const BANNER_WIDTH = 60
 const SEPARATOR = '─'.repeat(BANNER_WIDTH)
@@ -90,7 +91,9 @@ export function formatMessageBanner(
       msg.to_handle.startsWith('run:') || msg.to_handle.startsWith('dispatch:')
         ? ''
         : ` --from ${msg.to_handle}`
-    lines.push(`[Reply: orca orchestration reply --id ${msg.id}${explicitFrom} --body "..."]`)
+    lines.push(
+      `[Reply: ${PRIMARY_CLI_COMMAND} orchestration reply --id ${msg.id}${explicitFrom} --body "..."]`
+    )
   }
   lines.push(SEPARATOR)
 
@@ -113,5 +116,5 @@ export function formatMessagePointer(count: number, mailboxHandle?: string): str
   const runFlag = mailboxHandle?.startsWith('run:')
     ? ` --run ${mailboxHandle.slice('run:'.length)}`
     : ''
-  return `\nYou have ${count} orchestration ${noun}. Run \`orca orchestration check${runFlag}\`.\n`
+  return `\nYou have ${count} orchestration ${noun}. Run \`${PRIMARY_CLI_COMMAND} orchestration check${runFlag}\`.\n`
 }

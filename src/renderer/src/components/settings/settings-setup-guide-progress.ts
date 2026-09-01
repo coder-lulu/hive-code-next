@@ -6,6 +6,7 @@ import {
 } from '../../../../shared/feature-wall-setup-steps'
 import type { FeatureWallSetupProgress } from '../feature-wall/feature-wall-setup-progress'
 import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
+import { useSetupGuideProgressSnapshot } from '../setup-guide/setup-guide-progress-snapshot'
 
 export type SettingsSetupGuideProgress = {
   ready: boolean
@@ -32,10 +33,8 @@ export function getSettingsSetupGuideProgress(progress: {
   }
 }
 
-export function useSettingsSetupGuideProgress(
-  shouldRefreshCoreState: boolean
-): SettingsSetupGuideProgress {
-  const fullProgress = useSettingsSetupGuideFullProgress(shouldRefreshCoreState, false, false)
+export function useSettingsSetupGuideProgress(): SettingsSetupGuideProgress {
+  const fullProgress = useSetupGuideProgressSnapshot()
 
   return useMemo(() => getSettingsSetupGuideProgress(fullProgress), [fullProgress])
 }

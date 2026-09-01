@@ -1,5 +1,5 @@
 import type { CliStatusResult, RuntimeStatus } from '../../shared/runtime-types'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME, applyProductCliBranding } from '../../shared/brand'
 import { projectRemoteAppStatus } from '../../shared/cli-app-status-projection'
 import { randomUUID } from 'node:crypto'
 import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
@@ -38,16 +38,16 @@ export type { RemoteOrcaCliRequest, RemoteOrcaCliResult } from './ssh-remote-cli
 // caller's TTY (or a local tmux pane), which a buffered one-shot relay bridge
 // cannot host. Everything else routes through the full host CLI.
 const HOST_INTERACTIVE_COMMANDS: Record<string, string> = {
-  serve: applyProductBranding(
+  serve: applyProductCliBranding(
     'orca serve starts a foreground headless Orca server and cannot run through the SSH relay bridge. Run it directly on the machine that should host Orca.'
   ),
-  'claude-teams': applyProductBranding(
+  'claude-teams': applyProductCliBranding(
     'orca claude-teams starts an interactive Claude Code session and cannot run through the SSH relay bridge. Run it in a terminal on the Orca host machine.'
   ),
-  'agent-teams-tmux': applyProductBranding(
+  'agent-teams-tmux': applyProductCliBranding(
     'orca agent-teams-tmux is a tmux pane shim for the Orca host machine and cannot run through the SSH relay bridge.'
   ),
-  'account add': applyProductBranding(
+  'account add': applyProductCliBranding(
     'orca account add runs an interactive agent login and cannot run through the buffered SSH relay bridge. Run it directly in a terminal on the Orca host machine.'
   )
 }
@@ -293,9 +293,7 @@ async function dispatchRemoteCli(
       // include that root cause so users can fix the install instead of
       // assuming the command family is unsupported over SSH.
       throw new Error(
-        applyProductBranding(
-          `Unsupported SSH Orca CLI command: ${command} (full Orca CLI bridge unavailable: ${passthroughFailureReason})`
-        )
+        `Unsupported SSH ${APP_DISPLAY_NAME} CLI command: ${command} (full ${APP_DISPLAY_NAME} CLI bridge unavailable: ${passthroughFailureReason})`
       )
   }
 }

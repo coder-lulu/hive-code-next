@@ -74,7 +74,9 @@ const sleepingAgentLaunchConfigBaseSchema = z.object({
     .min(1)
     .max(32 * 1024)
     .refine((value) => !hasUnsafeLaunchEnvChars(value))
-    .optional()
+    .optional(),
+  hostDefaultsAuthoritative: z.literal(true).optional(),
+  agentPermissionMode: z.enum(['manual', 'yolo']).optional()
 })
 
 export const sleepingAgentLaunchConfigSchema = z.preprocess((raw) => {

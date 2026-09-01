@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
+import { APP_DISPLAY_NAME } from './brand'
 import type { PairingOffer } from './pairing'
 import {
   deriveSharedKey,
@@ -157,7 +158,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
       fail(
         new RemoteRuntimeClientError(
           'runtime_timeout',
-          'Timed out waiting for the remote Orca runtime subscription to start.'
+          `Timed out waiting for the remote ${APP_DISPLAY_NAME} runtime subscription to start.`
         )
       )
     }, timeoutMs)
@@ -246,7 +247,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
       fail(
         new RemoteRuntimeClientError(
           'remote_runtime_unavailable',
-          'Could not connect to the remote Orca runtime.'
+          `Could not connect to the remote ${APP_DISPLAY_NAME} runtime.`
         )
       )
     }
@@ -303,7 +304,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
         fail(
           new RemoteRuntimeClientError(
             'remote_runtime_unavailable',
-            'Remote Orca runtime stopped responding; the stream connection was reset.'
+            `Remote ${APP_DISPLAY_NAME} runtime stopped responding; the stream connection was reset.`
           )
         )
         try {

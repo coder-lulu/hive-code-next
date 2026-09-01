@@ -46,7 +46,7 @@ export default function AboutScreen() {
             onPress={() => router.back()}
           />
         }
-        title={productNameText('关于 Orca')}
+        title={productNameText('关于 HiveCode')}
       />
 
       <ScrollView
@@ -59,7 +59,7 @@ export default function AboutScreen() {
         <View style={styles.brand}>
           <OrcaLogo size={32} />
           <Text maxFontSizeMultiplier={1.3} style={styles.brandName}>
-            {productNameText('Orca')}
+            {productNameText('HiveCode')}
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.brandDescription}>
             开源智能体开发工作台
@@ -70,7 +70,7 @@ export default function AboutScreen() {
           <MobileGroupedList title="产品链接">
             {PRODUCT_PUBLIC_LINKS.website ? (
               <MobileGroupedListRow
-                accessibilityLabel={productNameText('打开 Orca 官方网站')}
+                accessibilityLabel={productNameText('打开 HiveCode 官方网站')}
                 leading={<Globe color={theme.color.text.secondary} size={20} strokeWidth={2} />}
                 onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.website!)}
                 title="官方网站"
@@ -93,7 +93,7 @@ export default function AboutScreen() {
             ) : null}
             {PRODUCT_PUBLIC_LINKS.social ? (
               <MobileGroupedListRow
-                accessibilityLabel={productNameText('打开 Orca 社交主页')}
+                accessibilityLabel={productNameText('打开 HiveCode 社交主页')}
                 leading={<Share2 color={theme.color.text.secondary} size={20} strokeWidth={2} />}
                 onPress={() => void Linking.openURL(PRODUCT_PUBLIC_LINKS.social!)}
                 title="社交主页"

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -21,7 +22,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
+  translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
+    fallback.replace(/\{\{(\w+)\}\}/g, (placeholder, key: string) =>
+      options?.[key] === undefined ? placeholder : String(options[key])
+    )
 }))
 
 vi.mock('@/store', () => ({
@@ -70,7 +74,7 @@ describe('OrcaAccountSettingsPane', () => {
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
     expect(screen.getByText('ada@example.com')).toBeInTheDocument()
     expect(screen.getByText('Artifact sharing')).toBeInTheDocument()
-    expect(screen.getByText('Orca Relay')).toBeInTheDocument()
+    expect(screen.getByText(`${APP_DISPLAY_NAME} Relay`)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
     await user.click(screen.getByRole('button', { name: 'Confirm sign out' }))
@@ -84,10 +88,10 @@ describe('OrcaAccountSettingsPane', () => {
 
     expect(
       screen.getByText(
-        'Sign in to extend Orca with cloud features, including Artifacts and Orca Relay.'
+        `Sign in to extend ${APP_DISPLAY_NAME} with cloud features, including Artifacts and ${APP_DISPLAY_NAME} Relay.`
       )
     ).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Sign in to Orca' }))
+    await user.click(screen.getByRole('button', { name: `Sign in to ${APP_DISPLAY_NAME}` }))
     expect(mocks.connect).toHaveBeenCalledOnce()
   })
 
@@ -96,6 +100,6 @@ describe('OrcaAccountSettingsPane', () => {
     render(<OrcaAccountSettingsPane />)
 
     expect(mocks.fetchAuthStatus).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Sign in to Orca' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: `Sign in to ${APP_DISPLAY_NAME}` })).toBeDisabled()
   })
 })

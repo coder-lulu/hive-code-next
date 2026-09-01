@@ -1,4 +1,5 @@
 import { dialog, type BrowserWindow, type MessageBoxOptions } from 'electron'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 export type GpuFallbackRecoveredLaunchDecision = 'keep-safe' | 'retry-hardware'
 
@@ -8,7 +9,7 @@ const GPU_FALLBACK_RECOVERED_LAUNCH_OPTIONS: MessageBoxOptions = {
   defaultId: 0,
   cancelId: 0,
   title: 'Safe Graphics Mode is Active',
-  message: 'Orca recovered in Safe Graphics Mode.',
+  message: `${APP_DISPLAY_NAME} recovered in Safe Graphics Mode.`,
   detail:
     'Safe Graphics Mode was enabled after repeated graphics crashes. Keep it for stability, or restart and try hardware acceleration again.'
 }

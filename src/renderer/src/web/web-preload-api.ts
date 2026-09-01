@@ -164,7 +164,7 @@ import {
 } from '../../../shared/feature-interactions'
 import { normalizeContextualTourIds, type ContextualTourId } from '../../../shared/contextual-tours'
 import { translate } from '@/i18n/i18n'
-import { APP_DISPLAY_NAME, applyProductBranding } from '@/product-brand'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND, applyProductBranding } from '@/product-brand'
 import {
   GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
   GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE
@@ -716,6 +716,12 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       orgMemberRemove: async () => ({ status: 'unconfigured' })
     },
     hiveAccount: {
+      getLoginCapabilities: async () => ({
+        contractRevision: 'hive-login-capabilities-v1',
+        clientId: 'hivecode-desktop',
+        defaultMethod: 'phone_sms',
+        providers: []
+      }),
       getState: () =>
         Promise.resolve({
           configured: false,
@@ -2922,6 +2928,7 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onToggleQuickCommandsMenu: () => noopUnsubscribe,
     onOpenTasks: () => noopUnsubscribe,
     onOpenNewWorkspace: () => noopUnsubscribe,
+    onOpenNewTaskHome: () => noopUnsubscribe,
     onDeleteCurrentWorkspace: () => noopUnsubscribe,
     onOpenWorkspaceBoard: () => noopUnsubscribe,
     onToggleAgentDashboard: () => noopUnsubscribe,
@@ -3079,7 +3086,7 @@ function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
 function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
   const status = {
     platform: getBrowserPlatform(),
-    commandName: getBrowserPlatform() === 'linux' ? 'orca-ide' : 'orca',
+    commandName: PRIMARY_CLI_COMMAND,
     commandPath: null,
     pathDirectory: null,
     pathConfigured: false,
@@ -3868,13 +3875,13 @@ function resolveEnvironment(selector: string): StoredWebRuntimeEnvironment {
   if (environment.compatibleEnvironmentIds?.includes(selector)) {
     return environment
   }
-  throw new Error(applyProductBranding(`Unknown Orca runtime environment: ${selector}`))
+  throw new Error(`Unknown ${APP_DISPLAY_NAME} runtime environment: ${selector}`)
 }
 
 function requireActiveEnvironment(): StoredWebRuntimeEnvironment {
   activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment()
   if (!activeEnvironment) {
-    throw new Error(applyProductBranding('Pair this web client with an Orca server first.'))
+    throw new Error('Pair this web client with a HiveCode server first.')
   }
   return activeEnvironment
 }

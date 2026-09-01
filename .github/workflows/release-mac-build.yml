@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build-mac:
-    if: github.repository == 'stablyai/orca'
+    if: github.repository == 'coder-lulu/hive-code-next'
     # Why: this workflow is outside the SignPath signing run, so Blacksmith
     # cannot enter Windows artifact provenance while mac notarization gets the
     # faster runner.
@@ -31,11 +31,19 @@ jobs:
     timeout-minutes: 60
     env:
       NODE_OPTIONS: --max-old-space-size=4096
+      HIVECODE_COMMIT_SHA: ${{ github.sha }}
+      # Packaging runs after the Vite build; keep identity embedding enabled
+      # for electron-builder so the shipped app carries its release metadata.
+      HIVECODE_EMBED_RELEASE_IDENTITY: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: refs/tags/${{ inputs.tag }}
+
+      - name: Stamp checked-out commit in release identity
+        shell: bash
+        run: echo "HIVECODE_COMMIT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -48,6 +56,25 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
+
+      - name: Reserve macOS build number in HiveCloud
+        shell: bash
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          if [[ "$version" == *-beta.* || "$version" == *-rc.* ]]; then
+            channel=beta
+          else
+            channel=stable
+          fi
+          export HIVECODE_RELEASE_PLATFORM=macos
+          export HIVECODE_RELEASE_CHANNEL="$channel"
+          export HIVECODE_BUILD_RESERVATION_KEY="hivecode:macos:${channel}:${version}"
+          node config/scripts/reserve-hivecloud-build-number.mjs
 
       # Cache the Electron binary + electron-builder tool downloads (notarytool,
       # winCodeSign, nsis, squirrel, AppImage). Saves ~30-90s per job, incl. mac.
@@ -100,12 +127,12 @@ jobs:
           # Why the optional trailing identifier: suffixed side-branch RCs
           # (vX.Y.Z-rc.N.perf) are rc-channel prerelease builds — same telemetry
           # identity as plain RCs.
-          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(\.[0-9A-Za-z]+)?$ ]]; then
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(beta|rc)\.[0-9]+(\.[0-9A-Za-z]+)?$ ]]; then
             identity=rc
           elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             identity=stable
           else
-            echo "::error::Tag $TAG does not match stable or rc pattern; refusing to build official artifact"
+            echo "::error::Tag $TAG does not match stable, beta, or rc pattern; refusing to build official artifact"
             exit 1
           fi
           echo "identity=$identity" >>"$GITHUB_OUTPUT"
@@ -134,47 +161,64 @@ jobs:
           # Kill only its child and require both PTY and watch recovery before packaging.
           node config/scripts/relay-watcher-fault-harness.mjs
 
-      - name: Publish release artifacts (macOS)
+      - name: Build release artifacts (macOS)
         uses: nick-fields/retry@v4
         with:
           timeout_minutes: 45
           max_attempts: 3
           retry_wait_seconds: 30
-          command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish always
+          command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERTS }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Verify release remains draft after artifact upload
-        # Why: the macOS build must never be the actor that exposes a partial
-        # release. If an uploader or GitHub transition flips draft early, fail
-        # this job so release-cut never publishes the release.
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-          releases_json="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100")"
-          # Why: release upload must validate the draft before it is publicly visible.
-          draft="$(jq -e -r --arg tag "$TAG" '
-            map(select(.tag_name == $tag))
-            | if length == 1 and (.[0].draft | type) == "boolean" then (.[0].draft | tostring) else empty end
-          ' <<<"$releases_json")" || {
-            echo "::error::Release $TAG was not found in the draft-aware releases list, or its draft state was missing."
-            exit 1
-          }
-          if [[ "$draft" != "true" ]]; then
-            echo "::error::Release $TAG was published during the mac artifact upload."
-            exit 1
-          fi
-
-      # Why post-publish for macOS: electron-builder packs and uploads in a
-      # single `--publish always` invocation, so there is no cheap insertion
-      # point between pack and upload without splitting those steps.
+      # Verify the packaged app before publishing immutable artifacts.
       - name: Verify telemetry constants present in app.asar
         run: node config/scripts/verify-telemetry-constants.mjs
+
+      - name: Verify macOS application signatures and certificates
+        shell: bash
+        env:
+          HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT: ${{ secrets.HIVECODE_MAC_SIGNING_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          expected="$(printf '%s' "$HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT" | tr '[:upper:]' '[:lower:]' | tr -d ':')"
+          [[ "$expected" =~ ^[0-9a-f]{64}$ ]]
+          apps="$(find dist -maxdepth 2 -type d -name 'HiveCode.app' -print | sort)"
+          test "$(printf '%s\n' "$apps" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 2
+          index=0
+          while IFS= read -r app; do
+            test -n "$app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            certificate_prefix="$RUNNER_TEMP/hivecode-certificate-$index-"
+            codesign --display --extract-certificates "$certificate_prefix" "$app"
+            actual="$(openssl x509 -inform der -in "${certificate_prefix}0" -noout -fingerprint -sha256 | cut -d= -f2 | tr '[:upper:]' '[:lower:]' | tr -d ':')"
+            test "$actual" = "$expected"
+            index=$((index + 1))
+          done <<< "$apps"
+
+      - name: Publish macOS ZIP artifacts to HiveCloud object storage
+        shell: bash
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECODE_VERSION: ${{ inputs.tag }}
+          HIVECODE_RELEASE_CHANNEL: ${{ contains(inputs.tag, '-beta.') && 'beta' || contains(inputs.tag, '-rc.') && 'beta' || 'stable' }}
+          HIVECODE_DESKTOP_PLATFORM: macos
+          HIVECODE_DESKTOP_ARCHITECTURE: x64
+          HIVECODE_EXPECTED_ARTIFACTS: '2'
+          HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES: x64,arm64
+          HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT: ${{ secrets.HIVECODE_MAC_SIGNING_FINGERPRINT }}
+          HIVECODE_RELEASE_NOTES: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          export HIVECODE_VERSION="${HIVECODE_VERSION#v}"
+          x64="$(find dist -maxdepth 1 -type f -name 'hivecode-macos-x64.zip' -print -quit)"
+          arm64="$(find dist -maxdepth 1 -type f -name 'hivecode-macos-arm64.zip' -print -quit)"
+          test -n "$x64" && test -n "$arm64"
+          export HIVECODE_ARTIFACT_PATHS="x64=$x64,arm64=$arm64"
+          node config/scripts/publish-hivecloud-desktop-release.mjs

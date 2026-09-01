@@ -1,10 +1,10 @@
 # SSH Execution Boundary
 
-How Orca splits work between your machine and an SSH host, what survives a disconnect, and how to keep `unverifiable` distinct from `exited`. Nothing under `docs/` stated this before; agents and humans were inferring it from error strings and getting it wrong.
+How HiveCode splits work between your machine and an SSH host, what survives a disconnect, and how to keep `unverifiable` distinct from `exited`. Nothing under `docs/` stated this before; agents and humans were inferring it from error strings and getting it wrong.
 
 ## The rule
 
-**The execution host owns everything that touches execution** — tools, credentials, identity, environment, processes, and artifacts. The client owns the UI, transport, and Orca control-plane state, but is not authoritative for execution state.
+**The execution host owns everything that touches execution** — tools, credentials, identity, environment, processes, and artifacts. The client owns the UI, transport, and HiveCode control-plane state, but is not authoritative for execution state.
 
 Two consequences, both non-negotiable:
 
@@ -27,11 +27,11 @@ Rule 1 is stated at `src/main/source-control/repo-default-branch.ts:76-78`, `src
 | repo setup hooks (`--setup`)                                   | **remote**         | identical policy to local                                            |
 | commit-message / PR-field AI generation                        | **remote**         | uses the remote agent CLI and its auth                               |
 | `gh` / GitHub API, `glab` / GitLab                             | **client**         | inconsistent with the rule; PRs carry the client's identity          |
-| the `orca` CLI inside a remote terminal                        | **client runtime** | control plane only — your files and processes stay remote; see below |
+| the `hive` CLI inside a remote terminal                        | **client runtime** | control plane only — your files and processes stay remote; see below |
 
 ## Survival: what a disconnect does _not_ do
 
-By default, remote work survives your machine going away. The relay is a detached daemon (`nohup … </dev/null &`), its handler in `src/relay/relay.ts` ignores `SIGHUP`, the PTY is its child rather than the ssh channel's, and quitting Orca is a **detach, not a dispose** (`src/main/ssh/ssh-relay-session.ts:901-915`). Sleep additionally pushes `graceTimeSeconds: 0` to un-bound any running grace window.
+By default, remote work survives your machine going away. The relay is a detached daemon (`nohup … </dev/null &`), its handler in `src/relay/relay.ts` ignores `SIGHUP`, the PTY is its child rather than the ssh channel's, and quitting HiveCode is a **detach, not a dispose** (`src/main/ssh/ssh-relay-session.ts:901-915`). Sleep additionally pushes `graceTimeSeconds: 0` to un-bound any running grace window.
 
 Two ways remote work _can_ actually stop:
 
@@ -42,11 +42,11 @@ Reconnect re-attaches to the same live PTYs and replays a bounded buffer (`REPLA
 
 ## Control plane
 
-On an SSH host, `orca` is a shim (`~/.orca-relay/bin/orca`) that proxies **back to the client's runtime** over the relay socket. Your repository, processes, and files remain remote — only the control plane is on the client. This is correct for an SSH target, but it has a consequence worth stating plainly:
+On an SSH host, `hive` is a shim (the legacy `~/.orca-relay/bin/orca` path remains supported) that proxies **back to the client's runtime** over the relay socket. Your repository, processes, and files remain remote — only the control plane is on the client. This is correct for an SSH target, but it has a consequence worth stating plainly:
 
-> When the client disconnects, every `orca …` command run on the SSH host fails with `No owning Orca client is connected to the relay`. The PTY stays `live`; its control plane does not.
+> When the client disconnects, every `hive …` command run on the SSH host fails with `No owning HiveCode client is connected to the relay`. The PTY stays `live`; its control plane does not.
 
-Orchestration state (Runs, Tasks, Dispatches, mailboxes) is client-resident for the same reason. An agent on an SSH host should not depend on `orca` for anything it must finish while you are away. **Commit and push early** — unpushed work on a remote box is unavailable to the client until it reconnects.
+Orchestration state (Runs, Tasks, Dispatches, mailboxes) is client-resident for the same reason. An agent on an SSH host should not depend on `hive` for anything it must finish while you are away. **Commit and push early** — unpushed work on a remote box is unavailable to the client until it reconnects.
 
 ## Distinguishing `unverifiable` from `exited`
 
@@ -72,6 +72,6 @@ A listing is only evidence about the hosts it actually covered. When a result do
 
 ## One host, one model
 
-An SSH host and a paired runtime (`orca environment`) imply opposite boundaries: the first is a dumb execution host driven by your client, the second is a peer that owns its own control plane. Registering the same machine both ways splits its worktrees across two identities, makes `terminal list` return different sets depending on `--environment`, and reliably confuses both humans and agents. Pick one per machine.
+An SSH host and a paired runtime (`hive environment`) imply opposite boundaries: the first is a dumb execution host driven by your client, the second is a peer that owns its own control plane. Registering the same machine both ways splits its worktrees across two identities, makes `terminal list` return different sets depending on `--environment`, and reliably confuses both humans and agents. Pick one per machine.
 
-For work that must continue while you are offline, use the peer/headless-runtime model on the remote host instead of the direct-SSH model. Its control plane is host-local, and its daemon-backed PTYs stay `live` across a normal runtime restart so the runtime can reattach; an explicit daemon shutdown can still make them `exited`. Do not register the same machine through both models. A detached agent process outside Orca can also survive a control-plane outage, but it has no stdin, so its instructions cannot be amended mid-run.
+For work that must continue while you are offline, use the peer/headless-runtime model on the remote host instead of the direct-SSH model. Its control plane is host-local, and its daemon-backed PTYs stay `live` across a normal runtime restart so the runtime can reattach; an explicit daemon shutdown can still make them `exited`. Do not register the same machine through both models. A detached agent process outside HiveCode can also survive a control-plane outage, but it has no stdin, so its instructions cannot be amended mid-run.

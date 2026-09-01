@@ -18,6 +18,13 @@ function enabled(value: string | undefined): boolean {
   return value === '1' || value === 'true'
 }
 
+function presenceEnabled(value: string | undefined): boolean {
+  // HiveCode ships with a validated HiveCloud account origin, so Runtime Cloud is
+  // part of the product contract rather than an opt-in launch-time experiment.
+  // Keep an explicit false value as an operational escape hatch for development.
+  return value === undefined || enabled(value)
+}
+
 function originRelativePath(value: string | undefined): string | null {
   if (!value || value.length > 256 || !value.startsWith('/') || value.includes('\\')) {
     return null
@@ -50,7 +57,7 @@ function webLaunchConfig(env: NodeJS.ProcessEnv): HiveRuntimeCloudWebLaunchConfi
 export function getHiveRuntimeCloudConfig(
   env: NodeJS.ProcessEnv = process.env
 ): HiveRuntimeCloudConfig {
-  if (!enabled(env.HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED)) {
+  if (!presenceEnabled(env.HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED)) {
     return { enabled: false }
   }
   const account = getHiveAccountConfig(env)

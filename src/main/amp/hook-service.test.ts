@@ -16,6 +16,7 @@ vi.mock('os', async () => {
 })
 
 import { AmpHookService, _internals } from './hook-service'
+import { LEGACY_AMP_PLUGIN_MARKER } from './agent-status-plugin-source'
 
 describe('AmpHookService', () => {
   let homeDir: string
@@ -30,7 +31,7 @@ describe('AmpHookService', () => {
     rmSync(homeDir, { recursive: true, force: true })
   })
 
-  it('installs an Orca-managed Amp system plugin', () => {
+  it('installs a HiveCode-managed Amp system plugin', () => {
     const status = new AmpHookService().install()
 
     expect(status).toMatchObject({
@@ -43,6 +44,7 @@ describe('AmpHookService', () => {
 
     const source = readFileSync(status.configPath, 'utf-8')
     expect(source).toContain(_internals.AMP_PLUGIN_MARKER)
+    expect(source).not.toContain(LEGACY_AMP_PLUGIN_MARKER)
     expect(source).toContain('/hook/amp')
     expect(source).toContain("amp.on('session.start'")
     expect(source).toContain("amp.on('agent.start'")
@@ -61,6 +63,17 @@ describe('AmpHookService', () => {
     expect(source).toContain('process.env.ORCA_AGENT_HOOK_ENDPOINT')
   })
 
+  it('upgrades a plugin with the legacy managed marker without treating it as user-authored', () => {
+    const pluginPath = _internals.getPluginPath()
+    mkdirSync(dirname(pluginPath), { recursive: true })
+    writeFileSync(pluginPath, `// ${LEGACY_AMP_PLUGIN_MARKER}\n`, 'utf-8')
+
+    const status = new AmpHookService().install()
+
+    expect(status.state).toBe('installed')
+    expect(readFileSync(pluginPath, 'utf-8')).toContain(_internals.AMP_PLUGIN_MARKER)
+  })
+
   it('does not overwrite an existing user-authored Amp plugin file', () => {
     const pluginPath = _internals.getPluginPath()
     mkdirSync(dirname(pluginPath), { recursive: true })
@@ -76,7 +89,7 @@ describe('AmpHookService', () => {
     expect(readFileSync(pluginPath, 'utf-8')).toBe('export default function userPlugin() {}\n')
   })
 
-  it('removes only Orca-managed Amp plugin files', () => {
+  it('removes only HiveCode-managed Amp plugin files', () => {
     const service = new AmpHookService()
     const installed = service.install()
     expect(existsSync(installed.configPath)).toBe(true)

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import { parseOrcaYaml } from '../../shared/orca-yaml'
@@ -65,7 +66,9 @@ function doctorRecipe(repoPath: string, recipeId: string): DoctorResult {
   const parseCheck: EphemeralVmRecipeDoctorCheck = {
     id: 'orca_yaml.parse',
     status: hooks ? 'pass' : 'fail',
-    message: hooks ? 'orca.yaml parsed successfully.' : 'orca.yaml has no supported Orca config.',
+    message: hooks
+      ? 'orca.yaml parsed successfully.'
+      : `orca.yaml has no supported ${APP_DISPLAY_NAME} config.`,
     ...(hooks ? {} : { remediation: 'Add an environmentRecipes entry to orca.yaml.' })
   }
   const result = doctorEphemeralVmRecipe({

@@ -45,6 +45,7 @@ describe('SSH remote Orca CLI launcher', () => {
     expect(plan.files[0]?.contents).toContain('socketPath + ".credential"')
     expect(plan.files[0]?.contents).toContain("value[index] == '\"'")
     expect(plan.files[0]?.contents).toContain("character == '\\\\'")
+    expect(plan.files[0]?.contents).toContain('HiveCode SSH CLI bridge')
     expect(plan.files[0]?.contents).not.toContain('cmd.exe')
     expect(plan.files[0]?.contents).not.toContain('%*')
 
@@ -68,7 +69,7 @@ describe('SSH remote Orca CLI launcher', () => {
     // Why: a host missing csc.exe or failing the compile must keep its existing
     // CLI, so every fail-closed guard precedes the legacy %* shim removal.
     const guards = [
-      "if (-not $compiler) { Write-Error 'Unable to find the .NET Framework C# compiler required for the Orca SSH CLI launcher.'; exit 1 }",
+      "if (-not $compiler) { Write-Error 'Unable to find the .NET Framework C# compiler required for the HiveCode SSH CLI launcher.'; exit 1 }",
       'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
       "if (-not (Test-Path -LiteralPath 'C:/Users/me user/.orca-relay/bin/orca.exe' -PathType Leaf))"
     ]
@@ -77,6 +78,26 @@ describe('SSH remote Orca CLI launcher', () => {
       expect(script).toContain(guard)
       expect(script.indexOf(guard)).toBeLessThan(script.indexOf(legacyShimRemoval))
     }
+  })
+
+  it('preserves standalone legacy product names inside Windows install paths', () => {
+    const binDir = 'C:/customer Orca workspace/bin'
+    const plan = createRemoteCliInstallPlan({
+      binDir,
+      relayDir: 'C:/customer Orca workspace/relay',
+      nodePath: 'C:/customer Orca workspace/node.exe',
+      sockPath: '\\\\.\\pipe\\customer-Orca-relay',
+      credentialFile: 'C:/customer Orca workspace/relay/credential',
+      hostPlatform: getRemoteHostPlatform('win32-x64')
+    })
+
+    expect(plan.launcherPath).toBe(`${binDir}/orca.exe`)
+    const compileScript = decodePowerShellCommand(plan.postWriteCommands[0] ?? '')
+    expect(compileScript).toContain(
+      "Set-Location -ErrorAction Stop -LiteralPath 'C:/customer Orca workspace/bin'"
+    )
+    expect(compileScript).toContain("'C:/customer Orca workspace/bin/orca.exe'")
+    expect(compileScript).not.toContain('C:/customer HiveCode workspace')
   })
 
   itWindows('preserves a multiline argument through the compiled remote launcher', () => {
@@ -237,5 +258,24 @@ describe('SSH remote Orca CLI launcher', () => {
         contents: expect.stringContaining('--orca-cli "$@"')
       })
     ])
+  })
+
+  it('preserves standalone legacy product names inside POSIX runtime paths', () => {
+    const plan = createRemoteCliInstallPlan({
+      binDir: '/home/customer Orca workspace/bin',
+      relayDir: '/home/customer Orca workspace/relay',
+      nodePath: '/home/customer Orca workspace/node',
+      sockPath: '/home/customer Orca workspace/relay/socket',
+      credentialFile: '/home/customer Orca workspace/relay/credential',
+      hostPlatform: getRemoteHostPlatform('linux-x64')
+    })
+
+    expect(plan.launcherPath).toBe('/home/customer Orca workspace/bin/orca')
+    const contents = plan.files[0]?.contents ?? ''
+    expect(contents).toContain("'/home/customer Orca workspace/node'")
+    expect(contents).toContain("'/home/customer Orca workspace/relay'")
+    expect(contents).toContain("'/home/customer Orca workspace/relay/socket'")
+    expect(contents).toContain("'/home/customer Orca workspace/relay/credential'")
+    expect(contents).not.toContain('/home/customer HiveCode workspace')
   })
 })

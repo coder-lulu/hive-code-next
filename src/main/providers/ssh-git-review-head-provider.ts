@@ -1,5 +1,6 @@
 import { isJsonRpcMethodNotFoundError } from './ssh-git-relay-errors'
 import { SshGitRemoteSyncProvider } from './ssh-git-remote-sync-provider'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 function readDurableReviewHeadLocalRef(
   result: unknown,
@@ -37,7 +38,7 @@ export class SshGitReviewHeadProvider extends SshGitRemoteSyncProvider {
     } catch (error) {
       if (isJsonRpcMethodNotFoundError(error)) {
         throw new Error(
-          'This SSH host is running an older Orca relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.'
+          `This SSH host is running an older ${APP_DISPLAY_NAME} relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.`
         )
       }
       throw error
@@ -61,7 +62,7 @@ export class SshGitReviewHeadProvider extends SshGitRemoteSyncProvider {
     } catch (error) {
       if (isJsonRpcMethodNotFoundError(error)) {
         throw new Error(
-          'This SSH host is running an older Orca relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.'
+          `This SSH host is running an older ${APP_DISPLAY_NAME} relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.`
         )
       }
       throw error

@@ -46,6 +46,9 @@ type AgentComboboxProps = {
    *  the selected trigger and each list item get a context menu. */
   onSetDefault?: (agent: DefaultAgentPreference) => void
   triggerClassName?: string
+  /** Optional sizing/styling for the portaled option panel. Keep this
+   * independent from the trigger so compact toolbars can still show full labels. */
+  contentClassName?: string
   /** When set, pressing Enter on the closed combobox trigger invokes this
    *  instead of opening the popover — lets the parent form treat the Agent
    *  field as the last keyboard-submit step. */
@@ -156,6 +159,7 @@ export default function AgentCombobox({
   defaultAgent,
   onSetDefault,
   triggerClassName,
+  contentClassName,
   onTriggerEnter,
   allowNarrowTrigger = false,
   allowBlankTerminal = true,
@@ -357,7 +361,8 @@ export default function AgentCombobox({
           align="start"
           className={cn(
             'w-[var(--radix-popover-trigger-width)] p-0',
-            !allowNarrowTrigger && 'min-w-[18rem]'
+            !allowNarrowTrigger && 'min-w-[18rem]',
+            contentClassName
           )}
           data-agent-combobox-root="true"
           onOpenAutoFocus={(event) => {

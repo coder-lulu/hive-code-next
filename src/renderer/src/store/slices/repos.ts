@@ -1590,7 +1590,10 @@ function getRuntimeTargetCachePrefix(
 }
 
 type FolderWorkspacePathStatusRouteOptions = { runtimeEnvironmentId?: string | null }
-type AddRepoPathRouteOptions = { runtimeEnvironmentId?: string | null }
+type AddRepoPathRouteOptions = {
+  runtimeEnvironmentId?: string | null
+  projectGroupId?: string | null
+}
 type RuntimeCatalogFetchOptions = { runtimeEnvironmentId?: string | null }
 
 function getFolderWorkspacePathStatusRouteSettings(
@@ -1900,7 +1903,8 @@ export type RepoSlice = {
   moveProjectToGroup: (
     projectId: string,
     groupId: string | null,
-    order?: number
+    order?: number,
+    options?: { hostId?: ExecutionHostId }
   ) => Promise<boolean>
   // options.hostId disambiguates which host's row to remove when the id exists on multiple hosts; else the focused host is assumed.
   // options.errorFeedback defaults to 'silent' so bulk/background callers keep their own aggregate reporting.
@@ -3114,7 +3118,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       if (stillExists) {
         failedProjectRemovals.push({
           projectId,
-          reason: 'Project remained in Orca after removeProject completed.'
+          reason: applyProductBranding('Project remained in Orca after removeProject completed.')
         })
       } else {
         removedProjectIds.push(projectId)
@@ -3130,12 +3134,19 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
     }
   },
 
-  moveProjectToGroup: async (projectId, groupId, order) => {
+  moveProjectToGroup: async (projectId, groupId, order, options) => {
     try {
-      if (!findRepoForHost(get().repos, projectId, { settings: get().settings })) {
+      const sourceRepo = findRepoForHost(get().repos, projectId, {
+        settings: get().settings,
+        hostId: options?.hostId
+      })
+      if (!sourceRepo) {
         return false
       }
-      const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), projectId))
+      // Capture the resolved owner before the async mutation. Drag callers
+      // provide it explicitly, while legacy callers retain focused-host fallback.
+      const sourceHostId = options?.hostId ?? getRepoExecutionHostId(sourceRepo)
+      const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), projectId, sourceHostId))
       const moved =
         target.kind === 'local'
           ? await window.api.projectGroups.moveProject({
@@ -3156,6 +3167,9 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       }
       const ownedMoved = repoWithFetchedOwner(moved, target)
       const movedHostId = getRepoExecutionHostId(ownedMoved)
+      if (movedHostId !== sourceHostId) {
+        return false
+      }
       set((s) => {
         const nextRepos = s.repos.map((repo) =>
           repoMatchesHostIdentity(repo, projectId, movedHostId) ? ownedMoved : repo
@@ -3228,7 +3242,10 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         const { openModal } = get()
         openModal('confirm-non-git-folder', {
           folderPath: path,
-          ...(target.kind === 'environment' ? { runtimeEnvironmentId: target.environmentId } : {})
+          ...(target.kind === 'environment' ? { runtimeEnvironmentId: target.environmentId } : {}),
+          ...(options && 'projectGroupId' in options
+            ? { projectGroupScoped: true, projectGroupId: options.projectGroupId ?? null }
+            : {})
         })
         return null
       }

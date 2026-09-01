@@ -52,6 +52,10 @@ import {
 } from './host-store'
 import { resetMobileRelayHostOverlayStoreForTests } from './mobile-relay-host-overlay-store'
 import { writeMobileRelayCredentialBundle } from './mobile-relay-credential-bundle'
+import {
+  replaceAccountRuntimeProfiles,
+  resetAccountRuntimeProfileRegistryForTests
+} from '../runtime-directory/account-runtime-profile-registry'
 
 const HOSTS_STORAGE_KEY = 'orca:hosts'
 const OVERLAY_STORAGE_KEY = 'orca:mobile-relay:host-overlays:v2'
@@ -94,6 +98,7 @@ describe('host-store list mutations', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetHostStoreForTests()
+    resetAccountRuntimeProfileRegistryForTests()
     platformMock.OS = 'ios'
     resetMobileRelayHostOverlayStoreForTests()
     scheduleCleanupMock.mockReset()
@@ -172,6 +177,22 @@ describe('host-store list mutations', () => {
       credentialStatus: 'missing',
       profile: null
     })
+  })
+
+  it('keeps account Runtime profiles out of the local pairing store API', async () => {
+    replaceAccountRuntimeProfiles([
+      {
+        id: 'account-runtime',
+        runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
+        name: 'Account Runtime',
+        endpoint: 'cloud://123e4567-e89b-42d3-a456-426614174000',
+        deviceToken: '',
+        publicKeyB64: '',
+        lastConnected: 0
+      }
+    ])
+
+    await expect(loadHosts()).resolves.toMatchObject([{ id: HOST_ONE.id }, { id: HOST_TWO.id }])
   })
 
   it('keeps existing metadata when pairing a distinct host', async () => {

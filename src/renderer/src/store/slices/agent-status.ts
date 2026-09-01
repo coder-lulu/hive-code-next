@@ -151,6 +151,7 @@ export type AgentProviderSessionTiming = { updatedAt?: number }
 export type AgentProviderSessionRouting = {
   tabId?: string
   worktreeId?: string
+  terminalHandle?: string
   connectionId?: string | null
 }
 
@@ -937,7 +938,9 @@ function copyLaunchConfig(config: SleepingAgentLaunchConfig): SleepingAgentLaunc
     ...(config.agentCommand ? { agentCommand: config.agentCommand } : {}),
     agentArgs: config.agentArgs,
     agentEnv: { ...config.agentEnv },
-    ...(config.ompResumeFilePath ? { ompResumeFilePath: config.ompResumeFilePath } : {})
+    ...(config.ompResumeFilePath ? { ompResumeFilePath: config.ompResumeFilePath } : {}),
+    ...(config.hostDefaultsAuthoritative ? { hostDefaultsAuthoritative: true as const } : {}),
+    ...(config.agentPermissionMode ? { agentPermissionMode: config.agentPermissionMode } : {})
   }
 }
 
@@ -951,7 +954,9 @@ function launchConfigsEqual(
   if (
     a.agentCommand !== b.agentCommand ||
     a.agentArgs !== b.agentArgs ||
-    a.ompResumeFilePath !== b.ompResumeFilePath
+    a.ompResumeFilePath !== b.ompResumeFilePath ||
+    a.hostDefaultsAuthoritative !== b.hostDefaultsAuthoritative ||
+    a.agentPermissionMode !== b.agentPermissionMode
   ) {
     return false
   }
@@ -1150,6 +1155,21 @@ function movePaneKeyedRecord<T>(
   const next = { ...record }
   delete next[fromPaneKey]
   next[toPaneKey] = transform(value)
+  return next
+}
+
+function mergePaneCompletionCounts(
+  record: Record<string, number>,
+  fromPaneKey: string,
+  toPaneKey: string
+): Record<string, number> {
+  const sourceCount = record[fromPaneKey]
+  if (sourceCount === undefined || fromPaneKey === toPaneKey) {
+    return record
+  }
+  const next = { ...record }
+  delete next[fromPaneKey]
+  next[toPaneKey] = (record[toPaneKey] ?? 0) + sourceCount
   return next
 }
 
@@ -1680,6 +1700,10 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
             s.unreadAgentCompletionPanes,
             retiredPaneKeySet
           ),
+          unreadAgentCompletionCountByPane: removePaneKeys(
+            s.unreadAgentCompletionCountByPane ?? {},
+            retiredPaneKeySet
+          ),
           lastTerminalInputAtByPaneKey: removePaneKeys(
             s.lastTerminalInputAtByPaneKey,
             retiredPaneKeySet
@@ -1802,6 +1826,11 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
         paneForegroundAgentByPaneKey: movePaneKeyedRecord(s.paneForegroundAgentByPaneKey, from, to),
         unreadTerminalPanes: movePaneKeyedRecord(s.unreadTerminalPanes, from, to),
         unreadAgentCompletionPanes: movePaneKeyedRecord(s.unreadAgentCompletionPanes, from, to),
+        unreadAgentCompletionCountByPane: mergePaneCompletionCounts(
+          s.unreadAgentCompletionCountByPane ?? {},
+          from,
+          to
+        ),
         lastTerminalInputAtByPaneKey: movePaneKeyedRecord(s.lastTerminalInputAtByPaneKey, from, to),
         cacheTimerByKey: movePaneKeyedRecord(s.cacheTimerByKey, from, to),
         retentionSuppressedPaneKeys: movePaneKeyedRecord(s.retentionSuppressedPaneKeys, from, to)
@@ -2018,7 +2047,7 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
           paneKey,
           agentType: agent,
           tabId,
-          terminalHandle: undefined,
+          terminalHandle: routing?.terminalHandle ?? existingStatus?.terminalHandle,
           launchToken: metadata?.launchToken,
           providerSession,
           existingProviderSession: existingRecord?.providerSession,
@@ -2105,10 +2134,6 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
           agentLaunchConfigByPaneKey: nextLaunchConfigs,
           acknowledgedAgentsByPaneKey: removePaneKeys(
             s.acknowledgedAgentsByPaneKey,
-            new Set([paneKey])
-          ),
-          unreadAgentCompletionPanes: removePaneKeys(
-            s.unreadAgentCompletionPanes,
             new Set([paneKey])
           ),
           agentStatusEpoch: removedLiveStatus ? s.agentStatusEpoch + 1 : s.agentStatusEpoch,

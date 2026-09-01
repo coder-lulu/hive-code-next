@@ -18,17 +18,38 @@ export function clearUnreadDockBadgeCount(): void {
 }
 
 export function useUnreadDockBadge(): typeof clearUnreadDockBadgeCount {
-  const { worktreesByRepo, tabsByWorktree, unreadTerminalTabs } = useAppStore(
+  const {
+    worktreesByRepo,
+    tabsByWorktree,
+    unifiedTabsByWorktree,
+    unreadTerminalTabs,
+    unreadAgentCompletionCountByPane
+  } = useAppStore(
     useShallow((state) => ({
       worktreesByRepo: state.worktreesByRepo,
       tabsByWorktree: state.tabsByWorktree,
-      unreadTerminalTabs: state.unreadTerminalTabs
+      unifiedTabsByWorktree: state.unifiedTabsByWorktree,
+      unreadTerminalTabs: state.unreadTerminalTabs,
+      unreadAgentCompletionCountByPane: state.unreadAgentCompletionCountByPane
     }))
   )
   // Why: this hook is always mounted; unrelated remote writes must not rescan every workspace.
   const unreadCount = useMemo(
-    () => getUnreadBadgeCount({ worktreesByRepo, tabsByWorktree, unreadTerminalTabs }),
-    [tabsByWorktree, unreadTerminalTabs, worktreesByRepo]
+    () =>
+      getUnreadBadgeCount({
+        worktreesByRepo,
+        tabsByWorktree,
+        unifiedTabsByWorktree,
+        unreadTerminalTabs,
+        unreadAgentCompletionCountByPane
+      }),
+    [
+      tabsByWorktree,
+      unifiedTabsByWorktree,
+      unreadTerminalTabs,
+      unreadAgentCompletionCountByPane,
+      worktreesByRepo
+    ]
   )
 
   // oxlint-disable-next-line react-doctor/no-derived-state-effect -- Why: this syncs an external OS dock badge, not React render state.

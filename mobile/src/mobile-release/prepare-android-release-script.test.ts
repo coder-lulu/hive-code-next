@@ -11,7 +11,7 @@ const scriptPath = fileURLToPath(
 
 const appConfig = {
   expo: {
-    version: '0.0.22',
+    version: '1.5.0-beta.1',
     android: {
       versionCode: 4
     }
@@ -49,8 +49,8 @@ describe('prepare Android release script', () => {
       }
     })
 
-    expect(output).toContain('Prepared Orca Mobile Android 0.0.22 (4)')
-    expect(output).toContain('Release tag: mobile-android-v0.0.22')
+    expect(output).toContain('Prepared HiveCode Mobile Android 1.5.0-beta.1 (4)')
+    expect(output).toContain('Release tag: mobile-android-v1.5.0-beta.1')
     expect(readFileSync(configPath, 'utf8')).toBe(contents)
   })
 

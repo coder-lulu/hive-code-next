@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from './brand'
 import { parseRemoteRuntimeJsonText } from './remote-runtime-request-frames'
 
 export type RemoteRuntimeHandshakeState = 'awaiting_ready' | 'awaiting_authenticated' | 'ready'
@@ -52,8 +53,8 @@ export function formatRemoteRuntimeCloseMessage(code: number, reason: Buffer): s
     suffixParts.push(reasonText)
   }
   return suffixParts.length > 0
-    ? `Remote Orca runtime closed the connection (${suffixParts.join(': ')}).`
-    : 'Remote Orca runtime closed the connection.'
+    ? `Remote ${APP_DISPLAY_NAME} runtime closed the connection (${suffixParts.join(': ')}).`
+    : `Remote ${APP_DISPLAY_NAME} runtime closed the connection.`
 }
 
 export function ignoreSettledRemoteRuntimeSocketError(): void {}

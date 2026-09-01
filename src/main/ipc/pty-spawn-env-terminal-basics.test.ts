@@ -227,7 +227,7 @@ describe('registerPtyHandlers', () => {
       const env = await spawnAndGetEnv()
       expect(env.TERM).toBe('xterm-256color')
       expect(env.COLORTERM).toBe('truecolor')
-      expect(env.TERM_PROGRAM).toBe('Orca')
+      expect(env.TERM_PROGRAM).toBe('HiveCode')
     })
     it('keeps indexed Git prompt guards in a local agent terminal env', async () => {
       const env = await spawnAndGetEnv(undefined, undefined, undefined, undefined, 'claude')
@@ -249,7 +249,7 @@ describe('registerPtyHandlers', () => {
       expect(env.GCM_INTERACTIVE).toBe('never')
     })
     it('advertises OSC 8 hyperlink support via FORCE_HYPERLINK', async () => {
-      // Why: supports-hyperlinks allowlists TERM_PROGRAM and reports false for Orca, so FORCE_HYPERLINK=1 forces detection on (xterm.js handles OSC 8 natively).
+      // Why: supports-hyperlinks allowlists TERM_PROGRAM and reports false for HiveCode, so FORCE_HYPERLINK=1 forces detection on (xterm.js handles OSC 8 natively).
       const env = await spawnAndGetEnv()
       expect(env.FORCE_HYPERLINK).toBe('1')
     })

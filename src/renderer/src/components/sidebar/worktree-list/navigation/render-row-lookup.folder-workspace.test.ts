@@ -3,7 +3,9 @@ import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import type { RenderRow } from '../listing/render-row'
+import { getRenderRowOptionId } from './active-descendant-option'
 import { findPreferredRenderRowIndexForWorktreeIdentity } from './render-row-lookup'
+import { getWorktreeOptionId } from '../rows/option-dom'
 
 const FOLDER_WORKSPACE: FolderWorkspace = {
   id: 'fw-1',
@@ -78,5 +80,42 @@ describe('host-qualified reveal lookup finds folder workspaces', () => {
         'single-location'
       )
     ).toBe(-1)
+  })
+
+  it('keeps same-id folder workspaces distinct by execution host', () => {
+    const localRow = {
+      type: 'folder-workspace' as const,
+      key: 'folder-workspace:local',
+      folderWorkspace: { ...FOLDER_WORKSPACE, executionHostId: 'local' as const },
+      projectGroup: PROJECT_GROUP,
+      depth: 0,
+      groupDepth: 0
+    } as RenderRow
+    const cloudRow = {
+      type: 'folder-workspace' as const,
+      key: 'folder-workspace:cloud',
+      folderWorkspace: { ...FOLDER_WORKSPACE, executionHostId: 'runtime:cloud-1' as const },
+      projectGroup: PROJECT_GROUP,
+      depth: 0,
+      groupDepth: 0
+    } as RenderRow
+    const target = {
+      id: folderWorkspaceKey(FOLDER_WORKSPACE.id),
+      hostId: 'runtime:cloud-1' as const
+    }
+
+    expect(
+      findPreferredRenderRowIndexForWorktreeIdentity(
+        [localRow, cloudRow],
+        target,
+        'single-location'
+      )
+    ).toBe(1)
+    expect(getRenderRowOptionId(cloudRow, target.id, target.hostId)).toBe(
+      getWorktreeOptionId('runtime:cloud-1|folder:fw-1')
+    )
+    expect(getRenderRowOptionId(localRow, target.id, target.hostId)).not.toBe(
+      getRenderRowOptionId(cloudRow, target.id, target.hostId)
+    )
   })
 })

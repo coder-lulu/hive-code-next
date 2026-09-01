@@ -1,4 +1,5 @@
 import { normalizeExecutionHostId, type ParsedExecutionHost } from '../shared/execution-host'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import type { ProjectHostSetup } from '../shared/project-types'
 import { hostFilterMatchesHostId, resolveHostFlagTarget } from './execution-host-flag'
 import type { RuntimeClient } from './runtime-client'
@@ -86,7 +87,7 @@ export async function resolveProjectCreateTarget(
     if (error instanceof RuntimeClientError && error.code === 'method_not_found') {
       throw new RuntimeClientError(
         'incompatible_runtime',
-        'This Orca server does not support project host setup yet. Update Orca on the server and try again.'
+        `This ${APP_DISPLAY_NAME} server does not support project host setup yet. Update ${APP_DISPLAY_NAME} on the server and try again.`
       )
     }
     throw error

@@ -118,6 +118,7 @@ describe('structured chat adoption guard on the launch path', () => {
       }
     ])
     mockToastError.mockReset()
+    store.settings.agentDefaultArgs = {}
     store.settings.openAgentTabsInChatByDefault = true
   })
 
@@ -274,6 +275,33 @@ describe('structured chat adoption guard on the launch path', () => {
     )
     expect(mockWaitForAgentReady).not.toHaveBeenCalled()
     expect(mockSetTabViewMode).not.toHaveBeenCalled()
+  })
+
+  it('keeps a manual permission override on the ordinary terminal launch path', async () => {
+    store.settings.agentDefaultArgs = {
+      codex: '--dangerously-bypass-approvals-and-sandbox'
+    }
+    const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
+
+    const result = launchAgentInNewTab({
+      agent: 'codex',
+      worktreeId: 'wt-1',
+      agentPermissionMode: 'manual'
+    })
+
+    expect(result?.tabId).toBe('tab-1')
+    expect(mockLaunchStructuredCodexSession).not.toHaveBeenCalled()
+    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
+      'tab-1',
+      expect.objectContaining({
+        agentPermissionMode: 'manual',
+        command: "codex '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'",
+        launchConfig: expect.objectContaining({
+          agentArgs: "'--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'"
+        })
+      })
+    )
+    expect(mockCreateTab.mock.calls.at(-1)?.[3]).not.toHaveProperty('agentPermissionMode')
   })
 
   it('shows rejected prompt delivery in chat after Codex becomes ready', async () => {

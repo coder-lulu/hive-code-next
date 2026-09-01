@@ -314,7 +314,7 @@ describe('orchestration RPC methods', () => {
       expect(db.getActiveDispatchForTerminal('term_a')).toBeUndefined()
     })
 
-    it('uses caller-provided dev mode for injected preamble', async () => {
+    it('uses the primary command for a dev-mode injected preamble', async () => {
       setup()
       provideInjectIdentity()
       const task = db.createTask({ spec: 'work' })
@@ -334,7 +334,7 @@ describe('orchestration RPC methods', () => {
 
       expect(send).toHaveBeenCalledWith(
         'term_a',
-        expect.stringContaining('orca-dev orchestration send')
+        expect.stringContaining('hive orchestration send')
       )
     })
 

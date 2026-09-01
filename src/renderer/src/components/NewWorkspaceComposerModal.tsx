@@ -21,6 +21,7 @@ import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
 import type { WorkspaceStatus } from '../../../shared/worktree/types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
@@ -38,6 +39,10 @@ type ComposerModalData = {
   prefilledName?: string
   /** Optional task authored before the workspace exists (for example on the desktop home). */
   initialPrompt?: string
+  /** Agent selected alongside a home-authored task. Keep it paired with its permission policy. */
+  initialAgent?: TuiAgent
+  /** Optional per-launch permission policy selected alongside `initialPrompt`. */
+  initialAgentPermissionMode?: AgentLaunchPermissionMode
   initialRepoId?: string
   initialEphemeralVmRecipeId?: string
   initialProjectGroupId?: string
@@ -119,6 +124,9 @@ function QuickTabBody({
   active: boolean
 }): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
+  const [agentPermissionMode, setAgentPermissionMode] = useState<AgentLaunchPermissionMode>(
+    modalData.initialAgentPermissionMode ?? 'default'
+  )
   const {
     cardProps,
     composerRef,
@@ -133,6 +141,7 @@ function QuickTabBody({
     // already owns the startup-plan path; this avoids creating a terminal while the
     // user is only drafting on the home surface.
     initialPrompt: modalData.initialPrompt ?? '',
+    agentPermissionMode,
     initialLinkedWorkItem: modalData.linkedWorkItem ?? null,
     initialGitHubWorkItem: modalData.initialGitHubWorkItem ?? null,
     initialTaskSourceContext: modalData.taskSourceContext ?? null,
@@ -161,7 +170,7 @@ function QuickTabBody({
   // during render keeps the selection in sync with the detected set without
   // triggering an extra commit.
   const [quickAgentOverride, setQuickAgentOverride] = useState<TuiAgent | null | undefined>(
-    undefined
+    modalData.initialAgent
   )
   const preferredQuickAgent = useMemo<TuiAgent | null>(() => {
     const pref = settings?.defaultTuiAgent
@@ -179,12 +188,24 @@ function QuickTabBody({
     // Why: detection/settings changes can invalidate a user-picked agent; repair
     // before the child selector renders an unavailable option for one commit.
     setQuickAgentOverride(resolvedQuickAgentSelection.quickAgentOverride)
+    if (resolvedQuickAgentSelection.quickAgent !== modalData.initialAgent) {
+      setAgentPermissionMode('default')
+    }
   }
   const quickAgent = resolvedQuickAgentSelection.quickAgent
 
-  const handleQuickAgentChange = useCallback((agent: TuiAgent | null) => {
-    setQuickAgentOverride(agent)
-  }, [])
+  const handleQuickAgentChange = useCallback(
+    (agent: TuiAgent | null) => {
+      setQuickAgentOverride(agent)
+      if (agent !== modalData.initialAgent) {
+        // The home permission choice was made for the home-selected agent. The
+        // modal does not expose that selector, so changing agents must not carry
+        // an invisible per-launch override onto a different CLI.
+        setAgentPermissionMode('default')
+      }
+    },
+    [modalData.initialAgent]
+  )
 
   const handleCreate = useCallback(async (): Promise<void> => {
     await submitQuick(quickAgent)

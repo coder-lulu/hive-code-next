@@ -1,5 +1,6 @@
 import type { SkillDeleteBlockReason } from './skill-delete-contract'
 import type { DiscoveredSkill, SkillSourceKind } from './skills'
+import { APP_DISPLAY_NAME } from './brand'
 
 export type SkillDeletionEligibility =
   | { deletable: true }
@@ -8,9 +9,9 @@ export type SkillDeletionEligibility =
 /** English defaults. The renderer translates by reason code; logs and the CLI
  *  use these directly. */
 export const SKILL_DELETE_BLOCK_MESSAGES: Record<SkillDeleteBlockReason, string> = {
-  bundled: 'Bundled with Orca — it would be restored',
+  bundled: `Bundled with ${APP_DISPLAY_NAME} — it would be restored`,
   plugin: 'Installed by a plugin — remove the plugin instead',
-  unowned: 'This skill lives outside Orca’s skill folders — delete it where it is stored',
+  unowned: `This skill lives outside ${APP_DISPLAY_NAME}’s skill folders — delete it where it is stored`,
   missing: 'This skill is no longer on disk',
   stale: 'This skill changed since the list was loaded — refresh and try again'
 }

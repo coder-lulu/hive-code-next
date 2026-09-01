@@ -3,6 +3,7 @@ import {
   DEFAULT_LOCAL_ORCA_PROFILE_ID,
   createDefaultLocalOrcaProfile
 } from '../../../../shared/orca-profiles'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function createWebOrcaProfilesApi(): Partial<PreloadApi> {
   const webOrcaProfileAuthStatus = () =>
@@ -11,7 +12,7 @@ export function createWebOrcaProfilesApi(): Partial<PreloadApi> {
       configured: false,
       state: 'unconfigured' as const,
       persistence: 'none' as const,
-      setupMessage: 'Orca Cloud sign-in is not available in the browser fallback.'
+      setupMessage: `${APP_DISPLAY_NAME} Cloud sign-in is not available in the browser fallback.`
     })
   return {
     orcaProfiles: {

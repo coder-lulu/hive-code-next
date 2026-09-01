@@ -156,7 +156,10 @@ Fix dispatch fallback preview for normalized status prompts`
     expect(result).not.toBeNull()
     expect(result!.prompt.length).toBeLessThanOrEqual(AGENT_STATUS_MAX_FIELD_LENGTH)
     expect(result!.prompt.includes('\n')).toBe(false)
-    expect(result!.prompt.startsWith('You are working inside Orca, a multi-agent IDE.')).toBe(true)
+    expect(result!.prompt.startsWith('You are working inside HiveCode, a multi-agent IDE.')).toBe(
+      true
+    )
+    expect(result!.prompt).not.toContain('Orca')
     expect(result!.prompt).toContain('Your task ID is: task_compact_1')
     expect(result!.prompt).toContain('=== TASK ===')
     expect(result!.prompt).toContain('Fix dispatch fallback preview')

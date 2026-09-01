@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { validateGitExecArgs } from '../../relay/git-exec-validator'
 import { getSshGitProviderMock, getActiveMultiplexerMock } from './worktrees-test-module-mocks'
 import { handlers, setupWorktreeHandlers, store } from './worktrees-test-harness'
@@ -211,7 +212,9 @@ describe('registerWorktreeHandlers', () => {
           remoteUrl: 'https://github.com/contributor/orca.git'
         }
       })
-    ).rejects.toThrow('Reconnect to deploy the latest relay')
+    ).rejects.toThrow(
+      `This SSH host is running an older ${APP_DISPLAY_NAME} relay that cannot add a fork remote for a PR workspace. Reconnect to deploy the latest relay, then try again.`
+    )
     expect(provider.addWorktree).not.toHaveBeenCalled()
   })
 
