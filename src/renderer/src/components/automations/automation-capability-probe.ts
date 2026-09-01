@@ -1,4 +1,5 @@
 import { getRuntimeEnvironmentStatus } from '@/runtime/runtime-rpc-client'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { AutomationAuthorityRef } from '../../../../shared/automation-owner-ref'
 import {
   AUTOMATION_LIST_HOST_SCOPE_RUNTIME_CAPABILITY,
@@ -136,7 +137,7 @@ export async function assertAutomationCreateIdempotencySupported(
   await assertAuthorityCapability(
     authority,
     AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
-    'Moving automations to this host requires a newer Orca server. Update the HUB and try again.'
+    `Moving automations to this host requires a newer ${APP_DISPLAY_NAME} server. Update the HUB and try again.`
   )
 }
 

@@ -14,6 +14,7 @@ import {
   ArtifactsPageErrorBanner
 } from './ArtifactsPageStates'
 import { artifactAccountIdentity, useArtifactPagination } from './useArtifactPagination'
+import { preloadHiveAccountSettings } from '../settings/settings-page-loader'
 
 const LOCAL_RUNTIME = { kind: 'local' } as const
 
@@ -36,6 +37,7 @@ export default function ArtifactsPage(): React.JSX.Element {
   const signedIn = authStatus?.state === 'connected'
   const needsReconnect = authStatus?.state === 'reconnect-required'
   const openAccountSettings = (): void => {
+    preloadHiveAccountSettings()
     openSettingsTarget({ pane: 'orca-account', repoId: null })
     openSettingsPage()
   }

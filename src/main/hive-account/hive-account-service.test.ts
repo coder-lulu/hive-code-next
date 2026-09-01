@@ -38,6 +38,7 @@ const sessionResponse = {
 
 let userDataPath: string
 let client: {
+  getLoginCapabilities: ReturnType<typeof vi.fn>
   discoverAuthorizationEndpoint: ReturnType<typeof vi.fn>
   createDeviceAuthorization: ReturnType<typeof vi.fn>
   createSmsChallenge: ReturnType<typeof vi.fn>
@@ -53,6 +54,12 @@ beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), 'hive-account-service-'))
   safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
   client = {
+    getLoginCapabilities: vi.fn().mockResolvedValue({
+      contractRevision: 'hive-login-capabilities-v1',
+      clientId: 'hivecode-desktop',
+      defaultMethod: 'phone_sms',
+      providers: []
+    }),
     discoverAuthorizationEndpoint: vi
       .fn()
       .mockResolvedValue(
@@ -89,7 +96,9 @@ beforeEach(() => {
 afterEach(() => rmSync(userDataPath, { recursive: true, force: true }))
 
 function createService(
-  onStateChanged: (state: HiveAccountState) => void = () => undefined
+  onStateChanged: (state: HiveAccountState) => void = () => undefined,
+  observeAuthorizationEndpoint: (endpoint: string) => void = () => undefined,
+  observeAuthorizationOptions: (options: Record<string, unknown>) => void = () => undefined
 ): HiveAccountService {
   return new HiveAccountService(
     userDataPath,
@@ -97,8 +106,11 @@ function createService(
       getConfig: () => ({ configured: true, config }),
       createClient: () => client,
       beginAuthorization: async (options: {
+        authorizationEndpoint: string
         prepareDeviceAuthorization: (nonce: string) => Promise<void>
       }) => {
+        observeAuthorizationEndpoint(options.authorizationEndpoint)
+        observeAuthorizationOptions(options)
         await options.prepareDeviceAuthorization('nonce')
         return {
           authorizationCode: 'code',
@@ -132,6 +144,69 @@ describe('Hive account application service', () => {
       redirectUri: 'http://127.0.0.1:32123'
     })
     await expect(createService().getState()).resolves.toMatchObject({ status: 'signed-in' })
+  })
+
+  it('uses only an advertised provider authorization path for the existing PKCE flow', async () => {
+    client.getLoginCapabilities.mockResolvedValue({
+      contractRevision: 'hive-login-capabilities-v1',
+      clientId: 'hivecode-desktop',
+      defaultMethod: 'phone_sms',
+      providers: [
+        {
+          id: 'github',
+          authorizationPath: '/hive/v1/auth/provider-authorizations/github'
+        }
+      ]
+    })
+    let authorizationEndpoint = ''
+    const service = createService(
+      () => undefined,
+      (endpoint) => {
+        authorizationEndpoint = endpoint
+      }
+    )
+
+    await expect(
+      service.signIn({ sessionProfile: 'TRUSTED', providerId: 'github' })
+    ).resolves.toMatchObject({ status: 'signed-in' })
+
+    expect(authorizationEndpoint).toBe(
+      'https://api.hivekernel.com/hive/v1/auth/provider-authorizations/github'
+    )
+    expect(client.getLoginCapabilities).toHaveBeenCalledOnce()
+    expect(client.discoverAuthorizationEndpoint).not.toHaveBeenCalled()
+  })
+
+  it('requests a fresh LoA 2 browser authentication for a step-up sign-in', async () => {
+    const observeAuthorizationOptions = vi.fn()
+    const service = createService(
+      () => undefined,
+      () => undefined,
+      observeAuthorizationOptions
+    )
+
+    await expect(
+      service.signIn({ sessionProfile: 'TRUSTED', intent: 'STEP_UP' })
+    ).resolves.toMatchObject({ status: 'signed-in' })
+
+    expect(observeAuthorizationOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        acrValues: 'urn:hive:acr:step-up',
+        maxAgeSeconds: 0,
+        prompt: 'login'
+      })
+    )
+  })
+
+  it('falls back to no providers when login capability discovery fails', async () => {
+    client.getLoginCapabilities.mockRejectedValue(new Error('offline'))
+
+    await expect(createService().getLoginCapabilities()).resolves.toEqual({
+      contractRevision: 'hive-login-capabilities-v1',
+      clientId: 'hivecode-desktop',
+      defaultMethod: 'phone_sms',
+      providers: []
+    })
   })
 
   it('keeps a temporary authorization in memory and does not restore it after restart', async () => {
@@ -202,6 +277,67 @@ describe('Hive account application service', () => {
 
     await expect(refresh).resolves.toMatchObject({ status: 'signed-out' })
     expect(client.revokeSession).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['session rejection', new HiveAccountRequestError(401, null)],
+    ['network failure', new TypeError('offline')]
+  ])('ignores a stale refresh %s after a newer sign-in', async (_label, refreshError) => {
+    vi.useFakeTimers()
+    try {
+      const onStateChanged = vi.fn()
+      const service = createService(onStateChanged)
+      await service.signIn({ sessionProfile: 'TRUSTED' })
+
+      let rejectRefresh: ((error: unknown) => void) | undefined
+      client.refreshSession.mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          rejectRefresh = reject
+        })
+      )
+      const refresh = service.refresh()
+      expect(client.refreshSession).toHaveBeenCalledOnce()
+
+      await service.signOut()
+      const newerSession = {
+        ...sessionResponse,
+        accessToken: 'newer-access',
+        refreshToken: 'newer-refresh',
+        expiresAt: Date.now() + 600_000,
+        account: {
+          accountId: '223e4567-e89b-42d3-a456-426614174000',
+          displayName: 'Grace'
+        }
+      }
+      client.exchangeSession.mockResolvedValueOnce(newerSession)
+      await service.signIn({ sessionProfile: 'TRUSTED' })
+      onStateChanged.mockClear()
+
+      rejectRefresh?.(refreshError)
+
+      await expect(refresh).resolves.toMatchObject({
+        status: 'refreshed',
+        state: {
+          status: 'signed-in',
+          account: { accountId: newerSession.account.accountId, displayName: 'Grace' }
+        }
+      })
+      await expect(service.getState()).resolves.toMatchObject({
+        status: 'signed-in',
+        account: { accountId: newerSession.account.accountId, displayName: 'Grace' }
+      })
+      expect(onStateChanged).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          status: 'signed-in',
+          account: expect.objectContaining({ accountId: newerSession.account.accountId })
+        })
+      )
+
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(client.refreshSession).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('publishes every completed account mutation to renderer subscribers', async () => {

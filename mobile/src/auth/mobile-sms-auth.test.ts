@@ -14,7 +14,9 @@ const crypto = vi.hoisted(() => ({
 vi.mock('expo-secure-store', () => secureStore)
 vi.mock('expo-crypto', () => crypto)
 vi.mock('../generated/product-config', () => ({
-  hivecodeProductConfig: { endpoints: { cloud: 'https://cloud.example.test/' } }
+  hivecodeProductConfig: {
+    services: { api: { baseUrl: 'https://cloud.example.test/' } }
+  }
 }))
 
 import {
@@ -24,12 +26,18 @@ import {
   revokeMobileSession,
   invalidateMobileSessionRefreshes
 } from './mobile-sms-auth'
+import { request } from './mobile-sms-client'
 
-function response(data: unknown, status = 200) {
+function response(data: unknown, status = 200, headers: Record<string, string> = {}) {
+  const text = vi.fn(async () => JSON.stringify(data))
+  const json = vi.fn(async () => data)
   return {
-    json: async () => data,
+    body: null,
+    headers: new Headers(headers),
+    json,
     ok: status >= 200 && status < 300,
-    status
+    status,
+    text
   }
 }
 
@@ -100,8 +108,40 @@ describe('mobile SMS authentication client', () => {
     )
   })
 
+  it('rejects an oversized API response before parsing its body', async () => {
+    const oversized = response({ ignored: true }, 200, { 'content-length': '10485760' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(oversized))
+
+    await expect(request('/hive/v1/runtimes', null, { method: 'GET' })).rejects.toThrow(
+      '登录服务暂时不可用'
+    )
+    expect(oversized.text).not.toHaveBeenCalled()
+    expect(oversized.json).not.toHaveBeenCalled()
+  })
+
+  it('stops reading an oversized streamed API response without Content-Length', async () => {
+    const oversized = new Response(new Uint8Array(2 * 1024 * 1024 + 1))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(oversized))
+
+    await expect(request('/hive/v1/runtimes', null, { method: 'GET' })).rejects.toThrow(
+      '登录服务暂时不可用'
+    )
+    expect(oversized.bodyUsed).toBe(true)
+  })
+
+  it('bounds server-provided API error messages', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ msg: 'x'.repeat(2_000) }, 400)))
+
+    const failure = await request('/hive/v1/runtimes', null, { method: 'GET' }).catch(
+      (error: unknown) => error
+    )
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toHaveLength(512)
+  })
+
   it('falls back to the Android host gateway when the local test domain is unreachable', async () => {
     vi.stubEnv('EXPO_PUBLIC_ANDROID_EMULATOR', '1')
+    vi.stubGlobal('__DEV__', true)
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('Failed to resolve host'))

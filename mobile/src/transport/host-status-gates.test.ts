@@ -5,13 +5,85 @@ import type { RpcClient } from './rpc-client'
 import { useHostStatusGates, type HostStatusGates } from './host-status-gates'
 
 const recordHostAppVersionMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+const runtimeIdentityMock = vi.hoisted(() => {
+  class HostRuntimeIdentityMismatchError extends Error {}
+  return {
+    HostRuntimeIdentityMismatchError,
+    record: vi.fn().mockResolvedValue(false)
+  }
+})
 
 vi.mock('./host-app-version-store', () => ({
   normalizeHostAppVersion: (value: unknown) => (typeof value === 'string' ? value : null),
   recordHostAppVersion: (...args: unknown[]) => recordHostAppVersionMock(...args)
 }))
 
+vi.mock('./host-store', () => ({
+  recordAuthenticatedRuntimeRecordId: (...args: unknown[]) => runtimeIdentityMock.record(...args)
+}))
+
+vi.mock('./authenticated-runtime-host-identity', () => ({
+  HostRuntimeIdentityMismatchError: runtimeIdentityMock.HostRuntimeIdentityMismatchError
+}))
+
 describe('useHostStatusGates', () => {
+  it('backfills the Runtime record id returned by authenticated status', async () => {
+    runtimeIdentityMock.record.mockClear()
+    const runtimeRecordId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const client = {
+      sendRequest: vi.fn().mockResolvedValue({
+        ok: true,
+        result: { runtimeRecordId }
+      })
+    } as unknown as RpcClient
+    let renderer: ReactTestRenderer | null = null
+
+    function Probe(): null {
+      useHostStatusGates({ hostId: 'host-1', client, connState: 'connected' })
+      return null
+    }
+
+    try {
+      await act(async () => {
+        renderer = create(createElement(Probe))
+        await Promise.resolve()
+      })
+      expect(runtimeIdentityMock.record).toHaveBeenCalledWith('host-1', runtimeRecordId)
+    } finally {
+      renderer?.unmount()
+    }
+  })
+
+  it('closes the authenticated client when persisted and reported Runtime ids conflict', async () => {
+    runtimeIdentityMock.record.mockRejectedValueOnce(
+      new runtimeIdentityMock.HostRuntimeIdentityMismatchError()
+    )
+    const close = vi.fn()
+    const client = {
+      close,
+      sendRequest: vi.fn().mockResolvedValue({
+        ok: true,
+        result: { runtimeRecordId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }
+      })
+    } as unknown as RpcClient
+    let renderer: ReactTestRenderer | null = null
+
+    function Probe(): null {
+      useHostStatusGates({ hostId: 'host-1', client, connState: 'connected' })
+      return null
+    }
+
+    try {
+      await act(async () => {
+        renderer = create(createElement(Probe))
+        await Promise.resolve()
+      })
+      expect(close).toHaveBeenCalledOnce()
+    } finally {
+      renderer?.unmount()
+    }
+  })
+
   it('clears every prior-host gate and ignores its late response while the client is replaced', async () => {
     let resolveOldStatus: ((response: unknown) => void) | null = null
     const pendingOldStatus = new Promise((resolve) => {

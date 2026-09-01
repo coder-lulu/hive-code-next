@@ -164,7 +164,7 @@ describe('CliSection project runtime defaults', () => {
       state: 'installed',
       currentTarget: 'C:\\Program Files\\Orca\\resources\\bin\\orca.exe',
       unsupportedReason: null,
-      detail: 'Orca could not read the Windows user PATH registry value.'
+      detail: 'Could not inspect C:\\customer Orca workspace\\PATH.'
     })
     Object.assign(window, {
       api: {
@@ -180,7 +180,10 @@ describe('CliSection project runtime defaults', () => {
 
     render(<CliSection currentPlatform="win32" settings={getDefaultSettings('/tmp')} />)
 
-    expect(await screen.findByText(/could not read the Windows user PATH/i)).toBeDefined()
+    expect(
+      await screen.findByText('Could not inspect C:\\customer Orca workspace\\PATH.')
+    ).toBeDefined()
+    expect(screen.queryByText(/customer HiveCode workspace/)).toBeNull()
     const registrationSwitch = screen.getByRole('switch') as HTMLButtonElement
     expect(registrationSwitch.disabled).toBe(true)
     expect(registrationSwitch.getAttribute('aria-checked')).toBe('false')

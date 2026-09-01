@@ -10,13 +10,13 @@ import {
   mobileOnboardingDestination
 } from '../onboarding/mobile-onboarding-plan'
 import { totalHomeStats, type HomeStatsSummary } from '../stats/home-stats-total'
+import { useAccountVisibleHostCatalog } from '../runtime-directory/use-account-visible-host-catalog'
 import type { TaskProvider } from '../tasks/mobile-task-providers'
 import {
   selectConnectableHostProfiles,
   sortHostsByLastConnected
 } from '../transport/host-catalog-selection'
-import { loadHostCatalog } from '../transport/host-store'
-import type { HostCatalogEntry, HostProfile } from '../transport/types'
+import type { HostProfile } from '../transport/types'
 import { fetchHomeHostWorktreeInfo } from '../worktree/home-host-worktree-fetch'
 import type { HomeWorktreeSummary, HostWorktreeInfo } from '../worktree/home-worktree-info'
 import {
@@ -33,7 +33,7 @@ import { useMobileHomeHostConnections } from './use-mobile-home-host-connections
 
 export function useMobileHomeData() {
   const router = useRouter()
-  const [hostCatalog, setHostCatalog] = useState<HostCatalogEntry[]>([])
+  const { catalog: hostCatalog, reload: reloadHostCatalog } = useAccountVisibleHostCatalog()
   const [statsByHost, setStatsByHost] = useState<Record<string, HomeStatsSummary>>({})
   const [worktreeInfo, setWorktreeInfo] = useState<Record<string, HostWorktreeInfo>>({})
   const [accountsByHost, setAccountsByHost] = useState<Record<string, AccountsSnapshot>>({})
@@ -51,7 +51,6 @@ export function useMobileHomeData() {
     setTaskProviders: setTaskProvidersByHost
   })
   const allClientsRef = useRef(connections.allClients)
-
   useEffect(() => {
     if (hydratedRef.current) {
       return
@@ -92,20 +91,21 @@ export function useMobileHomeData() {
   useFocusEffect(
     useCallback(() => {
       let stale = false
-      void loadHostCatalog().then(async (catalog) => {
-        if (stale) {
-          return
-        }
-        setHostCatalog(catalog)
-        if (catalog.length === 0 || onboardingCheckedRef.current) {
-          return
-        }
-        onboardingCheckedRef.current = true
-        const steps = await loadMobileOnboardingSteps()
-        if (!stale && steps.length > 0) {
-          router.replace(mobileOnboardingDestination(steps))
-        }
-      })
+      void reloadHostCatalog()
+        .then(async (catalog) => {
+          if (stale) {
+            return
+          }
+          if (catalog.length === 0 || onboardingCheckedRef.current) {
+            return
+          }
+          onboardingCheckedRef.current = true
+          const steps = await loadMobileOnboardingSteps()
+          if (!stale && steps.length > 0) {
+            router.replace(mobileOnboardingDestination(steps))
+          }
+        })
+        .catch(() => undefined)
       void AsyncStorage.getItem(LAST_VISITED_WORKTREE_STORAGE_KEY).then((raw) => {
         if (!stale) {
           setLastVisited(readLastVisitedWorktreeRecord(raw))
@@ -127,7 +127,7 @@ export function useMobileHomeData() {
       return () => {
         stale = true
       }
-    }, [router])
+    }, [reloadHostCatalog, router])
   )
 
   const sortedHosts = useMemo(() => sortHostsByLastConnected(hosts), [hosts])
@@ -188,8 +188,8 @@ export function useMobileHomeData() {
     primaryHost,
     primaryTaskProviders,
     resumeCard,
+    reloadHostCatalog,
     router,
-    setHostCatalog,
     sortedHostCatalog,
     stats,
     worktreeInfo

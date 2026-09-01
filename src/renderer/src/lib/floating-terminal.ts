@@ -1,4 +1,23 @@
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import {
+  getWorktreeIdFromHostIdentity,
+  isWorktreeHostIdentity
+} from '../../../shared/worktree/host-qualified-identity'
+
 export const TOGGLE_FLOATING_TERMINAL_EVENT = 'orca-toggle-floating-terminal'
+export const CLOSE_FLOATING_TERMINAL_EVENT = 'orca-close-floating-terminal'
+
+/** True for both the local synthetic bucket and a host-qualified mirror bucket. */
+export function isFloatingTerminalWorkspaceId(value: string | null | undefined): boolean {
+  if (!value) {
+    return false
+  }
+  return (
+    value === FLOATING_TERMINAL_WORKTREE_ID ||
+    (isWorktreeHostIdentity(value) &&
+      getWorktreeIdFromHostIdentity(value) === FLOATING_TERMINAL_WORKTREE_ID)
+  )
+}
 
 // Why: maximize/restore lives in the panel's own keydown handler, but that
 // handler is unmounted while the panel is closed. When Cmd+Opt+Shift+A is

@@ -25,6 +25,7 @@ import { useAppStore } from '../../store'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
 import { isMacUserAgent, isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
 import { applyDocumentTheme } from '@/lib/document-theme'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
 import {
   SCROLLBACK_PRESETS_ROWS,
@@ -37,46 +38,48 @@ import {
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId
 } from '../../../../shared/execution-host'
-import { GeneralPane } from './GeneralPane'
-import { BrowserPane } from './BrowserPane'
-import { AppearancePane } from './AppearancePane'
-import { InputPane } from './InputPane'
-import { ShortcutsPane } from './ShortcutsPane'
-import { TerminalPane } from './TerminalPane'
-import { FloatingWorkspacePane } from './FloatingWorkspacePane'
 import { useGhosttyImport } from './useGhosttyImport'
 import { useWarpThemeImport } from './useWarpThemeImport'
-import { RepositoryPane } from './RepositoryPane'
-import { GitPane } from './GitPane'
-import { CommitMessageAiPane } from './CommitMessageAiPane'
-import { GitProviderApiBudgetPane } from './GitProviderApiBudgetPane'
-import { NotificationsPane } from './NotificationsPane'
-import { VoicePane } from './VoicePane'
-import { SshPane } from './SshPane'
-import { ExperimentalPane } from './ExperimentalPane'
-import { PluginsSettingsSection } from './PluginsSettingsSection'
-import { AgentsPane } from './AgentsPane'
-import { OrchestrationPane } from './OrchestrationPane'
-import { ArtifactsSettingsPane } from './ArtifactsSettingsPane'
-import { ShareSkillsSettingsPane } from './ShareSkillsSettingsPane'
-import { AutomationsSettingsPane } from './AutomationsSettingsPane'
-import { HiveAccountSettingsPane } from './HiveAccountSettingsPane'
-import { LinearAgentSkillPane } from './LinearAgentSkillPane'
-import { AccountsPane } from './AccountsPane'
-import { StatsPane } from '../stats/StatsPane'
-import { IntegrationsPane } from './IntegrationsPane'
-import { TasksPane } from './TasksPane'
-import { QuickCommandsPane } from './QuickCommandsPane'
-import { DeveloperPermissionsPane } from './DeveloperPermissionsPane'
-import { ComputerUsePane } from './ComputerUsePane'
-import { MobileSettingsPane } from './MobileSettingsPane'
-import { MobileEmulatorSettingsPane } from './MobileEmulatorSettingsPane'
-import { RuntimeEnvironmentsPane } from './RuntimeEnvironmentsPane'
-import { PrivacyPane } from './PrivacyPane'
-import { AdvancedPane } from './AdvancedPane'
 import { SettingsSidebar } from './SettingsSidebar'
-import { SettingsSetupGuidePane } from './SettingsSetupGuidePane'
 import { ActiveSettingsSectionProvider, SettingsSection } from './SettingsSection'
+import {
+  AccountsPane,
+  AdvancedPane,
+  AgentsPane,
+  AppearancePane,
+  ArtifactsSettingsPane,
+  AutomationsSettingsPane,
+  BrowserPane,
+  CommitMessageAiPane,
+  ComputerUsePane,
+  DeveloperPermissionsPane,
+  ExperimentalPane,
+  FloatingWorkspacePane,
+  GeneralPane,
+  GitPane,
+  GitProviderApiBudgetPane,
+  HiveAccountSettingsPane,
+  InputPane,
+  IntegrationsPane,
+  LinearAgentSkillPane,
+  MobileEmulatorSettingsPane,
+  MobileSettingsPane,
+  NotificationsPane,
+  OrchestrationPane,
+  PluginsSettingsSection,
+  PrivacyPane,
+  QuickCommandsPane,
+  RepositoryPane,
+  RuntimeEnvironmentsPane,
+  SettingsSetupGuidePane,
+  ShareSkillsSettingsPane,
+  ShortcutsPane,
+  SshPane,
+  StatsPane,
+  TasksPane,
+  TerminalPane,
+  VoicePane
+} from './settings-pane-components'
 import { getSettingsSectionSearchEntries, rankSettingsSearchItems } from './settings-search'
 import { resolveAppearanceAccordionDeepLink } from './appearance-usage-percentage-search'
 import { cn } from '@/lib/utils'
@@ -119,7 +122,12 @@ import {
   getAgentSkillNavInstallStatus,
   getLinearAgentSkillNavInstallStatus
 } from '@/lib/agent-skill-nav-install-status'
-import { deriveNeededSectionIds, getInitialMountedSectionIds } from './settings-load-performance'
+import {
+  deriveNeededSectionIds,
+  getInitialMountedSectionIds,
+  getPendingSettingsNavigationDisposition,
+  shouldLoadSettingsSkillRuntime
+} from './settings-load-performance'
 import { translate } from '@/i18n/i18n'
 import { getProjectHostSetupProjectionFromState } from '../../store/selectors'
 import { getRepoHostIdentity } from '../../store/slices/repo-host-identity'
@@ -336,6 +344,17 @@ function Settings(): React.JSX.Element {
   const [repoHooksMap, setRepoHooksMap] = useState<
     Record<string, { hasHooks: boolean; hooks: OrcaHooks | null; mayNeedUpdate: boolean }>
   >({})
+  const [activeSectionId, setActiveSectionId] = useState('general')
+  const initialNavigationSectionId = settingsNavigationTarget
+    ? getSettingsSectionId(
+        settingsNavigationTarget.pane,
+        settingsNavigationTarget.repoId,
+        repoIdToRepresentative
+      )
+    : null
+  const [mountedSectionIds, setMountedSectionIds] = useState<Set<string>>(() =>
+    getInitialMountedSectionIds(initialNavigationSectionId)
+  )
   const systemPrefersDark = useSystemPrefersDark()
   const isWindows = isWindowsUserAgent()
   const isMac = isMacUserAgent()
@@ -343,24 +362,35 @@ function Settings(): React.JSX.Element {
   const showDesktopOnlySettings = !isWebClient
   // Why: mirror the nav registry's gate so the Linear sidebar entry and section appear/disappear together.
   const linearConnected = useLinearProviderConnected()
-  const activeSkillRuntime = useActiveProjectSkillRuntime()
+  const activeSkillRuntime = useActiveProjectSkillRuntime(
+    shouldLoadSettingsSkillRuntime(mountedSectionIds)
+  )
   const orchestrationSkill = useInstalledAgentSkill(ORCHESTRATION_SKILL_NAME, {
+    enabled: mountedSectionIds.has('orchestration'),
+    readCachedWhenDisabled: true,
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
   const linearSkill = useInstalledAgentSkillNames(LINEAR_AGENT_SKILL_NAMES, {
-    enabled: linearConnected,
+    enabled: linearConnected && mountedSectionIds.has('linear'),
+    readCachedWhenDisabled: true,
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
   const computerUseSkill = useInstalledAgentSkill(COMPUTER_USE_SKILL_NAME, {
-    enabled: showDesktopOnlySettings,
+    enabled: showDesktopOnlySettings && mountedSectionIds.has('computer-use'),
+    readCachedWhenDisabled: true,
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
-  const skillFreshnessApplies = activeSkillRuntime.canUseLocalSkillFreshness
+  const skillFreshnessApplies =
+    activeSkillRuntime.canUseLocalSkillFreshness &&
+    ['orchestration', 'linear', 'computer-use'].some((sectionId) =>
+      mountedSectionIds.has(sectionId)
+    )
   const { inventory: skillFreshnessInventory } = useSkillFreshness(skillFreshnessApplies)
-  const [voiceModelStatesLoading, setVoiceModelStatesLoading] = useState(showDesktopOnlySettings)
+  const [voiceModelStatesLoading, setVoiceModelStatesLoading] = useState(false)
+  const shouldLoadVoiceModelStates = showDesktopOnlySettings && mountedSectionIds.has('voice')
   // Why: trim platform-only Terminal entries from the shared search index so search never reveals hidden controls.
   const [scrollbackMode, setScrollbackMode] = useState<'preset' | 'custom'>('preset')
   const [prevScrollbackRows, setPrevScrollbackRows] = useState(settings?.terminalScrollbackRows)
@@ -373,10 +403,6 @@ function Settings(): React.JSX.Element {
   const terminalFontSuggestions = useMemo(
     () => fontSuggestions.filter((font) => font !== DEFAULT_APP_FONT_FAMILY),
     [fontSuggestions]
-  )
-  const [activeSectionId, setActiveSectionId] = useState('general')
-  const [mountedSectionIds, setMountedSectionIds] = useState<Set<string>>(
-    getInitialMountedSectionIds
   )
   const [pendingNavRequestTick, setPendingNavRequestTick] = useState(0)
   const [highlightedSettingsTargetId, setHighlightedSettingsTargetId] = useState<string | null>(
@@ -535,7 +561,7 @@ function Settings(): React.JSX.Element {
   }, [fetchKeybindings, fetchSettings])
 
   useEffect(() => {
-    if (!showDesktopOnlySettings) {
+    if (!shouldLoadVoiceModelStates) {
       setVoiceModelStatesLoading(false)
       return
     }
@@ -550,7 +576,7 @@ function Settings(): React.JSX.Element {
     return () => {
       canceled = true
     }
-  }, [refreshModelStates, showDesktopOnlySettings])
+  }, [refreshModelStates, shouldLoadVoiceModelStates])
 
   useEffect(() => {
     const hasVisibleOverlay = (): boolean =>
@@ -869,11 +895,18 @@ function Settings(): React.JSX.Element {
         navSectionIds: navSections.map((section) => section.id),
         mountedSectionIds,
         activeSectionId,
-        pendingSectionId: pendingNavSectionRef.current,
+        pendingSectionId: pendingNavSectionRef.current ?? initialNavigationSectionId,
         query: settingsSearchQuery,
         visibleSectionIds
       }),
-    [activeSectionId, mountedSectionIds, navSections, settingsSearchQuery, visibleSectionIds]
+    [
+      activeSectionId,
+      initialNavigationSectionId,
+      mountedSectionIds,
+      navSections,
+      settingsSearchQuery,
+      visibleSectionIds
+    ]
   )
   const windowsTerminalCapabilityOwnerKey = useWindowsTerminalCapabilityOwnerKey(
     settings?.activeRuntimeEnvironmentId
@@ -1043,19 +1076,30 @@ function Settings(): React.JSX.Element {
   useEffect(() => {
     const scrollTargetId = pendingScrollTargetRef.current
     const pendingNavSectionId = pendingNavSectionRef.current
+    const pendingDisposition = getPendingSettingsNavigationDisposition({
+      pendingSectionId: pendingNavSectionId,
+      navSectionIds: navSections.map((section) => section.id),
+      query: settingsSearchQuery,
+      visibleSectionIds
+    })
 
-    // Why: subsection deep links clear a stale filter that could hide the target row; pane-level links keep it to force-open the matching section.
-    if (
-      scrollTargetId &&
-      pendingNavSectionId &&
-      scrollTargetId !== pendingNavSectionId &&
-      settingsSearchQuery.trim() !== ''
-    ) {
+    if (pendingDisposition === 'invalid') {
+      pendingNavSectionRef.current = null
+      pendingScrollTargetRef.current = null
+      cancelPendingSettingsSubsectionScrollFrame(pendingSubsectionScrollFrameRef)
+      if (!visibleSectionIds.has(activeSectionId) && visibleNavSections.length > 0) {
+        setActiveSectionId(getFallbackVisibleSection(visibleNavSections)?.id ?? activeSectionId)
+      }
+      return
+    }
+
+    // Why: every valid deep link must outlive a stale filter, including pane-level links.
+    if (pendingDisposition === 'clear-search') {
       setSettingsSearchQuery('')
       return
     }
 
-    if (scrollTargetId && pendingNavSectionId && visibleSectionIds.has(pendingNavSectionId)) {
+    if (scrollTargetId && pendingNavSectionId && pendingDisposition === 'ready') {
       // Why: inactive panes don't render; activate the pane first, then find the subsection next render.
       if (activeSectionId !== pendingNavSectionId) {
         setActiveSectionId(pendingNavSectionId)
@@ -1100,6 +1144,7 @@ function Settings(): React.JSX.Element {
     }
   }, [
     activeSectionId,
+    navSections,
     pendingNavRequestTick,
     setSettingsSearchQuery,
     settingsSearchQuery,
@@ -1217,7 +1262,11 @@ function Settings(): React.JSX.Element {
             className={cn(
               'mx-auto flex w-full flex-col gap-10 px-8 pt-10',
               isFocusedShortcutsPane ? 'h-full pb-6' : 'pb-24',
-              isFocusedSetupGuidePane ? 'max-w-6xl' : 'max-w-4xl'
+              isFocusedSetupGuidePane
+                ? 'max-w-6xl'
+                : activeSectionId === 'orca-account'
+                  ? 'max-w-[1104px]'
+                  : 'max-w-4xl'
             )}
           >
             {visibleNavSections.length === 0 ? (
@@ -1260,7 +1309,8 @@ function Settings(): React.JSX.Element {
                   )}
                   description={translate(
                     'auto.components.settings.Settings.21f09426ea',
-                    'Optional. Orca works with your existing provider logins; add accounts only if you want Orca to help switch between them.'
+                    'Optional. {{value0}} works with your existing provider logins; add accounts only if you want {{value0}} to help switch between them.',
+                    { value0: APP_DISPLAY_NAME }
                   )}
                   badge={translate(
                     'auto.hooks.useSettingsNavigationMetadata.7c79d3b7bf',
@@ -1286,7 +1336,8 @@ function Settings(): React.JSX.Element {
                   title={translate('auto.components.settings.Settings.00c3a7950d', 'Orchestration')}
                   description={translate(
                     'auto.components.settings.Settings.475980f53d',
-                    'Coordinate multiple coding agents through Orca.'
+                    'Coordinate multiple coding agents through {{value0}}.',
+                    { value0: APP_DISPLAY_NAME }
                   )}
                   searchEntries={getSectionSearchEntries('orchestration')}
                 >
@@ -1301,7 +1352,8 @@ function Settings(): React.JSX.Element {
                     title={translate('auto.components.settings.Settings.linearTitle', 'Linear')}
                     description={translate(
                       'auto.components.settings.Settings.linearDescription',
-                      'How Linear works in Orca, setup checklist, agent skill, and example prompts.'
+                      'How Linear works in {{value0}}, setup checklist, agent skill, and example prompts.',
+                      { value0: APP_DISPLAY_NAME }
                     )}
                     searchEntries={getSectionSearchEntries('linear')}
                   >
@@ -1347,15 +1399,22 @@ function Settings(): React.JSX.Element {
                     id="orca-account"
                     title={translate(
                       'auto.components.settings.orcaAccount.title',
-                      'HiveCloud Account'
+                      'Account & cloud'
                     )}
                     description={translate(
                       'auto.components.settings.orcaAccount.description',
-                      'Sign in securely, review this device, and manage the current HiveCloud session.'
+                      'Manage your HiveCloud identity, this device, and cross-device connections.'
                     )}
                     searchEntries={getSectionSearchEntries('orca-account')}
+                    className="space-y-5 [@media(max-height:950px)]:space-y-4"
+                    headerClassName="border-b-0 pb-0"
+                    bodyClassName="rounded-none border-0 bg-transparent p-0 shadow-none"
                   >
-                    {isSectionMounted('orca-account') ? <HiveAccountSettingsPane /> : null}
+                    {isSectionMounted('orca-account') ? (
+                      <HiveAccountSettingsPane
+                        onOpenRuntimeDetails={() => void scrollToSection('servers')}
+                      />
+                    ) : null}
                   </SettingsSection>
                 ) : null}
 
@@ -1367,7 +1426,8 @@ function Settings(): React.JSX.Element {
                   )}
                   description={translate(
                     'auto.components.settings.Settings.6855b0f77d',
-                    'Finish the core workflows that make Orca useful for parallel agent work.'
+                    'Finish the core workflows that make {{value0}} useful for parallel agent work.',
+                    { value0: APP_DISPLAY_NAME }
                   )}
                   searchEntries={getSectionSearchEntries('setup-guide')}
                   bodyClassName="overflow-hidden rounded-none border-0 bg-transparent p-0 shadow-none"
@@ -1416,7 +1476,7 @@ function Settings(): React.JSX.Element {
                   <SettingsSection
                     id="mobile"
                     title={translate('auto.components.settings.Settings.c40dadaac8', 'Mobile')}
-                    badge="Beta"
+                    badge={translate('auto.hooks.useSettingsNavigationMetadata.40d80bad8a', 'Beta')}
                     description={translate(
                       'auto.components.settings.Settings.c6c01ac209',
                       'Control terminals and agents from your phone.'
@@ -1444,7 +1504,7 @@ function Settings(): React.JSX.Element {
                 <SettingsSection
                   id="artifacts"
                   title={translate('auto.components.settings.artifacts.title', 'Artifacts')}
-                  badge="Beta"
+                  badge={translate('auto.hooks.useSettingsNavigationMetadata.40d80bad8a', 'Beta')}
                   description={translate(
                     'auto.components.settings.artifacts.description',
                     'Share HTML and Markdown files with your team and manage their public links.'
@@ -1459,7 +1519,7 @@ function Settings(): React.JSX.Element {
                 <SettingsSection
                   id="share-skills"
                   title={translate('auto.components.settings.shareSkills.title', 'Share Skills')}
-                  badge="Beta"
+                  badge={translate('auto.hooks.useSettingsNavigationMetadata.40d80bad8a', 'Beta')}
                   description={translate(
                     'auto.components.settings.shareSkills.description',
                     'Share your skills with an unlisted link. Anyone who has it can install them.'
@@ -1595,7 +1655,8 @@ function Settings(): React.JSX.Element {
                     )}
                     description={translate(
                       'auto.components.settings.Settings.01f9d36292',
-                      'Configure mobile emulator support for Orca and coding agents.'
+                      'Configure mobile emulator support for {{value0}} and coding agents.',
+                      { value0: APP_DISPLAY_NAME }
                     )}
                     searchEntries={getSectionSearchEntries('mobile-emulator')}
                   >
@@ -1661,7 +1722,9 @@ function Settings(): React.JSX.Element {
                   )}
                   searchEntries={getSectionSearchEntries('input')}
                 >
-                  <InputPane settings={settings} updateSettings={updateSettings} />
+                  {isSectionMounted('input') ? (
+                    <InputPane settings={settings} updateSettings={updateSettings} />
+                  ) : null}
                 </SettingsSection>
 
                 {showDesktopOnlySettings ? (
@@ -1708,7 +1771,8 @@ function Settings(): React.JSX.Element {
                   title={translate('auto.components.settings.Settings.954a8f5aef', 'Stats & Usage')}
                   description={translate(
                     'auto.components.settings.Settings.8acf3f22e0',
-                    'Orca stats plus Claude, Codex, OpenCode token analytics and Grok subscription usage.'
+                    '{{value0}} stats plus Claude, Codex, OpenCode token analytics and Grok subscription usage.',
+                    { value0: APP_DISPLAY_NAME }
                   )}
                   searchEntries={getSectionSearchEntries('stats')}
                 >
@@ -1719,18 +1783,21 @@ function Settings(): React.JSX.Element {
                   id="servers"
                   title={translate(
                     'auto.components.settings.Settings.bd0181eeca',
-                    'Remote Orca Servers'
+                    'Remote {{value0}} Servers',
+                    { value0: APP_DISPLAY_NAME }
                   )}
-                  badge="Beta"
+                  badge={translate('auto.hooks.useSettingsNavigationMetadata.40d80bad8a', 'Beta')}
                   description={
                     isWebClient
                       ? translate(
                           'auto.components.settings.Settings.7686cb5c36',
-                          'Connect this browser to a saved Orca server.'
+                          'Connect this browser to a saved {{value0}} server.',
+                          { value0: APP_DISPLAY_NAME }
                         )
                       : translate(
                           'auto.components.settings.Settings.b5ee17826b',
-                          'Pair remote Orca runtimes for persistent sessions, richer remote state, and web or mobile handoff.'
+                          'Pair remote {{value0}} runtimes for persistent sessions, richer remote state, and web or mobile handoff.',
+                          { value0: APP_DISPLAY_NAME }
                         )
                   }
                   searchEntries={getSectionSearchEntries('servers')}

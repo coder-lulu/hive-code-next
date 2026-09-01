@@ -2,15 +2,27 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 import type {
+  HiveAccountLoginCapabilities,
+  HiveAccountLoginProviderId,
   HiveAccountRefreshResult,
   HiveAccountSessionProfile,
   HiveAccountSignInOptions,
   HiveAccountSignInResult,
   HiveAccountSignOutResult,
+  HiveAccountSecurity,
+  HiveAccountSecurityChallenge,
   HiveAccountState
 } from '../../shared/hive-account'
-import { getHiveAccountConfig, type HiveAccountConfig } from './hive-account-config'
-import { HiveAccountClient, type SmsChallengeStart } from './hive-account-client'
+import {
+  getHiveAccountConfig,
+  HIVE_ACCOUNT_CLIENT_ID,
+  type HiveAccountConfig
+} from './hive-account-config'
+import {
+  HiveAccountClient,
+  HiveAccountRequestError,
+  type SmsChallengeStart
+} from './hive-account-client'
 import {
   getOrCreateHiveDeviceIdentity,
   signHiveDeviceAuthorization,
@@ -68,6 +80,17 @@ const defaultDependencies: ServiceDependencies = {
   beginAuthorization: beginHiveAccountPkceFlow
 }
 
+const HIVE_ACCOUNT_STEP_UP_ACR = 'urn:hive:acr:step-up'
+
+function emptyLoginCapabilities(clientId: string): HiveAccountLoginCapabilities {
+  return {
+    contractRevision: 'hive-login-capabilities-v1',
+    clientId,
+    defaultMethod: 'phone_sms',
+    providers: []
+  }
+}
+
 export class HiveAccountService extends HiveAccountPublication {
   private signInFlight: Promise<HiveAccountSignInResult> | null = null
   private smsSignInFlight: Promise<HiveAccountSignInResult> | null = null
@@ -85,6 +108,18 @@ export class HiveAccountService extends HiveAccountPublication {
   ) {
     super(onStateChanged)
     migrateLegacyOrcaCloudIdentity(userDataPath)
+  }
+
+  async getLoginCapabilities(): Promise<HiveAccountLoginCapabilities> {
+    const configured = this.dependencies.getConfig()
+    if (!configured.configured) {
+      return emptyLoginCapabilities(HIVE_ACCOUNT_CLIENT_ID)
+    }
+    try {
+      return await this.dependencies.createClient(configured.config).getLoginCapabilities()
+    } catch {
+      return emptyLoginCapabilities(configured.config.clientId)
+    }
   }
 
   async getState(): Promise<HiveAccountState> {
@@ -350,11 +385,20 @@ export class HiveAccountService extends HiveAccountPublication {
     }
     try {
       const client = this.dependencies.createClient(configured.config)
-      const authorizationEndpoint = await client.discoverAuthorizationEndpoint()
+      const authorizationEndpoint = options.providerId
+        ? await this.getProviderAuthorizationEndpoint(client, configured.config, options.providerId)
+        : await client.discoverAuthorizationEndpoint()
       const code = await this.dependencies.beginAuthorization({
         authorizationEndpoint,
         clientId: configured.config.clientId,
         scope: configured.config.scope,
+        ...(options.intent === 'STEP_UP'
+          ? {
+              acrValues: HIVE_ACCOUNT_STEP_UP_ACR,
+              maxAgeSeconds: 0,
+              prompt: 'login' as const
+            }
+          : {}),
         prepareDeviceAuthorization: async (nonce) => {
           await client.createDeviceAuthorization({
             nonce,
@@ -401,6 +445,19 @@ export class HiveAccountService extends HiveAccountPublication {
     }
   }
 
+  private async getProviderAuthorizationEndpoint(
+    client: HiveAccountClient,
+    config: HiveAccountConfig,
+    providerId: HiveAccountLoginProviderId
+  ): Promise<string> {
+    const capabilities = await client.getLoginCapabilities()
+    const provider = capabilities.providers.find((candidate) => candidate.id === providerId)
+    if (!provider) {
+      throw new Error('hive_account_login_provider_unavailable')
+    }
+    return new URL(provider.authorizationPath, `${config.apiBaseUrl}/`).toString()
+  }
+
   refresh(): Promise<HiveAccountRefreshResult> {
     if (this.refreshFlight) {
       return this.refreshFlight
@@ -435,18 +492,10 @@ export class HiveAccountService extends HiveAccountPublication {
     try {
       const client = this.dependencies.createClient(configured.config)
       const refreshed = await client.refreshSession(expected.refreshToken)
-      const current = this.readCurrentSession()
-      if (
-        current.status !== 'ok' ||
-        this.mutationEpoch !== expectedEpoch ||
-        current.value.generation !== expected.generation ||
-        current.value.refreshToken !== expected.refreshToken
-      ) {
+      const superseded = this.getSupersededRefreshResult(expectedEpoch, expected)
+      if (superseded) {
         await this.bestEffortRevokeCurrent(client, refreshed.accessToken)
-        return {
-          status: current.status === 'ok' ? 'refreshed' : 'signed-out',
-          state: current.status === 'ok' ? stateFromSession(current.value) : signedOutState()
-        }
+        return superseded
       }
       const session: HiveAccountSession = {
         schemaVersion: 2,
@@ -462,6 +511,10 @@ export class HiveAccountService extends HiveAccountPublication {
       this.publishRuntimeCloudSession(session)
       return { status: 'refreshed', state: stateFromSession(session) }
     } catch (error) {
+      const superseded = this.getSupersededRefreshResult(expectedEpoch, expected)
+      if (superseded) {
+        return superseded
+      }
       const errorCode = classifyHiveAccountError(error)
       if (errorCode === 'session_rejected') {
         this.fenceRuntimeCloudAuthorization()
@@ -470,6 +523,25 @@ export class HiveAccountService extends HiveAccountPublication {
       }
       this.scheduleRefresh(expected, 60_000)
       return { status: 'failed', state: { ...stateFromSession(expected), errorCode } }
+    }
+  }
+
+  private getSupersededRefreshResult(
+    expectedEpoch: number,
+    expected: HiveAccountSession
+  ): HiveAccountRefreshResult | null {
+    const current = this.readCurrentSession()
+    if (
+      current.status === 'ok' &&
+      this.mutationEpoch === expectedEpoch &&
+      current.value.generation === expected.generation &&
+      current.value.refreshToken === expected.refreshToken
+    ) {
+      return null
+    }
+    return {
+      status: current.status === 'ok' ? 'refreshed' : 'signed-out',
+      state: current.status === 'ok' ? stateFromSession(current.value) : signedOutState()
     }
   }
 
@@ -492,6 +564,127 @@ export class HiveAccountService extends HiveAccountPublication {
       clearLocal: () => this.clearCurrentSession()
     })
     return publishHiveAccountResult((state) => this.publishState(state), result)
+  }
+
+  async accountSecurity(): Promise<HiveAccountSecurity> {
+    const configured = this.dependencies.getConfig()
+    const stored = this.readCurrentSession()
+    if (!configured.configured || stored.status !== 'ok') {
+      throw new Error('hive_account_session_required')
+    }
+    const client = this.dependencies.createClient(configured.config)
+    return this.requestWithRefresh(
+      (accessToken) => client.accountSecurity(accessToken),
+      stored.value.accessToken
+    )
+  }
+
+  async setPassword(newPassword: string): Promise<void> {
+    if (typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128) {
+      throw new Error('hive_account_password_invalid')
+    }
+    const configured = this.dependencies.getConfig()
+    const stored = this.readCurrentSession()
+    if (!configured.configured || stored.status !== 'ok') {
+      throw new Error('hive_account_session_required')
+    }
+    const client = this.dependencies.createClient(configured.config)
+    await this.requestWithRefresh(
+      (accessToken) => client.setPassword(accessToken, newPassword),
+      stored.value.accessToken
+    )
+    // Password changes advance the account security version and invalidate all
+    // existing sessions, including this desktop session.
+    this.mutationEpoch += 1
+    this.fenceRuntimeCloudAuthorization()
+    this.clearCurrentSession()
+    this.publishState(signedOutState())
+  }
+
+  async startPasswordReset(phoneNumber: string): Promise<HiveAccountSecurityChallenge> {
+    const configured = this.dependencies.getConfig()
+    if (!configured.configured) {
+      throw new Error('hive_account_unconfigured')
+    }
+    return this.dependencies.createClient(configured.config).startPasswordReset(phoneNumber)
+  }
+
+  async verifyPasswordReset(
+    challengeId: string,
+    bindingId: string,
+    smsCode: string,
+    newPassword: string
+  ): Promise<void> {
+    if (typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128) {
+      throw new Error('hive_account_password_invalid')
+    }
+    const configured = this.dependencies.getConfig()
+    if (!configured.configured) {
+      throw new Error('hive_account_unconfigured')
+    }
+    await this.dependencies
+      .createClient(configured.config)
+      .verifyPasswordReset(challengeId, bindingId, smsCode, newPassword)
+    // A reset invalidates every cloud session; remove any local credential as
+    // well in case the flow was started from an already-authenticated window.
+    this.mutationEpoch += 1
+    this.fenceRuntimeCloudAuthorization()
+    this.clearCurrentSession()
+    this.publishState(signedOutState())
+  }
+
+  async startPhoneBinding(phoneNumber: string): Promise<HiveAccountSecurityChallenge> {
+    const configured = this.dependencies.getConfig()
+    const stored = this.readCurrentSession()
+    if (!configured.configured || stored.status !== 'ok') {
+      throw new Error('hive_account_session_required')
+    }
+    const client = this.dependencies.createClient(configured.config)
+    return this.requestWithRefresh(
+      (accessToken) => client.startPhoneBinding(accessToken, phoneNumber),
+      stored.value.accessToken
+    )
+  }
+
+  async verifyPhoneBinding(challengeId: string, bindingId: string, smsCode: string): Promise<void> {
+    const configured = this.dependencies.getConfig()
+    const stored = this.readCurrentSession()
+    if (!configured.configured || stored.status !== 'ok') {
+      throw new Error('hive_account_session_required')
+    }
+    const client = this.dependencies.createClient(configured.config)
+    await this.requestWithRefresh(
+      (accessToken) => client.verifyPhoneBinding(accessToken, challengeId, bindingId, smsCode),
+      stored.value.accessToken
+    )
+    // Phone binding advances the account security version and invalidates all
+    // existing sessions, including this desktop session.
+    this.mutationEpoch += 1
+    this.fenceRuntimeCloudAuthorization()
+    this.clearCurrentSession()
+    this.publishState(signedOutState())
+  }
+
+  private async requestWithRefresh<T>(
+    operation: (accessToken: string) => Promise<T>,
+    accessToken: string
+  ): Promise<T> {
+    try {
+      return await operation(accessToken)
+    } catch (failure) {
+      if (!(failure instanceof HiveAccountRequestError) || failure.status !== 401) {
+        throw failure
+      }
+      const refreshed = await this.refresh()
+      if (refreshed.status !== 'refreshed') {
+        throw failure
+      }
+      const current = this.readCurrentSession()
+      if (current.status !== 'ok') {
+        throw failure
+      }
+      return operation(current.value.accessToken)
+    }
   }
 
   private async revokeCurrent(client: HiveAccountClient, accessToken: string): Promise<void> {

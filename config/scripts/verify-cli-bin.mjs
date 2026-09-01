@@ -15,7 +15,7 @@ const OUT_COMMONJS_PACKAGE_JSON = `${JSON.stringify(
   2
 )}\n`
 const PLATFORM_RESERVED_COMMAND_NAMES = new Set(['orca'])
-const DEFAULT_CLI_COMMAND_NAMES = ['hivecode', 'orca-ide']
+const DEFAULT_CLI_COMMAND_NAMES = ['hive', 'hivecode', 'orca-ide']
 
 function resolveCliCommandNames(projectDir) {
   const manifestPath = path.join(projectDir, 'config', 'product', 'hivecode.product.json')

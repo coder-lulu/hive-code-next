@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 import { GhAuthErrorHelp } from './GhAuthErrorHelp'
 import type { GitHubProjectViewSummary } from '../../../../shared/github/project-types'
 import type { GitHubProjectViewError } from '../../../../shared/github/project-result-types'
-
-const ORCA_FEATURE_REQUEST_URL = 'https://github.com/stablyai/orca/issues/new'
 
 export function ProjectViewTabStrip({
   views,
@@ -43,6 +43,7 @@ function ProjectViewTab({
   onPick: (viewId: string) => void
 }): React.JSX.Element {
   const supported = view.layout === 'TABLE_LAYOUT'
+  const featureRequestUrl = PRODUCT_PUBLIC_LINKS.support
   const layoutLabel =
     view.layout === 'BOARD_LAYOUT'
       ? 'Board'
@@ -63,11 +64,17 @@ function ProjectViewTab({
       title={
         supported
           ? view.name
-          : translate(
-              'auto.components.github.project.ProjectViewWrapper.2edf5e7e77',
-              "{{value0}} — Orca doesn't support {{value1}} project views yet. File a feature request at {{value2}}.",
-              { value0: view.name, value1: layoutLabel, value2: ORCA_FEATURE_REQUEST_URL }
-            )
+          : featureRequestUrl
+            ? translate(
+                'auto.components.github.project.ProjectViewWrapper.2edf5e7e77',
+                `{{value0}} — ${APP_DISPLAY_NAME} doesn't support {{value1}} project views yet. File a feature request at {{value2}}.`,
+                { value0: view.name, value1: layoutLabel, value2: featureRequestUrl }
+              )
+            : translate(
+                'auto.components.github.project.ProjectViewWrapper.unsupportedView',
+                `{{value0}} — ${APP_DISPLAY_NAME} doesn't support {{value1}} project views yet.`,
+                { value0: view.name, value1: layoutLabel }
+              )
       }
       className={cn(
         'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-md border-x border-t px-3 py-1.5 text-xs',
@@ -85,17 +92,21 @@ function ProjectViewTab({
   if (supported) {
     return tab
   }
-  const message = `Orca doesn't support ${layoutLabel} project views yet.`
+  const message = `${APP_DISPLAY_NAME} doesn't support ${layoutLabel} project views yet.`
   return (
     <HoverCard openDelay={200} closeDelay={100}>
       <HoverCardTrigger asChild>
         <span
           tabIndex={0}
-          aria-label={translate(
-            'auto.components.github.project.ProjectViewWrapper.55de4fb57a',
-            '{{value0}}. {{value1}} File a feature request at {{value2}}.',
-            { value0: view.name, value1: message, value2: ORCA_FEATURE_REQUEST_URL }
-          )}
+          aria-label={
+            featureRequestUrl
+              ? translate(
+                  'auto.components.github.project.ProjectViewWrapper.55de4fb57a',
+                  '{{value0}}. {{value1}} File a feature request at {{value2}}.',
+                  { value0: view.name, value1: message, value2: featureRequestUrl }
+                )
+              : `${view.name}. ${message}`
+          }
           className="inline-flex shrink-0 cursor-not-allowed rounded-t-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
           {tab}
@@ -107,21 +118,23 @@ function ProjectViewTab({
             {message}{' '}
             {translate(
               'auto.components.github.project.ProjectViewWrapper.1bf8c01c8b',
-              'Switch to a Table view to work with this project in Orca.'
+              `Switch to a Table view to work with this project in ${APP_DISPLAY_NAME}.`
             )}
           </p>
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            onClick={() => void window.api.shell.openUrl(ORCA_FEATURE_REQUEST_URL)}
-          >
-            {translate(
-              'auto.components.github.project.ProjectViewWrapper.4d2a77a119',
-              'File feature request'
-            )}
-            <ExternalLink className="size-3" />
-          </Button>
+          {featureRequestUrl && (
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={() => void window.api.shell.openUrl(featureRequestUrl)}
+            >
+              {translate(
+                'auto.components.github.project.ProjectViewWrapper.4d2a77a119',
+                'File feature request'
+              )}
+              <ExternalLink className="size-3" />
+            </Button>
+          )}
         </div>
       </HoverCardContent>
     </HoverCard>
@@ -152,9 +165,9 @@ export function ProjectViewErrorState({
   }
   const copy =
     error.type === 'too_large'
-      ? `This view has ${totalCount ?? 'many'} items — too large to render in Orca. Narrow the view's filter on GitHub.`
+      ? `This view has ${totalCount ?? 'many'} items — too large to render in ${APP_DISPLAY_NAME}. Narrow the view's filter on GitHub.`
       : error.type === 'unsupported_layout'
-        ? 'Orca only renders table views yet. This is a Board or Roadmap view.'
+        ? `${APP_DISPLAY_NAME} only renders table views yet. This is a Board or Roadmap view.`
         : error.type === 'not_found'
           ? 'Could not find this project or view.'
           : error.type === 'schema_drift'

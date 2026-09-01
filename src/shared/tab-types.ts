@@ -1,6 +1,7 @@
 import type { AiVaultSessionTitle } from './ai-vault-session-title'
 import type { AgentType } from './agent-status-types'
 import type { ExecutionHostId } from './execution-host'
+import type { SessionProjectAssignment } from './session-project-assignment'
 
 // ─── Tab Group Layout ───────────────────────────────────────────────
 export type TabGroupSplitDirection = 'horizontal' | 'vertical'
@@ -61,6 +62,8 @@ export type Tab = {
   generatedLabel?: string | null
   /** Stable AI Vault conversation name, bound to its provider session identity. */
   aiVaultTitle?: AiVaultSessionTitle | null
+  /** Optional project organization without changing the backing tab owner. */
+  projectAssignment?: SessionProjectAssignment
   quickCommandLabel?: string | null
   customLabel: string | null
   color: string | null

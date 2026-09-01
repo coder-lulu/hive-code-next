@@ -16,6 +16,7 @@ import {
   CODEX_USER_INPUT_METHOD,
   CodexPromptRegistry
 } from './codex-structured-prompt-replies'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 function harness() {
   return {
@@ -121,7 +122,7 @@ describe('Codex blocking server request dispositions', () => {
     expect(connection.respondWithError).toHaveBeenCalledWith(
       5,
       -32000,
-      'Orca rejected unrecognized blocking request future/blockingRequest'
+      `${APP_DISPLAY_NAME} rejected unrecognized blocking request future/blockingRequest`
     )
   })
 })

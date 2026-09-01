@@ -1,3 +1,5 @@
+import { APP_DISPLAY_NAME } from '@/product-brand'
+
 const MAX_FORK_CONTEXT_CHARS = 36_000
 const MAX_FORK_CAPTURE_SANITIZE_CHARS = MAX_FORK_CONTEXT_CHARS * 4
 const ESCAPE_CODE = 27
@@ -150,7 +152,7 @@ export function buildAgentSessionForkPrompt({
   const fence = getMarkdownFenceForTranscript(transcript)
 
   const header = [
-    'This is a fork of an existing Orca agent session.',
+    `This is a fork of an existing ${APP_DISPLAY_NAME} agent session.`,
     '',
     'Use the captured transcript as background context for this new, independent session. Keep file edits and decisions independent from the original terminal unless I explicitly ask you to coordinate with it.',
     '',

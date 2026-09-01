@@ -1,4 +1,5 @@
 import type { PairingCandidateClient } from './mobile-relay-physical-client'
+import type { RpcSuccess } from './types'
 
 export type PairingCandidatePath = 'direct' | 'relay'
 
@@ -7,11 +8,13 @@ export type PairingCandidate = {
   client: PairingCandidateClient
 }
 
+export type AuthenticatedPairingCandidate = PairingCandidate & { status: RpcSuccess }
+
 export function racePairingCandidates(
   candidates: readonly PairingCandidate[]
-): Promise<PairingCandidate> {
+): Promise<AuthenticatedPairingCandidate> {
   return new Promise((resolve, reject) => {
-    const successes: PairingCandidate[] = []
+    const successes: AuthenticatedPairingCandidate[] = []
     let failures = 0
     let settled = false
     let selectionQueued = false
@@ -23,7 +26,7 @@ export function racePairingCandidates(
             rejectIfFinished()
             return
           }
-          successes.push(candidate)
+          successes.push({ ...candidate, status: response })
           if (selectionQueued) {
             return
           }
@@ -37,7 +40,7 @@ export function racePairingCandidates(
             settled = true
             const winner = successes.find(({ path }) => path === 'direct') ?? successes[0]!
             for (const loser of candidates) {
-              if (loser !== winner) {
+              if (loser.client !== winner.client) {
                 loser.client.close()
               }
             }

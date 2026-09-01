@@ -90,6 +90,35 @@ describe('Orca cloud auth config', () => {
     expect(state.configured).toBe(true)
   })
 
+  it('does not require Relay for Cloud identity authentication', () => {
+    const state = getOrcaCloudAuthConfig(
+      {
+        ORCA_CLOUD_API_URL: 'https://cloud.example.test',
+        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
+      },
+      undefined,
+      { ...TEST_PRODUCT_DEFAULTS, relayDirectorUrl: null }
+    )
+    expect(state).toMatchObject({
+      configured: true,
+      config: { apiBaseUrl: 'https://cloud.example.test', relayDirectorUrl: null }
+    })
+  })
+
+  it('honors an explicit disabled Relay service in development', () => {
+    const state = getOrcaCloudAuthConfig(
+      {
+        HIVE_PRODUCT_API_BASE_URL: 'https://cloud.example.test',
+        HIVE_PRODUCT_DESKTOP_CLIENT_ID: 'desktop-client',
+        HIVE_PRODUCT_RELAY_ENABLED: 'false',
+        HIVE_PRODUCT_RELAY_DIRECTOR_URL: 'https://relay.example.test'
+      },
+      undefined,
+      TEST_PRODUCT_DEFAULTS
+    )
+    expect(state).toMatchObject({ configured: true, config: { relayDirectorUrl: null } })
+  })
+
   it('ignores all endpoint environment overrides in packaged builds', () => {
     const state = getOrcaCloudAuthConfig(
       {
@@ -115,6 +144,19 @@ describe('Orca cloud auth config', () => {
       getOrcaCloudAuthConfig(
         {
           ORCA_CLOUD_API_URL: 'http://orca-cloud.example',
+          ORCA_CLOUD_CLIENT_ID: 'desktop-client'
+        },
+        undefined,
+        TEST_PRODUCT_DEFAULTS
+      )
+    ).toMatchObject({ configured: false })
+  })
+
+  it('rejects endpoint URLs carrying credentials or query state', () => {
+    expect(
+      getOrcaCloudAuthConfig(
+        {
+          ORCA_CLOUD_API_URL: 'https://user:secret@cloud.example.test?token=secret',
           ORCA_CLOUD_CLIENT_ID: 'desktop-client'
         },
         undefined,

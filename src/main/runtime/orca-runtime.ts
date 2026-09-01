@@ -11,7 +11,7 @@ import {
   isShellProcess,
   normalizeTerminalTitle
 } from '../../shared/agent-detection'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
@@ -82,19 +82,21 @@ import {
   createEphemeralAgentSessionClaimSigner,
   type AgentSessionClaimSigner
 } from './agent-session-claim-identity'
-import { ensureStructuredAgentSessionHost as installStructuredAgentSessionHost } from './structured-agent-session-runtime'
 import {
   agentSessionPtyWriteGate,
   type AgentSessionPtyWriteAdmittance
 } from './agent-session-pty-write-gate'
-import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk } from './structured-agent-session-runtime'
-import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import type { AgentSessionAttachParams } from '../native-chat/agent-session-wire/structured-agent-session-attach'
 import { collectSavedStructuredAgentSessionIds } from './saved-structured-agent-session-restoration'
-import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { getSystemCodexHomePath } from '../codex/codex-home-paths'
 import { SESSION_TAB_NOT_FOUND_ERROR } from '../../shared/session-tab-close'
 import { structuredAgentSessionTabId } from '../../shared/structured-agent-session-projection'
+import {
+  ensureStructuredAgentSessionHost as installStructuredAgentSessionHost,
+  hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk
+} from './structured-agent-session-runtime'
+import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
+import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import {
   hasCompatibleAgentTitleIdentity,
   normalizeCompatibleAgentStatusEntryForOwner,
@@ -611,6 +613,11 @@ import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
 } from '../../shared/tui-agent-launch-defaults'
+import {
+  resolveTuiAgentLaunchPermission,
+  type AgentExplicitLaunchPermissionMode
+} from '../../shared/tui-agent-permissions'
+import { resolveStartupShell } from '../../shared/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../shared/windows-terminal-shell'
 import {
   getTuiAgentLaunchCommand,
@@ -923,7 +930,10 @@ import {
 } from '../project-runtime-git-options'
 import { resolveLocalProjectRuntimeForWorktreeId } from '../local-project-runtime-resolution'
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
-import { resolveTerminalOrchestrationCliCommand } from './orchestration/cli-command'
+import {
+  resolveTerminalOrchestrationCliCommand,
+  type OrchestrationCliCommand
+} from './orchestration/cli-command'
 import {
   scanLocalRepoWorktreesForResolution,
   type RuntimeWorktreeScanResult
@@ -1741,7 +1751,9 @@ function copySleepingAgentLaunchConfig(
     ...(config.agentCommand ? { agentCommand: config.agentCommand } : {}),
     agentArgs: config.agentArgs,
     agentEnv: { ...config.agentEnv },
-    ...(config.ompResumeFilePath ? { ompResumeFilePath: config.ompResumeFilePath } : {})
+    ...(config.ompResumeFilePath ? { ompResumeFilePath: config.ompResumeFilePath } : {}),
+    ...(config.hostDefaultsAuthoritative ? { hostDefaultsAuthoritative: true as const } : {}),
+    ...(config.agentPermissionMode ? { agentPermissionMode: config.agentPermissionMode } : {})
   }
 }
 
@@ -2265,8 +2277,8 @@ function createTerminalRevealWarning(handle: string, error?: unknown): string {
       ? ` Reason: ${error.message.trim()}.`
       : ''
   return [
-    `Terminal ${handle} is running, but Orca could not make it discoverable.${reason}`,
-    `Run \`orca terminal focus --terminal ${handle}\` to reveal and focus it.`
+    `Terminal ${handle} is running, but ${APP_DISPLAY_NAME} could not make it discoverable.${reason}`,
+    `Run \`${PRIMARY_CLI_COMMAND} terminal focus --terminal ${handle}\` to reveal and focus it.`
   ].join(' ')
 }
 
@@ -2612,7 +2624,7 @@ function assertProjectHostSetupHostIsSupported(hostId: ExecutionHostId | null | 
     return
   }
   throw new Error(
-    'SSH hosts are not supported by this operation. Set the project up from the Orca desktop app, which owns the SSH connection.'
+    `SSH hosts are not supported by this operation. Set the project up from the ${APP_DISPLAY_NAME} desktop app, which owns the SSH connection.`
   )
 }
 
@@ -3019,7 +3031,7 @@ class WorktreeIdRequiresFullPathError extends Error {
 
   constructor() {
     super(
-      'Worktree id selectors must use the full <repo-id>::<path> value. Use the id from `orca worktree list --json`, or target by path:<path>, branch:<branch>, or issue:<number>.'
+      `Worktree id selectors must use the full <repo-id>::<path> value. Use the id from \`${PRIMARY_CLI_COMMAND} worktree list --json\`, or target by path:<path>, branch:<branch>, or issue:<number>.`
     )
   }
 }
@@ -3816,6 +3828,7 @@ export class OrcaRuntimeService {
   private readonly getPairedDeviceNameFn: (pairedDeviceId: string) => string | null
   private readonly buildAgentHookPtyEnv: (() => Record<string, string>) | null
   private readonly getDesktopWindowStatusFn: () => RuntimeDesktopWindowStatus
+  private readonly getRuntimeRecordIdFn: () => string | null
   private readonly prepareAiVaultSessionResumeFn:
     | ((args: AiVaultPrepareSessionResumeArgs) => Promise<AiVaultPrepareSessionResumeResult>)
     | null
@@ -3914,6 +3927,7 @@ export class OrcaRuntimeService {
       ) => Promise<AiVaultPrepareSessionResumeResult>
       buildAgentHookPtyEnv?: () => Record<string, string>
       getDesktopWindowStatus?: () => RuntimeDesktopWindowStatus
+      getRuntimeRecordId?: () => string | null
       agentSessionClaimSigner?: AgentSessionClaimSigner
       prepareCodexStructuredLaunch?: (args: {
         workspacePath: string
@@ -3975,6 +3989,7 @@ export class OrcaRuntimeService {
     this.onTerminalAgentStatus = deps?.onTerminalAgentStatus ?? null
     this.buildAgentHookPtyEnv = deps?.buildAgentHookPtyEnv ?? null
     this.getDesktopWindowStatusFn = deps?.getDesktopWindowStatus ?? (() => 'openable')
+    this.getRuntimeRecordIdFn = deps?.getRuntimeRecordId ?? (() => null)
     this.prepareAiVaultSessionResumeFn = deps?.prepareAiVaultSessionResume ?? null
     this.agentSessionClaimSigner =
       deps?.agentSessionClaimSigner ?? createEphemeralAgentSessionClaimSigner(this.runtimeId)
@@ -6533,8 +6548,10 @@ export class OrcaRuntimeService {
           }
         ]
       : []
+    const runtimeRecordId = this.getRuntimeRecordIdFn()
     return {
       runtimeId: this.runtimeId,
+      ...(runtimeRecordId ? { runtimeRecordId } : {}),
       rendererGraphEpoch: this.rendererGraphEpoch,
       graphStatus: this.graphStatus,
       authoritativeWindowId: this.authoritativeWindowId,
@@ -11343,6 +11360,7 @@ export class OrcaRuntimeService {
     if (!this.hasPersistedStructuredAgentSessionStore()) {
       return
     }
+    // Durable records must be loaded before daemon inventory is reconciled against their leases.
     await this.ensureStructuredAgentSessionHost()
     await this.refreshMobileSessionPtyRecords()
     await getStructuredAgentSessionHost()?.reconcileRestartLeases()
@@ -15180,16 +15198,16 @@ export class OrcaRuntimeService {
       : undefined
   }
 
-  getTerminalOrchestrationCliCommand(handle: string): 'orca' | 'orca-ide' {
+  getTerminalOrchestrationCliCommand(handle: string): OrchestrationCliCommand {
     let pty: RuntimePtyWorktreeRecord | null = null
     try {
       const ptyId = this.resolveLeafForHandle(handle)?.ptyId
       pty = ptyId ? (this.ptysById.get(ptyId) ?? null) : null
     } catch {
-      return 'orca'
+      return PRIMARY_CLI_COMMAND
     }
     if (!pty) {
-      return 'orca'
+      return PRIMARY_CLI_COMMAND
     }
     return resolveTerminalOrchestrationCliCommand({
       connectionId: pty.connectionId,
@@ -24986,7 +25004,9 @@ export class OrcaRuntimeService {
   private async buildStartupForDraft(
     repo: Repo,
     draft: string,
-    requestedAgent?: TuiAgent
+    requestedAgent?: TuiAgent,
+    launchPreferences?: AgentLaunchPreferences,
+    permissionMode?: AgentExplicitLaunchPermissionMode
   ): Promise<{
     agent: TuiAgent
     startup: WorktreeStartupLaunch
@@ -25036,12 +25056,23 @@ export class OrcaRuntimeService {
       isRemote,
       terminalWindowsShell: settings.terminalWindowsShell
     })
+    const permissionLaunchConfig = resolveTuiAgentLaunchPermission({
+      agent,
+      mode: permissionMode ?? 'default',
+      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
+      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      shell: resolveStartupShell(agentLaunchPlatform, queuedShell)
+    })
+    const sessionOptions = this.toAgentSessionOptions(launchPreferences)
     const draftLaunchPlan = buildAgentDraftLaunchPlan({
       agent,
       draft: content,
       cmdOverrides: settings.agentCmdOverrides ?? {},
-      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentArgs: permissionLaunchConfig.agentArgs,
+      agentEnv: permissionLaunchConfig.agentEnv,
+      agentPermissionMode: permissionMode,
+      sessionOptions,
+      sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform: agentLaunchPlatform,
       shell: queuedShell,
       isRemote
@@ -25064,8 +25095,11 @@ export class OrcaRuntimeService {
       agent,
       prompt: '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
-      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentArgs: permissionLaunchConfig.agentArgs,
+      agentEnv: permissionLaunchConfig.agentEnv,
+      agentPermissionMode: permissionMode,
+      sessionOptions,
+      sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform: agentLaunchPlatform,
       shell: queuedShell,
       isRemote,
@@ -25092,7 +25126,8 @@ export class OrcaRuntimeService {
     repo: Repo,
     agent: TuiAgent,
     prompt: string | undefined,
-    launchPreferences?: AgentLaunchPreferences
+    launchPreferences?: AgentLaunchPreferences,
+    permissionMode?: AgentExplicitLaunchPermissionMode
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
@@ -25111,12 +25146,20 @@ export class OrcaRuntimeService {
       terminalWindowsShell: settings.terminalWindowsShell
     })
     const sessionOptions = this.toAgentSessionOptions(launchPreferences)
+    const permissionLaunchConfig = resolveTuiAgentLaunchPermission({
+      agent,
+      mode: permissionMode ?? 'default',
+      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
+      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      shell: resolveStartupShell(agentLaunchPlatform, queuedShell)
+    })
     const startupPlan = buildAgentStartupPlan({
       agent,
       prompt: prompt ?? '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
-      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentArgs: permissionLaunchConfig.agentArgs,
+      agentEnv: permissionLaunchConfig.agentEnv,
+      agentPermissionMode: permissionMode,
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform: agentLaunchPlatform,
@@ -25243,8 +25286,7 @@ export class OrcaRuntimeService {
     } else if (lineageResolution.parent.type === 'worktree') {
       warnings.push({
         code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-        message:
-          'Worktree created, but Orca could not record lineage because instance identity was unavailable.',
+        message: `Worktree created, but ${APP_DISPLAY_NAME} could not record lineage because instance identity was unavailable.`,
         details: {
           childHasInstanceId: Boolean(childInstanceId),
           parentHasInstanceId: Boolean(parentInstanceId),
@@ -25579,6 +25621,8 @@ export class OrcaRuntimeService {
     createdWithAgent?: TuiAgent
     startupAgent?: TuiAgent
     startupLaunchPreferences?: AgentLaunchPreferences
+    startupPermissionMode?: AgentExplicitLaunchPermissionMode
+    startupLaunchToken?: string
     startupPrompt?: string
     pendingFirstAgentMessageRename?: boolean
     automationProvenance?: AutomationWorkspaceProvenance
@@ -25600,7 +25644,11 @@ export class OrcaRuntimeService {
       requestedAgent !== undefined
         ? isTuiAgentEnabled(requestedAgent, createSettings.disabledTuiAgents)
         : false
-    if ((args.startup || args.startupAgent) && requestedAgent && !requestedAgentEnabled) {
+    if (
+      (args.startup || args.startupAgent || args.startupPermissionMode) &&
+      requestedAgent &&
+      !requestedAgentEnabled
+    ) {
       throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
     }
     if (
@@ -25616,21 +25664,43 @@ export class OrcaRuntimeService {
             repo,
             args.startupAgent,
             args.startupPrompt,
-            args.startupLaunchPreferences
+            args.startupLaunchPreferences,
+            args.startupPermissionMode
           )
         : null
     const draftStartup =
       !args.startup && !agentStartup && args.startupDraft
-        ? await this.buildStartupForDraft(repo, args.startupDraft, requestedAgent)
+        ? await this.buildStartupForDraft(
+            repo,
+            args.startupDraft,
+            requestedAgent,
+            args.startupLaunchPreferences,
+            args.startupPermissionMode
+          )
         : null
-    const effectiveStartup = args.startup ?? agentStartup?.startup ?? draftStartup?.startup
-    const effectiveStartupFollowup = agentStartup?.followup
+    if (args.startupPermissionMode && !args.startup && !agentStartup && !draftStartup) {
+      throw new Error('Could not build an agent startup with the selected permission mode.')
+    }
+    const unresolvedStartup = args.startup ?? agentStartup?.startup ?? draftStartup?.startup
+    const effectiveStartup =
+      unresolvedStartup && args.startupLaunchToken && !unresolvedStartup.launchToken
+        ? { ...unresolvedStartup, launchToken: args.startupLaunchToken }
+        : unresolvedStartup
+    // A Renderer-provided token means that client will paste the follow-up
+    // into the exact launch-bound pane after its mirrored surface exists.
+    // Host-only callers (CLI/mobile) omit the token and keep Host delivery.
+    const clientOwnsStartupPromptDelivery = Boolean(args.startupLaunchToken)
+    const effectiveStartupFollowup = clientOwnsStartupPromptDelivery
+      ? undefined
+      : agentStartup?.followup
     const effectiveCreatedWithAgent = args.startup
       ? args.createdWithAgent
       : (agentStartup?.agent ??
         draftStartup?.agent ??
         (requestedAgentEnabled ? requestedAgent : undefined))
-    const effectiveDraftPaste = args.startupDraftPaste ?? draftStartup?.draftPaste
+    const effectiveDraftPaste = clientOwnsStartupPromptDelivery
+      ? undefined
+      : (args.startupDraftPaste ?? draftStartup?.draftPaste)
     if (isFolderRepo(repo)) {
       const now = Date.now()
       const settings = createSettings
@@ -25707,6 +25777,7 @@ export class OrcaRuntimeService {
             ...(effectiveStartup.launchConfig
               ? { launchConfig: effectiveStartup.launchConfig }
               : {}),
+            ...(effectiveStartup.launchToken ? { launchToken: effectiveStartup.launchToken } : {}),
             ...(effectiveCreatedWithAgent ? { launchAgent: effectiveCreatedWithAgent } : {}),
             ...(effectiveStartup.viewMode ? { viewMode: effectiveStartup.viewMode } : {}),
             startupCommandDelivery: effectiveStartup.startupCommandDelivery,
@@ -26501,6 +26572,7 @@ export class OrcaRuntimeService {
             : {}),
           env: sequencedStartup.env,
           ...(sequencedStartup.launchConfig ? { launchConfig: sequencedStartup.launchConfig } : {}),
+          ...(sequencedStartup.launchToken ? { launchToken: sequencedStartup.launchToken } : {}),
           ...(effectiveCreatedWithAgent ? { launchAgent: effectiveCreatedWithAgent } : {}),
           ...(sequencedStartup.viewMode ? { viewMode: sequencedStartup.viewMode } : {}),
           startupCommandDelivery: sequencedStartup.startupCommandDelivery,
@@ -26848,6 +26920,7 @@ export class OrcaRuntimeService {
             : {}),
           env: sequencedStartup.env,
           ...(sequencedStartup.launchConfig ? { launchConfig: sequencedStartup.launchConfig } : {}),
+          ...(sequencedStartup.launchToken ? { launchToken: sequencedStartup.launchToken } : {}),
           ...(args.createdWithAgent ? { launchAgent: args.createdWithAgent } : {}),
           ...(sequencedStartup.viewMode ? { viewMode: sequencedStartup.viewMode } : {}),
           startupCommandDelivery: sequencedStartup.startupCommandDelivery,
@@ -29102,15 +29175,23 @@ export class OrcaRuntimeService {
       isRemote,
       terminalWindowsShell: settings.terminalWindowsShell
     })
-    const startup = buildAgentResumeStartupPlan({
+    const permissionLaunchConfig = resolveTuiAgentLaunchPermission({
       agent: request.agent,
-      providerSession: identity.providerSession,
-      cmdOverrides: settings.agentCmdOverrides ?? {},
+      mode: request.agentPermissionMode ?? 'default',
       agentArgs:
         request.agentArgs !== undefined
           ? request.agentArgs
           : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
       agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+      shell: resolveStartupShell(platform, shell)
+    })
+    const startup = buildAgentResumeStartupPlan({
+      agent: request.agent,
+      providerSession: identity.providerSession,
+      cmdOverrides: settings.agentCmdOverrides ?? {},
+      agentArgs: permissionLaunchConfig.agentArgs,
+      agentEnv: permissionLaunchConfig.agentEnv,
+      agentPermissionMode: request.agentPermissionMode,
       ompResumeFilePath: request.ompResumeFilePath,
       sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
       platform,
@@ -29129,6 +29210,7 @@ export class OrcaRuntimeService {
       env: startup.env,
       launchConfig: startup.launchConfig,
       launchAgent: request.agent,
+      startupCommandDelivery: startup.startupCommandDelivery,
       presentation: request.presentation ?? 'background',
       tabId: request.placement?.tabId,
       leafId: request.placement?.leafId,
@@ -29167,6 +29249,7 @@ export class OrcaRuntimeService {
           request.promptDelivery ?? null,
           request.agentArgs ?? null,
           request.agentArgs === undefined ? 'host-default' : 'client-override',
+          request.agentPermissionMode ?? null,
           request.launchPreferences?.model ?? null,
           request.launchPreferences?.effort ?? null,
           request.launchPreferences?.mode ?? null,
@@ -29233,6 +29316,7 @@ export class OrcaRuntimeService {
             request.promptDelivery ?? null,
             request.agentArgs ?? null,
             request.agentArgs === undefined ? 'host-default' : 'client-override',
+            request.agentPermissionMode ?? null,
             request.launchPreferences?.model ?? null,
             request.launchPreferences?.effort ?? null,
             request.launchPreferences?.mode ?? null,
@@ -29257,14 +29341,22 @@ export class OrcaRuntimeService {
         isRemote,
         terminalWindowsShell: settings.terminalWindowsShell
       })
-      const startupArgs = {
+      const permissionLaunchConfig = resolveTuiAgentLaunchPermission({
         agent: request.agent,
-        cmdOverrides: settings.agentCmdOverrides ?? {},
+        mode: request.agentPermissionMode ?? 'default',
         agentArgs:
           request.agentArgs !== undefined
             ? request.agentArgs
             : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
         agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+        shell: resolveStartupShell(platform, shell)
+      })
+      const startupArgs = {
+        agent: request.agent,
+        cmdOverrides: settings.agentCmdOverrides ?? {},
+        agentArgs: permissionLaunchConfig.agentArgs,
+        agentEnv: permissionLaunchConfig.agentEnv,
+        agentPermissionMode: request.agentPermissionMode,
         sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
         platform,
         shell,
@@ -32558,6 +32650,14 @@ export class OrcaRuntimeService {
   }
 
   private async resolveEmulatorWorkspaceId(selector: string): Promise<string> {
+    if (
+      selector === FLOATING_TERMINAL_WORKTREE_ID ||
+      selector === `id:${FLOATING_TERMINAL_WORKTREE_ID}`
+    ) {
+      // Why: Electron explicitly supports Mobile Emulator tabs in the synthetic
+      // floating workspace, which has no backing repo/worktree selector record.
+      return FLOATING_TERMINAL_WORKTREE_ID
+    }
     const folderWorkspace = this.resolveFolderWorkspaceSelector(selector)
     return folderWorkspace
       ? folderWorkspaceKey(folderWorkspace.id)
@@ -33138,7 +33238,7 @@ export class OrcaRuntimeService {
         warnings: [
           {
             code: 'LINEAGE_PARENT_CONTEXT_CONFLICT',
-            message: 'Worktree created, but Orca could not prove which parent context caused it.',
+            message: `Worktree created, but ${APP_DISPLAY_NAME} could not prove which parent context caused it.`,
             details: {
               terminalParentWorkspaceKey: candidates.find((c) => c.source === 'terminal-context')
                 ?.parent.workspaceKey,
@@ -37583,7 +37683,7 @@ export class OrcaRuntimeService {
       if (!worktree) {
         throw new LinearAgentAccessError(
           'linear_issue_required',
-          'Run --current from inside an Orca-managed worktree or pass an issue id.'
+          `Run --current from inside a ${APP_DISPLAY_NAME}-managed worktree or pass an issue id.`
         )
       }
     }
@@ -37591,7 +37691,7 @@ export class OrcaRuntimeService {
     if (!worktree) {
       throw new LinearAgentAccessError(
         'linear_issue_required',
-        'Run --current from inside an Orca-managed worktree or pass an issue id.'
+        `Run --current from inside a ${APP_DISPLAY_NAME}-managed worktree or pass an issue id.`
       )
     }
 
@@ -37735,10 +37835,10 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the state change, but Orca could not confirm it.',
+            `Linear may have applied the state change, but ${APP_DISPLAY_NAME} could not confirm it.`,
             {
               nextSteps: [
-                `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the current state before retrying.`
+                `Run \`${PRIMARY_CLI_COMMAND} linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the current state before retrying.`
               ],
               ...(cause ? { cause } : {})
             }
@@ -37783,10 +37883,10 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the relation change, but Orca could not confirm it.',
+            `Linear may have applied the relation change, but ${APP_DISPLAY_NAME} could not confirm it.`,
             {
               nextSteps: [
-                `Run \`orca linear issue ${target.issue.identifier} --relations --workspace ${target.workspaceId} --json\` before retrying.`
+                `Run \`${PRIMARY_CLI_COMMAND} linear issue ${target.issue.identifier} --relations --workspace ${target.workspaceId} --json\` before retrying.`
               ],
               ...(cause ? { cause } : {})
             }
@@ -37862,10 +37962,10 @@ export class OrcaRuntimeService {
           (cause) =>
             linearError(
               'linear_write_unconfirmed',
-              'Linear may have applied the issue save, but Orca could not confirm it.',
+              `Linear may have applied the issue save, but ${APP_DISPLAY_NAME} could not confirm it.`,
               {
                 nextSteps: [
-                  `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` before retrying.`
+                  `Run \`${PRIMARY_CLI_COMMAND} linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` before retrying.`
                 ],
                 ...(cause ? { cause } : {})
               }
@@ -37911,10 +38011,10 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the task update, but Orca could not confirm it.',
+            `Linear may have applied the task update, but ${APP_DISPLAY_NAME} could not confirm it.`,
             {
               nextSteps: [
-                `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the updated field before retrying.`
+                `Run \`${PRIMARY_CLI_COMMAND} linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the updated field before retrying.`
               ],
               ...(cause ? { cause } : {})
             }
@@ -38577,7 +38677,9 @@ export class OrcaRuntimeService {
             name: project.name,
             teams: project.teams
           })),
-          nextSteps: ['Run `orca linear project list --query <name> --json` and retry by id.']
+          nextSteps: [
+            `Run \`${PRIMARY_CLI_COMMAND} linear project list --query <name> --json\` and retry by id.`
+          ]
         }
       )
     }
@@ -38590,7 +38692,9 @@ export class OrcaRuntimeService {
         name: project.name,
         teams: project.teams
       })),
-      nextSteps: ['Run `orca linear project list --query <name> --json` and retry by id.']
+      nextSteps: [
+        `Run \`${PRIMARY_CLI_COMMAND} linear project list --query <name> --json\` and retry by id.`
+      ]
     })
   }
 
@@ -38716,7 +38820,9 @@ export class OrcaRuntimeService {
           : `Multiple labels exactly matched "${input}".`,
         {
           labels: labels.map((label) => ({ id: label.id, name: label.name })),
-          nextSteps: ['Run `orca linear team labels --team <key-or-id> --json` and retry by id.']
+          nextSteps: [
+            `Run \`${PRIMARY_CLI_COMMAND} linear team labels --team <key-or-id> --json\` and retry by id.`
+          ]
         }
       )
     })
@@ -38852,7 +38958,9 @@ export class OrcaRuntimeService {
           'linear_invalid_parent',
           'The reply target is not a comment on this issue.',
           {
-            nextSteps: ['Run `orca linear issue <id> --comments --json` to list valid comment ids.']
+            nextSteps: [
+              `Run \`${PRIMARY_CLI_COMMAND} linear issue <id> --comments --json\` to list valid comment ids.`
+            ]
           }
         )
       }
@@ -38925,7 +39033,7 @@ export class OrcaRuntimeService {
     }
     if (isLinearAuthError(error)) {
       return linearError('linear_auth_expired', 'Linear authentication expired.', {
-        nextSteps: ['Reconnect Linear from Orca settings.']
+        nextSteps: [`Reconnect Linear from ${APP_DISPLAY_NAME} settings.`]
       })
     }
     return linearError(classifyLinearError(error), linearMessage(error))
@@ -39233,7 +39341,9 @@ export class OrcaRuntimeService {
     }
     if (!teamInput) {
       throw linearError('linear_team_required', 'Pass --team or create under a parent issue.', {
-        nextSteps: ['Run `orca linear create --team <key> ...` or use --parent-current.']
+        nextSteps: [
+          `Run \`${PRIMARY_CLI_COMMAND} linear create --team <key> ...\` or use --parent-current.`
+        ]
       })
     }
 
@@ -39247,7 +39357,9 @@ export class OrcaRuntimeService {
     }
     if (teams.length === 0 && (getLinearStatus().workspaces?.length ?? 0) === 0) {
       throw linearError('linear_not_connected', 'Linear is not connected.', {
-        nextSteps: ['Connect Linear from Orca settings, then retry the issue create.']
+        nextSteps: [
+          `Connect Linear from ${APP_DISPLAY_NAME} settings, then retry the issue create.`
+        ]
       })
     }
     const matches = teams.filter(
@@ -39419,7 +39531,7 @@ export class OrcaRuntimeService {
     const pinned =
       verb === 'create'
         ? [
-            'orca linear create',
+            `${PRIMARY_CLI_COMMAND} linear create`,
             `--workspace=${this.commandToken(workspaceId, 'WORKSPACE_ID')}`,
             `--write-id=${this.commandToken(writeId, 'WRITE_ID')}`,
             '--title TITLE_HERE',
@@ -39433,7 +39545,7 @@ export class OrcaRuntimeService {
             ).concat(this.linearCreateFieldRetryTokens(extra.createFields))
           ].join(' ')
         : [
-            `orca linear ${verb === 'attach' ? 'attach' : 'comment add'}`,
+            `${PRIMARY_CLI_COMMAND} linear ${verb === 'attach' ? 'attach' : 'comment add'}`,
             this.commandToken(target?.issue.identifier ?? '', 'ISSUE_ID'),
             `--workspace=${this.commandToken(workspaceId, 'WORKSPACE_ID')}`,
             `--write-id=${this.commandToken(writeId, 'WRITE_ID')}`,
@@ -39452,7 +39564,7 @@ export class OrcaRuntimeService {
           : ''
     return linearError(
       'linear_write_unconfirmed',
-      'Linear may have applied the write, but Orca could not confirm it.',
+      `Linear may have applied the write, but ${APP_DISPLAY_NAME} could not confirm it.`,
       {
         writeId,
         workspaceId,

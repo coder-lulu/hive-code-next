@@ -21,6 +21,9 @@
 #
 set -euo pipefail
 
+echo "error: GitHub dev-channel publishing is retired; configure a HiveCloud token and OSS service instead." >&2
+exit 1
+
 # Guard: xtrace would echo the key to stderr on every expansion. Test before
 # disabling, or the check reads the state this line just cleared and never fires.
 if [[ -o xtrace ]]; then

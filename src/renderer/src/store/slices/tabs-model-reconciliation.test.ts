@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import { createTabsSliceMockApi } from './tabs-slice-test-harness'
 import { createTestStore } from './store-test-helpers'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 
 // Mock sonner (imported by repos.ts)
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
@@ -481,6 +482,92 @@ describe('TabsSlice', () => {
         type: 'leaf',
         groupId: restoredGroup?.id
       })
+    })
+
+    it('keeps recoverable floating agent sessions after their PTYs stop', () => {
+      const firstSessionId = 'floating-agent-1'
+      const secondSessionId = 'floating-agent-2'
+
+      store.setState({
+        tabsByWorktree: {
+          [FLOATING_TERMINAL_WORKTREE_ID]: [
+            {
+              id: firstSessionId,
+              ptyId: null,
+              worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+              title: 'Codex session',
+              customTitle: null,
+              color: null,
+              sortOrder: 0,
+              createdAt: 1,
+              launchAgent: 'codex'
+            },
+            {
+              id: secondSessionId,
+              ptyId: null,
+              worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+              title: 'Claude session',
+              customTitle: null,
+              color: null,
+              sortOrder: 1,
+              createdAt: 2,
+              aiVaultTitle: {
+                agent: 'claude',
+                sessionId: 'provider-session-2',
+                title: 'Claude session'
+              }
+            }
+          ]
+        },
+        ptyIdsByTabId: {
+          [firstSessionId]: [],
+          [secondSessionId]: []
+        },
+        unifiedTabsByWorktree: { [FLOATING_TERMINAL_WORKTREE_ID]: [] },
+        groupsByWorktree: { [FLOATING_TERMINAL_WORKTREE_ID]: [] },
+        activeGroupIdByWorktree: {}
+      })
+
+      const result = store.getState().reconcileWorktreeTabModel(FLOATING_TERMINAL_WORKTREE_ID)
+      const state = store.getState()
+
+      expect(result.renderableTabCount).toBe(2)
+      expect(state.tabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID]?.map((tab) => tab.id)).toEqual([
+        firstSessionId,
+        secondSessionId
+      ])
+      expect(
+        state.unifiedTabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID]?.map((tab) => tab.id)
+      ).toEqual([firstSessionId, secondSessionId])
+    })
+
+    it('still cleans a dead legacy agent terminal from a normal worktree', () => {
+      store.setState({
+        tabsByWorktree: {
+          [WT]: [
+            {
+              id: 'dead-project-agent',
+              ptyId: null,
+              worktreeId: WT,
+              title: 'Codex',
+              customTitle: null,
+              color: null,
+              sortOrder: 0,
+              createdAt: 1,
+              launchAgent: 'codex'
+            }
+          ]
+        },
+        ptyIdsByTabId: { 'dead-project-agent': [] },
+        unifiedTabsByWorktree: { [WT]: [] },
+        groupsByWorktree: { [WT]: [] },
+        activeGroupIdByWorktree: {}
+      })
+
+      const result = store.getState().reconcileWorktreeTabModel(WT)
+
+      expect(result.renderableTabCount).toBe(0)
+      expect(store.getState().tabsByWorktree[WT]).toEqual([])
     })
 
     it('promotes legacy terminals to the worktree remembered tab, not always the first one', () => {

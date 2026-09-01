@@ -661,8 +661,9 @@ async function importValidatedCookies(
   if (options.canReportPartitionSkippedCookies === false && plan.skips.length > 0) {
     return {
       ok: false,
-      reason:
+      reason: applyProductBranding(
         'This Orca client cannot report cookies skipped for an unreadable site partition. Update Orca on this device and try again.'
+      )
     }
   }
   // Why: a family-suppressed sibling is a partition skip too, so partitionSkippedCookies is a
@@ -2040,8 +2041,9 @@ export async function importCookiesFromBrowser(
         discardStagingFile()
         return {
           ok: false,
-          reason:
+          reason: applyProductBranding(
             'This Orca client cannot report cookies skipped for an unreadable site partition. Update Orca on this device and try again.'
+          )
         }
       }
 

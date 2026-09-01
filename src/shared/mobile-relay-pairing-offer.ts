@@ -10,6 +10,8 @@ export const PAIRING_OFFER_VERSION = 2
 const PairingScopeSchema = z.enum(['mobile', 'runtime'])
 const BASE64URL_16_PATTERN = /^[A-Za-z0-9_-]{16}$/
 const BASE64URL_43_PATTERN = /^[A-Za-z0-9_-]{43}$/
+export const CANONICAL_RUNTIME_RECORD_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const MAX_INVITE_TTL_MS = 10 * 60 * 1000
 // The cell stamps expiry from its own clock; without leeway, a cell clock
 // even slightly ahead of this machine makes every invite fail validation
@@ -76,6 +78,7 @@ export function createPairingOfferSchema(now: () => number = () => Date.now()) {
       // offer, while relayHostId is verified from its decoded bytes later.
       publicKeyB64: z.string().min(1).max(PAIRING_PUBLIC_KEY_MAX_CHARACTERS),
       pairedDeviceId: z.string().min(1).max(128).optional(),
+      runtimeRecordId: z.string().regex(CANONICAL_RUNTIME_RECORD_ID_PATTERN).optional(),
       scope: PairingScopeSchema.optional(),
       relay: relaySchema.optional()
     })

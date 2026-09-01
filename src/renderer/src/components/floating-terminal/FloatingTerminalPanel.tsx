@@ -770,7 +770,10 @@ export function FloatingTerminalPanel({
       activateTab(item.id)
       if (item.contentType === 'terminal') {
         setActiveTab(item.entityId)
+        useAppStore.getState().consumeFirstAgentCompletionUnreadForTab(item.entityId)
         focusTerminalTabSurface(item.entityId)
+      } else if (item.contentType === 'agent-session') {
+        useAppStore.getState().consumeFirstAgentCompletionUnreadForTab(item.id)
       } else if (item.contentType === 'browser') {
         const workspace = useAppStore
           .getState()

@@ -5,6 +5,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -23,7 +24,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
+  translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
+    fallback.replace(/\{\{(\w+)\}\}/g, (placeholder, key: string) =>
+      options?.[key] === undefined ? placeholder : String(options[key])
+    )
 }))
 
 vi.mock('@/lib/web-client-location', () => ({
@@ -99,7 +103,7 @@ describe('ShareSkillsSettingsPane', () => {
 
     expect(screen.getByText('Sign in to share skills')).toBeInTheDocument()
     expect(screen.getByText(/Recipients do not need an account/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Sign in to Orca' }))
+    await user.click(screen.getByRole('button', { name: `Sign in to ${APP_DISPLAY_NAME}` }))
     expect(mocks.connect).toHaveBeenCalledOnce()
   })
 
@@ -113,7 +117,7 @@ describe('ShareSkillsSettingsPane', () => {
 
     await user.click(
       screen.getByRole('switch', {
-        name: 'Allow agents and the Orca CLI to publish skill links'
+        name: `Allow agents and the ${APP_DISPLAY_NAME} CLI to publish skill links`
       })
     )
     expect(mocks.updateSettings).toHaveBeenCalledWith({ agentSkillSharingEnabled: true })
@@ -128,12 +132,18 @@ describe('ShareSkillsSettingsPane', () => {
       </TooltipProvider>
     )
 
-    expect(screen.getByText(/available in the Orca desktop app/)).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        `Publishing and link management are available in the ${APP_DISPLAY_NAME} desktop app.`
+      )
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Open Skills/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Sign in to Orca' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: `Sign in to ${APP_DISPLAY_NAME}` })
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('switch', {
-        name: 'Allow agents and the Orca CLI to publish skill links'
+        name: `Allow agents and the ${APP_DISPLAY_NAME} CLI to publish skill links`
       })
     ).toBeDisabled()
   })

@@ -17,9 +17,12 @@ import { isWebClientLocation } from '@/lib/web-client-location'
 
 export function useAddRepoHostSelection({
   isOpen,
+  preferredHostId,
   setStep
 }: {
   isOpen: boolean
+  /** Host owned by the space row that opened Add Project, when known. */
+  preferredHostId?: ExecutionHostId | null
   setStep: (step: AddRepoDialogStep) => void
 }): {
   hostOptions: ReturnType<typeof useSidebarHostScopeOptions>['hostOptions']
@@ -82,11 +85,20 @@ export function useAddRepoHostSelection({
   useEffect(() => {
     if (isOpen && !previousOpenRef.current) {
       const focusedHostId = getSettingsFocusedExecutionHostId(settings)
-      const nextHostId = selectableHostOptions.some(
+      const preferredHostSelectable = Boolean(
+        preferredHostId &&
+        selectableHostOptions.some(
+          (host) => host.id === preferredHostId && canSelectAddRepoHost(host)
+        )
+      )
+      const focusedHostSelectable = selectableHostOptions.some(
         (host) => host.id === focusedHostId && canSelectAddRepoHost(host)
       )
-        ? focusedHostId
-        : (pairedWebRuntimeHost?.id ?? (isWebClient ? null : LOCAL_EXECUTION_HOST_ID))
+      const nextHostId = preferredHostSelectable
+        ? preferredHostId
+        : focusedHostSelectable
+          ? focusedHostId
+          : (pairedWebRuntimeHost?.id ?? (isWebClient ? null : LOCAL_EXECUTION_HOST_ID))
       if (nextHostId) {
         setSelectedAddProjectHostId(nextHostId)
       }
@@ -95,7 +107,14 @@ export function useAddRepoHostSelection({
       setHostSelectorOpen(false)
     }
     previousOpenRef.current = isOpen
-  }, [isOpen, isWebClient, pairedWebRuntimeHost?.id, selectableHostOptions, settings])
+  }, [
+    isOpen,
+    isWebClient,
+    pairedWebRuntimeHost?.id,
+    preferredHostId,
+    selectableHostOptions,
+    settings
+  ])
 
   const handleSelectAddProjectHost = useCallback(
     async (hostId: ExecutionHostId): Promise<void> => {

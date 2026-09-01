@@ -68,22 +68,28 @@ export function launchSleepingAgentSession(
 ): boolean {
   const state = useAppStore.getState()
   const launchConfig = record.launchConfig
+  const hostDefaultsAuthoritative = launchConfig?.hostDefaultsAuthoritative === true
   const resumeTarget = getResumeLaunchTarget(record.worktreeId)
   const startupPlan = buildAgentResumeStartupPlan({
     agent: record.agent,
     providerSession: record.providerSession,
     cmdOverrides: state.settings?.agentCmdOverrides ?? {},
     agentArgs:
-      launchConfig !== undefined
+      launchConfig !== undefined && !hostDefaultsAuthoritative
         ? launchConfig.agentArgs
         : resolveTuiAgentLaunchArgs(record.agent, state.settings?.agentDefaultArgs),
     agentEnv:
-      launchConfig !== undefined
+      launchConfig !== undefined && !hostDefaultsAuthoritative
         ? launchConfig.agentEnv
         : resolveTuiAgentLaunchEnv(record.agent, state.settings?.agentDefaultEnv),
-    ...(launchConfig?.agentCommand ? { agentCommand: launchConfig.agentCommand } : {}),
+    ...(!hostDefaultsAuthoritative && launchConfig?.agentCommand
+      ? { agentCommand: launchConfig.agentCommand }
+      : {}),
     ...(launchConfig?.ompResumeFilePath
       ? { ompResumeFilePath: launchConfig.ompResumeFilePath }
+      : {}),
+    ...(launchConfig?.agentPermissionMode
+      ? { agentPermissionMode: launchConfig.agentPermissionMode }
       : {}),
     platform: resumeTarget.platform,
     shell: resumeTarget.shell
@@ -103,10 +109,15 @@ export function launchSleepingAgentSession(
     pendingStartup: {
       command: startupPlan.launchCommand,
       ...(startupPlan.env ? { env: startupPlan.env } : {}),
-      launchConfig: startupPlan.launchConfig,
+      launchConfig: hostDefaultsAuthoritative ? launchConfig : startupPlan.launchConfig,
       resumeProviderSession: record.providerSession,
       launchAgent: record.agent,
-      ...(launchConfig ? { agentArgsOverride: launchConfig.agentArgs } : {}),
+      ...(launchConfig && !hostDefaultsAuthoritative
+        ? { agentArgsOverride: launchConfig.agentArgs }
+        : {}),
+      ...(launchConfig?.agentPermissionMode
+        ? { agentPermissionMode: launchConfig.agentPermissionMode }
+        : {}),
       ...(startupPlan.startupCommandDelivery
         ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
         : {}),

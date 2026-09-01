@@ -1,4 +1,4 @@
-import { applyProductBranding } from './brand'
+import { applyProductCliBranding } from './brand'
 
 export type ComputerUseErrorRecoveryData = {
   nextSteps: string[]
@@ -45,7 +45,7 @@ export function computerUseErrorRecoveryData(
     case 'provider_incompatible':
       return recoverWith(
         'Run `orca computer capabilities --json` and verify the local provider supports the requested operation.',
-        applyProductBranding(
+        applyProductCliBranding(
           'Update Orca or use a supported platform/provider path before retrying.'
         )
       )
@@ -107,5 +107,5 @@ export function computerUseErrorRecoveryData(
 }
 
 function recoverWith(...nextSteps: string[]): ComputerUseErrorRecoveryData {
-  return { nextSteps }
+  return { nextSteps: nextSteps.map(applyProductCliBranding) }
 }

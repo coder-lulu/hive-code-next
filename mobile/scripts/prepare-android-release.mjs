@@ -7,7 +7,8 @@ import process from 'node:process'
 const mobileRoot = path.resolve(import.meta.dirname, '..')
 const appConfigPath = process.env.MOBILE_APP_CONFIG_PATH || path.join(mobileRoot, 'app.json')
 const androidTagRefPrefix = 'refs/tags/mobile-android-v'
-const semverPattern = /^\d+\.\d+\.\d+$/
+const semverPattern =
+  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:beta|rc)\.(?:0|[1-9]\d*))?$/
 
 function input(name) {
   return (process.env[name] || '').trim()
@@ -24,7 +25,9 @@ function fail(message) {
 
 function validateSemver(version, name) {
   if (!semverPattern.test(version)) {
-    fail(`${name} must use x.y.z format`)
+    fail(
+      `${name} must use SemVer x.y.z or x.y.z-beta.n format (legacy rc.n is read-only compatible)`
+    )
   }
 }
 
@@ -93,6 +96,6 @@ writeOutput('android_version_code', String(currentVersionCode))
 writeOutput('tag', tag)
 writeOutput('publish_release', publishRelease ? 'true' : 'false')
 
-console.log(`Prepared Orca Mobile Android ${currentVersion} (${currentVersionCode})`)
+console.log(`Prepared HiveCode Mobile Android ${currentVersion} (${currentVersionCode})`)
 console.log(`Release tag: ${tag}`)
-console.log(`Publish GitHub Release: ${publishRelease ? 'yes' : 'no'}`)
+console.log(`Publish HiveCloud OSS release: ${publishRelease ? 'yes' : 'no'}`)

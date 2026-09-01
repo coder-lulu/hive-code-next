@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 import { assessOrcadRollback, planOrcadUpdate } from './orcad-update-plan'
 import {
@@ -143,6 +144,7 @@ describe('assessOrcadRollback', () => {
     })
     expect(safety).toMatchObject({ safety: 'unsafe', code: 'orcad_rollback_snapshot_missing' })
     expect(safety.safety === 'unsafe' && safety.reason).toContain('no schema version')
+    expect(safety.safety === 'unsafe' && safety.reason).toContain(`${APP_DISPLAY_NAME} state`)
   })
 
   it('refuses when no snapshot was ever recorded', () => {

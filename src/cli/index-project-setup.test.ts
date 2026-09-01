@@ -223,7 +223,7 @@ describe('orca cli worktree awareness', () => {
     // The command itself never reached a runtime; only the suggestion lookup did.
     expect(callMock).not.toHaveBeenCalledWith('projectHostSetup.list')
     const printed = [...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')
-    expect(printed).toContain('no paired Orca server is named or has id not-a-real-env')
+    expect(printed).toContain('no paired HiveCode server is named or has id not-a-real-env')
     // An agent reads the code and the retry candidates, not the prose.
     expect(JSON.parse(printed).error.code).toBe('invalid_argument')
     expect(JSON.parse(printed).error.data.knownEnvironments).toEqual([])

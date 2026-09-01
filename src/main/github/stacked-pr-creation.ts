@@ -24,6 +24,7 @@ import {
   type GitHubStackPullRequest,
   type NumberedHostedReviewSummary
 } from './github-stack-api-responses'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 type StackedPullRequestPlan =
   | {
@@ -67,8 +68,7 @@ async function findOpenPullRequestsForBranch(
   base?: string
 ): Promise<GitHubStackPullRequest[]> {
   const head = encodeURIComponent(`${repository.owner}:${branch}`)
-  const baseQuery = base ? `&base=${encodeURIComponent(base)}` : ''
-  const endpoint = `repos/${repository.owner}/${repository.repo}/pulls?head=${head}${baseQuery}&state=open&per_page=2`
+  const endpoint = `repos/${repository.owner}/${repository.repo}/pulls?head=${head}${base ? `&base=${encodeURIComponent(base)}` : ''}&state=open&per_page=2`
   const { stdout } = await ghExecFileAsync(
     ['api', endpoint],
     ghOptions(repoPath, repository, connectionId, options)
@@ -148,10 +148,14 @@ export async function prepareGitHubStackedPullRequest(
       )
     }
     if (parentPullRequests.length !== 1) {
-      return creationError(`Orca found multiple open pull requests for the parent branch ${base}.`)
+      return creationError(
+        `${APP_DISPLAY_NAME} found multiple open pull requests for the parent branch ${base}.`
+      )
     }
     if (currentPullRequests.length > 1) {
-      return creationError(`Orca found multiple open pull requests for the current branch ${head}.`)
+      return creationError(
+        `${APP_DISPLAY_NAME} found multiple open pull requests for the current branch ${head}.`
+      )
     }
     const parentReview = parentPullRequests[0]
     const currentReview = currentPullRequests[0] ?? null
@@ -186,7 +190,7 @@ export async function prepareGitHubStackedPullRequest(
       code: isStacksUnavailableError(error) ? 'validation' : 'unknown',
       error: isStacksUnavailableError(error)
         ? 'GitHub stacked pull requests are not available for this repository.'
-        : 'Orca could not verify the parent pull request. Retry in a moment.'
+        : `${APP_DISPLAY_NAME} could not verify the parent pull request. Retry in a moment.`
     }
   } finally {
     release()

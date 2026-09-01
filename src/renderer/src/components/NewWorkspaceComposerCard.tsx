@@ -16,10 +16,7 @@ import { unwrapRuntimeRpcResult } from '@/runtime/runtime-rpc-client'
 import { withUiConnectTimeout } from '@/ssh/ssh-connect-ui-timeout'
 import { isSshConnectInFlight, trackSshConnect } from '@/ssh/ssh-connect-in-flight'
 import { translate } from '@/i18n/i18n'
-import {
-  DEFAULT_DISABLED_TUI_AGENTS,
-  filterEnabledTuiAgents
-} from '../../../shared/tui-agent-selection'
+import { DEFAULT_DISABLED_TUI_AGENTS } from '../../../shared/tui-agent-selection'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import { NewWorkspaceComposerAdvancedSection } from './new-workspace/NewWorkspaceComposerAdvancedSection'
@@ -36,6 +33,7 @@ import {
 } from './new-workspace/new-workspace-composer-card-props'
 import { getSshStatusLabel } from './new-workspace/new-workspace-composer-ssh-status'
 import { useComposerFileDragOver } from './new-workspace/use-composer-file-drag-over'
+import { filterQuickWorkspaceAgents } from '@/lib/quick-workspace-agent-selection'
 
 export default function NewWorkspaceComposerCard(
   props: NewWorkspaceComposerCardProps
@@ -130,18 +128,11 @@ export default function NewWorkspaceComposerCard(
   const showSetupAgentStartupPolicy =
     setupControlsEnabled && setupConfig !== null && setupConfig.kind !== 'default-tabs'
   const agentCatalog = getAgentCatalog()
-  const enabledAgentIds = new Set(
-    filterEnabledTuiAgents(
-      agentCatalog.map((candidate) => candidate.id),
-      disabledTuiAgents
-    )
+  const visibleQuickAgents = filterQuickWorkspaceAgents(
+    agentCatalog,
+    props.detectedAgentIds,
+    disabledTuiAgents
   )
-  const visibleQuickAgents = agentCatalog.filter((agent) => {
-    return (
-      enabledAgentIds.has(agent.id) &&
-      (props.detectedAgentIds === null || props.detectedAgentIds.has(agent.id))
-    )
-  })
 
   const cancelNameInputFocusFrame = React.useCallback((): void => {
     if (nameInputFocusFrameRef.current !== null) {

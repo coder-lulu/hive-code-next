@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import type { SkillFreshnessInventory } from '../../../shared/skill-freshness'
 import { INSTALLED_AGENT_SKILLS_CHANGED_EVENT } from './installed-agent-skills-change-event'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 // Why: window focus fires on every alt-tab, and each scan re-reads and re-hashes
 // every installed package; a just-completed scan stays authoritative briefly.
@@ -103,7 +104,8 @@ export async function refreshSkillFreshness(force = true): Promise<void> {
       publishSnapshot({
         inventory: null,
         loading: false,
-        error: cause instanceof Error ? cause.message : 'Could not inspect Orca skills.'
+        error:
+          cause instanceof Error ? cause.message : `Could not inspect ${APP_DISPLAY_NAME} skills.`
       })
     }
   }

@@ -18,6 +18,15 @@ export function canShowRightSidebarForView(activeView: ActiveView): boolean {
   return !RIGHT_SIDEBAR_SUPPRESSED_VIEWS.has(activeView)
 }
 
+export function canShowRightSidebar(
+  state: Pick<AppState, 'activeView' | 'activeWorktreeId'>
+): boolean {
+  return (
+    canShowRightSidebarForView(state.activeView) &&
+    (state.activeView !== 'terminal' || state.activeWorktreeId !== null)
+  )
+}
+
 export function rightSidebarShowsPullRequestData(
   state: Pick<
     AppState,
@@ -30,7 +39,7 @@ export function rightSidebarShowsPullRequestData(
   >
 ): boolean {
   if (
-    !canShowRightSidebarForView(state.activeView) ||
+    !canShowRightSidebar(state) ||
     !state.rightSidebarOpen ||
     (state.rightSidebarTab !== 'checks' && state.rightSidebarTab !== 'source-control')
   ) {

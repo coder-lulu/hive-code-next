@@ -11,6 +11,7 @@ import {
   agentJournalSubmissionKey,
   boundJournalKeyComponent
 } from '../../../shared/agent-session-journal-item-key'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type {
   AgentJournalCursor,
   AgentJournalRenderItem,
@@ -79,7 +80,7 @@ function oversizedHistoryItem(
     itemId: boundJournalKeyComponent(item.itemId),
     body: {
       kind: 'status',
-      text: `[Orca: item truncated — ${byteLength} bytes exceeds the history page budget]`
+      text: `[${APP_DISPLAY_NAME}: item truncated — ${byteLength} bytes exceeds the history page budget]`
     }
   }
 }

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import { app, BrowserWindow, powerMonitor } from 'electron'
+import { is } from '@electron-toolkit/utils'
 import { parse } from 'yaml'
 import type {
   LinuxPackageInstallInstructions,
@@ -18,7 +19,9 @@ import {
   resolveProductUpdateFeedUrl,
   resolveProductUpdateSource
 } from '../shared/product-update-source'
-import { applyProductBranding } from '../shared/brand'
+import * as productUpdateSourceModule from '../shared/product-update-source'
+import { isProductVersion } from '../shared/product-version'
+import { APP_DISPLAY_NAME, applyProductBranding, applyProductCliBranding } from '../shared/brand'
 import {
   installProductUpdaterNetworkBoundary,
   type ProductUpdaterHttpExecutor
@@ -71,7 +74,6 @@ import {
 import {
   compareVersions,
   isBenignCheckFailure,
-  isValidVersion,
   isMissingUpdateManifestFailure,
   isPrereleaseVersion,
   statusesEqual
@@ -83,6 +85,16 @@ import {
 import { fetchNudge, shouldApplyNudge } from './updater-nudge'
 import { cancelUnreadResponseBody } from './lib/unread-response-body'
 import { fetchWithProductUpdaterSession } from './product/product-updater-session'
+import {
+  fetchHiveCloudUpdateDecision,
+  type HiveCloudUpdateDecision
+} from './product/hivecloud-update-check'
+import { validateHiveCloudUpdateManifest } from './product/hivecloud-update-manifest'
+import {
+  cacheMandatoryHiveCloudDecision,
+  readCachedMandatoryHiveCloudDecision
+} from './product/hivecloud-update-cache'
+import { getDesktopReleaseIdentity } from './product/release-identity'
 import { readResponseTextWithLimit } from './updater-response-body'
 import {
   failServeUpdateHandoff,
@@ -114,7 +126,7 @@ type UpdateCandidateIdentity = {
   provider: 'github' | 'hivecloud' | null
   source: 'release' | UpdateSource
   repository: string | null
-  sourceChannel: 'stable' | 'beta' | 'rc' | null
+  sourceChannel: ReleaseChannel | null
   checkChannel: UpdateCheckVariant | ReleaseChannel | 'local'
   tag: string
   version: string
@@ -167,6 +179,7 @@ let availableReleaseUrl: string | null = null
 let pendingCheckFailureKey: string | null = null
 let pendingCheckFailurePromise: Promise<void> | null = null
 let autoUpdateCheckTimer: ReturnType<typeof setTimeout> | null = null
+let autoUpdateCheckScheduleGeneration = 0
 let nudgeCheckTimer: ReturnType<typeof setTimeout> | null = null
 let pendingQuitAndInstallTimer: ReturnType<typeof setTimeout> | null = null
 let quitAndInstallInProgress = false
@@ -239,6 +252,12 @@ let expectedUpdateOffer: UpdateCandidateIdentity | null = null
 let availableUpdateCandidate: UpdateCandidateIdentity | null = null
 let downloadingUpdateCandidate: UpdateCandidateIdentity | null = null
 let downloadedUpdateCandidate: UpdateCandidateIdentity | null = null
+let pendingHiveCloudDecision: HiveCloudUpdateDecision | null = null
+// Keep the decision fetched immediately before electron-updater emits its
+// checking event. `clearAvailableUpdateContext` intentionally clears the
+// candidate identity at that boundary, but the HiveCloud policy must remain
+// available for the available/downloaded/error status payloads.
+let activeHiveCloudDecision: HiveCloudUpdateDecision | null = null
 
 function getProductUpdaterNetworkMode(): 'release' | 'local' {
   return activeUpdateSource === 'local' ? 'local' : 'release'
@@ -264,6 +283,34 @@ function clearAvailableUpdateContext(): void {
   availableUpdateCandidate = null
   downloadingUpdateCandidate = null
   downloadedUpdateCandidate = null
+  pendingHiveCloudDecision = null
+}
+
+function clearHiveCloudDecision(): void {
+  pendingHiveCloudDecision = null
+  activeHiveCloudDecision = null
+}
+
+function getHiveCloudStatusMetadata(): Pick<
+  UpdateStatus,
+  'mandatory' | 'minimumSupportedBuild' | 'latestBuild' | 'releaseNotes' | 'channel' | 'blockReason'
+> {
+  const decision = pendingHiveCloudDecision ?? activeHiveCloudDecision
+  if (!decision?.latest) {
+    return {}
+  }
+  const source = decision ? resolveProductUpdateSource() : null
+  return {
+    mandatory:
+      decision?.hasUpdate && (decision.updateRequired || decision.latest.mandatory)
+        ? true
+        : undefined,
+    minimumSupportedBuild: decision?.minimumSupportedBuild ?? undefined,
+    latestBuild: decision?.latest?.buildNumber,
+    releaseNotes: decision?.latest?.releaseNotes,
+    channel: source?.channel,
+    blockReason: decision?.blockReason ?? undefined
+  }
 }
 
 function closeLocalBuildFeed(): void {
@@ -276,6 +323,7 @@ function closeLocalBuildFeed(): void {
 
 function restoreReleaseUpdateSource(): void {
   clearAvailableUpdateContext()
+  clearHiveCloudDecision()
   closeLocalBuildFeed()
   advanceUpdateAuthorityEpoch()
   activeUpdateSource = 'release'
@@ -349,9 +397,6 @@ function decorateStatusWithActiveNudge(status: UpdateStatus): UpdateStatus {
 
 /** `force` re-delivers a status the renderer must not miss even when it repeats the current one. */
 function sendStatus(status: UpdateStatus, options?: { force?: boolean }): void {
-  if (status.state === 'error') {
-    status = { ...status, message: applyProductBranding(status.message) }
-  }
   const pendingUserInitiatedCheckVariant = pendingUserInitiatedCheckAfterInFlight
   const shouldLaunchPendingUserInitiatedCheck =
     pendingUserInitiatedCheckVariant !== null &&
@@ -591,7 +636,9 @@ function armUpdateCheckStallTimer(attemptId: number): void {
 }
 
 function beginUpdateCheckAttempt(): number {
+  cancelAutomaticUpdateCheckTimer()
   finishActiveUpdateCheckAttempt()
+  clearHiveCloudDecision()
   clearAvailableUpdateContext()
   updateAvailableEventPendingAttemptId = null
   updateCheckAttemptSequence += 1
@@ -807,7 +854,6 @@ function shouldHandleUpdaterErrorEvent(): boolean {
 }
 
 function sendErrorStatus(message: string, userInitiated?: boolean): void {
-  message = applyProductBranding(message)
   if (
     currentStatus.state === 'error' &&
     currentStatus.message === message &&
@@ -822,7 +868,7 @@ function sendErrorStatus(message: string, userInitiated?: boolean): void {
       message: 'Windows update signature check could not run'
     })
   }
-  sendStatus({ state: 'error', message, userInitiated })
+  sendStatus({ state: 'error', message, userInitiated, ...getHiveCloudStatusMetadata() })
 }
 
 function getKnownReleaseUrl(): string | undefined {
@@ -862,12 +908,14 @@ function deferHeadlessServeInstall(phase: 'download' | 'install', version: strin
       { phase, version: version || null },
       {
         level: 'warn',
-        message: 'Update install deferred while hosting orca serve'
+        message: applyProductCliBranding('Update install deferred while hosting orca serve')
       }
     )
   }
   sendErrorStatus(
-    'This orca serve process was not started by an update-capable supervisor. Keep it running and update Orca through its service manager.',
+    applyProductCliBranding(
+      'This orca serve process was not started by an update-capable supervisor. Keep it running and update Orca through its service manager.'
+    ),
     true
   )
   return true
@@ -964,7 +1012,9 @@ async function performQuitAndInstall(): Promise<void> {
           }
         )
         sendErrorStatus(
-          'Could not prepare the supervised server restart. Orca remains running.',
+          applyProductBranding(
+            'Could not prepare the supervised server restart. Orca remains running.'
+          ),
           true
         )
         resetQuitForUpdateState()
@@ -1071,7 +1121,9 @@ async function performQuitAndInstall(): Promise<void> {
         // A synchronous throw out of quitAndInstall carries the same installer text the 'error' event would have.
         message: quitAndInstallNativeInvokedBeforeReset
           ? withInstallFailureCause(getPreCommitInstallFailureMessage(), error)
-          : 'Could not restart to install the update. Quit and reopen Orca, then try again.'
+          : applyProductBranding(
+              'Could not restart to install the update. Quit and reopen Orca, then try again.'
+            )
       }
     )
   }
@@ -1093,8 +1145,10 @@ function resetQuitForUpdateState(): void {
  */
 function getPreCommitInstallFailureMessage(): string {
   return process.platform === 'darwin'
-    ? 'Could not restart to install the update. Quit and reopen Orca, then try again.'
-    : 'Could not start the update installer. Orca remains open.'
+    ? applyProductBranding(
+        'Could not restart to install the update. Quit and reopen Orca, then try again.'
+      )
+    : applyProductBranding('Could not start the update installer. Orca remains open.')
 }
 
 /**
@@ -1307,15 +1361,18 @@ async function sendCheckFailureStatus(
     if (isBenignCheckFailure(message) || isRetryableReleaseFeedPreflightFailure(sourceError)) {
       // Why: benign failures (incomplete latest.yml, network blips) are transient — retry, and skip persisting the timestamp (would suppress the next startup check).
       console.warn('[updater] benign check failure:', message)
+      const mandatoryOffline = getHiveCloudStatusMetadata().mandatory === true
       clearAvailableUpdateContext()
       scheduleAutomaticUpdateCheck(AUTO_UPDATE_RETRY_INTERVAL_MS)
-      if (userInitiated) {
+      if (userInitiated || mandatoryOffline) {
         // Why: a user click needs visible feedback (idle looks broken); distinguish incomplete releases from transport failures.
         sendErrorStatus(
-          isStableReleaseNotReadyFailure(sourceError)
-            ? "A newer release isn't available for this device yet. Check again later."
-            : "Couldn't reach the update server. Try again in a few minutes.",
-          true
+          mandatoryOffline
+            ? 'HiveCloud is unavailable. A mandatory update is still required before continuing.'
+            : isStableReleaseNotReadyFailure(sourceError)
+              ? "A newer release isn't available for this device yet. Check again later."
+              : "Couldn't reach the update server. Try again in a few minutes.",
+          userInitiated || undefined
         )
       } else {
         if (isRetryableReleaseFeedPreflightFailure(sourceError)) {
@@ -1485,6 +1542,14 @@ export function installRemoteServerUpdate(runtimeId: string): RemoteServerUpdate
 
 let consecutiveAutomaticRetrySchedules = 0
 
+function cancelAutomaticUpdateCheckTimer(): void {
+  autoUpdateCheckScheduleGeneration += 1
+  if (autoUpdateCheckTimer) {
+    clearTimeout(autoUpdateCheckTimer)
+    autoUpdateCheckTimer = null
+  }
+}
+
 function scheduleAutomaticUpdateCheck(delayMs: number): void {
   let effectiveDelayMs = delayMs
   // All retry-cadence callers pass exactly this constant, so keying backoff on it keeps one choke point instead of threading a flag through every schedule site.
@@ -1498,7 +1563,14 @@ function scheduleAutomaticUpdateCheck(delayMs: number): void {
   if (autoUpdateCheckTimer) {
     clearTimeout(autoUpdateCheckTimer)
   }
+  const scheduleGeneration = ++autoUpdateCheckScheduleGeneration
   autoUpdateCheckTimer = setTimeout(() => {
+    if (scheduleGeneration !== autoUpdateCheckScheduleGeneration) {
+      return
+    }
+    // The timer has fired; clear its handle before launching the asynchronous
+    // preflight so a late result can safely install the next schedule.
+    autoUpdateCheckTimer = null
     // Why: Orca runs for days, so keep the next background check scheduled in the main process rather than tying it to relaunches or renderer lifetime.
     if (!runBackgroundUpdateCheck()) {
       // Why: a deferred check reaches no outcome handler, so re-arm here or one deferral ends automatic checks for the process lifetime.
@@ -1666,6 +1738,58 @@ async function prepareHiveCloudReleaseFeed(
     return 'superseded'
   }
 
+  // Older test/build fixtures may not expose the optional control-plane
+  // resolver yet; keep the generic feed path compatible while the product
+  // manifest migration rolls out. Production HiveCode config always provides it.
+  const checkSourceResolver = Object.hasOwn(
+    productUpdateSourceModule,
+    'resolveProductUpdateCheckSource'
+  )
+    ? productUpdateSourceModule.resolveProductUpdateCheckSource
+    : undefined
+  const checkSource = checkSourceResolver?.()
+  if (typeof checkSourceResolver === 'function' && !checkSource) {
+    throw new ReleaseFeedPreflightError(
+      'feed-unavailable',
+      variant,
+      'HiveCloud update check endpoint is not configured'
+    )
+  }
+  if (checkSourceResolver && checkSource) {
+    const identity = getDesktopReleaseIdentity()
+    try {
+      pendingHiveCloudDecision = await fetchHiveCloudUpdateDecision({
+        endpoint: checkSource.endpoint,
+        product: identity.product,
+        platform: identity.platform,
+        architecture: identity.architecture,
+        channel: checkSource.channel,
+        currentVersion: identity.versionName,
+        currentBuild: identity.buildNumber,
+        fetchImpl: fetchWithProductUpdaterSession,
+        timeoutMs: GENERIC_UPDATE_PREFLIGHT_TIMEOUT_MS
+      })
+      activeHiveCloudDecision = pendingHiveCloudDecision
+      cacheMandatoryHiveCloudDecision(pendingHiveCloudDecision)
+    } catch (error) {
+      const cachedMandatory = readCachedMandatoryHiveCloudDecision(
+        getDesktopReleaseIdentity().buildNumber
+      )
+      pendingHiveCloudDecision = cachedMandatory
+      activeHiveCloudDecision = cachedMandatory
+      throw new ReleaseFeedPreflightError(
+        'feed-unavailable',
+        variant,
+        cachedMandatory
+          ? 'HiveCloud is unavailable and a cached mandatory update still applies.'
+          : String(error instanceof Error ? error.message : error)
+      )
+    }
+    if (!pendingHiveCloudDecision.hasUpdate) {
+      return 'not-available'
+    }
+  }
+
   advanceUpdateAuthorityEpoch()
   activeReleaseFeedUrl = feedUrl
   getAutoUpdater().setFeedURL({ provider: 'generic', url: feedUrl })
@@ -1692,18 +1816,49 @@ async function prepareHiveCloudReleaseFeed(
     )
   }
 
-  let version: unknown
+  let manifest: unknown
   try {
-    version = (parse(manifestText) as { version?: unknown } | null)?.version
+    manifest = parse(manifestText)
   } catch {
-    version = null
+    manifest = null
   }
-  if (typeof version !== 'string' || !isValidVersion(version)) {
+  const version = (manifest as { version?: unknown } | null)?.version
+  if (typeof version !== 'string' || !isProductVersion(version)) {
     throw new ReleaseFeedPreflightError(
       'manifest-unavailable',
       variant,
       'HiveCloud update metadata did not contain a valid version'
     )
+  }
+  if (pendingHiveCloudDecision?.latest && version !== pendingHiveCloudDecision.latest.versionName) {
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      variant,
+      'HiveCloud update metadata does not match the control-plane release'
+    )
+  }
+  if (pendingHiveCloudDecision?.hasUpdate) {
+    const latest = pendingHiveCloudDecision.latest
+    const artifact = latest?.artifact ?? pendingHiveCloudDecision.artifact
+    if (!latest || !artifact) {
+      throw new ReleaseFeedPreflightError(
+        'manifest-unavailable',
+        variant,
+        'HiveCloud update metadata is missing the control-plane artifact'
+      )
+    }
+    try {
+      validateHiveCloudUpdateManifest(manifest, {
+        versionName: latest.versionName,
+        artifact
+      })
+    } catch (error) {
+      throw new ReleaseFeedPreflightError(
+        'manifest-unavailable',
+        variant,
+        error instanceof Error ? error.message : 'HiveCloud update metadata is invalid'
+      )
+    }
   }
   if (!canCommitReleaseFeedForAttempt(attemptId)) {
     return 'superseded'
@@ -2197,7 +2352,7 @@ async function checkForPinnedBuild(channel: ReleaseChannel, tag: string): Promis
   ) {
     sendStatus({
       state: 'error',
-      message: `${RELEASE_CHANNEL_LABELS[channel]} builds are unsigned, and this signed build only installs updates signed by Orca's publisher. Download the installer from the release page and run it once — updates work normally from there, including back to Stable.`,
+      message: `${RELEASE_CHANNEL_LABELS[channel]} builds are unsigned, and this signed build only installs updates signed by ${APP_DISPLAY_NAME}'s publisher. Download the installer from the release page and run it once — updates work normally from there, including back to Stable.`,
       userInitiated: true
     })
     return
@@ -2347,14 +2502,18 @@ const LINUX_PACKAGE_RECOVERY_MESSAGES: Record<LinuxPackageRecoveryUnavailableRea
   // Why: this reason also covers a path that left the cache (traversal or symlinked parent), so the copy must not promise the file merely changed type.
   'not-regular':
     'The downloaded package is no longer a valid file in the update cache. Download the update again, or get it from the official release page.',
-  'hash-mismatch':
-    'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.',
-  'read-failed':
-    'Orca could not read the downloaded package. Download the update again, or get it from the official release page.',
-  'no-sudo':
-    'No sudo command was found in the system directories, so Orca cannot build a safe install command. Show the package and install it with your package manager.',
-  'no-package-manager':
-    'No supported package manager was found in the system directories, so Orca cannot build a safe install command. Show the package and install it with your package manager.',
+  'hash-mismatch': applyProductBranding(
+    'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.'
+  ),
+  'read-failed': applyProductBranding(
+    'Orca could not read the downloaded package. Download the update again, or get it from the official release page.'
+  ),
+  'no-sudo': applyProductBranding(
+    'No sudo command was found in the system directories, so Orca cannot build a safe install command. Show the package and install it with your package manager.'
+  ),
+  'no-package-manager': applyProductBranding(
+    'No supported package manager was found in the system directories, so Orca cannot build a safe install command. Show the package and install it with your package manager.'
+  ),
   'no-integrity-checker':
     'No trusted SHA-512 utility was found in the system directories, so the app cannot build a verified install command. Show the package and install it with your package manager.',
   'no-secure-staging-tools':
@@ -2362,8 +2521,9 @@ const LINUX_PACKAGE_RECOVERY_MESSAGES: Record<LinuxPackageRecoveryUnavailableRea
   'invalid-package-digest':
     'The downloaded package digest is invalid, so the app will not build an install command. Download the update again, or get it from the official release page.',
   // Defensive: capture only ever tracks absolute cache paths, so this reports a bug rather than a machine state.
-  'invalid-package-path':
+  'invalid-package-path': applyProductBranding(
     'The downloaded package is not at a usable path, so Orca cannot build a safe install command. Show the package and install it with your package manager.'
+  )
 }
 
 // Why: clearing the artifact alone would leave the renderer's actions enabled; the status must lose its recovery too.
@@ -2749,7 +2909,7 @@ export function setupAutoUpdater(
     sendErrorStatus(`The server update did not complete: ${serveHandoffFailure}`, true)
   }
 
-  if (!app.isPackaged) {
+  if (!app.isPackaged || is.dev) {
     return
   }
 
@@ -2783,6 +2943,7 @@ export function setupAutoUpdater(
       getPublishingWindowLastGoodCheck,
       getActiveUpdateCheckEventAttemptId,
       getCurrentStatus: () => currentStatus,
+      getUpdateMetadata: getHiveCloudStatusMetadata,
       getKnownReleaseUrl,
       getPendingInstallVersion,
       getUserInitiatedCheck: () => userInitiatedCheck,
@@ -2848,7 +3009,15 @@ export function setupAutoUpdater(
     () => activeLocalBuildFeed?.url ?? null,
     () => {
       const { changelog, nudge } = getProductExternalServiceEndpoints()
-      return [changelog, nudge].filter((url): url is string => url !== null)
+      const checkSourceResolver = Object.hasOwn(
+        productUpdateSourceModule,
+        'resolveProductUpdateCheckSource'
+      )
+        ? productUpdateSourceModule.resolveProductUpdateCheckSource
+        : undefined
+      const checkEndpoint =
+        typeof checkSourceResolver === 'function' ? (checkSourceResolver()?.endpoint ?? null) : null
+      return [changelog, nudge, checkEndpoint].filter((url): url is string => url !== null)
     },
     () => activeReleaseFeedUrl,
     () => updateAuthorityEpoch
@@ -2941,7 +3110,7 @@ export function downloadUpdate(): void {
   const localBuildDownload = activeUpdateSource === 'local'
   beginMacUpdateDownload()
   // Why: setup can take seconds before progress emits; surface acceptance now so the action never looks inert.
-  sendStatus({ state: 'downloading', percent: 0, version })
+  sendStatus({ state: 'downloading', percent: 0, version, ...getHiveCloudStatusMetadata() })
   getAutoUpdater()
     .downloadUpdate()
     .catch((err) => {

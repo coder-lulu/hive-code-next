@@ -1,4 +1,5 @@
 import type { CreateWorktreeArgs } from '../../../../../../shared/worktree/create-types'
+import type { AgentLaunchPreferences } from '../../../../../../shared/agent-session-host-authority'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { WorkspaceKey } from '../../../../../../shared/folder-workspace-types'
 import type { TaskSourceContext } from '../../../../../../shared/task-source-context'
@@ -11,6 +12,12 @@ export type CreateWorktreeCallOptions = {
   linkedTaskSourceContext?: TaskSourceContext | null
   /** Lets the owning runtime launch and prefill a task agent without first creating an idle shell. */
   startupDraft?: string
+  /** Auto-submitted prompt for a host-authoritative semantic agent startup. */
+  startupPrompt?: string
+  /** One-launch model/effort/mode choices for a host-authoritative semantic startup. */
+  startupLaunchPreferences?: AgentLaunchPreferences
+  /** Preflight-only: a Renderer-owned startup still requires safe semantic permission support. */
+  requiresAgentLaunchPermissionCapability?: boolean
   /** True only when `name` came from the creature-name generator; gates host-side retirement. */
   nameWasGenerated?: boolean
   /** Parent picked in the composer. Sets sidebar nesting only; ignored if it no longer exists. */
@@ -117,15 +124,28 @@ export function buildRuntimeWorktreeCreateParams(
     // Why: the host defaults a bare `parentWorkspace` to CLI provenance; app picks are manual.
     ...(attempt.parentWorkspace ? { parentWorkspaceOrigin: 'manual' } : {}),
     ...(options?.startupDraft ? { startupDraft: options.startupDraft } : {}),
+    ...((startup?.agentPermissionMode || options?.startupDraft) && options?.startupLaunchPreferences
+      ? { startupLaunchPreferences: options.startupLaunchPreferences }
+      : {}),
     ...(startup
       ? {
           startupCommand: startup.command,
           ...(startup.env ? { startupEnv: startup.env } : {}),
           ...(startup.launchConfig ? { startupLaunchConfig: startup.launchConfig } : {}),
+          ...(startup.launchToken ? { startupLaunchToken: startup.launchToken } : {}),
           ...(startup.startupCommandDelivery
             ? { startupCommandDelivery: startup.startupCommandDelivery }
             : {}),
           activate: true
+        }
+      : {}),
+    ...(startup?.agentPermissionMode
+      ? {
+          startupPermissionMode: startup.agentPermissionMode,
+          ...(!options?.startupDraft && startup.launchAgent
+            ? { startupAgent: startup.launchAgent }
+            : {}),
+          ...(options?.startupPrompt ? { startupPrompt: options.startupPrompt } : {})
         }
       : {})
   }

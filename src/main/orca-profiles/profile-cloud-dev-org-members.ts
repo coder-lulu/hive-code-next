@@ -28,8 +28,8 @@ function cleanEnvString(value: string | undefined, fallback: string): string {
 function devSelf(): OrcaOrgMember {
   return {
     userId: cleanEnvString(process.env.ORCA_CLOUD_DEV_USER_ID, 'dev-user'),
-    email: cleanEnvString(process.env.ORCA_CLOUD_DEV_EMAIL, 'dev@orca.local'),
-    displayName: cleanEnvString(process.env.ORCA_CLOUD_DEV_DISPLAY_NAME, 'Orca Dev'),
+    email: cleanEnvString(process.env.ORCA_CLOUD_DEV_EMAIL, 'dev@hivecode.local'),
+    displayName: cleanEnvString(process.env.ORCA_CLOUD_DEV_DISPLAY_NAME, 'HiveCode Dev'),
     role: 'owner'
   }
 }
@@ -40,14 +40,19 @@ function seedDevRoster(): DevOrgRoster {
       devSelf(),
       {
         userId: 'dev-teammate-1',
-        email: 'teammate@orca.local',
+        email: 'teammate@hivecode.local',
         displayName: 'Dev Teammate',
         role: 'admin'
       },
       // Why: userId null exercises the "hasn't signed in to Orca yet" disabled row.
-      { userId: null, email: 'invited-member@orca.local', displayName: undefined, role: 'member' }
+      {
+        userId: null,
+        email: 'invited-member@hivecode.local',
+        displayName: undefined,
+        role: 'member'
+      }
     ],
-    pendingInvites: [{ email: 'pending@orca.local', role: 'member', createdAt: Date.now() }]
+    pendingInvites: [{ email: 'pending@hivecode.local', role: 'member', createdAt: Date.now() }]
   }
 }
 

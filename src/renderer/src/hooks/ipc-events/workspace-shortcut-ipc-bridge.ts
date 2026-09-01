@@ -34,6 +34,14 @@ export function registerWorkspaceShortcutIpcBridge(unsubs: (() => void)[]): void
     })
   )
 
+  if (window.api.ui.onOpenNewTaskHome) {
+    unsubs.push(
+      window.api.ui.onOpenNewTaskHome(() => {
+        useAppStore.getState().openNewTaskHome()
+      })
+    )
+  }
+
   if (window.api.ui.onDeleteCurrentWorkspace) {
     unsubs.push(
       window.api.ui.onDeleteCurrentWorkspace(() => {

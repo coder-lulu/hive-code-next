@@ -1,6 +1,7 @@
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useRef } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import Sidebar from '../components/Sidebar'
 import RightSidebar from '../components/right-sidebar'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
@@ -17,7 +18,9 @@ import { RightSidebarToggle, TitlebarMainStrip } from './TitlebarMainStrip'
 import type { AppChromeLayout } from './use-app-chrome-layout'
 import type { FloatingWorkspacePanelState } from './use-floating-workspace-panel'
 import { resolveSettingsHelpPlacement } from './titlebar-settings-help-placement'
+import { AppPageLoadingFallback } from './AppPageLoadingFallback'
 import { useAppStore } from '../store'
+import { loadSettingsPage } from '../components/settings/settings-page-loader'
 
 const Landing = lazy(() => import('../components/Landing'))
 const WorktreeCreationPanel = lazy(
@@ -26,7 +29,10 @@ const WorktreeCreationPanel = lazy(
 const TaskPage = lazy(() => import('../components/TaskPage'))
 const AutomationsPage = lazy(() => import('../components/automations/AutomationsPage'))
 const ActivityPrototypePage = lazy(() => import('../components/activity/ActivityPrototypePage'))
-const Settings = lazy(() => import('../components/settings/Settings'))
+const TemporarySessionsActivityView = lazy(
+  () => import('../components/activity/TemporarySessionsActivityView')
+)
+const Settings = lazy(loadSettingsPage, { reloadKey: 'settings' })
 const SkillsPage = lazy(() => import('../components/skills/SkillsPage'))
 const ArtifactsPage = lazy(() => import('../components/artifacts/ArtifactsPage'))
 const WorkspaceSpacePage = lazy(() => import('../components/workspace-space/WorkspaceSpacePage'))
@@ -76,6 +82,7 @@ function WorktreeSidebar({
 
 function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element {
   const { activeView, activeWorktreeId, activePendingCreationId, creationLayoutActive } = layout
+  const activityPageScope = useAppStore((state) => state.activityPageScope)
   return (
     <>
       {activeView === 'settings' ? <Settings /> : null}
@@ -83,7 +90,13 @@ function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element 
       {activeView === 'artifacts' ? <ArtifactsPage /> : null}
       {activeView === 'tasks' ? <TaskPage /> : null}
       {activeView === 'automations' ? <AutomationsPage /> : null}
-      {activeView === 'activity' ? <ActivityPrototypePage /> : null}
+      {activeView === 'activity' ? (
+        activityPageScope === 'temporary-sessions' ? (
+          <TemporarySessionsActivityView />
+        ) : (
+          <ActivityPrototypePage />
+        )
+      ) : null}
       {activeView === 'space' ? <WorkspaceSpacePage /> : null}
       {activeView === 'mobile' ? <MobilePage /> : null}
       {activeView === 'terminal' && creationLayoutActive && activePendingCreationId ? (
@@ -103,15 +116,7 @@ export function AppWorkspaceShell(props: {
   floatingWorkspace: FloatingWorkspacePanelState
 }): React.JSX.Element {
   const { layout, floatingWorkspace } = props
-  const landingActive =
-    layout.activeView === 'terminal' && !layout.activeWorktreeId && !layout.creationLayoutActive
-  useEffect(() => {
-    // The context rail is secondary below the desktop-wide breakpoint. Close it
-    // once on Landing entry, while preserving an explicit user reopen afterwards.
-    if (landingActive && window.innerWidth < 1440 && useAppStore.getState().rightSidebarOpen) {
-      useAppStore.getState().setRightSidebarOpen(false)
-    }
-  }, [landingActive])
+  const mandatoryUpdate = useAppStore((state) => state.updateStatus.mandatory === true)
   const workspaceBoardPanel = useWorkspaceBoardPanel()
   const stackedMainStripMounted =
     layout.stackedSidebarOpen &&
@@ -149,7 +154,11 @@ export function AppWorkspaceShell(props: {
         'The app is still running. Retry the shell or use the menu to report the crash details.'
       )}
     >
-      <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
+      <div
+        className="flex flex-row flex-1 min-h-0 overflow-hidden"
+        inert={mandatoryUpdate || undefined}
+        aria-hidden={mandatoryUpdate || undefined}
+      >
         {/* Why: keep the non-workspace titlebar inside this left+center wrapper so it doesn't span over the right-sidebar column. */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {/* Why: workspace view drops the full-width titlebar so tab groups extend to the top; settings/landing/tasks keep it. */}
@@ -245,7 +254,7 @@ export function AppWorkspaceShell(props: {
                       </Suspense>
                     </TerminalWorkbenchContainer>
                   ) : null}
-                  <Suspense fallback={null}>
+                  <Suspense fallback={<AppPageLoadingFallback />}>
                     <RecoverableRenderErrorBoundary
                       boundaryId={`page.${layout.activeView}`}
                       surface="page"
@@ -253,7 +262,8 @@ export function AppWorkspaceShell(props: {
                       title={translate('auto.App.b7a714db1e', 'This page hit an error.')}
                       description={translate(
                         'auto.App.03a14f6b5b',
-                        'Retry the page or navigate to another Orca surface.'
+                        'Retry the page or navigate to another {{value0}} page.',
+                        { value0: APP_DISPLAY_NAME }
                       )}
                     >
                       <ActivePage layout={layout} />
@@ -286,10 +296,7 @@ export function AppWorkspaceShell(props: {
               'Retry the sidebar or switch tabs to reload this surface.'
             )}
           >
-            <RightSidebar
-              showSettingsHelpControls={settingsHelpPlacement === 'right-sidebar'}
-              mode={landingActive ? 'landing' : 'workspace'}
-            />
+            <RightSidebar showSettingsHelpControls={settingsHelpPlacement === 'right-sidebar'} />
           </RecoverableRenderErrorBoundary>
         ) : null}
       </div>

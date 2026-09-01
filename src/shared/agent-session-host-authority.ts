@@ -8,8 +8,10 @@ import type { RuntimeTerminalCreate, RuntimeTerminalPresentation } from './runti
 import { isTerminalLeafId } from './stable-pane-id'
 import { isValidTerminalTabId } from './terminal-tab-id'
 import type { TuiAgent } from './tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from './tui-agent-permissions'
 
 export { AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY as AGENT_SESSION_HOST_AUTHORITY_CAPABILITY } from './protocol-version'
+export { AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY as AGENT_SESSION_LAUNCH_PERMISSION_CAPABILITY } from './protocol-version'
 
 export const AGENT_SESSION_RPC_ERROR_CODES = [
   'agent_session_identity_required',
@@ -109,6 +111,8 @@ export type RuntimeEnsureAgentSessionRequest =
       ompResumeFilePath?: string
       /** Explicit client override. Omission keeps launch defaults host-owned. */
       agentArgs?: string | null
+      /** Semantic resume override, resolved again from the execution Host's defaults. */
+      agentPermissionMode?: AgentExplicitLaunchPermissionMode
       launchPreferences?: AgentLaunchPreferences
       presentation?: RuntimeTerminalPresentation
       placement?: { tabId?: string; leafId?: string }
@@ -127,6 +131,8 @@ export type RuntimeCreateAgentSessionRequest = {
   promptDelivery?: AgentPromptDelivery
   /** Explicit client override. Omission keeps launch defaults host-owned. */
   agentArgs?: string | null
+  /** Semantic one-launch override, resolved against this execution host's defaults. */
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
   launchPreferences?: AgentLaunchPreferences
   startupCwd?: string
   presentation?: RuntimeTerminalPresentation

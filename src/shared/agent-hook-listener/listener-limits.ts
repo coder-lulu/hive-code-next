@@ -1,5 +1,6 @@
 import { ORCA_HOOK_PROTOCOL_VERSION } from '../agent-hook-types'
 import { REMOTE_AGENT_HOOK_ENV } from '../agent-hook-relay'
+import { APP_DISPLAY_NAME } from '../brand'
 import type { HookListenerState } from './listener-state'
 
 /** Bound the warn-once Sets so a client varying `version`/`env` per request can't grow them unbounded. */
@@ -56,7 +57,7 @@ export function warnOnHookEnvOrVersionMismatch(
       state.warnedEnvs.add(key)
       console.warn(
         `[agent-hooks] received ${env} hook on ${expectedEnv} server. ` +
-          'Likely a stale terminal from another Orca install.'
+          `Likely a stale terminal from another ${APP_DISPLAY_NAME} install.`
       )
     }
   }

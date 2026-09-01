@@ -1,4 +1,5 @@
 import { extname } from 'node:path'
+import { applyProductBranding } from '../../shared/brand'
 import type { RuntimeFilePreviewResult } from '../../shared/runtime-file-contracts'
 import type { DocPreviewFileFailureReason } from '../../shared/doc-preview-scheme'
 import { callRuntimeEnvironment } from '../ipc/runtime-environment-transport-routing'
@@ -30,8 +31,9 @@ const TRUNCATED_PREVIEW_MESSAGE = 'This document is too large for the server to 
 const RUNTIME_TOO_LARGE_ERROR = 'file_too_large'
 
 /** Same stance as the SSH relay message: previews fail closed on a host without scoped reads. */
-const RUNTIME_DOC_PREVIEW_UPDATE_REQUIRED_MESSAGE =
+const RUNTIME_DOC_PREVIEW_UPDATE_REQUIRED_MESSAGE = applyProductBranding(
   'Secure document previews require a newer Orca on the paired machine. Update it and try again.'
+)
 
 /** Both owners refuse an over-cap file; only their error shapes differ. */
 function isTooLargeReadError(error: unknown): boolean {

@@ -93,7 +93,7 @@ export function parseHostAccessLink(input: string): ParseHostAccessLinkResult {
     return {
       ok: false,
       kind: 'invalid-input',
-      message: applyProductBranding('Enter an Orca access link or bare pairing code.')
+      message: 'Enter a HiveCode access link or bare pairing code.'
     }
   }
   if (pairing.scope === 'mobile') {

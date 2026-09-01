@@ -19,6 +19,7 @@ import { printHelp } from './help'
 import type { RuntimeClient } from './runtime-client'
 import { COMMAND_SPECS } from './specs'
 import { resolveOrchestrationCliExecutable } from './runtime/orchestration-recovery-command'
+import { CLI_COMPATIBILITY_ALIASES, PRIMARY_CLI_COMMAND } from '../shared/brand'
 
 export { COMMAND_SPECS } from './specs'
 export { buildCurrentWorktreeSelector, normalizeWorktreeSelector } from './selectors'
@@ -28,6 +29,7 @@ const COMMAND_PATHS = COMMAND_SPECS.flatMap((spec) => specPaths(spec))
 function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
   return (
     commandPath[0] === 'account' ||
+    commandPath[0] === 'runtime' ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||
     commandPath[0] === 'serve' ||
@@ -59,6 +61,7 @@ export async function main(
   argv = process.argv.slice(2),
   cwd = resolveInvocationCwd()
 ): Promise<void> {
+  warnForCompatibilityInvocation()
   if (argv[0] === 'agent-teams-tmux') {
     await runAgentTeamsTmuxShim(argv.slice(1))
     return
@@ -163,6 +166,21 @@ export async function main(
     reportCliError(error, json, { commandPath: parsed.commandPath })
     process.exitCode = 1
   }
+}
+
+function warnForCompatibilityInvocation(): void {
+  const explicitName = process.env.HIVE_CLI_INVOKED_AS ?? process.env.ORCA_CLI_COMMAND
+  const entryName = process.argv[1]
+    ?.split(/[\\/]/)
+    .at(-1)
+    ?.replace(/\.(?:cmd|exe)$/i, '')
+  const invokedName = explicitName ?? entryName
+  if (!invokedName || !(CLI_COMPATIBILITY_ALIASES as readonly string[]).includes(invokedName)) {
+    return
+  }
+  process.stderr.write(
+    `Warning: \`${invokedName}\` is deprecated and will be removed after this compatibility release; use \`${PRIMARY_CLI_COMMAND}\`.\n`
+  )
 }
 
 async function runClaudeTeams(argv: string[], cwd: string): Promise<void> {

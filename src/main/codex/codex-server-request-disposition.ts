@@ -9,6 +9,7 @@ import {
   type CodexPromptRegistry,
   type CodexPendingPrompt
 } from './codex-structured-prompt-replies'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 export const CODEX_MCP_ELICITATION_METHOD = 'mcpServer/elicitation/request'
 export const CODEX_PERMISSIONS_APPROVAL_METHOD = 'item/permissions/requestApproval'
@@ -70,16 +71,24 @@ export function disposeCodexServerRequest(
       connection.respond(request.id, { decision: 'abort' })
       break
     case CODEX_AUTH_TOKEN_REFRESH_METHOD:
-      connection.respondWithError(request.id, -32001, 'Orca cannot refresh app-server auth tokens')
+      connection.respondWithError(
+        request.id,
+        -32001,
+        `${APP_DISPLAY_NAME} cannot refresh app-server auth tokens`
+      )
       break
     case CODEX_ATTESTATION_METHOD:
-      connection.respondWithError(request.id, -32001, 'Orca did not negotiate attestation')
+      connection.respondWithError(
+        request.id,
+        -32001,
+        `${APP_DISPLAY_NAME} did not negotiate attestation`
+      )
       break
     default:
       connection.respondWithError(
         request.id,
         -32000,
-        `Orca rejected unrecognized blocking request ${request.method}`
+        `${APP_DISPLAY_NAME} rejected unrecognized blocking request ${request.method}`
       )
   }
   return { kind: 'responded', method: request.method }

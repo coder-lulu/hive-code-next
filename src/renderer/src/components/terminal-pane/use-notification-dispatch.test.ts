@@ -39,6 +39,7 @@ type MockState = {
   markTerminalTabUnread: ReturnType<typeof vi.fn>
   markTerminalPaneUnread: ReturnType<typeof vi.fn>
   markAgentCompletionPaneUnread: ReturnType<typeof vi.fn>
+  incrementAgentCompletionUnread: ReturnType<typeof vi.fn>
 }
 
 const playDesktopNotificationSound = vi.hoisted(() => vi.fn())
@@ -143,7 +144,8 @@ describe('dispatchTerminalNotification', () => {
       markWorktreeUnread: vi.fn(),
       markTerminalTabUnread: vi.fn(),
       markTerminalPaneUnread: vi.fn(),
-      markAgentCompletionPaneUnread: vi.fn()
+      markAgentCompletionPaneUnread: vi.fn(),
+      incrementAgentCompletionUnread: vi.fn()
     }
     vi.stubGlobal('window', {
       api: {
@@ -188,6 +190,26 @@ describe('dispatchTerminalNotification', () => {
     expect(mockState.markWorktreeUnread).toHaveBeenCalledWith('wt-primary')
     expect(mockState.markTerminalTabUnread).toHaveBeenCalledWith('tab-1')
     expect(mockState.markTerminalPaneUnread).toHaveBeenCalledWith(paneKey)
+    expect(mockState.incrementAgentCompletionUnread).toHaveBeenCalledWith(paneKey)
+  })
+
+  it('does not count an input request as a completed task', () => {
+    dispatchTerminalNotification('wt-primary', {
+      source: 'agent-task-complete',
+      agentAttentionKind: 'input-required',
+      terminalTitle: 'claude',
+      paneKey,
+      agentStatusSnapshot: {
+        state: 'waiting',
+        prompt: 'approve the edit',
+        agentType: 'claude',
+        stateStartedAt: Date.now()
+      }
+    })
+
+    expect(mockState.markWorktreeUnread).toHaveBeenCalledWith('wt-primary')
+    expect(mockState.markAgentCompletionPaneUnread).toHaveBeenCalledWith(paneKey)
+    expect(mockState.incrementAgentCompletionUnread).not.toHaveBeenCalled()
   })
 
   it('builds the notification id from a completion snapshot, not the pinned working row', () => {

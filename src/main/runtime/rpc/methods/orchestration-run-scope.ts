@@ -1,5 +1,6 @@
 import type { OrchestrationCompatibilityEvidence } from '../../../../shared/orchestration-compatibility-evidence'
 import { orchestrationSkillRecoveryData } from '../../../../shared/orchestration-rpc-contract'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { RunRow } from '../../orchestration/types'
 import type {
@@ -73,7 +74,7 @@ export function resolveOrchestrationCaller(
   if (!paneKey && params.requireStablePane) {
     throw new OrchestrationError(
       'stable_pane_required',
-      'The coordinator terminal has no stable pane identity. Run this command inside a live Orca terminal.'
+      `The coordinator terminal has no stable pane identity. Run this command inside a live ${APP_DISPLAY_NAME} terminal.`
     )
   }
   return paneKey ?? null

@@ -74,6 +74,20 @@ describe('inspectEmulatorAvailability', () => {
               name: 'Pixel_7',
               state: 'booted',
               isAvailable: true
+            },
+            {
+              backend: 'android',
+              id: 'emulator-5556',
+              name: 'Pixel_Tablet',
+              state: 'booting',
+              isAvailable: true
+            },
+            {
+              backend: 'android',
+              id: 'emulator-5558',
+              name: 'Pixel_Stuck',
+              state: 'unresponsive',
+              isAvailable: true
             }
           ]
         }
@@ -86,6 +100,20 @@ describe('inspectEmulatorAvailability', () => {
         name: 'Pixel_7',
         udid: 'emulator-5554',
         state: 'Booted',
+        runtime: 'Android',
+        isAvailable: true
+      },
+      {
+        name: 'Pixel_Tablet',
+        udid: 'emulator-5556',
+        state: 'Booting',
+        runtime: 'Android',
+        isAvailable: true
+      },
+      {
+        name: 'Pixel_Stuck',
+        udid: 'emulator-5558',
+        state: 'Unresponsive',
         runtime: 'Android',
         isAvailable: true
       }

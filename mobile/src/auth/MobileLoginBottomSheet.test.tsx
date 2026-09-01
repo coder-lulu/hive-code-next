@@ -107,9 +107,24 @@ describe('MobileLoginBottomSheet', () => {
       configuration: {
         registrationEnabled: true,
         providers: [
-          { accessibilityLabel: '使用 GitHub 登录', enabled: false, id: 'github' },
-          { accessibilityLabel: '使用 QQ 登录', enabled: true, id: 'qq' },
-          { accessibilityLabel: '使用微信登录', enabled: true, id: 'wechat' }
+          {
+            accessibilityLabel: '使用 GitHub 登录',
+            authorizationPath: '/hive/v1/auth/provider-authorizations/github',
+            enabled: false,
+            id: 'github'
+          },
+          {
+            accessibilityLabel: '使用 QQ 登录',
+            authorizationPath: '/hive/v1/auth/provider-authorizations/qq',
+            enabled: true,
+            id: 'qq'
+          },
+          {
+            accessibilityLabel: '使用微信登录',
+            authorizationPath: '/hive/v1/auth/provider-authorizations/wechat',
+            enabled: true,
+            id: 'wechat'
+          }
         ]
       }
     })
@@ -151,21 +166,35 @@ describe('MobileLoginBottomSheet', () => {
     expect(onAction).toHaveBeenCalledWith({ kind: 'phone' })
   })
 
-  it('disables and loads only the active provider entry', () => {
+  it('disables every login action while one provider flow is active', () => {
     renderer = renderSheet({
       busyActionKey: 'provider:wechat',
       configuration: {
         registrationEnabled: false,
         providers: [
-          { accessibilityLabel: '使用 GitHub 登录', enabled: true, id: 'github' },
-          { accessibilityLabel: '使用微信登录', enabled: true, id: 'wechat' }
+          {
+            accessibilityLabel: '使用 GitHub 登录',
+            authorizationPath: '/hive/v1/auth/provider-authorizations/github',
+            enabled: true,
+            id: 'github'
+          },
+          {
+            accessibilityLabel: '使用微信登录',
+            authorizationPath: '/hive/v1/auth/provider-authorizations/wechat',
+            enabled: true,
+            id: 'wechat'
+          }
         ]
       }
     })
 
+    expect(buttonByLabel(renderer, '手机号登录').props.accessibilityState).toEqual({
+      busy: false,
+      disabled: true
+    })
     expect(buttonByLabel(renderer, '使用 GitHub 登录').props.accessibilityState).toEqual({
       busy: false,
-      disabled: false
+      disabled: true
     })
     expect(buttonByLabel(renderer, '使用微信登录').props.accessibilityState).toEqual({
       busy: true,

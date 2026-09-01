@@ -19,6 +19,8 @@ export function useComposerSubmitOrchestration(
   source: ComposerSourceState
 ): ComposerSubmitState {
   const folderSubmitOrchestration = useFolderSubmitOrchestration({
+    agentPermissionMode: target.composerTargetStore.agentPermissionMode,
+    agentPrompt: target.sourceContextState.agentPrompt,
     clearNewWorkspaceDraft: target.composerTargetStore.clearNewWorkspaceDraft,
     createFolderWorkspace: target.composerTargetStore.createFolderWorkspace,
     decisions: target.composerTargetStore.decisions,
@@ -66,6 +68,7 @@ export function useComposerSubmitOrchestration(
     workspaceSeedName: target.derivedComposerState.workspaceSeedName
   })
   const fullSubmitPreparation = useFullSubmitPreparation({
+    agentPermissionMode: target.composerTargetStore.agentPermissionMode,
     branchAutoNameRef: target.asyncComposerState.branchAutoNameRef,
     branchNameOverridePreservesNameEdits:
       target.workspaceIdentityState.branchNameOverridePreservesNameEdits,
@@ -201,6 +204,8 @@ export function useComposerSubmitOrchestration(
     smartNameMode: target.workspaceIdentityState.smartNameMode
   })
   const quickCreationExecution = useQuickCreationExecution({
+    agentPermissionMode: target.composerTargetStore.agentPermissionMode,
+    agentPrompt: target.sourceContextState.agentPrompt,
     clearNewWorkspaceDraft: target.composerTargetStore.clearNewWorkspaceDraft,
     createMultiple: target.asyncComposerState.createMultiple,
     effectivePresetId: target.derivedComposerState.effectivePresetId,

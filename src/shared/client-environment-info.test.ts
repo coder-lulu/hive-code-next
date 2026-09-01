@@ -6,6 +6,7 @@ import {
   hasClientEnvironmentFooter,
   stripClientEnvironmentFooter
 } from './client-environment-info'
+import { APP_DISPLAY_NAME } from './brand'
 
 const SAMPLE = {
   appVersion: '1.4.178-rc.2',
@@ -19,7 +20,7 @@ describe('formatClientEnvironmentInfo', () => {
   it('formats version, OS, and optional shell for copy-paste', () => {
     expect(formatClientEnvironmentInfo(SAMPLE)).toBe(
       [
-        'Orca: 1.4.178-rc.2',
+        `${APP_DISPLAY_NAME}: 1.4.178-rc.2`,
         'OS: win32 10.0.22631 (x64)',
         'Shell: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
       ].join('\n')
@@ -34,7 +35,7 @@ describe('formatClientEnvironmentInfo', () => {
         osRelease: '',
         arch: 'arm64'
       })
-    ).toBe(['Orca: unknown', 'OS: darwin (arm64)'].join('\n'))
+    ).toBe([`${APP_DISPLAY_NAME}: unknown`, 'OS: darwin (arm64)'].join('\n'))
   })
 
   it('keeps environment-controlled values on one line', () => {
@@ -48,7 +49,7 @@ describe('formatClientEnvironmentInfo', () => {
       })
     ).toBe(
       [
-        'Orca: 1.2.3 Injected: value',
+        `${APP_DISPLAY_NAME}: 1.2.3 Injected: value`,
         'OS: linux 6.8 Extra (x64)',
         'Shell: /bin/zsh More: data'
       ].join('\n')
@@ -59,7 +60,7 @@ describe('formatClientEnvironmentInfo', () => {
 describe('environment footer helpers', () => {
   it('builds a marked footer and detects when one is already present', () => {
     const footer = formatClientEnvironmentFooter(SAMPLE)
-    expect(footer.startsWith('---\nOrca:')).toBe(true)
+    expect(footer.startsWith(`---\n${APP_DISPLAY_NAME}:`)).toBe(true)
     expect(hasClientEnvironmentFooter(`oops\n\n${footer}`)).toBe(true)
     expect(hasClientEnvironmentFooter('oops')).toBe(false)
   })
@@ -70,7 +71,7 @@ describe('environment footer helpers', () => {
       info: SAMPLE
     })
     expect(withFooter).toContain('Working directory missing.')
-    expect(withFooter).toContain('Orca: 1.4.178-rc.2')
+    expect(withFooter).toContain(`${APP_DISPLAY_NAME}: 1.4.178-rc.2`)
     expect(appendClientEnvironmentFooter({ message: withFooter, info: SAMPLE })).toBe(withFooter)
   })
 
@@ -93,11 +94,18 @@ describe('environment footer helpers', () => {
     ).toBe('above below')
   })
 
-  it('still detects an edited footer block', () => {
-    const editedFooter = ['---', 'Orca: locally-built', 'OS: edited by user'].join('\n')
+  it('still detects current and legacy edited footer blocks', () => {
+    const editedFooter = [
+      '---',
+      `${APP_DISPLAY_NAME}: locally-built`,
+      'OS: edited by user'
+    ].join('\n')
+    const legacyFooter = ['---', 'Orca: locally-built', 'OS: edited by user'].join('\n')
 
     expect(hasClientEnvironmentFooter(editedFooter)).toBe(true)
     expect(stripClientEnvironmentFooter(editedFooter).trim()).toBe('')
+    expect(hasClientEnvironmentFooter(legacyFooter)).toBe(true)
+    expect(stripClientEnvironmentFooter(legacyFooter).trim()).toBe('')
   })
 
   it('treats a report as user text after the footer is deleted', () => {

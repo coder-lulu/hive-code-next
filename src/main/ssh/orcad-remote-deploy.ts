@@ -33,6 +33,7 @@ import {
   type OrcadStateSnapshot
 } from './orcad-activation-record'
 import { orcadActivationPath, readOrcadActivationRecord } from './orcad-activation-record-store'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { evaluateOrcadActivation, type OrcadActivationVerdict } from './orcad-activation-gate'
 import { planOrcadUpdate, type OrcadTerminalCensus } from './orcad-update-plan'
 import {
@@ -164,7 +165,7 @@ async function captureSnapshot(
   )
   if (capture === 'failed') {
     throw new Error(
-      `Could not snapshot ${options.userDataDir} before activating ${fullVersion}. Orca's ` +
+      `Could not snapshot ${options.userDataDir} before activating ${fullVersion}. ${APP_DISPLAY_NAME}'s ` +
         'persisted state carries no schema version, so without a snapshot a rollback has no ' +
         'way back. Refusing to activate.'
     )

@@ -35,18 +35,27 @@ function terminal() {
   }
 }
 
-function createRuntime(provider?: {
-  supportsAgentSessionClaims?: () => boolean
-  supportsAgentSessionCreateOperations?: () => boolean
-}) {
+function createRuntime(
+  provider?: {
+    supportsAgentSessionClaims?: () => boolean
+    supportsAgentSessionCreateOperations?: () => boolean
+  },
+  settings?: {
+    disabledTuiAgents: string[]
+    agentCmdOverrides: Record<string, string>
+    agentDefaultArgs: Record<string, string>
+    agentDefaultEnv: Record<string, Record<string, string>>
+  }
+) {
   const runtime = new OrcaRuntimeService(
     {
-      getSettings: () => ({
-        disabledTuiAgents: [],
-        agentCmdOverrides: {},
-        agentDefaultArgs: {},
-        agentDefaultEnv: {}
-      })
+      getSettings: () =>
+        settings ?? {
+          disabledTuiAgents: [],
+          agentCmdOverrides: {},
+          agentDefaultArgs: {},
+          agentDefaultEnv: {}
+        }
     } as never,
     undefined,
     provider ? { getLocalProvider: () => provider as never } : undefined
@@ -149,6 +158,130 @@ describe('agent-session create operation ledger', () => {
     )
   })
 
+  it('re-resolves a manual Codex resume against Host defaults', async () => {
+    const runtime = createRuntime(undefined, {
+      disabledTuiAgents: [],
+      agentCmdOverrides: {},
+      agentDefaultArgs: {
+        codex: '--model host --dangerously-bypass-approvals-and-sandbox'
+      },
+      agentDefaultEnv: {}
+    })
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+
+    await runtime.ensureAgentSession({
+      kind: 'explicit',
+      worktree: 'id:worktree-1',
+      agent: 'codex',
+      providerSession: { key: 'session_id', id: 'provider-session-1' },
+      agentPermissionMode: 'manual'
+    })
+
+    const command = createTerminal.mock.calls[0]?.[1]?.command
+    expect(command).toContain("'--model' 'host'")
+    expect(command).toContain("'--ask-for-approval' 'on-request'")
+    expect(command).toContain("'resume' 'provider-session-1'")
+    expect(command).not.toContain('dangerously-bypass')
+  })
+
+  it('resolves manual permission against host defaults without dropping unrelated arguments', async () => {
+    const runtime = createRuntime(undefined, {
+      disabledTuiAgents: [],
+      agentCmdOverrides: {},
+      agentDefaultArgs: {
+        codex: '--model gpt-5 --dangerously-bypass-approvals-and-sandbox'
+      },
+      agentDefaultEnv: {}
+    })
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+
+    await runtime.createAgentSession(request(operationId(), { agentPermissionMode: 'manual' }))
+
+    expect(createTerminal).toHaveBeenCalledWith(
+      'id:worktree-1',
+      expect.objectContaining({
+        command: expect.stringContaining(
+          "'--model' 'gpt-5' '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'"
+        ),
+        launchConfig: expect.objectContaining({
+          agentArgs:
+            "'--model' 'gpt-5' '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'"
+        })
+      })
+    )
+    expect(createTerminal.mock.calls[0]?.[1]?.command).not.toContain(
+      'dangerously-bypass-approvals-and-sandbox'
+    )
+  })
+
+  it('removes host command-override auto approval in manual mode', async () => {
+    const runtime = createRuntime(undefined, {
+      disabledTuiAgents: [],
+      agentCmdOverrides: {
+        codex: 'codex --dangerously-bypass-approvals-and-sandbox --profile work'
+      },
+      agentDefaultArgs: {},
+      agentDefaultEnv: {}
+    })
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+
+    await runtime.createAgentSession(request(operationId(), { agentPermissionMode: 'manual' }))
+
+    const command = createTerminal.mock.calls[0]?.[1]?.command
+    expect(command).toContain('--profile work')
+    expect(command).not.toContain('dangerously-bypass-approvals-and-sandbox')
+  })
+
+  it('resolves environment-backed auto approval on the execution host', async () => {
+    const runtime = createRuntime(undefined, {
+      disabledTuiAgents: [],
+      agentCmdOverrides: {},
+      agentDefaultArgs: {},
+      agentDefaultEnv: { goose: { GOOSE_PROFILE: 'review' } }
+    })
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+
+    await runtime.createAgentSession(
+      request(operationId(), { agent: 'goose', agentPermissionMode: 'yolo' })
+    )
+
+    expect(createTerminal).toHaveBeenCalledWith(
+      'id:worktree-1',
+      expect.objectContaining({
+        env: expect.objectContaining({ GOOSE_MODE: 'auto', GOOSE_PROFILE: 'review' }),
+        launchConfig: expect.objectContaining({
+          agentEnv: expect.objectContaining({ GOOSE_MODE: 'auto', GOOSE_PROFILE: 'review' })
+        })
+      })
+    )
+  })
+
+  it('clears inherited Goose auto approval in manual mode', async () => {
+    const runtime = createRuntime(undefined, {
+      disabledTuiAgents: [],
+      agentCmdOverrides: {},
+      agentDefaultArgs: {},
+      agentDefaultEnv: { goose: { GOOSE_MODE: 'auto', GOOSE_PROFILE: 'review' } }
+    })
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+
+    await runtime.createAgentSession(
+      request(operationId(), { agent: 'goose', agentPermissionMode: 'manual' })
+    )
+
+    expect(createTerminal).toHaveBeenCalledWith(
+      'id:worktree-1',
+      expect.objectContaining({
+        command: 'Remove-Item Env:GOOSE_MODE -ErrorAction SilentlyContinue; goose',
+        env: { GOOSE_PROFILE: 'review' },
+        launchConfig: expect.objectContaining({
+          agentCommand: 'Remove-Item Env:GOOSE_MODE -ErrorAction SilentlyContinue; goose',
+          agentEnv: { GOOSE_PROFILE: 'review' }
+        })
+      })
+    )
+  })
+
   it('selects nested SSH legacy fallback before reading a Pi transcript path locally', async () => {
     const runtime = createRuntime()
     const internal = runtime as unknown as {
@@ -211,6 +344,11 @@ describe('agent-session create operation ledger', () => {
     ).rejects.toThrow('agent_session_operation_conflict')
     await expect(
       runtime.createAgentSession(request(id, { agentArgs: '--profile changed' }), {
+        clientId: 'device-a'
+      })
+    ).rejects.toThrow('agent_session_operation_conflict')
+    await expect(
+      runtime.createAgentSession(request(id, { agentPermissionMode: 'manual' }), {
         clientId: 'device-a'
       })
     ).rejects.toThrow('agent_session_operation_conflict')

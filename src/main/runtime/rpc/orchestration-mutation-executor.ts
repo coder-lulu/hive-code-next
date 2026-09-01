@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { isOrchestrationMutation } from '../../../shared/orchestration-rpc-contract'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
+import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import { OrchestrationError } from '../orchestration/orchestration-error'
 import type { RpcRequest } from './core'
@@ -89,7 +90,7 @@ export class OrchestrationMutationExecutor {
             ? {
                 requestId,
                 dispatchId: recovery.dispatchId,
-                recoveryCommand: `orca orchestration worker-show --dispatch ${recovery.dispatchId} --json`
+                recoveryCommand: `${PRIMARY_CLI_COMMAND} orchestration worker-show --dispatch ${recovery.dispatchId} --json`
               }
             : { requestId }
         )

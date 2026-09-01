@@ -35,7 +35,8 @@ const mocks = vi.hoisted(() => ({
   deliverLaunchPromptToAgentTab: vi.fn(),
   seedNativeChatLaunchDraftForAgentTab: vi.fn(),
   getRuntimeEnvironmentIdForWorktree: vi.fn(),
-  hasMaterializedWebRuntimeBrowserPage: vi.fn()
+  hasMaterializedWebRuntimeBrowserPage: vi.fn(),
+  registerAgentLaunchConfig: vi.fn()
 }))
 
 vi.mock('../store', () => ({
@@ -193,6 +194,71 @@ describe('createWebRuntimeSessionTerminal', () => {
     }
   )
 
+  it('binds a direct Host-created manual launch to its mirrored pane for later resume', async () => {
+    const hostTabId = 'host-tab-manual'
+    const terminalHandle = 'term-manual'
+    const runtimeCall = vi.fn(async (request: { method: string }) => {
+      if (request.method === 'status.get') {
+        return {
+          id: 'status',
+          ok: true,
+          result: {
+            runtimeId: 'runtime-1',
+            graphStatus: 'ready',
+            runtimeProtocolVersion: 3,
+            minCompatibleRuntimeClientVersion: 2,
+            capabilities: ['agent-session.host-authority.v1', 'agent-session.launch-permission.v1']
+          }
+        }
+      }
+      if (request.method === 'terminal.createAgentSession') {
+        return {
+          id: 'create',
+          ok: true,
+          result: {
+            terminal: {
+              handle: terminalHandle,
+              worktreeId: WORKTREE_ID,
+              tabId: hostTabId,
+              paneKey: `${hostTabId}:${FOCUS_LEAF_ID}`
+            },
+            disposition: 'created'
+          }
+        }
+      }
+      return { id: 'list', ok: true, result: makeSnapshot() }
+    })
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: runtimeCall } }
+    })
+
+    await expect(
+      createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        agentSessionKind: 'fresh',
+        launchAgent: 'codex',
+        agentPermissionMode: 'manual'
+      })
+    ).resolves.toEqual({ status: 'created' })
+
+    const mirroredTabId = `web-terminal-${encodeURIComponent(hostTabId)}`
+    expect(mocks.registerAgentLaunchConfig).toHaveBeenCalledWith(
+      `${mirroredTabId}:${FOCUS_LEAF_ID}`,
+      {
+        agentArgs: '',
+        agentEnv: {},
+        hostDefaultsAuthoritative: true,
+        agentPermissionMode: 'manual'
+      },
+      {
+        agentType: 'codex',
+        tabId: mirroredTabId,
+        leafId: FOCUS_LEAF_ID,
+        terminalHandle
+      }
+    )
+  })
+
   it.each([
     { gated: false, authority: false },
     { gated: true, authority: true }
@@ -262,6 +328,134 @@ describe('createWebRuntimeSessionTerminal', () => {
       expect(methods.includes('session.tabs.createTerminal')).toBe(!authority)
     }
   )
+
+  it.each([
+    { gated: false, authority: false },
+    { gated: true, authority: true }
+  ])(
+    'routes a permission override by capability (advertised=$gated)',
+    async ({ gated, authority }) => {
+      const runtimeCall = vi.fn(
+        async (request: { method: string; params?: Record<string, unknown> }) => {
+          if (request.method === 'status.get') {
+            return {
+              id: 'status',
+              ok: true,
+              result: {
+                runtimeId: 'runtime-1',
+                graphStatus: 'ready',
+                runtimeProtocolVersion: 3,
+                minCompatibleRuntimeClientVersion: 2,
+                capabilities: [
+                  'agent-session.host-authority.v1',
+                  ...(gated ? ['agent-session.launch-permission.v1'] : [])
+                ]
+              }
+            }
+          }
+          if (request.method === 'terminal.createAgentSession') {
+            return {
+              id: 'create',
+              ok: true,
+              result: {
+                terminal: {
+                  handle: 'term-goose',
+                  worktreeId: WORKTREE_ID,
+                  tabId: 'host-tab-goose',
+                  paneKey: `host-tab-goose:${FOCUS_LEAF_ID}`
+                },
+                disposition: 'created'
+              }
+            }
+          }
+          if (request.method === 'session.tabs.createTerminal') {
+            return {
+              id: 'legacy-create',
+              ok: true,
+              result: { tab: { id: 'host-tab-goose', leafId: FOCUS_LEAF_ID } }
+            }
+          }
+          return { id: 'list', ok: true, result: makeSnapshot() }
+        }
+      )
+      vi.stubGlobal('window', {
+        api: { runtimeEnvironments: { call: runtimeCall } }
+      })
+
+      const outcome = await createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        agentSessionKind: 'fresh',
+        launchAgent: 'goose',
+        command: "goose '& whoami &'",
+        env: { GOOSE_MODE: 'auto' },
+        launchConfig: { agentArgs: '', agentEnv: { GOOSE_MODE: 'auto' } },
+        agentPermissionMode: 'yolo'
+      })
+
+      expect(outcome).toMatchObject(
+        authority
+          ? { status: 'created' }
+          : { status: 'failed', message: expect.stringMatching(/launch-permission/) }
+      )
+
+      const methods = runtimeCall.mock.calls.map(([request]) => request.method)
+      expect(methods.includes('terminal.createAgentSession')).toBe(authority)
+      expect(methods.includes('session.tabs.createTerminal')).toBe(false)
+      if (authority) {
+        const authorityRequest = runtimeCall.mock.calls.find(
+          ([request]) => request.method === 'terminal.createAgentSession'
+        )?.[0]
+        expect(authorityRequest).toMatchObject({
+          params: { agent: 'goose', agentPermissionMode: 'yolo' }
+        })
+        expect(authorityRequest?.params).not.toHaveProperty('agentArgs')
+      }
+    }
+  )
+
+  it('keeps legacy terminal creation available when no explicit permission mode is selected', async () => {
+    const runtimeCall = vi.fn(
+      async (request: { method: string; params?: Record<string, unknown> }) => {
+        if (request.method === 'status.get') {
+          return {
+            id: 'status',
+            ok: true,
+            result: {
+              runtimeId: 'runtime-1',
+              graphStatus: 'ready',
+              runtimeProtocolVersion: 3,
+              minCompatibleRuntimeClientVersion: 2,
+              capabilities: []
+            }
+          }
+        }
+        if (request.method === 'session.tabs.createTerminal') {
+          return {
+            id: 'legacy-create',
+            ok: true,
+            result: { tab: { id: 'host-tab-goose', leafId: FOCUS_LEAF_ID } }
+          }
+        }
+        return { id: 'list', ok: true, result: makeSnapshot() }
+      }
+    )
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: runtimeCall } }
+    })
+
+    await expect(
+      createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        agentSessionKind: 'fresh',
+        launchAgent: 'goose',
+        command: 'goose',
+        env: { GOOSE_MODE: 'auto' }
+      })
+    ).resolves.toEqual({ status: 'created' })
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'session.tabs.createTerminal' })
+    )
+  })
 
   it('creates paired web agents through host authority so activation is mirrored', async () => {
     const snapshot = {

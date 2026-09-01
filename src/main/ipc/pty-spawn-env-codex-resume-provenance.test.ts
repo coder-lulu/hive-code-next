@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { spawnMock } from './pty-ipc-mock-registry'
 import { posixOnlyIt, TEST_MANAGED_ROOT } from './pty-ipc-test-constants'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
@@ -252,7 +253,9 @@ describe('registerPtyHandlers', () => {
           spawnCodexResume(ORIGIN_ROLLOUT, {
             command: `codex 'resume' '${RESUME_SESSION_ID}' --sandbox`
           })
-        ).rejects.toThrow(/could not verify the originating Codex session file/)
+        ).rejects.toThrow(
+          `${APP_DISPLAY_NAME} could not verify the originating Codex session file, so automatic resume was stopped to avoid using a different account.`
+        )
       })
       posixOnlyIt(
         'launches an unstrippable resume unchanged when metadata never claimed Codex layout',

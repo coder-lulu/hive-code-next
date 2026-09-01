@@ -1,4 +1,5 @@
 import { InFlightPromiseDedupe, stableInFlightKey } from '../../shared/in-flight-promise-dedupe'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { GitDiffResult } from '../../shared/git-diff-compare-types'
 import type {
   GitStagingArea,
@@ -95,7 +96,7 @@ export class SshGitReadProvider {
     } catch (error) {
       if (isJsonRpcMethodNotFoundError(error)) {
         throw new Error(
-          'SSH submodule diff support is unavailable on this relay. Reconnect the SSH target to update Orca on the host, then try again.'
+          `SSH submodule diff support is unavailable on this relay. Reconnect the SSH target to update ${APP_DISPLAY_NAME} on the host, then try again.`
         )
       }
       throw error

@@ -61,6 +61,7 @@ const mockSetActiveTab = vi.fn((tabId: string) => {
 const mockSetActiveTabType = vi.fn((tabType: string) => {
   mockActiveTabType = tabType
 })
+const mockConsumeAgentCompletionUnread = vi.fn()
 let capturedRowActivations: {
   paneKey: string
   onActivate: (tabId: string, paneKey: string) => void
@@ -74,6 +75,7 @@ function buildMockStoreState(): Record<string, unknown> {
     dropAgentStatus: vi.fn(),
     dismissRetainedAgent: vi.fn(),
     acknowledgeAgents: vi.fn(),
+    consumeAgentCompletionUnread: mockConsumeAgentCompletionUnread,
     agentSendPopoverTargetMode: null,
     agentStatusByPaneKey: mockAgentStatusByPaneKey,
     agentStatusEpoch: 0,
@@ -200,6 +202,7 @@ describe('WorktreeCardAgents activation', () => {
       tabId
     })
     expect(activationMocks.activateTabAndFocusPane).not.toHaveBeenCalled()
+    expect(mockConsumeAgentCompletionUnread).toHaveBeenCalledWith(paneKey)
     expect(staleAgentRowMocks.dismissStaleAgentRowByKey).not.toHaveBeenCalled()
   })
 

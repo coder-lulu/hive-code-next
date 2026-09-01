@@ -1,4 +1,5 @@
 import {
+  CANONICAL_RUNTIME_RECORD_ID_PATTERN,
   PAIRING_OFFER_VERSION,
   PairingOfferSchema,
   type PairingOffer
@@ -14,7 +15,7 @@ const SUPPORTED_PAIRING_PROTOCOLS = new Set<string>(
   [PRIMARY_PAIRING_SCHEME, ...hivecodeProductConfig.schemes.aliases].map((scheme) => `${scheme}:`)
 )
 
-export { PAIRING_OFFER_VERSION, PairingOfferSchema }
+export { CANONICAL_RUNTIME_RECORD_ID_PATTERN, PAIRING_OFFER_VERSION, PairingOfferSchema }
 export type { PairingOffer }
 
 export function encodePairingOffer(offer: PairingOffer): string {

@@ -23,6 +23,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
   },
   {
+    name: 'runtime',
+    keys: ['runtime status', 'runtime claim', 'runtime reset-cloud-identity'],
+    load: async () => (await import('./handlers/runtime.js')).RUNTIME_HANDLERS
+  },
+  {
     name: 'artifacts',
     keys: [
       'artifacts list',

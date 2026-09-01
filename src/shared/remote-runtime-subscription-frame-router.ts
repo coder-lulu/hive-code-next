@@ -1,4 +1,5 @@
 import type WebSocket from 'ws'
+import { APP_DISPLAY_NAME } from './brand'
 import { decrypt, decryptBytes, encrypt } from './e2ee-crypto'
 import {
   classifyRemoteRuntimeReadyFrame,
@@ -45,7 +46,7 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
       this.options.fail(
         new RemoteRuntimeClientError(
           'invalid_runtime_response',
-          'Remote Orca runtime returned an undecryptable frame.'
+          `Remote ${APP_DISPLAY_NAME} runtime returned an undecryptable frame.`
         )
       )
       return
@@ -64,8 +65,8 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
         new RemoteRuntimeClientError(
           'invalid_runtime_response',
           readyFrame === 'invalid'
-            ? 'Remote Orca runtime returned an invalid E2EE handshake frame.'
-            : 'Remote Orca runtime returned an unexpected E2EE handshake frame.'
+            ? `Remote ${APP_DISPLAY_NAME} runtime returned an invalid E2EE handshake frame.`
+            : `Remote ${APP_DISPLAY_NAME} runtime returned an unexpected E2EE handshake frame.`
         )
       )
       return
@@ -80,7 +81,7 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
       this.options.fail(
         new RemoteRuntimeClientError(
           'invalid_runtime_response',
-          'Remote Orca runtime returned an invalid E2EE auth frame.'
+          `Remote ${APP_DISPLAY_NAME} runtime returned an invalid E2EE auth frame.`
         )
       )
       return
@@ -88,7 +89,10 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
     if (authenticated.kind !== 'authenticated') {
       const code = authenticated.unauthorized ? 'unauthorized' : 'invalid_runtime_response'
       this.options.fail(
-        new RemoteRuntimeClientError(code, 'Remote Orca runtime rejected the pairing token.')
+        new RemoteRuntimeClientError(
+          code,
+          `Remote ${APP_DISPLAY_NAME} runtime rejected the pairing token.`
+        )
       )
       return
     }
@@ -105,7 +109,7 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
       this.options.fail(
         new RemoteRuntimeClientError(
           'invalid_runtime_response',
-          'Remote Orca runtime returned an invalid response frame.'
+          `Remote ${APP_DISPLAY_NAME} runtime returned an invalid response frame.`
         )
       )
       return
@@ -125,7 +129,7 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
     this.options.fail(
       new RemoteRuntimeClientError(
         'invalid_runtime_response',
-        'Remote Orca runtime returned a mismatched response id.'
+        `Remote ${APP_DISPLAY_NAME} runtime returned a mismatched response id.`
       )
     )
   }
@@ -135,7 +139,7 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
       this.options.fail(
         new RemoteRuntimeClientError(
           'invalid_runtime_response',
-          'Remote Orca runtime returned binary data before authentication.'
+          `Remote ${APP_DISPLAY_NAME} runtime returned binary data before authentication.`
         )
       )
       return
@@ -145,7 +149,7 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
       this.options.fail(
         new RemoteRuntimeClientError(
           'invalid_runtime_response',
-          'Remote Orca runtime returned an undecryptable binary frame.'
+          `Remote ${APP_DISPLAY_NAME} runtime returned an undecryptable binary frame.`
         )
       )
       return

@@ -17,7 +17,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { CliInstallMethod, CliInstallStatus } from '../../shared/cli-install-types'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { hivecodeProductConfig } from '../../shared/generated/product-config'
 import { getCompatibilityCliCommandNamesForPlatform } from '../../shared/orca-cli-command-name'
 import { expandWindowsEnvironmentVariables } from '../../shared/windows-environment-expansion'
@@ -31,7 +31,7 @@ import {
 } from './windows-user-path-registry'
 
 const execFileAsync = promisify(execFile)
-const DEFAULT_MAC_COMMAND_PATH = '/usr/local/bin/hivecode'
+const DEFAULT_MAC_COMMAND_PATH = `/usr/local/bin/${hivecodeProductConfig.cli.primary}`
 const DEV_COMMAND_NAME = 'orca-dev'
 const LEGACY_LINUX_COMMAND_NAME = 'orca'
 const DEV_LAUNCHER_DIR = ['cli', 'bin']
@@ -112,7 +112,7 @@ export class CliInstaller {
     const candidateMacPath = options.defaultMacCommandPath ?? DEFAULT_MAC_COMMAND_PATH
     this.macCommandPath = existsSync(dirname(candidateMacPath))
       ? candidateMacPath
-      : join(this.homePath, '.local', 'bin', 'hivecode')
+      : join(this.homePath, '.local', 'bin', hivecodeProductConfig.cli.primary)
     this.privilegedRunner = options.privilegedRunner ?? runMacPrivilegedCommand
     this.userPathReader = options.userPathReader ?? readWindowsUserPathRegistry
     this.userPathMutationReader =
@@ -152,7 +152,7 @@ export class CliInstaller {
         this.isLinuxAppImage() && this.appImagePath
           ? `The AppImage file at ${this.appImagePath} is missing. Move it back or re-run CLI registration from the current AppImage location.`
           : this.isPackaged
-            ? 'The bundled CLI launcher is missing from this Orca build.'
+            ? `The bundled CLI launcher is missing from this ${APP_DISPLAY_NAME} build.`
             : 'Development mode uses a generated launcher for validation only.'
       return {
         platform: this.platform,
@@ -166,7 +166,7 @@ export class CliInstaller {
         state: 'unsupported',
         currentTarget: null,
         unsupportedReason: this.isPackaged ? 'launcher_missing' : 'launch_mode_unavailable',
-        detail: applyProductBranding(detail)
+        detail
       }
     }
 
@@ -190,7 +190,7 @@ export class CliInstaller {
     }
     if (status.state === 'conflict') {
       throw new Error(
-        applyProductBranding(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+        `Refusing to replace non-${APP_DISPLAY_NAME} command at ${status.commandPath}.`
       )
     }
 
@@ -235,14 +235,12 @@ export class CliInstaller {
     }
     if (status.state === 'conflict') {
       throw new Error(
-        applyProductBranding(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+        `Refusing to remove non-${APP_DISPLAY_NAME} command at ${status.commandPath}.`
       )
     }
     if (status.state === 'stale') {
       throw new Error(
-        applyProductBranding(
-          `Refusing to remove a command not owned by Orca at ${status.commandPath}.`
-        )
+        `Refusing to remove a command not owned by ${APP_DISPLAY_NAME} at ${status.commandPath}.`
       )
     }
 
@@ -366,7 +364,7 @@ export class CliInstaller {
 
     if (this.platform === 'linux') {
       // Why: Linux lacks a privileged global command flow; ~/.local/bin is the least-surprising user-scoped dir.
-      return join(this.homePath, '.local', 'bin', 'hivecode')
+      return join(this.homePath, '.local', 'bin', hivecodeProductConfig.cli.primary)
     }
 
     if (this.platform === 'win32') {
@@ -597,7 +595,7 @@ export class CliInstaller {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca launcher script.`
+          detail: `${commandPath} exists but is not a ${APP_DISPLAY_NAME} launcher script.`
         })
       }
 
@@ -624,7 +622,7 @@ export class CliInstaller {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from the terminal.`
+          detail: `Register ${commandPath} to use ${APP_DISPLAY_NAME} from the terminal.`
         })
       }
       throw error
@@ -649,7 +647,7 @@ export class CliInstaller {
               supported: true,
               state: 'stale',
               currentTarget: managedTarget,
-              detail: `${commandPath} contains an older Orca launcher.`
+              detail: `${commandPath} contains an older ${APP_DISPLAY_NAME} launcher.`
             })
           }
         }
@@ -661,7 +659,7 @@ export class CliInstaller {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca symlink.`
+          detail: `${commandPath} exists but is not a ${APP_DISPLAY_NAME} symlink.`
         })
       }
 
@@ -681,8 +679,8 @@ export class CliInstaller {
         detail: isInstalled
           ? `Registered at ${commandPath}.`
           : isManagedStaleTarget
-            ? `${commandPath} points to an older Orca launcher.`
-            : `${commandPath} points to a non-Orca launcher.`
+            ? `${commandPath} points to an older ${APP_DISPLAY_NAME} launcher.`
+            : `${commandPath} points to a non-${APP_DISPLAY_NAME} launcher.`
       })
     } catch (error) {
       if (isMissingError(error)) {
@@ -693,7 +691,7 @@ export class CliInstaller {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from the terminal.`
+          detail: `Register ${commandPath} to use ${APP_DISPLAY_NAME} from the terminal.`
         })
       }
       throw error
@@ -779,7 +777,7 @@ export class CliInstaller {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca launcher script.`
+          detail: `${commandPath} exists but is not a ${APP_DISPLAY_NAME} launcher script.`
         })
       }
 
@@ -818,7 +816,7 @@ export class CliInstaller {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from Command Prompt or PowerShell.`
+          detail: `Register ${commandPath} to use ${APP_DISPLAY_NAME} from Command Prompt or PowerShell.`
         })
       }
       throw error
@@ -846,7 +844,7 @@ export class CliInstaller {
       state: args.state,
       currentTarget: args.currentTarget,
       unsupportedReason: null,
-      detail: args.detail === null ? null : applyProductBranding(args.detail)
+      detail: args.detail
     }
   }
 
@@ -891,9 +889,7 @@ export class CliInstaller {
         pathConfigured,
         state: 'not_installed',
         currentTarget: null,
-        detail: applyProductBranding(
-          `Register ${status.commandPath} to use Orca from Command Prompt or PowerShell.`
-        )
+        detail: `Register ${status.commandPath} to use ${APP_DISPLAY_NAME} from Command Prompt or PowerShell.`
       }
     }
 
@@ -902,10 +898,9 @@ export class CliInstaller {
         ...status,
         pathDirectory,
         pathConfigured,
-        detail: applyProductBranding(
+        detail:
           pathProbe.detail ??
-            'The Orca launcher exists, but Orca could not check your Windows user PATH.'
-        )
+          `The ${APP_DISPLAY_NAME} launcher exists, but ${APP_DISPLAY_NAME} could not check your Windows user PATH.`
       }
     }
 
@@ -993,12 +988,10 @@ export class CliInstaller {
       }
       const guidance =
         action === 'add'
-          ? `Add this folder to your PATH manually: ${pathDirectory}. Or run Orca as an administrator and try again.`
-          : `Remove this folder from your PATH manually: ${pathDirectory}. Or run Orca as an administrator and try again.`
+          ? `Add this folder to your PATH manually: ${pathDirectory}. Or run ${APP_DISPLAY_NAME} as an administrator and try again.`
+          : `Remove this folder from your PATH manually: ${pathDirectory}. Or run ${APP_DISPLAY_NAME} as an administrator and try again.`
       throw new Error(
-        applyProductBranding(
-          `Windows blocked updating your user PATH (access denied). This usually means your PATH environment variable is managed by Group Policy or your organization's device management. ${guidance}`
-        ),
+        `Windows blocked updating your user PATH (access denied). This usually means your PATH environment variable is managed by Group Policy or your organization's device management. ${guidance}`,
         { cause: error }
       )
     }
@@ -1062,6 +1055,7 @@ if [ -z "\${ORCA_APP_EXECUTABLE:-}" ]; then
 fi
 export ORCA_NODE_OPTIONS="\${NODE_OPTIONS-}"
 export ORCA_NODE_REPL_EXTERNAL_MODULE="\${NODE_REPL_EXTERNAL_MODULE-}"
+export HIVE_CLI_INVOKED_AS="\${0##*/}"
 unset NODE_OPTIONS
 unset NODE_REPL_EXTERNAL_MODULE
 ELECTRON_RUN_AS_NODE=1 exec "$ELECTRON" "$CLI" "$@"
@@ -1084,6 +1078,7 @@ if not defined ORCA_APP_EXECUTABLE (
 )
 set "ORCA_NODE_OPTIONS=%NODE_OPTIONS%"
 set "ORCA_NODE_REPL_EXTERNAL_MODULE=%NODE_REPL_EXTERNAL_MODULE%"
+set "HIVE_CLI_INVOKED_AS=%~n0"
 set NODE_OPTIONS=
 set NODE_REPL_EXTERNAL_MODULE=
 set ELECTRON_RUN_AS_NODE=1

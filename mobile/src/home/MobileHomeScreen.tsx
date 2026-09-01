@@ -15,6 +15,7 @@ import { triggerMediumImpact } from '../platform/haptics'
 import { useOpenMobileSession } from '../session/use-open-mobile-session'
 import type { TaskProvider } from '../tasks/mobile-task-providers'
 import { useOpenMobileTasks } from '../tasks/use-open-mobile-tasks'
+import { hostCatalogEntryHasLocalPairing } from '../runtime-directory/account-runtime-catalog'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
 import {
   useDisconnectHostClient,
@@ -24,8 +25,7 @@ import {
 import { hostEndpointLabel } from '../transport/host-endpoint-label'
 import { resolveHomeHostConnectionState } from '../transport/home-host-auto-connect'
 import { removeHostAndCloseClient } from '../transport/host-removal-lifecycle'
-import { loadHostCatalog } from '../transport/host-store'
-import type { HostCatalogEntry, HostProfile } from '../transport/types'
+import type { HostCatalogEntry } from '../transport/types'
 import { useOpenMobileHostEdit } from '../transport/use-open-mobile-host-edit'
 import type { HomeWorktreeSummary } from '../worktree/home-worktree-info'
 import { isResumeTargetConfirmedMissing, type HomeResumeCard } from '../worktree/home-resume-card'
@@ -55,8 +55,8 @@ export function MobileHomeScreen() {
   const disconnectHostClient = useDisconnectHostClient()
   const forgetHostClient = useForgetHostClient()
   const forceReconnectHost = useForceReconnect()
-  const [actionTarget, setActionTarget] = useState<HostProfile | null>(null)
-  const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null)
+  const [actionTarget, setActionTarget] = useState<HostCatalogEntry | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<HostCatalogEntry | null>(null)
   const [homeMode, setHomeMode] = useState<MobileHomeMode | null>(null)
   const [drawerVisible, setDrawerVisible] = useState(false)
   const homeModeHydratedRef = useRef(false)
@@ -127,31 +127,49 @@ export function MobileHomeScreen() {
     if (host.credentialStatus === 'missing') {
       data.router.push('/pair-scan')
     } else if (host.credentialStatus === 'temporarily-unavailable') {
-      void loadHostCatalog()
-        .then(data.setHostCatalog)
+      void data
+        .reloadHostCatalog()
         .catch(() => Alert.alert('Could not check pairing', 'Please try again.'))
+    } else if (host.credentialStatus === 'cloud-offline') {
+      Alert.alert(
+        'Runtime offline',
+        'This Runtime will be available when it reconnects to HiveCloud.'
+      )
+    } else if (host.credentialStatus === 'cloud-unavailable') {
+      Alert.alert(
+        'Cloud connection unavailable',
+        'This Runtime is not advertising a mobile Relay route yet.'
+      )
     } else {
       data.router.push(`/h/${host.id}`)
     }
   }
 
   function openHostActions(host: HostCatalogEntry): void {
+    if (!hostCatalogEntryHasLocalPairing(host)) {
+      Alert.alert(
+        'Account Runtime',
+        'Manage this Runtime and its sessions from your HiveCloud account.'
+      )
+      return
+    }
     if (host.profile) {
-      setActionTarget(host.profile)
+      setActionTarget(host)
     } else {
       setConfirmRemove(host)
     }
   }
 
   async function handleRemove(): Promise<void> {
-    if (!confirmRemove) {
+    if (!confirmRemove || !hostCatalogEntryHasLocalPairing(confirmRemove)) {
+      setConfirmRemove(null)
       return
     }
     const host = confirmRemove
     try {
       await removeHostAndCloseClient(host.id, forgetHostClient)
       setConfirmRemove(null)
-      data.setHostCatalog(await loadHostCatalog())
+      await data.reloadHostCatalog()
     } catch {
       setConfirmRemove(host)
       Alert.alert('Could not remove host', 'Please try again.')
@@ -288,7 +306,7 @@ export function MobileHomeScreen() {
         title={actionTarget?.name}
         message={actionTarget ? hostEndpointLabel(actionTarget.endpoint) : undefined}
         actions={getHostListActionSheetActions({
-          host: actionTarget,
+          host: actionTarget?.profile ?? null,
           state: actionTarget
             ? resolveHomeHostConnectionState(
                 actionTarget.id,
@@ -305,7 +323,7 @@ export function MobileHomeScreen() {
           onDiagnostics: (hostId) =>
             data.router.push({ pathname: '/connection-log', params: { hostId } }),
           onEdit: openMobileHostEdit,
-          onRemove: (host) => setConfirmRemove(host)
+          onRemove: () => setConfirmRemove(actionTarget)
         })}
         onClose={() => setActionTarget(null)}
       />

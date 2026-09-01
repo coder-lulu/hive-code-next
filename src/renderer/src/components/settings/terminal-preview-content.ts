@@ -1,3 +1,5 @@
+import { PRODUCT_CONFIG } from '@/product-brand'
+
 // SGR escape helpers — keep tiny and local; xterm interprets these as ANSI.
 const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
@@ -14,7 +16,7 @@ const FG_BLACK = '\x1b[30m'
 function prompt(): string {
   // Why: short two-segment prompt — cwd + branch — so the preview reads as a
   // real shell line without using too many columns.
-  return `${BLUE}~/orca${RESET} ${MAGENTA}main${RESET} ${YELLOW}*${RESET} $ `
+  return `${BLUE}~/${PRODUCT_CONFIG.slug}${RESET} ${MAGENTA}main${RESET} ${YELLOW}*${RESET} $ `
 }
 
 // Why: every line must fit in PREVIEW_COLS (see TerminalSettingsPreview) so

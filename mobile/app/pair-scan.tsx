@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Linking,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   useWindowDimensions,
@@ -25,6 +24,7 @@ import { ConnectionLog } from '../src/components/ConnectionLog'
 import { PairingActionButton } from '../src/components/pairing/PairingActionButton'
 import { PairingCodeSheet } from '../src/components/pairing/PairingCodeSheet'
 import { resolvePairScanCameraSize } from '../src/components/pairing/pair-scan-camera-size'
+import { createPairScanScreenStyles } from '../src/components/pairing/pair-scan-screen-styles'
 import {
   PairingConnectingState,
   PairingScreenContent,
@@ -36,7 +36,6 @@ import {
   loadMobileOnboardingSteps,
   mobileOnboardingDestination
 } from '../src/onboarding/mobile-onboarding-plan'
-import type { MobileTheme } from '../src/theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
 import { useRefreshHostClient } from '../src/transport/client-context'
 import { decodePairingUrl, parsePairingCode } from '../src/transport/pairing'
@@ -44,6 +43,7 @@ import {
   startPreProfilePairing,
   type PreProfilePairingAttempt
 } from '../src/transport/pre-profile-pairing-coordinator'
+import { recoverMobileRelayPairing } from '../src/transport/mobile-relay-pairing-recovery'
 import type { ConnectionLogEntry, PairingOffer } from '../src/transport/types'
 
 const PAIRING_OVERALL_TIMEOUT_MS = 25_000
@@ -55,7 +55,7 @@ export default function PairScanScreen() {
   const refreshHostClient = useRefreshHostClient()
   const insets = useSafeAreaInsets()
   const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  const styles = useMobileThemeStyles(createPairScanScreenStyles)
   const viewportWidth = useWindowDimensions().width
   const [permission, requestPermission] = useCameraPermissions()
   const [status, setStatus] = useState<'scanning' | 'connecting' | 'error'>('scanning')
@@ -67,6 +67,7 @@ export default function PairScanScreen() {
   const processingRef = useRef(false)
   const mountedRef = useRef(true)
   const activePairingAttemptRef = useRef<PreProfilePairingAttempt | null>(null)
+  const pairingGenerationRef = useRef(0)
 
   const setPairScanRootRef = useCallback((node: View | null): void => {
     if (node !== null) {
@@ -75,6 +76,7 @@ export default function PairScanScreen() {
     }
     activePairingAttemptRef.current?.dispose()
     activePairingAttemptRef.current = null
+    pairingGenerationRef.current += 1
     mountedRef.current = false
   }, [])
 
@@ -124,13 +126,40 @@ export default function PairScanScreen() {
     logsRef.current = []
     setLogs([])
     activePairingAttemptRef.current?.dispose()
+    const pairingGeneration = ++pairingGenerationRef.current
+    const pairingIsCurrent = () =>
+      mountedRef.current && pairingGenerationRef.current === pairingGeneration
+
+    let recovery
+    try {
+      recovery = await recoverMobileRelayPairing()
+    } catch (error) {
+      if (pairingIsCurrent()) {
+        console.warn('[pair] pairing recovery failed', error)
+        setStatus('error')
+        setErrorMessage(
+          `无法恢复上一次配对：${error instanceof Error ? error.message : String(error)}`
+        )
+        processingRef.current = false
+      }
+      return
+    }
+    if (!pairingIsCurrent()) {
+      return
+    }
+    if (recovery === 'deferred') {
+      setStatus('error')
+      setErrorMessage('上一次配对仍在安全恢复中，请检查网络后重试。')
+      processingRef.current = false
+      return
+    }
 
     const attempt = startPreProfilePairing({
       offer,
       timeoutMs: PAIRING_OVERALL_TIMEOUT_MS,
       connectOptions: {
         onLog: (entry) => {
-          if (!mountedRef.current || activePairingAttemptRef.current !== attempt) {
+          if (!pairingIsCurrent() || activePairingAttemptRef.current !== attempt) {
             return
           }
           logsRef.current = [...logsRef.current, entry]
@@ -141,28 +170,28 @@ export default function PairScanScreen() {
     activePairingAttemptRef.current = attempt
     try {
       const { hostId } = await attempt.result
-      const attemptIsCurrent = activePairingAttemptRef.current === attempt
+      const attemptIsCurrent = pairingIsCurrent() && activePairingAttemptRef.current === attempt
       attempt.dispose()
       if (activePairingAttemptRef.current === attempt) {
         activePairingAttemptRef.current = null
       }
-      if (!mountedRef.current || !attemptIsCurrent) {
+      if (!attemptIsCurrent) {
         return
       }
       refreshHostClient(hostId)
       const onboardingSteps = await loadMobileOnboardingSteps()
-      if (!mountedRef.current) {
+      if (!pairingIsCurrent()) {
         return
       }
       router.replace(mobileOnboardingDestination(onboardingSteps, hostId))
     } catch (error) {
       const timedOut = attempt.timedOut
-      const attemptIsCurrent = activePairingAttemptRef.current === attempt
+      const attemptIsCurrent = pairingIsCurrent() && activePairingAttemptRef.current === attempt
       attempt.dispose()
       if (activePairingAttemptRef.current === attempt) {
         activePairingAttemptRef.current = null
       }
-      if (!mountedRef.current || !attemptIsCurrent) {
+      if (!attemptIsCurrent) {
         return
       }
       console.warn('[pair] connect failed', error)
@@ -177,6 +206,7 @@ export default function PairScanScreen() {
   }
 
   function retry() {
+    pairingGenerationRef.current += 1
     activePairingAttemptRef.current?.dispose()
     activePairingAttemptRef.current = null
     setStatus('scanning')
@@ -198,7 +228,13 @@ export default function PairScanScreen() {
         <MobileIconButton
           accessibilityLabel="返回"
           icon={ChevronLeft}
-          onPress={() => router.back()}
+          onPress={() => {
+            pairingGenerationRef.current += 1
+            activePairingAttemptRef.current?.dispose()
+            activePairingAttemptRef.current = null
+            processingRef.current = false
+            router.back()
+          }}
         />
       }
       title="连接电脑"
@@ -364,115 +400,4 @@ export default function PairScanScreen() {
       />
     </View>
   )
-}
-
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.color.bg.canvas },
-    centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    loadingText: {
-      ...theme.typography.meta,
-      color: theme.color.text.secondary,
-      marginTop: theme.spacing.space16
-    },
-    scrollCentered: {
-      flexGrow: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: theme.spacing.space24
-    },
-    scannerContent: {
-      flexGrow: 1,
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: 0
-    },
-    cameraStage: {
-      width: '100%',
-      maxWidth: 400,
-      minHeight: 470,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    cameraWrap: {
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.card,
-      backgroundColor: theme.color.bg.surface
-    },
-    cameraPlaceholder: { flex: 1, backgroundColor: theme.color.bg.subtle },
-    camera: { ...StyleSheet.absoluteFillObject },
-    reticle: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    reticleFrame: { position: 'relative' },
-    corner: {
-      position: 'absolute',
-      width: theme.spacing.space16,
-      height: theme.spacing.space16,
-      borderColor: theme.color.brand.primary
-    },
-    cornerTL: {
-      top: 0,
-      left: 0,
-      borderTopWidth: 3,
-      borderLeftWidth: 3,
-      borderTopLeftRadius: theme.radii.small
-    },
-    cornerTR: {
-      top: 0,
-      right: 0,
-      borderTopWidth: 3,
-      borderRightWidth: 3,
-      borderTopRightRadius: theme.radii.small
-    },
-    cornerBL: {
-      bottom: 0,
-      left: 0,
-      borderBottomWidth: 3,
-      borderLeftWidth: 3,
-      borderBottomLeftRadius: theme.radii.small
-    },
-    cornerBR: {
-      right: 0,
-      bottom: 0,
-      borderRightWidth: 3,
-      borderBottomWidth: 3,
-      borderBottomRightRadius: theme.radii.small
-    },
-    scanTitle: {
-      ...theme.typography.pageTitle,
-      color: theme.color.text.primary,
-      textAlign: 'center',
-      marginTop: theme.spacing.space20
-    },
-    scanDescription: {
-      ...theme.typography.meta,
-      maxWidth: 340,
-      color: theme.color.text.secondary,
-      textAlign: 'center',
-      marginTop: theme.spacing.space8
-    },
-    actions: { width: '100%', gap: theme.spacing.space8, marginTop: theme.spacing.space24 },
-    bottomActions: { width: '100%', maxWidth: 400 },
-    scanStatus: {
-      width: '100%',
-      minHeight: 48,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: theme.spacing.space8,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.selected,
-      paddingHorizontal: theme.spacing.space20,
-      paddingVertical: theme.spacing.space12
-    },
-    scanStatusText: { ...theme.typography.label, color: theme.color.text.inverse },
-    logSlot: { width: '100%', marginTop: theme.spacing.space20 }
-  })
 }

@@ -35,6 +35,7 @@ import {
 import { WslCliRegistration } from './WslCliRegistration'
 import { useLocalCliSkillFreshnessName } from './use-local-cli-skill-freshness-name'
 import { translate } from '@/i18n/i18n'
+import { PRIMARY_CLI_COMMAND, getProductCliDisplayCommand } from '@/product-brand'
 
 type CliSectionProps = {
   currentPlatform: string
@@ -56,19 +57,19 @@ function getRevealLabel(platform: string): string {
 
 function getInstallDescription(platform: string): string {
   if (platform === 'darwin') {
-    return 'Register `orca` in /usr/local/bin.'
+    return `Register \`${PRIMARY_CLI_COMMAND}\` in /usr/local/bin.`
   }
   if (platform === 'linux') {
-    return 'Register `orca-ide` in ~/.local/bin.'
+    return `Register \`${PRIMARY_CLI_COMMAND}\` in ~/.local/bin.`
   }
   if (platform === 'win32') {
-    return 'Register `orca` in your user PATH.'
+    return `Register \`${PRIMARY_CLI_COMMAND}\` in your user PATH.`
   }
   return 'CLI registration is not yet available on this platform.'
 }
 
-function getFallbackCommandName(platform: string): string {
-  return platform === 'linux' ? 'orca-ide' : 'orca'
+function getFallbackCommandName(): string {
+  return PRIMARY_CLI_COMMAND
 }
 
 export function CliSection({
@@ -163,7 +164,7 @@ export function CliSection({
   const isSupported = status?.supported ?? false
   const isBrowserManaged = status?.unsupportedReason === 'launch_mode_unavailable'
   const revealLabel = getRevealLabel(currentPlatform)
-  const commandName = status?.commandName ?? getFallbackCommandName(currentPlatform)
+  const commandName = getProductCliDisplayCommand(status?.commandName ?? getFallbackCommandName())
   const canRevealCommandPath =
     status?.commandPath != null && ['installed', 'stale', 'conflict'].includes(status.state)
 
@@ -178,7 +179,7 @@ export function CliSection({
           translate(
             'auto.components.settings.CliSection.9cbcd31338',
             'Registered `{{value0}}` in PATH.',
-            { value0: next.commandName }
+            { value0: getProductCliDisplayCommand(next.commandName) }
           )
         )
       }
@@ -212,7 +213,7 @@ export function CliSection({
           translate(
             'auto.components.settings.CliSection.af5540930c',
             'Removed `{{value0}}` from PATH.',
-            { value0: next.commandName }
+            { value0: getProductCliDisplayCommand(next.commandName) }
           )
         )
       }

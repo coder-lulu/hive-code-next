@@ -3,6 +3,7 @@ import type {
   ClaudeManagedAccount,
   ClaudeRateLimitAccountsState
 } from '../../shared/managed-account-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { Store } from '../persistence'
 import type { RateLimitService } from '../rate-limits/service'
 import { findDuplicateClaudeAccount } from './claude-duplicate-account'
@@ -103,7 +104,9 @@ export class ClaudeAccountRegistration {
       wslLinuxAuthPath: account.wslLinuxAuthPath ?? null
     })
     if (!captured.identity.email) {
-      throw new Error('Claude login completed, but Orca could not resolve the account email.')
+      throw new Error(
+        `Claude login completed, but ${APP_DISPLAY_NAME} could not resolve the account email.`
+      )
     }
 
     const settings = this.dependencies.store.getSettings()
@@ -152,7 +155,9 @@ export class ClaudeAccountRegistration {
     captured: CapturedClaudeAuth
   ): Promise<ClaudeRateLimitAccountsState> {
     if (!captured.identity.email) {
-      throw new Error('Claude login completed, but Orca could not resolve the account email.')
+      throw new Error(
+        `Claude login completed, but ${APP_DISPLAY_NAME} could not resolve the account email.`
+      )
     }
     if (
       findDuplicateClaudeAccount(previousSettings.claudeManagedAccounts, {

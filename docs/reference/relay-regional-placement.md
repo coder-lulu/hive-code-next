@@ -1,8 +1,8 @@
 # Relay regional placement
 
-Orca selects a Relay region in the Electron main process before requesting a new assignment. The
+HiveCode selects a Relay region in the Electron main process before requesting a new assignment. The
 director publishes an allowlisted region catalog containing only HTTPS cell subdomains of that
-director; Orca takes three bounded `/health` latency samples per region and caches the stable choice
+director; HiveCode takes three bounded `/health` latency samples per region and caches the stable choice
 for 24 hours. A cached region changes only when the alternative is materially faster.
 
 The assignment request sends only `preferredRegion`. It does not send latency, IP address, country,
@@ -16,5 +16,5 @@ exact cell URL in the desktop pairing payload, so its location is not measured i
 no mobile protocol update is required.
 
 For deterministic local diagnostics, set `ORCA_RELAY_REGION_OVERRIDE` to `us-central1` or
-`asia-east2` before launching Orca. The override is not an end-user setting and is not written to
+`asia-east2` before launching HiveCode. The override is not an end-user setting and is not written to
 the preference cache.

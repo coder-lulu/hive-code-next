@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { resolveProductUpdateFeedUrl, resolveProductUpdateSource } from './product-update-source'
+import {
+  resolveProductUpdateCheckSource,
+  resolveProductUpdateFeedUrl,
+  resolveProductUpdateSource
+} from './product-update-source'
 
 const config = (
   updateChannel: string | null,
@@ -167,6 +171,23 @@ describe('resolveProductUpdateSource', () => {
     ).toBeNull()
   })
 
+  it('treats a declared disabled update service as authoritative', () => {
+    const base = config(
+      'stable',
+      'https://github.com/coder-lulu/hive-code/releases/latest/download'
+    )!
+    expect(
+      resolveProductUpdateSource({
+        ...base,
+        desktop: base.desktop!,
+        endpoints: base.endpoints!,
+        services: {
+          update: { enabled: false, endpoint: null, provider: null, channel: null }
+        }
+      })
+    ).toBeNull()
+  })
+
   it.each([
     'http://downloads.example.com/product-update/stable/',
     'https://user:secret@downloads.example.com/product-update/stable/',
@@ -201,4 +222,53 @@ describe('resolveProductUpdateSource', () => {
       expect(resolveProductUpdateSource(config('stable', endpoint, repository))).toBeNull()
     }
   )
+})
+
+describe('resolveProductUpdateCheckSource', () => {
+  it('resolves the dedicated HiveCloud check endpoint and channel', () => {
+    expect(
+      resolveProductUpdateCheckSource({
+        ...config('beta', 'https://updates.hivekernel.example/hive/v1/updates/desktop/'),
+        services: {
+          update: {
+            enabled: true,
+            endpoint: 'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+            checkEndpoint: 'https://updates.hivekernel.example/hive/v1/updates/check',
+            provider: 'hivecloud',
+            channel: 'beta',
+            checkIntervalHours: 24
+          }
+        }
+      })
+    ).toEqual({
+      endpoint: 'https://updates.hivekernel.example/hive/v1/updates/check',
+      channel: 'beta'
+    })
+  })
+
+  it.each([
+    'http://updates.hivekernel.example/hive/v1/updates/check',
+    'https://user:secret@updates.hivekernel.example/hive/v1/updates/check',
+    'https://updates.hivekernel.example/hive/v1/updates/check?token=secret',
+    'https://updates.hivekernel.example/hive/v1/updates/check#latest',
+    'https://updates.hivekernel.example/hive/v1/updates/check/',
+    'https://updates.hivekernel.example/hive/v1/updates/proxy-check',
+    'https://updates.hivekernel.example/hive/v1/updates/%63heck'
+  ])('rejects unsafe check endpoints: %s', (endpoint) => {
+    expect(
+      resolveProductUpdateCheckSource({
+        ...config('beta', 'https://updates.hivekernel.example/hive/v1/updates/desktop/'),
+        services: {
+          update: {
+            enabled: true,
+            endpoint: 'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+            checkEndpoint: endpoint,
+            provider: 'hivecloud',
+            channel: 'beta',
+            checkIntervalHours: 24
+          }
+        }
+      })
+    ).toBeNull()
+  })
 })

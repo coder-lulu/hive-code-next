@@ -10,6 +10,7 @@ import {
   startPairedRuntimeBrowserClientHost
 } from '../browser/paired-runtime-browser-client-host-runtime'
 import { prepareBrowserClientHostPlacement } from '../browser/browser-client-host-placement-preparation'
+import { resolveRuntimeEnvironmentCatalogEntry } from './runtime-environment-account-routing'
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-connectivity-handlers'
 import { getRuntimeEnvironmentStatus } from './runtime-environment-transport-routing'
 
@@ -22,7 +23,16 @@ export function registerRuntimeEnvironmentBrowserClientHostHandler(options: {
     async (_event, input: unknown): Promise<BrowserPageCreationPlacement> => {
       const args = BrowserClientHostPlacementPreparationRequest.parse(input)
       const userDataPath = options.getUserDataPath()
-      const initialEnvironment = resolveEnvironment(userDataPath, args.selector)
+      const catalogEnvironment = resolveRuntimeEnvironmentCatalogEntry(userDataPath, args.selector)
+      let initialEnvironment: ReturnType<typeof resolveEnvironment>
+      try {
+        initialEnvironment = resolveEnvironment(userDataPath, catalogEnvironment.id)
+      } catch {
+        // Account-only Runtimes host browser pages on the Runtime. Client-hosted
+        // browser placement requires the local pairing secret and must never try
+        // to synthesize one from cloud directory metadata.
+        return { kind: 'server' }
+      }
       requireConnected(initialEnvironment.id)
       const placement = await prepareBrowserClientHostPlacement({
         selector: initialEnvironment.id,

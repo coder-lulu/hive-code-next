@@ -157,11 +157,11 @@ describe('Windows CLI launcher', () => {
     }
   })
 
-  itWindows('launches HiveCode.exe and preserves the canonical command identity', () => {
+  itWindows('launches HiveCode.exe and preserves the hive command identity', () => {
     const appRoot = mkdtempSync(join(tmpdir(), 'hivecode cli launcher '))
     try {
       const resourcesPath = join(appRoot, 'resources')
-      const launcherPath = join(resourcesPath, 'bin', 'hivecode.exe')
+      const launcherPath = join(resourcesPath, 'bin', 'hive.exe')
       const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
       mkdirSync(dirname(launcherPath), { recursive: true })
       mkdirSync(dirname(cliPath), { recursive: true })
@@ -187,7 +187,7 @@ describe('Windows CLI launcher', () => {
       expect(launch.status, launch.stderr).toBe(0)
       expect(JSON.parse(launch.stdout)).toEqual({
         argv: ['--help'],
-        command: 'hivecode',
+        command: 'hive',
         electronRunAsNode: '1'
       })
     } finally {
@@ -195,12 +195,12 @@ describe('Windows CLI launcher', () => {
     }
   })
 
-  itWindows('preserves the orca and orca-ide compatibility command identities', () => {
+  itWindows('preserves every one-release compatibility command identity', () => {
     const appRoot = mkdtempSync(join(tmpdir(), 'hivecode cli aliases '))
     try {
       const resourcesPath = join(appRoot, 'resources')
       const binPath = join(resourcesPath, 'bin')
-      const canonicalLauncherPath = join(binPath, 'hivecode.exe')
+      const canonicalLauncherPath = join(binPath, 'hive.exe')
       const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
       mkdirSync(binPath, { recursive: true })
       mkdirSync(dirname(cliPath), { recursive: true })
@@ -218,7 +218,7 @@ describe('Windows CLI launcher', () => {
       )
       expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0)
 
-      for (const alias of ['orca', 'orca-ide']) {
+      for (const alias of ['hivecode', 'orca', 'orca-ide']) {
         const aliasPath = join(binPath, `${alias}.exe`)
         copyFileSync(canonicalLauncherPath, aliasPath)
         const launch = spawnSync(aliasPath, [], { encoding: 'utf8' })

@@ -6,7 +6,8 @@ import {
   type MobileRelayEndpoint
 } from '../../../src/shared/mobile-relay-credential-contract'
 import type { PairingRelay } from '../../../src/shared/mobile-relay-pairing-offer'
-import { loadHosts, saveHost } from './host-store'
+import { MOBILE_RELAY_CLOSE_CODE } from '../../../src/shared/mobile-relay-close-codes'
+import { saveHost } from './host-store'
 import {
   promotePairingJournalCredential,
   readMobileRelayCredentialBundle,
@@ -22,6 +23,7 @@ import {
 } from './mobile-relay-pairing-journal-store'
 import {
   connectMobileRelayForPairing,
+  RelayOuterError,
   type PairingCandidateClient
 } from './mobile-relay-physical-client'
 import { createRecoveringPairingRelayCandidate } from './pairing-relay-candidate'
@@ -35,7 +37,6 @@ type RecoveryDependencies = {
   clearJournal: typeof clearMobileRelayPairingJournal
   readCredentialBundle: typeof readMobileRelayCredentialBundle
   writeCredentialBundle: typeof writeMobileRelayCredentialBundle
-  loadHosts: typeof loadHosts
   saveHost: typeof saveHost
   connectRelay: typeof connectMobileRelayForPairing
   resolveInviteDirector: typeof resolvePairingInviteThroughDirector
@@ -49,7 +50,6 @@ const defaultDependencies: RecoveryDependencies = {
   clearJournal: clearMobileRelayPairingJournal,
   readCredentialBundle: readMobileRelayCredentialBundle,
   writeCredentialBundle: writeMobileRelayCredentialBundle,
-  loadHosts,
   saveHost,
   connectRelay: connectMobileRelayForPairing,
   resolveInviteDirector: resolvePairingInviteThroughDirector,
@@ -92,18 +92,13 @@ async function runRecovery(
     return 'none'
   }
   const bundle = await dependencies.readCredentialBundle(journal.metadata.host.id).catch(() => null)
-  const hosts = await dependencies.loadHosts().catch(() => [])
-  const existing = hosts.find(({ id }) => id === journal!.metadata.host.id)
-  if (existing?.relayHostId === journal.metadata.relay.relayHostId && bundle) {
-    await dependencies.clearJournal(journal.metadata.journalId)
-    return 'recovered'
-  }
 
   const credentials = recoveryCredentials(journal, bundle, dependencies.now())
   // Why: publishCommitted runs inside the catch below, so a failed local write
   // of an authoritatively committed install must not look like "nothing to
   // reconcile" — that journal is the only record left to retry the write from.
   let observedCommitted = false
+  let allResumeCredentialsAuthoritativelyRejected = true
   for (const credential of credentials) {
     let client: PairingCandidateClient | null = null
     try {
@@ -141,21 +136,34 @@ async function runRecovery(
         await publishCommitted(journal, reconciled, dependencies)
         return 'recovered'
       }
-    } catch {
+      if (credential.kind === 'resume') {
+        // Authentication succeeded, so this is not evidence that the resume
+        // credential can never reconcile a committed install.
+        allResumeCredentialsAuthoritativelyRejected = false
+      }
+    } catch (error) {
+      if (
+        credential.kind === 'resume' &&
+        !(
+          error instanceof RelayOuterError &&
+          error.code === MOBILE_RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL
+        )
+      ) {
+        allResumeCredentialsAuthoritativelyRejected = false
+      }
       // Why: ambiguous pairing state advances only by credential priority and
       // authoritative status; a transport failure never rewrites the journal.
     } finally {
       client?.close()
     }
   }
-  // Why: past invite expiry no credential can still establish what happened, so
-  // retaining the journal cannot reconcile anything — it only fails every later
-  // pairing with "recovery pending" forever. Re-pairing mints a fresh device and
-  // any uncommitted server-side install expires on its own. The extra invite
-  // lifetime of slack keeps a brief relay outage from discarding a journal whose
-  // resume credential would have reconciled it on the next launch.
+  // Why: time alone cannot distinguish an uncommitted install from a committed
+  // one hidden by an outage. Only explicit rejection of every resume credential
+  // makes the journal unrecoverable. The extra grace window also allows relay
+  // credential propagation to settle before a fresh pairing is permitted.
   if (
     !observedCommitted &&
+    allResumeCredentialsAuthoritativelyRejected &&
     journal.metadata.relay.inviteExpiresAt + ABANDON_GRACE_MS <= dependencies.now()
   ) {
     await dependencies.clearJournal(journal.metadata.journalId).catch(() => {})

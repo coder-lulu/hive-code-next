@@ -5,15 +5,11 @@ import {
   ExternalLink,
   Github,
   Keyboard,
-  Loader2,
   MessageSquareText,
-  RefreshCw,
-  RotateCw,
   School,
   ScrollText,
   Settings
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
 import {
   PRODUCT_CHANGELOG_URL,
@@ -30,22 +26,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { useMountedRef } from '@/hooks/useMountedRef'
 import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { showOnboardingFromRenderer } from '../onboarding/show-onboarding-event'
 import { SetupGuideProgressRing } from '../setup-guide/SetupGuideProgressRing'
-import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
+import { useSetupGuideProgressSnapshot } from '../setup-guide/setup-guide-progress-snapshot'
 import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
-import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
-
-const NO_UPDATE_CHECK_MODIFIERS = {
-  altKey: false,
-  ctrlKey: false,
-  metaKey: false,
-  shiftKey: false
-}
 
 function openExternalUrl(url: string): void {
   void window.api.shell.openUrl(url)
@@ -89,17 +76,12 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
   const openModal = useAppStore((s) => s.openModal)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
-  const updateStatus = useAppStore((s) => s.updateStatus)
-  const setupProgress = useSetupGuideProgress(true, false, false)
+  const setupProgress = useSetupGuideProgressSnapshot()
 
   const settingsShortcut = useShortcutKeyDetails('app.settings')
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
-  const [isRestartingOrca, setIsRestartingOrca] = useState(false)
   const lastShowOnboardingAtRef = React.useRef(0)
-  const updateCheckModifiersRef = React.useRef(NO_UPDATE_CHECK_MODIFIERS)
-  const mountedRef = useMountedRef()
-  const updateCheckHint = getUpdateCheckHint()
   const hasPublicLinks = Boolean(
     PRODUCT_PUBLIC_LINKS.documentation ||
     PRODUCT_CHANGELOG_URL ||
@@ -113,7 +95,6 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
 
   const handleMenuOpenChange = (open: boolean): void => {
     setMenuOpen(open)
-    updateCheckModifiersRef.current = NO_UPDATE_CHECK_MODIFIERS
   }
 
   const handleShowOnboarding = (): void => {
@@ -125,48 +106,9 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
     void showOnboardingFromRenderer()
   }
 
-  const handleRestartOrca = (): void => {
-    if (isRestartingOrca) {
-      return
-    }
-    setIsRestartingOrca(true)
-    toast.info(
-      translate('auto.components.sidebar.SidebarSettingsHelpMenu.5161eef55d', 'Restarting Orca…')
-    )
-    void window.api.app.restart().catch((error) => {
-      if (mountedRef.current) {
-        setIsRestartingOrca(false)
-        toast.error(
-          translate(
-            'auto.components.sidebar.SidebarSettingsHelpMenu.4e8f5710d3',
-            "Couldn't restart Orca."
-          ),
-          {
-            description: error instanceof Error ? error.message : undefined
-          }
-        )
-      }
-    })
-  }
-
   const openShortcutsSettings = (): void => {
     openSettingsTarget({ pane: 'shortcuts', repoId: null })
     openSettingsPage()
-  }
-
-  const handleCheckForUpdatesPointerDown = (event: React.PointerEvent): void => {
-    updateCheckModifiersRef.current = {
-      altKey: event.altKey,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      shiftKey: event.shiftKey
-    }
-  }
-
-  const handleCheckForUpdates = (): void => {
-    const modifiers = updateCheckModifiersRef.current
-    updateCheckModifiersRef.current = NO_UPDATE_CHECK_MODIFIERS
-    void window.api.updater.check(getUpdateCheckClickOptions(modifiers))
   }
 
   const openMilestones = (): void => {
@@ -324,30 +266,6 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               </DropdownMenuItem>
             ) : null}
             {hasPublicLinks ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuItem
-              disabled={updateStatus.state === 'checking' || updateStatus.state === 'downloading'}
-              onPointerDown={handleCheckForUpdatesPointerDown}
-              onSelect={handleCheckForUpdates}
-              title={updateCheckHint}
-            >
-              {updateStatus.state === 'checking' ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="size-3.5" />
-              )}
-              {translate(
-                'auto.components.sidebar.SidebarSettingsHelpMenu.29c56f30ee',
-                'Check for Updates'
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={handleRestartOrca} disabled={isRestartingOrca}>
-              <RotateCw className="size-3.5" />
-              {translate(
-                'auto.components.sidebar.SidebarSettingsHelpMenu.ad3d3ed7f1',
-                'Restart Orca'
-              )}
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

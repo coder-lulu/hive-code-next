@@ -60,6 +60,7 @@ function createContext(overrides?: Partial<HandlerContext>): HandlerContext {
     getPublishingWindowLastGoodCheck: vi.fn(() => null),
     getMissingManifestPrereleaseFallbackUserInitiated: vi.fn(() => null),
     getCurrentStatus: vi.fn(() => ({ state: 'checking' }) as never),
+    getUpdateMetadata: vi.fn(() => ({})),
     getActiveUpdateCheckEventAttemptId: vi.fn(() => 1),
     getKnownReleaseUrl: vi.fn(() => undefined),
     getPendingInstallVersion: vi.fn(() => '1.0.61'),

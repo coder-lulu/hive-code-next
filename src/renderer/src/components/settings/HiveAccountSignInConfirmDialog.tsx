@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Globe2, Loader2, Monitor, ShieldCheck } from 'lucide-react'
-import mascotUrl from '../../../../../resources/desktop-home-mascot-float.png'
+import mascotUrl from '../../../../../resources/desktop-login-mascot.png'
 import githubIconUrl from '../../../../../mobile/assets/auth-icons/github.png'
 import wechatIconUrl from '../../../../../mobile/assets/auth-icons/wechat.png'
 import qqIconUrl from '../../../../../mobile/assets/auth-icons/qq.png'
 import { PRODUCT_LOGO_URL } from '@/product-brand'
-import type { HiveAccountSignInOptions } from '../../../../shared/hive-account'
-import type { HiveAccountSmsChallenge } from '../../../../shared/hive-account'
+import type {
+  HiveAccountLoginProvider,
+  HiveAccountLoginProviderId,
+  HiveAccountSmsChallenge,
+  HiveAccountSignInOptions
+} from '../../../../shared/hive-account'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -22,6 +26,8 @@ import {
 import { Label } from '@/components/ui/label'
 import { translate } from '@/i18n/i18n'
 
+const NO_LOGIN_PROVIDERS: readonly HiveAccountLoginProvider[] = []
+
 export function HiveAccountSignInConfirmDialog({
   open,
   onOpenChange,
@@ -29,17 +35,22 @@ export function HiveAccountSignInConfirmDialog({
   onSmsStart,
   onSmsCancel,
   onSmsComplete,
+  providers = NO_LOGIN_PROVIDERS,
   signingIn
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (sessionProfile: HiveAccountSignInOptions['sessionProfile']) => void
+  onConfirm: (
+    sessionProfile: HiveAccountSignInOptions['sessionProfile'],
+    providerId?: HiveAccountLoginProviderId
+  ) => void
   onSmsStart?: (
     phoneNumber: string,
     sessionProfile: HiveAccountSignInOptions['sessionProfile']
   ) => Promise<HiveAccountSmsChallenge>
   onSmsCancel?: () => Promise<void> | void
   onSmsComplete?: (challengeId: string, smsCode: string) => Promise<void>
+  providers?: readonly HiveAccountLoginProvider[]
   signingIn: boolean
 }): React.JSX.Element {
   useTranslation()
@@ -118,6 +129,19 @@ export function HiveAccountSignInConfirmDialog({
         translate('components.hiveAccountSignIn.codeExpired', 'The code is invalid or expired.')
       )
     }
+  }
+
+  const startProviderSignIn = (providerId: HiveAccountLoginProviderId): void => {
+    if (!smsTermsAccepted) {
+      setSmsError(
+        translate(
+          'components.hiveAccountSignIn.acceptTermsError',
+          'Please accept the Terms of Service and Privacy Policy first.'
+        )
+      )
+      return
+    }
+    onConfirm('TRUSTED', providerId)
   }
 
   const handleOpenChange = (nextOpen: boolean): void => {
@@ -382,7 +406,7 @@ export function HiveAccountSignInConfirmDialog({
               </div>
             )}
 
-            {method === 'sms' && !challenge ? (
+            {method === 'sms' && !challenge && providers.length > 0 ? (
               <>
                 <div className="hive-account-divider">
                   <span>
@@ -399,42 +423,41 @@ export function HiveAccountSignInConfirmDialog({
                     'Other sign-in methods'
                   )}
                 >
-                  <button
-                    type="button"
-                    aria-label={translate(
-                      'components.hiveAccountSignIn.github',
-                      'Sign in with GitHub'
-                    )}
-                    data-tooltip={translate(
-                      'components.hiveAccountSignIn.github',
-                      'Sign in with GitHub'
-                    )}
-                    onClick={() => {}}
-                  >
-                    <img src={githubIconUrl} alt="" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={translate(
-                      'components.hiveAccountSignIn.wechat',
-                      'Sign in with WeChat'
-                    )}
-                    data-tooltip={translate(
-                      'components.hiveAccountSignIn.wechat',
-                      'Sign in with WeChat'
-                    )}
-                    onClick={() => {}}
-                  >
-                    <img src={wechatIconUrl} alt="" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')}
-                    data-tooltip={translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')}
-                    onClick={() => {}}
-                  >
-                    <img src={qqIconUrl} alt="" />
-                  </button>
+                  {providers.map((provider) => {
+                    const presentation =
+                      provider.id === 'github'
+                        ? {
+                            iconUrl: githubIconUrl,
+                            label: translate(
+                              'components.hiveAccountSignIn.github',
+                              'Sign in with GitHub'
+                            )
+                          }
+                        : provider.id === 'wechat'
+                          ? {
+                              iconUrl: wechatIconUrl,
+                              label: translate(
+                                'components.hiveAccountSignIn.wechat',
+                                'Sign in with WeChat'
+                              )
+                            }
+                          : {
+                              iconUrl: qqIconUrl,
+                              label: translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')
+                            }
+                    return (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        aria-label={presentation.label}
+                        data-tooltip={presentation.label}
+                        onClick={() => startProviderSignIn(provider.id)}
+                        disabled={signingIn}
+                      >
+                        <img src={presentation.iconUrl} alt="" />
+                      </button>
+                    )
+                  })}
                 </div>
               </>
             ) : null}

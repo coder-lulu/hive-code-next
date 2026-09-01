@@ -36,6 +36,7 @@ import {
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { isFloatingTerminalSessionRecord } from '../../../../shared/terminal-tab-session'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import { getActiveExecutionHostIdForWorktree } from '@/lib/unified-tab-host-ownership'
 import {
@@ -640,7 +641,10 @@ export function projectWorktreeTabModelReconciliation(
       return false
     }
     // Why: reconnectable legacy tabs must re-enter the unified model instead of being orphaned.
-    return terminalTabHasReconnectablePty(state, tab.id, tab.ptyId)
+    return (
+      terminalTabHasReconnectablePty(state, tab.id, tab.ptyId) ||
+      isFloatingTerminalSessionRecord(tab, worktreeId)
+    )
   })
   const orphanTerminalIds = getOrphanTerminalIds(state, worktreeId)
   const ensuredGroupState =
@@ -670,6 +674,7 @@ export function projectWorktreeTabModelReconciliation(
               : {}),
             ...(tab.generatedTitle?.trim() ? { generatedLabel: tab.generatedTitle.trim() } : {}),
             ...(tab.aiVaultTitle ? { aiVaultTitle: tab.aiVaultTitle } : {}),
+            ...(tab.projectAssignment ? { projectAssignment: tab.projectAssignment } : {}),
             customLabel: tab.customTitle,
             color: tab.color,
             sortOrder: tab.sortOrder,

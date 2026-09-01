@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { UpdateStatus } from '../../../../../shared/update-status-types'
 import { buildUpdateCardErrorModel } from './update-card-error-model'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 function build(status: UpdateStatus, isLocalBuild = false) {
   return buildUpdateCardErrorModel({
@@ -39,8 +40,18 @@ describe('update card error model precedence', () => {
       message: 'New version 1.4.200 is not signed by the application owner: publisherNames: Orca'
     })
     expect(model?.variant).toBe('security')
+    expect(model?.summary).toContain(APP_DISPLAY_NAME)
+    expect(model?.summary).not.toContain('Orca')
+    expect(model?.detail).toBe(
+      'New version 1.4.200 is not signed by the application owner: publisherNames: Orca'
+    )
     expect(model?.primaryAction).toBeUndefined()
     expect(model?.manualLabel).toBe('Check official releases')
+  })
+
+  it('preserves external diagnostic paths verbatim', () => {
+    const message = 'Could not inspect C:\\customer Orca workspace; https://orca.dev'
+    expect(build({ state: 'error', message })?.detail).toBe(message)
   })
 
   it('preserves the pending HTTP/1 compatibility recovery action', () => {
@@ -59,6 +70,8 @@ describe('update card error model precedence', () => {
       onInstallRetry: vi.fn()
     })
     expect(model?.variant).toBe('http1Compatibility')
+    expect(model?.summary).toContain(APP_DISPLAY_NAME)
+    expect(model?.summary).not.toContain('Orca')
     expect(model?.primaryAction).toMatchObject({
       label: 'Enable & Restart',
       pendingLabel: 'Restarting...',

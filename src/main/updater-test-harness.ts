@@ -1,94 +1,14 @@
 import { vi } from 'vitest'
-import type { Mock } from 'vitest'
 import { applyProductBranding } from '../shared/brand'
-import {
-  createProductUpdaterTestMocks,
-  type ProductUpdaterModuleFactories,
-  type ProductUpdaterTestState
-} from './updater-product-test-harness'
+import { createProductUpdaterTestMocks } from './updater-product-test-harness'
+import type {
+  AppMock,
+  AutoUpdaterMock,
+  UpdaterMocks,
+  UpdaterModuleFactories
+} from './updater-electron-test-types'
 export type { ProductUpdateSource } from './updater-product-test-harness'
-
-/** Loose spy signature for the electron/electron-updater calls the suites only assert on. */
-type UpdaterSpy = Mock<(...args: unknown[]) => unknown>
-
-type AutoUpdaterMock = {
-  autoDownload: boolean
-  autoInstallOnAppQuit: boolean
-  autoRunAppAfterInstall: boolean
-  allowPrerelease: boolean
-  allowDowngrade: boolean
-  disableDifferentialDownload: boolean
-  logger: { error: (message: unknown) => void } | undefined
-  httpExecutor: { request: UpdaterSpy; doApiRequest: UpdaterSpy; doDownload: UpdaterSpy }
-  on: Mock<(event: string, handler: (...args: unknown[]) => void) => AutoUpdaterMock>
-  checkForUpdates: UpdaterSpy
-  downloadUpdate: UpdaterSpy
-  quitAndInstall: UpdaterSpy
-  setFeedURL: UpdaterSpy
-  updateConfigPath: string | undefined
-  emit: (event: string, ...args: unknown[]) => void
-  reset: () => void
-}
-
-type AppMock = {
-  isPackaged: boolean
-  getVersion: Mock<() => string>
-  on: Mock<(event: string, handler: (...args: unknown[]) => void) => AppMock>
-  emit: (event: string, ...args: unknown[]) => void
-  quit: UpdaterSpy
-}
-
-type UpdaterModuleFactories = {
-  electron: () => {
-    app: AppMock
-    BrowserWindow: { getAllWindows: Mock<() => unknown[]> }
-    autoUpdater: { on: UpdaterSpy }
-    powerMonitor: { on: UpdaterSpy }
-    shell: { showItemInFolder: UpdaterSpy }
-    net: { fetch: UpdaterSpy }
-  }
-  electronUpdater: () => { autoUpdater: AutoUpdaterMock }
-  electronUpdaterLoader: () => { loadElectronAutoUpdater: () => AutoUpdaterMock }
-  electronToolkitUtils: () => { is: { dev: boolean } }
-  ipcPty: () => { killAllPty: UpdaterSpy }
-  linuxUpdatePackageType: () => { getLinuxRootPackageType: Mock<() => 'deb' | 'rpm' | null> }
-  updaterLifecycleDiagnostics: () => { recordUpdaterLifecycle: UpdaterSpy }
-  updaterChangelog: () => { fetchChangelog: UpdaterSpy }
-  updaterNudge: () => { fetchNudge: UpdaterSpy; shouldApplyNudge: UpdaterSpy }
-  updateInstallExitWatchdog: () => {
-    armUpdateInstallExitWatchdog: UpdaterSpy
-    disarmUpdateInstallExitWatchdog: UpdaterSpy
-  }
-  updaterPrereleaseFeed: () => {
-    fetchNewerReleaseTagsWithReadiness: (...args: unknown[]) => Promise<unknown>
-    getReleaseDownloadUrl: (tag: string) => string | null
-  }
-  localBuildSwitch: () => { chooseLocalBuild: UpdaterSpy }
-  localBuildFeedServer: () => { startLocalBuildFeed: UpdaterSpy }
-} & ProductUpdaterModuleFactories
-
-export type UpdaterMocks = {
-  appMock: AppMock
-  browserWindowMock: { getAllWindows: Mock<() => unknown[]> }
-  nativeUpdaterMock: { on: UpdaterSpy }
-  autoUpdaterMock: AutoUpdaterMock
-  isMock: { dev: boolean }
-  killAllPtyMock: UpdaterSpy
-  powerMonitorOnMock: UpdaterSpy
-  getLinuxRootPackageTypeMock: Mock<() => 'deb' | 'rpm' | null>
-  recordUpdaterLifecycleMock: UpdaterSpy
-  fetchChangelogMock: UpdaterSpy
-  fetchNudgeMock: UpdaterSpy
-  shouldApplyNudgeMock: UpdaterSpy
-  armExitWatchdogMock: UpdaterSpy
-  disarmExitWatchdogMock: UpdaterSpy
-  fetchNewerReleaseTagsMock: UpdaterSpy
-  chooseLocalBuildMock: UpdaterSpy
-  startLocalBuildFeedMock: UpdaterSpy
-  closeLocalBuildFeedMock: UpdaterSpy
-  moduleFactories: UpdaterModuleFactories
-  resetUpdaterMocks: () => void
-} & ProductUpdaterTestState
+export type { UpdaterMocks } from './updater-electron-test-types'
 
 // Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
 export const PRE_COMMIT_INSTALL_FAILURE =
@@ -106,6 +26,32 @@ export const PRE_COMMIT_INSTALL_FAILURE =
 export function createUpdaterMocks(): UpdaterMocks {
   const appEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
   const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
+
+  const createHttpExecutorMock = () => ({
+    request: vi.fn(),
+    doApiRequest: vi.fn(),
+    doDownload: vi.fn(),
+    addRedirectHandlers: vi.fn()
+  })
+
+  const respondToProductUpdaterRequest = async (input: unknown): Promise<Response> => {
+    const url = input instanceof URL ? input.href : String(input)
+    if (url.includes('/hive/v1/updates/check')) {
+      return new Response(
+        JSON.stringify({
+          hasUpdate: true,
+          updateRequired: false,
+          blockReason: null,
+          currentBuild: 2,
+          minimumSupportedBuild: 1,
+          latest: null
+        }),
+        { headers: { 'content-type': 'application/json' } }
+      )
+    }
+    return new Response('version: 1.0.61\n')
+  }
+  const productUpdaterSessionFetchMock = vi.fn(respondToProductUpdaterRequest)
 
   const appOn = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
     const handlers = appEventHandlers.get(event) ?? []
@@ -148,9 +94,10 @@ export function createUpdaterMocks(): UpdaterMocks {
     autoUpdaterMock.disableDifferentialDownload = false
     autoUpdaterMock.autoRunAppAfterInstall = true
     autoUpdaterMock.logger = undefined
-    autoUpdaterMock.httpExecutor.request.mockReset()
-    autoUpdaterMock.httpExecutor.doApiRequest.mockReset()
-    autoUpdaterMock.httpExecutor.doDownload.mockReset()
+    // The production network boundary replaces these methods with guarded
+    // implementations. Recreate the executor between tests instead of
+    // trying to reset functions that may no longer be Vitest mocks.
+    autoUpdaterMock.httpExecutor = createHttpExecutorMock()
     delete (autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature
   }
 
@@ -163,7 +110,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     disableDifferentialDownload: false,
     // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
     logger: undefined as { error: (message: unknown) => void } | undefined,
-    httpExecutor: { request: vi.fn(), doApiRequest: vi.fn(), doDownload: vi.fn() },
+    httpExecutor: createHttpExecutorMock(),
     on,
     checkForUpdates: vi.fn(),
     downloadUpdate: vi.fn(),
@@ -211,6 +158,15 @@ export function createUpdaterMocks(): UpdaterMocks {
       app: appMock,
       BrowserWindow: browserWindowMock,
       autoUpdater: nativeUpdaterMock,
+      session: {
+        fromPartition: vi.fn(() => ({
+          fetch: productUpdaterSessionFetchMock,
+          webRequest: {
+            onBeforeRequest: vi.fn(),
+            onHeadersReceived: vi.fn()
+          }
+        }))
+      },
       powerMonitor: { on: powerMonitorOnMock },
       shell: { showItemInFolder: vi.fn() },
       net: { fetch: vi.fn() }
@@ -265,8 +221,10 @@ export function createUpdaterMocks(): UpdaterMocks {
 
   /** Shared `beforeEach` body: fresh module registry plus every mock back to its default. */
   const resetUpdaterMocks = () => {
+    vi.clearAllTimers()
     vi.resetModules()
     autoUpdaterMock.reset()
+    productUpdaterSessionFetchMock.mockReset().mockImplementation(respondToProductUpdaterRequest)
     nativeUpdaterMock.on.mockReset()
     browserWindowMock.getAllWindows.mockReset()
     browserWindowMock.getAllWindows.mockReturnValue([])

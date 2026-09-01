@@ -12,6 +12,7 @@ import {
 import { useAppStore } from '../store'
 import { folderWorkspaceKey } from '../../../shared/workspace-scope'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
 import { useAllWorktrees } from '../store/selectors'
 import { getConnectionId } from '../lib/connection-context'
 import { basename } from '../lib/path'
@@ -56,6 +57,8 @@ import {
   shouldMountRetainedBrowserOverlay
 } from './browser-pane/host-guest/browser-worktree-surface-paintability'
 import TerminalPaneOverlayLayer from './terminal-pane/TerminalPaneOverlayLayer'
+import StructuredAgentSessionPaneOverlayLayer from './native-chat/StructuredAgentSessionPaneOverlayLayer'
+import { resolveActiveFloatingWorkspaceSurface } from '@/lib/floating-workspace-surface-ownership'
 import {
   collectBrowserWebviewIds,
   destroyRemovedBrowserWebview,
@@ -321,17 +324,62 @@ function Terminal(): React.JSX.Element | null {
   const terminalWorktreeParkingTimersRef = useRef(new Map<string, number>())
   const allWorktrees = useAllWorktrees()
   const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
-  const workspaceSurfaces = useMemo(
-    () => [
+  const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
+  const activeFloatingWorkspaceId = isFloatingTerminalWorkspaceId(activeWorktreeId)
+    ? activeWorktreeId
+    : null
+  const floatingTerminalCwd = useAppStore((s) => s.settings?.floatingTerminalCwd ?? '')
+  const [floatingCwdResolution, setFloatingCwdResolution] = useState<{
+    requestedPath: string
+    cwd: string
+  } | null>(null)
+  const resolvedFloatingTerminalCwd =
+    activeFloatingWorkspaceId === FLOATING_TERMINAL_WORKTREE_ID &&
+    floatingCwdResolution?.requestedPath === floatingTerminalCwd
+      ? floatingCwdResolution.cwd
+      : null
+  useEffect(() => {
+    if (activeFloatingWorkspaceId !== FLOATING_TERMINAL_WORKTREE_ID) {
+      return
+    }
+    let cancelled = false
+    void window.api.app
+      .getFloatingTerminalCwd({ path: floatingTerminalCwd })
+      .then((cwd) => {
+        if (!cancelled) {
+          setFloatingCwdResolution({ requestedPath: floatingTerminalCwd, cwd })
+        }
+      })
+      .catch((error) => {
+        console.error('Could not resolve the temporary-session directory', error)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeFloatingWorkspaceId, floatingTerminalCwd])
+  const workspaceSurfaces = useMemo(() => {
+    const surfaces = [
       ...allWorktrees.map((worktree) => ({ id: worktree.id, path: worktree.path })),
       ...folderWorkspaces.map((workspace) => ({
         id: folderWorkspaceKey(workspace.id),
         path: workspace.folderPath
       }))
-    ],
-    [allWorktrees, folderWorkspaces]
-  )
-  const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
+    ]
+    const floatingSurface = resolveActiveFloatingWorkspaceSurface(
+      activeFloatingWorkspaceId,
+      resolvedFloatingTerminalCwd
+    )
+    if (floatingSurface) {
+      // Home's unscoped composer uses the long-lived synthetic workspace.
+      // Include it in the normal terminal surface list only while active so
+      // its newly-created tab renders in the main tab strip; the standalone
+      // floating panel remains available when explicitly opened elsewhere.
+      if (!surfaces.some((surface) => surface.id === floatingSurface.id)) {
+        surfaces.push(floatingSurface)
+      }
+    }
+    return surfaces
+  }, [activeFloatingWorkspaceId, allWorktrees, folderWorkspaces, resolvedFloatingTerminalCwd])
   const renderedActiveWorktreeId = activeWorktreeId
   const activeWorktreeDeferralHostId = useAppStore((s) =>
     getResolvedExecutionHostIdForWorktree(s, renderedActiveWorktreeId)
@@ -2912,6 +2960,10 @@ const WorktreeSplitSurface = React.memo(function WorktreeSplitSurface({
         activityTerminalPortals={activityTerminalPortals}
         backgroundMountTabIds={backgroundMountTabIds}
         activationDeferredMountTabIds={activationDeferredMountTabIds}
+      />
+      <StructuredAgentSessionPaneOverlayLayer
+        worktreeId={worktreeId}
+        isWorktreeActive={isVisible}
       />
       {/* Why: once eligible, retain slot DOM so hidden worktrees keep their Electron guests alive (STA-3228). */}
       <RetainedBrowserPaneOverlayLayer

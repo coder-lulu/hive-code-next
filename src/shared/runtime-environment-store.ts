@@ -7,7 +7,7 @@ import { parsePairingCode, type PairingOffer } from './pairing'
 import { classifyRemotePairingHostname } from './remote-pairing-address'
 import { writeSecureJsonFileWithinLimit } from './bounded-secure-json-file'
 import { hardenExistingSecureFile } from './secure-file'
-import { applyProductBranding } from './brand'
+import { APP_DISPLAY_NAME } from './brand'
 import {
   createEnvironmentFromPairingOffer,
   getPreferredPairingOffer,
@@ -46,6 +46,7 @@ export function addEnvironmentFromPairingCode(
   args: {
     name: string
     pairingCode: string
+    authenticatedRuntimeRecordId?: string
     now?: number
     source?: RuntimeEnvironmentSource
     connectionDependency?: 'ssh-tunnel'
@@ -72,6 +73,9 @@ export function addEnvironmentFromPairingCode(
     name: args.name,
     now,
     offer,
+    ...(args.authenticatedRuntimeRecordId
+      ? { authenticatedRuntimeRecordId: args.authenticatedRuntimeRecordId }
+      : {}),
     runtimeId: null,
     ...(args.source ? { source: args.source } : {}),
     ...getPairingConnectionDependency(args.connectionDependency, offer)
@@ -177,32 +181,47 @@ const LAST_USED_PERSIST_INTERVAL_MS = 60_000
 export function markEnvironmentUsed(
   userDataPath: string,
   selector: string,
-  args: { runtimeId?: string | null; pairedDeviceId?: string; now?: number } = {}
+  args: {
+    runtimeId?: string | null
+    runtimeRecordId?: string | null
+    pairedDeviceId?: string
+    now?: number
+  } = {}
 ): void {
   const store = readEnvironmentStore(userDataPath)
   const environment = resolveEnvironmentFromStore(store, selector)
   const now = args.now ?? Date.now()
   const runtimeIdChanged = args.runtimeId != null && args.runtimeId !== environment.runtimeId
+  const runtimeRecordIdChanged =
+    args.runtimeRecordId !== undefined && args.runtimeRecordId !== environment.runtimeRecordId
   const pairedDeviceIdChanged =
     args.pairedDeviceId != null && args.pairedDeviceId !== environment.pairedDeviceId
   const lastUsedIsFresh =
     environment.lastUsedAt != null &&
     now >= environment.lastUsedAt &&
     now - environment.lastUsedAt < LAST_USED_PERSIST_INTERVAL_MS
-  if (!runtimeIdChanged && !pairedDeviceIdChanged && lastUsedIsFresh) {
+  if (!runtimeIdChanged && !runtimeRecordIdChanged && !pairedDeviceIdChanged && lastUsedIsFresh) {
     return
   }
-  const next = store.environments.map((entry) =>
-    entry.id === environment.id
-      ? {
-          ...entry,
-          runtimeId: args.runtimeId ?? entry.runtimeId,
-          ...(args.pairedDeviceId ? { pairedDeviceId: args.pairedDeviceId } : {}),
-          lastUsedAt: now,
-          updatedAt: now
-        }
-      : entry
-  )
+  const next = store.environments.map((entry) => {
+    if (entry.id !== environment.id) {
+      return entry
+    }
+    const updated = {
+      ...entry,
+      runtimeId: args.runtimeId ?? entry.runtimeId,
+      ...(args.pairedDeviceId ? { pairedDeviceId: args.pairedDeviceId } : {}),
+      lastUsedAt: now,
+      updatedAt: now
+    }
+    if (args.runtimeRecordId === undefined) {
+      return updated
+    }
+    const { runtimeRecordId: _staleRuntimeRecordId, ...withoutRuntimeRecordId } = updated
+    return args.runtimeRecordId
+      ? { ...withoutRuntimeRecordId, runtimeRecordId: args.runtimeRecordId }
+      : withoutRuntimeRecordId
+  })
   writeEnvironmentStore(userDataPath, { version: 1, environments: next })
 }
 
@@ -250,7 +269,7 @@ function readEnvironmentStore(userDataPath: string): RuntimeEnvironmentStore {
   } catch {
     throw new RuntimeEnvironmentStoreError(
       'runtime_error',
-      applyProductBranding(`Could not read Orca environments at ${path}; the file is invalid.`)
+      `Could not read ${APP_DISPLAY_NAME} environments at ${path}; the file is invalid.`
     )
   }
 }
@@ -267,9 +286,7 @@ function writeEnvironmentStore(userDataPath: string, store: RuntimeEnvironmentSt
     if (error instanceof JsonStringifyByteLimitError) {
       throw new RuntimeEnvironmentStoreError(
         'runtime_error',
-        applyProductBranding(
-          `Could not write Orca environments at ${path}; the store exceeds its durable capacity.`
-        )
+        `Could not write ${APP_DISPLAY_NAME} environments at ${path}; the store exceeds its durable capacity.`
       )
     }
     throw error

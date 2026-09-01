@@ -240,6 +240,85 @@ describe('connectPanePty', () => {
     })
   })
 
+  it('preserves Host-owned manual permission semantics through deferred cold restore', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('fresh-pty')
+    transport.connect.mockImplementation(async ({ sessionId }: { sessionId?: string }) =>
+      sessionId
+        ? {
+            id: 'fresh-pty',
+            coldRestore: { scrollback: 'cold-payload', cwd: '/tmp/wt-1' }
+          }
+        : 'fresh-pty'
+    )
+    transportFactoryQueue.push(transport)
+    const paneKey = makePaneKey('tab-1', LEAF_1)
+    const hostLaunchConfig = {
+      agentArgs: '',
+      agentEnv: {},
+      hostDefaultsAuthoritative: true as const,
+      agentPermissionMode: 'manual' as const
+    }
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: {
+        'wt-1': [{ id: 'tab-1', ptyId: 'lost-pty' }]
+      },
+      settings: {
+        ...mockStoreState.settings,
+        agentCmdOverrides: {},
+        agentDefaultArgs: {
+          codex: '--dangerously-bypass-approvals-and-sandbox --model client-default'
+        }
+      },
+      agentStatusByPaneKey: {},
+      sleepingAgentSessionsByPaneKey: {
+        [paneKey]: {
+          paneKey,
+          tabId: 'tab-1',
+          worktreeId: 'wt-1',
+          agent: 'codex',
+          providerSession: { key: 'session_id', id: 'codex-session-1' },
+          prompt: 'finish the task',
+          state: 'working',
+          capturedAt: 1,
+          updatedAt: 1,
+          launchConfig: hostLaunchConfig
+        }
+      }
+    } as StoreState
+
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({
+        restoredLeafId: LEAF_1,
+        restoredPtyIdByLeafId: { [LEAF_1]: 'lost-pty' }
+      }) as never
+    )
+    await flushAsyncTicks(20)
+    await new Promise((resolve) => setTimeout(resolve, 70))
+
+    const reattachArgs = transport.connect.mock.calls.find(
+      ([args]) => args.sessionId === 'lost-pty'
+    )?.[0]
+    expect(reattachArgs).toEqual(
+      expect.objectContaining({
+        sessionId: 'lost-pty',
+        launchConfig: hostLaunchConfig,
+        agentPermissionMode: 'manual'
+      })
+    )
+    expect(reattachArgs).not.toHaveProperty('agentArgsOverride')
+    expect(reattachArgs?.command).toContain("'--ask-for-approval' 'on-request'")
+    expect(reattachArgs?.command).not.toContain('dangerously-bypass')
+    expect(mockStoreState.registerAgentLaunchConfig).toHaveBeenCalledWith(
+      paneKey,
+      hostLaunchConfig,
+      expect.objectContaining({ agentType: 'codex', tabId: 'tab-1', leafId: LEAF_1 })
+    )
+  })
+
   it('clears stale launch config when a pane consumes a non-agent startup command', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport()

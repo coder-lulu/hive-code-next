@@ -25,6 +25,7 @@ import { prepareLocalWorktreeRootsForRepos } from '../worktree-root-preparation'
 import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from './worktree-base-directory-watcher'
 import { applyPRBotAuthorOverride } from '../../shared/pr-bot-author-overrides'
 import { resolveEnvironment } from '../../shared/runtime-environment-store'
+import { resolveRuntimeEnvironmentCatalogEntry } from './runtime-environment-account-routing'
 import { haveSameDisabledTuiAgents } from '../../shared/tui-agent-selection'
 import {
   normalizeMobilePairingCustomAddress,
@@ -289,7 +290,9 @@ export function registerSettingsHandlers(
       }
       const requestedId = requestedEnvironmentId?.trim() || null
       const environmentId =
-        requestedId === null ? null : resolveEnvironment(app.getPath('userData'), requestedId).id
+        requestedId === null
+          ? null
+          : resolveActiveRuntimeEnvironmentId(app.getPath('userData'), requestedId)
       return store.updateSettings(
         { activeRuntimeEnvironmentId: environmentId },
         { notifyListeners: true, originWebContentsId: event.sender.id }
@@ -317,4 +320,19 @@ export function registerSettingsHandlers(
   ipcMain.handle('cache:setGitHub', (_event, args: { cache: PersistedState['githubCache'] }) => {
     store.setGitHubCache(args.cache)
   })
+}
+
+function resolveActiveRuntimeEnvironmentId(userDataPath: string, selector: string): string {
+  // Preserve the established local-pairing path (including its validation and
+  // error messages). Account-only Runtimes are transient catalog entries and
+  // are consulted only when no local pairing matches.
+  try {
+    return resolveEnvironment(userDataPath, selector).id
+  } catch (localError) {
+    try {
+      return resolveRuntimeEnvironmentCatalogEntry(userDataPath, selector).id
+    } catch {
+      throw localError
+    }
+  }
 }

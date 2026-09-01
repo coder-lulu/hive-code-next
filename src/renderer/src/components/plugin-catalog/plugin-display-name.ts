@@ -1,3 +1,5 @@
+import { APP_DISPLAY_NAME } from '@/product-brand'
+
 /** Human title from a dotted plugin key (`example.worktree-notes` → `Worktree Notes`). */
 export function pluginDisplayNameFromKey(pluginKey: string): string {
   return pluginKey
@@ -5,7 +7,9 @@ export function pluginDisplayNameFromKey(pluginKey: string): string {
     .at(-1)!
     .split(/[-_]+/)
     .map((word) =>
-      word.toLowerCase() === 'orca' ? 'Orca' : `${word[0]?.toUpperCase() ?? ''}${word.slice(1)}`
+      word.toLowerCase() === 'orca'
+        ? APP_DISPLAY_NAME
+        : `${word[0]?.toUpperCase() ?? ''}${word.slice(1)}`
     )
     .join(' ')
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { CliStatusResult, RuntimeStatus } from '../../shared/runtime-types'
 import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
 import {
@@ -240,7 +241,7 @@ export class RuntimeClient {
     if (!response.result.capabilities?.includes(ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY)) {
       throw new RuntimeClientError(
         'orchestration_migration_required',
-        'The connected Orca runtime does not support the current orchestration contract. No effects were applied.',
+        `The connected ${APP_DISPLAY_NAME} runtime does not support the current orchestration contract. No effects were applied.`,
         orchestrationMigrationData('runtime_capability_missing')
       )
     }
@@ -276,7 +277,7 @@ export class RuntimeClient {
 
     throw new RuntimeClientError(
       'runtime_open_timeout',
-      'Timed out waiting for an Orca desktop window. The runtime may still be running headlessly.'
+      `Timed out waiting for a ${APP_DISPLAY_NAME} desktop window. The runtime may still be running headlessly.`
     )
   }
 }
@@ -284,7 +285,7 @@ export class RuntimeClient {
 function throwDesktopActivationBlocked(): never {
   throw new RuntimeClientError(
     'desktop_activation_blocked',
-    'Orca is running headlessly, but it cannot open a desktop window safely because the persistent terminal provider is unavailable. Quit Orca normally and start the app again; do not use open -n.'
+    `${APP_DISPLAY_NAME} is running headlessly, but it cannot open a desktop window safely because the persistent terminal provider is unavailable. Quit ${APP_DISPLAY_NAME} normally and start the app again; do not use open -n.`
   )
 }
 

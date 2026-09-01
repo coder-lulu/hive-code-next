@@ -285,6 +285,13 @@ export const electronViteConfig: UserConfig = {
     }
   },
   renderer: {
+    // Settings is loaded on demand and reaches these packages through panes that
+    // are absent from the initial home-page graph. Pre-bundle them at startup so
+    // the first Settings navigation cannot invalidate Vite's dependency cache
+    // midway through the lazy import and strand the page behind its boundary.
+    optimizeDeps: {
+      include: ['@xterm/addon-ligatures', '@xterm/xterm', 'html-to-image', 'react-colorful']
+    },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),

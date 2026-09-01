@@ -1,4 +1,3 @@
-import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import type {
   ActiveLease,
@@ -42,14 +41,14 @@ export class HiveRuntimeCloudLeaseContextPublisher {
 
   current(
     state: HiveRuntimeCloudPresenceState,
-    authorization: HiveRuntimeCloudAuthorization | null,
+    authorityId: string | null,
     lease: ActiveLease | null
   ): CurrentHiveRuntimeCloudLeaseContext | null {
-    if (state !== 'ONLINE' || !authorization || !this.identity || !this.runtimeRecordId || !lease) {
+    if (state !== 'ONLINE' || !authorityId || !this.identity || !this.runtimeRecordId || !lease) {
       return null
     }
     return {
-      authorityId: authorization.authorityId,
+      authorityId,
       identity: this.identity,
       tuple: {
         authorityGeneration: lease.authorityGeneration,

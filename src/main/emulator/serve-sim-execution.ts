@@ -13,6 +13,7 @@ import { platform, tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { EmulatorError } from './emulator-errors'
 import { materializeServeSimRuntime } from './serve-sim-runtime-materializer'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 const EXEC_TIMEOUT_MS = 90_000
 const MAC_OPEN_SHIM_DIR = join(tmpdir(), 'orca-serve-sim-open-shim')
@@ -216,7 +217,7 @@ export async function execServeSimCommand(
     if (/no serve-sim server|not running/i.test(message)) {
       throw new EmulatorError(
         'emulator_no_active',
-        'No active emulator for this worktree — use orca emulator list/attach or open the pane'
+        `No active emulator for this worktree — use ${PRIMARY_CLI_COMMAND} emulator list/attach or open the pane`
       )
     }
     throw new EmulatorError('emulator_error', message)

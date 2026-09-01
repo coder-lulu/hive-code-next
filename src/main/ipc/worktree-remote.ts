@@ -6,6 +6,7 @@ import { posix, win32 } from 'node:path'
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { Repo } from '../../shared/repo-types'
 import type { SetupAgentStartupPolicy } from '../../shared/orca-yaml-hook-types'
@@ -1184,7 +1185,7 @@ async function prepareWorktreePushTargetSsh(
         // Why: relays predating fork-remote support reject this exec by policy; name the fix instead of surfacing their rule.
         if (error instanceof Error && error.message.includes('Destructive git remote operations')) {
           throw new Error(
-            'This SSH host is running an older Orca relay that cannot add a fork remote for a PR workspace. Reconnect to deploy the latest relay, then try again.'
+            `This SSH host is running an older ${APP_DISPLAY_NAME} relay that cannot add a fork remote for a PR workspace. Reconnect to deploy the latest relay, then try again.`
           )
         }
         throw error

@@ -410,7 +410,7 @@ describe('orchestration notification mailbox consistency', () => {
     expect(
       harness.write.mock.calls.filter(
         ([ptyId, payload]) =>
-          ptyId === SECOND_PTY_ID && String(payload).includes('orca orchestration check')
+          ptyId === SECOND_PTY_ID && String(payload).includes('hive orchestration check')
       )
     ).toHaveLength(1)
     expect(
@@ -450,7 +450,7 @@ describe('orchestration notification mailbox consistency', () => {
     expect(
       harness.write.mock.calls.filter(
         ([ptyId, payload]) =>
-          ptyId === SECOND_PTY_ID && String(payload).includes('orca orchestration check')
+          ptyId === SECOND_PTY_ID && String(payload).includes('hive orchestration check')
       )
     ).toHaveLength(0)
 
@@ -458,7 +458,7 @@ describe('orchestration notification mailbox consistency', () => {
     expect(
       harness.write.mock.calls.filter(
         ([ptyId, payload]) =>
-          ptyId === PTY_ID && String(payload).includes('orca orchestration check')
+          ptyId === PTY_ID && String(payload).includes('hive orchestration check')
       )
     ).toHaveLength(2)
     await vi.advanceTimersByTimeAsync(500)

@@ -76,6 +76,23 @@ describe('TabsSlice', () => {
 
       expect(store.getState().unreadTerminalTabs[t2TerminalId]).toBeUndefined()
     })
+
+    it('leaves completion consumption to explicit user acknowledgement', () => {
+      const tab = store.getState().createUnifiedTab(WT, 'terminal')
+      const otherTab = store.getState().createUnifiedTab(WT, 'terminal')
+      const paneKey = `${tab.entityId}:leaf-1`
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: otherTab.entityId,
+        unreadAgentCompletionCountByPane: { [paneKey]: 2 },
+        unreadAgentCompletionPanes: { [paneKey]: true }
+      })
+
+      store.getState().activateTab(tab.id)
+
+      expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 2 })
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe(true)
+    })
   })
 
   // Ghostty "show until interact": BEL always marks unread (even focused/visible tabs); only user interaction via clearTerminalTabUnread dismisses it.
@@ -297,6 +314,61 @@ describe('TabsSlice', () => {
 
       // Same reference => no-op. Downstream selectors must not re-render.
       expect(store.getState().unreadTerminalTabs).toBe(initial)
+    })
+  })
+
+  describe('cumulative task completion attention', () => {
+    it('increments per completion and decrements one task when the pane is opened', () => {
+      const paneKey = 'tab-complete:leaf-1'
+
+      store.getState().markAgentCompletionPaneUnread(paneKey)
+      store.getState().incrementAgentCompletionUnread(paneKey)
+      store.getState().incrementAgentCompletionUnread(paneKey)
+
+      expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 2 })
+
+      store.getState().clearTerminalPaneUnread(paneKey)
+
+      expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 1 })
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe(true)
+    })
+
+    it('consumes one completion per explicit tab acknowledgement', () => {
+      const paneKey = 'tab-complete:leaf-1'
+      store.getState().markAgentCompletionPaneUnread(paneKey)
+      store.getState().incrementAgentCompletionUnread(paneKey)
+      store.getState().incrementAgentCompletionUnread(paneKey)
+
+      store.getState().consumeFirstAgentCompletionUnreadForTab('tab-complete')
+      expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 1 })
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe(true)
+
+      store.getState().consumeFirstAgentCompletionUnreadForTab('tab-complete')
+      expect(store.getState().unreadAgentCompletionCountByPane).toEqual({})
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBeUndefined()
+    })
+
+    it('clears the final completion count without affecting other panes', () => {
+      const paneKey = 'tab-complete:leaf-1'
+      const otherPaneKey = 'tab-other:leaf-1'
+      store.getState().incrementAgentCompletionUnread(paneKey)
+      store.getState().incrementAgentCompletionUnread(otherPaneKey)
+
+      store.getState().clearTerminalPaneUnread(paneKey)
+
+      expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [otherPaneKey]: 1 })
+    })
+
+    it('does not consume a completion during automatic visibility acknowledgement', () => {
+      const paneKey = 'tab-visible:leaf-1'
+      store.getState().markAgentCompletionPaneUnread(paneKey)
+      store.getState().incrementAgentCompletionUnread(paneKey)
+      store.getState().incrementAgentCompletionUnread(paneKey)
+
+      store.getState().clearTerminalPaneUnread(paneKey, { consumeCompletion: false })
+
+      expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 2 })
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe(true)
     })
   })
 

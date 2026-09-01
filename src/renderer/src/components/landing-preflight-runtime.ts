@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { toast } from 'sonner'
 import { useAppStore } from '../store'
 import {
   getLandingPreflightIssues,
@@ -12,6 +13,9 @@ export function useLandingPreflightRuntime(): { preflightIssues: PreflightIssue[
   const refreshPreflightStatus = useAppStore((s) => s.refreshPreflightStatus)
   const invalidatePreflightStatus = useAppStore((s) => s.invalidatePreflightStatus)
   const activeRuntimeState = useAppStore((s) => {
+    if (!s.settings) {
+      return 'settings-pending'
+    }
     const environmentId = s.settings?.activeRuntimeEnvironmentId?.trim()
     if (!environmentId) {
       return 'local'
@@ -37,6 +41,10 @@ export function useLandingPreflightRuntime(): { preflightIssues: PreflightIssue[
   )
 
   useEffect(() => {
+    if (activeRuntimeState === 'settings-pending') {
+      invalidatePreflightStatus()
+      return
+    }
     if (activeRuntimeState !== 'local' && !activeRuntimeState.endsWith(':reachable')) {
       invalidatePreflightStatus()
       return
@@ -67,4 +75,49 @@ export function useLandingPreflightRuntime(): { preflightIssues: PreflightIssue[
   }, [preflightIssues.length, refreshPreflightStatus])
 
   return { preflightIssues }
+}
+
+const STARTUP_PREFLIGHT_TOAST_PREFIX = 'startup-preflight:'
+
+function startupPreflightToastId(issueId: string): string {
+  return `${STARTUP_PREFLIGHT_TOAST_PREFIX}${issueId}`
+}
+
+/**
+ * Keeps prerequisite checks alive for the entire app session and reports setup
+ * problems without reserving permanent space on the home screen.
+ */
+export function useStartupPreflightNotifications(): void {
+  const { preflightIssues } = useLandingPreflightRuntime()
+  const notifiedIssueIds = useRef(new Set<string>())
+  const activeIssueIds = useRef(new Set<string>())
+
+  useEffect(() => {
+    const nextActiveIssueIds = new Set(preflightIssues.map((issue) => issue.id))
+
+    for (const issueId of activeIssueIds.current) {
+      if (!nextActiveIssueIds.has(issueId)) {
+        toast.dismiss(startupPreflightToastId(issueId))
+      }
+    }
+
+    for (const issue of preflightIssues) {
+      if (notifiedIssueIds.current.has(issue.id)) {
+        continue
+      }
+
+      notifiedIssueIds.current.add(issue.id)
+      toast.warning(issue.title, {
+        id: startupPreflightToastId(issue.id),
+        description: issue.description,
+        duration: issue.dismissible ? 12000 : Infinity,
+        action: {
+          label: issue.fixLabel,
+          onClick: () => void window.api.shell.openUrl(issue.fixUrl)
+        }
+      })
+    }
+
+    activeIssueIds.current = nextActiveIssueIds
+  }, [preflightIssues])
 }

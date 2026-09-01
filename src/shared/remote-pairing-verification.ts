@@ -3,6 +3,7 @@ import { MIN_COMPATIBLE_RUNTIME_SERVER_VERSION, RUNTIME_PROTOCOL_VERSION } from 
 import type { PublicKnownRuntimeEnvironment } from './runtime-environments'
 import type { RuntimeStatus } from './runtime-types'
 import { applyProductBranding } from './brand'
+import { CANONICAL_RUNTIME_RECORD_ID_PATTERN } from './pairing'
 
 export type RemotePairingFailureKind =
   | 'host-unreachable'
@@ -48,7 +49,10 @@ function hasValidRuntimeStatusShape(status: Record<string, unknown>): boolean {
       status.deviceScope === 'runtime') &&
     (status.capabilities === undefined ||
       (Array.isArray(status.capabilities) &&
-        status.capabilities.every((capability) => typeof capability === 'string')))
+        status.capabilities.every((capability) => typeof capability === 'string'))) &&
+    (status.runtimeRecordId === undefined ||
+      (typeof status.runtimeRecordId === 'string' &&
+        CANONICAL_RUNTIME_RECORD_ID_PATTERN.test(status.runtimeRecordId)))
   )
 }
 

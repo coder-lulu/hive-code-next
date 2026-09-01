@@ -1,5 +1,6 @@
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { WebRuntimePendingRequest } from './web-runtime-connection-frame-router'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const REQUEST_TIMEOUT_MS = 30_000
 
@@ -39,7 +40,7 @@ export class WebRuntimeRequestRegistry {
       ) {
         this.pending.delete(id)
         window.clearTimeout(timeout)
-        reject(new Error('Remote Orca runtime is not connected.'))
+        reject(new Error(`Remote ${APP_DISPLAY_NAME} runtime is not connected.`))
       }
     })
   }

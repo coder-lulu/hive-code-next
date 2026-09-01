@@ -22,7 +22,7 @@ import { useAppStore } from '@/store'
 import { resolveDropZone } from './tab-drop-zone'
 import type { TabDropZone } from './useTabDragSplit'
 import { translate } from '@/i18n/i18n'
-import { applyProductBranding } from '@/product-brand'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { AiVaultPrepareSessionResumeResult } from '../../../../shared/ai-vault-resume-preparation'
 import { activateStructuredAgentSessionById } from '@/lib/structured-agent-session-tab-activation'
 
@@ -261,11 +261,9 @@ export default function AiVaultSessionDropLayer({
             // account's home, so an unrepinnable payload (older serializer)
             // must fail loudly rather than silently resume under it.
             throw new Error(
-              applyProductBranding(
-                result.substituteCodexHome
-                  ? 'This session was dragged from an older Orca window, so Orca cannot retarget it to the selected Codex account. Resume it from the Session History panel instead.'
-                  : 'Orca could not prepare this legacy Codex session. Retry resume.'
-              )
+              result.substituteCodexHome
+                ? `This session was dragged from an older ${APP_DISPLAY_NAME} window, so ${APP_DISPLAY_NAME} cannot retarget it to the selected Codex account. Resume it from the Session History panel instead.`
+                : `${APP_DISPLAY_NAME} could not prepare this legacy Codex session. Retry resume.`
             )
           }
           const providerSession = getAiVaultAgentProviderSession({

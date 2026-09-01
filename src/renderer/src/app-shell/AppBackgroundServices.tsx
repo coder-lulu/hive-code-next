@@ -1,5 +1,6 @@
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
+import { isWebClientLocation } from '@/lib/web-client-location'
 import { AgentHibernationGate } from '../components/AgentHibernationGate'
 import { AiVaultTabTitleSyncGate } from '../components/AiVaultTabTitleSyncGate'
 import RetainedAgentsSyncGate from '../components/dashboard/RetainedAgentsSyncGate'
@@ -16,9 +17,17 @@ const DashboardPopoutBridge = lazy(() => import('../components/dashboard/Dashboa
  */
 export function AppBackgroundServices(): React.JSX.Element {
   const workspaceSessionReady = useAppStore((s) => s.workspaceSessionReady)
+  const startAccountRuntimeCloudSync = useAppStore((s) => s.startAccountRuntimeCloudSync)
   const dashboardPopoutEnabled = useAppStore(
     (s) => s.settings?.experimentalAgentDashboardPopout === true
   )
+
+  useEffect(() => {
+    if (isWebClientLocation()) {
+      return
+    }
+    return startAccountRuntimeCloudSync()
+  }, [startAccountRuntimeCloudSync])
 
   return (
     <>

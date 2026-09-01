@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as NodeFsPromisesModule from 'node:fs/promises'
 import type { NativeChatMessage } from '../../shared/native-chat-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const UNC_PATH = '\\\\wsl.localhost\\Ubuntu\\home\\ada\\.claude\\projects\\p\\session.jsonl'
 
@@ -31,8 +32,7 @@ import {
   WSL_TRANSCRIPT_FS_EXACT_TIMEOUT_MS
 } from './wsl-transcript-fs-gate'
 
-const SLOW_MESSAGE =
-  'WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart Orca if the issue continues.'
+const SLOW_MESSAGE = `WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart ${APP_DISPLAY_NAME} if the issue continues.`
 
 type Snapshot = [NativeChatMessage[], boolean, number, string | undefined]
 

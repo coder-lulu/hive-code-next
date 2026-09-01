@@ -1,4 +1,5 @@
 import WebSocket from 'ws'
+import { APP_DISPLAY_NAME } from './brand'
 import type { PairingOffer } from './pairing'
 import {
   deriveSharedKey,
@@ -52,7 +53,7 @@ export function openRemoteRuntimeWebSocket(
   const onError = (): void => {
     callbacks.onError(
       ws,
-      remoteRuntimeUnavailableError('Could not connect to the remote Orca runtime.')
+      remoteRuntimeUnavailableError(`Could not connect to the remote ${APP_DISPLAY_NAME} runtime.`)
     )
   }
   const onClose = (code: number, reason: Buffer): void => callbacks.onClose(ws, code, reason)
@@ -61,7 +62,7 @@ export function openRemoteRuntimeWebSocket(
       callbacks.onError(
         ws,
         invalidRemoteRuntimeResponseError(
-          'Remote Orca runtime returned an unexpected binary frame.'
+          `Remote ${APP_DISPLAY_NAME} runtime returned an unexpected binary frame.`
         )
       )
       return

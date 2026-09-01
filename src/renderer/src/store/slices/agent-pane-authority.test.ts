@@ -216,6 +216,19 @@ describe('agent pane authority', () => {
     expect(store.getState().recentlyRetiredAgentStatusPaneKeys[SOURCE]).toBe(true)
   })
 
+  it('merges pending completion counts when both pane authorities have unread work', () => {
+    const store = createTestStore()
+    store.setState({
+      unreadAgentCompletionPanes: { [SOURCE]: true, [TARGET]: true },
+      unreadAgentCompletionCountByPane: { [SOURCE]: 2, [TARGET]: 3 }
+    })
+
+    store.getState().transferAgentPaneAuthority({ fromPaneKey: SOURCE, toPaneKey: TARGET })
+
+    expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [TARGET]: 5 })
+    expect(store.getState().unreadAgentCompletionPanes).toEqual({ [TARGET]: true })
+  })
+
   it('forgets aliases for purged tabs and caps unbounded detach churn', () => {
     const leafId = '66666666-6666-4666-8666-666666666666'
     transferAgentPaneAuthorityAlias({

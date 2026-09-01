@@ -11,6 +11,7 @@ import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { WorkspaceStatus } from '../../../../shared/worktree/types'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../../shared/workspace-source'
+import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import type { ComposerDecisions } from './composer-decisions'
 
@@ -20,6 +21,7 @@ export type ComposerStateInput = {
   initialProjectGroupId?: string
   initialName?: string
   initialPrompt?: string
+  agentPermissionMode?: AgentLaunchPermissionMode
   initialLinkedWorkItem?: LinkedWorkItemSummary | null
   initialGitHubWorkItem?: GitHubWorkItem | null
   initialTaskSourceContext?: TaskSourceContext | null
@@ -43,6 +45,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
     initialEphemeralVmRecipeId,
     initialName = '',
     initialPrompt = '',
+    agentPermissionMode = 'default',
     initialLinkedWorkItem = null,
     initialGitHubWorkItem = null,
     initialTaskSourceContext = null,
@@ -166,6 +169,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
     initialEphemeralVmRecipeId,
     initialName,
     initialPrompt,
+    agentPermissionMode,
     initialLinkedWorkItem,
     initialGitHubWorkItem,
     initialTaskSourceContext,

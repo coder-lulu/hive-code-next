@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const rawRequest = vi.fn()
 const getClients = vi.fn()
@@ -278,6 +279,16 @@ describe('list-issues pagination contract', () => {
       listMcpIssues({ cursor: encodeIssueListCursor('workspace-1', '') })
     ).rejects.toMatchObject({ code: 'linear_invalid_workspace' })
     expect(rawRequest).not.toHaveBeenCalled()
+  })
+
+  it('brands malformed issued cursor errors without changing the compatibility prefix', async () => {
+    const { ISSUE_LIST_CURSOR_PREFIX, resolveIssueListCursor } =
+      await import('./mcp-issue-list-cursor')
+
+    expect(ISSUE_LIST_CURSOR_PREFIX).toBe('orca.linear.v1.')
+    expect(() => resolveIssueListCursor({ cursor: `${ISSUE_LIST_CURSOR_PREFIX}bad` })).toThrow(
+      `Cursor was issued by ${APP_DISPLAY_NAME} but is malformed or truncated.`
+    )
   })
 
   it('maps every Linear priority number onto the CLI setter label', async () => {

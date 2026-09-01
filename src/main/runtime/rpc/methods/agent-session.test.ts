@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY,
+  AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
   AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
   RUNTIME_CAPABILITIES,
@@ -192,6 +193,26 @@ describe('agent session RPC methods', () => {
     expect(runtime.createAgentSession).not.toHaveBeenCalled()
   })
 
+  it('rejects an explicit permission mode for an unsupported agent', async () => {
+    const runtime = runtimeStub()
+    const dispatcher = new RpcDispatcher({
+      runtime: runtime as unknown as OrcaRuntimeService,
+      methods: AGENT_SESSION_METHODS
+    })
+
+    const response = await dispatcher.dispatch(
+      request('terminal.createAgentSession', {
+        clientOperationId: '1752883200000-0123456789abcdef0123456789abcdef',
+        worktree: 'id:worktree-1',
+        agent: 'opencode',
+        agentPermissionMode: 'yolo'
+      })
+    )
+
+    expect(response).toMatchObject({ ok: false, error: { code: 'invalid_argument' } })
+    expect(runtime.createAgentSession).not.toHaveBeenCalled()
+  })
+
   it('preserves legacy agent-bearing terminal.create requests for mixed-version clients', async () => {
     const createTerminal = vi.fn().mockResolvedValue({ handle: 'term-1' })
     const dedupeTerminalCreate = vi.fn(
@@ -285,6 +306,7 @@ describe('agent session RPC methods', () => {
         prompt: 'Fix the race',
         promptDelivery: 'draft',
         agentArgs: '--profile review',
+        agentPermissionMode: 'manual',
         launchPreferences: { model: 'gpt-5', effort: 'high' },
         viewMode: 'chat'
       }),
@@ -302,6 +324,7 @@ describe('agent session RPC methods', () => {
         prompt: 'Fix the race',
         promptDelivery: 'draft',
         agentArgs: '--profile review',
+        agentPermissionMode: 'manual',
         launchPreferences: { model: 'gpt-5', effort: 'high' },
         viewMode: 'chat'
       },
@@ -372,6 +395,7 @@ describe('agent session RPC methods', () => {
     expect(RUNTIME_PROTOCOL_VERSION).toBe(3)
     expect(MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION).toBe(2)
     expect(RUNTIME_CAPABILITIES).toContain(AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY)
+    expect(RUNTIME_CAPABILITIES).toContain(AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY)
     expect(RUNTIME_CAPABILITIES).toContain(AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY)
   })
 })

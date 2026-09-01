@@ -262,10 +262,10 @@ describe('useSkillFreshness', () => {
     expect(state?.inventory).toBeNull()
     expect(state?.loading).toBe(true)
 
-    await act(async () => second.reject(new Error('scan failed')))
+    await act(async () => second.reject(new Error('Orca scan failed')))
     expect(state?.inventory).toBeNull()
     expect(state?.loading).toBe(false)
-    expect(state?.error).toBe('scan failed')
+    expect(state?.error).toBe('Orca scan failed')
   })
 
   it('installs one event-listener pair for multiple consumers and cleans it up', async () => {

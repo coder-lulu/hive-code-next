@@ -152,4 +152,29 @@ describe('launchSleepingAgentSession Windows shell quoting', () => {
       `codex '--dangerously-bypass-approvals-and-sandbox' 'resume' '${SESSION_ID}'`
     )
   })
+
+  it('preserves a Host-owned manual permission mode without sending Renderer yolo args', async () => {
+    store.settings.agentDefaultArgs = {
+      codex: '--model client --dangerously-bypass-approvals-and-sandbox'
+    }
+    const hostSemanticConfig = {
+      agentArgs: '',
+      agentEnv: {},
+      hostDefaultsAuthoritative: true as const,
+      agentPermissionMode: 'manual' as const
+    }
+    const { launchSleepingAgentSession } = await import('./sleeping-agent-session-launch')
+
+    launchSleepingAgentSession({ ...record, launchConfig: hostSemanticConfig })
+
+    const pendingStartup = mockCreateTab.mock.calls.at(-1)?.[3]?.pendingStartup
+    expect(pendingStartup).toMatchObject({
+      agentPermissionMode: 'manual',
+      launchConfig: hostSemanticConfig
+    })
+    expect(pendingStartup).not.toHaveProperty('agentArgsOverride')
+    expect(pendingStartup.command).toContain("'--ask-for-approval'")
+    expect(pendingStartup.command).toContain("'workspace-write'")
+    expect(pendingStartup.command).not.toContain('dangerously-bypass')
+  })
 })

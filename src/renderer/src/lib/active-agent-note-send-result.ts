@@ -1,3 +1,5 @@
+import { APP_DISPLAY_NAME } from '@/product-brand'
+
 export type ActiveAgentNotesSendStatus =
   | 'sent'
   | 'empty'
@@ -39,8 +41,8 @@ export function activeAgentNotesSendFailureMessage(
       return `The ${target} terminal did not accept the notes.`
     case 'partial-submit-failed':
       return options.explicitTarget
-        ? 'The notes may already be pasted in the selected terminal, but Orca could not submit them.'
-        : 'The notes may already be pasted in the active terminal, but Orca could not submit them.'
+        ? `The notes may already be pasted in the selected terminal, but ${APP_DISPLAY_NAME} could not submit them.`
+        : `The notes may already be pasted in the active terminal, but ${APP_DISPLAY_NAME} could not submit them.`
     case 'sent':
       return ''
   }

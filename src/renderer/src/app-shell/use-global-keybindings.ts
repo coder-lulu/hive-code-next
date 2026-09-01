@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { canShowRightSidebarForView } from '@/lib/right-sidebar-visibility'
+import { canShowRightSidebar } from '@/lib/right-sidebar-visibility'
 import { isEditableTarget } from '../lib/editable-target'
 import { getSelectedTextForFileSearch } from '../lib/file-search-selection'
 import { registerAppCommandDispatcher } from '@/lib/app-command-dispatch'
@@ -135,7 +135,8 @@ export function useGlobalKeybindings(args: {
         })
       }
 
-      const canRevealRightSidebar = !creationLayoutActive && canShowRightSidebarForView(activeView)
+      const canRevealRightSidebar =
+        !creationLayoutActive && canShowRightSidebar({ activeView, activeWorktreeId })
 
       if (matchShortcut('sidebar.search.toggle') && canRevealRightSidebar) {
         // With a folder selected in the explorer, Cmd/Ctrl+Shift+F means "Find in Folder" — seed the include pattern with it, not a text search.
@@ -184,6 +185,15 @@ export function useGlobalKeybindings(args: {
       ) {
         input.preventDefault()
         openFloatingWorkspaceMaximized()
+        return
+      }
+
+      // New task is a window-level command even when the composer or another
+      // editable surface currently owns focus. Desktop main-process routing
+      // covers native/browser guests; this keeps the web renderer equivalent.
+      if (matchShortcut('home.newTask')) {
+        input.preventDefault()
+        actions.openNewTaskHome()
         return
       }
 

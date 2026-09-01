@@ -129,12 +129,17 @@ function normalizeHermesArgv(
     configuredChatIndex === -1
       ? configuredArgv
       : configuredArgv.filter((_, index) => index !== configuredChatIndex)
+  const normalizedBaseArgs = stripOrcaOwnedHermesArgs(baseArgsWithoutChat)
+  const normalizedConfiguredArgs = stripOrcaOwnedHermesArgs(configuredArgsWithoutChat)
+  const configuredArgsWithoutDuplicatePermission = normalizedBaseArgs.includes('--yolo')
+    ? normalizedConfiguredArgs.filter((token) => token !== '--yolo')
+    : normalizedConfiguredArgs
   return [
     ...commandPrefix,
     'chat',
     QUERY_ARG_PLACEHOLDER,
-    ...stripOrcaOwnedHermesArgs(baseArgsWithoutChat),
-    ...stripOrcaOwnedHermesArgs(configuredArgsWithoutChat),
+    ...normalizedBaseArgs,
+    ...configuredArgsWithoutDuplicatePermission,
     '--tui'
   ]
 }

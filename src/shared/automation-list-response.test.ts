@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from './brand'
 import { validateAutomationListResponse } from './automation-list-response'
 import type { AutomationListScopeSelector } from './automation-list-scope'
 
@@ -38,13 +39,16 @@ describe('validateAutomationListResponse', () => {
 
   it('reports a legacy-shaped payload as unsupported host scope', () => {
     const result = validateAutomationListResponse({ automations: [{ id: 'a1' }] }, SELF)
-    expect(result).toMatchObject({ ok: false, error: { code: 'unsupported_host_scope' } })
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported_host_scope', message: expect.stringContaining(APP_DISPLAY_NAME) }
+    })
   })
 
   it('rejects a malformed top-level response', () => {
     expect(validateAutomationListResponse(null, SELF)).toMatchObject({
       ok: false,
-      error: { code: 'invalid_response' }
+      error: { code: 'invalid_response', message: expect.stringContaining(APP_DISPLAY_NAME) }
     })
     expect(validateAutomationListResponse({ automations: 'nope' }, SELF)).toMatchObject({
       ok: false,

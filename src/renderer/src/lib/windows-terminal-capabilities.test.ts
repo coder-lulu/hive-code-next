@@ -153,6 +153,33 @@ describe('windows terminal capabilities', () => {
     expect(runtimeGetStatus).toHaveBeenCalledTimes(1)
   })
 
+  it('reuses an in-flight probe when a forced refresh arrives for the same owner', async () => {
+    let resolveWslAvailability: ((available: boolean) => void) | undefined
+    const wslIsAvailable = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveWslAvailability = resolve
+        })
+    )
+    vi.stubGlobal('window', {
+      api: {
+        wsl: { isAvailable: wslIsAvailable, listDistros: vi.fn().mockResolvedValue([]) },
+        pwsh: { isAvailable: vi.fn().mockResolvedValue(false) },
+        gitBash: { isAvailable: vi.fn().mockResolvedValue(false) },
+        runtime: { getStatus: vi.fn().mockResolvedValue({ hostPlatform: 'win32' }) }
+      }
+    })
+
+    const initialProbe = loadWindowsTerminalCapabilities({ ownerKey: 'local' })
+    const forcedRefresh = loadWindowsTerminalCapabilities({ force: true, ownerKey: 'local' })
+
+    expect(forcedRefresh).toBe(initialProbe)
+    expect(wslIsAvailable).toHaveBeenCalledTimes(1)
+
+    resolveWslAvailability?.(false)
+    await expect(Promise.all([initialProbe, forcedRefresh])).resolves.toHaveLength(2)
+  })
+
   it('keeps WSL available when the PowerShell version probe fails', async () => {
     const wslIsAvailable = vi.fn().mockResolvedValue(true)
     const pwshIsAvailable = vi.fn().mockRejectedValue(new Error('pwsh probe failed'))

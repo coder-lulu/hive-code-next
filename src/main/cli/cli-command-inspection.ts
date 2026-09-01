@@ -1,6 +1,7 @@
 import { lstat, readFile, readlink } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import type { CliInstallMethod, CliInstallStatus } from '../../shared/cli-install-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { buildAppImageCliWrapper } from './appimage-cli-wrapper'
 import { DEV_COMMAND_NAME, DEV_LAUNCHER_DIR } from './cli-install-constants'
 import { buildWindowsForwarder, extractManagedUnixLauncherTarget } from './cli-dev-launcher'
@@ -23,7 +24,7 @@ export class CliCommandInspection extends CliInstallLocation {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca launcher script.`
+          detail: `${commandPath} exists but is not a ${APP_DISPLAY_NAME} launcher script.`
         })
       }
 
@@ -50,7 +51,7 @@ export class CliCommandInspection extends CliInstallLocation {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from the terminal.`
+          detail: `Register ${commandPath} to use ${APP_DISPLAY_NAME} from the terminal.`
         })
       }
       throw error
@@ -75,7 +76,7 @@ export class CliCommandInspection extends CliInstallLocation {
               supported: true,
               state: 'stale',
               currentTarget: managedTarget,
-              detail: `${commandPath} contains an older Orca launcher.`
+              detail: `${commandPath} contains an older ${APP_DISPLAY_NAME} launcher.`
             })
           }
         }
@@ -87,7 +88,7 @@ export class CliCommandInspection extends CliInstallLocation {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca symlink.`
+          detail: `${commandPath} exists but is not a ${APP_DISPLAY_NAME} symlink.`
         })
       }
 
@@ -107,8 +108,8 @@ export class CliCommandInspection extends CliInstallLocation {
         detail: isInstalled
           ? `Registered at ${commandPath}.`
           : isManagedStaleTarget
-            ? `${commandPath} points to an older Orca launcher.`
-            : `${commandPath} points to a non-Orca launcher.`
+            ? `${commandPath} points to an older ${APP_DISPLAY_NAME} launcher.`
+            : `${commandPath} points to a non-${APP_DISPLAY_NAME} launcher.`
       })
     } catch (error) {
       if (isMissingError(error)) {
@@ -119,7 +120,7 @@ export class CliCommandInspection extends CliInstallLocation {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from the terminal.`
+          detail: `Register ${commandPath} to use ${APP_DISPLAY_NAME} from the terminal.`
         })
       }
       throw error
@@ -205,7 +206,7 @@ export class CliCommandInspection extends CliInstallLocation {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca launcher script.`
+          detail: `${commandPath} exists but is not a ${APP_DISPLAY_NAME} launcher script.`
         })
       }
 
@@ -244,7 +245,7 @@ export class CliCommandInspection extends CliInstallLocation {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from Command Prompt or PowerShell.`
+          detail: `Register ${commandPath} to use ${APP_DISPLAY_NAME} from Command Prompt or PowerShell.`
         })
       }
       throw error
@@ -272,6 +273,8 @@ export class CliCommandInspection extends CliInstallLocation {
       state: args.state,
       currentTarget: args.currentTarget,
       unsupportedReason: null,
+      // Status details are rendered directly in Settings. Brand owned copy at
+      // construction time so dynamic paths and external diagnostics stay intact.
       detail: args.detail
     }
   }

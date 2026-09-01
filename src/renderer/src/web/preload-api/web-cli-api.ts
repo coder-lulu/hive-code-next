@@ -1,10 +1,11 @@
 import type { PreloadApi } from '../../../../preload/api-types'
 import { getBrowserPlatform } from './web-storage'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '@/product-brand'
 
 export function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
   const status = {
     platform: getBrowserPlatform(),
-    commandName: getBrowserPlatform() === 'linux' ? 'orca-ide' : 'orca',
+    commandName: PRIMARY_CLI_COMMAND,
     commandPath: null,
     pathDirectory: null,
     pathConfigured: false,
@@ -14,7 +15,7 @@ export function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
     state: 'unsupported',
     currentTarget: null,
     unsupportedReason: 'launch_mode_unavailable',
-    detail: 'CLI registration is managed on the Orca server, not in the web browser.'
+    detail: `CLI registration is managed on the ${APP_DISPLAY_NAME} server, not in the web browser.`
   } as const
   return {
     getInstallStatus: () => Promise.resolve(status),

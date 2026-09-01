@@ -1,4 +1,5 @@
 import type { PreloadApi } from '../../../../preload/api-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
   const status = (
@@ -22,7 +23,7 @@ export function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHoo
       state: 'not_installed',
       configPath: '',
       managedHooksPresent: false,
-      detail: 'Agent hook status is only available on the Orca server.'
+      detail: `Agent hook status is only available on the ${APP_DISPLAY_NAME} server.`
     } as const)
   return {
     claudeStatus: () => status('claude'),

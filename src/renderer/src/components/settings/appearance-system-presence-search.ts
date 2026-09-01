@@ -52,7 +52,7 @@ const getMenuBarIconEntryCatalog = createLocalizedCatalog((): SettingsSearchEntr
     title: translate('settings.appearance.menuBarIcon.title', 'Show Menu Bar Icon'),
     description: translate(
       'settings.appearance.menuBarIcon.description',
-      'Keep an Orca shortcut and activity indicator in the macOS menu bar.'
+      'Keep a HiveCode shortcut and activity indicator in the macOS menu bar.'
     ),
     keywords: [
       ...translateSearchKeyword('settings.appearance.menuBarIcon.keyword.menuBar', 'menu bar', {
@@ -61,7 +61,10 @@ const getMenuBarIconEntryCatalog = createLocalizedCatalog((): SettingsSearchEntr
       ...translateSearchKeyword('auto.components.settings.appearance.search.tray.tray', 'tray', {
         englishOnly: true
       }),
-      ...translateSearchKeyword('auto.components.settings.appearance.search.1f2880a9d5', 'orca'),
+      ...translateSearchKeyword(
+        'auto.components.settings.appearance.search.1f2880a9d5',
+        'hivecode'
+      ),
       ...translateSearchKeyword(
         'settings.appearance.menuBarIcon.keyword.statusItem',
         'status item',

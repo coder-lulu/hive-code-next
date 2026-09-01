@@ -229,6 +229,8 @@ export function useTerminalPaneGlobalEffects({
         tabId,
         manager: managerRef.current,
         acknowledgeAgents: (paneKeys) => useAppStore.getState().acknowledgeAgents(paneKeys),
+        consumeAgentCompletionUnread: (paneKey) =>
+          useAppStore.getState().consumeAgentCompletionUnread(paneKey),
         surfaceStaleAgentRow,
         scrollToBottomIfOutputSinceLastView: scheduleFollowOutputIfNeeded
       })

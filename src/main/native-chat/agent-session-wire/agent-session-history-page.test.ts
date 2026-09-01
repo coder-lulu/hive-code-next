@@ -6,6 +6,7 @@ import {
   agentJournalSubmissionKey,
   boundJournalKeyComponent
 } from '../../../shared/agent-session-journal-item-key'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type {
   AgentJournalItemBody,
   AgentJournalItemIdentity,
@@ -307,7 +308,9 @@ describe('history page byte ceiling', () => {
     expect(tail.items).toHaveLength(1)
     const bodyOnPage = tail.items[0]?.body
     expect(bodyOnPage?.kind).toBe('status')
-    expect(bodyOnPage?.kind === 'status' ? bodyOnPage.text : '').toContain('[Orca: item truncated')
+    expect(bodyOnPage?.kind === 'status' ? bodyOnPage.text : '').toContain(
+      `[${APP_DISPLAY_NAME}: item truncated`
+    )
   })
 })
 

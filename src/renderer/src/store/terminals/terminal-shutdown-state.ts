@@ -84,6 +84,8 @@ export function commitTerminalShutdownState({
     let unreadTerminalTabs = state.unreadTerminalTabs
     let unreadTerminalPanes = state.unreadTerminalPanes
     let unreadAgentCompletionPanes = state.unreadAgentCompletionPanes
+    const currentUnreadAgentCompletionCountByPane = state.unreadAgentCompletionCountByPane ?? {}
+    let unreadAgentCompletionCountByPane = currentUnreadAgentCompletionCountByPane
     let lastTerminalInputAtByPaneKey = state.lastTerminalInputAtByPaneKey
 
     for (const tab of tabs) {
@@ -106,12 +108,22 @@ export function commitTerminalShutdownState({
           delete unreadTerminalPanes[paneKey]
         }
       }
-      for (const paneKey of Object.keys(unreadAgentCompletionPanes)) {
-        if (paneKey.startsWith(`${tab.id}:`)) {
-          if (unreadAgentCompletionPanes === state.unreadAgentCompletionPanes) {
-            unreadAgentCompletionPanes = { ...unreadAgentCompletionPanes }
+      if (!keepIdentifiers) {
+        for (const paneKey of Object.keys(unreadAgentCompletionPanes)) {
+          if (paneKey.startsWith(`${tab.id}:`)) {
+            if (unreadAgentCompletionPanes === state.unreadAgentCompletionPanes) {
+              unreadAgentCompletionPanes = { ...unreadAgentCompletionPanes }
+            }
+            delete unreadAgentCompletionPanes[paneKey]
           }
-          delete unreadAgentCompletionPanes[paneKey]
+        }
+        for (const paneKey of Object.keys(unreadAgentCompletionCountByPane)) {
+          if (paneKey.startsWith(`${tab.id}:`)) {
+            if (unreadAgentCompletionCountByPane === currentUnreadAgentCompletionCountByPane) {
+              unreadAgentCompletionCountByPane = { ...currentUnreadAgentCompletionCountByPane }
+            }
+            delete unreadAgentCompletionCountByPane[paneKey]
+          }
         }
       }
       for (const paneKey of Object.keys(lastTerminalInputAtByPaneKey)) {
@@ -155,6 +167,9 @@ export function commitTerminalShutdownState({
       ...(unreadTerminalPanes !== state.unreadTerminalPanes ? { unreadTerminalPanes } : {}),
       ...(unreadAgentCompletionPanes !== state.unreadAgentCompletionPanes
         ? { unreadAgentCompletionPanes }
+        : {}),
+      ...(unreadAgentCompletionCountByPane !== currentUnreadAgentCompletionCountByPane
+        ? { unreadAgentCompletionCountByPane }
         : {}),
       ...(lastTerminalInputAtByPaneKey !== state.lastTerminalInputAtByPaneKey
         ? { lastTerminalInputAtByPaneKey }

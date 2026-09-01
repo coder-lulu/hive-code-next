@@ -4,11 +4,7 @@ import {
   chunkFilesForCommand,
   parseAddedLineRangesByFile,
   resolveOxlintCommand,
-  OXLINT_SCANS,
-  diagnosticTouchesAddedLines,
-  isMovedCode,
-  overlapsAddedLines,
-  parseAddedLineRanges
+  isMovedCode
 } from './check-changed-code-quality.mjs'
 
 describe('changed-code quality diff parsing', () => {
@@ -83,27 +79,27 @@ describe('changed-code quality command batching', () => {
 })
 
 describe('moved-code exemption', () => {
-  it('treats a verbatim contiguous block from the base as moved', () => {
+  test('treats a verbatim contiguous block from the base as moved', () => {
     const base = [['const a = 1', 'items.map((item, index) => (', 'key={index}', '))']]
     expect(isMovedCode(['items.map((item, index) => (', 'key={index}', '))'], base)).toBe(true)
   })
 
-  it('ignores indentation and whitespace changes from the move', () => {
+  test('ignores indentation and whitespace changes from the move', () => {
     const base = [['    items.map((item, index) => (', '      key={index}']]
     expect(isMovedCode(['items.map((item, index) => (', 'key={index}'], base)).toBe(true)
   })
 
-  it('does not exempt a genuinely new violation', () => {
+  test('does not exempt a genuinely new violation', () => {
     const base = [['const a = 1', 'const b = 2']]
     expect(isMovedCode(['rows.map((row, i) => <td key={i} />)'], base)).toBe(false)
   })
 
-  it('does not exempt a block that is only partly present in the base', () => {
+  test('does not exempt a block that is only partly present in the base', () => {
     const base = [['doThing()', 'unrelated()']]
     expect(isMovedCode(['doThing()', 'newlyAddedSideEffect()'], base)).toBe(false)
   })
 
-  it('tolerates a few lines appended inside the moved block', () => {
+  test('tolerates a few lines appended inside the moved block', () => {
     // A split commonly grows a hook dependency array when closure variables
     // become props; the moved body around it is still moved.
     const body = Array.from({ length: 20 }, (_, i) => `line${i}()`)
@@ -112,23 +108,23 @@ describe('moved-code exemption', () => {
     expect(isMovedCode(moved, base)).toBe(true)
   })
 
-  it('does not exempt when the anchor line is absent from the base', () => {
+  test('does not exempt when the anchor line is absent from the base', () => {
     const base = [['doThing()', 'filler()', 'other()']]
     expect(isMovedCode(['brandNewCall()', 'doThing()', 'other()'], base)).toBe(false)
   })
 
-  it('does not exempt when most of the block is absent from the base', () => {
+  test('does not exempt when most of the block is absent from the base', () => {
     const base = [['keep0()', 'keep1()', 'unrelated()']]
     const mostlyNew = ['keep0()', ...Array.from({ length: 18 }, (_, i) => `fresh${i}()`)]
     expect(isMovedCode(mostlyNew, base)).toBe(false)
   })
 
-  it('ignores blank lines when matching', () => {
+  test('ignores blank lines when matching', () => {
     const base = [['a()', 'b()']]
     expect(isMovedCode(['a()', '', 'b()'], base)).toBe(true)
   })
 
-  it('never exempts an empty highlight', () => {
+  test('never exempts an empty highlight', () => {
     expect(isMovedCode(['', '   '], [['a()']])).toBe(false)
   })
 })

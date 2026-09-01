@@ -9,9 +9,10 @@ import {
 } from '../../shared/remote-pairing-verification'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime-client'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME, applyProductBranding } from '../../shared/brand'
 import { redactRuntimeEnvironment } from '../../shared/runtime-environments'
 import type { RuntimeStatus } from '../../shared/runtime-types'
+import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/protocol-version'
 
 type VerifyAndAddRuntimeEnvironmentArgs = {
   name: string
@@ -41,7 +42,10 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
       parsed.value.pairing,
       'status.get',
       undefined,
-      15_000
+      15_000,
+      undefined,
+      undefined,
+      ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES
     )
     if (!response.ok) {
       return {
@@ -59,11 +63,26 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
     return classifyPairingVerificationError(error, parsed.value.displayEndpoint)
   }
 
+  if (
+    parsed.value.pairing.runtimeRecordId &&
+    runtimeStatus.runtimeRecordId &&
+    parsed.value.pairing.runtimeRecordId !== runtimeStatus.runtimeRecordId
+  ) {
+    return {
+      ok: false,
+      kind: 'host-identity-mismatch',
+      message: 'The authenticated Runtime identity does not match this access link.'
+    }
+  }
+
   const usesSshTunnel = parsed.value.endpointKind === 'loopback' && args.allowLoopback === true
   let environment: ReturnType<typeof addEnvironmentFromPairingCode>
   try {
     environment = addEnvironmentFromPairingCode(userDataPath, {
       ...args,
+      ...(runtimeStatus.runtimeRecordId
+        ? { authenticatedRuntimeRecordId: runtimeStatus.runtimeRecordId }
+        : {}),
       ...(usesSshTunnel ? { connectionDependency: 'ssh-tunnel' as const } : {})
     })
   } catch (error) {
@@ -72,7 +91,7 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
       kind: 'environment-save-failed',
       message:
         error instanceof RuntimeEnvironmentStoreError && error.code === 'invalid_argument'
-          ? applyProductBranding(error.message)
+          ? error.message
           : applyProductBranding(
               'Orca verified the host but could not save it. Check local settings storage and try again.'
             )
@@ -104,9 +123,7 @@ function classifyPairingVerificationError(
       return {
         ok: false,
         kind: 'host-identity-mismatch',
-        message: applyProductBranding(
-          `Orca reached ${endpoint}, but that host does not match this access link.`
-        )
+        message: `${APP_DISPLAY_NAME} reached ${endpoint}, but that host does not match this access link.`
       }
     }
     if (error.pairingStage === 'runtime') {
@@ -140,8 +157,6 @@ function unreachableHostResult(endpoint: string): VerifyAndAddRuntimeEnvironment
   return {
     ok: false,
     kind: 'host-unreachable',
-    message: applyProductBranding(
-      `Cannot reach Orca at ${endpoint}. Confirm the other host is running and reachable.`
-    )
+    message: `Cannot reach ${APP_DISPLAY_NAME} at ${endpoint}. Confirm the other host is running and reachable.`
   }
 }

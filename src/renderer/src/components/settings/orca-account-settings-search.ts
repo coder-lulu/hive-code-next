@@ -4,10 +4,10 @@ import { translateSearchKeyword } from './settings-search-keywords'
 
 export const getOrcaAccountSettingsSearchEntries = createLocalizedCatalog(() => [
   {
-    title: translate('auto.components.settings.orcaAccount.account', 'HiveCloud account'),
+    title: translate('auto.components.settings.orcaAccount.title', 'Account & cloud'),
     description: translate(
       'auto.components.settings.orcaAccount.searchDescription',
-      'Sign in, refresh, or sign out of the application-wide HiveCloud account.'
+      'Manage HiveCloud identity, this device, Runtime access, and cross-device sessions.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.orcaAccount.keywordAccount', 'account'),

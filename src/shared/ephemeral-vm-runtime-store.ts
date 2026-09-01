@@ -4,7 +4,7 @@ import { JsonStringifyByteLimitError } from './node-bounded-json-stringify'
 import { readNodeFileSyncWithinLimit } from './node-bounded-file-reader'
 import { writeSecureJsonFileWithinLimit } from './bounded-secure-json-file'
 import { hardenExistingSecureFile } from './secure-file'
-import { applyProductBranding } from './brand'
+import { APP_DISPLAY_NAME } from './brand'
 import {
   featureEntryFromRuntime,
   featureIdentity,
@@ -105,7 +105,7 @@ export function upsertEphemeralVmRuntimeRollbackRecovery(
     if (error instanceof JsonStringifyByteLimitError) {
       throw new EphemeralVmRuntimeStoreError(
         'runtime_error',
-        `Could not write Orca ephemeral VM runtimes at ${path}; the store exceeds its durable capacity.`
+        `Could not write ${APP_DISPLAY_NAME} ephemeral VM runtimes at ${path}; the store exceeds its durable capacity.`
       )
     }
     throw error
@@ -241,9 +241,7 @@ function readEphemeralVmRuntimeStore(userDataPath: string): LoadedEphemeralVmRun
   } catch {
     throw new EphemeralVmRuntimeStoreError(
       'runtime_error',
-      applyProductBranding(
-        `Could not read Orca ephemeral VM runtimes at ${path}; the file is invalid.`
-      )
+      `Could not read ${APP_DISPLAY_NAME} ephemeral VM runtimes at ${path}; the file is invalid.`
     )
   }
 }
@@ -293,9 +291,7 @@ function writeEphemeralVmRuntimeStore(
     if (error instanceof JsonStringifyByteLimitError) {
       throw new EphemeralVmRuntimeStoreError(
         'runtime_error',
-        applyProductBranding(
-          `Could not write Orca ephemeral VM runtimes at ${path}; the store exceeds its durable capacity.`
-        )
+        `Could not write ${APP_DISPLAY_NAME} ephemeral VM runtimes at ${path}; the store exceeds its durable capacity.`
       )
     }
     throw error

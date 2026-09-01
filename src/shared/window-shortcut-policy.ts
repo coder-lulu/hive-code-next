@@ -9,6 +9,10 @@ import {
   type KeybindingOverrides,
   type PhysicalModifierToken
 } from './keybindings'
+import { getWindowShortcutActionId, type WindowShortcutAction } from './window-shortcut-action'
+
+export { getWindowShortcutActionId } from './window-shortcut-action'
+export type { WindowShortcutAction } from './window-shortcut-action'
 
 export type WindowShortcutInput = {
   type?: string
@@ -26,27 +30,6 @@ export type WindowShortcutInput = {
   // the main-process resolver so allowlisted actions can fire on double-tap.
   doubleTapModifier?: PhysicalModifierToken
 }
-
-export type WindowShortcutAction =
-  | { type: 'zoom'; direction: 'in' | 'out' | 'reset' }
-  | { type: 'openSettings' }
-  | { type: 'forceReload' }
-  | { type: 'toggleWorktreePalette' }
-  | { type: 'toggleFloatingTerminal' }
-  | { type: 'toggleLeftSidebar' }
-  | { type: 'toggleRightSidebar' }
-  | { type: 'openQuickOpen' }
-  | { type: 'toggleQuickCommandsMenu' }
-  | { type: 'openNewWorkspace' }
-  | { type: 'deleteCurrentWorkspace' }
-  | { type: 'openWorkspaceBoard' }
-  | { type: 'openTasks' }
-  | { type: 'toggleAgentDashboard' }
-  | { type: 'switchRecentTab' }
-  | { type: 'jumpToWorktreeIndex'; index: number }
-  | { type: 'jumpToTabIndex'; index: number }
-  | { type: 'worktreeHistoryNavigate'; direction: 'back' | 'forward' }
-  | { type: 'dictationKeyDown' }
 
 type WindowShortcutResolveOptions = KeybindingMatchOptions
 
@@ -226,12 +209,16 @@ export function resolveWindowShortcutAction(
     return { type: 'openQuickOpen' }
   }
 
-  // Why: Cmd/Ctrl+N opens the new-workspace composer. Routed through the
+  // Why: Cmd/Ctrl+N opens the new-task home. Routed through the
   // main process so it reaches the renderer even when focus lives inside
   // a contentEditable surface (markdown rich editor) or a browser guest
   // webContents, both of which bypass the renderer's window-level keydown.
-  // Shift is accepted for compatibility with the former Create-from shortcut;
-  // the unified composer now exposes source switching inside the name field.
+  if (actionMatches('home.newTask', input, platform, keybindings, options)) {
+    return { type: 'openNewTaskHome' }
+  }
+
+  // Shift+Cmd/Ctrl+N opens the new-workspace composer. The explicit Shift
+  // variant keeps workspace creation distinct from starting a new task.
   if (actionMatches('workspace.create', input, platform, keybindings, options)) {
     return { type: 'openNewWorkspace' }
   }
@@ -295,53 +282,6 @@ export function resolveWindowShortcutAction(
   // chords like Ctrl+R, Ctrl+U, and Ctrl+E are not accidentally stolen while
   // terminals own focus.
   return null
-}
-
-export function getWindowShortcutActionId(action: WindowShortcutAction): KeybindingActionId | null {
-  switch (action.type) {
-    case 'zoom':
-      return action.direction === 'in'
-        ? 'zoom.in'
-        : action.direction === 'out'
-          ? 'zoom.out'
-          : 'zoom.reset'
-    case 'openSettings':
-      return 'app.settings'
-    case 'forceReload':
-      return 'app.forceReload'
-    case 'toggleWorktreePalette':
-      return 'worktree.palette'
-    case 'toggleFloatingTerminal':
-      return 'floatingTerminal.toggle'
-    case 'toggleLeftSidebar':
-      return 'sidebar.left.toggle'
-    case 'toggleRightSidebar':
-      return 'sidebar.right.toggle'
-    case 'openQuickOpen':
-      return 'worktree.quickOpen'
-    case 'toggleQuickCommandsMenu':
-      return 'tab.openQuickCommandsMenu'
-    case 'openNewWorkspace':
-      return 'workspace.create'
-    case 'deleteCurrentWorkspace':
-      return 'workspace.delete'
-    case 'openWorkspaceBoard':
-      return 'workspace.openBoard'
-    case 'openTasks':
-      return 'view.tasks'
-    case 'toggleAgentDashboard':
-      return 'dashboard.toggle'
-    case 'switchRecentTab':
-      return 'tab.previousRecent'
-    case 'worktreeHistoryNavigate':
-      return action.direction === 'back' ? 'worktree.history.back' : 'worktree.history.forward'
-    case 'dictationKeyDown':
-      return 'voice.dictation'
-    case 'jumpToWorktreeIndex':
-      return 'workspace.selectByIndex'
-    case 'jumpToTabIndex':
-      return 'tab.selectByIndex'
-  }
 }
 
 export function windowShortcutActionCapturesTerminal(action: WindowShortcutAction): boolean {

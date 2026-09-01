@@ -18,14 +18,15 @@ export class RelayOuterError extends Error {
 
 type MobileRelayE2eeLinkOptions = {
   endpoint: { cellUrl: string; relayHostId: string }
-  credential: string
-  expectedCredentialKind: 'invite' | 'resume'
+  credential: string | { readonly ticketId: string; readonly ticketSecret: string }
+  expectedCredentialKind: 'invite' | 'resume' | 'ticket'
   deviceToken: string
   desktopPublicKeyB64: string
+  clientKeyPair?: { readonly publicKey: Uint8Array; readonly secretKey: Uint8Array }
   onAuthenticated: () => void
   onText: (plaintext: string) => void
   onBinary: (plaintext: Uint8Array) => void
-  onHello?: (hello: Extract<RelayPhoneHello, { ok: true }>) => void
+  onHello?: (hello: Extract<RelayConnectionHello, { ok: true }>) => void
   onError: (error: Error) => void
   createSocket?: (url: string) => WebSocket
 }
@@ -47,7 +48,8 @@ export class MobileRelayE2eeLink {
     const session = MobileE2EEV2ClientSession.create({
       desktopPublicKeyB64: options.desktopPublicKeyB64,
       transport: 'relay',
-      relayHostId: options.endpoint.relayHostId
+      relayHostId: options.endpoint.relayHostId,
+      clientKeyPair: options.clientKeyPair
     })
     this.channel = new MobileE2EEV2PhysicalChannel({
       session,
@@ -85,6 +87,9 @@ export class MobileRelayE2eeLink {
 
   private bindSocket(): void {
     this.socket.onopen = () => {
+      if (this.closed) {
+        return
+      }
       try {
         this.socket.send(
           JSON.stringify({
@@ -115,6 +120,9 @@ export class MobileRelayE2eeLink {
     // `error` is often delivered just before `close`; wait for close so a
     // typed relay code is not replaced by a generic transport error.
     this.socket.onerror = () => {
+      if (this.closed) {
+        return
+      }
       this.transportErrorTimer ??= setTimeout(() => {
         this.transportErrorTimer = null
         this.fail(new RelayOuterError(1006))
@@ -139,7 +147,7 @@ export class MobileRelayE2eeLink {
     } catch {
       throw new Error('invalid relay hello JSON')
     }
-    const parsed = RelayPhoneHelloSchema.safeParse(value)
+    const parsed = parseRelayConnectionHello(value, this.options.expectedCredentialKind)
     if (!parsed.success) {
       throw new Error('invalid relay hello')
     }
@@ -151,6 +159,9 @@ export class MobileRelayE2eeLink {
     }
     this.outerReady = true
     this.options.onHello?.(parsed.data)
+    if (this.closed) {
+      return
+    }
     this.channel.start()
   }
 
@@ -167,6 +178,40 @@ export class MobileRelayE2eeLink {
     this.options.onError(error)
     this.socket.close()
   }
+}
+
+type RelayConnectionHello =
+  | RelayPhoneHello
+  | { type: 'relay-hello'; ok: true; credentialKind: 'ticket'; leaseExpiresAt: number }
+
+function parseRelayConnectionHello(
+  value: unknown,
+  expectedCredentialKind: MobileRelayE2eeLinkOptions['expectedCredentialKind']
+): { success: true; data: RelayConnectionHello } | { success: false } {
+  if (expectedCredentialKind !== 'ticket') {
+    const parsed = RelayPhoneHelloSchema.safeParse(value)
+    return parsed.success ? { success: true, data: parsed.data } : { success: false }
+  }
+  const failure = RelayPhoneHelloSchema.safeParse(value)
+  if (failure.success && !failure.data.ok) {
+    return { success: true, data: failure.data }
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { success: false }
+  }
+  const hello = value as Record<string, unknown>
+  if (
+    Object.keys(hello).sort().join(',') !== 'credentialKind,leaseExpiresAt,ok,type' ||
+    hello.type !== 'relay-hello' ||
+    hello.ok !== true ||
+    hello.credentialKind !== 'ticket' ||
+    typeof hello.leaseExpiresAt !== 'number' ||
+    !Number.isSafeInteger(hello.leaseExpiresAt) ||
+    hello.leaseExpiresAt < 0
+  ) {
+    return { success: false }
+  }
+  return { success: true, data: hello as RelayConnectionHello }
 }
 
 function relaySocketUrl(endpoint: { cellUrl: string; relayHostId: string }): string {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { EmulatorSessionInfo } from '../emulator/emulator-types'
 import type { FolderWorkspace } from '../../shared/folder-workspace-types'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
 import { OrcaRuntimeService } from './orca-runtime'
 
 const FOLDER_WORKSPACE_ID = 'folder-workspace-1'
@@ -31,7 +32,50 @@ function makeFolderWorkspace(): FolderWorkspace {
   }
 }
 
-describe('RuntimeEmulatorCommands folder workspace routing', () => {
+describe('RuntimeEmulatorCommands workspace routing', () => {
+  it.each([FLOATING_TERMINAL_WORKTREE_ID, `id:${FLOATING_TERMINAL_WORKTREE_ID}`])(
+    'registers an attached device for floating workspace selector %s',
+    async (selector) => {
+      const bridge = {
+        acquireHelperForDevice: vi.fn(async () => ({
+          info: EMULATOR_INFO,
+          release: vi.fn(async () => {})
+        })),
+        getReusableActiveForWorktree: vi.fn(async () => null),
+        registerActiveEmulator: vi.fn(),
+        stopActiveForSwitch: vi.fn(async () => null)
+      }
+      const runtime = new OrcaRuntimeService({
+        getFolderWorkspaces: () => [],
+        getAllWorktreeMeta: () => new Map(),
+        getRepo: () => null,
+        getRepos: () => [],
+        getSettings: () => ({
+          mobileEmulatorEnabled: true,
+          mobileEmulatorDefaultDeviceUdid: null,
+          androidSdkPath: null
+        })
+      } as never)
+      runtime.setEmulatorBridge(bridge as never)
+      Object.assign(runtime, {
+        getAuthoritativeWindow: () => ({ webContents: { send: vi.fn() } })
+      })
+
+      await expect(
+        runtime.emulatorAttach({
+          device: EMULATOR_INFO.deviceUdid,
+          worktree: selector
+        })
+      ).resolves.toEqual({ attached: true, info: EMULATOR_INFO })
+
+      expect(bridge.registerActiveEmulator).toHaveBeenCalledWith(
+        FLOATING_TERMINAL_WORKTREE_ID,
+        EMULATOR_INFO,
+        { managed: true }
+      )
+    }
+  )
+
   it.each([FOLDER_WORKSPACE_KEY, `id:${FOLDER_WORKSPACE_KEY}`])(
     'registers and publishes an attached device for selector %s',
     async (selector) => {

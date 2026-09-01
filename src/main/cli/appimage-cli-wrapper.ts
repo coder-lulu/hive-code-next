@@ -27,6 +27,7 @@ if [ ! -f "$APPIMAGE" ]; then
 fi
 export ORCA_NODE_OPTIONS="\${NODE_OPTIONS-}"
 export ORCA_NODE_REPL_EXTERNAL_MODULE="\${NODE_REPL_EXTERNAL_MODULE-}"
+export HIVE_CLI_INVOKED_AS="\${0##*/}"
 unset NODE_OPTIONS
 unset NODE_REPL_EXTERNAL_MODULE
 # Why: AppImage mount paths change on each launch; $APPDIR is the runtime mount.

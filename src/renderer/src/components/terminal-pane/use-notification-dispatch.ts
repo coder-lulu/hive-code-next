@@ -58,6 +58,7 @@ export type TerminalNotificationEvent = {
   paneKey?: string
   agentStatusSnapshot?: AgentCompletionStatusSnapshot
   agentCompletionSource?: AgentCompletionDispatchMeta['source']
+  agentAttentionKind?: 'task-complete' | 'input-required'
   suppressOsNotification?: boolean
 }
 
@@ -168,6 +169,11 @@ export function dispatchTerminalNotification(
         // Why: focus-return auto-ack needs an agent-specific source marker;
         // generic pane unread also covers BEL and must still show until interact.
         state.markAgentCompletionPaneUnread(event.paneKey)
+        // Keep one count per completed task instead of collapsing multiple
+        // completions in the same pane into a single boolean unread marker.
+        if (event.agentAttentionKind !== 'input-required') {
+          state.incrementAgentCompletionUnread(event.paneKey)
+        }
       }
       if (terminalAttentionEnabled && tabId && event.paneKey) {
         state.markTerminalTabUnread(tabId)

@@ -29,6 +29,7 @@ export type WebRuntimeSessionMocks = {
   resolveHostSessionTabIdForWebSessionTab: SessionMock
   deliverLaunchPromptToAgentTab: SessionMock
   hasMaterializedWebRuntimeBrowserPage: SessionMock
+  registerAgentLaunchConfig?: SessionMock
 }
 
 /**
@@ -205,7 +206,8 @@ export function stubTerminalCreateEnvironment(mocks: WebRuntimeSessionMocks): vo
     createBrowserTab: mocks.createBrowserTab,
     setRemoteBrowserPageHandle: mocks.setRemoteBrowserPageHandle,
     focusBrowserTabInWorktree: mocks.focusBrowserTabInWorktree,
-    setActiveWorktree: mocks.setActiveWorktree
+    setActiveWorktree: mocks.setActiveWorktree,
+    registerAgentLaunchConfig: mocks.registerAgentLaunchConfig ?? vi.fn()
   })
   mocks.setState.mockImplementation((updater: (state: unknown) => unknown) => {
     updater({

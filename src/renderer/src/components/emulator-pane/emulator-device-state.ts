@@ -1,9 +1,9 @@
-import type { SimulatorDeviceRow } from './emulator-pane-types'
+import type { SimulatorDeviceRow, SimulatorDeviceState } from './emulator-pane-types'
 
 export function markSimulatorDeviceState(
   devices: SimulatorDeviceRow[],
   target: string | null | undefined,
-  state: string
+  state: SimulatorDeviceState
 ): SimulatorDeviceRow[] {
   if (!target) {
     return devices

@@ -2,56 +2,45 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  Code2,
-  Clock3,
-  FolderGit2,
-  FolderInput,
-  GitBranch,
-  GitBranchPlus,
-  GitPullRequest,
-  LayoutTemplate,
-  Layers3,
-  Rocket,
-  Sparkles,
-  Cloud,
-  Workflow,
-  UsersRound
-} from 'lucide-react'
+import { ChevronLeft, ChevronRight, Code2, LayoutTemplate, Sparkles, Workflow } from 'lucide-react'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import {
+  supportsTuiAgentLaunchPermission,
+  type AgentLaunchPermissionMode
+} from '../../../shared/tui-agent-permissions'
 import { useAppStore } from '../store'
 import { APP_DISPLAY_NAME, PRODUCT_LOGO_URL } from '@/product-brand'
 import { cn } from '@/lib/utils'
 import { getAgentCatalog } from '@/lib/agent-catalog'
+import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTarget'
+import { useDetectedAgents } from '@/hooks/useDetectedAgents'
 import { activateAndRevealWorkspace } from '@/lib/worktree-activation'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
-import { useLandingPreflightRuntime } from './landing-preflight-runtime'
-import { LandingPreflightBanner } from './landing/LandingPreflightBanner'
-import { DesktopHomeComposerFooter } from './landing/DesktopHomeComposerFooter'
 import {
-  buildDesktopHomeModel,
-  formatHomeRelativeTime,
-  type HomeRelativeTimeLabels,
-  type DesktopHomeWorkspace
-} from './landing/desktop-home-model'
+  filterQuickWorkspaceAgents,
+  pickQuickWorkspaceAgent,
+  resolveQuickWorkspaceAgentSelection
+} from '@/lib/quick-workspace-agent-selection'
+import { activateTemporarySessionInMain } from '@/lib/temporary-session-navigation'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { DesktopHomeComposerFooter } from './landing/DesktopHomeComposerFooter'
+import { desktopHomeProjectIdentityFromSelection } from './landing/desktop-home-selection'
+import { buildDesktopHomeModel, findDesktopHomeWorkspace } from './landing/desktop-home-model'
 import mascotUrl from '../../../../resources/desktop-home-mascot-float.png'
 import { translate } from '@/i18n/i18n'
 
 type HomeScene = 'code' | 'automation' | 'collaboration'
 const SCENES: { id: HomeScene; icon: typeof Code2; labelKey: string; placeholderKey: string }[] = [
-  { id: 'code', icon: Code2, labelKey: 'sceneCode', placeholderKey: 'placeholderCode' },
   {
     id: 'automation',
     icon: Workflow,
     labelKey: 'sceneAutomation',
     placeholderKey: 'placeholderAutomation'
   },
+  { id: 'code', icon: Code2, labelKey: 'sceneCode', placeholderKey: 'placeholderCode' },
   {
     id: 'collaboration',
-    icon: UsersRound,
+    icon: LayoutTemplate,
     labelKey: 'sceneCollaboration',
     placeholderKey: 'placeholderCollaboration'
   }
@@ -70,85 +59,131 @@ const CAPABILITIES: Record<HomeScene, string[]> = {
   collaboration: ['breakDownRequirements', 'parallelReview', 'planDelivery']
 }
 
-function WorkspaceRow({
-  workspace,
-  timeLabels
-}: {
-  workspace: DesktopHomeWorkspace
-  timeLabels: HomeRelativeTimeLabels
-}): React.JSX.Element {
-  return (
-    <button
-      type="button"
-      className="desktop-home-workspace-row group"
-      onClick={() => activateAndRevealWorkspace(workspace.id)}
-    >
-      <span
-        className="desktop-home-project-mark"
-        style={{ backgroundColor: workspace.badgeColor ?? '#2F6BFF' }}
-      >
-        {workspace.repoName.slice(0, 1).toUpperCase()}
-      </span>
-      <span className="min-w-0 flex-1 text-left">
-        <span className="block truncate text-[13px] font-semibold text-foreground">
-          {workspace.name}
-        </span>
-        <span className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
-          <GitBranch className="size-3" />
-          {workspace.branch === 'unnamed'
-            ? translate('components.desktopHome.unnamedBranch', 'Unnamed branch')
-            : workspace.branch}
-          <span aria-hidden>·</span>
-          {translate(`components.desktopHome.host.${workspace.hostLabel}`, workspace.hostLabel)}
-        </span>
-      </span>
-      <span className="shrink-0 text-[11px] text-muted-foreground">
-        {formatHomeRelativeTime(workspace.lastActivityAt, Date.now(), timeLabels)}
-      </span>
-      <ArrowRight className="size-3.5 -translate-x-1 text-muted-foreground opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" />
-    </button>
-  )
-}
-
 export default function Landing(): React.JSX.Element {
   useTranslation()
   const repos = useAppStore((state) => state.repos)
   const worktreesByRepo = useAppStore((state) => state.worktreesByRepo)
   const tabsByWorktree = useAppStore((state) => state.tabsByWorktree)
+  const unifiedTabsByWorktree = useAppStore((state) => state.unifiedTabsByWorktree)
   const openFiles = useAppStore((state) => state.openFiles)
+  const projectGroups = useAppStore((state) => state.projectGroups)
+  const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
+  const projects = useAppStore((state) => state.projects)
+  const projectHostSetups = useAppStore((state) => state.projectHostSetups)
+  const activeWorkspaceKey = useAppStore((state) => state.activeWorkspaceKey)
+  const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
+  const activeRepoId = useAppStore((state) => state.activeRepoId)
+  const activeWorkspaceExecutionHostId = useAppStore(
+    (state) => state.activeWorkspaceExecutionHostId
+  )
+  const collapsedGroups = useAppStore((state) => state.collapsedGroups)
+  const homeTaskDraft = useAppStore((state) => state.homeTaskDraft)
+  const setHomeTaskDraft = useAppStore((state) => state.setHomeTaskDraft)
+  const homeReturnScope = useAppStore((state) => state.homeReturnScope)
+  const homeNewTaskMode = useAppStore((state) => state.homeNewTaskMode)
+  const homeComposerFocusRequest = useAppStore((state) => state.homeComposerFocusRequest)
+  const restoreHomeReturnScope = useAppStore((state) => state.restoreHomeReturnScope)
+  const exitNewTaskHome = useAppStore((state) => state.exitNewTaskHome)
   const settings = useAppStore((state) => state.settings)
-  const openModal = useAppStore((state) => state.openModal)
+  const updateSettings = useAppStore((state) => state.updateSettings)
   const openSettingsPage = useAppStore((state) => state.openSettingsPage)
   const openSettingsTarget = useAppStore((state) => state.openSettingsTarget)
-  const { preflightIssues } = useLandingPreflightRuntime()
+  const openModal = useAppStore((state) => state.openModal)
   const model = useMemo(
-    () => buildDesktopHomeModel({ repos, worktreesByRepo, tabsByWorktree, openFiles }),
-    [openFiles, repos, tabsByWorktree, worktreesByRepo]
+    () =>
+      buildDesktopHomeModel({
+        repos,
+        worktreesByRepo,
+        tabsByWorktree,
+        unifiedTabsByWorktree,
+        openFiles,
+        projectGroups,
+        folderWorkspaces,
+        projects,
+        projectHostSetups,
+        activeWorkspaceKey,
+        activeWorktreeId,
+        activeRepoId,
+        activeWorkspaceExecutionHostId,
+        collapsedGroups
+      }),
+    [
+      activeRepoId,
+      activeWorkspaceExecutionHostId,
+      activeWorkspaceKey,
+      activeWorktreeId,
+      collapsedGroups,
+      folderWorkspaces,
+      openFiles,
+      projectGroups,
+      projectHostSetups,
+      projects,
+      repos,
+      tabsByWorktree,
+      unifiedTabsByWorktree,
+      worktreesByRepo
+    ]
   )
-  const enabledAgents = useMemo(() => {
-    const disabled = new Set(settings?.disabledTuiAgents ?? [])
-    return getAgentCatalog()
-      .filter((entry) => !disabled.has(entry.id))
-      .slice(0, 8)
-  }, [settings?.disabledTuiAgents])
-  const preferredAgent = settings?.defaultTuiAgent
-  const initialAgent: TuiAgent =
-    preferredAgent &&
-    preferredAgent !== 'blank' &&
-    enabledAgents.some((entry) => entry.id === preferredAgent)
-      ? preferredAgent
-      : (enabledAgents[0]?.id ?? 'codex')
+  // Keep the development surface as the default so the hero copy, composer
+  // affordances, and first-time experience stay aligned.  The renamed
+  // everyday-office and design tabs remain one-click alternatives.
   const [scene, setScene] = useState<HomeScene>('code')
-  const [draft, setDraft] = useState('')
-  const [agent, setAgent] = useState<TuiAgent>(initialAgent)
-  const [permissionMode, setPermissionMode] = useState('default')
-  const [workspaceId, setWorkspaceId] = useState(model.currentWorkspace?.id ?? '')
+  const [agentOverride, setAgentOverride] = useState<TuiAgent | null | undefined>(undefined)
+  const [permissionMode, setPermissionMode] = useState<AgentLaunchPermissionMode>('default')
+  const composerRef = useRef<HTMLTextAreaElement>(null)
+  const [workspaceId, setWorkspaceId] = useState('')
   const capabilitiesRef = useRef<HTMLDivElement>(null)
   const [capabilityScroll, setCapabilityScroll] = useState({ atStart: true, atEnd: true })
   const activeScene = SCENES.find((entry) => entry.id === scene) ?? SCENES[0]
-  const selectedWorkspace =
-    model.recentWorkspaces.find((workspace) => workspace.id === workspaceId) ??
-    model.currentWorkspace
+  const selectedProjectIdentity = desktopHomeProjectIdentityFromSelection(workspaceId)
+  const selectedProject = selectedProjectIdentity
+    ? (model.projects.find((project) => project.identityKey === selectedProjectIdentity) ?? null)
+    : null
+  const selectedWorkspace = selectedProject
+    ? ([...selectedProject.workspaces].sort(
+        (left, right) =>
+          Number(right.isMainWorktree) - Number(left.isMainWorktree) ||
+          right.lastActivityAt - left.lastActivityAt
+      )[0] ?? null)
+    : workspaceId
+      ? findDesktopHomeWorkspace(model, workspaceId)
+      : null
+  const agentDetectionWorktreeId = selectedWorkspace
+    ? selectedWorkspace.kind === 'folder'
+      ? selectedWorkspace.workspaceKey
+      : selectedWorkspace.id
+    : FLOATING_TERMINAL_WORKTREE_ID
+  const agentDetectionTarget = useAgentDetectionTargetForWorktree(agentDetectionWorktreeId)
+  const { detectedIds: detectedAgentIds } = useDetectedAgents(agentDetectionTarget)
+  const agentCatalog = getAgentCatalog()
+  const availableAgents = filterQuickWorkspaceAgents(
+    agentCatalog,
+    detectedAgentIds,
+    settings?.disabledTuiAgents
+  )
+  const preferredAgent = pickQuickWorkspaceAgent(
+    settings?.defaultTuiAgent === 'blank' ? null : settings?.defaultTuiAgent,
+    detectedAgentIds,
+    settings?.disabledTuiAgents
+  )
+  const resolvedAgentSelection = resolveQuickWorkspaceAgentSelection({
+    quickAgentOverride: agentOverride,
+    preferredQuickAgent: preferredAgent,
+    detectedAgentIds,
+    disabledTuiAgents: settings?.disabledTuiAgents
+  })
+  if (resolvedAgentSelection.quickAgentOverride !== agentOverride) {
+    // Match the new-session composer: a host switch or agent uninstall must
+    // repair a stale manual choice before this dropdown can launch it.
+    setAgentOverride(resolvedAgentSelection.quickAgentOverride)
+  }
+  const agent = resolvedAgentSelection.quickAgent
+  const resolvedPermissionMode =
+    agent && supportsTuiAgentLaunchPermission(agent) ? permissionMode : 'default'
+  // A persisted selector value can briefly outlive the catalog row while a
+  // host is hydrating. Keep that state from silently falling back to a
+  // floating temporary session and losing the user's intended target.
+  const targetSelectionPending = Boolean(workspaceId && !selectedWorkspace && !selectedProject)
   const syncCapabilityScroll = (): void => {
     const element = capabilitiesRef.current
     if (!element) {
@@ -166,38 +201,99 @@ export default function Landing(): React.JSX.Element {
     const frame = requestAnimationFrame(syncCapabilityScroll)
     return () => cancelAnimationFrame(frame)
   }, [scene])
-  const homeTimeLabels = {
-    unused: translate('components.desktopHome.time.unused', 'Not used yet'),
-    justNow: translate('components.desktopHome.time.justNow', 'Just now'),
-    minutesAgo: (value: number) =>
-      translate('components.desktopHome.time.minutesAgo', '{{value}} min ago', { value }),
-    hoursAgo: (value: number) =>
-      translate('components.desktopHome.time.hoursAgo', '{{value}} hr ago', { value }),
-    daysAgo: (value: number) =>
-      translate('components.desktopHome.time.daysAgo', '{{value}} days ago', { value })
-  }
-
+  useEffect(() => {
+    if (homeComposerFocusRequest <= 0) {
+      return
+    }
+    const frame = requestAnimationFrame(() => {
+      composerRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [homeComposerFocusRequest])
+  useEffect(() => {
+    // A new task starts unscoped by design. The user must opt into a project
+    // or workspace from the inline context selector; the current workspace is
+    // never silently reused as the task owner.
+    if (homeNewTaskMode) {
+      setWorkspaceId('')
+    }
+  }, [homeNewTaskMode])
   const submit = (): void => {
-    const prompt = draft.trim()
+    const prompt = homeTaskDraft.trim()
     if (!prompt) {
       return
     }
-    if (!selectedWorkspace) {
-      openModal('new-workspace-composer', { initialPrompt: prompt, telemetrySource: 'unknown' })
+    if (targetSelectionPending) {
+      // The selected project/workspace is not available in the current
+      // hydration snapshot yet. Waiting is safer than creating an unrelated
+      // floating session with the same prompt.
       return
     }
-    const activated = activateAndRevealWorkspace(selectedWorkspace.id, {
-      providesInitialSurface: true
-    })
+    if (!selectedWorkspace) {
+      if (selectedProject) {
+        // A project with no materialized workspace still has a concrete source;
+        // hand the prompt to the existing composer so it can create the first
+        // worktree (or folder workspace) without losing the user's text.
+        const projectGroup = selectedProject.projectGroupId
+          ? projectGroups.find((group) => group.id === selectedProject.projectGroupId)
+          : undefined
+        openModal('new-workspace-composer', {
+          ...(selectedProject.repoId ? { initialRepoId: selectedProject.repoId } : {}),
+          ...(!selectedProject.repoId && projectGroup
+            ? { initialProjectGroupId: projectGroup.id }
+            : {}),
+          initialPrompt: prompt,
+          initialAgent: agent ?? undefined,
+          initialAgentPermissionMode: resolvedPermissionMode,
+          telemetrySource: 'unknown'
+        })
+        return
+      }
+      if (!agent) {
+        return
+      }
+      const launched = launchAgentInNewTab({
+        agent,
+        worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+        prompt,
+        agentPermissionMode: resolvedPermissionMode,
+        promptDelivery: 'auto-submit',
+        launchSource: 'unknown'
+      })
+      if (launched) {
+        activateTemporarySessionInMain(launched.tabId)
+        setHomeTaskDraft('')
+        exitNewTaskHome()
+      }
+      return
+    }
+    if (!agent) {
+      return
+    }
+    const activated = activateAndRevealWorkspace(
+      selectedWorkspace.kind === 'folder' ? selectedWorkspace.workspaceKey : selectedWorkspace.id,
+      {
+        providesInitialSurface: true,
+        executionHostId: selectedWorkspace.executionHostId
+      }
+    )
     if (!activated) {
       return
     }
-    launchAgentInNewTab({
+    const launched = launchAgentInNewTab({
       agent,
-      worktreeId: selectedWorkspace.id,
+      worktreeId:
+        selectedWorkspace.kind === 'folder' ? selectedWorkspace.workspaceKey : selectedWorkspace.id,
+      executionHostId: selectedWorkspace.executionHostId,
       prompt,
+      agentPermissionMode: resolvedPermissionMode,
       promptDelivery: 'auto-submit'
     })
+    if (!launched) {
+      return
+    }
+    setHomeTaskDraft('')
+    exitNewTaskHome()
   }
 
   return (
@@ -239,10 +335,6 @@ export default function Landing(): React.JSX.Element {
             </div>
           </section>
 
-          {preflightIssues.length > 0 ? (
-            <LandingPreflightBanner issues={preflightIssues} repos={repos} />
-          ) : null}
-
           <div
             className="desktop-home-scene-tabs"
             role="tablist"
@@ -265,8 +357,8 @@ export default function Landing(): React.JSX.Element {
                     entry.id === 'code'
                       ? 'Code development'
                       : entry.id === 'automation'
-                        ? 'Automation'
-                        : 'Agent collaboration'
+                        ? 'Everyday office'
+                        : 'Design & creative'
                   )}
                 </button>
               )
@@ -285,7 +377,11 @@ export default function Landing(): React.JSX.Element {
                   capabilityKey
                 )
                 return (
-                  <button type="button" key={capabilityKey} onClick={() => setDraft(capability)}>
+                  <button
+                    type="button"
+                    key={capabilityKey}
+                    onClick={() => setHomeTaskDraft(capability)}
+                  >
                     <Sparkles className="size-3.5" />
                     {capability}
                   </button>
@@ -297,7 +393,10 @@ export default function Landing(): React.JSX.Element {
                 type="button"
                 onClick={() => scrollCapabilities(-1)}
                 disabled={capabilityScroll.atStart}
-                aria-label="向左滚动能力入口"
+                aria-label={translate(
+                  'components.desktopHome.previousCapability',
+                  'Previous capabilities'
+                )}
               >
                 <ChevronLeft />
               </button>
@@ -305,7 +404,7 @@ export default function Landing(): React.JSX.Element {
                 type="button"
                 onClick={() => scrollCapabilities(1)}
                 disabled={capabilityScroll.atEnd}
-                aria-label="向右滚动能力入口"
+                aria-label={translate('components.desktopHome.nextCapability', 'Next capabilities')}
               >
                 <ChevronRight />
               </button>
@@ -317,9 +416,15 @@ export default function Landing(): React.JSX.Element {
             aria-label={translate('components.desktopHome.newTask', 'New task')}
           >
             <textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              ref={composerRef}
+              value={homeTaskDraft}
+              onChange={(event) => setHomeTaskDraft(event.target.value)}
               onKeyDown={(event) => {
+                if (event.key === 'Escape' && homeNewTaskMode && homeReturnScope) {
+                  event.preventDefault()
+                  restoreHomeReturnScope()
+                  return
+                }
                 if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
                   event.preventDefault()
                   submit()
@@ -328,7 +433,7 @@ export default function Landing(): React.JSX.Element {
               placeholder={translate(
                 `components.desktopHome.${activeScene.placeholderKey}`,
                 activeScene.id === 'code'
-                  ? 'What should we build today? @ reference projects, files and branches / invoke skills and commands'
+                  ? 'Describe the development task to complete…'
                   : activeScene.id === 'automation'
                     ? 'Describe the repetitive work to automate…'
                     : 'Describe the task that needs multiple agents…'
@@ -337,275 +442,29 @@ export default function Landing(): React.JSX.Element {
             />
             <DesktopHomeComposerFooter
               model={model}
-              selectedWorkspaceId={selectedWorkspace?.id ?? ''}
+              selectedWorkspaceId={workspaceId}
               onWorkspaceChange={setWorkspaceId}
               agent={agent}
-              enabledAgents={enabledAgents}
-              onAgentChange={setAgent}
-              permissionMode={permissionMode}
+              agents={availableAgents}
+              onAgentChange={setAgentOverride}
+              defaultAgent={settings?.defaultTuiAgent ?? null}
+              onSetDefaultAgent={(nextAgent) => {
+                void updateSettings({ defaultTuiAgent: nextAgent })
+              }}
+              onOpenAgentSettings={() => {
+                openSettingsTarget({ pane: 'agents', repoId: null })
+                openSettingsPage()
+              }}
+              permissionMode={resolvedPermissionMode}
               onPermissionChange={setPermissionMode}
-              hasDraft={Boolean(draft.trim())}
+              hasDraft={
+                Boolean(homeTaskDraft.trim()) &&
+                !targetSelectionPending &&
+                (agent !== null || Boolean(selectedProject && !selectedWorkspace))
+              }
               onSubmit={submit}
             />
           </section>
-
-          <section
-            className="desktop-home-grid"
-            aria-label={translate('components.desktopHome.workOverview', 'Work overview')}
-          >
-            <article className="desktop-home-card desktop-home-card-wide">
-              <header>
-                <div>
-                  <span className="desktop-home-card-icon">
-                    <Clock3 />
-                  </span>
-                  <h2>
-                    {translate('components.desktopHome.recentWorkspaces', 'Recent workspaces')}
-                  </h2>
-                </div>
-                <button type="button" onClick={() => openModal('add-repo')}>
-                  {translate('components.desktopHome.manageProjects', 'Manage projects')}
-                </button>
-              </header>
-              <div className="desktop-home-card-body">
-                {model.recentWorkspaces.length ? (
-                  model.recentWorkspaces.map((workspace) => (
-                    <WorkspaceRow
-                      key={workspace.id}
-                      workspace={workspace}
-                      timeLabels={homeTimeLabels}
-                    />
-                  ))
-                ) : (
-                  <div className="desktop-home-empty">
-                    <FolderGit2 />
-                    <p>{translate('components.desktopHome.noProjects', 'No projects yet')}</p>
-                    <span>
-                      {translate(
-                        'components.desktopHome.noProjectsDescription',
-                        'Add a code repository to see workspaces here.'
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </article>
-            <article className="desktop-home-card desktop-home-card-quick">
-              <header>
-                <div>
-                  <span className="desktop-home-card-icon">
-                    <Rocket />
-                  </span>
-                  <h2>{translate('components.desktopHome.quickStart', 'Quick start')}</h2>
-                </div>
-              </header>
-              <div className="desktop-home-action-list">
-                <button
-                  type="button"
-                  aria-label={translate('components.desktopHome.addProject', 'Add project')}
-                  onClick={() => openModal('add-repo')}
-                >
-                  <GitPullRequest />
-                  <span>
-                    <strong>
-                      {translate('components.desktopHome.cloneProject', 'Clone project')}
-                    </strong>
-                    <small>
-                      {translate(
-                        'components.desktopHome.cloneProjectDescription',
-                        'Clone a repository from a remote URL'
-                      )}
-                    </small>
-                  </span>
-                  <ArrowRight />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    openModal('new-workspace-composer', { telemetrySource: 'unknown' })
-                  }
-                >
-                  <GitBranchPlus />
-                  <span>
-                    <strong>
-                      {translate('components.desktopHome.newWorkspace', 'New workspace')}
-                    </strong>
-                    <small>
-                      {translate(
-                        'components.desktopHome.newWorkspaceDescription',
-                        'Isolate branches and agent sessions'
-                      )}
-                    </small>
-                  </span>
-                  <ArrowRight />
-                </button>
-                <button type="button" onClick={() => openModal('add-repo')}>
-                  <FolderInput />
-                  <span>
-                    <strong>
-                      {translate('components.desktopHome.importRepository', 'Import repository')}
-                    </strong>
-                    <small>
-                      {translate(
-                        'components.desktopHome.importRepositoryDescription',
-                        'Add an existing local repository'
-                      )}
-                    </small>
-                  </span>
-                  <ArrowRight />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    openSettingsTarget({ pane: 'orca-account', repoId: null })
-                    openSettingsPage()
-                  }}
-                >
-                  <Cloud />
-                  <span>
-                    <strong>
-                      {translate('components.desktopHome.connectHiveCloud', 'Connect HiveCloud')}
-                    </strong>
-                    <small>
-                      {translate(
-                        'components.desktopHome.connectHiveCloudDescription',
-                        'Sync workspaces and sessions across devices'
-                      )}
-                    </small>
-                  </span>
-                  <ArrowRight />
-                </button>
-              </div>
-            </article>
-            <article className="desktop-home-card">
-              <header>
-                <div>
-                  <span className="desktop-home-card-icon">
-                    <Layers3 />
-                  </span>
-                  <h2>{translate('components.desktopHome.continueWork', 'Continue working')}</h2>
-                </div>
-              </header>
-              <div className="desktop-home-continue">
-                {model.currentWorkspace ? (
-                  <>
-                    <div className="desktop-home-continue-project">
-                      <span className="desktop-home-project-mark">
-                        {model.currentWorkspace.repoName.slice(0, 1).toUpperCase()}
-                      </span>
-                      <div className="min-w-0">
-                        <strong>{model.currentWorkspace.name}</strong>
-                        <span>
-                          {model.currentWorkspace.repoName} · {model.currentWorkspace.branch}
-                        </span>
-                      </div>
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>{translate('components.desktopHome.sessions', 'Sessions')}</dt>
-                        <dd>{model.currentWorkspace.sessionCount}</dd>
-                      </div>
-                      <div>
-                        <dt>
-                          {translate('components.desktopHome.recentActivity', 'Recent activity')}
-                        </dt>
-                        <dd>
-                          {formatHomeRelativeTime(
-                            model.currentWorkspace.lastActivityAt,
-                            Date.now(),
-                            homeTimeLabels
-                          )}
-                        </dd>
-                      </div>
-                    </dl>
-                    <button
-                      type="button"
-                      className="desktop-home-secondary-button"
-                      onClick={() => activateAndRevealWorkspace(model.currentWorkspace!.id)}
-                    >
-                      {translate('components.desktopHome.enterWorkspace', 'Open workspace')}{' '}
-                      <ArrowRight />
-                    </button>
-                  </>
-                ) : (
-                  <div className="desktop-home-empty">
-                    <Layers3 />
-                    <p>{translate('components.desktopHome.noContinue', 'Nothing to continue')}</p>
-                    <span>
-                      {translate(
-                        'components.desktopHome.noContinueDescription',
-                        'Create a workspace to return here quickly.'
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </article>
-            <article className="desktop-home-card desktop-home-card-template">
-              <header>
-                <div>
-                  <span className="desktop-home-card-icon">
-                    <LayoutTemplate />
-                  </span>
-                  <h2>{translate('components.desktopHome.templates', '推荐任务模板')}</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDraft(
-                      translate('components.desktopHome.capability.analyzeCode', '分析代码库')
-                    )
-                  }
-                >
-                  {translate('components.desktopHome.more', '更多')}
-                  <ArrowRight />
-                </button>
-              </header>
-              <div className="desktop-home-action-list">
-                {[
-                  ['analyzeCode', '代码审查'],
-                  ['architecture', 'API 设计评审'],
-                  ['addTests', '单元测试生成'],
-                  ['generateCommit', '提交说明生成']
-                ].map(([key, fallback]) => (
-                  <button
-                    type="button"
-                    key={key}
-                    onClick={() =>
-                      setDraft(translate(`components.desktopHome.capability.${key}`, fallback))
-                    }
-                  >
-                    <Code2 />
-                    <span>
-                      <strong>
-                        {translate(`components.desktopHome.template.${key}`, fallback)}
-                      </strong>
-                      <small>
-                        {translate(
-                          'components.desktopHome.templateHint',
-                          '基于当前工作区生成结构化结果'
-                        )}
-                      </small>
-                    </span>
-                    <ArrowRight />
-                  </button>
-                ))}
-              </div>
-            </article>
-          </section>
-          <div
-            className="desktop-home-meta"
-            aria-label={translate('components.desktopHome.projectStatsLabel', 'Project statistics')}
-          >
-            {translate(
-              'components.desktopHome.projectStats',
-              '{{projects}} projects · {{workspaces}} workspaces',
-              {
-                projects: model.projectCount,
-                workspaces: model.workspaceCount
-              }
-            )}
-          </div>
         </div>
       </div>
     </main>

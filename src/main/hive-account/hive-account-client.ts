@@ -2,7 +2,15 @@
 
 import { net } from 'electron'
 import { randomBytes } from 'node:crypto'
-import type { HiveAccountSessionProfile, HiveAccountSummary } from '../../shared/hive-account'
+import type {
+  HiveAccountLoginCapabilities,
+  HiveAccountLoginProvider,
+  HiveAccountLoginProviderId,
+  HiveAccountSecurity,
+  HiveAccountSecurityChallenge,
+  HiveAccountSessionProfile,
+  HiveAccountSummary
+} from '../../shared/hive-account'
 import type { HiveAccountConfig } from './hive-account-config'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -49,8 +57,55 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value)
+  return actual.length === keys.length && keys.every((key) => Object.hasOwn(value, key))
+}
+
+function loginProvider(value: unknown): HiveAccountLoginProvider {
+  if (!isRecord(value) || !hasExactKeys(value, ['id', 'authorizationPath'])) {
+    throw new Error('invalid_hive_account_login_provider')
+  }
+  if (value.id !== 'github' && value.id !== 'wechat' && value.id !== 'qq') {
+    throw new Error('invalid_hive_account_login_provider')
+  }
+  const expectedPath = `/hive/v1/auth/provider-authorizations/${value.id}`
+  if (value.authorizationPath !== expectedPath) {
+    throw new Error('invalid_hive_account_login_provider')
+  }
+  return { id: value.id, authorizationPath: expectedPath }
+}
+
+function loginCapabilities(value: unknown, expectedClientId: string): HiveAccountLoginCapabilities {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['contractRevision', 'clientId', 'defaultMethod', 'providers']) ||
+    value.contractRevision !== 'hive-login-capabilities-v1' ||
+    value.clientId !== expectedClientId ||
+    value.defaultMethod !== 'phone_sms' ||
+    !Array.isArray(value.providers) ||
+    value.providers.length > 3
+  ) {
+    throw new Error('invalid_hive_account_login_capabilities')
+  }
+  const providers = value.providers.map(loginProvider)
+  const providerIds = new Set<HiveAccountLoginProviderId>()
+  for (const provider of providers) {
+    if (providerIds.has(provider.id)) {
+      throw new Error('invalid_hive_account_login_capabilities')
+    }
+    providerIds.add(provider.id)
+  }
+  return {
+    contractRevision: 'hive-login-capabilities-v1',
+    clientId: expectedClientId,
+    defaultMethod: 'phone_sms',
+    providers
+  }
+}
+
 function text(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !value) {
+  if (typeof value !== 'string' || !value || !value.trim()) {
     throw new Error(`invalid_hive_account_${field}`)
   }
   return value
@@ -70,6 +125,22 @@ function instant(value: unknown, field: string): number {
     throw new Error(`invalid_hive_account_${field}`)
   }
   return parsed
+}
+
+function securityChallenge(value: unknown): HiveAccountSecurityChallenge {
+  if (!isRecord(value) || typeof value.challengeId !== 'string' || typeof value.bindingId !== 'string'
+    || typeof value.expiresInSeconds !== 'number' || !Number.isSafeInteger(value.expiresInSeconds)
+    || value.expiresInSeconds <= 0 || typeof value.resendAfterSeconds !== 'number'
+    || !Number.isSafeInteger(value.resendAfterSeconds) || value.resendAfterSeconds < 0
+    || value.resendAfterSeconds > value.expiresInSeconds || !value.challengeId.trim() || !value.bindingId.trim()) {
+    throw new Error('invalid_hive_account_security_challenge')
+  }
+  return {
+    challengeId: value.challengeId,
+    bindingId: value.bindingId,
+    expiresInSeconds: value.expiresInSeconds,
+    resendAfterSeconds: value.resendAfterSeconds
+  }
 }
 
 async function responseText(response: Response): Promise<string> {
@@ -165,6 +236,13 @@ export class HiveAccountClient {
     private readonly config: HiveAccountConfig,
     private readonly fetchImpl: FetchLike = electronFetch
   ) {}
+
+  async getLoginCapabilities(): Promise<HiveAccountLoginCapabilities> {
+    const query = new URL(`${this.config.apiBaseUrl}/hive/v1/meta/login-capabilities`)
+    query.searchParams.set('clientId', this.config.clientId)
+    const value = await requestJson(this.fetchImpl, query.toString(), { method: 'GET' })
+    return loginCapabilities(value, this.config.clientId)
+  }
 
   async discoverAuthorizationEndpoint(): Promise<string> {
     const discoveryUrl = `${this.config.identityIssuer}/.well-known/openid-configuration`
@@ -337,6 +415,58 @@ export class HiveAccountClient {
         securityVersion: item.securityVersion,
         currentSession: item.currentSession
       }
+    })
+  }
+
+  async accountSecurity(accessToken: string): Promise<HiveAccountSecurity> {
+    const value = await requestJson(this.fetchImpl, `${this.config.apiBaseUrl}/hive/v1/account/security`, {
+      method: 'GET', headers: { authorization: `Bearer ${accessToken}` }
+    })
+    if (!isRecord(value) || typeof value.accountId !== 'string' || typeof value.userName !== 'string'
+      || typeof value.displayName !== 'string' || typeof value.phoneBound !== 'boolean'
+      || (value.phoneNumber !== null && value.phoneNumber !== undefined
+        && (typeof value.phoneNumber !== 'string' || !value.phoneNumber.trim()))) {
+      throw new Error('invalid_hive_account_security')
+    }
+    return { accountId: uuid(value.accountId, 'account_id'), userName: value.userName,
+      displayName: value.displayName,
+      phoneNumber: typeof value.phoneNumber === 'string' ? value.phoneNumber : null,
+      phoneBound: value.phoneBound }
+  }
+
+  async setPassword(accessToken: string, newPassword: string): Promise<void> {
+    await requestJson(this.fetchImpl, `${this.config.apiBaseUrl}/hive/v1/account/security/password`, {
+      method: 'POST', headers: { authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ newPassword })
+    })
+  }
+
+  async startPasswordReset(phoneNumber: string): Promise<HiveAccountSecurityChallenge> {
+    const value = await requestJson(this.fetchImpl, `${this.config.apiBaseUrl}/hive/v1/auth/password-reset/start`, {
+      method: 'POST', body: JSON.stringify({ phoneNumber })
+    })
+    return securityChallenge(value)
+  }
+
+  async verifyPasswordReset(
+    challengeId: string, bindingId: string, smsCode: string, newPassword: string
+  ): Promise<void> {
+    await requestJson(this.fetchImpl, `${this.config.apiBaseUrl}/hive/v1/auth/password-reset/verify`, {
+      method: 'POST', body: JSON.stringify({ challengeId, bindingId, smsCode, newPassword })
+    })
+  }
+
+  async startPhoneBinding(accessToken: string, phoneNumber: string): Promise<HiveAccountSecurityChallenge> {
+    const value = await requestJson(this.fetchImpl, `${this.config.apiBaseUrl}/hive/v1/account/security/phone/challenge`, {
+      method: 'POST', headers: { authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ phoneNumber })
+    })
+    return securityChallenge(value)
+  }
+
+  async verifyPhoneBinding(accessToken: string, challengeId: string, bindingId: string, smsCode: string): Promise<void> {
+    await requestJson(this.fetchImpl, `${this.config.apiBaseUrl}/hive/v1/account/security/phone/verify`, {
+      method: 'POST', headers: { authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ challengeId, bindingId, smsCode })
     })
   }
 

@@ -18,7 +18,7 @@ export function getProductArtifactCloudConfig(
   override?: string,
   env: NodeJS.ProcessEnv = process.env,
   packaged = isPackaged(),
-  productEndpoint = getProductExternalServiceEndpoints().artifacts
+  productEndpoint: string | null = getProductExternalServiceEndpoints().artifacts
 ): ProductArtifactCloudConfig {
   const candidate = packaged
     ? productEndpoint?.trim()

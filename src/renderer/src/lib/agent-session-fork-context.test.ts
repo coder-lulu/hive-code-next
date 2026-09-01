@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   buildAgentSessionForkPrompt,
   buildBoundedSessionTranscript,
@@ -21,7 +22,7 @@ describe('agent session fork context', () => {
       agentLabel: 'codex'
     })
 
-    expect(prompt).toContain('fork of an existing Orca agent session')
+    expect(prompt).toContain(`fork of an existing ${APP_DISPLAY_NAME} agent session`)
     expect(prompt).toContain('Source: tab-1:leaf-1')
     expect(prompt).toContain('Original agent: codex')
     expect(prompt).toContain('User: implement auth')
@@ -75,7 +76,7 @@ describe('agent session fork context', () => {
     // Why: the standalone Copy Context action must yield raw transcript only —
     // no fork header/footer that a paste target would treat as instructions.
     expect(transcript).toBe('User: ship it\nAssistant: done')
-    expect(transcript).not.toContain('fork of an existing Orca agent session')
+    expect(transcript).not.toContain(`fork of an existing ${APP_DISPLAY_NAME} agent session`)
     expect(transcript).not.toContain('wait for my next instruction')
   })
 

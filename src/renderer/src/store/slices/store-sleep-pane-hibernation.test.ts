@@ -84,6 +84,7 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
       unreadTerminalTabs: { 'tab-1': true },
       unreadTerminalPanes: { [targetPaneKey]: true, [siblingPaneKey]: true },
       unreadAgentCompletionPanes: { [targetPaneKey]: true, [siblingPaneKey]: true },
+      unreadAgentCompletionCountByPane: { [targetPaneKey]: 2, [siblingPaneKey]: 1 },
       lastTerminalInputAtByPaneKey: { [targetPaneKey]: 1000, [siblingPaneKey]: 1100 },
       pendingSetupSplitByTabId: { 'tab-1': { command: 'setup', direction: 'horizontal' } },
       pendingIssueCommandSplitByTabId: { 'tab-1': { command: 'issue' } }
@@ -145,10 +146,14 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
     expect(state.retainedAgentsByPaneKey[targetPaneKey]).toMatchObject({
       entry: { lastAssistantMessage: 'done' }
     })
+    expect(state.unreadAgentCompletionCountByPane).toEqual({
+      [targetPaneKey]: 2,
+      [siblingPaneKey]: 1
+    })
     expect(state.unreadTerminalTabs['tab-1']).toBe(true)
     expect(state.unreadTerminalPanes[targetPaneKey]).toBeUndefined()
     expect(state.unreadTerminalPanes[siblingPaneKey]).toBe(true)
-    expect(state.unreadAgentCompletionPanes[targetPaneKey]).toBeUndefined()
+    expect(state.unreadAgentCompletionPanes[targetPaneKey]).toBe(true)
     expect(state.unreadAgentCompletionPanes[siblingPaneKey]).toBe(true)
     expect(state.lastTerminalInputAtByPaneKey[targetPaneKey]).toBeUndefined()
     expect(state.lastTerminalInputAtByPaneKey[siblingPaneKey]).toBe(1100)

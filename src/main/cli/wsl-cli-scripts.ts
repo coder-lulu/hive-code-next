@@ -1,5 +1,7 @@
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND, applyProductBranding } from '../../shared/brand'
 
+// Compatibility markers are persisted in existing distro files. Keep their
+// bytes stable so upgrades can still prove ownership before replacing them.
 const MANAGED_MARKER = '# Orca managed WSL CLI launcher'
 const BRIDGE_MANAGED_MARKER = '# Orca managed WSL CLI PowerShell bridge'
 
@@ -69,14 +71,14 @@ $exitCode = 0
 try {
   # Why: a param block prefix-binds forwarded flags such as --for in PowerShell 5.1.
   if ($args.Count -lt 1) {
-    throw 'Invalid Orca WSL CLI bridge invocation.'
+    throw 'Invalid ${APP_DISPLAY_NAME} WSL CLI bridge invocation.'
   }
   [string]$OrcaLauncher = $args[0]
   [string]$WslCwd = ''
   [int]$ForwardArgStart = 1
   if ($args.Count -ge 2 -and $args[1] -eq '-WslCwd') {
     if ($args.Count -lt 3) {
-      throw 'Invalid Orca WSL CLI bridge invocation.'
+      throw 'Invalid ${APP_DISPLAY_NAME} WSL CLI bridge invocation.'
     }
     $WslCwd = $args[2]
     $ForwardArgStart = 3
@@ -100,7 +102,7 @@ try {
   $StartInfo.UseShellExecute = $false
   $Process = [System.Diagnostics.Process]::Start($StartInfo)
   if ($null -eq $Process) {
-    throw 'Unable to start the Orca Windows CLI launcher.'
+    throw 'Unable to start the ${APP_DISPLAY_NAME} Windows CLI launcher.'
   }
   $Process.WaitForExit()
   $exitCode = $Process.ExitCode
@@ -116,7 +118,10 @@ exit $exitCode
 export function getBridgePathFromCommandPath(commandPath: string): string {
   // Why: both the current Linux command and the legacy pre-rename command
   // share one WSL bridge under ~/.local/share/orca.
-  return `${commandPath.replace(/\/\.local\/bin\/(?:orca|orca-ide)$/, '/.local/share/orca')}/orca-wsl-bridge.ps1`
+  return `${commandPath.replace(
+    new RegExp(`/\\.local/bin/(?:${PRIMARY_CLI_COMMAND}|orca|orca-ide)$`),
+    '/.local/share/orca'
+  )}/orca-wsl-bridge.ps1`
 }
 
 export function buildSafeReplaceGuard(path: string, managedMarker: string): string {
@@ -151,7 +156,10 @@ export function buildManagedLegacyRemoveCommand(quotedLegacyCommandPath: string)
   return `if [ ! -L ${quotedLegacyCommandPath} ] && [ -f ${quotedLegacyCommandPath} ] && grep -Fq ${quoteShell(MANAGED_MARKER)} ${quotedLegacyCommandPath}; then rm -f ${quotedLegacyCommandPath}; fi`
 }
 
-export function buildSafeRemoveCommand(commandPath: string, legacyCommandPath?: string): string {
+export function buildSafeRemoveCommand(
+  commandPath: string,
+  legacyCommandPaths: readonly string[] = []
+): string {
   const bridgePath = getBridgePathFromCommandPath(commandPath)
   return [
     // Why -eu not -euo pipefail: this script runs via runWslProcess's `sh -s`,
@@ -163,7 +171,9 @@ export function buildSafeRemoveCommand(commandPath: string, legacyCommandPath?: 
     `rm -f ${quoteShell(commandPath)} ${quoteShell(bridgePath)}`,
     // Why: leaving a managed legacy `orca` behind lets startup reconciliation
     // re-adopt it as opt-in proof and silently undo this removal.
-    ...(legacyCommandPath ? [buildManagedLegacyRemoveCommand(quoteShell(legacyCommandPath))] : [])
+    ...legacyCommandPaths.map((legacyCommandPath) =>
+      buildManagedLegacyRemoveCommand(quoteShell(legacyCommandPath))
+    )
   ].join('\n')
 }
 

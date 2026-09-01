@@ -528,6 +528,8 @@ describe('Linear agent write recovery helpers', () => {
 
     expect(comment.data?.nextSteps?.[0]).toContain('--body-file -')
     expect(comment.data?.nextSteps?.[0]).toContain('--reply-to=comment-root')
+    expect(comment.data?.nextSteps?.[0]).toContain('hive linear comment add')
+    expect(comment.data?.nextSteps?.[0]).not.toContain('orca linear')
     expect(attach.data?.nextSteps?.[0]).toContain('--url URL_HERE')
     expect(attach.data?.nextSteps?.[0]).toContain('--title TITLE_HERE')
     expect(attach.data?.nextSteps?.[0]).toContain('Replace TITLE_HERE/URL_HERE')
@@ -541,6 +543,8 @@ describe('Linear agent write recovery helpers', () => {
     expect(create.data?.nextSteps?.[0]).toContain('--project=project-1')
     expect(create.data?.nextSteps?.[0]).toContain('--label=label-1')
     expect(create.data?.nextSteps?.[0]).toContain('Replace TITLE_HERE')
+    expect(create.data?.nextSteps?.[0]).toContain('hive linear create')
+    expect(create.data?.nextSteps?.[0]).not.toContain('orca linear')
   })
 
   it('requires created issue readback to match enriched field intent', () => {

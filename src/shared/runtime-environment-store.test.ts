@@ -177,6 +177,45 @@ describe('runtime environment store', () => {
     })
   })
 
+  it('clears an explicit Cloud identity when re-pairing could target another Runtime', () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-env-store-'))
+    tempDirs.push(userDataPath)
+    const environment = addEnvironmentFromPairingCode(userDataPath, {
+      name: 'dev box',
+      pairingCode: pairingCode(),
+      now: 1_000
+    })
+    markEnvironmentUsed(userDataPath, environment.id, {
+      runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
+      now: 2_000
+    })
+
+    const updated = updateEnvironmentFromPairingCode(userDataPath, environment.id, {
+      pairingCode: pairingCode('ws://192.0.2.10:6768'),
+      now: 3_000
+    })
+
+    expect(updated).not.toHaveProperty('runtimeRecordId')
+  })
+
+  it('clears a stale Cloud identity when authenticated status omits it', () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-env-store-'))
+    tempDirs.push(userDataPath)
+    const environment = addEnvironmentFromPairingCode(userDataPath, {
+      name: 'dev box',
+      pairingCode: pairingCode(),
+      now: 1_000
+    })
+    markEnvironmentUsed(userDataPath, environment.id, {
+      runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
+      now: 2_000
+    })
+
+    markEnvironmentUsed(userDataPath, environment.id, { runtimeRecordId: null, now: 3_000 })
+
+    expect(listEnvironments(userDataPath)[0]).not.toHaveProperty('runtimeRecordId')
+  })
+
   it('rejects an oversized sparse environment store before parsing it', () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-env-store-bound-'))
     tempDirs.push(userDataPath)

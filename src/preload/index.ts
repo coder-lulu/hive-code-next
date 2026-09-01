@@ -19,6 +19,12 @@ import {
 import type { DocPreviewGrantRequest } from './api/doc-preview-api'
 import type { AppIdentity } from '../shared/app-identity'
 import { HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, type HiveAccountState } from '../shared/hive-account'
+import {
+  HIVE_RUNTIME_DIRECTORY_CHANGED_CHANNEL,
+  HIVE_RUNTIME_OWNERSHIP_CHANGED_CHANNEL,
+  type HiveAccountRuntimeDirectoryState,
+  type HiveLocalRuntimeOwnershipState
+} from '../shared/hive-runtime-cloud'
 import type { MacCapturedDigitRowChord } from '../shared/macos-symbolic-hotkeys'
 import type { ComputerAwakeStatus } from '../shared/computer-awake-mode'
 import type {
@@ -650,6 +656,7 @@ const api = {
   } satisfies PreloadApi['orcaProfiles'],
 
   hiveAccount: {
+    getLoginCapabilities: () => ipcRenderer.invoke('hiveAccount:getLoginCapabilities'),
     getState: () => ipcRenderer.invoke('hiveAccount:getState'),
     signIn: (options) => ipcRenderer.invoke('hiveAccount:signIn', options),
     startSmsSignIn: (options) => ipcRenderer.invoke('hiveAccount:startSmsSignIn', options),
@@ -657,6 +664,25 @@ const api = {
     completeSmsSignIn: (options) => ipcRenderer.invoke('hiveAccount:completeSmsSignIn', options),
     refresh: () => ipcRenderer.invoke('hiveAccount:refresh'),
     signOut: () => ipcRenderer.invoke('hiveAccount:signOut'),
+    accountSecurity: () => ipcRenderer.invoke('hiveAccount:accountSecurity'),
+    setPassword: (newPassword) => ipcRenderer.invoke('hiveAccount:setPassword', newPassword),
+    startPasswordReset: (phoneNumber) =>
+      ipcRenderer.invoke('hiveAccount:startPasswordReset', phoneNumber),
+    verifyPasswordReset: (challengeId, bindingId, smsCode, newPassword) =>
+      ipcRenderer.invoke('hiveAccount:verifyPasswordReset', {
+        challengeId,
+        bindingId,
+        smsCode,
+        newPassword
+      }),
+    startPhoneBinding: (phoneNumber) =>
+      ipcRenderer.invoke('hiveAccount:startPhoneBinding', phoneNumber),
+    verifyPhoneBinding: (challengeId, bindingId, smsCode) =>
+      ipcRenderer.invoke('hiveAccount:verifyPhoneBinding', {
+        challengeId,
+        bindingId,
+        smsCode
+      }),
     onStateChanged: (callback: (state: HiveAccountState) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, state: HiveAccountState): void => {
         callback(state)
@@ -665,6 +691,32 @@ const api = {
       return () => ipcRenderer.removeListener(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, listener)
     }
   } satisfies PreloadApi['hiveAccount'],
+  hiveRuntimeCloud: {
+    getDirectory: () => ipcRenderer.invoke('hiveRuntimeCloud:getDirectory'),
+    refreshDirectory: () => ipcRenderer.invoke('hiveRuntimeCloud:refreshDirectory'),
+    updateDisplayName: (request) =>
+      ipcRenderer.invoke('hiveRuntimeCloud:updateDisplayName', request),
+    getLocalOwnership: () => ipcRenderer.invoke('hiveRuntimeCloud:getLocalOwnership'),
+    refreshLocalOwnership: () => ipcRenderer.invoke('hiveRuntimeCloud:refreshLocalOwnership'),
+    claimLocalRuntime: (request) =>
+      ipcRenderer.invoke('hiveRuntimeCloud:claimLocalRuntime', request),
+    listSessions: () => ipcRenderer.invoke('hiveRuntimeCloud:listSessions'),
+    revokeSession: (request) => ipcRenderer.invoke('hiveRuntimeCloud:revokeSession', request),
+    onDirectoryChanged: (callback: (state: HiveAccountRuntimeDirectoryState) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        state: HiveAccountRuntimeDirectoryState
+      ) => callback(state)
+      ipcRenderer.on(HIVE_RUNTIME_DIRECTORY_CHANGED_CHANNEL, listener)
+      return () => ipcRenderer.removeListener(HIVE_RUNTIME_DIRECTORY_CHANGED_CHANNEL, listener)
+    },
+    onOwnershipChanged: (callback: (state: HiveLocalRuntimeOwnershipState) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: HiveLocalRuntimeOwnershipState) =>
+        callback(state)
+      ipcRenderer.on(HIVE_RUNTIME_OWNERSHIP_CHANGED_CHANNEL, listener)
+      return () => ipcRenderer.removeListener(HIVE_RUNTIME_OWNERSHIP_CHANGED_CHANNEL, listener)
+    }
+  } satisfies PreloadApi['hiveRuntimeCloud'],
 
   platform: {
     get: () => ({
@@ -3908,6 +3960,11 @@ const api = {
       const listener = (_event: Electron.IpcRendererEvent) => callback()
       ipcRenderer.on('ui:openNewWorkspace', listener)
       return () => ipcRenderer.removeListener('ui:openNewWorkspace', listener)
+    },
+    onOpenNewTaskHome: (callback: () => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent) => callback()
+      ipcRenderer.on('ui:openNewTaskHome', listener)
+      return () => ipcRenderer.removeListener('ui:openNewTaskHome', listener)
     },
     onDeleteCurrentWorkspace: (callback: () => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent) => callback()

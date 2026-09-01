@@ -18,6 +18,9 @@ type HivePkceOptions = {
   authorizationEndpoint: string
   clientId: string
   scope: string
+  acrValues?: string
+  maxAgeSeconds?: number
+  prompt?: 'login'
   prepareDeviceAuthorization: (nonce: string) => Promise<void>
 }
 
@@ -126,6 +129,15 @@ export function beginHiveAccountPkceFlow(options: HivePkceOptions): Promise<Hive
           authorizeUrl.searchParams.set('state', state)
           authorizeUrl.searchParams.set('code_challenge', codeChallenge)
           authorizeUrl.searchParams.set('code_challenge_method', 'S256')
+          if (options.acrValues !== undefined) {
+            authorizeUrl.searchParams.set('acr_values', options.acrValues)
+          }
+          if (options.maxAgeSeconds !== undefined) {
+            authorizeUrl.searchParams.set('max_age', String(options.maxAgeSeconds))
+          }
+          if (options.prompt !== undefined) {
+            authorizeUrl.searchParams.set('prompt', options.prompt)
+          }
           await shell.openExternal(authorizeUrl.toString())
         })
         .catch(() => settleFailure(new Error('hive_account_authorization_failed')))

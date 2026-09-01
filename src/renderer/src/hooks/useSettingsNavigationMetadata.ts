@@ -94,6 +94,7 @@ import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { useLinearProviderConnected } from '@/hooks/useLinearProviderConnected'
 import { translate } from '@/i18n/i18n'
 import { getClientCreationActionPolicy } from '@/lib/client-creation-action-policy'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export { isWebClientLocation } from '@/lib/web-client-location'
 
@@ -199,7 +200,7 @@ export function buildSettingsNavigationMetadata({
       title: translate('auto.hooks.useSettingsNavigationMetadata.58a868e8e4', 'Orchestration'),
       description: translate(
         'auto.hooks.useSettingsNavigationMetadata.cd50cec5d7',
-        'Coordinate multiple coding agents through Orca.'
+        `Coordinate multiple coding agents through ${APP_DISPLAY_NAME}.`
       ),
       icon: Network,
       searchEntries: getOrchestrationPaneSearchEntries({
@@ -216,7 +217,7 @@ export function buildSettingsNavigationMetadata({
             title: translate('auto.hooks.useSettingsNavigationMetadata.linearTitle', 'Linear'),
             description: translate(
               'auto.hooks.useSettingsNavigationMetadata.linearDescription',
-              'How Linear works in Orca, setup checklist, agent skill, and example prompts.'
+              `How Linear works in ${APP_DISPLAY_NAME}, setup checklist, agent skill, and example prompts.`
             ),
             icon: LinearIcon,
             searchEntries: getLinearAgentSkillPaneSearchEntries(),
@@ -254,10 +255,10 @@ export function buildSettingsNavigationMetadata({
       ? [
           {
             id: 'orca-account',
-            title: translate('auto.components.settings.orcaAccount.title', 'HiveCloud Account'),
+            title: translate('auto.components.settings.orcaAccount.title', 'Account & cloud'),
             description: translate(
               'auto.components.settings.orcaAccount.description',
-              'Sign in securely, review this device, and manage the current HiveCloud session.'
+              'Manage your HiveCloud identity, this device, and cross-device connections.'
             ),
             icon: CircleUserRound,
             searchEntries: getOrcaAccountSettingsSearchEntries(),
@@ -273,7 +274,7 @@ export function buildSettingsNavigationMetadata({
       ),
       description: translate(
         'auto.hooks.useSettingsNavigationMetadata.5f32ac08f3',
-        'Finish the onboarding checklist for core Orca workflows.'
+        `Finish the onboarding checklist for core ${APP_DISPLAY_NAME} workflows.`
       ),
       icon: OrcaLogoSettingsIcon,
       searchEntries: [
@@ -290,7 +291,7 @@ export function buildSettingsNavigationMetadata({
             translate('auto.hooks.useSettingsNavigationMetadata.ea0b1bc7b8', 'setup guide'),
             translate(
               'auto.hooks.useSettingsNavigationMetadata.0505d0df29',
-              'get started with Orca'
+              `get started with ${APP_DISPLAY_NAME}`
             ),
             translate('auto.hooks.useSettingsNavigationMetadata.724c440e72', 'getting started')
           ]
@@ -450,7 +451,7 @@ export function buildSettingsNavigationMetadata({
             ),
             description: translate(
               'auto.hooks.useSettingsNavigationMetadata.3d65d3f1b9',
-              'Configure mobile emulator support for Orca and coding agents.'
+              `Configure mobile emulator support for ${APP_DISPLAY_NAME} and coding agents.`
             ),
             icon: TabletSmartphone,
             searchEntries: getMobileEmulatorSearchEntries(),
@@ -539,7 +540,7 @@ export function buildSettingsNavigationMetadata({
       title: translate('auto.hooks.useSettingsNavigationMetadata.d72a58b5b9', 'Stats & Usage'),
       description: translate(
         'auto.hooks.useSettingsNavigationMetadata.b351014180',
-        'Orca stats plus Claude, Codex, OpenCode token analytics and Grok subscription usage.'
+        `${APP_DISPLAY_NAME} stats plus Claude, Codex, OpenCode token analytics and Grok subscription usage.`
       ),
       icon: BarChart3,
       searchEntries: getStatsPaneSearchEntries(),
@@ -564,11 +565,11 @@ export function buildSettingsNavigationMetadata({
       id: 'servers',
       title: translate(
         'auto.hooks.useSettingsNavigationMetadata.de0c2907a1',
-        'Remote Orca Servers'
+        `Remote ${APP_DISPLAY_NAME} Servers`
       ),
       description: isWebClient
-        ? 'Connect this browser to a saved Orca server.'
-        : 'Pair remote Orca runtimes for persistent sessions, richer remote state, and web or mobile handoff.',
+        ? `Connect this browser to a saved ${APP_DISPLAY_NAME} server.`
+        : `Pair remote ${APP_DISPLAY_NAME} runtimes for persistent sessions, richer remote state, and web or mobile handoff.`,
       icon: Server,
       searchEntries: [runtimeEnvironmentsSearchEntry],
       group: 'remote',
@@ -659,7 +660,7 @@ export function buildSettingsNavigationMetadata({
             title: translate('auto.hooks.useSettingsNavigationMetadata.pluginsTitle', 'Plugins'),
             description: translate(
               'auto.hooks.useSettingsNavigationMetadata.pluginsDescription',
-              'Install and manage experimental Orca plugins.'
+              `Install and manage experimental ${APP_DISPLAY_NAME} plugins.`
             ),
             icon: Blocks,
             searchEntries: getPluginsPaneSearchEntries(),

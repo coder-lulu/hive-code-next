@@ -6,9 +6,12 @@ import {
 } from '../orca-profiles/profile-cloud-auth-config'
 
 const HIVECODE_CLOUD_DEFAULTS: ProductCloudDefaults = {
-  apiBaseUrl: hivecodeProductConfig.endpoints.cloud,
-  clientId: hivecodeProductConfig.endpoints.cloud ? 'hivecode-desktop' : null,
-  relayDirectorUrl: hivecodeProductConfig.endpoints.relay,
+  apiBaseUrl: hivecodeProductConfig.services.api.baseUrl,
+  clientId: hivecodeProductConfig.services.identity.clients.desktop,
+  relayDirectorUrl: hivecodeProductConfig.services.relay.enabled
+    ? hivecodeProductConfig.services.relay.directorUrl
+    : null,
+  relayEnabled: hivecodeProductConfig.services.relay.enabled,
   scope: 'openid profile email offline_access hive.session.exchange',
   productLabel: 'HiveCode Cloud'
 }

@@ -137,7 +137,11 @@ function SettingsSetupGuideNavRow({
         done={progress.doneCount}
         total={progress.total}
         sizeClassName="size-4"
-        tooltipLabel={`${progress.doneCount}/${progress.total} complete`}
+        tooltipLabel={translate(
+          'auto.components.setup.guide.SetupGuideProgressRing.dac3a4724a',
+          '{{value0}} of {{value1}} setup steps complete',
+          { value0: progress.doneCount, value1: progress.total }
+        )}
       />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] font-medium leading-4">
@@ -159,7 +163,7 @@ export function SettingsSidebar({
   onBack,
   onSelectSection
 }: SettingsSidebarProps): React.JSX.Element {
-  const setupGuideProgress = useSettingsSetupGuideProgress(true)
+  const setupGuideProgress = useSettingsSetupGuideProgress()
   const systemPrefersDark = useSystemPrefersDark()
   const leftSidebarStyle = useMemo(
     () => resolveLeftSidebarStyleVariables(settings, systemPrefersDark),

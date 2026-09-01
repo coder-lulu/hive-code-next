@@ -32,11 +32,11 @@ function operationError(status: string): string {
   return status === 'reconnect-required'
     ? translate(
         'auto.components.skills.SkillShareDialog.reconnect',
-        'Reconnect your Orca account before sharing.'
+        'Reconnect your HiveCode account before sharing.'
       )
     : translate(
         'auto.components.skills.SkillShareDialog.unconfigured',
-        'Connect an Orca Cloud account before sharing.'
+        'Connect a HiveCode Cloud account before sharing.'
       )
 }
 

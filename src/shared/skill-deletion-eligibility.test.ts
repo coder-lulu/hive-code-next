@@ -38,4 +38,10 @@ describe('skillDeletionEligibility', () => {
     expect(SKILL_DELETE_BLOCK_MESSAGES.missing).toBeTruthy()
     expect(SKILL_DELETE_BLOCK_MESSAGES.stale).toBeTruthy()
   })
+
+  it('uses HiveCode branding in messages shown directly by logs and the CLI', () => {
+    const messages = Object.values(SKILL_DELETE_BLOCK_MESSAGES).join('\n')
+    expect(messages).toContain('HiveCode')
+    expect(messages).not.toContain('Orca')
+  })
 })

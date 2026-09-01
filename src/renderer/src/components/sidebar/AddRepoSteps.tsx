@@ -38,7 +38,9 @@ export function useRemoteRepo(
     inProgress: boolean,
     scanId: string | null
   ) => void,
-  onNestedScanResult?: (scan: NestedRepoScanResult | null, attemptId: string) => void
+  onNestedScanResult?: (scan: NestedRepoScanResult | null, attemptId: string) => void,
+  /** Explicit space target from the group-scoped Add Project action. */
+  projectGroupId?: string | null
 ) {
   const [sshTargets, setSshTargets] = useState<(SshTarget & { state?: SshConnectionState })[]>([])
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null)
@@ -221,7 +223,8 @@ export function useRemoteRepo(
         closeModal()
         useAppStore.getState().openModal('confirm-non-git-folder', {
           folderPath: trimmedRemotePath,
-          connectionId: selectedTargetId
+          connectionId: selectedTargetId,
+          ...(projectGroupId !== undefined ? { projectGroupScoped: true, projectGroupId } : {})
         })
         return
       }
@@ -243,7 +246,8 @@ export function useRemoteRepo(
     fetchWorktrees,
     mountedRef,
     closeModal,
-    onGitRepoReady
+    onGitRepoReady,
+    projectGroupId
   ])
 
   return {

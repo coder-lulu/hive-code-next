@@ -7,6 +7,7 @@ import {
   localizedHostedReviewCopy,
   resolveSupportedHostedReviewCopyProvider
 } from '@/i18n/hosted-review-localized-copy'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function canClickBlockedCreateReviewReason(
   reason: HostedReviewCreationBlockedReason | undefined
@@ -43,7 +44,7 @@ export function resolveUnavailableCreateReviewLookupNoticeMessage(
   provider: HostedReviewProvider
 ): string {
   const copy = localizedHostedReviewCopy(resolveSupportedHostedReviewCopyProvider(provider))
-  return `Create ${copy.shortLabel} failed: Orca could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`
+  return `Create ${copy.shortLabel} failed: ${APP_DISPLAY_NAME} could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`
 }
 
 export function resolveBlockedCreateReviewNoticeMessage(

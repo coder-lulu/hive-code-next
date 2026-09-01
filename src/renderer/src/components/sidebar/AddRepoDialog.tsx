@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- The dialog coordinates several host-specific add flows. */
+
 import React, { useCallback, useState } from 'react'
 import { useAppStore } from '@/store'
 import { useRemoteRepo } from './AddRepoSteps'
@@ -19,6 +21,8 @@ import {
   type AddRepoDialogHostedController
 } from './use-add-repo-hosted-controller'
 import { routeAddRepoBrowse } from './add-repo-browse-authority'
+import type { AddRepoPathRouteOptions } from '@/store/repos/repo-state'
+import { normalizeExecutionHostId } from '../../../../shared/execution-host'
 
 export default React.memo(function AddRepoDialog({
   hosted
@@ -31,6 +35,22 @@ export default React.memo(function AddRepoDialog({
   const droppedLocalPath = useAppStore((s) =>
     !hosted && typeof s.modalData.droppedLocalPath === 'string' ? s.modalData.droppedLocalPath : ''
   )
+  // Keep the originating space explicit throughout the add flow.  `undefined`
+  // means the dialog was opened globally; `null` is a deliberate Ungrouped
+  // target and must not be collapsed into the global case.
+  const projectGroupId = useAppStore((s) => {
+    if (hosted || s.modalData.projectGroupScoped !== true) {
+      return undefined
+    }
+    const value = s.modalData.projectGroupId
+    return typeof value === 'string' ? value : value === null ? null : undefined
+  })
+  const preferredHostId = useAppStore((s) => {
+    const value = s.modalData.projectGroupExecutionHostId
+    return !hosted && s.modalData.projectGroupScoped === true && typeof value === 'string'
+      ? normalizeExecutionHostId(value)
+      : null
+  })
   const addRepoPath = useAppStore((s) => s.addRepoPath)
   const scanNestedRepos = useAppStore((s) => s.scanNestedRepos)
   const cancelNestedRepoScan = useAppStore((s) => s.cancelNestedRepoScan)
@@ -44,12 +64,26 @@ export default React.memo(function AddRepoDialog({
   const [step, setStep] = useState<AddRepoDialogStep>('add')
   const [isAdding, setIsAdding] = useState(false)
   const [addProjectBusyLabel, setAddProjectBusyLabel] = useState<string | null>(null)
+  const scopedAddRepoPath = useCallback(
+    (
+      path: string,
+      kind?: 'git' | 'folder',
+      options?: AddRepoPathRouteOptions
+    ): ReturnType<typeof addRepoPath> =>
+      addRepoPath(
+        path,
+        kind,
+        projectGroupId !== undefined ? { ...options, projectGroupId } : options
+      ),
+    [addRepoPath, projectGroupId]
+  )
   const completeGitRepoAdd = useCompleteGitRepoAdd({
     closeModal,
     setHideDefaultBranchWorkspace,
-    finishProjectAdd
+    finishProjectAdd,
+    projectGroupId
   })
-  const hostSelection = useAddRepoHostSelection({ isOpen, setStep })
+  const hostSelection = useAddRepoHostSelection({ isOpen, preferredHostId, setStep })
   const selectedRuntimeEnvironmentId =
     hostSelection.selectedParsedHost?.kind === 'runtime'
       ? hostSelection.selectedParsedHost.environmentId
@@ -108,7 +142,8 @@ export default React.memo(function AddRepoDialog({
     (repoId, executionHostId) => completeGitRepoAdd(repoId, 'ssh_remote_path', executionHostId),
     scanNestedRepos,
     showRemoteNestedRepoReview,
-    trackRemoteNestedScanResult
+    trackRemoteNestedScanResult,
+    projectGroupId
   )
   const {
     createName,
@@ -174,7 +209,7 @@ export default React.memo(function AddRepoDialog({
     isOpen,
     droppedLocalPath,
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
-    addRepoPath,
+    addRepoPath: scopedAddRepoPath,
     // Why: this flow's closes are all folder/non-git outcomes that navigate.
     closeModal: closeForFolderHandoff,
     fetchWorktrees,
@@ -193,7 +228,7 @@ export default React.memo(function AddRepoDialog({
     resetServerPathFlow,
     handleAddServerPath
   } = useAddRepoServerPathFlow({
-    addRepoPath,
+    addRepoPath: scopedAddRepoPath,
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
     // Why: closes only after a folder add, which activates the folder workspace.
     closeModal: closeForFolderHandoff,

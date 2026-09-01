@@ -6,6 +6,8 @@ import type { ConnectionState } from './types'
 
 const openHostLogicalClientMock = vi.fn()
 const loadHostsMock = vi.fn()
+const findAccountRuntimeProfileMock = vi.fn()
+const mergeAccountRuntimeProfilesMock = vi.fn((profiles: unknown[]) => profiles)
 const revival = vi.hoisted(() => ({ callback: null as null | ((reason: 'focus') => void) }))
 
 vi.mock('./host-logical-client', () => ({
@@ -13,6 +15,10 @@ vi.mock('./host-logical-client', () => ({
 }))
 vi.mock('./host-store', () => ({
   loadHosts: () => loadHostsMock()
+}))
+vi.mock('../runtime-directory/account-runtime-profile-registry', () => ({
+  findAccountRuntimeProfile: (...args: unknown[]) => findAccountRuntimeProfileMock(...args),
+  mergeAccountRuntimeProfiles: (...args: unknown[]) => mergeAccountRuntimeProfilesMock(...args)
 }))
 vi.mock('./connection-revival-triggers', () => ({
   subscribeConnectionRevivalTriggers: (callback: (reason: 'focus') => void) => {
@@ -64,12 +70,82 @@ beforeEach(() => {
   vi.useFakeTimers()
   openHostLogicalClientMock.mockReset()
   loadHostsMock.mockReset()
+  findAccountRuntimeProfileMock.mockReset()
+  mergeAccountRuntimeProfilesMock.mockReset()
+  mergeAccountRuntimeProfilesMock.mockImplementation((profiles: unknown[]) => profiles)
   revival.callback = null
 })
 
 afterEach(() => vi.useRealTimers())
 
 describe('wanted host open recovery', () => {
+  it('opens a local pairing with its matching account fallback route attached', async () => {
+    const client = fakeClient()
+    const accountRuntime = {
+      runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      resourceVersion: 2,
+      createConnection: vi.fn()
+    }
+    const compositeHost = { ...HOST, accountRuntimeFallback: accountRuntime }
+    loadHostsMock.mockResolvedValue([HOST])
+    mergeAccountRuntimeProfilesMock.mockReturnValue([compositeHost])
+    openHostLogicalClientMock.mockReturnValue(client)
+
+    let renderer: MountedRenderer | null = null
+    function Probe(): null {
+      useHostClient(HOST.id)
+      return null
+    }
+
+    try {
+      await act(async () => {
+        renderer = create(createElement(RpcClientProvider, null, createElement(Probe)))
+        await Promise.resolve()
+      })
+
+      expect(mergeAccountRuntimeProfilesMock).toHaveBeenCalledWith([HOST])
+      expect(openHostLogicalClientMock).toHaveBeenCalledWith(compositeHost, expect.any(Function))
+    } finally {
+      act(() => renderer?.unmount())
+    }
+  })
+
+  it('opens an account Runtime even when the independent local pairing catalog is unavailable', async () => {
+    const client = fakeClient()
+    const accountHost = {
+      ...HOST,
+      id: 'account-runtime',
+      accountRuntime: {
+        runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        resourceVersion: 1,
+        createConnection: vi.fn()
+      }
+    }
+    loadHostsMock.mockRejectedValue(new Error('local catalog unavailable'))
+    findAccountRuntimeProfileMock.mockReturnValue(accountHost)
+    openHostLogicalClientMock.mockReturnValue(client)
+
+    let observed: { client: RpcClient | null; state: ConnectionState } | null = null
+    let renderer: MountedRenderer | null = null
+    function Probe(): null {
+      observed = useHostClient(accountHost.id)
+      return null
+    }
+
+    try {
+      await act(async () => {
+        renderer = create(createElement(RpcClientProvider, null, createElement(Probe)))
+        await Promise.resolve()
+      })
+
+      expect(findAccountRuntimeProfileMock).toHaveBeenCalledWith(accountHost.id)
+      expect(openHostLogicalClientMock).toHaveBeenCalledWith(accountHost, expect.any(Function))
+      expect(observed).toMatchObject({ client, state: 'connected' })
+    } finally {
+      act(() => renderer?.unmount())
+    }
+  })
+
   it('recovers after a transient catalog failure without remounting', async () => {
     const client = fakeClient()
     loadHostsMock.mockRejectedValueOnce(new Error('catalog unavailable')).mockResolvedValue([HOST])

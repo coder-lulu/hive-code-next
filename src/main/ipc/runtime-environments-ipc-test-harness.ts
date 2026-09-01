@@ -2,12 +2,13 @@ import { expect } from 'vitest'
 import type { Mock } from 'vitest'
 import { encodePairingOffer } from '../../shared/pairing'
 
-export function pairingCode(endpoint = 'ws://127.0.0.1:6768'): string {
+export function pairingCode(endpoint = 'ws://127.0.0.1:6768', runtimeRecordId?: string): string {
   return encodePairingOffer({
     v: 2,
     endpoint,
     deviceToken: 'device-token',
-    publicKeyB64: Buffer.from(new Uint8Array(32).fill(1)).toString('base64')
+    publicKeyB64: Buffer.from(new Uint8Array(32).fill(1)).toString('base64'),
+    ...(runtimeRecordId ? { runtimeRecordId } : {})
   })
 }
 

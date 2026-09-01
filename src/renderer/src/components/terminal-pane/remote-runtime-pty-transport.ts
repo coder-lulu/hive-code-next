@@ -19,7 +19,10 @@ import type {
   RuntimeTerminalResolvePane,
   RuntimeTerminalSend
 } from '../../../../shared/runtime-types'
-import { TERMINAL_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import {
+  AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
+  TERMINAL_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY
+} from '../../../../shared/protocol-version'
 import { agentResumeHostAuthorityCapability } from '../../runtime/agent-resume-host-authority-capability'
 import {
   isTerminalInputTooLargeWithDeferredMeasurement,
@@ -144,6 +147,7 @@ export function createRemoteRuntimePtyTransport(
     resumeProviderSession,
     launchToken,
     launchAgent,
+    agentPermissionMode,
     terminalColorQueryReplies,
     agentPrompt,
     agentPromptDelivery,
@@ -1276,7 +1280,7 @@ export function createRemoteRuntimePtyTransport(
           client: { id: clientId, type: 'desktop' },
           ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
         })
-        if (result.send.accepted !== true) {
+        if (!result.send.accepted) {
           return false
         }
       }
@@ -1322,7 +1326,7 @@ export function createRemoteRuntimePtyTransport(
           connected &&
           lifecycleEpoch === targetLifecycleEpoch &&
           handle === targetHandle &&
-          result.send.accepted !== true
+          !result.send.accepted
         ) {
           notifyWriteUnavailable()
         }
@@ -2021,6 +2025,9 @@ export function createRemoteRuntimePtyTransport(
         const envToSend = options.env ?? env
         const envToDeleteToSend = options.envToDelete ?? envToDelete
         const launchConfigToSend = options.launchConfig ?? launchConfig
+        const agentPermissionModeToSend = options.agentPermissionMode ?? agentPermissionMode
+        const agentArgsOverrideToSend =
+          options.agentArgsOverride !== undefined ? options.agentArgsOverride : agentArgsOverride
         const resumeProviderSessionToSend = options.resumeProviderSession ?? resumeProviderSession
         const launchTokenToSend = options.launchToken ?? launchToken
         const launchAgentToSend = options.launchAgent ?? launchAgent
@@ -2079,7 +2086,12 @@ export function createRemoteRuntimePtyTransport(
                       ...(launchConfigToSend?.ompResumeFilePath
                         ? { ompResumeFilePath: launchConfigToSend.ompResumeFilePath }
                         : {}),
-                      ...(agentArgsOverride !== undefined ? { agentArgs: agentArgsOverride } : {}),
+                      ...(agentArgsOverrideToSend !== undefined
+                        ? { agentArgs: agentArgsOverrideToSend }
+                        : {}),
+                      ...(agentPermissionModeToSend
+                        ? { agentPermissionMode: agentPermissionModeToSend }
+                        : {}),
                       ...(agentLaunchPreferences
                         ? { launchPreferences: agentLaunchPreferences }
                         : {}),
@@ -2097,8 +2109,11 @@ export function createRemoteRuntimePtyTransport(
                         agent: launchAgentToSend!,
                         ...(agentPrompt ? { prompt: agentPrompt } : {}),
                         ...(agentPromptDelivery ? { promptDelivery: agentPromptDelivery } : {}),
-                        ...(agentArgsOverride !== undefined
-                          ? { agentArgs: agentArgsOverride }
+                        ...(agentArgsOverrideToSend !== undefined
+                          ? { agentArgs: agentArgsOverrideToSend }
+                          : {}),
+                        ...(agentPermissionModeToSend
+                          ? { agentPermissionMode: agentPermissionModeToSend }
                           : {}),
                         ...(agentLaunchPreferences
                           ? { launchPreferences: agentLaunchPreferences }
@@ -2116,15 +2131,21 @@ export function createRemoteRuntimePtyTransport(
         const resumeHostAuthorityCapability = resumeProviderSessionToSend
           ? agentResumeHostAuthorityCapability(launchAgentToSend)
           : undefined
+        const freshHostAuthorityCapability = agentPermissionModeToSend
+          ? AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY
+          : undefined
+        const hostAuthorityCapabilities = [
+          ...(resumeHostAuthorityCapability ? [resumeHostAuthorityCapability] : []),
+          ...(freshHostAuthorityCapability ? [freshHostAuthorityCapability] : [])
+        ]
         const created = launchAgentToSend
           ? agentSessionRequiresHostAuthorityReplay
             ? await hostAuthorityCreate()
             : await runRemoteAgentSessionLaunch<RemoteAgentSessionLaunchResult | null>({
                 environmentId: createEnvironmentId,
                 hostAuthority: hostAuthorityCreate,
-                ...(resumeHostAuthorityCapability
-                  ? { hostAuthorityCapability: resumeHostAuthorityCapability }
-                  : {}),
+                ...(hostAuthorityCapabilities.length > 0 ? { hostAuthorityCapabilities } : {}),
+                ...(agentPermissionModeToSend ? { legacyFallbackPolicy: 'deny' as const } : {}),
                 legacy: legacyCreate
               })
           : await legacyCreate()

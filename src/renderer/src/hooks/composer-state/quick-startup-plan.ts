@@ -1,6 +1,13 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import type { AgentStartupShell } from '../../../../shared/tui-agent-startup-shell'
+import {
+  resolveStartupShell,
+  type AgentStartupShell
+} from '../../../../shared/tui-agent-startup-shell'
+import {
+  resolveTuiAgentLaunchPermission,
+  type AgentLaunchPermissionMode
+} from '../../../../shared/tui-agent-permissions'
 import type { AgentStartedTelemetry } from '@/lib/worktree-startup-payload'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
@@ -18,6 +25,7 @@ export type QuickComposerStartupInput = {
   prompt: string
   draftPrompt: string | null | undefined
   settings: GlobalSettings | null | undefined
+  agentPermissionMode?: AgentLaunchPermissionMode
   repoConnectionId: string | null | undefined
   platform: NodeJS.Platform
   shell: AgentStartupShell | null | undefined
@@ -33,6 +41,16 @@ export type QuickComposerStartup = {
 
 export function buildQuickComposerStartup(input: QuickComposerStartupInput): QuickComposerStartup {
   const { agent, draftPrompt, prompt, settings } = input
+  const permissionLaunchConfig =
+    agent === null
+      ? null
+      : resolveTuiAgentLaunchPermission({
+          agent,
+          mode: input.agentPermissionMode ?? 'default',
+          agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
+          agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
+          shell: resolveStartupShell(input.platform, input.shell ?? undefined)
+        })
   const sessionOptions =
     agent === null
       ? undefined
@@ -59,8 +77,9 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
           agent,
           draft: draftPrompt,
           cmdOverrides: settings?.agentCmdOverrides ?? {},
-          agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
-          agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
+          agentArgs: permissionLaunchConfig?.agentArgs,
+          agentEnv: permissionLaunchConfig?.agentEnv,
+          agentPermissionMode: input.agentPermissionMode,
           sessionOptions,
           platform: input.platform,
           shell: input.shell ?? undefined,
@@ -85,8 +104,9 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
       agent,
       prompt,
       cmdOverrides: settings?.agentCmdOverrides ?? {},
-      agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
+      agentArgs: permissionLaunchConfig?.agentArgs,
+      agentEnv: permissionLaunchConfig?.agentEnv,
+      agentPermissionMode: input.agentPermissionMode,
       sessionOptions,
       platform: input.platform,
       shell: input.shell ?? undefined,
@@ -96,6 +116,12 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
     if (startupPlan && draftPrompt) {
       startupPlan.draftPrompt = draftPrompt
     }
+  }
+  if (startupPlan && input.agentPermissionMode && input.agentPermissionMode !== 'default') {
+    startupPlan.agentPermissionMode = input.agentPermissionMode
+  }
+  if (agent !== null && !startupPlan) {
+    throw new Error('Unable to build an agent startup command with the selected permission mode.')
   }
   const telemetry: AgentStartedTelemetry | null =
     agent === null
@@ -107,12 +133,16 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
           request_kind: 'new'
         }
   const backendStartup =
-    startupPlan && !startupPlan.draftPrompt && !startupPlan.followupPrompt
+    startupPlan &&
+    ((!startupPlan.draftPrompt && !startupPlan.followupPrompt) || startupPlan.agentPermissionMode)
       ? {
           command: startupPlan.launchCommand,
           ...(startupPlan.env ? { env: startupPlan.env } : {}),
           launchConfig: startupPlan.launchConfig,
           ...(agent ? { launchAgent: agent } : {}),
+          ...(startupPlan.agentPermissionMode
+            ? { agentPermissionMode: startupPlan.agentPermissionMode }
+            : {}),
           ...(startupPlan.startupCommandDelivery
             ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
             : {}),

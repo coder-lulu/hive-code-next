@@ -130,7 +130,17 @@ export type DeleteProjectGroupWithContainedProjectsResult =
 
 export type FolderWorkspacePathStatusRouteOptions = { runtimeEnvironmentId?: string | null }
 
-export type AddRepoPathRouteOptions = { runtimeEnvironmentId?: string | null }
+/**
+ * Routing context captured by the Add Project surface.
+ *
+ * `projectGroupId` is intentionally optional (rather than defaulting to null):
+ * an omitted value means the caller did not choose a space, while an explicit
+ * null means the caller deliberately targeted the derived Ungrouped space.
+ */
+export type AddRepoPathRouteOptions = {
+  runtimeEnvironmentId?: string | null
+  projectGroupId?: string | null
+}
 
 export type RuntimeCatalogFetchOptions = { runtimeEnvironmentId?: string | null }
 
@@ -238,7 +248,8 @@ export type RepoSlice = {
   moveProjectToGroup: (
     projectId: string,
     groupId: string | null,
-    order?: number
+    order?: number,
+    options?: { hostId?: ExecutionHostId }
   ) => Promise<boolean>
   // options.hostId disambiguates which host's row to remove when the id exists on multiple hosts; else the focused host is assumed.
   // options.errorFeedback defaults to 'silent' so bulk/background callers keep their own aggregate reporting.

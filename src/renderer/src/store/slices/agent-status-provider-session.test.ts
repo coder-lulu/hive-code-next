@@ -509,6 +509,142 @@ describe('recordAgentProviderSession', () => {
     })
   })
 
+  it('persists only semantic authority for a Host-owned launch identity', () => {
+    const store = createTestStore()
+    store.setState({
+      tabsByWorktree: {
+        'wt-1': [makeTab({ id: 'tab-1', worktreeId: 'wt-1' })]
+      }
+    } as Partial<AppState>)
+    const providerSession = { key: 'session_id' as const, id: 'codex-session-host' }
+
+    const hostSemanticConfig = {
+      agentArgs: '',
+      agentEnv: {},
+      hostDefaultsAuthoritative: true as const,
+      agentPermissionMode: 'manual' as const
+    }
+    store.getState().registerAgentLaunchConfig('tab-1:leaf-1', hostSemanticConfig, {
+      agentType: 'codex',
+      launchToken: 'host-launch-1',
+      tabId: 'tab-1',
+      leafId: 'leaf-1'
+    })
+    store
+      .getState()
+      .setAgentStatus(
+        'tab-1:leaf-1',
+        { state: 'working', prompt: 'host task', agentType: 'codex' },
+        'Codex',
+        { updatedAt: 10, stateStartedAt: 10 },
+        { tabId: 'tab-1', worktreeId: 'wt-1' }
+      )
+    store
+      .getState()
+      .recordAgentProviderSession(
+        'tab-1:leaf-1',
+        'codex',
+        providerSession,
+        { updatedAt: 20 },
+        { tabId: 'tab-1', worktreeId: 'wt-1', connectionId: null },
+        { launchToken: 'host-launch-1' }
+      )
+
+    expect(store.getState().agentLaunchConfigByPaneKey['tab-1:leaf-1']).toMatchObject({
+      identity: { launchToken: 'host-launch-1' }
+    })
+    expect(store.getState().agentLaunchConfigByPaneKey['tab-1:leaf-1']?.launchConfig).toEqual(
+      hostSemanticConfig
+    )
+    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:leaf-1']?.launchConfig).toEqual(
+      hostSemanticConfig
+    )
+  })
+
+  it('binds a provider session to a Host-owned launch by terminal handle', () => {
+    const store = createTestStore()
+    store.setState({
+      tabsByWorktree: {
+        'wt-1': [makeTab({ id: 'tab-1', worktreeId: 'wt-1' })]
+      }
+    } as Partial<AppState>)
+    const hostSemanticConfig = {
+      agentArgs: '',
+      agentEnv: {},
+      hostDefaultsAuthoritative: true as const,
+      agentPermissionMode: 'manual' as const
+    }
+
+    store.getState().registerAgentLaunchConfig('tab-1:leaf-1', hostSemanticConfig, {
+      agentType: 'pi',
+      terminalHandle: 'terminal-host-1',
+      tabId: 'tab-1',
+      leafId: 'leaf-1'
+    })
+    store.getState().recordAgentProviderSession(
+      'tab-1:leaf-1',
+      'pi',
+      {
+        key: 'session_id',
+        id: 'pi-session-host',
+        transcriptPath: '/tmp/pi-session-host.jsonl'
+      },
+      { updatedAt: 20 },
+      {
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        connectionId: null,
+        terminalHandle: 'terminal-host-1'
+      }
+    )
+
+    expect(store.getState().agentLaunchConfigByPaneKey['tab-1:leaf-1']).toMatchObject({
+      identity: {
+        terminalHandle: 'terminal-host-1',
+        providerSession: { key: 'session_id', id: 'pi-session-host' }
+      }
+    })
+    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:leaf-1']?.launchConfig).toEqual(
+      hostSemanticConfig
+    )
+  })
+
+  it('preserves unread task completions across a late provider-session update', () => {
+    const store = createTestStore()
+    const paneKey = 'tab-1:leaf-1'
+    const providerSession = makePiCompatibleProviderSession('pi')
+    store.setState({
+      tabsByWorktree: {
+        'wt-1': [makeTab({ id: 'tab-1', worktreeId: 'wt-1' })]
+      }
+    } as Partial<AppState>)
+    store
+      .getState()
+      .setAgentStatus(
+        paneKey,
+        { state: 'done', prompt: 'finish the task', agentType: 'pi' },
+        'Pi',
+        { updatedAt: 30, stateStartedAt: 20 },
+        { tabId: 'tab-1', worktreeId: 'wt-1' },
+        { providerSession }
+      )
+    store.getState().markAgentCompletionPaneUnread(paneKey)
+    store.getState().incrementAgentCompletionUnread(paneKey)
+
+    store
+      .getState()
+      .recordAgentProviderSession(
+        paneKey,
+        'pi',
+        providerSession,
+        { updatedAt: 40 },
+        { tabId: 'tab-1', worktreeId: 'wt-1' }
+      )
+
+    expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 1 })
+    expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe(true)
+  })
+
   it.each(PI_COMPATIBLE_CASES)(
     'keeps a completed $label session resumable through quit capture',
     ({ agent, label }) => {

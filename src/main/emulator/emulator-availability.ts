@@ -72,9 +72,22 @@ function toSimulatorRow(device: EmulatorDevice): SimulatorDevice {
   return {
     name: device.name,
     udid: device.id,
-    state: device.state === 'booted' ? 'Booted' : 'Shutdown',
+    state: androidDeviceStateLabel(device.state),
     runtime: 'Android',
     isAvailable: device.isAvailable
+  }
+}
+
+function androidDeviceStateLabel(state: EmulatorDevice['state']): string {
+  switch (state) {
+    case 'booted':
+      return 'Booted'
+    case 'booting':
+      return 'Booting'
+    case 'unresponsive':
+      return 'Unresponsive'
+    case 'shutdown':
+      return 'Shutdown'
   }
 }
 

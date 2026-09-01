@@ -5,6 +5,7 @@ import {
   toSshExecutionHostId,
   type ParsedExecutionHost
 } from '../shared/execution-host'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../shared/brand'
 import {
   ambiguousEnvironments,
   crossKindNextSteps,
@@ -79,13 +80,13 @@ export async function resolveHostFlagEnvironmentId(
     const sshTargets = await selection.listSshTargets()
     throw new RuntimeClientError(
       'invalid_argument',
-      `Unknown Orca server in --host ${host.id}: no paired Orca server is named or has id ${host.environmentId}.`,
+      `Unknown ${APP_DISPLAY_NAME} server in --host ${host.id}: no paired ${APP_DISPLAY_NAME} server is named or has id ${host.environmentId}.`,
       {
         knownEnvironments: environments,
         knownSshTargets: sshTargets,
         nextSteps: [
           ...crossKindNextSteps(host.environmentId, { environments, sshTargets }, 'environment'),
-          'Run `orca environment list` to see paired Orca servers.',
+          `Run \`${PRIMARY_CLI_COMMAND} environment list\` to see paired ${APP_DISPLAY_NAME} servers.`,
           'Use --host local to target this machine.'
         ]
       }
@@ -94,7 +95,7 @@ export async function resolveHostFlagEnvironmentId(
   if (selection.pairingCode) {
     throw new RuntimeClientError(
       'invalid_argument',
-      `--host ${host.id} already selects a paired Orca server; use either --host runtime:<id> or --pairing-code, not both.`
+      `--host ${host.id} already selects a paired ${APP_DISPLAY_NAME} server; use either --host runtime:<id> or --pairing-code, not both.`
     )
   }
   if (selection.environmentSelector) {
@@ -102,7 +103,7 @@ export async function resolveHostFlagEnvironmentId(
     if (selected.id !== environment.id) {
       throw new RuntimeClientError(
         'invalid_argument',
-        `--host ${host.id} and ${selection.environmentSelector.label} ${selection.environmentSelector.value} name different Orca servers.`
+        `--host ${host.id} and ${selection.environmentSelector.label} ${selection.environmentSelector.value} name different ${APP_DISPLAY_NAME} servers.`
       )
     }
   }
@@ -161,7 +162,7 @@ function assertEnvironmentNameUnambiguous(
   }
   throw new RuntimeClientError(
     'invalid_argument',
-    `Ambiguous Orca server in ${flag}: ${ambiguous.length} paired servers are named ${name}. Use the environment id.`,
+    `Ambiguous ${APP_DISPLAY_NAME} server in ${flag}: ${ambiguous.length} paired servers are named ${name}. Use the environment id.`,
     {
       knownEnvironments: ambiguous,
       nextSteps: ambiguous.map(
@@ -194,13 +195,13 @@ export async function assertEnvironmentSelectorResolvable(
   const sshTargets = await listSshTargetsForSuggestion()
   throw new RuntimeClientError(
     'invalid_argument',
-    `Unknown Orca server in --environment ${selector}: no paired Orca server is named or has id ${selector}.`,
+    `Unknown ${APP_DISPLAY_NAME} server in --environment ${selector}: no paired ${APP_DISPLAY_NAME} server is named or has id ${selector}.`,
     {
       knownEnvironments: environments,
       knownSshTargets: sshTargets,
       nextSteps: [
         ...crossKindNextSteps(selector, { environments, sshTargets }, 'environment'),
-        'Run `orca host list` to see every machine you can target and the flag for each.'
+        `Run \`${PRIMARY_CLI_COMMAND} host list\` to see every machine you can target and the flag for each.`
       ]
     }
   )

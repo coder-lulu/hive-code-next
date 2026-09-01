@@ -18,12 +18,13 @@ import { MobileEmulatorExamples } from './MobileEmulatorExamples'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '@/product-brand'
 
 const EMULATOR_CLI_COMMANDS = [
-  'orca emulator list --json',
-  'orca emulator attach "iPhone 16 Pro" --json',
-  'orca emulator tap 0.5 0.7 --json',
-  'orca emulator type "hello" --json'
+  `${PRIMARY_CLI_COMMAND} emulator list --json`,
+  `${PRIMARY_CLI_COMMAND} emulator attach "iPhone 16 Pro" --json`,
+  `${PRIMARY_CLI_COMMAND} emulator tap 0.5 0.7 --json`,
+  `${PRIMARY_CLI_COMMAND} emulator type "hello" --json`
 ] as const
 
 export function MobileEmulatorAgentControlRow(): React.JSX.Element {
@@ -159,8 +160,8 @@ export function MobileEmulatorAgentControlRow(): React.JSX.Element {
             )}
             command={cliSkillInstallCommand}
             installedCommand={cliSkillUpdateCommand}
-            terminalTitle="Orca CLI skill setup"
-            terminalAriaLabel="Orca CLI skill install terminal"
+            terminalTitle={`${APP_DISPLAY_NAME} CLI skill setup`}
+            terminalAriaLabel={`${APP_DISPLAY_NAME} CLI skill install terminal`}
             terminalWorktreeId="settings-mobile-emulator-orca-cli-skill-terminal"
             terminalShellOverride={activeSkillRuntime.terminalShellOverride}
             installed={setup.cliSkillInstalled}

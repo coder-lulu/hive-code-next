@@ -12,7 +12,7 @@ import { DEFAULT_LOCALE, resolveUiLocale } from './supported-languages'
 import type { SupportedUiLocale } from '../../../shared/ui-locale'
 import { isPluginUiLanguage, type UiLanguage } from '../../../shared/ui-language'
 import type { PluginLanguagePackRegistration } from '../../../shared/plugins/plugin-language-pack-artifact'
-import { applyProductBranding } from '../../../shared/brand'
+import { applyProductCliBranding, applyProductCliBrandingToCatalog } from '../../../shared/brand'
 
 export const i18n: I18nInstance = i18next.createInstance()
 
@@ -44,7 +44,7 @@ const lazyLocaleBackend: BackendModule = {
       return
     }
     loader().then(
-      (mod) => callback(null, mod.default),
+      (mod) => callback(null, applyProductCliBrandingToCatalog(mod.default)),
       (error) => callback(error instanceof Error ? error : new Error(String(error)), false)
     )
   }
@@ -63,7 +63,7 @@ void i18n
     partialBundledLanguages: true,
     resources: {
       en: {
-        translation: en
+        translation: applyProductCliBrandingToCatalog(en)
       }
     },
     interpolation: {
@@ -75,11 +75,13 @@ void i18n
   })
 
 export function translate(key: string, fallback: string, options?: TOptions): string {
-  const value = i18n.t(key, { defaultValue: fallback, ...options })
-  const brandedValue = applyProductBranding(value)
-  return isPseudoLocalizationLocale(i18n.language)
-    ? pseudoLocalizeString(brandedValue)
-    : brandedValue
+  // Brand the static fallback before i18next interpolates options. Applying the
+  // adapter to `value` would silently rewrite user-authored names and URLs.
+  const value = i18n.t(key, {
+    ...options,
+    defaultValue: applyProductCliBranding(fallback)
+  })
+  return isPseudoLocalizationLocale(i18n.language) ? pseudoLocalizeString(value) : value
 }
 
 export async function setRendererUiLanguage(language: UiLanguage): Promise<void> {
@@ -130,7 +132,13 @@ export function setRendererPluginLanguagePacks(
   registeredPluginLanguages.clear()
   pluginLanguagePacks = packs
   for (const pack of packs) {
-    i18n.addResourceBundle(pack.resourceLanguage, 'translation', pack.catalog, true, true)
+    i18n.addResourceBundle(
+      pack.resourceLanguage,
+      'translation',
+      applyProductCliBrandingToCatalog(pack.catalog),
+      true,
+      true
+    )
     registeredPluginLanguages.add(pack.resourceLanguage)
   }
 }

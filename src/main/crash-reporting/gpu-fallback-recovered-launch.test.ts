@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const { showMessageBoxMock } = vi.hoisted(() => ({
   showMessageBoxMock: vi.fn()
@@ -56,7 +57,7 @@ describe('promptForGpuFallbackRecoveredLaunch', () => {
       defaultId: 0,
       cancelId: 0,
       title: 'Safe Graphics Mode is Active',
-      message: 'Orca recovered in Safe Graphics Mode.',
+      message: `${APP_DISPLAY_NAME} recovered in Safe Graphics Mode.`,
       detail:
         'Safe Graphics Mode was enabled after repeated graphics crashes. Keep it for stability, or restart and try hardware acceleration again.'
     })

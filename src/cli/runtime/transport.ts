@@ -1,5 +1,6 @@
 import { createConnection } from 'node:net'
 import { randomUUID } from 'node:crypto'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { findTransport, type RuntimeMetadata } from '../../shared/runtime-bootstrap'
 import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
 import { isKeepaliveFrame, RuntimeRpcEnvelopeSchema } from './envelope-schema'
@@ -25,7 +26,7 @@ export async function sendRequest<TResult>(
       reject(
         new RuntimeClientError(
           'runtime_unavailable',
-          'No compatible transport found in Orca runtime metadata.'
+          `No compatible transport found in ${APP_DISPLAY_NAME} runtime metadata.`
         )
       )
       return
@@ -44,7 +45,7 @@ export async function sendRequest<TResult>(
       reject(
         new RuntimeClientError(
           'runtime_timeout',
-          'Timed out waiting for the Orca runtime to respond.'
+          `Timed out waiting for the ${APP_DISPLAY_NAME} runtime to respond.`
         )
       )
     }, timeoutMs)
@@ -71,7 +72,7 @@ export async function sendRequest<TResult>(
         ok: false,
         error: new RuntimeClientError(
           'runtime_unavailable',
-          'Could not connect to the running Orca app. Restart Orca and try again.'
+          `Could not connect to the running ${APP_DISPLAY_NAME} app. Restart ${APP_DISPLAY_NAME} and try again.`
         )
       })
     })
@@ -84,7 +85,7 @@ export async function sendRequest<TResult>(
         ok: false,
         error: new RuntimeClientError(
           'runtime_unavailable',
-          'The Orca runtime closed the connection before responding. Restart Orca and try again.'
+          `The ${APP_DISPLAY_NAME} runtime closed the connection before responding. Restart ${APP_DISPLAY_NAME} and try again.`
         )
       })
     })
@@ -112,7 +113,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'invalid_runtime_response',
-              'The Orca runtime returned an invalid response frame.'
+              `The ${APP_DISPLAY_NAME} runtime returned an invalid response frame.`
             )
           })
           return
@@ -139,7 +140,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'invalid_runtime_response',
-              'The Orca runtime returned an invalid response frame.'
+              `The ${APP_DISPLAY_NAME} runtime returned an invalid response frame.`
             )
           })
           return
@@ -160,7 +161,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'invalid_runtime_response',
-              'The Orca runtime returned a mismatched response id.'
+              `The ${APP_DISPLAY_NAME} runtime returned a mismatched response id.`
             )
           })
           return
@@ -170,7 +171,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'runtime_unavailable',
-              'The Orca runtime changed while the request was in flight. Retry the command.'
+              `The ${APP_DISPLAY_NAME} runtime changed while the request was in flight. Retry the command.`
             )
           })
           return

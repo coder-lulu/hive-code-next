@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const safeStorageMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
@@ -41,6 +42,8 @@ describe('ElectronSecretStore', () => {
         const gap = new ElectronSecretStore().describeProtectionGap()
         expect(gap).toMatch(/built-in key/)
         expect(gap).toMatch(/gnome-keyring|kwallet/)
+        expect(gap).toContain(APP_DISPLAY_NAME)
+        expect(gap).not.toMatch(/\bOrca\b/)
       })
     })
 

@@ -405,7 +405,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
     const payloads = write.mock.calls
       .map(([, data]) => data)
       .filter((data): data is string => typeof data === 'string')
-    const pointers = payloads.filter((data) => data.includes('orca orchestration check'))
+    const pointers = payloads.filter((data) => data.includes('hive orchestration check'))
     expect(pointers).toHaveLength(1)
     expect(pointers[0]).toContain('You have 1 orchestration message')
     expect(payloads.some((data) => data.includes('unclaimed status'))).toBe(false)
@@ -450,7 +450,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
     const payloads = write.mock.calls
       .map(([, data]) => data)
       .filter((data): data is string => typeof data === 'string')
-    const pointers = payloads.filter((data) => data.includes('orca orchestration check'))
+    const pointers = payloads.filter((data) => data.includes('hive orchestration check'))
     expect(pointers).toHaveLength(1)
     expect(pointers[0]).toContain('You have 2 orchestration messages')
     expect(payloads.some((data) => data.includes('unclaimed status'))).toBe(false)
@@ -510,7 +510,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
 
       const pointerWrites = () =>
         write.mock.calls.filter(
-          ([, data]) => typeof data === 'string' && data.includes('orca orchestration check')
+          ([, data]) => typeof data === 'string' && data.includes('hive orchestration check')
         )
       expect(pointerWrites()).toHaveLength(1)
       expect(pointerWrites()[0]?.[1]).toContain('You have 1 orchestration message')
@@ -563,7 +563,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
 
       const pointerWrites = () =>
         write.mock.calls.filter(
-          ([, data]) => typeof data === 'string' && data.includes('orca orchestration check')
+          ([, data]) => typeof data === 'string' && data.includes('hive orchestration check')
         )
       expect(pointerWrites()).toHaveLength(1)
       expect(pointerWrites()[0]?.[1]).toContain('You have 1 orchestration message')
@@ -614,13 +614,13 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       runtime.deliverPendingMessagesForHandle(handle)
       expect(
         write.mock.calls.filter(
-          ([, data]) => typeof data === 'string' && data.includes('orca orchestration check')
+          ([, data]) => typeof data === 'string' && data.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       runtime.onPtyData(STALE_PTY_ID, '\x1b]0;Codex working\x07', 200)
       runtime.onPtyData(STALE_PTY_ID, '\x1b]0;Codex done\x07', 201)
       const payloadWrites = write.mock.calls.filter(
-        ([, data]) => typeof data === 'string' && data.includes('orca orchestration check')
+        ([, data]) => typeof data === 'string' && data.includes('hive orchestration check')
       )
       expect(payloadWrites).toHaveLength(2)
       await vi.advanceTimersByTimeAsync(500)

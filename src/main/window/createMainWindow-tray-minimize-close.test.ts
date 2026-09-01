@@ -251,6 +251,12 @@ describe('createMainWindow', () => {
       windowHandlers.close({ preventDefault: vi.fn() } as never)
 
       expect(notificationMock).toHaveBeenCalledTimes(1)
+      expect(notificationMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'HiveCode',
+          body: expect.stringContaining('HiveCode')
+        })
+      )
       expect(notificationShowMock).toHaveBeenCalledTimes(1)
       expect(store.updateUI).toHaveBeenCalledWith({ trayMinimizeNoticeShown: true })
     })

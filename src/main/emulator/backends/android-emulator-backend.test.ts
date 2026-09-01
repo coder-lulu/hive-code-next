@@ -1,14 +1,33 @@
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { spawn } from 'node:child_process'
 import { AndroidEmulatorBackend } from './android-emulator-backend'
 import type { AndroidCommandResult, AndroidCommandRunner } from '../android/android-command-runner'
 import type { AndroidSdkPaths } from '../android/android-sdk-discovery'
+import {
+  AndroidManagedAvdProcesses,
+  type AndroidAvdProcessSpawner
+} from '../android/android-managed-avd-processes'
 
-// The AVD boot spawns the emulator detached (not via the command runner).
+// The managed AVD process reaches node spawn through the shared process runner.
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
-  return { ...actual, spawn: vi.fn(() => ({ on: () => {}, unref: () => {} })) }
+  return { ...actual, spawn: vi.fn() }
 })
+
+function fakeSpawnChild(): ReturnType<typeof spawn> {
+  return Object.assign(new EventEmitter(), {
+    pid: 7_001,
+    stdin: new PassThrough(),
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
+    exitCode: null,
+    signalCode: null,
+    unref: vi.fn(),
+    kill: vi.fn(() => true)
+  }) as unknown as ReturnType<typeof spawn>
+}
 
 const SDK: AndroidSdkPaths = {
   sdkRoot: '/sdk',
@@ -36,6 +55,9 @@ function defaultRunner(): ReturnType<typeof vi.fn> {
     if (binary === SDK.adb && a === '-s emulator-5554 emu avd name') {
       return ok('Pixel_7\nOK')
     }
+    if (binary === SDK.adb && a === '-s emulator-5554 shell getprop sys.boot_completed') {
+      return ok('1')
+    }
     if (binary === SDK.adb && a === '-s emulator-5554 shell wm size') {
       return ok('Physical size: 1080x2400')
     }
@@ -55,6 +77,9 @@ describe('AndroidEmulatorBackend', () => {
   let runner: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
+    vi.mocked(spawn)
+      .mockReset()
+      .mockImplementation(() => fakeSpawnChild())
     runner = defaultRunner()
   })
 
@@ -98,6 +123,40 @@ describe('AndroidEmulatorBackend', () => {
         detail: 'avd',
         isAvailable: true
       }
+    ])
+  })
+
+  it('dedupes a managed AVD when adb cannot answer its name probe', async () => {
+    const managed = new AndroidManagedAvdProcesses(
+      vi.fn(() => fakeSpawnChild()) as unknown as AndroidAvdProcessSpawner,
+      vi.fn(async () => true)
+    )
+    const process = managed.launch(SDK.emulator, 'Pixel_7')
+    managed.bindSerial(process, 'emulator-5554')
+    const probeRunner = vi.fn(async (binary: string, args: readonly string[]) => {
+      const joinedArgs = args.join(' ')
+      if (binary === SDK.adb && joinedArgs === 'devices -l') {
+        return ok(RUNNING_ADB)
+      }
+      if (binary === SDK.emulator && joinedArgs === '-list-avds') {
+        return ok('Pixel_7')
+      }
+      if (joinedArgs === '-s emulator-5554 emu avd name') {
+        return { stdout: '', stderr: 'command timed out', code: 1 }
+      }
+      if (joinedArgs === '-s emulator-5554 shell getprop sys.boot_completed') {
+        return ok('1')
+      }
+      return ok('')
+    })
+    const android = new AndroidEmulatorBackend({
+      runner: probeRunner as unknown as AndroidCommandRunner,
+      sdk: SDK,
+      managedAvds: managed
+    })
+
+    await expect(android.listDevices()).resolves.toEqual([
+      expect.objectContaining({ id: 'emulator-5554', name: 'Pixel_7', state: 'booted' })
     ])
   })
 
@@ -183,7 +242,9 @@ describe('AndroidEmulatorBackend', () => {
 
   it('shuts a device down with adb emu kill', async () => {
     await backend(runner).shutdownDevice('emulator-5554')
-    expect(runner).toHaveBeenCalledWith(SDK.adb, ['-s', 'emulator-5554', 'emu', 'kill'])
+    expect(runner).toHaveBeenCalledWith(SDK.adb, ['-s', 'emulator-5554', 'emu', 'kill'], {
+      timeoutMs: 5_000
+    })
   })
 
   it('installs an apk and grants a permission on the resolved device', async () => {
@@ -223,7 +284,7 @@ describe('AndroidEmulatorBackend', () => {
     let bootStarted = false
     vi.mocked(spawn).mockImplementation(() => {
       bootStarted = true
-      return { on: () => {}, unref: () => {} } as unknown as ReturnType<typeof spawn>
+      return fakeSpawnChild()
     })
     const bootRunner = vi.fn(async (binary: string, args: readonly string[]) => {
       const a = args.join(' ')
@@ -272,5 +333,25 @@ describe('AndroidEmulatorBackend', () => {
     expect(info).toMatchObject({ deviceUdid: 'emulator-5554', streamCodec: 'h264' })
     await android.stopHelperForDevice('emulator-5554')
     expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('disposes every AVD process launched by this backend', async () => {
+    const child = fakeSpawnChild()
+    const terminateTree = vi.fn(async () => true)
+    const managed = new AndroidManagedAvdProcesses(
+      vi.fn(() => child) as unknown as AndroidAvdProcessSpawner,
+      terminateTree
+    )
+    managed.launch(SDK.emulator, 'Pixel_7')
+    const android = new AndroidEmulatorBackend({
+      runner: runner as unknown as AndroidCommandRunner,
+      sdk: SDK,
+      managedAvds: managed
+    })
+
+    await android.dispose()
+
+    expect(terminateTree).toHaveBeenCalledOnce()
+    expect(terminateTree).toHaveBeenCalledWith(child)
   })
 })

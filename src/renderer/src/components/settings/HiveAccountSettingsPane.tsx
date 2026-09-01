@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Check, CircleUserRound, KeyRound, Laptop, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import type { HiveAccountErrorCode, HiveAccountState } from '../../../../shared/hive-account'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import type {
+  HiveAccountErrorCode,
+  HiveAccountLoginProviderId,
+  HiveAccountState
+} from '../../../../shared/hive-account'
 import { translate } from '@/i18n/i18n'
-import { HiveAccountSignOutConfirmDialog } from './HiveAccountSignOutConfirmDialog'
+import { useAppStore } from '@/store'
+import {
+  HiveAccountSettingsContent,
+  type HiveAccountPlatformInfo
+} from './HiveAccountSettingsContent'
 import { HiveAccountSignInConfirmDialog } from './HiveAccountSignInConfirmDialog'
+import { HiveAccountSignOutConfirmDialog } from './HiveAccountSignOutConfirmDialog'
+import { useHiveAccountLoginProviders } from './use-hive-account-login-providers'
+
+const NOOP = (): void => undefined
 
 function errorCopy(error: HiveAccountErrorCode | undefined): string {
   switch (error) {
@@ -23,7 +32,7 @@ function errorCopy(error: HiveAccountErrorCode | undefined): string {
     case 'session_expired':
       return translate(
         'auto.components.settings.orcaAccount.sessionExpired',
-        'This session has expired. Refresh it or sign in again.'
+        'This session has expired. Sign in again.'
       )
     case 'network_unavailable':
       return translate(
@@ -59,54 +68,28 @@ function errorCopy(error: HiveAccountErrorCode | undefined): string {
   }
 }
 
-function statusCopy(state: HiveAccountState | null): string {
-  if (!state) {
-    return translate(
-      'auto.components.settings.orcaAccount.checking',
-      'Checking HiveCloud account status…'
-    )
-  }
-  if (state.status === 'unconfigured') {
-    return (
-      state.setupMessage ??
-      translate(
-        'auto.components.settings.orcaAccount.unavailable',
-        'HiveCloud sign-in is unavailable.'
-      )
-    )
-  }
-  if (state.status === 'error') {
-    return errorCopy(state.errorCode)
-  }
-  if (state.status === 'signed-in') {
-    return state.errorCode
-      ? errorCopy(state.errorCode)
-      : translate(
-          'auto.components.settings.orcaAccount.connectedDescription',
-          'This desktop is securely linked to HiveCloud.'
-        )
-  }
-  return translate(
-    'auto.components.settings.orcaAccount.signedOut',
-    'Sign in with an existing HiveCloud account. Local projects and provider accounts stay separate.'
-  )
-}
-
-function expiresCopy(expiresAt: number | undefined): string {
-  if (!expiresAt) {
-    return translate('auto.components.settings.orcaAccount.unknown', 'Unknown')
-  }
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(expiresAt)
-  )
-}
-
-export function HiveAccountSettingsPane(): React.JSX.Element {
+export function HiveAccountSettingsPane({
+  onOpenRuntimeDetails = NOOP
+}: {
+  onOpenRuntimeDetails?: () => void
+}): React.JSX.Element {
   const [state, setState] = useState<HiveAccountState | null>(null)
-  const [busy, setBusy] = useState<'sign-in' | 'refresh' | 'sign-out' | null>(null)
+  const [busy, setBusy] = useState<'sign-in' | 'refresh' | 'sign-out' | 'claim' | null>(null)
   const [signInOpen, setSignInOpen] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
-  const connected = state?.status === 'signed-in'
+  const [platformInfo] = useState<HiveAccountPlatformInfo | null>(() => {
+    try {
+      const info = window.api.platform?.get()
+      return info ? { platform: info.platform, osRelease: info.osRelease, arch: info.arch } : null
+    } catch {
+      return null
+    }
+  })
+  const { providers: loginProviders, clearProviders } = useHiveAccountLoginProviders(signInOpen)
+  const directory = useAppStore((store) => store.accountRuntimeDirectory)
+  const ownership = useAppStore((store) => store.localRuntimeOwnership)
+  const refreshAccountRuntimeCloud = useAppStore((store) => store.refreshAccountRuntimeCloud)
+  const claimLocalRuntimeForAccount = useAppStore((store) => store.claimLocalRuntimeForAccount)
   const secureStorageBlocked =
     state?.errorCode === 'secure_storage_unavailable' ||
     state?.errorCode === 'credential_unreadable'
@@ -114,15 +97,22 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
 
   useEffect(() => {
     let active = true
+    let receivedLiveState = false
+    const unsubscribeAccountState = window.api.hiveAccount.onStateChanged((next) => {
+      if (active) {
+        receivedLiveState = true
+        setState(next)
+      }
+    })
     void window.api.hiveAccount
       .getState()
       .then((next) => {
-        if (active) {
+        if (active && !receivedLiveState) {
           setState(next)
         }
       })
       .catch(() => {
-        if (active) {
+        if (active && !receivedLiveState) {
           setState({
             configured: true,
             status: 'error',
@@ -131,32 +121,36 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
           })
         }
       })
-    const unsubscribeAccountState = window.api.hiveAccount.onStateChanged((next) => {
-      if (active) {
-        setState(next)
-      }
-    })
     return () => {
       active = false
       unsubscribeAccountState()
     }
   }, [])
 
-  const signIn = async (sessionProfile: 'TEMPORARY' | 'TRUSTED'): Promise<void> => {
+  const openSignIn = (): void => {
+    clearProviders()
+    setSignInOpen(true)
+  }
+
+  const signIn = async (
+    sessionProfile: 'TEMPORARY' | 'TRUSTED',
+    providerId?: HiveAccountLoginProviderId
+  ): Promise<void> => {
     if (busy) {
       return
     }
     setBusy('sign-in')
     try {
-      const result = await window.api.hiveAccount.signIn({ sessionProfile })
+      const result = await window.api.hiveAccount.signIn(
+        providerId ? { sessionProfile, providerId } : { sessionProfile }
+      )
       setState(result.state)
       if (result.status === 'signed-in') {
         setSignInOpen(false)
         toast.success(
           translate('auto.components.settings.orcaAccount.signedInToast', 'Signed in to HiveCloud')
         )
-      }
-      if (result.status === 'failed') {
+      } else if (result.status === 'failed') {
         toast.error(errorCopy(result.state.errorCode))
       }
     } finally {
@@ -217,19 +211,55 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
     }
     setBusy('refresh')
     try {
-      const result = await window.api.hiveAccount.refresh()
-      setState(result.state)
-      if (result.status === 'refreshed') {
-        toast.success(
+      const [accountResult, runtimeResult] = await Promise.allSettled([
+        window.api.hiveAccount.refresh(),
+        refreshAccountRuntimeCloud()
+      ])
+      if (accountResult.status === 'fulfilled') {
+        setState(accountResult.value.state)
+        if (accountResult.value.status === 'failed') {
+          toast.error(errorCopy(accountResult.value.state.errorCode))
+        }
+      }
+      if (accountResult.status === 'rejected' || runtimeResult.status === 'rejected') {
+        toast.error(
           translate(
-            'auto.components.settings.orcaAccount.refreshedToast',
-            'HiveCloud session refreshed'
+            'auto.components.settings.orcaAccount.connectionCheckFailed',
+            'Connection status could not be fully updated.'
           )
         )
       }
-      if (result.status === 'failed') {
-        toast.error(errorCopy(result.state.errorCode))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const claimRuntime = async (): Promise<void> => {
+    const expectedAccountId = state?.account?.accountId
+    if (busy || !expectedAccountId) {
+      return
+    }
+    setBusy('claim')
+    try {
+      const result = await claimLocalRuntimeForAccount(expectedAccountId)
+      if (result.accountId !== expectedAccountId) {
+        throw new Error('hive_runtime_cloud_account_changed')
       }
+      if (result.relation === 'CLAIMED_BY_CURRENT') {
+        toast.success(
+          translate(
+            'auto.components.settings.orcaAccount.runtimeClaimedToast',
+            'Runtime linked to this HiveCloud account'
+          )
+        )
+      }
+    } catch {
+      toast.error(
+        translate(
+          'auto.components.settings.orcaAccount.runtimeClaimFailed',
+          'This Runtime could not be linked. Check the connection and try again.'
+        )
+      )
     } finally {
       setBusy(null)
     }
@@ -248,7 +278,7 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
         toast.warning(
           translate(
             'auto.components.settings.orcaAccount.localSignOutToast',
-            'Signed out locally. Revoke the remote session from HiveCloud Security when online.'
+            'Signed out on this device, but cloud session revocation is not yet confirmed. You can finish it later in HiveCloud Security.'
           )
         )
       } else {
@@ -266,103 +296,19 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <CircleUserRound className="size-5" />
-          </div>
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium">
-                {state?.account?.displayName ||
-                  translate('auto.components.settings.orcaAccount.account', 'HiveCloud account')}
-              </p>
-              {connected ? (
-                <Badge variant="outline" className="text-[11px] text-muted-foreground">
-                  <Check />
-                  {translate('auto.components.settings.orcaAccount.connected', 'Connected')}
-                </Badge>
-              ) : null}
-            </div>
-            <p className="text-xs leading-5 text-muted-foreground">{statusCopy(state)}</p>
-          </div>
-          {connected ? (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy !== null}
-                onClick={() => void refresh()}
-              >
-                <RefreshCw className={busy === 'refresh' ? 'animate-spin' : undefined} />
-                {translate('auto.components.settings.orcaAccount.refresh', 'Refresh')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy !== null}
-                onClick={() => setSignOutOpen(true)}
-              >
-                {translate('auto.components.settings.orcaAccount.signOut', 'Sign out')}
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              disabled={!canSignIn || busy !== null}
-              onClick={() => setSignInOpen(true)}
-            >
-              {busy === 'sign-in'
-                ? translate('auto.components.settings.orcaAccount.signingIn', 'Signing in…')
-                : translate('auto.components.settings.orcaAccount.signIn', 'Sign in to HiveCloud')}
-            </Button>
-          )}
-        </div>
-
-        {connected ? (
-          <div className="grid gap-4 border-t border-border/60 pt-5 md:grid-cols-2">
-            <div className="flex items-start gap-3">
-              <Laptop className="mt-0.5 size-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">
-                  {translate('auto.components.settings.orcaAccount.device', 'Device')}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {state.deviceLabel ??
-                    translate('auto.components.settings.orcaAccount.defaultDevice', 'Desktop')}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <KeyRound className="mt-0.5 size-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">
-                  {translate(
-                    'auto.components.settings.orcaAccount.sessionExpires',
-                    'Sign-in authorization valid until'
-                  )}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {expiresCopy(state.sessionExpiresAt)} ·{' '}
-                  {state.sessionProfile === 'TRUSTED'
-                    ? translate(
-                        'auto.components.settings.orcaAccount.trustedSession',
-                        'Trusted device'
-                      )
-                    : translate(
-                        'auto.components.settings.orcaAccount.temporarySession',
-                        'Temporary device'
-                      )}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
+      <HiveAccountSettingsContent
+        state={state}
+        directory={directory}
+        ownership={ownership}
+        platformInfo={platformInfo}
+        busy={busy}
+        canSignIn={canSignIn}
+        onSignIn={openSignIn}
+        onRefresh={() => void refresh()}
+        onClaimRuntime={() => void claimRuntime()}
+        onOpenRuntimeDetails={onOpenRuntimeDetails}
+        onSignOut={() => setSignOutOpen(true)}
+      />
       <HiveAccountSignOutConfirmDialog
         open={signOutOpen}
         onOpenChange={setSignOutOpen}
@@ -371,11 +317,17 @@ export function HiveAccountSettingsPane(): React.JSX.Element {
       />
       <HiveAccountSignInConfirmDialog
         open={signInOpen}
-        onOpenChange={setSignInOpen}
-        onConfirm={(sessionProfile) => void signIn(sessionProfile)}
+        onOpenChange={(open) => {
+          setSignInOpen(open)
+          if (!open) {
+            clearProviders()
+          }
+        }}
+        onConfirm={(sessionProfile, providerId) => void signIn(sessionProfile, providerId)}
         onSmsStart={startSmsSignIn}
         onSmsCancel={cancelSmsSignIn}
         onSmsComplete={completeSmsSignIn}
+        providers={loginProviders}
         signingIn={busy === 'sign-in'}
       />
     </>

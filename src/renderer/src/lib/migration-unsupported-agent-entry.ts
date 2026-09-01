@@ -2,6 +2,7 @@ import type {
   AgentStatusEntry,
   MigrationUnsupportedPtyEntry
 } from '../../../shared/agent-status-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const cachedMigrationUnsupportedEntries = new WeakMap<
   MigrationUnsupportedPtyEntry,
@@ -30,8 +31,7 @@ export function migrationUnsupportedToAgentStatusEntry(
         paneKey: entry.paneKey,
         terminalTitle: 'Migration unsupported',
         stateHistory: [],
-        lastAssistantMessage:
-          'Restart this terminal so Orca can attach a stable UUID pane key to agent hooks.'
+        lastAssistantMessage: `Restart this terminal so ${APP_DISPLAY_NAME} can attach a stable UUID pane key to agent hooks.`
       }
 
   cachedMigrationUnsupportedEntries.set(entry, converted)

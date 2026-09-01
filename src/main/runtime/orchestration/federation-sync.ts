@@ -4,6 +4,7 @@ import {
   type MessageType,
   type WorkerReportOutcome
 } from './types'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { FederatedLifecycleSettlement } from './federation-lifecycle-settlement'
 import { ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION } from '../../../shared/protocol-version'
@@ -68,7 +69,7 @@ async function syncFederatedDispatchPages(
   if (currentServer.peerFingerprint !== federated.peer_fingerprint) {
     throw new OrchestrationError(
       'peer_changed',
-      `Saved environment ${federated.environment_name} now identifies a different Orca server.`
+      `Saved environment ${federated.environment_name} now identifies a different ${APP_DISPLAY_NAME} server.`
     )
   }
   const ackLease = acquireFederationAckLease(runtime, dispatchId)

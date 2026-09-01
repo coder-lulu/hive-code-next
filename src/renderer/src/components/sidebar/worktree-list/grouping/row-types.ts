@@ -22,8 +22,15 @@ export type GroupHeaderRow = {
   tone: string
   icon?: React.ComponentType<{ className?: string }>
   repo?: Repo
-  projectGroup?: ProjectGroup | { id: null; name: 'Ungrouped'; tabOrder: number }
+  /** Null id is the derived ungrouped space; it is intentionally not persisted. */
+  projectGroup?: ProjectGroup | { id: null; name: string; tabOrder: number }
   projectGroupDepth?: number
+  /**
+   * A project-group header can be backed by Git repositories, folder workspaces,
+   * or both.  The header plus creates a Git worktree whenever a repository
+   * source exists, so stale folder-path state must not disable that action.
+   */
+  hasRepositorySource?: boolean
   hostId?: ExecutionHostId
   hostWorktreeCounts?: ReadonlyMap<ExecutionHostId, number>
   hostWorktreeIds?: ReadonlyMap<ExecutionHostId, readonly string[]>

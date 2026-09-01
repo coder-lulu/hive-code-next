@@ -224,10 +224,8 @@ export function createTerminalPaneHibernationActions(
           }
         }
         const nextUnreadTerminalPanes = { ...s.unreadTerminalPanes }
-        const nextUnreadAgentCompletionPanes = { ...s.unreadAgentCompletionPanes }
         const nextLastTerminalInputAtByPaneKey = { ...s.lastTerminalInputAtByPaneKey }
         delete nextUnreadTerminalPanes[opts.paneKey]
-        delete nextUnreadAgentCompletionPanes[opts.paneKey]
         delete nextLastTerminalInputAtByPaneKey[opts.paneKey]
         return {
           tabsByWorktree: nextTabsByWorktree,
@@ -245,7 +243,6 @@ export function createTerminalPaneHibernationActions(
             ? { runtimePaneTitlesByTabId: nextRuntimePaneTitlesByTabId }
             : {}),
           unreadTerminalPanes: nextUnreadTerminalPanes,
-          unreadAgentCompletionPanes: nextUnreadAgentCompletionPanes,
           lastTerminalInputAtByPaneKey: nextLastTerminalInputAtByPaneKey
         }
       })

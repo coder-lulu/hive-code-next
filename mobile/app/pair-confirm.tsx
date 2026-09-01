@@ -25,6 +25,7 @@ import {
   startPreProfilePairing,
   type PreProfilePairingAttempt
 } from '../src/transport/pre-profile-pairing-coordinator'
+import { recoverMobileRelayPairing } from '../src/transport/mobile-relay-pairing-recovery'
 import { useRefreshHostClient } from '../src/transport/client-context'
 import type { ConnectionLogEntry } from '../src/transport/types'
 
@@ -45,6 +46,7 @@ export default function PairConfirmScreen() {
   const logsRef = useRef<ConnectionLogEntry[]>([])
   const mountedRef = useRef(true)
   const activePairingAttemptRef = useRef<PreProfilePairingAttempt | null>(null)
+  const pairingGenerationRef = useRef(0)
 
   const routeState = resolvePairConfirmRouteState(params.code)
   const offer = routeState.offer
@@ -56,6 +58,7 @@ export default function PairConfirmScreen() {
       : errorMessage
 
   const cancel = useCallback(() => {
+    pairingGenerationRef.current += 1
     activePairingAttemptRef.current?.dispose()
     activePairingAttemptRef.current = null
     router.replace('/')
@@ -78,6 +81,7 @@ export default function PairConfirmScreen() {
     }
     activePairingAttemptRef.current?.dispose()
     activePairingAttemptRef.current = null
+    pairingGenerationRef.current += 1
     mountedRef.current = false
   }, [])
 
@@ -90,13 +94,38 @@ export default function PairConfirmScreen() {
     logsRef.current = []
     setLogs([])
     activePairingAttemptRef.current?.dispose()
+    const pairingGeneration = ++pairingGenerationRef.current
+    const pairingIsCurrent = () =>
+      mountedRef.current && pairingGenerationRef.current === pairingGeneration
+
+    let recovery
+    try {
+      recovery = await recoverMobileRelayPairing()
+    } catch (error) {
+      if (pairingIsCurrent()) {
+        console.warn('[pair-confirm] pairing recovery failed', error)
+        setStatus('error')
+        setErrorMessage(
+          `无法恢复上一次配对：${error instanceof Error ? error.message : String(error)}`
+        )
+      }
+      return
+    }
+    if (!pairingIsCurrent()) {
+      return
+    }
+    if (recovery === 'deferred') {
+      setStatus('error')
+      setErrorMessage('上一次配对仍在安全恢复中，请检查网络后重试。')
+      return
+    }
 
     const attempt = startPreProfilePairing({
       offer,
       timeoutMs: PAIRING_OVERALL_TIMEOUT_MS,
       connectOptions: {
         onLog: (entry) => {
-          if (!mountedRef.current || activePairingAttemptRef.current !== attempt) {
+          if (!pairingIsCurrent() || activePairingAttemptRef.current !== attempt) {
             return
           }
           logsRef.current = [...logsRef.current, entry]
@@ -107,28 +136,28 @@ export default function PairConfirmScreen() {
     activePairingAttemptRef.current = attempt
     try {
       const { hostId } = await attempt.result
-      const attemptIsCurrent = activePairingAttemptRef.current === attempt
+      const attemptIsCurrent = pairingIsCurrent() && activePairingAttemptRef.current === attempt
       attempt.dispose()
       if (activePairingAttemptRef.current === attempt) {
         activePairingAttemptRef.current = null
       }
-      if (!mountedRef.current || !attemptIsCurrent) {
+      if (!attemptIsCurrent) {
         return
       }
       refreshHostClient(hostId)
       const onboardingSteps = await loadMobileOnboardingSteps()
-      if (!mountedRef.current) {
+      if (!pairingIsCurrent()) {
         return
       }
       router.replace(mobileOnboardingDestination(onboardingSteps, hostId))
     } catch (error) {
       const timedOut = attempt.timedOut
-      const attemptIsCurrent = activePairingAttemptRef.current === attempt
+      const attemptIsCurrent = pairingIsCurrent() && activePairingAttemptRef.current === attempt
       attempt.dispose()
       if (activePairingAttemptRef.current === attempt) {
         activePairingAttemptRef.current = null
       }
-      if (!mountedRef.current || !attemptIsCurrent) {
+      if (!attemptIsCurrent) {
         return
       }
       console.warn('[pair-confirm] connect failed', error)

@@ -1,6 +1,10 @@
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { HiveRuntimeCloudWebLaunchConfig } from './hive-runtime-cloud-config'
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
+import {
+  getHiveRuntimeDeviceInfoSnapshot,
+  type HiveRuntimeDeviceInfo
+} from './hive-runtime-device-info'
 
 const WEB_ENDPOINT_TTL_MS = 75_000
 
@@ -25,7 +29,8 @@ export function createHiveRuntimeCloudReport(
   runtime: RuntimeReportSource,
   runtimeVersion: string,
   webLaunch?: HiveRuntimeCloudWebLaunchConfig,
-  now: () => number = Date.now
+  now: () => number = Date.now,
+  deviceInfo: HiveRuntimeDeviceInfo = getHiveRuntimeDeviceInfoSnapshot()
 ): HiveRuntimeCloudReport {
   const status = runtime.getStatus()
   return {
@@ -37,6 +42,7 @@ export function createHiveRuntimeCloudReport(
     ...readiness(status),
     startedAt: new Date(runtime.getStartedAt()).toISOString(),
     connectionCapabilities: ['orca-direct'],
+    ...deviceInfo,
     ...(webLaunch
       ? {
           webHttpsOrigin: webLaunch.publicOrigin,

@@ -1,4 +1,5 @@
 import type { AgentSessionPtyWriteRefusal } from './agent-session-pty-write-admission'
+import { PRIMARY_CLI_COMMAND } from './brand'
 
 export function structuredChatPtyWriteRefusalCopy(
   refusal: AgentSessionPtyWriteRefusal,
@@ -8,6 +9,6 @@ export function structuredChatPtyWriteRefusalCopy(
     return null
   }
   return action === 'worker-start'
-    ? 'The target terminal is in Structured Chat. Switch it to Terminal, then retry `orca orchestration worker-start`.'
-    : 'The target terminal is in Structured Chat. Switch it to Terminal, then retry `orca terminal send`.'
+    ? `The target terminal is in Structured Chat. Switch it to Terminal, then retry \`${PRIMARY_CLI_COMMAND} orchestration worker-start\`.`
+    : `The target terminal is in Structured Chat. Switch it to Terminal, then retry \`${PRIMARY_CLI_COMMAND} terminal send\`.`
 }

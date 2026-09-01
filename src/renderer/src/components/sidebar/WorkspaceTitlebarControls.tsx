@@ -86,7 +86,11 @@ export const WorkspaceTitlebarControls = React.memo(function WorkspaceTitlebarCo
             <Kanban className="size-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={6}>
+        <TooltipContent
+          side="bottom"
+          sideOffset={6}
+          className="border border-border bg-popover text-popover-foreground shadow-md"
+        >
           {movedHintOpen
             ? translate(
                 'auto.components.sidebar.SidebarToolbar.87d0064026',

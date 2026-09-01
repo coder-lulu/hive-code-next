@@ -84,7 +84,11 @@ function isLaunchConfig(value: unknown): value is SleepingAgentLaunchConfig {
     (config.agentCommand === undefined || typeof config.agentCommand === 'string') &&
     typeof config.agentArgs === 'string' &&
     isStringRecord(config.agentEnv) &&
-    (config.ompResumeFilePath === undefined || isNonEmptyString(config.ompResumeFilePath))
+    (config.ompResumeFilePath === undefined || isNonEmptyString(config.ompResumeFilePath)) &&
+    (config.hostDefaultsAuthoritative === undefined || config.hostDefaultsAuthoritative === true) &&
+    (config.agentPermissionMode === undefined ||
+      config.agentPermissionMode === 'manual' ||
+      config.agentPermissionMode === 'yolo')
   )
 }
 

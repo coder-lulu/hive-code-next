@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 const sources = {
   picker: readFileSync(fileURLToPath(new URL('./PickerModal.tsx', import.meta.url)), 'utf8'),
-  customKey: readFileSync(fileURLToPath(new URL('./CustomKeyModal.tsx', import.meta.url)), 'utf8'),
+  customKey: [
+    readFileSync(fileURLToPath(new URL('./CustomKeyModal.tsx', import.meta.url)), 'utf8'),
+    readFileSync(fileURLToPath(new URL('./custom-key-modal-styles.ts', import.meta.url)), 'utf8')
+  ].join('\n'),
   dragReorder: readFileSync(
     fileURLToPath(new URL('./DragReorderList.tsx', import.meta.url)),
     'utf8'

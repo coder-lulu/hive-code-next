@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import { abortSignalReason } from './abort-signal-reason'
+import { APP_DISPLAY_NAME } from './brand'
 import type { PairingOffer } from './pairing'
 import { scheduleOrphanedRemoteRuntimeSocketClose } from './remote-runtime-abort-orphaned-socket'
 import { decrypt, encrypt } from './e2ee-crypto'
@@ -36,6 +37,7 @@ import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabil
 import type { RuntimeCapability } from './protocol-version'
 type ConnectionState = 'closed' | 'awaiting_ready' | 'awaiting_authenticated' | 'ready'
 const IDLE_CLOSE_MS = 60_000
+const INVALID_FRAME_MESSAGE = `Remote ${APP_DISPLAY_NAME} runtime returned an undecryptable frame.`
 
 export class RemoteRuntimeRequestConnection {
   private state: ConnectionState = 'closed'
@@ -207,9 +209,7 @@ export class RemoteRuntimeRequestConnection {
     }
     const plaintext = decrypt(frame, sharedKey)
     if (plaintext === null) {
-      this.close(
-        invalidRemoteRuntimeResponseError('Remote Orca runtime returned an undecryptable frame.')
-      )
+      this.close(invalidRemoteRuntimeResponseError(INVALID_FRAME_MESSAGE))
       return
     }
 

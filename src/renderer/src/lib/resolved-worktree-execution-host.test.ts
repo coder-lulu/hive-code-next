@@ -8,6 +8,12 @@ describe('getResolvedExecutionHostIdForWorktree', () => {
     expect(getResolvedExecutionHostIdForWorktree({}, undefined)).toBeNull()
   })
 
+  it('treats a canonical host-qualified bucket as explicit ownership', () => {
+    expect(
+      getResolvedExecutionHostIdForWorktree({}, 'runtime:cloud-a|global-floating-terminal')
+    ).toBe('runtime:cloud-a')
+  })
+
   it('requires a hydrated worktree before treating a matching local repo row as authoritative', () => {
     expect(
       getResolvedExecutionHostIdForWorktree(

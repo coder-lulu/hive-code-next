@@ -13,6 +13,12 @@ import {
 } from './external-chromium-browser-process'
 import { resolveOrcadAgentBrowserBinary } from './orcad-agent-browser-binary'
 import { ElectronServeBrowserProcess } from './electron-serve-browser-process'
+import {
+  APP_DISPLAY_NAME,
+  CLI_COMPATIBILITY_ALIASES,
+  PRIMARY_CLI_COMMAND,
+  PRODUCT_CONFIG
+} from '../../shared/brand'
 
 export type OrcadBrowserProvider = {
   kind: 'electron' | 'chromium'
@@ -65,6 +71,15 @@ export function installedElectronCandidates(
   const joinPath = platform === 'win32' ? win32.join : posix.join
   if (platform === 'darwin') {
     return [
+      `/Applications/${APP_DISPLAY_NAME}.app/Contents/MacOS/${PRODUCT_CONFIG.desktop.executableName}`,
+      joinPath(
+        homePath,
+        'Applications',
+        `${APP_DISPLAY_NAME}.app`,
+        'Contents',
+        'MacOS',
+        PRODUCT_CONFIG.desktop.executableName
+      ),
       '/Applications/Orca.app/Contents/MacOS/Orca',
       joinPath(homePath, 'Applications', 'Orca.app', 'Contents', 'MacOS', 'Orca')
     ]
@@ -72,15 +87,37 @@ export function installedElectronCandidates(
   if (platform === 'win32') {
     return [
       ...(environment.LOCALAPPDATA
-        ? [joinPath(environment.LOCALAPPDATA, 'Programs', 'Orca', 'Orca.exe')]
+        ? [
+            joinPath(
+              environment.LOCALAPPDATA,
+              'Programs',
+              APP_DISPLAY_NAME,
+              `${PRODUCT_CONFIG.desktop.executableName}.exe`
+            ),
+            joinPath(environment.LOCALAPPDATA, 'Programs', 'Orca', 'Orca.exe')
+          ]
         : []),
-      ...(environment.ProgramFiles ? [joinPath(environment.ProgramFiles, 'Orca', 'Orca.exe')] : [])
+      ...(environment.ProgramFiles
+        ? [
+            joinPath(
+              environment.ProgramFiles,
+              APP_DISPLAY_NAME,
+              `${PRODUCT_CONFIG.desktop.executableName}.exe`
+            ),
+            joinPath(environment.ProgramFiles, 'Orca', 'Orca.exe')
+          ]
+        : [])
     ]
   }
+  const launcherNames = [
+    PRIMARY_CLI_COMMAND,
+    ...CLI_COMPATIBILITY_ALIASES.filter((alias) => alias !== 'orca')
+  ]
   return [
-    joinPath(homePath, '.local', 'bin', 'orca-ide'),
-    '/usr/local/bin/orca-ide',
-    '/usr/bin/orca-ide',
+    ...launcherNames.map((name) => joinPath(homePath, '.local', 'bin', name)),
+    ...launcherNames.map((name) => joinPath('/usr/local/bin', name)),
+    ...launcherNames.map((name) => joinPath('/usr/bin', name)),
+    joinPath('/opt', APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND),
     '/opt/Orca/orca-ide'
   ]
 }

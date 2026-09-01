@@ -8,7 +8,7 @@ name: Cut Release
 # Flow:
 #   1. Resolve `ref` to a SHA.
 #   2. Read the latest stable release from GitHub.
-#   3. Compute the next version from `kind` (rc | patch | minor | major).
+#   3. Compute the next version from `kind` (beta | patch | minor | major).
 #   4. For stable kinds, REFUSE if the new version is <= the latest stable.
 #      This is the only guard electron-updater actually needs — it compares
 #      semver within a channel, so a regressing "latest" is the one thing
@@ -25,9 +25,9 @@ on:
         description: Release kind
         required: true
         type: choice
-        default: rc
+        default: beta
         options:
-          - rc
+          - beta
           - patch
           - minor
           - major
@@ -42,12 +42,12 @@ on:
         default: false
         type: boolean
       version_suffix:
-        description: Extra prerelease identifier appended to an rc version (e.g. "perf" -> 1.2.3-rc.4.perf). Applies to kind=rc, or to an explicit version that is a bare X.Y.Z-rc.N.
+        description: Legacy RC suffix input; new HiveCode releases use beta.N and ignore this field.
         required: false
         type: string
         default: ''
       version:
-        description: Exact version to cut (e.g. 1.4.155 or 1.4.155-rc.4), bypassing kind-based computation. Use to leapfrog a deleted/rolled-back stable that regressed the release list. Must be greater than the latest published stable, and an -rc.N must be above the highest RC already cut for its own base.
+        description: Exact version to cut (e.g. 1.5.0-beta.1, 1.4.155, or 1.4.155-rc.4), bypassing kind-based computation. Use to leapfrog a deleted/rolled-back stable that regressed the release list. Must be greater than the latest published stable, and a prerelease number must be above the highest matching prerelease already cut for its own base.
         required: false
         type: string
         default: ''
@@ -329,10 +329,10 @@ jobs:
         # Why: if an RC run only had complete drafts to publish, stop there
         # instead of immediately cutting another RC after the recovered one.
         # Stable dispatches should still cut the requested stable release.
-        if: steps.window.outputs.allowed == 'true' && steps.existing.outputs.already_ran != 'true' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) && !((github.event_name == 'schedule' || inputs.kind == 'rc') && steps.publish_drafts.outputs.published_count != '0' && steps.publish_drafts.outputs.skipped_count == '0')
+        if: steps.window.outputs.allowed == 'true' && steps.existing.outputs.already_ran != 'true' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) && !((github.event_name == 'schedule' || inputs.kind == 'beta') && steps.publish_drafts.outputs.published_count != '0' && steps.publish_drafts.outputs.skipped_count == '0')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KIND: ${{ github.event_name == 'schedule' && 'rc' || inputs.kind }}
+          KIND: ${{ github.event_name == 'schedule' && 'beta' || inputs.kind }}
           VERSION_SUFFIX: ${{ github.event_name == 'schedule' && '' || inputs.version_suffix }}
           EXPLICIT_VERSION: ${{ github.event_name == 'schedule' && '' || inputs.version }}
         run: |
@@ -395,6 +395,19 @@ jobs:
 
           highest_rc_for_base() {
             node config/scripts/release-rc-history.mjs "$1"
+          }
+
+          highest_beta_for_base() {
+            local base="$1"
+            local highest=""
+            local tag suffix
+            while IFS= read -r tag; do
+              suffix="${tag#v${base}-beta.}"
+              if [[ "$suffix" =~ ^(0|[1-9][0-9]{0,8})$ ]] && [[ -z "$highest" || "$suffix" -gt "$highest" ]]; then
+                highest="$suffix"
+              fi
+            done < <(git for-each-ref --format='%(refname:short)' "refs/tags/v${base}-beta.*")
+            printf '%s' "$highest"
           }
 
           require_valid_version_suffix() {
@@ -522,8 +535,16 @@ jobs:
           # human assert the exact target (e.g. leapfrog to 1.4.155); the
           # updater-safety gate and tag-collision recovery below still apply.
           new=""
+          if [[ "$KIND" == "rc" ]]; then
+            echo "::error::New RC releases are disabled; use kind=beta or an explicit X.Y.Z-beta.N version." >&2
+            exit 1
+          fi
           if [[ -n "${EXPLICIT_VERSION:-}" ]]; then
             explicit="${EXPLICIT_VERSION#v}"
+            if [[ "$explicit" == *-rc.* ]]; then
+              echo "::error::New RC releases are disabled; legacy -rc.N versions are accepted only for update compatibility." >&2
+              exit 1
+            fi
             # Why the optional trailing identifier: it lets an operator name a
             # suffixed side-branch RC (X.Y.Z-rc.N.perf) directly, the same shape
             # the rc path cuts. Note this only ever admits one *above* the
@@ -542,8 +563,8 @@ jobs:
             # at 1e20 forever, and every later cut wraps to a *lower* rc that
             # sorts below it, so the fleet never updates again. Nine digits is
             # far above any real series and exact in bash math either way.
-            if [[ ! "$explicit" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.(0|[1-9][0-9]{0,8})(\.[0-9A-Za-z]+)?)?$ ]]; then
-              echo "::error::version must be X.Y.Z, X.Y.Z-rc.N, or X.Y.Z-rc.N.suffix, got: $EXPLICIT_VERSION" >&2
+            if [[ ! "$explicit" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.(0|[1-9][0-9]{0,8})|-rc\.(0|[1-9][0-9]{0,8})(\.[0-9A-Za-z]+)?)?$ ]]; then
+              echo "::error::version must be X.Y.Z, X.Y.Z-beta.N, X.Y.Z-rc.N, or X.Y.Z-rc.N.suffix, got: $EXPLICIT_VERSION" >&2
               exit 1
             fi
             # Why route the embedded identifier through the same validator the
@@ -581,6 +602,15 @@ jobs:
                 exit 1
               fi
             fi
+            if [[ "$explicit" == *-beta.* ]]; then
+              explicit_base="${explicit%%-*}"
+              explicit_beta="${explicit#*-beta.}"
+              highest_explicit_beta="$(highest_beta_for_base "$explicit_base")"
+              if [[ -n "$highest_explicit_beta" && "$explicit_beta" -le "$highest_explicit_beta" ]]; then
+                echo "::error::Refusing explicit version $explicit: beta.$explicit_beta is not above beta.$highest_explicit_beta, the highest already cut for $explicit_base." >&2
+                exit 1
+              fi
+            fi
             new="$explicit"
             # Why here too: the suffix append below lives in the kind path the
             # override skips, so an operator passing both inputs used to get
@@ -602,6 +632,17 @@ jobs:
 
           if [[ -z "$new" ]]; then
           case "$KIND" in
+            beta)
+              # Unified HiveCode prereleases start on the next minor line;
+              # beta numbers begin at 1 and advance monotonically per base.
+              base="$(bump "$latest_stable" minor)"
+              highest_beta="$(highest_beta_for_base "$base")"
+              if [[ -z "$highest_beta" ]]; then
+                new="${base}-beta.1"
+              else
+                new="${base}-beta.$((highest_beta + 1))"
+              fi
+              ;;
             rc)
               # Why: RCs always stabilize the *next* patch after whatever
               # is currently published as stable. Earlier logic tried to
@@ -822,9 +863,13 @@ jobs:
     if: github.repository == 'stablyai/orca' && needs.cut.outputs.should_release == 'true'
     name: golden e2e ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
     env:
+      # HiveCloud owns the per-platform monotonic build number. Keep one value
+      # across the desktop matrix so x64/arm64 artifacts share an identity.
+      HIVECODE_BUILD_NUMBER: ${{ vars.HIVECODE_DESKTOP_BUILD_NUMBER }}
+      HIVECODE_COMMIT_SHA: ${{ needs.cut.outputs.source_sha }}
       NODE_OPTIONS: --max-old-space-size=4096
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -1143,14 +1188,14 @@ jobs:
               ~\AppData\Local\electron-builder\Cache
           - os: ubuntu-22.04
             platform: linux-x64
-            release_command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm --x64 --publish always
+            release_command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm --x64 --publish never
             unpacked_dir: dist/linux-unpacked
             eb_cache_path: |
               ~/.cache/electron
               ~/.cache/electron-builder
           - os: ubuntu-24.04-arm
             platform: linux-arm64
-            release_command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_LINUX_ARM64_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm --arm64 --publish always
+            release_command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_LINUX_ARM64_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm --arm64 --publish never
             unpacked_dir: dist/linux-arm64-unpacked
             eb_cache_path: |
               ~/.cache/electron
@@ -1161,6 +1206,16 @@ jobs:
     # (1h inner + 4h installer) are budgeted to fit under this with the
     # build itself, so a slow approval can't kill the job mid-flow.
     timeout-minutes: 360
+
+    env:
+      # HiveCloud owns the per-platform monotonic build number. Keep one value
+      # across the desktop matrix so all architectures share the release identity.
+      HIVECODE_BUILD_NUMBER: ${{ vars.HIVECODE_DESKTOP_BUILD_NUMBER }}
+      HIVECODE_COMMIT_SHA: ${{ needs.cut.outputs.source_sha }}
+      # electron-builder runs in a later step than the Vite build; keep the
+      # identity switch at job scope so package metadata is embedded in the
+      # actual installers as well as the compiled app.
+      HIVECODE_EMBED_RELEASE_IDENTITY: '1'
 
     permissions:
       actions: read
@@ -1271,12 +1326,12 @@ jobs:
           # Why the optional trailing identifier: suffixed side-branch RCs
           # (vX.Y.Z-rc.N.perf) are rc-channel prerelease builds — same telemetry
           # identity as plain RCs.
-          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(\.[0-9A-Za-z]+)?$ ]]; then
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(beta|rc)\.[0-9]+(\.[0-9A-Za-z]+)?$ ]]; then
             identity=rc
           elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             identity=stable
           else
-            echo "::error::Tag $TAG does not match stable or rc pattern; refusing to build official artifact"
+            echo "::error::Tag $TAG does not match stable, beta, or rc pattern; refusing to build official artifact"
             exit 1
           fi
           echo "identity=$identity" >>"$GITHUB_OUTPUT"
@@ -1319,7 +1374,7 @@ jobs:
           # Kill only its child and require both PTY and watch recovery before packaging.
           node config/scripts/relay-watcher-fault-harness.mjs
 
-      - name: Publish release artifacts (Linux)
+      - name: Build release artifacts (Linux)
         if: matrix.platform == 'linux-x64' || matrix.platform == 'linux-arm64'
         uses: nick-fields/retry@v4
         with:
@@ -1327,8 +1382,6 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 30
           command: ${{ matrix.release_command }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load packaged node-pty on the Linux floor
         if: matrix.platform == 'linux-x64' || matrix.platform == 'linux-arm64'
@@ -1340,6 +1393,30 @@ jobs:
           command: >-
             node config/scripts/run-linux-packaged-node-pty-floor-smoke.mjs
             --app-dir ${{ matrix.unpacked_dir }}
+
+      - name: Publish Linux AppImage to HiveCloud object storage
+        if: matrix.platform == 'linux-x64' || matrix.platform == 'linux-arm64'
+        shell: bash
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECODE_VERSION: ${{ needs.cut.outputs.tag }}
+          HIVECODE_BUILD_NUMBER: ${{ env.HIVECODE_BUILD_NUMBER }}
+          HIVECODE_RELEASE_CHANNEL: ${{ contains(needs.cut.outputs.tag, '-beta.') && 'beta' || contains(needs.cut.outputs.tag, '-rc.') && 'beta' || 'stable' }}
+          HIVECODE_DESKTOP_PLATFORM: linux
+          HIVECODE_DESKTOP_ARCHITECTURE: ${{ matrix.platform == 'linux-arm64' && 'arm64' || 'x64' }}
+          HIVECODE_EXPECTED_ARTIFACTS: '2'
+          HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES: x64,arm64
+          HIVECODE_PUBLISH: ${{ matrix.platform == 'linux-arm64' && 'true' || 'false' }}
+          HIVECODE_RELEASE_NOTES: ${{ needs.cut.outputs.tag }}
+        run: |
+          set -euo pipefail
+          export HIVECODE_VERSION="${HIVECODE_VERSION#v}"
+          artifact="$(find dist -maxdepth 1 -type f -iname '*.AppImage' -print -quit)"
+          test -n "$artifact"
+          export HIVECODE_ARTIFACT_PATHS="$artifact"
+          node config/scripts/publish-hivecloud-desktop-release.mjs
 
       # Why: SignPath signs GitHub workflow artifacts, so Windows builds must
       # upload only after the production-signed installer has been returned.
@@ -1432,7 +1509,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: orca-windows-inner-unsigned-${{ needs.cut.outputs.tag }}
+          name: hivecode-windows-inner-unsigned-${{ needs.cut.outputs.tag }}
           path: signing-stage/**
           if-no-files-found: error
 
@@ -1618,21 +1695,21 @@ jobs:
           # Why: keep the pre-rebuild artifacts so a failed rebuild can fall
           # back to shipping them unchanged (fail-open).
           New-Item -ItemType Directory -Path prepack-backup -Force | Out-Null
-          Copy-Item 'dist/orca-windows-setup.exe' 'prepack-backup/orca-windows-setup.exe' -Force
+          Copy-Item 'dist/hivecode-windows-setup.exe' 'prepack-backup/hivecode-windows-setup.exe' -Force
           Copy-Item 'dist/latest.yml' 'prepack-backup/latest.yml' -Force
 
           pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish never --prepackaged "$env:GITHUB_WORKSPACE\dist\win-unpacked"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not (Test-Path 'dist/orca-windows-setup.exe')) {
-            throw 'electron-builder --prepackaged did not produce dist/orca-windows-setup.exe'
+          if (-not (Test-Path 'dist/hivecode-windows-setup.exe')) {
+            throw 'electron-builder --prepackaged did not produce dist/hivecode-windows-setup.exe'
           }
 
       - name: Roll back to original installer after failed rebuild
         if: matrix.platform == 'win' && steps.rebuild-nsis-signed.outcome == 'failure'
         shell: pwsh
         run: |
-          if (Test-Path 'prepack-backup/orca-windows-setup.exe') {
-            Copy-Item 'prepack-backup/orca-windows-setup.exe' 'dist/orca-windows-setup.exe' -Force
+          if (Test-Path 'prepack-backup/hivecode-windows-setup.exe') {
+            Copy-Item 'prepack-backup/hivecode-windows-setup.exe' 'dist/hivecode-windows-setup.exe' -Force
             Copy-Item 'prepack-backup/latest.yml' 'dist/latest.yml' -Force
             Write-Warning 'Restored pre-rebuild installer; this release ships with unsigned inner binaries.'
           }
@@ -1642,8 +1719,8 @@ jobs:
         id: upload-unsigned-windows-installer
         uses: actions/upload-artifact@v7
         with:
-          name: orca-windows-unsigned-${{ needs.cut.outputs.tag }}
-          path: dist/orca-windows-setup.exe
+          name: hivecode-windows-unsigned-${{ needs.cut.outputs.tag }}
+          path: dist/hivecode-windows-setup.exe
           if-no-files-found: error
 
       # Why: SignPath Foundation production certificates require manual review,
@@ -1747,17 +1824,17 @@ jobs:
         if: matrix.platform == 'win'
         shell: pwsh
         run: |
-          $signedInstaller = Get-ChildItem -Path signed-windows -Recurse -File -Filter 'orca-windows-setup.exe' | Select-Object -First 1
+          $signedInstaller = Get-ChildItem -Path signed-windows -Recurse -File -Filter 'hivecode-windows-setup.exe' | Select-Object -First 1
           if ($null -eq $signedInstaller) {
             throw 'Signed Windows installer was not returned by SignPath.'
           }
 
-          Copy-Item -Path $signedInstaller.FullName -Destination 'dist/orca-windows-setup.exe' -Force
-          node config/scripts/generate-windows-blockmap.mjs 'dist/orca-windows-setup.exe' 'dist/orca-windows-setup.exe.blockmap'
+          Copy-Item -Path $signedInstaller.FullName -Destination 'dist/hivecode-windows-setup.exe' -Force
+          node config/scripts/generate-windows-blockmap.mjs 'dist/hivecode-windows-setup.exe' 'dist/hivecode-windows-setup.exe.blockmap'
           if ($LASTEXITCODE -ne 0) { throw "blockmap generation failed with exit code $LASTEXITCODE" }
 
-          $installer = Get-Item 'dist/orca-windows-setup.exe'
-          $blockmap = Get-Item 'dist/orca-windows-setup.exe.blockmap'
+          $installer = Get-Item 'dist/hivecode-windows-setup.exe'
+          $blockmap = Get-Item 'dist/hivecode-windows-setup.exe.blockmap'
           $stream = [System.IO.File]::OpenRead($installer.FullName)
           try {
             $sha512 = [System.Security.Cryptography.SHA512]::Create()
@@ -1778,40 +1855,40 @@ jobs:
           $latestYml = $latestYml -replace '(?m)^    blockMapSize: \d+$', "    blockMapSize: $($blockmap.Length)"
           Set-Content -Path 'dist/latest.yml' -Value $latestYml -NoNewline
 
-          Get-Item 'dist/orca-windows-setup.exe', 'dist/orca-windows-setup.exe.blockmap', 'dist/latest.yml'
+          Get-Item 'dist/hivecode-windows-setup.exe', 'dist/hivecode-windows-setup.exe.blockmap', 'dist/latest.yml'
 
       - name: Verify signed Windows installer
         if: matrix.platform == 'win'
         shell: pwsh
         run: |
-          $signature = Get-AuthenticodeSignature -FilePath 'dist/orca-windows-setup.exe'
+          $signature = Get-AuthenticodeSignature -FilePath 'dist/hivecode-windows-setup.exe'
           if ($signature.Status -ne 'Valid') {
             throw ($signature | Format-List * | Out-String)
           }
           if ($signature.SignerCertificate.Subject -notlike '*CN=SignPath Foundation*') {
             throw "Unexpected Windows signer: $($signature.SignerCertificate.Subject)"
           }
+          $fingerprint = $signature.SignerCertificate.GetCertHashString([System.Security.Cryptography.HashAlgorithmName]::SHA256)
+          "HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT=$fingerprint" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $signature.SignerCertificate | Format-List Subject,Issuer,NotBefore,NotAfter,Thumbprint
 
       # Why: evidence gate for inner-binary signing (issue #7785, supersedes
       # PR #7170's Orca.exe-only gate — this covers every staged .exe/.dll/.node
-      # by extracting the shipped installer). Warn-only until the flow has been
-      # proven on a real release, then flip ORCA_WINDOWS_INNER_SIGNATURE_REQUIRED
-      # to 'true' so unsigned inner binaries block the release.
+      # by extracting the shipped installer). HiveCode releases run this gate in
+      # required mode so unsigned inner binaries cannot reach object storage.
       - name: Verify Windows inner binary signatures
         if: matrix.platform == 'win'
         shell: pwsh
         env:
-          ORCA_WINDOWS_INNER_SIGNATURE_REQUIRED: 'false'
+          ORCA_WINDOWS_INNER_SIGNATURE_REQUIRED: 'true'
           INNER_SIGNING_COMPLETED: ${{ steps.rebuild-nsis-signed.outcome == 'success' }}
         run: |
           $required = $env:ORCA_WINDOWS_INNER_SIGNATURE_REQUIRED -eq 'true'
 
-          # Why: a fail-open gate that writes nothing is indistinguishable from a
+          # Why: a gate that writes nothing is indistinguishable from a
           # gate that passed. Always leave a verdict in the evidence artifact and
           # the job summary so a silent degradation is visible (#6487).
-          # Why best-effort: while warn-only, a disk-full or permission error
-          # writing the verdict must not become the thing that fails the release.
+          # Evidence writes remain best effort; signature failures themselves are fatal.
           function Add-GateEvidence([string]$line) {
             try {
               Add-Content -Path 'inner-signing-evidence.txt' -Value "`n$line" -ErrorAction Stop
@@ -1839,16 +1916,15 @@ jobs:
           }
 
           if ($env:INNER_SIGNING_COMPLETED -ne 'true') {
-            $message = 'Windows inner-binary signing did not complete; this release ships unsigned inner binaries (fail-open, issue #7785).'
+            $message = 'Windows inner-binary signing did not complete; refusing to publish unsigned inner binaries.'
             Write-GateVerdict "NOT VERIFIED — $message"
             if ($required) { throw $message }
             Write-Host "::warning::$message"
             exit 0
           }
 
-          # Why try/catch: while the gate is warn-only, even an unexpected
-          # script error (extraction hiccup, missing file) must not block
-          # the release — only the flip to required makes failures fatal.
+          # Why try/catch: retain a diagnostic verdict for unexpected extraction
+          # or verification failures before required mode stops the release.
           # Why tracked separately: a required-mode signature failure must not be
           # rewritten as ERRORED by the catch below, which would replace the
           # per-file report with an exception string and lose the diagnostics.
@@ -1872,7 +1948,7 @@ jobs:
               throw "The 7za resolver returned an invalid path for the inner-binary evidence gate: $7za"
             }
             New-Item -ItemType Directory -Path inner-evidence-extract -Force | Out-Null
-            & $7za x 'dist/orca-windows-setup.exe' '-oinner-evidence-extract' -y | Out-Null
+            & $7za x 'dist/hivecode-windows-setup.exe' '-oinner-evidence-extract' -y | Out-Null
 
             $root = Resolve-Path 'inner-evidence-extract'
             # Why elevate.exe is always appended: staging skips already-signed
@@ -1924,7 +2000,7 @@ jobs:
           } catch {
             Write-GateVerdict "ERRORED — $_"
             if ($required) { throw }
-            Write-Host "::warning::Windows inner-binary evidence gate errored: $_ (fail-open, issue #7785)."
+            Write-Host "::warning::Windows inner-binary evidence gate errored: $_"
           }
 
           # Outside the catch so the FAILED evidence report survives intact.
@@ -1934,64 +2010,38 @@ jobs:
         if: always() && matrix.platform == 'win'
         uses: actions/upload-artifact@v7
         with:
-          name: orca-windows-inner-signing-evidence-${{ needs.cut.outputs.tag }}
+          name: hivecode-windows-inner-signing-evidence-${{ needs.cut.outputs.tag }}
           path: |
             inner-signing-evidence.txt
             inner-signing-list.txt
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Publish signed Windows release artifacts
+      # Verify the packaged app before publishing immutable artifacts. A
+      # failed identity/integrity gate must never leave a published release.
+      - name: Verify telemetry constants present in app.asar
+        run: node config/scripts/verify-telemetry-constants.mjs
+
+      - name: Publish signed Windows installer to HiveCloud object storage
         if: matrix.platform == 'win'
         uses: nick-fields/retry@v4
         with:
           timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 30
-          command: gh release upload "${{ needs.cut.outputs.tag }}" "dist/orca-windows-setup.exe" "dist/orca-windows-setup.exe.blockmap" "dist/latest.yml" --clobber --repo "${{ github.repository }}"
+          command: >-
+            $env:HIVECODE_VERSION = '${{ needs.cut.outputs.tag }}'.TrimStart('v');
+            $env:HIVECODE_ARTIFACT_PATHS = 'x64=dist/hivecode-windows-setup.exe';
+            node config/scripts/publish-hivecloud-desktop-release.mjs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify release remains draft after artifact upload
-        # Why: the build matrix must never be the actor that exposes a partial
-        # release. If an uploader or GitHub transition flips draft early, fail
-        # this platform leg and leave the diagnostic monitor artifact behind.
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.cut.outputs.tag }}
-        run: |
-          set -euo pipefail
-          releases_json="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100")"
-          # Why: release upload must validate the draft before it is publicly visible.
-          draft="$(jq -e -r --arg tag "$TAG" '
-            map(select(.tag_name == $tag))
-            | if length == 1 and (.[0].draft | type) == "boolean" then (.[0].draft | tostring) else empty end
-          ' <<<"$releases_json")" || {
-            echo "::error::Release $TAG was not found in the draft-aware releases list, or its draft state was missing."
-            exit 1
-          }
-          if [[ "$draft" != "true" ]]; then
-            echo "::error::Release $TAG was published during the ${{ matrix.platform }} artifact upload."
-            exit 1
-          fi
-
-      # Why post-publish for Linux: electron-builder packs and uploads in a
-      # single `--publish always` invocation, so there is no cheap insertion
-      # point between pack and upload without splitting those steps. Running
-      # verify last still blocks the bad release: the binary is uploaded to the
-      # draft, but a failed matrix job blocks `publish-release` from flipping
-      # the release from draft → published, so users never see it. A human then
-      # deletes the draft and re-cuts.
-      #
-      # Why this guards against: a misconfigured CI run where
-      # `ORCA_POSTHOG_WRITE_KEY` is unset or the tag fails to classify
-      # would otherwise produce a binary with `BUILD_IDENTITY = null` and
-      # `WRITE_KEY = null`, which silently disables transport
-      # (`IS_OFFICIAL_BUILD === false`) — the exact failure mode flagged
-      # in PR #1385's deferred follow-up.
-      - name: Verify telemetry constants present in app.asar
-        run: node config/scripts/verify-telemetry-constants.mjs
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECODE_BUILD_NUMBER: ${{ env.HIVECODE_BUILD_NUMBER }}
+          HIVECODE_RELEASE_CHANNEL: ${{ contains(needs.cut.outputs.tag, '-beta.') && 'beta' || contains(needs.cut.outputs.tag, '-rc.') && 'beta' || 'stable' }}
+          HIVECODE_DESKTOP_PLATFORM: windows
+          HIVECODE_DESKTOP_ARCHITECTURE: x64
+          HIVECODE_RELEASE_NOTES: ${{ needs.cut.outputs.tag }}
 
   build-mac:
     needs:
@@ -2064,15 +2114,6 @@ jobs:
             exit 1
           fi
 
-      - name: Verify release assets complete
-        # Why: publish-release is the only intended draft -> published
-        # transition. Refuse to un-draft until every updater manifest and
-        # referenced installer asset is present on GitHub.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.cut.outputs.tag }}
-        run: node config/scripts/verify-release-required-assets.mjs "$TAG"
-
       - name: Publish release
         # Why: derive `--prerelease` from the tag shape (not from whatever
         # electron-builder left the release flagged as). On 2026-04-27,
@@ -2086,7 +2127,7 @@ jobs:
           TAG: ${{ needs.cut.outputs.tag }}
         run: |
           set -euo pipefail
-          if [[ "$TAG" == *"-rc."* ]]; then
+          if [[ "$TAG" == *"-beta."* || "$TAG" == *"-rc."* ]]; then
             prerelease=true
           else
             prerelease=false

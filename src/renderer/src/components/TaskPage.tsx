@@ -2125,7 +2125,7 @@ export default function TaskPage(): React.JSX.Element {
           setLinearError(
             translate(
               'auto.components.TaskPage.linearHasWorktreeLoadFailed',
-              'Unable to load Linear issues linked to an Orca workspace.'
+              'Unable to load Linear issues linked to a HiveCode workspace.'
             )
           )
           setLinearIssues([])
@@ -2136,7 +2136,7 @@ export default function TaskPage(): React.JSX.Element {
           setLinearError(
             translate(
               'auto.components.TaskPage.linearHasWorktreePartialLoadFailed',
-              'Some Linear issues linked to an Orca workspace could not be loaded. Refresh to try again.'
+              'Some Linear issues linked to a HiveCode workspace could not be loaded. Refresh to try again.'
             )
           )
         }

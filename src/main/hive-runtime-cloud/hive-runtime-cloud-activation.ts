@@ -37,10 +37,22 @@ export type ActivationResult =
   | {
       status: 'LEASED'
       identity: HiveRuntimeCloudIdentity
+      authorityId: string
       runtimeRecordId: string
       bootId: string
       lease: ActiveLease
     }
+
+type ClaimedActivationOptions = Readonly<{
+  client: PresenceClient
+  identity: HiveRuntimeCloudIdentity
+  stored: Extract<HiveRuntimeCloudRegistrationState, { status: 'CLAIMED' }>
+  bootId: string
+  signal: AbortSignal
+  randomUuid: () => string
+  assertCurrent: () => void
+  saveState: (state: HiveRuntimeCloudRegistrationState) => void
+}>
 
 async function registerRuntime(
   options: ActivationOptions
@@ -124,6 +136,7 @@ async function claimRuntime(
     runtimeRecordId: claim.runtime.runtimeRecordId,
     status: 'CLAIMED',
     ownerAccountId: claim.runtime.ownerAccountId,
+    authorityId: options.authorization.authorityId,
     resourceVersion: claim.runtime.resourceVersion,
     authorityGeneration: claim.runtime.authorityGeneration,
     fencingEpoch: claim.runtime.fencingEpoch,
@@ -202,8 +215,58 @@ export async function activateHiveRuntimeCloudPresence(
   return {
     status: 'LEASED',
     identity: options.identity,
+    authorityId: options.authorization.authorityId,
     runtimeRecordId: registration.runtimeRecordId,
     bootId,
     lease
+  }
+}
+
+export async function activateClaimedHiveRuntimeCloudPresence(
+  options: ClaimedActivationOptions
+): Promise<Extract<ActivationResult, { status: 'LEASED' }>> {
+  const authorityId = options.stored.authorityId
+  if (!authorityId) {
+    throw new ClaimPendingPresenceError('runtime_authority_unavailable')
+  }
+  const lookup = await options.client.lookup(
+    createRuntimeRegistrationLookupRequest(options.identity, { authorityId }),
+    options.signal
+  )
+  options.assertCurrent()
+  if (!lookup.exists || lookup.status !== 'CLAIMED') {
+    throw new ClaimPendingPresenceError('runtime_claim_required')
+  }
+  if (lookup.identityPublicKeySha256 !== publicKeyDigest(options.identity)) {
+    throw new FatalPresenceError('registration_identity_mismatch')
+  }
+  const registration = reconcileRuntimeRegistrationState(lookup, options.stored)
+  if (registration.status !== 'CLAIMED') {
+    throw new ClaimPendingPresenceError('runtime_claim_required')
+  }
+  const claimed = { ...registration, authorityId }
+  options.saveState(claimed)
+  const bootId = claimed.latestLeaseEpoch > 0 ? options.randomUuid() : options.bootId
+  const lease = await options.client.acquireLease(
+    createRuntimeLeaseAcquireRequest(
+      options.identity,
+      {
+        bootId,
+        expectedAuthorityGeneration: claimed.authorityGeneration,
+        expectedLeaseEpoch: claimed.latestLeaseEpoch,
+        expectedFencingEpoch: claimed.fencingEpoch
+      },
+      { authorityId }
+    ),
+    options.signal
+  )
+  options.assertCurrent()
+  return {
+    status: 'LEASED',
+    identity: options.identity,
+    authorityId,
+    runtimeRecordId: claimed.runtimeRecordId,
+    bootId,
+    lease: { ...lease, bootId, nextHeartbeatSeq: 1 }
   }
 }

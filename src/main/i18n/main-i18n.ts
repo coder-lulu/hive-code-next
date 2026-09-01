@@ -10,7 +10,7 @@ import { isPseudoLocalizationLocale, pseudoLocalizeString } from '../../shared/p
 import { DEFAULT_UI_LOCALE, resolveUiLocale, type SupportedUiLocale } from '../../shared/ui-locale'
 import { UI_LANGUAGE_SYSTEM, type UiLanguage } from '../../shared/ui-language'
 import type { PluginLanguagePackRegistration } from '../../shared/plugins/plugin-language-pack-artifact'
-import { applyProductBranding } from '../../shared/brand'
+import { applyProductCliBranding, applyProductCliBrandingToCatalog } from '../../shared/brand'
 
 export const mainI18n: I18nInstance = i18next.createInstance()
 
@@ -43,7 +43,7 @@ const lazyLocaleBackend: BackendModule = {
       return
     }
     loader().then(
-      (mod) => callback(null, mod.default),
+      (mod) => callback(null, applyProductCliBrandingToCatalog(mod.default)),
       (error) => callback(error instanceof Error ? error : new Error(String(error)), false)
     )
   }
@@ -105,7 +105,13 @@ function applyMainPluginLanguagePacks(): void {
   }
   registeredPluginLanguages.clear()
   for (const pack of pluginLanguagePacks) {
-    mainI18n.addResourceBundle(pack.resourceLanguage, 'translation', pack.catalog, true, true)
+    mainI18n.addResourceBundle(
+      pack.resourceLanguage,
+      'translation',
+      applyProductCliBrandingToCatalog(pack.catalog),
+      true,
+      true
+    )
     registeredPluginLanguages.add(pack.resourceLanguage)
   }
 }
@@ -126,10 +132,10 @@ export function setMainPluginLanguagePacks(
 export function translateMain(key: string, fallback: string, options?: TOptions): string {
   // Why: menu registration can run before async init finishes in tests; fall back
   // to the English default instead of returning undefined from an uninitialized i18n.
-  const raw = initialized ? mainI18n.t(key, { defaultValue: fallback, ...options }) : fallback
-  const value = typeof raw === 'string' && raw.length > 0 ? raw : fallback
-  const brandedValue = applyProductBranding(value)
-  return isPseudoLocalizationLocale(mainI18n.language)
-    ? pseudoLocalizeString(brandedValue)
-    : brandedValue
+  const brandedFallback = applyProductCliBranding(fallback)
+  const raw = initialized
+    ? mainI18n.t(key, { ...options, defaultValue: brandedFallback })
+    : brandedFallback
+  const value = typeof raw === 'string' && raw.length > 0 ? raw : brandedFallback
+  return isPseudoLocalizationLocale(mainI18n.language) ? pseudoLocalizeString(value) : value
 }

@@ -1,4 +1,3 @@
-import { net } from 'electron'
 import {
   normalizeClaim,
   normalizeConnectionTicketConsume,
@@ -6,7 +5,6 @@ import {
   normalizeLease,
   normalizeLookup,
   normalizeRegistration,
-  problemCategory,
   type RuntimeClaim,
   type RuntimeConnectionTicketConsume,
   type RuntimeHeartbeat,
@@ -18,6 +16,18 @@ import {
   normalizeWebSessionControlPull,
   type RuntimeWebSessionControlPull
 } from './hive-runtime-cloud-web-session-control-response'
+import {
+  normalizeClaimCapabilityReissue,
+  normalizeClaimChallenge,
+  normalizeClaimChallengePoll,
+  normalizeClaimReconcile,
+  type RuntimeClaimCapabilityReissue,
+  type RuntimeClaimChallenge,
+  type RuntimeClaimChallengePoll,
+  type RuntimeClaimReconcile
+} from './hive-runtime-cloud-claim-response'
+import { normalizeHiveRuntimeCloudAuthorityId } from './hive-runtime-cloud-capabilities-response'
+import { HiveRuntimeCloudAccountClient } from './hive-runtime-cloud-account-client'
 
 export type {
   RuntimeClaim,
@@ -28,122 +38,20 @@ export type {
   RuntimeRegistrationLookup
 } from './hive-runtime-cloud-response'
 export type { RuntimeWebSessionControlPull } from './hive-runtime-cloud-web-session-control-response'
+export type {
+  RuntimeClaimCapabilityReissue,
+  RuntimeClaimChallenge,
+  RuntimeClaimChallengePoll,
+  RuntimeClaimReconcile
+} from './hive-runtime-cloud-claim-response'
+export type { HiveRuntimeCloudConnectionIntent } from './hive-runtime-cloud-connection-response'
+export {
+  HiveRuntimeCloudRequestError,
+  HiveRuntimeCloudTransportError
+} from './hive-runtime-cloud-http-client'
 
-const REQUEST_TIMEOUT_MS = 10_000
-const MAXIMUM_RESPONSE_BYTES = 65_536
-
-type FetchLike = (input: string, init: RequestInit) => Promise<Response>
-const electronFetch: FetchLike = (input, init) => net.fetch(input, init)
-
-export class HiveRuntimeCloudRequestError extends Error {
-  constructor(
-    readonly status: number,
-    readonly category: string | null
-  ) {
-    super('hive_runtime_cloud_request_failed')
-    this.name = 'HiveRuntimeCloudRequestError'
-  }
-}
-
-export class HiveRuntimeCloudTransportError extends Error {
-  constructor() {
-    super('hive_runtime_cloud_transport_failed')
-    this.name = 'HiveRuntimeCloudTransportError'
-  }
-}
-
-async function parseResponse(response: Response): Promise<unknown> {
-  const contentLength = Number(response.headers.get('content-length'))
-  if (Number.isFinite(contentLength) && contentLength > MAXIMUM_RESPONSE_BYTES) {
-    throw new Error('hive_runtime_cloud_response_too_large')
-  }
-  if (!response.body) {
-    throw new Error('invalid_hive_runtime_cloud_response')
-  }
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let byteLength = 0
-  while (true) {
-    const chunk = await reader.read()
-    if (chunk.done) {
-      break
-    }
-    byteLength += chunk.value.byteLength
-    if (byteLength > MAXIMUM_RESPONSE_BYTES) {
-      await reader.cancel()
-      throw new Error('hive_runtime_cloud_response_too_large')
-    }
-    chunks.push(chunk.value)
-  }
-  const bytes = new Uint8Array(byteLength)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
-  } catch {
-    throw new Error('invalid_hive_runtime_cloud_response')
-  }
-}
-
-export class HiveRuntimeCloudClient {
-  constructor(
-    private readonly apiBaseUrl: string,
-    private readonly fetchImpl: FetchLike = electronFetch
-  ) {}
-
-  private async request(
-    path: string,
-    request: Record<string, unknown>,
-    headers: Record<string, string>,
-    expectedStatus: number,
-    signal?: AbortSignal
-  ): Promise<unknown> {
-    const controller = new AbortController()
-    const abort = (): void => controller.abort()
-    if (signal?.aborted) {
-      controller.abort()
-    } else {
-      signal?.addEventListener('abort', abort, { once: true })
-    }
-    const timeout = setTimeout(abort, REQUEST_TIMEOUT_MS)
-    try {
-      let response: Response
-      try {
-        response = await this.fetchImpl(`${this.apiBaseUrl}${path}`, {
-          method: 'POST',
-          cache: 'no-store',
-          redirect: 'error',
-          signal: controller.signal,
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            ...headers
-          },
-          body: JSON.stringify(request)
-        })
-      } catch {
-        throw new HiveRuntimeCloudTransportError()
-      }
-      if (expectedStatus === 204 && response.status === expectedStatus) {
-        const contentLength = response.headers.get('content-length')
-        if (response.body !== null || (contentLength !== null && contentLength !== '0')) {
-          throw new Error('invalid_hive_runtime_cloud_response')
-        }
-        return undefined
-      }
-      const value = await parseResponse(response)
-      if (response.status !== expectedStatus) {
-        throw new HiveRuntimeCloudRequestError(response.status, problemCategory(value))
-      }
-      return value
-    } finally {
-      clearTimeout(timeout)
-      signal?.removeEventListener('abort', abort)
-    }
-  }
+export class HiveRuntimeCloudClient extends HiveRuntimeCloudAccountClient {
+  private pinnedAuthorityId: string | null = null
 
   async lookup(
     request: Record<string, unknown>,
@@ -152,6 +60,19 @@ export class HiveRuntimeCloudClient {
     return normalizeLookup(
       await this.request('/hive/v1/runtime-registrations/lookup', request, {}, 200, signal)
     )
+  }
+
+  async getAuthorityId(signal?: AbortSignal): Promise<string> {
+    if (this.pinnedAuthorityId) {
+      return this.pinnedAuthorityId
+    }
+    const response = await this.get('/hive/v1/meta/capabilities', null, signal)
+    const authorityId = normalizeHiveRuntimeCloudAuthorityId(response.value)
+    if (this.pinnedAuthorityId && this.pinnedAuthorityId !== authorityId) {
+      throw new Error('hive_runtime_cloud_authority_changed')
+    }
+    this.pinnedAuthorityId = authorityId
+    return authorityId
   }
 
   async register(
@@ -181,6 +102,64 @@ export class HiveRuntimeCloudClient {
         '/hive/v1/runtime-claims',
         request,
         { authorization: `Bearer ${accessToken}`, 'idempotency-key': idempotencyKey },
+        200,
+        signal
+      )
+    )
+  }
+
+  async reissueClaimCapability(
+    runtimeRecordId: string,
+    request: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<RuntimeClaimCapabilityReissue> {
+    return normalizeClaimCapabilityReissue(
+      await this.request(
+        `/hive/v1/runtime-records/${encodeURIComponent(runtimeRecordId)}/reclaim-capabilities`,
+        request,
+        {},
+        200,
+        signal
+      )
+    )
+  }
+
+  async reconcileClaim(
+    runtimeRecordId: string,
+    request: Record<string, unknown>,
+    accessToken: string,
+    signal?: AbortSignal
+  ): Promise<RuntimeClaimReconcile> {
+    return normalizeClaimReconcile(
+      await this.request(
+        `/hive/v1/runtime-records/${encodeURIComponent(runtimeRecordId)}/claim-reconcile`,
+        request,
+        { authorization: `Bearer ${accessToken}` },
+        200,
+        signal
+      )
+    )
+  }
+
+  async createClaimChallenge(
+    request: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<RuntimeClaimChallenge> {
+    return normalizeClaimChallenge(
+      await this.request('/hive/v1/runtime-claim-challenges', request, {}, 201, signal)
+    )
+  }
+
+  async pollClaimChallenge(
+    challengeId: string,
+    deviceCode: string,
+    signal?: AbortSignal
+  ): Promise<RuntimeClaimChallengePoll> {
+    return normalizeClaimChallengePoll(
+      await this.request(
+        `/hive/v1/runtime-claim-challenges/${encodeURIComponent(challengeId)}/poll`,
+        { deviceCode },
+        {},
         200,
         signal
       )

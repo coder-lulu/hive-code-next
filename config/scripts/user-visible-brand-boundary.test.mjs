@@ -4,49 +4,47 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const { collectRendererBrandCandidates } = require('./user-visible-brand-candidates.cjs')
+const {
+  collectBrandCandidatesFromSource,
+  collectRendererBrandCandidates
+} = require('./user-visible-brand-candidates.cjs')
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const upstreamVisibleBrandPattern = /\b(?:ORCA|Orca)\b/
 const upstreamPublicLinkPattern =
-  /(?:onorca\.dev|github\.com\/stablyai\/orca|discord\.gg\/fzjDKHxv8Q|x\.com\/orca_build)/i
+  /(?:app\.orca\.dev|onorca\.dev|github\.com\/stablyai\/orca|discord\.gg\/fzjDKHxv8Q|x\.com\/orca_build)/i
+const legacyVisibleProtocolPattern = /orca:\/\/(?:pair|skills\/share)/i
+const localeCatalogFiles = readdirSync(
+  path.join(repoRoot, 'src', 'renderer', 'src', 'i18n', 'locales')
+)
+  .filter((entry) => entry.endsWith('.json'))
+  .map((entry) => path.join(repoRoot, 'src', 'renderer', 'src', 'i18n', 'locales', entry))
 const userVisibleSharedFiles = [
   path.join(repoRoot, 'src', 'shared', 'feature-wall-tiles.ts'),
   path.join(repoRoot, 'src', 'shared', 'feature-wall-workflows.ts'),
   path.join(repoRoot, 'src', 'shared', 'feature-tips.ts'),
   path.join(repoRoot, 'src', 'shared', 'agents-orchestration-steps.ts'),
+  path.join(repoRoot, 'src', 'shared', 'client-environment-info.ts'),
   path.join(repoRoot, 'src', 'shared', 'orchestration-rpc-contract.ts'),
   path.join(repoRoot, 'src', 'shared', 'source-control-ai-action-variables.ts'),
   path.join(repoRoot, 'src', 'shared', 'workbench-steps.ts')
 ]
-const mainBrandSurfaceFiles = [
-  'src/main/app-icon.ts',
-  'src/main/codex/codex-app-server-session.ts',
-  'src/main/i18n/main-i18n.ts',
-  'src/main/index.ts',
-  'src/main/ipc/notification-options.ts',
-  'src/main/ipc/notifications.ts',
-  'src/main/automations/run-target-resolution.ts',
-  'src/main/startup/appimage-cli-redirect.ts',
-  'src/main/startup/packaged-cli-entry-redirect.ts',
-  'src/main/startup/single-instance-lock.ts',
-  'src/main/tray/system-tray.ts',
-  'src/main/window/createMainWindow.ts',
-  'src/main/window/dashboard-popout-window.ts'
-].map((relativePath) => path.join(repoRoot, relativePath))
-
 function sourceFilesUnder(root) {
   const files = []
   for (const entry of readdirSync(root)) {
     const absolutePath = path.join(root, entry)
     const stat = statSync(absolutePath)
     if (stat.isDirectory()) {
-      if (entry === '__tests__') {
+      if (entry === '__tests__' || entry === '__fixtures__') {
         continue
       }
       files.push(...sourceFilesUnder(absolutePath))
       continue
     }
-    if (!/\.[jt]sx?$/.test(entry) || /\.test\.[jt]sx?$/.test(entry)) {
+    if (
+      !/\.[jt]sx?$/.test(entry) ||
+      /\.test\.[jt]sx?$/.test(entry) ||
+      /(?:test-fixtures?|test-harness)\.[jt]sx?$/.test(entry)
+    ) {
       continue
     }
     files.push(absolutePath)
@@ -106,6 +104,89 @@ function collectVisibleBrandLeaks(filePath) {
 }
 
 describe('user-visible brand boundary', () => {
+  it('only exempts direct static values inside product-brand adapters', () => {
+    const fixturePath = path.join(repoRoot, 'dynamic-brand-adapter-fixture.ts')
+    const dynamicCases = [
+      'applyProductBranding(`Orca failed for ${userText}`)',
+      "applyProductBranding('Orca failed ' + userText)",
+      "applyProductBranding(condition ? 'Orca failed' : userText)",
+      "applyProductBranding(['Orca failed', userText].join(' '))"
+    ]
+    for (const source of dynamicCases) {
+      expect(collectBrandCandidatesFromSource(source, fixturePath, repoRoot)).toEqual([
+        expect.stringMatching(/^dynamic-brand-adapter-fixture\.ts:1:Orca failed/)
+      ])
+    }
+    expect(
+      collectBrandCandidatesFromSource(
+        "applyProductBranding('Orca failed for a static reason')",
+        fixturePath,
+        repoRoot
+      )
+    ).toEqual([])
+    expect(
+      collectBrandCandidatesFromSource(
+        "translate('example.key', 'Orca failed for a static reason')",
+        fixturePath,
+        repoRoot
+      )
+    ).toEqual([])
+    expect(
+      collectBrandCandidatesFromSource(
+        "translate('example.key', 'Orca failed ' + userText)",
+        fixturePath,
+        repoRoot
+      )
+    ).toEqual(['dynamic-brand-adapter-fixture.ts:1:Orca failed'])
+
+    for (const source of [
+      'applyProductBranding(error.message)',
+      'applyProductBranding(status.message)',
+      'applyProductBranding(message)',
+      'applyProductCliBranding(value)'
+    ]) {
+      expect(collectBrandCandidatesFromSource(source, fixturePath, repoRoot)).toEqual([
+        expect.stringMatching(/dynamic-brand-adapter-fixture\.ts:1:.*dynamic value/)
+      ])
+    }
+
+    const rendererI18nPath = path.join(repoRoot, 'src', 'renderer', 'src', 'i18n', 'i18n.ts')
+    expect(
+      collectBrandCandidatesFromSource(
+        'function translate(fallback) { return applyProductCliBranding(fallback) }',
+        rendererI18nPath,
+        repoRoot
+      )
+    ).toEqual([])
+    expect(
+      collectBrandCandidatesFromSource(
+        'function translate(fallback, value) { return applyProductCliBranding(value) }',
+        rendererI18nPath,
+        repoRoot
+      )
+    ).toEqual([expect.stringMatching(/src\/renderer\/src\/i18n\/i18n\.ts:1:.*dynamic value/)])
+  })
+
+  it('treats backend error properties and browser tab commands as visible copy', () => {
+    const fixturePath = path.join(repoRoot, 'backend-brand-boundary-fixture.ts')
+    expect(
+      collectBrandCandidatesFromSource(
+        'const result = { error: `plugin is blocked by Orca: ${blockedReason}` }',
+        fixturePath,
+        repoRoot,
+        { backendUserVisibleContextOnly: true }
+      )
+    ).toEqual([expect.stringMatching(/backend-brand-boundary-fixture\.ts:1:plugin is blocked/)])
+    expect(
+      collectBrandCandidatesFromSource(
+        'throw new Error("Run \'orca tab list\' to recover.")',
+        fixturePath,
+        repoRoot,
+        { backendUserVisibleContextOnly: true }
+      )
+    ).toEqual([expect.stringMatching(/backend-brand-boundary-fixture\.ts:1:Run 'orca tab list'/)])
+  })
+
   it('does not ship standalone upstream product names in mobile production copy', () => {
     const roots = [path.join(repoRoot, 'mobile', 'app'), path.join(repoRoot, 'mobile', 'src')]
     const leaks = roots.flatMap((root) => sourceFilesUnder(root).flatMap(collectVisibleBrandLeaks))
@@ -119,7 +200,11 @@ describe('user-visible brand boundary', () => {
       path.join(repoRoot, 'mobile', 'app'),
       path.join(repoRoot, 'mobile', 'src')
     ]
-    const leaks = [...roots.flatMap(sourceFilesUnder), ...userVisibleSharedFiles]
+    const leaks = [
+      ...roots.flatMap(sourceFilesUnder),
+      ...localeCatalogFiles,
+      ...userVisibleSharedFiles
+    ]
       .filter((filePath) => !filePath.includes('test-fakes'))
       .flatMap((filePath) =>
         readFileSync(filePath, 'utf8')
@@ -133,24 +218,56 @@ describe('user-visible brand boundary', () => {
       )
 
     expect(leaks).toEqual([])
-  })
+  }, 30_000)
+
+  it('does not advertise legacy product protocols in UI copy or locale catalogs', () => {
+    const roots = [
+      path.join(repoRoot, 'src', 'renderer', 'src'),
+      path.join(repoRoot, 'mobile', 'app'),
+      path.join(repoRoot, 'mobile', 'src')
+    ]
+    const leaks = [...roots.flatMap(sourceFilesUnder), ...localeCatalogFiles]
+      .filter((filePath) => !filePath.includes('test-fakes'))
+      .flatMap((filePath) =>
+        readFileSync(filePath, 'utf8')
+          .split(/\r?\n/)
+          .map((line, index) => ({ line, index }))
+          .filter(({ line }) => legacyVisibleProtocolPattern.test(line))
+          .map(
+            ({ line, index }) =>
+              `${path.relative(repoRoot, filePath).replaceAll('\\', '/')}:${index + 1}:${line.trim()}`
+          )
+      )
+
+    expect(leaks).toEqual([])
+  }, 30_000)
 
   it('does not ship standalone upstream product names in desktop production copy', () => {
-    const roots = [path.join(repoRoot, 'src', 'renderer', 'src')]
+    const rendererFiles = sourceFilesUnder(path.join(repoRoot, 'src', 'renderer', 'src'))
+    // This file is generated from skill guides, whose source/manifest parity has
+    // its own release gate; parsing the embedded copies creates duplicate noise.
+    const cliFiles = sourceFilesUnder(path.join(repoRoot, 'src', 'cli')).filter(
+      (filePath) => !filePath.endsWith(`${path.sep}bundled-skill-guides.ts`)
+    )
+    const sharedVisibleFileSet = new Set(userVisibleSharedFiles)
+    const sharedFiles = sourceFilesUnder(path.join(repoRoot, 'src', 'shared'))
+    const backendContextFiles = [
+      ...sourceFilesUnder(path.join(repoRoot, 'src', 'main')),
+      ...sharedFiles.filter((filePath) => !sharedVisibleFileSet.has(filePath))
+    ]
     const leaks = [
-      ...roots.flatMap((root) =>
-        sourceFilesUnder(root).flatMap((filePath) =>
-          collectRendererBrandCandidates(filePath, repoRoot)
-        )
-      ),
+      ...rendererFiles.flatMap((filePath) => collectRendererBrandCandidates(filePath, repoRoot)),
+      ...cliFiles.flatMap((filePath) => collectRendererBrandCandidates(filePath, repoRoot)),
       ...userVisibleSharedFiles.flatMap((filePath) =>
         collectRendererBrandCandidates(filePath, repoRoot)
       ),
-      ...mainBrandSurfaceFiles.flatMap((filePath) =>
-        collectRendererBrandCandidates(filePath, repoRoot)
+      ...backendContextFiles.flatMap((filePath) =>
+        collectRendererBrandCandidates(filePath, repoRoot, {
+          backendUserVisibleContextOnly: true
+        })
       )
     ]
 
     expect(leaks).toEqual([])
-  }, 30_000)
+  }, 90_000)
 })

@@ -1,4 +1,5 @@
 import type { CliStatusResult } from '../shared/runtime-types'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../shared/brand'
 import { computerUseErrorRecoveryData } from '../shared/computer-use-error-recovery'
 import {
   matchAutomationOwnerConflict,
@@ -89,7 +90,7 @@ export function formatCliError(error: unknown, context: CliErrorContext = {}): s
     if (hasOrchestrationRequestId(error.data)) {
       return message
     }
-    return `${message}\nOrca is not running. Run 'orca open' first.`
+    return `${message}\n${APP_DISPLAY_NAME} is not running. Run '${PRIMARY_CLI_COMMAND} open' first.`
   }
   // Why: error-specific recovery must win over the generic computer fallback.
   // Classified from the whole error, not just `.code`: a hop that flattens the class leaves only the token.
@@ -113,7 +114,7 @@ export function formatCliError(error: unknown, context: CliErrorContext = {}): s
     error instanceof RuntimeRpcFailureError &&
     error.response.error.code === 'runtime_unavailable'
   ) {
-    return `${message}\nOrca is not running. Run 'orca open' first.`
+    return `${message}\n${APP_DISPLAY_NAME} is not running. Run '${PRIMARY_CLI_COMMAND} open' first.`
   }
   if (error instanceof RuntimeRpcFailureError) {
     return formatMessageWithNextSteps(message, nextStepsFromData(error.response.error.data))
@@ -228,7 +229,7 @@ export function formatHostList(result: { hosts: HostListEntry[] }): string {
   const kindLabel: Record<HostListEntry['kind'], string> = {
     local: 'local',
     ssh: 'ssh target',
-    environment: 'orca server'
+    environment: `${APP_DISPLAY_NAME} server`
   }
   return result.hosts
     .map((host) => `${kindLabel[host.kind].padEnd(11)} ${host.name}  ->  ${host.selector}`)

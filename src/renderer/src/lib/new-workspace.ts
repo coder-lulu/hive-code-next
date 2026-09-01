@@ -13,11 +13,13 @@ import {
   queuePendingAgentStartupDelivery,
   resolveAgentStartupTabId
 } from '@/lib/agent-startup-delayed-delivery'
+import { bindHostAgentStartupLaunch } from '@/lib/agent-startup-host-pane-binding'
 import type { FolderWorkspaceLinkedTask } from '../../../shared/folder-workspace-types'
 import type { OrcaHooks } from '../../../shared/orca-yaml-hook-types'
 import { resolveHookCommandSourcePolicy } from '../../../shared/hook-command-source-policy'
 import { slugifyForWorkspaceName } from '../../../shared/workspace-name'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { parsePaneKey } from '../../../shared/stable-pane-id'
 export { getLinkedWorkItemSuggestedName } from '../../../shared/workspace-name'
 export { getLinkedWorkItemWorkspaceName } from '../../../shared/workspace-name'
 export { getWorkspaceIntentName } from '../../../shared/workspace-name'
@@ -215,8 +217,9 @@ export function getWorkspaceSeedName(args: {
       return slug
     }
   }
-  if (fallbackName && fallbackName.trim()) {
-    return fallbackName.trim()
+  const normalizedFallbackName = fallbackName?.trim()
+  if (normalizedFallbackName) {
+    return normalizedFallbackName
   }
   // Why: the prompt is optional in this flow. Fall back to a stable default
   // branch/workspace seed so users can launch an empty draft without first
@@ -227,6 +230,7 @@ export function getWorkspaceSeedName(args: {
 export async function ensureAgentStartupInTerminal(args: {
   worktreeId: string
   primaryTabId?: string | null
+  startupPaneKey?: string | null
   startup: AgentStartupPlan
 }): Promise<void> {
   const { worktreeId, primaryTabId, startup } = args
@@ -235,6 +239,11 @@ export async function ensureAgentStartupInTerminal(args: {
     return
   }
   const launchToken = ensureStartupLaunchToken(startup)
+  const parsedStartupPane = args.startupPaneKey ? parsePaneKey(args.startupPaneKey) : null
+  const hostPane =
+    parsedStartupPane && primaryTabId && parsedStartupPane.tabId === primaryTabId
+      ? parsedStartupPane
+      : undefined
 
   // Why: poll until a terminal tab + PTY exists for the worktree before we
   // can interact with it. Activation creates the tab synchronously but the
@@ -250,7 +259,21 @@ export async function ensureAgentStartupInTerminal(args: {
     if (!tabId) {
       continue
     }
-    ptyId = getAgentStartupTabPtyId(state, tabId, launchToken)
+    const binding = bindHostAgentStartupLaunch({
+      worktreeId,
+      tabId,
+      launchToken,
+      startup,
+      hostPane
+    })
+    if (binding === 'conflict') {
+      return
+    }
+    ptyId = getAgentStartupTabPtyId(
+      binding === 'bound' ? useAppStore.getState() : state,
+      tabId,
+      launchToken
+    )
     if (ptyId) {
       break
     }
@@ -265,6 +288,7 @@ export async function ensureAgentStartupInTerminal(args: {
         tabId,
         launchToken,
         startup,
+        hostPane,
         deliver: deliverAgentStartupToTerminal
       })
     }

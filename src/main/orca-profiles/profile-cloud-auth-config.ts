@@ -10,7 +10,8 @@ export type OrcaCloudAuthConfig = {
   orgEndpoint: string
   logoutEndpoint: string
   relayTokenEndpoint: string
-  relayDirectorUrl: string
+  /** Optional Relay director. Cloud identity/session auth does not depend on Relay. */
+  relayDirectorUrl: string | null
   clientId: string
   scope: string
 }
@@ -38,7 +39,14 @@ function cleanUrl(value: string | undefined, allowLoopbackHttp: boolean): string
       parsed.hostname === '127.0.0.1' ||
       parsed.hostname === 'localhost' ||
       parsed.hostname === '[::1]'
-    if (parsed.protocol !== 'https:' && !(loopbackHost && allowLoopbackHttp)) {
+    if (
+      !['https:', 'http:'].includes(parsed.protocol) ||
+      (parsed.protocol === 'http:' && !(loopbackHost && allowLoopbackHttp)) ||
+      parsed.username !== '' ||
+      parsed.password !== '' ||
+      parsed.search !== '' ||
+      parsed.hash !== ''
+    ) {
       return null
     }
     return parsed.toString().replace(/\/$/, '')
@@ -67,6 +75,8 @@ export type ProductCloudDefaults = {
   clientId: string | null
   /** Production relay director URL when no ORCA_RELAY_URL env override. */
   relayDirectorUrl: string | null
+  /** Whether the product provisions Relay. Omitted for legacy callers. */
+  relayEnabled?: boolean
   /** Product OAuth scopes when no ORCA_CLOUD_AUTH_SCOPE env override. */
   scope: string
   /** Label used in setupMessage when cloud is unconfigured in this product. */
@@ -84,7 +94,8 @@ export function getOrcaCloudAuthConfig(
   const configEnv = packaged ? {} : env
   const cleanEndpointUrl = (value: string | undefined): string | null =>
     cleanUrl(value, allowLoopbackHttp)
-  const configuredApiBaseUrl = configEnv.ORCA_CLOUD_API_URL?.trim()
+  const configuredApiBaseUrl =
+    configEnv.HIVE_PRODUCT_API_BASE_URL?.trim() || configEnv.ORCA_CLOUD_API_URL?.trim()
   // Why: packaged releases cannot depend on launch-time environment injection;
   // each product must explicitly supply its own non-secret production defaults.
   const apiBaseUrl = configuredApiBaseUrl
@@ -93,10 +104,24 @@ export function getOrcaCloudAuthConfig(
       ? productDefaults.apiBaseUrl
       : null
   const clientId =
-    configEnv.ORCA_CLOUD_CLIENT_ID?.trim() || (packaged ? productDefaults.clientId : undefined)
-  const relayDirectorUrl =
-    cleanOrigin(configEnv.ORCA_RELAY_URL, allowLoopbackHttp) ?? productDefaults.relayDirectorUrl
-  if (!apiBaseUrl || !clientId || !relayDirectorUrl) {
+    configEnv.HIVE_PRODUCT_DESKTOP_CLIENT_ID?.trim() ||
+    configEnv.ORCA_CLOUD_CLIENT_ID?.trim() ||
+    (packaged ? productDefaults.clientId : undefined)
+  const relayEnabled =
+    configEnv.HIVE_PRODUCT_RELAY_ENABLED === undefined
+      ? (productDefaults.relayEnabled ?? productDefaults.relayDirectorUrl !== null)
+      : configEnv.HIVE_PRODUCT_RELAY_ENABLED === 'true' ||
+        configEnv.HIVE_PRODUCT_RELAY_ENABLED === '1'
+  const relayDirectorUrl = relayEnabled
+    ? (cleanOrigin(
+        configEnv.HIVE_PRODUCT_RELAY_DIRECTOR_URL?.trim() || configEnv.ORCA_RELAY_URL,
+        allowLoopbackHttp
+      ) ?? productDefaults.relayDirectorUrl)
+    : null
+  // Relay is an optional capability. A product may expose Cloud identity and
+  // session APIs without provisioning a Relay director, so it must not block
+  // the primary sign-in flow.
+  if (!apiBaseUrl || !clientId) {
     return {
       configured: false,
       setupMessage: `${productDefaults.productLabel} sign-in is not configured for this build.`

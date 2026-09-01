@@ -4,13 +4,14 @@ import { sessionStorageKeyForHost } from './web-workspace-session-api'
 import { mergeWebUIState } from './web-preference-normalization'
 import { readLocalWebUIState } from './web-preferences-store'
 import { UI_STORAGE_KEY, writeJson } from './web-storage'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function createWebAppApi(): Partial<PreloadApi> {
   return {
     app: {
       getIdentity: () =>
         Promise.resolve({
-          name: 'Orca',
+          name: APP_DISPLAY_NAME,
           isDev: false,
           devLabel: null,
           devBranch: null,

@@ -13,12 +13,13 @@
  * version's directory is still load-bearing.
  *
  * **The state root is shared across versions.** `~/.orca/` (or `$ORCA_USER_DATA`) is outside
- * every version dir, and Orca's persisted state carries no schema version — migrations run
+ * every version dir, and HiveCode's persisted state carries no schema version — migrations run
  * on load and rewrite in place. So "is the old version able to read what the new one wrote"
  * has no answer that can be computed. That is why rollback is defined against a
  * pre-activation snapshot rather than against a version comparison.
  */
 import type { OrcadActivationRecord } from './orcad-activation-record'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 export type OrcadTerminalCensus = {
   /**
@@ -182,7 +183,7 @@ export function assessOrcadRollback(input: {
       code: 'orcad_rollback_snapshot_missing',
       reason:
         `The pre-activation state snapshot for ${input.record.active ?? 'the active version'} ` +
-        'is gone, and Orca state carries no schema version that could prove the older build ' +
+        `is gone, and ${APP_DISPLAY_NAME} state carries no schema version that could prove the older build ` +
         'can read what the newer one migrated. Switching the binary back would hand ' +
         `${target} a store it may not understand. Deploy forward instead.`
     }

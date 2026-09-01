@@ -108,6 +108,21 @@ describe('orchestration RPC methods', () => {
       return { task, dispatch }
     }
 
+    it('accepts the packaged HiveCode compatibility command', () => {
+      const method = findMethod('orchestration.ask')
+      expect(
+        method.params!.parse({
+          from: 'term_worker',
+          question: 'proceed?',
+          compatibilityCliCommand: 'hivecode',
+          compatibilityWindowsCommand: 'hivecode'
+        })
+      ).toMatchObject({
+        compatibilityCliCommand: 'hivecode',
+        compatibilityWindowsCommand: 'hivecode'
+      })
+    })
+
     it('persists a Run question and returns its first durable answer', async () => {
       setup()
       const { dispatch } = createAskingDispatch()

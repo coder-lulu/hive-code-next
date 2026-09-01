@@ -13,6 +13,12 @@ export type ProductExternalServiceEndpoints = {
 
 type ProductEndpointConfig = {
   endpoints: ProductExternalServiceEndpoints
+  services?: {
+    oss: {
+      enabled: boolean
+      endpoint: string | null
+    }
+  }
 }
 
 type ProductStarRepositoryConfig = {
@@ -24,8 +30,12 @@ type ProductStarRepositoryConfig = {
 export function getProductExternalServiceEndpoints(
   config: ProductEndpointConfig = hivecodeProductConfig
 ): ProductExternalServiceEndpoints {
+  const oss = config.services?.oss
   return {
-    artifacts: config.endpoints.artifacts,
+    // A declared service group is authoritative, including an explicit
+    // disabled state. Legacy endpoint fallback is only for pre-service
+    // manifests that do not declare the group yet.
+    artifacts: oss ? (oss.enabled ? oss.endpoint : null) : config.endpoints.artifacts,
     feedback: config.endpoints.feedback,
     pluginKillList: config.endpoints.pluginKillList,
     pluginMarketplace: config.endpoints.pluginMarketplace,

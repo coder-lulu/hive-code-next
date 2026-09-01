@@ -280,6 +280,121 @@ describe('worktree remote runtime mutations', () => {
     )
   })
 
+  it('sends a token-bound semantic permission startup to a capable Host', async () => {
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/semantic', repoId: 'repo1' })
+    runtimeEnvironmentCall.mockResolvedValue({
+      id: 'rpc-create',
+      ok: true,
+      result: { worktree: wt },
+      _meta: { runtimeId: 'runtime-remote' }
+    })
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+      worktreesByRepo: { repo1: [] }
+    } as Partial<AppState>)
+    const createWorktree = store.getState().createWorktree
+    const args: Parameters<typeof createWorktree> = ['repo1', 'semantic']
+    args[10] = 'goose'
+    args[16] = {
+      command: 'goose',
+      env: { GOOSE_MODE: 'auto' },
+      launchAgent: 'goose',
+      launchToken: 'launch-token',
+      agentPermissionMode: 'yolo'
+    }
+    args[25] = {
+      startupPrompt: 'implement the task',
+      startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high' }
+    } as never
+
+    await createWorktree(...args)
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'worktree.create',
+        params: expect.objectContaining({
+          startupCommand: 'goose',
+          startupEnv: { GOOSE_MODE: 'auto' },
+          startupLaunchToken: 'launch-token',
+          startupPermissionMode: 'yolo',
+          startupAgent: 'goose',
+          startupPrompt: 'implement the task',
+          startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high' }
+        })
+      })
+    )
+  })
+
+  it('does not create a partial workspace when the Host lacks semantic permission startup', async () => {
+    const oldRuntimeStatus = createCompatibleRuntimeStatusResponse('runtime-old')
+    if (oldRuntimeStatus.ok) {
+      oldRuntimeStatus.result.capabilities = oldRuntimeStatus.result.capabilities?.filter(
+        (capability) => capability !== 'agent-session.launch-permission.v1'
+      )
+    }
+    runtimeEnvironmentTransportCall.mockImplementation((request: RuntimeEnvironmentCallRequest) =>
+      request.method === 'status.get' ? oldRuntimeStatus : runtimeEnvironmentCall(request)
+    )
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/legacy', repoId: 'repo1' })
+    runtimeEnvironmentCall.mockResolvedValue({
+      id: 'rpc-create',
+      ok: true,
+      result: { worktree: wt },
+      _meta: { runtimeId: 'runtime-old' }
+    })
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+      worktreesByRepo: { repo1: [] }
+    } as Partial<AppState>)
+    const createWorktree = store.getState().createWorktree
+    const args: Parameters<typeof createWorktree> = ['repo1', 'legacy']
+    args[10] = 'goose'
+    args[16] = {
+      command: 'goose',
+      env: { GOOSE_MODE: 'auto' },
+      launchAgent: 'goose',
+      launchToken: 'launch-token',
+      agentPermissionMode: 'yolo'
+    }
+    args[25] = { startupPrompt: 'implement the task' }
+
+    await expect(createWorktree(...args)).rejects.toThrow(/permission-aware agent launches/i)
+
+    expect(
+      runtimeEnvironmentCall.mock.calls.some(([request]) => request.method === 'worktree.create')
+    ).toBe(false)
+  })
+
+  it('preflights a Renderer-owned permission launch before creating the workspace', async () => {
+    const oldRuntimeStatus = createCompatibleRuntimeStatusResponse('runtime-old')
+    if (oldRuntimeStatus.ok) {
+      oldRuntimeStatus.result.capabilities = oldRuntimeStatus.result.capabilities?.filter(
+        (capability) => capability !== 'agent-session.launch-permission.v1'
+      )
+    }
+    runtimeEnvironmentTransportCall.mockImplementation((request: RuntimeEnvironmentCallRequest) =>
+      request.method === 'status.get' ? oldRuntimeStatus : runtimeEnvironmentCall(request)
+    )
+    const store = createTestStore()
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+      worktreesByRepo: { repo1: [] }
+    } as Partial<AppState>)
+    const createWorktree = store.getState().createWorktree
+    const args: Parameters<typeof createWorktree> = ['repo1', 'renderer-owned']
+    args[10] = 'goose'
+    args[25] = { requiresAgentLaunchPermissionCapability: true } as never
+
+    await expect(createWorktree(...args)).rejects.toThrow(/permission-aware agent launches/i)
+
+    expect(
+      runtimeEnvironmentCall.mock.calls.some(([request]) => request.method === 'worktree.create')
+    ).toBe(false)
+    expect(store.getState().worktreesByRepo.repo1).toEqual([])
+  })
+
   it('passes task startup drafts only to the owning remote runtime', async () => {
     const store = createTestStore()
     const wt = makeWorktree({

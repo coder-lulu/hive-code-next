@@ -1,4 +1,5 @@
 import type { CliInstallStatus } from '../../shared/cli-install-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { getDefaultWslDistro } from '../wsl'
 import { runWslProcess } from '../wsl/wsl-runner'
 import { CliInstaller } from './cli-installer'
@@ -19,8 +20,13 @@ import { buildWslCliStatus, readWslCliCommandFile, resolveReadyWslCliState } fro
 
 const MANAGED_MARKER = getWslLauncherMarker()
 const BRIDGE_MANAGED_MARKER = getWslBridgeMarker()
-const LEGACY_WSL_COMMAND_NAME = 'orca'
+const LEGACY_WSL_COMMAND_NAMES = ['orca', 'orca-ide'] as const
 const WSL_COMMAND_TIMEOUT_MS = 10_000
+
+function getLegacyCommandPaths(commandPath: string): string[] {
+  const commandDirectory = getPosixDirname(commandPath)
+  return LEGACY_WSL_COMMAND_NAMES.map((commandName) => `${commandDirectory}/${commandName}`)
+}
 
 function normalizeManagedScriptContent(content: string): string {
   return content.replace(/\n+$/u, '\n')
@@ -76,7 +82,7 @@ export class WslCliInstaller {
         state: 'not_installed',
         currentTarget: null,
         pathConfigured: ready.pathConfigured,
-        detail: `Register ${ready.commandPath} to use Orca from WSL.`
+        detail: `Register ${ready.commandPath} to use ${APP_DISPLAY_NAME} from WSL.`
       })
     }
 
@@ -88,7 +94,7 @@ export class WslCliInstaller {
         state: 'conflict',
         currentTarget: null,
         pathConfigured: ready.pathConfigured,
-        detail: `${ready.commandPath} exists but is not an Orca launcher script.`
+        detail: `${ready.commandPath} exists but is not a ${APP_DISPLAY_NAME} launcher script.`
       })
     }
 
@@ -125,7 +131,7 @@ export class WslCliInstaller {
         detail:
           bridgeContent === null || bridgeManaged
             ? `${ready.commandPath} is missing its PowerShell bridge.`
-            : `${ready.bridgePath} exists but is not managed by Orca.`
+            : `${ready.bridgePath} exists but is not managed by ${APP_DISPLAY_NAME}.`
       })
     }
 
@@ -141,10 +147,10 @@ export class WslCliInstaller {
       currentTarget,
       pathConfigured: ready.pathConfigured,
       detail: !managed
-        ? `${ready.commandPath} exists but is not managed by Orca.`
+        ? `${ready.commandPath} exists but is not managed by ${APP_DISPLAY_NAME}.`
         : bridgeConflict
-          ? `${ready.bridgePath} exists but is not managed by Orca.`
-          : `${ready.commandPath} points to a different Orca launcher.`
+          ? `${ready.bridgePath} exists but is not managed by ${APP_DISPLAY_NAME}.`
+          : `${ready.commandPath} points to a different ${APP_DISPLAY_NAME} launcher.`
     })
   }
 
@@ -171,16 +177,19 @@ export class WslCliInstaller {
       return { changed: true, managed: true, status: await this.install(status) }
     }
 
-    const legacyCommandPath = status.commandPath
-      ? `${getPosixDirname(status.commandPath)}/${LEGACY_WSL_COMMAND_NAME}`
-      : null
-    if (!legacyCommandPath || !this.distro) {
+    const legacyCommandPaths = status.commandPath ? getLegacyCommandPaths(status.commandPath) : []
+    if (legacyCommandPaths.length === 0 || !this.distro) {
       return { changed: false, managed: status.state === 'installed', status }
     }
 
-    const legacyContent = await this.readCommandFile(this.distro, legacyCommandPath)
-    const legacyManaged =
-      typeof legacyContent === 'string' && legacyContent.includes(MANAGED_MARKER)
+    let legacyManaged = false
+    for (const legacyCommandPath of legacyCommandPaths) {
+      const legacyContent = await this.readCommandFile(this.distro, legacyCommandPath)
+      if (typeof legacyContent === 'string' && legacyContent.includes(MANAGED_MARKER)) {
+        legacyManaged = true
+        break
+      }
+    }
     if (!legacyManaged) {
       return { changed: false, managed: status.state === 'installed', status }
     }
@@ -195,7 +204,8 @@ export class WslCliInstaller {
     }
 
     // Why: a legacy-only managed command proves the user opted into WSL CLI
-    // registration; install the current name before removing that owned script.
+    // registration. Install the primary name and keep the old managed alias
+    // working for compatibility until the user explicitly removes the CLI.
     return { changed: true, managed: true, status: await this.install(status) }
   }
 
@@ -207,7 +217,9 @@ export class WslCliInstaller {
       throw new Error(status.detail ?? 'WSL CLI registration is unavailable.')
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+      throw new Error(
+        `Refusing to replace non-${APP_DISPLAY_NAME} command at ${status.commandPath}.`
+      )
     }
 
     await this.run(
@@ -226,23 +238,30 @@ export class WslCliInstaller {
     if (!status.supported || !status.commandPath) {
       return status
     }
-    const legacyCommandPath = `${getPosixDirname(status.commandPath)}/${LEGACY_WSL_COMMAND_NAME}`
+    const legacyCommandPaths = getLegacyCommandPaths(status.commandPath)
     if (status.state === 'not_installed') {
       // Why: a managed legacy `orca` left behind would later be re-adopted by
       // startup reconciliation as opt-in proof, silently undoing this removal.
       await this.run(
         this.distro as string,
-        ['set -eu', buildManagedLegacyRemoveCommand(quoteShell(legacyCommandPath))].join('\n')
+        [
+          'set -eu',
+          ...legacyCommandPaths.map((commandPath) =>
+            buildManagedLegacyRemoveCommand(quoteShell(commandPath))
+          )
+        ].join('\n')
       )
       return status
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+      throw new Error(
+        `Refusing to remove non-${APP_DISPLAY_NAME} command at ${status.commandPath}.`
+      )
     }
 
     await this.run(
       this.distro as string,
-      buildSafeRemoveCommand(status.commandPath, legacyCommandPath)
+      buildSafeRemoveCommand(status.commandPath, legacyCommandPaths)
     )
     return this.getStatus()
   }

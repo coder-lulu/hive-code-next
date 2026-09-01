@@ -22,6 +22,7 @@ const {
 } = require('./scripts/verify-packaged-node-pty-job-ownership.cjs')
 const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.cjs')
 const productManifest = require('./product/hivecode.product.json')
+const packageJson = require('../package.json')
 
 // Why: dev-channel builds must carry the *release* identity — same bundle id,
 // Developer ID signature, and notarization ticket — or Squirrel.Mac refuses to
@@ -68,6 +69,31 @@ const packagedMetadata = {
   author: { name: productManifest.displayName }
 }
 const packagedVersion = devChannelBuildVersion ?? localBuildVersion
+const releaseVersionName = packagedVersion ?? packageJson.version
+const configuredBuildNumber = Number.parseInt(process.env.HIVECODE_BUILD_NUMBER ?? '', 10)
+const packagedBuildNumber =
+  Number.isSafeInteger(configuredBuildNumber) && configuredBuildNumber > 0
+    ? configuredBuildNumber
+    : undefined
+const configuredReleaseChannel = process.env.HIVECODE_RELEASE_CHANNEL
+const releaseChannel = ['internal', 'beta', 'stable', 'rc'].includes(configuredReleaseChannel)
+  ? configuredReleaseChannel
+  : /-beta\./.test(releaseVersionName)
+    ? 'beta'
+    : /-rc\./.test(releaseVersionName)
+      ? 'rc'
+      : 'stable'
+const desktopPlatform =
+  process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux'
+const hivecodeReleaseIdentity = {
+  product: 'hivecode',
+  platform: desktopPlatform,
+  architecture: process.arch,
+  channel: releaseChannel,
+  versionName: releaseVersionName,
+  buildNumber: packagedBuildNumber ?? 1,
+  commitSha: process.env.HIVECODE_COMMIT_SHA ?? null
+}
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
   to: 'onboarding/feature-wall',
@@ -122,13 +148,15 @@ module.exports = {
       schemes: [productManifest.schemes.primary, ...productManifest.schemes.aliases]
     }
   ],
-  // Why: undefined lets electron-builder infer a GitHub publisher from package metadata
-  // or the current Git remote. The product manifest has no approved release authority,
-  // so make every packaging channel explicitly non-publishing.
+  // Why: an explicit null publisher makes release output fail closed. Installer
+  // bytes must be uploaded by the HiveCloud release workflow, never inferred to
+  // a third-party provider when a job forgets its publish override.
   publish: null,
   extraMetadata: {
     ...packagedMetadata,
-    ...(packagedVersion ? { version: packagedVersion } : {})
+    ...(packagedVersion ? { version: packagedVersion } : {}),
+    ...(packagedBuildNumber ? { hivecodeBuildNumber: packagedBuildNumber } : {}),
+    ...(process.env.HIVECODE_EMBED_RELEASE_IDENTITY === '1' ? { hivecodeReleaseIdentity } : {})
   },
   directories: {
     buildResources: 'resources/build'
@@ -157,6 +185,9 @@ module.exports = {
     // it is gitignored, but exclude it defensively so a stray local capture at
     // package time never bloats app.asar.
     '!pr-evidence{,/**/*}',
+    // Why: local agent configuration can contain credentials and session state;
+    // it is never a runtime input and must not cross the packaging boundary.
+    '!{.claude,.grok,.agents,.codex}{,/**/*}',
     // Why: local clean-build rehearsals may place pnpm's content-addressed store
     // under the repository root. It is never a runtime input and can exceed 2 GiB.
     '!.pnpm-store{,/**/*}',
@@ -331,7 +362,10 @@ module.exports = {
       chmodSync(join(resourcesDir, filename), 0o755)
     }
     if (context.electronPlatformName === 'darwin') {
-      await signMacComputerUseHelper(join(resourcesDir, 'Orca Computer Use.app'), context.packager)
+      await signMacComputerUseHelper(
+        join(resourcesDir, 'HiveCode Computer Use.app'),
+        context.packager
+      )
       await signMacStandaloneHelper(
         join(resourcesDir, '..', 'MacOS', 'orca-notification-status'),
         'orca-notification-status',
@@ -359,6 +393,10 @@ module.exports = {
       ...createPackagedRuntimeNodeModuleResources('win32'),
       winSpeechNativeResource,
       {
+        from: 'resources/win32/bin/hive.cmd',
+        to: 'bin/hive.cmd'
+      },
+      {
         from: 'resources/win32/bin/hivecode.cmd',
         to: 'bin/hivecode.cmd'
       },
@@ -369,6 +407,10 @@ module.exports = {
       {
         from: 'resources/win32/bin/orca-ide.cmd',
         to: 'bin/orca-ide.cmd'
+      },
+      {
+        from: 'native/windows-cli-launcher/.build/orca.exe',
+        to: 'bin/hive.exe'
       },
       {
         from: 'native/windows-cli-launcher/.build/orca.exe',
@@ -464,6 +506,10 @@ module.exports = {
       ...createPackagedRuntimeNodeModuleResources('darwin'),
       macSpeechNativeResource,
       {
+        from: 'resources/darwin/bin/hive',
+        to: 'bin/hive'
+      },
+      {
         from: 'resources/darwin/bin/hivecode',
         to: 'bin/hivecode'
       },
@@ -486,8 +532,8 @@ module.exports = {
         to: 'serve-sim'
       },
       {
-        from: 'native/computer-use-macos/.build/release/Orca Computer Use.app',
-        to: 'Orca Computer Use.app'
+        from: 'native/computer-use-macos/.build/release/HiveCode Computer Use.app',
+        to: 'HiveCode Computer Use.app'
       },
       featureWallResources
     ],
@@ -545,6 +591,10 @@ module.exports = {
             }
           ]
         : []),
+      {
+        from: 'resources/linux/bin/hive',
+        to: 'bin/hive'
+      },
       {
         from: 'resources/linux/bin/hivecode',
         to: 'bin/hivecode'
@@ -607,7 +657,7 @@ module.exports = {
       'xclip',
       'xvfb'
     ],
-    // Why: symlink the bundled CLI onto PATH at install time so `orca-ide serve`
+    // Why: symlink the bundled CLI onto PATH at install time so `hive serve`
     // works on a headless host. The in-app CLI registration (CliInstaller) is
     // GUI-triggered and can never run on a server, so without this the CLI is
     // unreachable from the shell on exactly the hosts that need it.
@@ -647,7 +697,7 @@ function chmodUnixCliLaunchers(resourcesDir, electronPlatformName) {
   if (electronPlatformName === 'win32') {
     return
   }
-  for (const launcherName of ['hivecode', 'orca', 'orca-ide']) {
+  for (const launcherName of ['hive', 'hivecode', 'orca', 'orca-ide']) {
     const launcherPath = join(resourcesDir, 'bin', launcherName)
     if (!existsSync(launcherPath)) {
       continue

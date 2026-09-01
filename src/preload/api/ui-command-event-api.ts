@@ -59,6 +59,8 @@ export type UiCommandEventApi = {
   onOpenQuickOpen: (callback: () => void) => () => void
   onToggleQuickCommandsMenu: (callback: () => void) => () => void
   onOpenNewWorkspace: (callback: () => void) => () => void
+  /** Emitted by the main process for Cmd/Ctrl+N. Optional for older/web bridges. */
+  onOpenNewTaskHome?: (callback: () => void) => () => void
   onDeleteCurrentWorkspace: (callback: () => void) => () => void
   onOpenWorkspaceBoard: (callback: () => void) => () => void
   onOpenTasks: (callback: () => void) => () => void

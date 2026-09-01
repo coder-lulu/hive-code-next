@@ -5,7 +5,7 @@ import {
   recoverMobileRelayPairing,
   resetMobileRelayPairingRecoveryForTests
 } from './mobile-relay-pairing-recovery'
-import type { PairingCandidateClient } from './mobile-relay-physical-client'
+import { RelayOuterError, type PairingCandidateClient } from './mobile-relay-physical-client'
 import type { PairingOffer, RpcResponse } from './types'
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }))
@@ -101,7 +101,6 @@ function dependencies(args: {
     clearJournal: vi.fn(async () => {}),
     readCredentialBundle: vi.fn(async () => args.bundle ?? null),
     writeCredentialBundle: vi.fn(async () => {}),
-    loadHosts: vi.fn(async () => []),
     saveHost: vi.fn(async () => {}),
     connectRelay: args.connectRelay,
     resolveInviteDirector: vi.fn(async () => {
@@ -141,6 +140,37 @@ describe('mobile relay pairing recovery', () => {
     expect(deps.writeCredentialBundle).toHaveBeenCalledOnce()
     expect(deps.saveHost).toHaveBeenCalledOnce()
     expect(deps.clearJournal).toHaveBeenCalledOnce()
+  })
+
+  it('never treats an old credential bundle as proof that an ambiguous install was published', async () => {
+    const saved = journal()
+    const committed = installed(saved, 'authenticated-direct')
+    const pending = client(async () =>
+      response(endpoints(saved, { state: 'committed', result: committed }))
+    )
+    const oldBundle: MobileRelayCredentialBundle = {
+      v: 1,
+      hostId: saved.metadata.host.id,
+      deviceToken: saved.secrets.deviceToken,
+      current: {
+        token: 'C'.repeat(43),
+        hash: 'D'.repeat(43),
+        version: 1,
+        expiresAt: now + 60_000
+      }
+    }
+    const deps = dependencies({
+      journal: saved,
+      connectRelay: vi.fn(() => pending),
+      bundle: oldBundle
+    })
+
+    await expect(recoverMobileRelayPairing(deps)).resolves.toBe('recovered')
+    expect(deps.connectRelay).toHaveBeenCalledWith(
+      expect.objectContaining({ credential: saved.secrets.pendingResumeToken })
+    )
+    expect(deps.writeCredentialBundle).toHaveBeenCalledOnce()
+    expect(deps.saveHost).toHaveBeenCalledOnce()
   })
 
   it('tries pending then current before an unexpired invite and transitions after not-found', async () => {
@@ -220,9 +250,21 @@ describe('mobile relay pairing recovery', () => {
     expect(saved.metadata.authorizationMode).toBe('authenticated-direct')
     expect(deps.updateJournal).toHaveBeenCalledTimes(2)
   })
-  // Why: a journal stranded by a relay outage used to block every later pairing
-  // with "recovery pending" forever, because recovery only ever deferred.
-  it('abandons a journal once its invite expired and no credential can reconcile', async () => {
+  it('abandons an expired journal after every resume credential is authoritatively rejected', async () => {
+    const saved = journal()
+    const rejected = client(async () => {
+      throw new RelayOuterError(4401)
+    })
+    const deps = {
+      ...dependencies({ journal: saved, connectRelay: vi.fn(() => rejected) }),
+      now: () => saved.metadata.relay.inviteExpiresAt + 10 * 60 * 1000 + 1
+    }
+
+    await expect(recoverMobileRelayPairing(deps)).resolves.toBe('abandoned')
+    expect(deps.clearJournal).toHaveBeenCalledWith(saved.metadata.journalId)
+  })
+
+  it('keeps an old journal when a transport outage leaves commit state ambiguous', async () => {
     const saved = journal()
     const unreachable = client(async () => {
       throw new Error('relay unreachable')
@@ -232,8 +274,8 @@ describe('mobile relay pairing recovery', () => {
       now: () => saved.metadata.relay.inviteExpiresAt + 10 * 60 * 1000 + 1
     }
 
-    await expect(recoverMobileRelayPairing(deps)).resolves.toBe('abandoned')
-    expect(deps.clearJournal).toHaveBeenCalledWith(saved.metadata.journalId)
+    await expect(recoverMobileRelayPairing(deps)).resolves.toBe('deferred')
+    expect(deps.clearJournal).not.toHaveBeenCalled()
   })
 
   it('keeps a just-expired journal so a brief outage cannot discard it', async () => {

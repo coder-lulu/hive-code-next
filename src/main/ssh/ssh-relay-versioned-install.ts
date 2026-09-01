@@ -5,7 +5,7 @@
 // See: docs/ssh-relay-versioned-install-dirs.md
 
 import { join } from 'node:path'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { existsSync, readFileSync } from 'node:fs'
 import type { SshConnection } from './ssh-connection'
 import { execCommand } from './ssh-relay-deploy-helpers'
@@ -55,17 +55,13 @@ export function readLocalFullVersion(localRelayDir: string): string {
   const versionFile = join(localRelayDir, '.version')
   if (!existsSync(versionFile)) {
     throw new Error(
-      applyProductBranding(
-        `Orca's local relay build is missing its version marker at ${versionFile}. This usually indicates a packaging or build problem; reinstall Orca.`
-      )
+      `${APP_DISPLAY_NAME}'s local relay build is missing its version marker at ${versionFile}. This usually indicates a packaging or build problem; reinstall ${APP_DISPLAY_NAME}.`
     )
   }
   const v = readFileSync(versionFile, 'utf-8').trim()
   if (!v) {
     throw new Error(
-      applyProductBranding(
-        `Orca's local relay version marker at ${versionFile} is empty. This usually indicates a packaging or build problem; reinstall Orca.`
-      )
+      `${APP_DISPLAY_NAME}'s local relay version marker at ${versionFile} is empty. This usually indicates a packaging or build problem; reinstall ${APP_DISPLAY_NAME}.`
     )
   }
   return v

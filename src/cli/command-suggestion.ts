@@ -1,4 +1,5 @@
 import { specPaths, type CommandSpec } from './command-spec'
+import { PRIMARY_CLI_COMMAND } from '../shared/brand'
 
 // Why: rank the live registry so typo recovery cannot drift from accepted paths.
 
@@ -112,7 +113,7 @@ export function suggestCommands(specs: CommandSpec[], commandPath: string[]): st
 export function unknownCommandData(specs: CommandSpec[], commandPath: string[]): CommandErrorData {
   const suggestions = suggestCommands(specs, commandPath)
   const nextSteps = suggestions.length
-    ? [`Did you mean: ${suggestions.map((path) => `orca ${path}`).join(', ')}`]
+    ? [`Did you mean: ${suggestions.map((path) => `${PRIMARY_CLI_COMMAND} ${path}`).join(', ')}`]
     : []
   return { suggestions, nextSteps }
 }

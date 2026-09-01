@@ -1,4 +1,5 @@
 import type { AiVaultSessionTitle } from './ai-vault-session-title'
+import type { SessionProjectAssignment } from './session-project-assignment'
 import type { TuiAgent } from './tui-agent'
 
 // ─── Terminal Tab (legacy — used by persistence and TerminalContentSlice) ─
@@ -15,6 +16,8 @@ export type TerminalTab = {
   generatedTitle?: string | null
   /** Stable AI Vault conversation name, bound to its provider session identity. */
   aiVaultTitle?: AiVaultSessionTitle | null
+  /** Optional project organization without unsafe live-PTY reparenting. */
+  projectAssignment?: SessionProjectAssignment
   /** Stable label from the tab-bar Quick Command that created this terminal. */
   quickCommandLabel?: string | null
   customTitle: string | null

@@ -30,6 +30,7 @@ export function registerAutoUpdaterHandlers({
   getPublishingWindowLastGoodCheck,
   getMissingManifestPrereleaseFallbackUserInitiated,
   getCurrentStatus,
+  getUpdateMetadata,
   getActiveUpdateCheckEventAttemptId,
   getKnownReleaseUrl,
   getPendingInstallVersion,
@@ -79,7 +80,8 @@ export function registerAutoUpdaterHandlers({
         sendStatus({
           state: 'downloaded',
           version: getPendingInstallVersion(),
-          releaseUrl: getKnownReleaseUrl()
+          releaseUrl: getKnownReleaseUrl(),
+          ...getUpdateMetadata()
         })
       })
     })
@@ -202,7 +204,12 @@ export function registerAutoUpdaterHandlers({
           }
         }
 
-        sendStatus({ state: 'available', version: info.version, changelog })
+        sendStatus({
+          state: 'available',
+          version: info.version,
+          changelog,
+          ...getUpdateMetadata()
+        })
       } finally {
         clearUpdateAvailableEventPending(attemptId)
       }
@@ -249,7 +256,8 @@ export function registerAutoUpdaterHandlers({
     sendStatus({
       state: 'downloading',
       percent: Math.round(progress.percent),
-      version
+      version,
+      ...getUpdateMetadata()
     })
   })
 
@@ -287,10 +295,20 @@ export function registerAutoUpdaterHandlers({
     if (process.platform === 'darwin' && !macInstallerReady) {
       // Keep the UI at 100% downloaded while Squirrel processes, to avoid a premature "ready to install".
       recordUpdaterLifecycle('macos_waiting_for_squirrel', { version: info.version })
-      sendStatus({ state: 'downloading', percent: 100, version: info.version })
+      sendStatus({
+        state: 'downloading',
+        percent: 100,
+        version: info.version,
+        ...getUpdateMetadata()
+      })
       return
     }
-    sendStatus({ state: 'downloaded', version: info.version, releaseUrl: getKnownReleaseUrl() })
+    sendStatus({
+      state: 'downloaded',
+      version: info.version,
+      releaseUrl: getKnownReleaseUrl(),
+      ...getUpdateMetadata()
+    })
   })
 
   autoUpdater.on('error', (err) => {

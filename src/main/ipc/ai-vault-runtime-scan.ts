@@ -3,7 +3,7 @@ import {
   type AiVaultListArgs,
   type AiVaultListResult
 } from '../../shared/ai-vault-types'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   abandonRemoteSessionScanOnCancel,
   throwIfAiVaultScanCancelled
@@ -57,9 +57,7 @@ export async function scanRuntimeAiVaultSessions(args: {
     }
     return runtimeScanIssueResult(
       args.hostInfo,
-      error instanceof Error
-        ? applyProductBranding(error.message)
-        : applyProductBranding('Remote Orca server is unavailable.')
+      error instanceof Error ? error.message : `Remote ${APP_DISPLAY_NAME} server is unavailable.`
     )
   }
 }

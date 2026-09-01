@@ -258,7 +258,7 @@ export function AppearanceInterfaceSection({
                   // activation and the close-keeps-running lifecycle stay intact.
                   description={translate(
                     'settings.appearance.menuBarIcon.description',
-                    'Keep an Orca shortcut and activity indicator in the macOS menu bar.'
+                    'Keep a HiveCode shortcut and activity indicator in the macOS menu bar.'
                   )}
                   checked={settings.showMenuBarIcon !== false}
                   onChange={() =>

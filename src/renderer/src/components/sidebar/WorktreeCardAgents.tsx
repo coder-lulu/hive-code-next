@@ -167,14 +167,18 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
       }
       // Why: design-doc rule — every user-initiated worktree switch must route through activateAndRevealWorktree (cross-repo activation + nav history).
       activateAndRevealWorktree(worktreeId)
-      const tabs = useAppStore.getState().tabsByWorktree[worktreeId] ?? []
+      const state = useAppStore.getState()
+      const tabs = state.tabsByWorktree[worktreeId] ?? []
       if (tabs.some((t) => t.id === tabId)) {
         activateTabAndFocusPane(tabId, parsed.leafId, {
           ackPaneKeyOnSuccess: paneKey,
           flashFocusedPane: true,
           scrollToBottomIfOutputSinceLastView: true
         })
-      } else if (!activateStructuredAgentSessionTab({ worktreeId, tabId })) {
+      } else if (activateStructuredAgentSessionTab({ worktreeId, tabId })) {
+        // Structured sessions have no xterm focus event to acknowledge the exact completion.
+        state.consumeAgentCompletionUnread(paneKey)
+      } else {
         const liveEntry = useAppStore.getState().agentStatusByPaneKey[paneKey]
         if (liveEntry?.worktreeId === worktreeId) {
           // Why: orchestration worker status can be worktree-attributed before the renderer knows its tab; keep the live row instead of dismissing as stale.
@@ -185,8 +189,11 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
     },
     [worktreeId]
   )
-  const handleActivateRetainedAgent = useCallback(() => {
-    // Why: hibernation-retained rows are passive completion evidence; activating would resume sleeping sessions, so the row is inert.
+  const handleActivateRetainedAgent = useCallback((_tabId: string, paneKey: string) => {
+    // Keep the hibernated session asleep while acknowledging its completion.
+    const state = useAppStore.getState()
+    state.acknowledgeAgents([paneKey])
+    state.consumeAgentCompletionUnread(paneKey)
   }, [])
 
   // Why: one 30s tick per non-empty inline list; zero-agent cards never mount this (see WorktreeCardAgents), so idle worktrees pay no timer cost.

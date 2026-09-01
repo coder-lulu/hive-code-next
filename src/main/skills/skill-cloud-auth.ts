@@ -34,7 +34,7 @@ export async function runSkillCloudOperation<T>(input: {
       current.profile.cloud?.cloudProfileId !== stamp.cloudProfileId ||
       (current.profile.cloud?.activeOrgId ?? '') !== stamp.organizationId
     ) {
-      throw new Error('The signed-in Orca account changed during the skill request.')
+      throw new Error('The signed-in HiveCode account changed during the skill request.')
     }
   }
   if (override) {

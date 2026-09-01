@@ -5,6 +5,7 @@ import type {
   RuntimeWorktreeCreateResult,
   RuntimeWorktreeRemoveResult
 } from '../../shared/runtime-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { CommandHandler } from '../dispatch'
 import { formatWorktreeList, formatWorktreePs, formatWorktreeShow, printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
@@ -165,7 +166,7 @@ async function getCreateRepoSelector(
   }
   throw new RuntimeClientError(
     'invalid_argument',
-    'Missing repo selector. Pass --repo or run from inside an Orca-managed worktree.'
+    `Missing repo selector. Pass --repo or run from inside a ${APP_DISPLAY_NAME}-managed worktree.`
   )
 }
 
@@ -289,7 +290,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     if (!hostId) {
       throw new RuntimeClientError(
         'worktree_host_unresolved',
-        'Orca cannot tell which host owns this workspace. Refresh projects and try again.'
+        `${APP_DISPLAY_NAME} cannot tell which host owns this workspace. Refresh projects and try again.`
       )
     }
     const result = await client.call<RuntimeWorktreeRemoveResult>('worktree.rm', {

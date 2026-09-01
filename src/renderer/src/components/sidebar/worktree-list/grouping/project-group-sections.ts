@@ -15,6 +15,7 @@ import {
   withRepoSectionDisplayLabels
 } from './section-order'
 import { buildFolderWorkspaceRow } from './row-builders'
+import { translate } from '@/i18n/i18n'
 
 export function appendProjectGroupSections(
   ctx: SectionAppendContext,
@@ -24,9 +25,18 @@ export function appendProjectGroupSections(
     folderWorkspaces: readonly RenderableFolderWorkspace[]
     projectOrderBy: ProjectOrderBy
     repoOrder: Map<string, number> | undefined
+    /** Keep repos without a persisted group inside an explicit derived space. */
+    showUngroupedProjectGroup?: boolean
   }
 ): void {
-  const { orderedGroups, projectGroups, folderWorkspaces, projectOrderBy, repoOrder } = args
+  const {
+    orderedGroups,
+    projectGroups,
+    folderWorkspaces,
+    projectOrderBy,
+    repoOrder,
+    showUngroupedProjectGroup = false
+  } = args
   const { result, collapsedGroups } = ctx
 
   const groupByProjectGroupId = new Map<string | null, OrderedGroupEntry[]>()
@@ -83,14 +93,42 @@ export function appendProjectGroupSections(
     )
   }
 
-  const getProjectGroupSubtreeCount = (groupId: string): number => {
-    const directCount = groupByProjectGroupId.get(groupId)?.length ?? 0
-    const folderWorkspaceCount = folderWorkspacesByProjectGroupId.get(groupId)?.length ?? 0
-    const children = childGroupsByParentId.get(groupId) ?? []
-    return children.reduce(
-      (count, child) => count + getProjectGroupSubtreeCount(child.id),
-      directCount + folderWorkspaceCount
-    )
+  // Compute group aggregates once. The previous per-header recursion repeated
+  // subtree walks and rescanned the full repo catalog for every group.
+  const directRepoGroupIds = new Set<string>()
+  for (const [groupId, entries] of groupByProjectGroupId) {
+    if (groupId && entries.length > 0) {
+      directRepoGroupIds.add(groupId)
+    }
+  }
+  for (const repo of ctx.repoMap.values()) {
+    if (repo.projectGroupId) {
+      directRepoGroupIds.add(repo.projectGroupId)
+    }
+  }
+  const subtreeCountByGroupId = new Map<string, number>()
+  const hasRepositorySourceByGroupId = new Map<string, boolean>()
+  const aggregateVisiting = new Set<string>()
+  const computeGroupAggregates = (groupId: string): void => {
+    if (subtreeCountByGroupId.has(groupId) || aggregateVisiting.has(groupId)) {
+      return
+    }
+    aggregateVisiting.add(groupId)
+    let subtreeCount =
+      (groupByProjectGroupId.get(groupId)?.length ?? 0) +
+      (folderWorkspacesByProjectGroupId.get(groupId)?.length ?? 0)
+    let hasRepositorySource = directRepoGroupIds.has(groupId)
+    for (const child of childGroupsByParentId.get(groupId) ?? []) {
+      computeGroupAggregates(child.id)
+      subtreeCount += subtreeCountByGroupId.get(child.id) ?? 0
+      hasRepositorySource ||= hasRepositorySourceByGroupId.get(child.id) ?? false
+    }
+    aggregateVisiting.delete(groupId)
+    subtreeCountByGroupId.set(groupId, subtreeCount)
+    hasRepositorySourceByGroupId.set(groupId, hasRepositorySource)
+  }
+  for (const projectGroup of projectGroups) {
+    computeGroupAggregates(projectGroup.id)
   }
 
   const appendProjectGroup = (projectGroup: ProjectGroup, depth: number): void => {
@@ -101,11 +139,12 @@ export function appendProjectGroupSections(
       type: 'header',
       key,
       label: projectGroup.name,
-      count: getProjectGroupSubtreeCount(projectGroup.id),
+      count: subtreeCountByGroupId.get(projectGroup.id) ?? 0,
       tone: PROJECT_GROUP_META.tone,
       icon: PROJECT_GROUP_META.icon,
       projectGroup,
-      projectGroupDepth: depth
+      projectGroupDepth: depth,
+      hasRepositorySource: hasRepositorySourceByGroupId.get(projectGroup.id) ?? false
     })
     if (!collapsedGroups.has(key)) {
       for (const pair of folderWorkspacesByProjectGroupId.get(projectGroup.id) ?? []) {
@@ -132,6 +171,39 @@ export function appendProjectGroupSections(
     // not fetched yet; missing metadata must not make those repos disappear.
     remainingRepoEntries.push(...entries)
   }
+
+  // A repo can arrive before its ProjectGroup metadata (or intentionally have
+  // no group at all). Keep that state visible as a real, derived space instead
+  // of flattening it beside persisted spaces. The null id is presentation-only
+  // and is never sent to group mutations.
+  if (showUngroupedProjectGroup && remainingRepoEntries.length > 0) {
+    const key = getProjectGroupHeaderKey(null)
+    const label = translate('components.desktopHome.ungrouped', 'Ungrouped')
+    const count = remainingRepoEntries.reduce(
+      (total, [, entry]) => total + entry.items.length + (entry.folderWorkspaces?.length ?? 0),
+      0
+    )
+    result.push({
+      type: 'header',
+      key,
+      label,
+      count,
+      tone: PROJECT_GROUP_META.tone,
+      icon: PROJECT_GROUP_META.icon,
+      projectGroup: { id: null, name: label, tabOrder: Number.MAX_SAFE_INTEGER },
+      projectGroupDepth: 0,
+      hasRepositorySource: true
+    })
+    if (!collapsedGroups.has(key)) {
+      appendOrderedGroups(
+        ctx,
+        withRepoSectionDisplayLabels(sortRepoEntriesWithinGroup(remainingRepoEntries)),
+        1
+      )
+    }
+    return
+  }
+
   appendOrderedGroups(
     ctx,
     withRepoSectionDisplayLabels(sortRepoEntriesWithinGroup(remainingRepoEntries)),

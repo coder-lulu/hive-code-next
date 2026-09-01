@@ -65,4 +65,17 @@ describe('Hive account preload subscription', () => {
     expect(onStateChanged).toHaveBeenCalledExactlyOnceWith(state)
     expect(removeListener).toHaveBeenCalledWith(HIVE_ACCOUNT_STATE_CHANGED_CHANNEL, listener)
   })
+
+  it('forwards phone binding verification as the object payload expected by main', async () => {
+    await import('./index')
+    const api = exposeInMainWorld.mock.calls.find(([name]) => name === 'api')?.[1] as PreloadApi
+
+    await api.hiveAccount.verifyPhoneBinding?.('challenge-1', 'binding-1', '123456')
+
+    expect(invoke).toHaveBeenCalledWith('hiveAccount:verifyPhoneBinding', {
+      challengeId: 'challenge-1',
+      bindingId: 'binding-1',
+      smsCode: '123456'
+    })
+  })
 })

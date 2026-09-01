@@ -20,6 +20,7 @@ export function createTerminalTabPresentationActions(
   | 'updateTabTitle'
   | 'updateTabTitles'
   | 'setAiVaultTabTitle'
+  | 'setSessionProjectAssignment'
   | 'setGeneratedTabTitleFromAgentPrompt'
   | 'setGeneratedTabTitlesFromAgentPrompts'
   | 'clearTabLaunchAgent'
@@ -78,6 +79,74 @@ export function createTerminalTabPresentationActions(
           unifiedTabsByWorktree: {
             ...s.unifiedTabsByWorktree,
             [ownerWorktreeId]: nextUnifiedTabs
+          }
+        }
+      })
+    },
+    setSessionProjectAssignment: (worktreeId, tabId, assignment, linkedTabIds = []) => {
+      set((s) => {
+        const terminalTabs = s.tabsByWorktree[worktreeId] ?? []
+        const unifiedTabs = s.unifiedTabsByWorktree[worktreeId] ?? []
+        const candidateTabIds = new Set([tabId, ...linkedTabIds])
+        const matchingUnifiedTabIds = new Set<string>()
+        const linkedTerminalIds = new Set(
+          terminalTabs.filter((tab) => candidateTabIds.has(tab.id)).map((tab) => tab.id)
+        )
+        for (const unifiedTab of unifiedTabs) {
+          const isDirectMatch = candidateTabIds.has(unifiedTab.id)
+          const isTerminalIdentityMatch =
+            unifiedTab.contentType === 'terminal' && candidateTabIds.has(unifiedTab.entityId)
+          if (!isDirectMatch && !isTerminalIdentityMatch) {
+            continue
+          }
+          matchingUnifiedTabIds.add(unifiedTab.id)
+          if (unifiedTab.contentType === 'terminal') {
+            linkedTerminalIds.add(unifiedTab.entityId)
+          }
+        }
+        const matchesTerminal = (terminalId: string): boolean => linkedTerminalIds.has(terminalId)
+        const matchesUnified = (unifiedTab: (typeof unifiedTabs)[number]): boolean =>
+          matchingUnifiedTabIds.has(unifiedTab.id) ||
+          (unifiedTab.contentType === 'terminal' && matchesTerminal(unifiedTab.entityId))
+        const hasMatchingTerminal = terminalTabs.some((tab) => matchesTerminal(tab.id))
+        const hasMatchingUnified = unifiedTabs.some(matchesUnified)
+        if (!hasMatchingTerminal && !hasMatchingUnified) {
+          return s
+        }
+
+        const hasSameAssignment = (current: typeof assignment | undefined): boolean =>
+          current?.projectIdentityKey === assignment?.projectIdentityKey &&
+          current?.projectGroupId === assignment?.projectGroupId &&
+          current?.executionHostId === assignment?.executionHostId &&
+          current?.projectId === assignment?.projectId
+        const terminalNeedsUpdate = terminalTabs.some(
+          (tab) => matchesTerminal(tab.id) && !hasSameAssignment(tab.projectAssignment)
+        )
+        const unifiedNeedsUpdate = unifiedTabs.some(
+          (tab) => matchesUnified(tab) && !hasSameAssignment(tab.projectAssignment)
+        )
+        if (!terminalNeedsUpdate && !unifiedNeedsUpdate) {
+          return s
+        }
+        const assign = <T extends { projectAssignment?: unknown }>(tab: T): T => {
+          if (assignment) {
+            return { ...tab, projectAssignment: assignment }
+          }
+          const { projectAssignment: _projectAssignment, ...rest } = tab
+          void _projectAssignment
+          return rest as T
+        }
+        const nextTerminalTabs = terminalTabs.map((tab) =>
+          matchesTerminal(tab.id) && !hasSameAssignment(tab.projectAssignment) ? assign(tab) : tab
+        )
+        const nextUnifiedTabs = unifiedTabs.map((tab) =>
+          matchesUnified(tab) && !hasSameAssignment(tab.projectAssignment) ? assign(tab) : tab
+        )
+        return {
+          tabsByWorktree: { ...s.tabsByWorktree, [worktreeId]: nextTerminalTabs },
+          unifiedTabsByWorktree: {
+            ...s.unifiedTabsByWorktree,
+            [worktreeId]: nextUnifiedTabs
           }
         }
       })

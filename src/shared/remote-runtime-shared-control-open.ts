@@ -1,4 +1,5 @@
 import type WebSocket from 'ws'
+import { APP_DISPLAY_NAME } from './brand'
 import type { PairingOffer } from './pairing'
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import { remoteRuntimeUnavailableError } from './remote-runtime-request-frames'
@@ -84,7 +85,7 @@ export function openSharedControlSocket(
       }
       liveness.onDead(
         remoteRuntimeUnavailableError(
-          'Remote Orca runtime stopped responding; resetting the control connection.'
+          `Remote ${APP_DISPLAY_NAME} runtime stopped responding; resetting the control connection.`
         )
       )
     },

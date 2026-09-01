@@ -300,6 +300,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     virtualization,
     measureVirtualRowElement,
     settings,
+    defaultHostId: props.defaultHostId,
     worktreeVisibilityDefaultsByHost,
     sshConnectionStates,
     newCardStyle,
@@ -347,8 +348,18 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
         onPointerDown={handleScrollPointerDown}
         onTouchMove={markDirectScrollInput}
         onWheel={markDirectScrollInput}
-        onDragOver={nativeDrag.handleWorktreeDragOver}
-        onDrop={nativeDrag.handleWorktreeDrop}
+        onDragOver={(event) => {
+          if (props.onTemporarySessionDragOver(event)) {
+            return
+          }
+          nativeDrag.handleWorktreeDragOver(event)
+        }}
+        onDrop={(event) => {
+          if (props.onTemporarySessionDrop(event)) {
+            return
+          }
+          nativeDrag.handleWorktreeDrop(event)
+        }}
         className="worktree-sidebar-scrollbar h-full overflow-y-auto overflow-x-hidden pl-1 scrollbar-sleek outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset pt-px"
         style={WORKTREE_SIDEBAR_SCROLL_STYLE}
       >

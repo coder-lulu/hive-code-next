@@ -10,6 +10,7 @@ vi.mock('electron', () => ({
 
 import { ensureLinuxTerminalOrcaCliShimDir } from './linux-terminal-orca-cli-shim'
 import { getBundledLauncherPath } from './bundled-cli-launcher-path'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 const created: string[] = []
 const bundledLinuxLauncher = basename(getBundledLauncherPath('linux', '/')!)
@@ -28,7 +29,7 @@ afterEach(async () => {
 })
 
 describe('ensureLinuxTerminalOrcaCliShimDir', () => {
-  it('writes an executable bare-orca shim that execs the bundled product launcher', async () => {
+  it('writes executable primary and compatibility shims that exec the bundled product launcher', async () => {
     const { userDataPath, resourcesPath } = await makeFixture()
 
     const shimDir = ensureLinuxTerminalOrcaCliShimDir({
@@ -38,12 +39,15 @@ describe('ensureLinuxTerminalOrcaCliShimDir', () => {
     })
 
     expect(shimDir).toBe(join(userDataPath, 'linux-orca-cli-shim'))
-    const content = readFileSync(join(shimDir!, 'orca'), 'utf8')
-    // Single-quoted so a resources path with shell metacharacters can't break out.
-    expect(content).toContain(`exec '${join(resourcesPath, 'bin', bundledLinuxLauncher)}' "$@"`)
-    if (process.platform !== 'win32') {
-      const mode = statSync(join(shimDir!, 'orca')).mode & 0o777
-      expect(mode & 0o111).not.toBe(0)
+    for (const commandName of [PRIMARY_CLI_COMMAND, 'orca']) {
+      const shimPath = join(shimDir!, commandName)
+      const content = readFileSync(shimPath, 'utf8')
+      // Single-quoted so a resources path with shell metacharacters can't break out.
+      expect(content).toContain(`exec '${join(resourcesPath, 'bin', bundledLinuxLauncher)}' "$@"`)
+      if (process.platform !== 'win32') {
+        const mode = statSync(shimPath).mode & 0o777
+        expect(mode & 0o111).not.toBe(0)
+      }
     }
   })
 
@@ -91,9 +95,11 @@ describe('ensureLinuxTerminalOrcaCliShimDir', () => {
       appImagePath
     })
 
-    const content = readFileSync(join(shimDir!, 'orca'), 'utf8')
-    expect(content).toContain(appImagePath)
-    expect(content).not.toContain(resourcesPath)
+    for (const commandName of [PRIMARY_CLI_COMMAND, 'orca']) {
+      const content = readFileSync(join(shimDir!, commandName), 'utf8')
+      expect(content).toContain(appImagePath)
+      expect(content).not.toContain(resourcesPath)
+    }
   })
 
   it('returns null (and does not memoize) when the bundled launcher is missing', async () => {

@@ -10,6 +10,7 @@ import {
 import { normalizeSkillBundleName } from '../../shared/skill-bundle-name'
 import type { SkillCloudOperation } from '../../shared/skill-cloud-contract'
 import type { SkillDiscoveryResult } from '../../shared/skills'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type { CommandHandler, HandlerContext } from '../dispatch'
 import { getRepeatedStringFlag } from '../flags'
 import { printResult } from '../format'
@@ -46,7 +47,7 @@ function rejectForwardedSkillFilesystem(ctx: HandlerContext, command: string): v
   }
   throw new RuntimeClientError(
     'invalid_environment',
-    `orca skills ${command} must run on the machine whose installed skills you want to use. Run the command from an Orca terminal on that machine.`
+    `${PRIMARY_CLI_COMMAND} skills ${command} must run on the machine whose installed skills you want to use. Run the command from a ${APP_DISPLAY_NAME} terminal on that machine.`
   )
 }
 
@@ -74,7 +75,10 @@ function requireCloudOperation<T>(operation: SkillCloudOperation<T>): T {
     return operation.value
   }
   if (operation.status === 'reconnect-required') {
-    throw new RuntimeClientError('authentication_required', 'Sign in to Orca and try again.')
+    throw new RuntimeClientError(
+      'authentication_required',
+      `Sign in to ${APP_DISPLAY_NAME} and try again.`
+    )
   }
   throw new RuntimeClientError('authentication_unconfigured', operation.message)
 }
@@ -134,7 +138,7 @@ async function callShare(
     if (error instanceof RuntimeRpcFailureError && error.code === 'method_not_found') {
       throw new RuntimeClientError(
         'update_required',
-        'The connected Orca runtime does not support agent skill sharing yet. Update Orca on that machine and try again.'
+        `The connected ${APP_DISPLAY_NAME} runtime does not support agent skill sharing yet. Update ${APP_DISPLAY_NAME} on that machine and try again.`
       )
     }
     throw error
@@ -158,7 +162,7 @@ export const SKILL_SHARING_HANDLERS: Record<string, CommandHandler> = {
     if (skillSelectors.length === 0) {
       throw new RuntimeClientError(
         'invalid_argument',
-        'Select at least one installed skill with --skill. Run `orca skills installed` to list them.'
+        `Select at least one installed skill with --skill. Run \`${PRIMARY_CLI_COMMAND} skills installed\` to list them.`
       )
     }
     const bundleLabel = stringFlag(ctx, 'bundle-name')

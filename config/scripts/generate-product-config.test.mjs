@@ -57,10 +57,48 @@ const validManifest = {
     pluginMarketplace: null,
     changelog: null,
     nudge: null
+  },
+  services: {
+    api: { baseUrl: 'https://api.example.test' },
+    identity: {
+      issuer: 'https://identity.example.test/realms/hive',
+      clients: { desktop: 'desktop', userWeb: 'user-web', operatorWeb: 'operator-web' }
+    },
+    oss: { enabled: false, endpoint: null, provider: null },
+    update: {
+      enabled: false,
+      endpoint: null,
+      checkEndpoint: null,
+      provider: null,
+      channel: null,
+      checkIntervalHours: 24
+    },
+    relay: { enabled: false, directorUrl: null }
   }
 }
 
 describe('validateProductManifest', () => {
+  it('requires the grouped service contract', () => {
+    const manifest = { ...validManifest }
+    delete manifest.services
+    expect(() => validateProductManifest(manifest)).toThrow(
+      'Missing required manifest key: services'
+    )
+  })
+
+  it('allows an explicitly disabled Relay without a director URL', () => {
+    expect(() => validateProductManifest(validManifest)).not.toThrow()
+  })
+
+  it('rejects populated legacy endpoint aliases that drift from services', () => {
+    expect(() =>
+      validateProductManifest({
+        ...validManifest,
+        endpoints: { ...validManifest.endpoints, cloud: 'https://stale.example.test' }
+      })
+    ).toThrow('endpoints.cloud conflicts with services configuration')
+  })
+
   it('accepts empty endpoints and preserves the dual CLI/Scheme compatibility contract', () => {
     expect(normalizeProductManifest(validManifest)).toMatchObject({
       displayName: 'HiveCode',
@@ -110,7 +148,7 @@ describe('validateProductManifest', () => {
         ...validManifest,
         desktop: { ...validManifest.desktop, updateChannel: 'hourly' }
       })
-    ).toThrow('desktop.updateChannel must be stable, beta, rc, or null')
+    ).toThrow('desktop.updateChannel must be internal, stable, beta, rc, or null')
   })
 
   it('rejects unknown updater providers', () => {
@@ -120,6 +158,29 @@ describe('validateProductManifest', () => {
         desktop: { ...validManifest.desktop, updateProvider: 'generic' }
       })
     ).toThrow('desktop.updateProvider must be github, hivecloud, or null')
+  })
+
+  it.each([
+    'https://updates.example.test/hive/v1/updates/check/',
+    'https://updates.example.test/hive/v1/updates/proxy-check',
+    'https://updates.example.test/hive/v1/updates/%63heck'
+  ])('requires the canonical HiveCloud update check path: %s', (checkEndpoint) => {
+    expect(() =>
+      validateProductManifest({
+        ...validManifest,
+        services: {
+          ...validManifest.services,
+          update: {
+            enabled: true,
+            endpoint: 'https://updates.example.test/hive/v1/updates/desktop/',
+            checkEndpoint,
+            provider: 'hivecloud',
+            channel: 'beta',
+            checkIntervalHours: 24
+          }
+        }
+      })
+    ).toThrow('canonical /hive/v1/updates/check path')
   })
 
   it.each(['artifacts', 'changelog', 'nudge'])(

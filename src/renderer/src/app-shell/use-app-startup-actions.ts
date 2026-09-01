@@ -31,6 +31,7 @@ export function useStartupActions() {
       setDeferredSshReconnectTargets: s.setDeferredSshReconnectTargets,
       setSshConnectionState: s.setSshConnectionState,
       hydratePersistedUI: s.hydratePersistedUI,
+      openStartupHome: s.openStartupHome,
       setHydrationSucceeded: s.setHydrationSucceeded,
       pruneLastVisitedTimestamps: s.pruneLastVisitedTimestamps,
       seedActiveWorktreeLastVisitedIfMissing: s.seedActiveWorktreeLastVisitedIfMissing

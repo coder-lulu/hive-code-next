@@ -76,6 +76,72 @@ describe('remote agent-session launch routing', () => {
     expect(hostAuthority).not.toHaveBeenCalled()
   })
 
+  it('fails closed when a semantic launch forbids an unsafe legacy fallback', async () => {
+    const hostAuthority = vi.fn().mockResolvedValue('structured')
+    const legacy = vi.fn().mockResolvedValue('legacy')
+    mocks.supportsCapability.mockResolvedValue(false)
+
+    await expect(
+      runRemoteAgentSessionLaunch({
+        environmentId: 'env-1',
+        hostAuthority,
+        hostAuthorityCapability: 'agent-session.launch-permission.v1',
+        legacyFallbackPolicy: 'deny',
+        legacy
+      })
+    ).rejects.toMatchObject({ code: 'capability_unsupported' })
+    expect(hostAuthority).not.toHaveBeenCalled()
+    expect(legacy).not.toHaveBeenCalled()
+  })
+
+  it('requires both resume and permission capabilities before semantic resume dispatch', async () => {
+    const hostAuthority = vi.fn().mockResolvedValue('structured')
+    const legacy = vi.fn().mockResolvedValue('legacy')
+    mocks.supportsCapability.mockImplementation(
+      async (_environmentId: string, capability: string) =>
+        capability === 'agent-session.codex-resume.v1'
+    )
+
+    await expect(
+      runRemoteAgentSessionLaunch({
+        environmentId: 'env-1',
+        hostAuthority,
+        hostAuthorityCapabilities: [
+          'agent-session.codex-resume.v1',
+          'agent-session.launch-permission.v1'
+        ],
+        legacyFallbackPolicy: 'deny',
+        legacy
+      })
+    ).rejects.toMatchObject({ code: 'capability_unsupported' })
+    expect(mocks.supportsCapability).toHaveBeenCalledWith(
+      'env-1',
+      'agent-session.launch-permission.v1'
+    )
+    expect(hostAuthority).not.toHaveBeenCalled()
+    expect(legacy).not.toHaveBeenCalled()
+  })
+
+  it('does not let an empty capability list bypass the generic authority probe', async () => {
+    const hostAuthority = vi.fn().mockResolvedValue('structured')
+    const legacy = vi.fn().mockResolvedValue('legacy')
+    mocks.supportsCapability.mockResolvedValue(false)
+
+    await expect(
+      runRemoteAgentSessionLaunch({
+        environmentId: 'env-1',
+        hostAuthority,
+        hostAuthorityCapabilities: [],
+        legacy
+      })
+    ).resolves.toBe('legacy')
+    expect(mocks.supportsCapability).toHaveBeenCalledWith(
+      'env-1',
+      'agent-session.host-authority.v1'
+    )
+    expect(hostAuthority).not.toHaveBeenCalled()
+  })
+
   it('keeps legacy behavior when a read-only capability probe fails', async () => {
     const hostAuthority = vi.fn().mockResolvedValue('structured')
     const legacy = vi.fn().mockResolvedValue('legacy')

@@ -10,6 +10,7 @@ import type {
   RuntimeTerminalSplit,
   RuntimeTerminalWait
 } from '../../shared/runtime-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { CommandHandler } from '../dispatch'
 import { shouldUseRendererBackedInteractiveTerminal } from '../codex-command-classification'
 import {
@@ -97,7 +98,7 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
     if (screen && result.result.terminal.source === undefined) {
       throw new RuntimeClientError(
         'incompatible_runtime',
-        'This Orca host does not support --screen reads, so it answered with accumulated output instead of the rendered screen. Update Orca on the host, or drop --screen to read accumulated output deliberately.'
+        `This ${APP_DISPLAY_NAME} host does not support --screen reads, so it answered with accumulated output instead of the rendered screen. Update ${APP_DISPLAY_NAME} on the host, or drop --screen to read accumulated output deliberately.`
       )
     }
     printResult(result, json, formatTerminalRead)

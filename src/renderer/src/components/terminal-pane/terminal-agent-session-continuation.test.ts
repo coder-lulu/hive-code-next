@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager'
 import { buildAgentSessionContinuationPrompt } from '@/lib/agent-session-continuation'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { prepareAgentSessionContinuationFromPane } from './terminal-agent-session-continuation'
 
 const LEAF_ID = '11111111-1111-4111-8111-111111111111'
@@ -43,7 +44,7 @@ describe('buildAgentSessionContinuationPrompt', () => {
     const focused = buildAgentSessionContinuationPrompt(source, 'focused')
     const full = buildAgentSessionContinuationPrompt(source, 'full')
 
-    expect(focused).toContain('Continue work from the prior Orca session')
+    expect(focused).toContain(`Continue work from the prior ${APP_DISPLAY_NAME} session`)
     expect(focused).toContain('The prior provider session is read-only context')
     expect(focused).not.toContain('Start a fresh, independent agent session')
     expect(focused).toContain('If the prior task appears complete, say so and wait')

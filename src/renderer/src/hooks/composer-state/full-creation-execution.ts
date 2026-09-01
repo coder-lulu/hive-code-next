@@ -35,6 +35,17 @@ import { createBrowserUuid } from '@/lib/browser-uuid'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { seedNativeChatAppliedSessionOptions } from '@/components/native-chat/native-chat-session-option-cache'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
+import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
+
+export function resolveFullCreationSemanticStartupPrompt(
+  startup: { agentPermissionMode?: unknown } | undefined,
+  prompt: string
+): string | undefined {
+  if (!startup?.agentPermissionMode) {
+    return undefined
+  }
+  return prompt.trim() || undefined
+}
 
 export function useFullCreationExecution(input: FullCreationExecutionInput) {
   const {
@@ -120,6 +131,12 @@ export function useFullCreationExecution(input: FullCreationExecutionInput) {
         return
       }
 
+      const semanticStartupPrompt = resolveFullCreationSemanticStartupPrompt(
+        backendStartup,
+        submitStartupPrompt
+      )
+      const startupLaunchPreferences = toAgentLaunchPreferences(startupPlan?.sessionOptions)
+
       const result = await createWorktree(
         repoId,
         workspaceName,
@@ -157,6 +174,11 @@ export function useFullCreationExecution(input: FullCreationExecutionInput) {
           nameWasGenerated,
           ...(!backendStartup && startupPlan?.draftPrompt
             ? { startupDraft: startupPlan.draftPrompt }
+            : {}),
+          ...(semanticStartupPrompt ? { startupPrompt: semanticStartupPrompt } : {}),
+          ...(startupLaunchPreferences ? { startupLaunchPreferences } : {}),
+          ...(startupPlan?.agentPermissionMode
+            ? { requiresAgentLaunchPermissionCapability: true }
             : {}),
           ...(parentWorktreeId ? { parentWorktreeId } : {})
         }
@@ -199,6 +221,9 @@ export function useFullCreationExecution(input: FullCreationExecutionInput) {
                 launchConfig: startupPlan.launchConfig,
                 ...(startupPlan.launchToken ? { launchToken: startupPlan.launchToken } : {}),
                 launchAgent: tuiAgent,
+                ...(startupPlan.agentPermissionMode
+                  ? { agentPermissionMode: startupPlan.agentPermissionMode }
+                  : {}),
                 ...(startupPlan.draftPrompt ? { draftPrompt: startupPlan.draftPrompt } : {}),
                 ...(startupPlan.startupCommandDelivery
                   ? { startupCommandDelivery: startupPlan.startupCommandDelivery }

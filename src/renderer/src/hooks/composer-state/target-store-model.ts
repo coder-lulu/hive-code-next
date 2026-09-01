@@ -21,12 +21,14 @@ import type { RuntimeEnvironmentStatus } from '../../store/slices/runtime-status
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { WorkspaceHostScope } from '../../../../shared/ui-chrome-types'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../../shared/workspace-source'
+import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 
 export type ComposerTargetStoreModel = {
   initialRepoId: string | undefined
   initialEphemeralVmRecipeId: string | undefined
   initialName: string
   initialPrompt: string
+  agentPermissionMode: AgentLaunchPermissionMode
   initialLinkedWorkItem: LinkedWorkItemSummary | null
   initialGitHubWorkItem: GitHubWorkItem | null
   initialTaskSourceContext: TaskSourceContext | null

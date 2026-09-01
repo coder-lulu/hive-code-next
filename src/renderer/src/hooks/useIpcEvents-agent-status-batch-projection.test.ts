@@ -359,6 +359,7 @@ describe('useIpcEvents agent status snapshot integration', () => {
         agentType: 'pi',
         providerSession: { key: 'session_id', id: 'pi-session' },
         providerSessionOnly: true,
+        terminalHandle: 'terminal-pi-session',
         receivedAt: 1_700_000_000_003,
         stateStartedAt: 1_700_000_000_003
       })
@@ -381,7 +382,8 @@ describe('useIpcEvents agent status snapshot integration', () => {
           kind: 'providerSession',
           paneKey: FUTURE_PANE_KEY,
           agent: 'pi',
-          providerSession: { key: 'session_id', id: 'pi-session' }
+          providerSession: { key: 'session_id', id: 'pi-session' },
+          routing: expect.objectContaining({ terminalHandle: 'terminal-pi-session' })
         })
       ])
       expect(recordAgentProviderSession).not.toHaveBeenCalled()

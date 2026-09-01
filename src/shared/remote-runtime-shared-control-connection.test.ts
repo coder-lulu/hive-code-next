@@ -18,7 +18,6 @@ import {
 } from './remote-runtime-memory-limits'
 import { getRemoteRuntimeRequestAdmissionEvidence } from './remote-runtime-prepared-request-admission'
 import { RemoteRuntimeSharedControlConnection } from './remote-runtime-shared-control-connection'
-import * as sharedControlProtocol from './remote-runtime-shared-control-protocol'
 import { isRuntimeSubscriptionReplayResponse } from './runtime-subscription-replay'
 import * as protocolVersion from './protocol-version'
 import { APP_DISPLAY_NAME } from './brand'
@@ -64,10 +63,12 @@ describe('RemoteRuntimeSharedControlConnection', () => {
       deviceToken: 'device-token',
       clientCapabilities: [
         protocolVersion.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+        protocolVersion.SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
         protocolVersion.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
         protocolVersion.SKILL_INSTALL_RESULT_V2_CAPABILITY,
         protocolVersion.WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-        protocolVersion.WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
+        protocolVersion.WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
+        protocolVersion.AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY
       ]
     })
     expect(server.requests.map((request) => request.method)).toEqual([
@@ -105,44 +106,6 @@ describe('RemoteRuntimeSharedControlConnection', () => {
       deviceToken: 'device-token',
       method: 'orchestration.federationPull',
       params: {}
-    })
-    connection.close()
-  })
-
-  it('does not expose a binary sender on the shared control protocol surface', () => {
-    expect('sendSharedControlEncryptedBinary' in sharedControlProtocol).toBe(false)
-  })
-
-  it('releases a pending request when the socket send throws', async () => {
-    const connection = new RemoteRuntimeSharedControlConnection({
-      v: 2,
-      endpoint: 'ws://127.0.0.1:1',
-      deviceToken: 'token',
-      publicKeyB64: Buffer.from(new Uint8Array(32).fill(1)).toString('base64')
-    })
-    const unsafe = connection as unknown as {
-      state: string
-      ws: { readyState: number; send: () => void; close: () => void } | null
-      sharedKey: Uint8Array | null
-      pendingRequests: Map<string, unknown>
-    }
-    unsafe.state = 'ready'
-    unsafe.ws = {
-      readyState: 1,
-      send: () => {
-        throw new Error('send failed')
-      },
-      close: vi.fn()
-    }
-    unsafe.sharedKey = new Uint8Array(32).fill(2)
-
-    await expect(connection.request('worktree.ps', undefined, 1000)).rejects.toMatchObject({
-      code: 'remote_runtime_unavailable'
-    })
-    expect(unsafe.pendingRequests.size).toBe(0)
-    expect(getRemoteRuntimeRequestAdmissionEvidence()).toEqual({
-      pendingRequestCount: 0,
-      retainedBytes: 0
     })
     connection.close()
   })

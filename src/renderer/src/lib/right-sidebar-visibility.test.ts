@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canShowRightSidebar,
   canShowRightSidebarForView,
   rightSidebarShowsPullRequestData
 } from './right-sidebar-visibility'
@@ -46,6 +47,11 @@ describe('right sidebar visibility helpers', () => {
 
   it('allows right sidebar controls on workspace views', () => {
     expect(canShowRightSidebarForView('terminal')).toBe(true)
+  })
+
+  it('suppresses the right sidebar on the terminal landing page', () => {
+    expect(canShowRightSidebar(makeState({ activeWorktreeId: null }))).toBe(false)
+    expect(canShowRightSidebar(makeState())).toBe(true)
   })
 
   it('does not treat hidden full-page sidebars as visible PR panels', () => {

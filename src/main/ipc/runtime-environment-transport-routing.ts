@@ -77,6 +77,7 @@ export async function getRuntimeEnvironmentStatus(
   if (response.ok === true) {
     markEnvironmentUsed(userDataPath, environment.id, {
       runtimeId: response._meta.runtimeId,
+      runtimeRecordId: response.result.runtimeRecordId ?? null,
       pairedDeviceId: response.result.pairedDeviceId
     })
     reconnectRemoteRuntimeSharedControlConnection(environment.id)

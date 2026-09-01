@@ -1,6 +1,6 @@
 import type { GitHubPRRefreshSkippedReason } from '../../../../shared/github/pull-request-refresh-types'
 import { translate } from '@/i18n/i18n'
-import { applyProductBranding } from '@/product-brand'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { getGitHubUnavailableEmptyStateCopy } from './github-refresh-error-copy'
 import {
   autoRetrySchedule,
@@ -23,28 +23,28 @@ export function concurrentLookupDetail(input: ChecksPanelReviewStateInput): stri
   if (input.reviewLookup === 'positive_unresolved') {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.positive',
-      'Orca also has saved {{reviewLabel}} information that it could not verify.',
+      `${APP_DISPLAY_NAME} also has saved {{reviewLabel}} information that it could not verify.`,
       { reviewLabel }
     )
   }
   if (isRateLimitRefresh(refresh)) {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.rate_limited',
-      'Orca also could not check {{reviewLabel}} status because {{provider}} is temporarily limiting requests.',
+      `${APP_DISPLAY_NAME} also could not check {{reviewLabel}} status because {{provider}} is temporarily limiting requests.`,
       { reviewLabel, provider: providerName }
     )
   }
   if (refresh?.errorType === 'network') {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.network',
-      'Orca also could not check {{reviewLabel}} status because this environment could not reach {{provider}}.',
+      `${APP_DISPLAY_NAME} also could not check {{reviewLabel}} status because this environment could not reach {{provider}}.`,
       { reviewLabel, provider: providerName }
     )
   }
   if (refresh?.status === 'error' || isHardRefreshError(refresh)) {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.untyped',
-      'Orca also could not confirm whether this branch already has a {{reviewLabel}}.',
+      `${APP_DISPLAY_NAME} also could not confirm whether this branch already has a {{reviewLabel}}.`,
       { reviewLabel }
     )
   }
@@ -113,7 +113,7 @@ export function transientRefreshState(
       ),
       description: translate(
         'auto.components.right.sidebar.checks.panel.review.unknown_error.body',
-        'The lookup failed, so Orca could not confirm whether this branch already has a {{reviewLabel}}.',
+        `The lookup failed, so ${APP_DISPLAY_NAME} could not confirm whether this branch already has a {{reviewLabel}}.`,
         { reviewLabel }
       )
     }
@@ -127,7 +127,7 @@ export function transientRefreshState(
     ),
     description: translate(
       'auto.components.right.sidebar.checks.panel.review.untyped.body',
-      'Orca could not confirm whether this branch already has a {{reviewLabel}}. Retry to check again.',
+      `${APP_DISPLAY_NAME} could not confirm whether this branch already has a {{reviewLabel}}. Retry to check again.`,
       { reviewLabel }
     )
   }
@@ -180,9 +180,7 @@ const HARD_ERROR_COPY: Record<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.cli.body',
-      fallback: applyProductBranding(
-        'Orca could not run {{provider}} CLI in this environment. Set it up here, then retry.'
-      )
+      fallback: `${APP_DISPLAY_NAME} could not run {{provider}} CLI in this environment. Set it up here, then retry.`
     }
   }
 }
@@ -216,9 +214,7 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.disconnected.body',
-      fallback: applyProductBranding(
-        "This repository's execution host is disconnected, so Orca cannot refresh {{reviewLabel}} status."
-      )
+      fallback: `This repository's execution host is disconnected, so ${APP_DISPLAY_NAME} cannot refresh {{reviewLabel}} status.`
     },
     recovery: ['retry']
   },
@@ -240,9 +236,7 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.archived.body',
-      fallback: applyProductBranding(
-        'This repository is archived, so Orca is not refreshing {{reviewLabel}} status.'
-      )
+      fallback: `This repository is archived, so ${APP_DISPLAY_NAME} is not refreshing {{reviewLabel}} status.`
     },
     recovery: []
   },
@@ -253,9 +247,7 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.not_git.body',
-      fallback: applyProductBranding(
-        'Orca could not treat this folder as a Git repository for {{reviewLabel}} status.'
-      )
+      fallback: `${APP_DISPLAY_NAME} could not treat this folder as a Git repository for {{reviewLabel}} status.`
     },
     recovery: []
   },
@@ -266,9 +258,7 @@ const SKIPPED_COPY: Partial<
     },
     body: {
       key: 'auto.components.right.sidebar.checks.panel.review.skipped.remote.body',
-      fallback: applyProductBranding(
-        'Orca could not refresh {{reviewLabel}} status for this remote context. Retry after the host is available.'
-      )
+      fallback: `${APP_DISPLAY_NAME} could not refresh {{reviewLabel}} status for this remote context. Retry after the host is available.`
     },
     recovery: ['retry']
   }

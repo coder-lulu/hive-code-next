@@ -13,6 +13,10 @@ import { buildSleepingAgentLaunchConfig } from './sleeping-agent-launch-config'
 import { planHermesStartupQuery } from './hermes-startup-query'
 import { inlineAgentDraftFitsPlatform } from './agent-draft-platform-limit'
 import type { TuiAgent } from './tui-agent'
+import type {
+  AgentExplicitLaunchPermissionMode,
+  AgentLaunchPermissionMode
+} from './tui-agent-permissions'
 import type { SessionOptionValue } from './native-chat-session-options'
 import { resolveAgentLaunchCommand } from './tui-agent-launch-command'
 
@@ -25,6 +29,7 @@ export type AgentStartupPlan = {
   followupPrompt: string | null
   launchConfig: SleepingAgentLaunchConfig
   launchToken?: string
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
   draftPrompt?: string | null
   env?: Record<string, string>
   startupCommandDelivery?: StartupCommandDelivery
@@ -51,6 +56,7 @@ export function buildAgentStartupPlan(args: {
   /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
    * `orca-ide` rename must be skipped for remote launches. */
   isRemote?: boolean
+  agentPermissionMode?: AgentLaunchPermissionMode
 }): AgentStartupPlan | null {
   const { agent, prompt, cmdOverrides, platform, allowEmptyPromptLaunch = false } = args
   const shell = resolveStartupShell(platform, args.shell)
@@ -65,7 +71,8 @@ export function buildAgentStartupPlan(args: {
     agentArgs: usesQuery ? null : args.agentArgs,
     sessionOptions: args.sessionOptions,
     sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
-    isRemote: args.isRemote
+    isRemote: args.isRemote,
+    agentPermissionMode: args.agentPermissionMode
   })
   if (!baseCommand.ok) {
     return null
@@ -200,8 +207,10 @@ export function buildAgentDraftLaunchPlan(args: {
   agentArgs?: string | null
   agentEnv?: Record<string, string> | null
   sessionOptions?: Record<string, SessionOptionValue>
+  sessionOptionsOverrideAgentArgs?: boolean
   /** Why: see buildAgentStartupPlan — remote launches use the plain `orca` shim. */
   isRemote?: boolean
+  agentPermissionMode?: AgentLaunchPermissionMode
 }): AgentDraftLaunchPlan | null {
   const { agent, draft, cmdOverrides, platform } = args
   const shell = resolveStartupShell(platform, args.shell)
@@ -217,7 +226,9 @@ export function buildAgentDraftLaunchPlan(args: {
     shell,
     agentArgs: args.agentArgs,
     sessionOptions: args.sessionOptions,
-    isRemote: args.isRemote
+    sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
+    isRemote: args.isRemote,
+    agentPermissionMode: args.agentPermissionMode
   })
   if (!baseCommand.ok) {
     return null

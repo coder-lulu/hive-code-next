@@ -38,6 +38,27 @@ function renderAfterAvailableStatus(): RenderResult {
   return render(<UpdateCard />)
 }
 
+function renderMandatoryStatus(
+  status: Record<string, unknown>,
+  ui: { dismissedUpdateVersion?: string | null; updateCardCollapsed?: boolean } = {}
+): RenderResult {
+  useAppStore.setState({
+    updateStatus: {
+      state: 'available',
+      version: '1.5.0-beta.1',
+      changelog: null,
+      mandatory: true,
+      latestBuild: 14,
+      ...status
+    } as never,
+    updateChangelog: null,
+    dismissedUpdateVersion: ui.dismissedUpdateVersion ?? null,
+    updateCardCollapsed: ui.updateCardCollapsed ?? false,
+    updateReassuranceSeen: true
+  })
+  return render(<UpdateCard />)
+}
+
 function mockReducedMotion(matches: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
@@ -138,6 +159,25 @@ describe('UpdateCard Windows signature failures', () => {
     expect(screen.getByText("Update Wasn't Installed")).toBeTruthy()
     // The generic restart advice must not be prefixed onto a security stop.
     expect(screen.queryByText(/Quit and reopen Orca/)).toBeNull()
+  })
+})
+
+describe('UpdateCard mandatory policy', () => {
+  it('shows a mandatory update even when the version was previously dismissed', () => {
+    renderMandatoryStatus({}, { dismissedUpdateVersion: '1.5.0-beta.1' })
+
+    expect(screen.getByTestId('mandatory-update-backdrop')).toBeTruthy()
+    expect(screen.getByRole('complementary', { name: 'Update available' })).toBeTruthy()
+  })
+
+  it('keeps a mandatory download visible when the card was persisted collapsed', () => {
+    renderMandatoryStatus(
+      { state: 'downloading', version: '1.5.0-beta.1', percent: 25 },
+      { updateCardCollapsed: true }
+    )
+
+    expect(screen.getByTestId('mandatory-update-backdrop')).toBeTruthy()
+    expect(screen.getByRole('complementary', { name: 'Downloading update' })).toBeTruthy()
   })
 })
 

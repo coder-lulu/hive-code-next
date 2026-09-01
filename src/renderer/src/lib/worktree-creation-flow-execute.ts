@@ -21,6 +21,11 @@ import { createBrowserUuid } from '@/lib/browser-uuid'
 import { seedAgentTabStateAfterWorktreeCreate } from '@/lib/worktree-creation-agent-seeds'
 import { resolveBackendDraftStartup } from '@/lib/worktree-draft-startup-view-mode'
 import { buildWorktreeCreationStartupOpt } from '@/lib/worktree-creation-flow-startup'
+import {
+  needsPostCreateAgentStartup,
+  prepareBackendFollowupStartup
+} from '@/lib/worktree-creation-followup-startup'
+import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
 
 // Why: activePendingCreationId can outlive the terminal route when the user
 // switches app views; only the terminal route renders the creation panel.
@@ -68,7 +73,16 @@ export async function executeWorktreeCreation(
   let result: CreateWorktreeResult
   try {
     const provisionedRoot = getProvisionedRootCreateOptions(preparedRequest)
+    if (!provisionedRoot) {
+      // Why: stdin-after-start agents still need the execution host to spawn
+      // the real agent command (including its one-launch permission env). The
+      // shared token lets the renderer deliver the prompt to that exact pane.
+      prepareBackendFollowupStartup(preparedRequest, createBrowserUuid)
+    }
     const backendStartup = provisionedRoot ? undefined : resolveBackendDraftStartup(preparedRequest)
+    const startupLaunchPreferences = toAgentLaunchPreferences(
+      preparedRequest.startupPlan?.sessionOptions
+    )
     result = await useAppStore
       .getState()
       .createWorktree(
@@ -106,9 +120,15 @@ export async function executeWorktreeCreation(
             ? { linkedTaskSourceContext: preparedRequest.linkedTaskSourceContext }
             : {}),
           // Why: the remote host must own task-draft startup so its initial terminal is the agent, not an idle fallback shell.
-          ...(!backendStartup && preparedRequest.agent && preparedRequest.launchDraftPrompt
+          ...((!backendStartup || backendStartup.agentPermissionMode) &&
+          preparedRequest.agent &&
+          preparedRequest.launchDraftPrompt
             ? { startupDraft: preparedRequest.launchDraftPrompt }
             : {}),
+          ...(backendStartup?.agentPermissionMode && preparedRequest.quickPrompt.trim()
+            ? { startupPrompt: preparedRequest.quickPrompt.trim() }
+            : {}),
+          ...(startupLaunchPreferences ? { startupLaunchPreferences } : {}),
           ...(provisionedRoot ? { provisionedRoot } : {}),
           ...(preparedRequest.parentWorktreeId
             ? { parentWorktreeId: preparedRequest.parentWorktreeId }
@@ -215,10 +235,16 @@ export async function executeWorktreeCreation(
     startupTerminalTabId: result.startupTerminal?.tabId,
     backendSpawned
   })
-  if (preparedRequest.startupPlan && !backendSpawned) {
+  if (preparedRequest.startupPlan && needsPostCreateAgentStartup(preparedRequest, backendSpawned)) {
     void ensureAgentStartupInTerminal({
       worktreeId: worktree.id,
-      primaryTabId,
+      primaryTabId:
+        backendSpawned && result.startupTerminal?.tabId
+          ? result.startupTerminal.tabId
+          : primaryTabId,
+      ...(backendSpawned && result.startupTerminal?.paneKey
+        ? { startupPaneKey: result.startupTerminal.paneKey }
+        : {}),
       startup: preparedRequest.startupPlan
     })
   }

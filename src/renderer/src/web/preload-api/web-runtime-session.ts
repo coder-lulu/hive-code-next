@@ -11,6 +11,7 @@ import {
 } from '../web-runtime-environment'
 import type { StoredWebRuntimeEnvironment } from '../web-runtime-environment'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export const webRuntimeState: {
   activeEnvironment: StoredWebRuntimeEnvironment | null
@@ -98,14 +99,14 @@ export function resolveEnvironment(selector: string): StoredWebRuntimeEnvironmen
   if (environment.compatibleEnvironmentIds?.includes(selector)) {
     return environment
   }
-  throw new Error(`Unknown Orca runtime environment: ${selector}`)
+  throw new Error(`Unknown ${APP_DISPLAY_NAME} runtime environment: ${selector}`)
 }
 
 export function requireActiveEnvironment(): StoredWebRuntimeEnvironment {
   webRuntimeState.activeEnvironment =
     webRuntimeState.activeEnvironment ?? readStoredWebRuntimeEnvironment()
   if (!webRuntimeState.activeEnvironment) {
-    throw new Error('Pair this web client with an Orca server first.')
+    throw new Error(`Pair this web client with a ${APP_DISPLAY_NAME} server first.`)
   }
   return webRuntimeState.activeEnvironment
 }
@@ -118,7 +119,9 @@ export function requireActiveEnvironmentOrNull(): StoredWebRuntimeEnvironment | 
 
 export function assertActiveEnvironment(environmentId: string): void {
   if (requireActiveEnvironment().id !== environmentId) {
-    throw new Error('The paired Orca server changed while the request was in progress.')
+    throw new Error(
+      `The paired ${APP_DISPLAY_NAME} server changed while the request was in progress.`
+    )
   }
 }
 

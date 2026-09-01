@@ -18,14 +18,18 @@ function makeRepo(id: string, overrides: Partial<Repo> = {}): Repo {
 
 function makeSession(
   repoId: string,
-  sidebarRepoHeaderIds: readonly string[]
+  sidebarRepoHeaderIds: readonly string[],
+  bucketKey = 'ungrouped',
+  sourceExecutionHostId: ProjectHeaderDragSession['sourceExecutionHostId'] = 'local'
 ): ProjectHeaderDragSession {
   return {
     repoId,
-    bucketKey: 'ungrouped',
+    bucketKey,
     sidebarRepoHeaderIds,
+    sourceExecutionHostId,
     pointerId: 1,
     headerRects: [],
+    dropZones: [],
     handleEl: document.createElement('div'),
     startX: 0,
     startY: 0,
@@ -43,9 +47,12 @@ describe('commitProjectHeaderDragDrop', () => {
     commitProjectHeaderDragDrop({
       session: makeSession('c', ['a', 'b', 'c']),
       sidebarDropIndex: 0,
+      targetBucketKey: 'ungrouped',
+      targetSidebarRepoHeaderIds: ['a', 'b', 'c'],
       orderedRepoIds: ['a', 'b', 'c'],
       repoById,
       usesProjectGroupOrdering: false,
+      projectGroupHostIdByGroupId: new Map(),
       onCommitRepoOrder,
       onCommitProjectGroupOrder: vi.fn()
     })
@@ -61,9 +68,12 @@ describe('commitProjectHeaderDragDrop', () => {
     commitProjectHeaderDragDrop({
       session: makeSession('same', ['b', 'same', 'c']),
       sidebarDropIndex: 0,
+      targetBucketKey: 'ungrouped',
+      targetSidebarRepoHeaderIds: ['b', 'same', 'c'],
       orderedRepoIds: ['b', 'same', 'c', 'same'],
       repoById,
       usesProjectGroupOrdering: false,
+      projectGroupHostIdByGroupId: new Map(),
       onCommitRepoOrder,
       onCommitProjectGroupOrder: vi.fn()
     })
@@ -79,9 +89,12 @@ describe('commitProjectHeaderDragDrop', () => {
     commitProjectHeaderDragDrop({
       session: makeSession('same', ['b', 'same', 'c']),
       sidebarDropIndex: 2,
+      targetBucketKey: 'ungrouped',
+      targetSidebarRepoHeaderIds: ['b', 'same', 'c'],
       orderedRepoIds: ['b', 'same', 'c', 'same'],
       repoById,
       usesProjectGroupOrdering: false,
+      projectGroupHostIdByGroupId: new Map(),
       onCommitRepoOrder,
       onCommitProjectGroupOrder: vi.fn()
     })
@@ -99,15 +112,111 @@ describe('commitProjectHeaderDragDrop', () => {
     const repoById = new Map(repos.map((repo) => [repo.id, repo]))
 
     commitProjectHeaderDragDrop({
-      session: makeSession('c', ['a', 'b', 'c']),
+      session: makeSession('c', ['a', 'b', 'c'], 'group:group-1'),
       sidebarDropIndex: 0,
+      targetBucketKey: 'group:group-1',
+      targetSidebarRepoHeaderIds: ['a', 'b', 'c'],
       orderedRepoIds: ['a', 'b', 'c'],
       repoById,
       usesProjectGroupOrdering: true,
+      projectGroupHostIdByGroupId: new Map([['group-1', 'local']]),
       onCommitRepoOrder: vi.fn(),
       onCommitProjectGroupOrder
     })
 
-    expect(onCommitProjectGroupOrder).toHaveBeenCalledWith('c', 'group-1', -1)
+    expect(onCommitProjectGroupOrder).toHaveBeenCalledWith('c', 'group-1', -1, 'local')
+  })
+
+  it('moves a project from one group into the actual target group slot', () => {
+    const onCommitProjectGroupOrder = vi.fn()
+    const repos = [
+      makeRepo('a', { projectGroupId: 'group-a' }),
+      makeRepo('b', { projectGroupId: 'group-b', projectGroupOrder: 0 }),
+      makeRepo('c', { projectGroupId: 'group-b', projectGroupOrder: 10 })
+    ]
+
+    commitProjectHeaderDragDrop({
+      session: makeSession('a', ['a'], 'group:group-a', 'runtime:env-dragged'),
+      sidebarDropIndex: 1,
+      targetBucketKey: 'group:group-b',
+      targetSidebarRepoHeaderIds: ['b', 'c'],
+      orderedRepoIds: ['a', 'b', 'c'],
+      repoById: new Map(repos.map((repo) => [repo.id, repo])),
+      usesProjectGroupOrdering: true,
+      projectGroupHostIdByGroupId: new Map([
+        ['group-a', 'runtime:env-dragged'],
+        ['group-b', 'runtime:env-dragged']
+      ]),
+      onCommitRepoOrder: vi.fn(),
+      onCommitProjectGroupOrder
+    })
+
+    expect(onCommitProjectGroupOrder).toHaveBeenCalledWith('a', 'group-b', 5, 'runtime:env-dragged')
+  })
+
+  it('moves a grouped project into the ungrouped bucket', () => {
+    const onCommitProjectGroupOrder = vi.fn()
+    const repos = [
+      makeRepo('a', { projectGroupId: 'group-a' }),
+      makeRepo('loose', { projectGroupOrder: 0 })
+    ]
+
+    commitProjectHeaderDragDrop({
+      session: makeSession('a', ['a'], 'group:group-a'),
+      sidebarDropIndex: 1,
+      targetBucketKey: 'ungrouped',
+      targetSidebarRepoHeaderIds: ['loose'],
+      orderedRepoIds: ['a', 'loose'],
+      repoById: new Map(repos.map((repo) => [repo.id, repo])),
+      usesProjectGroupOrdering: true,
+      projectGroupHostIdByGroupId: new Map([['group-a', 'local']]),
+      onCommitRepoOrder: vi.fn(),
+      onCommitProjectGroupOrder
+    })
+
+    expect(onCommitProjectGroupOrder).toHaveBeenCalledWith('a', null, 1, 'local')
+  })
+
+  it('rejects a target group owned by another execution host', () => {
+    const onCommitProjectGroupOrder = vi.fn()
+    const repos = [makeRepo('a', { projectGroupId: 'group-a' }), makeRepo('b')]
+
+    commitProjectHeaderDragDrop({
+      session: makeSession('a', ['a'], 'group:group-a'),
+      sidebarDropIndex: 0,
+      targetBucketKey: 'group:remote-group',
+      targetSidebarRepoHeaderIds: ['b'],
+      orderedRepoIds: ['a', 'b'],
+      repoById: new Map(repos.map((repo) => [repo.id, repo])),
+      usesProjectGroupOrdering: true,
+      projectGroupHostIdByGroupId: new Map([['remote-group', 'runtime:remote']]),
+      onCommitRepoOrder: vi.fn(),
+      onCommitProjectGroupOrder
+    })
+
+    expect(onCommitProjectGroupOrder).not.toHaveBeenCalled()
+  })
+
+  it('rejects an ambiguous same-id group shared by multiple hosts', () => {
+    const onCommitProjectGroupOrder = vi.fn()
+    const repos = [
+      makeRepo('a', { projectGroupId: 'shared' }),
+      makeRepo('b', { projectGroupId: 'shared' })
+    ]
+
+    commitProjectHeaderDragDrop({
+      session: makeSession('a', ['a', 'b'], 'group:shared'),
+      sidebarDropIndex: 2,
+      targetBucketKey: 'group:shared',
+      targetSidebarRepoHeaderIds: ['a', 'b'],
+      orderedRepoIds: ['a', 'b'],
+      repoById: new Map(repos.map((repo) => [repo.id, repo])),
+      usesProjectGroupOrdering: true,
+      projectGroupHostIdByGroupId: new Map([['shared', null]]),
+      onCommitRepoOrder: vi.fn(),
+      onCommitProjectGroupOrder
+    })
+
+    expect(onCommitProjectGroupOrder).not.toHaveBeenCalled()
   })
 })

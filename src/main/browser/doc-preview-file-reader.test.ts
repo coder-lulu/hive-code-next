@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const mocks = vi.hoisted(() => ({
   callRuntimeEnvironment: vi.fn(),
@@ -260,8 +261,7 @@ describe('readDocPreviewFile — paired runtime owner', () => {
       status: 404,
       reason: 'unreadable',
       // Why: fail-closed is deliberate, so the reader is told the host is old, not that it broke.
-      message:
-        'Secure document previews require a newer Orca on the paired machine. Update it and try again.'
+      message: `Secure document previews require a newer ${APP_DISPLAY_NAME} on the paired machine. Update it and try again.`
     })
     expect(mocks.callRuntimeEnvironment).toHaveBeenCalledOnce()
   })

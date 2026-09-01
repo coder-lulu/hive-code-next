@@ -1,4 +1,5 @@
 import type { AppState } from '../types'
+import { isFloatingTerminalSessionRecord } from '../../../../shared/terminal-tab-session'
 
 type TerminalTabReconnectState = Pick<
   AppState,
@@ -51,6 +52,7 @@ type OrphanTerminalCleanupState = Pick<
   | 'nativeChatLaunchDraftByTabId'
   | 'tabBarOrderByWorktree'
   | 'cacheTimerByKey'
+  | 'unreadAgentCompletionCountByPane'
   | 'activeTabIdByWorktree'
   | 'activeTabId'
 >
@@ -70,6 +72,9 @@ export function getOrphanTerminalIds(
     runtimeTabs
       .filter((tab) => {
         if (unifiedTerminalEntityIds.has(tab.id)) {
+          return false
+        }
+        if (isFloatingTerminalSessionRecord(tab, worktreeId)) {
           return false
         }
         // Why: a tab is orphaned only when it owns NO live/reconnecting PTY; a
@@ -103,6 +108,7 @@ export function buildOrphanTerminalCleanupPatch(
   | 'nativeChatLaunchDraftByTabId'
   | 'tabBarOrderByWorktree'
   | 'cacheTimerByKey'
+  | 'unreadAgentCompletionCountByPane'
   | 'activeTabIdByWorktree'
   | 'activeTabId'
 > {
@@ -123,6 +129,7 @@ export function buildOrphanTerminalCleanupPatch(
       nativeChatLaunchDraftByTabId: state.nativeChatLaunchDraftByTabId,
       tabBarOrderByWorktree: state.tabBarOrderByWorktree,
       cacheTimerByKey: state.cacheTimerByKey,
+      unreadAgentCompletionCountByPane: state.unreadAgentCompletionCountByPane,
       activeTabIdByWorktree: state.activeTabIdByWorktree,
       activeTabId: state.activeTabId
     }
@@ -152,6 +159,9 @@ export function buildOrphanTerminalCleanupPatch(
     )
   }
   const nextCacheTimerByKey = { ...state.cacheTimerByKey }
+  const nextUnreadAgentCompletionCountByPane = {
+    ...state.unreadAgentCompletionCountByPane
+  }
 
   // Why: orphan runtime terminals no longer have a backing unified tab or live
   // PTY, so every per-tab cache keyed off that runtime ID must disappear with
@@ -173,6 +183,11 @@ export function buildOrphanTerminalCleanupPatch(
     for (const key of Object.keys(nextCacheTimerByKey)) {
       if (key.startsWith(`${orphanTabId}:`)) {
         delete nextCacheTimerByKey[key]
+      }
+    }
+    for (const paneKey of Object.keys(nextUnreadAgentCompletionCountByPane)) {
+      if (paneKey.startsWith(`${orphanTabId}:`)) {
+        delete nextUnreadAgentCompletionCountByPane[paneKey]
       }
     }
   }
@@ -203,6 +218,7 @@ export function buildOrphanTerminalCleanupPatch(
     nativeChatLaunchDraftByTabId: nextNativeChatLaunchDraftByTabId,
     tabBarOrderByWorktree: nextTabBarOrderByWorktree,
     cacheTimerByKey: nextCacheTimerByKey,
+    unreadAgentCompletionCountByPane: nextUnreadAgentCompletionCountByPane,
     activeTabIdByWorktree: nextActiveTabIdByWorktree,
     activeTabId:
       state.activeTabId && orphanTerminalIds.has(state.activeTabId) ? null : state.activeTabId

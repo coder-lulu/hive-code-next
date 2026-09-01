@@ -53,7 +53,7 @@ export async function registerWorktreeForPairingRuntime(runtime, worktree, tools
     return
   }
   tools.logStep('0.1', 'Registering current worktree in temporary runtime...')
-  await tools.orca(['repo', 'add', '--path', worktree, '--json'], {
+  await tools.hive(['repo', 'add', '--path', worktree, '--json'], {
     cwd: worktree,
     env: runtime.env,
     timeout: 60000
@@ -86,9 +86,9 @@ async function waitForPairingRuntime({ child, userData, pairingAddress, logSucce
     env: {
       ...process.env,
       ORCA_USER_DATA_PATH: userData,
-      // Why: `orca-dev` derives its own profile and ignores ORCA_USER_DATA_PATH, so
-      // without this an ORCA_CLI=orca-dev run would address the dev profile instead
-      // of this disposable runtime. Plain `orca` ignores it.
+      // Why: the legacy `orca-dev` alias derives its own profile and ignores
+      // ORCA_USER_DATA_PATH, so selecting that compatibility alias would address
+      // the dev profile instead of this disposable runtime. The primary CLI ignores it.
       ORCA_DEV_USER_DATA_PATH: userData
     },
     stop

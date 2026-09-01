@@ -40,6 +40,20 @@ describe('home host auto-connect', () => {
     expect(hosts.map((item) => item.id)).toEqual(['old', 'new'])
   })
 
+  it('does not spend a one-time account ticket during background auto-connect', () => {
+    const cloud = {
+      ...host('cloud', 10, false),
+      accountRuntime: {
+        runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        createConnection: async () => {
+          throw new Error('not called')
+        }
+      }
+    }
+
+    expect(selectHomeAutoConnectHostIds([cloud, host('local', 1)])).toEqual(['local'])
+  })
+
   it('only presents hosts in the startup subset as connecting before clients open', () => {
     const autoConnectHostIds = ['recent']
 

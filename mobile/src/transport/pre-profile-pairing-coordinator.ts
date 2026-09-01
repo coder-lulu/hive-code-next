@@ -8,6 +8,7 @@ import {
 import { connect, type ConnectOptions } from './rpc-client'
 import { resolvePairingHostIdentity, saveHost } from './host-store'
 import type { HostProfile, PairingOffer, RpcResponse } from './types'
+import { offerWithAuthenticatedRuntimeRecordId } from './authenticated-runtime-pairing-offer'
 import {
   createMobileRelayPairingJournal,
   type MobileRelayPairingJournal
@@ -198,11 +199,12 @@ async function runPairing(
     candidates.push({ path: 'relay', client: relayClient })
   }
   const winner = await racePairingCandidates(candidates)
+  const authenticatedOffer = offerWithAuthenticatedRuntimeRecordId(offer, winner.status.result)
   log('success', 'Pairing path selected', `winner: ${winner.path}`)
   assertActive(isDisposed)
 
   if (!journal) {
-    await dependencies.saveHost(baseHost(offer, hostId, hostName, now))
+    await dependencies.saveHost(baseHost(authenticatedOffer, hostId, hostName, now))
     return { hostId }
   }
 
@@ -210,6 +212,7 @@ async function runPairing(
     ...journal,
     metadata: {
       ...journal.metadata,
+      host: baseHost(authenticatedOffer, hostId, hostName, now),
       winner: winner.path,
       authorizationMode: winner.path === 'direct' ? 'authenticated-direct' : 'relay-basis'
     }
@@ -223,7 +226,7 @@ async function runPairing(
     if (winner.path !== 'direct') {
       throw new Error('relay pairing RPC unavailable after relay path authentication')
     }
-    await dependencies.saveHost(baseHost(offer, hostId, hostName, now))
+    await dependencies.saveHost(baseHost(authenticatedOffer, hostId, hostName, now))
     await dependencies.clearJournal(journal.metadata.journalId)
     return { hostId }
   }
@@ -258,7 +261,8 @@ function baseHost(
     endpoint: offer.endpoint,
     deviceToken: offer.deviceToken,
     publicKeyB64: offer.publicKeyB64,
-    lastConnected
+    lastConnected,
+    runtimeRecordId: offer.runtimeRecordId
   }
 }
 

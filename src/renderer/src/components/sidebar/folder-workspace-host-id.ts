@@ -1,4 +1,8 @@
-import { toSshExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
+import {
+  normalizeExecutionHostId,
+  toSshExecutionHostId,
+  type ExecutionHostId
+} from '../../../../shared/execution-host'
 import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
 
@@ -12,10 +16,18 @@ import type { ProjectGroup } from '../../../../shared/project-group-types'
  * one must match where the row actually renders.
  */
 export function getFolderWorkspaceHostId(
-  folderWorkspace: Pick<FolderWorkspace, 'connectionId'>,
-  projectGroup: Pick<ProjectGroup, 'connectionId'>,
+  folderWorkspace: Pick<FolderWorkspace, 'connectionId' | 'executionHostId'>,
+  projectGroup: Pick<ProjectGroup, 'connectionId' | 'executionHostId'>,
   defaultHostId: ExecutionHostId
 ): ExecutionHostId {
+  const explicitHostId = normalizeExecutionHostId(folderWorkspace.executionHostId)
+  if (explicitHostId) {
+    return explicitHostId
+  }
+  const groupHostId = normalizeExecutionHostId(projectGroup.executionHostId)
+  if (groupHostId) {
+    return groupHostId
+  }
   const connectionId = folderWorkspace.connectionId ?? projectGroup.connectionId
   return connectionId ? toSshExecutionHostId(connectionId) : defaultHostId
 }

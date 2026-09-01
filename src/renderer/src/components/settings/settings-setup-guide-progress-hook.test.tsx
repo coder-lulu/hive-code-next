@@ -4,11 +4,16 @@ import type { FeatureWallSetupProgress } from '../feature-wall/feature-wall-setu
 import { useSettingsSetupGuideProgress } from './settings-setup-guide-progress'
 
 const mocks = vi.hoisted(() => ({
-  useSetupGuideProgress: vi.fn()
+  useSetupGuideProgress: vi.fn(),
+  useSetupGuideProgressSnapshot: vi.fn()
 }))
 
 vi.mock('../setup-guide/use-setup-guide-progress', () => ({
   useSetupGuideProgress: mocks.useSetupGuideProgress
+}))
+
+vi.mock('../setup-guide/setup-guide-progress-snapshot', () => ({
+  useSetupGuideProgressSnapshot: mocks.useSetupGuideProgressSnapshot
 }))
 
 function makeProgress(): FeatureWallSetupProgress {
@@ -30,24 +35,26 @@ function makeProgress(): FeatureWallSetupProgress {
 }
 
 function SettingsProgressProbe(): React.JSX.Element {
-  const progress = useSettingsSetupGuideProgress(true)
+  const progress = useSettingsSetupGuideProgress()
   return <span>{`${progress.doneCount}/${progress.total}`}</span>
 }
 
 describe('useSettingsSetupGuideProgress', () => {
   beforeEach(() => {
     mocks.useSetupGuideProgress.mockReset()
+    mocks.useSetupGuideProgressSnapshot.mockReset()
   })
 
-  it('uses the same setup progress path as the main sidebar', () => {
-    mocks.useSetupGuideProgress.mockReturnValue(makeProgress())
+  it('reads the root observer snapshot without starting another setup-guide refresh', () => {
+    mocks.useSetupGuideProgressSnapshot.mockReturnValue(makeProgress())
 
     expect(renderToStaticMarkup(<SettingsProgressProbe />)).toContain('4/8')
-    expect(mocks.useSetupGuideProgress).toHaveBeenCalledWith(true, false, false)
+    expect(mocks.useSetupGuideProgressSnapshot).toHaveBeenCalledOnce()
+    expect(mocks.useSetupGuideProgress).not.toHaveBeenCalled()
   })
 
   it('uses legacy-aware completion returned by the shared setup progress path', () => {
-    mocks.useSetupGuideProgress.mockReturnValue({
+    mocks.useSetupGuideProgressSnapshot.mockReturnValue({
       ...makeProgress(),
       stepDone: {
         'default-agent': true,
@@ -66,7 +73,7 @@ describe('useSettingsSetupGuideProgress', () => {
   })
 
   it('shows browser incomplete after the browser migration has already run for fresh users', () => {
-    mocks.useSetupGuideProgress.mockReturnValue({
+    mocks.useSetupGuideProgressSnapshot.mockReturnValue({
       ...makeProgress(),
       stepDone: {
         'default-agent': true,

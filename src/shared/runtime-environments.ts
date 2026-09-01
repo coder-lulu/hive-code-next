@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { PAIRING_OFFER_VERSION, type PairingOffer } from './pairing'
+import {
+  CANONICAL_RUNTIME_RECORD_ID_PATTERN,
+  PAIRING_OFFER_VERSION,
+  type PairingOffer
+} from './pairing'
 
 export const RuntimeAccessEndpointSchema = z.object({
   id: z.string().min(1),
@@ -29,6 +33,9 @@ export const KnownRuntimeEnvironmentSchema = z.object({
   pairedDeviceId: z.string().min(1).optional(),
   lastUsedAt: z.number().finite().nullable(),
   runtimeId: z.string().min(1).nullable(),
+  // An account Runtime is joined to a local pairing only through this explicit
+  // cloud record id. Hostnames and display names are deliberately not identity.
+  runtimeRecordId: z.string().regex(CANONICAL_RUNTIME_RECORD_ID_PATTERN).optional(),
   source: RuntimeEnvironmentSourceSchema.optional(),
   connectionDependency: z.literal('ssh-tunnel').optional(),
   endpoints: z.array(RuntimeAccessEndpointSchema).min(1),
@@ -37,8 +44,37 @@ export const KnownRuntimeEnvironmentSchema = z.object({
 
 export type KnownRuntimeEnvironment = z.infer<typeof KnownRuntimeEnvironmentSchema>
 
+export type RuntimeEnvironmentAccessSource = 'local-pairing' | 'account-claimed'
+
+export type RuntimeEnvironmentAccountClaim = Readonly<{
+  runtimeRecordId: string
+  resourceVersion: number
+  presence: 'ONLINE' | 'DEGRADED' | 'OFFLINE'
+  readiness: 'STARTING' | 'READY' | 'DEGRADED' | 'RECOVERING' | 'STOPPED' | 'ERROR' | null
+  readinessReasonCode: string | null
+  lastHeartbeatAt: number | null
+  freeDiskBytes: number | null
+  clientAuthMode: 'MTLS' | 'IDENTITY_PROOF' | null
+  credentialState:
+    | 'ACTIVE'
+    | 'EXPIRING'
+    | 'ROTATING'
+    | 'EXPIRED'
+    | 'REVOKED'
+    | 'COMPROMISED'
+    | 'IDENTITY_PROOF'
+    | 'UNAVAILABLE'
+  connectionCapabilities: readonly string[]
+  cloudConnectable: boolean
+  cloudDisplayName?: string | null
+  cloudDisplayNameVersion?: number | null
+  reportedDeviceName?: string | null
+}>
+
 export type PublicKnownRuntimeEnvironment = Omit<KnownRuntimeEnvironment, 'endpoints'> & {
   endpoints: PublicRuntimeAccessEndpoint[]
+  accessSources?: readonly RuntimeEnvironmentAccessSource[]
+  accountClaim?: RuntimeEnvironmentAccountClaim
 }
 
 export function redactRuntimeEnvironment(
@@ -64,6 +100,7 @@ export function createEnvironmentFromPairingOffer(args: {
   name: string
   now: number
   offer: PairingOffer
+  authenticatedRuntimeRecordId?: string
   runtimeId?: string | null
   source?: RuntimeEnvironmentSource
   connectionDependency?: 'ssh-tunnel'
@@ -76,6 +113,9 @@ export function createEnvironmentFromPairingOffer(args: {
     updatedAt: args.now,
     pairingRevision: args.now,
     ...(args.offer.pairedDeviceId ? { pairedDeviceId: args.offer.pairedDeviceId } : {}),
+    ...(args.authenticatedRuntimeRecordId
+      ? { runtimeRecordId: args.authenticatedRuntimeRecordId }
+      : {}),
     lastUsedAt: null,
     runtimeId: args.runtimeId ?? null,
     ...(args.source ? { source: args.source } : {}),
@@ -118,6 +158,7 @@ export function getPreferredPairingOffer(environment: KnownRuntimeEnvironment): 
     endpoint: endpoint.endpoint,
     deviceToken: endpoint.deviceToken,
     publicKeyB64: endpoint.publicKeyB64,
-    ...(environment.pairedDeviceId ? { pairedDeviceId: environment.pairedDeviceId } : {})
+    ...(environment.pairedDeviceId ? { pairedDeviceId: environment.pairedDeviceId } : {}),
+    ...(environment.runtimeRecordId ? { runtimeRecordId: environment.runtimeRecordId } : {})
   }
 }

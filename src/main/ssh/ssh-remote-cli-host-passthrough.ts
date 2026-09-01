@@ -9,7 +9,7 @@ import { spawn as nodeSpawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { getCanonicalUserDataPath } from '../persistence'
-import { applyProductBranding } from '../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { parseRemoteCliArgs } from './ssh-remote-cli-args'
 import { clampOrchestrationAskTimeoutMs } from '../../shared/orchestration-ask-timeout'
 import {
@@ -229,9 +229,7 @@ export async function runHostOrcaCliPassthrough(
   }
 
   if (!entryExists(cliEntryPath)) {
-    throw new HostCliUnavailableError(
-      applyProductBranding(`Orca CLI entry not found at ${cliEntryPath}`)
-    )
+    throw new HostCliUnavailableError(`${APP_DISPLAY_NAME} CLI entry not found at ${cliEntryPath}`)
   }
 
   const env = buildHostCliEnv({
@@ -266,9 +264,7 @@ export async function runHostOrcaCliPassthrough(
       }
       resolve({
         stdout: stdout.toString(),
-        stderr: `${stderr.toString()}${applyProductBranding(
-          `Orca CLI bridge timed out after ${killTimeoutMs}ms on the host.`
-        )}\n`,
+        stderr: `${stderr.toString()}${APP_DISPLAY_NAME} CLI bridge timed out after ${killTimeoutMs}ms on the host.\n`,
         exitCode: 1
       })
     }, killTimeoutMs)
@@ -285,7 +281,7 @@ export async function runHostOrcaCliPassthrough(
       // than reporting a confusing per-command failure.
       reject(
         new HostCliUnavailableError(
-          applyProductBranding(`Failed to launch the Orca CLI on the host: ${err.message}`)
+          `Failed to launch the ${APP_DISPLAY_NAME} CLI on the host: ${err.message}`
         )
       )
     })

@@ -6,12 +6,13 @@ import {
 } from '@/components/feature-wall/agents-orchestration/orchestration-types'
 import { usePrefersReducedMotion } from '@/components/feature-wall/feature-wall-modal-helpers'
 import { translate } from '@/i18n/i18n'
+import { PRIMARY_CLI_COMMAND } from '@/product-brand'
 
 const CLI_AGENT_COMMANDS = [
-  'orca worktree create --name auth-pr-1',
-  'orca worktree create --name auth-pr-2',
-  'orca orchestration dispatch --task pr1 --to w1',
-  'orca orchestration dispatch --task pr2 --to w2'
+  `${PRIMARY_CLI_COMMAND} worktree create --name auth-pr-1`,
+  `${PRIMARY_CLI_COMMAND} worktree create --name auth-pr-2`,
+  `${PRIMARY_CLI_COMMAND} orchestration dispatch --task pr1 --to w1`,
+  `${PRIMARY_CLI_COMMAND} orchestration dispatch --task pr2 --to w2`
 ]
 
 export function CliFeatureTipVisual(): JSX.Element {

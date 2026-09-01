@@ -19,6 +19,18 @@ const SESSION_PERSISTENCE_PATH = 'src/renderer/src/app-shell/use-app-session-per
 const PERSISTED_UI_WRITER_PATH = 'src/renderer/src/app-shell/use-persisted-ui-writer.ts'
 
 describe('renderer startup runtime routing', () => {
+  it('keeps Runtime Cloud sync alive independently of sidebar visibility', () => {
+    const appSource = readSource(APP_PATH)
+    const backgroundServicesSource = readSource(BACKGROUND_SERVICES_PATH)
+    const sidebarFooterSource = readSource('src/renderer/src/components/sidebar/SidebarFooter.tsx')
+
+    expect(appSource).toContain('<AppBackgroundServices />')
+    expect(backgroundServicesSource).toContain('startAccountRuntimeCloudSync')
+    expect(backgroundServicesSource).toContain('if (isWebClientLocation())')
+    expect(backgroundServicesSource).toContain('return startAccountRuntimeCloudSync()')
+    expect(sidebarFooterSource).not.toContain('startAccountRuntimeCloudSync')
+  })
+
   it('routes packaged terminal restore through the daemon adoption gate', () => {
     const source = readFileSync(
       join(process.cwd(), 'src/renderer/src/components/Terminal.tsx'),
@@ -136,6 +148,43 @@ describe('renderer startup runtime routing', () => {
     expect(joinBlock).toContain('localCatalogChain')
     expect(startupBlock).not.toContain('await Promise.all([')
     expect(startupBlock).not.toContain("actions.fetchAllWorktrees({ hydrationPurge: 'defer' })")
+  })
+
+  it('opens Home after restoring session surfaces and before unlocking persistence', () => {
+    const source = readSource(STARTUP_HYDRATION_PATH)
+    const persistedUiIndex = source.indexOf("timeRendererStartupSyncStep('hydrate-persisted-ui'")
+    const firstHomeIndex = source.indexOf('actions.openStartupHome()', persistedUiIndex)
+    const localReposIndex = source.indexOf(
+      'actions.fetchReposForAllHosts({ remoteHosts:',
+      firstHomeIndex
+    )
+    const hydrationStart = source.indexOf("timeRendererStartupSyncStep('hydrate-session-stores'")
+    const hydrationEnd = source.indexOf(
+      "timeRendererStartupStep('prepare-terminal-startup-restoration'",
+      hydrationStart
+    )
+    const hydrationBlock = source.slice(hydrationStart, hydrationEnd)
+
+    const workspaceIndex = hydrationBlock.indexOf('actions.hydrateWorkspaceSession(')
+    const tabsIndex = hydrationBlock.indexOf('actions.hydrateTabsSession(')
+    const editorIndex = hydrationBlock.indexOf('actions.hydrateEditorSession(')
+    const browserIndex = hydrationBlock.indexOf('actions.hydrateBrowserSession(')
+    const homeIndex = hydrationBlock.indexOf('actions.openStartupHome()')
+    const unlockIndex = source.indexOf('actions.setHydrationSucceeded(true)')
+
+    expect(persistedUiIndex).toBeGreaterThanOrEqual(0)
+    expect(persistedUiIndex).toBeLessThan(firstHomeIndex)
+    expect(firstHomeIndex).toBeLessThan(localReposIndex)
+    expect(workspaceIndex).toBeGreaterThanOrEqual(0)
+    expect(workspaceIndex).toBeLessThan(tabsIndex)
+    expect(tabsIndex).toBeLessThan(editorIndex)
+    expect(editorIndex).toBeLessThan(browserIndex)
+    expect(browserIndex).toBeLessThan(homeIndex)
+    expect(source.indexOf('actions.openStartupHome()', hydrationStart)).toBeLessThan(unlockIndex)
+
+    const catchIndex = source.indexOf('} catch (error) {')
+    const recoveryIndex = source.indexOf('await recoverFromDegradedStartup(', catchIndex)
+    expect(source.indexOf('actions.openStartupHome()', catchIndex)).toBeLessThan(recoveryIndex)
   })
 
   it('refreshes remote catalogs after startup hydration succeeds', () => {

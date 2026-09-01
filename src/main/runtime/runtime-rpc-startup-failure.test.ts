@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 const { appDisplayName, showMessageBoxMock, trackMock } = vi.hoisted(() => ({
   appDisplayName: 'Hive' + 'Code',
@@ -159,7 +160,10 @@ describe('runtime RPC startup failure reporting', () => {
         title: `${appDisplayName} CLI unavailable`,
         message: `${appDisplayName} couldn't start its local command transport.`,
         detail: expect.stringMatching(
-          /orca status.*orca terminal.*orchestration.*Cause: metadata write failed/s
+          new RegExp(
+            `${PRIMARY_CLI_COMMAND} status.*${PRIMARY_CLI_COMMAND} terminal.*orchestration.*Cause: metadata write failed`,
+            's'
+          )
         )
       })
     )

@@ -205,4 +205,39 @@ describe('mobile E2EE v2 physical channel', () => {
     expect(ctx.onError).toHaveBeenCalledOnce()
     expect(ctx.onError.mock.calls[0]![0].message).toBe('E2EE v2 outbound buffer overflow')
   })
+
+  it('accounts for base64 expansion when bounding queued text frames', async () => {
+    const ctx = setup(async () => null)
+    await authenticate(ctx)
+    ctx.socket.bufferedAmount = 9 * 1024 * 1024
+    const megabyte = 'a'.repeat(1024 * 1024)
+    for (let index = 0; index < 49; index++) {
+      ctx.channel.sendText(megabyte)
+    }
+
+    expect(ctx.onError).toHaveBeenCalledOnce()
+    expect(ctx.onError.mock.calls[0]![0].message).toBe('E2EE v2 outbound buffer overflow')
+  })
+
+  it('does not emit or send after the physical channel is disposed', async () => {
+    let releaseBinary!: (bytes: Uint8Array) => void
+    const pendingBinary = new Promise<Uint8Array>((resolve) => (releaseBinary = resolve))
+    const ctx = setup(async () => pendingBinary)
+    await authenticate(ctx)
+    ctx.events.length = 0
+    const binary = serverFrame(new Uint8Array([7]), 'binary', 1n, ctx.schedule)
+    const inbound = ctx.channel.handleMessage({ delayedBlob: true })
+    await Promise.resolve()
+
+    ctx.channel.dispose()
+    ctx.channel.start()
+    expect(ctx.channel.sendText('late')).toBe(false)
+    expect(ctx.channel.sendBinary(new Uint8Array([1]))).toBe(false)
+    releaseBinary(binary)
+    await inbound
+
+    expect(ctx.sent).toHaveLength(2)
+    expect(ctx.events).toEqual([])
+    expect(ctx.onError).not.toHaveBeenCalled()
+  })
 })

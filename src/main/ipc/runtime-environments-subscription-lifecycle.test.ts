@@ -207,6 +207,107 @@ describe('registerRuntimeEnvironmentHandlers', () => {
     markUsedSpy.mockRestore()
   })
 
+  it('reserves a subscription id while asynchronous setup is pending', async () => {
+    registerRuntimeEnvironmentHandlers(store as never)
+    let resolveSubscription!: (subscription: {
+      requestId: string
+      close: () => void
+      sendBinary: () => boolean
+    }) => void
+    subscribeRemoteRuntimeRequestMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSubscription = resolve
+      })
+    )
+
+    const add = handler<
+      { name: string; pairingCode: string },
+      { environment: { id: string; name: string } }
+    >('runtimeEnvironments:addFromPairingCode')
+    await add(null, { name: 'desk', pairingCode: pairingCode() })
+
+    const subscribe = handler<
+      { selector: string; method: string; subscriptionId: string },
+      { subscriptionId: string; requestId: string }
+    >('runtimeEnvironments:subscribe')
+    const sender = {
+      id: 1,
+      isDestroyed: () => false,
+      send: vi.fn(),
+      once: vi.fn(),
+      removeListener: vi.fn()
+    }
+    const args = {
+      selector: 'desk',
+      method: 'terminal.subscribe',
+      subscriptionId: 'pending-subscription'
+    }
+    const first = subscribe({ sender }, args)
+
+    await expect(subscribe({ sender }, args)).rejects.toThrow(
+      'Runtime environment subscription id already exists'
+    )
+
+    const close = vi.fn()
+    resolveSubscription({ requestId: 'stream-pending', close, sendBinary: () => true })
+    await expect(first).resolves.toEqual({
+      subscriptionId: 'pending-subscription',
+      requestId: 'stream-pending'
+    })
+    const unsubscribe = handler<{ subscriptionId: string }, { unsubscribed: boolean }>(
+      'runtimeEnvironments:unsubscribe'
+    )
+    expect(await unsubscribe({ sender }, { subscriptionId: 'pending-subscription' })).toEqual({
+      unsubscribed: true
+    })
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('does not retain a subscription that closes before setup resolves', async () => {
+    registerRuntimeEnvironmentHandlers(store as never)
+    const close = vi.fn()
+    subscribeRemoteRuntimeRequestMock.mockImplementation(
+      async (_pairing, _method, _params, _timeoutMs, callbacks) => {
+        callbacks.onClose()
+        return { requestId: 'already-closed', close, sendBinary: vi.fn() }
+      }
+    )
+
+    const add = handler<
+      { name: string; pairingCode: string },
+      { environment: { id: string; name: string } }
+    >('runtimeEnvironments:addFromPairingCode')
+    await add(null, { name: 'desk', pairingCode: pairingCode() })
+
+    const sender = {
+      id: 1,
+      isDestroyed: () => false,
+      send: vi.fn(),
+      once: vi.fn(),
+      removeListener: vi.fn()
+    }
+    const subscribe = handler<
+      { selector: string; method: string; subscriptionId: string },
+      { subscriptionId: string; requestId: string }
+    >('runtimeEnvironments:subscribe')
+
+    await expect(
+      subscribe(
+        { sender },
+        { selector: 'desk', method: 'terminal.subscribe', subscriptionId: 'closed-during-setup' }
+      )
+    ).resolves.toEqual({ subscriptionId: 'closed-during-setup', requestId: 'already-closed' })
+    expect(close).toHaveBeenCalledOnce()
+    expect(sender.removeListener).toHaveBeenCalledWith('destroyed', expect.any(Function))
+
+    const unsubscribe = handler<{ subscriptionId: string }, { unsubscribed: boolean }>(
+      'runtimeEnvironments:unsubscribe'
+    )
+    expect(unsubscribe({ sender }, { subscriptionId: 'closed-during-setup' })).toEqual({
+      unsubscribed: false
+    })
+  })
+
   it('rejects cross-window streaming subscription control', async () => {
     registerRuntimeEnvironmentHandlers(store as never)
     const close = vi.fn()

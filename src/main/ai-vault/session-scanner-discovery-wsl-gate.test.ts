@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Dirent } from 'node:fs'
 import type * as NodeFsPromisesModule from 'node:fs/promises'
 import type { AiVaultScanIssue } from '../../shared/ai-vault-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const fsMocks = vi.hoisted(() => ({ readdir: vi.fn(), stat: vi.fn() }))
 
@@ -18,8 +19,7 @@ import {
 } from '../native-chat/wsl-transcript-fs-gate'
 import { discoverFiles, walkSessionFiles } from './session-scanner-discovery'
 
-const SLOW_MESSAGE =
-  'WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart Orca if the issue continues.'
+const SLOW_MESSAGE = `WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart ${APP_DISPLAY_NAME} if the issue continues.`
 
 // Complete: UNC readdir results pass through the child dispatcher's dirent
 // serializer, which reads every kind flag.

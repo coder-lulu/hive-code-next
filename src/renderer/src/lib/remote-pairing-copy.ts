@@ -4,13 +4,14 @@ import type {
 } from '../../../shared/remote-pairing-address'
 import type { RemotePairingFailureKind } from '../../../shared/remote-pairing-verification'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export function translateHostAccessLinkError(kind: HostAccessLinkErrorKind): string {
   switch (kind) {
     case 'invalid-input':
       return translate(
         'auto.lib.remotePairingCopy.invalidInput',
-        'Enter an Orca access link or bare pairing code.'
+        'Enter a HiveCode access link or bare pairing code.'
       )
     case 'mobile-only':
       return translate(
@@ -59,7 +60,7 @@ export function translateRemotePairingFailureDescription(
       return translate(
         'auto.components.settings.RuntimeHostAccessForm.identityMismatchHelp',
         'Orca reached {{endpoint}}, but that host does not match this link. Generate a new link on the other host.',
-        { endpoint: endpoint ?? 'Orca' }
+        { endpoint: endpoint ?? APP_DISPLAY_NAME }
       )
     case 'access-link-invalid':
       return translate(
@@ -85,7 +86,7 @@ export function translateRemotePairingFailureDescription(
       return translate(
         'auto.components.settings.RuntimeHostAccessForm.unavailableHelp',
         'Make sure Orca is running on the other host and that the network or SSH tunnel can reach {{endpoint}}.',
-        { endpoint: endpoint ?? 'Orca' }
+        { endpoint: endpoint ?? APP_DISPLAY_NAME }
       )
   }
 }

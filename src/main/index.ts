@@ -106,9 +106,31 @@ import { OrcaRuntimeService, type RuntimeWorktreeLifecycleEvent } from './runtim
 import { HiveAccountService } from './hive-account/hive-account-service'
 import { getHiveRuntimeCloudConfig } from './hive-runtime-cloud/hive-runtime-cloud-config'
 import { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud/hive-runtime-cloud-presence-service'
+import { defaultPresenceDependencies } from './hive-runtime-cloud/hive-runtime-cloud-presence-support'
 import { createHiveRuntimeCloudReport } from './hive-runtime-cloud/hive-runtime-cloud-report'
+import {
+  collectHiveRuntimeFreeDiskBytes,
+  getHiveRuntimeDeviceInfoSnapshot
+} from './hive-runtime-cloud/hive-runtime-device-info'
 import { HiveRuntimeCloudWebLaunchService } from './hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import { HiveRuntimeCloudWebSessionControlService } from './hive-runtime-cloud/hive-runtime-cloud-web-session-control-service'
+import { HiveAccountRuntimeDirectoryService } from './hive-runtime-cloud/hive-account-runtime-directory-service'
+import { HiveAccountRuntimeSessionService } from './hive-runtime-cloud/hive-account-runtime-session-service'
+import { HiveAccountRuntimeTransport } from './hive-runtime-cloud/hive-account-runtime-transport'
+import { installHiveAccountRuntimeAccess } from './hive-runtime-cloud/hive-account-runtime-access'
+import {
+  defaultLocalRuntimeOwnershipDependencies,
+  LocalRuntimeOwnershipService
+} from './hive-runtime-cloud/local-runtime-ownership-service'
+import {
+  clearHiveRuntimeCloudServiceIdentity,
+  getOrCreateHiveRuntimeCloudServiceIdentity
+} from './hive-runtime-cloud/hive-runtime-cloud-identity-store'
+import {
+  clearHiveRuntimeCloudServiceRegistrationState,
+  readHiveRuntimeCloudServiceRegistrationState,
+  saveHiveRuntimeCloudServiceRegistrationState
+} from './hive-runtime-cloud/hive-runtime-cloud-state-store'
 import type { HiveAccountState } from '../shared/hive-account'
 import { ArtifactCloudService } from './artifacts/artifact-cloud-service'
 import { SkillCloudService } from './skills/skill-cloud-service'
@@ -119,7 +141,10 @@ import {
   fingerprintOrchestrationPeer,
   type OrchestrationEnvironmentTransport
 } from './runtime/orchestration/environment-transport'
-import { callRuntimeEnvironment } from './ipc/runtime-environment-transport-routing'
+import {
+  callEnvironmentWithCloudFallback,
+  resolveRuntimeEnvironmentCatalogEntry
+} from './ipc/runtime-environment-account-routing'
 import { resolveEnvironment } from '../shared/runtime-environment-store'
 import { getPreferredPairingOffer } from '../shared/runtime-environments'
 import { OrcaRuntimeRpcServer } from './runtime/runtime-rpc'
@@ -435,9 +460,15 @@ let runtimeRpc: OrcaRuntimeRpcServer | null = null
 let hiveAccountService: HiveAccountService | null = null
 let hiveAccountStartupState: Promise<HiveAccountState> | null = null
 let runtimeCloudPresence: HiveRuntimeCloudPresenceService | null = null
+let runtimeCloudDirectory: HiveAccountRuntimeDirectoryService | null = null
+let runtimeCloudSessions: HiveAccountRuntimeSessionService | null = null
+let runtimeCloudTransport: HiveAccountRuntimeTransport | null = null
+let uninstallRuntimeCloudAccess: (() => void) | null = null
+let localRuntimeOwnership: LocalRuntimeOwnershipService | null = null
 let runtimeCloudWebLaunch: HiveRuntimeCloudWebLaunchService | null = null
 let runtimeCloudWebSessionControl: HiveRuntimeCloudWebSessionControlService | null = null
 let unsubscribeRuntimeCloudAuthorization: (() => void) | null = null
+let unsubscribeRuntimeCloudPresenceState: (() => void) | null = null
 const serveReadinessPublisher = new ServeReadinessPublisher()
 let desktopRelayService: DesktopRelayService | null = null
 let desktopRelayStatus: RelayBrokerStatus = 'offline'
@@ -1084,6 +1115,11 @@ ipcMain.handle('app:awaitFirstWindowStartupServices', async () => {
   await Promise.all([firstWindowStartupServicesReady, managedWslCliStartupBarrierReady])
 })
 
+ipcMain.handle('app:prepareTerminalStartupRestoration', async () => {
+  await Promise.all([firstWindowStartupServicesReady, managedWslCliStartupBarrierReady])
+  await runtime?.prepareStructuredAgentSessionStartupRestoration()
+})
+
 ipcMain.handle('app:recoverLegacyWorkerTerminalsForRendererStartup', () =>
   recoverLegacyWorkerTerminalsForRendererStartup({
     firstWindowStartupServicesReady,
@@ -1710,6 +1746,15 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
     {
       ...(hiveAccountService ? { hiveAccountService } : {}),
       ...(hiveAccountStartupState ? { hiveAccountStartupState } : {}),
+      ...(runtimeCloudDirectory && runtimeCloudSessions && localRuntimeOwnership
+        ? {
+            hiveRuntimeCloudServices: {
+              directory: runtimeCloudDirectory,
+              ownership: localRuntimeOwnership,
+              sessions: runtimeCloudSessions
+            }
+          }
+        : {}),
       getAdditionalAiVaultCodexHomePaths: () =>
         codexRuntimeHome ? codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery() : [],
       prepareAiVaultSessionResume: (args) =>
@@ -1812,12 +1857,14 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       if (mainWindow?.isDestroyed()) {
         return
       }
+      const terminalHandle = runtime?.getAgentStatusTerminalHandleForPaneKey(paneKey)
       if (providerSessionOnly) {
         // Why: session_start just refreshes durable resume identity while Pi is idle; forward it without titles, telemetry, or status UI.
         mainWindow?.webContents.send('agentStatus:set', {
           ...payload,
           paneKey,
           ...(launchToken ? { launchToken } : {}),
+          ...(terminalHandle ? { terminalHandle } : {}),
           tabId,
           worktreeId,
           connectionId,
@@ -1833,7 +1880,6 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
         maybeAutoRenameBranchOnFirstWorkFromHook({ paneKey, tabId, worktreeId, payload, isReplay })
       }
       const orchestration = runtime?.getAgentStatusOrchestrationContextForPaneKey(paneKey)
-      const terminalHandle = runtime?.getAgentStatusTerminalHandleForPaneKey(paneKey)
       const suppressSyntheticCodexAutoApprovalTitle =
         payload.agentType === 'codex' &&
         (payload.state === 'waiting' || payload.state === 'blocked')
@@ -2876,24 +2922,38 @@ void app.whenReady().then(async () => {
   })
   const orchestrationEnvironmentTransport: OrchestrationEnvironmentTransport = {
     resolve: (selector) => {
-      const environment = resolveEnvironment(app.getPath('userData'), selector)
-      const pairing = getPreferredPairingOffer(environment)
+      const userDataPath = app.getPath('userData')
+      const environment = resolveRuntimeEnvironmentCatalogEntry(userDataPath, selector)
+      const localPairing = environment.accessSources?.includes('local-pairing')
+        ? getPreferredPairingOffer(resolveEnvironment(userDataPath, environment.id))
+        : null
+      const accountRuntimeRecordId = environment.runtimeRecordId
+      if (!localPairing && !accountRuntimeRecordId) {
+        throw new Error('Account Runtime identity is unavailable')
+      }
       return {
         environmentId: environment.id,
         name: environment.name,
-        peerFingerprint: fingerprintOrchestrationPeer(pairing.publicKeyB64)
+        peerFingerprint: localPairing
+          ? fingerprintOrchestrationPeer(localPairing.publicKeyB64)
+          : fingerprintOrchestrationPeer(
+              Buffer.from(`hive-account-runtime:${accountRuntimeRecordId}`).toString('base64')
+            )
       }
     },
-    call: (selector, method, params, timeoutMs, envelope) =>
-      callRuntimeEnvironment(
-        app.getPath('userData'),
-        selector,
+    call: async (selector, method, params, timeoutMs, envelope) => {
+      const userDataPath = app.getPath('userData')
+      const environment = resolveRuntimeEnvironmentCatalogEntry(userDataPath, selector)
+      return callEnvironmentWithCloudFallback(
+        userDataPath,
+        environment,
         method,
         params,
         timeoutMs,
         undefined,
         envelope
       )
+    }
   }
   const runtimeService = new OrcaRuntimeService(store, stats, {
     agentSessionClaimSigner: loadAgentSessionClaimSigner(
@@ -2915,6 +2975,7 @@ void app.whenReady().then(async () => {
       }
     },
     getDesktopWindowStatus: getDesktopWindowStatus,
+    getRuntimeRecordId: () => localRuntimeOwnership?.getClaimedRuntimeRecordId() ?? null,
     // Why: worktree.ps pulls hook-reported agent status (same source as the desktop sidebar) at query time so mobile shows the same agents.
     getAgentStatusSnapshot: () =>
       agentHookServer.getStatusSnapshot().filter((entry) => entry.providerSessionOnly !== true),
@@ -2944,26 +3005,81 @@ void app.whenReady().then(async () => {
   })
   runtime = runtimeService
   const runtimeCloudConfig = getHiveRuntimeCloudConfig()
+  const getRuntimeCloudReport = () => {
+    const freeDiskBytes = collectHiveRuntimeFreeDiskBytes(app.getPath('userData'))
+    return createHiveRuntimeCloudReport(
+      runtimeService,
+      app.getVersion(),
+      runtimeCloudConfig.enabled ? runtimeCloudConfig.webLaunch : undefined,
+      Date.now,
+      {
+        ...getHiveRuntimeDeviceInfoSnapshot(),
+        ...(freeDiskBytes !== undefined ? { freeDiskBytes } : {})
+      }
+    )
+  }
+  const serviceOwnedRuntimeCloudStorage = isServeMode
+    ? {
+        loadIdentity: getOrCreateHiveRuntimeCloudServiceIdentity,
+        readState: readHiveRuntimeCloudServiceRegistrationState,
+        saveState: saveHiveRuntimeCloudServiceRegistrationState,
+        clearIdentity: clearHiveRuntimeCloudServiceIdentity,
+        clearState: clearHiveRuntimeCloudServiceRegistrationState
+      }
+    : null
+  const runtimeCloudPresenceDependencies = serviceOwnedRuntimeCloudStorage
+    ? { ...defaultPresenceDependencies, ...serviceOwnedRuntimeCloudStorage }
+    : defaultPresenceDependencies
   const processRuntimeCloudPresence = new HiveRuntimeCloudPresenceService(
     runtimeCloudConfig,
     app.getPath('userData'),
-    {
-      getReport: () =>
-        createHiveRuntimeCloudReport(
-          runtimeService,
-          app.getVersion(),
-          runtimeCloudConfig.enabled ? runtimeCloudConfig.webLaunch : undefined
-        )
-    }
+    { getReport: getRuntimeCloudReport },
+    runtimeCloudPresenceDependencies
   )
   runtimeCloudPresence = processRuntimeCloudPresence
+  const processRuntimeCloudDirectory = new HiveAccountRuntimeDirectoryService(
+    runtimeCloudConfig,
+    undefined,
+    app.getPath('userData')
+  )
+  runtimeCloudDirectory = processRuntimeCloudDirectory
+  const processRuntimeCloudSessions = new HiveAccountRuntimeSessionService(runtimeCloudConfig)
+  runtimeCloudSessions = processRuntimeCloudSessions
+  const processRuntimeCloudTransport = new HiveAccountRuntimeTransport(processRuntimeCloudDirectory)
+  runtimeCloudTransport = processRuntimeCloudTransport
+  uninstallRuntimeCloudAccess = installHiveAccountRuntimeAccess({
+    directory: processRuntimeCloudDirectory,
+    transport: processRuntimeCloudTransport
+  })
+  const processLocalRuntimeOwnership = new LocalRuntimeOwnershipService({
+    config: runtimeCloudConfig,
+    userDataPath: app.getPath('userData'),
+    getReport: getRuntimeCloudReport,
+    getBootId: () => processRuntimeCloudPresence.getBootId(),
+    getRelayStatus: () => desktopRelayStatus,
+    onRegistrationChanged: () => processRuntimeCloudPresence.notifyRegistrationChanged(),
+    dependencies: serviceOwnedRuntimeCloudStorage
+      ? { ...defaultLocalRuntimeOwnershipDependencies, ...serviceOwnedRuntimeCloudStorage }
+      : defaultLocalRuntimeOwnershipDependencies
+  })
+  localRuntimeOwnership = processLocalRuntimeOwnership
+  unsubscribeRuntimeCloudPresenceState = processRuntimeCloudPresence.subscribeState((state) =>
+    processLocalRuntimeOwnership.setPresenceState(state)
+  )
   if (hiveAccountService) {
     unsubscribeRuntimeCloudAuthorization = hiveAccountService.subscribeRuntimeCloudAuthorization(
       (authorization) => {
+        processRuntimeCloudDirectory.setAuthorization(authorization)
+        processRuntimeCloudSessions.setAuthorization(authorization)
+        processLocalRuntimeOwnership.setAuthorization(authorization)
         processRuntimeCloudPresence.setAuthorization(authorization)
       }
     )
-    processRuntimeCloudPresence.setAuthorization(hiveAccountService.getRuntimeCloudAuthorization())
+    const authorization = hiveAccountService.getRuntimeCloudAuthorization()
+    processRuntimeCloudDirectory.setAuthorization(authorization)
+    processRuntimeCloudSessions.setAuthorization(authorization)
+    processLocalRuntimeOwnership.setAuthorization(authorization)
+    processRuntimeCloudPresence.setAuthorization(authorization)
   }
   runtimeService.prepareLegacyWorkerTerminalRecovery()
   publishProviderSessionChanges(agentHookServer.getProviderSessionIdentities())
@@ -3418,6 +3534,7 @@ void app.whenReady().then(async () => {
   migrateMobilePairingDataToCanonicalUserDataPath(app.getPath('userData'))
   runtimeRpc = new OrcaRuntimeRpcServer({
     runtime,
+    hiveRuntimeCloud: processLocalRuntimeOwnership,
     // Why: mobile pairing needs the stable pre-setName() path (getCanonicalUserDataPath), not a late app.getPath('userData') that drops paired devices across restarts.
     userDataPath: getCanonicalUserDataPath(),
     enableWebSocket: true,
@@ -3546,11 +3663,11 @@ void app.whenReady().then(async () => {
           }
         }).install()
         console.log(
-          `[serve] orca CLI install: ${cliStatus.state}${cliStatus.commandPath ? ` (${cliStatus.commandPath})` : ''}`
+          `[serve] ${APP_DISPLAY_NAME} CLI install: ${cliStatus.state}${cliStatus.commandPath ? ` (${cliStatus.commandPath})` : ''}`
         )
       } catch (error) {
         console.warn(
-          '[serve] orca CLI install skipped:',
+          `[serve] ${APP_DISPLAY_NAME} CLI install skipped:`,
           error instanceof Error ? error.message : String(error)
         )
       }
@@ -3562,12 +3679,12 @@ void app.whenReady().then(async () => {
           resourcesPath: process.resourcesPath
         })
         console.log(
-          `[serve] bare orca dispatcher ${dispatcher.state}: ${dispatcher.dispatcherPath}` +
+          `[serve] legacy CLI dispatcher ${dispatcher.state}: ${dispatcher.dispatcherPath}` +
             `${dispatcher.target ? ` -> ${dispatcher.target}` : ''}`
         )
       } catch (error) {
         console.warn(
-          '[serve] bare orca dispatcher install skipped:',
+          '[serve] legacy CLI dispatcher install skipped:',
           error instanceof Error ? error.message : String(error)
         )
       }
@@ -3631,7 +3748,7 @@ void app.whenReady().then(async () => {
   }
 
   const cloudAuth = getProductCloudAuthConfig()
-  if (cloudAuth.configured) {
+  if (cloudAuth.configured && cloudAuth.config.relayDirectorUrl) {
     try {
       const relayService = new DesktopRelayService({
         authConfig: cloudAuth.config,
@@ -3732,6 +3849,18 @@ app.on('will-quit', (e) => {
   destroySystemTray()
   unsubscribeRuntimeCloudAuthorization?.()
   unsubscribeRuntimeCloudAuthorization = null
+  unsubscribeRuntimeCloudPresenceState?.()
+  unsubscribeRuntimeCloudPresenceState = null
+  uninstallRuntimeCloudAccess?.()
+  uninstallRuntimeCloudAccess = null
+  runtimeCloudTransport?.stop()
+  runtimeCloudTransport = null
+  runtimeCloudDirectory?.stop()
+  runtimeCloudDirectory = null
+  runtimeCloudSessions?.stop()
+  runtimeCloudSessions = null
+  localRuntimeOwnership?.stop()
+  localRuntimeOwnership = null
   const runtimeCloudWebSessionControlShutdown =
     runtimeCloudWebSessionControl?.stop() ?? Promise.resolve()
   runtimeCloudWebSessionControl = null
@@ -3774,7 +3903,7 @@ app.on('will-quit', (e) => {
     .then((routes) => routes.closeAllLocalSshBrowserRoutes())
     .catch(() => {})
   browserManager.setBrowserGuestStateChangedListener(null)
-  const emulatorShutdown = runtime?.getEmulatorBridge()?.destroyAllSessions() ?? Promise.resolve()
+  const emulatorShutdown = runtime?.getEmulatorBridge()?.onAppQuit() ?? Promise.resolve()
   // Why immediately before store.flushAsync() with no await in between: beginSshShutdown() marks every
   // active SSH lease detached in memory synchronously, and that flush is what persists it.
   const sshShutdown = beginSshShutdown()

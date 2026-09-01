@@ -17,6 +17,7 @@ import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { PRIMARY_CLI_COMMAND, getProductCliDisplayCommand } from '@/product-brand'
 
 type WslCliRegistrationProps = {
   currentPlatform: string
@@ -70,7 +71,7 @@ export function WslCliRegistration({
 
   const isEnabled = status?.state === 'installed'
   const isSupported = status?.supported ?? false
-  const commandName = status?.commandName ?? 'orca-ide'
+  const commandName = getProductCliDisplayCommand(status?.commandName ?? PRIMARY_CLI_COMMAND)
 
   const handleInstall = async (): Promise<void> => {
     setBusyAction('install')
@@ -85,7 +86,7 @@ export function WslCliRegistration({
         translate(
           'auto.components.settings.WslCliRegistration.951536dda5',
           'Registered `{{value0}}` in WSL.',
-          { value0: next.commandName }
+          { value0: getProductCliDisplayCommand(next.commandName) }
         )
       )
     } catch (error) {
@@ -120,7 +121,7 @@ export function WslCliRegistration({
         translate(
           'auto.components.settings.WslCliRegistration.89c7414cf5',
           'Removed `{{value0}}` from WSL.',
-          { value0: next.commandName }
+          { value0: getProductCliDisplayCommand(next.commandName) }
         )
       )
     } catch (error) {
@@ -162,7 +163,7 @@ export function WslCliRegistration({
                 : (status?.detail ??
                   translate(
                     'auto.components.settings.WslCliRegistration.7aa456a460',
-                    'Register `orca-ide` in ~/.local/bin inside WSL.'
+                    'Register `hive` in ~/.local/bin inside WSL.'
                   ))}
             </p>
           </div>

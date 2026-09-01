@@ -155,28 +155,30 @@ describe('Windows signing workflow contract', () => {
     )
   })
 
-  it('verifies Windows inner binary signatures fail-open before publishing', () => {
+  it('verifies Windows inner binary signatures fail-closed before publishing', () => {
     const parsedWorkflow = readWorkflow('.github/workflows/release-cut.yml')
     const steps = parsedWorkflow.jobs.build.steps
     const stepNames = steps.map((step) => step.name)
     const outerVerifyIndex = stepNames.indexOf('Verify signed Windows installer')
     const innerVerifyIndex = stepNames.indexOf('Verify Windows inner binary signatures')
     const evidenceIndex = stepNames.indexOf('Upload Windows inner signing evidence')
-    const publishIndex = stepNames.indexOf('Publish signed Windows release artifacts')
+    const telemetryIndex = stepNames.indexOf('Verify telemetry constants present in app.asar')
+    const publishIndex = stepNames.indexOf(
+      'Publish signed Windows installer to HiveCloud object storage'
+    )
 
     expect(outerVerifyIndex).toBeGreaterThan(-1)
     expect(innerVerifyIndex).toBe(outerVerifyIndex + 1)
     expect(evidenceIndex).toBe(innerVerifyIndex + 1)
-    expect(publishIndex).toBe(evidenceIndex + 1)
+    expect(telemetryIndex).toBe(evidenceIndex + 1)
+    expect(publishIndex).toBe(telemetryIndex + 1)
 
-    // Why fail-open: unsigned inner binaries must warn, not block, until the
-    // flow is proven on a real release (issue #7785). Flip this to 'true'
-    // together with the workflow env to make the gate required.
-    expect(steps[innerVerifyIndex].env.ORCA_WINDOWS_INNER_SIGNATURE_REQUIRED).toBe('false')
+    // The final verifier is required even though the preceding signing steps
+    // continue long enough to leave useful failure evidence.
+    expect(steps[innerVerifyIndex].env.ORCA_WINDOWS_INNER_SIGNATURE_REQUIRED).toBe('true')
 
-    // Why: every step in the inner-signing chain must be unable to fail the
-    // release — a SignPath outage or timeout falls through to today's
-    // unsigned-inner flow instead of blocking the cut.
+    // The signing chain records individual outcomes; the required verifier
+    // converts an incomplete chain into a release-blocking failure.
     const innerChainStepNames = [
       'Stage unsigned inner PE files for signing',
       'Upload unsigned inner binaries for SignPath',

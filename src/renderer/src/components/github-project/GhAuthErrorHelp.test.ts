@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GhAuthDiagnostic } from '../../../../shared/github/auth-types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
@@ -35,6 +36,17 @@ function diagnostic(overrides: Partial<GhAuthDiagnostic> = {}): GhAuthDiagnostic
 }
 
 describe('GitHub Project auth remediation host routing', () => {
+  it('uses the current product name in GitHub CLI setup guidance', () => {
+    const remediation = buildRemediation(
+      'Sign in required.',
+      'auth_required',
+      diagnostic({ ghAvailable: false })
+    )
+
+    expect(remediation.detail).toContain(`${APP_DISPLAY_NAME} uses \`gh\``)
+    expect(remediation.detail).not.toContain('Orca')
+  })
+
   it('uses the requested GHES host while the diagnostic is still loading', () => {
     expect(
       buildRemediation('Sign in required.', 'auth_required', null, 'ghe.acme.test:8443').commands

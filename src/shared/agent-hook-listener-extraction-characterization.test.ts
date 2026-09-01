@@ -111,6 +111,10 @@ describe('agent hook extraction boundaries', () => {
     }
     expect(cappedState.warnedVersions.size).toBe(32)
     expect(cappedState.warnedEnvs.size).toBe(32)
+    expect(warn.mock.calls.flat().join('\n')).toContain(
+      'Likely a stale terminal from another HiveCode install.'
+    )
+    expect(warn.mock.calls.flat().join('\n')).not.toContain('another Orca install')
     warn.mockRestore()
   })
 

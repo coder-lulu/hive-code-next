@@ -9,14 +9,9 @@ export function getHiveCodeCliCommandNameForPlatform(platform: NodeJS.Platform):
 }
 
 export function getCompatibilityCliCommandNamesForPlatform(platform: NodeJS.Platform): string[] {
-  if (platform === 'linux') {
-    // Why: GNOME Orca owns the bare `orca` command on Linux.
-    return ['orca-ide']
-  }
-  if (platform === 'win32') {
-    return ['orca.cmd', 'orca-ide.cmd']
-  }
-  return ['orca', 'orca-ide']
+  return hivecodeProductConfig.cli.aliases
+    .filter((commandName) => platform !== 'linux' || commandName !== 'orca')
+    .map((commandName) => (platform === 'win32' ? `${commandName}.cmd` : commandName))
 }
 
 export function getGlobalCliCommandNamesForPlatform(platform: NodeJS.Platform): string[] {

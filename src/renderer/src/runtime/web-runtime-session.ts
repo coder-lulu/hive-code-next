@@ -19,7 +19,10 @@ import type {
   SleepingAgentLaunchConfig,
   AgentProviderSessionMetadata
 } from '../../../shared/agent-session-resume'
-import { BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import {
+  AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
+  BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY
+} from '../../../shared/protocol-version'
 import { agentResumeHostAuthorityCapability } from './agent-resume-host-authority-capability'
 import { expectsBrowserClientHosting } from '../../../shared/browser-client-hosting-eligibility'
 import type {
@@ -34,6 +37,7 @@ import type {
 } from '../../../shared/agent-session-host-authority'
 import type { TerminalPaneLayoutNode } from '../../../shared/terminal-tab-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import { createBrowserUuid } from '../lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '../lib/worktree-runtime-owner'
 import { useAppStore } from '../store'
@@ -73,7 +77,7 @@ import { runRemoteAgentSessionLaunch } from './remote-agent-session-launch'
 import { translate } from '../i18n/i18n'
 import { getRuntimeEnvironmentRevision } from './runtime-environment-revision'
 import { getRuntimeEnvironmentConnectionGeneration } from '@/store/slices/runtime-status'
-import { parsePaneKey } from '../../../shared/stable-pane-id'
+import { makePaneKey, parsePaneKey } from '../../../shared/stable-pane-id'
 import { toRuntimeExecutionHostId } from '../../../shared/execution-host'
 import {
   resolveWebRuntimeSessionEnvironmentId,
@@ -200,6 +204,8 @@ type CreateWebRuntimeSessionTerminalArgs = {
   promptDelivery?: AgentPromptDelivery
   /** Explicit CLI override; omission leaves the remote host's defaults authoritative. */
   agentArgs?: string | null
+  /** Explicit semantic permission override, resolved from the remote host's defaults. */
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
   launchPreferences?: AgentLaunchPreferences
   providerSession?: AgentProviderSessionMetadata
   viewMode?: 'terminal' | 'chat'
@@ -213,12 +219,43 @@ type CreatedWebRuntimeSessionTerminal = {
 }
 
 type CreatedAgentTerminalIdentity = Pick<RuntimeTerminalCreate, 'tabId' | 'paneKey'> & {
+  handle?: string
   leafId?: string
 }
 
 function createdTerminalLeafId(terminal: CreatedAgentTerminalIdentity): string | undefined {
   const pane = parsePaneKey(terminal.paneKey ?? '')
   return pane && pane.tabId === terminal.tabId ? pane.leafId : undefined
+}
+
+function registerHostOwnedAgentLaunch(args: {
+  terminal: CreatedAgentTerminalIdentity
+  agent: TuiAgent
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
+  providerSession?: AgentProviderSessionMetadata
+}): void {
+  const { terminal } = args
+  const leafId = createdTerminalLeafId(terminal)
+  if (!terminal.handle || !terminal.tabId || !leafId) {
+    return
+  }
+  const tabId = toWebTerminalSurfaceTabId(terminal.tabId)
+  useAppStore.getState().registerAgentLaunchConfig(
+    makePaneKey(tabId, leafId),
+    {
+      agentArgs: '',
+      agentEnv: {},
+      hostDefaultsAuthoritative: true,
+      ...(args.agentPermissionMode ? { agentPermissionMode: args.agentPermissionMode } : {})
+    },
+    {
+      agentType: args.agent,
+      tabId,
+      leafId,
+      terminalHandle: terminal.handle,
+      ...(args.providerSession ? { providerSession: args.providerSession } : {})
+    }
+  )
 }
 
 export async function createWebRuntimeSessionTerminal(
@@ -314,7 +351,11 @@ async function createWebRuntimeSessionTerminalResult(
   try {
     const agent = args.launchAgent ?? args.agent
     const agentArgsOverride =
-      args.agentArgs !== undefined ? args.agentArgs : args.launchConfig?.agentArgs
+      args.agentArgs !== undefined
+        ? args.agentArgs
+        : args.agentPermissionMode
+          ? undefined
+          : args.launchConfig?.agentArgs
     if (agent) {
       let legacyAlreadyPlacedInGroup = false
       // Why: structured creation cannot yet express afterTabId; keep the exact legacy placement contract until it can.
@@ -336,6 +377,9 @@ async function createWebRuntimeSessionTerminalResult(
                         ? { ompResumeFilePath: args.launchConfig.ompResumeFilePath }
                         : {}),
                       ...(agentArgsOverride !== undefined ? { agentArgs: agentArgsOverride } : {}),
+                      ...(args.agentPermissionMode
+                        ? { agentPermissionMode: args.agentPermissionMode }
+                        : {}),
                       ...(args.launchPreferences
                         ? { launchPreferences: args.launchPreferences }
                         : {}),
@@ -359,6 +403,9 @@ async function createWebRuntimeSessionTerminalResult(
                         ...(agentArgsOverride !== undefined
                           ? { agentArgs: agentArgsOverride }
                           : {}),
+                        ...(args.agentPermissionMode
+                          ? { agentPermissionMode: args.agentPermissionMode }
+                          : {}),
                         ...(args.launchPreferences
                           ? { launchPreferences: args.launchPreferences }
                           : {}),
@@ -374,14 +421,21 @@ async function createWebRuntimeSessionTerminalResult(
               )
       const resumeHostAuthorityCapability =
         args.agentSessionKind === 'resume' ? agentResumeHostAuthorityCapability(agent) : undefined
+      const freshHostAuthorityCapability = args.agentPermissionMode
+        ? AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY
+        : undefined
+      const hostAuthorityCapabilities = [
+        ...(resumeHostAuthorityCapability ? [resumeHostAuthorityCapability] : []),
+        ...(freshHostAuthorityCapability ? [freshHostAuthorityCapability] : [])
+      ]
       const created = await runRemoteAgentSessionLaunch<{
         terminal: CreatedAgentTerminalIdentity
+        disposition?: 'created' | 'adopted' | 'replayed'
       }>({
         environmentId,
         ...(hostAuthority ? { hostAuthority } : {}),
-        ...(resumeHostAuthorityCapability
-          ? { hostAuthorityCapability: resumeHostAuthorityCapability }
-          : {}),
+        ...(hostAuthorityCapabilities.length > 0 ? { hostAuthorityCapabilities } : {}),
+        ...(args.agentPermissionMode ? { legacyFallbackPolicy: 'deny' as const } : {}),
         legacy: async () => {
           const response = await callEnvironment({
             method: 'session.tabs.createTerminal',
@@ -423,6 +477,14 @@ async function createWebRuntimeSessionTerminalResult(
       createdLeafId = legacyAlreadyPlacedInGroup
         ? created.terminal.leafId
         : createdTerminalLeafId(created.terminal)
+      if (!legacyAlreadyPlacedInGroup && created.disposition !== 'adopted') {
+        registerHostOwnedAgentLaunch({
+          terminal: created.terminal,
+          agent,
+          ...(args.agentPermissionMode ? { agentPermissionMode: args.agentPermissionMode } : {}),
+          ...(args.providerSession ? { providerSession: args.providerSession } : {})
+        })
+      }
       if (args.targetGroupId && createdTabId && !legacyAlreadyPlacedInGroup) {
         await callEnvironment({
           method: 'session.tabs.move',

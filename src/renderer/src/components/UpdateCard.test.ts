@@ -323,6 +323,7 @@ type VisibilityResult = 'hidden' | 'visible'
 function computeVisibility(input: VisibilityInput): VisibilityResult {
   const { status, dismissedVersion, cachedVersion, hasStartedDownload } = input
   const isUserInitiated = 'userInitiated' in status && status.userInitiated
+  const isMandatoryUpdate = status.mandatory === true
   const updateUserInitiatedCycle = input.updateUserInitiatedCycle ?? false
   const shouldShowDetailedErrorCard =
     status.state === 'error' && (hasStartedDownload || cachedVersion !== null)
@@ -336,12 +337,22 @@ function computeVisibility(input: VisibilityInput): VisibilityResult {
   if (status.state === 'idle' || status.state === 'disabled') {
     return 'hidden'
   }
-  if (status.state === 'error' && !shouldShowDetailedErrorCard && !isUserInitiated) {
+  if (
+    status.state === 'error' &&
+    !isMandatoryUpdate &&
+    !shouldShowDetailedErrorCard &&
+    !isUserInitiated
+  ) {
     return 'hidden'
   }
 
   const effectiveVersion = 'version' in status ? status.version : cachedVersion
-  if (effectiveVersion && dismissedVersion === effectiveVersion && !updateUserInitiatedCycle) {
+  if (
+    !isMandatoryUpdate &&
+    effectiveVersion &&
+    dismissedVersion === effectiveVersion &&
+    !updateUserInitiatedCycle
+  ) {
     if (status.state !== 'downloading' && status.state !== 'error') {
       return 'hidden'
     }
@@ -448,6 +459,22 @@ describe('UpdateCard visibility gates', () => {
         hasStartedDownload: false
       })
     ).toBe('hidden')
+  })
+
+  it('shows a mandatory available update even when the version is dismissed', () => {
+    expect(
+      computeVisibility({
+        status: {
+          state: 'available',
+          version: '1.2.0',
+          changelog: null,
+          mandatory: true
+        },
+        dismissedVersion: '1.2.0',
+        cachedVersion: '1.2.0',
+        hasStartedDownload: false
+      })
+    ).toBe('visible')
   })
 
   it('shows dismissed available update when a lazy-mounted manual check cycle reaches available', () => {

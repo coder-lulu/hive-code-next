@@ -15,7 +15,7 @@ import {
   WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL
 } from '../../shared/windows-batch-spawn'
 import { isSkillsCliAgentKeyShaped, toSkillsCliAgentKeys } from '../../shared/skills-cli-agent-keys'
-import { applyProductBranding, PRIMARY_CLI_COMMAND } from '../../shared/brand'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   buildAgentFeatureSkillInstallArgs,
   buildAgentFeatureSkillUpdateArgs
@@ -216,7 +216,7 @@ function resolveInstallAgentKeys(flags: Map<string, string | boolean>): string[]
     'invalid_environment',
     'No coding agent detected on this host, so there is no install target. Pass ' +
       '--agent <name>[,<name>...] to choose targets explicitly — --agent universal ' +
-      'writes only the shared .agents/skills directory that Orca reads.'
+      `writes only the shared .agents/skills directory that ${APP_DISPLAY_NAME} reads.`
   )
 }
 
@@ -273,11 +273,9 @@ function createSkillMutationHandler(verb: SkillMutationVerb): CommandHandler {
     if (process.env.ORCA_CLI_CWD) {
       throw new RuntimeClientError(
         'invalid_environment',
-        applyProductBranding(
-          `orca skills ${verb} writes to the machine that runs it, but this shell forwards ` +
-            `orca to the Orca host. Run the same orca skills ${verb} command on the machine ` +
-            "you want it on, where it can detect that host's agents."
-        )
+        `hive skills ${verb} writes to the machine that runs it, but this shell forwards ` +
+          `hive to the HiveCode host. Run the same hive skills ${verb} command on the machine ` +
+          "you want it on, where it can detect that host's agents."
       )
     }
 
@@ -302,7 +300,7 @@ function createSkillMutationHandler(verb: SkillMutationVerb): CommandHandler {
       // that stream is not JSON, so --json can't be honored here.
       throw new RuntimeClientError(
         'invalid_argument',
-        `orca skills ${verb} --json only supports --dry-run. Real ${verb}s stream ` +
+        `${PRIMARY_CLI_COMMAND} skills ${verb} --json only supports --dry-run. Real ${verb}s stream ` +
           "npx's own output, which isn't JSON."
       )
     }
@@ -324,7 +322,7 @@ export const SKILL_HANDLERS: Record<string, CommandHandler> = {
     // canonical sorting keeps agent-visible output reproducible across builds.
     const topics = guides.map((guide) => ({
       name: guide.name,
-      description: applyProductBranding(guide.description.replace(/\s+/g, ' ').trim())
+      description: guide.description.replace(/\s+/g, ' ').trim()
     }))
     writeStdout(
       json
@@ -338,7 +336,7 @@ export const SKILL_HANDLERS: Record<string, CommandHandler> = {
     const guides = canonicalGuides(BUNDLED_SKILL_GUIDES)
     const guide = requireTopic(flags, guides)
     const full = flags.has('full')
-    const markdown = applyProductBranding(full ? guide.fullMarkdown : guide.markdown)
+    const markdown = full ? guide.fullMarkdown : guide.markdown
     writeStdout(json ? JSON.stringify({ name: guide.name, full, markdown }, null, 2) : markdown)
   },
   'skills install': createSkillMutationHandler('install'),

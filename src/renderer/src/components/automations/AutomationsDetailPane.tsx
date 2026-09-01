@@ -42,6 +42,7 @@ import type { AutomationRunViewState } from './automation-run-view-state'
 import type { AutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
 import type { AutomationPaneTab, SelectedExternalRunPage } from './automation-page-state'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type AutomationsDetailPaneProps = {
   selected: Automation | null
@@ -245,7 +246,7 @@ export function AutomationsDetailPane({
                     selectedAutomationRunPage.scheduledFor,
                     relativeNow
                   ),
-                  'Orca',
+                  APP_DISPLAY_NAME,
                   selectedAutomationRunPageWorkspaceDisplay?.detailLabel ??
                     translate(
                       'auto.components.automations.AutomationsPage.noWorkspace',

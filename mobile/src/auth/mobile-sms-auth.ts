@@ -1,13 +1,8 @@
 import { sha256 } from '@noble/hashes/sha256'
 import * as SecureStore from 'expo-secure-store'
-import nacl from 'tweetnacl'
-import {
-  deviceIdentity,
-  encodeBase64Url,
-  isRecord,
-  randomToken,
-  request
-} from './mobile-sms-client'
+import { MOBILE_CLIENT_ID, MOBILE_REDIRECT_URI } from './mobile-auth-contract'
+import { registerMobileDeviceAuthorization } from './mobile-device-authorization'
+import { encodeBase64Url, isRecord, randomToken, request } from './mobile-sms-client'
 import { parseSession, saveMobileSession, type MobileSession } from './mobile-sms-session'
 export {
   clearStoredMobileSession,
@@ -17,16 +12,28 @@ export {
   parseSession,
   refreshMobileSession,
   revokeMobileSession,
-  saveMobileSession
+  saveMobileSession,
+  subscribeMobileSessionInvalidation,
+  loadMobileAccountSecurity,
+  setMobilePassword,
+  startMobilePasswordReset,
+  verifyMobilePasswordReset,
+  startMobilePhoneBinding,
+  verifyMobilePhoneBinding
 } from './mobile-sms-session'
-export type { MobileSession } from './mobile-sms-session'
-
-export const MOBILE_CLIENT_ID = 'hivecode-mobile'
-export const MOBILE_REDIRECT_URI = 'hivecode://auth/callback'
+export type {
+  MobileSession,
+  MobileAccountSecurity,
+  MobileAccountSecurityChallenge
+} from './mobile-sms-session'
+export {
+  MOBILE_CLIENT_ID,
+  MOBILE_REDIRECT_URI,
+  MOBILE_SESSION_PROFILE
+} from './mobile-auth-contract'
 // Mobile keeps its device key in OS-secure storage, so it can safely opt into
 // the persistent trusted-device profile. The cloud console can revoke the
 // resulting device at any time; a subsequent SMS login reactivates it.
-export const MOBILE_SESSION_PROFILE = 'TRUSTED'
 
 const PENDING_SMS_FLOWS_KEY = 'hivecode.mobile.auth.pending-sms-flows'
 
@@ -147,24 +154,11 @@ export async function requestMobileSms(
   if (!termsAccepted) {
     throw new Error('请先同意协议')
   }
-  const identity = await deviceIdentity()
   const nonce = randomToken()
   const state = randomToken()
   const codeVerifier = randomToken()
   const codeChallenge = encodeBase64Url(sha256(codeVerifier))
-  const proofInput = `hive-device-authorization-v2\n${nonce}\n${MOBILE_CLIENT_ID}\n${identity.deviceLabel}\n${MOBILE_SESSION_PROFILE}`
-  const proof = encodeBase64Url(
-    nacl.sign.detached(new TextEncoder().encode(proofInput), identity.secretKey)
-  )
-
-  await request('/hive/v1/auth/device-authorizations', {
-    nonce,
-    clientId: MOBILE_CLIENT_ID,
-    devicePublicKey: identity.publicKey,
-    deviceLabel: identity.deviceLabel,
-    sessionProfile: MOBILE_SESSION_PROFILE,
-    proof
-  })
+  await registerMobileDeviceAuthorization(nonce)
   const challenge = await request<SmsChallenge>('/hive/v1/auth/sms-challenges', {
     nonce,
     clientId: MOBILE_CLIENT_ID,

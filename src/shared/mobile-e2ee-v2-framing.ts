@@ -6,6 +6,8 @@ export type MobileE2EEDirection = 'mobile-to-desktop' | 'desktop-to-mobile'
 const NONCE_LENGTH = 24
 const SESSION_ID_LENGTH = 32
 const HEADER_LENGTH = SESSION_ID_LENGTH + 1 + 1 + 8
+export const MOBILE_E2EE_V2_FRAME_OVERHEAD_BYTES =
+  NONCE_LENGTH + nacl.secretbox.overheadLength + HEADER_LENGTH
 const FRAME_VERSION = 2
 const MAX_COUNTER = (1n << 64n) - 1n
 
@@ -34,7 +36,7 @@ export function openMobileE2EEV2Frame(args: {
   expectedCounter: bigint
 }): Uint8Array | null {
   validateFrameInputs(args.key, args.sessionId, args.expectedCounter)
-  if (args.frame.length < NONCE_LENGTH + nacl.secretbox.overheadLength + HEADER_LENGTH) {
+  if (args.frame.length < MOBILE_E2EE_V2_FRAME_OVERHEAD_BYTES) {
     return null
   }
   const expected = {

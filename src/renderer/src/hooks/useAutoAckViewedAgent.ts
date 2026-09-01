@@ -112,7 +112,10 @@ type ViewedAgentAttentionActions = {
   acknowledgeAgents: (paneKeys: string[]) => void
   clearWorktreeUnread: (worktreeId: string) => void
   clearTerminalTabUnread: (tabId: string) => void
-  clearTerminalPaneUnread: (paneKey: string) => void
+  clearTerminalPaneUnread: (
+    paneKey: string,
+    options?: { consumeCompletion?: boolean }
+  ) => void
 }
 
 export function acknowledgeViewedAgentAttention(
@@ -142,7 +145,9 @@ export function acknowledgeViewedAgentAttention(
   }
   state.clearTerminalTabUnread(args.activeTabId)
   for (const paneKey of paneKeysToClear) {
-    state.clearTerminalPaneUnread(paneKey)
+    // Visibility acknowledgement should clear the legacy marker, but a
+    // completion count is consumed only by an explicit session/pane click.
+    state.clearTerminalPaneUnread(paneKey, { consumeCompletion: false })
   }
 }
 

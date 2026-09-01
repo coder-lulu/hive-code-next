@@ -1,18 +1,17 @@
 import { toast } from 'sonner'
 import type { CliInstallStatus } from '../../../shared/cli-install-types'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type EnsureOrcaCliAvailableOptions = {
   onStatusChange?: (status: CliInstallStatus) => void
   registrationPromptDelayMs?: number
 }
 
-export const AGENT_SKILL_CLI_PREREQUISITE_NOTICE =
-  'Before opening setup, Orca may show a system prompt to register the Orca CLI command on PATH.'
+export const AGENT_SKILL_CLI_PREREQUISITE_NOTICE = `Before opening setup, ${APP_DISPLAY_NAME} may show a system prompt to register the ${APP_DISPLAY_NAME} CLI command on PATH.`
 
-export const CLI_PREREQUISITE_REGISTRATION_TOAST = 'Orca needs to register its CLI on PATH.'
-export const CLI_PREREQUISITE_REGISTRATION_TOAST_DESCRIPTION =
-  'Approve the system prompt so skill setup can use the Orca CLI command.'
+export const CLI_PREREQUISITE_REGISTRATION_TOAST = `${APP_DISPLAY_NAME} needs to register its CLI on PATH.`
+export const CLI_PREREQUISITE_REGISTRATION_TOAST_DESCRIPTION = `Approve the system prompt so skill setup can use the ${APP_DISPLAY_NAME} CLI command.`
 
 export function isOrcaCliAvailableOnPath(status: CliInstallStatus | null | undefined): boolean {
   return status?.state === 'installed' && status.pathConfigured === true

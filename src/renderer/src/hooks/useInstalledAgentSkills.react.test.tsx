@@ -100,8 +100,18 @@ const projectWslRuntime: ProjectExecutionRuntimeResolution = {
   }
 }
 
-function Probe({ discoveryTarget }: { discoveryTarget?: SkillDiscoveryTarget }): null {
+function Probe({
+  discoveryTarget,
+  enabled = true,
+  readCachedWhenDisabled = false
+}: {
+  discoveryTarget?: SkillDiscoveryTarget
+  enabled?: boolean
+  readCachedWhenDisabled?: boolean
+}): null {
   latestState = useInstalledAgentSkillNames(LINEAR_AGENT_SKILL_NAMES, {
+    enabled,
+    readCachedWhenDisabled,
     discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
@@ -117,6 +127,17 @@ async function renderProbe(discoveryTarget?: SkillDiscoveryTarget): Promise<void
   }
   await act(async () => {
     root?.render(<Probe discoveryTarget={discoveryTarget} />)
+  })
+}
+
+async function renderPassiveCachedProbe(): Promise<void> {
+  if (!container) {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  }
+  await act(async () => {
+    root?.render(<Probe enabled={false} readCachedWhenDisabled />)
   })
 }
 
@@ -171,6 +192,28 @@ beforeEach(() => {
 })
 
 describe('useInstalledAgentSkill', () => {
+  it('updates a passive disabled consumer from cache without starting its own scan', async () => {
+    const discover = vi
+      .fn<(target?: SkillDiscoveryTarget) => Promise<SkillDiscoveryResult>>()
+      .mockResolvedValue(discoveryResult([skill({ name: 'orca-linear' })]))
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { skills: { discover } }
+    })
+
+    await renderPassiveCachedProbe()
+    expect(latestState?.installed).toBe(false)
+    expect(discover).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await _installedAgentSkillDiscoveryInternalsForTests.discoverInstalledAgentSkills(false)
+    })
+
+    expect(discover).toHaveBeenCalledOnce()
+    expect(latestState?.installed).toBe(true)
+    expect(latestState?.settled).toBe(true)
+  })
+
   // A root that did not answer holds unknown skills, not zero. Reporting a bare
   // "not installed" there is what offered Install for an already-installed skill.
   it('says the scan was incomplete when an in-scope root did not answer', async () => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { isStreamingMethod, type RpcContext } from '../core'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 
 const { installForRuntimeHomeSerializedMock, realpathMock } = vi.hoisted(() => ({
   installForRuntimeHomeSerializedMock: vi.fn(),
@@ -97,7 +98,7 @@ describe('agent hook RPC methods', () => {
         runtime: runtimeWithSettings(),
         clientKind
       } as RpcContext)
-    ).rejects.toThrow(/only available to the local Orca CLI/)
+    ).rejects.toThrow(`only available to the local ${APP_DISPLAY_NAME} CLI`)
     expect(installForRuntimeHomeSerializedMock).not.toHaveBeenCalled()
   })
 

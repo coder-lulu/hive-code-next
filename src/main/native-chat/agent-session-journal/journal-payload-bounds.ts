@@ -9,6 +9,7 @@
 
 import { createHash } from 'node:crypto'
 import type { AgentJournalBoundedPayload } from '../../../shared/agent-session-journal-types'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 
 export type JournalPayloadLimits = {
   /** Bytes of the payload kept inline on the row. */
@@ -31,7 +32,7 @@ export const DEFAULT_JOURNAL_PAYLOAD_LIMITS: JournalPayloadLimits = {
  *  truncated body as complete. Kept in the text itself because block-level
  *  payloads (tool-result output) have nowhere else to carry the flag. */
 export function journalTruncationMarker(byteLength: number, digest: string): string {
-  return `\n[Orca: output truncated — ${byteLength} bytes total, digest ${digest.slice(0, 12)}]`
+  return `\n[${APP_DISPLAY_NAME}: output truncated — ${byteLength} bytes total, digest ${digest.slice(0, 12)}]`
 }
 
 export function digestPayload(payload: string): string {

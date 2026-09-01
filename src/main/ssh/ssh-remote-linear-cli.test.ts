@@ -761,8 +761,8 @@ describe('runRemoteOrcaCli Linear commands', () => {
     })
 
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain('orca linear issue')
-    expect(result.stdout).toContain('Usage: orca linear issue')
+    expect(result.stdout).toContain('hive linear issue')
+    expect(result.stdout).toContain('Usage: hive linear issue')
     expect(linearIssueContext).not.toHaveBeenCalled()
   })
 
@@ -779,8 +779,8 @@ describe('runRemoteOrcaCli Linear commands', () => {
     })
 
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain('orca linear')
-    expect(result.stdout).toContain('Usage: orca linear <command> [options]')
+    expect(result.stdout).toContain('hive linear')
+    expect(result.stdout).toContain('Usage: hive linear <command> [options]')
     expect(result.stdout).toContain('search')
     expect(result.stdout).toContain('team list')
     expect(result.stdout).toContain('label set')
@@ -806,9 +806,9 @@ describe('runRemoteOrcaCli Linear commands', () => {
     })
 
     expect(group.exitCode).toBe(0)
-    expect(group.stdout).toContain('Usage: orca linear <command> [options]')
+    expect(group.stdout).toContain('Usage: hive linear <command> [options]')
     expect(issue.exitCode).toBe(0)
-    expect(issue.stdout).toContain('Usage: orca linear issue')
+    expect(issue.stdout).toContain('Usage: hive linear issue')
     expect(linearIssueContext).not.toHaveBeenCalled()
   })
 

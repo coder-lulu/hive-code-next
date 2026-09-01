@@ -14,7 +14,8 @@
     "schemes",
     "desktop",
     "mobile",
-    "endpoints"
+    "endpoints",
+    "services"
   ],
   "properties": {
     "$schema": { "type": "string" },
@@ -103,7 +104,7 @@
         },
         "updateChannel": {
           "type": ["string", "null"],
-          "enum": ["stable", "beta", "rc", null]
+          "enum": ["internal", "stable", "beta", "rc", null]
         },
         "updateRepository": { "$ref": "#/$defs/nullableString" },
         "starRepository": { "$ref": "#/$defs/nullableString" }
@@ -149,12 +150,80 @@
         "changelog": { "$ref": "#/$defs/nullableUrl" },
         "nudge": { "$ref": "#/$defs/nullableUrl" }
       }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["api", "identity", "oss", "update", "relay"],
+      "properties": {
+        "api": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseUrl"],
+          "properties": { "baseUrl": { "$ref": "#/$defs/requiredUrl" } }
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["issuer", "clients"],
+          "properties": {
+            "issuer": { "$ref": "#/$defs/requiredUrl" },
+            "clients": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["desktop", "userWeb", "operatorWeb"],
+              "properties": {
+                "desktop": { "type": "string", "minLength": 1 },
+                "userWeb": { "type": "string", "minLength": 1 },
+                "operatorWeb": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "oss": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "endpoint", "provider"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "endpoint": { "$ref": "#/$defs/nullableUrl" },
+            "provider": { "$ref": "#/$defs/nullableString" }
+          }
+        },
+        "update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "endpoint", "checkEndpoint", "provider", "channel", "checkIntervalHours"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "endpoint": { "$ref": "#/$defs/nullableUrl" },
+            "checkEndpoint": { "$ref": "#/$defs/nullableUrl" },
+            "provider": { "type": ["string", "null"], "enum": ["github", "hivecloud", null] },
+            "channel": { "type": ["string", "null"], "enum": ["internal", "stable", "beta", "rc", null] },
+            "checkIntervalHours": { "type": "number", "minimum": 1, "maximum": 168 }
+          }
+        },
+        "relay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "directorUrl"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "directorUrl": { "$ref": "#/$defs/nullableUrl" }
+          }
+        }
+      }
     }
   },
   "$defs": {
     "nullableString": { "type": ["string", "null"] },
     "nullableUrl": {
       "type": ["string", "null"],
+      "format": "uri"
+    },
+    "requiredUrl": {
+      "type": "string",
+      "minLength": 1,
       "format": "uri"
     },
     "compatibilityNames": {

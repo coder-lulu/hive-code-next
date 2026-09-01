@@ -125,6 +125,24 @@ describe('startup ordering', () => {
     expect(desktopStartup).toContain('startServices: startTerminalRuntimeStartupServices')
     expect(barrier).toContain('managedWslCliStartupBarrierReady')
     expect(barrier).not.toContain('managedWslCliReconciliationReady')
+    const structuredRestoreStart = barrier.indexOf(
+      "ipcMain.handle('app:prepareTerminalStartupRestoration'"
+    )
+    const legacyRestoreStart = barrier.indexOf(
+      "ipcMain.handle('app:recoverLegacyWorkerTerminalsForRendererStartup'"
+    )
+    const structuredRestore = barrier.slice(structuredRestoreStart, legacyRestoreStart)
+    expect(structuredRestoreStart).toBeGreaterThanOrEqual(0)
+    expect(legacyRestoreStart).toBeGreaterThan(structuredRestoreStart)
+    expect(structuredRestore).toContain(
+      'Promise.all([firstWindowStartupServicesReady, managedWslCliStartupBarrierReady])'
+    )
+    expect(structuredRestore).toContain(
+      'await runtime?.prepareStructuredAgentSessionStartupRestoration()'
+    )
+    expect(structuredRestore.indexOf('Promise.all(')).toBeLessThan(
+      structuredRestore.indexOf('prepareStructuredAgentSessionStartupRestoration()')
+    )
     expect(barrier).toContain("ipcMain.handle('app:recoverLegacyWorkerTerminalsForRendererStartup'")
     expect(barrier).toContain('recoverLegacyWorkerTerminalsForRendererStartup({')
     expect(barrier).toContain('localPtyProviderStartupReady,')
@@ -305,6 +323,18 @@ describe('startup ordering', () => {
     expect(residualCleanupStart).toBeGreaterThan(offscreenCleanupStart)
     expect(barrierStart).toBeGreaterThan(cleanupStart)
     expect(willQuit.slice(barrierStart)).toContain("{ name: 'browser', promise: browserShutdown }")
+  })
+
+  it('joins emulator session and owned-process cleanup to the quit barrier', () => {
+    const source = readFileSync(join(process.cwd(), 'src/main/index.ts'), 'utf8')
+    const willQuitStart = source.indexOf("app.on('will-quit'")
+    const windowAllClosedStart = source.indexOf("app.on('window-all-closed'", willQuitStart)
+    const willQuit = source.slice(willQuitStart, windowAllClosedStart)
+
+    expect(willQuit).toContain(
+      'const emulatorShutdown = runtime?.getEmulatorBridge()?.onAppQuit() ?? Promise.resolve()'
+    )
+    expect(willQuit).toContain("{ name: 'emulator', promise: emulatorShutdown }")
   })
 
   it('registers repeatable serve signal handling before headless startup completes', () => {

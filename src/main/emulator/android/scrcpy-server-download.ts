@@ -1,9 +1,8 @@
-import { app } from 'electron'
+import { app, net } from 'electron'
 import { createWriteStream, existsSync, mkdirSync, rmSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { get } from 'node:https'
+import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import type { IncomingMessage } from 'node:http'
 import { EmulatorError } from '../emulator-errors'
 import { emulatorProbe, emulatorProbeError } from '../emulator-probe'
 import { SCRCPY_SERVER_VERSION } from './scrcpy-server-deploy'
@@ -13,6 +12,11 @@ import { SCRCPY_SERVER_VERSION } from './scrcpy-server-deploy'
 // targets. The GitHub release asset is unversioned-extension, so we store it as .jar.
 const DOWNLOAD_URL = `https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_SERVER_VERSION}/scrcpy-server-v${SCRCPY_SERVER_VERSION}`
 const MIN_VALID_BYTES = 10_000
+const DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
+const MAX_REDIRECTS = 5
+
+type DownloadIncomingMessage = Electron.IncomingMessage &
+  NodeJS.ReadableStream & { destroy?: () => void }
 
 export function scrcpyServerJarPath(): string {
   return join(app.getPath('userData'), 'scrcpy', `scrcpy-server-v${SCRCPY_SERVER_VERSION}.jar`)
@@ -67,38 +71,124 @@ async function downloadScrcpyServerJar(path: string): Promise<string> {
   return path
 }
 
-function downloadTo(url: string, dest: string, redirects = 0): Promise<void> {
+function downloadTo(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (redirects > 5) {
-      reject(new Error('too many redirects'))
+    let currentUrl: URL
+    try {
+      currentUrl = new URL(url)
+    } catch {
+      reject(new Error('invalid download URL'))
       return
     }
-    const req = get(url, (res: IncomingMessage) => {
-      const status = res.statusCode ?? 0
-      // GitHub release downloads 302-redirect to the asset CDN.
-      if (status >= 300 && status < 400 && res.headers.location) {
-        // Resolve relative Locations and refuse protocol downgrades (http:).
-        const next = new URL(res.headers.location, url)
-        if (next.protocol !== 'https:') {
-          res.resume()
-          reject(new Error(`refusing non-https redirect to ${next.protocol}`))
-          return
+    if (currentUrl.protocol !== 'https:') {
+      reject(new Error(`refusing non-https URL using ${currentUrl.protocol}`))
+      return
+    }
+
+    // Electron net.request uses Chromium's default session, including the app-wide proxy.
+    // Its redirect event also lets us keep the existing HTTPS-only redirect policy.
+    const request = net.request({ method: 'GET', url: currentUrl.toString(), redirect: 'manual' })
+    let response: DownloadIncomingMessage | null = null
+    let fileStream: ReturnType<typeof createWriteStream> | null = null
+    let streamAbortError: Error | null = null
+    let redirects = 0
+    let settled = false
+    let idleTimeout: ReturnType<typeof setTimeout> | null = null
+
+    const clearIdleTimeout = (): void => {
+      if (idleTimeout) {
+        clearTimeout(idleTimeout)
+        idleTimeout = null
+      }
+    }
+    const resetIdleTimeout = (): void => {
+      clearIdleTimeout()
+      idleTimeout = setTimeout(onIdleTimeout, DOWNLOAD_IDLE_TIMEOUT_MS)
+    }
+    const cleanup = (): void => {
+      clearIdleTimeout()
+      request.off('error', onRequestError)
+      request.off('redirect', onRedirect)
+      request.off('response', onResponse)
+    }
+    const resolveOnce = (): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      cleanup()
+      resolve()
+    }
+    const rejectOnce = (error: Error): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      cleanup()
+      reject(error)
+    }
+    const abortWith = (error: Error): void => {
+      const activeResponse = response
+      if (fileStream) {
+        streamAbortError ??= error
+      }
+      request.abort()
+      activeResponse?.destroy?.()
+      if (fileStream) {
+        // Let pipeline close the Windows file handle before the outer failure path removes it.
+        fileStream.destroy()
+        return
+      }
+      rejectOnce(error)
+    }
+    const onIdleTimeout = (): void => abortWith(new Error('download timed out'))
+    const onRequestError = (error: Error): void => abortWith(error)
+    const onRedirect = (_statusCode: number, _method: string, redirectUrl: string): void => {
+      if (redirects >= MAX_REDIRECTS) {
+        abortWith(new Error('too many redirects'))
+        return
+      }
+      let next: URL
+      try {
+        next = new URL(redirectUrl, currentUrl)
+      } catch {
+        abortWith(new Error('invalid redirect URL'))
+        return
+      }
+      if (next.protocol !== 'https:') {
+        abortWith(new Error(`refusing non-https redirect to ${next.protocol}`))
+        return
+      }
+      currentUrl = next
+      redirects += 1
+      resetIdleTimeout()
+      // Electron requires this synchronously inside the redirect event.
+      request.followRedirect()
+    }
+    const onResponse = (incoming: Electron.IncomingMessage): void => {
+      response = incoming as DownloadIncomingMessage
+      resetIdleTimeout()
+      if (response.statusCode !== 200) {
+        abortWith(new Error(`HTTP ${response.statusCode}`))
+        return
+      }
+      fileStream = createWriteStream(dest)
+      const activity = new Transform({
+        transform(chunk, _encoding, callback) {
+          resetIdleTimeout()
+          callback(null, chunk)
         }
-        res.resume()
-        downloadTo(next.toString(), dest, redirects + 1).then(resolve, reject)
-        return
-      }
-      if (status !== 200) {
-        res.resume()
-        reject(new Error(`HTTP ${status}`))
-        return
-      }
-      // pipeline destroys the write stream and rejects on any stream error
-      // (incl. mid-body errors on res), so the Promise always settles.
-      pipeline(res, createWriteStream(dest)).then(resolve, reject)
-    })
-    req.on('error', reject)
-    // Don't hang forever if GitHub/CDN stalls before or during the response.
-    req.setTimeout(30_000, () => req.destroy(new Error('download timed out')))
+      })
+      pipeline(response, activity, fileStream).then(
+        () => (streamAbortError ? rejectOnce(streamAbortError) : resolveOnce()),
+        (error: Error) => rejectOnce(streamAbortError ?? error)
+      )
+    }
+
+    resetIdleTimeout()
+    request.on('error', onRequestError)
+    request.on('redirect', onRedirect)
+    request.on('response', onResponse)
+    request.end()
   })
 }

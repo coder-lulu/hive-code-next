@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { Repo } from '../../shared/repo-types'
 import type { Automation } from '../../shared/automations-types'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { Store } from '../persistence'
 import { AutomationService } from './service'
 import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
@@ -46,7 +47,7 @@ const makeRepo = (): Repo => ({
 
 const SETUP_GONE = 'Project is not set up on the selected automation host anymore.'
 
-const NO_WINDOW = 'No Orca window was available to launch the automation.'
+const NO_WINDOW = `No ${APP_DISPLAY_NAME} window was available to launch the automation.`
 
 /**
  * Daily at 09:00, pointed at a project host setup that does not exist. The

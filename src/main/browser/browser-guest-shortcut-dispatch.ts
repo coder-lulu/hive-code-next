@@ -174,6 +174,8 @@ export function forwardGuestShortcutInput(
     renderer.send('ui:openQuickOpen')
   } else if (action?.type === 'toggleQuickCommandsMenu') {
     renderer.send('ui:toggleQuickCommandsMenu')
+  } else if (action?.type === 'openNewTaskHome') {
+    renderer.send('ui:openNewTaskHome')
   } else if (action?.type === 'openNewWorkspace') {
     renderer.send('ui:openNewWorkspace')
   } else if (action?.type === 'deleteCurrentWorkspace') {

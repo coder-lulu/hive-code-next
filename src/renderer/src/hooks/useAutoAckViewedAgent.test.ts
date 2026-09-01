@@ -227,7 +227,9 @@ describe('acknowledgeViewedAgentAttention', () => {
     expect(actions.acknowledgeAgents).toHaveBeenCalledWith([paneKey])
     expect(actions.clearWorktreeUnread).toHaveBeenCalledWith('wt-1')
     expect(actions.clearTerminalTabUnread).toHaveBeenCalledWith('tab-1')
-    expect(actions.clearTerminalPaneUnread).toHaveBeenCalledWith(paneKey)
+    expect(actions.clearTerminalPaneUnread).toHaveBeenCalledWith(paneKey, {
+      consumeCompletion: false
+    })
   })
 
   it('does nothing when there are no visible agent targets', () => {
@@ -269,7 +271,9 @@ describe('acknowledgeViewedAgentAttention', () => {
     expect(actions.acknowledgeAgents).not.toHaveBeenCalled()
     expect(actions.clearWorktreeUnread).toHaveBeenCalledWith('wt-1')
     expect(actions.clearTerminalTabUnread).toHaveBeenCalledWith('tab-1')
-    expect(actions.clearTerminalPaneUnread).toHaveBeenCalledWith(paneKey)
+    expect(actions.clearTerminalPaneUnread).toHaveBeenCalledWith(paneKey, {
+      consumeCompletion: false
+    })
   })
 })
 

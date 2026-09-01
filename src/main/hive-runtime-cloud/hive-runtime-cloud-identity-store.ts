@@ -1,6 +1,15 @@
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { readSecureJson, writeSecureJson } from '../hive-account/hive-account-secure-store'
+import {
+  deleteSecureJson,
+  readSecureJson,
+  writeSecureJson
+} from '../hive-account/hive-account-secure-store'
+import {
+  deleteHiveRuntimeServiceOwnedJson,
+  readHiveRuntimeServiceOwnedJson,
+  writeHiveRuntimeServiceOwnedJson
+} from './hive-runtime-cloud-service-owned-json'
 
 export type HiveRuntimeCloudIdentity = Readonly<{
   schemaVersion: 1
@@ -16,6 +25,10 @@ export type HiveRuntimeCloudIdentityResult =
 
 function identityPath(userDataPath: string): string {
   return join(userDataPath, 'hive-runtime-cloud', 'runtime-identity.v1.enc')
+}
+
+function serviceIdentityPath(userDataPath: string): string {
+  return join(userDataPath, 'hive-runtime-cloud-service', 'runtime-identity.v1.json')
 }
 
 function isCanonicalBase64(value: string): boolean {
@@ -89,4 +102,30 @@ export function getOrCreateHiveRuntimeCloudIdentity(
     return { status: 'unavailable' }
   }
   return { status: 'ok', identity }
+}
+
+export function getOrCreateHiveRuntimeCloudServiceIdentity(
+  userDataPath: string,
+  now: number = Date.now()
+): HiveRuntimeCloudIdentityResult {
+  const path = serviceIdentityPath(userDataPath)
+  const stored = readHiveRuntimeServiceOwnedJson(path, isIdentity)
+  if (stored.status === 'ok') {
+    return { status: 'ok', identity: stored.value }
+  }
+  if (stored.status !== 'missing') {
+    return { status: 'unreadable' }
+  }
+  const identity = createIdentity(now)
+  return writeHiveRuntimeServiceOwnedJson(path, identity)
+    ? { status: 'ok', identity }
+    : { status: 'unavailable' }
+}
+
+export function clearHiveRuntimeCloudIdentity(userDataPath: string): void {
+  deleteSecureJson(identityPath(userDataPath))
+}
+
+export function clearHiveRuntimeCloudServiceIdentity(userDataPath: string): void {
+  deleteHiveRuntimeServiceOwnedJson(serviceIdentityPath(userDataPath))
 }

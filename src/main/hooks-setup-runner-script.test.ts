@@ -1,6 +1,7 @@
 import type * as GitRunner from './git/runner'
 
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import { makeHookTestRepo } from './hooks-test-fixtures'
 
 // Mock fs used by the runner-script writers
@@ -31,6 +32,15 @@ vi.mock('./git/runner', async () => ({
 }))
 
 describe('runner script builders', () => {
+  it('brands Windows shebang refusal output for the current product', async () => {
+    const { buildWindowsRunnerScript } = await import('./setup-runner-script-text')
+
+    const result = buildWindowsRunnerScript('#!/usr/bin/env bash\necho ready\n')
+
+    expect(result).toContain(`echo ${APP_DISPLAY_NAME} setup:`)
+    expect(result).not.toMatch(/\bOrca\b/)
+  })
+
   it('builds Windows runners for newline-heavy scripts without line-array splitting', async () => {
     const { buildWindowsRunnerScript } = await import('./setup-runner-script-text')
     const script = `${'\r\n'.repeat(10_000)}pnpm install\r\nnpm run build\n`

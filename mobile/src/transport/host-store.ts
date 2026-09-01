@@ -1,5 +1,9 @@
-import { HostProfileSchema } from './types'
-import type { HostCatalogEntry, HostProfile, StoredHostProfile } from './types'
+import {
+  HostProfileSchema,
+  type HostCatalogEntry,
+  type HostProfile,
+  type StoredHostProfile
+} from './types'
 import { getNextHostNameFromHosts } from './host-names'
 import * as hostListLoads from './host-list-load-sharing'
 import { joinHostCatalogCredentials } from './host-catalog-credential-join'
@@ -30,6 +34,11 @@ import {
   toStoredHostProfile,
   writeStoredHostProfiles
 } from './host-metadata-store'
+import { commitAuthenticatedRuntimeRecordId } from './authenticated-runtime-host-identity'
+import {
+  updateStoredHostLastConnected,
+  updateStoredHostNameAndEndpoint
+} from './stored-host-profile-updates'
 
 async function commitDeviceToken(hostId: string, token: string): Promise<void> {
   markHostCredentialWrite(hostId)
@@ -133,9 +142,12 @@ async function cancelCleanupForDurablyStoredHosts(hostIds: Iterable<string>): Pr
   }).catch(() => undefined)
 }
 
-function enqueueHostListMutation(operation: () => Promise<void>): Promise<void> {
+function enqueueHostListMutation<T>(operation: () => Promise<T>): Promise<T> {
   const mutation = hostListMutation.then(operation)
-  hostListMutation = mutation.catch(() => {})
+  hostListMutation = mutation.then(
+    () => undefined,
+    () => undefined
+  )
   return mutation
 }
 
@@ -297,37 +309,23 @@ export async function retryPendingHostCredentialCleanup(): Promise<{
   )
 }
 
-// Why: single mutation pass commits name + endpoint atomically so a mid-save failure can't persist one without the other.
 export async function updateHostNameAndEndpoint(
   hostId: string,
   updates: { name?: string; endpoint?: string }
 ): Promise<void> {
-  await mutateStoredHosts((hosts) => {
-    const index = hosts.findIndex((host) => host.id === hostId)
-    if (index === -1) {
-      throw new Error('Host not found')
-    }
-    const next = hosts.slice()
-    next[index] = {
-      ...next[index]!,
-      ...(updates.name !== undefined ? { name: updates.name } : {}),
-      ...(updates.endpoint !== undefined ? { endpoint: updates.endpoint } : {})
-    }
-    return next
-  })
+  await mutateStoredHosts((hosts) => updateStoredHostNameAndEndpoint(hosts, hostId, updates))
+}
+
+export async function recordAuthenticatedRuntimeRecordId(
+  hostId: string,
+  runtimeRecordId: string
+): Promise<boolean> {
+  return enqueueHostListMutation(() => commitAuthenticatedRuntimeRecordId(hostId, runtimeRecordId))
 }
 
 export async function updateLastConnected(hostId: string): Promise<void> {
   try {
-    await mutateStoredHosts((hosts) => {
-      const index = hosts.findIndex((h) => h.id === hostId)
-      if (index === -1) {
-        return hosts
-      }
-      const next = hosts.slice()
-      next[index] = { ...next[index]!, lastConnected: Date.now() }
-      return next
-    })
+    await mutateStoredHosts((hosts) => updateStoredHostLastConnected(hosts, hostId, Date.now()))
   } catch {
     // Why: best-effort timestamp fired with void; swallow so unreadable storage doesn't reject.
   }

@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { SkillShareDeepLinkState } from './skill-share-deep-link-state'
 
 describe('SkillShareDeepLinkState', () => {
+  it('captures the current HiveCode skill-share protocol', () => {
+    const state = new SkillShareDeepLinkState()
+    expect(state.capture(['hivecode', 'hivecode://skills/share/share_current'])).toBe(true)
+    expect(state.consume()).toBe('share_current')
+  })
+
   it('queues a startup share until the renderer consumes it once', () => {
     const state = new SkillShareDeepLinkState()
 

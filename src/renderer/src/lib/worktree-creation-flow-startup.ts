@@ -22,6 +22,7 @@ export function buildWorktreeCreationStartupOpt(
     launchConfig: plan.launchConfig,
     ...(plan.launchToken ? { launchToken: plan.launchToken } : {}),
     ...(request.agent ? { launchAgent: request.agent } : {}),
+    ...(plan.agentPermissionMode ? { agentPermissionMode: plan.agentPermissionMode } : {}),
     ...(plan.draftPrompt ? { draftPrompt: plan.draftPrompt } : {}),
     // Why: view-mode only. An argv-prefill plan sets no draftPrompt, so this is
     // the sole signal that this launch starts with unsent context in the TUI.

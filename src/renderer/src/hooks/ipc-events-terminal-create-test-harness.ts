@@ -1,5 +1,6 @@
 import type * as ReactModule from 'react'
 import { vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { buildTerminalCreateWindow } from './ipc-events-terminal-create-window-test-fixtures'
 import type {
   FocusTerminalListenerPayload,
@@ -39,7 +40,7 @@ export async function setupTerminalCreateSurfacing(
   const createFloatingWorkspaceTerminalTab = vi.fn()
   const createWebRuntimeSessionTerminal = vi.fn().mockResolvedValue({
     status: 'failed',
-    message: 'The workspace is not connected to a remote Orca host.'
+    message: `The workspace is not connected to a remote ${APP_DISPLAY_NAME} host.`
   })
   const focusRuntimeTerminalSurface = vi.fn(() => false)
   const focusTerminalTabSurface = vi.fn()

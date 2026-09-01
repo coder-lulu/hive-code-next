@@ -1,18 +1,18 @@
-# Headless Linux Server (Orca Compatibility Reference)
+# HiveCode Headless Linux Server (Upstream Compatibility Reference)
 
 > This document is retained as an upstream Orca compatibility reference. HiveCode does not publish
-> Linux server assets from this repository yet, so the download URLs and `orca` commands below are
-> not HiveCode release instructions. Use them only when operating an explicitly compatible upstream
-> runtime, and keep the legacy paths and identifiers unchanged for that runtime.
+> Linux server assets from this repository yet, so the upstream download URLs and legacy paths below
+> are not HiveCode release instructions. Command examples use the current `hive` CLI name where
+> applicable. Use them only when operating an explicitly compatible upstream runtime.
 
-Use this guide when you want to run `orca serve` on a Linux machine without a
+Use this guide when you want to run `hive serve` on a Linux machine without a
 desktop session, such as an Ubuntu VPS or a remote build box.
 
-`orca serve` starts the Orca runtime without opening the desktop window. On
+`hive serve` starts the HiveCode runtime without opening the desktop window. On
 Linux, the packaged AppImage still needs the libraries that Electron expects at
-startup. Current Orca builds start Xvfb automatically for `orca serve` when no
+startup. Current HiveCode builds start Xvfb automatically for `hive serve` when no
 `DISPLAY` is set, but Xvfb must be installed first. A separate D-Bus session is
-not required. When `DISPLAY` is set, Orca uses that display instead of starting
+not required. When `DISPLAY` is set, HiveCode uses that display instead of starting
 a competing Xvfb process.
 
 The supported deployment matrix covers Ubuntu 20.04, 22.04, and 24.04 and
@@ -24,7 +24,7 @@ differ on other Debian-derived releases.
 
 Install the CLI tools, Xvfb, and the shared libraries Electron links against.
 A minimal server or container image ships none of the Electron libraries, and
-`orca serve` then fails before Electron starts:
+`hive serve` then fails before Electron starts:
 
 ```bash
 sudo apt-get update
@@ -77,7 +77,7 @@ even traverse it, and the run fails before Electron starts.
 
 Docker commonly has no FUSE device. Use `--appimage-extract` once or
 `--appimage-extract-and-run`; neither requires a privileged container. The
-extract-and-run wrapper can print extracted paths before Orca starts, so
+extract-and-run wrapper can print extracted paths before HiveCode starts, so
 automation that requires stdout to contain only the ready JSON should extract
 once and invoke `squashfs-root/AppRun`.
 
@@ -115,10 +115,10 @@ LIBGL_ALWAYS_SOFTWARE=1 /opt/orca/orca-linux.AppImage serve \
 ```
 
 `--pairing-address` is only the address advertised to clients. It does not
-change the listener bind address. Orca binds its WebSocket listener, then
+change the listener bind address. HiveCode binds its WebSocket listener, then
 combines the actual bound port with the advertised host when the address omits
 a port. Use a reachable LAN/Tailscale hostname or IP, or a complete reverse
-proxy URL such as `https://orca.example.com/runtime` (`http(s)` is normalized
+proxy URL such as `https://hivecode.example.com/runtime` (`http(s)` is normalized
 to `ws(s)`). Wildcard addresses such as `*`, `0.0.0.0`, and `::` cannot be
 advertised.
 
@@ -126,7 +126,7 @@ The command writes one ready block to stdout after the listener bind and
 pairing initialization complete:
 
 ```text
-Orca server ready
+HiveCode server ready
 Bound endpoint: ws://0.0.0.0:6768
 Advertised endpoint: ws://100.64.1.20:6768
 Pairing URL: orca://pair?code=...
@@ -194,13 +194,13 @@ it. `--appimage-extract` writes `squashfs-root` as `drwx------ root root`, so th
 `orca` service user cannot read or traverse the extracted tree and the unit fails
 at startup. `chmod 755 /opt/orca` alone does not reach into it.
 
-For most hosts, one `orca serve` service is enough because Orca starts Xvfb on
+For most hosts, one `hive serve` service is enough because HiveCode starts Xvfb on
 display `:99` when no display exists:
 
 ```ini
 # /etc/systemd/system/orca-serve.service
 [Unit]
-Description=Orca runtime server
+Description=HiveCode runtime server
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=300
@@ -226,9 +226,9 @@ WantedBy=multi-user.target
 Replace `100.64.1.20` with the LAN, Tailscale, tunnel, or public hostname that
 clients should use.
 
-`KillMode=mixed` sends the graceful stop signal only to Orca's main process,
+`KillMode=mixed` sends the graceful stop signal only to HiveCode's main process,
 then retains systemd's cgroup-wide `SIGKILL` fallback if shutdown times out.
-This lets Orca keep its owned Xvfb alive until Electron disconnects cleanly.
+This lets HiveCode keep its owned Xvfb alive until Electron disconnects cleanly.
 
 Exit status `3` means another process already owns this userData profile, so
 `RestartPreventExitStatus=3` stops the unit instead of retrying a launch that
@@ -241,7 +241,7 @@ refuses a plain `systemctl start` until the 5-minute window rolls over. Run
 [Upgrade](#upgrade-steps) and [Roll back](#roll-back) scripts already do.
 On systemd older than 230 those two directives are spelled
 `StartLimitInterval=`/`StartLimitBurst=` and belong in `[Service]`; Ubuntu
-20.04, Orca's oldest supported base, ships systemd 245.
+20.04, HiveCode's oldest supported base, ships systemd 245.
 
 Enable the service:
 
@@ -267,12 +267,12 @@ error, or missing library.
 ## Managed Xvfb Service
 
 If you prefer to own the virtual display lifecycle in systemd, run Xvfb as a
-separate service and set `DISPLAY=:99` for Orca.
+separate service and set `DISPLAY=:99` for HiveCode.
 
 ```ini
 # /etc/systemd/system/orca-xvfb.service
 [Unit]
-Description=Virtual X display for Orca
+Description=Virtual X display for HiveCode
 After=network-online.target
 Wants=network-online.target
 
@@ -289,12 +289,12 @@ WantedBy=multi-user.target
 If `command -v Xvfb` returned a different path, update `ExecStart` to that
 absolute path.
 
-Then add the display dependency to the Orca service:
+Then add the display dependency to the HiveCode service:
 
 ```ini
 # /etc/systemd/system/orca-serve.service
 [Unit]
-Description=Orca runtime server
+Description=HiveCode runtime server
 After=network-online.target orca-xvfb.service
 Wants=network-online.target orca-xvfb.service
 StartLimitIntervalSec=300
@@ -353,7 +353,7 @@ user, especially when the listener is reachable beyond localhost.
 - An omitted advertised port uses the actual bound port, including a fallback
   port selected after a collision. An explicit proxy port is preserved. A port
   mismatch therefore means the supplied external routing is wrong, not that
-  Orca changes it.
+  HiveCode changes it.
 - Reverse proxies must support WebSocket upgrade and route the advertised path.
   Use `wss://` or `https://` when TLS terminates at the proxy; do not advertise
   `ws://` through an HTTPS-only endpoint.
@@ -365,13 +365,13 @@ user, especially when the listener is reachable beyond localhost.
   did not reach serve mode; confirm the AppImage version and exact argument
   order, especially `--no-sandbox serve`.
 
-If you later install the desktop CLI from Orca settings, use that CLI for normal
+If you later install the desktop CLI from HiveCode settings, use that CLI for normal
 shell workflows. Keep the AppImage path in systemd so service restarts do not
 depend on an interactive shell profile.
 
 ## Upgrade
 
-`orca serve` never updates itself. In headless mode Orca wires up no auto-updater
+`hive serve` never updates itself. In headless mode HiveCode wires up no auto-updater
 at all — the built-in updater only runs in the desktop GUI, and no paired mobile
 or web client can trigger it remotely. Upgrading is always a deliberate step:
 replace the AppImage and restart the service.
@@ -379,12 +379,12 @@ replace the AppImage and restart the service.
 Two facts make this safe and predictable:
 
 - **State lives in the service user's home, not next to the binary.** Persisted
-  data is under `/home/orca/.config/` (Orca uses both an `orca` and an `Orca`
+  data is under `/home/orca/.config/` (HiveCode retains both the legacy `orca` and `Orca`
   directory there), fully independent of `/opt/orca/orca-linux.AppImage`.
   Replacing the binary never touches projects, worktree metadata, terminal
   history, orchestration state, or paired-device keys — so mobile and web
   clients reconnect after an upgrade without re-pairing.
-- **New builds migrate old state on load.** Orca loads older `orca-data.json`
+- **New builds migrate old state on load.** HiveCode loads older `orca-data.json`
   state into the current schema and writes it back in the current shape, so a
   forward upgrade needs no manual data step.
 
@@ -392,8 +392,8 @@ Rolling back is the case that needs care — see [Roll back](#roll-back).
 
 ### Record the version you deploy
 
-Orca has no headless version command: there is no `--version` flag or `version`
-subcommand, and `orca serve` prints only its endpoint. Choose a release tag
+HiveCode has no headless version command: there is no `--version` flag or `version`
+subcommand, and `hive serve` prints only its endpoint. Choose a release tag
 explicitly instead of following the `latest` URL, and record it next to the
 binary so upgrades are auditable. The steps below keep that record in
 `/opt/orca/VERSION`.
@@ -421,9 +421,9 @@ sudo du -sh /home/orca/.config
 df -h /opt/orca /home/orca
 ```
 
-`/opt/orca` needs room for the compressed Orca profile archive, the staged
+`/opt/orca` needs room for the compressed HiveCode profile archive, the staged
 build, and the rollback binary. A rollback extracts the old profile and preserves
-the post-upgrade Orca profile directories, so `/home` needs room for both copies.
+the post-upgrade HiveCode profile directories, so `/home` needs room for both copies.
 
 Run the following block as one Bash script so its fail-fast and recovery traps
 remain active for the whole operation:
@@ -434,7 +434,7 @@ set -euo pipefail
 # Replace this example with the release tag you intend to deploy
 ORCA_VERSION=v1.4.147
 
-# Select the release asset on the server where Orca runs
+# Select the release asset on the server where HiveCode runs
 case "$(uname -m)" in
   x86_64)
     ORCA_ASSET=orca-linux.AppImage
@@ -528,11 +528,11 @@ sudo chmod 644 /opt/orca/VERSION.new
 ORCA_SERVICE_STOPPED=1
 sudo systemctl stop orca-serve.service
 
-# Add only Orca-owned profile directories, then publish the complete bundle
+# Add only HiveCode-owned profile directories, then publish the complete bundle
 ORCA_PROFILE_DIRS=()
 for profile_dir in orca Orca; do
   if sudo test -L "/home/orca/.config/$profile_dir"; then
-    echo "Refusing symlinked Orca profile: /home/orca/.config/$profile_dir" >&2
+    echo "Refusing symlinked HiveCode profile: /home/orca/.config/$profile_dir" >&2
     exit 1
   fi
   if sudo test -d "/home/orca/.config/$profile_dir"; then
@@ -544,7 +544,7 @@ for profile_dir in orca Orca; do
   fi
 done
 if ((${#ORCA_PROFILE_DIRS[@]} == 0)); then
-  echo 'No Orca profile directory found under /home/orca/.config' >&2
+  echo 'No HiveCode profile directory found under /home/orca/.config' >&2
   exit 1
 fi
 sudo tar czf "$ORCA_ROLLBACK_NEW/profile.tgz" \
@@ -563,7 +563,7 @@ ORCA_SERVICE_STOPPED=0
 trap - EXIT
 ```
 
-The profile archive created in step 3 captures both Orca profile directory names
+The profile archive created in step 3 captures both legacy HiveCode profile directory names
 when present without rewinding unrelated tools under `/home/orca/.config`. The
 `.ready` suffix is published only after the prior binary, version record, and
 profile archive are complete. If you run the managed Xvfb unit, only
@@ -575,7 +575,7 @@ profile archive are complete. If you run the managed Xvfb unit, only
 sudo journalctl -u orca-serve.service -f
 ```
 
-A healthy start prints one `Orca server ready` block with the actual bound and
+A healthy start prints one `HiveCode server ready` block with the actual bound and
 advertised endpoints. Verify those values rather than assuming the configured
 port, because a collision can select a fallback port.
 Confirm a client reconnects before you discard the backup. The timestamped
@@ -710,7 +710,7 @@ trap restart_after_rollback_error EXIT
 
 if [[ "$(sudo stat -c %d "$ORCA_RESTORE")" != \
   "$(sudo stat -c %d /home/orca/.config)" ]]; then
-  echo 'Refusing rollback because staging and the Orca profile are on different filesystems' >&2
+  echo 'Refusing rollback because staging and the HiveCode profile are on different filesystems' >&2
   exit 1
 fi
 sudo tar xzf "$ORCA_ROLLBACK/profile.tgz" -C "$ORCA_RESTORE"
@@ -729,7 +729,7 @@ for profile_dir in orca Orca; do
   fi
 done
 if ((${#ORCA_RESTORE_DIRS[@]} == 0)); then
-  echo "Rollback bundle has no Orca profile directories: $ORCA_ROLLBACK" >&2
+  echo "Rollback bundle has no HiveCode profile directories: $ORCA_ROLLBACK" >&2
   exit 1
 fi
 for profile_dir in "${ORCA_RESTORE_DIRS[@]}"; do
@@ -748,11 +748,11 @@ fi
 ORCA_SERVICE_STOPPED=1
 sudo systemctl stop orca-serve.service
 
-# Preserve and replace only Orca-owned profile directories
+# Preserve and replace only HiveCode-owned profile directories
 ORCA_CURRENT_DIRS=()
 for profile_dir in orca Orca; do
   if sudo test -L "/home/orca/.config/$profile_dir"; then
-    echo "Refusing symlinked Orca profile: /home/orca/.config/$profile_dir" >&2
+    echo "Refusing symlinked HiveCode profile: /home/orca/.config/$profile_dir" >&2
     exit 1
   fi
   if sudo test -d "/home/orca/.config/$profile_dir"; then
@@ -811,23 +811,23 @@ is resolved.
 
 ## Installing Agent Skills Without A Desktop
 
-Orca's agent skills (CLI usage, orchestration, computer use, etc.) are normally
-installed from Orca Settings, which pre-fills an `npx skills add ... --global`
+HiveCode's agent skills (CLI usage, orchestration, computer use, etc.) are normally
+installed from HiveCode Settings, which pre-fills an `npx skills add ... --global`
 command in a terminal for you to run. A headless host has no Settings UI, so
-use `orca skills install` instead:
+use `hive skills install` instead:
 
 ```bash
-orca skills install                                      # list installable skills
-orca skills install --skill orca-cli --skill orchestration # install globally (default)
-orca skills install --skill orca-cli --local              # install into the current project only
-orca skills install --all                                 # install every bundled skill
-orca skills install --all --dry-run                       # print the npx command without running it
+hive skills install                                      # list installable skills
+hive skills install --skill orca-cli --skill orchestration # install globally (default)
+hive skills install --skill orca-cli --local              # install into the current project only
+hive skills install --all                                 # install every bundled skill
+hive skills install --all --dry-run                       # print the npx command without running it
 ```
 
 This resolves the same `npx skills add <repo> --skill <name> ...` command
 Settings would show you (adding `--global` unless `--local` is passed), then
 runs it and forwards its output and exit code. It requires `node`/`npx` on the
-host; it does not need a running Orca runtime.
+host; it does not need a running HiveCode runtime.
 
 Unlike the command Settings shows, the spawned one adds `npx --yes` and `-y`.
 Without them the `skills` CLI opens an interactive agent picker and blocks
@@ -836,31 +836,31 @@ forever on any allocated TTY — which includes a normal `ssh` session. Use
 
 Settings keeps that picker deliberately, because choosing which agents get a
 skill is a real decision. A headless run cannot answer it, so instead of dropping
-the choice Orca makes it explicitly: it passes an `--agent` list built from the
+the choice HiveCode makes it explicitly: it passes an `--agent` list built from the
 coding agents it detects on the host, plus the shared `.agents/skills` directory
 it reads itself. Left to decide on its own with no agent detected, the `skills`
 CLI installs into all ~75 agents it knows and leaves a config directory for each.
 Override the targets yourself, or narrow to the shared directory alone:
 
 ```bash
-orca skills install --skill orca-cli --agent claude-code,codex
-orca skills install --skill orca-cli --agent universal
+hive skills install --skill orca-cli --agent claude-code,codex
+hive skills install --skill orca-cli --agent universal
 ```
 
-If Orca detects no agent at all, `orca skills install` stops and asks for
+If HiveCode detects no agent at all, `hive skills install` stops and asks for
 `--agent` rather than guessing.
 
-To refresh already-installed skills, `orca skills update` mirrors the same
+To refresh already-installed skills, `hive skills update` mirrors the same
 selection flags (`--skill`, `--all`, `--local`, `--dry-run`) and resolves to
 `npx skills update <names...>` with a matching scope flag — `--global`, or
 `--project` when you pass `--local`:
 
 ```bash
-orca skills update --all                                  # update every bundled skill globally
-orca skills update --skill orca-cli --dry-run             # print the npx command without running it
+hive skills update --all                                  # update every bundled skill globally
+hive skills update --skill orca-cli --dry-run             # print the npx command without running it
 ```
 
-`orca skills update` only refreshes skills that are already installed — it exits
+`hive skills update` only refreshes skills that are already installed — it exits
 0 without doing anything for a skill that is missing, so install it first. More
 generally, a 0 exit means the `skills` CLI ran without erroring, not that it
 wrote anything; read its output to confirm what changed.
@@ -868,8 +868,8 @@ wrote anything; read its output to confirm what changed.
 `--json` covers the skill listing and `--dry-run`. A real run streams the
 `skills` CLI's own non-JSON output and rejects `--json`.
 
-Both commands install onto the machine that runs them. In an Orca SSH workspace
-or the WSL bridge the `orca` shim forwards commands to the Orca host, so they
+Both commands install onto the machine that runs them. In a HiveCode SSH workspace
+or the WSL bridge the `hive` shim forwards commands to the HiveCode host, so they
 refuse to run there and print the command to run on the machine you want.
 
 ## Troubleshooting
@@ -886,7 +886,7 @@ refuse to run there and print the command to run on the machine you want.
   `/opt/orca/squashfs-root` if you extracted the AppImage.
 - Clients cannot connect: make sure `--pairing-address` is an address reachable
   from the client, and make sure firewalls allow the selected `--port`.
-- Journal shows `Another Orca instance is already running for this userData
+- Journal shows `Another HiveCode instance is already running for this userData
 profile` and the unit exits `3`: another process already owns the profile, so
   `RestartPreventExitStatus=3` leaves the unit `failed` on purpose. Find the
   owner with `systemctl status orca-serve` and `pgrep -af orca`. Stop it (or

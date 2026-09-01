@@ -11,6 +11,7 @@ import type { TuiAgent } from '../../../shared/tui-agent'
 import { translate } from '@/i18n/i18n'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export type SourceControlLaunchPlanDelivery =
   | 'argv'
@@ -194,11 +195,11 @@ export function planSourceControlAgentActionLaunch(args: {
 
   const summary =
     delivery === 'paste-submit'
-      ? 'The agent starts with no prompt, then Orca pastes and submits the command input after the TUI is ready.'
+      ? `The agent starts with no prompt, then ${APP_DISPLAY_NAME} pastes and submits the command input after the TUI is ready.`
       : delivery === 'draft-native'
         ? 'The command input is prefilled as an editable draft by the agent launch command.'
         : delivery === 'draft-paste'
-          ? 'The agent starts with no prompt, then Orca pastes the command input as an editable draft after the TUI is ready.'
+          ? `The agent starts with no prompt, then ${APP_DISPLAY_NAME} pastes the command input as an editable draft after the TUI is ready.`
           : 'The command input is included in the launch command and submitted as the first turn.'
 
   return {
@@ -207,7 +208,6 @@ export function planSourceControlAgentActionLaunch(args: {
     delivery,
     commandLabel: startupPlan.launchCommand,
     summary,
-    caveat:
-      'This check builds Orca’s launch plan only. PATH, binary availability, account setup, and terminal startup failures are still caught by the real launch watchdog.'
+    caveat: `This check builds ${APP_DISPLAY_NAME}’s launch plan only. PATH, binary availability, account setup, and terminal startup failures are still caught by the real launch watchdog.`
   }
 }

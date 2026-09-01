@@ -50,6 +50,10 @@ export type VirtualizedWorktreeViewportProps = {
   handleRenameProjectGroup: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
   handleDeleteProjectGroup: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
   handleCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
+  /** Create a worktree from a repo in the space; null is the derived ungrouped space. */
+  handleCreateWorkspaceForProjectGroup: (projectGroup: ProjectGroup | null) => void
+  /** Add a repository/folder source from the scoped space header action. */
+  handleAddProjectToProjectGroup: (projectGroup: ProjectGroup | null) => void
   activeModal: string
   pendingRevealWorktree: PendingSidebarWorktreeReveal | null
   pendingRevealSidebarRow: PendingSidebarRowReveal | null
@@ -94,6 +98,8 @@ export type VirtualizedWorktreeViewportProps = {
     worktreeIds: readonly string[],
     status: WorkspaceStatus
   ) => boolean
+  onTemporarySessionDragOver: (event: React.DragEvent<HTMLDivElement>) => boolean
+  onTemporarySessionDrop: (event: React.DragEvent<HTMLDivElement>) => boolean
   onReorderWorktrees: (args: {
     groups: readonly WorktreeDragGroup[]
     sourceGroupKey: string

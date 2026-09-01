@@ -50,6 +50,7 @@ import { skillDeleteActionLabel } from './skill-delete-copy'
 import { shareSelectionActionLabel } from './skill-display-labels'
 import { SkillDeleteResultBand } from './SkillDeleteResultBand'
 import { useSkillDeleteFlow } from './use-skill-delete-flow'
+import { formatSkillShareLink } from '../../../../shared/skill-share-link'
 
 const EMPTY_SKILLS: DiscoveredSkill[] = []
 const NO_FILTERS: SkillsFilterState = {
@@ -156,7 +157,7 @@ export default function SkillsPage(): React.JSX.Element {
     if (!pendingSkillShareId) {
       return
     }
-    setInstallLink(`https://app.orca.dev/skills/share/${pendingSkillShareId}`)
+    setInstallLink(formatSkillShareLink(pendingSkillShareId))
     setInstallOpen(true)
     clearPendingSkillShare()
   }, [clearPendingSkillShare, pendingSkillShareId])

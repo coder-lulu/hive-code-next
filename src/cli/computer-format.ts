@@ -9,6 +9,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { PRIMARY_CLI_COMMAND } from '../shared/brand'
 import { formatBase64PayloadByteCount } from './base64-payload-byte-count'
 import { quoteCliCommandArgument } from './shell-command-quote'
 import type {
@@ -221,7 +222,7 @@ function formatComputerFollowUpCommand(
   target: ComputerActionFollowUpTarget
 ): string {
   const args = [
-    'orca',
+    PRIMARY_CLI_COMMAND,
     'computer',
     'get-app-state',
     '--app',

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   buildToolchainProbeCommand,
   parseBuildToolchainProbe,
@@ -86,6 +87,7 @@ describe('formatMissingToolchainError', () => {
     expect(msg).toContain('make')
     expect(msg).toContain('a C++ compiler (g++ or clang++)')
     expect(msg).toContain('python3')
+    expect(msg).toContain(`${APP_DISPLAY_NAME}'s relay native modules`)
     expect(msg).toContain('sudo apt-get install -y build-essential python3')
     // Tailored hint replaces the generic distro list.
     expect(msg).not.toContain('Fedora/RHEL:')

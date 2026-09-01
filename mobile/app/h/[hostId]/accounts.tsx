@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
@@ -11,8 +11,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, Check, RefreshCw, User } from 'lucide-react-native'
-import { loadHosts } from '../../../src/transport/host-store'
-import { useHostClient } from '../../../src/transport/client-context'
+import { useAccountVisibleHostCatalog } from '../../../src/runtime-directory/use-account-visible-host-catalog'
+import { selectConnectableHostProfiles } from '../../../src/transport/host-catalog-selection'
+import { useHostClient, useRefreshHostClient } from '../../../src/transport/client-context'
 import { createMobileAccountsScreenStyles } from '../../../src/accounts/mobile-accounts-screen-styles'
 import { useMobileTheme, useMobileThemeStyles } from '../../../src/theme/mobile-theme-provider'
 import { useNow } from '../../../src/hooks/use-now'
@@ -41,9 +42,12 @@ export default function AccountsScreen() {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileAccountsScreenStyles)
   const { hostId } = useLocalSearchParams<{ hostId: string }>()
+  const { catalog, loaded: hostCatalogLoaded } = useAccountVisibleHostCatalog()
+  const hosts = useMemo(() => selectConnectableHostProfiles(catalog), [catalog])
 
   // Why: shared client per host. See docs/mobile-shared-client-per-host.md.
   const { client, state: connState } = useHostClient(hostId)
+  const refreshHostClient = useRefreshHostClient()
   const [hostName, setHostName] = useState<string>('')
   const [snapshot, setSnapshot] = useState<AccountsSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -89,22 +93,19 @@ export default function AccountsScreen() {
     if (!hostId) {
       return
     }
-    let stale = false
-    void loadHosts().then((hosts) => {
-      if (stale) {
-        return
-      }
-      const host = hosts.find((h) => h.id === hostId)
-      if (!host) {
+    const host = hosts.find((candidate) => candidate.id === hostId)
+    if (!host) {
+      if (hostCatalogLoaded) {
         setError('Host not found')
-        return
       }
-      setHostName(host.name)
-    })
-    return () => {
-      stale = true
+      return
     }
-  }, [hostId])
+    setHostName(host.name)
+    setError((current) => (current === 'Host not found' ? null : current))
+    if (!client && (host.accountRuntime || host.accountRuntimeFallback)) {
+      refreshHostClient(host.id)
+    }
+  }, [client, hostCatalogLoaded, hostId, hosts, refreshHostClient])
 
   // Why: subscribe to streaming snapshot updates so usage bars refresh in
   // place when the desktop's rate-limit poll completes (every 5 min) or

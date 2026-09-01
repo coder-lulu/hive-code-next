@@ -13,6 +13,12 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 type CompleteGitRepoAddOptions = {
   closeModal: () => void
   setHideDefaultBranchWorkspace: (hide: boolean) => void
+  /**
+   * Optional space captured by the scoped Add Project action.  Undefined is
+   * intentionally different from null: null means the derived Ungrouped
+   * space was selected explicitly.
+   */
+  projectGroupId?: string | null
   /** Why: the nested Add Project flow (hosted inside the workspace composer)
    *  keeps the composer open and selects the new project instead of running
    *  the default-checkout navigation handoff. Telemetry above still applies. */
@@ -26,7 +32,8 @@ type CompleteGitRepoAddOptions = {
 export function useCompleteGitRepoAdd({
   closeModal,
   setHideDefaultBranchWorkspace,
-  finishProjectAdd
+  finishProjectAdd,
+  projectGroupId
 }: CompleteGitRepoAddOptions): (
   repoId: string,
   source: AddRepoExistingWorkspaceSource,
@@ -64,6 +71,18 @@ export function useCompleteGitRepoAdd({
         detectedTelemetryTrackedRef.current.add(repoId)
         track('add_repo_existing_workspaces_detected', existingWorkspaceTelemetry)
       }
+      if (projectGroupId !== undefined) {
+        const moved = await useAppStore.getState().moveProjectToGroup(repoId, projectGroupId)
+        if (!moved) {
+          // Adding a project succeeded even if a stale/remote catalog prevented
+          // the follow-up association.  Keep the completion flow usable and
+          // leave an actionable breadcrumb for diagnostics.
+          console.warn('Failed to associate added project with its originating space', {
+            repoId,
+            projectGroupId
+          })
+        }
+      }
       if (finishProjectAdd) {
         await finishProjectAdd(repoId, source, executionHostId)
         return
@@ -76,6 +95,6 @@ export function useCompleteGitRepoAdd({
         setHideDefaultBranchWorkspace
       })
     },
-    [closeModal, finishProjectAdd, setHideDefaultBranchWorkspace]
+    [closeModal, finishProjectAdd, projectGroupId, setHideDefaultBranchWorkspace]
   )
 }

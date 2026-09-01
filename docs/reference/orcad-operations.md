@@ -1,6 +1,6 @@
 # Running orcad
 
-`orcad` is the Orca runtime served from plain Node. This is the contract between it and
+`orcad` is the HiveCode runtime served from plain Node. This is the contract between it and
 whatever supervises it: what it binds, what it owns on disk, who restarts what, and what its
 readiness payload actually proves.
 
@@ -36,7 +36,7 @@ interface got bound. `localhost` maps to `127.0.0.1`. `0.0.0.0` / `::` are the e
 opt-ins to network reach, and the startup log says so on every launch.
 
 The bind is **pinned**, not defaulted. Two things widen the desktop's listener on their own —
-`orca serve`'s wide default, and a startup where some device has connected before — and an
+`hive serve`'s wide default, and a startup where some device has connected before — and an
 unattended host's exposure must be exactly what the operator asked for on every launch. A
 mobile pairing offer, which normally rebinds to all interfaces, is refused while the bind is
 pinned to loopback and reports `network_exposure_failed` rather than advertising an endpoint
@@ -128,7 +128,7 @@ An external supervisor (systemd, launchd, a process manager). orcad conforms to 
 ### Decommissioning
 
 The daemon outliving orcad is deliberate, so stopping orcad does **not** leave the host with
-zero Orca processes. A daemon that has been adopted stays resident after its runtime
+zero HiveCode processes. A daemon that has been adopted stays resident after its runtime
 disconnects — that is what makes the next start a reattach rather than a cold restore. To
 retire a host completely, stop orcad and then stop the daemon named by
 `health.terminalDaemon.pid`, or delete the data root and let the endpoint go stale.

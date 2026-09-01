@@ -22,8 +22,8 @@ export const hivecodeProductConfig = {
     termsOfService: null
   },
   cli: {
-    primary: 'hivecode',
-    aliases: ['orca', 'orca-ide']
+    primary: 'hive',
+    aliases: ['hivecode', 'orca', 'orca-ide']
   },
   schemes: {
     primary: 'hivecode',
@@ -55,6 +55,36 @@ export const hivecodeProductConfig = {
     pluginMarketplace: null,
     changelog: null,
     nudge: null
+  },
+  services: {
+    api: {
+      baseUrl: 'https://api.hive.test'
+    },
+    identity: {
+      issuer: 'https://identity.hive.test/realms/hive',
+      clients: {
+        desktop: 'hivecode-desktop',
+        userWeb: 'hive-cloud-user-web',
+        operatorWeb: 'hive-cloud-operator-web'
+      }
+    },
+    oss: {
+      enabled: false,
+      endpoint: null,
+      provider: null
+    },
+    update: {
+      enabled: true,
+      endpoint: 'https://updates.hive.test/hive/v1/updates/desktop/',
+      checkEndpoint: 'https://updates.hive.test/hive/v1/updates/check',
+      provider: 'hivecloud',
+      channel: 'beta',
+      checkIntervalHours: 24
+    },
+    relay: {
+      enabled: false,
+      directorUrl: null
+    }
   }
 } as const
 

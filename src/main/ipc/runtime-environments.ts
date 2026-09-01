@@ -1,8 +1,13 @@
 import { app, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { resolveEnvironment } from '../../shared/runtime-environment-store'
 import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
+import { REMOTE_RUNTIME_MAX_SUBSCRIPTIONS } from '../../shared/remote-runtime-memory-limits'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import type { Store } from '../persistence'
+import {
+  resolveRuntimeEnvironmentCatalogEntry,
+  subscribeEnvironmentWithCloudFallback
+} from './runtime-environment-account-routing'
 import {
   isRuntimeEnvironmentManuallyDisconnected,
   registerRuntimeEnvironmentConnectivityHandlers,
@@ -16,8 +21,7 @@ import {
 } from './runtime-environment-transport-generation'
 import {
   clearSharedControlSupport,
-  resetSharedControlSupport,
-  subscribeRuntimeEnvironment
+  resetSharedControlSupport
 } from './runtime-environment-transport-routing'
 import { RUNTIME_ENVIRONMENT_HANDLER_CHANNELS } from './runtime-environment-handler-channels'
 import { retirePairedRuntimeBrowserClientHostEnvironment } from '../browser/paired-runtime-browser-client-host-runtime'
@@ -30,6 +34,7 @@ type RetainedRemoteRuntimeSubscription = RemoteRuntimeSubscription & {
   notifyClosed: () => void
 }
 const remoteRuntimeSubscriptions = new Map<string, RetainedRemoteRuntimeSubscription>()
+const pendingRemoteRuntimeSubscriptionIds = new Set<string>()
 const getUserDataPath = (): string => app.getPath('userData')
 
 function closeSubscriptionsForEnvironment(environmentId: string): void {
@@ -112,10 +117,22 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
         typeof args.subscriptionId === 'string' && args.subscriptionId.length > 0
           ? args.subscriptionId
           : randomUUID()
-      if (remoteRuntimeSubscriptions.has(subscriptionId)) {
+      if (
+        remoteRuntimeSubscriptions.has(subscriptionId) ||
+        pendingRemoteRuntimeSubscriptionIds.has(subscriptionId)
+      ) {
         throw new Error('Runtime environment subscription id already exists')
       }
-      const environment = resolveEnvironment(getUserDataPath(), args.selector)
+      if (
+        remoteRuntimeSubscriptions.size + pendingRemoteRuntimeSubscriptionIds.size >=
+        REMOTE_RUNTIME_MAX_SUBSCRIPTIONS
+      ) {
+        throw new RemoteRuntimeClientError(
+          'remote_runtime_busy',
+          'Runtime environment subscription limit reached.'
+        )
+      }
+      const environment = resolveRuntimeEnvironmentCatalogEntry(getUserDataPath(), args.selector)
       if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
         throw new Error('runtime_manually_disconnected')
       }
@@ -132,6 +149,7 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
       const sender = event.sender
       const ownerWebContentsId = sender.id
       let senderDestroyed = sender.isDestroyed()
+      let transportClosed = false
       let subscription: RemoteRuntimeSubscription | null = null
       let destroyedListenerAttached = false
       const removeDestroyedListener = (): void => {
@@ -167,12 +185,13 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
           // The renderer is gone; there is no one left to tell.
         }
       }
+      pendingRemoteRuntimeSubscriptionIds.add(subscriptionId)
       sender.once('destroyed', closeSubscription)
       destroyedListenerAttached = true
       try {
-        subscription = await subscribeRuntimeEnvironment(
+        subscription = await subscribeEnvironmentWithCloudFallback(
           getUserDataPath(),
-          environment.id,
+          environment,
           args.method,
           args.params,
           args.timeoutMs,
@@ -192,8 +211,8 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
               }
             },
             onClose: () => {
-              const retained = remoteRuntimeSubscriptions.get(subscriptionId) ?? null
-              retained?.removeDestroyedListener()
+              transportClosed = true
+              removeDestroyedListener()
               remoteRuntimeSubscriptions.delete(subscriptionId)
             }
           }
@@ -201,10 +220,19 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
       } catch (error) {
         removeDestroyedListener()
         throw error
+      } finally {
+        pendingRemoteRuntimeSubscriptionIds.delete(subscriptionId)
+      }
+      if (transportClosed) {
+        subscription.close()
+        return { subscriptionId, requestId: subscription.requestId }
       }
       let pairingIsCurrent = false
       try {
-        const currentEnvironment = resolveEnvironment(getUserDataPath(), environment.id)
+        const currentEnvironment = resolveRuntimeEnvironmentCatalogEntry(
+          getUserDataPath(),
+          environment.id
+        )
         pairingIsCurrent =
           (currentEnvironment.pairingRevision ?? currentEnvironment.createdAt) === pairingRevision
       } catch {

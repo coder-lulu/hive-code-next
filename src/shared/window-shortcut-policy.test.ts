@@ -818,7 +818,7 @@ describe('resolveWindowShortcutAction', () => {
       [{ code: 'KeyR', key: 'p', meta: true, alt: false, shift: false }, { type: 'openQuickOpen' }],
       [
         { code: 'KeyL', key: 'n', meta: true, alt: false, shift: false },
-        { type: 'openNewWorkspace' }
+        { type: 'openNewTaskHome' }
       ],
       [
         { code: 'KeyC', key: 'j', meta: true, alt: false, shift: false },
@@ -848,7 +848,7 @@ describe('resolveWindowShortcutAction', () => {
       ],
       [
         { code: 'KeyN', key: 'Dead', meta: true, alt: false, shift: false },
-        { type: 'openNewWorkspace' }
+        { type: 'openNewTaskHome' }
       ],
       [{ code: 'KeyP', meta: true, alt: false, shift: false }, { type: 'openQuickOpen' }]
     ]

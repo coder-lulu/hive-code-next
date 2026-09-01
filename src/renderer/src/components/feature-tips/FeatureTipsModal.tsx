@@ -30,7 +30,7 @@ import {
 } from './feature-tip-telemetry'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
-import { applyProductBranding } from '@/product-brand'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { VoiceDictationTipDialog } from './VoiceDictationTipDialog'
 
 function WorktreePromptTerm({ children }: { children: string }): JSX.Element {
@@ -203,9 +203,7 @@ export default function FeatureTipsModal(): JSX.Element | null {
           openCliSettings()
         } catch (error) {
           const message =
-            error instanceof Error
-              ? applyProductBranding(error.message)
-              : applyProductBranding('Failed to install Orca CLI.')
+            error instanceof Error ? error.message : `Failed to install ${APP_DISPLAY_NAME} CLI.`
           if (
             import.meta.env.DEV &&
             message.includes('Development mode uses a generated launcher for validation only')

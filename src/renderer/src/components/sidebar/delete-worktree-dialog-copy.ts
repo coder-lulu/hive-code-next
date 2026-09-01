@@ -1,6 +1,7 @@
 import { isFolderRepo } from '../../../../shared/repo-kind'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type WorktreeRepoRef = Pick<Worktree, 'repoId'>
 
@@ -51,12 +52,12 @@ export function getDeleteWorktreeDialogCopy(args: {
       : 'break-all font-medium text-foreground',
     descriptionSuffix: args.isBatchDelete
       ? allFolderWorkspaceDeletes
-        ? 'from Orca. Project folders on disk will not be deleted.'
+        ? `from ${APP_DISPLAY_NAME}. Project folders on disk will not be deleted.`
         : mixedFolderWorkspaceDeletes
-          ? 'from Orca. Git worktrees will also be removed from git and disk; folder workspaces will only remove the Orca workspace entry.'
+          ? `from ${APP_DISPLAY_NAME}. Git worktrees will also be removed from git and disk; folder workspaces will only remove the ${APP_DISPLAY_NAME} workspace entry.`
           : 'from git and delete their workspace folders.'
       : args.isFolderWorkspaceDelete
-        ? 'from Orca. The project folder on disk will not be deleted.'
+        ? `from ${APP_DISPLAY_NAME}. The project folder on disk will not be deleted.`
         : 'from git and delete its workspace folder.',
     mainWorktreeBlocker: args.isFolderWorkspaceDelete
       ? 'Remove the folder project instead of deleting this workspace.'
@@ -83,9 +84,9 @@ export function getDeleteWorktreeLineageDialogCopy(args: {
         ? '1 child workspace'
         : `${args.childWorkspaceCount} child workspaces`,
     descriptionSuffix: allFolderWorkspaceDeletes
-      ? 'from Orca. Project folders on disk will not be deleted.'
+      ? `from ${APP_DISPLAY_NAME}. Project folders on disk will not be deleted.`
       : mixedFolderWorkspaceDeletes
-        ? 'from Orca. Git worktrees will also be removed from git and disk; folder workspaces will only remove the Orca workspace entry.'
+        ? `from ${APP_DISPLAY_NAME}. Git worktrees will also be removed from git and disk; folder workspaces will only remove the ${APP_DISPLAY_NAME} workspace entry.`
         : 'from git and delete their workspace folders.'
   }
 }

@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, chmodSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const TLS_CERT_FILENAME = 'orca-tls-cert.pem'
 const TLS_KEY_FILENAME = 'orca-tls-key.pem'
@@ -51,7 +52,7 @@ export function loadOrCreateTlsCertificate(userDataPath: string): TlsCertificate
       '-days',
       '3650',
       '-subj',
-      '/CN=Orca Runtime',
+      `/CN=${APP_DISPLAY_NAME} Runtime`,
       '-keyout',
       keyPath_,
       '-out',

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react'
 import {
+  CLOSE_FLOATING_TERMINAL_EVENT,
   TOGGLE_FLOATING_TERMINAL_EVENT,
+  isFloatingTerminalWorkspaceId,
   requestFloatingTerminalOpenMaximized
 } from '@/lib/floating-terminal'
 import { createFloatingWorkspaceTourInteractionSnapshot } from '@/lib/floating-workspace-tour-interaction-snapshot'
@@ -10,6 +12,10 @@ import {
 } from '../components/floating-terminal/floating-terminal-panel-view-state'
 import { useAppStore } from '../store'
 import { selectFloatingVisibleTabCount } from '../store/selectors'
+import {
+  mainWorkbenchOwnsFloatingWorkspace,
+  shouldMountFloatingWorkspacePanel
+} from '@/lib/floating-workspace-surface-ownership'
 
 export type FloatingWorkspacePanelState = ReturnType<typeof useFloatingWorkspacePanel>
 
@@ -39,6 +45,9 @@ export function useFloatingWorkspacePanel() {
   )
   const statusBarVisible = useAppStore((s) => s.statusBarVisible)
   const visibleTabCount = useAppStore(selectFloatingVisibleTabCount)
+  const mainWorkspaceOwnsFloatingTabs = useAppStore((s) =>
+    mainWorkbenchOwnsFloatingWorkspace(s.activeView, s.activeWorktreeId)
+  )
 
   // Why: floating workspace is a transient overlay; hotkey minimize returns focus to the surface the user came from.
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -88,9 +97,13 @@ export function useFloatingWorkspacePanel() {
       const resolvedOpen = typeof nextOpen === 'function' ? nextOpen(open) : nextOpen
       // Why: recordFeatureInteraction updates Zustand subscribers; running it inside the state updater logs a render-phase update warning.
       if (resolvedOpen && !open) {
-        tourInteractionSnapshotRef.current = createFloatingWorkspaceTourInteractionSnapshot(
-          useAppStore.getState()
-        )
+        const state = useAppStore.getState()
+        if (isFloatingTerminalWorkspaceId(state.activeWorktreeId)) {
+          // One React surface owns the synthetic workspace at a time. Opening
+          // the overlay first releases the main workbench before it can mount.
+          state.setActiveWorktree(null)
+        }
+        tourInteractionSnapshotRef.current = createFloatingWorkspaceTourInteractionSnapshot(state)
         rememberReturnFocus()
       } else if (!resolvedOpen && open) {
         restoreReturnFocus()
@@ -117,9 +130,20 @@ export function useFloatingWorkspacePanel() {
         setOpenWithFocus((current) => !current)
       }
     }
+    const closeFloatingTerminal = (): void => setOpenWithFocus(false)
     window.addEventListener(TOGGLE_FLOATING_TERMINAL_EVENT, toggleFloatingTerminal)
-    return () => window.removeEventListener(TOGGLE_FLOATING_TERMINAL_EVENT, toggleFloatingTerminal)
+    window.addEventListener(CLOSE_FLOATING_TERMINAL_EVENT, closeFloatingTerminal)
+    return () => {
+      window.removeEventListener(TOGGLE_FLOATING_TERMINAL_EVENT, toggleFloatingTerminal)
+      window.removeEventListener(CLOSE_FLOATING_TERMINAL_EVENT, closeFloatingTerminal)
+    }
   }, [enabled, setOpenWithFocus])
+
+  useEffect(() => {
+    if (mainWorkspaceOwnsFloatingTabs && open) {
+      setOpenWithFocus(false)
+    }
+  }, [mainWorkspaceOwnsFloatingTabs, open, setOpenWithFocus])
 
   useEffect(() => {
     // Why the hydration gate: this effect fires on every boot while settings are still
@@ -137,7 +161,12 @@ export function useFloatingWorkspacePanel() {
     openMaximized,
     setOpenWithFocus,
     // Why: once the floating workspace owns tabs, keep it mounted while closed so hidden terminal/browser/editor panes retain local state.
-    shouldMountPanel: enabled && (open || visibleTabCount > 0),
+    shouldMountPanel: shouldMountFloatingWorkspacePanel({
+      enabled,
+      open,
+      visibleTabCount,
+      mainWorkbenchOwnsWorkspace: mainWorkspaceOwnsFloatingTabs
+    }),
     showToggleButton: enabled && (triggerLocation === 'floating-button' || !statusBarVisible),
     tourInteractionSnapshotRef,
     visibleTabCount

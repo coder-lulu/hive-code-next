@@ -1,5 +1,3 @@
-import { applyProductBranding } from './brand'
-
 export type RemoteRuntimePairingStage = 'connect' | 'host-identity' | 'access-grant' | 'runtime'
 
 /**
@@ -25,7 +23,7 @@ export class RemoteRuntimeClientError extends Error {
       closeCode?: number
     }
   ) {
-    super(applyProductBranding(message))
+    super(message)
     this.name = 'RemoteRuntimeClientError'
     this.code = code
     this.data = details?.data

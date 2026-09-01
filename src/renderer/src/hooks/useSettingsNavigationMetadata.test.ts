@@ -131,7 +131,7 @@ describe('settings navigation metadata', () => {
     const account = desktopSections.find((section) => section.id === 'orca-account')
 
     expect(account?.group).toBe('setup')
-    expect(account?.searchEntries[0]?.title).toBe('HiveCloud account')
+    expect(account?.searchEntries[0]?.title).toBe('Account & cloud')
     expect(ids({ isWebClient: true })).not.toContain('orca-account')
   })
 

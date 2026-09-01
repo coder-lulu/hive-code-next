@@ -13,6 +13,7 @@ import {
 } from '../web-runtime-environment'
 import { translate } from '@/i18n/i18n'
 import { translateHostAccessLinkError } from '@/lib/remote-pairing-copy'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { callEnvironmentEnvelope } from './web-runtime-calls'
 import {
   closeActiveRuntimeClients,
@@ -36,7 +37,7 @@ export function createRuntimeEnvironmentsApi(): NonNullable<
     addFromPairingCode: async ({ name, pairingCode }) => {
       const offer = parseWebPairingInput(pairingCode)
       if (!offer) {
-        throw new Error('Invalid Orca pairing code.')
+        throw new Error(`Invalid ${APP_DISPLAY_NAME} pairing code.`)
       }
       const previousEnvironment = webRuntimeState.activeEnvironment
       closeActiveRuntimeClients()

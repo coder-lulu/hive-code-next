@@ -13,6 +13,7 @@ type FocusTerminalPaneEventDeps = {
   tabId: string
   manager: FocusTerminalPaneManager | null
   acknowledgeAgents: (paneKeys: string[]) => void
+  consumeAgentCompletionUnread: (paneKey: string) => void
   surfaceStaleAgentRow: (tabId: string, leafId: string) => void
   scrollToBottomIfOutputSinceLastView?: (paneId: number) => void
 }
@@ -23,6 +24,7 @@ export function handleFocusTerminalPaneDetail(
     tabId,
     manager,
     acknowledgeAgents,
+    consumeAgentCompletionUnread,
     surfaceStaleAgentRow,
     scrollToBottomIfOutputSinceLastView
   }: FocusTerminalPaneEventDeps
@@ -58,5 +60,6 @@ export function handleFocusTerminalPaneDetail(
   }
   if (detail.ackPaneKeyOnSuccess) {
     acknowledgeAgents([detail.ackPaneKeyOnSuccess])
+    consumeAgentCompletionUnread(detail.ackPaneKeyOnSuccess)
   }
 }

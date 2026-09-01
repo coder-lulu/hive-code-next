@@ -1,13 +1,13 @@
 import type { GlobalSettings } from './global-settings-types'
+import { APP_DISPLAY_NAME } from './brand'
 
 export const AGENT_SKILL_SHARING_DISABLED_CODE = 'agent_skill_sharing_disabled'
 
-export const AGENT_SKILL_SHARING_DISABLED_MESSAGE =
-  'Publishing skill links from agents and the Orca CLI is off for this device.'
+export const AGENT_SKILL_SHARING_DISABLED_MESSAGE = `Publishing skill links from agents and the ${APP_DISPLAY_NAME} CLI is off for this device.`
 
 export const AGENT_SKILL_SHARING_DISABLED_NEXT_STEPS: readonly string[] = [
-  'Open Settings → Share Skills in the Orca desktop app on this device.',
-  'Turn on "Allow agents and the Orca CLI to publish skill links".',
+  `Open Settings → Share Skills in the ${APP_DISPLAY_NAME} desktop app on this device.`,
+  `Turn on "Allow agents and the ${APP_DISPLAY_NAME} CLI to publish skill links".`,
   'Run the share command again.'
 ]
 

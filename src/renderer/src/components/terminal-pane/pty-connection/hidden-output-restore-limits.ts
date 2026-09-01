@@ -33,5 +33,7 @@ export const HIDDEN_OUTPUT_RESTORE_REMOTE_OUTCOME_MAX_ATTEMPTS = 7
 export const HIDDEN_OUTPUT_RESTORE_LOCAL_GATE_MAX_ATTEMPTS = 30
 // Why: this is only shown if hidden renderer output was skipped and main-owned
 // terminal state is unavailable, so the user has an explicit loss signal.
-export const HIDDEN_OUTPUT_RESTORE_UNAVAILABLE_WARNING =
+export const HIDDEN_OUTPUT_RESTORE_UNAVAILABLE_WARNING = applyProductBranding(
   '\r\n[Orca skipped hidden terminal output because main recovery was unavailable.]\r\n'
+)
+import { applyProductBranding } from '@/product-brand'

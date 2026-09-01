@@ -1,4 +1,5 @@
 import { isTailscaleEndpoint } from '../../../src/shared/remote-runtime-tailscale-hint'
+import { APP_DISPLAY_NAME } from '../product-brand'
 import type {
   ConnectionLogEntry,
   ConnectionState,
@@ -41,8 +42,8 @@ export function diagnoseConnection(args: DiagnoseConnectionArgs): ConnectionDiag
   if (/relay director resolve failed \(503\)/i.test(evidence)) {
     const retryMs = parseRetryDelayMs(evidence)
     return {
-      likelyCause: `Relay service was temporarily unavailable${retryMs == null ? '.' : ` and asked Orca to retry in ${formatDelay(retryMs)}.`}`,
-      nextStep: 'Keep Orca open; recovery should retry automatically.',
+      likelyCause: `Relay service was temporarily unavailable${retryMs == null ? '.' : ` and asked ${APP_DISPLAY_NAME} to retry in ${formatDelay(retryMs)}.`}`,
+      nextStep: `Keep ${APP_DISPLAY_NAME} open; recovery should retry automatically.`,
       reportability: 'none'
     }
   }
@@ -58,7 +59,7 @@ export function diagnoseConnection(args: DiagnoseConnectionArgs): ConnectionDiag
         : 'The connected host'
     return {
       likelyCause: `${path} stopped answering authenticated health checks.`,
-      nextStep: 'Orca closed the stale session and started recovery.',
+      nextStep: `${APP_DISPLAY_NAME} closed the stale session and started recovery.`,
       reportability: relayLiveness ? 'orca-relay' : 'none'
     }
   }
@@ -66,7 +67,7 @@ export function diagnoseConnection(args: DiagnoseConnectionArgs): ConnectionDiag
   if (/relay-session-failed|active relay session failed/i.test(evidence)) {
     return {
       likelyCause: 'The active Relay session closed unexpectedly.',
-      nextStep: 'Orca started Relay recovery; the event history includes the cell close reason.',
+      nextStep: `${APP_DISPLAY_NAME} started Relay recovery; the event history includes the cell close reason.`,
       reportability:
         failure?.code === 'relay-session-failed' && failure.path === 'relay' ? 'orca-relay' : 'none'
     }
@@ -87,7 +88,7 @@ export function diagnoseConnection(args: DiagnoseConnectionArgs): ConnectionDiag
         : 'The saved direct endpoint did not answer before the connection timeout.',
       nextStep:
         args.pendingPath === 'relay'
-          ? 'Relay recovery is in progress; keep Orca open while it retries.'
+          ? `Relay recovery is in progress; keep ${APP_DISPLAY_NAME} open while it retries.`
           : 'Check the local/VPN network and confirm the desktop is awake.',
       reportability: 'none'
     }
@@ -95,8 +96,8 @@ export function diagnoseConnection(args: DiagnoseConnectionArgs): ConnectionDiag
 
   if (/handshake-timeout|handshake timeout/i.test(evidence)) {
     return {
-      likelyCause: 'The endpoint opened, but the encrypted Orca handshake did not finish.',
-      nextStep: 'Confirm the desktop is running a compatible Orca version and retry.',
+      likelyCause: `The endpoint opened, but the encrypted ${APP_DISPLAY_NAME} handshake did not finish.`,
+      nextStep: `Confirm the desktop is running a compatible ${APP_DISPLAY_NAME} version and retry.`,
       reportability: 'none'
     }
   }

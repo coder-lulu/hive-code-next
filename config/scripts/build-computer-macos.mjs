@@ -5,7 +5,7 @@ import path from 'node:path'
 const repoRoot = path.resolve(import.meta.dirname, '../..')
 const packagePath = path.join(repoRoot, 'native', 'computer-use-macos')
 const binaryPath = path.join(packagePath, '.build', 'release', 'orca-computer-use-macos')
-const appPath = path.join(packagePath, '.build', 'release', 'Orca Computer Use.app')
+const appPath = path.join(packagePath, '.build', 'release', 'HiveCode Computer Use.app')
 const appExecutablePath = path.join(appPath, 'Contents', 'MacOS', 'orca-computer-use-macos')
 const appIconPath = path.join(appPath, 'Contents', 'Resources', 'AppIcon.icns')
 const entitlementsPath = path.join(

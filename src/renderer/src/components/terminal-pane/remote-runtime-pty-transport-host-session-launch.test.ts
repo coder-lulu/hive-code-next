@@ -74,17 +74,19 @@ describe('createRemoteRuntimePtyTransport', () => {
       }
     )
 
-    ;(globalThis as { window: typeof window }).window = {
-      ...originalWindow,
-      api: {
-        ...originalWindow?.api,
-        runtimeEnvironments: {
-          ...originalWindow?.api?.runtimeEnvironments,
-          call: runtimeCall,
-          subscribe: runtimeSubscribe
+    ;(globalThis as { window: typeof window }).window = Object.assign(
+      Object.create(originalWindow ?? null) as typeof window,
+      {
+        api: {
+          ...originalWindow?.api,
+          runtimeEnvironments: {
+            ...originalWindow?.api?.runtimeEnvironments,
+            call: runtimeCall,
+            subscribe: runtimeSubscribe
+          }
         }
       }
-    } as unknown as typeof window
+    )
   })
 
   afterEach(() => {
@@ -251,7 +253,7 @@ describe('createRemoteRuntimePtyTransport', () => {
     })
 
     const connecting = transport.connect({ url: '', callbacks: {} })
-    transport.destroy?.()
+    await transport.destroy?.()
     resolveCreate({
       id: 'rpc-create',
       ok: true,
@@ -503,6 +505,70 @@ describe('createRemoteRuntimePtyTransport', () => {
       })
     )
   })
+
+  it.each([
+    { advertised: false, expectedMethod: null },
+    { advertised: true, expectedMethod: 'terminal.createAgentSession' }
+  ])(
+    'routes a fresh permission override by host capability (advertised=$advertised)',
+    async ({ advertised, expectedMethod }) => {
+      runtimeCall.mockImplementation(async (args: { method?: string }) =>
+        args.method === 'status.get'
+          ? {
+              id: 'rpc-status',
+              ok: true,
+              result: {
+                runtimeProtocolVersion: 3,
+                minCompatibleRuntimeClientVersion: 2,
+                capabilities: [
+                  'agent-session.host-authority.v1',
+                  ...(advertised ? ['agent-session.launch-permission.v1'] : [])
+                ]
+              },
+              _meta: { runtimeId: 'runtime-remote' }
+            }
+          : {
+              id: 'rpc-create',
+              ok: true,
+              result: {
+                terminal: {
+                  handle: 'term-remote',
+                  worktreeId: 'repo1::/remote/wt',
+                  title: null,
+                  surface: 'background'
+                }
+              },
+              _meta: { runtimeId: 'runtime-remote' }
+            }
+      )
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const transport = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'repo1::/remote/wt',
+        command: 'goose',
+        env: { GOOSE_MODE: 'auto' },
+        launchConfig: { agentArgs: '', agentEnv: { GOOSE_MODE: 'auto' } },
+        launchAgent: 'goose',
+        agentPermissionMode: 'yolo',
+        tabId: 'tab-1',
+        leafId: '11111111-1111-4111-8111-111111111111'
+      })
+
+      const result = await transport.connect({ url: '', callbacks: {} })
+
+      expect(result === undefined).toBe(!advertised)
+      expect(runtimeCall.mock.calls.some(([request]) => request.method === 'terminal.create')).toBe(
+        false
+      )
+      if (expectedMethod) {
+        expect(runtimeCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            method: expectedMethod,
+            params: expect.objectContaining({ agent: 'goose', agentPermissionMode: 'yolo' })
+          })
+        )
+      }
+    }
+  )
 
   it('forwards input over the stream and disconnects without closing shared remote sessions', async () => {
     vi.useFakeTimers()

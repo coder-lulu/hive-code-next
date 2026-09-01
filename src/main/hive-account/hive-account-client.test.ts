@@ -23,6 +23,32 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe('Hive account Native client', () => {
+  it('validates account security payloads and security challenge bounds', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        accountId: '123e4567-e89b-42d3-a456-426614174000',
+        userName: 'm13800138000',
+        displayName: 'Ada',
+        phoneNumber: null,
+        phoneBound: false
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        challengeId: 'challenge', bindingId: 'binding', expiresInSeconds: 300, resendAfterSeconds: 60
+      }))
+    const client = new HiveAccountClient(config, fetchMock)
+    await expect(client.accountSecurity('access')).resolves.toMatchObject({ displayName: 'Ada' })
+    await expect(client.startPhoneBinding('access', '+8613800138000')).resolves.toMatchObject({
+      expiresInSeconds: 300
+    })
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      challengeId: 'challenge', bindingId: 'binding', expiresInSeconds: -1, resendAfterSeconds: 60
+    }))
+    await expect(client.startPhoneBinding('access', '+8613800138000')).rejects.toThrow(
+      'invalid_hive_account_security_challenge'
+    )
+  })
+
   it('uses the Electron Chrome network stack by default', async () => {
     electronNetFetch.mockResolvedValueOnce(
       jsonResponse({
@@ -59,6 +85,73 @@ describe('Hive account Native client', () => {
       `${config.identityIssuer}/.well-known/openid-configuration`,
       expect.objectContaining({ redirect: 'error', cache: 'no-store' })
     )
+  })
+
+  it('loads the ordered login providers from the exact desktop capability contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        contractRevision: 'hive-login-capabilities-v1',
+        clientId: 'hivecode-desktop',
+        defaultMethod: 'phone_sms',
+        providers: [
+          {
+            id: 'wechat',
+            authorizationPath: '/hive/v1/auth/provider-authorizations/wechat'
+          },
+          {
+            id: 'github',
+            authorizationPath: '/hive/v1/auth/provider-authorizations/github'
+          }
+        ]
+      })
+    )
+    const client = new HiveAccountClient(config, fetchMock)
+
+    await expect(client.getLoginCapabilities()).resolves.toMatchObject({
+      clientId: 'hivecode-desktop',
+      defaultMethod: 'phone_sms',
+      providers: [{ id: 'wechat' }, { id: 'github' }]
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.hivekernel.com/hive/v1/meta/login-capabilities?clientId=hivecode-desktop',
+      expect.objectContaining({ method: 'GET', redirect: 'error', cache: 'no-store' })
+    )
+  })
+
+  it.each([
+    {
+      contractRevision: 'hive-login-capabilities-v1',
+      clientId: 'another-client',
+      defaultMethod: 'phone_sms',
+      providers: []
+    },
+    {
+      contractRevision: 'hive-login-capabilities-v1',
+      clientId: 'hivecode-desktop',
+      defaultMethod: 'phone_sms',
+      providers: [
+        { id: 'github', authorizationPath: 'https://attacker.test/authorize' }
+      ]
+    },
+    {
+      contractRevision: 'hive-login-capabilities-v1',
+      clientId: 'hivecode-desktop',
+      defaultMethod: 'phone_sms',
+      providers: [
+        { id: 'github', authorizationPath: '/hive/v1/auth/provider-authorizations/github' },
+        { id: 'github', authorizationPath: '/hive/v1/auth/provider-authorizations/github' }
+      ]
+    },
+    {
+      contractRevision: 'hive-login-capabilities-v1',
+      clientId: 'hivecode-desktop',
+      defaultMethod: 'phone_sms',
+      providers: [],
+      extra: true
+    }
+  ])('rejects malformed or extended login capability payload %#', async (payload) => {
+    const client = new HiveAccountClient(config, vi.fn().mockResolvedValue(jsonResponse(payload)))
+    await expect(client.getLoginCapabilities()).rejects.toThrow(/invalid_hive_account_login/)
   })
 
   it('sends the exact device authorization and session exchange contracts', async () => {

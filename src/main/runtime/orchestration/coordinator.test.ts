@@ -3,6 +3,7 @@ import { OrchestrationDb } from './db'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
 import { Coordinator } from './coordinator'
 import type { CoordinatorRuntime } from './coordinator-runtime-contract'
+import type { OrchestrationCliCommand } from './cli-command'
 import {
   DISPATCH_STALE_THRESHOLD,
   parseAllowStaleBaseFromSpec
@@ -22,7 +23,7 @@ function createMockRuntime(): CoordinatorRuntime & {
   createdTerminalOptions: { title?: string }[]
   probeDriftCalls: string[]
   probeDriftResult: DriftResult
-  cliCommand: 'orca' | 'orca-ide'
+  cliCommand: OrchestrationCliCommand
   setProbeDrift(result: DriftResult): void
   throwProbeDrift: Error | null
 } {
@@ -38,7 +39,7 @@ function createMockRuntime(): CoordinatorRuntime & {
     createdTerminalOptions: [] as { title?: string }[],
     probeDriftCalls: [] as string[],
     probeDriftResult: null as DriftResult,
-    cliCommand: 'orca' as 'orca' | 'orca-ide',
+    cliCommand: 'hive' as OrchestrationCliCommand,
     throwProbeDrift: null as Error | null,
     setProbeDrift(result: DriftResult): void {
       mock.probeDriftResult = result

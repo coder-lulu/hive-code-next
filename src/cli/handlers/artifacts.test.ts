@@ -12,6 +12,7 @@ import {
 } from '../../shared/artifact-sharing-gate'
 import { RuntimeRpcFailureError } from '../runtime-client'
 import { reportCliError } from '../format'
+import { applyProductCliBranding } from '../../shared/brand'
 
 const item: ArtifactListItem = {
   artifact: {
@@ -236,7 +237,7 @@ describe('artifact CLI handlers', () => {
         { commandPath: command.split(' ') }
       )
       const rendered = String(errorLog.mock.calls.at(-1)?.[0])
-      expect(rendered).toContain(ARTIFACT_SHARING_DISABLED_MESSAGE)
+      expect(rendered).toContain(applyProductCliBranding(ARTIFACT_SHARING_DISABLED_MESSAGE))
       expect(rendered).toContain('Settings → Artifacts')
     }
   )

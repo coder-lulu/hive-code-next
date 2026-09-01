@@ -24,24 +24,24 @@ const AUTOMATION_STATE_FLAGS = [
 export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['automations', 'list'],
-    summary: 'List scheduled Orca automations',
-    usage: 'orca automations list [--json]',
+    summary: 'List scheduled HiveCode automations',
+    usage: 'hive automations list [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
-    examples: ['orca automations list', 'orca automations list --json']
+    examples: ['hive automations list', 'hive automations list --json']
   },
   {
     path: ['automations', 'show'],
-    summary: 'Show one Orca automation',
-    usage: 'orca automations show <id> [--json]',
+    summary: 'Show one HiveCode automation',
+    usage: 'hive automations show <id> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
     positionalArgs: ['id'],
-    examples: ['orca automations show 2f9e...', 'orca automations show --id 2f9e... --json']
+    examples: ['hive automations show 2f9e...', 'hive automations show --id 2f9e... --json']
   },
   {
     path: ['automations', 'create'],
-    summary: 'Create a scheduled Orca automation',
+    summary: 'Create a scheduled HiveCode automation',
     usage:
-      'orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
+      'hive automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'name',
@@ -54,24 +54,24 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Trigger accepts hourly, daily, weekdays, weekly, a 5-field cron expression, or an RRULE string.',
-      'When --repo is omitted, the CLI uses the enclosing Orca worktree when one can be resolved from cwd.',
+      'When --repo is omitted, the CLI uses the enclosing HiveCode worktree when one can be resolved from cwd.',
       'Use --project with --host, or --project-host-setup, to run on a specific project host setup.',
-      '--host runtime:<environment-id> targets that paired Orca server; use the id from `orca environment list`, not the environment name.',
+      '--host runtime:<environment-id> targets that paired HiveCode server; use the id from `hive environment list`, not the environment name.',
       'Use --source-context with a JSON TaskSourceContext when task/provider data should come from a specific host/account; pass null on edit to clear it.',
       'Use --workspace to run in an existing worktree; otherwise the automation creates a new worktree per run.',
       'Use --precheck to run a bounded command before scheduled runs; exit code 0 continues, anything else records a skipped run.',
       'Use --reuse-session only with existing-workspace automations to submit later runs to the previous live automation session when it is still available. Use --fresh-session to disable reuse.'
     ],
     examples: [
-      'orca automations create --name "Daily review" --trigger daily --prompt "Review open changes" --provider codex',
-      'orca automations create --name "Weekday triage" --trigger "0 9 * * 1-5" --prompt "Triage issues" --provider claude --repo my-repo',
-      'orca automations create --name "PR review" --trigger hourly --precheck "gh pr list --json number -q .[0].number" --prompt "Review requested PRs" --provider codex'
+      'hive automations create --name "Daily review" --trigger daily --prompt "Review open changes" --provider codex',
+      'hive automations create --name "Weekday triage" --trigger "0 9 * * 1-5" --prompt "Triage issues" --provider claude --repo my-repo',
+      'hive automations create --name "PR review" --trigger hourly --precheck "gh pr list --json number -q .[0].number" --prompt "Review requested PRs" --provider codex'
     ]
   },
   {
     path: ['automations', 'edit'],
-    summary: 'Edit an Orca automation',
-    usage: 'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--json]',
+    summary: 'Edit a HiveCode automation',
+    usage: 'hive automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'id',
@@ -85,32 +85,32 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     ],
     positionalArgs: ['id'],
     examples: [
-      'orca automations edit 2f9e... --disabled',
-      'orca automations edit --id 2f9e... --trigger "30 * * * *" --json'
+      'hive automations edit 2f9e... --disabled',
+      'hive automations edit --id 2f9e... --trigger "30 * * * *" --json'
     ]
   },
   {
     path: ['automations', 'remove'],
     destructive: true,
-    summary: 'Remove an Orca automation and its run history',
-    usage: 'orca automations remove <id> [--json]',
+    summary: 'Remove a HiveCode automation and its run history',
+    usage: 'hive automations remove <id> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
     positionalArgs: ['id'],
-    examples: ['orca automations remove 2f9e...', 'orca automations remove --id 2f9e... --json']
+    examples: ['hive automations remove 2f9e...', 'hive automations remove --id 2f9e... --json']
   },
   {
     path: ['automations', 'run'],
-    summary: 'Run an Orca automation now',
-    usage: 'orca automations run <id> [--json]',
+    summary: 'Run a HiveCode automation now',
+    usage: 'hive automations run <id> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
     positionalArgs: ['id'],
-    examples: ['orca automations run 2f9e...', 'orca automations run --id 2f9e... --json']
+    examples: ['hive automations run 2f9e...', 'hive automations run --id 2f9e... --json']
   },
   {
     path: ['automations', 'runs'],
     summary: 'List automation run history',
-    usage: 'orca automations runs [--id <automation-id>] [--json]',
+    usage: 'hive automations runs [--id <automation-id>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
-    examples: ['orca automations runs', 'orca automations runs --id 2f9e... --json']
+    examples: ['hive automations runs', 'hive automations runs --id 2f9e... --json']
   }
 ]

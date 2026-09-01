@@ -34,14 +34,22 @@ describe('agent skill selection', () => {
 
   it('fails missing selectors with installed-list recovery', () => {
     expect(() => selectDiscoveredSkills([], ['missing'])).toThrow(
-      expect.objectContaining({ code: AGENT_SKILL_SELECTOR_NOT_FOUND_CODE })
+      expect.objectContaining({
+        code: AGENT_SKILL_SELECTOR_NOT_FOUND_CODE,
+        message: expect.stringContaining('hive skills installed')
+      })
     )
   })
 
   it('requires an ID when names are ambiguous', () => {
     expect(() =>
       selectDiscoveredSkills([skill('one', 'same'), skill('two', 'same')], ['same'])
-    ).toThrow(expect.objectContaining({ code: AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE }))
+    ).toThrow(
+      expect.objectContaining({
+        code: AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE,
+        message: expect.stringContaining('hive skills installed')
+      })
+    )
   })
 
   it('rejects two exact IDs whose bundle folder names would collide', () => {

@@ -12,7 +12,7 @@ type HiveAccountConfigResult =
   | { configured: true; config: HiveAccountConfig }
   | { configured: false; setupMessage: string }
 
-export const HIVE_ACCOUNT_CLIENT_ID = 'hivecode-desktop'
+export const HIVE_ACCOUNT_CLIENT_ID = hivecodeProductConfig.services.identity.clients.desktop
 const SCOPE = 'openid profile email hive.session.exchange'
 
 function isPackagedBuild(): boolean {
@@ -57,11 +57,15 @@ export function getHiveAccountConfig(
   // Why: packaged builds must be reproducible and cannot redirect credentials
   // through launch-time environment variables.
   const apiCandidate = packaged
-    ? hivecodeProductConfig.endpoints.cloud
-    : env.HIVECODE_ACCOUNT_API_URL || hivecodeProductConfig.endpoints.cloud
+    ? hivecodeProductConfig.services.api.baseUrl
+    : env.HIVE_PRODUCT_API_BASE_URL ||
+      env.HIVECODE_ACCOUNT_API_URL ||
+      hivecodeProductConfig.services.api.baseUrl
   const issuerCandidate = packaged
-    ? hivecodeProductConfig.endpoints.identityIssuer
-    : env.HIVECODE_ACCOUNT_IDENTITY_ISSUER || hivecodeProductConfig.endpoints.identityIssuer
+    ? hivecodeProductConfig.services.identity.issuer
+    : env.HIVE_PRODUCT_IDENTITY_ISSUER ||
+      env.HIVECODE_ACCOUNT_IDENTITY_ISSUER ||
+      hivecodeProductConfig.services.identity.issuer
   const apiBaseUrl = cleanUrl(apiCandidate, packaged, true)
   const identityIssuer = cleanUrl(issuerCandidate, packaged, false)
   if (!apiBaseUrl || !identityIssuer) {

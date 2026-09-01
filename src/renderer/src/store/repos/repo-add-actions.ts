@@ -81,7 +81,12 @@ export function createRepoAddActions(
           const { openModal } = get()
           openModal('confirm-non-git-folder', {
             folderPath: path,
-            ...(target.kind === 'environment' ? { runtimeEnvironmentId: target.environmentId } : {})
+            ...(target.kind === 'environment'
+              ? { runtimeEnvironmentId: target.environmentId }
+              : {}),
+            ...(options && 'projectGroupId' in options
+              ? { projectGroupScoped: true, projectGroupId: options.projectGroupId ?? null }
+              : {})
           })
           return null
         }

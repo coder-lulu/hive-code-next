@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { ProviderRateLimits, ProviderRateLimitStatus } from '../../shared/rate-limit-types'
 import { deriveAntigravityRateLimits } from './antigravity-usage-mirror'
 
@@ -39,6 +40,8 @@ describe('deriveAntigravityRateLimits', () => {
     expect(antigravity.status).toBe('unavailable')
     expect(antigravity.error).not.toContain('Gemini project ID not found')
     expect(antigravity.error).toContain('Antigravity usage is not available')
+    expect(antigravity.error).toContain(APP_DISPLAY_NAME)
+    expect(antigravity.error).not.toMatch(/\bOrca\b/)
     expect(antigravity.session).toBeNull()
     expect(antigravity.weekly).toBeNull()
   })
@@ -65,6 +68,7 @@ describe('deriveAntigravityRateLimits', () => {
     expect(antigravity.status).toBe('unavailable')
     expect(antigravity.error).not.toContain('Gemini CLI OAuth is disabled in settings')
     expect(antigravity.error).toContain('Antigravity usage is not available')
+    expect(antigravity.error).toContain(APP_DISPLAY_NAME)
     expect(antigravity.error).toContain('Gemini CLI sign-in is connected')
   })
 })

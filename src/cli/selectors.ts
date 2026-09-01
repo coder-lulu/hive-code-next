@@ -5,6 +5,7 @@ import type {
   RuntimeWorktreeRecord
 } from '../shared/runtime-types'
 import { isPathInsideOrEqual } from '../shared/cross-platform-path'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import type { RuntimeClient } from './runtime-client'
 import { RuntimeClientError } from './runtime/types'
 import { getOptionalStringFlag, getRequiredStringFlag } from './flags'
@@ -70,7 +71,7 @@ export async function resolveCurrentWorktreeSelector(
   if (!enclosingWorktree) {
     throw new RuntimeClientError(
       'selector_not_found',
-      `No Orca-managed worktree contains the current directory: ${currentPath}`
+      `No ${APP_DISPLAY_NAME}-managed worktree contains the current directory: ${currentPath}`
     )
   }
 
@@ -144,7 +145,7 @@ export async function getBrowserWorktreeSelector(
 
 // Why: mirrors browser's implicit active-tab targeting. When --terminal is
 // omitted, resolve the active terminal in the current worktree so commands
-// like `orca terminal send --text "hello" --enter` Just Work.
+// like `hive terminal send --text "hello" --enter` Just Work.
 export async function getTerminalHandle(
   flags: Map<string, string | boolean>,
   cwd: string,

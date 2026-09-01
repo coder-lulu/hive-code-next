@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   applyAllRepoInsertAt,
+  computeProjectHeaderBucketDropPreview,
   computeProjectHeaderDropPreview,
   getLogicalRepoOrderRankById,
   getProjectGroupOrderForSidebarDrop,
@@ -322,6 +323,112 @@ describe('computeProjectHeaderDropPreview', () => {
         dropIndicatorY: estimatedSectionBottom + INDICATOR_GAP
       })
     })
+  })
+})
+
+describe('computeProjectHeaderBucketDropPreview', () => {
+  const buckets = new Map<string, readonly string[]>([
+    ['group:group-a', ['a']],
+    ['group:group-b', ['b', 'c']],
+    ['ungrouped', ['loose']]
+  ])
+  const rects = [
+    {
+      repoId: 'a',
+      bucketKey: 'group:group-a',
+      headerIndex: 0,
+      top: 40,
+      bottom: 68,
+      sectionBottom: 180
+    },
+    {
+      repoId: 'b',
+      bucketKey: 'group:group-b',
+      headerIndex: 0,
+      top: 240,
+      bottom: 268,
+      sectionBottom: 290
+    },
+    {
+      repoId: 'c',
+      bucketKey: 'group:group-b',
+      headerIndex: 1,
+      top: 300,
+      bottom: 328,
+      sectionBottom: 360
+    },
+    {
+      repoId: 'loose',
+      bucketKey: 'ungrouped',
+      headerIndex: 0,
+      top: 440,
+      bottom: 468,
+      sectionBottom: 500
+    }
+  ]
+  const dropZones = [
+    { bucketKey: 'group:group-a', top: 0, bottom: 28, sectionBottom: 200 },
+    { bucketKey: 'group:group-b', top: 200, bottom: 228, sectionBottom: 400 },
+    { bucketKey: 'ungrouped', top: 400, bottom: 428, sectionBottom: 520 }
+  ]
+
+  it('uses the named group header under the pointer as the target bucket', () => {
+    expect(
+      computeProjectHeaderBucketDropPreview({
+        pointerY: 215,
+        containerTop: 0,
+        scrollTop: 0,
+        rects,
+        dropZones,
+        sidebarRepoHeaderIdsByBucket: buckets,
+        sourceBucketKey: 'group:group-a',
+        sourceExecutionHostId: 'local',
+        projectGroupHostIdByGroupId: new Map([
+          ['group-a', 'local'],
+          ['group-b', 'local']
+        ])
+      })
+    ).toEqual({
+      bucketKey: 'group:group-b',
+      sidebarRepoHeaderIds: ['b', 'c'],
+      dropIndex: 0,
+      dropIndicatorY: 236
+    })
+  })
+
+  it('targets the explicit ungrouped drop zone', () => {
+    expect(
+      computeProjectHeaderBucketDropPreview({
+        pointerY: 415,
+        containerTop: 0,
+        scrollTop: 0,
+        rects,
+        dropZones,
+        sidebarRepoHeaderIdsByBucket: buckets,
+        sourceBucketKey: 'group:group-a',
+        sourceExecutionHostId: 'local',
+        projectGroupHostIdByGroupId: new Map([['group-a', 'local']])
+      })
+    ).toMatchObject({ bucketKey: 'ungrouped', dropIndex: 0 })
+  })
+
+  it('rejects a group drop zone owned by another host', () => {
+    expect(
+      computeProjectHeaderBucketDropPreview({
+        pointerY: 215,
+        containerTop: 0,
+        scrollTop: 0,
+        rects,
+        dropZones,
+        sidebarRepoHeaderIdsByBucket: buckets,
+        sourceBucketKey: 'group:group-a',
+        sourceExecutionHostId: 'local',
+        projectGroupHostIdByGroupId: new Map([
+          ['group-a', 'local'],
+          ['group-b', 'runtime:remote']
+        ])
+      })
+    ).toBeNull()
   })
 })
 

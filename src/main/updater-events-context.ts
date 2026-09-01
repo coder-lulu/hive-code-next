@@ -1,4 +1,4 @@
-import type { UpdateStatus } from '../shared/update-status-types'
+import type { UpdateStatus, UpdateStatusMetadata } from '../shared/update-status-types'
 import type { ElectronAutoUpdater } from './electron-updater-loader'
 
 export const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
@@ -12,6 +12,7 @@ export type UpdaterHandlerContext = {
   getPublishingWindowLastGoodCheck: () => { lastGoodTag: string } | null
   getMissingManifestPrereleaseFallbackUserInitiated: () => boolean | null
   getCurrentStatus: () => UpdateStatus
+  getUpdateMetadata: () => UpdateStatusMetadata
   getActiveUpdateCheckEventAttemptId: () => number | null
   getKnownReleaseUrl: () => string | undefined
   getPendingInstallVersion: () => string

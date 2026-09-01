@@ -51,6 +51,10 @@ internal static class OrcaCliLauncher
             MoveEnvironmentVariable("NODE_REPL_EXTERNAL_MODULE", "ORCA_NODE_REPL_EXTERNAL_MODULE");
             Environment.SetEnvironmentVariable("ELECTRON_RUN_AS_NODE", "1");
             Environment.SetEnvironmentVariable("ORCA_WINDOWS_PACKAGED_CLI_LAUNCHER", "1");
+            Environment.SetEnvironmentVariable(
+                "HIVE_CLI_INVOKED_AS",
+                Path.GetFileNameWithoutExtension(typeof(OrcaCliLauncher).Assembly.Location).ToLowerInvariant()
+            );
             string requestedCliCommand = Environment.GetEnvironmentVariable("ORCA_CLI_COMMAND");
             Environment.SetEnvironmentVariable("ORCA_CLI_COMMAND", ResolveCliCommand(requestedCliCommand));
 
@@ -83,6 +87,7 @@ internal static class OrcaCliLauncher
     private static string ResolveCliCommand(string requestedCliCommand)
     {
         if (
+            requestedCliCommand == "hive" ||
             requestedCliCommand == "hivecode" ||
             requestedCliCommand == "orca" ||
             requestedCliCommand == "orca-ide"
@@ -94,7 +99,11 @@ internal static class OrcaCliLauncher
         string launcherName = Path.GetFileNameWithoutExtension(
             typeof(OrcaCliLauncher).Assembly.Location
         ).ToLowerInvariant();
-        if (launcherName == "hivecode" || launcherName == "orca-ide")
+        if (
+            launcherName == "hive" ||
+            launcherName == "hivecode" ||
+            launcherName == "orca-ide"
+        )
         {
             return launcherName;
         }

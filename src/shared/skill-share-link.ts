@@ -1,5 +1,18 @@
+import { PRIMARY_SCHEME, SCHEME_COMPATIBILITY_ALIASES } from './brand'
+
 const SHARE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
-const PRODUCTION_HOSTS = new Set(['app.orca.dev', 'share.onorca.dev'])
+const LEGACY_PRODUCTION_HOSTS = new Set(['app.orca.dev', 'share.onorca.dev'])
+const SUPPORTED_PROTOCOLS = new Set([
+  `${PRIMARY_SCHEME}:`,
+  ...SCHEME_COMPATIBILITY_ALIASES.map((scheme) => `${scheme}:`)
+])
+
+export function formatSkillShareLink(shareId: string): string {
+  if (!SHARE_ID_PATTERN.test(shareId)) {
+    throw new Error('skill-share-id-invalid')
+  }
+  return `${PRIMARY_SCHEME}://skills/share/${shareId}`
+}
 
 export function parseSkillShareId(value: string): string | null {
   const trimmed = value.trim()
@@ -12,7 +25,7 @@ export function parseSkillShareId(value: string): string | null {
   } catch {
     return null
   }
-  if (url.protocol === 'orca:') {
+  if (SUPPORTED_PROTOCOLS.has(url.protocol)) {
     const match = `${url.host}${url.pathname}`.match(/^skills\/share\/([A-Za-z0-9_-]{1,128})\/?$/)
     return match?.[1] ?? null
   }
@@ -20,7 +33,7 @@ export function parseSkillShareId(value: string): string | null {
   if (url.protocol !== 'https:' && !(developmentHost && url.protocol === 'http:')) {
     return null
   }
-  if (!PRODUCTION_HOSTS.has(url.hostname) && !developmentHost) {
+  if (!LEGACY_PRODUCTION_HOSTS.has(url.hostname) && !developmentHost) {
     return null
   }
   const match = url.pathname.match(/^\/skills\/share\/([A-Za-z0-9_-]{1,128})\/?$/)
@@ -30,9 +43,17 @@ export function parseSkillShareId(value: string): string | null {
 export function skillShareIdFromArguments(argv: readonly string[]): string | null {
   for (const value of argv) {
     const id = parseSkillShareId(value)
-    if (id && (value.includes('/skills/share/') || value.startsWith('orca:'))) {
+    if (id && (value.includes('/skills/share/') || SUPPORTED_PROTOCOLS.has(safeProtocol(value)))) {
       return id
     }
   }
   return null
+}
+
+function safeProtocol(value: string): string {
+  try {
+    return new URL(value).protocol
+  } catch {
+    return ''
+  }
 }

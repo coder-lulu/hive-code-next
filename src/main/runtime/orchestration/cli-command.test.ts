@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { resolveTerminalOrchestrationCliCommand } from './cli-command'
 
 describe('resolveTerminalOrchestrationCliCommand', () => {
-  it('uses orca-ide for a pane recorded as WSL', () => {
+  it('uses the primary HiveCode command for a pane recorded as WSL', () => {
     expect(
       resolveTerminalOrchestrationCliCommand({
         connectionId: null,
         isWsl: true,
         worktreeId: 'repo::C:\\repo'
       })
-    ).toBe('orca-ide')
+    ).toBe('hive')
   })
 
   it('uses project runtime and WSL paths when restored pane metadata is unavailable', () => {
@@ -30,30 +30,30 @@ describe('resolveTerminalOrchestrationCliCommand', () => {
           }
         }
       })
-    ).toBe('orca-ide')
+    ).toBe('hive')
     expect(
       resolveTerminalOrchestrationCliCommand({
         connectionId: null,
         isWsl: null,
         worktreeId: 'repo::\\\\wsl.localhost\\Ubuntu\\home\\alice\\repo'
       })
-    ).toBe('orca-ide')
+    ).toBe('hive')
   })
 
-  it('preserves native and SSH bare-orca commands', () => {
+  it('uses the primary HiveCode command for native and SSH panes', () => {
     expect(
       resolveTerminalOrchestrationCliCommand({
         connectionId: null,
         isWsl: false,
         worktreeId: 'repo::/home/alice/repo'
       })
-    ).toBe('orca')
+    ).toBe('hive')
     expect(
       resolveTerminalOrchestrationCliCommand({
         connectionId: 'ssh-1',
         isWsl: null,
         worktreeId: 'repo::\\\\wsl.localhost\\Ubuntu\\home\\alice\\repo'
       })
-    ).toBe('orca')
+    ).toBe('hive')
   })
 })

@@ -2,6 +2,7 @@ import { mkdir, readFile, readlink, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const execFileMock = vi.hoisted(() => vi.fn())
 
@@ -53,7 +54,9 @@ describe('CliInstaller', () => {
         state: 'conflict',
         supported: true
       })
-      await expect(installer.install()).rejects.toThrow('Refusing to replace non-Orca command')
+      await expect(installer.install()).rejects.toThrow(
+        `Refusing to replace non-${APP_DISPLAY_NAME} command`
+      )
       await expect(readlink(installPath)).resolves.toBe(existingTarget)
     }
   )
@@ -166,7 +169,9 @@ describe('CliInstaller', () => {
         state: 'conflict',
         currentTarget: null
       })
-      await expect(installer.install()).rejects.toThrow('Refusing to replace non-Orca command')
+      await expect(installer.install()).rejects.toThrow(
+        `Refusing to replace non-${APP_DISPLAY_NAME} command`
+      )
       await expect(readFile(installPath, 'utf8')).resolves.toContain('/tmp/not-orca')
     }
   )

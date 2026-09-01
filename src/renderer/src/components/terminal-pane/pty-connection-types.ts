@@ -7,6 +7,7 @@ import type { EventProps } from '../../../../shared/telemetry-events'
 import type { TerminalColorSchemeMode } from '../../../../shared/terminal-color-scheme-protocol'
 import type { StartupCommandDelivery } from '../../../../shared/codex-startup-delivery'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { SetupSplitDirection } from '../../../../shared/worktree/launch-types'
 import type {
   AgentProviderSessionMetadata,
@@ -29,6 +30,7 @@ export type PtyPaneStartup = {
   resumeProviderSession?: AgentProviderSessionMetadata
   launchToken?: string
   launchAgent?: TuiAgent
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
   /** Explicit CLI override for host-owned agent launches; omission uses host settings. */
   agentArgsOverride?: string | null
   draftPrompt?: string

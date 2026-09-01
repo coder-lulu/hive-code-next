@@ -8,6 +8,9 @@ const DEVICE_PUBLIC_KEY = 'hivecode.mobile.auth.device-public-key'
 const DEVICE_SECRET_KEY = 'hivecode.mobile.auth.device-secret-key'
 const REQUEST_TIMEOUT_MS = 15_000
 const DEV_PRIMARY_TIMEOUT_MS = 3_000
+const MAX_API_RESPONSE_BYTES = 2 * 1024 * 1024
+const MAX_API_ERROR_MESSAGE_CHARACTERS = 512
+const MAX_API_ERROR_CATEGORY_CHARACTERS = 256
 
 export type DeviceIdentity = {
   readonly deviceId: string
@@ -17,6 +20,11 @@ export type DeviceIdentity = {
 }
 
 type ApiEnvelope<T> = { code?: number; msg?: string; category?: string; data?: T | null }
+type MobileApiRequestOptions = Readonly<{
+  headers?: Record<string, string>
+  method?: 'GET' | 'POST' | 'PATCH'
+  signal?: AbortSignal
+}>
 
 export class MobileApiError extends Error {
   readonly status: number
@@ -33,11 +41,18 @@ export class MobileApiError extends Error {
 }
 
 function apiBase(): string {
-  const value = hivecodeProductConfig.endpoints.cloud
+  const value = hivecodeProductConfig.services.api.baseUrl
   if (!value) {
     throw new Error('云端登录服务未配置')
   }
   return value.replace(/\/$/, '')
+}
+
+export function mobileApiUrl(path: string): string {
+  if (!path.startsWith('/') || path.startsWith('//')) {
+    throw new Error('登录服务路径无效')
+  }
+  return `${apiBase()}${path}`
 }
 
 function apiBaseCandidates(): string[] {
@@ -48,7 +63,9 @@ function apiBaseCandidates(): string[] {
   // as a transport fallback while retaining the test-domain URL as primary.
   const androidDev =
     process.env.EXPO_OS === 'android' || process.env.EXPO_PUBLIC_ANDROID_EMULATOR === '1'
-  if (androidDev && process.env.NODE_ENV !== 'production') {
+  const isDevBuild =
+    Boolean((globalThis as { __DEV__?: unknown }).__DEV__) || process.env.NODE_ENV === 'development'
+  if (androidDev && isDevBuild) {
     return [configured, 'http://10.0.2.2:8080']
   }
   return [configured]
@@ -77,14 +94,8 @@ export function randomToken(): string {
   return encodeBase64Url(getRandomBytes(32))
 }
 
-function ensureNaclRandomness(): void {
-  nacl.setPRNG((_array, length) => {
-    _array.set(getRandomBytes(length))
-  })
-}
-
 export async function deviceIdentity(): Promise<DeviceIdentity> {
-  ensureNaclRandomness()
+  nacl.setPRNG((_array, length) => _array.set(getRandomBytes(length)))
   const [storedId, storedPublic, storedSecret] = await Promise.all([
     SecureStore.getItemAsync(DEVICE_ID_KEY),
     SecureStore.getItemAsync(DEVICE_PUBLIC_KEY),
@@ -128,49 +139,58 @@ export async function deviceIdentity(): Promise<DeviceIdentity> {
 export async function request<T>(
   path: string,
   body: unknown,
-  options: { readonly headers?: Record<string, string> } = {}
+  options: MobileApiRequestOptions = {}
 ): Promise<T> {
+  return (await requestWithMetadata<T>(path, body, options)).value
+}
+
+export async function requestWithMetadata<T>(
+  path: string,
+  body: unknown,
+  options: MobileApiRequestOptions = {}
+): Promise<{ readonly value: T; readonly headers: Headers }> {
   let response: Response | undefined
   let payload: unknown
   let lastFailure: unknown
   const bases = apiBaseCandidates()
   for (const [index, base] of bases.entries()) {
     const controller = new AbortController()
+    const abortFromCaller = () => controller.abort()
+    if (options.signal?.aborted) {
+      abortFromCaller()
+    } else {
+      options.signal?.addEventListener('abort', abortFromCaller, { once: true })
+    }
     const timeout = setTimeout(
       () => controller.abort(),
       index === 0 && bases.length > 1 ? DEV_PRIMARY_TIMEOUT_MS : REQUEST_TIMEOUT_MS
     )
     try {
       response = await fetch(`${base}${path}`, {
-        method: 'POST',
+        method: options.method ?? 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
           ...options.headers
         },
-        body: JSON.stringify(body),
+        ...(options.method === 'GET' ? {} : { body: JSON.stringify(body) }),
         signal: controller.signal
       })
       if (response.status === 204) {
-        return {} as T
+        return { value: {} as T, headers: response.headers }
       }
-      payload = await response.json()
+      payload = await readApiJsonWithinLimit(response)
       break
     } catch (failure) {
+      if (options.signal?.aborted) {
+        throw failure
+      }
       lastFailure = failure
       response = undefined
       payload = undefined
-      if (index === bases.length - 1) {
-        const timedOut = failure instanceof Error && failure.name === 'AbortError'
-        throw new MobileApiError(
-          timedOut ? '登录服务响应超时，请重试' : '登录服务暂时不可用，请稍后再试',
-          timedOut ? 408 : 0,
-          undefined,
-          true
-        )
-      }
     } finally {
       clearTimeout(timeout)
+      options.signal?.removeEventListener('abort', abortFromCaller)
     }
   }
   if (!response) {
@@ -205,9 +225,9 @@ export async function request<T>(
     if (envelope.data === null || envelope.data === undefined) {
       throw new MobileApiError('登录服务返回了无效响应', response.status, undefined, false)
     }
-    return envelope.data as T
+    return { value: envelope.data as T, headers: response.headers }
   }
-  return payload as T
+  return { value: payload as T, headers: response.headers }
 }
 
 function apiErrorMessage(payload: unknown): string {
@@ -228,7 +248,7 @@ function apiErrorMessage(payload: unknown): string {
     return categoryMessage
   }
   return isRecord(payload) && typeof payload.msg === 'string'
-    ? payload.msg
+    ? payload.msg.slice(0, MAX_API_ERROR_MESSAGE_CHARACTERS)
     : '登录服务暂时不可用，请稍后再试'
 }
 
@@ -237,9 +257,55 @@ function apiErrorCategory(payload: unknown): string | undefined {
     return undefined
   }
   if (typeof payload.category === 'string') {
-    return payload.category
+    return payload.category.slice(0, MAX_API_ERROR_CATEGORY_CHARACTERS)
   }
-  return typeof payload.code === 'string' ? payload.code : undefined
+  return typeof payload.code === 'string'
+    ? payload.code.slice(0, MAX_API_ERROR_CATEGORY_CHARACTERS)
+    : undefined
+}
+
+async function readApiJsonWithinLimit(response: Response): Promise<unknown> {
+  const contentLength = Number(response.headers.get('content-length') ?? 0)
+  if (Number.isFinite(contentLength) && contentLength > MAX_API_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => undefined)
+    throw new Error('mobile_api_response_too_large')
+  }
+
+  if (!response.body) {
+    const text = await response.text()
+    if (new TextEncoder().encode(text).byteLength > MAX_API_RESPONSE_BYTES) {
+      throw new Error('mobile_api_response_too_large')
+    }
+    return JSON.parse(text) as unknown
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
+      }
+      totalBytes += value.byteLength
+      if (totalBytes > MAX_API_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined)
+        throw new Error('mobile_api_response_too_large')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const bytes = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown
 }
 
 function isRetryableApiError(status: number, category: string | undefined): boolean {

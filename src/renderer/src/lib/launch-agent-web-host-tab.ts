@@ -10,6 +10,7 @@ import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { Tab } from '../../../shared/tab-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentPromptDelivery } from '../../../shared/agent-session-host-authority'
+import type { AgentExplicitLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import { translate } from '@/i18n/i18n'
 import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
 
@@ -44,6 +45,7 @@ export function launchAgentInWebHostTab(args: {
   pastePromptAfterReady: string | null
   submitPastedPrompt: boolean
   agentArgs?: string | null
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
   viewMode?: Tab['viewMode']
   onPromptDelivered?: () => void
 }): Promise<{ delivered: boolean; failureNotified: boolean }> {
@@ -59,6 +61,7 @@ export function launchAgentInWebHostTab(args: {
     pastePromptAfterReady,
     submitPastedPrompt,
     agentArgs,
+    agentPermissionMode,
     viewMode,
     onPromptDelivered
   } = args
@@ -75,7 +78,7 @@ export function launchAgentInWebHostTab(args: {
     ...(cwd?.trim() ? { cwd } : {}),
     ...(viewMode ? { viewMode } : {}),
     agentSessionKind: 'fresh',
-    ...(hasPrompt
+    ...(hasPrompt || agentPermissionMode
       ? {
           launchAgent: agent,
           command: startupPlan.launchCommand,
@@ -91,6 +94,7 @@ export function launchAgentInWebHostTab(args: {
       ? { promptDelivery: structuredPromptDelivery }
       : {}),
     ...(agentArgs !== undefined ? { agentArgs } : {}),
+    ...(agentPermissionMode ? { agentPermissionMode } : {}),
     ...(launchPreferences ? { launchPreferences } : {})
   } as const
 

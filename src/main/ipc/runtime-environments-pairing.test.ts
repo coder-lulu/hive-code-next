@@ -71,7 +71,7 @@ import { channelHandlerLookup, pairingCode } from './runtime-environments-ipc-te
 
 const handler = channelHandlerLookup(handleMock)
 
-function runtimeStatus(): Record<string, unknown> {
+function runtimeStatus(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     runtimeId: 'runtime-a',
     rendererGraphEpoch: 1,
@@ -79,7 +79,8 @@ function runtimeStatus(): Record<string, unknown> {
     authoritativeWindowId: 1,
     liveTabCount: 0,
     liveLeafCount: 0,
-    protocolVersion: 999_999
+    protocolVersion: 999_999,
+    ...overrides
   }
 }
 
@@ -261,6 +262,92 @@ describe('registerRuntimeEnvironmentHandlers', () => {
       ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES
     )
     expect(environmentStore.listEnvironments(userDataPath)).toHaveLength(1)
+  })
+
+  it('persists only the Runtime record id proven by authenticated status', async () => {
+    registerRuntimeEnvironmentHandlers(store as never)
+    const runtimeRecordId = '123e4567-e89b-42d3-a456-426614174000'
+    sendRemoteRuntimeRequestMock.mockResolvedValue({
+      id: 'status',
+      ok: true,
+      result: runtimeStatus({ runtimeRecordId }),
+      _meta: { runtimeId: 'runtime-a' }
+    })
+    const verifyAndAdd = handler<
+      { name: string; pairingCode: string },
+      { ok: boolean; environment?: { runtimeRecordId?: string } }
+    >('runtimeEnvironments:verifyAndAddFromPairingCode')
+
+    await expect(
+      verifyAndAdd(null, {
+        name: 'desk',
+        pairingCode: pairingCode('ws://100.76.32.125:6768')
+      })
+    ).resolves.toMatchObject({ ok: true, environment: { runtimeRecordId } })
+    expect(environmentStore.listEnvironments(userDataPath)[0]).toMatchObject({ runtimeRecordId })
+  })
+
+  it('does not trust a Runtime record id carried only by an unverified pairing offer', async () => {
+    registerRuntimeEnvironmentHandlers(store as never)
+    const runtimeRecordId = '123e4567-e89b-42d3-a456-426614174000'
+    const add = handler<
+      { name: string; pairingCode: string },
+      { environment: { runtimeRecordId?: string } }
+    >('runtimeEnvironments:addFromPairingCode')
+
+    const result = await add(null, {
+      name: 'desk',
+      pairingCode: pairingCode('ws://100.76.32.125:6768', runtimeRecordId)
+    })
+
+    expect(result.environment).not.toHaveProperty('runtimeRecordId')
+    expect(environmentStore.listEnvironments(userDataPath)[0]).not.toHaveProperty('runtimeRecordId')
+  })
+
+  it('rejects a pairing offer whose Runtime record id disagrees with authenticated status', async () => {
+    registerRuntimeEnvironmentHandlers(store as never)
+    sendRemoteRuntimeRequestMock.mockResolvedValue({
+      id: 'status',
+      ok: true,
+      result: runtimeStatus({
+        runtimeRecordId: '223e4567-e89b-42d3-a456-426614174000'
+      }),
+      _meta: { runtimeId: 'runtime-a' }
+    })
+    const verifyAndAdd = handler<
+      { name: string; pairingCode: string },
+      { ok: boolean; kind?: string }
+    >('runtimeEnvironments:verifyAndAddFromPairingCode')
+
+    await expect(
+      verifyAndAdd(null, {
+        name: 'desk',
+        pairingCode: pairingCode('ws://100.76.32.125:6768', '123e4567-e89b-42d3-a456-426614174000')
+      })
+    ).resolves.toMatchObject({ ok: false, kind: 'host-identity-mismatch' })
+    expect(environmentStore.listEnvironments(userDataPath)).toEqual([])
+  })
+
+  it('rejects a malformed Runtime record id in authenticated status', async () => {
+    registerRuntimeEnvironmentHandlers(store as never)
+    sendRemoteRuntimeRequestMock.mockResolvedValue({
+      id: 'status',
+      ok: true,
+      result: runtimeStatus({ runtimeRecordId: 'NOT-A-CANONICAL-UUID' }),
+      _meta: { runtimeId: 'runtime-a' }
+    })
+    const verifyAndAdd = handler<
+      { name: string; pairingCode: string },
+      { ok: boolean; kind?: string }
+    >('runtimeEnvironments:verifyAndAddFromPairingCode')
+
+    await expect(
+      verifyAndAdd(null, {
+        name: 'desk',
+        pairingCode: pairingCode('ws://100.76.32.125:6768')
+      })
+    ).resolves.toMatchObject({ ok: false, kind: 'connection-interrupted' })
+    expect(environmentStore.listEnvironments(userDataPath)).toEqual([])
   })
 
   it('does not mark non-loopback hosts as SSH-tunnel dependent', async () => {

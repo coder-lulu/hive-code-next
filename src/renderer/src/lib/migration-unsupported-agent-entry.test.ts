@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { migrationUnsupportedToAgentStatusEntry } from './migration-unsupported-agent-entry'
 import type { MigrationUnsupportedPtyEntry } from '../../../shared/agent-status-types'
 
@@ -17,6 +18,7 @@ describe('migrationUnsupportedToAgentStatusEntry', () => {
 
     expect(second).toBe(first)
     expect(first?.updatedAt).toBe(Number.MAX_SAFE_INTEGER)
+    expect(first?.lastAssistantMessage).toContain(APP_DISPLAY_NAME)
   })
 
   it('caches null for records that cannot be projected to a pane key', () => {
