@@ -487,7 +487,9 @@ function getAccountRuntimeConnectionHelp(state: RuntimeServerConnectionState): s
         'auto.components.settings.RuntimeEnvironmentsPane.accountRuntimeOffline',
         'Offline in HiveCloud.'
       )
-    default:
+    case 'checking':
+    case 'connected':
+    case 'disconnected':
       return null
   }
 }

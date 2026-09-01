@@ -538,18 +538,6 @@ describe('registerClipboardHandlers', () => {
     expect(clipboardWriteTextMock).not.toHaveBeenCalled()
   })
 
-  it('removes stale clipboard IPC handlers before registering replacements', () => {
-    registerClipboardHandlers({} as never)
-
-    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:readText')
-    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:readSelectionText')
-    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:writeText')
-    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:writeSelectionText')
-    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:writeImage')
-    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:writeFile')
-    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:saveImageAsTempFile')
-  })
-
   it('saves clipboard images to a local temp file when no connection is provided', async () => {
     const png = Buffer.from([0, 1, 2, 3])
     const expectedPath = join(

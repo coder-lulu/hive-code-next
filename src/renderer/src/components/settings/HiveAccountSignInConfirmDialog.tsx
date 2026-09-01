@@ -11,9 +11,9 @@ import { PRODUCT_LOGO_URL } from '@/product-brand'
 import type {
   HiveAccountLoginProvider,
   HiveAccountLoginProviderId,
+  HiveAccountSmsChallenge,
   HiveAccountSignInOptions
 } from '../../../../shared/hive-account'
-import type { HiveAccountSmsChallenge } from '../../../../shared/hive-account'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -443,10 +443,7 @@ export function HiveAccountSignInConfirmDialog({
                             }
                           : {
                               iconUrl: qqIconUrl,
-                              label: translate(
-                                'components.hiveAccountSignIn.qq',
-                                'Sign in with QQ'
-                              )
+                              label: translate('components.hiveAccountSignIn.qq', 'Sign in with QQ')
                             }
                     return (
                       <button

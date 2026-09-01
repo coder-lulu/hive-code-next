@@ -98,7 +98,9 @@ describe('HiveCode cloud auth config', () => {
     )
 
     expect(result.configured).toBe(true)
-    if (result.configured) expect(result.config.apiBaseUrl).toBe('https://api.hive.test')
+    if (result.configured) {
+      expect(result.config.apiBaseUrl).toBe('https://api.hive.test')
+    }
   })
 
   it('allows Cloud auth when API and client are configured without Relay', () => {

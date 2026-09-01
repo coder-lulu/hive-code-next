@@ -160,7 +160,7 @@ export function buildOrphanTerminalCleanupPatch(
   }
   const nextCacheTimerByKey = { ...state.cacheTimerByKey }
   const nextUnreadAgentCompletionCountByPane = {
-    ...(state.unreadAgentCompletionCountByPane ?? {})
+    ...state.unreadAgentCompletionCountByPane
   }
 
   // Why: orphan runtime terminals no longer have a backing unified tab or live

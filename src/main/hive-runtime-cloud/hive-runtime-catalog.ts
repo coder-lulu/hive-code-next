@@ -77,32 +77,50 @@ export function resolveHiveRuntimeCatalogEntry(
   pendingDisplayNames: ReadonlyMap<string, string | null>,
   selector: string
 ): PublicKnownRuntimeEnvironment {
-  const catalog = mergeHiveAccountRuntimeCatalog(
-    localEnvironments,
-    accountRuntimes,
-    pendingDisplayNames
-  )
-  const byId = catalog.find((entry) => entry.id === selector)
-  if (byId) {
-    return byId
+  const localById = localEnvironments.find((entry) => entry.id === selector)
+  if (localById) {
+    return resolveLocalCatalogEntry(localById, accountRuntimes, pendingDisplayNames)
   }
-  const byRuntimeRecordId = catalog.find(
-    (entry) => entry.runtimeRecordId === selector && entry.accountClaim
+  const accountRuntimeRecordId = runtimeRecordIdFromAccountEnvironmentId(selector) ?? selector
+  const accountRuntime = accountRuntimes.find(
+    (runtime) => runtime.runtimeRecordId === accountRuntimeRecordId
   )
-  if (byRuntimeRecordId) {
-    return byRuntimeRecordId
+  if (accountRuntime) {
+    const linkedLocal = localEnvironments.findLast(
+      (entry) => entry.runtimeRecordId === accountRuntime.runtimeRecordId
+    )
+    return mergeHiveAccountRuntimeCatalog(
+      linkedLocal ? [linkedLocal] : [],
+      [accountRuntime],
+      pendingDisplayNames
+    )[0]!
   }
   // Local pairing names remain a compatibility selector. Resolve them from
   // the persisted local source, never from the merged presentation name,
   // because cloud display names are mutable labels rather than identity.
   const localMatches = localEnvironments.filter((entry) => entry.name === selector)
   if (localMatches.length === 1) {
-    return catalog.find((entry) => entry.id === localMatches[0]!.id)!
+    return resolveLocalCatalogEntry(localMatches[0]!, accountRuntimes, pendingDisplayNames)
   }
   if (localMatches.length > 1) {
     throw new Error(`Runtime environment name "${selector}" is ambiguous; use the environment id.`)
   }
   throw new Error(`Unknown Runtime environment: ${selector}`)
+}
+
+function resolveLocalCatalogEntry(
+  local: PublicKnownRuntimeEnvironment,
+  accountRuntimes: readonly HiveAccountRuntimeDirectoryEntry[],
+  pendingDisplayNames: ReadonlyMap<string, string | null>
+): PublicKnownRuntimeEnvironment {
+  const accountRuntime = local.runtimeRecordId
+    ? accountRuntimes.find((runtime) => runtime.runtimeRecordId === local.runtimeRecordId)
+    : undefined
+  return mergeHiveAccountRuntimeCatalog(
+    [local],
+    accountRuntime ? [accountRuntime] : [],
+    pendingDisplayNames
+  )[0]!
 }
 
 function accountOnlyEnvironment(

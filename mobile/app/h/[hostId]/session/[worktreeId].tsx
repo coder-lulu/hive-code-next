@@ -244,6 +244,7 @@ import { useMobileNativeChatSendError } from '../../../../src/session/use-mobile
 import { getMobileTerminalActionSheetActions } from '../../../../src/session/mobile-terminal-action-sheet-actions'
 import * as nativeChatTerminalStream from '../../../../src/session/mobile-native-chat-terminal-stream'
 import { mobileNativeChatScopeKey } from '../../../../src/session/mobile-native-chat-scope-key'
+import { createEffectTimerRegistry } from '../../../../src/session/session-effect-timer-registry'
 import {
   createTerminalPrunePredicate,
   pruneTerminalKeyboardMetrics,
@@ -731,28 +732,6 @@ function FileReader({
   }
 
   return renderSourceText(doc.content)
-}
-
-function createEffectTimerRegistry() {
-  let disposed = false
-  const timers = new Set<ReturnType<typeof setTimeout>>()
-
-  return {
-    get disposed() {
-      return disposed
-    },
-    schedule(callback: () => void, delayMs: number) {
-      if (disposed) {
-        return
-      }
-      timers.add(setTimeout(callback, delayMs))
-    },
-    dispose() {
-      disposed = true
-      timers.forEach(clearTimeout)
-      timers.clear()
-    }
-  }
 }
 
 export default function SessionScreen() {

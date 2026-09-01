@@ -1,7 +1,7 @@
 import type { HiveAccountRuntimeDirectoryEntry } from '../../shared/hive-runtime-cloud'
-import type { HiveRuntimeCloudClient } from './hive-runtime-cloud-client'
 import {
   HiveRuntimeCloudRequestError,
+  type HiveRuntimeCloudClient,
   type HiveRuntimeCloudTransportError
 } from './hive-runtime-cloud-client'
 

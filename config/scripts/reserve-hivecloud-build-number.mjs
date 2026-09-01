@@ -7,7 +7,9 @@ const MAX_RESPONSE_BYTES = 1024 * 1024
 
 function required(value, name) {
   const normalized = String(value ?? '').trim()
-  if (!normalized) throw new Error(`${name} is required`)
+  if (!normalized) {
+    throw new Error(`${name} is required`)
+  }
   return normalized
 }
 
@@ -30,7 +32,9 @@ async function responseText(response) {
   try {
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        break
+      }
       total += value.byteLength
       if (total > MAX_RESPONSE_BYTES) {
         await reader.cancel()

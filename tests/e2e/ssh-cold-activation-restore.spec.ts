@@ -18,10 +18,6 @@ import {
   type DockerSshRelayTarget
 } from './helpers/docker-ssh-relay-target'
 import { connectDockerSshRelayTarget } from './helpers/docker-ssh-relay-connection'
-import {
-  createRemoteTerminalTab,
-  readRemoteTerminalTabs
-} from './helpers/docker-ssh-relay-terminal-tabs'
 import { createRestartSession } from './helpers/orca-restart'
 
 const RUN_DOCKER_SSH = process.env.ORCA_E2E_SSH_DOCKER === '1'

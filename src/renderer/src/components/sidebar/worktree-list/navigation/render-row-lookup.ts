@@ -1,13 +1,15 @@
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
-import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  getWorktreeExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import { getFolderWorkspaceSidebarRowKey, type RenderRow } from '../listing/render-row'
 import type { PinnedWorktreeDisplayPolicy } from '../grouping/row-types'
 import { isPinnedWorktreeRow, type WorktreeItemRow } from '../listing/renderable-rows'
 import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host'
 
 export function getRenderRowSidebarKey(
   row: RenderRow,

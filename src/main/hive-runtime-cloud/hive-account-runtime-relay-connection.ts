@@ -4,8 +4,7 @@ import {
   serializeRemoteRuntimeRpcRequest
 } from '../../shared/remote-runtime-memory-limits'
 import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
-import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
-import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
+import type * as RuntimeRpc from '../../shared/runtime-rpc-envelope'
 import {
   createWsOutboundBackpressureQueue,
   type WsOutboundBackpressureQueue
@@ -101,8 +100,8 @@ export class HiveAccountRuntimeRelayConnection {
     method: string,
     params: unknown,
     timeoutMs: number,
-    envelope?: RuntimeOrchestrationEnvelope
-  ): Promise<RuntimeRpcResponse<TResult>> {
+    envelope?: RuntimeRpc.RuntimeOrchestrationEnvelope
+  ): Promise<RuntimeRpc.RuntimeRpcResponse<TResult>> {
     if (this.state !== 'ACTIVE') {
       return Promise.reject(relayConnectionError('Cloud Runtime E2EE session is not ready.'))
     }
@@ -257,7 +256,7 @@ export class HiveAccountRuntimeRelayConnection {
     id: string,
     method: string,
     params: unknown,
-    envelope?: RuntimeOrchestrationEnvelope
+    envelope?: RuntimeRpc.RuntimeOrchestrationEnvelope
   ): string {
     return serializeRemoteRuntimeRpcRequest({
       requestId: id,

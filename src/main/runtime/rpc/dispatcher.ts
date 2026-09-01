@@ -25,8 +25,8 @@ import { mapDispatcherError } from './dispatcher-error-response'
 import { parseRpcRequestParams } from './dispatcher-request-parsing'
 import { routeDispatcherClientHostedBrowserRpc } from './dispatcher-client-browser-routing'
 import { needsLocalCallerFingerprint } from './dispatcher-caller-fingerprint'
-import { createDispatcherStreamingFeatureEmitter } from './dispatcher-streaming-feature-emitter'
 import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runtime-cloud-control'
+import { dispatchStreamingRpc } from './dispatcher-streaming'
 
 export type DispatcherOptions = {
   runtime: OrcaRuntimeService
@@ -166,161 +166,23 @@ export class RpcDispatcher {
     }
   }
 
-  // Why: streaming dispatch sends multiple responses through the reply callback
-  // instead of returning a single Promise. This enables terminal.subscribe and
-  // other subscription-style methods that push data over time.
   async dispatchStreaming(
     request: RpcRequest,
     reply: (response: string) => void,
     options?: RpcDispatchStreamingOptions
   ): Promise<void> {
-    const meta = this.meta()
-    const method = this.registry.get(request.method)
-    if (!method) {
-      reply(
-        JSON.stringify(
-          errorResponse(request.id, meta, 'method_not_found', `Unknown method: ${request.method}`)
-        )
-      )
-      return
-    }
-
-    const migrationFence = orchestrationMigrationFence(request, meta)
-    if (migrationFence) {
-      reply(JSON.stringify(migrationFence))
-      return
-    }
-
-    const parsedParams = parseRpcRequestParams(request, method, meta)
-    if (parsedParams.error) {
-      reply(JSON.stringify(parsedParams.error))
-      return
-    }
-
-    if (!isStreamingMethod(method)) {
-      try {
-        const clientHostedBrowser = await routeDispatcherClientHostedBrowserRpc(
-          this.runtime,
-          request.method,
-          parsedParams.value
-        )
-        if (clientHostedBrowser.handled) {
-          recordRuntimeFeatureInteraction(
-            this.runtime,
-            request.method,
-            clientHostedBrowser.result,
-            undefined,
-            request.params
-          )
-          reply(JSON.stringify(successResponse(request.id, meta, clientHostedBrowser.result)))
-          return
-        }
-        const compatibility = await this.legacyOrchestration.tryHandle(
-          request,
-          parsedParams.value,
-          options?.signal
-        )
-        if (compatibility.handled) {
-          reply(JSON.stringify(successResponse(request.id, meta, compatibility.result)))
-          return
-        }
-        const effectiveParams = compatibility.params ?? parsedParams.value
-        const legacyCoordinator = this.legacyOrchestration.createCoordinatorInvocation(
-          request,
-          compatibility.legacyCoordinatorAuthority
-        )
-        const authenticatedCallerFingerprint =
-          options?.authenticatedCallerFingerprint ??
-          (needsLocalCallerFingerprint(request, effectiveParams)
-            ? this.orchestrationMutations.getLocalAuthenticatedCallerFingerprint()
-            : undefined)
-        const invoke = (mutation?: DurableMutationInvocation) => {
-          const legacyCoordinatorRunId = legacyCoordinator?.revalidate()
-          return method.handler(effectiveParams, {
-            runtime: this.runtime,
-            hiveRuntimeCloud: this.hiveRuntimeCloud,
-            signal: options?.signal,
-            requestId: request.id,
-            connectionId: options?.connectionId,
-            clientId: options?.clientId,
-            pairedDeviceId: options?.pairedDeviceId,
-            clientKind: options?.clientKind,
-            clientCapabilities: options?.clientCapabilities,
-            orchestrationCapability: request.orchestrationCapability,
-            authenticatedCallerFingerprint:
-              mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint,
-            recordMutationReceipt: mutation?.recordReceipt,
-            orchestrationMutation: mutation?.identity,
-            pairing: options?.pairing,
-            sendBinary: options?.sendBinary,
-            registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
-            registerBinaryMessageHandler: options?.registerBinaryMessageHandler,
-            legacyCoordinatorRunId,
-            legacyCoordinatorAuthority: legacyCoordinator?.authority,
-            revalidateLegacyCoordinator: legacyCoordinator?.revalidate,
-            orchestrationCompatibilityCallerAuthority:
-              compatibility.orchestrationCompatibilityCallerAuthority,
-            orchestrationCompatibilityEvidence: request.orchestrationCompatibilityEvidence
-          })
-        }
-        const result = await this.orchestrationMutations.run(
-          request,
-          effectiveParams,
-          invoke,
-          legacyCoordinator?.mutationCallerFingerprint ?? authenticatedCallerFingerprint
-        )
-        recordRuntimeFeatureInteraction(
-          this.runtime,
-          request.method,
-          result,
-          undefined,
-          request.params
-        )
-        reply(JSON.stringify(successResponse(request.id, meta, result)))
-      } catch (error) {
-        reply(JSON.stringify(mapDispatcherError(request, meta, error)))
-      }
-      return
-    }
-
-    const { emit, recordedFeatureInteractions } = createDispatcherStreamingFeatureEmitter(
-      this.runtime,
+    await dispatchStreamingRpc(
+      {
+        runtime: this.runtime,
+        registry: this.registry,
+        orchestrationMutations: this.orchestrationMutations,
+        legacyOrchestration: this.legacyOrchestration,
+        hiveRuntimeCloud: this.hiveRuntimeCloud
+      },
       request,
-      meta,
-      reply
+      reply,
+      options
     )
-
-    try {
-      const result = await method.handler(
-        parsedParams.value,
-        {
-          runtime: this.runtime,
-          hiveRuntimeCloud: this.hiveRuntimeCloud,
-          signal: options?.signal,
-          requestId: request.id,
-          connectionId: options?.connectionId,
-          clientId: options?.clientId,
-          pairedDeviceId: options?.pairedDeviceId,
-          clientKind: options?.clientKind,
-          clientCapabilities: options?.clientCapabilities,
-          orchestrationCapability: request.orchestrationCapability,
-          pairing: options?.pairing,
-          sendBinary: options?.sendBinary,
-          registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
-          registerBinaryMessageHandler: options?.registerBinaryMessageHandler
-        },
-        emit
-      )
-      recordRuntimeFeatureInteraction(
-        this.runtime,
-        request.method,
-        result,
-        recordedFeatureInteractions,
-        request.params
-      )
-    } catch (error) {
-      reply(JSON.stringify(mapDispatcherError(request, meta, error)))
-    }
   }
 
   private meta(): RpcEnvelopeMeta {
