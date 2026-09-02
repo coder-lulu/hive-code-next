@@ -409,6 +409,15 @@
       "regressionTests": ["documentation governance", "brand boundary"]
     },
     {
+      "upstreamSha": "212c0e42a6518bc558ba75a61f8b76af64b894d2",
+      "type": "UI",
+      "applied": "已等价实现",
+      "dependencies": [],
+      "conflictReason": "上游仅更新 Orca 下载量徽章（33m 至 34m）；HiveCode 没有批准公开制品链接，且产品文档已省略该徽章",
+      "adaptation": "保留 HiveCode 不展示上游下载量或发布入口的产品边界，不引入 Orca 制品暗示",
+      "regressionTests": ["documentation governance", "brand boundary"]
+    },
+    {
       "upstreamSha": "808fc3563dbfb5d4a369d1d874cf2c94e86236bb",
       "type": "UI",
       "applied": "需要产品决定",
