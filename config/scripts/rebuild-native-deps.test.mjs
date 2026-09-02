@@ -14,6 +14,31 @@ import {
 } from './rebuild-native-deps-test-fixtures.mjs'
 
 describe('rebuild-native-deps Electron install fallback', () => {
+  it('forwards an explicit Electron header mirror to the rebuild API', () => {
+    const projectDir = mkTempProject()
+    const logPath = join(projectDir, 'rebuild-options.jsonl')
+    const headerURL = 'https://artifacts.electronjs.org/headers/dist'
+
+    try {
+      writeFakeUsableElectronPackage(projectDir, { platform: 'linux' })
+      writeFakeElectronRebuild(projectDir, { logPathEnv: 'REBUILD_OPTIONS_LOG' })
+
+      const result = runRebuildScript(
+        projectDir,
+        {
+          ELECTRON_REBUILD_DIST_URL: headerURL,
+          REBUILD_OPTIONS_LOG: logPath
+        },
+        ['--platform=linux', '--force']
+      )
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(JSON.parse(readFileSync(logPath, 'utf8')).headerURL).toBe(headerURL)
+    } finally {
+      removeTreeSync(projectDir)
+    }
+  })
+
   it('continues non-strict postinstall when Electron retry download fails', () => {
     const projectDir = mkTempProject()
 

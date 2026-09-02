@@ -7,6 +7,8 @@ import {
 } from './preload-runtime-support'
 import { appApi } from './api/app-bridge'
 import { orcaProfilesApi } from './api/orca-profiles-bridge'
+import { hiveAccountApi } from './api/hive-account-bridge'
+import { hiveRuntimeCloudApi } from './api/hive-runtime-cloud-bridge'
 import { platformApi } from './api/platform-bridge'
 import { wslApi } from './api/wsl-bridge'
 import { pwshApi } from './api/pwsh-bridge'
@@ -100,6 +102,8 @@ const telemetryGetConsentStateApi: PreloadApi['telemetryGetConsentState'] = () =
 const api = {
   app: appApi,
   orcaProfiles: orcaProfilesApi,
+  hiveAccount: hiveAccountApi,
+  hiveRuntimeCloud: hiveRuntimeCloudApi,
   platform: platformApi,
   wsl: wslApi,
   pwsh: pwshApi,
@@ -181,7 +185,7 @@ const api = {
   mobile: mobileApi,
   agentStatus: agentStatusApi,
   speech: speechApi
-}
+} satisfies Pick<PreloadApi, 'hiveAccount' | 'hiveRuntimeCloud'> & Record<string, unknown>
 
 if (process.contextIsolated) {
   try {

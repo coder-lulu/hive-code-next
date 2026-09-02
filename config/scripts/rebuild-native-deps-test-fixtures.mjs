@@ -164,6 +164,7 @@ export async function rebuild(options) {
       arch: options.arch,
       electronVersion: options.electronVersion,
       force: options.force,
+      headerURL: options.headerURL,
       ignoreModules: options.ignoreModules,
       onlyModules: options.onlyModules,
       platform: options.platform

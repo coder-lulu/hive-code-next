@@ -56,6 +56,7 @@ const electronPackageDir = resolve(projectDir, 'node_modules/electron')
 const electronVersion = JSON.parse(
   readFileSync(resolve(electronPackageDir, 'package.json'), 'utf8')
 ).version
+const electronHeaderURL = process.env.ELECTRON_REBUILD_DIST_URL?.trim() || undefined
 
 const ignoreModules = ['cpu-features']
 const NODE_PTY_CONPTY_RUNTIME_FILES = ['conpty.dll', 'OpenConsole.exe']
@@ -151,6 +152,7 @@ try {
     electronVersion,
     platform: rebuildPlatform,
     arch: rebuildArch,
+    headerURL: electronHeaderURL,
     ignoreModules,
     onlyModules: modulesToRebuild,
     // Why: without force, @electron/rebuild skips modules it considers
