@@ -35,6 +35,7 @@ import { InFlightPromiseDedupe, stableInFlightKey } from '../../shared/in-flight
 import { gitExecMutatesRepository } from '../../shared/git-exec-mutation'
 import { GitStatusReadLeaseOwner } from '../git/git-status-read-lease-owner'
 import { GitUpstreamStatusReadOwner } from '../git/git-upstream-status-read-owner'
+import type { GitAdmissionTier } from '../git/command-runner/git-exec-options'
 
 type NonInteractiveExecQueueEntry = {
   started: boolean
@@ -135,7 +136,9 @@ export class SshGitProvider implements IGitProvider {
     options?: GitProviderStatusOptions
   ): Promise<GitStatusResult> {
     this.gitDiffReadDedupe.clear()
+    const admissionTierArgs = options?.admissionTier ? { admissionTier: options.admissionTier } : {}
     const includeIgnoredArgs = options?.includeIgnored ? { includeIgnored: true } : {}
+    const lineStatsArgs = options?.includeLineStats === false ? { includeLineStats: false } : {}
     const upstreamCacheBypassArgs = options?.bypassEffectiveUpstreamNegativeCache
       ? { bypassEffectiveUpstreamNegativeCache: true }
       : {}
@@ -146,14 +149,18 @@ export class SshGitProvider implements IGitProvider {
         : { branchLineTotalMergeBase: options.branchLineTotalMergeBase }
     const request = {
       worktreePath,
+      ...admissionTierArgs,
       ...includeIgnoredArgs,
+      ...lineStatsArgs,
       ...upstreamCacheBypassArgs,
       ...lineStatsReuseArgs,
       ...branchLineTotalArgs
     }
     const key = stableInFlightKey([
       worktreePath,
+      options?.admissionTier ?? 'status',
       options?.includeIgnored === true,
+      options?.includeLineStats !== false,
       options?.bypassEffectiveUpstreamNegativeCache === true,
       options?.reuseLineStats === true,
       // Why: the result carries a total only for callers who asked, and only for
@@ -503,10 +510,15 @@ export class SshGitProvider implements IGitProvider {
     }
   }
 
-  async getBranchCompare(worktreePath: string, baseRef: string): Promise<GitBranchCompareResult> {
+  async getBranchCompare(
+    worktreePath: string,
+    baseRef: string,
+    options: { admissionTier?: GitAdmissionTier } = {}
+  ): Promise<GitBranchCompareResult> {
     return (await this.mux.request('git.branchCompare', {
       worktreePath,
-      baseRef
+      baseRef,
+      ...(options.admissionTier ? { admissionTier: options.admissionTier } : {})
     })) as GitBranchCompareResult
   }
 

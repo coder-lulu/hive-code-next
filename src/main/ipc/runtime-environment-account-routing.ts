@@ -56,11 +56,17 @@ function pendingDisplayNameMap(
 export async function getEnvironmentStatusWithCloudFallback(
   userDataPath: string,
   environment: PublicKnownRuntimeEnvironment,
-  timeoutMs?: number
+  timeoutMs?: number,
+  options?: { observeOnly?: true }
 ): Promise<RuntimeRpcResponse<RuntimeStatus>> {
   let localResponse: RuntimeRpcResponse<RuntimeStatus> | null = null
   if (hasLocalPairing(environment)) {
-    localResponse = await getRuntimeEnvironmentStatus(userDataPath, environment.id, timeoutMs)
+    localResponse = await getRuntimeEnvironmentStatus(
+      userDataPath,
+      environment.id,
+      timeoutMs,
+      options
+    )
     if (
       localResponse.ok ||
       !environment.accountClaim ||

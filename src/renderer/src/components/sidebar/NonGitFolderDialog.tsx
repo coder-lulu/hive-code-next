@@ -41,6 +41,7 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
           ? null
           : undefined
       : undefined
+  const displayName = typeof modalData.displayName === 'string' ? modalData.displayName.trim() : ''
   const runtimeEnvironmentName =
     runtimeEnvironmentId &&
     (runtimeEnvironments.find((environment) => environment.id === runtimeEnvironmentId)?.name ||
@@ -69,7 +70,8 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
           const result = await window.api.repos.addRemote({
             connectionId,
             remotePath: folderPath,
-            kind: 'folder'
+            kind: 'folder',
+            ...(displayName ? { displayName } : {})
           })
           if ('error' in result) {
             throw new Error(result.error)
@@ -132,11 +134,20 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
     } else if (folderPath) {
       void addNonGitFolder(folderPath, {
         runtimeEnvironmentId: runtimeEnvironmentId || null,
-        ...(projectGroupId !== undefined ? { projectGroupId } : {})
+        ...(projectGroupId !== undefined ? { projectGroupId } : {}),
+        ...(displayName ? { displayName } : {})
       })
     }
     closeModal()
-  }, [addNonGitFolder, closeModal, folderPath, connectionId, projectGroupId, runtimeEnvironmentId])
+  }, [
+    addNonGitFolder,
+    closeModal,
+    connectionId,
+    displayName,
+    folderPath,
+    projectGroupId,
+    runtimeEnvironmentId
+  ])
 
   const handleOpenChange = useCallback(
     (open: boolean) => {

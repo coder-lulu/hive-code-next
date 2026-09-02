@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const {
   appMock,
@@ -35,6 +36,8 @@ vi.mock('./linux-root-package-install-policy', () =>
   moduleFactories.linuxRootPackageInstallPolicy()
 )
 
+warmUpdaterModule()
+
 describe('updater', () => {
   beforeEach(() => {
     resetUpdaterMocks()
@@ -45,7 +48,7 @@ describe('updater', () => {
     isMock.dev = true
     const mainWindow = { webContents: { send: vi.fn() } }
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     setupAutoUpdater(mainWindow as never)
 
@@ -60,7 +63,7 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const setLastUpdateCheckAt = vi.fn()
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     setupAutoUpdater(mainWindow as never, {
       getLastUpdateCheckAt: () => Date.now() - 25 * 60 * 60 * 1000,
@@ -78,7 +81,7 @@ describe('updater', () => {
     fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })
     shouldApplyNudgeMock.mockReturnValue(true)
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     setupAutoUpdater(mainWindow as never)
 
@@ -100,7 +103,7 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     const setLastUpdateCheckAt = vi.fn()
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     setupAutoUpdater(mainWindow as never, {
       getLastUpdateCheckAt: () => Date.now() - 23 * 60 * 60 * 1000,
@@ -125,7 +128,7 @@ describe('updater', () => {
 
     autoUpdaterMock.checkForUpdates.mockImplementation(() => new Promise(() => {}))
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     setupAutoUpdater(mainWindow as never, {
       getLastUpdateCheckAt: () => lastUpdateCheckAt
@@ -154,7 +157,7 @@ describe('updater', () => {
       return Promise.reject(new Error('net::ERR_FAILED'))
     })
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     setupAutoUpdater(mainWindow as never, {
       getLastUpdateCheckAt: () => lastUpdateCheckAt,
@@ -189,7 +192,7 @@ describe('updater', () => {
     const sendMock = vi.fn()
     const mainWindow = { webContents: { send: sendMock } }
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     setupAutoUpdater(mainWindow as never, {
       getLastUpdateCheckAt: () => null,
@@ -225,7 +228,7 @@ describe('updater', () => {
     const setLastUpdateCheckAt = vi.fn()
     const mainWindow = { webContents: { send: sendMock } }
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     // Why: a startup check also arms its own 24h timer, which would fire at the same boundary as the
     // reschedule under test; entering 23h in makes the startup timer fire the check itself, so only
@@ -268,7 +271,7 @@ describe('updater', () => {
   it('does not disable Windows Authenticode verification on win32', async () => {
     vi.stubGlobal('process', { ...process, platform: 'win32' })
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     const sendMock = vi.fn()
     const mainWindow = { webContents: { send: sendMock } }
@@ -281,7 +284,7 @@ describe('updater', () => {
   it('does not override verifyUpdateCodeSignature on non-Windows platforms', async () => {
     vi.stubGlobal('process', { ...process, platform: 'darwin' })
 
-    const { setupAutoUpdater } = await import('./updater')
+    const { setupAutoUpdater } = await loadUpdaterModule()
 
     const sendMock = vi.fn()
     const mainWindow = { webContents: { send: sendMock } }

@@ -218,7 +218,7 @@ export class WslCliInstaller {
     }
     if (status.state === 'conflict') {
       throw new Error(
-        `Refusing to replace non-${APP_DISPLAY_NAME} command at ${status.commandPath}.`
+        `Refusing to replace non-${APP_DISPLAY_NAME} command at ${status.commandPath}. Remove it and register again if it is no longer needed.`
       )
     }
 

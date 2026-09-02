@@ -8,6 +8,7 @@ import type * as RecoveryModule from './linux-package-update-recovery'
 import type { UpdateStatus } from '../shared/update-status-types'
 import { applyProductBranding } from '../shared/brand'
 import { PRE_COMMIT_INSTALL_FAILURE } from './updater-test-harness'
+import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const {
   browserWindowMock,
@@ -176,6 +177,8 @@ function probeRevalidation(): RevalidationProbe {
   }
 }
 
+warmUpdaterModule()
+
 describe('updater', () => {
   beforeEach(() => {
     resetUpdaterMocks()
@@ -250,7 +253,7 @@ describe('updater', () => {
         return Promise.resolve(undefined)
       })
       const send = vi.fn()
-      const updater = await import('./updater')
+      const updater = await loadUpdaterModule()
       updater.setupAutoUpdater({ webContents: { send } } as never, {
         getLastUpdateCheckAt: () => Date.now()
       })
@@ -279,7 +282,7 @@ describe('updater', () => {
         vi.resetModules()
         autoUpdaterMock.autoInstallOnAppQuit = true
         getLinuxRootPackageTypeMock.mockReturnValue(packageType)
-        const { setupAutoUpdater } = await import('./updater')
+        const { setupAutoUpdater } = await loadUpdaterModule()
 
         setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
           getLastUpdateCheckAt: () => Date.now(),
@@ -339,7 +342,7 @@ describe('updater', () => {
 
     it('keeps automatic install-on-quit disabled when no root-package marker is present', async () => {
       autoUpdaterMock.autoInstallOnAppQuit = false
-      const { setupAutoUpdater } = await import('./updater')
+      const { setupAutoUpdater } = await loadUpdaterModule()
 
       setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
         getLastUpdateCheckAt: () => Date.now(),
@@ -356,7 +359,7 @@ describe('updater', () => {
       ] as const) {
         vi.resetModules()
         autoUpdaterMock.autoInstallOnAppQuit = true
-        const { setupAutoUpdater } = await import('./updater')
+        const { setupAutoUpdater } = await loadUpdaterModule()
 
         setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
           getLastUpdateCheckAt: () => Date.now(),

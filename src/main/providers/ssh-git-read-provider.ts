@@ -58,7 +58,9 @@ export class SshGitReadProvider {
     this.gitDiffReadDedupe.clear()
     const request = {
       worktreePath,
+      ...(options?.admissionTier ? { admissionTier: options.admissionTier } : {}),
       ...(options?.includeIgnored ? { includeIgnored: true } : {}),
+      ...(options?.includeLineStats === false ? { includeLineStats: false } : {}),
       ...(options?.bypassEffectiveUpstreamNegativeCache
         ? { bypassEffectiveUpstreamNegativeCache: true }
         : {}),
@@ -69,7 +71,9 @@ export class SshGitReadProvider {
     }
     const key = stableInFlightKey([
       worktreePath,
+      options?.admissionTier ?? 'status',
       options?.includeIgnored === true,
+      options?.includeLineStats !== false,
       options?.bypassEffectiveUpstreamNegativeCache === true,
       options?.reuseLineStats === true,
       options?.branchLineTotalMergeBase ?? ''

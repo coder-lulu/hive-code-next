@@ -12,8 +12,7 @@ const RELOCALIZED_GENERIC_TERMS = [
   ['[Tt]erminals?', 'ターミナル', 'terminal'],
   ['[Cc]ommits?', 'コミット', 'commit'],
   ['[Rr]epos?', 'リポジトリ', 'repo'],
-  // Agent stays Latin in ja; this only normalizes the case.
-  ['[Aa]gents?', 'Agent', 'agent'],
+  ['[Aa]gents?', 'エージェント', 'agent'],
   ['[Ww]orktrees?', 'ワークツリー', 'worktree']
 ].flatMap(([latin, katakana, whenEnIncludes]) => [
   {
@@ -37,13 +36,6 @@ const RELOCALIZED_GENERIC_TERMS = [
 
 export const JA_PHRASE_FIXES = [
   ...RELOCALIZED_GENERIC_TERMS,
-  {
-    pattern: /エージェント/g,
-    replacement: 'Agent',
-    whenEnIncludes: 'agent',
-    // Skills filters and metadata are Japanese UI labels, not agent product prose.
-    skipKeyPrefixes: ['auto.components.skills.']
-  },
   { pattern: /解雇/g, replacement: '閉じる', whenEnIncludes: 'Dismiss' },
   { pattern: /却下/g, replacement: '閉じる', whenEnIncludes: 'Dismiss' },
   { pattern: /代理人/g, replacement: 'Agent', whenEnIncludes: 'agent' },

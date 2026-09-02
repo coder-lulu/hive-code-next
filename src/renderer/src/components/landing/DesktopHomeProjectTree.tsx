@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { useNow } from '@/hooks/use-now'
 import {
   formatHomeRelativeTime,
   type DesktopHomeProject,
@@ -102,10 +103,12 @@ function collectExpandedProjectKeys(
 function ProjectSessionRow({
   session,
   timeLabels,
+  now,
   onActivate
 }: {
   session: DesktopHomeSession
   timeLabels: HomeRelativeTimeLabels
+  now: number
   onActivate: (session: DesktopHomeSession) => void
 }): React.JSX.Element {
   return (
@@ -125,25 +128,37 @@ function ProjectSessionRow({
         </span>
       </span>
       <span className="desktop-home-tree-workspace-time">
-        {formatHomeRelativeTime(session.lastActivityAt, Date.now(), timeLabels)}
+        {formatHomeRelativeTime(session.lastActivityAt, now, timeLabels)}
       </span>
       <ChevronRight className="desktop-home-tree-row-chevron" aria-hidden />
     </button>
   )
 }
 
-function workspaceStatusIcon(status: DesktopHomeWorkspace['status']) {
+function WorkspaceStatusIcon({
+  status,
+  label
+}: {
+  status: DesktopHomeWorkspace['status']
+  label: string
+}): React.JSX.Element | null {
+  const className = cn(
+    'desktop-home-tree-status-icon',
+    status === 'error' && 'is-error',
+    status === 'offline' && 'is-offline',
+    status === 'running' && 'is-running'
+  )
   if (status === 'offline') {
-    return WifiOff
+    return <WifiOff className={className} aria-label={label} />
   }
   if (status === 'error') {
-    return CircleAlert
+    return <CircleAlert className={className} aria-label={label} />
   }
   if (status === 'completed') {
-    return CircleCheck
+    return <CircleCheck className={className} aria-label={label} />
   }
   if (status === 'running' || status === 'waiting') {
-    return Activity
+    return <Activity className={className} aria-label={label} />
   }
   return null
 }
@@ -162,14 +177,15 @@ function WorkspaceRow({
   workspace,
   active,
   timeLabels,
+  now,
   onActivate
 }: {
   workspace: DesktopHomeWorkspace
   active: boolean
   timeLabels: HomeRelativeTimeLabels
+  now: number
   onActivate: (workspace: DesktopHomeWorkspace) => void
 }): React.JSX.Element {
-  const StatusIcon = workspaceStatusIcon(workspace.status)
   return (
     <button
       type="button"
@@ -218,21 +234,14 @@ function WorkspaceRow({
               </span>
             </>
           ) : null}
-          {StatusIcon ? (
-            <StatusIcon
-              className={cn(
-                'desktop-home-tree-status-icon',
-                workspace.status === 'error' && 'is-error',
-                workspace.status === 'offline' && 'is-offline',
-                workspace.status === 'running' && 'is-running'
-              )}
-              aria-label={workspace.statusLabel ?? workspace.status}
-            />
-          ) : null}
+          <WorkspaceStatusIcon
+            status={workspace.status}
+            label={workspace.statusLabel ?? workspace.status}
+          />
         </span>
       </span>
       <span className="desktop-home-tree-workspace-time">
-        {formatHomeRelativeTime(workspace.lastActivityAt, Date.now(), timeLabels)}
+        {formatHomeRelativeTime(workspace.lastActivityAt, now, timeLabels)}
       </span>
       <ChevronRight className="desktop-home-tree-row-chevron" aria-hidden />
     </button>
@@ -246,6 +255,7 @@ function ProjectRow({
   onCreateWorkspace,
   activeWorkspaceIdentity,
   timeLabels,
+  now,
   onActivate,
   temporarySessions,
   pendingSession,
@@ -258,6 +268,7 @@ function ProjectRow({
   onCreateWorkspace: () => void
   activeWorkspaceIdentity: string | null
   timeLabels: HomeRelativeTimeLabels
+  now: number
   onActivate: (workspace: DesktopHomeWorkspace) => void
   temporarySessions: readonly DesktopHomeSession[]
   pendingSession: DesktopHomeSession | null
@@ -347,6 +358,7 @@ function ProjectRow({
               key={`${session.executionHostId ?? 'local'}|${session.id}`}
               session={session}
               timeLabels={timeLabels}
+              now={now}
               onActivate={onActivateSession}
             />
           ))}
@@ -357,6 +369,7 @@ function ProjectRow({
                 workspace={workspace}
                 active={workspace.identityKey === activeWorkspaceIdentity}
                 timeLabels={timeLabels}
+                now={now}
                 onActivate={onActivate}
               />
             ))
@@ -386,6 +399,7 @@ function GroupNode({
   onCreateWorkspace,
   onActivate,
   timeLabels,
+  now,
   temporarySessions,
   pendingSession,
   onActivateSession,
@@ -400,6 +414,7 @@ function GroupNode({
   onCreateWorkspace: (project: DesktopHomeProject | null, group?: DesktopHomeProjectGroup) => void
   onActivate: (workspace: DesktopHomeWorkspace) => void
   timeLabels: HomeRelativeTimeLabels
+  now: number
   temporarySessions: readonly DesktopHomeSession[]
   pendingSession: DesktopHomeSession | null
   onActivateSession: (session: DesktopHomeSession) => void
@@ -461,6 +476,7 @@ function GroupNode({
               workspace={workspace}
               active={workspace.identityKey === activeWorkspaceIdentity}
               timeLabels={timeLabels}
+              now={now}
               onActivate={onActivate}
             />
           ))}
@@ -473,6 +489,7 @@ function GroupNode({
               onCreateWorkspace={() => onCreateWorkspace(project)}
               activeWorkspaceIdentity={activeWorkspaceIdentity}
               timeLabels={timeLabels}
+              now={now}
               onActivate={onActivate}
               temporarySessions={temporarySessions}
               pendingSession={pendingSession}
@@ -492,6 +509,7 @@ function GroupNode({
               onCreateWorkspace={onCreateWorkspace}
               onActivate={onActivate}
               timeLabels={timeLabels}
+              now={now}
               temporarySessions={temporarySessions}
               pendingSession={pendingSession}
               onActivateSession={onActivateSession}
@@ -530,6 +548,7 @@ export default function DesktopHomeProjectTree({
   onSaveTemporarySession
 }: DesktopHomeProjectTreeProps): React.JSX.Element {
   useTranslation()
+  const now = useNow(60_000, groups.length > 0)
   const projectKeysWithWorkspaces = useMemo(() => collectExpandedProjectKeys(groups), [groups])
   const [expandedProjects, setExpandedProjects] = useState<ReadonlySet<string>>(
     () => new Set(projectKeysWithWorkspaces)
@@ -573,6 +592,7 @@ export default function DesktopHomeProjectTree({
           onCreateWorkspace={onCreateWorkspace}
           onActivate={onActivate}
           timeLabels={timeLabels}
+          now={now}
           temporarySessions={temporarySessions}
           pendingSession={pendingSession}
           onActivateSession={onActivateSession}

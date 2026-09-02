@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { CliStatusResult, RuntimeStatus } from '../../shared/runtime-types'
+import { runtimeHostConnectionState } from '../../shared/runtime-host-connection-state'
 import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
 import {
   isOrchestrationMutation,
@@ -208,6 +209,10 @@ export class RuntimeClient {
           runtime: {
             state: graphState === 'ready' ? 'ready' : 'graph_not_ready',
             reachable: true,
+            connectionState: runtimeHostConnectionState({
+              hasStatusEntry: true,
+              status: response.result
+            }),
             runtimeId: response.result.runtimeId,
             ...(response.result.appVersion ? { appVersion: response.result.appVersion } : {}),
             ...(response.result.remoteUpdateSupport

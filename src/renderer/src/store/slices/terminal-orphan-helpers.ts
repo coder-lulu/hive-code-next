@@ -7,6 +7,7 @@ type TerminalTabReconnectState = Pick<
   | 'lastKnownRelayPtyIdByTabId'
   | 'deferredSshSessionIdsByTabId'
   | 'pendingReconnectPtyIdByTabId'
+  | 'unverifiedPtyLossTabIds'
 >
 
 type OrphanTerminalDetectionState = Pick<AppState, 'tabsByWorktree' | 'unifiedTabsByWorktree'> &
@@ -75,6 +76,12 @@ export function getOrphanTerminalIds(
           return false
         }
         if (isFloatingTerminalSessionRecord(tab, worktreeId)) {
+          return false
+        }
+        // A missing PTY is not proof that the user closed the tab: the host
+        // may have gone away and emitted a synthetic exit. Keep the row until
+        // a replacement binds or the user explicitly closes it.
+        if (state.unverifiedPtyLossTabIds[tab.id]) {
           return false
         }
         // Why: a tab is orphaned only when it owns NO live/reconnecting PTY; a

@@ -12,91 +12,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import { ArrowDown, ChevronsDownUp, ChevronsUpDown, Square } from 'lucide-react-native'
 import { formatAgentTypeLabel } from '../../../src/shared/agent-type-label'
-import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { createMobileNativeChatViewStyles } from './mobile-native-chat-view-styles'
-import {
-  buildMobileNativeChatTransientData,
-  type MobileNativeChatPendingItem
-} from './mobile-native-chat-render-data'
+import { buildMobileNativeChatTransientData } from './mobile-native-chat-render-data'
 import { useMobileNativeChatPinchGesture } from './use-mobile-native-chat-pinch-gesture'
 import { MobileAgentWorkingIndicator } from './MobileAgentWorkingIndicator'
-import type { PendingNativeChatImage } from './mobile-native-chat-image-attachment'
 import { MobileNativeChatComposer } from './MobileNativeChatComposer'
-import type { MobileNativeChatSessionOptionPickersProps } from './MobileNativeChatSessionOptionPickers'
 import { MobileNativeChatMessage } from './MobileNativeChatMessage'
 import { MobileNativeChatAsk } from './MobileNativeChatAsk'
 import { MobileNativeChatPermission } from './MobileNativeChatPermission'
-import type { MobileChatPermission } from './mobile-native-chat-permission'
 import { MobileNativeChatQuestion } from './MobileNativeChatQuestion'
-import { mobileChatQuestionKey, type MobileChatQuestion } from './mobile-native-chat-question'
-import type { MobileNativeChatStatus } from './use-mobile-native-chat-session'
+import { mobileChatQuestionKey } from './mobile-native-chat-question'
+import type { MobileNativeChatViewProps } from './mobile-native-chat-view-props'
 
 const INPUT_LOCK_SETTLE_MS = 600
 const EMPTY_ERROR = '无法读取对话记录。你可以切回终端继续工作。'
 const EMPTY_HINT = '让 Agent 检查代码、解释输出或进行修改。'
 
-/** Why the composer input is locked: the transport is disconnected, or the
- *  terminal subscription has not acknowledged its input lease yet. */
-export type MobileNativeChatInputLockReason = 'disconnected' | 'waiting'
-
-type Props = {
-  /** Raw transcript, only for telling "still loading" from "loaded and empty". */
-  messages: NativeChatMessage[]
-  /** `messages` with noise stripped and tool turns folded in, from the overlay. */
-  folded: NativeChatMessage[]
-  status: MobileNativeChatStatus
-  error?: string
-  /** Resolved agent for this chat; names the empty-state copy (desktop parity). */
-  agent?: string | null
-  agentWorking?: boolean
-  /** Interrupt the agent mid-turn (shown as a Stop button on the working bar). */
-  onStop?: () => void
-  /** Live partial assistant text to show as an in-progress bubble, already gated
-   *  by the overlay against the transcript catching up. */
-  streaming: string | null
-  hasMore?: boolean
-  loadingEarlier?: boolean
-  onLoadEarlier?: () => void
-  onSend: (text: string) => Promise<boolean>
-  /** Accepted user echoes awaiting transcript replacement, including image previews. */
-  pending: MobileNativeChatPendingItem[]
-  /** Local photo URIs retained when the authoritative transcript replaces an
-   *  optimistic image bubble. */
-  imagePreviewsByMessageId?: Record<string, string[]>
-  /** Controlled composer text (owned by the route so dictation can write to it). */
-  composerText: string
-  onComposerTextChange: (text: string) => void
-  onAttachImage?: () => void
-  /** Pending image attachments shown as composer thumbnails until the next send. */
-  attachments?: PendingNativeChatImage[]
-  onRemoveAttachment?: (id: string) => void
-  isAttaching?: boolean
-  onMicPress?: () => void
-  micActive?: boolean
-  dictationMode?: 'toggle' | 'hold'
-  onMicPressIn?: () => void
-  onMicPressOut?: () => void
-  inputLockReason?: MobileNativeChatInputLockReason | null
-  sendErrorMessage?: string | null
-  onClearSendError?: () => void
-  filePaths?: string[]
-  onNeedFiles?: (query: string) => void
-  /** Model/session-option pickers for the composer action row (desktop parity). */
-  sessionOptions?: MobileNativeChatSessionOptionPickersProps | null
-  ask?: AskPrompt | null
-  askKey?: string | null
-  onDismissAsk?: () => void
-  onAnswerAsk?: (prompt: AskPrompt, selections: AskAnswerSelection[]) => Promise<boolean>
-  onCancelAsk?: () => Promise<boolean>
-  question?: MobileChatQuestion | null
-  onAnswerQuestion?: (text: string) => Promise<boolean>
-  permission?: MobileChatPermission | null
-  onRespondPermission?: (send: string) => Promise<boolean>
-  onOpenFile?: (relativePath: string) => void
-  keyboardInset?: number
-}
+export type { MobileNativeChatInputLockReason } from './mobile-native-chat-view-props'
 
 export function MobileNativeChatView({
   messages,
@@ -111,6 +45,9 @@ export function MobileNativeChatView({
   loadingEarlier,
   onLoadEarlier,
   onSend,
+  sendSurfaceId,
+  getSendCompletionGeneration,
+  getComposerEditGeneration,
   pending,
   imagePreviewsByMessageId,
   composerText,
@@ -141,7 +78,7 @@ export function MobileNativeChatView({
   onRespondPermission,
   onOpenFile,
   keyboardInset = 0
-}: Props): React.JSX.Element {
+}: MobileNativeChatViewProps): React.JSX.Element {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileNativeChatViewStyles)
   const insets = useSafeAreaInsets()
@@ -419,6 +356,8 @@ export function MobileNativeChatView({
         value={composerText}
         onChangeText={onComposerTextChange}
         onSend={handleSend}
+        sendSurfaceId={sendSurfaceId}
+        {...{ getSendCompletionGeneration, getComposerEditGeneration }}
         agent={agent}
         sessionOptions={sessionOptions}
         onAttachImage={onAttachImage}

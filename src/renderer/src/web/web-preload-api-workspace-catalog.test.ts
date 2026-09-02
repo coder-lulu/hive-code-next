@@ -597,6 +597,8 @@ describe('web worktree preload API', () => {
       compareBaseRef: 'refs/remotes/origin/main',
       setupDecision: 'inherit',
       createdWithAgent: 'codex',
+      displayName: 'Review label',
+      displayNameKind: 'user',
       startup: {
         command: "codex 'summarize repo'",
         env: { ORCA_AGENT_MODE: 'direct' },
@@ -637,6 +639,8 @@ describe('web worktree preload API', () => {
           baseBranch: TEST_COMMIT_OID,
           compareBaseRef: 'refs/remotes/origin/main',
           createdWithAgent: 'codex',
+          displayName: 'Review label',
+          displayNameKind: 'user',
           startupCommand: "codex 'summarize repo'",
           startupEnv: { ORCA_AGENT_MODE: 'direct' },
           startupLaunchConfig: {

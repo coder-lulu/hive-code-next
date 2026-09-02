@@ -2,6 +2,7 @@ import type React from 'react'
 import { ChevronRight, FolderInput, MessageCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { useNow } from '@/hooks/use-now'
 import type { DesktopHomeSession, HomeRelativeTimeLabels } from './desktop-home-model'
 import { formatHomeRelativeTime } from './desktop-home-model-utils'
 import { writeDesktopHomeSessionDragData } from './desktop-home-session-drag'
@@ -43,6 +44,7 @@ function SessionSummaryRow({
   onActivate: (session: DesktopHomeSession) => void
   onSaveToProject: (session: DesktopHomeSession) => void
 }): React.JSX.Element {
+  const now = useNow(60_000)
   return (
     <div className="desktop-home-session-summary-row-wrap">
       <button
@@ -75,7 +77,7 @@ function SessionSummaryRow({
           </span>
         </span>
         <span className="desktop-home-session-summary-time">
-          {formatHomeRelativeTime(session.lastActivityAt, Date.now(), timeLabels)}
+          {formatHomeRelativeTime(session.lastActivityAt, now, timeLabels)}
         </span>
         <ChevronRight className="desktop-home-tree-row-chevron" aria-hidden />
       </button>

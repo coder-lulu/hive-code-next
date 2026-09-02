@@ -34,9 +34,9 @@ install_link() {
     return
   fi
   if [ -L "$link" ]; then
-    target="$(readlink "$link" || true)"
+    target="$(readlink -- "$link" 2>/dev/null || true)"
     if is_managed_target "$target"; then
-      ln -sfn "$shim" "$link"
+      ln -sfn -- "$shim" "$link"
     fi
   fi
 }

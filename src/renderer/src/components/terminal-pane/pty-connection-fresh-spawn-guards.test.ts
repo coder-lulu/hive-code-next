@@ -477,6 +477,12 @@ describe('connectPanePty', () => {
     expect(onStartupBound).not.toHaveBeenCalled()
     expect(createdTransportOptions[0]).toMatchObject(startup)
 
+    // `onPtySpawn` is emitted by the connected transport, after the pane has
+    // installed itself as the current transport. Waiting for that setup mirrors
+    // the production ordering and avoids calling the captured callback during
+    // construction, when it must reject stale ownership.
+    await flushAsyncTicks()
+
     const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
       | ((ptyId: string) => void)
       | undefined

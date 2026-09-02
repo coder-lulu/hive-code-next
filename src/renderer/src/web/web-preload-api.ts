@@ -948,6 +948,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     hostedReview: createRuntimeNamespaceApi('hostedReview'),
     linear: createRuntimeNamespaceApi('linear'),
     hooks: createHooksApi(),
+    agentHooks: createAgentHooksApi(),
     stats: {
       getSummary: async () =>
         callRuntimeResult<StatsSummary>('stats.summary').catch(() => ({
@@ -969,7 +970,6 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     codexAccounts: createAccountsApi(),
     claudeAccounts: createAccountsApi(),
     cli: createCliApi(),
-    agentHooks: createAgentHooksApi(),
     macosTccPrompts: createMacosTccPromptsApi(),
     // Why: the desktop derives this from the host filesystem, which the web
     // client has no view of; reporting synced keeps the warning banner silent.

@@ -4,6 +4,16 @@ import { basename, dirname, join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
 import type { CliInstallStatus } from '../../shared/cli-install-types'
 import { hivecodeProductConfig } from '../../shared/generated/product-config'
+import {
+  hasAppImagePathEnvironment,
+  resolveAppImageRuntimeIdentity
+} from '../appimage-runtime-identity'
+import {
+  getAppImageCacheRootPath,
+  resolveAppImageExtractedRoot,
+  type AppImageExtractionOptions
+} from './appimage-extracted-root'
+import { getBundledLauncherPath, LINUX_CLI_COMMAND_NAME } from './bundled-cli-launcher-path'
 import { DEFAULT_MAC_COMMAND_PATH, DEV_COMMAND_NAME } from './cli-install-constants'
 import { ensureDevLauncher } from './cli-dev-launcher'
 import type { CliInstallerOptions, InstallSpec } from './cli-installer-contracts'
@@ -14,7 +24,6 @@ import {
   uniquePathEntries
 } from './cli-install-path-format'
 import { runMacPrivilegedCommand, writeWindowsUserPath } from './cli-privileged-processes'
-import { getBundledLauncherPath, LINUX_CLI_COMMAND_NAME } from './bundled-cli-launcher-path'
 import {
   invalidateWindowsUserPathRegistryCache,
   readFreshWindowsUserPathRegistry,
@@ -47,13 +56,16 @@ export abstract class CliInstallLocation {
   protected readonly userPathCacheInvalidator: () => void
   protected readonly windowsEnvironment: NodeJS.ProcessEnv
   protected readonly appImagePath: string | null
+  protected readonly hasUnverifiedAppImageRuntime: boolean
+  protected readonly appImageCacheRootPath: string
+  protected readonly appImageExtractRunner?: (appImagePath: string, cwd: string) => Promise<void>
 
   protected get commandName(): string {
     if (!this.isPackaged && !this.commandPathOverride) {
       // Why: development builds must not claim the production shell command.
       return DEV_COMMAND_NAME
     }
-    return hivecodeProductConfig.cli.primary
+    return this.platform === 'linux' ? LINUX_CLI_COMMAND_NAME : hivecodeProductConfig.cli.primary
   }
 
   constructor(options: CliInstallerOptions = {}) {
@@ -84,10 +96,27 @@ export abstract class CliInstallLocation {
     this.userPathCacheInvalidator =
       options.userPathCacheInvalidator ?? invalidateWindowsUserPathRegistryCache
     this.windowsEnvironment = options.windowsEnvironment ?? process.env
+    const hasExplicitAppImagePath = Object.hasOwn(options, 'appImagePath')
+    const runtimeAppImageIdentity = resolveAppImageRuntimeIdentity({
+      platform: this.platform,
+      execPath: this.execPathValue,
+      resourcesPath: this.resourcesPath
+    })
+    this.hasUnverifiedAppImageRuntime =
+      this.platform === 'linux' &&
+      this.isPackaged &&
+      !hasExplicitAppImagePath &&
+      hasAppImagePathEnvironment() &&
+      !runtimeAppImageIdentity
     this.appImagePath =
       this.platform === 'linux' && this.isPackaged
-        ? (options.appImagePath ?? process.env.APPIMAGE ?? null)
+        ? hasExplicitAppImagePath
+          ? (options.appImagePath ?? null)
+          : (runtimeAppImageIdentity?.appImagePath ?? null)
         : null
+    this.appImageCacheRootPath =
+      options.appImageCacheRootPath ?? getAppImageCacheRootPath(this.homePath)
+    this.appImageExtractRunner = options.appImageExtractRunner
   }
 
   protected resolveInstallSpec(): InstallSpec | null {
@@ -99,7 +128,7 @@ export abstract class CliInstallLocation {
     if (this.platform === 'darwin' || this.platform === 'linux') {
       return {
         commandPath,
-        installMethod: this.isLinuxAppImage() ? 'wrapper' : 'symlink'
+        installMethod: 'symlink'
       }
     }
 
@@ -153,7 +182,7 @@ export abstract class CliInstallLocation {
       const status = await this.inspectSymlink(commandPath, launcherPath)
       if (status.state !== 'not_installed') {
         if (reachedDefaultCommandPath && !isDefaultCommandPath && status.state === 'conflict') {
-          // Why: a non-HiveCode command after an empty default slot can be shadowed by installing there; no user file replaced.
+          // Why: a non-Orca command after an empty default slot can be shadowed by installing there; no user file replaced.
           continue
         }
         // Why: PATH lookup is first-match-wins; return the command the shell will actually run, preserving shadowing conflicts.
@@ -195,6 +224,7 @@ export abstract class CliInstallLocation {
 
     if (this.platform === 'linux') {
       // Why: Linux lacks a privileged global command flow; ~/.local/bin is the least-surprising user-scoped dir.
+      // Why `orca-ide`: GNOME Orca ships /usr/bin/orca, so avoid shadowing that screen reader.
       return join(this.homePath, '.local', 'bin', LINUX_CLI_COMMAND_NAME)
     }
 
@@ -211,8 +241,18 @@ export abstract class CliInstallLocation {
       return null
     }
 
+    if (this.hasUnverifiedAppImageRuntime) {
+      return null
+    }
+
     if (this.isLinuxAppImage()) {
-      return this.appImagePath && existsSync(this.appImagePath) ? this.appImagePath : null
+      if (!this.appImagePath || !existsSync(this.appImagePath)) {
+        return null
+      }
+      const extractionOptions = this.appImageExtractionOptions()
+      return extractionOptions
+        ? (resolveAppImageExtractedRoot(extractionOptions)?.stableLauncherPath ?? null)
+        : null
     }
 
     if (this.isPackaged) {
@@ -227,5 +267,15 @@ export abstract class CliInstallLocation {
       cliEntryPath: join(this.appPathValue, 'out', 'cli', 'index.js'),
       commandName: this.commandName
     })
+  }
+
+  protected appImageExtractionOptions(): AppImageExtractionOptions | null {
+    return this.appImagePath
+      ? {
+          appImagePath: this.appImagePath,
+          cacheRootPath: this.appImageCacheRootPath,
+          runExtract: this.appImageExtractRunner
+        }
+      : null
   }
 }

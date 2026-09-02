@@ -42,7 +42,9 @@ export function registerRuntimeEnvironmentBrowserClientHostHandler(options: {
         resolveEnvironment: (selector) => resolveEnvironment(userDataPath, selector),
         getStatus: async (environmentId) => {
           requireConnected(environmentId)
-          const status = await getRuntimeEnvironmentStatus(userDataPath, environmentId)
+          const status = await getRuntimeEnvironmentStatus(userDataPath, environmentId, undefined, {
+            observeOnly: true
+          })
           requireConnected(environmentId)
           return status
         },

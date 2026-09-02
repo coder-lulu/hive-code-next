@@ -1,5 +1,6 @@
 import type { CliStatusResult, RuntimeStatus } from '../../shared/runtime-types'
 import { APP_DISPLAY_NAME, applyProductCliBranding } from '../../shared/brand'
+import { runtimeHostConnectionState } from '../../shared/runtime-host-connection-state'
 import { projectRemoteAppStatus } from '../../shared/cli-app-status-projection'
 import { randomUUID } from 'node:crypto'
 import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
@@ -187,6 +188,7 @@ async function dispatchRemoteCli(
         runtime: {
           state: status.graphStatus === 'ready' ? 'ready' : 'graph_not_ready',
           reachable: true,
+          connectionState: runtimeHostConnectionState({ hasStatusEntry: true, status }),
           runtimeId: status.runtimeId
         },
         graph: { state: status.graphStatus }

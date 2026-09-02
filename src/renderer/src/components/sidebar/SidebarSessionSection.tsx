@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
   Activity,
@@ -21,6 +21,7 @@ import {
   type TemporarySessionItem
 } from '@/hooks/use-temporary-session-collection'
 import { useTemporarySessionListActions } from '@/hooks/use-temporary-session-list-actions'
+import { useNow } from '@/hooks/use-now'
 import { formatHomeRelativeTime } from '../landing/desktop-home-model-utils'
 import { translate } from '@/i18n/i18n'
 import { writeDesktopHomeSessionDragData } from '../landing/desktop-home-session-drag'
@@ -116,7 +117,8 @@ export function SessionRow({
   onOpen,
   onRequestDelete,
   deleting,
-  active = false
+  active = false,
+  now
 }: {
   item: TemporarySessionItem
   timeLabels: Parameters<typeof formatHomeRelativeTime>[2]
@@ -124,6 +126,7 @@ export function SessionRow({
   onRequestDelete: (item: TemporarySessionItem) => void
   deleting: boolean
   active?: boolean
+  now: number
 }): React.JSX.Element {
   const temporary = isSidebarTemporarySession(item)
   const context = item.contextLabel
@@ -171,7 +174,7 @@ export function SessionRow({
           </span>
         </span>
         <span className="sidebar-session-row-time">
-          {formatHomeRelativeTime(item.lastActivityAt, Date.now(), timeLabels)}
+          {formatHomeRelativeTime(item.lastActivityAt, now, timeLabels)}
         </span>
       </button>
       {temporary && item.tabId ? (
@@ -211,21 +214,12 @@ export function sidebarSessionIdentityKey(
 
 export default function SidebarSessionSection(): React.JSX.Element {
   useTranslation()
-  const [, setRelativeTimeEpoch] = useState(0)
   const { items, totalCount } = useTemporarySessionCollection({ limit: 4 })
+  const now = useNow(60_000, totalCount > 0)
   const { deletingSessionKeys, openSession, requestDelete } = useTemporarySessionListActions()
   const openNewTaskHome = useAppStore((state) => state.openNewTaskHome)
   const openActivityPage = useAppStore((state) => state.openActivityPage)
   const activeSessionTarget = useAppStore(useShallow(getSidebarActiveSessionTarget))
-  useEffect(() => {
-    if (totalCount === 0) {
-      return
-    }
-    const interval = window.setInterval(() => {
-      setRelativeTimeEpoch((current) => current + 1)
-    }, 60_000)
-    return () => window.clearInterval(interval)
-  }, [totalCount])
   const timeLabels = {
     unused: translate('components.desktopHome.time.unused', 'Not used yet'),
     justNow: translate('components.desktopHome.time.justNow', 'Just now'),
@@ -280,6 +274,7 @@ export default function SidebarSessionSection(): React.JSX.Element {
               onRequestDelete={requestDelete}
               deleting={deletingSessionKeys.has(sidebarSessionIdentityKey(item))}
               active={isSidebarSessionActive(item, activeSessionTarget)}
+              now={now}
             />
           ))
         ) : (

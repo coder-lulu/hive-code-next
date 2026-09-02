@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UpdateStatus } from '../shared/update-status-types'
 import type * as UpdaterModule from './updater'
+import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const {
   appMock,
@@ -115,6 +116,8 @@ const ARTIFACT = {
   sha512: 'LHlL7dKoqg98gS2nfQv878dK+UoktbAkm4M20/hoJ2Qr0Kqsa3MSL4VmWy/Lll/MYjQFkpvOxduQ/vswentozA=='
 }
 
+warmUpdaterModule()
+
 describe('linux package recovery actions', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -146,7 +149,7 @@ describe('linux package recovery actions', () => {
     updater: typeof UpdaterModule
   }> => {
     const send = vi.fn()
-    const updater = await import('./updater')
+    const updater = await loadUpdaterModule()
     updater.setupAutoUpdater({ webContents: { send } } as never, {
       getLastUpdateCheckAt: () => Date.now()
     })

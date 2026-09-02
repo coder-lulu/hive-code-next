@@ -26,6 +26,17 @@ function getSection(markdown, heading) {
 }
 
 describe('orchestration skill guidance', () => {
+  it('keeps external browser routing at the OS/page boundary', () => {
+    const description = readFileSync(guidePath, 'utf8').replace(/\s+/gu, ' ')
+
+    expect(description).toContain(
+      "Use Computer Use for external browser windows, webviews, HiveCode app UI, or desktop UI outside HiveCode's embedded browser only when the task requires OS/window-level control such as focus, menus, dialogs, coordinates, or screenshots."
+    )
+    expect(description).toContain(
+      "`orca-cli` for HiveCode's embedded pages and a page-automation tool such as Playwright or CDP for external pages."
+    )
+  })
+
   it('requires HiveCode runtime state before claiming a worker was orchestrated', () => {
     const skill = readSkill()
     const toolBoundary = getSection(skill, 'Tool Boundary')

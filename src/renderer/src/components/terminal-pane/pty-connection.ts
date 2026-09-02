@@ -1218,6 +1218,10 @@ export function connectPanePty(
   // mutation does not propagate back.
   const paneStartup = deps.startup ?? null
   deps.startup = undefined
+  // A queued startup may only be settled after this pane owns a concrete PTY.
+  // The callback is shared by fresh-spawn and reattach paths, so keep the
+  // one-shot state beside the captured startup rather than in either path.
+  let startupPtyBound = false
 
   // Why: paneKey crosses PTY env, hook IPC, retained rows, and reload/replay.
   // Use the stable layout leaf UUID, not the renderer-local numeric pane id.
@@ -3068,6 +3072,10 @@ export function connectPanePty(
     registerSideEffectFactConsumerForPty(ptyId)
     syncHiddenRendererPtyDelivery()
     deps.syncPanePtyLayoutBinding(pane.id, ptyId)
+    if (paneStartup && !startupPtyBound) {
+      startupPtyBound = true
+      deps.onStartupBound?.()
+    }
     // Why: binding a live PTY here is the proof that this pane is current again, so
     // lift any retirement fence left by a detach/reattach cycle before hooks arrive.
     // Waiting for a new turn would strand a pane re-attached mid-turn or idle (STA-4114).

@@ -25,8 +25,8 @@ import { mapDispatcherError } from './dispatcher-error-response'
 import { parseRpcRequestParams } from './dispatcher-request-parsing'
 import { routeDispatcherClientHostedBrowserRpc } from './dispatcher-client-browser-routing'
 import { needsLocalCallerFingerprint } from './dispatcher-caller-fingerprint'
+import { RpcStreamingDispatcher } from './rpc-streaming-dispatcher'
 import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runtime-cloud-control'
-import { dispatchStreamingRpc } from './dispatcher-streaming'
 
 export type DispatcherOptions = {
   runtime: OrcaRuntimeService
@@ -42,6 +42,7 @@ export class RpcDispatcher {
   private readonly registry: RpcRegistry
   private readonly orchestrationMutations: OrchestrationMutationExecutor
   private readonly legacyOrchestration: OrchestrationLegacyCompatibility
+  private readonly streamingDispatcher: RpcStreamingDispatcher
   private readonly hiveRuntimeCloud: HiveRuntimeCloudControl | undefined
 
   constructor({ runtime, methods = ALL_RPC_METHODS, hiveRuntimeCloud }: DispatcherOptions) {
@@ -50,6 +51,14 @@ export class RpcDispatcher {
     this.registry = buildRegistry(methods)
     this.orchestrationMutations = getOrchestrationMutationExecutor(runtime)
     this.legacyOrchestration = new OrchestrationLegacyCompatibility(runtime)
+    this.streamingDispatcher = new RpcStreamingDispatcher({
+      runtime,
+      registry: this.registry,
+      orchestrationMutations: this.orchestrationMutations,
+      legacyOrchestration: this.legacyOrchestration,
+      hiveRuntimeCloud,
+      meta: () => this.meta()
+    })
   }
 
   async dispatch(request: RpcRequest, options?: DispatchCallOptions): Promise<RpcResponse> {
@@ -133,7 +142,9 @@ export class RpcDispatcher {
           clientCapabilities: options?.clientCapabilities,
           orchestrationCapability: request.orchestrationCapability,
           authenticatedCallerFingerprint:
-            mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint,
+            mutation?.identity.callerFingerprint ??
+            legacyCoordinator?.mutationCallerFingerprint ??
+            authenticatedCallerFingerprint,
           recordMutationReceipt: mutation?.recordReceipt,
           orchestrationMutation: mutation?.identity,
           legacyCoordinatorRunId,
@@ -171,18 +182,7 @@ export class RpcDispatcher {
     reply: (response: string) => void,
     options?: RpcDispatchStreamingOptions
   ): Promise<void> {
-    await dispatchStreamingRpc(
-      {
-        runtime: this.runtime,
-        registry: this.registry,
-        orchestrationMutations: this.orchestrationMutations,
-        legacyOrchestration: this.legacyOrchestration,
-        hiveRuntimeCloud: this.hiveRuntimeCloud
-      },
-      request,
-      reply,
-      options
-    )
+    return this.streamingDispatcher.dispatch(request, reply, options)
   }
 
   private meta(): RpcEnvelopeMeta {

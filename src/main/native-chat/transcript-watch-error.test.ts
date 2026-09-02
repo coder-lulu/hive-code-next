@@ -7,7 +7,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as TranscriptTailReader from './transcript-tail-reader'
 
-const { watchers, watchCallbacks, watchMock, tailReadFailure } = vi.hoisted(() => ({
+const { tailReaderState, watchers, watchCallbacks, watchMock } = vi.hoisted(() => ({
+  tailReaderState: { failure: null as Error | null },
   watchers: [] as (EventEmitter & { close: ReturnType<typeof vi.fn> })[],
   watchCallbacks: [] as ((event: string, filename: string | Buffer | null) => void)[],
   watchMock: vi.fn(),
@@ -25,15 +26,15 @@ vi.mock('node:fs', async () => {
   return { ...actual, watch: watchMock }
 })
 
-vi.mock('./transcript-tail-reader', async (importOriginal) => {
-  const actual = await importOriginal<typeof TranscriptTailReader>()
+vi.mock('./transcript-tail-reader', async () => {
+  const actual = await vi.importActual<typeof TranscriptTailReader>('./transcript-tail-reader')
   return {
     ...actual,
     readNativeChatTranscriptTailFile: (
       ...args: Parameters<typeof actual.readNativeChatTranscriptTailFile>
     ) => {
-      if (tailReadFailure.current) {
-        throw new Error('injected transcript tail read failure')
+      if (tailReaderState.failure) {
+        return Promise.reject(tailReaderState.failure)
       }
       return actual.readNativeChatTranscriptTailFile(...args)
     }
@@ -48,7 +49,7 @@ afterEach(async () => {
   watchers.length = 0
   watchCallbacks.length = 0
   watchMock.mockClear()
-  tailReadFailure.current = false
+  tailReaderState.failure = null
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -118,7 +119,7 @@ describe('native chat transcript watcher errors', () => {
     roots.push(root)
     const filePath = join(root, 'transcript.jsonl')
     await writeFile(filePath, '')
-    tailReadFailure.current = true
+    tailReaderState.failure = new Error('deterministic read failure')
     const onInitialSnapshot = vi.fn()
     const onAppend = vi.fn()
     const subscription = await subscribeNativeChatTranscript({
@@ -147,7 +148,7 @@ describe('native chat transcript watcher errors', () => {
     roots.push(root)
     const filePath = join(root, 'transcript.jsonl')
     await writeFile(filePath, '')
-    tailReadFailure.current = true
+    tailReaderState.failure = new Error('deterministic read failure')
     const onInitialSnapshot = vi.fn()
     const subscription = await subscribeNativeChatTranscript({
       agent: 'claude',
@@ -164,14 +165,16 @@ describe('native chat transcript watcher errors', () => {
 
     // initialDrain stays true after the error, so a recovered read delivers the
     // real snapshot instead of stranding the client on the error frame.
-    tailReadFailure.current = false
+    // The content must land before reads recover: the capped rotation retry is
+    // still firing, and any drain that succeeds against a still-empty file
+    // legitimately consumes the pending initial drain with an empty snapshot.
     await writeFile(filePath, claudeLine('u-recovered', 'user', 'back'))
+    tailReaderState.failure = null
     watchCallbacks[0]!('change', 'transcript.jsonl')
-    await vi.waitFor(() =>
-      expect(onInitialSnapshot.mock.calls.flat(2)).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: 'u-recovered' })])
-      )
-    )
+    await vi.waitFor(() => expect(onInitialSnapshot).toHaveBeenCalledTimes(2))
+    expect(onInitialSnapshot.mock.calls[1]![0]).toEqual([
+      expect.objectContaining({ id: 'u-recovered' })
+    ])
 
     subscription.unsubscribe()
   })

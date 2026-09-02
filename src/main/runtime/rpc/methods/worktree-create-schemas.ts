@@ -46,6 +46,7 @@ export const WorktreeCreate = z
     linkedTaskSourceContext: TaskSourceContextSchema.nullable().optional(),
     comment: OptionalString,
     displayName: OptionalString,
+    displayNameKind: z.enum(['generated', 'user']).optional(),
     telemetrySource: z
       .unknown()
       .transform((value) => {

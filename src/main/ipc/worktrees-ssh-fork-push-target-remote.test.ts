@@ -111,6 +111,9 @@ describe('registerWorktreeHandlers', () => {
       if (args[0] === 'remote' && args.length === 1) {
         return { stdout: 'origin\n', stderr: '' }
       }
+      if (args[0] === 'show-ref') {
+        throw Object.assign(new Error('missing exact ref'), { code: 1 })
+      }
       return { stdout: '', stderr: '' }
     })
     const provider = {
@@ -189,6 +192,9 @@ describe('registerWorktreeHandlers', () => {
         if (args[0] === 'remote' && args.length === 1) {
           return { stdout: 'origin\n', stderr: '' }
         }
+        if (args[0] === 'show-ref') {
+          throw Object.assign(new Error('missing exact ref'), { code: 1 })
+        }
         return { stdout: '', stderr: '' }
       }),
       fetchRemoteTrackingRef: vi.fn().mockResolvedValue(undefined),
@@ -235,6 +241,9 @@ describe('registerWorktreeHandlers', () => {
       }
       if (args[0] === 'remote' && args.length === 1) {
         return { stdout: 'origin\n', stderr: '' }
+      }
+      if (args[0] === 'show-ref') {
+        throw Object.assign(new Error('missing exact ref'), { code: 1 })
       }
       return { stdout: '', stderr: '' }
     })
@@ -298,6 +307,9 @@ describe('registerWorktreeHandlers', () => {
       }
       if (args[0] === 'remote' && args.length === 1) {
         return { stdout: 'origin\npr-contributor-orca\n', stderr: '' }
+      }
+      if (args[0] === 'show-ref') {
+        throw Object.assign(new Error('missing exact ref'), { code: 1 })
       }
       return { stdout: '', stderr: '' }
     })

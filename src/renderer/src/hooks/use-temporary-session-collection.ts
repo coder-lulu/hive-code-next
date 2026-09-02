@@ -92,7 +92,7 @@ export function useTemporarySessionCollection(options?: { limit?: number }): {
   items: TemporarySessionItem[]
   totalCount: number
 } {
-  const selector = useMemo(createTemporarySessionStoreSelector, [])
+  const selector = useMemo(() => createTemporarySessionStoreSelector(), [])
   const selection = useAppStore(selector)
   const limit = options?.limit
 

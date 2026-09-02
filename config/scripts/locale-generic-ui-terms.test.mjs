@@ -54,6 +54,14 @@ describe('locale generic UI terms', () => {
     ).toBe('에이전트 대시보드 전환')
     expect(
       repairTranslatedValue({
+        key: 'auto.components.artifacts.ArtifactsPage.emptyCopy',
+        enValue: 'Ask your agent to share it.',
+        localeValue: 'エージェントに共有を依頼してください。',
+        locale: 'ja'
+      })
+    ).toBe('エージェントに共有を依頼してください。')
+    expect(
+      repairTranslatedValue({
         key: 'components.agentSessionContinuation.dialogTitle',
         enValue: 'Continue in New Session',
         localeValue: '新しいセッションで続ける',

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', () => ({
@@ -14,6 +13,10 @@ import { createMobileNativeChatMessageStyles } from './mobile-native-chat-messag
 import { createMobileNativeChatViewStyles } from './mobile-native-chat-view-styles'
 import { createMobileSessionReaderStyles } from './mobile-session-reader-styles'
 import { createMobileSessionStyles, resolveMobileSessionTheme } from './mobile-session-styles'
+import {
+  readMobileSessionRouteSource,
+  readMobileSessionRouteSourceFamily
+} from './mobile-session-route-source-family.test-support'
 
 describe('Session Graphite presentation', () => {
   it.each([lightTheme, darkTheme])('uses the $scheme semantic theme', (theme) => {
@@ -63,15 +66,11 @@ describe('Session Graphite presentation', () => {
     expect(resolveMobileSessionTheme(darkTheme, 'browser')).toBe(darkTheme)
   })
 
-  it('binds the large Session route to the runtime semantic theme', () => {
-    const source = readFileSync(
-      new URL('../../app/h/[hostId]/session/[worktreeId].tsx', import.meta.url),
-      'utf8'
-    )
+  it('binds the split Session surface to the runtime semantic theme', () => {
+    const source = readMobileSessionRouteSourceFamily()
 
-    expect(source).toContain('useMobileThemeStyles(createMobileSessionStyles)')
-    expect(source).toContain('resolveMobileSessionTheme(theme, activeSessionTab?.type)')
-    expect(source).not.toContain("from '../../../../src/theme/mobile-theme'")
+    expect(source).toContain('useMobileSessionThemeStyles(controller.activeSessionTab?.type)')
+    expect(source).toContain('resolveMobileSessionTheme(appTheme, activeTabType)')
     expect(source).not.toMatch(/\bcolors\./)
   })
 
@@ -86,7 +85,7 @@ describe('Session Graphite presentation', () => {
       'QuickCommandEditorForm.tsx',
       'QuickCommandsList.tsx',
       'QuickCommandsSheet.tsx'
-    ].map((file) => readFileSync(new URL(`./${file}`, import.meta.url), 'utf8'))
+    ].map((file) => readMobileSessionRouteSource(`./${file}`))
     const source = sources.join('\n')
 
     for (const label of [

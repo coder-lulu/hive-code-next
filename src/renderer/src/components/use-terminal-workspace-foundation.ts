@@ -1,0 +1,154 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { parseWorkspaceKey } from '../../../shared/workspace-scope'
+import type { TerminalTab } from '../../../shared/terminal-tab-types'
+import { useAppStore } from '../store'
+import { useWorktreeMap } from '../store/selectors'
+import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
+import type { WorktreeTabBucketProjection } from '@/lib/worktree-tab-bucket-projection'
+import { projectWorkspaceSurfaces } from './workspace-surface-projection'
+import { selectPairedRuntimeParkingEnvironmentIds } from './terminal-pane/terminal-hidden-view-parking'
+import { createTerminalWorktreeTopologyProjection } from './terminal-pane/terminal-hidden-worktree-retention'
+import { isMainTerminalSideEffectAuthorityForPty } from './terminal-pane/terminal-side-effect-facts-handler'
+import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
+import { resolveActiveFloatingWorkspaceSurface } from '@/lib/floating-workspace-surface-ownership'
+
+export function useTerminalWorkspaceFoundation() {
+  const terminalTopologyProjectionRef = useRef<WorktreeTabBucketProjection<
+    TerminalTab,
+    TerminalTab
+  > | null>(null)
+  terminalTopologyProjectionRef.current ??= createTerminalWorktreeTopologyProjection()
+  const mountedWorktreeIdsRef = useRef(new Set<string>())
+  const browserGuestWorktreeRecencyRef = useRef<string[]>([])
+  const measurableBackgroundWorktreeIdsRef = useRef(new Set<string>())
+  const terminalWorktreeHiddenSinceRef = useRef(new Map<string, number>())
+  const measuringTerminalWorktreeIdsRef = useRef(new Set<string>())
+  const terminalWorktreeParkCooldownUntilRef = useRef(new Map<string, number>())
+  const terminalWorktreeParkingTimersRef = useRef(new Map<string, number>())
+  const worktreesById = useWorktreeMap()
+  const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
+  const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
+  const activeFloatingWorkspaceId = isFloatingTerminalWorkspaceId(activeWorktreeId)
+    ? activeWorktreeId
+    : null
+  const floatingTerminalCwd = useAppStore((state) => state.settings?.floatingTerminalCwd ?? '')
+  const [floatingCwdResolution, setFloatingCwdResolution] = useState<{
+    requestedPath: string
+    cwd: string
+  } | null>(null)
+  const resolvedFloatingTerminalCwd =
+    activeFloatingWorkspaceId === FLOATING_TERMINAL_WORKTREE_ID &&
+    floatingCwdResolution?.requestedPath === floatingTerminalCwd
+      ? floatingCwdResolution.cwd
+      : null
+  useEffect(() => {
+    if (activeFloatingWorkspaceId !== FLOATING_TERMINAL_WORKTREE_ID) {
+      return
+    }
+    let cancelled = false
+    void window.api.app
+      .getFloatingTerminalCwd({ path: floatingTerminalCwd })
+      .then((cwd) => {
+        if (!cancelled) {
+          setFloatingCwdResolution({ requestedPath: floatingTerminalCwd, cwd })
+        }
+      })
+      .catch((error) => {
+        console.error('Could not resolve the temporary-session directory', error)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeFloatingWorkspaceId, floatingTerminalCwd])
+  const renderedActiveWorktreeId = activeWorktreeId
+  const activeWorktreeDeferralHostId = useAppStore((state) =>
+    getResolvedExecutionHostIdForWorktree(state, renderedActiveWorktreeId)
+  )
+  // Why narrow it: only the folder-collision tie-break reads this host, so a git
+  // workspace's ownership settling must not re-identify the whole mount projection.
+  const activeFolderSurfaceHostId =
+    parseWorkspaceKey(renderedActiveWorktreeId ?? '')?.type === 'folder'
+      ? activeWorktreeDeferralHostId
+      : null
+  const workspaceSurfaces = useMemo(() => {
+    const surfaces = projectWorkspaceSurfaces({
+        worktreesById,
+        folderWorkspaces,
+        activeWorkspaceId: renderedActiveWorktreeId,
+        activeWorkspaceResolvedHostId: activeFolderSurfaceHostId
+      })
+    const floatingSurface = resolveActiveFloatingWorkspaceSurface(
+      activeFloatingWorkspaceId,
+      resolvedFloatingTerminalCwd
+    )
+    return floatingSurface && !surfaces.some((surface) => surface.id === floatingSurface.id)
+      ? [...surfaces, floatingSurface]
+      : surfaces
+  }, [
+    activeFloatingWorkspaceId,
+    activeFolderSurfaceHostId,
+    folderWorkspaces,
+    renderedActiveWorktreeId,
+    resolvedFloatingTerminalCwd,
+    worktreesById
+  ])
+  const activeView = useAppStore((state) => state.activeView)
+  // Why: terminal titles are leaf chrome. The root host only subscribes to
+  // mount/parking semantics; a real transition publishes fresh tab objects,
+  // while LiveTerminalTabBar reads title-only updates from the active bucket.
+  const tabsByWorktree = useAppStore((state) =>
+    terminalTopologyProjectionRef.current!.project(state.tabsByWorktree)
+  )
+  const pendingStartupByTabId = useAppStore((state) => state.pendingStartupByTabId)
+  const terminalParkingEnabled = useAppStore(
+    (state) => state.settings?.terminalHiddenViewParking !== false
+  )
+  const terminalSshParkingEnabled = useAppStore(
+    (state) => state.settings?.terminalSshViewParking !== false
+  )
+  const runtimeStatusByEnvironmentId = useAppStore((state) => state.runtimeStatusByEnvironmentId)
+  const pairedRuntimeParkingEnvironmentIds = useMemo(
+    () => selectPairedRuntimeParkingEnvironmentIds(runtimeStatusByEnvironmentId),
+    [runtimeStatusByEnvironmentId]
+  )
+  const terminalRetentionBudgetEnabled = useAppStore(
+    (state) => state.settings?.terminalHiddenWorktreeRetentionBudget !== false
+  )
+  const browserGuestRetentionBudgetEnabled = useAppStore(
+    (state) => state.settings?.browserGuestWorktreeRetentionBudget !== false
+  )
+  const terminalTitleSnapshotAuthorityEnabled = useAppStore((state) =>
+    isMainTerminalSideEffectAuthorityForPty({
+      settings: state.settings,
+      runtimeEnvironmentId: null
+    })
+  )
+
+  return {
+    mountedWorktreeIdsRef,
+    browserGuestWorktreeRecencyRef,
+    measurableBackgroundWorktreeIdsRef,
+    terminalWorktreeHiddenSinceRef,
+    measuringTerminalWorktreeIdsRef,
+    terminalWorktreeParkCooldownUntilRef,
+    terminalWorktreeParkingTimersRef,
+    folderWorkspaces,
+    workspaceSurfaces,
+    activeWorktreeId,
+    renderedActiveWorktreeId,
+    activeWorktreeDeferralHostId,
+    activeView,
+    tabsByWorktree,
+    pendingStartupByTabId,
+    terminalParkingEnabled,
+    terminalSshParkingEnabled,
+    runtimeStatusByEnvironmentId,
+    pairedRuntimeParkingEnvironmentIds,
+    terminalRetentionBudgetEnabled,
+    browserGuestRetentionBudgetEnabled,
+    terminalTitleSnapshotAuthorityEnabled
+  }
+}
+
+export type TerminalWorkspaceFoundation = ReturnType<typeof useTerminalWorkspaceFoundation>

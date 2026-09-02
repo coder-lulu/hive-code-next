@@ -46,10 +46,9 @@ jobs:
         run: echo "HIVECODE_COMMIT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/setup@v2
         with:
-          version: 10.24.0
-          run_install: false
+          install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
