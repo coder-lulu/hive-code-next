@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { lstat, readFile, readdir, rm } from 'node:fs/promises'
+import { lstat, readFile, readdir, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { parseTree, printParseErrorCode } from 'jsonc-parser'
@@ -323,7 +323,8 @@ export async function verifyHiveRelayContract({
 
 async function main() {
   const result = await verifyHiveRelayContract()
-  await rm(DEFAULT_REPORT_PATH, { force: true })
+  const runReportPath = `${DEFAULT_REPORT_PATH}.${process.pid}-${randomUUID()}.tmp`
+  await rm(runReportPath, { force: true })
   const pnpm = resolvePnpmCliInvocation()
   const testFiles = [
     'config/scripts/verify-hiverelay-contract.test.mjs',
@@ -335,48 +336,53 @@ async function main() {
     'tests/e2e/hiverelay/hiverelay-testkit.unit.test.ts',
     'tests/e2e/hiverelay/hiverelay-testkit-boundary.unit.test.ts'
   ]
-  const tested = spawnSync(
-    pnpm.command,
-    [
-      ...pnpm.prefixArgs,
-      'exec',
-      'vitest',
-      'run',
-      '--config',
-      'config/vitest.config.ts',
-      ...testFiles
-    ],
-    {
-      cwd: REPO_ROOT,
-      env: { ...process.env, HIVERELAY_CONTRACT_REPORT_PATH: DEFAULT_REPORT_PATH },
-      shell: pnpm.shell,
-      stdio: 'inherit'
+  try {
+    const tested = spawnSync(
+      pnpm.command,
+      [
+        ...pnpm.prefixArgs,
+        'exec',
+        'vitest',
+        'run',
+        '--config',
+        'config/vitest.config.ts',
+        ...testFiles
+      ],
+      {
+        cwd: REPO_ROOT,
+        env: { ...process.env, HIVERELAY_CONTRACT_REPORT_PATH: runReportPath },
+        shell: pnpm.shell,
+        stdio: 'inherit'
+      }
+    )
+    if (tested.error) {
+      throw tested.error
     }
-  )
-  if (tested.error) {
-    throw tested.error
-  }
-  if (tested.status !== 0) {
-    throw new Error(`HiveRelay TypeScript contract suite failed with exit ${tested.status}`)
-  }
-  const report = assertObject(JSON.parse(await readFile(DEFAULT_REPORT_PATH, 'utf8')), 'report')
-  const currentCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8'
-  }).trim()
-  if (
-    report.status !== 'PASS' ||
-    report.component !== 'hivecode-typescript' ||
-    report.commit !== currentCommit ||
-    report.contractRevision !== result.receipt.contractRevision ||
-    report.manifestSha256 !== result.receipt.manifestSha256 ||
-    report.testCount !== result.applicableCases.length ||
-    report.resultCount !== result.fixtureCases.length ||
-    report.applicableFixtureCount !== result.applicableCases.length ||
-    !Array.isArray(report.results) ||
-    report.results.length !== report.resultCount
-  ) {
-    throw new Error('Generated HiveRelay contract report does not match the verified inputs')
+    if (tested.status !== 0) {
+      throw new Error(`HiveRelay TypeScript contract suite failed with exit ${tested.status}`)
+    }
+    const report = assertObject(JSON.parse(await readFile(runReportPath, 'utf8')), 'report')
+    const currentCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8'
+    }).trim()
+    if (
+      report.status !== 'PASS' ||
+      report.component !== 'hivecode-typescript' ||
+      report.commit !== currentCommit ||
+      report.contractRevision !== result.receipt.contractRevision ||
+      report.manifestSha256 !== result.receipt.manifestSha256 ||
+      report.testCount !== result.applicableCases.length ||
+      report.resultCount !== result.fixtureCases.length ||
+      report.applicableFixtureCount !== result.applicableCases.length ||
+      !Array.isArray(report.results) ||
+      report.results.length !== report.resultCount
+    ) {
+      throw new Error('Generated HiveRelay contract report does not match the verified inputs')
+    }
+    await rename(runReportPath, DEFAULT_REPORT_PATH)
+  } finally {
+    await rm(runReportPath, { force: true })
   }
   console.log(
     `HiveRelay contract integrity passed: revision=${result.receipt.contractRevision} ` +
