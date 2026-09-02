@@ -227,15 +227,21 @@ export const createAccountRuntimeCloudSlice: StateCreator<
     localRuntimeOwnership: EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP,
 
     startAccountRuntimeCloudSync: () => {
+      const runtimeCloudApi = window.api.hiveRuntimeCloud
+      // Packaged upgrade failures can leave renderer and preload artifacts at different revisions.
+      // Runtime Cloud is optional in that mixed-version window; it must not take down the shell.
+      if (!runtimeCloudApi) {
+        return () => undefined
+      }
       let disposed = false
-      const unsubscribeDirectory = window.api.hiveRuntimeCloud.onDirectoryChanged((state) => {
+      const unsubscribeDirectory = runtimeCloudApi.onDirectoryChanged((state) => {
         if (!disposed) {
           directoryGeneration += 1
           publishAccountRuntimeDirectory(state)
           reloadRuntimeEnvironmentCatalog(state, () => disposed)
         }
       })
-      const unsubscribeOwnership = window.api.hiveRuntimeCloud.onOwnershipChanged((state) => {
+      const unsubscribeOwnership = runtimeCloudApi.onOwnershipChanged((state) => {
         if (!disposed) {
           ownershipGeneration += 1
           set({ localRuntimeOwnership: state })
@@ -244,7 +250,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
       const initialDirectoryGeneration = directoryGeneration
       const initialOwnershipGeneration = ownershipGeneration
       reloadRuntimeEnvironmentCatalog(get().accountRuntimeDirectory, () => disposed)
-      void window.api.hiveRuntimeCloud
+      void runtimeCloudApi
         .getDirectory()
         .then((accountRuntimeDirectory) => {
           if (!disposed && directoryGeneration === initialDirectoryGeneration) {
@@ -253,7 +259,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
           }
         })
         .catch(() => undefined)
-      void window.api.hiveRuntimeCloud
+      void runtimeCloudApi
         .getLocalOwnership()
         .then((localRuntimeOwnership) => {
           if (!disposed && ownershipGeneration === initialOwnershipGeneration) {

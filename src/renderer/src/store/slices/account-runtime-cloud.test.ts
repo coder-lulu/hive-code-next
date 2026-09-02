@@ -96,6 +96,18 @@ function environment(id: string): PublicKnownRuntimeEnvironment {
 }
 
 describe('account Runtime Cloud store sync', () => {
+  it('keeps startup alive when an older preload does not expose Runtime Cloud', () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        runtimeEnvironments: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    const store = createSliceStore()
+
+    expect(() => store.getState().startAccountRuntimeCloudSync()).not.toThrow()
+  })
+
   it('projects cloud presence without replacing local pairing metadata', () => {
     const initialEntry = directoryEntry('runtime-1')
     const localEnvironment: PublicKnownRuntimeEnvironment = {
