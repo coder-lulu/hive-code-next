@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "authorityRepository": "hive-cloud",
   "authorityPath": "docs/hive/contracts/hiverelay-v2",
-  "authoritySourceCommit": "46f8fd59a7e0650e26308645e5b5866373eccd05",
+  "authoritySourceCommit": "46f8fd59a64907dec8ddeea5d44535b9469df3b5",
   "contractRevision": "hiverelay-v2-p0.1",
   "manifestSha256": "eaca92034aa0761b4a3bf279ecf9acefb5fcafbb0a9b3d10fe964a29372ee7aa",
   "files": [
