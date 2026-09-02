@@ -166,6 +166,8 @@ import { normalizeContextualTourIds, type ContextualTourId } from '../../../shar
 import { translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND, applyProductBranding } from '@/product-brand'
 import {
+  GITLAB_READY_FOR_REVIEW_RUNTIME_CAPABILITY,
+  GITLAB_READY_FOR_REVIEW_UPDATE_REQUIRED_MESSAGE,
   GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
   GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE
 } from '../../../shared/protocol-version'
@@ -948,7 +950,6 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     hostedReview: createRuntimeNamespaceApi('hostedReview'),
     linear: createRuntimeNamespaceApi('linear'),
     hooks: createHooksApi(),
-    agentHooks: createAgentHooksApi(),
     stats: {
       getSummary: async () =>
         callRuntimeResult<StatsSummary>('stats.summary').catch(() => ({
@@ -1376,7 +1377,8 @@ function createNativeChatApi(): NativeChatApi {
             sessionId: args.sessionId,
             subscriptionId: args.subscriptionId,
             transcriptPath: args.transcriptPath,
-            limit: args.limit
+            limit: args.limit,
+            capabilities: { transcriptPending: 1 }
           },
           {
             onResponse: (response) => {
@@ -1401,8 +1403,10 @@ function createNativeChatApi(): NativeChatApi {
                 hasMore?: boolean
                 error?: string
                 lifecycle?: unknown
+                pending?: boolean
               }
               const lifecycle = parseRuntimeNativeChatTurnLifecycle(result?.lifecycle)
+              const pending = result?.pending === true
               if (
                 (result?.type === 'appended' ||
                   result?.type === 'snapshot' ||
@@ -1410,13 +1414,16 @@ function createNativeChatApi(): NativeChatApi {
                 Array.isArray(result.messages)
               ) {
                 if (!receivedInitial) {
-                  receivedInitial = true
+                  if (!pending) {
+                    receivedInitial = true
+                  }
                   onFrame({
                     type: 'snapshot',
                     messages: result.messages,
                     hasMore: result.hasMore ?? result.messages.length >= (args.limit ?? 300),
                     ...(result.error ? { error: result.error } : {}),
-                    ...(lifecycle ? { lifecycle } : {})
+                    ...(lifecycle ? { lifecycle } : {}),
+                    ...(pending ? { pending: true } : {})
                   })
                 } else if (result.type === 'snapshot') {
                   onFrame({
@@ -1424,7 +1431,8 @@ function createNativeChatApi(): NativeChatApi {
                     messages: result.messages,
                     hasMore: result.hasMore ?? false,
                     ...(result.error ? { error: result.error } : {}),
-                    ...(lifecycle ? { lifecycle } : {})
+                    ...(lifecycle ? { lifecycle } : {}),
+                    ...(pending ? { pending: true } : {})
                   })
                 } else {
                   onFrame(
@@ -1908,6 +1916,7 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
         name: args.name,
         // Absent means user-typed, which is what the host must assume — so send it only when true.
         ...(args.nameWasGenerated ? { nameWasGenerated: true } : {}),
+        ...(args.displayNameKind ? { displayNameKind: args.displayNameKind } : {}),
         baseBranch: args.baseBranch,
         compareBaseRef: args.compareBaseRef,
         branchNameOverride: args.branchNameOverride,
@@ -1941,6 +1950,8 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
             }
           : {}),
         parentWorkspace: args.parentWorkspace,
+        // Why: every create through this API is an in-app action, never the CLI's parent flag.
+        ...(args.parentWorkspace ? { parentWorkspaceOrigin: 'manual' } : {}),
         workspaceStatus: args.workspaceStatus,
         manualOrder: args.manualOrder,
         automationProvenanceRequest: args.automationProvenanceRequest
@@ -2191,6 +2202,7 @@ function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
     status: async ({
       worktreePath,
       includeIgnored,
+      includeLineStats,
       bypassEffectiveUpstreamNegativeCache,
       reuseLineStats,
       branchLineTotalMergeBase,
@@ -2200,6 +2212,7 @@ function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
       const params = {
         worktree: toRuntimeWorktreeSelector(worktree.id),
         includeIgnored,
+        includeLineStats,
         bypassEffectiveUpstreamNegativeCache,
         reuseLineStats,
         ...(branchLineTotalMergeBase ? { branchLineTotalMergeBase } : {})
@@ -2267,11 +2280,12 @@ function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
         compareAgainstHead
       })
     },
-    branchCompare: async ({ worktreePath, baseRef }) => {
+    branchCompare: async ({ worktreePath, baseRef, admissionTier }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
       return callRuntimeResult('git.branchCompare', {
         worktree: toRuntimeWorktreeSelector(worktree.id),
-        baseRef
+        baseRef,
+        ...(admissionTier ? { admissionTier } : {})
       })
     },
     commitCompare: async ({ worktreePath, commitId }) => {
@@ -2747,7 +2761,15 @@ function createGitLabApi(): WebGitLabApi {
         state: 'opened'
       }),
     mergeMR: (args) => route<WebGitLabResult<'mergeMR'>>(GITLAB_WEB_RPC_METHODS.mergeMR, args),
-    updateMR: (args) => route<WebGitLabResult<'updateMR'>>(GITLAB_WEB_RPC_METHODS.updateMR, args),
+    updateMR: async (args) => {
+      if (args.updates.readyForReview) {
+        const status = await getRemoteRuntimeStatus().catch(() => null)
+        if (!status?.capabilities?.includes(GITLAB_READY_FOR_REVIEW_RUNTIME_CAPABILITY)) {
+          return { ok: false, error: GITLAB_READY_FOR_REVIEW_UPDATE_REQUIRED_MESSAGE }
+        }
+      }
+      return route<WebGitLabResult<'updateMR'>>(GITLAB_WEB_RPC_METHODS.updateMR, args)
+    },
     updateMRReviewers: (args) =>
       route<WebGitLabResult<'updateMRReviewers'>>(GITLAB_WEB_RPC_METHODS.updateMRReviewers, args),
     addMRComment: (args) =>
@@ -2827,6 +2849,15 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
       } catch {
         // Why: unpaired/offline web clients still need local UI persistence.
       }
+    },
+    // Why a separate entry point: set stays best-effort, while callers that update a
+    // diff baseline must know whether the host persisted the patch (STA-5781).
+    setWithAck: async (updates) => {
+      const next = mergeWebUIState(readLocalWebUIState(), updates)
+      writeJson(UI_STORAGE_KEY, next)
+      zoomLevel = next.uiZoomLevel
+      const hostUpdates = omitPairingLocalUiFields(updates)
+      await callRuntimeResult('ui.set', hostUpdates, 15_000)
     },
     recordFeatureInteraction: async (id: FeatureInteractionId) => {
       const current = readLocalWebUIState()
@@ -3108,47 +3139,6 @@ function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
     installWsl: (_args?: { distro?: string | null }) => Promise.resolve(status),
     removeWsl: (_args?: { distro?: string | null }) => Promise.resolve(status)
   } as NonNullable<Partial<PreloadApi>['cli']>
-}
-
-function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
-  const status = (
-    agent:
-      | 'claude'
-      | 'openclaude'
-      | 'codex'
-      | 'gemini'
-      | 'antigravity'
-      | 'amp'
-      | 'cursor'
-      | 'droid'
-      | 'command-code'
-      | 'grok'
-      | 'copilot'
-      | 'hermes'
-      | 'devin'
-  ) =>
-    Promise.resolve({
-      agent,
-      state: 'not_installed',
-      configPath: '',
-      managedHooksPresent: false,
-      detail: applyProductBranding('Agent hook status is only available on the Orca server.')
-    } as const)
-  return {
-    claudeStatus: () => status('claude'),
-    openClaudeStatus: () => status('openclaude'),
-    codexStatus: () => status('codex'),
-    geminiStatus: () => status('gemini'),
-    antigravityStatus: () => status('antigravity'),
-    ampStatus: () => status('amp'),
-    cursorStatus: () => status('cursor'),
-    droidStatus: () => status('droid'),
-    commandCodeStatus: () => status('command-code'),
-    grokStatus: () => status('grok'),
-    copilotStatus: () => status('copilot'),
-    hermesStatus: () => status('hermes'),
-    devinStatus: () => status('devin')
-  }
 }
 
 function createMacosTccPromptsApi(): NonNullable<Partial<PreloadApi>['macosTccPrompts']> {
@@ -3649,7 +3639,7 @@ async function callRuntimeResult<TResult>(
 ): Promise<TResult> {
   const response = await callRuntimeEnvelope(method, params, timeoutMs)
   if (!response.ok) {
-    throw new Error(response.error.message)
+    throw Object.assign(new Error(response.error.message), { code: response.error.code })
   }
   return response.result as TResult
 }

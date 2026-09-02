@@ -23,6 +23,7 @@ describe('web preload API composition', () => {
       'platform',
       'workspacePorts',
       'orcaProfiles',
+      'hiveAccount',
       'e2e',
       'settings',
       'agentAwake',

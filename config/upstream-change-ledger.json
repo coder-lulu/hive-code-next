@@ -10,8 +10,12 @@
       "applied": "已移植",
       "dependencies": [],
       "conflictReason": "无；翻译文件采用上游新增键",
-      "adaptation": "保留 HiveCode composer UI 与产品边界",
-      "regressionTests": ["worktree-create-lineage", "ComposerParentWorktreePicker"]
+      "adaptation": "保留 HiveCode composer UI 与产品边界；Web preload 补齐 manual parentWorkspaceOrigin，并保留 runtime 错误码供调用方判断",
+      "regressionTests": [
+        "worktree-create-lineage",
+        "ComposerParentWorktreePicker",
+        "web preload workspace lineage"
+      ]
     },
     {
       "upstreamSha": "6f3c5cc03995ceeb7181ba421dfa58a50ea77f71",
@@ -253,7 +257,10 @@
       "dependencies": [],
       "conflictReason": "远程 session merge 已采用 HiveCode tombstone/close 语义",
       "adaptation": "保留本地 UI 与 session store，沿用上游 closed-tab tombstone reconnect 规则",
-      "regressionTests": ["remote-workspace-session-merge-close-tombstones", "workspace-session-closed-tab-tombstones"]
+      "regressionTests": [
+        "remote-workspace-session-merge-close-tombstones",
+        "workspace-session-closed-tab-tombstones"
+      ]
     },
     {
       "upstreamSha": "e06a8667a930b06472ce28a9b0ee0c4371a1716f",
@@ -262,7 +269,10 @@
       "dependencies": [],
       "conflictReason": "host authority 与恢复流程已在产品分支实现",
       "adaptation": "执行 host 未确认时禁止 seed/resume，保留 HiveCode terminal UI",
-      "regressionTests": ["workspace-terminal-host-authority", "remote-workspace-snapshot-fresh-client-tab-seeding"]
+      "regressionTests": [
+        "workspace-terminal-host-authority",
+        "remote-workspace-snapshot-fresh-client-tab-seeding"
+      ]
     },
     {
       "upstreamSha": "8b99c8365d6bd9cbc7e50d9d4a5a73b5005c2f80",
@@ -352,7 +362,11 @@
       "dependencies": ["fc36d58bbb", "fd9125ea8c"],
       "conflictReason": "结构化会话 host 接入点在 runtime 拆分冲突中遗漏",
       "adaptation": "恢复 lazy structured-agent-session host、创建意图、重启恢复、agent tab 投影与关闭；保留 HiveCode 移动 session tab 边界",
-      "regressionTests": ["structured agent-session create intent", "structured session cold restoration", "session tab move validation"]
+      "regressionTests": [
+        "structured agent-session create intent",
+        "structured session cold restoration",
+        "session tab move validation"
+      ]
     },
     {
       "upstreamSha": "caef20fec8dee3d5c7df6ff23600938da381a4b7",
@@ -368,9 +382,9 @@
       "type": "BUG",
       "applied": "已移植",
       "dependencies": [],
-      "conflictReason": "GitHub runtime facade 缺少 draft PR ready action",
-      "adaptation": "恢复 markRepoPRReadyForReview runtime bridge，保留 HiveCode checks panel/UI",
-      "regressionTests": ["GitHub PR update RPC"]
+      "conflictReason": "GitHub runtime facade 缺少 draft PR ready action，Web GitLab facade 也遗漏旧 runtime 能力门禁",
+      "adaptation": "恢复 GitHub markRepoPRReadyForReview runtime bridge，并为 Web GitLab readyForReview 增加 capability gate；保留 HiveCode checks panel/UI",
+      "regressionTests": ["GitHub PR update RPC", "Web GitLab ready-for-review capability"]
     },
     {
       "upstreamSha": "673842db35b37557006d9f20d04e077780253d82",
@@ -397,7 +411,11 @@
       "dependencies": [],
       "conflictReason": "GPU fallback 与 HiveCode 启动/品牌流程冲突，按 hunk 手工合并",
       "adaptation": "按上游方案在重启提示前持久化 safe-graphics marker，补恢复启动确认提示，保留 HiveCode 启动顺序与产品边界",
-      "regressionTests": ["gpu fallback engagement", "gpu fallback recovered launch", "gpu fallback marker"]
+      "regressionTests": [
+        "gpu fallback engagement",
+        "gpu fallback recovered launch",
+        "gpu fallback marker"
+      ]
     },
     {
       "upstreamSha": "a1f198be0d96c7152997a1fd178ad4f201fa7e67",
@@ -443,6 +461,51 @@
       "conflictReason": "结构化原生聊天与 HiveCode runtime/preload facade 存在拆分差异",
       "adaptation": "补齐结构化会话 PTY 写入门禁、退出解绑，以及 web preload 的会话恢复和能力暴露；保留 HiveCode web API 与 UI 品牌",
       "regressionTests": ["structured agent session PTY binding", "web preload capability parity"]
+    },
+    {
+      "upstreamSha": "98bdd653abcb12e2b8abba57fa0f2aa9ed636110",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Web 单体 preload 未吸收拆分模块中的 transcriptPending 协议",
+      "adaptation": "在 HiveCode Web 运行入口声明 transcriptPending 能力，并保证 pending 空快照不消耗首个有效快照",
+      "regressionTests": ["web native-chat pending transcript"]
+    },
+    {
+      "upstreamSha": "5c10bf9001a820612e2d98e528ec2d266296005a",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Web 单体 preload 缺少需要主机确认的 UI 状态写入入口",
+      "adaptation": "保留 set 的离线 best-effort 行为，新增 setWithAck 让依赖持久化确认的调用方感知 host 写入失败",
+      "regressionTests": ["web ui setWithAck transport failure"]
+    },
+    {
+      "upstreamSha": "b5a85890acff397adcea565733766190bfd75462",
+      "type": "重构",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Git 调度器参数已进入共享类型，但 Web 单体 preload 未向 runtime 转发",
+      "adaptation": "转发 status.includeLineStats 与 branchCompare.admissionTier，使 Web 调用受上游原子 admission scheduler 约束",
+      "regressionTests": ["web git admission parameters"]
+    },
+    {
+      "upstreamSha": "8f15f217a22953cc4e5da20010fc9a3de930aeea",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Web 单体 preload 创建工作树时丢失 displayNameKind",
+      "adaptation": "按可选字段转发 displayNameKind，保留用户显式命名，避免分支变化覆盖工作区名称",
+      "regressionTests": ["web worktree display name kind"]
+    },
+    {
+      "upstreamSha": "a651e81843bdf7c37979b8f761ada500a6738e8a",
+      "type": "重构",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "上游已删除无消费者的 agentHooks IPC，但冲突合并误恢复了 Web fallback",
+      "adaptation": "删除 Web 单体与拆分模块中的死 agentHooks fallback，继续通过现有 agent defaults/status 路径提供能力",
+      "regressionTests": ["web preload exact API composition", "web product branding"]
     }
   ]
 }
