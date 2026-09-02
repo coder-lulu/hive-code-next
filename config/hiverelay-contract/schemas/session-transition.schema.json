@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/session-transition.schema.json",
+  "title": "HiveRelay managed session transition batch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "v", "runtimeId", "runtimeBootId", "sessionTransitions"],
+  "properties": {
+    "type": {"const": "session-transition-batch"},
+    "v": {"const": 2},
+    "runtimeId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+    "runtimeBootId": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+    "sessionTransitions": {
+      "type": "array", "maxItems": 128,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["sequence", "transitionId", "transitionType", "managedSessionId", "runtimeSessionId", "expectedControlVersion", "sessionBindingHash", "occurredAt", "reason"],
+        "properties": {
+          "sequence": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+          "transitionId": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+          "transitionType": {"enum": ["ACTIVATE", "ABANDON", "CLOSE", "IDLE_EXPIRE", "AUTHORITY_EXPIRE"]},
+          "managedSessionId": {"type": "string", "minLength": 1, "maxLength": 128},
+          "runtimeSessionId": {"type": "string", "minLength": 1, "maxLength": 128},
+          "expectedControlVersion": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+          "sessionBindingHash": {"type": "string", "pattern": "^[A-Za-z0-9_-]{43}$"},
+          "occurredAt": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+          "reason": {"enum": ["ACTIVATED", "ABANDONED_BEFORE_ACTIVATION", "CLIENT_CLOSED", "RUNTIME_SHUTDOWN", "TRANSPORT_CLOSED", "LOCAL_ERROR", "IDLE_TIMEOUT", "SESSION_AUTHORITY_TIMEOUT"]}
+        }
+      }
+    }
+  }
+}

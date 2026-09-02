@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "authorityRepository": "hive-cloud",
+  "authorityPath": "docs/hive/contracts/hiverelay-v2",
+  "authoritySourceCommit": "4437030d6bd5af43e06208a7e92b81fa901ec4c0",
+  "contractRevision": "hiverelay-v2-p0.1",
+  "manifestSha256": "370937683d5915ad96fc605ab4f4c9c88fee80d9483e48d8202fc91b7f392623",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "829ba8bdfba942bc5e3442aac43d122d3c474bee58557ee0f71d335488af75c7"
+    },
+    {
+      "path": "canonical-encoding.md",
+      "sha256": "78ace065bd2301a8bf9750b050b5e456ab88f88b3a45db950677cbedbffb18d3"
+    },
+    {
+      "path": "fixture-manifest.json",
+      "sha256": "370937683d5915ad96fc605ab4f4c9c88fee80d9483e48d8202fc91b7f392623"
+    },
+    {
+      "path": "fixtures/legacy-v1/conn-open-invite.json",
+      "sha256": "613f9b49c2f82b46f9ab8c67f6b320da53240f8e386c8b7d8e41523f08ad71ec"
+    },
+    {
+      "path": "fixtures/legacy-v1/conn-open-resume.json",
+      "sha256": "97b36c5b71c3e6c832f37d232671a938b3c8a14c5d1e89b55b8192f4f459cbca"
+    },
+    {
+      "path": "fixtures/v2/admission-first-use.json",
+      "sha256": "742d68a33ba4f27cc4112e9f58cdc82491031e4e35dbe6fb674611fb18ab7270"
+    },
+    {
+      "path": "fixtures/v2/admission-replay.json",
+      "sha256": "0de64ac0376d599ee2206f4c01f34513ba89531c5ffe31e8f932e65970410dc3"
+    },
+    {
+      "path": "fixtures/v2/base64url-noncanonical.json",
+      "sha256": "fb911164e2dfea8ab6ce13dc6f03d507e509cfb81f9ccca667134ddad21e59d6"
+    },
+    {
+      "path": "fixtures/v2/binding-mismatches.json",
+      "sha256": "08d2227953258b7e063c2ff56f9089f77c8a7165182f01b42b8127683c50ff3f"
+    },
+    {
+      "path": "fixtures/v2/close-codes-valid.json",
+      "sha256": "84b210a6cf1a3667678c671547af11efb235fe97122914a1edd3343752b99dff"
+    },
+    {
+      "path": "fixtures/v2/conn-ticket-first-use.json",
+      "sha256": "70d9ca44836e68d4de29621abe2cdd2fb9b6ec62e138f36687400221d938beef"
+    },
+    {
+      "path": "fixtures/v2/conn-ticket-replay.json",
+      "sha256": "f2eb77513fc6f8b8d7ef1d310dd51deec5bda7e708c5628b4c2c4c9e58ac1492"
+    },
+    {
+      "path": "fixtures/v2/frame-boundaries-plus-one.json",
+      "sha256": "721ab627150e56bf40d8d259739067a9dd0402ac7189db0bfd3b3cf1ecbe11e1"
+    },
+    {
+      "path": "fixtures/v2/frame-boundaries-valid.json",
+      "sha256": "3324171a4fc792bfa1ab6d66344543f92e1996225907d87426efa282bc4dbd02"
+    },
+    {
+      "path": "fixtures/v2/jws-expired.json",
+      "sha256": "912d64af87d863501fbe9c7157dce613884394459c83145360295060ec38cb15"
+    },
+    {
+      "path": "fixtures/v2/jws-unknown-kid.json",
+      "sha256": "4a332d9641529f094c6bfb35360bc4cbde1e1ec9604b176b90cba47bd67611b4"
+    },
+    {
+      "path": "fixtures/v2/jws-valid.json",
+      "sha256": "5c7f49fa3e2fc0e04877c191fa9377f0d351b343f482601f9eb2b33b5c0c4801"
+    },
+    {
+      "path": "fixtures/v2/jws-wrong-alg.json",
+      "sha256": "a265c860abaa236ef92dd699f5a74d67b46fbae9c4b6101c033fcf8aa116b520"
+    },
+    {
+      "path": "fixtures/v2/jws-wrong-audience.json",
+      "sha256": "ea04e1a437fb749b6034ae9a44317c16e8f2093e23bc310ccecdbd93835d5612"
+    },
+    {
+      "path": "fixtures/v2/jws-wrong-typ.json",
+      "sha256": "041fab6ff0f8897c761f66cf58267fd81ea569c16ce25b1c84cc2922bee0ae13"
+    },
+    {
+      "path": "fixtures/v2/origin-userinfo-query.json",
+      "sha256": "627a0e61d90bd9ff665061a0d3e72b63600338c86acefa37085e0ae29e65e91d"
+    },
+    {
+      "path": "fixtures/v2/origin-valid.json",
+      "sha256": "f6a97b15ad2eadf56d68fb491166083c06b08f27b8f822f9fa4e6ba459c0c033"
+    },
+    {
+      "path": "fixtures/v2/private-command-body-conflict.json",
+      "sha256": "9d99b7103d79a16875d808a57c0efc0adb3d45fcba544798cba7b5358c65b10e"
+    },
+    {
+      "path": "fixtures/v2/private-commands-valid.json",
+      "sha256": "822dfc5c0d84b5f12c867ebe115d25001c72680f1d70359bf01fcd0dbd8ee5bc"
+    },
+    {
+      "path": "fixtures/v2/session-transition-gap.json",
+      "sha256": "a92441eeb0e1211e089a3c0b6c3276ccbe93610f99c4c3b4d2dc2512fb07a3a5"
+    },
+    {
+      "path": "fixtures/v2/session-transition-replay-conflict.json",
+      "sha256": "b07c80ab29aa7cb483c1e876b5182e7de3bc3ee03a296f0526fc74f4c270f534"
+    },
+    {
+      "path": "fixtures/v2/session-transition-valid.json",
+      "sha256": "247a93aae1ef8b768d128f2d0639906e7d98f2cb492a1bbafa0274ecbb2aa6e8"
+    },
+    {
+      "path": "fixtures/v2/wire-duplicate-key.json",
+      "sha256": "d69bc4705efe2a0a0409a23e0e9b52d7670e408acac578699cd0e368dc2fd4e1"
+    },
+    {
+      "path": "fixtures/v2/wire-forbidden-secret.json",
+      "sha256": "abeaa4e517bbe636bcf4454b70bcc754cb73e977e7e21bcc8088fce65f02cfce"
+    },
+    {
+      "path": "fixtures/v2/wire-messages-valid.json",
+      "sha256": "2e687135be5e93f1db960c8775f1d57d5107a4adbaab4a3be650040f012c810f"
+    },
+    {
+      "path": "fixtures/v2/wire-unknown-field.json",
+      "sha256": "aa60a64a98d7c8a7f2e5b14ea793784e866a05e2aa93207f1e58061f0dfcad4a"
+    },
+    {
+      "path": "fixtures/v2/x25519-low-order.json",
+      "sha256": "b56eddc5f90567bd0a2bc35d385229d34a82ed27df057b6f0d9682510ebd3d18"
+    },
+    {
+      "path": "fixtures/v2/x25519-valid.json",
+      "sha256": "4de8299ae940b767c63a3b0f1d3420ac8b7f54493f8acd4f5eb2325873254be5"
+    },
+    {
+      "path": "openapi/hiverelay-cloud-v2.openapi.yaml",
+      "sha256": "d4e613b24b3605eeb4394a0c7bb71d673b0862a4c76ea6ae47fc04474fe7b6cd"
+    },
+    {
+      "path": "registries/close-codes.json",
+      "sha256": "230d636b9f160069bec5c05a8178a39e7e089a82cca12cdbe4afa4dc971a5f59"
+    },
+    {
+      "path": "registries/credentials.json",
+      "sha256": "de149cbfba8535a604ea580cf1871039b2b63a9aa2211973b2d451f4f9ceef3d"
+    },
+    {
+      "path": "registries/feature-flags.json",
+      "sha256": "f6039ba97686c66ca871e56728ee09d843fc4223eb051f36748ab9a26f7accd9"
+    },
+    {
+      "path": "registries/limits.json",
+      "sha256": "af92b4889c6a191d2775815e5af7eb9eaa92ee18dd09b4b3e12381b8f14183c3"
+    },
+    {
+      "path": "registries/security-boundaries.json",
+      "sha256": "f6798cfd3bd454a674d3f82881eff63033b6a5d92e62bff76d3251bacd979209"
+    },
+    {
+      "path": "registries/state-transitions.json",
+      "sha256": "eaa7f7a1cd028525c9611dcffdd49d18181c4cd468ea89fb1e0f10ba413210f2"
+    },
+    {
+      "path": "registries/test-keys.json",
+      "sha256": "5ad8fdd716686819113a7a194d0ab29de2bb9a42da1a1f6d38ae30f7b6ce404e"
+    },
+    {
+      "path": "schemas/common.schema.json",
+      "sha256": "1e2301b99259b26af54dc3f4745f9fdcb055fd6fb37dd8f6ae98d2ef5fc5e560"
+    },
+    {
+      "path": "schemas/contract-report.schema.json",
+      "sha256": "1610c7c5084bc0be7563d26aeefd75b18c68f12ea4de88d4c26cb0c1bf8f53d2"
+    },
+    {
+      "path": "schemas/contract-source-receipt.schema.json",
+      "sha256": "4bae5d26fc96d1237014ef0f4006a76a5133c2e038e63bea084f920e92235849"
+    },
+    {
+      "path": "schemas/fixture-case.schema.json",
+      "sha256": "df346bfbee14766d1fad35bb870157d9852fe2e3b3ba299e26f82d7f9bfdc47f"
+    },
+    {
+      "path": "schemas/fixture-manifest.schema.json",
+      "sha256": "40d4ca0f2ae21b2ab1f859bfb25bbec10c9c714844410144634e30ecc3de560b"
+    },
+    {
+      "path": "schemas/private-ops.schema.json",
+      "sha256": "afccb4daf5e53bb1048813df273f07325ffe7f31857eb59d1abba4a57fa8fabe"
+    },
+    {
+      "path": "schemas/session-transition.schema.json",
+      "sha256": "1a6c3f658377ee3fa67239faaf6f84e87fa275ae6eea19d5ef6c9bd2570cf011"
+    },
+    {
+      "path": "schemas/token-claims.schema.json",
+      "sha256": "ad082c84ae67b5eabab0e734d433b415a2b1db4be212c1dbc7f98d652144297f"
+    },
+    {
+      "path": "schemas/wire-messages.schema.json",
+      "sha256": "add80711ec6b6660b584740bc00483e921cdfec9a040fe5049ae5f878ca257ea"
+    }
+  ]
+}

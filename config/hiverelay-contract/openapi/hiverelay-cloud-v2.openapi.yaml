@@ -1,0 +1,382 @@
+openapi: 3.1.0
+info:
+  title: HiveRelay v2 P0 contract
+  version: hiverelay-v2-p0.1
+  description: >-
+    Authority-only interface shapes. P0 does not register these routes or enable any
+    capability.
+servers:
+  - url: https://cloud.hive.test
+    description: HiveCloud authority
+x-hiverelay-public-wss:
+  - path: /v1/host/control
+    role: runtime-host-control
+    credential: controlLease
+  - path: /v1/host/data/{connId}
+    role: runtime-host-data
+    credential: connTicket
+  - path: /v1/connect/{relayHostId}
+    role: client-admission
+    credential: clientAdmissionToken
+x-hiverelay-cell-private-paths:
+  - /internal/status
+  - /internal/v1/lifecycle
+  - /internal/v1/fences
+paths:
+  /hive/v1/runtime-relay-hosts:
+    post:
+      operationId: registerRelayHostV2
+      security: [{hiveSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/HostRegistrationRequest'}
+      responses:
+        '200':
+          description: Current Host binding
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HostRegistrationResponse'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+  /hive/v1/runtimes/{runtimeRecordId}/relay/authorizations:
+    post:
+      operationId: authorizeRuntimeRelayV2
+      security: [{runtimeProof: []}]
+      parameters:
+        - {$ref: '#/components/parameters/RuntimeRecordId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RelayAuthorizationRequest'}
+      responses:
+        '200':
+          description: Short-lived Director credential
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RelayAuthorizationResponse'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /v1/assign:
+    post:
+      operationId: assignRuntimeToCellV2
+      servers:
+        - url: https://relay-director.hive.test
+      security: [{relayToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignmentRequest'}
+      responses:
+        '200':
+          description: Exact Cell assignment and control lease
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssignmentResponse'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /hive/v1/runtimes/{runtimeRecordId}/connection-intents:
+    post:
+      operationId: createRuntimeConnectionIntentV2
+      security: [{hiveSession: []}]
+      parameters:
+        - {$ref: '#/components/parameters/RuntimeRecordId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConnectionIntentRequest'}
+      responses:
+        '200':
+          description: V2 outer admission and E2EE inner ticket material
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConnectionIntentResponse'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+        '426': {$ref: '#/components/responses/UpgradeRequired'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /hive/v1/runtime-connection-tickets/{ticketId}/consume:
+    post:
+      operationId: consumeRuntimeConnectionTicketV2
+      security: [{runtimeProof: []}]
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema: {$ref: '#/components/schemas/UuidV4'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TicketConsumeRequest'}
+      responses:
+        '200':
+          description: Stable replayable consume result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TicketConsumeResponse'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+  /internal/status:
+    get:
+      operationId: readCellStatusV2
+      servers: [{url: 'https://cell-01.private.hive.test:8443'}]
+      security: [{cellOpsToken: []}]
+      parameters:
+        - name: nonce
+          in: header
+          required: true
+          schema: {$ref: '#/components/schemas/Base64Url16'}
+      responses:
+        '200':
+          description: Non-sensitive Cell readiness report
+          content:
+            application/json:
+              schema: {$ref: '../schemas/private-ops.schema.json#/$defs/statusResponse'}
+  /internal/v1/lifecycle:
+    post:
+      operationId: applyCellLifecycleCommandV2
+      servers: [{url: 'https://cell-01.private.hive.test:8443'}]
+      security: [{cellOpsToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/private-ops.schema.json#/$defs/lifecycleCommand'}
+      responses:
+        '200':
+          description: Idempotent command result
+          content:
+            application/json:
+              schema: {$ref: '../schemas/private-ops.schema.json#/$defs/commandResult'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+  /internal/v1/fences:
+    post:
+      operationId: applyCellFenceCommandV2
+      servers: [{url: 'https://cell-01.private.hive.test:8443'}]
+      security: [{cellOpsToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - {$ref: '../schemas/private-ops.schema.json#/$defs/assignmentFence'}
+                - {$ref: '../schemas/private-ops.schema.json#/$defs/incarnationFence'}
+      responses:
+        '200':
+          description: Idempotent command result
+          content:
+            application/json:
+              schema: {$ref: '../schemas/private-ops.schema.json#/$defs/commandResult'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+components:
+  securitySchemes:
+    hiveSession:
+      type: http
+      scheme: bearer
+    runtimeProof:
+      type: http
+      scheme: bearer
+      bearerFormat: Ed25519 signed request proof
+    relayToken:
+      type: http
+      scheme: bearer
+      bearerFormat: compact JWS relay-assignment+jwt
+    cellOpsToken:
+      type: http
+      scheme: bearer
+      bearerFormat: compact JWS relay-cell-ops+jwt
+  parameters:
+    RuntimeRecordId:
+      name: runtimeRecordId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/UuidV4'}
+  responses:
+    SymbolicConflict:
+      description: Binding, state, idempotency, or replay conflict
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    UpgradeRequired:
+      description: V2 is not supported by the selected component set
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    RateLimited:
+      description: Frozen quota exceeded
+      headers:
+        Retry-After:
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 30}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+  schemas:
+    OpaqueId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+    UuidV4:
+      type: string
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    Generation:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    EpochMs:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    Base64Url16:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{22}$'
+    Base64Url32:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{43}$'
+    RuntimeTuple:
+      type: object
+      additionalProperties: false
+      required: [runtimeId, runtimeBootId, authorityGeneration, fencingEpoch, leaseEpoch]
+      properties:
+        runtimeId: {$ref: '#/components/schemas/OpaqueId'}
+        runtimeBootId: {$ref: '#/components/schemas/UuidV4'}
+        authorityGeneration: {$ref: '#/components/schemas/Generation'}
+        fencingEpoch: {$ref: '#/components/schemas/Generation'}
+        leaseEpoch: {$ref: '#/components/schemas/Generation'}
+    HostRegistrationRequest:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, runtimeId, runtimeBootId, authorityGeneration, fencingEpoch, leaseEpoch, hostPublicKeyB64, requestedRelayHostId]
+      properties:
+        protocolVersion: {const: 2}
+        runtimeId: {$ref: '#/components/schemas/OpaqueId'}
+        runtimeBootId: {$ref: '#/components/schemas/UuidV4'}
+        authorityGeneration: {$ref: '#/components/schemas/Generation'}
+        fencingEpoch: {$ref: '#/components/schemas/Generation'}
+        leaseEpoch: {$ref: '#/components/schemas/Generation'}
+        hostPublicKeyB64: {$ref: '#/components/schemas/Base64Url32'}
+        requestedRelayHostId: {type: string, pattern: '^[A-Za-z0-9_-]{16}$'}
+    HostRegistrationResponse:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, relayHostId, hostBindingVersion]
+      properties:
+        protocolVersion: {const: 2}
+        relayHostId: {type: string, pattern: '^[A-Za-z0-9_-]{16}$'}
+        hostBindingVersion: {$ref: '#/components/schemas/Generation'}
+    RelayAuthorizationRequest:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, runtimeProof, capabilities]
+      properties:
+        protocolVersion: {const: 2}
+        runtimeProof: {type: string, minLength: 64, maxLength: 2048}
+        capabilities:
+          type: array
+          uniqueItems: true
+          minItems: 1
+          maxItems: 8
+          items: {enum: [ticket-connect-v2]}
+    RelayAuthorizationResponse:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, relayToken, expiresAt]
+      properties:
+        protocolVersion: {const: 2}
+        relayToken: {type: string, maxLength: 8192}
+        expiresAt: {$ref: '#/components/schemas/EpochMs'}
+    AssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, hostPublicKeyB64, requestedRegion]
+      properties:
+        protocolVersion: {const: 2}
+        hostPublicKeyB64: {$ref: '#/components/schemas/Base64Url32'}
+        requestedRegion: {$ref: '#/components/schemas/OpaqueId'}
+    AssignmentResponse:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, cellUrl, cellId, cellIncarnationId, assignmentId, assignmentEpoch, relayHostId, controlLease, controlLeaseExpiresAt]
+      properties:
+        protocolVersion: {const: 2}
+        cellUrl: {type: string, pattern: '^https://[a-z0-9][a-z0-9.-]*(?::[1-9][0-9]{0,4})?$'}
+        cellId: {$ref: '#/components/schemas/OpaqueId'}
+        cellIncarnationId: {$ref: '#/components/schemas/UuidV4'}
+        assignmentId: {$ref: '#/components/schemas/UuidV4'}
+        assignmentEpoch: {$ref: '#/components/schemas/Generation'}
+        relayHostId: {type: string, pattern: '^[A-Za-z0-9_-]{16}$'}
+        controlLease: {type: string, maxLength: 8192}
+        controlLeaseExpiresAt: {$ref: '#/components/schemas/EpochMs'}
+    ConnectionIntentRequest:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, idempotencyKey, clientKind, clientPublicKeyB64, ticketSecretSha256]
+      properties:
+        protocolVersion: {const: 2}
+        idempotencyKey: {$ref: '#/components/schemas/UuidV4'}
+        clientKind: {enum: [DESKTOP, MOBILE, WEB]}
+        clientPublicKeyB64: {$ref: '#/components/schemas/Base64Url32'}
+        ticketSecretSha256: {$ref: '#/components/schemas/Base64Url32'}
+    ConnectionIntentResponse:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, intentId, ticketId, expiresAt, cellUrl, cellId, cellIncarnationId, assignmentId, assignmentEpoch, relayHostId, clientAdmissionToken]
+      properties:
+        protocolVersion: {const: 2}
+        intentId: {$ref: '#/components/schemas/UuidV4'}
+        ticketId: {$ref: '#/components/schemas/UuidV4'}
+        expiresAt: {$ref: '#/components/schemas/EpochMs'}
+        cellUrl: {type: string, pattern: '^https://[a-z0-9][a-z0-9.-]*(?::[1-9][0-9]{0,4})?$'}
+        cellId: {$ref: '#/components/schemas/OpaqueId'}
+        cellIncarnationId: {$ref: '#/components/schemas/UuidV4'}
+        assignmentId: {$ref: '#/components/schemas/UuidV4'}
+        assignmentEpoch: {$ref: '#/components/schemas/Generation'}
+        relayHostId: {type: string, pattern: '^[A-Za-z0-9_-]{16}$'}
+        clientAdmissionToken: {type: string, maxLength: 8192}
+    TicketConsumeRequest:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, runtimeProof, consumeAttemptId, ticketSecret, intentId, runtimeId, runtimeBootId, authorityGeneration, fencingEpoch, leaseEpoch, assignmentId, assignmentEpoch, controlGeneration, cellId, cellIncarnationId, connId, clientKeyHash, e2eeTranscriptHash, sessionBindingHash]
+      properties:
+        protocolVersion: {const: 'account-runtime-ticket-consume/v2'}
+        runtimeProof: {type: string, minLength: 64, maxLength: 2048}
+        consumeAttemptId: {$ref: '#/components/schemas/UuidV4'}
+        ticketSecret: {$ref: '#/components/schemas/Base64Url32'}
+        intentId: {$ref: '#/components/schemas/UuidV4'}
+        runtimeId: {$ref: '#/components/schemas/OpaqueId'}
+        runtimeBootId: {$ref: '#/components/schemas/UuidV4'}
+        authorityGeneration: {$ref: '#/components/schemas/Generation'}
+        fencingEpoch: {$ref: '#/components/schemas/Generation'}
+        leaseEpoch: {$ref: '#/components/schemas/Generation'}
+        assignmentId: {$ref: '#/components/schemas/UuidV4'}
+        assignmentEpoch: {$ref: '#/components/schemas/Generation'}
+        controlGeneration: {$ref: '#/components/schemas/Generation'}
+        cellId: {$ref: '#/components/schemas/OpaqueId'}
+        cellIncarnationId: {$ref: '#/components/schemas/UuidV4'}
+        connId: {$ref: '#/components/schemas/OpaqueId'}
+        clientKeyHash: {$ref: '#/components/schemas/Base64Url32'}
+        e2eeTranscriptHash: {$ref: '#/components/schemas/Base64Url32'}
+        sessionBindingHash: {$ref: '#/components/schemas/Base64Url32'}
+    TicketConsumeResponse:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, managedSessionId, runtimeSessionId, status, activationDeadlineAt, absoluteExpiresAt, controlVersion]
+      properties:
+        protocolVersion: {const: 'account-runtime-ticket-consume/v2'}
+        managedSessionId: {$ref: '#/components/schemas/UuidV4'}
+        runtimeSessionId: {$ref: '#/components/schemas/UuidV4'}
+        status: {const: PENDING_ACTIVATION}
+        activationDeadlineAt: {$ref: '#/components/schemas/EpochMs'}
+        absoluteExpiresAt: {$ref: '#/components/schemas/EpochMs'}
+        controlVersion: {$ref: '#/components/schemas/Generation'}
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          enum: [UPGRADE_REQUIRED, RELAY_UNAVAILABLE, STALE_BINDING, REPLAY_DETECTED, CAPACITY_EXCEEDED, COMMAND_REPLAY_CONFLICT, TRANSITION_REPLAY_CONFLICT, SEQUENCE_GAP]

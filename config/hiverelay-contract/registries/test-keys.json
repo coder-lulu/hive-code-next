@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "environment": "fixture-only",
+  "keys": [
+    {
+      "kid": "relay-test-2026-01",
+      "alg": "EdDSA",
+      "curve": "Ed25519",
+      "publicKeyB64Url": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+    }
+  ]
+}

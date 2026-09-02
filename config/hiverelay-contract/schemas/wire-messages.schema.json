@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/wire-messages.schema.json",
+  "title": "HiveRelay v2 strict outer wire messages",
+  "oneOf": [
+    {"$ref": "#/$defs/hostHello"},
+    {"$ref": "#/$defs/hostChallenge"},
+    {"$ref": "#/$defs/hostChallengeAck"},
+    {"$ref": "#/$defs/hostHelloAck"},
+    {"$ref": "#/$defs/relayAuth"},
+    {"$ref": "#/$defs/connOpen"},
+    {"$ref": "#/$defs/hostDataAuth"},
+    {"$ref": "#/$defs/relayHello"},
+    {"$ref": "#/$defs/authRefresh"},
+    {"$ref": "#/$defs/drain"}
+  ],
+  "$defs": {
+    "opaqueId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+    "uuidV4": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+    "generation": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "epochMs": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "base64url24": {"type": "string", "pattern": "^[A-Za-z0-9_-]{32}$"},
+    "base64url32": {"type": "string", "pattern": "^[A-Za-z0-9_-]{43}$"},
+    "relayHostId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{16}$"},
+    "compactJws": {"type": "string", "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{86}$", "maxLength": 8192},
+    "bindingProperties": {
+      "cellId": {"$ref": "#/$defs/opaqueId"},
+      "cellIncarnationId": {"$ref": "#/$defs/uuidV4"},
+      "runtimeId": {"$ref": "#/$defs/opaqueId"},
+      "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
+      "authorityGeneration": {"$ref": "#/$defs/generation"},
+      "fencingEpoch": {"$ref": "#/$defs/generation"},
+      "leaseEpoch": {"$ref": "#/$defs/generation"},
+      "assignmentId": {"$ref": "#/$defs/uuidV4"},
+      "assignmentEpoch": {"$ref": "#/$defs/generation"},
+      "controlGeneration": {"$ref": "#/$defs/generation"},
+      "relayHostId": {"$ref": "#/$defs/relayHostId"}
+    },
+    "hostHello": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "cellId", "cellIncarnationId", "runtimeId", "runtimeBootId", "authorityGeneration", "fencingEpoch", "leaseEpoch", "assignmentId", "assignmentEpoch", "controlGeneration", "relayHostId", "hostPublicKeyB64", "capabilities"],
+      "properties": {
+        "type": {"const": "host-hello"}, "v": {"const": 2},
+        "cellId": {"$ref": "#/$defs/opaqueId"}, "cellIncarnationId": {"$ref": "#/$defs/uuidV4"},
+        "runtimeId": {"$ref": "#/$defs/opaqueId"}, "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
+        "authorityGeneration": {"$ref": "#/$defs/generation"}, "fencingEpoch": {"$ref": "#/$defs/generation"}, "leaseEpoch": {"$ref": "#/$defs/generation"},
+        "assignmentId": {"$ref": "#/$defs/uuidV4"}, "assignmentEpoch": {"$ref": "#/$defs/generation"}, "controlGeneration": {"$ref": "#/$defs/generation"},
+        "relayHostId": {"$ref": "#/$defs/relayHostId"}, "hostPublicKeyB64": {"$ref": "#/$defs/base64url32"},
+        "capabilities": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "contains": {"const": "ticket-connect-v2"}, "items": {"enum": ["ticket-connect-v2"]}}
+      }
+    },
+    "hostChallenge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "challengeId", "relayEphemeralPublicKeyB64", "nonceB64", "ciphertextB64", "expiresAt"],
+      "properties": {
+        "type": {"const": "host-challenge"}, "v": {"const": 2}, "challengeId": {"$ref": "#/$defs/opaqueId"},
+        "relayEphemeralPublicKeyB64": {"$ref": "#/$defs/base64url32"}, "nonceB64": {"$ref": "#/$defs/base64url24"},
+        "ciphertextB64": {"type": "string", "minLength": 1, "maxLength": 16384, "pattern": "^[A-Za-z0-9_-]+$"},
+        "expiresAt": {"$ref": "#/$defs/epochMs"}
+      }
+    },
+    "hostChallengeAck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "challengeId", "proofB64"],
+      "properties": {"type": {"const": "host-challenge-ack"}, "v": {"const": 2}, "challengeId": {"$ref": "#/$defs/opaqueId"}, "proofB64": {"$ref": "#/$defs/base64url32"}}
+    },
+    "hostHelloAck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "leaseExpiresAt", "controlGeneration"],
+      "properties": {"type": {"const": "host-hello-ack"}, "v": {"const": 2}, "leaseExpiresAt": {"$ref": "#/$defs/epochMs"}, "controlGeneration": {"$ref": "#/$defs/generation"}}
+    },
+    "relayAuth": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "clientAdmissionToken", "clientPublicKeyB64"],
+      "properties": {"type": {"const": "relay-auth"}, "v": {"const": 2}, "clientAdmissionToken": {"$ref": "#/$defs/compactJws"}, "clientPublicKeyB64": {"$ref": "#/$defs/base64url32"}}
+    },
+    "connOpen": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "kind", "connId", "connTicket", "intentId", "clientKeyHash", "assignmentEpoch", "controlGeneration", "attachDeadlineMs"],
+      "properties": {
+        "type": {"const": "conn-open"}, "v": {"const": 2}, "kind": {"const": "ticket"},
+        "connId": {"$ref": "#/$defs/opaqueId"}, "connTicket": {"$ref": "#/$defs/base64url32"}, "intentId": {"$ref": "#/$defs/uuidV4"},
+        "clientKeyHash": {"$ref": "#/$defs/base64url32"}, "assignmentEpoch": {"$ref": "#/$defs/generation"}, "controlGeneration": {"$ref": "#/$defs/generation"},
+        "attachDeadlineMs": {"type": "integer", "minimum": 1, "maximum": 12000}
+      }
+    },
+    "hostDataAuth": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "connId", "connTicket", "assignmentEpoch", "controlGeneration"],
+      "properties": {"type": {"const": "host-data-auth"}, "v": {"const": 2}, "connId": {"$ref": "#/$defs/opaqueId"}, "connTicket": {"$ref": "#/$defs/base64url32"}, "assignmentEpoch": {"$ref": "#/$defs/generation"}, "controlGeneration": {"$ref": "#/$defs/generation"}}
+    },
+    "relayHello": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "connId", "cellId", "cellIncarnationId"],
+      "properties": {"type": {"const": "relay-hello"}, "v": {"const": 2}, "connId": {"$ref": "#/$defs/opaqueId"}, "cellId": {"$ref": "#/$defs/opaqueId"}, "cellIncarnationId": {"$ref": "#/$defs/uuidV4"}}
+    },
+    "authRefresh": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "controlLease"],
+      "properties": {"type": {"const": "auth-refresh"}, "v": {"const": 2}, "controlLease": {"$ref": "#/$defs/compactJws"}}
+    },
+    "drain": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "v", "deadlineMs", "reason"],
+      "properties": {"type": {"const": "drain"}, "v": {"const": 2}, "deadlineMs": {"type": "integer", "minimum": 0, "maximum": 120000}, "reason": {"enum": ["INCARNATION_DRAIN", "ASSIGNMENT_FENCE", "CONTROL_LEASE_EXPIRED"]}}
+    }
+  }
+}

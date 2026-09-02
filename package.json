@@ -47,6 +47,7 @@
     "verify:bundled-skill-guides": "node config/scripts/generate-bundled-skill-guides.mjs --check",
     "generate:product-config": "node config/scripts/generate-product-config.mjs --write",
     "verify:product-config": "node config/scripts/generate-product-config.mjs --check",
+    "verify:hiverelay-contract": "node config/scripts/verify-hiverelay-contract.mjs",
     "verify:documentation-governance": "node config/scripts/verify-documentation-governance.mjs",
     "generate:skill-bundle-manifest": "node config/scripts/generate-skill-bundle-manifest.mjs --write",
     "verify:skill-bundle-manifest": "node config/scripts/generate-skill-bundle-manifest.mjs",

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "caseId": "v2.frames.exact-boundaries.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "frame-limit",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {"frames": [{"limit": "preAuthJsonBytes", "bytes": 16384}, {"limit": "hostControlJsonBytes", "bytes": 65536}, {"limit": "jsonPlaintextBytes", "bytes": 4194304}, {"limit": "binaryPlaintextBytes", "bytes": 8388608}, {"limit": "encryptedPayloadBytes", "bytes": 8388690}, {"limit": "maskedWireMessageBytes", "bytes": 8388704}], "compressionRequested": false}
+}
