@@ -3,19 +3,22 @@ import { rewindHistoryIndexPastView } from '../worktree-nav-history'
 
 export function createUiViewActions(set: UISliceSet, get: UISliceGet): Partial<UISlice> {
   return {
-    openActivityPage: () => {
-      if (get().settings?.experimentalActivity !== true) {
+    openActivityPage: (options) => {
+      const scope = options?.scope ?? 'all'
+      if (scope === 'all' && get().settings?.experimentalActivity !== true) {
         return
       }
       set((state) => ({
         activeView: 'activity',
+        activityPageScope: scope,
         previousViewBeforeActivity:
           state.activeView === 'activity' ? state.previousViewBeforeActivity : state.activeView
       }))
     },
     closeActivityPage: () =>
       set((state) => ({
-        activeView: state.previousViewBeforeActivity
+        activeView: state.previousViewBeforeActivity,
+        activityPageScope: 'all'
       })),
     selectedAutomationId: null,
     setSelectedAutomationId: (id) => set({ selectedAutomationId: id }),

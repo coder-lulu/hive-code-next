@@ -63,6 +63,14 @@ export function getRuntimeServerConnectionState(
 }
 
 export function isRuntimeServerTransportConnected(state: RuntimeServerConnectionState): boolean {
+  if (
+    state === 'available' ||
+    state === 'online-unavailable' ||
+    state === 'degraded' ||
+    state === 'offline'
+  ) {
+    return false
+  }
   return isConnectedRuntimeHostState(state)
 }
 

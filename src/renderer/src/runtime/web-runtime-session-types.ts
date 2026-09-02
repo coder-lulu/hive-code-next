@@ -9,6 +9,7 @@ import type {
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
 import type { RuntimeTerminalCreate } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import type { AgentExplicitLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 
 export type WebRuntimeTerminalCreateOutcome =
   | { status: 'created' }
@@ -33,6 +34,7 @@ export type CreateWebRuntimeSessionTerminalArgs = {
   promptDelivery?: AgentPromptDelivery
   /** Explicit CLI override; omission leaves the remote host's defaults authoritative. */
   agentArgs?: string | null
+  agentPermissionMode?: AgentExplicitLaunchPermissionMode
   launchPreferences?: AgentLaunchPreferences
   providerSession?: AgentProviderSessionMetadata
   viewMode?: 'terminal' | 'chat'
@@ -45,6 +47,7 @@ export type CreatedWebRuntimeSessionTerminal = {
   hostTabId?: string
 }
 
-export type CreatedAgentTerminalIdentity = Pick<RuntimeTerminalCreate, 'tabId' | 'paneKey'> & {
-  leafId?: string
-}
+export type CreatedAgentTerminalIdentity = Pick<RuntimeTerminalCreate, 'tabId' | 'paneKey'> &
+  Partial<Pick<RuntimeTerminalCreate, 'handle'>> & {
+    leafId?: string
+  }

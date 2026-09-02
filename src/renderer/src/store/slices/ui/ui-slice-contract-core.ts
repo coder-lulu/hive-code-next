@@ -131,6 +131,8 @@ export type HomePendingSessionAssignment = {
   executionHostId?: ExecutionHostId
 }
 
+export type ActivityPageScope = 'all' | 'temporary-sessions'
+
 export type UISliceCore = {
   sidebarOpen: boolean
   sidebarWidth: number
@@ -165,6 +167,7 @@ export type UISliceCore = {
   previousViewBeforeTasks: Exclude<UiViewHistory, 'tasks'>
   previousViewBeforeSettings: Exclude<UiViewHistory, 'settings'>
   previousViewBeforeActivity: Exclude<UiViewHistory, 'activity'>
+  activityPageScope: ActivityPageScope
   previousViewBeforeAutomations: Exclude<UiViewHistory, 'automations'>
   previousViewBeforeSpace: Exclude<UiViewHistory, 'space'>
   previousViewBeforeSkills: Exclude<UiViewHistory, 'skills'>
@@ -184,7 +187,7 @@ export type UISliceCore = {
     options?: { recordTasksInteraction?: boolean }
   ) => void
   closeTaskPage: () => void
-  openActivityPage: () => void
+  openActivityPage: (options?: { scope?: ActivityPageScope }) => void
   closeActivityPage: () => void
   selectedAutomationId: string | null
   setSelectedAutomationId: (id: string | null) => void

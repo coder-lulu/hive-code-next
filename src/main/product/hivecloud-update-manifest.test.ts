@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { validateHiveCloudUpdateManifest } from './hivecloud-update-manifest'
 import type { HiveCloudUpdateArtifact } from './hivecloud-update-check'
 
-const artifact: HiveCloudUpdateArtifact = {
+const artifact = {
   packageFormat: 'nsis',
   architecture: 'x64',
   distributionType: 'direct',
@@ -12,7 +12,7 @@ const artifact: HiveCloudUpdateArtifact = {
   sha256: 'a'.repeat(64),
   sha512: 'b'.repeat(128),
   size: 1234
-}
+} satisfies HiveCloudUpdateArtifact
 
 function manifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

@@ -10,7 +10,7 @@ export function isAppImageCacheKey(value: string): boolean {
 export function resolveCachedAppImagePayloadRoot(
   cacheRootPath: string,
   candidatePath: string,
-  launcherName = LINUX_CLI_COMMAND_NAME
+  launcherName: string = LINUX_CLI_COMMAND_NAME
 ): string | null {
   if (!isAbsolute(candidatePath)) {
     return null

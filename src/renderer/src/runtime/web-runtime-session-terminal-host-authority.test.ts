@@ -260,11 +260,13 @@ describe('createWebRuntimeSessionTerminal', () => {
   })
 
   it.each([
-    { gated: false, authority: false },
-    { gated: true, authority: true }
+    { gated: false, permissionMode: false, authority: false, legacy: true },
+    { gated: true, permissionMode: false, authority: true, legacy: false },
+    { gated: false, permissionMode: true, authority: false, legacy: false },
+    { gated: true, permissionMode: true, authority: true, legacy: false }
   ])(
-    'routes a Kimi resume by capability (advertised=$gated) instead of the generic host-authority probe',
-    async ({ gated, authority }) => {
+    'routes a Kimi resume by capability (advertised=$gated, permission=$permissionMode)',
+    async ({ gated, permissionMode, authority, legacy }) => {
       // Why: an old host answers the widened ensureAgentSession enum with invalid_argument, which
       // runRemoteAgentSessionLaunch does not retry on — the per-agent probe is the only thing
       // keeping a remote Kimi resume from dying instead of degrading to a legacy launch.
@@ -280,7 +282,8 @@ describe('createWebRuntimeSessionTerminal', () => {
               minCompatibleRuntimeClientVersion: 2,
               capabilities: [
                 'agent-session.host-authority.v1',
-                ...(gated ? ['agent-session.kimi-resume.v1'] : [])
+                ...(gated ? ['agent-session.kimi-resume.v1'] : []),
+                ...(permissionMode ? ['agent-session.launch-permission.v1'] : [])
               ]
             }
           }
@@ -313,19 +316,19 @@ describe('createWebRuntimeSessionTerminal', () => {
         api: { runtimeEnvironments: { call: runtimeCall } }
       })
 
-      await expect(
-        createWebRuntimeSessionTerminal({
-          worktreeId: WORKTREE_ID,
-          agentSessionKind: 'resume',
-          launchAgent: 'kimi',
-          command: "kimi '--session' 'session_431324d7'",
-          providerSession: { key: 'session_id', id: 'session_431324d7' }
-        })
-      ).resolves.toEqual({ status: 'created' })
+      const outcome = await createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        agentSessionKind: 'resume',
+        launchAgent: 'kimi',
+        command: "kimi '--session' 'session_431324d7'",
+        providerSession: { key: 'session_id', id: 'session_431324d7' },
+        ...(permissionMode ? { agentPermissionMode: 'manual' as const } : {})
+      })
 
       const methods = runtimeCall.mock.calls.map(([request]) => request.method)
+      expect(outcome.status).toBe(authority || legacy ? 'created' : 'failed')
       expect(methods.includes('terminal.ensureAgentSession')).toBe(authority)
-      expect(methods.includes('session.tabs.createTerminal')).toBe(!authority)
+      expect(methods.includes('session.tabs.createTerminal')).toBe(legacy)
     }
   )
 

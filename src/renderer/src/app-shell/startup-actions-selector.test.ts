@@ -10,6 +10,7 @@ type StartupTestState = StartupActions & { publication: number }
 
 function makeActions(): StartupActions {
   return {
+    openStartupHome: vi.fn(),
     fetchReposForAllHosts: vi.fn(),
     awaitLocalRepoCatalogSettlement: vi.fn(),
     fetchProjectGroupsForAllHosts: vi.fn(),

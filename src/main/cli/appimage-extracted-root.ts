@@ -77,7 +77,7 @@ export function resolveAppImageExtractedRoot(
 export function isAppImageExtractedLauncherPath(
   options: AppImageExtractionOptions,
   candidatePath: string,
-  launcherName = LINUX_CLI_COMMAND_NAME
+  launcherName: string = LINUX_CLI_COMMAND_NAME
 ): boolean {
   if (!isAbsolute(candidatePath)) {
     return false

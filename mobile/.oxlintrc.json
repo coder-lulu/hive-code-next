@@ -16,6 +16,12 @@
   },
   "overrides": [
     {
+      "files": ["app/h/*/tasks.tsx"],
+      "rules": {
+        "max-lines": ["error", { "max": 14675, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
       "files": ["src/terminal/TerminalWebView.tsx"],
       "rules": {
         "max-lines": ["error", { "max": 379, "skipBlankLines": true, "skipComments": true }]

@@ -91,7 +91,7 @@ export const STRUCTURED_AGENT_SESSION_METHODS: RpcAnyMethod[] = [
           envelope: { ...params.envelope, payloadFingerprint: hostFingerprint }
         })
         if (result.ok && resolved.agent === 'codex') {
-          await ctx.runtime.publishStructuredAgentSessionTab({
+          ctx.runtime.publishStructuredAgentSessionTab({
             workspaceId: resolved.location.workspaceId,
             sessionId: result.value.sessionId,
             agent: 'codex',

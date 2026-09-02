@@ -778,7 +778,7 @@ configureRemoteServerUpdater({
   getSnapshot: getRemoteServerUpdaterSnapshot,
   check: (runtimeId, options) => {
     if (options?.localBuild || hasConfiguredProductUpdateChannel()) {
-      ensureAutoUpdaterConfigured({ localOnly: options?.localBuild === true })
+      ensureAutoUpdaterConfigured()
     }
     return checkForRemoteServerUpdate(runtimeId, options)
   },
@@ -1531,7 +1531,7 @@ function runUserInitiatedUpdateCheck(options?: UpdateCheckOptions): void {
     reportReleaseUpdatesDisabled()
     return
   }
-  ensureAutoUpdaterConfigured({ localOnly: options?.localBuild === true })
+  ensureAutoUpdaterConfigured()
   checkForUpdatesFromMenu(options)
 }
 
@@ -3600,12 +3600,12 @@ void app.whenReady().then(async () => {
   let desktopWindow: BrowserWindow | null = null
   if (process.platform === 'win32' && app.isPackaged && !serveOptions) {
     const desktopStartup = startWindowsDesktopBeforeShellPathReady({
+      bindServices: bindTerminalRuntimeStartupServices,
       openWindow: () => openMainWindow({ revealOnDidFinishLoad: true }),
       shellPathReady,
       startServices: startTerminalRuntimeStartupServices
     })
     desktopWindow = desktopStartup.window
-    bindTerminalRuntimeStartupServices(desktopStartup.services)
   } else {
     await shellPathReady
     bindTerminalRuntimeStartupServices(Promise.resolve(startTerminalRuntimeStartupServices()))

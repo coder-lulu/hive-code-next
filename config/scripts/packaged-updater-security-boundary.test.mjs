@@ -11,15 +11,21 @@ const {
 
 const roots = []
 
-function validMainBundle(runtimeProductConfigChunkName = 'product-config-fixture.js') {
+function validMainBundle(
+  runtimeProductConfigChunkName = 'product-config-fixture.js',
+  runtimeProductConfigExportName = 'hivecodeProductConfig'
+) {
   return `
     const runtimeProductConfig = require("./chunks/${runtimeProductConfigChunkName}")
+    void runtimeProductConfig.${runtimeProductConfigExportName}
     installProductUpdaterHttpExecutorBoundary(executor)
     executor.addRedirectHandlers = function boundedRedirectHandlers() {}
     executor.doApiRequest = function boundedApiRequest() {}
     executor.doDownload = function boundedDownload() {}
-    electron.session.fromPartition("electron-updater", { cache: false })
-    autoUpdater.autoInstallOnAppQuit = false
+    electron.session.fromPartition(\`electron-updater\`, { cache: !1 })
+    autoUpdater.autoInstallOnAppQuit = !1
+    executor.request = function boundedRequest() {}
+    const updaterHeaderAllowlist = new Set([\`accept\`, \`accept-encoding\`, \`cache-control\`, \`pragma\`, \`user-agent\`])
     const MAX_UPDATER_ARTIFACT_BYTES = 2147483648
     const config = {
       updateRepository: null,
@@ -32,6 +38,10 @@ function validMainBundle(runtimeProductConfigChunkName = 'product-config-fixture
       pluginMarketplace: null
     }
     sanitizeCrossOriginHeaders(headers)
+    throw new Error("Updater HTTP executor redirect handler is unavailable")
+    throw new Error("Updater metadata POST requests are not allowed")
+    throw new Error("Updater request is outside the active update feed")
+    throw new Error("Updater redirect is outside the product network boundary")
     throw new Error("Too many updater redirects")
     throw new Error("electron-updater HTTP executor is unavailable")
   `
@@ -134,6 +144,11 @@ function validBundledMainProductConfig(productConfig = validProductConfig()) {
       get: function() { return hivecodeProductConfig; }
     });
   `
+}
+
+function validMinifiedRuntimeProductConfig(productConfig = validProductConfig()) {
+  const declaration = productConfig.replace('exports.hivecodeProductConfig =', 'const e=')
+  return `${declaration}Object.defineProperty(exports,\`l\`,{enumerable:!0,get:function(){return e}});`
 }
 
 function validPackagedMetadata() {
@@ -269,6 +284,33 @@ describe('packaged updater security boundary', () => {
         passed: true,
         productConfigBundle: 'out/main/chunks/brand-fixture.js'
       }
+    )
+  })
+
+  it('accepts a statically exported runtime product config after identifier minification', async () => {
+    const fixture = await createFixture({
+      main: validMainBundle('brand-minified.js', 'l'),
+      runtimeProductConfigChunkName: 'brand-minified.js',
+      runtimeProductConfig: validMinifiedRuntimeProductConfig()
+    })
+
+    expect(verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toMatchObject(
+      {
+        passed: true,
+        productConfigBundle: 'out/main/chunks/brand-minified.js'
+      }
+    )
+  })
+
+  it('rejects a canonical decoy export that the main bundle does not consume', async () => {
+    const fixture = await createFixture({
+      main: validMainBundle('brand-minified.js', 'a'),
+      runtimeProductConfigChunkName: 'brand-minified.js',
+      runtimeProductConfig: `${validMinifiedRuntimeProductConfig()}const t={name:\`brand\`};Object.defineProperty(exports,\`a\`,{enumerable:!0,get:function(){return t}});`
+    })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /does not consume its runtime product config export/i
     )
   })
 

@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import type { BrowserWindow } from 'electron'
+import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import type { Store } from '../persistence'
 import {
   acknowledgePendingTccPromptNotice,

@@ -138,6 +138,7 @@ describe('SidebarSessionSection', () => {
           onOpen={onOpen}
           onRequestDelete={vi.fn()}
           deleting={false}
+          now={Date.now()}
         />
       )
     })
@@ -168,6 +169,7 @@ describe('SidebarSessionSection', () => {
           onRequestDelete={vi.fn()}
           deleting={false}
           active
+          now={Date.now()}
         />
       )
     })

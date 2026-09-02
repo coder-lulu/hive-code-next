@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 describe('serve desktop activation wiring', () => {
   const entrySource = readFileSync(join(process.cwd(), 'src/main/index.ts'), 'utf8')
+  const source = entrySource
   const preflightSource = readFileSync(
     join(process.cwd(), 'src/main/startup/main-process-preflight.ts'),
     'utf8'

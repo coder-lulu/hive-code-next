@@ -217,8 +217,7 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
               removeDestroyedListener()
               remoteRuntimeSubscriptions.delete(subscriptionId)
             }
-          },
-          transportIsCurrent
+          }
         )
       } catch (error) {
         removeDestroyedListener()

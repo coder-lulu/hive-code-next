@@ -17,8 +17,9 @@ import {
   clearCachedMandatoryHiveCloudDecision,
   readCachedMandatoryHiveCloudDecision
 } from './hivecloud-update-cache'
+import type { HiveCloudUpdateDecision } from './hivecloud-update-decision'
 
-function mandatoryDecision(currentBuild = 13) {
+function mandatoryDecision(currentBuild = 13): HiveCloudUpdateDecision {
   return {
     hasUpdate: true,
     updateRequired: true,
@@ -61,6 +62,9 @@ describe('HiveCloud mandatory update cache', () => {
   it('replaces an existing policy when a newer mandatory decision arrives', () => {
     cacheMandatoryHiveCloudDecision(mandatoryDecision(13))
     const newer = mandatoryDecision(13)
+    if (!newer.latest) {
+      throw new Error('Expected latest release metadata')
+    }
     newer.latest.buildNumber = 15
     cacheMandatoryHiveCloudDecision(newer)
 
@@ -78,6 +82,9 @@ describe('HiveCloud mandatory update cache', () => {
     const decision = mandatoryDecision(13)
     decision.updateRequired = false
     decision.minimumSupportedBuild = null
+    if (!decision.latest) {
+      throw new Error('Expected latest release metadata')
+    }
     decision.latest.mandatory = true
 
     cacheMandatoryHiveCloudDecision(decision)
@@ -90,6 +97,9 @@ describe('HiveCloud mandatory update cache', () => {
     decision.hasUpdate = false
     decision.updateRequired = false
     decision.minimumSupportedBuild = null
+    if (!decision.latest) {
+      throw new Error('Expected latest release metadata')
+    }
     decision.latest.mandatory = true
 
     cacheMandatoryHiveCloudDecision(decision)

@@ -539,6 +539,9 @@ describe('LocalRuntimeOwnershipService', () => {
   it('does not let a completed headless poll mutate ownership after its observer stops the service', async () => {
     const { service, onRegistrationChanged } = fixture()
     const started = await service.beginHeadlessClaim()
+    if (started.status !== 'PENDING') {
+      throw new Error(`Expected a claim challenge, received ${started.status}`)
+    }
     const stateRevisionBeforePoll = service.getState().stateRevision
     onRegistrationChanged.mockImplementationOnce(() => service.stop())
 

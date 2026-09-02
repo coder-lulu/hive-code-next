@@ -303,7 +303,10 @@ import type {
   GitHubPRReviewCommentInput,
   GitHubReactionContent
 } from '../../shared/github/comment-types'
-import type { PRRefreshOutcome } from '../../shared/github/pull-request-refresh-types'
+import type {
+  GitHubPRRefreshReason,
+  PRRefreshOutcome
+} from '../../shared/github/pull-request-refresh-types'
 import type { GitHubOwnerRepo, GitHubPRFile } from '../../shared/github/pull-request-types'
 import type { ListWorkItemsResult } from '../../shared/github/work-item-types'
 import type {
@@ -856,6 +859,8 @@ import {
   type MainWorkItem,
   type GitHubPRBranchLookupOptions
 } from '../github/client'
+import { admissionTierForRefreshReason } from '../github/pr-refresh-candidate-policy'
+import type { GitAdmissionTier } from '../git/command-runner/git-exec-options'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
 import {
   fetchGitHubPullRequestHeadRef,
@@ -925,6 +930,7 @@ import {
   getLocalProjectGitExecOptions,
   getLocalProjectWorktreeGitOptions,
   getLocalProjectWorktreeGitOptionsForRuntime,
+  getWorktreeCreatePrefetchGitOptions,
   resolveLocalProjectRuntimeForRepo,
   resolveLocalProjectRuntimesForRepos
 } from '../project-runtime-git-options'
@@ -1049,6 +1055,7 @@ import {
   listProjects as listJiraProjects,
   listTransitions as listJiraTransitions,
   searchIssues as searchJiraIssues,
+  searchUsers as searchJiraUsers,
   updateIssue as updateJiraIssue
 } from '../jira/issues'
 import {
@@ -1197,8 +1204,9 @@ import {
   isOrphanCompatiblePreflightError,
   isOrphanedWorktreeError,
   mergeWorktree,
+  resolveWorktreeCreateDisplayNameMeta,
+  resolveWorktreeCreateDisplayNameRequest,
   sanitizeWorktreeName,
-  shouldSetDisplayName,
   areWorktreePathsEqual
 } from '../ipc/worktree-logic'
 import { findCreatedWorktree } from '../ipc/created-worktree-reconciliation'
@@ -1430,6 +1438,7 @@ type RuntimeStore = {
     agentDefaultArgs?: GlobalSettings['agentDefaultArgs']
     agentDefaultEnv?: GlobalSettings['agentDefaultEnv']
     terminalWindowsShell?: GlobalSettings['terminalWindowsShell']
+    localWindowsRuntimeDefault?: GlobalSettings['localWindowsRuntimeDefault']
     floatingTerminalEnabled?: GlobalSettings['floatingTerminalEnabled']
     agentStatusHooksEnabled?: GlobalSettings['agentStatusHooksEnabled']
     defaultTaskSource?: GlobalSettings['defaultTaskSource']
@@ -3317,6 +3326,16 @@ export class OrcaRuntimeService {
   private handleByLeafKey = new Map<string, string>()
   private handleByPtyId = new Map<string, string>()
   private handleByPtyIncarnation = new Map<string, PtyIncarnationHandleRecord>()
+  // A provider announces a replacement before the spawn commit can bind its
+  // pane. Keep the predecessor aliases fenced during that hand-off window.
+  private pendingPtyHandleReplacementFences = new Map<
+    string,
+    {
+      incarnationId: PtyIncarnationId
+      staleHandles: Set<string>
+      pendingRegistration: boolean
+    }
+  >()
   private readonly mailPointerRepointScheduler = new MailPointerRepointScheduler((handle) =>
     this.repointPendingMessagesForHandle(handle)
   )
@@ -3834,7 +3853,10 @@ export class OrcaRuntimeService {
     | null
   private readonly agentSessionClaimSigner: AgentSessionClaimSigner
   private readonly prepareCodexStructuredLaunchFn:
-    | ((args: { workspacePath: string; launchEnv: NodeJS.ProcessEnv }) => string | Promise<string>)
+    | ((args: {
+        workspacePath: string
+        launchEnv: NodeJS.ProcessEnv
+      }) => string | null | Promise<string | null>)
     | null
   private readonly agentSessionCreateOperations = new Map<string, AgentSessionCreateOperation>()
   private readonly orchestrationCompatibilitySshAttachments = new Map<
@@ -3932,7 +3954,7 @@ export class OrcaRuntimeService {
       prepareCodexStructuredLaunch?: (args: {
         workspacePath: string
         launchEnv: NodeJS.ProcessEnv
-      }) => string | Promise<string>
+      }) => string | null | Promise<string | null>
       orchestrationEnvironmentTransport?: OrchestrationEnvironmentTransport
       skillTransactionRecovery?: Promise<unknown>
     }
@@ -6029,22 +6051,18 @@ export class OrcaRuntimeService {
     )
     const worktrees = (await this.listResolvedWorktrees())
       .filter((worktree) => repos.has(getRepoIdFromWorktreeId(worktree.id)))
-      .map(
-        (worktree): SkillSshWorkspaceAuthority => ({
-          kind: 'worktree',
-          id: worktree.id,
-          path: worktree.path
-        })
-      )
+      .map((worktree): SkillSshWorkspaceAuthority => ({
+        kind: 'worktree',
+        id: worktree.id,
+        path: worktree.path
+      }))
     const folders = this.listFolderWorkspaces()
       .filter((folder) => folder.connectionId === connectionId)
-      .map(
-        (folder): SkillSshWorkspaceAuthority => ({
-          kind: 'folder',
-          id: folder.id,
-          path: folder.folderPath
-        })
-      )
+      .map((folder): SkillSshWorkspaceAuthority => ({
+        kind: 'folder',
+        id: folder.id,
+        path: folder.folderPath
+      }))
     return [...worktrees, ...folders]
   }
 
@@ -7456,6 +7474,10 @@ export class OrcaRuntimeService {
         ? { mobileSessionResyncWorktrees: [...mobileSessionResyncWorktrees] }
         : {})
     }
+  }
+
+  shouldRelayTerminalBrowserOpens(): boolean {
+    return this.authoritativeWindowId === HEADLESS_RUNTIME_WINDOW_ID
   }
 
   // Why: toMobileSessionTabsResult resolves handles/titles from this.tabs and
@@ -11652,7 +11674,39 @@ export class OrcaRuntimeService {
     return `term_${randomUUID()}`
   }
 
+  private rememberPtyHandleReplacementFence(
+    ptyId: string,
+    incarnationId: PtyIncarnationId,
+    staleHandles: Iterable<string>,
+    pendingRegistration: boolean
+  ): void {
+    const previous = this.pendingPtyHandleReplacementFences.get(ptyId)
+    const merged = new Set(previous?.staleHandles)
+    for (const handle of staleHandles) {
+      merged.add(handle)
+    }
+    // A PTY normally has one direct and one renderer alias. Keep a small bound
+    // in case a malformed provider emits an unbounded alias stream.
+    while (merged.size > 16) {
+      const oldest = merged.values().next().value
+      if (typeof oldest !== 'string') {
+        break
+      }
+      merged.delete(oldest)
+    }
+    this.pendingPtyHandleReplacementFences.set(ptyId, {
+      incarnationId,
+      staleHandles: merged,
+      pendingRegistration
+    })
+  }
+
   registerPreAllocatedHandleForPty(ptyId: string, handle: string): void {
+    if (this.pendingPtyHandleReplacementFences.get(ptyId)?.staleHandles.has(handle)) {
+      // The provider can replay the old env handle after announcing a new
+      // incarnation. Never let that predecessor alias be reintroduced.
+      return
+    }
     const retained = this.handleByPtyIncarnation.get(ptyId)
     if (retained?.handle === handle) {
       this.handleByPtyIncarnation.delete(ptyId)
@@ -11703,19 +11757,25 @@ export class OrcaRuntimeService {
     this.registerPreAllocatedHandleForPty(ptyId, trimmed)
   }
 
-  private invalidateAllHandlesForPty(ptyId: string): void {
+  private invalidateAllHandlesForPty(ptyId: string, preserveHandle?: string): Set<string> {
     const incarnationHandle = this.handleByPtyIncarnation.get(ptyId)?.handle
     const preallocatedHandle = this.handleByPtyId.get(ptyId)
-    this.invalidatePtyIncarnationHandle(ptyId)
-    this.handleByPtyId.delete(ptyId)
     const invalidated = new Set<string>()
-    if (preallocatedHandle && preallocatedHandle !== incarnationHandle) {
+    if (incarnationHandle && incarnationHandle !== preserveHandle) {
+      this.handleByPtyIncarnation.delete(ptyId)
+      invalidated.add(incarnationHandle)
+    } else if (incarnationHandle) {
+      // The retained handle no longer describes the old incarnation. Keep its direct alias,
+      // when requested, but discard the incarnation-specific leaf record.
+      this.handleByPtyIncarnation.delete(ptyId)
+    }
+    if (preallocatedHandle && preallocatedHandle !== preserveHandle) {
+      this.handleByPtyId.delete(ptyId)
       invalidated.add(preallocatedHandle)
     }
     for (const [handle, record] of this.handles) {
-      if (record.ptyId === ptyId) {
+      if (record.ptyId === ptyId && handle !== preserveHandle) {
         invalidated.add(handle)
-        this.handles.delete(handle)
       }
     }
     for (const handle of invalidated) {
@@ -11724,10 +11784,18 @@ export class OrcaRuntimeService {
       this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
     }
     for (const [leafKey, handle] of this.handleByLeafKey) {
-      if (invalidated.has(handle)) {
+      if (invalidated.has(handle) || (preserveHandle !== undefined && handle === preserveHandle)) {
         this.handleByLeafKey.delete(leafKey)
       }
     }
+    if (preserveHandle !== undefined) {
+      // The direct alias is the only identity retained across an incarnation
+      // change. Renderer records point at the predecessor pane generation and
+      // must be rebuilt by graph sync (or issuePtyHandle) before use.
+      this.handles.delete(preserveHandle)
+      this.syntheticTerminalHandles.delete(preserveHandle)
+    }
+    return invalidated
   }
 
   private replaceSyntheticTerminalHandlesForRestoredPty(
@@ -11801,7 +11869,25 @@ export class OrcaRuntimeService {
     incarnationId?: PtyIncarnationId,
     options: { awaitsRegistration?: boolean } = {}
   ): void {
+    const existingPty = this.ptysById.get(ptyId)
+    if (
+      existingPty &&
+      incarnationId !== undefined &&
+      existingPty.incarnationId !== null &&
+      existingPty.incarnationId !== incarnationId
+    ) {
+      // Providers announce a child before the commit binds its pane. Fence the
+      // predecessor now so a reused id cannot route through its old handle in
+      // that gap.
+      this.rememberPtyHandleReplacementFence(
+        ptyId,
+        incarnationId,
+        this.invalidateAllHandlesForPty(ptyId),
+        true
+      )
+    }
     this.forgetPtyLivenessVerdict(ptyId)
+    this.stopRequestedPtyIds.delete(ptyId)
     if (options.awaitsRegistration !== false) {
       // Why: surface absence cannot distinguish an in-flight admission from a completed headless lifecycle.
       this.pendingPtyRegistrationIncarnations.set(ptyId, incarnationId ?? null)
@@ -11830,6 +11916,8 @@ export class OrcaRuntimeService {
       tabId: string
       leafId: string
       incarnationId?: PtyIncarnationId
+      /** Handle allocated for the replacement incarnation, when one is known. */
+      terminalHandle?: string
       agentLaunchAuthority?: { launchToken: string; launchAgent: TuiAgent }
       providerReattachLaunchIdentity?: {
         incarnationId: PtyIncarnationId
@@ -11839,6 +11927,42 @@ export class OrcaRuntimeService {
     isWsl?: boolean
   ): void {
     this.assertPtyDidNotExitBeforeRegistration(ptyId, binding?.incarnationId)
+    const existingPty = this.ptysById.get(ptyId)
+    const replacementHandle = binding?.terminalHandle?.trim()
+    const pendingReplacement = this.pendingPtyHandleReplacementFences.get(ptyId)
+    const pendingReplacementMatches =
+      pendingReplacement !== undefined &&
+      pendingReplacement.pendingRegistration &&
+      binding?.incarnationId !== undefined &&
+      pendingReplacement.incarnationId === binding.incarnationId
+    const incarnationChanged =
+      existingPty !== undefined &&
+      binding?.incarnationId !== undefined &&
+      existingPty.incarnationId !== null &&
+      existingPty.incarnationId !== binding.incarnationId
+    if (incarnationChanged || pendingReplacementMatches) {
+      // A reconnect can register a replacement before inventory reports its exported handle.
+      // Drop every alias for the predecessor; a newly preallocated handle is retained only when
+      // the caller can prove it is the replacement's handle.
+      const directHandle = this.handleByPtyId.get(ptyId)
+      const canPreserveReplacementHandle =
+        replacementHandle !== undefined &&
+        replacementHandle.startsWith('term_') &&
+        directHandle === replacementHandle &&
+        !pendingReplacement?.staleHandles.has(replacementHandle)
+      const invalidated = this.invalidateAllHandlesForPty(
+        ptyId,
+        canPreserveReplacementHandle ? replacementHandle : undefined
+      )
+      if (binding?.incarnationId) {
+        this.rememberPtyHandleReplacementFence(
+          ptyId,
+          binding.incarnationId,
+          invalidated,
+          pendingReplacementMatches
+        )
+      }
+    }
     this.forgetPtyLivenessVerdict(ptyId)
     this.spawnPublishedPtys.add(ptyId)
     // Why: record the renderer pane identity at spawn time so a stalled graph
@@ -11893,6 +12017,12 @@ export class OrcaRuntimeService {
       pendingIncarnation === binding.incarnationId
     ) {
       this.pendingPtyRegistrationIncarnations.delete(ptyId)
+    }
+    if (pendingReplacement !== undefined) {
+      const currentFence = this.pendingPtyHandleReplacementFences.get(ptyId)
+      if (currentFence && (pendingReplacementMatches || !binding?.incarnationId)) {
+        currentFence.pendingRegistration = false
+      }
     }
     // Why: the renderer's own PTY spawn is the reliable signal that the pending
     // mobile create's tab is live; publish its surface main-side (#7587).
@@ -22381,7 +22511,8 @@ export class OrcaRuntimeService {
   async addRepo(
     path: string,
     kind: 'git' | 'folder' = 'git',
-    executionHostId?: ExecutionHostId | null
+    executionHostId?: ExecutionHostId | null,
+    displayName?: string
   ): Promise<Repo> {
     if (!this.store) {
       throw new Error('runtime_unavailable')
@@ -22429,7 +22560,7 @@ export class OrcaRuntimeService {
     const repo: Repo = {
       id: randomUUID(),
       path,
-      displayName: getRepoName(path),
+      displayName: displayName?.trim() || getRepoName(path),
       badgeColor: DEFAULT_REPO_BADGE_COLOR,
       ...(executionHostId != null ? { executionHostId } : {}),
       ...detected,
@@ -23032,9 +23163,17 @@ export class OrcaRuntimeService {
   }
 
   private getHostedReviewExecutionOptions(
-    repo: Repo
-  ): { localGitExecOptions: { wslDistro?: string } } | undefined {
-    const localGitOptions = this.getLocalGitExecutionOptionArgs(repo)[0] ?? {}
+    repo: Repo,
+    admissionTier?: GitAdmissionTier
+  ):
+    | {
+        localGitExecOptions: { wslDistro?: string; admissionTier?: GitAdmissionTier }
+      }
+    | undefined {
+    const localGitOptions = {
+      ...this.getLocalGitExecutionOptionArgs(repo)[0],
+      ...(admissionTier ? { admissionTier } : {})
+    }
     return Object.keys(localGitOptions).length > 0
       ? { localGitExecOptions: localGitOptions }
       : undefined
@@ -23259,10 +23398,15 @@ export class OrcaRuntimeService {
     linkedPRNumber?: number | null,
     fallbackPRNumber?: number | null,
     acceptMergedFallbackPR?: boolean,
-    currentHeadOid?: string | null
+    currentHeadOid?: string | null,
+    reason?: GitHubPRRefreshReason
   ): Promise<PRRefreshOutcome> {
     const repo = await this.resolveRepoSelector(repoSelector)
-    const options: GitHubPRBranchLookupOptions = this.getHostedReviewExecutionOptions(repo) ?? {}
+    const options: GitHubPRBranchLookupOptions =
+      this.getHostedReviewExecutionOptions(
+        repo,
+        reason ? admissionTierForRefreshReason(reason) : undefined
+      ) ?? {}
     const lookupOptions = { ...options }
     if (acceptMergedFallbackPR === true) {
       lookupOptions.acceptMergedFallbackPR = true
@@ -25575,10 +25719,12 @@ export class OrcaRuntimeService {
     }
 
     const repo = await this.resolveRepoSelector(args.repoSelector)
+    const store = this.requireStore()
     await prefetchWorktreeCreateBase({
       repo,
       baseBranch: args.baseBranch,
-      runtime: this
+      runtime: this,
+      gitOptions: getWorktreeCreatePrefetchGitOptions(store, repo)
     })
   }
 
@@ -25605,6 +25751,7 @@ export class OrcaRuntimeService {
     linkedTaskSourceContext?: TaskSourceContext | null
     comment?: string
     displayName?: string
+    displayNameKind?: 'generated' | 'user'
     telemetrySource?: WorkspaceCreateTelemetrySource
     workspaceStatus?: string
     manualOrder?: number
@@ -25706,10 +25853,20 @@ export class OrcaRuntimeService {
       const settings = createSettings
       const instanceId = randomUUID()
       const worktreeId = getRuntimeFolderWorkspaceInstanceId(repo, instanceId)
+      const displayNameRequest = resolveWorktreeCreateDisplayNameRequest(
+        args.displayName,
+        args.displayNameKind,
+        args.name,
+        args.cliProvenance?.kind === 'created-by-cli',
+        args.nameWasGenerated === true
+      )
       const meta = this.store.setWorktreeMeta(worktreeId, {
         instanceId,
         ...getProjectHostSetupWorktreeMeta(this.store.getProjectHostSetups?.() ?? [], repo),
-        displayName: args.displayName?.trim() || args.name,
+        displayName: displayNameRequest.value ?? args.name,
+        ...(displayNameRequest.kind === 'user' && displayNameRequest.value
+          ? { displayNameIsPinned: true }
+          : {}),
         lastActivityAt: now,
         createdAt: now,
         orcaCreatedAt: now,
@@ -25898,7 +26055,14 @@ export class OrcaRuntimeService {
     }
     const hostedReviewExecutionContext = this.getHostedReviewExecutionOptions(repo)
     let effectiveRequestedName = args.name
-    const requestedDisplayName = args.displayName?.trim() || undefined
+    const displayNameRequest = resolveWorktreeCreateDisplayNameRequest(
+      args.displayName,
+      args.displayNameKind,
+      args.name,
+      args.cliProvenance?.kind === 'created-by-cli',
+      args.nameWasGenerated === true
+    )
+    const requestedDisplayName = displayNameRequest.value
     const sanitizedName = sanitizeWorktreeName(args.name)
     let effectiveSanitizedName = sanitizedName
     // Why: explicit branches and non-username prefix modes never consume this
@@ -26327,11 +26491,12 @@ export class OrcaRuntimeService {
     // Why: PR/MR-created worktrees can start from a head ref/SHA while Source
     // Control must compare against the review target branch.
     const metadataBaseRef = args.compareBaseRef ?? remoteTrackingBase?.ref ?? baseBranch
-    const displayNameMeta = requestedDisplayName
-      ? { displayName: requestedDisplayName }
-      : shouldSetDisplayName(effectiveRequestedName, branchName, effectiveSanitizedName)
-        ? { displayName: effectiveRequestedName }
-        : {}
+    const displayNameMeta = resolveWorktreeCreateDisplayNameMeta(
+      requestedDisplayName,
+      branchName,
+      displayNameRequest.kind,
+      { requestedName: effectiveRequestedName, sanitizedName: effectiveSanitizedName }
+    )
     const meta = this.store.setWorktreeMeta(worktreeId, {
       // Why: worktree IDs are path-derived. If a path is deleted outside Orca
       // and later recreated, creation must mint a fresh instance identity so
@@ -34416,6 +34581,7 @@ export class OrcaRuntimeService {
     this.advancePtyLifecycleGeneration(ptyId)
     this.pairedRendererSessionOwnedPtyIds.delete(ptyId)
     this.ptysById.delete(ptyId)
+    this.pendingPtyHandleReplacementFences.delete(ptyId)
     this.recentPtyOutputById.delete(ptyId)
     this.setupCompletionTokenByPtyId.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
@@ -39821,6 +39987,10 @@ export class OrcaRuntimeService {
     return listJiraAssignableUsers(key, query, siteId)
   }
 
+  jiraSearchUsers(query?: string, siteId?: string): ReturnType<typeof searchJiraUsers> {
+    return searchJiraUsers(query, siteId)
+  }
+
   jiraListTransitions(key: string, siteId?: string): ReturnType<typeof listJiraTransitions> {
     return listJiraTransitions(key, siteId)
   }
@@ -40254,6 +40424,9 @@ export class OrcaRuntimeService {
 
   browserTabCreate: RuntimeBrowserCommands['browserTabCreate'] =
     this.browserCommands.browserTabCreate.bind(this.browserCommands)
+
+  browserOpenUrlOnClient: RuntimeBrowserCommands['browserOpenUrlOnClient'] =
+    this.browserCommands.browserOpenUrlOnClient.bind(this.browserCommands)
 
   browserTabSetProfile: RuntimeBrowserCommands['browserTabSetProfile'] =
     this.browserCommands.browserTabSetProfile.bind(this.browserCommands)

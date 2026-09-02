@@ -7,7 +7,6 @@ import type {
 import { toRuntimeExecutionHostId } from '../../../shared/execution-host'
 import { translate } from '../i18n/i18n'
 import { useAppStore } from '../store'
-import { agentResumeHostAuthorityCapability } from './agent-resume-host-authority-capability'
 import {
   createAgentSessionCreateOperation,
   withAgentSessionCreateOperationId
@@ -23,6 +22,10 @@ import {
   webTerminalPlacementParentTabId
 } from './web-session-terminal-placement'
 import { toHostSessionTabId } from './web-terminal-surface-id'
+import {
+  registerWebRuntimeAgentLaunchConfig,
+  resolveWebRuntimeAgentHostAuthorityCapabilities
+} from './web-runtime-agent-launch-config'
 import {
   captureRuntimeEnvironmentCall,
   captureWebSessionIntentOwner,
@@ -42,6 +45,7 @@ import {
   type WebRuntimeSessionWorkspaceSelectionRollback
 } from './web-runtime-session-workspace-selection'
 import { createdTerminalLeafId } from './web-runtime-terminal-identity'
+import { reportWebRuntimeTerminalCreateFailure } from './web-runtime-terminal-create-outcome'
 import { settleWebRuntimeTerminalPlacement } from './web-runtime-terminal-placement-settlement'
 
 export async function createWebRuntimeSessionTerminalResult(
@@ -80,10 +84,13 @@ export async function createWebRuntimeSessionTerminalResult(
   let hostCreated = false
   let createdTabId: string | undefined
   let createdLeafId: string | undefined
+  let createdTerminalHandle: string | undefined
   try {
     const agent = args.launchAgent ?? args.agent
-    const agentArgsOverride =
-      args.agentArgs !== undefined ? args.agentArgs : args.launchConfig?.agentArgs
+    // Structured launches resolve host defaults themselves. A renderer-side
+    // launchConfig belongs only to the legacy path and must not silently become
+    // a CLI override for a capable host.
+    const agentArgsOverride = args.agentArgs
     if (agent) {
       let legacyAlreadyPlacedInGroup = false
       // Why: structured creation cannot yet express afterTabId; keep the exact legacy placement contract until it can.
@@ -105,6 +112,9 @@ export async function createWebRuntimeSessionTerminalResult(
                         ? { ompResumeFilePath: args.launchConfig.ompResumeFilePath }
                         : {}),
                       ...(agentArgsOverride !== undefined ? { agentArgs: agentArgsOverride } : {}),
+                      ...(args.agentPermissionMode
+                        ? { agentPermissionMode: args.agentPermissionMode }
+                        : {}),
                       ...(args.launchPreferences
                         ? { launchPreferences: args.launchPreferences }
                         : {}),
@@ -128,6 +138,9 @@ export async function createWebRuntimeSessionTerminalResult(
                         ...(agentArgsOverride !== undefined
                           ? { agentArgs: agentArgsOverride }
                           : {}),
+                        ...(args.agentPermissionMode
+                          ? { agentPermissionMode: args.agentPermissionMode }
+                          : {}),
                         ...(args.launchPreferences
                           ? { launchPreferences: args.launchPreferences }
                           : {}),
@@ -141,15 +154,20 @@ export async function createWebRuntimeSessionTerminalResult(
                   })) as RuntimeRpcResponse<RuntimeCreateAgentSessionResult>
                 )
               )
-      const resumeHostAuthorityCapability =
-        args.agentSessionKind === 'resume' ? agentResumeHostAuthorityCapability(agent) : undefined
       const created = await runRemoteAgentSessionLaunch<{
         terminal: CreatedAgentTerminalIdentity
       }>({
         environmentId,
         ...(hostAuthority ? { hostAuthority } : {}),
-        ...(resumeHostAuthorityCapability
-          ? { hostAuthorityCapability: resumeHostAuthorityCapability }
+        hostAuthorityCapabilities: resolveWebRuntimeAgentHostAuthorityCapabilities({
+          agent,
+          agentSessionKind: args.agentSessionKind,
+          agentPermissionMode: args.agentPermissionMode
+        }),
+        ...(args.agentPermissionMode
+          ? {
+              legacyFallbackPolicy: 'deny' as const
+            }
           : {}),
         legacy: async () => {
           const response = await callEnvironment({
@@ -189,6 +207,7 @@ export async function createWebRuntimeSessionTerminalResult(
       })
       hostCreated = true
       createdTabId = created.terminal.tabId
+      createdTerminalHandle = created.terminal.handle
       createdLeafId = legacyAlreadyPlacedInGroup
         ? created.terminal.leafId
         : createdTerminalLeafId(created.terminal)
@@ -233,6 +252,14 @@ export async function createWebRuntimeSessionTerminalResult(
       createdTabId = created.tab.id
       createdLeafId = created.tab.leafId
     }
+    registerWebRuntimeAgentLaunchConfig({
+      agent,
+      agentArgs: args.agentArgs,
+      agentPermissionMode: args.agentPermissionMode,
+      tabId: createdTabId,
+      leafId: createdLeafId,
+      terminalHandle: createdTerminalHandle
+    })
     if (args.targetGroupId && createdTabId) {
       // Why: the host drops client-minted group ids, so this client's own record is what
       // lands the mirrored tab in the requested pane under client-owned placement.
@@ -269,13 +296,6 @@ export async function createWebRuntimeSessionTerminalResult(
       ...(createdTabId ? { hostTabId: createdTabId } : {})
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.warn(
-      hostCreated
-        ? '[web-runtime-session] terminal created but reconciliation failed:'
-        : '[web-runtime-session] failed to create terminal:',
-      message
-    )
     if (createdTabId) {
       // Why: a record that outlives the create flow could yank a user-dragged tab back later.
       forgetWebSessionTerminalPlacement({
@@ -289,9 +309,6 @@ export async function createWebRuntimeSessionTerminalResult(
     }
     // Why: once the host accepted creation, reporting failure invites the user
     // to retry with a new operation ID and can duplicate a fresh agent.
-    return {
-      outcome: hostCreated ? { status: 'created' } : { status: 'failed', message },
-      ...(createdTabId ? { hostTabId: createdTabId } : {})
-    }
+    return reportWebRuntimeTerminalCreateFailure(error, hostCreated, createdTabId)
   }
 }

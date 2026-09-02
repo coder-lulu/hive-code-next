@@ -9,6 +9,7 @@ import { SettingsSegmentedControl, SettingsSubsectionHeader } from './SettingsFo
 import { Badge } from '../ui/badge'
 import { translate } from '@/i18n/i18n'
 import { getShortcutPlatform } from '@/lib/shortcut-platform'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   DEV_CHANNEL_PLATFORM_LABEL,
   RELEASE_CHANNELS,
@@ -25,7 +26,9 @@ import {
 
 const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, string> = {
   stable: 'Shipped releases. What everyone else is running.',
+  beta: 'Preview builds for broader validation before a stable release.',
   rc: 'Release candidates cut ahead of each stable.',
+  internal: `Internal validation builds for the ${APP_DISPLAY_NAME} team.`,
   hourly: 'macOS and Windows. Unvetted builds from main, built every hour. No tests.',
   daily:
     'macOS and Windows. Unvetted builds from main, cut once a day at 14:15 UTC (early morning Pacific). No tests.',

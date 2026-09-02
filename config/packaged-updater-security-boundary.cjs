@@ -19,14 +19,27 @@ const EXPECTED_PACKAGED_APPLICATION_METADATA = {
 }
 
 const REQUIRED_MAIN_LITERALS = [
-  'installProductUpdaterHttpExecutorBoundary',
-  'boundedRedirectHandlers',
-  'boundedApiRequest',
-  'boundedDownload',
-  'sanitizeCrossOriginHeaders',
+  'Updater HTTP executor redirect handler is unavailable',
+  'Updater metadata POST requests are not allowed',
+  'Updater request is outside the active update feed',
+  'Updater redirect is outside the product network boundary',
   'Too many updater redirects',
-  'electron-updater HTTP executor is unavailable',
-  '2147483648'
+  'electron-updater HTTP executor is unavailable'
+]
+
+const REQUIRED_MAIN_PATTERNS = [
+  ['bounded request override', /\.request\s*=\s*function\b/],
+  ['bounded redirect override', /\.addRedirectHandlers\s*=\s*function\b/],
+  ['bounded API request override', /\.doApiRequest\s*=\s*function\b/],
+  ['bounded download override', /\.doDownload\s*=\s*function\b/],
+  [
+    'cross-origin updater header allowlist',
+    /new Set\(\[\s*[`"']accept[`"']\s*,\s*[`"']accept-encoding[`"']\s*,\s*[`"']cache-control[`"']\s*,\s*[`"']pragma[`"']\s*,\s*[`"']user-agent[`"']\s*\]\)/
+  ],
+  [
+    '2 GiB updater artifact limit',
+    /\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:2147483648|2\s*\*\s*1024\s*\*\s*1024\s*\*\s*1024)\b/
+  ]
 ]
 
 const REQUIRED_NULL_PATHS = [
@@ -144,11 +157,17 @@ function resolveMainProductConfigBundle(entries, mainBundle, mainSource, readEnt
     .filter((entry) => MAIN_PRODUCT_CONFIG_ENTRY_PATTERN.test(entry))
   // `brand.ts` imports the generated config and can be emitted as a separate
   // shared Rollup chunk. It is not itself a runtime config export, so only
-  // count chunks that actually define the product-config CommonJS export.
+  // count chunks that contain one statically exported product config. The
+  // CommonJS export key and local identifier may be shortened by Rolldown.
   const configCandidates = readEntry
-    ? candidates.filter((entry) =>
-        /Object\.defineProperty\(exports,\s*["']hivecodeProductConfig["']/.test(readEntry(entry))
-      )
+    ? candidates.filter((entry) => {
+        try {
+          parsePackagedProductConfigExport(readEntry(entry))
+          return true
+        } catch {
+          return false
+        }
+      })
     : candidates
   if (configCandidates.length !== 1) {
     throw new Error(
@@ -158,11 +177,25 @@ function resolveMainProductConfigBundle(entries, mainBundle, mainSource, readEnt
   const productConfigBundle = configCandidates[0]
   const relativeRequirePath = `./${posix.relative(posix.dirname(mainBundle), productConfigBundle)}`
   const escapedRequirePath = relativeRequirePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const staticRequirePattern = new RegExp(`require\\(\\s*(["'])${escapedRequirePath}\\1\\s*\\)`)
-  if (!staticRequirePattern.test(mainSource)) {
+  const staticRequirePattern = new RegExp(
+    `\\b([A-Za-z_$][\\w$]*)\\s*=\\s*require\\(\\s*(["'\\x60])${escapedRequirePath}\\2\\s*\\)`
+  )
+  const staticRequire = staticRequirePattern.exec(mainSource)
+  if (!staticRequire) {
     throw new Error(
       `Packaged Main entry does not statically require its runtime product config: ${relativeRequirePath}`
     )
+  }
+  if (readEntry) {
+    const { exportName } = parsePackagedProductConfigExport(readEntry(productConfigBundle))
+    const escapedBinding = staticRequire[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const escapedExportName = exportName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const consumedExportPattern = new RegExp(
+      `\\b${escapedBinding}\\s*(?:\\.\\s*${escapedExportName}\\b|\\[\\s*(["'\\x60])${escapedExportName}\\1\\s*\\])`
+    )
+    if (!consumedExportPattern.test(mainSource)) {
+      throw new Error('Packaged Main entry does not consume its runtime product config export')
+    }
   }
   return productConfigBundle
 }
@@ -179,10 +212,19 @@ function requireMainAuthorityBoundary(source, entry) {
 
 function requireMainBundleMarkers(source) {
   const missing = REQUIRED_MAIN_LITERALS.filter((marker) => !source.includes(marker))
-  if (!/\.fromPartition\(["']electron-updater["'],\s*\{\s*cache:\s*false\s*\}\)/.test(source)) {
+  for (const [label, pattern] of REQUIRED_MAIN_PATTERNS) {
+    if (!pattern.test(source)) {
+      missing.push(label)
+    }
+  }
+  if (
+    !/\.fromPartition\(\s*(["'`])electron-updater\1\s*,\s*\{\s*cache:\s*(?:false|!1)\s*\}\s*\)/.test(
+      source
+    )
+  ) {
     missing.push('dedicated electron-updater session partition')
   }
-  if (!/autoInstallOnAppQuit\s*=\s*false/.test(source)) {
+  if (!/autoInstallOnAppQuit\s*=\s*(?:false|!1)/.test(source)) {
     missing.push('autoInstallOnAppQuit=false')
   }
   if (missing.length > 0) {
@@ -215,7 +257,7 @@ function skipStaticWhitespace(source, state) {
 
 function parseStaticString(source, state) {
   const quote = source[state.index]
-  if (quote !== '"' && quote !== "'") {
+  if (quote !== '"' && quote !== "'" && quote !== '`') {
     throw new Error(`Expected a string at offset ${state.index}`)
   }
   state.index += 1
@@ -224,6 +266,9 @@ function parseStaticString(source, state) {
     const character = source[state.index++]
     if (character === quote) {
       return value
+    }
+    if (quote === '`' && character === '$' && source[state.index] === '{') {
+      throw new Error('Dynamic template expressions are not supported in packaged product config')
     }
     if (character !== '\\') {
       value += character
@@ -280,7 +325,7 @@ function parseStaticValue(source, state) {
     state.index += 1
     return values
   }
-  if (character === '"' || character === "'") {
+  if (character === '"' || character === "'" || character === '`') {
     return parseStaticString(source, state)
   }
   if (source.startsWith('null', state.index)) {
@@ -293,6 +338,14 @@ function parseStaticValue(source, state) {
   }
   if (source.startsWith('false', state.index)) {
     state.index += 5
+    return false
+  }
+  if (source.startsWith('!0', state.index)) {
+    state.index += 2
+    return true
+  }
+  if (source.startsWith('!1', state.index)) {
+    state.index += 2
     return false
   }
   const number = source.slice(state.index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/)
@@ -336,30 +389,53 @@ function parseStaticObject(source, state) {
   return value
 }
 
-function parsePackagedProductConfig(source) {
+function parsePackagedProductConfigExport(source) {
   const directAssignments = [...source.matchAll(/\bexports\.hivecodeProductConfig\s*=\s*(?=\{)/g)]
-  const bundledDeclarations = [
-    ...source.matchAll(/\b(?:const|let|var)\s+hivecodeProductConfig\s*=\s*(?=\{)/g)
+  const staticGetters = [
+    ...source.matchAll(
+      /Object\.defineProperty\(\s*exports\s*,\s*(["'`])([^"'`]+)\1\s*,\s*\{[\s\S]{0,256}?\bget\s*:\s*function\s*\([^)]*\)\s*\{\s*return\s+([A-Za-z_$][\w$]*)\s*;?\s*\}[\s\S]{0,64}?\}\s*\)/g
+    )
   ]
-  const candidates = [...directAssignments, ...bundledDeclarations]
+  const bundledDeclarations = [
+    ...source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?=\{)/g)
+  ].flatMap((declaration) =>
+    staticGetters
+      .filter((getter) => getter[3] === declaration[1])
+      .map((getter) => ({ match: declaration, exportName: getter[2] }))
+  )
+  const candidates = [
+    ...directAssignments.map((match) => ({ match, exportName: 'hivecodeProductConfig' })),
+    ...bundledDeclarations
+  ]
+    .map((candidate) => {
+      const state = { index: candidate.match.index + candidate.match[0].length }
+      try {
+        return { exportName: candidate.exportName, value: parseStaticValue(source, state) }
+      } catch {
+        return null
+      }
+    })
+    .filter(
+      (candidate) =>
+        candidate &&
+        candidate.value?.schemaVersion === 1 &&
+        typeof candidate.value.displayName === 'string' &&
+        typeof candidate.value.slug === 'string' &&
+        candidate.value.desktop &&
+        candidate.value.mobile &&
+        candidate.value.endpoints &&
+        candidate.value.services
+    )
   if (candidates.length !== 1) {
     throw new Error(
       `Packaged product config must contain exactly one static config (found ${candidates.length})`
     )
   }
+  return candidates[0]
+}
 
-  if (bundledDeclarations.length === 1) {
-    const bundledExportPattern =
-      /Object\.defineProperty\(\s*exports\s*,\s*["']hivecodeProductConfig["']\s*,[\s\S]*?\bget\s*:\s*function\s*\([^)]*\)\s*\{\s*return\s+hivecodeProductConfig\s*;?\s*\}/
-    if (!bundledExportPattern.test(source)) {
-      throw new Error(
-        'Packaged product config declaration is not exported through the expected static getter'
-      )
-    }
-  }
-
-  const state = { index: candidates[0].index + candidates[0][0].length }
-  return parseStaticValue(source, state)
+function parsePackagedProductConfig(source) {
+  return parsePackagedProductConfigExport(source).value
 }
 
 function getConfigPath(config, path) {

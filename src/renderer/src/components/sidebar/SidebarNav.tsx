@@ -213,7 +213,7 @@ const SidebarNav = React.memo(function SidebarNav() {
       {showAgentsButton ? (
         <button
           type="button"
-          onClick={openActivityPage}
+          onClick={() => openActivityPage()}
           aria-current={activityActive ? 'page' : undefined}
           className={cn(
             'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] font-medium tracking-tight transition-colors',

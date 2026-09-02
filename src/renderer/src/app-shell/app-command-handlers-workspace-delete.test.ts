@@ -104,7 +104,7 @@ describe('right sidebar app command', () => {
     const toggleRightSidebar = vi.fn()
     const handler = createAppCommandHandlers(
       shortcutState({
-        actions: { toggleRightSidebar } as AppShortcutState['actions']
+        actions: { toggleRightSidebar } as unknown as AppShortcutState['actions']
       }),
       input
     ).get('sidebar.right.toggle')

@@ -461,6 +461,7 @@ describe('RuntimeEnvironmentsPane host details', () => {
     expect(canConnectRuntimeEnvironment(accountOnly)).toBe(true)
     expect(getRuntimeEnvironmentEndpointDisplay(accountOnly)).toBe('Managed by HiveCloud')
     expect(getRuntimeServerConnectionState(undefined, accountOnly)).toBe('available')
+    expect(isRuntimeServerTransportConnected('available')).toBe(false)
     expect(
       getRuntimeServerConnectionState(undefined, {
         ...accountOnly,
@@ -471,6 +472,7 @@ describe('RuntimeEnvironmentsPane host details', () => {
         }
       })
     ).toBe('online-unavailable')
+    expect(isRuntimeServerTransportConnected('online-unavailable')).toBe(false)
     expect(
       getRuntimeEnvironmentInitialDetails({
         ...accountOnly,

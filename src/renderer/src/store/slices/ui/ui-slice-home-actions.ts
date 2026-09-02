@@ -1,7 +1,9 @@
 import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
 import { getExecutionHostIdForFolderWorkspace } from '@/lib/folder-workspace-runtime-owner'
-import { getRepoExecutionHostId } from '../repo-host-identity'
-import { normalizeExecutionHostId } from '../../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  normalizeExecutionHostId
+} from '../../../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../../../shared/workspace-scope'
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
 
@@ -104,10 +106,9 @@ export function createUiHomeActions(
         return false
       }
       let activated = false
-      if (current.scope.type === 'folder') {
-        const folder = get().folderWorkspaces.find(
-          (entry) => entry.id === current.scope.folderWorkspaceId
-        )
+      const scope = current.scope
+      if (scope.type === 'folder') {
+        const folder = get().folderWorkspaces.find((entry) => entry.id === scope.folderWorkspaceId)
         if (folder) {
           get().setActiveFolderWorkspace(
             folder.id,
@@ -117,7 +118,7 @@ export function createUiHomeActions(
         }
       } else {
         const worktree = get().getKnownWorktreeById(
-          current.scope.worktreeId,
+          scope.worktreeId,
           current.executionHostId ?? undefined
         )
         if (worktree) {

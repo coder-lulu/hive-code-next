@@ -1,6 +1,6 @@
 import { app, powerMonitor, type BrowserWindow } from 'electron'
 import { is } from '@electron-toolkit/utils'
-import { getOrcaCloudAuthConfig } from '../orca-profiles/profile-cloud-auth-config'
+import { getProductCloudAuthConfig } from '../product/product-cloud-config'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import {
   getCanonicalUserDataPath,
@@ -228,7 +228,7 @@ async function launchDesktopMode(
   if (!runtimeRpcStartResult.ok) {
     void showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
   }
-  const cloudAuth = getOrcaCloudAuthConfig()
+  const cloudAuth = getProductCloudAuthConfig()
   if (cloudAuth.configured) {
     try {
       const relayService = new DesktopRelayService({
