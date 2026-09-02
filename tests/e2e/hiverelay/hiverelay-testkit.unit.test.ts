@@ -5,13 +5,28 @@ import {
   ProgrammableHiveRelayMockCell,
   ReferenceHiveRelayClient,
   ReferenceHiveRelayHost,
+  HIVE_RELAY_CLIENT_PATH_PREFIX,
+  HIVE_RELAY_HOST_CONTROL_PATH,
+  HIVE_RELAY_HOST_DATA_PATH_PREFIX,
   deriveHiveRelayHostId,
   deriveHiveRelayKeyHash,
   type HiveRelayBinding,
   type MockAdmissionGrant
 } from './index'
+import { parseMockCellRoute } from './hiverelay-mock-cell-server'
+import {
+  BINARY_INBOX_OVERFLOW_CLOSE,
+  BINARY_INBOX_OVERFLOW_REASON,
+  BinaryInbox,
+  openWebSocket,
+  queueBinaryFrame,
+  sendJson,
+  waitForOpen,
+  wireText
+} from './hiverelay-websocket-peer'
 
 const CELL_ORIGIN = 'https://cell-a.hiverelay.test'
+const CLIENT_ORIGIN = 'https://client.hiverelay.test'
 const CONTROL_LEASE = 'test-only-control-lease'
 
 function bindingFor(hostPublicKey: Uint8Array): HiveRelayBinding {
@@ -38,6 +53,8 @@ function grant(
   return {
     token: tokenFor(token),
     binding,
+    origin: CLIENT_ORIGIN,
+    expiresAtMs: Number.MAX_SAFE_INTEGER,
     clientPublicKeyB64: Buffer.from(clientKeys.publicKey).toString('base64url'),
     intentId: uuidFor(token),
     clientKeyHash: deriveHiveRelayKeyHash(clientKeys.publicKey)
@@ -85,6 +102,11 @@ describe('HiveRelay P0 reference peer wire testkit', () => {
     autoAttach?: boolean
     holdConnectionOpens?: boolean
     cellBinding?: HiveRelayBinding
+    eventCapacity?: number
+    relayHelloBindingOverride?: {
+      cellId: string
+      cellIncarnationId: string
+    }
   }): Promise<Harness> {
     const cell = new ProgrammableHiveRelayMockCell({
       cellOrigin: CELL_ORIGIN,
@@ -92,6 +114,8 @@ describe('HiveRelay P0 reference peer wire testkit', () => {
       binding: args.cellBinding ?? args.binding,
       admissionGrants: args.grants,
       now: args.now,
+      eventCapacity: args.eventCapacity,
+      relayHelloBindingOverride: args.relayHelloBindingOverride,
       holdConnectionOpens: args.holdConnectionOpens
     })
     cells.push(cell)
@@ -112,12 +136,16 @@ describe('HiveRelay P0 reference peer wire testkit', () => {
   function createClient(
     harness: Harness,
     token: string,
-    keys: nacl.BoxKeyPair
+    keys: nacl.BoxKeyPair,
+    origin = CLIENT_ORIGIN
   ): ReferenceHiveRelayClient {
     const client = new ReferenceHiveRelayClient({
       cellUrl: harness.cell.baseUrl,
       relayHostId: harness.binding.relayHostId,
       clientAdmissionToken: tokenFor(token),
+      origin,
+      expectedCellId: harness.binding.cellId,
+      expectedCellIncarnationId: harness.binding.cellIncarnationId,
       keys
     })
     clients.push(client)
@@ -193,6 +221,86 @@ describe('HiveRelay P0 reference peer wire testkit', () => {
     })
   })
 
+  it.each([
+    {
+      operation: 'drain completion',
+      expectedReason: 'INCARNATION_DRAIN',
+      apply: (cell: ProgrammableHiveRelayMockCell) => {
+        cell.beginDrain(0)
+        cell.finishDrain()
+      }
+    },
+    {
+      operation: 'incarnation rotation',
+      expectedReason: 'STALE_BINDING',
+      apply: (cell: ProgrammableHiveRelayMockCell) =>
+        cell.rotateIncarnation('00000000-0000-4000-8000-000000000099')
+    }
+  ])('releases pending admission on $operation', async ({ operation, expectedReason, apply }) => {
+    const hostKeys = nacl.box.keyPair()
+    const binding = bindingFor(hostKeys.publicKey)
+    const clientKeys = nacl.box.keyPair()
+    const label = `admission-${operation}`
+    const token = tokenFor(label)
+    const harness = await startHarness({
+      hostKeys,
+      binding,
+      grants: [grant(label, binding, clientKeys)],
+      autoAttach: false
+    })
+    await harness.host.connect()
+    const client = createClient(harness, label, clientKeys)
+    const connecting = client.connect()
+    void connecting.catch(() => {})
+    await vi.waitFor(() => expect(harness.cell.pendingConnectionIds()).toHaveLength(1))
+
+    apply(harness.cell)
+
+    await expect(connecting).rejects.toMatchObject({ reason: expectedReason })
+    expect(harness.cell.admissionState(token)).toBe('UNUSED')
+  })
+
+  it('keeps the authentication deadline active until Host proof is acknowledged', async () => {
+    const hostKeys = nacl.box.keyPair()
+    const binding = bindingFor(hostKeys.publicKey)
+    const cell = new ProgrammableHiveRelayMockCell({
+      cellOrigin: CELL_ORIGIN,
+      controlLease: CONTROL_LEASE,
+      binding,
+      admissionGrants: [],
+      preAuthTimeoutMs: 100
+    })
+    cells.push(cell)
+    await cell.start()
+    const socket = openWebSocket(cell.baseUrl, HIVE_RELAY_HOST_CONTROL_PATH, {
+      authorization: CONTROL_LEASE
+    })
+    const challenge = new Promise<Record<string, unknown>>((resolve, reject) => {
+      socket.once('message', (raw, isBinary) => {
+        if (isBinary) {
+          reject(new Error('Expected a text Host challenge'))
+          return
+        }
+        resolve(JSON.parse(wireText(raw)) as Record<string, unknown>)
+      })
+      socket.once('error', reject)
+    })
+    const closed = new Promise<{ code: number; reason: string }>((resolve) => {
+      socket.once('close', (code, reason) => resolve({ code, reason: reason.toString('utf8') }))
+    })
+    await waitForOpen(socket)
+    sendJson(socket, {
+      type: 'host-hello',
+      v: 2,
+      ...binding,
+      hostPublicKeyB64: Buffer.from(hostKeys.publicKey).toString('base64url'),
+      capabilities: ['ticket-connect-v2']
+    })
+
+    await expect(challenge).resolves.toMatchObject({ type: 'host-challenge' })
+    await expect(closed).resolves.toEqual({ code: 4408, reason: 'AUTH_TIMEOUT' })
+  })
+
   it('rejects replay of a consumed admission token', async () => {
     const hostKeys = nacl.box.keyPair()
     const binding = bindingFor(hostKeys.publicKey)
@@ -211,6 +319,45 @@ describe('HiveRelay P0 reference peer wire testkit', () => {
       code: 4409,
       reason: 'REPLAY_DETECTED'
     })
+  })
+
+  it('rejects a browser client whose Origin differs from its admission binding', async () => {
+    const hostKeys = nacl.box.keyPair()
+    const binding = bindingFor(hostKeys.publicKey)
+    const clientKeys = nacl.box.keyPair()
+    const harness = await startHarness({
+      hostKeys,
+      binding,
+      grants: [grant('admission-wrong-origin', binding, clientKeys)]
+    })
+    await harness.host.connect()
+    const client = createClient(
+      harness,
+      'admission-wrong-origin',
+      clientKeys,
+      'https://attacker.invalid'
+    )
+
+    await expect(client.connect()).rejects.toMatchObject({ code: 4403, reason: 'ORIGIN_REJECTED' })
+  })
+
+  it('rejects a relay acknowledgement for a different Cell incarnation', async () => {
+    const hostKeys = nacl.box.keyPair()
+    const binding = bindingFor(hostKeys.publicKey)
+    const clientKeys = nacl.box.keyPair()
+    const harness = await startHarness({
+      hostKeys,
+      binding,
+      grants: [grant('admission-wrong-relay-hello', binding, clientKeys)],
+      relayHelloBindingOverride: {
+        cellId: binding.cellId,
+        cellIncarnationId: '99999999-9999-4999-8999-999999999999'
+      }
+    })
+    await harness.host.connect()
+    const client = createClient(harness, 'admission-wrong-relay-hello', clientKeys)
+
+    await expect(client.connect()).rejects.toThrow('acknowledgement binding mismatch')
   })
 
   it('fails a stale Host binding before issuing an active acknowledgement', async () => {
@@ -253,6 +400,8 @@ describe('HiveRelay P0 reference peer wire testkit', () => {
     const [firstHello, secondHello] = await Promise.all([firstConnecting, secondConnecting])
 
     expect(harness.host.openedConnectionIds).toEqual([secondHello.connId, firstHello.connId])
+    expect(firstHello.connId).toMatch(/^conn-[A-Za-z0-9_-]{22}-1$/)
+    expect(secondHello.connId).toMatch(/^conn-[A-Za-z0-9_-]{22}-2$/)
     await Promise.all([
       harness.host.waitForAttached(firstHello.connId),
       harness.host.waitForAttached(secondHello.connId)
@@ -287,5 +436,91 @@ describe('HiveRelay P0 reference peer wire testkit', () => {
     const activeClosed = active.waitForClose()
     harness.cell.finishDrain()
     await expect(activeClosed).resolves.toMatchObject({ code: 4413, reason: 'INCARNATION_DRAIN' })
+  })
+
+  it('releases active data peers when the Host control channel disappears', async () => {
+    const hostKeys = nacl.box.keyPair()
+    const binding = bindingFor(hostKeys.publicKey)
+    const clientKeys = nacl.box.keyPair()
+    const harness = await startHarness({
+      hostKeys,
+      binding,
+      grants: [grant('admission-control-loss', binding, clientKeys)]
+    })
+    await harness.host.connect()
+    const client = createClient(harness, 'admission-control-loss', clientKeys)
+    const hello = await client.connect()
+    await harness.host.waitForAttached(hello.connId)
+
+    const closed = client.waitForClose()
+    harness.cell.dropControl()
+
+    await expect(closed).resolves.toMatchObject({ code: 4411, reason: 'HOST_UNAVAILABLE' })
+    expect(harness.cell.pendingConnectionIds()).toEqual([])
+  })
+
+  it('bounds diagnostic event retention', async () => {
+    const hostKeys = nacl.box.keyPair()
+    const binding = bindingFor(hostKeys.publicKey)
+    const clientKeys = nacl.box.keyPair()
+    const harness = await startHarness({
+      hostKeys,
+      binding,
+      grants: [grant('admission-bounded-events', binding, clientKeys)],
+      eventCapacity: 2
+    })
+    await harness.host.connect()
+    const client = createClient(harness, 'admission-bounded-events', clientKeys)
+    await client.connect()
+
+    expect(harness.cell.events).toHaveLength(2)
+  })
+})
+
+describe('HiveRelay binary inbox bounds', () => {
+  it('reuses fixed storage across sustained push/read churn', async () => {
+    const inbox = new BinaryInbox(2)
+    for (let index = 0; index < 100; index += 1) {
+      inbox.push(Buffer.from([index]))
+      await expect(inbox.next()).resolves.toEqual(new Uint8Array([index]))
+    }
+  })
+
+  it('fails closed instead of retaining unbounded ciphertext frames', async () => {
+    const inbox = new BinaryInbox(2)
+    inbox.push(Buffer.from([1]))
+    inbox.push(Buffer.from([2]))
+    inbox.push(Buffer.from([3]))
+
+    await expect(inbox.next()).rejects.toThrow('capacity exceeded')
+  })
+
+  it('closes the peer when its bounded inbox overflows', () => {
+    const close = vi.fn()
+    const inbox = new BinaryInbox(1)
+    queueBinaryFrame({ close }, inbox, Buffer.from([1]))
+    queueBinaryFrame({ close }, inbox, Buffer.from([2]))
+
+    expect(close).toHaveBeenCalledExactlyOnceWith(
+      BINARY_INBOX_OVERFLOW_CLOSE,
+      BINARY_INBOX_OVERFLOW_REASON
+    )
+  })
+
+  it('rejects excess pending readers', async () => {
+    const inbox = new BinaryInbox(1)
+    const first = inbox.next()
+    await expect(inbox.next()).rejects.toThrow('waiter capacity exceeded')
+    inbox.reject(new Error('closed'))
+    await expect(first).rejects.toThrow('closed')
+  })
+})
+
+describe('HiveRelay mock Cell route parsing', () => {
+  it('rejects malformed percent escapes and empty route identifiers', () => {
+    expect(parseMockCellRoute(`${HIVE_RELAY_HOST_DATA_PATH_PREFIX}%ZZ`)).toBeNull()
+    expect(parseMockCellRoute(`${HIVE_RELAY_CLIENT_PATH_PREFIX}%ZZ`)).toBeNull()
+    expect(parseMockCellRoute(HIVE_RELAY_HOST_DATA_PATH_PREFIX)).toBeNull()
+    expect(parseMockCellRoute(HIVE_RELAY_CLIENT_PATH_PREFIX)).toBeNull()
   })
 })

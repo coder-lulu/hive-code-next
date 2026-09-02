@@ -18,6 +18,7 @@ import {
   BinaryInbox,
   deferred,
   openWebSocket,
+  queueBinaryFrame,
   sendJson,
   waitForOpen,
   wireText,
@@ -32,6 +33,7 @@ export type ReferenceHostOptions = {
   keys?: nacl.BoxKeyPair
   now?: () => number
   autoAttach?: boolean
+  historyCapacity?: number
   onConnectionOpen?: (message: ConnectionOpen) => void
 }
 
@@ -51,6 +53,7 @@ export class ReferenceHiveRelayHost {
   private readonly pending = new Map<string, ConnectionOpen>()
   private readonly data = new Map<string, DataConnection>()
   private readonly controlReady = deferred<HostHelloAck>()
+  private readonly historyCapacity: number
   private control: WebSocketClient | null = null
   private autoAttach: boolean
 
@@ -60,6 +63,10 @@ export class ReferenceHiveRelayHost {
     this.secretKey = keys.secretKey
     this.publicKeyB64 = toBase64Url(keys.publicKey)
     this.autoAttach = options.autoAttach ?? true
+    this.historyCapacity = options.historyCapacity ?? 1_024
+    if (!Number.isSafeInteger(this.historyCapacity) || this.historyCapacity < 1) {
+      throw new Error('Reference Host history capacity must be a positive safe integer')
+    }
     if (deriveHiveRelayHostId(keys.publicKey) !== options.binding.relayHostId) {
       throw new Error('Reference Host key does not match relayHostId')
     }
@@ -135,6 +142,7 @@ export class ReferenceHiveRelayHost {
     for (const connection of this.data.values()) {
       connection.socket.close(1000)
     }
+    this.pending.clear()
     this.data.clear()
   }
 
@@ -169,7 +177,7 @@ export class ReferenceHiveRelayHost {
     if (message.type === 'conn-open') {
       const connectionOpen = ConnectionOpenSchema.parse(message)
       this.pending.set(connectionOpen.connId, connectionOpen)
-      this.openedConnectionIds.push(connectionOpen.connId)
+      this.recordHistory(this.openedConnectionIds, connectionOpen.connId)
       this.options.onConnectionOpen?.(connectionOpen)
       if (this.autoAttach) {
         void this.attachPending(connectionOpen.connId).catch((error: unknown) => {
@@ -178,7 +186,7 @@ export class ReferenceHiveRelayHost {
       }
       return
     }
-    this.drainDeadlines.push(message.deadlineMs)
+    this.recordHistory(this.drainDeadlines, message.deadlineMs)
   }
 
   private async attach(message: ConnectionOpen): Promise<void> {
@@ -197,7 +205,7 @@ export class ReferenceHiveRelayHost {
     this.data.set(message.connId, connection)
     socket.on('message', (raw, isBinary) => {
       if (isBinary) {
-        connection.inbox.push(raw)
+        queueBinaryFrame(socket, connection.inbox, raw)
         return
       }
       try {
@@ -218,6 +226,9 @@ export class ReferenceHiveRelayHost {
       const error = new Error(`Host data closed:${code}:${reason.toString()}`)
       connection.ready.reject(error)
       connection.inbox.reject(error)
+      if (this.data.get(message.connId) === connection) {
+        this.data.delete(message.connId)
+      }
     })
     socket.once('error', (error) => {
       connection.ready.reject(error)
@@ -245,10 +256,20 @@ export class ReferenceHiveRelayHost {
 
   private failControl(error: Error): void {
     this.controlReady.reject(error)
+    this.pending.clear()
     for (const connection of this.data.values()) {
       connection.ready.reject(error)
       connection.inbox.reject(error)
+      connection.socket.close(1012, 'CONTROL_UNAVAILABLE')
     }
+    this.data.clear()
     this.control?.close(1008)
+  }
+
+  private recordHistory<T>(history: T[], value: T): void {
+    if (history.length === this.historyCapacity) {
+      history.shift()
+    }
+    history.push(value)
   }
 }

@@ -10,6 +10,7 @@ import {
   type HostHello
 } from './hiverelay-test-wire'
 import {
+  MOCK_CELL_AUTH_TIMEOUT_CLOSE,
   MOCK_CELL_POLICY_CLOSE,
   MOCK_CELL_DRAINING_CLOSE,
   MOCK_CELL_STALE_BINDING_CLOSE,
@@ -39,6 +40,10 @@ export function acceptMockCellControl(args: {
     closeMockCellSocket(socket, MOCK_CELL_POLICY_CLOSE, 'INVALID_CONTROL_LEASE')
     return
   }
+  const preAuthTimeout = setTimeout(() => {
+    closeMockCellSocket(socket, MOCK_CELL_AUTH_TIMEOUT_CLOSE, 'AUTH_TIMEOUT')
+  }, args.options.preAuthTimeoutMs ?? 5_000)
+  preAuthTimeout.unref()
   socket.once('message', (raw, isBinary) => {
     if (isBinary) {
       closeMockCellSocket(socket, MOCK_CELL_POLICY_CLOSE, 'INVALID_HOST_HELLO')
@@ -61,12 +66,18 @@ export function acceptMockCellControl(args: {
       closeMockCellSocket(socket, MOCK_CELL_STALE_BINDING_CLOSE, 'STALE_BINDING')
       return
     }
-    proveHost({ ...args, hello })
+    proveHost({ ...args, hello }, preAuthTimeout)
   })
-  socket.once('close', () => args.onClosed(socket))
+  socket.once('close', () => {
+    clearTimeout(preAuthTimeout)
+    args.onClosed(socket)
+  })
 }
 
-function proveHost(args: Parameters<typeof acceptMockCellControl>[0] & { hello: HostHello }): void {
+function proveHost(
+  args: Parameters<typeof acceptMockCellControl>[0] & { hello: HostHello },
+  preAuthTimeout: NodeJS.Timeout
+): void {
   const challenge = issueHostChallenge({
     hello: args.hello,
     cellOrigin: args.options.cellOrigin,
@@ -82,6 +93,7 @@ function proveHost(args: Parameters<typeof acceptMockCellControl>[0] & { hello: 
     try {
       const ack = parseStrictJson(wireText(raw), HostChallengeAckSchema)
       if (
+        (args.options.now ?? Date.now)() > challenge.message.expiresAt ||
         ack.challengeId !== challenge.message.challengeId ||
         ack.proofB64 !== challenge.expectedProofB64
       ) {
@@ -91,6 +103,7 @@ function proveHost(args: Parameters<typeof acceptMockCellControl>[0] & { hello: 
       closeMockCellSocket(args.socket, MOCK_CELL_POLICY_CLOSE, 'INVALID_HOST_PROOF')
       return
     }
+    clearTimeout(preAuthTimeout)
     args.onActive(args.socket, args.hello)
     sendMockCellJson(args.socket, {
       type: 'host-hello-ack',

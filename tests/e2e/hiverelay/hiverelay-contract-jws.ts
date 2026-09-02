@@ -1,5 +1,6 @@
 import nacl from 'tweetnacl'
 import { z } from 'zod'
+import { isCanonicalHiveRelayOrigin } from './hiverelay-contract-origin'
 import { fromBase64Url, parseStrictJson } from './hiverelay-test-wire'
 
 const OpaqueId = z
@@ -14,9 +15,19 @@ const Base64Url16 = z.string().regex(/^[A-Za-z0-9_-]{22}$/)
 const Base64Url32 = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 const RelayHostId = z.string().regex(/^[A-Za-z0-9_-]{16}$/)
 const Epoch = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+const VerifierContextSchema = z
+  .object({
+    issuer: z.string().min(1),
+    acceptedVerifierKids: z
+      .array(z.string().min(1))
+      .min(1)
+      .refine((kids) => new Set(kids).size === kids.length),
+    privateOriginsByCellId: z.record(z.string(), z.string().min(1))
+  })
+  .strict()
 
 const StandardClaims = {
-  iss: z.literal('https://cloud.hive.test/relay'),
+  iss: z.string().min(1),
   sub: OpaqueId,
   jti: UuidV4,
   iat: Epoch,
@@ -87,7 +98,7 @@ const TOKEN_PROFILES = {
         scope: z.enum(['relay:cell:status', 'relay:cell:lifecycle', 'relay:cell:fence']),
         method: z.enum(['GET', 'POST']),
         path: z.enum(['/internal/status', '/internal/v1/lifecycle', '/internal/v1/fences']),
-        privateOrigin: z.literal('https://cell-01.private.hive.test:8443'),
+        privateOrigin: z.string().min(1),
         cellId: OpaqueId,
         nonce: Base64Url16
       })
@@ -96,7 +107,20 @@ const TOKEN_PROFILES = {
 } as const
 
 type TokenType = keyof typeof TOKEN_PROFILES
-type TestKey = { kid: string; alg: string; publicKeyB64Url: string }
+type TestKey = {
+  kid: string
+  purpose: string
+  alg: string
+  curve: string
+  publicKeyB64Url: string
+}
+export type JwsVerifierContext = z.infer<typeof VerifierContextSchema>
+
+const CELL_OPS_BINDINGS = {
+  'relay:cell:status': { method: 'GET', path: '/internal/status' },
+  'relay:cell:lifecycle': { method: 'POST', path: '/internal/v1/lifecycle' },
+  'relay:cell:fence': { method: 'POST', path: '/internal/v1/fences' }
+} as const
 
 function decodePart(part: string): Record<string, unknown> | null {
   if (!/^[A-Za-z0-9_-]+$/.test(part)) {
@@ -120,6 +144,7 @@ export function validateFixtureJws(args: {
   clockSkewSeconds: number
   lifetimeSeconds: number
   keys: readonly TestKey[]
+  verifierContext: unknown
 }): string {
   const profile = TOKEN_PROFILES[args.tokenType as TokenType]
   if (!profile) {
@@ -136,23 +161,44 @@ export function validateFixtureJws(args: {
   if (!header || !claims || !signature) {
     return 'INVALID_JWS'
   }
+  const context = VerifierContextSchema.safeParse(args.verifierContext)
+  if (
+    !context.success ||
+    Object.values(context.data.privateOriginsByCellId).some(
+      (origin) => !isCanonicalHiveRelayOrigin(origin)
+    )
+  ) {
+    return 'INVALID_JWS'
+  }
   if (header.alg !== 'EdDSA') {
     return 'INVALID_ALG'
   }
   if (header.typ !== profile.typ) {
     return 'INVALID_TYP'
   }
-  const key = args.keys.find((candidate) => candidate.kid === header.kid)
-  if (!key || key.alg !== 'EdDSA') {
+  if (typeof header.kid !== 'string' || !context.data.acceptedVerifierKids.includes(header.kid)) {
     return 'UNKNOWN_KID'
+  }
+  const key = args.keys.find((candidate) => candidate.kid === header.kid)
+  if (!key) {
+    return 'UNKNOWN_KID'
+  }
+  if (key.purpose !== 'cloud-relay-ed25519' || key.alg !== 'EdDSA' || key.curve !== 'Ed25519') {
+    return 'INVALID_KEY_PURPOSE'
   }
   const publicKey = fromBase64Url(key.publicKeyB64Url, 32)
   const signingInput = Buffer.from(`${headerPart}.${claimsPart}`)
   if (!publicKey || !nacl.sign.detached.verify(signingInput, signature, publicKey)) {
     return 'INVALID_SIGNATURE'
   }
+  if (claims.iss !== context.data.issuer) {
+    return 'WRONG_ISSUER'
+  }
   if (claims.aud !== profile.aud) {
     return 'WRONG_AUDIENCE'
+  }
+  if (!profile.schema.safeParse(claims).success) {
+    return 'INVALID_TOKEN_CLAIMS'
   }
   if (
     typeof claims.iat !== 'number' ||
@@ -170,8 +216,20 @@ export function validateFixtureJws(args: {
   if (claims.exp < args.validationTime - args.clockSkewSeconds) {
     return 'TOKEN_EXPIRED'
   }
-  if (!profile.schema.safeParse(claims).success) {
-    return 'INVALID_TOKEN_CLAIMS'
+  if (args.tokenType === 'cellOpsToken') {
+    const scope = claims.scope as keyof typeof CELL_OPS_BINDINGS
+    const binding = CELL_OPS_BINDINGS[scope]
+    if (!binding || claims.method !== binding.method || claims.path !== binding.path) {
+      return 'WRONG_OPERATION_BINDING'
+    }
+    if (
+      typeof claims.cellId !== 'string' ||
+      typeof claims.privateOrigin !== 'string' ||
+      !isCanonicalHiveRelayOrigin(claims.privateOrigin) ||
+      context.data.privateOriginsByCellId[claims.cellId] !== claims.privateOrigin
+    ) {
+      return 'WRONG_BINDING'
+    }
   }
   const headerKeys = Object.keys(header).sort().join(',')
   return headerKeys === 'alg,kid,typ' ? 'VALID_JWS' : 'INVALID_JWS'

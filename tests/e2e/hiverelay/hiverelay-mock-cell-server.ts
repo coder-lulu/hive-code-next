@@ -12,6 +12,25 @@ export type MockCellRoute =
   | { kind: 'host-data'; connId: string }
   | { kind: 'client'; relayHostId: string }
 
+export function parseMockCellRoute(path: string): MockCellRoute | null {
+  try {
+    if (path === HIVE_RELAY_HOST_CONTROL_PATH) {
+      return { kind: 'control' }
+    }
+    if (path.startsWith(HIVE_RELAY_HOST_DATA_PATH_PREFIX)) {
+      const connId = decodeURIComponent(path.slice(HIVE_RELAY_HOST_DATA_PATH_PREFIX.length))
+      return connId ? { kind: 'host-data', connId } : null
+    }
+    if (path.startsWith(HIVE_RELAY_CLIENT_PATH_PREFIX)) {
+      const relayHostId = decodeURIComponent(path.slice(HIVE_RELAY_CLIENT_PATH_PREFIX.length))
+      return relayHostId ? { kind: 'client', relayHostId } : null
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 export class HiveRelayMockCellServer {
   private readonly webSockets = new WebSocketServer({
     noServer: true,
@@ -68,7 +87,7 @@ export class HiveRelayMockCellServer {
 
   private upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
     const path = new URL(request.url ?? '/', 'http://mock-cell.invalid').pathname
-    const route = this.route(path)
+    const route = parseMockCellRoute(path)
     if (!route) {
       socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n')
       return
@@ -78,22 +97,4 @@ export class HiveRelayMockCellServer {
     })
   }
 
-  private route(path: string): MockCellRoute | null {
-    if (path === HIVE_RELAY_HOST_CONTROL_PATH) {
-      return { kind: 'control' }
-    }
-    if (path.startsWith(HIVE_RELAY_HOST_DATA_PATH_PREFIX)) {
-      return {
-        kind: 'host-data',
-        connId: decodeURIComponent(path.slice(HIVE_RELAY_HOST_DATA_PATH_PREFIX.length))
-      }
-    }
-    if (path.startsWith(HIVE_RELAY_CLIENT_PATH_PREFIX)) {
-      return {
-        kind: 'client',
-        relayHostId: decodeURIComponent(path.slice(HIVE_RELAY_CLIENT_PATH_PREFIX.length))
-      }
-    }
-    return null
-  }
 }

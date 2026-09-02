@@ -43,5 +43,25 @@
       {"source": "REVOKE_PENDING", "event": "ABSOLUTE_DEADLINE", "guard": "absolute-deadline-reached", "target": "EXPIRED", "terminalReason": "ABSOLUTE_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "IDEMPOTENT"}
     ]
   },
-  "transitionVerdicts": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY", "TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"]
+  "transitionVerdicts": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY", "TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"],
+  "managedSessionBatch": {
+    "method": "POST",
+    "pathTemplate": "/hive/v1/runtimes/{runtimeRecordId}/session-transitions",
+    "maximumEntries": 128,
+    "processInRequestOrder": true,
+    "storedVerdicts": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY"],
+    "unstoredStopVerdicts": ["TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"],
+    "stopResponseRule": "emit stored=false stop verdict for offending and every later request entry without state evaluation",
+    "ackRule": "highest-contiguous-stored-sequence",
+    "controlVersionRule": "APPLIED increments by one; every rejected adjudication preserves the current value",
+    "exactReplayRule": "return-original-stored-adjudication",
+    "outboxDeleteRule": "matching-adjudication-and-covering-ack-required",
+    "reasonByTransitionType": {
+      "ACTIVATE": ["ACTIVATED"],
+      "ABANDON": ["ABANDONED_BEFORE_ACTIVATION"],
+      "CLOSE": ["CLIENT_CLOSED", "RUNTIME_SHUTDOWN", "TRANSPORT_CLOSED", "LOCAL_ERROR"],
+      "IDLE_EXPIRE": ["IDLE_TIMEOUT"],
+      "AUTHORITY_EXPIRE": ["SESSION_AUTHORITY_TIMEOUT"]
+    }
+  }
 }

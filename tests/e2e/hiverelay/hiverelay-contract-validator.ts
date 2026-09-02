@@ -8,21 +8,21 @@ import {
   parseStrictJson
 } from './hiverelay-test-wire'
 import { validateFixtureJws } from './hiverelay-contract-jws'
-import {
-  evaluateCloseCodes,
-  evaluateFrame,
-  evaluatePrivateCommand,
-  evaluateReplay,
-  evaluateSession
-} from './hiverelay-contract-state-rules'
+import { isCanonicalHiveRelayOrigin } from './hiverelay-contract-origin'
+import { evaluateRuntimeProof } from './hiverelay-contract-runtime-proof'
+import { evaluateSession } from './hiverelay-contract-session-rules'
+import { evaluatePrivateCommand, evaluatePrivateStatus } from './hiverelay-contract-private-ops'
+import { evaluateCloseCodes, evaluateFrame, evaluateReplay } from './hiverelay-contract-state-rules'
 
 const Operation = z.enum([
   'legacy-bytes',
   'wire-message',
   'jws',
+  'runtime-proof',
   'origin',
   'x25519-key',
   'private-command',
+  'private-status',
   'session-transition',
   'close-code',
   'frame-limit',
@@ -37,7 +37,7 @@ const ContractFixtureSchema = z
     suite: z.enum(['legacy-v1-byte-regression', 'hiverelay-v2-conformance']),
     operation: Operation,
     applicableComponents: z.array(z.enum(['cloud', 'hivecode', 'cell', 'legacy-orca'])).min(1),
-    validationTime: z.number().int().nonnegative(),
+    validationTime: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     input: z.record(z.string(), z.unknown())
   })
   .strict()
@@ -51,7 +51,13 @@ export type HiveRelayContractResult = {
 export type HiveRelayContractContext = {
   clockSkewSeconds: number
   frameLimits: Readonly<Record<string, number | boolean>>
-  testKeys: readonly { kid: string; alg: string; publicKeyB64Url: string }[]
+  testKeys: readonly {
+    kid: string
+    purpose: string
+    alg: string
+    curve: string
+    publicKeyB64Url: string
+  }[]
   closeCodes: readonly { symbol: string; code: number }[]
   credentials: readonly { name: string; lifetimeSeconds: number }[]
 }
@@ -155,7 +161,8 @@ function evaluateJws(
       lifetimeSeconds:
         context.credentials.find((credential) => credential.name === token.tokenType)
           ?.lifetimeSeconds ?? -1,
-      keys: context.testKeys
+      keys: context.testKeys,
+      verifierContext: fixture.input.verifierContext
     })
     if (reason !== 'VALID_JWS') {
       return ['REJECT', reason]
@@ -165,30 +172,22 @@ function evaluateJws(
 }
 
 function evaluateOrigin(input: Record<string, unknown>): ['ACCEPT' | 'REJECT', string] {
-  if (typeof input.origin !== 'string' || !Array.isArray(input.allowedOrigins)) {
+  if (
+    Object.keys(input).sort().join(',') !== ['allowedOrigins', 'browser', 'origin'].join(',') ||
+    typeof input.origin !== 'string' ||
+    input.browser !== true ||
+    !Array.isArray(input.allowedOrigins) ||
+    input.allowedOrigins.length === 0 ||
+    input.allowedOrigins.some((origin) => typeof origin !== 'string')
+  ) {
     return ['REJECT', 'INVALID_ORIGIN']
   }
-  try {
-    const url = new URL(input.origin)
-    const port = url.port ? Number(url.port) : null
-    const canonicalDns =
-      url.hostname.length <= 253 &&
-      url.hostname.split('.').every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
-    const valid =
-      url.protocol === 'https:' &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash &&
-      (url.pathname === '/' || url.pathname === '') &&
-      canonicalDns &&
-      (port === null || (port >= 1 && port <= 65_535 && port !== 443)) &&
-      url.origin === input.origin &&
-      input.allowedOrigins.includes(input.origin)
-    return valid ? ['ACCEPT', 'VALID_ORIGIN'] : ['REJECT', 'INVALID_ORIGIN']
-  } catch {
-    return ['REJECT', 'INVALID_ORIGIN']
-  }
+  const allowedOrigins = input.allowedOrigins as string[]
+  const valid =
+    isCanonicalHiveRelayOrigin(input.origin) &&
+    allowedOrigins.every(isCanonicalHiveRelayOrigin) &&
+    allowedOrigins.includes(input.origin)
+  return valid ? ['ACCEPT', 'VALID_ORIGIN'] : ['REJECT', 'INVALID_ORIGIN']
 }
 
 function evaluateX25519(input: Record<string, unknown>): ['ACCEPT' | 'REJECT', string] {
@@ -228,12 +227,16 @@ export function evaluateHiveRelayContractFixture(
         return evaluateWire(fixture.input)
       case 'jws':
         return evaluateJws(fixture, context)
+      case 'runtime-proof':
+        return evaluateRuntimeProof(fixture.input, fixture.validationTime)
       case 'origin':
         return evaluateOrigin(fixture.input)
       case 'x25519-key':
         return evaluateX25519(fixture.input)
       case 'private-command':
-        return evaluatePrivateCommand(fixture.input)
+        return evaluatePrivateCommand(fixture.input, fixture.validationTime)
+      case 'private-status':
+        return evaluatePrivateStatus(fixture.input, fixture.validationTime)
       case 'session-transition':
         return evaluateSession(fixture.input)
       case 'frame-limit':

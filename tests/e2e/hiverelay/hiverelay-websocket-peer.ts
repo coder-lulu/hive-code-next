@@ -55,11 +55,12 @@ export function webSocketUrl(cellUrl: string, path: string): string {
 export function openWebSocket(
   cellUrl: string,
   path: string,
-  options: { authorization?: string } = {}
+  options: { authorization?: string; origin?: string } = {}
 ): WebSocketClient {
   return new WebSocketClient(webSocketUrl(cellUrl, path), {
     perMessageDeflate: false,
     maxPayload: 8_388_690,
+    ...(options.origin ? { origin: options.origin } : {}),
     ...(options.authorization
       ? { headers: { authorization: `Bearer ${options.authorization}` } }
       : {})
@@ -96,33 +97,108 @@ export function sendJson(socket: WebSocket, message: object): void {
   socket.send(encodeWireJson(message))
 }
 
-export class BinaryInbox {
-  private readonly queued: Uint8Array[] = []
-  private readonly waiting: Deferred<Uint8Array>[] = []
+export const BINARY_INBOX_OVERFLOW_CLOSE = 1013
+export const BINARY_INBOX_OVERFLOW_REASON = 'INBOX_CAPACITY_EXCEEDED'
 
-  push(raw: RawData): void {
+class FixedQueue<T> {
+  private readonly values: (T | undefined)[]
+  private head = 0
+  private size = 0
+
+  constructor(private readonly capacity: number) {
+    this.values = Array.from<T | undefined>({ length: capacity })
+  }
+
+  push(value: T): boolean {
+    if (this.size === this.capacity) {
+      return false
+    }
+    this.values[(this.head + this.size) % this.capacity] = value
+    this.size += 1
+    return true
+  }
+
+  shift(): T | undefined {
+    if (this.size === 0) {
+      return undefined
+    }
+    const value = this.values[this.head]
+    this.values[this.head] = undefined
+    this.head = (this.head + 1) % this.capacity
+    this.size -= 1
+    return value
+  }
+
+  clear(): void {
+    this.values.fill(undefined)
+    this.head = 0
+    this.size = 0
+  }
+}
+
+export class BinaryInbox {
+  private readonly queued: FixedQueue<Uint8Array>
+  private readonly waiting: FixedQueue<Deferred<Uint8Array>>
+  private failure: Error | null = null
+
+  constructor(capacity = 32) {
+    if (!Number.isSafeInteger(capacity) || capacity < 1) {
+      throw new Error('Binary inbox capacity must be a positive safe integer')
+    }
+    this.queued = new FixedQueue(capacity)
+    this.waiting = new FixedQueue(capacity)
+  }
+
+  push(raw: RawData): boolean {
+    if (this.failure) {
+      return false
+    }
     const bytes = rawBuffer(raw)
     const next = this.waiting.shift()
     if (next) {
       next.resolve(new Uint8Array(bytes))
-    } else {
-      this.queued.push(new Uint8Array(bytes))
+      return true
     }
+    if (!this.queued.push(new Uint8Array(bytes))) {
+      this.reject(new Error('Binary inbox capacity exceeded'))
+      return false
+    }
+    return true
   }
 
   next(): Promise<Uint8Array> {
+    if (this.failure) {
+      return Promise.reject(this.failure)
+    }
     const queued = this.queued.shift()
     if (queued) {
       return Promise.resolve(queued)
     }
     const next = deferred<Uint8Array>()
-    this.waiting.push(next)
+    if (!this.waiting.push(next)) {
+      return Promise.reject(new Error('Binary inbox waiter capacity exceeded'))
+    }
     return next.promise
   }
 
   reject(error: Error): void {
-    for (const waiter of this.waiting.splice(0)) {
+    if (this.failure) {
+      return
+    }
+    this.failure = error
+    this.queued.clear()
+    for (let waiter = this.waiting.shift(); waiter; waiter = this.waiting.shift()) {
       waiter.reject(error)
     }
+  }
+}
+
+export function queueBinaryFrame(
+  socket: Pick<WebSocket, 'close'>,
+  inbox: BinaryInbox,
+  raw: RawData
+): void {
+  if (!inbox.push(raw)) {
+    socket.close(BINARY_INBOX_OVERFLOW_CLOSE, BINARY_INBOX_OVERFLOW_REASON)
   }
 }

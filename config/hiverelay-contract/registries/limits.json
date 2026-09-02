@@ -3,9 +3,12 @@
   "contractRevision": "hiverelay-v2-p0.1",
   "time": {
     "clockSkewSeconds": 30,
+    "runtimeProofLifetimeSeconds": 60,
     "hostChallengeLifetimeMs": 10000,
     "preAuthDeadlineMs": 5000,
     "privateStatusFreshnessSeconds": 30,
+    "privateCommandFreshnessSeconds": 30,
+    "privateLifecycleDeadlineSeconds": 120,
     "activationDeadlineSeconds": 120,
     "managedSessionAbsoluteSeconds": 28800,
     "managedSessionIdleSeconds": 900,

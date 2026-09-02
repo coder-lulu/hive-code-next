@@ -27,8 +27,11 @@ The contract is split into four small surfaces:
 4. JWS NumericDate values are integer epoch seconds. Wire timestamps ending in `At` are
    integer epoch milliseconds. Validators use each fixture's frozen `validationTime`.
 5. An origin is lowercase `https`, an ASCII DNS host, optional non-default port, and no
-   userinfo, query, fragment, or non-root path. The canonical form omits port 443 and the
-   trailing slash.
+   userinfo, query, fragment, IPv6 literal, or path (including `/`). Each DNS label is
+   1..63 characters, starts and ends with `[a-z0-9]`, and otherwise contains only
+   `[a-z0-9-]`; the full host is at most 253 characters. A supplied port is `1..65535`
+   and must not be `443`. JSON Schema checks only the wire shape; validators perform
+   these per-label, numeric-port, and canonical-form checks before allowlist comparison.
 6. Identifier and reason values are opaque and must never be emitted as metric labels.
 7. A verdict reason is one symbol from the fixture/registry; free-text parser details are
    diagnostic only and must not cross the component boundary.
@@ -40,6 +43,40 @@ The contract is split into four small surfaces:
 Keys and tokens in `fixtures/` are public test material and must never be configured in a
 deployed environment. The test signer is distinct from Hive Session and Runtime identity
 signers. Validators implement only the exact Ed25519 compact-JWS profile in this contract.
+JWS `kid`, `iss`, and private Cell origin values are deployment bindings, not constants
+in the normative token schema. Fixtures supply them through `input.verifierContext`.
+Key lookup also enforces registry purpose: Relay compact JWS accepts only
+`cloud-relay-ed25519`; a Runtime-proof key remains invalid even if its `kid` is placed in
+the caller's accepted-key set.
+
+Runtime proof is not a bearer credential. It is the closed `runtimeProof` object inside
+the JSON request body and follows `schemas/runtime-proof.schema.json` plus the exact
+projection, digest, signature-input, freshness, and nonce-digest rules in
+`canonical-encoding.md`. A runtime-proof fixture marked with any other carrier must be
+rejected before cryptographic verification.
+
+Managed-session transitions use the request and response definitions in
+`schemas/session-transition.schema.json`. Only stored adjudications cover a contiguous
+ACK; a gap or replay conflict and every later entry in that batch remain unstored.
+
+Private status verification is one atomic operation: the `cellOpsToken` must arrive in
+the private HTTPS Authorization header, its method/path/private origin/Cell binding must
+match the request, and the request header nonce, token nonce, and response nonce must be
+identical. A previously consumed token `jti` or nonce is rejected before status data is
+trusted. The response `observedAt` must be within 30 seconds of validation time.
+
+Private command replay returns the structurally identical stored response when command
+ID and canonical body digest both match. It never substitutes a new wire-level replay
+marker. A lower lifecycle generation produces a stored `STALE_NOOP` response and cannot
+roll Cell state backward.
+
+Each component report emits one result for every manifest fixture. `resultCount` equals
+the result array length, while `applicableFixtureCount` equals the number of fixtures
+that name that component. A passing report sets `testCount` to the number of applicable
+fixture evaluations it actually executed, so it must equal `applicableFixtureCount`.
+Cell evidence additionally records the
+externally supplied immutable container image plus the observed Elixir and OTP versions;
+the report generator must not invent or default the image identity.
 
 ## Change rule
 

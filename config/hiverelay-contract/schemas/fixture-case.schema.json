@@ -10,7 +10,7 @@
     "contractRevision": {"const": "hiverelay-v2-p0.1"},
     "caseId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{2,127}$"},
     "suite": {"enum": ["legacy-v1-byte-regression", "hiverelay-v2-conformance"]},
-    "operation": {"enum": ["legacy-bytes", "wire-message", "jws", "origin", "x25519-key", "private-command", "session-transition", "close-code", "frame-limit", "admission-replay", "conn-ticket-replay"]},
+    "operation": {"enum": ["legacy-bytes", "wire-message", "jws", "runtime-proof", "origin", "x25519-key", "private-command", "private-status", "session-transition", "close-code", "frame-limit", "admission-replay", "conn-ticket-replay"]},
     "applicableComponents": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["cloud", "hivecode", "cell", "legacy-orca"]}},
     "validationTime": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
     "input": {"type": "object"}

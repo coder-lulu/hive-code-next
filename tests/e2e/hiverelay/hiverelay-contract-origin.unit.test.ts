@@ -39,8 +39,12 @@ describe('HiveRelay canonical native origin validation', () => {
     'https://client.hive.test/',
     'https://CLIENT.hive.test',
     'https://clïent.hive.test',
+    'https://a-.hive.test',
+    'https://a..hive.test',
     'https://client.hive.test:443',
     'https://client.hive.test:0',
+    'https://client.hive.test:99999',
+    'https://[::1]:8443',
     'https://client.hive.test/path',
     'https://user@client.hive.test',
     'https://client.hive.test?token=secret'

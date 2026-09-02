@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import type { RawData, WebSocket } from 'ws'
 import {
@@ -15,10 +15,14 @@ export const MOCK_CELL_REPLAY_CLOSE = 4409
 export const MOCK_CELL_STALE_BINDING_CLOSE = 4410
 export const MOCK_CELL_HOST_UNAVAILABLE_CLOSE = 4411
 export const MOCK_CELL_DRAINING_CLOSE = 4413
+export const MOCK_CELL_CAPACITY_CLOSE = 1013
+export const MOCK_CELL_ORIGIN_CLOSE = 4403
 
 export type MockAdmissionGrant = {
   token: string
   binding: HiveRelayBinding
+  origin: string | null
+  expiresAtMs: number
   clientPublicKeyB64: string
   intentId: string
   clientKeyHash: string
@@ -49,20 +53,73 @@ export type ProgrammableMockCellOptions = {
   random?: (size: number) => Uint8Array
   attachTimeoutMs?: number
   holdConnectionOpens?: boolean
+  eventCapacity?: number
+  maxConnections?: number
+  preAuthTimeoutMs?: number
+  maxPreAuthConnections?: number
+  relayHelloBindingOverride?: {
+    cellId: string
+    cellIncarnationId: string
+  }
 }
 
-export type AdmissionRecord = MockAdmissionGrant & {
+export type AdmissionRecord = Omit<MockAdmissionGrant, 'token'> & {
   state: 'UNUSED' | 'RESERVED' | 'CONSUMED'
 }
 
 export type CellConnection = {
   connId: string
-  connTicket: string
+  connTicketSha256: Buffer
   grant: AdmissionRecord
   client: WebSocket
   hostData: WebSocket | null
   deadlineMs: number
   state: 'WAIT_HOST_ATTACH' | 'ACTIVE' | 'CLOSED'
+}
+
+export class MockCellEventLog {
+  private readonly values: (MockCellEvent | undefined)[]
+  private start = 0
+  private size = 0
+
+  constructor(private readonly capacity: number) {
+    if (!Number.isSafeInteger(capacity) || capacity < 1) {
+      throw new Error('Mock Cell event capacity must be a positive safe integer')
+    }
+    this.values = Array.from<MockCellEvent | undefined>({ length: capacity })
+  }
+
+  push(event: MockCellEvent): void {
+    if (this.size < this.capacity) {
+      this.values[(this.start + this.size) % this.capacity] = event
+      this.size += 1
+      return
+    }
+    this.values[this.start] = event
+    this.start = (this.start + 1) % this.capacity
+  }
+
+  snapshot(): MockCellEvent[] {
+    return Array.from(
+      { length: this.size },
+      (_, index) => this.values[(this.start + index) % this.capacity] as MockCellEvent
+    )
+  }
+}
+
+export function digestMockCellTicket(ticket: string): Buffer {
+  return createHash('sha256').update(ticket, 'utf8').digest()
+}
+
+export function digestMockCellCredential(credential: string): string {
+  return createHash('sha256').update(credential, 'utf8').digest('hex')
+}
+
+export function createMockCellConnectionId(
+  sequence: number,
+  random: (size: number) => Uint8Array = (size) => randomBytes(size)
+): string {
+  return `conn-${toBase64Url(random(16))}-${sequence}`
 }
 
 export function sameMockCellBinding(left: HiveRelayBinding, right: HiveRelayBinding): boolean {
@@ -94,14 +151,14 @@ export function forwardMockCellCiphertext(args: {
   destination: WebSocket
   raw: RawData
   isBinary: boolean
-  events: MockCellEvent[]
+  recordEvent: (event: MockCellEvent) => void
 }): void {
   if (args.connection.state !== 'ACTIVE' || args.destination.readyState !== args.destination.OPEN) {
     return
   }
   args.destination.send(args.raw, { binary: args.isBinary })
   const bytes = Array.isArray(args.raw) ? Buffer.concat(args.raw) : Buffer.from(args.raw as Buffer)
-  args.events.push({
+  args.recordEvent({
     kind: 'ciphertext-forwarded',
     connId: args.connection.connId,
     direction: args.direction,
@@ -114,7 +171,8 @@ export function releaseMockCellConnection(args: {
   reason: string
   releaseAdmission: boolean
   connections: Map<string, CellConnection>
-  events: MockCellEvent[]
+  heldConnectionOpens?: ConnectionOpen[]
+  recordEvent: (event: MockCellEvent) => void
 }): void {
   const { connection } = args
   if (connection.state === 'CLOSED') {
@@ -130,14 +188,26 @@ export function releaseMockCellConnection(args: {
       ? MOCK_CELL_DRAINING_CLOSE
       : args.reason === 'HOST_ATTACH_TIMEOUT'
         ? MOCK_CELL_HOST_UNAVAILABLE_CLOSE
-        : MOCK_CELL_POLICY_CLOSE,
+        : args.reason === 'HOST_UNAVAILABLE'
+          ? MOCK_CELL_HOST_UNAVAILABLE_CLOSE
+          : MOCK_CELL_POLICY_CLOSE,
     args.reason
   )
   if (connection.hostData) {
     closeMockCellSocket(connection.hostData, MOCK_CELL_POLICY_CLOSE, args.reason)
   }
+  const heldIndex = args.heldConnectionOpens?.findIndex(
+    (message) => message.connId === connection.connId
+  )
+  if (heldIndex !== undefined && heldIndex !== -1) {
+    args.heldConnectionOpens?.splice(heldIndex, 1)
+  }
   args.connections.delete(connection.connId)
-  args.events.push({ kind: 'connection-released', connId: connection.connId, reason: args.reason })
+  args.recordEvent({
+    kind: 'connection-released',
+    connId: connection.connId,
+    reason: args.reason
+  })
 }
 
 export function reserveMockCellClient(args: {
@@ -148,16 +218,17 @@ export function reserveMockCellClient(args: {
   attachTimeoutMs: number
   random?: (size: number) => Uint8Array
   connections: Map<string, CellConnection>
-  events: MockCellEvent[]
+  recordEvent: (event: MockCellEvent) => void
   heldConnectionOpens: ConnectionOpen[]
   holdConnectionOpens: boolean
   onClientClosed: (connection: CellConnection) => void
   sendConnectionOpen: (message: ConnectionOpen) => void
 }): void {
   const makeRandom = args.random ?? ((size: number) => randomBytes(size))
+  const connTicket = toBase64Url(makeRandom(32))
   const connection: CellConnection = {
     connId: args.connId,
-    connTicket: toBase64Url(makeRandom(32)),
+    connTicketSha256: digestMockCellTicket(connTicket),
     grant: args.grant,
     client: args.client,
     hostData: null,
@@ -166,14 +237,14 @@ export function reserveMockCellClient(args: {
   }
   args.grant.state = 'RESERVED'
   args.connections.set(args.connId, connection)
-  args.events.push({ kind: 'client-reserved', connId: args.connId })
+  args.recordEvent({ kind: 'client-reserved', connId: args.connId })
   args.client.once('close', () => args.onClientClosed(connection))
   const message: ConnectionOpen = {
     type: 'conn-open',
     v: 2,
     kind: 'ticket',
     connId: args.connId,
-    connTicket: connection.connTicket,
+    connTicket,
     intentId: args.grant.intentId,
     clientKeyHash: args.grant.clientKeyHash,
     assignmentEpoch: args.grant.binding.assignmentEpoch,

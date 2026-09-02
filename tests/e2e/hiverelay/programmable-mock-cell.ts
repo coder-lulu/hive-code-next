@@ -1,59 +1,60 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import type { WebSocket } from 'ws'
 import { acceptMockCellControl } from './hiverelay-mock-cell-control'
 import { HiveRelayMockCellServer, type MockCellRoute } from './hiverelay-mock-cell-server'
 import {
-  ClientAdmissionSchema,
   HostDataAuthSchema,
-  deriveHiveRelayKeyHash,
-  fromBase64Url,
   parseStrictJson,
-  type ClientAdmission,
   type ConnectionOpen,
   type HostHello
 } from './hiverelay-test-wire'
+import { acceptMockCellClient } from './hiverelay-mock-cell-client'
 import { wireText } from './hiverelay-websocket-peer'
 import {
   MOCK_CELL_POLICY_CLOSE,
+  MOCK_CELL_AUTH_TIMEOUT_CLOSE,
   MOCK_CELL_DRAINING_CLOSE,
-  MOCK_CELL_REPLAY_CLOSE,
   MOCK_CELL_STALE_BINDING_CLOSE,
   closeMockCellSocket,
+  createMockCellConnectionId,
+  digestMockCellCredential,
+  digestMockCellTicket,
   forwardMockCellCiphertext,
   releaseMockCellConnection,
   reserveMockCellClient,
-  sameMockCellBinding,
   sendMockCellJson,
   type AdmissionRecord,
   type CellConnection,
   type MockCellEvent,
+  MockCellEventLog,
   type ProgrammableMockCellOptions
 } from './hiverelay-mock-cell-state'
 
 export type { MockAdmissionGrant, MockCellEvent } from './hiverelay-mock-cell-state'
 
 export class ProgrammableHiveRelayMockCell {
-  readonly events: MockCellEvent[] = []
-
   private readonly server: HiveRelayMockCellServer
   private readonly admissions = new Map<string, AdmissionRecord>()
   private readonly connections = new Map<string, CellConnection>()
   private readonly heldConnectionOpens: ConnectionOpen[] = []
-  private currentIncarnationId: string
+  private readonly preAuthClients = new Set<WebSocket>()
+  private readonly eventLog = new MockCellEventLog(this.options.eventCapacity ?? 1_024)
+  private currentIncarnationId = this.options.binding.cellIncarnationId
   private control: WebSocket | null = null
   private hostHello: HostHello | null = null
   private connectionSequence = 0
   private draining = false
-  private holdConnectionOpens: boolean
+  private holdConnectionOpens = this.options.holdConnectionOpens ?? false
 
   constructor(private readonly options: ProgrammableMockCellOptions) {
-    this.currentIncarnationId = options.binding.cellIncarnationId
-    this.holdConnectionOpens = options.holdConnectionOpens ?? false
     for (const grant of options.admissionGrants) {
-      if (this.admissions.has(grant.token)) {
+      const tokenDigest = digestMockCellCredential(grant.token)
+      if (this.admissions.has(tokenDigest)) {
         throw new Error('Duplicate mock admission token')
       }
-      this.admissions.set(grant.token, { ...grant, state: 'UNUSED' })
+      const { token: _token, ...binding } = grant
+      this.admissions.set(tokenDigest, { ...binding, state: 'UNUSED' })
     }
     this.server = new HiveRelayMockCellServer((socket, request, route) =>
       this.acceptRoute(socket, request, route)
@@ -62,6 +63,10 @@ export class ProgrammableHiveRelayMockCell {
 
   get baseUrl(): string {
     return this.server.baseUrl
+  }
+
+  get events(): MockCellEvent[] {
+    return this.eventLog.snapshot()
   }
 
   async start(): Promise<void> {
@@ -81,9 +86,11 @@ export class ProgrammableHiveRelayMockCell {
   }
 
   pendingConnectionIds(): string[] {
-    return [...this.connections.values()]
-      .filter((connection) => connection.state === 'WAIT_HOST_ATTACH')
-      .map((connection) => connection.connId)
+    return [...this.connections.values()].filter((connection) => connection.state === 'WAIT_HOST_ATTACH').map((connection) => connection.connId)
+  }
+
+  admissionState(token: string): AdmissionRecord['state'] | null {
+    return this.admissions.get(digestMockCellCredential(token))?.state ?? null
   }
 
   expirePending(): void {
@@ -97,7 +104,7 @@ export class ProgrammableHiveRelayMockCell {
 
   beginDrain(deadlineMs: number): void {
     this.draining = true
-    this.events.push({ kind: 'drain-started' })
+    this.recordEvent({ kind: 'drain-started' })
     if (this.control) {
       sendMockCellJson(this.control, {
         type: 'drain',
@@ -110,7 +117,7 @@ export class ProgrammableHiveRelayMockCell {
 
   finishDrain(): void {
     for (const connection of this.connections.values()) {
-      this.release(connection, 'INCARNATION_DRAIN', false)
+      this.release(connection, 'INCARNATION_DRAIN', connection.state === 'WAIT_HOST_ATTACH')
     }
     if (this.control) {
       closeMockCellSocket(this.control, MOCK_CELL_DRAINING_CLOSE, 'DRAINING')
@@ -119,9 +126,9 @@ export class ProgrammableHiveRelayMockCell {
 
   rotateIncarnation(nextIncarnationId: string): void {
     this.currentIncarnationId = nextIncarnationId
-    this.events.push({ kind: 'incarnation-rotated' })
+    this.recordEvent({ kind: 'incarnation-rotated' })
     for (const connection of this.connections.values()) {
-      this.release(connection, 'STALE_BINDING', false)
+      this.release(connection, 'STALE_BINDING', connection.state === 'WAIT_HOST_ATTACH')
     }
     if (this.control) {
       closeMockCellSocket(this.control, MOCK_CELL_STALE_BINDING_CLOSE, 'STALE_BINDING')
@@ -134,13 +141,19 @@ export class ProgrammableHiveRelayMockCell {
     await this.server.stop()
   }
 
+  dropControl(): void {
+    if (this.control) {
+      closeMockCellSocket(this.control, 1012, 'SERVICE_RESTART')
+    }
+  }
+
   private acceptRoute(socket: WebSocket, request: IncomingMessage, route: MockCellRoute): void {
     if (route.kind === 'control') {
       this.acceptControl(socket, request)
     } else if (route.kind === 'host-data') {
       this.acceptHostData(socket, route.connId)
     } else {
-      this.acceptClient(socket, route.relayHostId)
+      this.acceptClient(socket, request, route.relayHostId)
     }
   }
 
@@ -154,58 +167,38 @@ export class ProgrammableHiveRelayMockCell {
       onActive: (activeSocket, hello) => {
         this.control = activeSocket
         this.hostHello = hello
-        this.events.push({ kind: 'host-active' })
+        this.recordEvent({ kind: 'host-active' })
       },
       onClosed: (closedSocket) => {
         if (this.control === closedSocket) {
           this.control = null
           this.hostHello = null
+          for (const connection of this.connections.values()) {
+            this.release(connection, 'HOST_UNAVAILABLE', connection.state === 'WAIT_HOST_ATTACH')
+          }
         }
       }
     })
   }
 
-  private acceptClient(socket: WebSocket, routeHostId: string): void {
-    socket.once('message', (raw, isBinary) => {
-      if (isBinary) {
-        closeMockCellSocket(socket, MOCK_CELL_POLICY_CLOSE, 'INVALID_CLIENT_ADMISSION')
-        return
-      }
-      let admission: ClientAdmission
-      try {
-        admission = parseStrictJson(wireText(raw), ClientAdmissionSchema)
-      } catch {
-        closeMockCellSocket(socket, MOCK_CELL_POLICY_CLOSE, 'INVALID_CLIENT_ADMISSION')
-        return
-      }
-      const grant = this.admissions.get(admission.clientAdmissionToken)
-      const clientKey = fromBase64Url(admission.clientPublicKeyB64, 32)
-      if (this.draining) {
-        closeMockCellSocket(socket, MOCK_CELL_DRAINING_CLOSE, 'DRAINING')
-      } else if (!grant || grant.state !== 'UNUSED') {
-        closeMockCellSocket(
-          socket,
-          grant?.state === 'CONSUMED' ? MOCK_CELL_REPLAY_CLOSE : MOCK_CELL_POLICY_CLOSE,
-          grant?.state === 'CONSUMED' ? 'REPLAY_DETECTED' : 'INVALID_ADMISSION'
-        )
-      } else if (
-        routeHostId !== grant.binding.relayHostId ||
-        !clientKey ||
-        grant.clientPublicKeyB64 !== admission.clientPublicKeyB64 ||
-        grant.clientKeyHash !== deriveHiveRelayKeyHash(clientKey) ||
-        !this.hostHello ||
-        !sameMockCellBinding(grant.binding, this.hostHello) ||
-        grant.binding.cellIncarnationId !== this.currentIncarnationId
-      ) {
-        closeMockCellSocket(socket, MOCK_CELL_STALE_BINDING_CLOSE, 'STALE_BINDING')
-      } else {
-        this.reserveClient(socket, grant)
-      }
+  private acceptClient(socket: WebSocket, request: IncomingMessage, routeHostId: string): void {
+    acceptMockCellClient({
+      socket,
+      request,
+      routeHostId,
+      options: this.options,
+      draining: this.draining,
+      currentIncarnationId: this.currentIncarnationId,
+      hostHello: this.hostHello,
+      admissions: this.admissions,
+      connections: this.connections,
+      preAuthClients: this.preAuthClients,
+      reserveClient: (client, grant) => this.reserveClient(client, grant)
     })
   }
-
   private reserveClient(socket: WebSocket, grant: AdmissionRecord): void {
-    const connId = `conn-${++this.connectionSequence}`
+    const sequence = ++this.connectionSequence
+    const connId = createMockCellConnectionId(sequence, this.options.random)
     reserveMockCellClient({
       connId,
       grant,
@@ -214,7 +207,7 @@ export class ProgrammableHiveRelayMockCell {
       attachTimeoutMs: this.options.attachTimeoutMs ?? 5_000,
       random: this.options.random,
       connections: this.connections,
-      events: this.events,
+      recordEvent: (event) => this.recordEvent(event),
       heldConnectionOpens: this.heldConnectionOpens,
       holdConnectionOpens: this.holdConnectionOpens,
       onClientClosed: (connection) => {
@@ -235,11 +228,17 @@ export class ProgrammableHiveRelayMockCell {
       return
     }
     sendMockCellJson(this.control, message)
-    this.events.push({ kind: 'connection-open-sent', connId: message.connId })
+    this.recordEvent({ kind: 'connection-open-sent', connId: message.connId })
   }
 
   private acceptHostData(socket: WebSocket, routeConnId: string): void {
+    const preAuthTimeout = setTimeout(() => {
+      closeMockCellSocket(socket, MOCK_CELL_AUTH_TIMEOUT_CLOSE, 'AUTH_TIMEOUT')
+    }, this.options.preAuthTimeoutMs ?? 5_000)
+    preAuthTimeout.unref()
+    socket.once('close', () => clearTimeout(preAuthTimeout))
     socket.once('message', (raw, isBinary) => {
+      clearTimeout(preAuthTimeout)
       if (isBinary) {
         closeMockCellSocket(socket, MOCK_CELL_POLICY_CLOSE, 'INVALID_HOST_DATA_AUTH')
         return
@@ -251,7 +250,7 @@ export class ProgrammableHiveRelayMockCell {
           !connection ||
           connection.state !== 'WAIT_HOST_ATTACH' ||
           auth.connId !== routeConnId ||
-          auth.connTicket !== connection.connTicket ||
+          !timingSafeEqual(digestMockCellTicket(auth.connTicket), connection.connTicketSha256) ||
           auth.assignmentEpoch !== connection.grant.binding.assignmentEpoch ||
           auth.controlGeneration !== connection.grant.binding.controlGeneration ||
           (this.options.now ?? Date.now)() > connection.deadlineMs
@@ -269,13 +268,15 @@ export class ProgrammableHiveRelayMockCell {
     connection.hostData = hostData
     connection.state = 'ACTIVE'
     connection.grant.state = 'CONSUMED'
-    this.events.push({ kind: 'connection-active', connId: connection.connId })
+    this.recordEvent({ kind: 'connection-active', connId: connection.connId })
     const hello = {
       type: 'relay-hello',
       v: 2,
       connId: connection.connId,
-      cellId: connection.grant.binding.cellId,
-      cellIncarnationId: connection.grant.binding.cellIncarnationId
+      cellId: this.options.relayHelloBindingOverride?.cellId ?? connection.grant.binding.cellId,
+      cellIncarnationId:
+        this.options.relayHelloBindingOverride?.cellIncarnationId ??
+        connection.grant.binding.cellIncarnationId
     } as const
     sendMockCellJson(connection.client, hello)
     sendMockCellJson(hostData, hello)
@@ -286,7 +287,7 @@ export class ProgrammableHiveRelayMockCell {
         destination: hostData,
         raw,
         isBinary,
-        events: this.events
+        recordEvent: (event) => this.recordEvent(event)
       })
     )
     hostData.on('message', (raw, isBinary) =>
@@ -296,7 +297,7 @@ export class ProgrammableHiveRelayMockCell {
         destination: connection.client,
         raw,
         isBinary,
-        events: this.events
+        recordEvent: (event) => this.recordEvent(event)
       })
     )
     hostData.once('close', () => this.release(connection, 'HOST_DATA_CLOSED', false))
@@ -309,7 +310,12 @@ export class ProgrammableHiveRelayMockCell {
       reason,
       releaseAdmission,
       connections: this.connections,
-      events: this.events
+      heldConnectionOpens: this.heldConnectionOpens,
+      recordEvent: (event) => this.recordEvent(event)
     })
+  }
+
+  private recordEvent(event: MockCellEvent): void {
+    this.eventLog.push(event)
   }
 }

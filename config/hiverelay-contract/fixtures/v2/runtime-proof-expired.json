@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "caseId": "v2.runtime-proof.expired.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "runtime-proof",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1893456000000,
+  "input": {
+    "verifierContext": {
+      "expectedCarrier": "json-body.runtimeProof",
+      "presentedCarrier": "json-body.runtimeProof",
+      "method": "POST",
+      "path": "/hive/v1/runtimes/55555555-5555-4555-8555-555555555555/relay/authorizations",
+      "authorityId": "cloud-authority-test",
+      "runtimeIdentityPublicKeyB64Url": "rgjbdK6W7UiJYtzlh5MaeAE8zWnNpzPMEOOAPwXr89Q",
+      "currentRuntimeTuple": {"runtimeId": "runtime-01", "runtimeBootId": "22222222-2222-4222-8222-222222222222", "authorityGeneration": 7, "fencingEpoch": 3, "leaseEpoch": 11},
+      "usedNonceDigests": []
+    },
+    "protectedPayload": {"protocolVersion": 2, "capabilities": ["ticket-connect-v2"]},
+    "runtimeProof": {"protocolVersion": "hive-relay-runtime-proof/v2", "algorithm": "Ed25519", "method": "POST", "path": "/hive/v1/runtimes/55555555-5555-4555-8555-555555555555/relay/authorizations", "authorityId": "cloud-authority-test", "runtimeId": "runtime-01", "runtimeBootId": "22222222-2222-4222-8222-222222222222", "authorityGeneration": 7, "fencingEpoch": 3, "leaseEpoch": 11, "issuedAt": 1893455909999, "nonce": "dddddddd-dddd-4ddd-8ddd-dddddddddddd", "bodySha256": "1af464b8eabf840b80e8151beaa3ed30290a36850dd5b7507a46a2bc7ac14b7d", "signature": "eopnIEocguOfANPMEoZc2RfYCwqxRoIW4iCR_ISrz2XFnNQ8tPZNfQCPlceJoV7_vPmIPX2sIn2ymSGvr43OBg"}
+  }
+}

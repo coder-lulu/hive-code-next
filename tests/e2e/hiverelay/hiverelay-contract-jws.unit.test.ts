@@ -36,7 +36,9 @@ function signedControlLease(times: { iat: number; nbf: number; exp: number }) {
     keys: [
       {
         kid: header.kid,
+        purpose: 'cloud-relay-ed25519',
         alg: 'EdDSA',
+        curve: 'Ed25519',
         publicKeyB64Url: Buffer.from(keys.publicKey).toString('base64url')
       }
     ]
@@ -51,7 +53,12 @@ function validate(times: { iat: number; nbf: number; exp: number }): string {
     validationTime: 1_000,
     clockSkewSeconds: 30,
     lifetimeSeconds: 120,
-    keys: token.keys
+    keys: token.keys,
+    verifierContext: {
+      issuer: 'https://cloud.hive.test/relay',
+      acceptedVerifierKids: ['unit-test-key'],
+      privateOriginsByCellId: {}
+    }
   })
 }
 
@@ -72,5 +79,16 @@ describe('HiveRelay authority JWS lifetime rules', () => {
   it('allows skew but rejects tokens expired beyond it', () => {
     expect(validate({ iat: 850, nbf: 850, exp: 970 })).toBe('VALID_JWS')
     expect(validate({ iat: 849, nbf: 849, exp: 969 })).toBe('TOKEN_EXPIRED')
+  })
+
+  it('rejects NumericDate values outside the non-negative JSON safe-integer range', () => {
+    expect(validate({ iat: -1, nbf: -1, exp: 119 })).toBe('INVALID_TOKEN_CLAIMS')
+    expect(
+      validate({
+        iat: Number.MAX_SAFE_INTEGER + 1,
+        nbf: Number.MAX_SAFE_INTEGER + 1,
+        exp: Number.MAX_SAFE_INTEGER + 121
+      })
+    ).toBe('INVALID_TOKEN_CLAIMS')
   })
 })

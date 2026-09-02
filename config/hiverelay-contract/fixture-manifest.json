@@ -3,6 +3,16 @@
   "contractRevision": "hiverelay-v2-p0.1",
   "files": [
     {
+      "path": "README.md",
+      "kind": "documentation",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "3fd6e1e52704eb6b0aa0ef4c7ab2d72110f3c989795173595d3d08e0635c5377"
+    },
+    {
       "path": "canonical-encoding.md",
       "kind": "documentation",
       "applicableComponents": [
@@ -10,7 +20,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "78ace065bd2301a8bf9750b050b5e456ab88f88b3a45db950677cbedbffb18d3"
+      "sha256": "a2ff117d2aab86b93f0bbe7d315cc0ee6c687e6c1e417acae533b0a40d14915b"
     },
     {
       "path": "fixtures/legacy-v1/conn-open-invite.json",
@@ -37,6 +47,19 @@
       "caseId": "legacy-v1.conn-open.resume.bytes",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_LEGACY_BYTES"
+    },
+    {
+      "path": "fixtures/v2/admission-binding-valid.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "1cfa184609621f7c4c4ba77347c07b453c1f85d6ea7baca38cd68614bf52359d",
+      "caseId": "v2.admission.binding-match.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "FIRST_USE"
     },
     {
       "path": "fixtures/v2/admission-first-use.json",
@@ -130,6 +153,19 @@
       "expectedReason": "REPLAY_DETECTED"
     },
     {
+      "path": "fixtures/v2/frame-boundaries-mixed-plus-one.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "02b436cbfade4aa5fa2396f0e2d4826396efc06bf90d3f593f690a3093cd80c8",
+      "caseId": "v2.frame-boundaries.mixed-plus-one.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "FRAME_TOO_LARGE"
+    },
+    {
       "path": "fixtures/v2/frame-boundaries-plus-one.json",
       "kind": "fixture",
       "applicableComponents": [
@@ -156,6 +192,45 @@
       "expectedReason": "AT_LIMIT"
     },
     {
+      "path": "fixtures/v2/jws-cell-ops-binding-mismatch.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "82cb142f3cabe1eeb5b81d62570f8c0470222b0fcd8b08684a12f1c083930ada",
+      "caseId": "v2.jws.cell-ops-operation-binding.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "WRONG_OPERATION_BINDING"
+    },
+    {
+      "path": "fixtures/v2/jws-cell-ops-fence-binding-mismatch.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "a1dae8b73a1fcad8cc0000bf15c39fc8ddc0812895dd5f89809a1a32f36157f9",
+      "caseId": "v2.jws.cell-ops-fence-binding.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "WRONG_OPERATION_BINDING"
+    },
+    {
+      "path": "fixtures/v2/jws-cell-ops-lifecycle-binding-mismatch.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "111ff64472c037e7a176b85c0d6bec176f71f702d49df04d14d0d4b4b1322886",
+      "caseId": "v2.jws.cell-ops-lifecycle-binding.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "WRONG_OPERATION_BINDING"
+    },
+    {
       "path": "fixtures/v2/jws-expired.json",
       "kind": "fixture",
       "applicableComponents": [
@@ -163,7 +238,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "912d64af87d863501fbe9c7157dce613884394459c83145360295060ec38cb15",
+      "sha256": "b571f089a7e5b770fce6cd6fbf138eab9cbb22f131179fa514a50bfd99e861ed",
       "caseId": "v2.jws.expired.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "TOKEN_EXPIRED"
@@ -176,7 +251,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "4a332d9641529f094c6bfb35360bc4cbde1e1ec9604b176b90cba47bd67611b4",
+      "sha256": "006c5db0650c368402bf6016c835c217566e152f6a4440882e6a7e9bb62ac97b",
       "caseId": "v2.jws.unknown-kid.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "UNKNOWN_KID"
@@ -189,7 +264,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "5c7f49fa3e2fc0e04877c191fa9377f0d351b343f482601f9eb2b33b5c0c4801",
+      "sha256": "d8857a84002cf7de1aa06cadd121354bed5d1d520bb3562229064da157779a1b",
       "caseId": "v2.jws.all-token-types.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_JWS"
@@ -202,7 +277,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "a265c860abaa236ef92dd699f5a74d67b46fbae9c4b6101c033fcf8aa116b520",
+      "sha256": "93751412ee6b361e175c3ead437e7333521c3765b06e04d90d65d312e6d4ce2c",
       "caseId": "v2.jws.wrong-alg.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ALG"
@@ -215,10 +290,23 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "ea04e1a437fb749b6034ae9a44317c16e8f2093e23bc310ccecdbd93835d5612",
+      "sha256": "9683788ac4d91e48f2a72d9367c59ceab9dab6c264cc78ee3db7b23d5b0b91e2",
       "caseId": "v2.jws.wrong-audience.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_AUDIENCE"
+    },
+    {
+      "path": "fixtures/v2/jws-wrong-key-purpose.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "c99d3b9858eba99d7d9b95d38b65041422ee9f07e9eb7392a33c444336eec312",
+      "caseId": "v2.jws.wrong-key-purpose.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_KEY_PURPOSE"
     },
     {
       "path": "fixtures/v2/jws-wrong-typ.json",
@@ -228,10 +316,114 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "041fab6ff0f8897c761f66cf58267fd81ea569c16ce25b1c84cc2922bee0ae13",
+      "sha256": "7876659171f5f47ed3d341154eaf983c6c0bcd4b5d8d4982c83a97dccf559062",
       "caseId": "v2.jws.wrong-typ.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_TYP"
+    },
+    {
+      "path": "fixtures/v2/origin-browser-required.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "b68f7a46ae0558bab7b3a942ac60f35cd349a22ce4a4f878c6ddffc3d745b874",
+      "caseId": "v2.origin.browser-required.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_ORIGIN"
+    },
+    {
+      "path": "fixtures/v2/origin-default-port.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "14d26ed48eba1a807ac59347b8789adf20fb66cdd3a879f6f0dd7bf724714599",
+      "caseId": "v2.origin.explicit-default-port.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_ORIGIN"
+    },
+    {
+      "path": "fixtures/v2/origin-empty-label.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "91f1b4feb0e8a5a7bb222eb20e838eab987b3036efde4819d87a9bee0359e28f",
+      "caseId": "v2.origin.empty-dns-label.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_ORIGIN"
+    },
+    {
+      "path": "fixtures/v2/origin-ipv4-literal.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "bc627e648cb94550f08ea399592847da2ff8f97fa7d560bda20b8bb9bc3c8ccb",
+      "caseId": "v2.origin.ipv4-literal.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_ORIGIN"
+    },
+    {
+      "path": "fixtures/v2/origin-ipv6-literal.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "2bc692a9c647991230a412fa16c402fb4dbe3919f1852981a6608b212113e95a",
+      "caseId": "v2.origin.ipv6-literal.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_ORIGIN"
+    },
+    {
+      "path": "fixtures/v2/origin-label-hyphen.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "80c138cafdfa2cf546faec86db522b949c04b185b1c22f70aa40032992bf533b",
+      "caseId": "v2.origin.trailing-label-hyphen.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_ORIGIN"
+    },
+    {
+      "path": "fixtures/v2/origin-nondefault-port-valid.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "37d57ade442478459193247987144acec15e0a894fa753613e6898a9a8a5bd20",
+      "caseId": "v2.origin.nondefault-port.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "VALID_ORIGIN"
+    },
+    {
+      "path": "fixtures/v2/origin-port-out-of-range.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "96ab77b1ebebd96bdc2ad5865823e3c47eeacf52a52de73139767380240e01cb",
+      "caseId": "v2.origin.port-out-of-range.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_ORIGIN"
     },
     {
       "path": "fixtures/v2/origin-userinfo-query.json",
@@ -273,6 +465,84 @@
       "expectedReason": "COMMAND_REPLAY_CONFLICT"
     },
     {
+      "path": "fixtures/v2/private-command-deadline-too-long.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "6397aaa226135507f46236df796a28f037c609f2fc2437f8ad0d773dbab308b7",
+      "caseId": "v2.private-ops.lifecycle-deadline-too-long.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_DEADLINE"
+    },
+    {
+      "path": "fixtures/v2/private-command-deadline.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "0a32b4b92516a4bd9d835ca987e50b5e95740700e46e40022a24cae276cf4c3b",
+      "caseId": "v2.private-ops.lifecycle-deadline.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_DEADLINE"
+    },
+    {
+      "path": "fixtures/v2/private-command-exact-replay.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "f74a2ea8472371b7b7b8f1f5a3d20a1fabc055509a370435ff37338654e1336a",
+      "caseId": "v2.private-ops.exact-replay.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "IDEMPOTENT_REPLAY"
+    },
+    {
+      "path": "fixtures/v2/private-command-future.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "f263a3d5922cff9494c491479cbe4629dbe2ca226b896476784265bcd8692bee",
+      "caseId": "v2.private-ops.future-issued-at.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "COMMAND_NOT_YET_VALID"
+    },
+    {
+      "path": "fixtures/v2/private-command-stale-generation.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "e7f1c4b7bad5c2efa8e1192d7b2b03179ae60fe9e3eb4d2fd504e2fbaf612d15",
+      "caseId": "v2.private-ops.stale-generation.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "STALE_NOOP"
+    },
+    {
+      "path": "fixtures/v2/private-command-stale.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "44dad9291f9d8bbb22f78bf06d6553fa25b80f7ddff0af87b79ad8f16dc36e30",
+      "caseId": "v2.private-ops.stale-issued-at.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "COMMAND_STALE"
+    },
+    {
       "path": "fixtures/v2/private-commands-valid.json",
       "kind": "fixture",
       "applicableComponents": [
@@ -284,6 +554,194 @@
       "caseId": "v2.private-ops.commands.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_PRIVATE_COMMAND"
+    },
+    {
+      "path": "fixtures/v2/private-status-future.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "8f176e087250aefdb85a9673433f9df4ff284a9d38d14e41299233ad613c9b91",
+      "caseId": "v2.private-status.future.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "STATUS_NOT_YET_VALID"
+    },
+    {
+      "path": "fixtures/v2/private-status-jti-replay.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "4b86c909c062e10571d0aa172481031b4ffd549cec6a2be231f7279657ea2a21",
+      "caseId": "v2.private-status.jti-replay.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "CELL_OPS_REPLAY"
+    },
+    {
+      "path": "fixtures/v2/private-status-nonce-mismatch.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "24a299c033f8d7a991affd45d4c9737f4b82935c04926f9d4ef1ce65924677b3",
+      "caseId": "v2.private-status.nonce-binding.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "WRONG_NONCE_BINDING"
+    },
+    {
+      "path": "fixtures/v2/private-status-nonce-replay.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "a224aad2e7c40a1ca193c5019bbc479bd1641dd0795519233e802db8586a1d39",
+      "caseId": "v2.private-status.nonce-replay.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "CELL_OPS_REPLAY"
+    },
+    {
+      "path": "fixtures/v2/private-status-stale.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "b7445ff500d09db34896b4e05546d6b63d8cd9b8ebc4ba523ad1e725f3d69ee3",
+      "caseId": "v2.private-status.stale.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "STATUS_STALE"
+    },
+    {
+      "path": "fixtures/v2/private-status-valid.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "b3c211db16740a2ade5249c3d34bba7a4ebc780e62100c5de2a8f1a3c9c8aeeb",
+      "caseId": "v2.private-status.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "VALID_PRIVATE_STATUS"
+    },
+    {
+      "path": "fixtures/v2/private-status-wrong-binding.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "a14b46c82f6cbfe0213cfa4a80334af2e9f85a911f02972d2db75884487d5756",
+      "caseId": "v2.private-status.cell-binding.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "WRONG_BINDING"
+    },
+    {
+      "path": "fixtures/v2/private-status-wrong-carrier.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "20101da6220fa075d1139e15a7bd86b5d728095049759fdc9cc750f7d77c20cd",
+      "caseId": "v2.private-status.carrier.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "WRONG_TOKEN_CARRIER"
+    },
+    {
+      "path": "fixtures/v2/runtime-proof-body-mismatch.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "63c26df4e254b1e0eb2407a7dd80d5a8af9690605ba5f5be97cddf435201db81",
+      "caseId": "v2.runtime-proof.body-binding.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "RUNTIME_PROOF_BODY_MISMATCH"
+    },
+    {
+      "path": "fixtures/v2/runtime-proof-expired.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "e1330bfcc6da2c78e34c7a9b498ec3e923e76800cb7e3c5e58784e937705523d",
+      "caseId": "v2.runtime-proof.expired.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "RUNTIME_PROOF_EXPIRED"
+    },
+    {
+      "path": "fixtures/v2/runtime-proof-replay.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "c29b7f49910f755532c67a6e1c986a17d00abe2c978e9a3a4c27eeb45d142e0e",
+      "caseId": "v2.runtime-proof.nonce-replay.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "RUNTIME_PROOF_REPLAY"
+    },
+    {
+      "path": "fixtures/v2/runtime-proof-valid.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "af449ab11dfc6a214e0bc3488f548a87a060228ca117ac61cdeeb3e2a9e5fa83",
+      "caseId": "v2.runtime-proof.body-carrier.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "VALID_RUNTIME_PROOF"
+    },
+    {
+      "path": "fixtures/v2/runtime-proof-wrong-carrier.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "fed6e71022763f9ffb189a750692f852bfb7ddcc1b161ec30be2abfa7cada8d0",
+      "caseId": "v2.runtime-proof.bearer-carrier.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_RUNTIME_PROOF_CARRIER"
+    },
+    {
+      "path": "fixtures/v2/session-transition-batch-gap.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "a7165d43ff6bc524f0b1b810f25b4aa2ac7444979270c5822764746556f0f6c4",
+      "caseId": "v2.session-transition.batch-gap-unacked.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "SEQUENCE_GAP"
+    },
+    {
+      "path": "fixtures/v2/session-transition-exact-replay.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "01057fd88f45c098ff51722651d3fa6c15c1545ad78601a5a7cd96fddce71aec",
+      "caseId": "v2.session-transition.exact-replay.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "STORED_ADJUDICATION"
     },
     {
       "path": "fixtures/v2/session-transition-gap.json",
@@ -298,6 +756,54 @@
       "expectedReason": "SEQUENCE_GAP"
     },
     {
+      "path": "fixtures/v2/session-transition-id-reuse.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "ad3a2c998b85f4b8fe6fa536d35e6e48681204533ed64054603960772f8b2635",
+      "caseId": "v2.session-transition.id-reuse-new-sequence.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "TRANSITION_REPLAY_CONFLICT"
+    },
+    {
+      "path": "fixtures/v2/session-transition-illegal-state.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "b5d1d614b1ff7c78b5187b44e865658f4dd7e0f29c1338560470ca74dab53504",
+      "caseId": "v2.session-transition.pending-close.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "REJECTED_ILLEGAL_STATE"
+    },
+    {
+      "path": "fixtures/v2/session-transition-mixed-batch.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "1f4b0e3141c84472bd98508455c39f04233e34a8e0f36b2adce901cdf5188ac1",
+      "caseId": "v2.session-transition.mixed-stored-batch.valid",
+      "expectedVerdict": "ACCEPT",
+      "expectedReason": "VALID_SESSION_TRANSITION_BATCH"
+    },
+    {
+      "path": "fixtures/v2/session-transition-reason-mismatch.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "3688d2ed3c54f8530ee692c485907c42c3f49d022bc53cf94b2188fe18cbcca8",
+      "caseId": "v2.session-transition.reason-mismatch.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "INVALID_TRANSITION_REASON"
+    },
+    {
       "path": "fixtures/v2/session-transition-replay-conflict.json",
       "kind": "fixture",
       "applicableComponents": [
@@ -306,6 +812,18 @@
       ],
       "sha256": "b07c80ab29aa7cb483c1e876b5182e7de3bc3ee03a296f0526fc74f4c270f534",
       "caseId": "v2.session-transition.replay-conflict.reject",
+      "expectedVerdict": "REJECT",
+      "expectedReason": "TRANSITION_REPLAY_CONFLICT"
+    },
+    {
+      "path": "fixtures/v2/session-transition-sequence-reuse.json",
+      "kind": "fixture",
+      "applicableComponents": [
+        "cloud",
+        "hivecode"
+      ],
+      "sha256": "82e12ec12945944d8742a3f463aa21b50a0b51c3511017e1888d211f9fed6d04",
+      "caseId": "v2.session-transition.sequence-reuse-new-id.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "TRANSITION_REPLAY_CONFLICT"
     },
@@ -407,17 +925,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "d4e613b24b3605eeb4394a0c7bb71d673b0862a4c76ea6ae47fc04474fe7b6cd"
-    },
-    {
-      "path": "README.md",
-      "kind": "documentation",
-      "applicableComponents": [
-        "cloud",
-        "hivecode",
-        "cell"
-      ],
-      "sha256": "829ba8bdfba942bc5e3442aac43d122d3c474bee58557ee0f71d335488af75c7"
+      "sha256": "c89880754074284740478cb42210e153fc35742362ce1d76b2a763ca092392e1"
     },
     {
       "path": "registries/close-codes.json",
@@ -437,7 +945,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "de149cbfba8535a604ea580cf1871039b2b63a9aa2211973b2d451f4f9ceef3d"
+      "sha256": "45617c9ab7615ba8450ac9e5a0ce2c3536198a5366e96b1fcc70f1400320c06a"
     },
     {
       "path": "registries/feature-flags.json",
@@ -457,7 +965,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "af92b4889c6a191d2775815e5af7eb9eaa92ee18dd09b4b3e12381b8f14183c3"
+      "sha256": "f1c6ce9bc33c0800efee809d8611c747f211bea258dddc3fcd3d1da3d2b5a58a"
     },
     {
       "path": "registries/security-boundaries.json",
@@ -477,7 +985,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "eaa7f7a1cd028525c9611dcffdd49d18181c4cd468ea89fb1e0f10ba413210f2"
+      "sha256": "30b668e44feb7f06bc310e71b40badfe7362ed8ad540b09f6d5d7687dc4ee6f9"
     },
     {
       "path": "registries/test-keys.json",
@@ -487,7 +995,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "5ad8fdd716686819113a7a194d0ab29de2bb9a42da1a1f6d38ae30f7b6ce404e"
+      "sha256": "bca0f030b53840070aa2d4114560fad5ef60bdd350da1c8c560266a322c51426"
     },
     {
       "path": "schemas/common.schema.json",
@@ -497,7 +1005,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "1e2301b99259b26af54dc3f4745f9fdcb055fd6fb37dd8f6ae98d2ef5fc5e560"
+      "sha256": "2af5338ba8401134bb5343b6f644ad7ffd553d87a00ec64b4b783c4eb185620a"
     },
     {
       "path": "schemas/contract-report.schema.json",
@@ -507,7 +1015,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "1610c7c5084bc0be7563d26aeefd75b18c68f12ea4de88d4c26cb0c1bf8f53d2"
+      "sha256": "9d65049bce91c20b2e748f7667bde736602d43af8ac9872f2288ec48a2f68343"
     },
     {
       "path": "schemas/contract-source-receipt.schema.json",
@@ -527,7 +1035,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "df346bfbee14766d1fad35bb870157d9852fe2e3b3ba299e26f82d7f9bfdc47f"
+      "sha256": "136bc7611084f38e9ee1ef804d4572ada4cf19a688e708530bacfd4ef26a6eba"
     },
     {
       "path": "schemas/fixture-manifest.schema.json",
@@ -547,7 +1055,17 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "afccb4daf5e53bb1048813df273f07325ffe7f31857eb59d1abba4a57fa8fabe"
+      "sha256": "3d0dc3daf69c629d0474b71f622c36703e9535626605b4563dcbcc21a8b78025"
+    },
+    {
+      "path": "schemas/runtime-proof.schema.json",
+      "kind": "schema",
+      "applicableComponents": [
+        "cloud",
+        "hivecode",
+        "cell"
+      ],
+      "sha256": "8d9da696c7155463480f95043f633b0b86ec4b1dd3011b4c484417dd746542c3"
     },
     {
       "path": "schemas/session-transition.schema.json",
@@ -557,7 +1075,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "1a6c3f658377ee3fa67239faaf6f84e87fa275ae6eea19d5ef6c9bd2570cf011"
+      "sha256": "622f5a373d1f772940ef1c9594c50bba1cfdddc4ecdcc94c2065e9aeb2b6f8b6"
     },
     {
       "path": "schemas/token-claims.schema.json",
@@ -567,7 +1085,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "ad082c84ae67b5eabab0e734d433b415a2b1db4be212c1dbc7f98d652144297f"
+      "sha256": "f91dc06ad4b9683added2aec88f8d9dbdd7e3cb80c6e5c3eb63f7a6beb92cdb8"
     },
     {
       "path": "schemas/wire-messages.schema.json",

@@ -76,3 +76,55 @@ For idempotency, serialize the schema-declared fields in the order shown by the 
 with UTF-8 string bytes and big-endian integer bytes using the length-prefixed field
 representation above. Optional fields are represented by an empty byte value in their
 declared position. SHA-256 of those bytes is the replay body digest.
+
+## Runtime Cloud request proof
+
+`runtimeProof` has exactly one carrier: the `runtimeProof` member of the JSON request
+body. It is never accepted from `Authorization`, another header, a query parameter, or a
+second body member. To form the protected payload, remove that one top-level member and
+serialize the remaining JSON value with RFC 8785 JSON Canonicalization Scheme (JCS).
+`bodySha256` is lowercase hexadecimal SHA-256 of those UTF-8 JCS bytes.
+
+The proof fields `runtimeId`, `runtimeBootId`, `authorityGeneration`, `fencingEpoch`, and
+`leaseEpoch` must equal the current Runtime tuple resolved by Cloud. When any of those
+fields is also present in the protected payload it must be equal after JSON decoding.
+`method` and `path` are the actual uppercase HTTP method and exact path (including
+resolved path identifiers, without query). `authorityId` is the Cloud authority selected
+by deployment configuration.
+
+Sign UTF-8 bytes of the following newline-delimited values in this exact order, without
+a trailing newline, using the Runtime identity Ed25519 private key:
+
+```text
+hive-relay-runtime-proof/v2
+Ed25519
+method
+path
+authorityId
+runtimeId
+runtimeBootId
+authorityGeneration (base-10 ASCII)
+fencingEpoch (base-10 ASCII)
+leaseEpoch (base-10 ASCII)
+issuedAt (base-10 epoch milliseconds ASCII)
+nonce (canonical lowercase UUIDv4)
+bodySha256
+```
+
+The signature is canonical unpadded base64url of exactly 64 bytes. Verification requires
+`issuedAt <= validationTime + 30,000 ms` and
+`validationTime <= issuedAt + 60,000 ms + 30,000 ms`, both inclusively. This preserves
+the full 60 s lifetime while allowing exactly 30 s of comparison skew.
+
+For one-use replay storage compute lowercase hexadecimal SHA-256 over UTF-8 bytes of
+`"hive-relay-runtime-proof-nonce/v2\n" || runtimeId || "\n" || nonce`. The nonce is
+committed atomically only after all structural, binding, freshness, digest, and signature
+checks succeed, and the digest is retained through proof expiry plus skew.
+
+## Canonical HTTPS origin semantics
+
+After the schema shape check, split the authority into DNS host and optional decimal
+port. Reject empty labels, uppercase, non-ASCII, underscores, labels longer than 63,
+leading or trailing hyphens, hosts longer than 253, IPv4/IPv6 literals, port zero, ports
+above 65535, and explicit port 443. Compare the reconstructed canonical origin exactly
+against the allowlist; do not rely on URL-parser normalization.

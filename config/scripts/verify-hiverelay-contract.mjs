@@ -311,15 +311,14 @@ export async function verifyHiveRelayContract({
       throw new Error(`Contract file digest does not match manifest: ${file.path}`)
     }
   }
-  const applicableCases = manifest.files.filter(
-    (fixture) =>
-      fixture.kind === 'fixture' &&
-      fixture.applicableComponents.some((component) => component.toLowerCase() === 'hivecode')
+  const fixtureCases = manifest.files.filter((fixture) => fixture.kind === 'fixture')
+  const applicableCases = fixtureCases.filter((fixture) =>
+    fixture.applicableComponents.some((component) => component.toLowerCase() === 'hivecode')
   )
   if (applicableCases.length === 0) {
     throw new Error('Fixture manifest has zero HiveCode-applicable cases')
   }
-  return { receipt, manifest, applicableCases }
+  return { receipt, manifest, fixtureCases, applicableCases }
 }
 
 async function main() {
@@ -331,6 +330,7 @@ async function main() {
     'tests/e2e/hiverelay/hiverelay-contract-fixtures.unit.test.ts',
     'tests/e2e/hiverelay/hiverelay-contract-jws.unit.test.ts',
     'tests/e2e/hiverelay/hiverelay-contract-origin.unit.test.ts',
+    'tests/e2e/hiverelay/hiverelay-contract-state-rules.unit.test.ts',
     'tests/e2e/hiverelay/hiverelay-test-wire.unit.test.ts',
     'tests/e2e/hiverelay/hiverelay-testkit.unit.test.ts',
     'tests/e2e/hiverelay/hiverelay-testkit-boundary.unit.test.ts'
@@ -370,7 +370,11 @@ async function main() {
     report.commit !== currentCommit ||
     report.contractRevision !== result.receipt.contractRevision ||
     report.manifestSha256 !== result.receipt.manifestSha256 ||
-    report.testCount !== result.applicableCases.length
+    report.testCount !== result.applicableCases.length ||
+    report.resultCount !== result.fixtureCases.length ||
+    report.applicableFixtureCount !== result.applicableCases.length ||
+    !Array.isArray(report.results) ||
+    report.results.length !== report.resultCount
   ) {
     throw new Error('Generated HiveRelay contract report does not match the verified inputs')
   }

@@ -11,6 +11,7 @@ import {
   BinaryInbox,
   deferred,
   openWebSocket,
+  queueBinaryFrame,
   sendJson,
   waitForOpen,
   wireText,
@@ -21,6 +22,9 @@ export type ReferenceClientOptions = {
   cellUrl: string
   relayHostId: string
   clientAdmissionToken: string
+  origin?: string
+  expectedCellId: string
+  expectedCellIncarnationId: string
   keys?: nacl.BoxKeyPair
 }
 
@@ -54,16 +58,23 @@ export class ReferenceHiveRelayClient {
     }
     const socket = openWebSocket(
       this.options.cellUrl,
-      `${HIVE_RELAY_CLIENT_PATH_PREFIX}${encodeURIComponent(this.options.relayHostId)}`
+      `${HIVE_RELAY_CLIENT_PATH_PREFIX}${encodeURIComponent(this.options.relayHostId)}`,
+      { origin: this.options.origin }
     )
     this.socket = socket
     socket.on('message', (raw, isBinary) => {
       if (isBinary) {
-        this.inbox.push(raw)
+        queueBinaryFrame(socket, this.inbox, raw)
         return
       }
       try {
         const hello = parseStrictJson(wireText(raw), RelayHelloSchema)
+        if (
+          hello.cellId !== this.options.expectedCellId ||
+          hello.cellIncarnationId !== this.options.expectedCellIncarnationId
+        ) {
+          throw new Error('Client relay acknowledgement binding mismatch')
+        }
         this.ready.resolve(hello)
       } catch (error) {
         this.ready.reject(error instanceof Error ? error : new Error(String(error)))

@@ -39,12 +39,15 @@ const manifest = readJson<Manifest>('fixture-manifest.json')
 const fixtureEntries = manifest.files.filter(
   (entry): entry is ManifestFixture => entry.kind === 'fixture'
 )
+const applicableFixtureCount = fixtureEntries.filter((entry) =>
+  entry.applicableComponents.includes('hivecode')
+).length
 const limits = readJson<{
   time: { clockSkewSeconds: number }
   frames: Record<string, number | boolean>
 }>('registries/limits.json')
 const testKeys = readJson<{
-  keys: { kid: string; alg: string; publicKeyB64Url: string }[]
+  keys: { kid: string; purpose: string; alg: string; curve: string; publicKeyB64Url: string }[]
 }>('registries/test-keys.json')
 const closeCodes = readJson<{ codes: { symbol: string; code: number }[] }>(
   'registries/close-codes.json'
@@ -77,7 +80,9 @@ afterAll(async () => {
     commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim(),
     contractRevision: manifest.contractRevision,
     manifestSha256: receipt.manifestSha256,
-    testCount: observedResults.length,
+    testCount: applicableFixtureCount,
+    resultCount: observedResults.length,
+    applicableFixtureCount,
     results: observedResults,
     errors
   }
@@ -128,5 +133,17 @@ describe('HiveRelay vendored contract fixtures', () => {
         reason: 'COMPONENT_NOT_APPLICABLE'
       })
     }
+  })
+
+  it('rejects a Runtime tuple duplicated inconsistently inside the protected payload', () => {
+    const fixture = parseHiveRelayContractFixture(
+      readFileSync(path.join(CONTRACT_ROOT, 'fixtures/v2/runtime-proof-valid.json'), 'utf8')
+    )
+    const payload = fixture.input.protectedPayload as Record<string, unknown>
+    payload.runtimeId = 'different-runtime'
+    expect(evaluateHiveRelayContractFixture(fixture, context)).toMatchObject({
+      verdict: 'REJECT',
+      reason: 'WRONG_BINDING'
+    })
   })
 })

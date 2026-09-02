@@ -42,7 +42,8 @@ paths:
   /hive/v1/runtimes/{runtimeRecordId}/relay/authorizations:
     post:
       operationId: authorizeRuntimeRelayV2
-      security: [{runtimeProof: []}]
+      security: []
+      x-hiverelay-runtime-proof-carrier: json-body.runtimeProof
       parameters:
         - {$ref: '#/components/parameters/RuntimeRecordId'}
       requestBody:
@@ -100,7 +101,8 @@ paths:
   /hive/v1/runtime-connection-tickets/{ticketId}/consume:
     post:
       operationId: consumeRuntimeConnectionTicketV2
-      security: [{runtimeProof: []}]
+      security: []
+      x-hiverelay-runtime-proof-carrier: json-body.runtimeProof
       parameters:
         - name: ticketId
           in: path
@@ -118,15 +120,37 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/TicketConsumeResponse'}
         '409': {$ref: '#/components/responses/SymbolicConflict'}
+  /hive/v1/runtimes/{runtimeRecordId}/session-transitions:
+    post:
+      operationId: applyManagedSessionTransitionsV2
+      security: []
+      x-hiverelay-runtime-proof-carrier: json-body.runtimeProof
+      parameters:
+        - {$ref: '#/components/parameters/RuntimeRecordId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/session-transition.schema.json#/$defs/batchRequest'}
+      responses:
+        '200':
+          description: Ordered stored/rejected adjudications and covering contiguous ACK
+          content:
+            application/json:
+              schema: {$ref: '../schemas/session-transition.schema.json#/$defs/batchResponse'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
   /internal/status:
     get:
       operationId: readCellStatusV2
       servers: [{url: 'https://cell-01.private.hive.test:8443'}]
       security: [{cellOpsToken: []}]
+      x-hiverelay-cell-ops-token-carrier: private-https-authorization-header
+      x-hiverelay-cell-ops-replay-consumption: after-authentication-before-handler
       parameters:
         - name: nonce
           in: header
           required: true
+          description: Must equal the authenticated cellOpsToken nonce and returned status nonce.
           schema: {$ref: '#/components/schemas/Base64Url16'}
       responses:
         '200':
@@ -176,10 +200,6 @@ components:
     hiveSession:
       type: http
       scheme: bearer
-    runtimeProof:
-      type: http
-      scheme: bearer
-      bearerFormat: Ed25519 signed request proof
     relayToken:
       type: http
       scheme: bearer
@@ -274,7 +294,7 @@ components:
       required: [protocolVersion, runtimeProof, capabilities]
       properties:
         protocolVersion: {const: 2}
-        runtimeProof: {type: string, minLength: 64, maxLength: 2048}
+        runtimeProof: {$ref: '../schemas/runtime-proof.schema.json'}
         capabilities:
           type: array
           uniqueItems: true
@@ -303,7 +323,7 @@ components:
       required: [protocolVersion, cellUrl, cellId, cellIncarnationId, assignmentId, assignmentEpoch, relayHostId, controlLease, controlLeaseExpiresAt]
       properties:
         protocolVersion: {const: 2}
-        cellUrl: {type: string, pattern: '^https://[a-z0-9][a-z0-9.-]*(?::[1-9][0-9]{0,4})?$'}
+        cellUrl: {type: string, pattern: '^https://[a-z0-9.-]+(?::[0-9]{1,5})?$'}
         cellId: {$ref: '#/components/schemas/OpaqueId'}
         cellIncarnationId: {$ref: '#/components/schemas/UuidV4'}
         assignmentId: {$ref: '#/components/schemas/UuidV4'}
@@ -330,7 +350,7 @@ components:
         intentId: {$ref: '#/components/schemas/UuidV4'}
         ticketId: {$ref: '#/components/schemas/UuidV4'}
         expiresAt: {$ref: '#/components/schemas/EpochMs'}
-        cellUrl: {type: string, pattern: '^https://[a-z0-9][a-z0-9.-]*(?::[1-9][0-9]{0,4})?$'}
+        cellUrl: {type: string, pattern: '^https://[a-z0-9.-]+(?::[0-9]{1,5})?$'}
         cellId: {$ref: '#/components/schemas/OpaqueId'}
         cellIncarnationId: {$ref: '#/components/schemas/UuidV4'}
         assignmentId: {$ref: '#/components/schemas/UuidV4'}
@@ -343,7 +363,7 @@ components:
       required: [protocolVersion, runtimeProof, consumeAttemptId, ticketSecret, intentId, runtimeId, runtimeBootId, authorityGeneration, fencingEpoch, leaseEpoch, assignmentId, assignmentEpoch, controlGeneration, cellId, cellIncarnationId, connId, clientKeyHash, e2eeTranscriptHash, sessionBindingHash]
       properties:
         protocolVersion: {const: 'account-runtime-ticket-consume/v2'}
-        runtimeProof: {type: string, minLength: 64, maxLength: 2048}
+        runtimeProof: {$ref: '../schemas/runtime-proof.schema.json'}
         consumeAttemptId: {$ref: '#/components/schemas/UuidV4'}
         ticketSecret: {$ref: '#/components/schemas/Base64Url32'}
         intentId: {$ref: '#/components/schemas/UuidV4'}
@@ -379,4 +399,4 @@ components:
       required: [code]
       properties:
         code:
-          enum: [UPGRADE_REQUIRED, RELAY_UNAVAILABLE, STALE_BINDING, REPLAY_DETECTED, CAPACITY_EXCEEDED, COMMAND_REPLAY_CONFLICT, TRANSITION_REPLAY_CONFLICT, SEQUENCE_GAP]
+          enum: [UPGRADE_REQUIRED, RELAY_UNAVAILABLE, STALE_BINDING, REPLAY_DETECTED, CAPACITY_EXCEEDED, COMMAND_REPLAY_CONFLICT, TRANSITION_REPLAY_CONFLICT, SEQUENCE_GAP, RUNTIME_PROOF_REJECTED]
