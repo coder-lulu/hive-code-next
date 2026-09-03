@@ -56,7 +56,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24.18.0
           # The repository root pins pnpm 12 while this isolated app pins 10;
           # setup-node's cache probe runs at the root and would auto-switch.
           package-manager-cache: false
@@ -231,7 +231,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24.18.0
           package-manager-cache: false
 
       - name: Install site dependencies
