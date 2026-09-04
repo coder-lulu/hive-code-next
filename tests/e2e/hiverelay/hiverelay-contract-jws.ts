@@ -207,13 +207,17 @@ export function validateFixtureJws(args: {
   ) {
     return 'INVALID_NBF'
   }
-  if (typeof claims.exp !== 'number' || claims.exp - claims.iat !== args.lifetimeSeconds) {
+  if (
+    typeof claims.exp !== 'number' ||
+    claims.exp <= claims.iat ||
+    claims.exp - claims.iat > args.lifetimeSeconds
+  ) {
     return 'INVALID_TOKEN_LIFETIME'
   }
   if (claims.iat > args.validationTime + args.clockSkewSeconds) {
     return 'TOKEN_NOT_YET_VALID'
   }
-  if (claims.exp < args.validationTime - args.clockSkewSeconds) {
+  if (claims.exp <= args.validationTime) {
     return 'TOKEN_EXPIRED'
   }
   if (args.tokenType === 'cellOpsToken') {

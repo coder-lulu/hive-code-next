@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.4",
+  "contractRevision": "hiverelay-v2-p0.5",
   "caseId": "v2.admission.first-use.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "admission-replay",

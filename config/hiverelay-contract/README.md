@@ -1,6 +1,6 @@
 # HiveRelay v2 authority contract
 
-Contract revision: `hiverelay-v2-p0.4`
+Contract revision: `hiverelay-v2-p0.5`
 
 This directory is the sole authority copied by HiveCode and HiveRelay Cell. A consumer
 must verify `fixture-manifest.json`, every listed file digest, the revision, and its source
@@ -106,6 +106,37 @@ fixture evaluations it actually executed, so it must equal `applicableFixtureCou
 Cell evidence additionally records the
 externally supplied immutable container image plus the observed Elixir and OTP versions;
 the report generator must not invent or default the image identity.
+
+## Credential deadlines and lifecycle snapshots
+
+For compact JWS credentials, `lifetimeSeconds` is an upper bound: require
+`0 < exp - iat <= lifetimeSeconds` and `nbf == iat`. A control lease may be
+shortened by the remaining Runtime heartbeat authority (for example, 90 seconds
+with a 120-second maximum). Cloud must cap `exp` at the upstream authority
+deadline; admission expiry is also capped at its ticket and current assignment.
+The Cell trusts only the verified Cloud signature for `controlGeneration`; it
+must not invent or independently increment this generation on reconnect.
+
+The 30-second issue-time allowance never extends `exp`: reject when `now >= exp`,
+including exact equality. This profile uses no optional expiration leeway from
+[RFC 7519 section 4.1.4](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4).
+At acceptance, derive a monotonic deadline once from the signed remaining time;
+never restart the full registry TTL after an event or a wall-clock correction.
+For control authority, subtract the configured maximum clock error from signed
+remaining wall time and also cap the local budget at 120 seconds. An empty
+budget rejects admission. A deployment whose clock error exceeds that bound
+must close authority and recover clock health before accepting a new lease.
+This conservative enforcement keeps a slow Cell clock from extending Cloud's
+upstream deadline; scheduling and network delay do not grant additional time.
+
+Fleet operators read `GET /hive/v1/relay-cells/{cellId}/lifecycle` before each new
+lifecycle action because status observation can advance `resourceVersion`.
+The same genuine mTLS certificate and `relay:fleet:lifecycle` scope protect GET
+and POST. GET carries no body, query, Origin, Authorization, or Cookie and returns
+only `schemas/lifecycle-snapshot.schema.json`. Unknown Cells return 409
+`STALE_BINDING`; storage unavailability returns 503 `RELAY_UNAVAILABLE`.
+An exact operation retry retains its original operation ID and body. A new
+operation after a version conflict reads a new snapshot before attempting CAS.
 
 ## Change rule
 

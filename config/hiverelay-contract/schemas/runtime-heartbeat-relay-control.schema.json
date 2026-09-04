@@ -118,7 +118,7 @@
         "startedAt": {"$ref": "#/$defs/instant"},
         "freeDiskBytes": {"type": "integer", "minimum": 0},
         "lastBackupAt": {"oneOf": [{"$ref": "#/$defs/instant"}, {"type": "null"}]},
-        "connectionCapabilities": {"type": "array", "maxItems": 5, "uniqueItems": true, "items": {"enum": ["orca-direct", "orca-relay", "hive-direct", "hive-relay", "tailscale-embedded-evaluation"]}},
+        "connectionCapabilities": {"type": "array", "maxItems": 6, "uniqueItems": true, "items": {"enum": ["orca-direct", "orca-relay", "hive-direct", "hive-relay", "tailscale-embedded-evaluation", "ticket-connect-v2"]}},
         "webHttpsOrigin": {"type": "string", "maxLength": 256},
         "webClientPath": {"type": "string", "maxLength": 256},
         "websocketPath": {"type": "string", "maxLength": 256},

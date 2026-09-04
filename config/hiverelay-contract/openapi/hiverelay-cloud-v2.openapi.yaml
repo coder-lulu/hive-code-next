@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HiveRelay v2 contract
-  version: hiverelay-v2-p0.4
+  version: hiverelay-v2-p0.5
   description: >-
     Authority interface shapes. Every implementation remains disabled until its
     corresponding product and capability gates are enabled.
@@ -170,7 +170,64 @@ paths:
             application/json:
               schema: {$ref: '../schemas/session-transition.schema.json#/$defs/batchResponse'}
         '409': {$ref: '#/components/responses/SymbolicConflict'}
+  /hive/v1/runtime-sessions/{managedRuntimeSessionId}/revoke:
+    post:
+      operationId: revokeManagedRuntimeSessionV2
+      security: [{hiveSession: []}]
+      description: >-
+        Revoke only a session owned by the authenticated account, device and Cloud
+        session. The body operationId is the only idempotency key; an exact replay
+        returns its stored result. Any Idempotency-Key header is rejected, including
+        one equal to operationId. Cookie, query and Origin carriers are rejected.
+        The path ID must be a canonical lowercase UUID v4 without path parameters.
+        The endpoint requires hive.relay.enabled and hive.session-credentials.enabled.
+        This v2 branch remains available for existing sessions when new admission
+        is disabled; the legacy v1 delegate keeps its original behavior.
+      parameters:
+        - name: managedRuntimeSessionId
+          in: path
+          required: true
+          schema: {$ref: '#/components/schemas/UuidV4'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/session-revoke.schema.json#/$defs/request'}
+      responses:
+        '202':
+          description: Stored authoritative revocation result, including an exact replay
+          headers:
+            Cache-Control: {schema: {const: no-store}}
+          content:
+            application/json:
+              schema: {$ref: '../schemas/session-revoke.schema.json#/$defs/response'}
+        '400': {$ref: '#/components/responses/SessionRevokeError'}
+        '401': {$ref: '#/components/responses/SessionRevokeError'}
+        '404': {$ref: '#/components/responses/SessionRevokeError'}
+        '409': {$ref: '#/components/responses/SessionRevokeError'}
+        '503': {$ref: '#/components/responses/SessionRevokeError'}
   /hive/v1/relay-cells/{cellId}/lifecycle:
+    get:
+      operationId: readCloudRelayCellLifecycleV1
+      security: [{relayFleetOperatorMtls: []}]
+      x-hiverelay-required-scope: relay:fleet:lifecycle
+      description: Read the current CAS versions before a new lifecycle operation. No request body, query, Origin, Authorization, or Cookie is accepted.
+      parameters:
+        - name: cellId
+          in: path
+          required: true
+          schema: {$ref: '#/components/schemas/OpaqueId'}
+      responses:
+        '200':
+          description: Low-sensitivity authoritative lifecycle snapshot without credentials or private routing data
+          content:
+            application/json:
+              schema: {$ref: '../schemas/lifecycle-snapshot.schema.json'}
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '401': {$ref: '#/components/responses/OperatorCredentialRejected'}
+        '403': {$ref: '#/components/responses/OperatorScopeRejected'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+        '503': {$ref: '#/components/responses/RelayUnavailable'}
     post:
       operationId: applyCloudRelayCellLifecycleV1
       security: [{relayFleetOperatorMtls: []}]
@@ -327,6 +384,25 @@ components:
           schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyUnavailable'}
         application/json:
           schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayUnavailable'}
+    SessionRevokeError:
+      description: Symbolic owner, input, state, replay, or availability rejection without authority details
+      content:
+        application/json:
+          schema: {$ref: '../schemas/session-revoke.schema.json#/$defs/error'}
+    InvalidRequest:
+      description: Malformed request or unsupported carrier
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    RelayUnavailable:
+      description: Authoritative Relay storage is temporarily unavailable
+      headers:
+        Retry-After:
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 30}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
     SymbolicConflict:
       description: Binding, state, idempotency, or replay conflict
       content:
@@ -467,17 +543,18 @@ components:
     ConnectionIntentRequest:
       type: object
       additionalProperties: false
-      required: [protocolVersion, idempotencyKey, clientKind, clientPublicKeyB64, ticketSecretSha256]
+      required: [protocolVersion, idempotencyKey, expectedResourceVersion, clientKind, clientPublicKeyB64, ticketSecretSha256]
       properties:
         protocolVersion: {const: 2}
         idempotencyKey: {$ref: '#/components/schemas/UuidV4'}
+        expectedResourceVersion: {type: integer, minimum: 1, maximum: 9007199254740991}
         clientKind: {enum: [DESKTOP, MOBILE, WEB]}
         clientPublicKeyB64: {$ref: '#/components/schemas/Base64Url32'}
         ticketSecretSha256: {$ref: '#/components/schemas/Base64Url32'}
     ConnectionIntentResponse:
       type: object
       additionalProperties: false
-      required: [protocolVersion, intentId, ticketId, expiresAt, cellUrl, cellId, cellIncarnationId, assignmentId, assignmentEpoch, relayHostId, clientAdmissionToken]
+      required: [protocolVersion, intentId, ticketId, expiresAt, cellUrl, cellId, cellIncarnationId, assignmentId, assignmentEpoch, relayHostId, clientAdmissionToken, runtimePublicKeyB64, e2eeFraming]
       properties:
         protocolVersion: {const: 2}
         intentId: {$ref: '#/components/schemas/UuidV4'}
@@ -490,6 +567,10 @@ components:
         assignmentEpoch: {$ref: '#/components/schemas/Generation'}
         relayHostId: {type: string, pattern: '^[A-Za-z0-9_-]{16}$'}
         clientAdmissionToken: {type: string, maxLength: 8192}
+        runtimePublicKeyB64:
+          allOf: [{$ref: '#/components/schemas/Base64Url32'}]
+          description: X25519 public key of the current Host Binding used for Client-Runtime E2EE; never the Runtime Ed25519 proof identity key.
+        e2eeFraming: {const: hive-relay-e2ee/v2}
     TicketConsumeRequest:
       type: object
       additionalProperties: false

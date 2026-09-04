@@ -63,11 +63,13 @@ function validate(times: { iat: number; nbf: number; exp: number }): string {
 }
 
 describe('HiveRelay authority JWS lifetime rules', () => {
-  it('accepts the exact registry lifetime and nbf equal to iat', () => {
+  it('accepts a positive lifetime up to the registry maximum and nbf equal to iat', () => {
     expect(validate({ iat: 970, nbf: 970, exp: 1_090 })).toBe('VALID_JWS')
+    expect(validate({ iat: 970, nbf: 970, exp: 1_060 })).toBe('VALID_JWS')
   })
 
-  it('rejects a signed token whose lifetime differs from the credential registry', () => {
+  it('rejects signed tokens with zero or excessive lifetime', () => {
+    expect(validate({ iat: 1_000, nbf: 1_000, exp: 1_000 })).toBe('INVALID_TOKEN_LIFETIME')
     expect(validate({ iat: 970, nbf: 970, exp: 1_091 })).toBe('INVALID_TOKEN_LIFETIME')
   })
 
@@ -76,9 +78,10 @@ describe('HiveRelay authority JWS lifetime rules', () => {
     expect(validate({ iat: 1_031, nbf: 1_031, exp: 1_151 })).toBe('TOKEN_NOT_YET_VALID')
   })
 
-  it('allows skew but rejects tokens expired beyond it', () => {
-    expect(validate({ iat: 850, nbf: 850, exp: 970 })).toBe('VALID_JWS')
-    expect(validate({ iat: 849, nbf: 849, exp: 969 })).toBe('TOKEN_EXPIRED')
+  it('never adds clock skew to the signed expiry deadline', () => {
+    expect(validate({ iat: 881, nbf: 881, exp: 1_001 })).toBe('VALID_JWS')
+    expect(validate({ iat: 880, nbf: 880, exp: 1_000 })).toBe('TOKEN_EXPIRED')
+    expect(validate({ iat: 879, nbf: 879, exp: 999 })).toBe('TOKEN_EXPIRED')
   })
 
   it('rejects NumericDate values outside the non-negative JSON safe-integer range', () => {

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/lifecycle-snapshot.schema.json",
+  "title": "HiveRelay Cloud fleet lifecycle snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "cellId",
+    "state",
+    "resourceVersion",
+    "lifecycleGeneration",
+    "observedIncarnationId",
+    "routingConfirmedIncarnationId",
+    "routingConfirmedAt",
+    "updatedAt",
+    "observedAt"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "const": "hiverelay-cell-lifecycle-operator/v1"
+    },
+    "cellId": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "state": {
+      "enum": [
+        "DISCOVERED",
+        "ACTIVATING",
+        "ACTIVE",
+        "DRAINING",
+        "UNHEALTHY",
+        "RETIRED"
+      ]
+    },
+    "resourceVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "lifecycleGeneration": {
+      "$ref": "#/$defs/generation"
+    },
+    "observedIncarnationId": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/uuidV4"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "routingConfirmedIncarnationId": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/uuidV4"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "routingConfirmedAt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/instant"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/instant"
+    },
+    "observedAt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/instant"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
