@@ -32,12 +32,14 @@ export type HiveRuntimeCloudWebSessionControlServiceOptions = Readonly<{
   target: RevocationTarget
   client?: ControlClient
   pullIntervalMs?: number
+  random?: () => number
   now?: () => number
 }>
 
 export class HiveRuntimeCloudWebSessionControlService {
   private readonly client: ControlClient
   private readonly pullIntervalMs: number
+  private readonly random: () => number
   private readonly now: () => number
   private readonly pending = new Map<string, RuntimeWebSessionRevocationAcknowledgement>()
   private readonly highestControlVersions = new Map<string, number>()
@@ -52,7 +54,8 @@ export class HiveRuntimeCloudWebSessionControlService {
   constructor(private readonly options: HiveRuntimeCloudWebSessionControlServiceOptions) {
     this.client = options.client ?? new HiveRuntimeCloudClient(options.apiBaseUrl)
     this.pullIntervalMs = options.pullIntervalMs ?? DEFAULT_PULL_INTERVAL_MS
-    this.now = options.now ?? Date.now
+    this.random = options.random ?? Math.random
+    this.now = options.now ?? (() => performance.now())
     if (
       !Number.isSafeInteger(this.pullIntervalMs) ||
       this.pullIntervalMs < 1 ||
@@ -77,8 +80,8 @@ export class HiveRuntimeCloudWebSessionControlService {
       return
     }
     this.ensureContext(context)
-    const controller = new AbortController()
-    await this.runCycle(context, this.epoch, controller.signal)
+    this.cancelTimer()
+    await this.startCycle(context)
   }
 
   async stop(): Promise<void> {
@@ -88,11 +91,12 @@ export class HiveRuntimeCloudWebSessionControlService {
     this.stopped = true
     this.unsubscribe?.()
     this.unsubscribe = null
+    const pending = this.inFlight
     this.resetCycle()
     this.activeContextKey = null
     this.pending.clear()
     this.highestControlVersions.clear()
-    await this.inFlight?.catch(() => undefined)
+    await pending?.catch(() => undefined)
   }
 
   private handleContext(context: CurrentHiveRuntimeCloudLeaseContext | null): void {
@@ -105,7 +109,10 @@ export class HiveRuntimeCloudWebSessionControlService {
     this.pending.clear()
     this.highestControlVersions.clear()
     if (context) {
-      this.timer = setTimeout(() => this.runScheduledCycle(), 0)
+      this.timer = setTimeout(
+        () => this.runScheduledCycle(),
+        initialPullDelay(this.pullIntervalMs, this.random)
+      )
     }
   }
 
@@ -122,12 +129,18 @@ export class HiveRuntimeCloudWebSessionControlService {
 
   private resetCycle(): void {
     this.epoch += 1
-    if (this.timer) {
-      clearTimeout(this.timer)
-      this.timer = undefined
-    }
+    this.cancelTimer()
     this.controller?.abort()
     this.controller = null
+    this.inFlight = null
+  }
+
+  private cancelTimer(): void {
+    if (this.timer === undefined) {
+      return
+    }
+    clearTimeout(this.timer)
+    this.timer = undefined
   }
 
   private runScheduledCycle(): void {
@@ -136,21 +149,50 @@ export class HiveRuntimeCloudWebSessionControlService {
     if (!context || this.stopped || contextKey(context) !== this.activeContextKey) {
       return
     }
+    void this.startCycle(context).catch(() => undefined)
+  }
+
+  private startCycle(context: CurrentHiveRuntimeCloudLeaseContext): Promise<void> {
+    if (this.inFlight) {
+      return this.inFlight
+    }
     const epoch = this.epoch
     const startedAt = this.now()
     const controller = new AbortController()
     this.controller = controller
-    this.inFlight = this.runCycle(context, epoch, controller.signal)
-      .catch(() => undefined)
-      .finally(() => {
-        if (this.stopped || epoch !== this.epoch) {
-          return
-        }
-        this.controller = null
-        this.inFlight = null
-        const delay = Math.max(0, this.pullIntervalMs - (this.now() - startedAt))
-        this.timer = setTimeout(() => this.runScheduledCycle(), delay)
-      })
+    const cycle = this.runCycle(context, epoch, controller.signal).finally(() => {
+      this.finishCycle(context, epoch, controller, startedAt)
+    })
+    this.inFlight = cycle
+    return cycle
+  }
+
+  private finishCycle(
+    context: CurrentHiveRuntimeCloudLeaseContext,
+    epoch: number,
+    controller: AbortController,
+    startedAt: number
+  ): void {
+    if (this.controller !== controller) {
+      return
+    }
+    this.controller = null
+    this.inFlight = null
+    const current = this.options.presence.getCurrentLeaseContext()
+    if (
+      this.stopped ||
+      this.unsubscribe === null ||
+      epoch !== this.epoch ||
+      current === null ||
+      contextKey(current) !== contextKey(context)
+    ) {
+      return
+    }
+    const elapsed = this.now() - startedAt
+    const delay = Number.isFinite(elapsed)
+      ? Math.max(0, this.pullIntervalMs - Math.max(0, elapsed))
+      : this.pullIntervalMs
+    this.timer = setTimeout(() => this.runScheduledCycle(), delay)
   }
 
   private async runCycle(
@@ -265,4 +307,13 @@ function contextKey(context: CurrentHiveRuntimeCloudLeaseContext): string {
     tuple.leaseEpoch,
     tuple.fencingEpoch
   ].join(':')
+}
+
+function initialPullDelay(intervalMs: number, random: () => number): number {
+  return Math.round(intervalMs * boundedRandom(random))
+}
+
+function boundedRandom(random: () => number): number {
+  const value = random()
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0.5
 }

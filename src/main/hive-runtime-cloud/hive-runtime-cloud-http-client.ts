@@ -3,6 +3,7 @@ import { problemCategory } from './hive-runtime-cloud-response'
 
 const REQUEST_TIMEOUT_MS = 10_000
 const MAXIMUM_RESPONSE_BYTES = 65_536
+const MAXIMUM_RETRY_AFTER_MS = 2_147_483_647
 
 export type HiveRuntimeCloudFetch = (input: string, init: RequestInit) => Promise<Response>
 
@@ -11,7 +12,8 @@ const electronFetch: HiveRuntimeCloudFetch = (input, init) => net.fetch(input, i
 export class HiveRuntimeCloudRequestError extends Error {
   constructor(
     readonly status: number,
-    readonly category: string | null
+    readonly category: string | null,
+    readonly retryAfterMs: number | null = null
   ) {
     super('hive_runtime_cloud_request_failed')
     this.name = 'HiveRuntimeCloudRequestError'
@@ -68,6 +70,38 @@ async function parseProblemCategory(response: Response): Promise<string | null> 
   } catch {
     return null
   }
+}
+
+function parseRetryAfterMs(value: string | null): number | null {
+  if (value === null) {
+    return null
+  }
+  const normalized = value.trim()
+  if (!normalized || normalized.startsWith('-')) {
+    return null
+  }
+  let delayMs: number
+  if (/^\d+$/.test(normalized)) {
+    const seconds = Number(normalized)
+    if (Number.isNaN(seconds)) {
+      return null
+    }
+    delayMs = Number.isFinite(seconds) ? seconds * 1_000 : MAXIMUM_RETRY_AFTER_MS
+  } else {
+    if (/^[+\d.]/.test(normalized)) {
+      return null
+    }
+    delayMs = Date.parse(normalized) - Date.now()
+  }
+  return Number.isFinite(delayMs) && delayMs >= 0 ? Math.min(MAXIMUM_RETRY_AFTER_MS, delayMs) : null
+}
+
+async function requestError(response: Response): Promise<HiveRuntimeCloudRequestError> {
+  return new HiveRuntimeCloudRequestError(
+    response.status,
+    await parseProblemCategory(response),
+    parseRetryAfterMs(response.headers.get('retry-after'))
+  )
 }
 
 export class HiveRuntimeCloudHttpClient {
@@ -137,10 +171,7 @@ export class HiveRuntimeCloudHttpClient {
         throw new HiveRuntimeCloudTransportError()
       }
       if (response.status !== expectedStatus) {
-        throw new HiveRuntimeCloudRequestError(
-          response.status,
-          await parseProblemCategory(response)
-        )
+        throw await requestError(response)
       }
       if (expectedStatus === 204) {
         const contentLength = response.headers.get('content-length')
@@ -187,10 +218,7 @@ export class HiveRuntimeCloudHttpClient {
         throw new HiveRuntimeCloudTransportError()
       }
       if (response.status !== 200) {
-        throw new HiveRuntimeCloudRequestError(
-          response.status,
-          await parseProblemCategory(response)
-        )
+        throw await requestError(response)
       }
       const value = await parseResponse(response)
       const nextCursor = response.headers.get('x-hive-next-cursor')

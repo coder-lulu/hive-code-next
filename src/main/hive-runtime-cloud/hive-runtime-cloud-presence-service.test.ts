@@ -50,9 +50,15 @@ const claimedState = (authorityId: string | undefined = authorization.authorityI
     latestLeaseEpoch: 0
   }) satisfies HiveRuntimeCloudRegistrationState
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
-function fixture(initialState: HiveRuntimeCloudRegistrationState | null) {
+function fixture(
+  initialState: HiveRuntimeCloudRegistrationState | null,
+  random: () => number = () => 0
+) {
   let stored = initialState
   let nextId = 0
   const saveState = vi.fn((_path: string, state: HiveRuntimeCloudRegistrationState) => {
@@ -103,7 +109,7 @@ function fixture(initialState: HiveRuntimeCloudRegistrationState | null) {
     saveState,
     randomUuid: () => ids[nextId++ % ids.length],
     now: () => Date.parse('2026-08-25T08:00:00.000Z'),
-    random: () => 0.5
+    random
   }
   const service = new HiveRuntimeCloudPresenceService(
     { enabled: true, apiBaseUrl: 'https://api.hivekernel.com' },
@@ -120,6 +126,18 @@ async function startClaimed(service: HiveRuntimeCloudPresenceService): Promise<v
 }
 
 describe('Hive Runtime Cloud Presence service', () => {
+  it('spreads the initial activation after the Runtime becomes ready', async () => {
+    vi.useFakeTimers()
+    const { service, client } = fixture(claimedState(), () => 0.5)
+
+    service.setRuntimeReady(true)
+    await vi.advanceTimersByTimeAsync(7_499)
+    expect(client.lookup).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(client.lookup).toHaveBeenCalledOnce()
+    await service.stop()
+  })
+
   it('keeps an identity-backed claimed Runtime online after account sign-out', async () => {
     const { service, client } = fixture(claimedState())
 

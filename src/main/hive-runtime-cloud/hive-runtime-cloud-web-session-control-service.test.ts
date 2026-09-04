@@ -70,7 +70,7 @@ class TestPresence {
   }
 }
 
-function testHarness() {
+function testHarness(random: () => number = () => 0.5) {
   const presence = new TestPresence(leaseContext())
   const pullWebSessionControls = vi.fn().mockResolvedValue({ commands: [] })
   const acknowledgeWebSessionRevocations = vi.fn().mockResolvedValue(undefined)
@@ -80,7 +80,8 @@ function testHarness() {
     apiBaseUrl: 'https://api.hivekernel.com',
     presence,
     target: { revokeManagedSession, expireManagedSessions },
-    client: { pullWebSessionControls, acknowledgeWebSessionRevocations }
+    client: { pullWebSessionControls, acknowledgeWebSessionRevocations },
+    random
   })
   return {
     presence,
@@ -221,9 +222,26 @@ describe('Hive Runtime Cloud Web Session control service', () => {
     expect(harness.acknowledgeWebSessionRevocations).toHaveBeenCalledOnce()
   })
 
-  it('starts pulls no more than 15 seconds apart and rejects a slower configuration', async () => {
+  it('uses a random initial phase and reschedules after an immediate pollNow', async () => {
     vi.useFakeTimers()
-    const harness = testHarness()
+    const harness = testHarness(() => 0.5)
+    harness.service.start()
+
+    await vi.advanceTimersByTimeAsync(7_499)
+    expect(harness.pullWebSessionControls).not.toHaveBeenCalled()
+    await harness.service.pollNow()
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(14_999)
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(2)
+    await harness.service.stop()
+  })
+
+  it('keeps later pulls at the configured interval and rejects a slower interval', async () => {
+    vi.useFakeTimers()
+    const random = vi.fn().mockReturnValueOnce(0)
+    const harness = testHarness(random)
     harness.service.start()
 
     await vi.advanceTimersByTimeAsync(0)
@@ -250,5 +268,85 @@ describe('Hive Runtime Cloud Web Session control service', () => {
           pullIntervalMs: 15_001
         })
     ).toThrow('invalid_web_session_control_pull_interval')
+  })
+
+  it('keeps pull starts fifteen seconds apart when a cycle takes five seconds', async () => {
+    vi.useFakeTimers()
+    const harness = testHarness(() => 0)
+    harness.pullWebSessionControls
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({ commands: [] }), 5_000)
+          })
+      )
+      .mockResolvedValue({ commands: [] })
+    harness.service.start()
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(14_999)
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(2)
+
+    await harness.service.stop()
+  })
+
+  it('immediately catches up after a cycle exceeds the pull interval', async () => {
+    vi.useFakeTimers()
+    const harness = testHarness(() => 0)
+    harness.pullWebSessionControls
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({ commands: [] }), 20_000)
+          })
+      )
+      .mockResolvedValue({ commands: [] })
+    harness.service.start()
+
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(19_999)
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(harness.pullWebSessionControls).toHaveBeenCalledTimes(2)
+
+    await harness.service.stop()
+  })
+
+  it('coalesces concurrent manual polls into one in-flight request', async () => {
+    const harness = testHarness()
+    let completePull!: (value: { commands: [] }) => void
+    harness.pullWebSessionControls.mockReturnValue(
+      new Promise((resolve) => {
+        completePull = resolve
+      })
+    )
+
+    const first = harness.service.pollNow()
+    const second = harness.service.pollNow()
+
+    expect(harness.pullWebSessionControls).toHaveBeenCalledOnce()
+    completePull({ commands: [] })
+    await Promise.all([first, second])
+  })
+
+  it('aborts and waits for a manual poll during stop', async () => {
+    const harness = testHarness()
+    let requestSignal!: AbortSignal
+    harness.pullWebSessionControls.mockImplementation((_request, signal: AbortSignal) => {
+      requestSignal = signal
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+      })
+    })
+
+    const polling = harness.service.pollNow()
+    const stopping = harness.service.stop()
+
+    expect(requestSignal.aborted).toBe(true)
+    await Promise.all([polling, stopping])
   })
 })

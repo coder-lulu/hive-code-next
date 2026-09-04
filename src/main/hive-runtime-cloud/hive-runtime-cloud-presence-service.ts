@@ -12,7 +12,6 @@ import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-sto
 import {
   defaultPresenceDependencies,
   FatalPresenceError,
-  schedulePresenceRetry,
   type ActiveLease,
   type HiveRuntimeCloudPresenceState,
   type PresenceClient,
@@ -29,9 +28,10 @@ import {
   handleHiveRuntimeCloudHeartbeatFailure
 } from './hive-runtime-cloud-presence-failure'
 import { migrateHiveRuntimeCloudPresenceAuthorization } from './hive-runtime-cloud-presence-authorization'
-import { scheduleHiveRuntimeCloudHeartbeat } from './hive-runtime-cloud-presence-scheduling'
+import { HiveRuntimeCloudPresenceScheduler } from './hive-runtime-cloud-presence-scheduling'
 
 const HEARTBEAT_INTERVAL_MS = 30_000
+const INITIAL_ACTIVATION_WINDOW_MS = 15_000
 const STALE_OPERATION = Symbol('stale_operation')
 
 export class HiveRuntimeCloudPresenceService {
@@ -42,14 +42,13 @@ export class HiveRuntimeCloudPresenceService {
   private stopped = false
   private epoch = 0
   private bootId: string
-  private timer: NodeJS.Timeout | undefined
   private abortController: AbortController | null = null
   private inFlight: Promise<void> | null = null
   private lease: ActiveLease | null = null
   private readonly leaseContext = new HiveRuntimeCloudLeaseContextPublisher()
   private readonly stateListeners = new Set<(state: HiveRuntimeCloudPresenceState) => void>()
   private pendingHeartbeat: PendingHeartbeat | null = null
-  private retryAttempt = 0
+  private readonly scheduler: HiveRuntimeCloudPresenceScheduler
 
   constructor(
     private readonly config: HiveRuntimeCloudConfig,
@@ -60,6 +59,7 @@ export class HiveRuntimeCloudPresenceService {
     this.state = config.enabled ? 'WAITING_RUNTIME' : 'DISABLED'
     this.client = config.enabled ? dependencies.createClient(config.apiBaseUrl) : null
     this.bootId = dependencies.randomUuid()
+    this.scheduler = new HiveRuntimeCloudPresenceScheduler(dependencies.random)
   }
 
   getState(): HiveRuntimeCloudPresenceState {
@@ -104,6 +104,10 @@ export class HiveRuntimeCloudPresenceService {
   }
 
   notifyRegistrationChanged(): void {
+    this.restartRegistration(false)
+  }
+
+  private restartRegistration(spreadInitialActivation: boolean): void {
     if (!this.config.enabled || this.stopped) {
       return
     }
@@ -112,7 +116,16 @@ export class HiveRuntimeCloudPresenceService {
     this.setState(this.runtimeReady ? 'ACTIVATING' : 'WAITING_RUNTIME')
     this.publishLeaseContext()
     if (this.runtimeReady) {
-      this.startActivation()
+      if (spreadInitialActivation) {
+        const epoch = this.epoch
+        this.scheduler.scheduleInitial(
+          INITIAL_ACTIVATION_WINDOW_MS,
+          () => !this.stopped && this.runtimeReady && this.epoch === epoch,
+          () => this.startActivation()
+        )
+      } else {
+        this.startActivation()
+      }
     }
   }
 
@@ -128,7 +141,7 @@ export class HiveRuntimeCloudPresenceService {
       this.publishLeaseContext()
       return
     }
-    this.notifyRegistrationChanged()
+    this.restartRegistration(true)
   }
 
   async stop(): Promise<void> {
@@ -153,13 +166,9 @@ export class HiveRuntimeCloudPresenceService {
 
   private resetWork(): void {
     this.epoch += 1
-    if (this.timer) {
-      clearTimeout(this.timer)
-      this.timer = undefined
-    }
+    this.scheduler.reset()
     this.abortController?.abort()
     this.abortController = null
-    this.retryAttempt = 0
   }
 
   private assertCurrent(epoch: number): void {
@@ -180,7 +189,7 @@ export class HiveRuntimeCloudPresenceService {
           fence: () => this.fence(),
           retry: () => {
             this.setState('OFFLINE_RETRY')
-            this.scheduleRetry(() => this.startActivation())
+            this.scheduleRetry(() => this.startActivation(), error)
           }
         })
       )
@@ -214,7 +223,7 @@ export class HiveRuntimeCloudPresenceService {
     this.lease = result.lease
     this.pendingHeartbeat = null
     this.setState('LEASED')
-    this.retryAttempt = 0
+    this.scheduler.resetRetryAttempts()
     try {
       await this.sendHeartbeat(epoch, result.identity, signal)
     } catch (error) {
@@ -246,16 +255,12 @@ export class HiveRuntimeCloudPresenceService {
       assertCurrent: () => this.assertCurrent(epoch)
     })
     this.pendingHeartbeat = null
-    this.retryAttempt = 0
     this.setState('ONLINE')
     this.publishLeaseContext()
-    this.timer = scheduleHiveRuntimeCloudHeartbeat(
+    this.scheduler.scheduleHeartbeat(
       HEARTBEAT_INTERVAL_MS,
       () => this.epoch === epoch && !this.stopped,
-      () => {
-        this.timer = undefined
-        this.startHeartbeat(epoch, identity)
-      }
+      () => this.startHeartbeat(epoch, identity)
     )
   }
 
@@ -289,19 +294,13 @@ export class HiveRuntimeCloudPresenceService {
       retry: () => {
         this.setState('OFFLINE_RETRY')
         this.publishLeaseContext()
-        this.scheduleRetry(() => this.startHeartbeat(epoch, identity))
+        this.scheduleRetry(() => this.startHeartbeat(epoch, identity), error)
       }
     })
   }
 
-  private scheduleRetry(action: () => void, explicitDelay?: number): void {
-    this.timer = schedulePresenceRetry(
-      this.retryAttempt++,
-      this.dependencies.random,
-      () => !this.stopped && this.runtimeReady,
-      action,
-      explicitDelay
-    )
+  private scheduleRetry(action: () => void, error?: unknown): void {
+    this.scheduler.scheduleRetry(error, () => !this.stopped && this.runtimeReady, action)
   }
 
   private clearLease(): void {
