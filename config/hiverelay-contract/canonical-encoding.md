@@ -11,7 +11,26 @@ counts.
 3. Compute SHA-256 over the raw 32 bytes.
 4. Encode the digest as unpadded base64url and take its first 16 ASCII characters.
 
-The result is a routing hint only.
+`hostKeyHash` is the complete unpadded base64url SHA-256 digest from step 3. The
+`relayHostId` result is a routing hint only.
+
+## Runtime tuple hash
+
+Compute SHA-256 over fields encoded with the length-prefixed representation described
+above, in this exact order:
+
+```text
+domain = "hive-relay-runtime-tuple/v2"
+runtimeId
+runtimeBootId
+authorityGeneration = u64
+fencingEpoch = u64
+leaseEpoch = u64
+```
+
+The 32-byte digest is represented as canonical unpadded base64url. Cloud-internal record
+and lease identifiers are deliberately excluded so Director, Cell, and Runtime can
+independently bind the same wire tuple.
 
 ## Host possession transcript
 
@@ -120,6 +139,18 @@ For one-use replay storage compute lowercase hexadecimal SHA-256 over UTF-8 byte
 `"hive-relay-runtime-proof-nonce/v2\n" || runtimeId || "\n" || nonce`. The nonce is
 committed atomically only after all structural, binding, freshness, digest, and signature
 checks succeed, and the digest is retained through proof expiry plus skew.
+
+Host Binding registration is also a Runtime Cloud request. Its protected payload includes
+`expectedBindingVersion`; creation requires `0`, while rotation requires the exact current
+positive version. The proof and compare-and-set are adjudicated in the same authority
+transaction. An exact completed retry may return the stored current binding, but an older
+binding version or a Host key from a terminal binding may never restore that binding.
+
+For a `relayToken`, `sub` is the externally visible `runtimeId` from this tuple, never the
+Cloud-internal Runtime record identifier. A Director must authorize assignment only while
+the token tuple hash still matches the Runtime's current ACTIVE Host Binding; Host rotation
+therefore invalidates previously issued Relay tokens even when their cryptographic expiry
+has not yet elapsed.
 
 ## Canonical HTTPS origin semantics
 

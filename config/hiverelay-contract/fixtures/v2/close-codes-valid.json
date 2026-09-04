@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.1",
+  "contractRevision": "hiverelay-v2-p0.2",
   "caseId": "v2.close-codes.registry.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "close-code",

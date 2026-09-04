@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HiveRelay v2 P0 contract
-  version: hiverelay-v2-p0.1
+  version: hiverelay-v2-p0.2
   description: >-
     Authority-only interface shapes. P0 does not register these routes or enable any
     capability.
@@ -26,7 +26,8 @@ paths:
   /hive/v1/runtime-relay-hosts:
     post:
       operationId: registerRelayHostV2
-      security: [{hiveSession: []}]
+      security: []
+      x-hiverelay-runtime-proof-carrier: json-body.runtimeProof
       requestBody:
         required: true
         content:
@@ -270,9 +271,10 @@ components:
     HostRegistrationRequest:
       type: object
       additionalProperties: false
-      required: [protocolVersion, runtimeId, runtimeBootId, authorityGeneration, fencingEpoch, leaseEpoch, hostPublicKeyB64, requestedRelayHostId]
+      required: [protocolVersion, runtimeProof, runtimeId, runtimeBootId, authorityGeneration, fencingEpoch, leaseEpoch, hostPublicKeyB64, requestedRelayHostId, expectedBindingVersion]
       properties:
         protocolVersion: {const: 2}
+        runtimeProof: {$ref: '../schemas/runtime-proof.schema.json'}
         runtimeId: {$ref: '#/components/schemas/OpaqueId'}
         runtimeBootId: {$ref: '#/components/schemas/UuidV4'}
         authorityGeneration: {$ref: '#/components/schemas/Generation'}
@@ -280,6 +282,7 @@ components:
         leaseEpoch: {$ref: '#/components/schemas/Generation'}
         hostPublicKeyB64: {$ref: '#/components/schemas/Base64Url32'}
         requestedRelayHostId: {type: string, pattern: '^[A-Za-z0-9_-]{16}$'}
+        expectedBindingVersion: {$ref: '#/components/schemas/Generation'}
     HostRegistrationResponse:
       type: object
       additionalProperties: false
@@ -399,4 +402,4 @@ components:
       required: [code]
       properties:
         code:
-          enum: [UPGRADE_REQUIRED, RELAY_UNAVAILABLE, STALE_BINDING, REPLAY_DETECTED, CAPACITY_EXCEEDED, COMMAND_REPLAY_CONFLICT, TRANSITION_REPLAY_CONFLICT, SEQUENCE_GAP, RUNTIME_PROOF_REJECTED]
+          enum: [UPGRADE_REQUIRED, RELAY_UNAVAILABLE, INVALID_REQUEST, LOW_ORDER_X25519, STALE_BINDING, RELAY_HOST_ID_COLLISION, BINDING_REPLAY_CONFLICT, REPLAY_DETECTED, CAPACITY_EXCEEDED, COMMAND_REPLAY_CONFLICT, TRANSITION_REPLAY_CONFLICT, SEQUENCE_GAP, RUNTIME_PROOF_REJECTED]

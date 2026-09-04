@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.1",
+  "contractRevision": "hiverelay-v2-p0.2",
   "caseId": "legacy-v1.conn-open.resume.bytes",
   "suite": "legacy-v1-byte-regression",
   "operation": "legacy-bytes",

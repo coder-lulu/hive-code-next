@@ -4,6 +4,7 @@ import { RelayConnectionOpenMessageSchema } from '../../../src/main/runtime/rela
 import {
   HiveRelayWireMessageSchema,
   deriveHiveRelayHostId,
+  deriveHiveRelayRuntimeTupleHash,
   fromBase64Url,
   parseStrictJson
 } from './hiverelay-test-wire'
@@ -19,6 +20,7 @@ const Operation = z.enum([
   'wire-message',
   'jws',
   'runtime-proof',
+  'runtime-tuple-hash',
   'origin',
   'x25519-key',
   'private-command',
@@ -207,6 +209,34 @@ function evaluateX25519(input: Record<string, unknown>): ['ACCEPT' | 'REJECT', s
     : ['REJECT', 'WRONG_RELAY_HOST_ID']
 }
 
+const RuntimeTupleHashInput = z
+  .object({
+    runtimeId: z
+      .string()
+      .min(1)
+      .max(128)
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+    runtimeBootId: z
+      .string()
+      .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+    authorityGeneration: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    fencingEpoch: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    leaseEpoch: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    runtimeTupleHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+  })
+  .strict()
+
+function evaluateRuntimeTupleHash(input: Record<string, unknown>): ['ACCEPT' | 'REJECT', string] {
+  const parsed = RuntimeTupleHashInput.safeParse(input)
+  if (!parsed.success) {
+    return ['REJECT', 'INVALID_RUNTIME_TUPLE_HASH']
+  }
+  const { runtimeTupleHash, ...tuple } = parsed.data
+  return deriveHiveRelayRuntimeTupleHash(tuple) === runtimeTupleHash
+    ? ['ACCEPT', 'VALID_RUNTIME_TUPLE_HASH']
+    : ['REJECT', 'WRONG_BINDING']
+}
+
 export function parseHiveRelayContractFixture(raw: string): HiveRelayContractFixture {
   return parseStrictJson(raw, ContractFixtureSchema)
 }
@@ -229,6 +259,8 @@ export function evaluateHiveRelayContractFixture(
         return evaluateJws(fixture, context)
       case 'runtime-proof':
         return evaluateRuntimeProof(fixture.input, fixture.validationTime)
+      case 'runtime-tuple-hash':
+        return evaluateRuntimeTupleHash(fixture.input)
       case 'origin':
         return evaluateOrigin(fixture.input)
       case 'x25519-key':

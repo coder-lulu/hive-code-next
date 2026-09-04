@@ -41,6 +41,11 @@ export const HiveRelayBindingSchema = z
 
 export type HiveRelayBinding = z.infer<typeof HiveRelayBindingSchema>
 
+export type HiveRelayRuntimeTuple = Pick<
+  HiveRelayBinding,
+  'runtimeId' | 'runtimeBootId' | 'authorityGeneration' | 'fencingEpoch' | 'leaseEpoch'
+>
+
 export const HostHelloSchema = HiveRelayBindingSchema.extend({
   type: z.literal('host-hello'),
   v: z.literal(2),
@@ -224,6 +229,36 @@ export function deriveHiveRelayHostId(publicKey: Uint8Array): string {
 
 export function deriveHiveRelayKeyHash(publicKey: Uint8Array): string {
   return createHash('sha256').update(publicKey).digest('base64url')
+}
+
+function encodeLengthPrefixedField(name: string, value: Uint8Array): Buffer {
+  const nameBytes = Buffer.from(name, 'ascii')
+  const nameLength = Buffer.allocUnsafe(4)
+  const valueLength = Buffer.allocUnsafe(4)
+  nameLength.writeUInt32BE(nameBytes.byteLength)
+  valueLength.writeUInt32BE(value.byteLength)
+  return Buffer.concat([nameLength, nameBytes, valueLength, value])
+}
+
+function encodeUnsigned64(value: number): Buffer {
+  const encoded = Buffer.allocUnsafe(8)
+  encoded.writeBigUInt64BE(BigInt(value))
+  return encoded
+}
+
+export function deriveHiveRelayRuntimeTupleHash(tuple: HiveRelayRuntimeTuple): string {
+  const fields: [string, Uint8Array][] = [
+    ['domain', Buffer.from('hive-relay-runtime-tuple/v2', 'ascii')],
+    ['runtimeId', Buffer.from(tuple.runtimeId, 'ascii')],
+    ['runtimeBootId', Buffer.from(tuple.runtimeBootId, 'ascii')],
+    ['authorityGeneration', encodeUnsigned64(tuple.authorityGeneration)],
+    ['fencingEpoch', encodeUnsigned64(tuple.fencingEpoch)],
+    ['leaseEpoch', encodeUnsigned64(tuple.leaseEpoch)]
+  ]
+  const preimage = Buffer.concat(
+    fields.map(([name, value]) => encodeLengthPrefixedField(name, value))
+  )
+  return createHash('sha256').update(preimage).digest('base64url')
 }
 
 export function toBase64Url(bytes: Uint8Array): string {

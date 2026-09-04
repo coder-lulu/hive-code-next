@@ -146,4 +146,25 @@ describe('HiveRelay vendored contract fixtures', () => {
       reason: 'WRONG_BINDING'
     })
   })
+
+  it('binds every Runtime tuple field into the frozen length-prefixed digest', () => {
+    const fixture = parseHiveRelayContractFixture(
+      readFileSync(path.join(CONTRACT_ROOT, 'fixtures/v2/runtime-tuple-hash-valid.json'), 'utf8')
+    )
+    const mutations = {
+      runtimeId: 'runtime-02',
+      runtimeBootId: '33333333-3333-4333-8333-333333333333',
+      authorityGeneration: 8,
+      fencingEpoch: 4,
+      leaseEpoch: 12
+    }
+    for (const [field, value] of Object.entries(mutations)) {
+      const changed = structuredClone(fixture)
+      changed.input[field] = value
+      expect(evaluateHiveRelayContractFixture(changed, context), field).toMatchObject({
+        verdict: 'REJECT',
+        reason: 'WRONG_BINDING'
+      })
+    }
+  })
 })

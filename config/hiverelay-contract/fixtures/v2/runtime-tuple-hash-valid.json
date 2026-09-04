@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.2",
+  "caseId": "v2.runtime-tuple-hash.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "runtime-tuple-hash",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {
+    "runtimeId": "runtime-01",
+    "runtimeBootId": "22222222-2222-4222-8222-222222222222",
+    "authorityGeneration": 7,
+    "fencingEpoch": 3,
+    "leaseEpoch": 11,
+    "runtimeTupleHash": "HNGDUrrLAZr8P8WxrWIegPHgRgVfOiJjG5H90nXQ_7A"
+  }
+}

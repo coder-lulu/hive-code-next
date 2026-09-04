@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.1",
+  "contractRevision": "hiverelay-v2-p0.2",
   "caseId": "v2.session-transition.id-reuse-new-sequence.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "session-transition",
