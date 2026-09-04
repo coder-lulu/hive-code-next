@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.3",
+  "contractRevision": "hiverelay-v2-p0.4",
   "caseId": "v2.private-status.carrier.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-status",

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HiveRelay v2 contract
-  version: hiverelay-v2-p0.3
+  version: hiverelay-v2-p0.4
   description: >-
     Authority interface shapes. Every implementation remains disabled until its
     corresponding product and capability gates are enabled.
@@ -46,9 +46,13 @@ paths:
                 oneOf:
                   - {$ref: '../schemas/runtime-heartbeat-relay-control.schema.json#/$defs/legacyHeartbeatResponse'}
                   - {$ref: '../schemas/runtime-heartbeat-relay-control.schema.json#/$defs/relayHeartbeatResponse'}
-        '409': {$ref: '#/components/responses/SymbolicConflict'}
-        '426': {$ref: '#/components/responses/UpgradeRequired'}
-        '429': {$ref: '#/components/responses/RateLimited'}
+        '400': {$ref: '#/components/responses/RuntimeHeartbeatBadRequest'}
+        '401': {$ref: '#/components/responses/RuntimeHeartbeatProofRejected'}
+        '409': {$ref: '#/components/responses/RuntimeHeartbeatConflict'}
+        '410': {$ref: '#/components/responses/RuntimeHeartbeatGone'}
+        '422': {$ref: '#/components/responses/RuntimeHeartbeatUnprocessable'}
+        '426': {$ref: '#/components/responses/RuntimeHeartbeatUpgradeRequired'}
+        '503': {$ref: '#/components/responses/RuntimeHeartbeatUnavailable'}
   /hive/v1/runtime-relay-hosts:
     post:
       operationId: registerRelayHostV2
@@ -270,6 +274,59 @@ components:
       required: true
       schema: {$ref: '#/components/schemas/UuidV4'}
   responses:
+    RuntimeHeartbeatBadRequest:
+      description: Malformed or structurally invalid Runtime heartbeat
+      content:
+        application/problem+json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyBadRequest'}
+        application/json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayBadRequest'}
+    RuntimeHeartbeatProofRejected:
+      description: Runtime heartbeat proof or credential carrier rejected
+      content:
+        application/problem+json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyProofRejected'}
+        application/json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayProofRejected'}
+    RuntimeHeartbeatConflict:
+      description: Runtime heartbeat, command acknowledgement, or sequence replay conflict
+      content:
+        application/problem+json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyConflict'}
+        application/json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayConflict'}
+    RuntimeHeartbeatGone:
+      description: Runtime, lease, credential, or Relay assignment binding is stale
+      content:
+        application/problem+json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyGone'}
+        application/json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayGone'}
+    RuntimeHeartbeatUnprocessable:
+      description: Structurally valid heartbeat failed semantic validation
+      content:
+        application/problem+json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyUnprocessable'}
+        application/json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayUnprocessable'}
+    RuntimeHeartbeatUpgradeRequired:
+      description: Runtime requested Relay control while its server-side capability gate is disabled
+      content:
+        application/problem+json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyUpgradeRequired'}
+        application/json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayUpgradeRequired'}
+    RuntimeHeartbeatUnavailable:
+      description: Runtime heartbeat authority is transiently unavailable
+      headers:
+        Retry-After:
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 30}
+      content:
+        application/problem+json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/legacyUnavailable'}
+        application/json:
+          schema: {$ref: '../schemas/runtime-heartbeat-errors.schema.json#/$defs/relayUnavailable'}
     SymbolicConflict:
       description: Binding, state, idempotency, or replay conflict
       content:

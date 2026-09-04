@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.3",
+  "contractRevision": "hiverelay-v2-p0.4",
   "caseId": "v2.session-transition.mixed-stored-batch.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "session-transition",

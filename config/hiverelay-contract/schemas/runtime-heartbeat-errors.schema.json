@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/runtime-heartbeat-errors.schema.json",
+  "title": "HiveRelay Runtime heartbeat error responses",
+  "description": "The media type and explicit runtime-session-control-v1 capability select one closed error family. A request that cannot be reliably identified as capability-declaring remains on the legacy Problem shape.",
+  "oneOf": [
+    {"$ref": "#/$defs/legacyProblem"},
+    {"$ref": "#/$defs/relayErrorResponse"}
+  ],
+  "$defs": {
+    "legacyProblem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title", "status", "code", "traceId"],
+      "properties": {
+        "type": {"type": "string", "pattern": "^urn:hive:problem:[A-Za-z0-9_:-]{1,128}$"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 128},
+        "status": {"enum": [400, 401, 409, 410, 422, 426, 503]},
+        "code": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{1,127}$"},
+        "traceId": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "legacyBadRequest": {
+      "allOf": [
+        {"$ref": "#/$defs/legacyProblem"},
+        {"properties": {"status": {"const": 400}, "code": {"const": "runtime_heartbeat_invalid_request"}}}
+      ]
+    },
+    "legacyProofRejected": {
+      "allOf": [
+        {"$ref": "#/$defs/legacyProblem"},
+        {"properties": {"status": {"const": 401}, "code": {"const": "runtime_heartbeat_proof_rejected"}}}
+      ]
+    },
+    "legacyConflict": {
+      "allOf": [
+        {"$ref": "#/$defs/legacyProblem"},
+        {"properties": {"status": {"const": 409}, "code": {"const": "runtime_heartbeat_conflict"}}}
+      ]
+    },
+    "legacyGone": {
+      "allOf": [
+        {"$ref": "#/$defs/legacyProblem"},
+        {"properties": {"status": {"const": 410}, "code": {"const": "runtime_heartbeat_gone"}}}
+      ]
+    },
+    "legacyUnprocessable": {
+      "allOf": [
+        {"$ref": "#/$defs/legacyProblem"},
+        {"properties": {"status": {"const": 422}, "code": {"const": "runtime_heartbeat_unprocessable"}}}
+      ]
+    },
+    "legacyUpgradeRequired": {
+      "allOf": [
+        {"$ref": "#/$defs/legacyProblem"},
+        {"properties": {"status": {"const": 426}, "code": {"const": "UPGRADE_REQUIRED"}}}
+      ]
+    },
+    "legacyUnavailable": {
+      "allOf": [
+        {"$ref": "#/$defs/legacyProblem"},
+        {"properties": {"status": {"const": 503}, "code": {"const": "runtime_heartbeat_service_unavailable"}}}
+      ]
+    },
+    "relayErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "enum": ["INVALID_REQUEST", "RUNTIME_PROOF_REJECTED", "STALE_BINDING", "REPLAY_DETECTED", "COMMAND_REPLAY_CONFLICT", "SEQUENCE_GAP", "UPGRADE_REQUIRED", "RELAY_UNAVAILABLE"]
+        }
+      }
+    },
+    "relayBadRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {"code": {"const": "INVALID_REQUEST"}}
+    },
+    "relayProofRejected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {"code": {"const": "RUNTIME_PROOF_REJECTED"}}
+    },
+    "relayConflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {"code": {"enum": ["REPLAY_DETECTED", "COMMAND_REPLAY_CONFLICT", "SEQUENCE_GAP"]}}
+    },
+    "relayGone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {"code": {"const": "STALE_BINDING"}}
+    },
+    "relayUnprocessable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {"code": {"const": "INVALID_REQUEST"}}
+    },
+    "relayUpgradeRequired": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {"code": {"const": "UPGRADE_REQUIRED"}}
+    },
+    "relayUnavailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {"code": {"const": "RELAY_UNAVAILABLE"}}
+    }
+  }
+}

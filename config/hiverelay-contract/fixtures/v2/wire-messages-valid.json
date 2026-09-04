@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.3",
+  "contractRevision": "hiverelay-v2-p0.4",
   "caseId": "v2.wire.messages.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "wire-message",

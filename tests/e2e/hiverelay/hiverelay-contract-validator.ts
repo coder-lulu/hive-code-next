@@ -13,6 +13,7 @@ import { isCanonicalHiveRelayOrigin } from './hiverelay-contract-origin'
 import { evaluateRuntimeProof } from './hiverelay-contract-runtime-proof'
 import { evaluateSession } from './hiverelay-contract-session-rules'
 import { evaluateHeartbeatControl } from './hiverelay-contract-heartbeat'
+import { evaluateHeartbeatError } from './hiverelay-contract-heartbeat-error'
 import { evaluatePrivateCommand, evaluatePrivateStatus } from './hiverelay-contract-private-ops'
 import { evaluateCloseCodes, evaluateFrame, evaluateReplay } from './hiverelay-contract-state-rules'
 
@@ -28,6 +29,7 @@ const Operation = z.enum([
   'private-status',
   'lifecycle-operator',
   'heartbeat-control',
+  'heartbeat-error',
   'session-transition',
   'close-code',
   'frame-limit',
@@ -274,6 +276,8 @@ export function evaluateHiveRelayContractFixture(
         return evaluatePrivateStatus(fixture.input, fixture.validationTime)
       case 'heartbeat-control':
         return evaluateHeartbeatControl(fixture.input, fixture.validationTime)
+      case 'heartbeat-error':
+        return evaluateHeartbeatError(fixture.input)
       case 'lifecycle-operator':
         return ['REJECT', 'INVALID_LIFECYCLE_OPERATOR'] as const
       case 'session-transition':

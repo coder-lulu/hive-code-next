@@ -1,6 +1,6 @@
 # HiveRelay v2 authority contract
 
-Contract revision: `hiverelay-v2-p0.3`
+Contract revision: `hiverelay-v2-p0.4`
 
 This directory is the sole authority copied by HiveCode and HiveRelay Cell. A consumer
 must verify `fixture-manifest.json`, every listed file digest, the revision, and its source
@@ -25,6 +25,15 @@ acknowledged nor included in the response's contiguous `controlCommands` prefix.
 duplicate heartbeat returns a current bounded command snapshot; it must preserve stored
 transition adjudications and both server cursors, but it is not an immutable replay of a
 previous command-delivery snapshot.
+
+Heartbeat failures keep the legacy five-field `HiveHttpProblem` and
+`application/problem+json` media type unless the request can be strictly parsed far
+enough to observe the explicit `runtime-session-control-v1` capability. A declaring
+Runtime receives only the closed one-field `{ "code": "..." }` symbolic response with
+`application/json`. Invalid JSON, duplicate keys, and other input from which that
+capability cannot be reliably identified stay on the legacy Problem contract. The route
+publishes only 400, 401, 409, 410, 422, 426, and 503 failures; 503 includes a bounded
+`Retry-After` value.
 
 The contract is split into four small surfaces:
 
