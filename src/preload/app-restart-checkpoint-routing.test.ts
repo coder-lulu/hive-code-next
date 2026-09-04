@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { PreloadApi } from './api-types'
+import type { ComposedPreloadApi } from './index'
 import {
   ORCA_APP_RESTART_ABORTED_EVENT,
   ORCA_APP_RESTART_STARTED_EVENT
@@ -59,6 +60,20 @@ describe('native preload destructive app actions', () => {
     await import('./index')
     return exposeInMainWorld.mock.calls.find(([name]) => name === 'api')?.[1] as PreloadApi
   }
+
+  it('keeps the composed bridge key set exact and assignable to the complete contract', () => {
+    expectTypeOf<keyof ComposedPreloadApi>().toEqualTypeOf<keyof PreloadApi>()
+    expectTypeOf<ComposedPreloadApi>().toMatchTypeOf<PreloadApi>()
+  })
+
+  it('exposes the durable checkpoint wait through the app bridge', async () => {
+    const api = await loadApi()
+    invoke.mockResolvedValue({ ok: true })
+
+    await api.app.awaitBeforeUnloadCheckpoint()
+
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('app:await-before-unload-checkpoint')
+  })
 
   for (const action of ['reload', 'relaunch'] as const) {
     it(`prepares and awaits durability before ${action}`, async () => {

@@ -1,38 +1,31 @@
 import { ipcRenderer } from 'electron'
-import type { GhosttyImportPreview } from '../../shared/global-settings-types'
-import type {
-  WarpThemeImportPreview,
-  WarpThemeImportSource
-} from '../../shared/terminal-custom-themes'
+import type { PreloadApi } from '../api-types'
 
-export const settingsApi = {
-  get: (): Promise<unknown> => ipcRenderer.invoke('settings:get'),
+export const settingsApi: PreloadApi['settings'] = {
+  get: () => ipcRenderer.invoke('settings:get'),
 
   // Why: blocking read for the few startup decisions (terminal side-effect authority) that can't wait for async hydration. Call sparingly.
-  getSync: (): unknown => ipcRenderer.sendSync('settings:get-sync'),
+  getSync: () => ipcRenderer.sendSync('settings:get-sync'),
 
-  set: (args: Record<string, unknown>): Promise<unknown> =>
-    ipcRenderer.invoke('settings:set', args),
+  set: (args) => ipcRenderer.invoke('settings:set', args),
 
-  setActiveRuntimeEnvironmentPreference: (args: {
-    environmentId: string | null
-  }): Promise<unknown> =>
+  setActiveRuntimeEnvironmentPreference: (args) =>
     ipcRenderer.invoke('settings:set-active-runtime-environment-preference', args),
 
-  updatePRBotAuthorOverride: (args: { author: string; isBot: boolean }): Promise<unknown> =>
+  updatePRBotAuthorOverride: (args) =>
     ipcRenderer.invoke('settings:update-pr-bot-author-override', args),
 
-  listFonts: (): Promise<string[]> => ipcRenderer.invoke('settings:listFonts'),
+  listFonts: () => ipcRenderer.invoke('settings:listFonts'),
 
-  previewGhosttyImport: (): Promise<GhosttyImportPreview> =>
-    ipcRenderer.invoke('settings:previewGhosttyImport'),
+  previewGhosttyImport: () => ipcRenderer.invoke('settings:previewGhosttyImport'),
 
-  previewWarpThemeImport: (source: WarpThemeImportSource): Promise<WarpThemeImportPreview> =>
-    ipcRenderer.invoke('settings:previewWarpThemeImport', source),
+  previewWarpThemeImport: (source) => ipcRenderer.invoke('settings:previewWarpThemeImport', source),
 
-  onChanged: (callback: (updates: Record<string, unknown>) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, updates: Record<string, unknown>): void =>
-      callback(updates)
+  onChanged: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      updates: Parameters<typeof callback>[0]
+    ): void => callback(updates)
     ipcRenderer.on('settings:changed', listener)
     return () => ipcRenderer.removeListener('settings:changed', listener)
   }

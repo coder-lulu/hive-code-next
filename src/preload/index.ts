@@ -185,7 +185,9 @@ const api = {
   mobile: mobileApi,
   agentStatus: agentStatusApi,
   speech: speechApi
-} satisfies Pick<PreloadApi, 'hiveAccount' | 'hiveRuntimeCloud'> & Record<string, unknown>
+} satisfies PreloadApi
+
+export type ComposedPreloadApi = typeof api
 
 if (process.contextIsolated) {
   try {
@@ -196,6 +198,5 @@ if (process.contextIsolated) {
   }
 } else {
   window.electron = electronAPI
-  // @ts-expect-error (define in dts)
   window.api = api
 }

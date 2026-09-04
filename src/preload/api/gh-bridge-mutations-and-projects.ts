@@ -39,7 +39,7 @@ import type { AppStarSource } from '../../shared/gh-star-source'
 export const ghMutationsAndProjectsApi = {
   setPRAutoMerge: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     prNumber: number
     enabled: boolean
@@ -49,7 +49,7 @@ export const ghMutationsAndProjectsApi = {
     ipcRenderer.invoke('gh:setPRAutoMerge', args),
   updatePRState: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     prNumber: number
     updates: { state: 'open' | 'closed' }
@@ -58,7 +58,7 @@ export const ghMutationsAndProjectsApi = {
     ipcRenderer.invoke('gh:updatePRState', args),
   markPRReadyForReview: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     prNumber: number
     prRepo?: GitHubOwnerRepo | null
@@ -66,7 +66,7 @@ export const ghMutationsAndProjectsApi = {
     ipcRenderer.invoke('gh:markPRReadyForReview', args),
   requestPRReviewers: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     prNumber: number
     reviewers: string[]
@@ -75,7 +75,7 @@ export const ghMutationsAndProjectsApi = {
     ipcRenderer.invoke('gh:requestPRReviewers', args),
   removePRReviewers: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     prNumber: number
     reviewers: string[]
@@ -84,7 +84,7 @@ export const ghMutationsAndProjectsApi = {
     ipcRenderer.invoke('gh:removePRReviewers', args),
   updateIssue: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     number: number
     updates: unknown
@@ -92,7 +92,7 @@ export const ghMutationsAndProjectsApi = {
     ipcRenderer.invoke('gh:updateIssue', args),
   addIssueComment: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     number: number
     body: string
@@ -101,7 +101,7 @@ export const ghMutationsAndProjectsApi = {
   }): Promise<GitHubCommentResult> => ipcRenderer.invoke('gh:addIssueComment', args),
   addPRReviewCommentReply: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     prNumber: number
     commentId: number
@@ -113,7 +113,7 @@ export const ghMutationsAndProjectsApi = {
   }): Promise<GitHubCommentResult> => ipcRenderer.invoke('gh:addPRReviewCommentReply', args),
   addPRReviewComment: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
     prNumber: number
     prRepo?: GitHubOwnerRepo | null
@@ -125,12 +125,12 @@ export const ghMutationsAndProjectsApi = {
   }): Promise<GitHubCommentResult> => ipcRenderer.invoke('gh:addPRReviewComment', args),
   listLabels: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
   }): Promise<string[]> => ipcRenderer.invoke('gh:listLabels', args),
   listAssignableUsers: (args: {
     repoPath: string
-    repoId?: string
+    repoId?: string | null
     sourceContext?: TaskSourceContext | null
   }): Promise<GitHubAssignableUser[]> => ipcRenderer.invoke('gh:listAssignableUsers', args),
   onWorkItemMutated: (

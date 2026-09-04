@@ -1,11 +1,10 @@
 import { ipcRenderer } from 'electron'
+import type { PreloadApi } from '../api-types'
 
-export const developerPermissionsApi = {
-  getStatus: (): Promise<unknown> => ipcRenderer.invoke('developerPermissions:getStatus'),
-  request: (args: { id: string }): Promise<unknown> =>
-    ipcRenderer.invoke('developerPermissions:request', args),
-  openSettings: (args: { id: string }): Promise<void> =>
-    ipcRenderer.invoke('developerPermissions:openSettings', args),
-  testLocalNetworkConnection: (args: { host: string; port: number }): Promise<unknown> =>
+export const developerPermissionsApi: PreloadApi['developerPermissions'] = {
+  getStatus: () => ipcRenderer.invoke('developerPermissions:getStatus'),
+  request: (args) => ipcRenderer.invoke('developerPermissions:request', args),
+  openSettings: (args) => ipcRenderer.invoke('developerPermissions:openSettings', args),
+  testLocalNetworkConnection: (args) =>
     ipcRenderer.invoke('developerPermissions:testLocalNetworkConnection', args)
 }
