@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.3",
+  "caseId": "v2.heartbeat.legacy-shape.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "heartbeat-control",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1788566400000,
+  "input": {
+    "legacyRequest": {
+      "runtimeInstanceId": "21000000-0000-4000-8000-000000000001",
+      "bootId": "21000000-0000-4000-8000-000000000002",
+      "leaseId": "21000000-0000-4000-8000-000000000003",
+      "authorityGeneration": 7,
+      "leaseEpoch": 11,
+      "fencingEpoch": 3,
+      "heartbeatSeq": 19,
+      "sourceReportedAt": "2026-09-05T00:00:00Z",
+      "report": {
+        "runtimeVersion": "1.2.3",
+        "runtimeProtocolVersion": 3,
+        "capabilities": ["runtime-health-v1"],
+        "readiness": "READY",
+        "startedAt": "2026-09-04T23:59:00Z",
+        "connectionCapabilities": ["hive-direct"]
+      },
+      "proof": {
+        "protocolVersion": "hive-runtime-heartbeat/v1",
+        "algorithm": "Ed25519",
+        "method": "POST",
+        "path": "/hive/v1/runtime-heartbeats",
+        "authorityId": "cloud-authority-test",
+        "issuedAt": "2026-09-05T00:00:00Z",
+        "nonce": "21000000-0000-4000-8000-000000000004",
+        "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    },
+    "legacyResponse": {
+      "leaseId": "21000000-0000-4000-8000-000000000003",
+      "authorityGeneration": 7,
+      "leaseEpoch": 11,
+      "fencingEpoch": 3,
+      "acceptedHeartbeatSeq": 19,
+      "observedAt": "2026-09-05T00:00:00Z",
+      "leaseExpiresAt": "2026-09-05T00:02:00Z",
+      "presence": "ONLINE",
+      "duplicate": false
+    }
+  }
+}

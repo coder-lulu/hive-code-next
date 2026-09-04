@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.3",
+  "caseId": "v2.lifecycle-operator.private-origin.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "lifecycle-operator",
+  "applicableComponents": ["cloud"],
+  "validationTime": 1788566400000,
+  "input": {
+    "request": {
+      "protocolVersion": "hiverelay-cell-lifecycle-operator/v1",
+      "operationId": "10000000-0000-4000-8000-000000000011",
+      "action": "CONFIRM_ROUTABLE",
+      "expectedResourceVersion": 8,
+      "expectedLifecycleGeneration": 4,
+      "targetIncarnationId": "10000000-0000-4000-8000-000000000002"
+    },
+    "response": {
+      "protocolVersion": "hiverelay-cell-lifecycle-operator/v1",
+      "operationId": "10000000-0000-4000-8000-000000000011",
+      "action": "CONFIRM_ROUTABLE",
+      "cellId": "cell-ap-east-1a",
+      "state": "ACTIVE",
+      "resourceVersion": 9,
+      "lifecycleGeneration": 5,
+      "observedIncarnationId": "10000000-0000-4000-8000-000000000002",
+      "routingConfirmedIncarnationId": "10000000-0000-4000-8000-000000000002",
+      "routingConfirmedAt": "2026-09-05T00:00:00Z",
+      "updatedAt": "2026-09-05T00:00:00Z",
+      "duplicate": false,
+      "delivery": null,
+      "privateOrigin": "https://cell-01.private.hive.test:8443"
+    }
+  }
+}

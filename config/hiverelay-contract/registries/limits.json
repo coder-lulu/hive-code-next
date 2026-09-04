@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.2",
+  "contractRevision": "hiverelay-v2-p0.3",
   "time": {
     "clockSkewSeconds": 30,
     "runtimeProofLifetimeSeconds": 60,
@@ -42,6 +42,14 @@
     {"operation": "cellAdmission", "globalPerSecond": 2000, "perAssignmentPerMinute": 120, "perIpPerMinute": 120},
     {"operation": "cellPrivateOps", "globalPerSecond": 100, "perCellPerMinute": 120}
   ],
+  "rateLimitKeying": {
+    "authenticatedDimensions": ["accountId", "runtimeRecordId"],
+    "networkDimension": "server-observed-peer-ip",
+    "storageEncoding": "HMAC-SHA-256",
+    "metricsExposeKeys": false,
+    "externalLimiterBeforeDatabaseLocks": true,
+    "backendFailure": "FAIL_CLOSED"
+  },
   "replayCapacity": {
     "admissionJtiEntries": 187500,
     "cellOpsJtiEntries": 12000,

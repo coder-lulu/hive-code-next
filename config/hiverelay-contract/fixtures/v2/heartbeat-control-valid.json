@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.3",
+  "caseId": "v2.heartbeat-control.independent-acks.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "heartbeat-control",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1788566400000,
+  "input": {
+    "relayControl": {
+      "assignmentId": "20000000-0000-4000-8000-000000000001",
+      "cellId": "cell-ap-east-1a",
+      "cellIncarnationId": "20000000-0000-4000-8000-000000000002",
+      "assignmentEpoch": 9,
+      "controlGeneration": 2,
+      "controlConnectionAcknowledged": true,
+      "controlCommandAck": {
+        "sequence": 4,
+        "commandId": "20000000-0000-4000-8000-000000000003",
+        "acknowledgedResourceVersion": 12
+      },
+      "sessionTransitions": []
+    },
+    "response": {
+      "responseVersion": "runtime-session-control/v1",
+      "ackedSessionTransitionSequence": 7,
+      "sessionTransitionResults": [],
+      "sessionAuthorityUntil": "2026-09-05T00:02:00Z",
+      "ackedControlSequence": 4,
+      "controlCommands": [
+        {
+          "sequence": 5,
+          "commandId": "20000000-0000-4000-8000-000000000004",
+          "commandType": "SESSION_REVOKE",
+          "managedSessionId": "20000000-0000-4000-8000-000000000005",
+          "assignmentId": "20000000-0000-4000-8000-000000000001",
+          "targetResourceVersion": 13,
+          "targetControlVersion": 3,
+          "reason": "ADMINISTRATIVE"
+        }
+      ],
+      "nextControlSequence": 6
+    }
+  }
+}

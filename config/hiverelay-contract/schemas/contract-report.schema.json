@@ -11,7 +11,7 @@
     "status": {"enum": ["PASS", "FAIL"]},
     "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "containerImage": {"type": "string", "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$"},
-    "contractRevision": {"const": "hiverelay-v2-p0.2"},
+    "contractRevision": {"const": "hiverelay-v2-p0.3"},
     "manifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "testCount": {"type": "integer", "minimum": 1},
     "resultCount": {"type": "integer", "minimum": 1},

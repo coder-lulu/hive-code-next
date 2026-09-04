@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
-  title: HiveRelay v2 P0 contract
-  version: hiverelay-v2-p0.2
+  title: HiveRelay v2 contract
+  version: hiverelay-v2-p0.3
   description: >-
-    Authority-only interface shapes. P0 does not register these routes or enable any
-    capability.
+    Authority interface shapes. Every implementation remains disabled until its
+    corresponding product and capability gates are enabled.
 servers:
   - url: https://cloud.hive.test
     description: HiveCloud authority
@@ -23,6 +23,32 @@ x-hiverelay-cell-private-paths:
   - /internal/v1/lifecycle
   - /internal/v1/fences
 paths:
+  /hive/v1/runtime-heartbeats:
+    post:
+      operationId: recordRuntimeRelayControlHeartbeatV1
+      security: []
+      x-hiverelay-capability: runtime-session-control-v1
+      x-hiverelay-legacy-response-shape: unchanged-when-capability-absent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - {$ref: '../schemas/runtime-heartbeat-relay-control.schema.json#/$defs/legacyHeartbeatRequest'}
+                - {$ref: '../schemas/runtime-heartbeat-relay-control.schema.json#/$defs/relayHeartbeatRequest'}
+      responses:
+        '200':
+          description: Relay control heartbeat response for a capability-declaring Runtime
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - {$ref: '../schemas/runtime-heartbeat-relay-control.schema.json#/$defs/legacyHeartbeatResponse'}
+                  - {$ref: '../schemas/runtime-heartbeat-relay-control.schema.json#/$defs/relayHeartbeatResponse'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+        '426': {$ref: '#/components/responses/UpgradeRequired'}
+        '429': {$ref: '#/components/responses/RateLimited'}
   /hive/v1/runtime-relay-hosts:
     post:
       operationId: registerRelayHostV2
@@ -140,6 +166,31 @@ paths:
             application/json:
               schema: {$ref: '../schemas/session-transition.schema.json#/$defs/batchResponse'}
         '409': {$ref: '#/components/responses/SymbolicConflict'}
+  /hive/v1/relay-cells/{cellId}/lifecycle:
+    post:
+      operationId: applyCloudRelayCellLifecycleV1
+      security: [{relayFleetOperatorMtls: []}]
+      x-hiverelay-required-scope: relay:fleet:lifecycle
+      parameters:
+        - name: cellId
+          in: path
+          required: true
+          schema: {$ref: '#/components/schemas/OpaqueId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/lifecycle-operator.schema.json#/$defs/request'}
+      responses:
+        '200':
+          description: Authoritative idempotent lifecycle result with optional private delivery result
+          content:
+            application/json:
+              schema: {$ref: '../schemas/lifecycle-operator.schema.json#/$defs/response'}
+        '401': {$ref: '#/components/responses/OperatorCredentialRejected'}
+        '403': {$ref: '#/components/responses/OperatorScopeRejected'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+        '503': {$ref: '#/components/responses/LifecycleDeliveryUnavailable'}
   /internal/status:
     get:
       operationId: readCellStatusV2
@@ -209,6 +260,9 @@ components:
       type: http
       scheme: bearer
       bearerFormat: compact JWS relay-cell-ops+jwt
+    relayFleetOperatorMtls:
+      type: mutualTLS
+      description: Dedicated fleet-gate client certificate mapped to relay:fleet:lifecycle; ordinary admin, Runtime and Client credentials are rejected.
   parameters:
     RuntimeRecordId:
       name: runtimeRecordId
@@ -228,6 +282,25 @@ components:
           schema: {$ref: '#/components/schemas/ErrorResponse'}
     RateLimited:
       description: Frozen quota exceeded
+      headers:
+        Retry-After:
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 30}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    OperatorCredentialRejected:
+      description: Dedicated fleet lifecycle mTLS credential is missing or invalid
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    OperatorScopeRejected:
+      description: Authenticated operator credential lacks relay:fleet:lifecycle
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    LifecycleDeliveryUnavailable:
+      description: Authority may already be committed; retry the identical request with the same operationId to safely repeat private delivery
       headers:
         Retry-After:
           required: true
@@ -402,4 +475,4 @@ components:
       required: [code]
       properties:
         code:
-          enum: [UPGRADE_REQUIRED, RELAY_UNAVAILABLE, INVALID_REQUEST, LOW_ORDER_X25519, STALE_BINDING, RELAY_HOST_ID_COLLISION, BINDING_REPLAY_CONFLICT, REPLAY_DETECTED, CAPACITY_EXCEEDED, COMMAND_REPLAY_CONFLICT, TRANSITION_REPLAY_CONFLICT, SEQUENCE_GAP, RUNTIME_PROOF_REJECTED]
+          enum: [UPGRADE_REQUIRED, RELAY_UNAVAILABLE, INVALID_REQUEST, LOW_ORDER_X25519, STALE_BINDING, RELAY_HOST_ID_COLLISION, BINDING_REPLAY_CONFLICT, REPLAY_DETECTED, CAPACITY_EXCEEDED, RATE_LIMITED, COMMAND_REPLAY_CONFLICT, TRANSITION_REPLAY_CONFLICT, SEQUENCE_GAP, RUNTIME_PROOF_REJECTED, OPERATOR_CREDENTIAL_REJECTED, OPERATOR_SCOPE_REJECTED]

@@ -13,7 +13,7 @@ const Epoch = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const Base64Url32 = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 const Sha256Hex = z.string().regex(/^[0-9a-f]{64}$/)
 
-const SessionTransitionSchema = z
+export const SessionTransitionSchema = z
   .object({
     sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     transitionId: UuidV4,
@@ -54,7 +54,7 @@ const SessionStatusSchema = z.enum([
   'REVOKED'
 ])
 
-const SessionAdjudicationSchema = z
+export const SessionAdjudicationSchema = z
   .object({
     sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     transitionId: UuidV4,

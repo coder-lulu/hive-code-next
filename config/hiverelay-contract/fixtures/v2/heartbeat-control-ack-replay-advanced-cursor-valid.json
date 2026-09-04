@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.3",
+  "caseId": "v2.heartbeat-control.ack-replay-advanced-cursor.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "heartbeat-control",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1788566400000,
+  "input": {
+    "relayControl": {
+      "assignmentId": "22000000-0000-4000-8000-000000000001",
+      "cellId": "cell-ap-east-1a",
+      "cellIncarnationId": "22000000-0000-4000-8000-000000000002",
+      "assignmentEpoch": 9,
+      "controlGeneration": 2,
+      "controlConnectionAcknowledged": true,
+      "controlCommandAck": {
+        "sequence": 4,
+        "commandId": "22000000-0000-4000-8000-000000000003",
+        "acknowledgedResourceVersion": 12
+      },
+      "sessionTransitions": []
+    },
+    "storedControlCommand": {
+      "sequence": 4,
+      "commandId": "22000000-0000-4000-8000-000000000003",
+      "targetResourceVersion": 12
+    },
+    "response": {
+      "responseVersion": "runtime-session-control/v1",
+      "ackedSessionTransitionSequence": 7,
+      "sessionTransitionResults": [],
+      "sessionAuthorityUntil": "2026-09-05T00:02:00Z",
+      "ackedControlSequence": 5,
+      "controlCommands": [],
+      "nextControlSequence": 6
+    }
+  }
+}

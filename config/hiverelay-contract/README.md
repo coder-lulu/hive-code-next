@@ -1,10 +1,30 @@
-# HiveRelay v2 P0 authority contract
+# HiveRelay v2 authority contract
 
-Contract revision: `hiverelay-v2-p0.2`
+Contract revision: `hiverelay-v2-p0.3`
 
 This directory is the sole authority copied by HiveCode and HiveRelay Cell. A consumer
 must verify `fixture-manifest.json`, every listed file digest, the revision, and its source
 commit before running fixtures. Extra or missing vendored files fail verification.
+
+Route registration and capability advertisement remain independently gated and default
+off. Legacy Orca bytes and the heartbeat response returned to a Runtime that does not
+declare `runtime-session-control-v1` remain unchanged.
+
+The Relay heartbeat keeps two independent acknowledgements: a boolean
+`controlConnectionAcknowledged` for the Cell control handshake and a structured
+`controlCommandAck` for one contiguous Cloud-to-Runtime command. Session-transition
+sequence acknowledgement is separate from both. Replaying a durable lifecycle operator
+operation may perform a fresh private delivery; the authority result remains stable while
+the new delivery can safely return `STALE_NOOP`. A 503 after an operator lifecycle call
+may therefore follow a committed authority transition; clients must retry the byte-for-byte
+equivalent request with the same `operationId`, never mint a replacement operation.
+
+`sessionAuthorityUntil` is null unless the reported assignment and current Cell control
+connection are authoritative. `nextControlSequence` is the first sequence neither
+acknowledged nor included in the response's contiguous `controlCommands` prefix. A
+duplicate heartbeat returns a current bounded command snapshot; it must preserve stored
+transition adjudications and both server cursors, but it is not an immutable replay of a
+previous command-delivery snapshot.
 
 The contract is split into four small surfaces:
 

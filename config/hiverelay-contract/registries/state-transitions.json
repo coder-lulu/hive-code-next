@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.2",
+  "contractRevision": "hiverelay-v2-p0.3",
   "admissionCommitEvent": "ATTACH_COMMIT",
   "machines": {
     "admission": [
@@ -47,6 +47,9 @@
   "managedSessionBatch": {
     "method": "POST",
     "pathTemplate": "/hive/v1/runtimes/{runtimeRecordId}/session-transitions",
+    "preferredTransport": "/hive/v1/runtime-heartbeats#report.relayControl.sessionTransitions",
+    "capability": "runtime-session-control-v1",
+    "legacyStandaloneRouteStatus": "FROZEN_COMPATIBILITY_NOT_ADVERTISED",
     "maximumEntries": 128,
     "processInRequestOrder": true,
     "storedVerdicts": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY"],

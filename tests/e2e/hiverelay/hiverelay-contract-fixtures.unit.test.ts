@@ -108,11 +108,19 @@ describe('HiveRelay vendored contract fixtures', () => {
         expect(fixture.applicableComponents).toEqual(entry.applicableComponents)
         const actual = evaluateHiveRelayContractFixture(fixture, context)
         observedResults.push(actual)
-        expect(actual).toEqual({
-          caseId: entry.caseId,
-          verdict: entry.expectedVerdict,
-          reason: entry.expectedReason
-        })
+        expect(actual).toEqual(
+          entry.applicableComponents.includes('hivecode')
+            ? {
+                caseId: entry.caseId,
+                verdict: entry.expectedVerdict,
+                reason: entry.expectedReason
+              }
+            : {
+                caseId: entry.caseId,
+                verdict: 'NOT_APPLICABLE',
+                reason: 'COMPONENT_NOT_APPLICABLE'
+              }
+        )
       } catch (error) {
         errors.push(`${entry.caseId}: ${error instanceof Error ? error.message : String(error)}`)
         throw error

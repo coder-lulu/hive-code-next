@@ -33,6 +33,10 @@
     "config/hiverelay-contract/fixtures/v2/frame-boundaries-mixed-plus-one.json",
     "config/hiverelay-contract/fixtures/v2/frame-boundaries-plus-one.json",
     "config/hiverelay-contract/fixtures/v2/frame-boundaries-valid.json",
+    "config/hiverelay-contract/fixtures/v2/heartbeat-control-ack-confusion-reject.json",
+    "config/hiverelay-contract/fixtures/v2/heartbeat-control-ack-replay-advanced-cursor-valid.json",
+    "config/hiverelay-contract/fixtures/v2/heartbeat-control-valid.json",
+    "config/hiverelay-contract/fixtures/v2/heartbeat-legacy-shape-valid.json",
     "config/hiverelay-contract/fixtures/v2/jws-cell-ops-binding-mismatch.json",
     "config/hiverelay-contract/fixtures/v2/jws-cell-ops-fence-binding-mismatch.json",
     "config/hiverelay-contract/fixtures/v2/jws-cell-ops-lifecycle-binding-mismatch.json",
@@ -74,6 +78,7 @@
     "config/hiverelay-contract/fixtures/v2/runtime-proof-replay.json",
     "config/hiverelay-contract/fixtures/v2/runtime-proof-valid.json",
     "config/hiverelay-contract/fixtures/v2/runtime-proof-wrong-carrier.json",
+    "config/hiverelay-contract/fixtures/v2/runtime-tuple-hash-valid.json",
     "config/hiverelay-contract/fixtures/v2/session-transition-batch-gap.json",
     "config/hiverelay-contract/fixtures/v2/session-transition-exact-replay.json",
     "config/hiverelay-contract/fixtures/v2/session-transition-gap.json",
@@ -543,7 +548,7 @@
     "tests/e2e/hiverelay/hiverelay-contract-validator.ts"
   ],
   "protectedFileHashes": {
-    ".gitignore": "ec6898b453b17a964289e8f88a928225e3adadc617909bc86ad541b0a2d543ca",
+    ".gitignore": "26fd7b7adbd2888f536ee6b583ffd0fe406ec68a2536244ecea9ab8b626727ef",
     ".gitattributes": "7ff46a6e8654aaaa2ee8893c4d5065d2719c59da0639068ce77d56961eb2b50e"
   }
 }

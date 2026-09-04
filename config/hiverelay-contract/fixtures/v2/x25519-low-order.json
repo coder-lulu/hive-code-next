@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.2",
+  "contractRevision": "hiverelay-v2-p0.3",
   "caseId": "v2.x25519.low-order.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "x25519-key",

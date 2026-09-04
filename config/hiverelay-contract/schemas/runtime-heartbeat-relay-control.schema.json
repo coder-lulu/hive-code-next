@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/runtime-heartbeat-relay-control.schema.json",
+  "title": "HiveRelay Runtime heartbeat control extension",
+  "oneOf": [
+    {"$ref": "#/$defs/legacyHeartbeatRequest"},
+    {"$ref": "#/$defs/legacyHeartbeatResponse"},
+    {"$ref": "#/$defs/relayHeartbeatRequest"},
+    {"$ref": "#/$defs/relayHeartbeatResponse"}
+  ],
+  "$defs": {
+    "opaqueId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+    "uuidV4": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+    "generation": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "positiveGeneration": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "instant": {"type": "string", "format": "date-time"},
+    "base64url64": {"type": "string", "pattern": "^[A-Za-z0-9_-]{86}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "heartbeatProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "algorithm", "method", "path", "authorityId", "issuedAt", "nonce", "bodySha256", "signature"],
+      "properties": {
+        "protocolVersion": {"const": "hive-runtime-heartbeat/v1"},
+        "algorithm": {"const": "Ed25519"},
+        "method": {"const": "POST"},
+        "path": {"const": "/hive/v1/runtime-heartbeats"},
+        "authorityId": {"$ref": "#/$defs/opaqueId"},
+        "issuedAt": {"$ref": "#/$defs/instant"},
+        "nonce": {"$ref": "#/$defs/uuidV4"},
+        "bodySha256": {"$ref": "#/$defs/sha256"},
+        "signature": {"$ref": "#/$defs/base64url64"}
+      }
+    },
+    "controlCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "commandId", "commandType", "managedSessionId", "assignmentId", "targetResourceVersion", "targetControlVersion", "reason"],
+      "properties": {
+        "sequence": {"$ref": "#/$defs/positiveGeneration"},
+        "commandId": {"$ref": "#/$defs/uuidV4"},
+        "commandType": {"const": "SESSION_REVOKE"},
+        "managedSessionId": {"$ref": "#/$defs/uuidV4"},
+        "assignmentId": {"$ref": "#/$defs/uuidV4"},
+        "targetResourceVersion": {"$ref": "#/$defs/positiveGeneration"},
+        "targetControlVersion": {"$ref": "#/$defs/positiveGeneration"},
+        "reason": {"enum": ["ACCOUNT_SESSION_REVOKED", "ACCOUNT_DEVICE_REVOKED", "ACCOUNT_DELETION", "RUNTIME_AUTHORITY_REVOKED", "RUNTIME_CREDENTIAL_REVOKED", "ADMINISTRATIVE"]}
+      }
+    },
+    "controlCommandAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "commandId", "acknowledgedResourceVersion"],
+      "properties": {
+        "sequence": {"$ref": "#/$defs/positiveGeneration"},
+        "commandId": {"$ref": "#/$defs/uuidV4"},
+        "acknowledgedResourceVersion": {"$ref": "#/$defs/positiveGeneration"}
+      }
+    },
+    "relayControlReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "controlConnectionAcknowledged attests that the Cell accepted the exact assignment/control generation. controlCommandAck independently acknowledges at most one next contiguous command; null means no command acknowledgement.",
+      "required": ["assignmentId", "cellId", "cellIncarnationId", "assignmentEpoch", "controlGeneration", "controlConnectionAcknowledged", "controlCommandAck", "sessionTransitions"],
+      "properties": {
+        "assignmentId": {"$ref": "#/$defs/uuidV4"},
+        "cellId": {"$ref": "#/$defs/opaqueId"},
+        "cellIncarnationId": {"$ref": "#/$defs/uuidV4"},
+        "assignmentEpoch": {"$ref": "#/$defs/generation"},
+        "controlGeneration": {"$ref": "#/$defs/generation"},
+        "controlConnectionAcknowledged": {"type": "boolean"},
+        "controlCommandAck": {"oneOf": [{"$ref": "#/$defs/controlCommandAck"}, {"type": "null"}]},
+        "sessionTransitions": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 128,
+          "items": {"$ref": "session-transition.schema.json#/$defs/transition"}
+        }
+      }
+    },
+    "legacyRuntimeReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeVersion", "runtimeProtocolVersion", "capabilities", "readiness", "startedAt", "connectionCapabilities"],
+      "properties": {
+        "runtimeVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$", "maxLength": 64},
+        "runtimeProtocolVersion": {"enum": [2, 3]},
+        "capabilities": {"type": "array", "minItems": 0, "maxItems": 5, "uniqueItems": true, "items": {"enum": ["connection-ticket-v1", "pairing-v3", "runtime-health-v1", "shared-control-v1", "web-launch-grant-v1"]}},
+        "readiness": {"enum": ["STARTING", "READY", "DEGRADED", "RECOVERING", "STOPPED"]},
+        "readinessReasonCode": {"enum": ["starting", "healthy", "disk_pressure", "identity_unavailable", "network_unavailable", "upgrade_required", "recovery_in_progress"]},
+        "startedAt": {"$ref": "#/$defs/instant"},
+        "freeDiskBytes": {"type": "integer", "minimum": 0},
+        "lastBackupAt": {"oneOf": [{"$ref": "#/$defs/instant"}, {"type": "null"}]},
+        "connectionCapabilities": {"type": "array", "maxItems": 5, "uniqueItems": true, "items": {"enum": ["orca-direct", "orca-relay", "hive-direct", "hive-relay", "tailscale-embedded-evaluation"]}},
+        "webHttpsOrigin": {"type": "string", "maxLength": 256},
+        "webClientPath": {"type": "string", "maxLength": 256},
+        "websocketPath": {"type": "string", "maxLength": 256},
+        "webEndpointExpiresAt": {"$ref": "#/$defs/instant"},
+        "deviceName": {"type": "string", "maxLength": 255},
+        "osName": {"type": "string", "maxLength": 64},
+        "osVersion": {"type": "string", "maxLength": 128},
+        "osArch": {"type": "string", "maxLength": 32},
+        "cpuModel": {"type": "string", "maxLength": 255},
+        "cpuLogicalCores": {"type": "integer", "minimum": 1, "maximum": 65536},
+        "totalMemoryBytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "runtimeReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeVersion", "runtimeProtocolVersion", "capabilities", "readiness", "startedAt", "connectionCapabilities", "relayControl"],
+      "properties": {
+        "runtimeVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$", "maxLength": 64},
+        "runtimeProtocolVersion": {"enum": [2, 3]},
+        "capabilities": {"type": "array", "minItems": 1, "maxItems": 6, "uniqueItems": true, "contains": {"const": "runtime-session-control-v1"}, "items": {"enum": ["connection-ticket-v1", "pairing-v3", "runtime-health-v1", "shared-control-v1", "web-launch-grant-v1", "runtime-session-control-v1"]}},
+        "readiness": {"enum": ["STARTING", "READY", "DEGRADED", "RECOVERING", "STOPPED"]},
+        "readinessReasonCode": {"enum": ["starting", "healthy", "disk_pressure", "identity_unavailable", "network_unavailable", "upgrade_required", "recovery_in_progress"]},
+        "startedAt": {"$ref": "#/$defs/instant"},
+        "freeDiskBytes": {"type": "integer", "minimum": 0},
+        "lastBackupAt": {"oneOf": [{"$ref": "#/$defs/instant"}, {"type": "null"}]},
+        "connectionCapabilities": {"type": "array", "maxItems": 5, "uniqueItems": true, "items": {"enum": ["orca-direct", "orca-relay", "hive-direct", "hive-relay", "tailscale-embedded-evaluation"]}},
+        "webHttpsOrigin": {"type": "string", "maxLength": 256},
+        "webClientPath": {"type": "string", "maxLength": 256},
+        "websocketPath": {"type": "string", "maxLength": 256},
+        "webEndpointExpiresAt": {"$ref": "#/$defs/instant"},
+        "deviceName": {"type": "string", "maxLength": 255},
+        "osName": {"type": "string", "maxLength": 64},
+        "osVersion": {"type": "string", "maxLength": 128},
+        "osArch": {"type": "string", "maxLength": 32},
+        "cpuModel": {"type": "string", "maxLength": 255},
+        "cpuLogicalCores": {"type": "integer", "minimum": 1, "maximum": 65536},
+        "totalMemoryBytes": {"type": "integer", "minimum": 1},
+        "relayControl": {"$ref": "#/$defs/relayControlReport"}
+      }
+    },
+    "legacyHeartbeatRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeInstanceId", "bootId", "leaseId", "authorityGeneration", "leaseEpoch", "fencingEpoch", "heartbeatSeq", "sourceReportedAt", "report", "proof"],
+      "properties": {
+        "runtimeInstanceId": {"$ref": "#/$defs/uuidV4"},
+        "bootId": {"$ref": "#/$defs/uuidV4"},
+        "leaseId": {"$ref": "#/$defs/uuidV4"},
+        "authorityGeneration": {"$ref": "#/$defs/positiveGeneration"},
+        "leaseEpoch": {"$ref": "#/$defs/positiveGeneration"},
+        "fencingEpoch": {"$ref": "#/$defs/positiveGeneration"},
+        "heartbeatSeq": {"$ref": "#/$defs/generation"},
+        "sourceReportedAt": {"$ref": "#/$defs/instant"},
+        "report": {"$ref": "#/$defs/legacyRuntimeReport"},
+        "clientAuthMode": {"enum": ["MTLS", "IDENTITY_PROOF"]},
+        "proof": {"$ref": "#/$defs/heartbeatProof"}
+      }
+    },
+    "legacyHeartbeatResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leaseId", "authorityGeneration", "leaseEpoch", "fencingEpoch", "acceptedHeartbeatSeq", "observedAt", "leaseExpiresAt", "presence", "duplicate"],
+      "properties": {
+        "leaseId": {"$ref": "#/$defs/uuidV4"},
+        "authorityGeneration": {"$ref": "#/$defs/positiveGeneration"},
+        "leaseEpoch": {"$ref": "#/$defs/positiveGeneration"},
+        "fencingEpoch": {"$ref": "#/$defs/positiveGeneration"},
+        "acceptedHeartbeatSeq": {"$ref": "#/$defs/generation"},
+        "observedAt": {"$ref": "#/$defs/instant"},
+        "leaseExpiresAt": {"$ref": "#/$defs/instant"},
+        "presence": {"enum": ["ONLINE", "STALE", "OFFLINE", "FENCED"]},
+        "duplicate": {"type": "boolean"}
+      }
+    },
+    "relayHeartbeatRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeInstanceId", "bootId", "leaseId", "authorityGeneration", "leaseEpoch", "fencingEpoch", "heartbeatSeq", "sourceReportedAt", "report", "proof"],
+      "properties": {
+        "runtimeInstanceId": {"$ref": "#/$defs/uuidV4"},
+        "bootId": {"$ref": "#/$defs/uuidV4"},
+        "leaseId": {"$ref": "#/$defs/uuidV4"},
+        "authorityGeneration": {"$ref": "#/$defs/positiveGeneration"},
+        "leaseEpoch": {"$ref": "#/$defs/positiveGeneration"},
+        "fencingEpoch": {"$ref": "#/$defs/positiveGeneration"},
+        "heartbeatSeq": {"$ref": "#/$defs/generation"},
+        "sourceReportedAt": {"$ref": "#/$defs/instant"},
+        "report": {"$ref": "#/$defs/runtimeReport"},
+        "clientAuthMode": {"enum": ["MTLS", "IDENTITY_PROOF"]},
+        "proof": {"$ref": "#/$defs/heartbeatProof"}
+      }
+    },
+    "relayHeartbeatResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leaseId", "authorityGeneration", "leaseEpoch", "fencingEpoch", "acceptedHeartbeatSeq", "observedAt", "leaseExpiresAt", "presence", "duplicate", "responseVersion", "ackedSessionTransitionSequence", "sessionTransitionResults", "sessionAuthorityUntil", "ackedControlSequence", "controlCommands", "nextControlSequence"],
+      "properties": {
+        "leaseId": {"$ref": "#/$defs/uuidV4"},
+        "authorityGeneration": {"$ref": "#/$defs/generation"},
+        "leaseEpoch": {"$ref": "#/$defs/generation"},
+        "fencingEpoch": {"$ref": "#/$defs/generation"},
+        "acceptedHeartbeatSeq": {"$ref": "#/$defs/generation"},
+        "observedAt": {"$ref": "#/$defs/instant"},
+        "leaseExpiresAt": {"$ref": "#/$defs/instant"},
+        "presence": {"enum": ["ONLINE", "STALE", "OFFLINE", "FENCED"]},
+        "duplicate": {"type": "boolean"},
+        "responseVersion": {"const": "runtime-session-control/v1"},
+        "ackedSessionTransitionSequence": {"$ref": "#/$defs/generation"},
+        "sessionTransitionResults": {"type": "array", "minItems": 0, "maxItems": 128, "items": {"$ref": "session-transition.schema.json#/$defs/adjudication"}},
+        "sessionAuthorityUntil": {
+          "$comment": "null when the current assignment/control connection is not authoritative; otherwise it is after observedAt and no more than 120 seconds later.",
+          "oneOf": [{"$ref": "#/$defs/instant"}, {"type": "null"}]
+        },
+        "ackedControlSequence": {"$ref": "#/$defs/generation"},
+        "controlCommands": {"type": "array", "minItems": 0, "maxItems": 128, "items": {"$ref": "#/$defs/controlCommand"}},
+        "nextControlSequence": {
+          "$comment": "The first command sequence not covered by ackedControlSequence and not included in the returned contiguous controlCommands prefix.",
+          "$ref": "#/$defs/generation"
+        }
+      }
+    }
+  }
+}

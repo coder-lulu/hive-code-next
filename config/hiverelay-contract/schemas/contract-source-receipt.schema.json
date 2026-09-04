@@ -10,7 +10,7 @@
     "authorityRepository": {"const": "hive-cloud"},
     "authorityPath": {"const": "docs/hive/contracts/hiverelay-v2"},
     "authoritySourceCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-    "contractRevision": {"const": "hiverelay-v2-p0.2"},
+    "contractRevision": {"const": "hiverelay-v2-p0.3"},
     "manifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "files": {
       "type": "array", "minItems": 1,
