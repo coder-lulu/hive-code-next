@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "caseId": "v2.session-transition.mixed-stored-batch.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "session-transition",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1893456000000,
+  "input": {
+    "highestContiguousAck": 40,
+    "currentStatus": "PENDING_ACTIVATION",
+    "currentControlVersion": 3,
+    "transitions": [
+      {"sequence": 41, "transitionId": "21212121-2121-4121-8121-212121212121", "transitionType": "ACTIVATE", "managedSessionId": "managed-01", "runtimeSessionId": "runtime-session-01", "expectedControlVersion": 3, "sessionBindingHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "occurredAt": 1893456000000, "reason": "ACTIVATED"},
+      {"sequence": 42, "transitionId": "23232323-2323-4323-8323-232323232323", "transitionType": "CLOSE", "managedSessionId": "managed-01", "runtimeSessionId": "runtime-session-01", "expectedControlVersion": 99, "sessionBindingHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "occurredAt": 1893456000001, "reason": "CLIENT_CLOSED"},
+      {"sequence": 43, "transitionId": "24242424-2424-4424-8424-242424242424", "transitionType": "CLOSE", "managedSessionId": "managed-01", "runtimeSessionId": "runtime-session-01", "expectedControlVersion": 4, "sessionBindingHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "occurredAt": 1893456000002, "reason": "CLIENT_CLOSED"}
+    ],
+    "expectedResponse": {
+      "highestContiguousAck": 43,
+      "adjudications": [
+        {"sequence": 41, "transitionId": "21212121-2121-4121-8121-212121212121", "verdict": "APPLIED", "stored": true, "resultingStatus": "ACTIVE", "resultingControlVersion": 4},
+        {"sequence": 42, "transitionId": "23232323-2323-4323-8323-232323232323", "verdict": "REJECTED_STALE_VERSION", "stored": true, "resultingStatus": "ACTIVE", "resultingControlVersion": 4},
+        {"sequence": 43, "transitionId": "24242424-2424-4424-8424-242424242424", "verdict": "APPLIED", "stored": true, "resultingStatus": "CLOSED", "resultingControlVersion": 5}
+      ]
+    }
+  }
+}

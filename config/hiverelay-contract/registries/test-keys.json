@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "environment": "fixture-only",
+  "keys": [
+    {
+      "kid": "relay-test-2026-01",
+      "purpose": "cloud-relay-ed25519",
+      "alg": "EdDSA",
+      "curve": "Ed25519",
+      "publicKeyB64Url": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+    },
+    {
+      "kid": "runtime-proof-test-2026-01",
+      "purpose": "runtime-cloud-ed25519",
+      "alg": "Ed25519",
+      "curve": "Ed25519",
+      "publicKeyB64Url": "rgjbdK6W7UiJYtzlh5MaeAE8zWnNpzPMEOOAPwXr89Q"
+    },
+    {
+      "kid": "runtime-cross-purpose-2026-01",
+      "purpose": "runtime-cloud-ed25519",
+      "alg": "Ed25519",
+      "curve": "Ed25519",
+      "publicKeyB64Url": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg"
+    }
+  ]
+}

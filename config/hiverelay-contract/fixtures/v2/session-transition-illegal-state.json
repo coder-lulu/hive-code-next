@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "caseId": "v2.session-transition.pending-close.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "session-transition",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1893456000000,
+  "input": {"highestContiguousAck": 40, "currentStatus": "PENDING_ACTIVATION", "currentControlVersion": 3, "transition": {"sequence": 41, "transitionId": "18181818-1818-4818-8818-181818181818", "transitionType": "CLOSE", "managedSessionId": "managed-01", "runtimeSessionId": "runtime-session-01", "expectedControlVersion": 3, "sessionBindingHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "occurredAt": 1893456000000, "reason": "CLIENT_CLOSED"}}
+}

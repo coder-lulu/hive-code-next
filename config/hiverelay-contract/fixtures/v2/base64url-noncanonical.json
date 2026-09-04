@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "caseId": "v2.base64url.padding.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "wire-message",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {"message": {"type": "host-data-auth", "v": 2, "connId": "conn-01", "connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "assignmentEpoch": 5, "controlGeneration": 2}}
+}

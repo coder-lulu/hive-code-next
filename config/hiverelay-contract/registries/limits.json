@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "time": {
+    "clockSkewSeconds": 30,
+    "runtimeProofLifetimeSeconds": 60,
+    "hostChallengeLifetimeMs": 10000,
+    "preAuthDeadlineMs": 5000,
+    "privateStatusFreshnessSeconds": 30,
+    "privateCommandFreshnessSeconds": 30,
+    "privateLifecycleDeadlineSeconds": 120,
+    "activationDeadlineSeconds": 120,
+    "managedSessionAbsoluteSeconds": 28800,
+    "managedSessionIdleSeconds": 900,
+    "sessionAuthoritySeconds": 120,
+    "retryAfterMinSeconds": 1,
+    "retryAfterMaxSeconds": 30
+  },
+  "frames": {
+    "preAuthJsonBytes": 16384,
+    "hostControlJsonBytes": 65536,
+    "jsonPlaintextBytes": 4194304,
+    "binaryPlaintextBytes": 8388608,
+    "encryptedPayloadBytes": 8388690,
+    "maskedWireMessageBytes": 8388704,
+    "compressionEnabled": false,
+    "oversizeCloseCode": 1009
+  },
+  "capacity": {
+    "preAuthGlobalSlots": 4096,
+    "preAuthPerIpSlots": 32,
+    "authenticatedGlobalSlots": 10000,
+    "authenticatedPerAssignmentSlots": 64,
+    "pendingFramesPerConnection": 32,
+    "pendingBytesPerConnection": 16777216,
+    "controlQueueMessagesPerOwner": 128
+  },
+  "rateLimits": [
+    {"operation": "relayAuthorization", "perAccountPerMinute": 60, "perRuntimePerMinute": 30, "perIpPerMinute": 120},
+    {"operation": "assign", "perAccountPerMinute": 60, "perRuntimePerMinute": 30, "perIpPerMinute": 120},
+    {"operation": "connectionIntent", "perAccountPerMinute": 120, "perRuntimePerMinute": 120, "perIpPerMinute": 240},
+    {"operation": "cellAdmission", "globalPerSecond": 2000, "perAssignmentPerMinute": 120, "perIpPerMinute": 120},
+    {"operation": "cellPrivateOps", "globalPerSecond": 100, "perCellPerMinute": 120}
+  ],
+  "replayCapacity": {
+    "admissionJtiEntries": 187500,
+    "cellOpsJtiEntries": 12000,
+    "connTicketEntries": 10000,
+    "evictBeforeExpiry": false,
+    "capacityFailureCloseCode": 1013
+  },
+  "numeric": {
+    "generationMinimum": 0,
+    "generationMaximum": 9007199254740991,
+    "identifierMaxUtf8Bytes": 128,
+    "tokenMaxUtf8Bytes": 8192
+  }
+}

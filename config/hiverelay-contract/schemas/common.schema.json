@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/common.schema.json",
+  "title": "HiveRelay v2 common values",
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "epochMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "epochSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "base64url16": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22}$"
+    },
+    "base64url24": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32}$"
+    },
+    "base64url32": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "base64url64": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$"
+    },
+    "relayHostId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{16}$"
+    },
+    "canonicalHttpsOrigin": {
+      "type": "string",
+      "pattern": "^https://[a-z0-9.-]+(?::[0-9]{1,5})?$",
+      "maxLength": 300
+    },
+    "compactJws": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{86}$",
+      "maxLength": 8192
+    },
+    "runtimeTuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeId", "runtimeBootId", "authorityGeneration", "fencingEpoch", "leaseEpoch"],
+      "properties": {
+        "runtimeId": {"$ref": "#/$defs/opaqueId"},
+        "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
+        "authorityGeneration": {"$ref": "#/$defs/generation"},
+        "fencingEpoch": {"$ref": "#/$defs/generation"},
+        "leaseEpoch": {"$ref": "#/$defs/generation"}
+      }
+    },
+    "relayBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cellId", "cellIncarnationId", "runtimeId", "runtimeBootId",
+        "authorityGeneration", "fencingEpoch", "leaseEpoch", "assignmentId",
+        "assignmentEpoch", "controlGeneration", "relayHostId"
+      ],
+      "properties": {
+        "cellId": {"$ref": "#/$defs/opaqueId"},
+        "cellIncarnationId": {"$ref": "#/$defs/uuidV4"},
+        "runtimeId": {"$ref": "#/$defs/opaqueId"},
+        "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
+        "authorityGeneration": {"$ref": "#/$defs/generation"},
+        "fencingEpoch": {"$ref": "#/$defs/generation"},
+        "leaseEpoch": {"$ref": "#/$defs/generation"},
+        "assignmentId": {"$ref": "#/$defs/uuidV4"},
+        "assignmentEpoch": {"$ref": "#/$defs/generation"},
+        "controlGeneration": {"$ref": "#/$defs/generation"},
+        "relayHostId": {"$ref": "#/$defs/relayHostId"}
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["ACCEPT", "REJECT", "NOT_APPLICABLE"]
+    }
+  }
+}

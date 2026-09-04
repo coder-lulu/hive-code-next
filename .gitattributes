@@ -18,6 +18,9 @@
 /resources/plugins/** text eol=lf
 # pnpm hashes every patch byte-for-byte, so a CRLF checkout breaks the install.
 /config/patches/*.patch -text
+/config/hiverelay-contract/** text eol=lf
+/config/hiverelay-contract-source.json text eol=lf
+/config/hiverelay-contract-report.json text eol=lf
 /mobile/patches/*.patch -text
 /pnpm-lock.yaml text eol=lf
 # The xterm bundle hunks also make a diff nobody can read; review the hand-written

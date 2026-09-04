@@ -364,7 +364,7 @@ describe('PR Checks skip wiring', () => {
     const primerInstall = prWorkflow.jobs.test_native_cache.steps.find(
       (step) => step.uses === './.github/actions/install-node-dependencies'
     )
-    expect(primerInstall.with['node-version']).toBe('24')
+    expect(primerInstall.with['node-version']).toBe('24.18.0')
   })
 
   it('skips e2e detection on docs-only PRs without dropping the draft gate', () => {

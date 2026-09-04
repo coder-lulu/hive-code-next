@@ -508,7 +508,7 @@ jobs:
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: node
-          node-version: '24'
+          node-version: '24.18.0'
 
   test:
     needs: [code_paths, test_native_cache]
@@ -518,7 +518,7 @@ jobs:
       (needs.test_native_cache.result == 'success' || needs.test_native_cache.result == 'skipped')
     uses: ./.github/workflows/unit-tests.yml
     with:
-      node_versions: '["24"]'
+      node_versions: '["24.18.0"]'
 
   # Why a separate job: the test needs a real Chrome, and the sharded `test` matrix
   # would pay for it on every shard to run one file in whichever shard it landed in.

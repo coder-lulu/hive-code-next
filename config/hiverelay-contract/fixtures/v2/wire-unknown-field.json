@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.1",
+  "caseId": "v2.wire.unknown-field.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "wire-message",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {"message": {"type": "relay-hello", "v": 2, "connId": "conn-01", "cellId": "cell-01", "cellIncarnationId": "22222222-2222-4222-8222-222222222222", "debug": true}}
+}
