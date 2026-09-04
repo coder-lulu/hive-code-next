@@ -1,3 +1,7 @@
+import { LOCAL_PTY_STARTUP_FAIL_OPEN_TIMEOUT_MS } from '../../shared/pty-startup-timeouts'
+
+export { LOCAL_PTY_STARTUP_FAIL_OPEN_TIMEOUT_MS }
+
 type FirstWindowStartupServices = {
   startDaemonPtyProvider: (signal: AbortSignal) => Promise<void>
   startAgentHookServer: (signal: AbortSignal) => Promise<void>
@@ -17,13 +21,6 @@ type FirstWindowStartupServicesResult = {
 }
 
 export const FIRST_WINDOW_STARTUP_SERVICE_TIMEOUT_MS = 12_000
-// Why: a slow (but succeeding) daemon start must not flip terminals to the
-// LocalPtyProvider fallback — local PTYs are killed on quit, so panes bound to
-// them lose their daemon sessions permanently (#5232). The PTY gate therefore
-// waits for the daemon attempt itself and only fail-opens at a hard cap that
-// exists solely as a deadlock backstop.
-export const LOCAL_PTY_STARTUP_FAIL_OPEN_TIMEOUT_MS = 60_000
-
 function startService(
   label: string,
   start: (signal: AbortSignal) => Promise<void>,

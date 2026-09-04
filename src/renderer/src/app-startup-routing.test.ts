@@ -248,6 +248,33 @@ describe('renderer startup runtime routing', () => {
     expect(postReconnectRecoveryIndex).toBeGreaterThan(reconnectIndex)
   })
 
+  it('overlaps persisted PTY sanitization without blocking terminal model hydration', () => {
+    const source = readSource(STARTUP_HYDRATION_PATH)
+    const servicesIndex = source.indexOf("timeRendererStartupStep('first-window-services-await'")
+    const sanitizeIndex = source.indexOf("'sanitize-persisted-terminal-session'")
+    const completedReadIndex = source.indexOf(
+      'const sanitizedSession = terminalSanitization.readCompleted()'
+    )
+    const workspaceHydrationIndex = source.indexOf('actions.hydrateWorkspaceSession(')
+    const tabHydrationIndex = source.indexOf('actions.hydrateTabsSession(')
+    const reconciliationIndex = source.indexOf('reconcileHydratedWorkspaceTabModels(')
+    const lateSanitizationIndex = source.indexOf(
+      'applyLatePersistedTerminalSessionSanitization(',
+      reconciliationIndex
+    )
+
+    expect(sanitizeIndex).toBeGreaterThanOrEqual(0)
+    expect(sanitizeIndex).toBeLessThan(servicesIndex)
+    expect(completedReadIndex).toBeGreaterThan(servicesIndex)
+    expect(workspaceHydrationIndex).toBeGreaterThan(completedReadIndex)
+    expect(tabHydrationIndex).toBeGreaterThan(workspaceHydrationIndex)
+    expect(reconciliationIndex).toBeGreaterThan(tabHydrationIndex)
+    expect(lateSanitizationIndex).toBeGreaterThan(reconciliationIndex)
+    expect(source).not.toContain(
+      "await timeRendererStartupStep(\n            'sanitize-persisted-terminal-session'"
+    )
+  })
+
   it('refreshes terminal snapshot capability before degraded reconnect', () => {
     const source = readSource(DEGRADED_RECOVERY_PATH)
     const degradedStart = source.indexOf(

@@ -8,6 +8,12 @@ import {
   terminalTabHasReconnectablePty
 } from '../terminal-orphan-helpers'
 import { isFloatingTerminalSessionRecord } from '../../../../../shared/terminal-tab-session'
+import { worktreeUsesRemoteConnection } from '../../terminals/terminal-workspace-routing'
+import { reconcileTerminalPtyOwners } from './terminal-legacy-dedupe'
+import {
+  buildRemovedTerminalAuxiliaryStatePatch,
+  buildTerminalPtyOwnershipReleasePatch
+} from './terminal-pty-ownership-release'
 
 export type WorktreeTabModelReconciliation = {
   patch: Partial<AppState>
@@ -40,8 +46,18 @@ export function projectWorktreeTabModelReconciliation(
     )
   })
   const orphanTerminalIds = getOrphanTerminalIds(state, worktreeId)
+  // Direct-SSH session rows come from an authoritative remote snapshot. PTY
+  // ids are opaque in the renderer and may legitimately repeat, so only the
+  // owning host may arbitrate them.
+  const { duplicateIds, releasedPtyIdsByTabId } = worktreeUsesRemoteConnection(state, worktreeId)
+    ? { duplicateIds: new Set<string>(), releasedPtyIdsByTabId: new Map<string, Set<string>>() }
+    : reconcileTerminalPtyOwners(state, runtimeTerminalTabs)
+  const dedupedLegacyRuntimeTerminalTabs = legacyRuntimeTerminalTabs.filter(
+    (tab) => !duplicateIds.has(tab.id)
+  )
+  const terminalCleanupIds = new Set([...orphanTerminalIds, ...duplicateIds])
   const ensuredGroupState =
-    legacyRuntimeTerminalTabs.length > 0
+    dedupedLegacyRuntimeTerminalTabs.length > 0
       ? ensureGroup(
           state.groupsByWorktree,
           state.activeGroupIdByWorktree,
@@ -53,7 +69,7 @@ export function projectWorktreeTabModelReconciliation(
   const restoredLegacyTabs =
     reconciliationGroup == null
       ? []
-      : legacyRuntimeTerminalTabs
+      : dedupedLegacyRuntimeTerminalTabs
           .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
           .map((tab) => ({
             id: tab.id,
@@ -94,7 +110,7 @@ export function projectWorktreeTabModelReconciliation(
         })
       : groups
   const liveTerminalIds = new Set(
-    runtimeTerminalTabs.filter((tab) => !orphanTerminalIds.has(tab.id)).map((tab) => tab.id)
+    runtimeTerminalTabs.filter((tab) => !terminalCleanupIds.has(tab.id)).map((tab) => tab.id)
   )
   const liveEditorIds = new Set(
     state.openFiles.filter((file) => file.worktreeId === worktreeId).map((file) => file.id)
@@ -173,7 +189,8 @@ export function projectWorktreeTabModelReconciliation(
     groupsChanged ||
     activeGroupChanged ||
     layoutChanged ||
-    orphanTerminalIds.size > 0
+    terminalCleanupIds.size > 0 ||
+    releasedPtyIdsByTabId.size > 0
   ) {
     const droppedTerminalEntityIds = unifiedTabs.flatMap((tab) =>
       tab.contentType === 'terminal' && !validTabIds.has(tab.id) ? [tab.entityId] : []
@@ -192,6 +209,21 @@ export function projectWorktreeTabModelReconciliation(
         nextUnreadTerminalTabs = copy
       }
     }
+    const terminalCleanupPatch =
+      terminalCleanupIds.size > 0
+        ? {
+            ...buildOrphanTerminalCleanupPatch(state, worktreeId, terminalCleanupIds),
+            ...buildRemovedTerminalAuxiliaryStatePatch(state, worktreeId, terminalCleanupIds)
+          }
+        : {}
+    const terminalOwnershipReleasePatch =
+      releasedPtyIdsByTabId.size > 0
+        ? buildTerminalPtyOwnershipReleasePatch(
+            { ...state, ...terminalCleanupPatch },
+            worktreeId,
+            releasedPtyIdsByTabId
+          )
+        : {}
     patch = {
       unifiedTabsByWorktree: { ...state.unifiedTabsByWorktree, [worktreeId]: validTabs },
       groupsByWorktree: { ...state.groupsByWorktree, [worktreeId]: nextGroups },
@@ -211,9 +243,8 @@ export function projectWorktreeTabModelReconciliation(
             }
           }
         : {}),
-      ...(orphanTerminalIds.size > 0
-        ? buildOrphanTerminalCleanupPatch(state, worktreeId, orphanTerminalIds)
-        : {})
+      ...terminalCleanupPatch,
+      ...terminalOwnershipReleasePatch
     }
   }
 

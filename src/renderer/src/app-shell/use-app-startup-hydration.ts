@@ -3,6 +3,9 @@ import { syncZoomCSSVar } from '@/lib/ui-zoom'
 import { installCodexDetachedPaneRestartExecutor } from '@/components/terminal-pane/codex-detached-pane-restart-scheduler'
 import { useAppStore } from '../store'
 import { reconcileHydratedWorkspaceTabModels } from './reconcile-hydrated-workspace-tab-models'
+import { startPersistedTerminalSessionSanitization } from './sanitize-persisted-terminal-session'
+import { applyLatePersistedTerminalSessionSanitization } from './apply-startup-terminal-sanitization'
+import { restoreStartupTerminalSession } from './restore-startup-terminal-session'
 import { useStartupActions } from './use-app-startup-actions'
 import { WORKTREE_REFRESH_CONCURRENCY } from '../store/slices/worktrees'
 import { sweepRestoredCodexPanesForStaleAccounts } from '../lib/codex-stale-pane-sweep'
@@ -22,10 +25,6 @@ import { restoreSshConnectionsForStartup } from '../startup/startup-ssh-connecti
 import { publishTerminalViewAttributesAtAppStart } from '../components/terminal-pane/terminal-appearance'
 import { getSystemPrefersDark } from '../lib/terminal-theme'
 import {
-  collectTerminalProviderSnapshotPtyIds,
-  refreshTerminalProviderSnapshotCapabilities
-} from '../components/terminal/terminal-provider-snapshot-capability'
-import {
   getRepoExecutionHostId,
   isRuntimeOwnedSshTargetId,
   parseExecutionHostId,
@@ -34,7 +33,6 @@ import {
 } from '../../../shared/execution-host'
 import { mapWithConcurrency } from '../../../shared/map-with-concurrency'
 import type { OnboardingState } from '../../../shared/onboarding-state-types'
-import { restoreLocalStructuredSessionTabsOnce } from '../runtime/local-structured-session-tabs-sync'
 
 async function listRuntimeSessionHostIdsForStartup(): Promise<ExecutionHostId[]> {
   try {
@@ -148,6 +146,17 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           )
         )
         const hydrationSessionChain = sessionReadPromise.then(async (sessionRead) => {
+          // Begin PTY validation as soon as the session is available, then
+          // overlap the provider wait with worktree hydration. Base workspace
+          // chrome must not wait up to the provider fail-open deadline.
+          const terminalSanitization = startPersistedTerminalSessionSanitization(
+            sessionRead.session
+          )
+          const terminalSanitizationCompletion = timeRendererStartupStep(
+            'sanitize-persisted-terminal-session',
+            () => terminalSanitization.completion
+          )
+          terminalSanitizationCompletion.catch(() => {})
           const hydrationRepoIds = collectWorktreeHydrationRepoIdsFromSession(
             sessionRead.session,
             sessionRead.runtimeHostIdByWorkspaceSessionKey
@@ -168,7 +177,15 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
               actions.fetchWorktrees(repo.id, { executionHostId: getRepoExecutionHostId(repo) })
             )
           )
-          return sessionRead
+          // Use an already-completed verdict synchronously. Otherwise hydrate
+          // now and retire only matching dead bindings when the probe settles.
+          const sanitizedSession = terminalSanitization.readCompleted()
+          return {
+            ...sessionRead,
+            session: sanitizedSession ?? sessionRead.session,
+            terminalSanitizationOriginalSession: sessionRead.session,
+            pendingTerminalSanitization: sanitizedSession ? null : terminalSanitizationCompletion
+          }
         })
         // Why: wait for both writers to settle before recovery so neither can mutate hydrated state afterward.
         const [sessionOutcome, catalogOutcome] = await Promise.allSettled([
@@ -206,6 +223,22 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
             // keeps sessions resumable while making the ordinary Home page the launch target.
             actions.openStartupHome()
           })
+          if (sessionRead.pendingTerminalSanitization) {
+            void sessionRead.pendingTerminalSanitization
+              .then((sanitizedSession) => {
+                if (cancelled) {
+                  return
+                }
+                applyLatePersistedTerminalSessionSanitization(
+                  useAppStore,
+                  sessionRead.terminalSanitizationOriginalSession,
+                  sanitizedSession
+                )
+              })
+              .catch((error) => {
+                console.warn('Late persisted terminal sanitization failed:', error)
+              })
+          }
           await timeRendererStartupStep('prepare-terminal-startup-restoration', () =>
             window.api.app.prepareTerminalStartupRestoration()
           )
@@ -245,25 +278,9 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
             logRendererStartupDiagnostic('ssh-reconnect-skipped', { connectionIds: 0 })
           }
 
-          // first-window-services-await already fenced worktree hydration; terminal recovery reuses that ready state.
-          await timeRendererStartupStep('recover-legacy-worker-terminals-pre-reconnect', () =>
-            window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
-          )
-          await timeRendererStartupStep('terminal-provider-snapshot-capabilities', () => {
-            return refreshTerminalProviderSnapshotCapabilities(
-              collectTerminalProviderSnapshotPtyIds(useAppStore.getState())
-            )
-          })
           reconnectStarted = true
-          await timeRendererStartupStep('reconnect-terminals', () =>
-            actions.reconnectPersistedTerminals(abortController.signal)
-          )
-          await timeRendererStartupStep('recover-legacy-worker-terminals-post-reconnect', () =>
-            window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
-          )
-          await timeRendererStartupStep('project-structured-session-tabs', () =>
-            restoreLocalStructuredSessionTabsOnce()
-          )
+          // first-window-services-await already fenced worktree hydration; terminal recovery reuses that ready state.
+          await restoreStartupTerminalSession(actions, abortController.signal)
           if (cancelled) {
             return
           }

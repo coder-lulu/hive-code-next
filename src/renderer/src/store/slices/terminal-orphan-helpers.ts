@@ -20,7 +20,10 @@ type OrphanTerminalDetectionState = Pick<AppState, 'tabsByWorktree' | 'unifiedTa
  * can outlive its session (e.g. after an SSH target is removed) and must not
  * keep a dead tab pinned in the orphan sweep. The reconnect maps are the ones
  * retirement planning also honors as live ownership, so a tab it would tear
- * down on close is never swept as a dead orphan first (#9911).
+ * down on close is never swept as a dead orphan first (#9911). A persisted
+ * row-level `ptyId` is retained as a wake hint for providers that cannot be
+ * queried yet; startup liveness sanitization clears it only on an explicit
+ * `false` answer.
  */
 export function terminalTabHasReconnectablePty(
   state: TerminalTabReconnectState,
