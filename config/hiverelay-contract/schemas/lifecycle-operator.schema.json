@@ -49,7 +49,12 @@
           "$ref": "#/$defs/uuidV4"
         },
         "action": {
-          "enum": ["PREPARE_ACTIVATE", "CONFIRM_ROUTABLE", "ABORT", "DRAIN"]
+          "enum": [
+            "PREPARE_ACTIVATE",
+            "CONFIRM_ROUTABLE",
+            "ABORT",
+            "DRAIN"
+          ]
         },
         "expectedResourceVersion": {
           "$ref": "#/$defs/generation"
@@ -65,16 +70,29 @@
     "delivery": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["commandId", "commandType", "result", "observedAt"],
+      "required": [
+        "commandId",
+        "commandType",
+        "result",
+        "observedAt"
+      ],
       "properties": {
         "commandId": {
           "$ref": "#/$defs/uuidV4"
         },
         "commandType": {
-          "enum": ["INCARNATION_ACTIVATE", "INCARNATION_DRAIN"]
+          "enum": [
+            "INCARNATION_ACTIVATE",
+            "INCARNATION_DRAIN"
+          ]
         },
         "result": {
-          "enum": ["APPLIED", "STALE_NOOP", "COMMAND_REPLAY_CONFLICT", "TARGET_MISMATCH"]
+          "enum": [
+            "APPLIED",
+            "STALE_NOOP",
+            "COMMAND_REPLAY_CONFLICT",
+            "TARGET_MISMATCH"
+          ]
         },
         "observedAt": {
           "$ref": "#/$defs/instant"
@@ -108,13 +126,25 @@
           "$ref": "#/$defs/uuidV4"
         },
         "action": {
-          "enum": ["PREPARE_ACTIVATE", "CONFIRM_ROUTABLE", "ABORT", "DRAIN"]
+          "enum": [
+            "PREPARE_ACTIVATE",
+            "CONFIRM_ROUTABLE",
+            "ABORT",
+            "DRAIN"
+          ]
         },
         "cellId": {
           "$ref": "#/$defs/opaqueId"
         },
         "state": {
-          "enum": ["DISCOVERED", "ACTIVATING", "ACTIVE", "DRAINING", "UNHEALTHY", "RETIRED"]
+          "enum": [
+            "DISCOVERED",
+            "ACTIVATING",
+            "ACTIVE",
+            "DRAINING",
+            "UNHEALTHY",
+            "RETIRED"
+          ]
         },
         "resourceVersion": {
           "$ref": "#/$defs/generation"

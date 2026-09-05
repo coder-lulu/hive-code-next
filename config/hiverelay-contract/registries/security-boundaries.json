@@ -2,46 +2,10 @@
   "schemaVersion": 1,
   "contractRevision": "hiverelay-v2-p0.7",
   "cellOuterForbiddenFields": ["ticketSecret", "ticketId", "relayDeviceId", "deviceToken"],
-  "neverLogFields": [
-    "relayToken",
-    "controlLease",
-    "clientAdmissionToken",
-    "cellOpsToken",
-    "connTicket",
-    "ticketSecret",
-    "deviceToken",
-    "operatorCertificate"
-  ],
-  "neverUrlFields": [
-    "relayToken",
-    "controlLease",
-    "clientAdmissionToken",
-    "cellOpsToken",
-    "connTicket",
-    "ticketSecret",
-    "ticketId",
-    "deviceToken"
-  ],
-  "allowedMetricLabels": [
-    "component",
-    "protocol",
-    "region",
-    "role",
-    "result",
-    "reason",
-    "close_code"
-  ],
+  "neverLogFields": ["relayToken", "controlLease", "clientAdmissionToken", "cellOpsToken", "connTicket", "ticketSecret", "deviceToken", "operatorCertificate"],
+  "neverUrlFields": ["relayToken", "controlLease", "clientAdmissionToken", "cellOpsToken", "connTicket", "ticketSecret", "ticketId", "deviceToken"],
+  "allowedMetricLabels": ["component", "protocol", "region", "role", "result", "reason", "close_code"],
   "cellForbiddenDependencies": ["product-database", "redis", "vault", "keycloak", "kubernetes-api"],
-  "testOnlyRoots": [
-    "config/hiverelay-contract",
-    "tests/e2e/hiverelay",
-    "test/hiverelay_contract",
-    "test/support/hiverelay_contract"
-  ],
-  "releaseGates": [
-    "all-flags-default-false",
-    "legacy-heartbeat-shape-regression",
-    "trusted-principal-rate-limit",
-    "three-repository-contract-aggregate"
-  ]
+  "testOnlyRoots": ["config/hiverelay-contract", "tests/e2e/hiverelay", "test/hiverelay_contract", "test/support/hiverelay_contract"],
+  "releaseGates": ["all-flags-default-false", "legacy-heartbeat-shape-regression", "trusted-principal-rate-limit", "three-repository-contract-aggregate"]
 }

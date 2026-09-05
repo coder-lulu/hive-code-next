@@ -4,7 +4,11 @@
   "title": "HiveRelay authority file manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "contractRevision", "files"],
+  "required": [
+    "schemaVersion",
+    "contractRevision",
+    "files"
+  ],
   "properties": {
     "schemaVersion": {
       "const": 1
@@ -20,21 +24,35 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["path", "kind", "applicableComponents", "sha256"],
+            "required": [
+              "path",
+              "kind",
+              "applicableComponents",
+              "sha256"
+            ],
             "properties": {
               "path": {
                 "type": "string",
                 "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\\\)[A-Za-z0-9._/-]+$"
               },
               "kind": {
-                "enum": ["documentation", "openapi", "schema", "registry"]
+                "enum": [
+                  "documentation",
+                  "openapi",
+                  "schema",
+                  "registry"
+                ]
               },
               "applicableComponents": {
                 "type": "array",
                 "minItems": 1,
                 "uniqueItems": true,
                 "items": {
-                  "enum": ["cloud", "hivecode", "cell"]
+                  "enum": [
+                    "cloud",
+                    "hivecode",
+                    "cell"
+                  ]
                 }
               },
               "sha256": {
@@ -68,7 +86,11 @@
                 "minItems": 1,
                 "uniqueItems": true,
                 "items": {
-                  "enum": ["cloud", "hivecode", "cell"]
+                  "enum": [
+                    "cloud",
+                    "hivecode",
+                    "cell"
+                  ]
                 }
               },
               "sha256": {
@@ -80,7 +102,10 @@
                 "pattern": "^[a-z0-9][a-z0-9.-]{2,127}$"
               },
               "expectedVerdict": {
-                "enum": ["ACCEPT", "REJECT"]
+                "enum": [
+                  "ACCEPT",
+                  "REJECT"
+                ]
               },
               "expectedReason": {
                 "type": "string",

@@ -12,7 +12,7 @@
       {
         "status": 409,
         "contentType": "application/json",
-        "body": { "code": "REPLAY_DETECTED", "detail": "must-not-cross-boundary" }
+        "body": {"code": "REPLAY_DETECTED", "detail": "must-not-cross-boundary"}
       }
     ]
   }

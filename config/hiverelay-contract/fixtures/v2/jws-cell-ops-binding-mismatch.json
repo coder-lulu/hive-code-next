@@ -7,11 +7,7 @@
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000,
   "input": {
-    "verifierContext": {
-      "issuer": "https://cloud.hive.test/relay",
-      "acceptedVerifierKids": ["relay-test-2026-01"],
-      "privateOriginsByCellId": { "cell-01": "https://cell-01.private.hive.test:8443" }
-    },
+    "verifierContext": {"issuer": "https://cloud.hive.test/relay", "acceptedVerifierKids": ["relay-test-2026-01"], "privateOriginsByCellId": {"cell-01": "https://cell-01.private.hive.test:8443"}},
     "tokenType": "cellOpsToken",
     "compactJws": "eyJhbGciOiJFZERTQSIsInR5cCI6InJlbGF5LWNlbGwtb3BzK2p3dCIsImtpZCI6InJlbGF5LXRlc3QtMjAyNi0wMSJ9.eyJpc3MiOiJodHRwczovL2Nsb3VkLmhpdmUudGVzdC9yZWxheSIsInN1YiI6ImhpdmUtY2xvdWQtcmVsYXktb3BzIiwianRpIjoiMTQxNDE0MTQtMTQxNC00NDE0LTg0MTQtMTQxNDE0MTQxNDE0IiwiaWF0IjoxODkzNDU1OTgwLCJuYmYiOjE4OTM0NTU5ODAsImF1ZCI6ImhpdmUtcmVsYXktY2VsbC1vcHMiLCJzY29wZSI6InJlbGF5OmNlbGw6c3RhdHVzIiwiZXhwIjoxODkzNDU2MDEwLCJtZXRob2QiOiJQT1NUIiwicGF0aCI6Ii9pbnRlcm5hbC92MS9saWZlY3ljbGUiLCJwcml2YXRlT3JpZ2luIjoiaHR0cHM6Ly9jZWxsLTAxLnByaXZhdGUuaGl2ZS50ZXN0Ojg0NDMiLCJjZWxsSWQiOiJjZWxsLTAxIiwibm9uY2UiOiJBd01EQXdNREF3TURBd01EQXdNREF3In0.ORdQm3hfPa0WKOT0Gv7o5lmH6MPh6JlNScG_HUOEQNrO4J6947t2ya0z9MthBSpa4r7mzJwgkRz-utagx65TBw"
   }

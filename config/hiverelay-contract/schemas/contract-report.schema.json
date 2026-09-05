@@ -22,10 +22,17 @@
       "const": 1
     },
     "component": {
-      "enum": ["cloud-java", "hivecode-typescript", "cell-elixir"]
+      "enum": [
+        "cloud-java",
+        "hivecode-typescript",
+        "cell-elixir"
+      ]
     },
     "status": {
-      "enum": ["PASS", "FAIL"]
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
     },
     "commit": {
       "type": "string",
@@ -57,7 +64,10 @@
     "runtime": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["elixirVersion", "otpRelease"],
+      "required": [
+        "elixirVersion",
+        "otpRelease"
+      ],
       "properties": {
         "elixirVersion": {
           "type": "string",
@@ -75,7 +85,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["caseId", "verdict", "reason"],
+        "required": [
+          "caseId",
+          "verdict",
+          "reason"
+        ],
         "properties": {
           "caseId": {
             "type": "string",
@@ -83,7 +97,11 @@
             "maxLength": 128
           },
           "verdict": {
-            "enum": ["ACCEPT", "REJECT", "NOT_APPLICABLE"]
+            "enum": [
+              "ACCEPT",
+              "REJECT",
+              "NOT_APPLICABLE"
+            ]
           },
           "reason": {
             "type": "string",
@@ -108,10 +126,15 @@
             "const": "cell-elixir"
           }
         },
-        "required": ["component"]
+        "required": [
+          "component"
+        ]
       },
       "then": {
-        "required": ["containerImage", "runtime"]
+        "required": [
+          "containerImage",
+          "runtime"
+        ]
       }
     }
   ]

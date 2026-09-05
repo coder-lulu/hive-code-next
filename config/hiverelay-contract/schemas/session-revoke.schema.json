@@ -28,7 +28,11 @@
     "request": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["protocolVersion", "operationId", "expectedResourceVersion"],
+      "required": [
+        "protocolVersion",
+        "operationId",
+        "expectedResourceVersion"
+      ],
       "properties": {
         "protocolVersion": {
           "const": "account-runtime-session-revoke/v2"
@@ -63,7 +67,13 @@
           "$ref": "#/$defs/uuidV4"
         },
         "status": {
-          "enum": ["REVOKE_PENDING", "CLOSED", "REVOKED", "EXPIRED", "UNVERIFIABLE"]
+          "enum": [
+            "REVOKE_PENDING",
+            "CLOSED",
+            "REVOKED",
+            "EXPIRED",
+            "UNVERIFIABLE"
+          ]
         },
         "resourceVersion": {
           "$ref": "#/$defs/positiveGeneration"
@@ -76,7 +86,9 @@
     "error": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "enum": [

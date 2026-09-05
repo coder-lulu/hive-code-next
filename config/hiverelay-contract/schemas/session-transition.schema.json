@@ -65,7 +65,13 @@
           "$ref": "#/$defs/uuidV4"
         },
         "transitionType": {
-          "enum": ["ACTIVATE", "ABANDON", "CLOSE", "IDLE_EXPIRE", "AUTHORITY_EXPIRE"]
+          "enum": [
+            "ACTIVATE",
+            "ABANDON",
+            "CLOSE",
+            "IDLE_EXPIRE",
+            "AUTHORITY_EXPIRE"
+          ]
         },
         "managedSessionId": {
           "$ref": "#/$defs/opaqueId"
@@ -139,7 +145,12 @@
           "then": {
             "properties": {
               "reason": {
-                "enum": ["CLIENT_CLOSED", "RUNTIME_SHUTDOWN", "TRANSPORT_CLOSED", "LOCAL_ERROR"]
+                "enum": [
+                  "CLIENT_CLOSED",
+                  "RUNTIME_SHUTDOWN",
+                  "TRANSPORT_CLOSED",
+                  "LOCAL_ERROR"
+                ]
               }
             }
           }
@@ -181,7 +192,14 @@
     "batchRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "runtimeId", "runtimeBootId", "runtimeProof", "sessionTransitions"],
+      "required": [
+        "type",
+        "v",
+        "runtimeId",
+        "runtimeBootId",
+        "runtimeProof",
+        "sessionTransitions"
+      ],
       "properties": {
         "type": {
           "const": "session-transition-batch"
@@ -265,7 +283,10 @@
           "if": {
             "properties": {
               "verdict": {
-                "enum": ["TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"]
+                "enum": [
+                  "TRANSITION_REPLAY_CONFLICT",
+                  "SEQUENCE_GAP"
+                ]
               }
             }
           },

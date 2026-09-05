@@ -6,7 +6,5 @@
   "operation": "wire-message",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
-  "input": {
-    "rawJson": "{\"type\":\"relay-hello\",\"v\":2,\"connId\":\"conn-01\",\"connId\":\"conn-02\",\"cellId\":\"cell-01\",\"cellIncarnationId\":\"22222222-2222-4222-8222-222222222222\"}"
-  }
+  "input": {"rawJson": "{\"type\":\"relay-hello\",\"v\":2,\"connId\":\"conn-01\",\"connId\":\"conn-02\",\"cellId\":\"cell-01\",\"cellIncarnationId\":\"22222222-2222-4222-8222-222222222222\"}"}
 }

@@ -6,8 +6,5 @@
   "operation": "x25519-key",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
-  "input": {
-    "publicKeyB64Url": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
-    "relayHostId": "If4x36FUomFia_hU"
-  }
+  "input": {"publicKeyB64Url": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", "relayHostId": "If4x36FUomFia_hU"}
 }

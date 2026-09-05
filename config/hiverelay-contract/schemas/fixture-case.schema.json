@@ -26,7 +26,9 @@
       "pattern": "^[a-z0-9][a-z0-9.-]{2,127}$"
     },
     "suite": {
-      "enum": ["hiverelay-v2-conformance"]
+      "enum": [
+        "hiverelay-v2-conformance"
+      ]
     },
     "operation": {
       "enum": [
@@ -53,7 +55,11 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": {
-        "enum": ["cloud", "hivecode", "cell"]
+        "enum": [
+          "cloud",
+          "hivecode",
+          "cell"
+        ]
       }
     },
     "validationTime": {

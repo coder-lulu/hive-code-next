@@ -6,17 +6,5 @@
   "operation": "session-transition",
   "applicableComponents": ["cloud", "hivecode"],
   "validationTime": 1893456000000,
-  "input": {
-    "highestContiguousAck": 41,
-    "stored": {
-      "sequence": 41,
-      "transitionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    },
-    "replay": {
-      "sequence": 42,
-      "transitionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    }
-  }
+  "input": {"highestContiguousAck": 41, "stored": {"sequence": 41, "transitionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "replay": {"sequence": 42, "transitionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
 }

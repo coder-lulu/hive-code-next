@@ -4,7 +4,9 @@
   "caseId": "v2.lifecycle-snapshot.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "lifecycle-operator",
-  "applicableComponents": ["cloud"],
+  "applicableComponents": [
+    "cloud"
+  ],
   "validationTime": 1788566401000,
   "input": {
     "snapshot": {

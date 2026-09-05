@@ -6,9 +6,5 @@
   "operation": "conn-ticket-replay",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
-  "input": {
-    "connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-    "priorConsumed": true,
-    "concurrentAttempts": 2
-  }
+  "input": {"connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "priorConsumed": true, "concurrentAttempts": 2}
 }

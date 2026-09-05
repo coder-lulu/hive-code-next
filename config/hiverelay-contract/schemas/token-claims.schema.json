@@ -90,7 +90,11 @@
     "relayToken": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tokenType", "header", "claims"],
+      "required": [
+        "tokenType",
+        "header",
+        "claims"
+      ],
       "properties": {
         "tokenType": {
           "const": "relayToken"
@@ -98,7 +102,11 @@
         "header": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["alg", "typ", "kid"],
+          "required": [
+            "alg",
+            "typ",
+            "kid"
+          ],
           "properties": {
             "alg": {
               "const": "EdDSA"
@@ -160,7 +168,11 @@
     "controlLease": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tokenType", "header", "claims"],
+      "required": [
+        "tokenType",
+        "header",
+        "claims"
+      ],
       "properties": {
         "tokenType": {
           "const": "controlLease"
@@ -168,7 +180,11 @@
         "header": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["alg", "typ", "kid"],
+          "required": [
+            "alg",
+            "typ",
+            "kid"
+          ],
           "properties": {
             "alg": {
               "const": "EdDSA"
@@ -270,7 +286,11 @@
     "clientAdmissionToken": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tokenType", "header", "claims"],
+      "required": [
+        "tokenType",
+        "header",
+        "claims"
+      ],
       "properties": {
         "tokenType": {
           "const": "clientAdmissionToken"
@@ -278,7 +298,11 @@
         "header": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["alg", "typ", "kid"],
+          "required": [
+            "alg",
+            "typ",
+            "kid"
+          ],
           "properties": {
             "alg": {
               "const": "EdDSA"
@@ -380,7 +404,11 @@
     "cellOpsToken": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tokenType", "header", "claims"],
+      "required": [
+        "tokenType",
+        "header",
+        "claims"
+      ],
       "properties": {
         "tokenType": {
           "const": "cellOpsToken"
@@ -388,7 +416,11 @@
         "header": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["alg", "typ", "kid"],
+          "required": [
+            "alg",
+            "typ",
+            "kid"
+          ],
           "properties": {
             "alg": {
               "const": "EdDSA"
@@ -430,7 +462,11 @@
               "const": "hive-relay-cell-ops"
             },
             "scope": {
-              "enum": ["relay:cell:status", "relay:cell:lifecycle", "relay:cell:fence"]
+              "enum": [
+                "relay:cell:status",
+                "relay:cell:lifecycle",
+                "relay:cell:fence"
+              ]
             },
             "jti": {
               "$ref": "#/$defs/uuidV4"
@@ -445,10 +481,17 @@
               "$ref": "#/$defs/epochSeconds"
             },
             "method": {
-              "enum": ["GET", "POST"]
+              "enum": [
+                "GET",
+                "POST"
+              ]
             },
             "path": {
-              "enum": ["/internal/status", "/internal/v1/lifecycle", "/internal/v1/fences"]
+              "enum": [
+                "/internal/status",
+                "/internal/v1/lifecycle",
+                "/internal/v1/fences"
+              ]
             },
             "privateOrigin": {
               "$ref": "#/$defs/canonicalHttpsOriginShape"

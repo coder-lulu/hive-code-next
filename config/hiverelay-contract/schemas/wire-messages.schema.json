@@ -179,7 +179,9 @@
             "const": "ticket-connect-v2"
           },
           "items": {
-            "enum": ["ticket-connect-v2"]
+            "enum": [
+              "ticket-connect-v2"
+            ]
           }
         }
       }
@@ -226,7 +228,12 @@
     "hostChallengeAck": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "challengeId", "proofB64"],
+      "required": [
+        "type",
+        "v",
+        "challengeId",
+        "proofB64"
+      ],
       "properties": {
         "type": {
           "const": "host-challenge-ack"
@@ -245,7 +252,12 @@
     "hostHelloAck": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "leaseExpiresAt", "controlGeneration"],
+      "required": [
+        "type",
+        "v",
+        "leaseExpiresAt",
+        "controlGeneration"
+      ],
       "properties": {
         "type": {
           "const": "host-hello-ack"
@@ -264,7 +276,12 @@
     "relayAuth": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "clientAdmissionToken", "clientPublicKeyB64"],
+      "required": [
+        "type",
+        "v",
+        "clientAdmissionToken",
+        "clientPublicKeyB64"
+      ],
       "properties": {
         "type": {
           "const": "relay-auth"
@@ -333,7 +350,14 @@
     "hostDataAuth": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "connId", "connTicket", "assignmentEpoch", "controlGeneration"],
+      "required": [
+        "type",
+        "v",
+        "connId",
+        "connTicket",
+        "assignmentEpoch",
+        "controlGeneration"
+      ],
       "properties": {
         "type": {
           "const": "host-data-auth"
@@ -358,7 +382,13 @@
     "relayHello": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "connId", "cellId", "cellIncarnationId"],
+      "required": [
+        "type",
+        "v",
+        "connId",
+        "cellId",
+        "cellIncarnationId"
+      ],
       "properties": {
         "type": {
           "const": "relay-hello"
@@ -380,7 +410,11 @@
     "authRefresh": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "controlLease"],
+      "required": [
+        "type",
+        "v",
+        "controlLease"
+      ],
       "properties": {
         "type": {
           "const": "auth-refresh"
@@ -396,7 +430,12 @@
     "drain": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "deadlineMs", "reason"],
+      "required": [
+        "type",
+        "v",
+        "deadlineMs",
+        "reason"
+      ],
       "properties": {
         "type": {
           "const": "drain"
@@ -410,7 +449,11 @@
           "maximum": 120000
         },
         "reason": {
-          "enum": ["INCARNATION_DRAIN", "ASSIGNMENT_FENCE", "CONTROL_LEASE_EXPIRED"]
+          "enum": [
+            "INCARNATION_DRAIN",
+            "ASSIGNMENT_FENCE",
+            "CONTROL_LEASE_EXPIRED"
+          ]
         }
       }
     }

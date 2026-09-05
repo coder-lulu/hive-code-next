@@ -28,7 +28,9 @@
       "const": "Ed25519"
     },
     "method": {
-      "enum": ["POST"]
+      "enum": [
+        "POST"
+      ]
     },
     "path": {
       "type": "string",

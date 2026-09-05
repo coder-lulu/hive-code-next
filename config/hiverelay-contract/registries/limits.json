@@ -36,31 +36,11 @@
     "controlQueueMessagesPerOwner": 128
   },
   "rateLimits": [
-    {
-      "operation": "relayAuthorization",
-      "perAccountPerMinute": 60,
-      "perRuntimePerMinute": 30,
-      "perIpPerMinute": 120
-    },
-    {
-      "operation": "assign",
-      "perAccountPerMinute": 60,
-      "perRuntimePerMinute": 30,
-      "perIpPerMinute": 120
-    },
-    {
-      "operation": "connectionIntent",
-      "perAccountPerMinute": 120,
-      "perRuntimePerMinute": 120,
-      "perIpPerMinute": 240
-    },
-    {
-      "operation": "cellAdmission",
-      "globalPerSecond": 2000,
-      "perAssignmentPerMinute": 120,
-      "perIpPerMinute": 120
-    },
-    { "operation": "cellPrivateOps", "globalPerSecond": 100, "perCellPerMinute": 120 }
+    {"operation": "relayAuthorization", "perAccountPerMinute": 60, "perRuntimePerMinute": 30, "perIpPerMinute": 120},
+    {"operation": "assign", "perAccountPerMinute": 60, "perRuntimePerMinute": 30, "perIpPerMinute": 120},
+    {"operation": "connectionIntent", "perAccountPerMinute": 120, "perRuntimePerMinute": 120, "perIpPerMinute": 240},
+    {"operation": "cellAdmission", "globalPerSecond": 2000, "perAssignmentPerMinute": 120, "perIpPerMinute": 120},
+    {"operation": "cellPrivateOps", "globalPerSecond": 100, "perCellPerMinute": 120}
   ],
   "rateLimitKeying": {
     "authenticatedDimensions": ["accountId", "runtimeRecordId"],

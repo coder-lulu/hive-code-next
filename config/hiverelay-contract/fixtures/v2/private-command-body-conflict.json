@@ -7,13 +7,7 @@
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
   "input": {
-    "previous": {
-      "commandId": "77777777-7777-4777-8777-777777777777",
-      "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    },
-    "current": {
-      "commandId": "77777777-7777-4777-8777-777777777777",
-      "bodySha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    }
+    "previous": {"commandId": "77777777-7777-4777-8777-777777777777", "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "current": {"commandId": "77777777-7777-4777-8777-777777777777", "bodySha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
   }
 }

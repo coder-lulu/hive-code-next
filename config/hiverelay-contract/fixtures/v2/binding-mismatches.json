@@ -7,20 +7,8 @@
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
   "input": {
-    "expected": {
-      "cellId": "cell-01",
-      "cellIncarnationId": "22222222-2222-4222-8222-222222222222",
-      "relayHostId": "If4x36FUomFia_hU",
-      "assignmentEpoch": 5,
-      "clientKeyHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    },
-    "actual": {
-      "cellId": "cell-02",
-      "cellIncarnationId": "66666666-6666-4666-8666-666666666666",
-      "relayHostId": "AAAAAAAAAAAAAAAA",
-      "assignmentEpoch": 4,
-      "clientKeyHash": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
-    },
+    "expected": {"cellId": "cell-01", "cellIncarnationId": "22222222-2222-4222-8222-222222222222", "relayHostId": "If4x36FUomFia_hU", "assignmentEpoch": 5, "clientKeyHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+    "actual": {"cellId": "cell-02", "cellIncarnationId": "66666666-6666-4666-8666-666666666666", "relayHostId": "AAAAAAAAAAAAAAAA", "assignmentEpoch": 4, "clientKeyHash": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"},
     "priorState": "UNUSED",
     "attempts": 1
   }

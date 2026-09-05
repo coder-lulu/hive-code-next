@@ -15,7 +15,13 @@
     "legacyProblem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "title", "status", "code", "traceId"],
+      "required": [
+        "type",
+        "title",
+        "status",
+        "code",
+        "traceId"
+      ],
       "properties": {
         "type": {
           "type": "string",
@@ -27,7 +33,15 @@
           "maxLength": 128
         },
         "status": {
-          "enum": [400, 401, 409, 410, 422, 426, 503]
+          "enum": [
+            400,
+            401,
+            409,
+            410,
+            422,
+            426,
+            503
+          ]
         },
         "code": {
           "type": "string",
@@ -162,7 +176,9 @@
     "relayErrorResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "enum": [
@@ -181,7 +197,9 @@
     "relayBadRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "const": "INVALID_REQUEST"
@@ -191,7 +209,9 @@
     "relayProofRejected": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "const": "RUNTIME_PROOF_REJECTED"
@@ -201,17 +221,25 @@
     "relayConflict": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
-          "enum": ["REPLAY_DETECTED", "COMMAND_REPLAY_CONFLICT", "SEQUENCE_GAP"]
+          "enum": [
+            "REPLAY_DETECTED",
+            "COMMAND_REPLAY_CONFLICT",
+            "SEQUENCE_GAP"
+          ]
         }
       }
     },
     "relayGone": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "const": "STALE_BINDING"
@@ -221,7 +249,9 @@
     "relayUnprocessable": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "const": "INVALID_REQUEST"
@@ -231,7 +261,9 @@
     "relayUpgradeRequired": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "const": "UPGRADE_REQUIRED"
@@ -241,7 +273,9 @@
     "relayUnavailable": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "const": "RELAY_UNAVAILABLE"

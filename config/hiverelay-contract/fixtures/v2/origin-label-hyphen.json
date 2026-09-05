@@ -6,9 +6,5 @@
   "operation": "origin",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
-  "input": {
-    "origin": "https://a-.hive.test",
-    "allowedOrigins": ["https://a-.hive.test"],
-    "browser": true
-  }
+  "input": {"origin": "https://a-.hive.test", "allowedOrigins": ["https://a-.hive.test"], "browser": true}
 }

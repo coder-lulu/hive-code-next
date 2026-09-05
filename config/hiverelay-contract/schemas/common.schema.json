@@ -140,7 +140,11 @@
     },
     "verdict": {
       "type": "string",
-      "enum": ["ACCEPT", "REJECT", "NOT_APPLICABLE"]
+      "enum": [
+        "ACCEPT",
+        "REJECT",
+        "NOT_APPLICABLE"
+      ]
     }
   }
 }

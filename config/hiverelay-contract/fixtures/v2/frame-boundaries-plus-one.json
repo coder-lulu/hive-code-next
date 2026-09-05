@@ -6,15 +6,5 @@
   "operation": "frame-limit",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
-  "input": {
-    "frames": [
-      { "limit": "preAuthJsonBytes", "bytes": 16385 },
-      { "limit": "hostControlJsonBytes", "bytes": 65537 },
-      { "limit": "jsonPlaintextBytes", "bytes": 4194305 },
-      { "limit": "binaryPlaintextBytes", "bytes": 8388609 },
-      { "limit": "encryptedPayloadBytes", "bytes": 8388691 },
-      { "limit": "maskedWireMessageBytes", "bytes": 8388705 }
-    ],
-    "expectedCloseCode": 1009
-  }
+  "input": {"frames": [{"limit": "preAuthJsonBytes", "bytes": 16385}, {"limit": "hostControlJsonBytes", "bytes": 65537}, {"limit": "jsonPlaintextBytes", "bytes": 4194305}, {"limit": "binaryPlaintextBytes", "bytes": 8388609}, {"limit": "encryptedPayloadBytes", "bytes": 8388691}, {"limit": "maskedWireMessageBytes", "bytes": 8388705}], "expectedCloseCode": 1009}
 }
