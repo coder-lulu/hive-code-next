@@ -56,6 +56,8 @@ export class ReferenceHiveRelayClient {
     if (this.socket) {
       throw new Error('Reference Client is already connected')
     }
+    // An HTTP upgrade failure can reject readiness before waitForOpen settles.
+    void this.ready.promise.catch(() => undefined)
     const socket = openWebSocket(
       this.options.cellUrl,
       `${HIVE_RELAY_CLIENT_PATH_PREFIX}${encodeURIComponent(this.options.relayHostId)}`,

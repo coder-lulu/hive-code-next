@@ -53,8 +53,10 @@ export class ReferenceHiveRelayHost {
   private readonly pending = new Map<string, ConnectionOpen>()
   private readonly data = new Map<string, DataConnection>()
   private readonly controlReady = deferred<HostHelloAck>()
+  private readonly controlClosed = deferred<{ code: number; reason: string }>()
   private readonly historyCapacity: number
   private control: WebSocketClient | null = null
+  private pendingRefresh: Deferred<HostHelloAck> | null = null
   private autoAttach: boolean
 
   constructor(private readonly options: ReferenceHostOptions) {
@@ -76,6 +78,8 @@ export class ReferenceHiveRelayHost {
     if (this.control) {
       throw new Error('Reference Host control is already connected')
     }
+    // An HTTP upgrade failure can reject readiness before waitForOpen settles.
+    void this.controlReady.promise.catch(() => undefined)
     const socket = openWebSocket(this.options.cellUrl, HIVE_RELAY_HOST_CONTROL_PATH, {
       authorization: this.options.controlLease
     })
@@ -88,6 +92,7 @@ export class ReferenceHiveRelayHost {
       this.handleControlMessage(wireText(raw))
     })
     socket.once('close', (code, reason) => {
+      this.controlClosed.resolve({ code, reason: reason.toString() })
       this.failControl(new Error(`Host control closed:${code}:${reason.toString()}`))
     })
     socket.once('error', (error) => this.failControl(error))
@@ -104,6 +109,20 @@ export class ReferenceHiveRelayHost {
 
   setAutoAttach(enabled: boolean): void {
     this.autoAttach = enabled
+  }
+
+  async refreshControlLease(controlLease: string): Promise<HostHelloAck> {
+    if (!this.control || !this.controlReady.resolved() || this.pendingRefresh) {
+      throw new Error('Reference Host must be ready with no pending refresh')
+    }
+    const refresh = deferred<HostHelloAck>()
+    this.pendingRefresh = refresh
+    sendJson(this.control, { type: 'auth-refresh', v: 2, controlLease })
+    return refresh.promise
+  }
+
+  waitForClose(): Promise<{ code: number; reason: string }> {
+    return this.controlClosed.promise
   }
 
   pendingConnectionIds(): string[] {
@@ -137,6 +156,8 @@ export class ReferenceHiveRelayHost {
   }
 
   close(): void {
+    this.pendingRefresh?.reject(new Error('Reference Host closed during refresh'))
+    this.pendingRefresh = null
     this.control?.close(1000)
     this.control = null
     for (const connection of this.data.values()) {
@@ -171,6 +192,12 @@ export class ReferenceHiveRelayHost {
       return
     }
     if (message.type === 'host-hello-ack') {
+      if (message.controlGeneration !== this.options.binding.controlGeneration) {
+        this.failControl(new Error('Reference Host rejected control generation'))
+        return
+      }
+      this.pendingRefresh?.resolve(message)
+      this.pendingRefresh = null
       this.controlReady.resolve(message)
       return
     }
@@ -255,6 +282,8 @@ export class ReferenceHiveRelayHost {
   }
 
   private failControl(error: Error): void {
+    this.pendingRefresh?.reject(error)
+    this.pendingRefresh = null
     this.controlReady.reject(error)
     this.pending.clear()
     for (const connection of this.data.values()) {
