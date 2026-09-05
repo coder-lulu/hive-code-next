@@ -222,6 +222,8 @@ module.exports = {
     // Why: local agent configuration can contain credentials and session state;
     // it is never a runtime input and must not cross the packaging boundary.
     '!{.claude,.grok,.agents,.codex}{,/**/*}',
+    // Local sessions, credentials and mutable build evidence must never ship.
+    '!{.tmp,.omx,.local-dev,output,test-results,playwright-report}{,/**/*}',
     // Why: local clean-build rehearsals may place pnpm's content-addressed store
     // under the repository root. It is never a runtime input and can exceed 2 GiB.
     '!.pnpm-store{,/**/*}',

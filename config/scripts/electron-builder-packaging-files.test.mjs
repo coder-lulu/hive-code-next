@@ -48,7 +48,15 @@ describe('electron-builder config', () => {
       '.grok/skills/review-and-submit/review-and-submit/SKILL.md',
       '.claude/skills/review-and-submit/review-and-submit/SKILL.md',
       '.agents/skills/electron/SKILL.md',
-      '.codex/sessions/session.json'
+      '.codex/sessions/session.json',
+      '.tmp/p4/material.json',
+      '.omx/state/session.json',
+      '.local-dev/session.json',
+      'test-results/runtime/trace.zip',
+      'playwright-report/data/trace.zip',
+      'output/artifacts/app.apk',
+      '.env.local',
+      '.npmrc'
     ]) {
       expect(packs(toolingPath)).toBe(false)
     }
