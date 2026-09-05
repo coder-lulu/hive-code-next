@@ -69,8 +69,10 @@ Use a disposable PostgreSQL database initialized from the existing base SQL, set
   journey is not verified. Automatic approval rejected the second emulator deep-link
   launch with `blocked by policy` and no further reason. It was not retried.
 - iOS device/simulator acceptance is unavailable on this Windows environment.
-- Public deployment was not performed. Copy the Web build to the documented static
-  directory and apply the existing 1Panel routing procedure when deploying.
+- Public Cloud, Cell and browser client deployment completed on 2026-09-06.
+  The current browser entry is `https://console.hivekernel.com/runtime/`.
+  Service health, Fleet activation and public Chrome/TLS checks passed. See the
+  [deployment record](../../../hive-cloud/docs/hive/hiverelay-public-deployment-2026-09-06.md).
 - Existing full E2E type-check baseline errors and bundle-size warnings remain;
   the modified application targets pass their type checks. No sustained-load or
   production-HA claim is made.
