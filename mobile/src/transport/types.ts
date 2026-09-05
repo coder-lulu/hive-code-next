@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { HiveAccountRelayMaterial } from '../../../src/shared/hive-account-relay-material'
 import {
   CANONICAL_RUNTIME_RECORD_ID_PATTERN,
   PairingOfferSchema as SharedPairingOfferSchema
@@ -106,7 +107,7 @@ export type HostProfile = {
 export type AccountRuntimeRoute = {
   readonly runtimeRecordId: string
   readonly resourceVersion: number
-  readonly createConnection: (signal?: AbortSignal) => Promise<never>
+  readonly createConnection: (signal?: AbortSignal) => Promise<HiveAccountRelayMaterial>
 }
 
 export type RuntimeAccessSource = 'manual-pairing' | 'account-claimed'

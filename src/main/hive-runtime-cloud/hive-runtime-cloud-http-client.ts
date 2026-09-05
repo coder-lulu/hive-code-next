@@ -1,4 +1,5 @@
 import { getMainHttpClient } from '../network/http-client'
+import { parseHiveRelayJson } from '../../shared/hive-relay-json'
 import { problemCategory } from './hive-runtime-cloud-response'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -58,7 +59,10 @@ async function parseResponse(response: Response): Promise<unknown> {
     offset += chunk.byteLength
   }
   try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+    return parseHiveRelayJson(
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+      MAXIMUM_RESPONSE_BYTES
+    )
   } catch {
     throw new Error('invalid_hive_runtime_cloud_response')
   }

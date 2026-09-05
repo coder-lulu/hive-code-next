@@ -71,6 +71,13 @@ export class HiveAccountRuntimeDirectoryService {
     return this.state
   }
 
+  getConnectionScope(): string | null {
+    const auth = this.authorization
+    return auth && auth.sessionExpiresAt > this.dependencies.now()
+      ? JSON.stringify([auth.authorityId, auth.accountId, auth.sessionGeneration])
+      : null
+  }
+
   subscribe(listener: (state: HiveAccountRuntimeDirectoryState) => void): () => void {
     this.listeners.add(listener)
     publishHiveAccountRuntimeDirectory(new Set([listener]), this.state)

@@ -1,6 +1,6 @@
 # HiveRelay v2 authority contract
 
-Contract revision: `hiverelay-v2-p0.7`
+Contract revision: `hiverelay-v2-p0.8`
 
 This directory is the sole authority copied by HiveCode and HiveRelay Cell. A consumer
 must verify `fixture-manifest.json`, every listed file digest, the revision, and its source

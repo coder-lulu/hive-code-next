@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HiveRelay v2 contract
-  version: hiverelay-v2-p0.7
+  version: hiverelay-v2-p0.8
   description: >-
     Authority interface shapes. Every implementation remains disabled until its
     corresponding product and capability gates are enabled.
@@ -145,7 +145,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/ConnectionIntentRequest'}
       responses:
-        '200':
+        '201':
           description: V2 outer admission and E2EE inner ticket material
           content:
             application/json:

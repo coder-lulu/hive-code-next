@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import nacl from 'tweetnacl'
+import { HiveAccountRelayHandshake } from '../../../src/shared/hive-account-relay-channel-handshake'
+import { mobileRuntimeRandomBytes } from '../transport/runtime-random'
 
 const api = vi.hoisted(() => ({
   request: vi.fn(),
@@ -50,16 +53,57 @@ function runtimeSession(id = managedWebSessionId) {
 }
 
 describe('account Runtime cloud operations', () => {
+  afterEach(() => vi.unstubAllGlobals())
   beforeEach(() => {
     vi.clearAllMocks()
     api.randomToken.mockReturnValueOnce('ticket-secret').mockReturnValue('idempotency-key')
   })
 
-  it('refuses connection intent creation before generating or sending credentials', async () => {
-    await expect(createAccountRuntimeConnectionIntent(session, runtimeRecordId, 4)).rejects.toThrow(
-      'not ready'
+  it('requests current MOBILE material without sending the ticket secret', async () => {
+    api.request.mockResolvedValue({
+      protocolVersion: 2,
+      intentId: managedWebSessionId,
+      ticketId: runtimeRecordId,
+      expiresAt: Date.now() + 30_000,
+      cellUrl: 'https://relay.hive.test',
+      cellId: 'cell-1',
+      cellIncarnationId: managedWebSessionId,
+      assignmentId: managedWebSessionId,
+      assignmentEpoch: 1,
+      relayHostId: 'AbCdEf0123_-xyZ9',
+      clientAdmissionToken: `header.payload.${'a'.repeat(86)}`,
+      runtimePublicKeyB64: api.encodeBase64Url(
+        nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(3)).publicKey
+      ),
+      e2eeFraming: 'hive-relay-e2ee/v2'
+    })
+    // Hermes has no browser crypto API: both material and nonce must use Expo's native entropy.
+    vi.stubGlobal('crypto', undefined)
+    const material = await createAccountRuntimeConnectionIntent(session, runtimeRecordId, 4)
+    const handshake = new HiveAccountRelayHandshake(material, [], mobileRuntimeRandomBytes)
+    expect(handshake.session.hello.clientNonceB64).toBe(
+      btoa(String.fromCharCode(...new Uint8Array(32).fill(7)))
     )
-    expect(api.randomToken).not.toHaveBeenCalled()
+    expect(material.clientKind).toBe('MOBILE')
+    const [path, body, options] = api.request.mock.calls[0]!
+    expect(path).toBe(`/hive/v1/runtimes/${runtimeRecordId}/connection-intents`)
+    expect(body).toMatchObject({
+      protocolVersion: 2,
+      clientKind: 'MOBILE',
+      expectedResourceVersion: 4
+    })
+    expect(body.ticketSecret).toBeUndefined()
+    expect(body.ticketSecretSha256).toHaveLength(43)
+    expect(options.headers.Authorization).toBe('Bearer account-token')
+  })
+
+  it('rejects malformed and cancelled connection requests before sending credentials', async () => {
+    await expect(createAccountRuntimeConnectionIntent(session, '../other', 4)).rejects.toThrow()
+    const controller = new AbortController()
+    controller.abort()
+    await expect(
+      createAccountRuntimeConnectionIntent(session, runtimeRecordId, 4, controller.signal)
+    ).rejects.toThrow()
     expect(api.request).not.toHaveBeenCalled()
   })
 

@@ -1,10 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   JsonStringifyByteLimitError,
   stringifyJsonWithinByteLimit
 } from './node-bounded-json-stringify'
 
 describe('stringifyJsonWithinByteLimit', () => {
+  it('preserves Unicode byte limits without Node globals', () => {
+    const value = { text: '中文🐋\ud800', nested: [true, null] }
+    const serialized = JSON.stringify(value, null, 2)
+    const byteLength = Buffer.byteLength(serialized, 'utf8')
+    vi.stubGlobal('Buffer', undefined)
+    try {
+      expect(stringifyJsonWithinByteLimit(value, byteLength, 2)).toEqual({ serialized, byteLength })
+      expect(() => stringifyJsonWithinByteLimit(value, byteLength - 1, 2)).toThrow(
+        JsonStringifyByteLimitError
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
   it('matches native JSON for nested values, escaping, and omitted fields', () => {
     const shared = { label: 'same object' }
     const value = {

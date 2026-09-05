@@ -16,7 +16,7 @@ import {
   readStoredWebRuntimeEnvironment,
   saveStoredWebRuntimeEnvironment
 } from './web-runtime-environment'
-import { installWebPreloadApi } from './web-preload-api'
+import { installWebPreloadApi, closeActiveRuntimeClients } from './web-preload-api'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { translate } from '../i18n/i18n'
 import { APP_DISPLAY_NAME } from '../product-brand'
@@ -26,6 +26,9 @@ import {
   type CloudLaunchCredential
 } from './cloud-launch-fragment'
 import { exchangeCloudLaunchCredential, type CloudLaunchBootstrap } from './cloud-launch-bootstrap'
+import WebAccountConnect, {
+  type WebAccountBootstrap
+} from './account-runtime-relay/WebAccountConnect'
 
 document.title = `${APP_DISPLAY_NAME} Web`
 const App = lazy(() => import('../App'))
@@ -35,6 +38,90 @@ if (initialCloudLaunch.kind !== 'absent') {
 }
 
 function WebRoot(): React.JSX.Element {
+  if (window.location.pathname === '/runtime/' || window.location.pathname === '/runtime') {
+    return <AccountRuntimeRoot />
+  }
+  return <PairedWebRoot />
+}
+
+function AccountRuntimeRoot(): React.JSX.Element {
+  const [bootstrap, setBootstrap] = useState<WebAccountBootstrap | null>(null)
+  useEffect(() => {
+    if (!bootstrap || typeof BroadcastChannel === 'undefined') {
+      return
+    }
+    const channel = new BroadcastChannel('hivecloud:user-auth')
+    channel.onmessage = (event) => {
+      if (event.data?.type === 'signed-out' || event.data?.type === 'session-expired') {
+        closeActiveRuntimeClients()
+        bootstrap.session.close()
+        window.location.reload()
+      }
+    }
+    return () => {
+      channel.onmessage = null
+      channel.close()
+    }
+  }, [bootstrap])
+  useEffect(() => {
+    if (!bootstrap) {
+      return
+    }
+    let active = true
+    const dispose = () => {
+      closeActiveRuntimeClients()
+      bootstrap.session.close()
+    }
+    const expired = () => {
+      if (active) {
+        dispose()
+        window.location.reload()
+      }
+    }
+    const check = () => {
+      void bootstrap.session
+        .restore()
+        .then((valid) => {
+          if (!valid) {
+            expired()
+          }
+        })
+        .catch(expired)
+    }
+    const timer = window.setInterval(check, 30_000)
+    const visible = () => {
+      if (document.visibilityState === 'visible') {
+        check()
+      }
+    }
+    document.addEventListener('visibilitychange', visible)
+    window.addEventListener('pagehide', dispose)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', visible)
+      window.removeEventListener('pagehide', dispose)
+      dispose()
+    }
+  }, [bootstrap])
+  if (!bootstrap) {
+    return (
+      <WebAccountConnect
+        onConnected={(value) => {
+          installWebPreloadApi(undefined, value)
+          setBootstrap(value)
+        }}
+      />
+    )
+  }
+  return (
+    <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+      <App />
+    </Suspense>
+  )
+}
+
+function PairedWebRoot(): React.JSX.Element {
   const initialPairingInput = useMemo(() => readPairingInputFromLocation(window.location), [])
   // Why: current runtime links carry scope metadata. Runtime-scope offers keep
   // the instant save path; mobile/legacy-unknown offers must be shown/probed.

@@ -3,11 +3,20 @@ const { getDefaultConfig } = require('expo/metro-config')
 
 const projectRoot = __dirname
 const sharedRoot = path.resolve(projectRoot, '..', 'src', 'shared')
+const relayJsonParserRoot = path.dirname(
+  require.resolve('jsonc-parser/package.json', { paths: [path.resolve(projectRoot, '..')] })
+)
 
 const config = getDefaultConfig(projectRoot)
+config.resolver.extraNodeModules = {
+  ...config.resolver.extraNodeModules,
+  'jsonc-parser': relayJsonParserRoot
+}
 
 // Why: mobile source-control prompts use the same pure builders as desktop.
 // Metro only watches mobile/ by default, so make repo-root shared modules visible.
-config.watchFolders = Array.from(new Set([...(config.watchFolders ?? []), sharedRoot]))
+config.watchFolders = Array.from(
+  new Set([...(config.watchFolders ?? []), sharedRoot, relayJsonParserRoot])
+)
 
 module.exports = config

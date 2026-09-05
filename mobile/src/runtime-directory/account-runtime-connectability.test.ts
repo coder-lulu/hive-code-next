@@ -32,7 +32,8 @@ describe('account Runtime connection gate', () => {
     { readiness: 'RECOVERING' as const },
     { clientAuthMode: 'MTLS' as const },
     { credentialState: 'EXPIRED' as const },
-    { connectionCapabilities: ['hive-direct'] }
+    { connectionCapabilities: ['hive-direct'] },
+    { connectionCapabilities: ['orca-relay'] }
   ])('rejects a Runtime that Cloud would refuse: %o', (override) => {
     expect(accountRuntimeCanRequestConnection({ ...connectable, ...override })).toBe(false)
   })

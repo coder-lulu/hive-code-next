@@ -143,6 +143,10 @@ export default function WebConnect({
           />
         </div>
 
+        <Button variant="outline" asChild>
+          <a href="https://console.hivekernel.com/runtime/">使用 HiveCloud 账户连接</a>
+        </Button>
+
         <div className="grid gap-2">
           <Label htmlFor="web-runtime-pairing-code">
             {translate('auto.web.WebConnect.7a566540de', 'Pairing URL or code')}

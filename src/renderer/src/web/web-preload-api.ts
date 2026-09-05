@@ -141,6 +141,15 @@ import {
 import { parseWebPairingInput } from './web-pairing'
 import { copyClipboardTextViaExecCommand } from './web-clipboard-copy-fallback'
 import { WebRuntimeClient } from './web-runtime-client'
+import { createWebAccountPreloadApi } from './account-runtime-relay/web-account-preload-api'
+import {
+  createWebAccountRelayClient,
+  type WebAccountRuntimeClient
+} from './account-runtime-relay/web-account-relay-client'
+import {
+  accountRuntimeEnvironment,
+  type WebAccountBootstrap
+} from './account-runtime-relay/WebAccountConnect'
 import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'
 import { isWebRuntimeUnauthorizedError } from './web-runtime-client-error'
 import { RuntimeRpcCallQueuePool } from '../../../shared/runtime-rpc-call-queue'
@@ -206,9 +215,10 @@ const CLIPBOARD_IMAGE_SAVE_TIMEOUT_MS = 30_000
 
 let activeEnvironment: StoredWebRuntimeEnvironment | null = readStoredWebRuntimeEnvironment()
 let activeCloudBootstrap: CloudLaunchBootstrap | null = null
+let activeAccountBootstrap: WebAccountBootstrap | null = null
 let worktreeVisibilityDefaultsRuntimeEnvironmentId: string | null = null
 let worktreeVisibilityDefaultsRuntimeValue: WorktreeVisibilityDefaults | null = null
-let activeClient: WebRuntimeClient | null = null
+let activeClient: WebAccountRuntimeClient | null = null
 let activeClientEnvironmentId: string | null = null
 const manuallyDisconnectedEnvironmentIds = new Set<string>()
 let cachedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
@@ -538,11 +548,25 @@ export const GITLAB_WEB_RPC_METHODS = {
 const WEB_KEYBINDING_PLATFORMS: readonly KeybindingPlatform[] = ['darwin', 'linux', 'win32']
 const webKeybindingListeners = new Set<(snapshot: KeybindingFileSnapshot) => void>()
 
-export function installWebPreloadApi(cloudBootstrap?: CloudLaunchBootstrap): void {
+export function installWebPreloadApi(
+  cloudBootstrap?: CloudLaunchBootstrap,
+  accountBootstrap?: WebAccountBootstrap
+): void {
+  if ((accountBootstrap ?? null) !== activeAccountBootstrap) {
+    closeActiveRuntimeClients()
+    activeAccountBootstrap?.session.close()
+  }
+  activeAccountBootstrap = accountBootstrap ?? null
   activeCloudBootstrap = cloudBootstrap ?? null
-  activeEnvironment = cloudBootstrap
-    ? createVolatileCloudEnvironment(cloudBootstrap)
-    : readStoredWebRuntimeEnvironment()
+  activeEnvironment = accountBootstrap
+    ? accountRuntimeEnvironment(accountBootstrap.runtime)
+    : cloudBootstrap
+      ? createVolatileCloudEnvironment(cloudBootstrap)
+      : readStoredWebRuntimeEnvironment()
+  if (accountBootstrap) {
+    activeClient = accountBootstrap.client
+    activeClientEnvironmentId = activeEnvironment!.id
+  }
   const webWindow = window as unknown as { __ORCA_WEB_CLIENT__?: boolean }
   webWindow.__ORCA_WEB_CLIENT__ = true
   window.electron = createFallbackProxy(['electron']) as Window['electron']
@@ -720,44 +744,10 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       orgMemberChangeRole: async () => ({ status: 'unconfigured' }),
       orgMemberRemove: async () => ({ status: 'unconfigured' })
     },
-    hiveAccount: {
-      getLoginCapabilities: async () => ({
-        contractRevision: 'hive-login-capabilities-v1',
-        clientId: 'hivecode-desktop',
-        defaultMethod: 'phone_sms',
-        providers: []
-      }),
-      getState: () =>
-        Promise.resolve({
-          configured: false,
-          status: 'unconfigured',
-          persistence: 'none',
-          setupMessage: 'HiveCloud account sign-in is available in HiveCode Desktop.'
-        }),
-      signIn: async (_options) => ({
-        status: 'unconfigured',
-        state: {
-          configured: false,
-          status: 'unconfigured',
-          persistence: 'none',
-          setupMessage: 'HiveCloud account sign-in is available in HiveCode Desktop.'
-        }
-      }),
-      refresh: async () => ({
-        status: 'unconfigured',
-        state: {
-          configured: false,
-          status: 'unconfigured',
-          persistence: 'none',
-          setupMessage: 'HiveCloud account sign-in is available in HiveCode Desktop.'
-        }
-      }),
-      signOut: async () => ({
-        status: 'already-signed-out',
-        state: { configured: true, status: 'signed-out', persistence: 'encrypted' }
-      }),
-      onStateChanged: () => noopUnsubscribe
-    },
+    hiveAccount: createWebAccountPreloadApi(
+      () => activeAccountBootstrap,
+      closeActiveRuntimeClients
+    ),
     e2e: {
       getConfig: () => webE2EConfig
     },
@@ -3808,23 +3798,29 @@ async function getRemoteRuntimeStatus(): Promise<RuntimeStatus> {
   return callRuntimeResult<RuntimeStatus>('status.get', undefined, 15_000)
 }
 
-function getClientForEnvironment(environment: StoredWebRuntimeEnvironment): WebRuntimeClient {
+function getClientForEnvironment(
+  environment: StoredWebRuntimeEnvironment
+): WebAccountRuntimeClient {
   if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
     throw new Error('runtime_manually_disconnected')
   }
   if (!activeClient || activeClientEnvironmentId !== environment.id) {
     activeClient?.close()
-    activeClient = new WebRuntimeClient(
-      activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)
-        ? activeCloudBootstrap
-        : getPreferredWebPairingOffer(environment)
-    )
+    const account = activeAccountBootstrap
+    activeClient =
+      account && environment.id === `account-${account.runtime.runtimeRecordId}`
+        ? createWebAccountRelayClient(() => account.session.material(account.runtime))
+        : new WebRuntimeClient(
+            activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)
+              ? activeCloudBootstrap
+              : getPreferredWebPairingOffer(environment)
+          )
     activeClientEnvironmentId = environment.id
   }
   return activeClient
 }
 
-function closeActiveRuntimeClients(): void {
+export function closeActiveRuntimeClients(): void {
   activeClient?.close()
   activeClient = null
   activeClientEnvironmentId = null
@@ -3837,7 +3833,10 @@ function disconnectActiveRuntimeEnvironment(): void {
 
 function removeActiveRuntimeEnvironment(): void {
   disconnectActiveRuntimeEnvironment()
-  if (activeCloudBootstrap) {
+  if (activeAccountBootstrap) {
+    activeAccountBootstrap.session.close()
+    activeAccountBootstrap = null
+  } else if (activeCloudBootstrap) {
     activeCloudBootstrap = null
   } else {
     clearStoredWebRuntimeEnvironment()
@@ -3909,7 +3908,11 @@ function updateEnvironmentFromResponse(
     typeof (response.result as { pairedDeviceId?: unknown }).pairedDeviceId === 'string'
       ? (response.result as { pairedDeviceId: string }).pairedDeviceId
       : undefined
-  if (activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)) {
+  if (
+    (activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)) ||
+    (activeAccountBootstrap &&
+      environment.id === `account-${activeAccountBootstrap.runtime.runtimeRecordId}`)
+  ) {
     activeEnvironment = {
       ...environment,
       runtimeId,

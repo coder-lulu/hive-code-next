@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.7",
+  "contractRevision": "hiverelay-v2-p0.8",
   "cellOuterForbiddenFields": ["ticketSecret", "ticketId", "relayDeviceId", "deviceToken"],
   "neverLogFields": ["relayToken", "controlLease", "clientAdmissionToken", "cellOpsToken", "connTicket", "ticketSecret", "deviceToken", "operatorCertificate"],
   "neverUrlFields": ["relayToken", "controlLease", "clientAdmissionToken", "cellOpsToken", "connTicket", "ticketSecret", "ticketId", "deviceToken"],

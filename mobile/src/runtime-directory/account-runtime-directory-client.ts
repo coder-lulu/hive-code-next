@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+  acquireHiveAccountRelayMaterial,
+  type HiveAccountRelayMaterial
+} from '../../../src/shared/hive-account-relay-material'
+import { mobileRuntimeRandomBytes } from '../transport/runtime-random'
 import type { MobileSession } from '../auth/mobile-sms-auth'
 import { isRecord, randomToken, request, requestWithMetadata } from '../auth/mobile-sms-client'
 import {
@@ -95,12 +100,26 @@ export async function loadRuntimePresence(
 }
 
 export async function createAccountRuntimeConnectionIntent(
-  _session: MobileSession,
-  _runtimeRecordId: string,
-  _expectedResourceVersion: number,
-  _signal?: AbortSignal
-): Promise<never> {
-  throw new Error('Account remote connection is not ready.')
+  session: MobileSession,
+  runtimeRecordId: string,
+  expectedResourceVersion: number,
+  signal?: AbortSignal
+): Promise<HiveAccountRelayMaterial> {
+  CanonicalUuidSchema.parse(runtimeRecordId)
+  if (signal?.aborted) {
+    throw new Error('runtime_connection_cancelled')
+  }
+  return acquireHiveAccountRelayMaterial({
+    randomBytes: mobileRuntimeRandomBytes,
+    clientKind: 'MOBILE',
+    expectedResourceVersion,
+    createIntent: (body) =>
+      request<unknown>(
+        `/hive/v1/runtimes/${encodeURIComponent(runtimeRecordId)}/connection-intents`,
+        body,
+        { headers: bearerHeaders(session.accessToken), signal }
+      )
+  })
 }
 
 export async function loadRuntimeSessions(session: MobileSession): Promise<RuntimeSession[]> {

@@ -28,7 +28,7 @@
       "pattern": "^[0-9a-f]{40}$"
     },
     "contractRevision": {
-      "const": "hiverelay-v2-p0.7"
+      "const": "hiverelay-v2-p0.8"
     },
     "manifestSha256": {
       "type": "string",

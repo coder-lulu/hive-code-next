@@ -13,6 +13,10 @@ import {
 } from './hive-runtime-cloud-display-name-response'
 import { normalizeHiveRuntimeDisplayName } from '../../shared/hive-runtime-display-name'
 import {
+  HiveAccountRelayIntentRequestSchema,
+  parseHiveAccountRelayIntent
+} from '../../shared/hive-account-relay-material'
+import {
   normalizeRuntimeSession,
   normalizeRuntimeSessionPage
 } from './hive-runtime-cloud-session-response'
@@ -49,13 +53,25 @@ export class HiveRuntimeCloudAccountClient extends HiveRuntimeCloudHttpClient {
   }
 
   async createConnectionIntent(
-    _runtimeRecordId: string,
-    _request: Record<string, unknown>,
-    _accessToken: string,
-    _idempotencyKey: string,
-    _signal?: AbortSignal
-  ): Promise<never> {
-    throw new Error('Account remote connection is not ready.')
+    runtimeRecordId: string,
+    request: Record<string, unknown>,
+    accessToken: string,
+    idempotencyKey: string,
+    signal?: AbortSignal
+  ) {
+    const body = HiveAccountRelayIntentRequestSchema.parse(request)
+    if (body.idempotencyKey !== idempotencyKey) {
+      throw new Error('Relay intent idempotency mismatch')
+    }
+    return parseHiveAccountRelayIntent(
+      await this.request(
+        `/hive/v1/runtimes/${encodeURIComponent(runtimeRecordId)}/connection-intents`,
+        body,
+        { authorization: `Bearer ${accessToken}` },
+        201,
+        signal
+      )
+    )
   }
 
   async updateOwnedRuntimeDisplayName(

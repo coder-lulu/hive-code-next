@@ -139,30 +139,24 @@ describe('mobile SMS authentication client', () => {
     expect((failure as Error).message).toHaveLength(512)
   })
 
-  it('falls back to the Android host gateway when the local test domain is unreachable', async () => {
+  it('rejects duplicate fields in an account authority response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('{"ticketId":"first","ticketId":"second"}'))
+    )
+    await expect(request('/hive/v1/runtimes', null, { method: 'GET' })).rejects.toThrow()
+  })
+
+  it('never sends account credentials to a cleartext Android fallback', async () => {
     vi.stubEnv('EXPO_PUBLIC_ANDROID_EMULATOR', '1')
     vi.stubGlobal('__DEV__', true)
-    const fetchMock = vi
-      .fn()
-      .mockRejectedValueOnce(new TypeError('Failed to resolve host'))
-      .mockResolvedValueOnce(
-        response(
-          {
-            expiresAt: '2030-01-01T00:05:00Z',
-            contractRevision: 'stage2a-device-authorization-v2'
-          },
-          201
-        )
-      )
-      .mockResolvedValueOnce(response(challenge))
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to resolve host'))
     vi.stubGlobal('fetch', fetchMock)
-
-    await expect(requestMobileSms('+8613812345678', true)).resolves.toEqual(challenge)
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      'https://cloud.example.test/hive/v1/auth/device-authorizations',
-      'http://10.0.2.2:8080/hive/v1/auth/device-authorizations',
-      'https://cloud.example.test/hive/v1/auth/sms-challenges'
-    ])
+    await expect(requestMobileSms('+8613812345678', true)).rejects.toThrow()
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://cloud.example.test/hive/v1/auth/device-authorizations'
+    )
   })
 
   it('verifies SMS, obtains a headless authorization code, and exchanges camelCase Hive tokens', async () => {

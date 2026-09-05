@@ -14,7 +14,7 @@
       "const": 1
     },
     "contractRevision": {
-      "const": "hiverelay-v2-p0.7"
+      "const": "hiverelay-v2-p0.8"
     },
     "files": {
       "type": "array",

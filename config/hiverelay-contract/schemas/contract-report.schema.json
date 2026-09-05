@@ -43,7 +43,7 @@
       "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$"
     },
     "contractRevision": {
-      "const": "hiverelay-v2-p0.7"
+      "const": "hiverelay-v2-p0.8"
     },
     "manifestSha256": {
       "type": "string",

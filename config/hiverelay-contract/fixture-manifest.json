@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.7",
+  "contractRevision": "hiverelay-v2-p0.8",
   "files": [
     {
       "path": "README.md",
@@ -10,7 +10,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "a6d128a763574b0d8df02e89c8a9c2a8cfadcc721cb8b9a8232b9159369591af"
+      "sha256": "96c601350d69368d691a3b1b6a125e5a322468df99bf80abd0c618320d7919fa"
     },
     {
       "path": "canonical-encoding.md",
@@ -30,7 +30,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "889397fcc12762e6e89a9f00903165c09514153f3a4674da73710c3d09e2d28d",
+      "sha256": "88c3033f07c1f3599668a90db9b13837d9a3dc5d9e6f731cbc00dcf9eec3fdfa",
       "caseId": "v2.admission.binding-match.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "FIRST_USE"
@@ -43,7 +43,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "77b589c049fada18fa8ce72fa2555c79dc2832c68da0f50d60ebd38c8d5ed876",
+      "sha256": "0c9e3d278d02d8de787d99fac51fa04e730f5da85c0842e95d8915638974f501",
       "caseId": "v2.admission.first-use.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "FIRST_USE"
@@ -56,7 +56,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "0ed534162897edd43d134d2998a49048a38f96dd6ab8c964dba6d3127dcb7ff4",
+      "sha256": "c8911264459ba3606cdb5763338fa438c108551c6d5fa74da9cc3a07ccb79bb1",
       "caseId": "v2.admission.replay.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "REPLAY_DETECTED"
@@ -69,7 +69,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "2c08e62e0a814a57e5a97ca81ac5501d8616c1abafb91b2018ed8278a66ff9c2",
+      "sha256": "0eff65be5450f25ab0c253981a15d5a1c517ec0a001d8beb38ae3ff7dc02cbde",
       "caseId": "v2.base64url.padding.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "NON_CANONICAL_BASE64URL"
@@ -82,7 +82,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "bf27b14e6e880c6970a310b54edf740e08dc245d02f0ac2948ae1fce6ef8f1a9",
+      "sha256": "0ca41b723c900570f8f34ecbc60badcbdb78713abbc5b5d9166735667b8376b8",
       "caseId": "v2.binding.cell-incarnation-host-epoch-client.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_BINDING"
@@ -95,7 +95,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "8d2d09f874ee50b8efd9f39d75751f4a5b1e5de6b7113d44709ae4c75d7af8fb",
+      "sha256": "1d0c8d69dadccf20ef9ec759b8e5bc656745831d8c9409875ee3aeef5910bc4d",
       "caseId": "v2.close-codes.registry.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_CLOSE_CODES"
@@ -108,7 +108,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "4c56ebb7bf58c72d6957cb2773d5995f752121252468afcacd195e92d5b1d4fa",
+      "sha256": "e35d513059981ad8548d394b6e3163f358c8998c156cbb5961c60c2bc45eba53",
       "caseId": "v2.conn-ticket.first-use.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "FIRST_USE"
@@ -121,7 +121,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "d610e7d2dc1a3f2dc93f9ee3295cb7726940f75ad7a5830a2353a67a7bd7d932",
+      "sha256": "091603018dedf4e1d416f6823e515bebe8964605357d570d1225bf8826d9b91d",
       "caseId": "v2.conn-ticket.replay.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "REPLAY_DETECTED"
@@ -134,7 +134,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "07d29f393bff143a86ebdae42b996ceba46c5002c4e5940b49503668b3ef61d1",
+      "sha256": "34819b5411f1caeab28c2bf92f307e2b998ab19becfe58d69ee2cda9e9edf20c",
       "caseId": "v2.frame-boundaries.mixed-plus-one.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "FRAME_TOO_LARGE"
@@ -147,7 +147,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "b554a1539c74820ca55e1ea4677104c09e3d62827de525b9c589db34414e747c",
+      "sha256": "63effdde322de628c9610b4f9097ad8011b995678f92c0eed508a275bd7ba797",
       "caseId": "v2.frames.boundaries-plus-one.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "FRAME_TOO_LARGE"
@@ -160,7 +160,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "688502b157885313e8891b8f2f7d0304c3368a6f10b56ece3c63823f53d84922",
+      "sha256": "6ef178dc152bafce083351ebcbc6b2a9434597558667073c4d9b3650cb01e6ff",
       "caseId": "v2.frames.exact-boundaries.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "AT_LIMIT"
@@ -172,7 +172,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "76d5fb7f4396ba97a998a7d1422778b7b95e681f37274d50e87efebf02330a8f",
+      "sha256": "1ac5ad64ac0bbf990aa8cacb738435c6c2588c81e61d74b4cd941276783c79ea",
       "caseId": "v2.heartbeat-control.ack-confusion.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_CONTROL_ACK"
@@ -184,7 +184,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "95bc2cb1a38922ded23e5b6dd62a9f553a966a8f6d6a9d71014930fa0404cbed",
+      "sha256": "f2a7f3b0d22fc0613ad4515423777cc6136a20aab2896fe76d9c663699afc2a6",
       "caseId": "v2.heartbeat-control.ack-replay-advanced-cursor.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_HEARTBEAT_CONTROL"
@@ -196,7 +196,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "210d43940df5a5d7ee3027a3eae25f1c6b0e37ea36f6f7310d6bf744474a23ef",
+      "sha256": "46cdffb25ebb4e6e12eccfd5bd68ba775d7533d59598296963b7b0e4542b726c",
       "caseId": "v2.heartbeat-control.independent-acks.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_HEARTBEAT_CONTROL"
@@ -208,7 +208,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "e8a548b6643d037f2a50aeb76c3f8319268a1bfa8d74f14f3e0631fbe856af30",
+      "sha256": "b2584718f1b6aad43ec2dcf83fa3864a23d7d0f92f8cc78efaf3d73ce34bd24c",
       "caseId": "v2.heartbeat-error.legacy-problem.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_HEARTBEAT_ERROR"
@@ -220,7 +220,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "c9b6b179f1d1f1213787ca6913d0e5ae6914d10c0827dc59d8ed4a958348f8dd",
+      "sha256": "46070959013fc3a8375051ba1f7c78f105e90fb5b4f9464b72f620647c204af6",
       "caseId": "v2.heartbeat-error.relay-extra-field.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_HEARTBEAT_ERROR"
@@ -232,7 +232,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "aa74376ee88855c59f6a07435188ff921daa3559ecd38691ccdf9a3970512518",
+      "sha256": "4841d138cf291292941d0bf263d5ce0093c6b0dbaaafe07dec68b75700cc5f34",
       "caseId": "v2.heartbeat-error.relay-matrix.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_HEARTBEAT_ERROR"
@@ -244,7 +244,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "8d0d42ab2954c78ed1ec144d6aed37c36f09efd8b4fc8fec23bac04f6bedc027",
+      "sha256": "22b409c738ce41761ca9f5bf4ffab3e0d383d79b49cd2b23397abe3e90dba1b0",
       "caseId": "v2.heartbeat.legacy-shape.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_LEGACY_HEARTBEAT_SHAPE"
@@ -257,7 +257,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "27cbec612d35d187de4471384d5fa24ff8fb22738a70abb55daf1b6af5ef788b",
+      "sha256": "8f2c0a287ae7d944942758fdd0f54e5bff40bc033cedebe61aa52058ec7ffba7",
       "caseId": "v2.jws.cell-ops-operation-binding.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_OPERATION_BINDING"
@@ -270,7 +270,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "8dad835ea2cffd41695312ce374486a2a2617e641797981d4b487a8687f868a7",
+      "sha256": "e1bb8f4618f2d228511b871286aa921096abc16f76b9a8605af2f9f262bc58bc",
       "caseId": "v2.jws.cell-ops-fence-binding.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_OPERATION_BINDING"
@@ -283,7 +283,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "0fd60739985db5a359c5551c8413fd1534ac007ce1fabd83274d9fa42fbcb896",
+      "sha256": "5a6843c9afee152982650d05a10cbdc09af4a7b93062d1b5e7a2cf9ff3be6daf",
       "caseId": "v2.jws.cell-ops-lifecycle-binding.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_OPERATION_BINDING"
@@ -296,7 +296,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "b25728bd1d7c609a15ac072ca1a72ed1c4580ea630a9b404b0285302888bef03",
+      "sha256": "267be91d85f7136665eac592505dbbd41436e095eb0bb8106bd0c7afd3a58faa",
       "caseId": "v2.jws.expired.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "TOKEN_EXPIRED"
@@ -312,7 +312,7 @@
       "caseId": "v2.jws.expiry-boundary.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "TOKEN_EXPIRED",
-      "sha256": "6ff6c866c8e828c081f6ffa9e2990506df7c7f0265584fd123e95e5d2fd43338"
+      "sha256": "98c33bb1f8aa516d6c21837e12977d53b62d0b0993279fe8a76328a04a171e21"
     },
     {
       "path": "fixtures/v2/jws-short-ttl-valid.json",
@@ -325,7 +325,7 @@
       "caseId": "v2.jws.short-ttl.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_JWS",
-      "sha256": "6765e4848d51a0b517fbcf52fefc7c11bfafa2e3a552292c7c1ea98c81170ca3"
+      "sha256": "e1b67d2e3de64ef922a168a1567fcdc1aeffb6547a841fe94848ff78ef7bad49"
     },
     {
       "path": "fixtures/v2/jws-ttl-over-limit.json",
@@ -338,7 +338,7 @@
       "caseId": "v2.jws.ttl-over-limit.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_TOKEN_LIFETIME",
-      "sha256": "e656b4dd62b5bc5e472b085f8b61f9fc720525b838a83ef0aa07ab9dd010a50b"
+      "sha256": "8ebbd48b11a30a095561d5a47cc3977b7a65b3ded1e802fa351f221a8b31c0e8"
     },
     {
       "path": "fixtures/v2/jws-ttl-zero.json",
@@ -351,7 +351,7 @@
       "caseId": "v2.jws.ttl-zero.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_TOKEN_LIFETIME",
-      "sha256": "2ec2fa14e130f2e6e3f5b5ce4e516f0aa46213750a57d02bbb9e4aa1f7f1a263"
+      "sha256": "a858df24e5c8cd39b83a7af265bf60640db3d24dee77bb49e500e1ff1913a624"
     },
     {
       "path": "fixtures/v2/jws-unknown-kid.json",
@@ -361,7 +361,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "60300524d81518278d5eba8d62b39ce94ff7851541757d87151501647cec475a",
+      "sha256": "705d87417172f6b6646ca56968a3772eb1c1caf3a95dd76b56103ef2f24a545a",
       "caseId": "v2.jws.unknown-kid.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "UNKNOWN_KID"
@@ -374,7 +374,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "65af3fa9f36a36c52fd3a908ca4e9b7015b56e7683b487db696806f3d23ebb9c",
+      "sha256": "cca1fb174936af3a1eeaf85ca466f072d1ad97875edc075261ee986f6c3c87fc",
       "caseId": "v2.jws.all-token-types.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_JWS"
@@ -387,7 +387,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "c708456577b3580521687423c9f7c58e83e5a2c81b70a2f228c74810f485bcde",
+      "sha256": "341b74194787de749068af11e185c8679feaffe21dc7239cf273610159baa260",
       "caseId": "v2.jws.wrong-alg.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ALG"
@@ -400,7 +400,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "458b25b57ba3339b8d2b123309960b0348347dafbaa187f307582153005dfce2",
+      "sha256": "6beb7c03d1d1ef9ffe034add5b99fcb67f87a2ab5a3c6ca1cfe3cccc10f17315",
       "caseId": "v2.jws.wrong-audience.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_AUDIENCE"
@@ -413,7 +413,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "38e5f4203a53af50774ff3887acf39b0d55cc9ad8522512d255b629637e7a1c6",
+      "sha256": "afb192cd8cffeecef56314453f77514b4452e0d0dadafc3aa1f8950c6cded03d",
       "caseId": "v2.jws.wrong-key-purpose.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_KEY_PURPOSE"
@@ -426,7 +426,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "5e050c1e4890b802cd9ade7a437005fca82f8aaa13be6364a62072423d32a475",
+      "sha256": "761a61ad1c6672ed2601b229722a6b86d54648f16c7b0244bcdc3a19f5d4d54b",
       "caseId": "v2.jws.wrong-typ.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_TYP"
@@ -437,7 +437,7 @@
       "applicableComponents": [
         "cloud"
       ],
-      "sha256": "f25979e8fe3470cf0b55e41f07639f28aa201a2e7ea1c4d3c14f27756172c11e",
+      "sha256": "73406e2133ef30484e50363f0a6b5727f8bfae0ea8a71f61dc699d565a7f40f3",
       "caseId": "v2.lifecycle-operator.private-origin.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "PRIVATE_FIELD_EXPOSED"
@@ -448,7 +448,7 @@
       "applicableComponents": [
         "cloud"
       ],
-      "sha256": "87805646b9c0bede2fc29b6fe2ae5c43241fbce14dbd1aa3f2f9a57219a29715",
+      "sha256": "526560676eaf0e3cf36df778750644e11e833a5b52055dfc43c50764fd3adad1",
       "caseId": "v2.lifecycle-operator.prepare.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_LIFECYCLE_OPERATOR"
@@ -462,7 +462,7 @@
       "caseId": "v2.lifecycle-snapshot.private-field-reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "PRIVATE_FIELD_EXPOSED",
-      "sha256": "b482e5edd08cadf4fc599a683790168a3b4bec726fc56e4b48d229b2dc6d69bb"
+      "sha256": "344a3e94e59444c2c7c5cea60f24eade63ea909c40b7432853b2da0184690b16"
     },
     {
       "path": "fixtures/v2/lifecycle-snapshot-valid.json",
@@ -473,7 +473,7 @@
       "caseId": "v2.lifecycle-snapshot.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_LIFECYCLE_SNAPSHOT",
-      "sha256": "63cba3243136f28c94620cca3c25289b929a6909a23bd6d453e52a381a3da025"
+      "sha256": "908bc583b23986280a15f866bc36a19a71466bfd499c2169327ea153298d6d11"
     },
     {
       "path": "fixtures/v2/origin-browser-required.json",
@@ -483,7 +483,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "fd53f892fc7ba9f10ae4725aed5050ea9908719f52b28adf047b55c8ae369f7b",
+      "sha256": "eb89e8cbda08f8b0b2280a6bf667b49c8650d081b7acf733b2e15b1f9264cb97",
       "caseId": "v2.origin.browser-required.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -496,7 +496,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "cb24a078aa74c41239e06dbfc0f883750b065233fb6161a4ac4362aeba33f769",
+      "sha256": "ef92001ce2b53e27ecd8f30b6948c7a0bef61c0650582ad1f58e1dfd12cd4519",
       "caseId": "v2.origin.explicit-default-port.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -509,7 +509,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "12711208d9429be5f20e828a1b9329ffce469c1033c25ea14f486668de00de2a",
+      "sha256": "1665ce1aaae599fd4066da83b9f5d3ab5be06709b164b42ff1c3fba007ce6e6d",
       "caseId": "v2.origin.empty-dns-label.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -522,7 +522,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "dff93c600b84a0d67edde60d277a112166be63fb8a0c0159ef14f7718de38128",
+      "sha256": "60c14d0faa19932649303e738ab538765c338050c8f1088d002b4849ea30e0b8",
       "caseId": "v2.origin.ipv4-literal.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -535,7 +535,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "197aedcb8f4aa0b5766a9cd82ae02ddaa2810f219e3f36e145d4d52f11f858e1",
+      "sha256": "a7fdac3847736e0aebb75ead0464c8b440e8810cba5aecac3c8acad8dfd11abe",
       "caseId": "v2.origin.ipv6-literal.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -548,7 +548,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "481bbb7f88ee19393f6fe38fcc47e8e10e2bb4788d90185843004dc26cddde98",
+      "sha256": "504cf60163c24a5b7e7f484f42d14c73193ef96b8cf6027acd2c8df800f4800f",
       "caseId": "v2.origin.trailing-label-hyphen.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -561,7 +561,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "9abe10836f8d4b02b39b2d6ae007856aec066596d8fc2ec1efc34ea7a637c933",
+      "sha256": "722ecc36a50aa41d06a348aaa93f9d53cab5e2f36343c56050759c5f6f66cf18",
       "caseId": "v2.origin.nondefault-port.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_ORIGIN"
@@ -574,7 +574,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "8885f079ae7959b8a036de63a85a310e9bed229b0a61c1f823604bdebd80c46f",
+      "sha256": "5cb0b37446419a1318dcda342719a7372c678368011e8ea21342cbf7f24bea04",
       "caseId": "v2.origin.port-out-of-range.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -587,7 +587,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "e91f6471095523b1906c52df053c962d4c64babe5222deb21c53fa696c609f2a",
+      "sha256": "1608179a4a9438a9cdcc573cf21f544f1c469e7956e8f7b21d5ea691d4af9fd0",
       "caseId": "v2.origin.userinfo-query.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_ORIGIN"
@@ -600,7 +600,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "fbbfb17d0569331af6dede316219f861d8b9325b6ff392c40903ee24ea745765",
+      "sha256": "c8d29366421f7d1e9b4de7c74b248419029e9642c04d0b9f0b3e4f158ee85236",
       "caseId": "v2.origin.allowlisted.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_ORIGIN"
@@ -613,7 +613,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "9b43bfef466ca1a75439a8e170b8519e381dade40fa5c751dfb6dc7b28441b9a",
+      "sha256": "4d3eff6ad40248d6893f2b170c2bbe33df37f562a33c64a2493785815ff6efaf",
       "caseId": "v2.private-ops.body-conflict.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "COMMAND_REPLAY_CONFLICT"
@@ -626,7 +626,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "41a39b93ab4cc768c007b926ae521dfc465e5be419be06f0a590b88ed30cf12c",
+      "sha256": "fc07b40898efff223c867319e7817cc2406cb753c0ac8de248a28bf4442d3028",
       "caseId": "v2.private-ops.lifecycle-deadline-too-long.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_DEADLINE"
@@ -639,7 +639,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "923c643436f51a358909fd446266429b6b69b01bac4889905bc1d258a3296ede",
+      "sha256": "a5399a26692f828eff5c7280c41fed27d7b90f9cdef30fbdaf3af220b02ee684",
       "caseId": "v2.private-ops.lifecycle-deadline.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_DEADLINE"
@@ -652,7 +652,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "cac4f93d62b83c365e4144abe2118042782315742d6db7305cee8c0a73ff60ed",
+      "sha256": "03c30d0189a898bd235a01ee47dcd1b2fb13e14ffd63d13594912cc98ebd92e8",
       "caseId": "v2.private-ops.exact-replay.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "IDEMPOTENT_REPLAY"
@@ -665,7 +665,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "b427283b089ba7a661f2f53649de678b720236af0615c07ea75fcdad8921f80b",
+      "sha256": "7fbb010a269921861e49c27ccddcfdd534b37e20c2ffe7fc8ee693358740065a",
       "caseId": "v2.private-ops.future-issued-at.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "COMMAND_NOT_YET_VALID"
@@ -678,7 +678,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "c8778f65c519653a0a019ad54a37f709527403cb722c9cc1cc6b6cb230bcabf7",
+      "sha256": "73e94b3077f2a892510b838941eb40f0ef678b45a339a3b50dc6e51b806d97cb",
       "caseId": "v2.private-ops.stale-generation.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "STALE_NOOP"
@@ -691,7 +691,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "c83ff1b06da2b20d377967877809b63af3cd4f5fbe4b508d0f0990fa62791be6",
+      "sha256": "3d1378628ae765926c3b5285b90ace3100c182684e5ab1c1f5cf06dcb6341336",
       "caseId": "v2.private-ops.stale-issued-at.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "COMMAND_STALE"
@@ -704,7 +704,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "6124a297a6761ebd8c9e186836733e4ef5ac49a4a86329161dffdd7aad705a33",
+      "sha256": "d76fb75a868fc54c96060c627748d9f7d084555b157a74e700c7326bba0f4c30",
       "caseId": "v2.private-ops.commands.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_PRIVATE_COMMAND"
@@ -717,7 +717,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "a8f0beac855eaa06de480801f3f8f2fb922b6f81fbd1ba88c71c2829b88bfe0e",
+      "sha256": "3029c5e7ce6154fe4d0733f45b6563b80d145c5d4c2a0bea34e3a9a72fce4508",
       "caseId": "v2.private-status.future.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "STATUS_NOT_YET_VALID"
@@ -730,7 +730,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "bfb7ebc3fb6e792da05fd5d8b7af1f8917cb48852524c20e7ebf03e6906b0e77",
+      "sha256": "3dd6eb188e167927cc8ecea2131fa80db6c115916473a38115b85c4af3bc0e33",
       "caseId": "v2.private-status.jti-replay.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "CELL_OPS_REPLAY"
@@ -743,7 +743,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "dabdc57a91308407451d392b68ac00cf01393032dfa9b54e80f0c8ed2ea74784",
+      "sha256": "c733f770b071e2b93c5e6537a1e5b630323fa721b40ea9fd8c0e141a3e029185",
       "caseId": "v2.private-status.nonce-binding.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_NONCE_BINDING"
@@ -756,7 +756,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "80345fbf66f8ebf223cc1d3eb0538aa89fc43701b4bf80301d3149e0e565f458",
+      "sha256": "bd2b9ae30ec07697d74f3b226bfda3cd48eaf0d8db17a2322c9380d54f1965e9",
       "caseId": "v2.private-status.nonce-replay.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "CELL_OPS_REPLAY"
@@ -769,7 +769,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "20aedba13725172226a38da61d086864405b483e6ca2f69219b6b962bcb47753",
+      "sha256": "aed7558e328dd7c255365db84413c18ba57959d26985ef203c2cd5d0aef9a2ff",
       "caseId": "v2.private-status.stale.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "STATUS_STALE"
@@ -782,7 +782,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "f0d298ae8df87bb64176cd91c2e67ea1dba174eaaa6c0c2f95b4fd13b584a25c",
+      "sha256": "ebfa539262ff36f6d2c6094c16b550613e32a05cdda2087e2405c76800113663",
       "caseId": "v2.private-status.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_PRIVATE_STATUS"
@@ -795,7 +795,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "434a422a348676c61de60fbfaa7f072708e07f35907b10fdbf67a1db82d8d9fe",
+      "sha256": "844e7e0665ef83b49be71b3e899b17eef96dfef17cd02f0c7cf17412b9bc0084",
       "caseId": "v2.private-status.cell-binding.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_BINDING"
@@ -808,7 +808,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "d2202b5f4f0796f4503ef6bd444954168b7cf0caa6e196dd266a2d9ffd0622cc",
+      "sha256": "5f6453eaaee653a18feb335c6f00cfb77c8aabba3d55c4435dc00ccdc3c99682",
       "caseId": "v2.private-status.carrier.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "WRONG_TOKEN_CARRIER"
@@ -820,7 +820,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "df847334287eaeebc5b2669cad3f3f939a542f912ed70369dca8c45bdd0b5730",
+      "sha256": "9941df8aa0a35894c75a34bfade93f1a98b997ec3ca291f415ade8eb8058b5c7",
       "caseId": "v2.runtime-proof.body-binding.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "RUNTIME_PROOF_BODY_MISMATCH"
@@ -832,7 +832,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "39c793d1a18140954b3bd4d4e3c9970c985cb91db02808b7454bf1a979951dce",
+      "sha256": "a1b9b1b0492b0f9cdcf9ac8fe698784d8576efff43ee80afcb9b4d512df45855",
       "caseId": "v2.runtime-proof.expired.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "RUNTIME_PROOF_EXPIRED"
@@ -844,7 +844,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "7c4648697f54d187b36487d3df7a4df7b262a62c2e799cb935d7110f71b65227",
+      "sha256": "58a0000facf74c3e568a7b3c8b9fb693f2576de51fbee70ecd2a06796b20c8fe",
       "caseId": "v2.runtime-proof.nonce-replay.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "RUNTIME_PROOF_REPLAY"
@@ -856,7 +856,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "68462a0ef46f9f71d7695df51620d0682f8675d7fdc972f3d5993dbc43feb22b",
+      "sha256": "71790ebd5103a73b6cb338901b0d6e6b4213ae6a839c741d36c44cb993242c75",
       "caseId": "v2.runtime-proof.body-carrier.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_RUNTIME_PROOF"
@@ -868,7 +868,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "ce54221fe69556673570499983ba75b24fb2cd98808042e6cb0e9cb84e9db761",
+      "sha256": "4d06b1ee0cd303ce9ae732226efa811b44f327acc519af10452a3e874fea6043",
       "caseId": "v2.runtime-proof.bearer-carrier.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_RUNTIME_PROOF_CARRIER"
@@ -881,7 +881,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "e252cfc44a050e6890e8b395d168736bfbbddb1621f1c7f00c09421891125ecc",
+      "sha256": "8b750583014bca96ff94fda05bdca5208442284dd3c32540b636f7cb88319451",
       "caseId": "v2.runtime-tuple-hash.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_RUNTIME_TUPLE_HASH"
@@ -893,7 +893,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "f9c50b7a7507e54aa5da607814bbe9566fd09df9e2ea2844d27eede0d3dc3837",
+      "sha256": "17bd69b5111de79f35959516ac0b1264fa2ea5f5b2b5ad9259841265bdbf96ca",
       "caseId": "v2.session-transition.batch-gap-unacked.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "SEQUENCE_GAP"
@@ -905,7 +905,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "226926f3060b4cd74d64b00c4a97d574fbe46ba8c53fe0b0f73301a862f555ed",
+      "sha256": "db3e9928ccc1c790ab0ad51410e7e56aba45e5ee224a98158e560ad82d5f73fe",
       "caseId": "v2.session-transition.exact-replay.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "STORED_ADJUDICATION"
@@ -917,7 +917,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "0c9c39dcb9104aab01d83f813e6b65d99a0f20856128ee3d8ab1fe509ab4bd3b",
+      "sha256": "62f49093cf276b84ce72d70920f8aff82721974f294c48924b6ea084bb064adc",
       "caseId": "v2.session-transition.sequence-gap.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "SEQUENCE_GAP"
@@ -929,7 +929,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "1bf2564ebc38a2692471d74f188ed3dc74c33e016ba5a4c0e8b243588416bee0",
+      "sha256": "5da6739c2ad1286beb28877431bab3c962f1fdf39fa08b5df518e5d2ec1d64a8",
       "caseId": "v2.session-transition.id-reuse-new-sequence.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "TRANSITION_REPLAY_CONFLICT"
@@ -941,7 +941,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "2cd1a722d06981d4dd95195bd021362eb7a5c19ceb5792ec347efabc0fc867fd",
+      "sha256": "44f089c966db3839cc771d73783b0ccd909dafb4e4ac73caadf16f61dc429ff8",
       "caseId": "v2.session-transition.pending-close.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "REJECTED_ILLEGAL_STATE"
@@ -953,7 +953,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "3e05d345a245cc957a32a5f819cad473720ed88b7760a8e9b56c9314858e017c",
+      "sha256": "54349f3c9ab26e069a1c94602c0d9b0504c434376cd2d2758742b405f73495ab",
       "caseId": "v2.session-transition.mixed-stored-batch.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_SESSION_TRANSITION_BATCH"
@@ -965,7 +965,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "35d5b318d547665aa7b01fd1ba27ef7d20a3e31c44bd70f980e6e93a7e250839",
+      "sha256": "84071d2785039c84317009b25423311d0602c24bf9d5c84b653310fc363fa60a",
       "caseId": "v2.session-transition.reason-mismatch.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "INVALID_TRANSITION_REASON"
@@ -977,7 +977,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "37296d5f6fe0b0fcbbc7c99caced501367f6f4da18c8d21c9652fd1705669339",
+      "sha256": "e3162a890371e877115c048513957bbc08654fdaaa87c4fd265e75ed007ad97d",
       "caseId": "v2.session-transition.replay-conflict.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "TRANSITION_REPLAY_CONFLICT"
@@ -989,7 +989,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "8fea4b660b63254da438afb3ab798ef623d2cce33edda3d2ee7e334136b98e58",
+      "sha256": "229f752b395e2d6463cb80fa52fa26b7b86d53df1242e0f8d2248c66d5f31861",
       "caseId": "v2.session-transition.sequence-reuse-new-id.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "TRANSITION_REPLAY_CONFLICT"
@@ -1001,7 +1001,7 @@
         "cloud",
         "hivecode"
       ],
-      "sha256": "3f0b394d256371e9541cc2af0626c266f61f3e94dc5340600dc3fa0bef782b24",
+      "sha256": "657d70ed4b7c1f9df491ac60becbd92488f81b59bd451103c85b62b0e4b6d19f",
       "caseId": "v2.session-transition.activate.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_SESSION_TRANSITION"
@@ -1014,7 +1014,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "006490d8be5f1a59eba7bc1689f1d504859879fc228e44b8130b4f4c3be3e3c3",
+      "sha256": "d68393c658d551d53c93b686d10fcd124234658a56cfaafd87e9a274aaded5d5",
       "caseId": "v2.wire.duplicate-key.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "DUPLICATE_KEY"
@@ -1027,7 +1027,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "64f0a4ea184d80e761c07f54ea261c4c9a9ae5ab4a1ab9d620aec960e7980a96",
+      "sha256": "aa2a009e773c07ab4d277b198a2e4b0f156784b410490f2d6a7278208f6b45b9",
       "caseId": "v2.wire.forbidden-secret.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "FORBIDDEN_FIELD"
@@ -1040,7 +1040,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "7cec7994f8294694fed330fd4e1b9cd37183d937858488cdd78d1dceb9b0368f",
+      "sha256": "59292f0956b5f52926af650f7ac925a1be8fb5ca19bc500b2dff6c413a8d1bda",
       "caseId": "v2.wire.messages.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_WIRE_MESSAGE"
@@ -1053,7 +1053,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "b8823d037b33ad250b46929aca16df73d14598e34d1fac120c3bb76d7ff850fb",
+      "sha256": "76449eb1a9fb943a084ca8c4892501d86d15bc3f0e72ebe1e25a8c574f57b21b",
       "caseId": "v2.wire.unknown-field.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "UNKNOWN_FIELD"
@@ -1066,7 +1066,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "601afed2ea82345decf124bdf790a21316e0a3601b8c6c9b64e0083d721f700e",
+      "sha256": "40382689a0a02311f944198069e86b3e0f50cdb01bbfa16654482c054eb8ed37",
       "caseId": "v2.x25519.low-order.reject",
       "expectedVerdict": "REJECT",
       "expectedReason": "LOW_ORDER_X25519"
@@ -1079,7 +1079,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "791e854e2bd567dd4fe8b4112f9488c0aad13c60efdc3840b5c6f46c4f70d22f",
+      "sha256": "a60e80027cf89ea8b086f09f2f016e65ba982637a85349fc2b19fdd12a6481a2",
       "caseId": "v2.x25519.host-key.valid",
       "expectedVerdict": "ACCEPT",
       "expectedReason": "VALID_X25519_KEY"
@@ -1092,7 +1092,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "7086effcb9350cd2d963b17309ecbebd3214bec675ac79bb20966187bf519023"
+      "sha256": "173309ebacf8f9e2652ef0bc48869f7d61a26ba2b19146785dc59b86ed3c8087"
     },
     {
       "path": "registries/close-codes.json",
@@ -1102,7 +1102,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "06fda620c31a3d8c13d8cb397661d7e25db773ed009433b97a27a7917c5b1b58"
+      "sha256": "0262a94cac91df72d619dba685f4004950ac8c95aeb3f05eaa87616011f0b22c"
     },
     {
       "path": "registries/credentials.json",
@@ -1112,7 +1112,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "96b94ba7f7b3a200781f365c31b0278dfc811a288cd4fcda9e60f8b38d120506"
+      "sha256": "8c514755183fedd07e454f45e478ef8d2a0e1b49b348286277661df5cf1e57be"
     },
     {
       "path": "registries/feature-flags.json",
@@ -1122,7 +1122,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "c647db3f54e8479c6b72a274c4eca7182d019b039f4243ac9254fb0df7109b14"
+      "sha256": "390b368e354a1baeb90756dcc15492c63210482b9a09bd1ec264884c42d0abdd"
     },
     {
       "path": "registries/limits.json",
@@ -1132,7 +1132,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "233bcfc857520f2c81b4befec20f03de99f8335ef33a4da31e5d815032f7ed61"
+      "sha256": "f34b05ae776c56d0d1a674a2aabab1a9f65ccb01390f50f4a37d317b5077249a"
     },
     {
       "path": "registries/security-boundaries.json",
@@ -1142,7 +1142,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "9a676c4a8654b3e86488fd7de19f7edcdd9dc7caf0548793bf23b52a88b1bf0b"
+      "sha256": "a2a2a0ef64ed9009bf963aaf4dcbb328dab037899f357f520fec2e472dfe3d3c"
     },
     {
       "path": "registries/state-transitions.json",
@@ -1152,7 +1152,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "b9bb20723d9a861640c3ba40f8311fef4b0fa3c091f31c3e2ab4487066d5c044"
+      "sha256": "90c05cf0f611371eaab559e69fa404701a443b06ccc4462790cdb599d018bc7b"
     },
     {
       "path": "registries/test-keys.json",
@@ -1162,7 +1162,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "fcbda0ebfa4676415d4cb65987e954a76bba3c715a44e04839df7ea47ccaef82"
+      "sha256": "c4b86cc08fefbab99f4d174c5c83392b0e5bab34bbe0860dd9a09c895410db32"
     },
     {
       "path": "schemas/common.schema.json",
@@ -1182,7 +1182,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "95fe6219fb7c9c1ac516149b9b6cada0a91d99402a8abb1c2176817707adcebf"
+      "sha256": "b8772937b1798f0dc7f540400c0002ae8645b19b209f49c13727097c49fb3795"
     },
     {
       "path": "schemas/contract-source-receipt.schema.json",
@@ -1192,7 +1192,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "f144bb94b1f183a7dfca4f89f9f537cffae4e23380cd53730aafc82a893a0f19"
+      "sha256": "8f7d253923b32e4b1c0a587f92dc8f1ea337b05b2668bd334700efcef4520693"
     },
     {
       "path": "schemas/control-lease-refresh.schema.json",
@@ -1211,7 +1211,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "b4d8dad3bf10e53fcd0c0224f064d3fd533407c5829c61d3a5c15ce5c78b8822"
+      "sha256": "7489f695092c63631ff648541883047e469384f9f7f689f1993ffe9b11923b7c"
     },
     {
       "path": "schemas/fixture-manifest.schema.json",
@@ -1221,7 +1221,7 @@
         "hivecode",
         "cell"
       ],
-      "sha256": "b74de59adecc43f312d2c6769ea6faf69aaeed038cd82d0319b30e81ff7cb722"
+      "sha256": "a184efa3e437f76a9aab3c89fbbfa9eec8636a5dd1cb1f90f14a154ace14b041"
     },
     {
       "path": "schemas/lifecycle-operator.schema.json",

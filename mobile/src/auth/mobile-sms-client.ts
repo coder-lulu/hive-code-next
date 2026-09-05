@@ -2,12 +2,13 @@ import * as SecureStore from 'expo-secure-store'
 import { getRandomBytes, randomUUID } from 'expo-crypto'
 import nacl from 'tweetnacl'
 import { hivecodeProductConfig } from '../generated/product-config'
+import { parseHiveRelayJson } from '../../../src/shared/hive-relay-json'
+import { parseRelayRetryAfterMs } from '../../../src/shared/relay-retry-after-header'
 
 const DEVICE_ID_KEY = 'hivecode.mobile.auth.device-id'
 const DEVICE_PUBLIC_KEY = 'hivecode.mobile.auth.device-public-key'
 const DEVICE_SECRET_KEY = 'hivecode.mobile.auth.device-secret-key'
 const REQUEST_TIMEOUT_MS = 15_000
-const DEV_PRIMARY_TIMEOUT_MS = 3_000
 const MAX_API_RESPONSE_BYTES = 2 * 1024 * 1024
 const MAX_API_ERROR_MESSAGE_CHARACTERS = 512
 const MAX_API_ERROR_CATEGORY_CHARACTERS = 256
@@ -31,7 +32,13 @@ export class MobileApiError extends Error {
   readonly category?: string
   readonly retryable: boolean
 
-  constructor(message: string, status: number, category: string | undefined, retryable: boolean) {
+  constructor(
+    message: string,
+    status: number,
+    category: string | undefined,
+    retryable: boolean,
+    readonly retryAfterMs: number | null = null
+  ) {
     super(message)
     this.name = 'MobileApiError'
     this.status = status
@@ -53,22 +60,6 @@ export function mobileApiUrl(path: string): string {
     throw new Error('登录服务路径无效')
   }
   return `${apiBase()}${path}`
-}
-
-function apiBaseCandidates(): string[] {
-  const configured = apiBase()
-  // The local HTTPS gateway intentionally binds to the host loopback address,
-  // which the Android emulator cannot resolve through the reserved `.test`
-  // domains. Development builds can therefore use the host-gateway HTTP API
-  // as a transport fallback while retaining the test-domain URL as primary.
-  const androidDev =
-    process.env.EXPO_OS === 'android' || process.env.EXPO_PUBLIC_ANDROID_EMULATOR === '1'
-  const isDevBuild =
-    Boolean((globalThis as { __DEV__?: unknown }).__DEV__) || process.env.NODE_ENV === 'development'
-  if (androidDev && isDevBuild) {
-    return [configured, 'http://10.0.2.2:8080']
-  }
-  return [configured]
 }
 
 export function encodeBase64Url(bytes: Uint8Array): string {
@@ -152,8 +143,8 @@ export async function requestWithMetadata<T>(
   let response: Response | undefined
   let payload: unknown
   let lastFailure: unknown
-  const bases = apiBaseCandidates()
-  for (const [index, base] of bases.entries()) {
+  const bases = [apiBase()]
+  for (const base of bases) {
     const controller = new AbortController()
     const abortFromCaller = () => controller.abort()
     if (options.signal?.aborted) {
@@ -161,10 +152,7 @@ export async function requestWithMetadata<T>(
     } else {
       options.signal?.addEventListener('abort', abortFromCaller, { once: true })
     }
-    const timeout = setTimeout(
-      () => controller.abort(),
-      index === 0 && bases.length > 1 ? DEV_PRIMARY_TIMEOUT_MS : REQUEST_TIMEOUT_MS
-    )
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
     try {
       response = await fetch(`${base}${path}`, {
         method: options.method ?? 'POST',
@@ -208,7 +196,8 @@ export async function requestWithMetadata<T>(
       apiErrorMessage(payload),
       response.status,
       category,
-      isRetryableApiError(response.status, category)
+      isRetryableApiError(response.status, category),
+      parseRelayRetryAfterMs(response.headers.get('Retry-After'), 60_000)
     )
   }
   if (isRecord(payload) && typeof payload.code === 'number') {
@@ -219,7 +208,8 @@ export async function requestWithMetadata<T>(
         apiErrorMessage(envelope),
         response.status,
         category,
-        isRetryableApiError(response.status, category)
+        isRetryableApiError(response.status, category),
+        parseRelayRetryAfterMs(response.headers.get('Retry-After'), 60_000)
       )
     }
     if (envelope.data === null || envelope.data === undefined) {
@@ -276,7 +266,7 @@ async function readApiJsonWithinLimit(response: Response): Promise<unknown> {
     if (new TextEncoder().encode(text).byteLength > MAX_API_RESPONSE_BYTES) {
       throw new Error('mobile_api_response_too_large')
     }
-    return JSON.parse(text) as unknown
+    return parseHiveRelayJson(text, MAX_API_RESPONSE_BYTES)
   }
 
   const reader = response.body.getReader()
@@ -305,7 +295,7 @@ async function readApiJsonWithinLimit(response: Response): Promise<unknown> {
     bytes.set(chunk, offset)
     offset += chunk.byteLength
   }
-  return JSON.parse(new TextDecoder().decode(bytes)) as unknown
+  return parseHiveRelayJson(new TextDecoder().decode(bytes), MAX_API_RESPONSE_BYTES)
 }
 
 function isRetryableApiError(status: number, category: string | undefined): boolean {

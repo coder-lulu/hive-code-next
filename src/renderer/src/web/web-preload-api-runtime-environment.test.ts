@@ -9,6 +9,35 @@ import {
 } from './web-preload-api-test-harness'
 
 describe('web runtime environment identity', () => {
+  it('enters the existing app with the account Relay client without persisting connection material', async () => {
+    const globals = installBrowserGlobals('Linux')
+    const { WebAccountSession } = await import('./account-runtime-relay/web-account-session')
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    const session = new WebAccountSession(vi.fn(), 'https://console.hivekernel.com')
+    const call = vi.fn(async () => ({
+      id: 'status',
+      ok: true as const,
+      result: {},
+      _meta: { runtimeId: 'account-runtime' }
+    }))
+    const client = { call, close: vi.fn(), subscribe: vi.fn() }
+    installWebPreloadApi(undefined, {
+      runtime: {
+        runtimeRecordId: '11111111-1111-4111-8111-111111111111',
+        status: 'CLAIMED',
+        resourceVersion: 1,
+        deviceName: 'My computer'
+      },
+      session,
+      client
+    })
+    const [environment] = await globals.window.api.runtimeEnvironments.list()
+    await globals.window.api.runtimeEnvironments.getStatus({ selector: environment!.id })
+    expect(call).toHaveBeenCalledWith('status.get', undefined, { timeoutMs: undefined })
+    expect(globals.storage.getItem('orca.web.runtimeEnvironment.v1')).toBeNull()
+    expect((await globals.window.api.hiveAccount.getState()).status).toBe('signed-in')
+    session.close()
+  })
   beforeEach(() => {
     vi.resetModules()
   })

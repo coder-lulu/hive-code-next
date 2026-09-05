@@ -75,6 +75,7 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
   const operationState = operationStateRef.current
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const sessionRef = useRef<MobileSession | null>(auth.session)
+  const previousTransportSessionRef = useRef<MobileSession | null>(auth.session)
   const presenceOffsetRef = useRef(0)
   const presenceSequenceRef = useRef(0)
   sessionRef.current = auth.session
@@ -191,6 +192,8 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
 
   useEffect(() => {
     const current = auth.session
+    const previousTransportSession = previousTransportSessionRef.current
+    previousTransportSessionRef.current = current
     presenceOffsetRef.current = 0
     invalidateAccountRuntimeDirectoryOperations(operationState)
     if (!current) {
@@ -205,9 +208,11 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
     }
     const previousScope = store.getSnapshot().scope
     if (
-      previousScope &&
-      (previousScope.accountId !== current.account.accountId ||
-        previousScope.authorityId !== current.authorityId)
+      (previousTransportSession &&
+        !mobileSessionMatchesOperationScope(current, previousTransportSession)) ||
+      (previousScope &&
+        (previousScope.accountId !== current.account.accountId ||
+          previousScope.authorityId !== current.authorityId))
     ) {
       clearAccountRuntimeProfiles()
       invalidateAccountRuntimeClients(

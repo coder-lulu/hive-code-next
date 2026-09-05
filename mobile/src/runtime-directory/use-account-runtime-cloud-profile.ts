@@ -1,5 +1,7 @@
 import { useCallback, type MutableRefObject } from 'react'
 import { resolveHiveRuntimeDisplayName } from '../../../src/shared/hive-runtime-display-name'
+import { disposeHiveAccountRelayMaterial } from '../../../src/shared/hive-account-relay-material'
+import { mobileSessionMatchesOperationScope } from './account-runtime-session-operation'
 import type { MobileSession } from '../auth/mobile-sms-auth'
 import type { HostProfile } from '../transport/types'
 import { createAccountRuntimeConnectionIntent } from './account-runtime-directory-client'
@@ -17,7 +19,8 @@ export function useAccountRuntimeCloudProfile(args: {
 }): (entry: AccountRuntimeDirectoryEntry) => HostProfile | null {
   return useCallback(
     (entry: AccountRuntimeDirectoryEntry): HostProfile | null => {
-      if (!accountRuntimeCanRequestConnection(entry)) {
+      const profileSession = args.sessionRef.current
+      if (!accountRuntimeCanRequestConnection(entry) || !profileSession) {
         return null
       }
       return {
@@ -42,6 +45,7 @@ export function useAccountRuntimeCloudProfile(args: {
             const expectedScope = args.directoryStore.getSnapshot().scope
             const expectedSession = args.sessionRef.current
             if (
+              !mobileSessionMatchesOperationScope(expectedSession, profileSession) ||
               !expectedScope ||
               !expectedSession ||
               expectedSession.account.accountId !== expectedScope.accountId ||
@@ -49,14 +53,22 @@ export function useAccountRuntimeCloudProfile(args: {
             ) {
               throw new Error('mobile_session_required')
             }
-            return args.withCurrentSession((session) =>
-              createAccountRuntimeConnectionIntent(
+            return args.withCurrentSession(async (session) => {
+              const material = await createAccountRuntimeConnectionIntent(
                 session,
                 entry.runtimeRecordId,
                 entry.resourceVersion,
                 signal
               )
-            )
+              if (
+                signal?.aborted ||
+                !mobileSessionMatchesOperationScope(args.sessionRef.current, profileSession)
+              ) {
+                disposeHiveAccountRelayMaterial(material)
+                throw new Error('mobile_session_required')
+              }
+              return material
+            })
           }
         }
       }
