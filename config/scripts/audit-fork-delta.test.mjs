@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -9,6 +10,20 @@ import {
   renderMarkdown,
   sanitizeEndpointMatch
 } from './audit-fork-delta.mjs'
+
+it('can be imported by the inline workflow without a CLI script argument', () => {
+  const moduleUrl = new URL('./audit-fork-delta.mjs', import.meta.url).href
+  expect(
+    execFileSync(
+      process.execPath,
+      ['--input-type=module', '--eval', `await import(${JSON.stringify(moduleUrl)})`],
+      {
+        encoding: 'utf8',
+        windowsHide: true
+      }
+    )
+  ).toBe('')
+})
 
 describe('parseNameStatus', () => {
   it('parses additions, modifications, deletions, and renames', () => {

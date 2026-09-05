@@ -5,6 +5,7 @@ import path from 'node:path'
 const SCRIPT_DIR = import.meta.dirname
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
 const MANIFEST_PATH = path.join(REPO_ROOT, 'config', 'upstream-sync-gates.json')
+const MATRIX_PATH = path.join(REPO_ROOT, 'config', 'upstream-regression-matrix.json')
 
 function loadManifest() {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'))
@@ -16,6 +17,7 @@ function loadManifest() {
 
 function parseOptions(argv) {
   let suite = 'common'
+  let platform = process.platform
   let list = false
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
@@ -31,9 +33,54 @@ function parseOptions(argv) {
       suite = argument.slice('--suite='.length)
       continue
     }
+    if (argument === '--platform') {
+      platform = argv[++index]
+      continue
+    }
+    if (argument.startsWith('--platform=')) {
+      platform = argument.slice('--platform='.length)
+      continue
+    }
     throw new Error(`Unknown argument: ${argument}`)
   }
-  return { suite, list }
+  return { suite, list, platform }
+}
+
+export function selectChecks({ manifest, matrix, suite = 'common', platform = process.platform }) {
+  const suiteNames = suite === 'all' ? ['common'] : suite === 'regression' ? [] : [suite]
+  let extraChecks = []
+  if (suite === 'all' || suite === 'regression') {
+    const platformName = { win32: 'windows', darwin: 'macos', linux: 'linux' }[platform]
+    const coverage = matrix?.platforms?.[platformName]
+    if (
+      matrix?.schemaVersion !== 2 ||
+      !coverage ||
+      !Array.isArray(coverage.suites) ||
+      coverage.suites.length === 0 ||
+      !Array.isArray(coverage.checks)
+    ) {
+      throw new Error(`No valid upstream regression coverage for ${platform}`)
+    }
+    suiteNames.push(...coverage.suites)
+    extraChecks = coverage.checks
+  }
+  const checks = suiteNames
+    .flatMap((name) => {
+      if (!Array.isArray(manifest.suites[name])) {
+        throw new Error(`Unknown upstream sync gate suite: ${name}`)
+      }
+      return manifest.suites[name]
+    })
+    .concat(extraChecks)
+  const selected = new Map()
+  for (const check of checks) {
+    const existing = selected.get(check.id)
+    if (existing && JSON.stringify(existing) !== JSON.stringify(check)) {
+      throw new Error(`Conflicting upstream sync gate definitions: ${check.id}`)
+    }
+    selected.set(check.id, check)
+  }
+  return [...selected.values()]
 }
 
 function isUnsafeRelativePath(value) {
@@ -82,7 +129,7 @@ function validateCheck(check, suiteName, index) {
 
 function resolveInvocation(command, args) {
   if (process.platform === 'win32' && command === 'pnpm') {
-    const commandLine = ['pnpm.cmd', ...args]
+    const commandLine = ['pnpm', ...args]
       .map((value) => (/[\s"&|<>^]/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value))
       .join(' ')
     return {
@@ -116,40 +163,41 @@ function runCheck(check) {
   return true
 }
 
-const { suite, list } = parseOptions(process.argv.slice(2))
-const manifest = loadManifest()
-const suiteNames = suite === 'all' ? Object.keys(manifest.suites) : [suite]
-for (const suiteName of suiteNames) {
-  if (!Array.isArray(manifest.suites[suiteName])) {
-    throw new Error(`Unknown upstream sync gate suite: ${suiteName}`)
-  }
-}
-
-if (list) {
-  for (const suiteName of suiteNames) {
-    console.log(`${suiteName}:`)
-    for (const check of manifest.suites[suiteName]) {
+function main() {
+  const { suite, list, platform } = parseOptions(process.argv.slice(2))
+  const manifest = loadManifest()
+  const matrix = JSON.parse(readFileSync(MATRIX_PATH, 'utf8'))
+  const checks = selectChecks({ manifest, matrix, suite, platform })
+  checks.forEach((check, index) => validateCheck(check, suite, index))
+  if (list) {
+    console.log(`${suite} (${platform}):`)
+    for (const check of checks) {
       console.log(`- ${check.id} (${check.category})`)
     }
+    return
   }
-  process.exit(0)
+  if (platform !== process.platform) {
+    throw new Error(
+      'Cross-platform selection is available for --list only; execute on the actual OS'
+    )
+  }
+  let failed = 0
+  for (const check of checks) {
+    if (!runCheck(check)) {
+      failed += 1
+    }
+  }
+  if (failed > 0) {
+    throw new Error(`${failed} fixed gate(s) failed.`)
+  }
+  console.log(`\n[upstream-sync] ${checks.length} fixed gate(s) passed on ${process.platform}.`)
 }
 
-const checks = suiteNames.flatMap((suiteName) => {
-  const suiteChecks = manifest.suites[suiteName]
-  suiteChecks.forEach((check, index) => validateCheck(check, suiteName, index))
-  return suiteChecks
-})
-
-let failed = 0
-for (const check of checks) {
-  if (!runCheck(check)) {
-    failed += 1
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  try {
+    main()
+  } catch (error) {
+    console.error(`[upstream-sync] ${error.message}`)
+    process.exitCode = 1
   }
 }
-
-if (failed > 0) {
-  console.error(`\n[upstream-sync] ${failed} fixed gate(s) failed.`)
-  process.exit(1)
-}
-console.log(`\n[upstream-sync] ${checks.length} fixed gate(s) passed on ${process.platform}.`)

@@ -105,6 +105,7 @@ docs/**
 !docs/reference/
 !docs/reference/build-toolchain.md
 !docs/reference/git-compatibility.md
+!docs/reference/upstream-sync-review.md
 !docs/reference/headless-linux-server.md
 !docs/reference/ime-regression-checklist.md
 !docs/reference/linux-glibc-compatibility.md

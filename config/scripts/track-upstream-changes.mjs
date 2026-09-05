@@ -1,6 +1,7 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { collectCommitHistory } from './upstream-intake-history.mjs'
+import { createGit, resolveAuditRange } from './upstream-sync-checkpoint.mjs'
 
 const SCRIPT_DIR = import.meta.dirname
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
@@ -8,14 +9,7 @@ const PRIORITY_PATH = path.join(REPO_ROOT, 'config', 'upstream-change-priority.j
 const DEFAULT_BASE = 'upstream/main'
 const DEFAULT_HEAD = 'HEAD'
 
-function runGit(args) {
-  return execFileSync('git', args, {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true
-  })
-}
+const runGit = createGit()
 
 export function loadPriorityManifest(manifestPath = PRIORITY_PATH) {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
@@ -147,15 +141,24 @@ export function collectUpstreamChanges({
   base = DEFAULT_BASE,
   head = DEFAULT_HEAD,
   git = runGit,
-  manifest = loadPriorityManifest()
+  manifest = loadPriorityManifest(),
+  stateRef,
+  targetBranch = 'hivecode/main-next'
 }) {
-  const resolvedBase = git(['rev-parse', '--verify', '--end-of-options', base]).trim()
-  const resolvedHead = git(['rev-parse', '--verify', '--end-of-options', head]).trim()
-  const commits = parseCommitLog(
-    git(['log', '--no-merges', '--format=%H%x09%s', `${resolvedBase}..${resolvedHead}`])
-  )
+  const range = stateRef ? resolveAuditRange({ git, upstream: head, stateRef, targetBranch }) : null
+  const resolvedBase = range
+    ? range.audit.baseSha
+    : git(['rev-parse', '--verify', '--end-of-options', base]).trim()
+  const resolvedHead = range
+    ? range.upstreamSha
+    : git(['rev-parse', '--verify', '--end-of-options', head]).trim()
+  const commits = range
+    ? collectCommitHistory(git, range.selectedShas)
+    : parseCommitLog(
+        git(['log', '--no-merges', '--format=%H%x09%s', `${resolvedBase}..${resolvedHead}`])
+      )
   const changes = commits.map((commit) => {
-    const paths = normalizedPaths(collectCommitPaths(git, commit.sha))
+    const paths = normalizedPaths(commit.paths ?? collectCommitPaths(git, commit.sha))
     return { ...commit, paths, ...classifyUpstreamChange({ ...commit, paths, manifest }) }
   })
   const counts = Object.fromEntries(
@@ -167,10 +170,13 @@ export function collectUpstreamChanges({
   return {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
-    base,
+    base: range ? (resolvedBase ?? 'complete reachable history') : base,
     head,
     baseSha: resolvedBase,
     headSha: resolvedHead,
+    ...(range
+      ? { audit: range.audit, stateRef: range.stateRef, pendingShas: range.pendingShas }
+      : {}),
     counts,
     changes
   }
@@ -195,7 +201,7 @@ export function renderMarkdown(report, manifest = loadPriorityManifest()) {
     })
     .join('\n\n')
 
-  return `# Upstream Change Intake\n\n- Generated at: \`${report.generatedAt}\`\n- Base: \`${report.base}\` (${report.baseSha})\n- Head: \`${report.head}\` (${report.headSha})\n- Non-merge commits tracked: \`${report.changes.length}\`\n\n${sections}\n`
+  return `# Upstream Change Intake\n\n- Generated at: \`${report.generatedAt}\`\n- Base: \`${report.base}\` (${report.baseSha})\n- Head: \`${report.head}\` (${report.headSha})\n- Commits tracked: \`${report.changes.length}\`\n\n${sections}\n`
 }
 
 export function parseArgs(argv) {
@@ -204,12 +210,17 @@ export function parseArgs(argv) {
     const argument = argv[index]
     if (argument === '--json') {
       options.format = 'json'
-    } else if (argument === '--base' || argument === '--head' || argument === '--output') {
+    } else if (
+      ['--base', '--head', '--output', '--state-ref', '--target-branch', '--cwd'].includes(argument)
+    ) {
       const value = argv[index + 1]
       if (!value) {
         throw new Error(`${argument} requires a value`)
       }
-      options[argument.slice(2)] = value
+      const key =
+        { '--state-ref': 'stateRef', '--target-branch': 'targetBranch' }[argument] ??
+        argument.slice(2)
+      options[key] = value
       index += 1
     } else if (argument === '--help' || argument === '-h') {
       options.help = true
@@ -217,11 +228,14 @@ export function parseArgs(argv) {
       throw new Error(`Unknown argument: ${argument}`)
     }
   }
+  if (options.stateRef && argv.includes('--base')) {
+    throw new Error('--base cannot override the product checkpoint')
+  }
   return options
 }
 
 function usage() {
-  return `Usage: node config/scripts/track-upstream-changes.mjs [options]\n\nOptions:\n  --base <ref>       Previous vendor base (default: upstream/main)\n  --head <ref>       New upstream/vendor head (default: HEAD)\n  --json             Emit JSON instead of Markdown\n  --output <path>    Also write the report to a file\n  --help             Show this help\n`
+  return `Usage: node config/scripts/track-upstream-changes.mjs [options]\n\nOptions:\n  --state-ref <sha>  Frozen product commit owning the reviewed cursor\n  --target-branch <branch> Product identity (default: hivecode/main-next)\n  --base <ref>       Legacy explicit range; cannot accompany --state-ref\n  --head <ref>       Frozen upstream commit (default: HEAD)\n  --cwd <path>       Git checkout (default: current directory)\n  --json             Emit JSON instead of Markdown\n  --output <path>    Also write the report to a file\n  --help             Show this help\n`
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
@@ -231,7 +245,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
       process.stdout.write(usage())
     } else {
       const manifest = loadPriorityManifest()
-      const report = collectUpstreamChanges({ ...options, manifest })
+      const report = collectUpstreamChanges({ ...options, manifest, git: createGit(options.cwd) })
       const output =
         options.format === 'json'
           ? `${JSON.stringify(report, null, 2)}\n`

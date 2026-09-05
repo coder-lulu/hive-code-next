@@ -142,7 +142,11 @@
     "requiredNonConflictingFeatures": true,
     "rule": "Every upstream BUG or security fix, historical or current, must be absorbed or documented as already equivalent in the product tree. Every upstream feature that does not cross a product boundary must be absorbed. Product decision is required only when the change crosses a product-boundary path, changes a persisted or wire contract, or conflicts with a maintained HiveCode capability.",
     "uiAdaptation": "When an upstream feature overlaps HiveCode UI, preserve HiveCode branding and existing UI capabilities while adopting upstream behavior and compatibility fixes.",
-    "historicalAudit": "Each synchronization audits the complete upstream history since the recorded vendor baseline, not only commits introduced since the previous synchronization.",
+    "historicalAudit": "Perform one complete review of reachable upstream history before accepting the initial checkpoint. Subsequent runs review every commit after the last reviewed upstream SHA read from the frozen product target, plus unresolved carried-over decisions. A fetch, vendor merge, failed gate, or unmerged PR never advances that effective checkpoint.",
+    "checkpointFile": "config/upstream-sync-state.json",
+    "checkpointAuthority": "Only a validated and reviewed vendor PR merged into the product target makes its proposed checkpoint effective. Missing initial history requires a full review; malformed state or rewritten upstream history stops for explicit repair, never silently skips commits.",
+    "equivalence": "Use reachable commits and nonempty patch IDs as inclusion evidence. Semantic equivalence or duplicate features require explicit product evidence and review. Ancestry alone is not proof that later product adaptations preserved upstream behavior.",
+    "pendingDecisions": "Carry unresolved boundary feature decisions into every subsequent run. Mandatory BUG, security, stability, and data-consistency fixes cannot be closed by deferral or an unexplained product decision.",
     "lanes": {
       "bugBackport": "BUG, security, stability, and data-consistency fixes are mandatory backports after dependency-closure and patch-id review.",
       "productDecision": "New features and UI changes enter product decision only when they meet the explicit product-boundary/conflict criteria above; otherwise they are mandatory absorption candidates."

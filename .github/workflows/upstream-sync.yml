@@ -1,8 +1,6 @@
 name: Upstream Sync
 
-# This workflow is the only automated path that merges upstream into the fork.
-# Conflicts stop the run before anything is pushed, so they remain reviewable on
-# vendor-integration instead of leaking into the product branch.
+# Publish a candidate to vendor only; product promotion always requires review.
 on:
   schedule:
     - cron: '17 2 * * 1,4'
@@ -29,255 +27,317 @@ env:
 
 jobs:
   sync:
-    name: merge upstream into vendor-integration
+    name: prepare and publish vendor candidate
     permissions:
       contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
     outputs:
       upstream_sha: ${{ steps.sync.outputs.upstream_sha }}
       target_sha: ${{ steps.sync.outputs.target_sha }}
-      vendor_sha: ${{ steps.sync.outputs.vendor_sha }}
+      vendor_sha: ${{ steps.publish.outputs.vendor_sha }}
       vendor_base_sha: ${{ steps.sync.outputs.vendor_base_sha }}
+      has_changes: ${{ steps.checkpoint.outputs.has_changes }}
     steps:
-      - name: Checkout repository
+      - name: Checkout repository without publication credentials
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Configure git identity
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-      - name: Integrate product branch and upstream on vendor-integration
+      - name: Freeze upstream, product, and remote vendor tips
         id: sync
         shell: bash
         env:
           UPSTREAM_URL: https://github.com/${{ env.UPSTREAM_REPOSITORY }}.git
         run: |
           set -euo pipefail
-
-          if ! git check-ref-format --branch "$VENDOR_BRANCH"; then
-            echo "::error::Invalid vendor branch name: $VENDOR_BRANCH"
-            exit 1
-          fi
+          for branch in "$VENDOR_BRANCH" "$TARGET_BRANCH" "$UPSTREAM_BRANCH"; do
+            git check-ref-format --branch "$branch"
+          done
           case "$TARGET_BRANCH" in
             main|hivecode/main-next) ;;
-            *)
-              echo "::error::Target branch must be main or hivecode/main-next: $TARGET_BRANCH"
-              exit 1
-              ;;
+            *) echo '::error::Invalid product target branch.'; exit 1 ;;
           esac
-          if ! git check-ref-format --branch "$TARGET_BRANCH"; then
-            echo "::error::Invalid target branch name: $TARGET_BRANCH"
-            exit 1
-          fi
-
+          test -z "$(git status --porcelain)"
+          test -z "$(git ls-files -u)"
+          for state in MERGE_HEAD rebase-merge rebase-apply; do
+            test ! -e "$(git rev-parse --git-path "$state")"
+          done
           if git remote get-url upstream >/dev/null 2>&1; then
             git remote set-url upstream "$UPSTREAM_URL"
           else
             git remote add upstream "$UPSTREAM_URL"
           fi
-          git fetch --no-tags --prune upstream "$UPSTREAM_BRANCH"
-          upstream_sha="$(git rev-parse "upstream/$UPSTREAM_BRANCH")"
-
-          target_ref="refs/remotes/origin/$TARGET_BRANCH"
-          if ! git fetch --no-tags origin "refs/heads/$TARGET_BRANCH:$target_ref"; then
-            echo "::error::Target branch is not published on origin: $TARGET_BRANCH"
-            exit 1
-          fi
-          target_sha="$(git rev-parse "$target_ref")"
-
-          vendor_ref="refs/remotes/origin/$VENDOR_BRANCH"
-          if ! git fetch --no-tags origin "refs/heads/$VENDOR_BRANCH:$vendor_ref"; then
-            echo '::error::vendor-integration is not published on origin.'
-            echo 'Bootstrap it from the validated local vendor-integration branch before enabling this workflow.'
-            echo 'Refusing to create it from upstream/main because that would discard the product overlay.'
-            exit 1
-          fi
-          vendor_base="$vendor_ref"
-          vendor_base_sha="$(git rev-parse "$vendor_base")"
-
-          git switch --force-create "$VENDOR_BRANCH" "$vendor_base"
-          if ! git merge --no-edit "$target_ref"; then
-            git diff --name-only --diff-filter=U | sort -u > "$RUNNER_TEMP/product-conflicts.txt"
-            echo '::error::Product integration conflicts must be resolved on vendor-integration.'
-            cat "$RUNNER_TEMP/product-conflicts.txt"
-            git merge --abort || true
-            exit 1
-          fi
-          if ! git merge --no-edit --no-ff "upstream/$UPSTREAM_BRANCH"; then
-            git diff --name-only --diff-filter=U | sort -u > "$RUNNER_TEMP/upstream-conflicts.txt"
-            echo '::error::Upstream merge conflicts must be resolved on vendor-integration.'
-            cat "$RUNNER_TEMP/upstream-conflicts.txt"
-            git merge --abort || true
-            exit 1
-          fi
-
-          git push \
-            --force-with-lease="refs/heads/$VENDOR_BRANCH:$vendor_base_sha" \
-            origin "HEAD:refs/heads/$VENDOR_BRANCH"
-          vendor_sha="$(git rev-parse HEAD)"
+          git fetch --no-tags --prune upstream \
+            "+refs/heads/$UPSTREAM_BRANCH:refs/remotes/upstream/$UPSTREAM_BRANCH"
+          upstream_sha="$(git rev-parse "refs/remotes/upstream/$UPSTREAM_BRANCH")"
+          # Missing refs fail: never bootstrap vendor from upstream and lose the overlay.
+          git fetch --no-tags origin \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH" \
+            "+refs/heads/$VENDOR_BRANCH:refs/remotes/origin/$VENDOR_BRANCH"
+          target_sha="$(git rev-parse "refs/remotes/origin/$TARGET_BRANCH")"
+          vendor_base_sha="$(git rev-parse "refs/remotes/origin/$VENDOR_BRANCH")"
           {
             echo "upstream_sha=$upstream_sha"
             echo "target_sha=$target_sha"
-            echo "vendor_sha=$vendor_sha"
             echo "vendor_base_sha=$vendor_base_sha"
           } >> "$GITHUB_OUTPUT"
+          # Run privileged intake code from the reviewed product, not the incoming tree.
+          mkdir -p "$RUNNER_TEMP/upstream-sync-control"
+          git archive "$target_sha" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
 
+      - name: Setup Node.js for dependency-free intake
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ${{ runner.temp }}/upstream-sync-control/package.json
+
+      - name: Merge product first and upstream second
+        shell: bash
+        env:
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          TARGET_SHA: ${{ steps.sync.outputs.target_sha }}
+          VENDOR_BASE_SHA: ${{ steps.sync.outputs.vendor_base_sha }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch --create upstream-sync-candidate "$VENDOR_BASE_SHA"
+          if ! git merge --no-edit -m 'Retain approved HiveCode behavior before upstream intake' "$TARGET_SHA"; then
+            git diff --name-only --diff-filter=U | sort -u > "$RUNNER_TEMP/product-conflicts.txt"
+            cat "$RUNNER_TEMP/product-conflicts.txt"
+            git merge --abort
+            echo '::error::Product integration conflicts require maintainer resolution.'
+            exit 1
+          fi
+          if ! git merge --no-edit --no-ff -m 'Absorb upstream changes through the reviewed vendor boundary' "$UPSTREAM_SHA"; then
+            git diff --name-only --diff-filter=U | sort -u > "$RUNNER_TEMP/upstream-conflicts.txt"
+            cat "$RUNNER_TEMP/upstream-conflicts.txt"
+            git merge --abort
+            echo '::error::Upstream conflicts require boundary review on vendor-integration.'
+            exit 1
+          fi
+
+      - name: Close intake before proposing a checkpoint
+        id: checkpoint
+        shell: bash
+        env:
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          TARGET_SHA: ${{ steps.sync.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-intake.mjs" \
+            --cwd "$GITHUB_WORKSPACE" \
+            --upstream "$UPSTREAM_SHA" --head HEAD --state-ref "$TARGET_SHA" \
+            --target-branch "$TARGET_BRANCH" \
+            --report "$RUNNER_TEMP/proposed-intake.md" \
+            --json-output "$RUNNER_TEMP/proposed-intake.json" --write-checkpoint
+          git add -- config/upstream-sync-state.json
+          test "$(git diff --cached --name-only)" = 'config/upstream-sync-state.json' || git diff --cached --quiet
+          if ! git diff --cached --quiet; then
+            git commit -m 'Keep the next upstream review anchored to a reviewed product checkpoint' \
+              -m 'The checkpoint is proposed until this candidate passes gates and its reviewed PR reaches the product branch.' \
+              -m 'Tested: Upstream intake inclusion and dependency closure' \
+              -m 'Not-tested: Candidate platform and product gates run after publication'
+          fi
+          test -z "$(git status --porcelain)"
+          if git diff --quiet "$TARGET_SHA" HEAD; then
+            echo 'has_changes=false' >> "$GITHUB_OUTPUT"
+            echo 'No product or checkpoint changes; skip publication and repeated gates.'
+          else
+            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish only the final candidate using the original vendor lease
+        id: publish
+        if: steps.checkpoint.outputs.has_changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          TARGET_SHA: ${{ steps.sync.outputs.target_sha }}
+          VENDOR_BASE_SHA: ${{ steps.sync.outputs.vendor_base_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$TARGET_SHA"
+          # An open PR must not retain ready status while its candidate is unverified.
+          ready_pr="$(gh pr list --head "$VENDOR_BRANCH" --base "$TARGET_BRANCH" --state open --json number,isDraft --jq 'map(select(.isDraft == false))[0].number // empty')"
+          if [[ -n "$ready_pr" ]]; then
+            gh pr ready "$ready_pr" --undo
+          fi
+          gh auth setup-git --hostname github.com
+          git push --force-with-lease="refs/heads/$VENDOR_BRANCH:$VENDOR_BASE_SHA" \
+            origin "HEAD:refs/heads/$VENDOR_BRANCH"
+          vendor_sha="$(git rev-parse HEAD)"
+          echo "vendor_sha=$vendor_sha" >> "$GITHUB_OUTPUT"
           {
-            echo '## Upstream sync evidence'
-            printf '%s\n' "- Upstream: $upstream_sha"
-            printf '%s\n' "- Product target: $TARGET_BRANCH at $target_sha"
-            printf '%s\n' "- vendor-integration: $vendor_sha"
-            printf '%s\n' "- Previous vendor base: $vendor_base_sha"
-            printf '%s\n' "- Target PR branch: $TARGET_BRANCH"
+            echo '## Proposed upstream candidate'
+            printf '%s\n' "- Upstream: $UPSTREAM_SHA"
+            printf '%s\n' "- Product: $TARGET_BRANCH at $TARGET_SHA"
+            printf '%s\n' "- Candidate: $vendor_sha (vendor base $VENDOR_BASE_SHA)"
+            echo '- Checkpoint is proposed; only reviewed product promotion makes it effective.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload merge and delta evidence
+      - name: Upload preparation evidence, including failures
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: upstream-sync-evidence
+          name: upstream-sync-preparation
           path: |
             ${{ runner.temp }}/product-conflicts.txt
             ${{ runner.temp }}/upstream-conflicts.txt
-            ${{ runner.temp }}/upstream-intake-report.md
+            ${{ runner.temp }}/proposed-intake.md
+            ${{ runner.temp }}/proposed-intake.json
           if-no-files-found: ignore
           retention-days: 30
 
   gates:
-    name: compatibility gates
+    name: product, compatibility, and intake evidence
     needs: sync
-    if: needs.sync.result == 'success'
+    if: needs.sync.result == 'success' && needs.sync.outputs.has_changes == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    env:
+      UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+      TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
+      VENDOR_SHA: ${{ needs.sync.outputs.vendor_sha }}
     steps:
-      - name: Checkout vendor-integration
+      - name: Checkout the exact published candidate
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.sync.outputs.vendor_sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify tested vendor commit
-        env:
-          VENDOR_SHA: ${{ needs.sync.outputs.vendor_sha }}
-        shell: bash
-        run: test "$(git rev-parse HEAD)" = "$VENDOR_SHA"
-
-      - name: Fetch upstream comparison base
+      - name: Verify immutable commits and load reviewed audit code
         shell: bash
         run: |
           set -euo pipefail
-          upstream_url="https://github.com/${UPSTREAM_REPOSITORY}.git"
-          git remote add upstream "$upstream_url"
-          git fetch --no-tags upstream "$UPSTREAM_BRANCH"
+          test "$(git rev-parse HEAD)" = "$VENDOR_SHA"
+          # Both frozen commits must belong to this candidate; never fetch a moving upstream ref.
+          git merge-base --is-ancestor "$UPSTREAM_SHA" "$VENDOR_SHA"
+          git merge-base --is-ancestor "$TARGET_SHA" "$VENDOR_SHA"
+          mkdir -p "$RUNNER_TEMP/upstream-sync-control" "$RUNNER_TEMP/upstream-sync-evidence"
+          git archive "$TARGET_SHA" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
 
-      - name: Generate fork delta evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          node config/scripts/audit-fork-delta.mjs \
-            --base "upstream/$UPSTREAM_BRANCH" \
-            --head HEAD \
-            --output "$RUNNER_TEMP/fork-delta.md" > "$RUNNER_TEMP/fork-delta.stdout"
-
-      - name: Track upstream change intake priorities
-        env:
-          VENDOR_BASE_SHA: ${{ needs.sync.outputs.vendor_base_sha }}
-          UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          node config/scripts/track-upstream-changes.mjs \
-            --base "$VENDOR_BASE_SHA" \
-            --head "$UPSTREAM_SHA" \
-            --output "$RUNNER_TEMP/upstream-change-intake.md"
-
-      - name: Verify dependency closure, patch ids, and generate ledger report
-        env:
-          VENDOR_BASE_SHA: ${{ needs.sync.outputs.vendor_base_sha }}
-          UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          node config/scripts/upstream-intake.mjs \
-            --vendor "${VENDOR_BASE_SHA}" \
-            --upstream "${UPSTREAM_SHA}" \
-            --head HEAD \
-            --report "$RUNNER_TEMP/upstream-intake-report.md"
+      - name: Setup Node.js for reviewed audit code
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ${{ runner.temp }}/upstream-sync-control/package.json
 
       - uses: ./.github/actions/install-node-dependencies
 
-      - name: Run fixed upstream sync gates
-        run: node config/scripts/run-upstream-sync-gates.mjs --suite=common
+      - name: Install separate mobile workspace dependencies
+        run: pnpm --dir mobile install --frozen-lockfile --ignore-scripts
 
-      - name: Run product and compatibility tests
+      - name: Run common product verification once
+        shell: bash
         run: |
-          pnpm exec vitest run --config config/vitest.config.ts \
-            config/scripts/audit-fork-delta.test.mjs \
-            config/scripts/check-hivecode-brand-boundary.test.mjs \
-            config/scripts/generate-product-config.test.mjs \
-            config/scripts/product-identity-integration.test.mjs \
-            config/scripts/product-release-workflow-boundary.test.mjs \
-            config/scripts/packaged-updater-security-boundary.test.mjs \
-            src/shared/pairing.test.ts \
-            src/shared/product-update-policy.test.ts \
-            src/shared/product-update-source.test.ts \
-            src/main/updater-prerelease-feed.test.ts \
-            src/main/updater-release-builds.test.ts
+          set -euo pipefail
+          {
+            node config/scripts/run-upstream-sync-gates.mjs --suite=common
+            pnpm run typecheck
+            pnpm run lint
+            pnpm run test
+            pnpm run build:desktop
+            pnpm run build:web
+            pnpm --dir mobile run typecheck
+            pnpm --dir mobile run lint
+            pnpm --dir mobile run test
+          } 2>&1 | tee "$RUNNER_TEMP/upstream-sync-evidence/common-gates.log"
 
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Lint
-        run: pnpm run lint
-
-      - name: Unit tests
-        run: pnpm run test
-
-      - name: Desktop build
-        run: pnpm run build:desktop
-
-      - name: Web build
-        run: pnpm run build:web
-
-      - name: Mobile typecheck, lint, and tests
+      - name: Regenerate trusted fork and product evidence after candidate execution
+        if: always()
+        shell: bash
         run: |
-          pnpm --dir mobile run typecheck
-          pnpm --dir mobile run lint
-          pnpm --dir mobile run test
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$VENDOR_SHA"
+          mkdir -p "$RUNNER_TEMP/upstream-sync-control" "$RUNNER_TEMP/upstream-sync-evidence"
+          git archive "$TARGET_SHA" config | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          import { pathToFileURL } from 'node:url'
+          const root = process.env.RUNNER_TEMP
+          const { collectForkDelta, renderMarkdown } = await import(pathToFileURL(`${root}/upstream-sync-control/config/scripts/audit-fork-delta.mjs`))
+          for (const [name, base] of [['fork-delta', process.env.UPSTREAM_SHA], ['product-delta', process.env.TARGET_SHA]]) {
+            const report = collectForkDelta({ base, head: process.env.VENDOR_SHA })
+            writeFileSync(`${root}/upstream-sync-evidence/${name}.json`, JSON.stringify(report, null, 2))
+            writeFileSync(`${root}/upstream-sync-evidence/${name}.md`, renderMarkdown(report))
+          }
+          NODE
 
-      - name: Upload compatibility evidence
+      - name: Track priorities and reverify intake on the final candidate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/track-upstream-changes.mjs" \
+            --cwd "$GITHUB_WORKSPACE" \
+            --head "$UPSTREAM_SHA" --state-ref "$TARGET_SHA" --target-branch "$TARGET_BRANCH" \
+            --output "$RUNNER_TEMP/upstream-sync-evidence/upstream-change-intake.md"
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-intake.mjs" \
+            --cwd "$GITHUB_WORKSPACE" \
+            --upstream "$UPSTREAM_SHA" --head "$VENDOR_SHA" --state-ref "$TARGET_SHA" \
+            --target-branch "$TARGET_BRANCH" \
+            --report "$RUNNER_TEMP/upstream-sync-evidence/upstream-intake-report.md" \
+            --json-output "$RUNNER_TEMP/upstream-sync-evidence/upstream-intake-report.json"
+
+      - name: Record common verification outcome
+        if: always()
+        shell: bash
+        env:
+          GATE_STATUS: ${{ job.status }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from 'node:fs'
+          const directory = `${process.env.RUNNER_TEMP}/upstream-sync-evidence`
+          mkdirSync(directory, { recursive: true })
+          writeFileSync(`${directory}/common-gates.json`, JSON.stringify({
+            suite: 'common-gates', status: process.env.GATE_STATUS,
+            upstreamSha: process.env.UPSTREAM_SHA, targetSha: process.env.TARGET_SHA, vendorSha: process.env.VENDOR_SHA,
+            commands: [
+              'node config/scripts/run-upstream-sync-gates.mjs --suite=common',
+              'pnpm run typecheck', 'pnpm run lint', 'pnpm run test',
+              'pnpm run build:desktop', 'pnpm run build:web',
+              'pnpm --dir mobile run typecheck', 'pnpm --dir mobile run lint', 'pnpm --dir mobile run test',
+            ],
+          }, null, 2))
+          NODE
+
+      - name: Upload the reports produced by this job
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: upstream-sync-compatibility-evidence
-          path: |
-            ${{ runner.temp }}/fork-delta.md
-            ${{ runner.temp }}/fork-delta.stdout
-            ${{ runner.temp }}/upstream-change-intake.md
-          if-no-files-found: ignore
+          path: ${{ runner.temp }}/upstream-sync-evidence/
+          if-no-files-found: error
           retention-days: 30
 
   platform-gates:
     name: PTY / WSL / SSH (${{ matrix.os }})
     needs: sync
-    if: needs.sync.result == 'success'
+    if: needs.sync.result == 'success' && needs.sync.outputs.has_changes == 'true'
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win32
+          - os: macos-latest
+            platform: darwin
     runs-on: ${{ matrix.os }}
+    env:
+      UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+      TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
+      VENDOR_SHA: ${{ needs.sync.outputs.vendor_sha }}
+      PLATFORM: ${{ matrix.platform }}
     steps:
-      - name: Checkout vendor-integration
+      - name: Checkout the exact published candidate
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.sync.outputs.vendor_sha }}
@@ -285,81 +345,123 @@ jobs:
           persist-credentials: false
 
       - name: Verify tested vendor commit
-        env:
-          VENDOR_SHA: ${{ needs.sync.outputs.vendor_sha }}
         shell: bash
         run: test "$(git rev-parse HEAD)" = "$VENDOR_SHA"
 
       - uses: ./.github/actions/install-node-dependencies
 
-      - name: Run PTY, WSL, and SSH platform contracts
-        run: node config/scripts/run-upstream-sync-gates.mjs --suite=platform
+      - name: Execute the focused platform regression matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          node config/scripts/run-upstream-sync-gates.mjs --suite=regression --platform="$PLATFORM" \
+            2>&1 | tee "$RUNNER_TEMP/regression-$PLATFORM.log"
+
+      - name: Record platform verification outcome
+        if: always()
+        shell: bash
+        env:
+          GATE_STATUS: ${{ job.status }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          const suite = `regression-${process.env.PLATFORM}`
+          writeFileSync(`${process.env.RUNNER_TEMP}/${suite}.json`, JSON.stringify({
+            suite, status: process.env.GATE_STATUS,
+            upstreamSha: process.env.UPSTREAM_SHA, targetSha: process.env.TARGET_SHA, vendorSha: process.env.VENDOR_SHA,
+            commands: [`node config/scripts/run-upstream-sync-gates.mjs --suite=regression --platform=${process.env.PLATFORM}`],
+          }, null, 2))
+          NODE
+
+      - name: Upload platform evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync-platform-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/regression-${{ matrix.platform }}.json
+            ${{ runner.temp }}/regression-${{ matrix.platform }}.log
+          if-no-files-found: error
+          retention-days: 30
 
   propose:
     name: propose reviewed vendor update
-    needs:
-      - sync
-      - gates
-      - platform-gates
-    if: needs.gates.result == 'success' && needs.platform-gates.result == 'success'
+    needs: [sync, gates, platform-gates]
+    if: needs.sync.result == 'success' && needs.gates.result == 'success' && needs.platform-gates.result == 'success'
     permissions:
       contents: read
       pull-requests: write
     runs-on: ubuntu-latest
+    env:
+      UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+      TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
+      VENDOR_SHA: ${{ needs.sync.outputs.vendor_sha }}
+      VENDOR_BASE_SHA: ${{ needs.sync.outputs.vendor_base_sha }}
     steps:
-      - name: Checkout repository
+      - name: Checkout reviewed product code for PR generation
         uses: actions/checkout@v6
         with:
+          ref: ${{ needs.sync.outputs.target_sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Open or update vendor PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
-          TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
-          VENDOR_SHA: ${{ needs.sync.outputs.vendor_sha }}
+      - name: Download complete verification evidence
+        uses: actions/download-artifact@v8
+        with:
+          pattern: upstream-sync-*
+          path: ${{ runner.temp }}/upstream-sync-evidence
+          merge-multiple: true
+
+      - name: Setup Node.js for reviewed PR generation
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Validate both published tips and generate a reviewable PR body
+        id: proposal
         shell: bash
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          vendor_remote_sha="$(git ls-remote origin "refs/heads/$VENDOR_BRANCH" | cut -f1)"
-          if [[ -z "$vendor_remote_sha" || "$vendor_remote_sha" != "$VENDOR_SHA" ]]; then
-            echo "::error::vendor-integration moved after gates; expected $VENDOR_SHA, found ${vendor_remote_sha:-missing}."
-            exit 1
-          fi
-          target_remote_sha="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)"
-          if [[ -z "$target_remote_sha" || "$target_remote_sha" != "$TARGET_SHA" ]]; then
-            echo "::error::$TARGET_BRANCH moved after gates; expected $TARGET_SHA, found ${target_remote_sha:-missing}."
-            exit 1
-          fi
+          test "$(git ls-remote origin "refs/heads/$VENDOR_BRANCH" | cut -f1)" = "$VENDOR_SHA"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$TARGET_SHA"
           git fetch --no-tags origin \
-            "refs/heads/$VENDOR_BRANCH:refs/remotes/origin/$VENDOR_BRANCH" \
-            "refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
-          if git diff --quiet "origin/$TARGET_BRANCH...origin/$VENDOR_BRANCH"; then
-            echo "vendor-integration has no changes relative to $TARGET_BRANCH."
+            "+refs/heads/$VENDOR_BRANCH:refs/remotes/origin/$VENDOR_BRANCH" \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          # A ref can move between ls-remote and fetch; validate what was actually fetched.
+          test "$(git rev-parse "refs/remotes/origin/$VENDOR_BRANCH")" = "$VENDOR_SHA"
+          test "$(git rev-parse "refs/remotes/origin/$TARGET_BRANCH")" = "$TARGET_SHA"
+          if git diff --quiet "$TARGET_SHA" "$VENDOR_SHA"; then
+            echo 'No changes against the product target; no PR is needed.'
             exit 0
           fi
+          node config/scripts/upstream-sync-pr.mjs \
+            --evidence "$RUNNER_TEMP/upstream-sync-evidence" \
+            --upstream "$UPSTREAM_SHA" --target "$TARGET_SHA" --vendor "$VENDOR_SHA" \
+            --vendor-base "$VENDOR_BASE_SHA" --target-branch "$TARGET_BRANCH" \
+            --run-url "$RUN_URL" --output "$RUNNER_TEMP/upstream-sync-pr.md"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
 
-          cat > "$RUNNER_TEMP/upstream-sync-pr.md" <<EOF
-          ## Upstream sync
-
-          This PR was produced by the controlled fork sync workflow.
-
-          - Upstream SHA: $UPSTREAM_SHA
-          - Product target SHA: $TARGET_SHA
-          - vendor-integration SHA: $VENDOR_SHA
-          - Compatibility gates: passed
-          - Merge conflicts: none
-
-          The workflow never merges directly into $TARGET_BRANCH; review is required before the product branch advances.
-          EOF
-
-          if gh pr list --head "$VENDOR_BRANCH" --base "$TARGET_BRANCH" --state open --json number --jq 'length' | grep -q '^0$'; then
-            gh pr create \
-              --base "$TARGET_BRANCH" \
-              --head "$VENDOR_BRANCH" \
-              --title "chore: sync upstream into vendor-integration" \
+      - name: Create or refresh the reviewed product PR
+        if: steps.proposal.outputs.ready == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "refs/heads/$VENDOR_BRANCH" | cut -f1)" = "$VENDOR_SHA"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$TARGET_SHA"
+          pr_number="$(gh pr list --head "$VENDOR_BRANCH" --base "$TARGET_BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$pr_number" ]]; then
+            gh pr edit "$pr_number" \
+              --title 'Keep HiveCode current with reviewed upstream fixes and features' \
               --body-file "$RUNNER_TEMP/upstream-sync-pr.md"
+            if [[ "$(gh pr view "$pr_number" --json isDraft --jq '.isDraft')" == 'true' ]]; then
+              gh pr ready "$pr_number"
+            fi
           else
-            echo "An open vendor sync PR already exists; its branch has been updated."
+            gh pr create --base "$TARGET_BRANCH" --head "$VENDOR_BRANCH" \
+              --title 'Keep HiveCode current with reviewed upstream fixes and features' \
+              --body-file "$RUNNER_TEMP/upstream-sync-pr.md"
           fi

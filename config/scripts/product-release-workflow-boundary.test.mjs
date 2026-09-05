@@ -110,16 +110,26 @@ describe('upstream synchronization boundary', () => {
     const syncJob = workflow.jobs.sync
     const syncStep = findStep(syncJob, (step) => step.id === 'sync', 'sync step must exist')
     const syncScript = String(syncStep.run)
-    const mergeTarget = 'git merge --no-edit "$target_ref"'
-    const mergeUpstream = 'git merge --no-edit --no-ff "upstream/$UPSTREAM_BRANCH"'
+    const mergeStep = findStep(
+      syncJob,
+      (step) => step.run?.includes('git merge --no-edit'),
+      'candidate must merge the pinned commits'
+    )
+    const mergeCommands = String(mergeStep.run)
+      .split('\n')
+      .filter((line) => line.includes('git merge --no-edit'))
 
     expect(workflow.on.workflow_dispatch.inputs.target_branch.default).toBe('hivecode/main-next')
     expect(workflow.env.TARGET_BRANCH).toContain("'hivecode/main-next'")
     expect(syncJob.outputs.target_sha).toBe('${{ steps.sync.outputs.target_sha }}')
-    expect(syncScript).toContain('refs/heads/$TARGET_BRANCH:$target_ref')
+    expect(syncScript).toContain('refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH')
     expect(syncScript).toContain('echo "target_sha=$target_sha"')
-    expect(syncScript.indexOf(mergeTarget)).toBeGreaterThan(-1)
-    expect(syncScript.indexOf(mergeUpstream)).toBeGreaterThan(syncScript.indexOf(mergeTarget))
+    expect(mergeStep.env.TARGET_SHA).toBe('${{ steps.sync.outputs.target_sha }}')
+    expect(mergeStep.env.UPSTREAM_SHA).toBe('${{ steps.sync.outputs.upstream_sha }}')
+    expect(mergeCommands).toHaveLength(2)
+    expect(mergeCommands[0]).toContain('"$TARGET_SHA"')
+    expect(mergeCommands[1]).toContain('--no-ff')
+    expect(mergeCommands[1]).toContain('"$UPSTREAM_SHA"')
 
     const checkoutStep = findStep(
       workflow.jobs.gates,
@@ -135,14 +145,25 @@ describe('upstream synchronization boundary', () => {
     )
     const proposeStep = findStep(
       workflow.jobs.propose,
-      (step) => step.env?.VENDOR_SHA,
-      'proposal step must pin synchronization SHAs'
+      (step) => step.id === 'proposal',
+      'proposal step must validate synchronization SHAs'
     )
     const proposeScript = String(proposeStep.run)
 
-    expect(proposeStep.env.TARGET_SHA).toBe('${{ needs.sync.outputs.target_sha }}')
-    expect(proposeScript).toContain('vendor_remote_sha')
-    expect(proposeScript).toContain('target_remote_sha')
-    expect(proposeScript).toContain('target_remote_sha" != "$TARGET_SHA')
+    expect(workflow.jobs.propose.env.TARGET_SHA).toBe('${{ needs.sync.outputs.target_sha }}')
+    expect(workflow.jobs.propose.env.VENDOR_SHA).toBe('${{ needs.sync.outputs.vendor_sha }}')
+    for (const [branch, sha] of [
+      ['VENDOR_BRANCH', 'VENDOR_SHA'],
+      ['TARGET_BRANCH', 'TARGET_SHA']
+    ]) {
+      const remoteCheck = `test "$(git ls-remote origin "refs/heads/$${branch}" | cut -f1)" = "$${sha}"`
+      const fetchedCheck = `test "$(git rev-parse "refs/remotes/origin/$${branch}")" = "$${sha}"`
+      expect(proposeScript).toContain(remoteCheck)
+      expect(proposeScript).toContain(fetchedCheck)
+      expect(proposeScript.indexOf(fetchedCheck)).toBeLessThan(
+        proposeScript.indexOf('node config/scripts/upstream-sync-pr.mjs')
+      )
+      expect(workflow.jobs.propose.steps.at(-1).run).toContain(remoteCheck)
+    }
   })
 })

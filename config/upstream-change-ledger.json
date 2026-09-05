@@ -356,19 +356,6 @@
       "regressionTests": ["repo-worktree-row-resolution", "worktree-rm-id-selector-path-spelling"]
     },
     {
-      "upstreamSha": "b4ed53f7c65be1d03ba2896631fe75c62742babf",
-      "type": "BUG",
-      "applied": "已移植",
-      "dependencies": ["fc36d58bbb", "fd9125ea8c"],
-      "conflictReason": "结构化会话 host 接入点在 runtime 拆分冲突中遗漏",
-      "adaptation": "恢复 lazy structured-agent-session host、创建意图、重启恢复、agent tab 投影与关闭；保留 HiveCode 移动 session tab 边界",
-      "regressionTests": [
-        "structured agent-session create intent",
-        "structured session cold restoration",
-        "session tab move validation"
-      ]
-    },
-    {
       "upstreamSha": "caef20fec8dee3d5c7df6ff23600938da381a4b7",
       "type": "BUG",
       "applied": "已移植",
@@ -454,13 +441,20 @@
       "regressionTests": ["brand-boundary", "documentation-governance"]
     },
     {
-      "upstreamSha": "fd9125ea8c7b6cb64ea1daf7f4a335c13e52f351",
+      "upstreamSha": "fd9125ea8c7b347cd8b675a4095e31cd3c865d25",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [],
-      "conflictReason": "结构化原生聊天与 HiveCode runtime/preload facade 存在拆分差异",
-      "adaptation": "补齐结构化会话 PTY 写入门禁、退出解绑，以及 web preload 的会话恢复和能力暴露；保留 HiveCode web API 与 UI 品牌",
-      "regressionTests": ["structured agent session PTY binding", "web preload capability parity"]
+      "dependencies": ["fc36d58bbb697e10ade0ecbd5df22e53bd2e7cf6"],
+      "conflictReason": "结构化原生聊天与 HiveCode runtime/preload facade 存在拆分差异，包含 runtime 拆分时遗漏的 host 接入点",
+      "adaptation": "补齐结构化会话 PTY 写入门禁、退出解绑、web preload 会话恢复和能力暴露，以及 lazy structured-agent-session host、创建意图、重启恢复、agent tab 投影与关闭；保留 HiveCode web API、UI 品牌和移动 session tab 边界",
+      "historicalReference": "旧记录 b4ed53f7c65be1d03ba2896631fe75c62742babf 属于上游开发分支，不在 upstream/main 历史；其 lazy host 文件在主线实际由本条 #16729 引入，因此将适配说明和回归项归并到主线提交，保留原 SHA 供溯源，不将旁支提交计为已审核主线历史",
+      "regressionTests": [
+        "structured agent session PTY binding",
+        "web preload capability parity",
+        "structured agent-session create intent",
+        "structured session cold restoration",
+        "session tab move validation"
+      ]
     },
     {
       "upstreamSha": "98bdd653abcb12e2b8abba57fa0f2aa9ed636110",

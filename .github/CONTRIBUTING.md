@@ -68,6 +68,19 @@ decision is required only for an explicit product-boundary or compatibility
 conflict. Where an upstream feature overlaps HiveCode UI, preserve HiveCode
 branding and existing UI capabilities while adopting upstream behavior.
 
+The first synchronization performs one complete historical review. Later runs
+start at the reviewed upstream SHA in the frozen product target's
+`config/upstream-sync-state.json` and also revisit unresolved boundary feature
+decisions. The vendor tip is a publication lease, not the review checkpoint.
+Candidate checkpoint changes become effective only after their verified,
+reviewed PR is merged into the product branch. Failed gates and unmerged PRs
+therefore cannot cause skipped updates. A malformed checkpoint or rewritten
+upstream history requires explicit repair before continuing.
+
+See [`docs/reference/upstream-sync-review.md`](../docs/reference/upstream-sync-review.md)
+for inclusion evidence, required decisions, retry behavior, and focused platform
+verification. Neither Git ancestry nor a passing merge replaces behavior review.
+
 ## Compatibility Contract
 
 Do not rename or remove these without an explicit migration plan: `orca` and

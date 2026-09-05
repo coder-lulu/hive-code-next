@@ -1,13 +1,21 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "description": "Run focused platform contracts on each OS; the common job owns the broad unit, build, and mobile checks once.",
   "platforms": {
-    "windows": [
-      "pnpm exec vitest run --config config/vitest.config.ts src/main src/shared",
-      "pnpm exec tsc -p config/tsconfig.tc.cli.json --noEmit"
-    ],
-    "macos": ["pnpm exec vitest run --config config/vitest.config.ts src/main src/shared"],
-    "linux": ["pnpm exec vitest run --config config/vitest.config.ts src/main src/shared"],
-    "mobile": ["pnpm exec vitest run --config mobile/vitest.config.ts"]
+    "windows": {
+      "suites": ["platform"],
+      "checks": [
+        {
+          "id": "windows-cli-typecheck",
+          "category": "platform",
+          "kind": "command",
+          "cwd": ".",
+          "argv": ["pnpm", "run", "typecheck:cli"]
+        }
+      ]
+    },
+    "macos": { "suites": ["platform"], "checks": [] },
+    "linux": { "suites": ["platform"], "checks": [] }
   },
   "criticalAreas": [
     "session reconnect",

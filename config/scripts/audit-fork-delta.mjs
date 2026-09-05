@@ -408,7 +408,7 @@ function main() {
   process.stdout.write(output)
 }
 
-if (path.resolve(process.argv[1]) === import.meta.filename) {
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   try {
     main()
   } catch (error) {
