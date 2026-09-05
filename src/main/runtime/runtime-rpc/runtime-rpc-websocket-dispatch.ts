@@ -4,11 +4,14 @@ import type {
   PairingProvisionRelayParams
 } from '../../../shared/mobile-relay-credential-contract'
 import { fingerprintAuthenticatedPairingCredential } from '../rpc/orchestration-mutation-executor'
-import type { AuthenticatedMobileSocket } from '../rpc/mobile-socket-wiring'
+import type {
+  AuthenticatedMobileSocket,
+  AuthenticatedCloudManagedSocket
+} from '../rpc/mobile-socket-wiring'
 import type { RpcRequest, RpcResponse } from '../rpc/core'
 import type { WebSocketTransport } from '../rpc/ws-transport'
 import type { DeviceScope } from '../device-registry'
-import { RuntimeRpcRequestAdmission } from './runtime-rpc-request-admission'
+import { RuntimeRpcCloudDispatch, LOCAL_ONLY_RPC_METHODS } from './runtime-rpc-cloud-dispatch'
 import { classifyRuntimeLongPoll } from './runtime-rpc-long-poll'
 import { MOBILE_RPC_METHOD_ALLOWLIST } from './runtime-rpc-mobile-method-allowlist'
 
@@ -26,7 +29,7 @@ function injectDeviceScope(response: string, scope: DeviceScope): string {
   }
 }
 
-export class RuntimeRpcWebSocketDispatch extends RuntimeRpcRequestAdmission {
+export class RuntimeRpcWebSocketDispatch extends RuntimeRpcCloudDispatch {
   // Why: WebSocket dispatch is streaming (multiple responses) and auths via per-device tokens, not the shared token.
   protected async handleWebSocketMessage(
     rawMessage: string,
@@ -35,7 +38,8 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcRequestAdmission {
     wsTransport?: WebSocketTransport,
     ws?: WebSocket,
     authenticatedDeviceToken?: string | null,
-    authenticatedSocket?: AuthenticatedMobileSocket
+    authenticatedSocket?: AuthenticatedMobileSocket,
+    authenticatedCloudSocket?: AuthenticatedCloudManagedSocket
   ): Promise<void> {
     let request: RpcRequest
     try {
@@ -45,12 +49,28 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcRequestAdmission {
       return
     }
 
+    if (typeof request !== 'object' || request === null || Array.isArray(request)) {
+      reply(JSON.stringify(this.buildError('unknown', 'bad_request', 'Invalid RPC request')))
+      return
+    }
+
     if (typeof request.id !== 'string' || request.id.length === 0) {
       reply(JSON.stringify(this.buildError('unknown', 'bad_request', 'Missing request id')))
       return
     }
     if (typeof request.method !== 'string' || request.method.length === 0) {
       reply(JSON.stringify(this.buildError(request.id, 'bad_request', 'Missing RPC method')))
+      return
+    }
+
+    if (authenticatedCloudSocket) {
+      await this.handleCloudManagedWebSocketMessage(
+        request,
+        reply,
+        sendBinary,
+        ws,
+        authenticatedCloudSocket
+      )
       return
     }
 
@@ -71,6 +91,18 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcRequestAdmission {
     const device = this.deviceRegistry?.validateToken(token)
     if (!device) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Invalid device token')))
+      return
+    }
+    if (LOCAL_ONLY_RPC_METHODS.has(request.method)) {
+      reply(
+        JSON.stringify(
+          this.buildError(
+            request.id,
+            'forbidden',
+            `Method '${request.method}' is available only to local clients`
+          )
+        )
+      )
       return
     }
     if (device.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
@@ -141,6 +173,12 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcRequestAdmission {
         // Why: gates the mobile-only payload diet so full-screen web/desktop clients aren't truncated.
         clientKind: device.scope,
         clientCapabilities: authenticatedSocket?.clientCapabilities,
+        updateClientCapabilities:
+          authenticatedSocket && device.scope === 'mobile'
+            ? (clientCapabilities) => {
+                authenticatedSocket.clientCapabilities = clientCapabilities
+              }
+            : undefined,
         pairing: pairingContext,
         signal: abortRegistration?.signal,
         sendBinary,

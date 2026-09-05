@@ -100,7 +100,7 @@ describe.skipIf(process.platform === 'win32')('createHostedReview with shared sy
     createHostedReview(
       worktree,
       { provider: 'github', base: 'main', head: 'feature', title: 'Feature' },
-      null,
+      'local',
       sharedLinkPaths ? { sharedLinkPaths } : {}
     )
 

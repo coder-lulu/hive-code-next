@@ -13,6 +13,7 @@ import { createTerminalTabAttentionActions } from '../terminals/terminal-tab-att
 import { createTerminalPtyBindingActions } from '../terminals/terminal-pty-bindings'
 import { createTerminalPtyReleaseActions } from '../terminals/terminal-pty-release'
 import { createTerminalUnverifiedPtyLossActions } from '../terminals/terminal-unverified-pty-loss'
+import { createTerminalDisownedPtySourceActions } from '../terminals/terminal-disowned-pty-sources'
 import { createTerminalPaneHibernationActions } from '../terminals/terminal-pane-hibernation'
 import { createDirectSshTerminalBindingActions } from '../terminals/direct-ssh-terminal-bindings'
 import { createTerminalShutdownActions } from '../terminals/terminal-shutdown'
@@ -56,6 +57,8 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
     set({ terminalStartupRestorationReady: value })
   },
   restoredRuntimeHostIdByWorkspaceSessionKey: {},
+  contestedHostWorkspaceSessions: {},
+  contestedPrimaryHostBySessionKey: {},
   defaultTerminalTabsAppliedByWorktreeId: {},
   closedTerminalTabTombstonesByTabId: {},
   hydrationSucceeded: false,
@@ -64,6 +67,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
   pendingReconnectPtyIdByTabId: {},
   lastKnownRelayPtyIdByTabId: {},
   unverifiedPtyLossTabIds: {},
+  disownedPtyIds: {},
   pendingSnapshotByPtyId: {},
   pendingColdRestoreByPtyId: {},
   deferredSshReconnectTargets: [],
@@ -81,6 +85,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
   ...createTerminalPtyBindingActions(set, get),
   ...createTerminalPtyReleaseActions(set, get),
   ...createTerminalUnverifiedPtyLossActions(set),
+  ...createTerminalDisownedPtySourceActions(set),
   ...createTerminalPaneHibernationActions(set, get),
   ...createDirectSshTerminalBindingActions(set, get),
   ...createTerminalShutdownActions(set, get),

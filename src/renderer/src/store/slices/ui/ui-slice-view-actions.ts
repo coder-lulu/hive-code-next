@@ -5,9 +5,6 @@ export function createUiViewActions(set: UISliceSet, get: UISliceGet): Partial<U
   return {
     openActivityPage: (options) => {
       const scope = options?.scope ?? 'all'
-      if (scope === 'all' && get().settings?.experimentalActivity !== true) {
-        return
-      }
       set((state) => ({
         activeView: 'activity',
         activityPageScope: scope,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { APP_DISPLAY_NAME, applyProductBranding } from '@/product-brand'
 
+import en from '@/i18n/locales/en.json'
 import ko from '@/i18n/locales/ko.json'
 import { i18n } from '@/i18n/i18n'
 import { getBrowserPaneSearchEntries, getTerminalLinkActionSearchKeywords } from './browser-search'
@@ -10,6 +11,17 @@ import {
   getLinkRoutingModifierDescription,
   getLinkRoutingModifierTitle
 } from './browser-link-routing-copy'
+
+function lookupEnglishCatalog(key: string): string | undefined {
+  const value = key
+    .split('.')
+    .reduce<unknown>(
+      (node, part) =>
+        node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined,
+      en
+    )
+  return typeof value === 'string' ? value : undefined
+}
 
 describe('browser settings search copy', () => {
   it('uses macOS shortcut symbols for Link Routing copy and search metadata', () => {
@@ -193,7 +205,10 @@ describe('Link Routing description localization', () => {
   })
 
   it('uses the catalog key rather than an inline literal', () => {
-    expect(i18n.exists(KEY)).toBe(true)
-    expect(i18n.exists(BASE_KEY)).toBe(true)
+    // Against en.json, not the runtime resource: the renderer only bundles the
+    // English entries i18next cannot rebuild from a call site default, so the
+    // translator catalog is what has to carry the key for other locales.
+    expect(lookupEnglishCatalog(KEY)).toBeTruthy()
+    expect(lookupEnglishCatalog(BASE_KEY)).toBeTruthy()
   })
 })

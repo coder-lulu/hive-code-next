@@ -183,6 +183,7 @@ export function connectPanePty(
   // mutation does not propagate back.
   session.paneStartup = session.deps.startup ?? null
   session.deps.startup = undefined
+  session.startupPtyBound = false
 
   // Why: paneKey crosses PTY env, hook IPC, retained rows, and reload/replay.
   // Use the stable layout leaf UUID, not the renderer-local numeric pane id.

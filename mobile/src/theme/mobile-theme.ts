@@ -163,8 +163,11 @@ export const typographyTokens = {
   }
 } as const
 
+export const motionTokens = { standardDurationMs: 200 } as const
+
 export const lightTheme = {
   scheme: 'light',
+  motion: motionTokens,
   color: lightThemeColors,
   terminal: lightTerminalColors,
   spacing: spacingTokens,
@@ -175,6 +178,7 @@ export const lightTheme = {
 
 export const darkTheme = {
   scheme: 'dark',
+  motion: motionTokens,
   color: darkThemeColors,
   terminal: darkTerminalColors,
   spacing: spacingTokens,

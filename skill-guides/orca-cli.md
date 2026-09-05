@@ -194,7 +194,6 @@ hive terminal send --terminal <handle> --text "continue" --enter --json
 hive terminal send --text "echo hello" --enter --json
 hive terminal wait --terminal <handle> --for exit --timeout-ms 5000 --json
 hive terminal wait --terminal <handle> --for tui-idle --timeout-ms 300000 --json
-hive terminal stop --worktree id:<repoId>::<worktreePath> --json
 hive terminal create --json
 hive terminal create --title "Worker" --json
 hive terminal create --worktree active --command "codex" --json
@@ -203,11 +202,15 @@ hive terminal split --terminal <handle> --direction horizontal --command "npm te
 hive terminal rename --terminal <handle> --title "New Name" --json
 hive terminal switch --terminal <handle> --json
 hive terminal close --terminal <handle> --json
+hive terminal close --worktree id:<repoId>::<worktreePath> --all --json
 ```
 
 Terminal rules:
 
 - `--terminal` is optional for most commands; omitted means the active terminal in the current worktree.
+- Use `terminal close --terminal <handle>` to close one terminal. Use `terminal close --worktree <selector> --all` to stop every terminal process in exactly that workspace and durably remove its terminal tabs, layouts, and agent-resume records.
+- A bulk close fails when the execution host cannot confirm every PTY stopped. Treat that as `unverifiable`; do not report the processes as exited or retry against another host.
+- Use workspace Sleep, not close, when the terminals and agent sessions should resume later. `terminal stop` is legacy compatibility plumbing and should not be used in new agent workflows.
 - `terminal list --json` omits `visualLayouts` to keep the common agent payload bounded. Add `--include-visual-layouts` only when tab and pane topology is required.
 - Use `terminal read` before `terminal send` unless the next input is obvious.
 - Use `terminal send` only for direct terminal input or one-off prompts where no task state, inbox, or reply tracking is needed.

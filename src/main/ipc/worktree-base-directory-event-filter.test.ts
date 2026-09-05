@@ -348,3 +348,28 @@ describe('matchingWorktreeBaseRepoIds (git-common)', () => {
     ).toEqual([])
   })
 })
+
+describe('flat workspace markers', () => {
+  const WORKTREE_ROOT = '/workspace/worktrees'
+  it('matches flat workspace .git marker events without matching sibling churn', () => {
+    const target = {
+      key: `base:${WORKTREE_ROOT}`,
+      kind: 'base' as const,
+      path: WORKTREE_ROOT,
+      repos: new Map([['repo-1', { repoId: 'repo-1', repoName: 'project', nestWorkspaces: false }]])
+    }
+
+    expect(
+      matchingWorktreeBaseRepoIds(target, {
+        type: 'create',
+        path: join(WORKTREE_ROOT, 'external-5104', '.git')
+      })
+    ).toEqual(['repo-1'])
+    expect(
+      matchingWorktreeBaseRepoIds(target, {
+        type: 'update',
+        path: join(WORKTREE_ROOT, 'external-5104', 'src', 'file.ts')
+      })
+    ).toEqual([])
+  })
+})

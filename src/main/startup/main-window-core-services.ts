@@ -15,6 +15,7 @@ import {
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import { prepareCodexSessionResumeForLaunch } from './codex-session-resume-launch'
 import { isRecoveryReloadInFlight } from './main-window-lifecycle-flags'
+import { RELAY_HOST_CLOSE_REASON } from '../../shared/relay-host-close-reason'
 
 export function attachMainWindowCoreServices(
   window: BrowserWindow,
@@ -73,6 +74,19 @@ export function attachMainWindowCoreServices(
     state.crashReports ?? undefined,
     keybindings,
     {
+      ...(state.hiveAccountService ? { hiveAccountService: state.hiveAccountService } : {}),
+      ...(state.hiveAccountStartupState
+        ? { hiveAccountStartupState: state.hiveAccountStartupState }
+        : {}),
+      ...(state.runtimeCloudDirectory && state.runtimeCloudSessions && state.localRuntimeOwnership
+        ? {
+            hiveRuntimeCloudServices: {
+              directory: state.runtimeCloudDirectory,
+              ownership: state.localRuntimeOwnership,
+              sessions: state.runtimeCloudSessions
+            }
+          }
+        : {}),
       getAdditionalAiVaultCodexHomePaths: () =>
         codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery(),
       prepareAiVaultSessionResume: (args) =>
@@ -83,6 +97,8 @@ export function attachMainWindowCoreServices(
       onBeforeRelaunch: async () => {
         state.isQuitting = true
         state.desktopRelayService?.fenceAndCloseNow()
+        state.runtimeCloudPresence?.setRuntimeReady(false)
+        state.runtimeCloudPresence?.setAuthorization(null)
         await preserveAgentAuthBeforeRestart({
           codexRuntimeHome,
           claudeRuntimeAuth,
@@ -90,7 +106,10 @@ export function attachMainWindowCoreServices(
         })
       },
       onOrcaProfileAuthMutation: () => state.desktopRelayService?.authMutated(),
-      onBeforeOrcaProfileSignOut: () => state.desktopRelayService?.fenceAndCloseNow()
+      // Sign-out is the one fence a paired phone can be told about; quit and
+      // relaunch above stay reasonless so a restart never reads as signed out.
+      onBeforeOrcaProfileSignOut: () =>
+        state.desktopRelayService?.fenceAndCloseNow(RELAY_HOST_CLOSE_REASON.SIGNED_OUT)
     },
     state.pluginService ?? undefined,
     state.pluginMarketplaceService && state.pluginMarketplaceInstaller
@@ -119,8 +138,11 @@ export function attachMainWindowCoreServices(
       isRecoveryReloadInFlight,
       onCodexHomePtySpawned: handleCodexHomePtySpawned,
       onPtyExit: handlePtyExit,
-      onBeforeUpdateQuit: () =>
-        preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store }),
+      onBeforeUpdateQuit: () => {
+        state.runtimeCloudPresence?.setRuntimeReady(false)
+        state.runtimeCloudPresence?.setAuthorization(null)
+        return preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
+      },
       updateInstallMode: resolveUpdateInstallMode(state.isServeMode),
       onWorktreeLifecycle: emitPluginWorktreeLifecycle
     }

@@ -65,6 +65,7 @@
         "cwd": ".",
         "argv": ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"],
         "paths": [
+          "src/main/runtime/runtime-rpc-cloud-transport-security.test.ts",
           "src/main/runtime/rpc/cloud-managed-e2ee-auth-validation.test.ts",
           "src/main/runtime/rpc/runtime-close-attribution.test.ts",
           "src/main/runtime/rpc/terminal-subscribe-reconnect-rebind.test.ts",

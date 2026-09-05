@@ -1,20 +1,20 @@
+import { installRuntimeRpc } from './main-process-runtime-rpc'
 import { app, powerMonitor, type BrowserWindow } from 'electron'
-import { is } from '@electron-toolkit/utils'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
+import {
+  completePendingUserDataMigration,
+  showUserDataMigrationWarning
+} from './main-process-user-data-migration'
 import { getProductCloudAuthConfig } from '../product/product-cloud-config'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
-import {
-  getCanonicalUserDataPath,
-  migrateMobilePairingDataToCanonicalUserDataPath
-} from '../persistence'
-import { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
-import { registerMobileHandlers } from '../ipc/mobile'
+import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import { getLocalPtyProvider, registerHeadlessPtyRuntime } from '../ipc/pty'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-types'
 import { OffscreenBrowserBackend } from '../browser/offscreen-browser-backend'
 import { browserManager } from '../browser/browser-manager'
 import { DesktopRelayService } from '../runtime/relay/desktop-relay-service'
-import { getServeOptions, getBundledWebClientRoot, printServeReady } from './main-process-serve'
+import { getServeOptions, printServeReady } from './main-process-serve'
 import {
   bindTerminalRuntimeStartupServices,
   handleCodexHomePtySpawned,
@@ -24,6 +24,7 @@ import {
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import { prepareCodexSessionResumeForLaunch } from './codex-session-resume-launch'
 import { startWindowsDesktopBeforeShellPathReady } from './windows-desktop-shell-path-startup'
+import { repairKnownPoisonedInstallDirBeforeWindow } from './windows-install-dir-acl-recovery'
 import { registerServeSignalHandlers } from './serve-signal-handlers'
 import { settleServeDesktopActivation } from './serve-desktop-activation'
 import {
@@ -54,72 +55,14 @@ function settleDesktopActivation(): void {
   })
 }
 
-function installRuntimeRpc(
-  runtime: RuntimeService,
-  serveOptions: ReturnType<typeof getServeOptions> | null
-): OrcaRuntimeRpcServer {
-  // Why: existing installs may have pairing creds under the late app.getPath('userData'); copy them forward before switching to the canonical path.
-  migrateMobilePairingDataToCanonicalUserDataPath(app.getPath('userData'))
-  // Why: parallel E2E Electron instances would race the fixed port (EADDRINUSE); port 0 gives each a random OS-assigned port.
-  const isE2E = Boolean(process.env.ORCA_E2E_USER_DATA_DIR)
-  const requestedE2EWsPort = process.env.ORCA_E2E_RUNTIME_WS_PORT
-  const e2eWsPort = requestedE2EWsPort === undefined ? 0 : Number(requestedE2EWsPort)
-  if (isE2E && (!Number.isInteger(e2eWsPort) || e2eWsPort < 0 || e2eWsPort > 65_535)) {
-    throw new Error(`Invalid ORCA_E2E_RUNTIME_WS_PORT value: ${requestedE2EWsPort}`)
-  }
-  // Why: pin dev to 6769 so `pnpm dev` doesn't race packaged Orca on 6768 and fall back to a random port, breaking deterministic mobile pairing/repro (STA-1511).
-  const devWsPort = is.dev && !isE2E ? 6769 : undefined
-  const runtimeRpc = new OrcaRuntimeRpcServer({
-    runtime,
-    // Why: mobile pairing needs the stable pre-setName() path (getCanonicalUserDataPath), not a late app.getPath('userData') that drops paired devices across restarts.
-    userDataPath: getCanonicalUserDataPath(),
-    enableWebSocket: true,
-    // Why: STA-2370 — the desktop app binds the WS listener to loopback until the user pairs a device;
-    // `orca serve` is an explicit remote opt-in, and E2E keeps the wide bind its harness connects over.
-    exposeNetworkByDefault: Boolean(serveOptions) || isE2E,
-    ...(isE2E ? { wsPort: e2eWsPort } : {}),
-    ...(devWsPort !== undefined ? { wsPort: devWsPort } : {}),
-    ...(serveOptions?.wsPort !== undefined
-      ? {
-          wsPort: serveOptions.wsPort,
-          // Why: only explicit `orca serve --port` overrides a stale STA-1511 fallback (issue #8535); default/dev stay fallback-first for pairing stability.
-          preferPinnedWsPort: true
-        }
-      : {}),
-    webClientRoot: getBundledWebClientRoot()
-  })
-  state.runtimeRpc = runtimeRpc
-  registerMobileHandlers(runtimeRpc, {
-    getRelayStatus: () => state.desktopRelayStatus,
-    consumePendingUnpairedDeviceAuthFailure: (webContentsId) => {
-      if (
-        !state.mainWindow ||
-        state.mainWindow.isDestroyed() ||
-        state.mainWindow.webContents.id !== webContentsId ||
-        !state.pendingUnpairedDeviceAuthFailure
-      ) {
-        return false
-      }
-      state.pendingUnpairedDeviceAuthFailure = false
-      return true
-    }
-  })
-  // Why: repeated direct auth failures otherwise look like a client that never connects; point users to re-pairing.
-  runtimeRpc.setOnUnpairedDeviceAuthFailure(() => {
-    // Why: runtime startup races renderer mount; retain the one-shot until the listener consumes it.
-    state.pendingUnpairedDeviceAuthFailure = true
-    if (state.mainWindow && !state.mainWindow.isDestroyed()) {
-      state.mainWindow.webContents.send('mobile:unpairedDeviceAuthFailure')
-    }
-  })
-  return runtimeRpc
-}
-
 async function launchServeMode(
   runtime: RuntimeService,
   runtimeRpc: OrcaRuntimeRpcServer,
   serveOptions: NonNullable<ReturnType<typeof getServeOptions>>
 ): Promise<void> {
+  // Why here: headless serve has no window to unblock, so keep the persisted proxy strictly
+  // ahead of every fetcher this phase can reach (relay, CLI install, RPC clients).
+  await state.initialProxyApplicationReady
   // Why: give managed WSL launchers a brief chance to migrate before headless PTYs go live, without slow repairs withholding all RPC readiness.
   logStartupMilestone('wsl-cli-barrier-start')
   await state.managedWslCliStartupBarrierReady
@@ -154,6 +97,7 @@ async function launchServeMode(
     console.error('[runtime] Failed to start headless RPC transport:', error)
     throw error
   })
+  state.runtimeCloudPresence?.setRuntimeReady(true)
   settleDesktopActivation()
   // Why: every attempt must reach app.quit(); a page beforeunload can veto an earlier signal.
   registerServeSignalHandlers(process, () => app.quit())
@@ -167,11 +111,11 @@ async function launchServeMode(
         }
       }).install()
       console.log(
-        `[serve] orca CLI install: ${cliStatus.state}${cliStatus.commandPath ? ` (${cliStatus.commandPath})` : ''}`
+        `[serve] ${APP_DISPLAY_NAME} CLI install: ${cliStatus.state}${cliStatus.commandPath ? ` (${cliStatus.commandPath})` : ''}`
       )
     } catch (error) {
       console.warn(
-        '[serve] orca CLI install skipped:',
+        `[serve] ${APP_DISPLAY_NAME} CLI install skipped:`,
         error instanceof Error ? error.message : String(error)
       )
     }
@@ -183,12 +127,12 @@ async function launchServeMode(
         resourcesPath: process.resourcesPath
       })
       console.log(
-        `[serve] bare orca dispatcher ${dispatcher.state}: ${dispatcher.dispatcherPath}` +
+        `[serve] legacy CLI dispatcher ${dispatcher.state}: ${dispatcher.dispatcherPath}` +
           `${dispatcher.target ? ` -> ${dispatcher.target}` : ''}`
       )
     } catch (error) {
       console.warn(
-        '[serve] bare orca dispatcher install skipped:',
+        '[serve] legacy CLI dispatcher install skipped:',
         error instanceof Error ? error.message : String(error)
       )
     }
@@ -199,6 +143,7 @@ async function launchServeMode(
   // armed from the main window — without this, a quit mid-removal leaks the tree until a desktop launch.
   scheduleAllPendingHistoryTreeRemovals()
   await printServeReady(serveOptions)
+  completePendingUserDataMigration()
 }
 
 async function launchDesktopMode(
@@ -226,8 +171,21 @@ async function launchDesktopMode(
       )
   ])
   if (!runtimeRpcStartResult.ok) {
-    void showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
+    // Why gated: this dialog is the only launch-phase text read through translateMain, and i18n
+    // now settles alongside this phase — without the wait a non-English user could get the
+    // English defaultValue fallback. Still off the renderer's path (it is failure-only).
+    void state.mainProcessI18nReady.then(() =>
+      showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
+    )
   }
+  if (runtimeRpcStartResult.ok) {
+    state.runtimeCloudPresence?.setRuntimeReady(true)
+  }
+  showUserDataMigrationWarning(win)
+  // Why after the window and not before it: the default-session request guard already holds every
+  // fetcher until the persisted proxy lands, so this only has to keep the launch phase itself
+  // ordered ahead of the relay — it must not gate the renderer.
+  await state.initialProxyApplicationReady
   const cloudAuth = getProductCloudAuthConfig()
   if (cloudAuth.configured) {
     try {
@@ -280,7 +238,7 @@ export async function initializeMainProcessRuntimeLaunch(
   }
   let serveOptions: ReturnType<typeof getServeOptions> | null = null
   try {
-    serveOptions = state.isServeMode ? getServeOptions() : null
+    serveOptions = state.isServeMode ? getServeOptions(process.argv) : null
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     app.exit(1)
@@ -289,6 +247,20 @@ export async function initializeMainProcessRuntimeLaunch(
   state.serveOptions = serveOptions
   const runtimeRpc = installRuntimeRpc(runtime, serveOptions)
   const shellPathReady = shellPathHydration.whenReady()
+  // Why published: the renderer's git-environment barrier must fence on the same
+  // generation the terminal startup services wait for, not a later re-read.
+  state.shellPathReady = shellPathReady
+  // Why before any window: the poisoned install DACL kills the renderer at init, and
+  // the probe that detects it cannot finish before createMainWindow. Bounded, and a
+  // no-op (one absent-file read) unless a previous launch already recorded the verdict.
+  const aclGate = await repairKnownPoisonedInstallDirBeforeWindow({
+    isServeMode: state.isServeMode || serveOptions !== null,
+    userDataPath: app.getPath('userData'),
+    appVersion: app.getVersion()
+  })
+  if (aclGate !== 'not-marked' && aclGate !== 'skipped') {
+    logStartupMilestone('install-dir-acl-repair-blocking-done', { mode: aclGate })
+  }
   let desktopWindow: BrowserWindow | null = null
   if (process.platform === 'win32' && app.isPackaged && !serveOptions) {
     const desktopStartup = startWindowsDesktopBeforeShellPathReady({
@@ -308,4 +280,5 @@ export async function initializeMainProcessRuntimeLaunch(
     return
   }
   await launchDesktopMode(runtimeRpc, shellPathReady, desktopWindow, options.openMainWindow)
+  completePendingUserDataMigration()
 }

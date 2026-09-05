@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   extractProtocolUrlFromArgv,
   registerProtocolHandlers,
+  isPairingProtocolUrl,
   ALL_SCHEMES,
   PRIMARY_SCHEME
 } from './protocol-handler'
@@ -63,6 +64,8 @@ describe('registerProtocolHandlers', () => {
     expect(fake.listeners.get('open-url')).toBeUndefined()
 
     registerProtocolHandlers({ app: fake.app, onUrl, platform: 'win32' })
+    registerProtocolHandlers({ app: fake.app, onUrl, platform: 'darwin', listenForOpenUrl: false })
+    expect(fake.listeners.get('open-url')).toBeUndefined()
   })
 
   it('forwards open-url events to the consumer', () => {
@@ -136,6 +139,20 @@ describe('extractProtocolUrlFromArgv', () => {
 })
 
 describe('Protocol URL scheme constants', () => {
+  it('accepts only pairing authorities on the product and compatibility schemes', () => {
+    expect(['hivecode://pair?code=abc', 'orca://pair?code=xyz'].every(isPairingProtocolUrl)).toBe(
+      true
+    )
+    expect(
+      [
+        'https://pair',
+        'hivecode://pairing',
+        'hivecode://user@pair',
+        'hivecode://pair:123',
+        'invalid'
+      ].some(isPairingProtocolUrl)
+    ).toBe(false)
+  })
   it('primary scheme is hivecode', () => {
     expect(PRIMARY_SCHEME).toBe('hivecode')
   })

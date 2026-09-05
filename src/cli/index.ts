@@ -8,6 +8,7 @@ import {
   specPaths,
   validateCommandAndFlags
 } from './args'
+import { readOrcaCliVersion } from './cli-version'
 import { dispatch } from './dispatch'
 import {
   assertEnvironmentSelectorResolvable,
@@ -19,7 +20,7 @@ import { printHelp } from './help'
 import type { RuntimeClient } from './runtime-client'
 import { COMMAND_SPECS } from './specs'
 import { resolveOrchestrationCliExecutable } from './runtime/orchestration-recovery-command'
-import { CLI_COMPATIBILITY_ALIASES, PRIMARY_CLI_COMMAND } from '../shared/brand'
+import { APP_DISPLAY_NAME, CLI_COMPATIBILITY_ALIASES, PRIMARY_CLI_COMMAND } from '../shared/brand'
 
 export { COMMAND_SPECS } from './specs'
 export { buildCurrentWorktreeSelector, normalizeWorktreeSelector } from './selectors'
@@ -32,6 +33,10 @@ function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
     commandPath[0] === 'runtime' ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||
+    // Why: `host list` answers "what can this machine target, and with what flag". Half of that
+    // answer (paired servers) is read from this machine's own pairing store and cannot be routed,
+    // so routing the other half produced one listing describing two machines at once.
+    commandPath[0] === 'host' ||
     commandPath[0] === 'serve' ||
     commandPath[0] === 'agent' ||
     commandPath[0] === 'vm' ||
@@ -62,6 +67,17 @@ export async function main(
   cwd = resolveInvocationCwd()
 ): Promise<void> {
   warnForCompatibilityInvocation()
+  // Why: version audits use the bundled launcher; Electron intercepts direct binary version flags.
+  if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) {
+    const version = readOrcaCliVersion()
+    if (!version) {
+      process.stderr.write(`Could not determine the ${APP_DISPLAY_NAME} version for this build.\n`)
+      process.exitCode = 1
+      return
+    }
+    process.stdout.write(`${version}\n`)
+    return
+  }
   if (argv[0] === 'agent-teams-tmux') {
     await runAgentTeamsTmuxShim(argv.slice(1))
     return

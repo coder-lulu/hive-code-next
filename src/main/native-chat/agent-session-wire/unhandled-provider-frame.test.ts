@@ -9,12 +9,7 @@ describe('unhandled provider frame journal fallback', () => {
       'future-provider',
       'notification:new/event',
       { body: 'abcdefghij' },
-      {
-        inlineHeadBytes: 8,
-        maxSessionBytes: 1024,
-        maxAppendsPerWindow: 10,
-        appendWindowMs: 1000
-      }
+      { inlineHeadBytes: 8 }
     )
 
     expect(item).not.toBeNull()
@@ -33,12 +28,6 @@ describe('unhandled provider frame journal fallback', () => {
     expect(
       Buffer.byteLength(item.body.providerFrame?.payload.head ?? '', 'utf8')
     ).toBeLessThanOrEqual(8)
-    expect(item.blobs).toEqual([
-      {
-        digest: item.body.providerFrame?.payload.digest,
-        payload: '{"body":"abcdefghij"}'
-      }
-    ])
   })
 
   it('turns an unserializable message-shaped payload into an explicit visible value', () => {
@@ -199,12 +188,7 @@ describe('unhandled provider frame journal fallback', () => {
       'codex',
       'notification:warning',
       { message },
-      {
-        inlineHeadBytes: 8,
-        maxSessionBytes: 1024,
-        maxAppendsPerWindow: 10,
-        appendWindowMs: 1000
-      }
+      { inlineHeadBytes: 8 }
     )
 
     expect(row?.body.text).toContain('abcdefgh')

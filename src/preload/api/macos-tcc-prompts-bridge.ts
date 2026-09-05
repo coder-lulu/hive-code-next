@@ -8,7 +8,9 @@ export const macosTccPromptsApi: PreloadApi['macosTccPrompts'] = {
       payload: Parameters<typeof callback>[0]
     ): void => callback(payload)
     ipcRenderer.on('macosTccPrompts:threshold', listener)
-    return () => ipcRenderer.removeListener('macosTccPrompts:threshold', listener)
+    return (): void => {
+      ipcRenderer.removeListener('macosTccPrompts:threshold', listener)
+    }
   },
   consumePending: () => ipcRenderer.invoke('macosTccPrompts:consumePending'),
   acknowledgePending: (claimId) =>

@@ -128,6 +128,11 @@ vi.mock('./updater-prerelease-feed', () => ({
 vi.mock('./updater-lifecycle-diagnostics', () => ({
   recordUpdaterLifecycle: recordUpdaterLifecycleMock
 }))
+vi.mock('./linux-update-package-type', () => ({
+  getLinuxPackageType: () => 'non-root',
+  getLinuxRootPackageType: () => null,
+  isExternallyManagedLinuxInstall: () => false
+}))
 
 // The real electron-updater DebUpdater failure text when elevation is impossible.
 const DEB_ELEVATION_ERROR =

@@ -2,11 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { HOST_DOCK_MIN_WIDTH } from '../storage/preferences'
-import {
-  useHostClient,
-  useForceReconnect,
-  useRefreshHostClient
-} from '../transport/client-context'
+import { useHostClient, useForceReconnect, useRefreshHostClient } from '../transport/client-context'
 import { useAccountVisibleHostCatalog } from '../runtime-directory/use-account-visible-host-catalog'
 import { selectConnectableHostProfiles } from '../transport/host-catalog-selection'
 import {
@@ -41,7 +37,7 @@ export function useMobileSessionFoundation() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   // Why: shared client per host owned by RpcClientProvider (docs/mobile-shared-client-per-host.md).
-  const { client, state: connState } = useHostClient(hostId)
+  const { client, clientId, state: connState } = useHostClient(hostId)
   const { catalog: accountVisibleHostCatalog } = useAccountVisibleHostCatalog()
   const accountVisibleHosts = useMemo(
     () => selectConnectableHostProfiles(accountVisibleHostCatalog),
@@ -108,6 +104,7 @@ export function useMobileSessionFoundation() {
     router,
     insets,
     client,
+    clientId,
     connState,
     reconnectAttempts,
     lastConnectedAt,

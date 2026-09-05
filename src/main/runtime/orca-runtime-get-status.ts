@@ -95,8 +95,10 @@ export class OrcaRuntimeWithGetStatus extends OrcaRuntimeWithGetRuntimeId {
     if (terminalDegradation) {
       degradations.push(terminalDegradation)
     }
+    const runtimeRecordId = this.getRuntimeRecordIdFn()
     return {
       runtimeId: this.runtimeId,
+      ...(runtimeRecordId ? { runtimeRecordId } : {}),
       rendererGraphEpoch: this.rendererGraphEpoch,
       graphStatus: this.graphStatus,
       authoritativeWindowId: this.authoritativeWindowId,

@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import type { HostClientAcquisition } from './host-client-acquisition-registry'
 import type { RpcClient } from './rpc-client'
 import type { MobileConnectionPath } from './stable-logical-rpc-client'
@@ -18,13 +19,25 @@ export type RpcClientContextValue = {
   disconnectHostClient: (hostId: string) => void
   getState: (hostId: string) => ConnectionState
   getKnownState: (hostId: string) => ConnectionState | null
+  getClientId: (hostId: string) => string | null
   getReconnectAttempt: (hostId: string) => number
   getLastConnectedAt: (hostId: string) => number | null
   getActivePath: (hostId: string) => MobileConnectionPath
   getPendingPath: (hostId: string) => MobileConnectionPath | null
   isPairingRejected: (hostId: string) => boolean
+  isHostSignedOut: (hostId: string) => boolean
   subscribeHostState: (hostId: string, listener: (state: ConnectionState) => void) => () => void
   getAllClients: () => { hostId: string; client: RpcClient }[]
   subscribeAllHosts: (listener: () => void) => () => void
   primeHosts: (hosts: HostProfile[]) => void
+}
+
+export const RpcClientContext = createContext<RpcClientContextValue | null>(null)
+
+export function useRpcClientContext(): RpcClientContextValue {
+  const ctx = useContext(RpcClientContext)
+  if (!ctx) {
+    throw new Error('useHostClient must be used inside <RpcClientProvider>')
+  }
+  return ctx
 }

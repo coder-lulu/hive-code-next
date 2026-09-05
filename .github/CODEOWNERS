@@ -22,3 +22,7 @@
 /.gitignore @coder-lulu
 /.gitattributes @coder-lulu
 /.github/CODEOWNERS @coder-lulu
+# The relay's deploy and operate surface: workspace, workflows, and the rollout lease action.
+/cloud/ @coder-lulu
+/.github/workflows/cloud-*.yml @coder-lulu
+/.github/actions/cloud-sql-rollout-lease/ @coder-lulu

@@ -69,6 +69,9 @@ async function reachVerifiedDownloadedUpdate(version: string): Promise<void> {
     ready?.()
   }
   await Promise.resolve()
+  expect(updater.getUpdateStatus()).toEqual(
+    expect.objectContaining({ state: 'downloaded', version })
+  )
 }
 
 describe('updater', () => {

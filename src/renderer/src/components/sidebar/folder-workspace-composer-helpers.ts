@@ -1,3 +1,9 @@
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
+import type { LaunchSource } from '../../../../shared/telemetry-events'
+import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
+import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import {
   buildGitHubWorkspaceSource,
@@ -104,4 +110,37 @@ export function getFolderWorkspacePrimaryActionLabel(): string {
     'auto.components.sidebar.FolderWorkspaceComposerDialog.create',
     'Create workspace'
   )
+}
+
+type FolderWorkspaceCreateInput = {
+  projectGroupId: string
+  name: string
+  connectionId?: string | null
+  linkedTask: FolderWorkspace['linkedTask']
+  linkedTaskSourceContext?: TaskSourceContext | null
+  createdWithAgent?: TuiAgent
+  pendingFirstAgentMessageRename?: boolean
+}
+
+export type SubmitFolderWorkspaceCreateParams = {
+  projectGroup: ProjectGroup
+  name: string
+  lastAutoName: string
+  linkedWorkItem: LinkedWorkItemSummary | null
+  linkedTaskSourceContext?: TaskSourceContext | null
+  note: string
+  quickAgent: TuiAgent | null
+  autoRenameBranchFromWork: boolean | undefined
+  agentCmdOverrides: Record<string, string> | undefined
+  agentArgs?: string | null
+  agentEnv?: Record<string, string>
+  agentPermissionMode?: AgentLaunchPermissionMode
+  sessionOptions?: Record<string, SessionOptionValue>
+  terminalWindowsShell?: string | null
+  isRemote?: boolean
+  launchSource?: LaunchSource
+  runtimeEnvironmentId?: string | null
+  settings?: GlobalSettings | null
+  createFolderWorkspace: (input: FolderWorkspaceCreateInput) => Promise<FolderWorkspace | null>
+  onOpenChange: (open: boolean) => void
 }

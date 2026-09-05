@@ -2,19 +2,26 @@ import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import type { Tab } from '../../../shared/tab-types'
 import type { Worktree } from '../../../shared/worktree/types'
 
+/** The only fields the count reads, so a projection over them is a sound cache key. */
+export type UnreadBadgeWorktree = Pick<Worktree, 'id' | 'isUnread'>
+export type UnreadBadgeTab = Pick<TerminalTab, 'id'>
+export type UnreadBadgeUnifiedTab = Pick<Tab, 'id' | 'entityId' | 'worktreeId'>
+
+export type UnreadBadgeCountSources = {
+  worktreesByRepo: Readonly<Record<string, readonly UnreadBadgeWorktree[]>>
+  tabsByWorktree: Readonly<Record<string, readonly UnreadBadgeTab[]>>
+  unreadTerminalTabs: Readonly<Record<string, true>>
+  unifiedTabsByWorktree?: Readonly<Record<string, readonly UnreadBadgeUnifiedTab[]>>
+  unreadAgentCompletionCountByPane?: Readonly<Record<string, number>>
+}
+
 export function getUnreadBadgeCount({
   worktreesByRepo,
   tabsByWorktree,
   unifiedTabsByWorktree = {},
   unreadTerminalTabs,
   unreadAgentCompletionCountByPane
-}: {
-  worktreesByRepo: Record<string, Worktree[]>
-  tabsByWorktree: Record<string, TerminalTab[]>
-  unifiedTabsByWorktree?: Record<string, Tab[]>
-  unreadTerminalTabs: Record<string, true>
-  unreadAgentCompletionCountByPane?: Record<string, number>
-}): number {
+}: UnreadBadgeCountSources): number {
   const completionCounts = unreadAgentCompletionCountByPane ?? {}
   const completionCount = Object.values(completionCounts).reduce(
     (total, count) => total + (Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0),

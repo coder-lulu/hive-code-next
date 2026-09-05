@@ -39,7 +39,7 @@ export function MobileSessionActiveContent({
     browserScreencastSupported,
     showToast,
     nativeChatSendError,
-    nativeChatInputLockReason,
+    nativeChatOverlayInputLockReason,
     nativeChatController,
     dictation,
     handleDictationToggle,
@@ -241,7 +241,7 @@ export function MobileSessionActiveContent({
         dictationMode={dictationMode}
         onMicPressIn={handleDictationPressIn}
         onMicPressOut={handleDictationPressOut}
-        inputLockReason={nativeChatInputLockReason}
+        inputLockReason={nativeChatOverlayInputLockReason}
         sendErrorMessage={nativeChatSendError.message}
         onClearSendError={nativeChatSendError.clear}
         sendSurfaceId={controller.nativeChatScopeKey ?? ''}

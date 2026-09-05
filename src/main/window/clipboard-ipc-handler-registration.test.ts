@@ -48,5 +48,6 @@ describe('clipboard IPC handler registration', () => {
     expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:writeImage')
     expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:writeFile')
     expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:saveImageAsTempFile')
+    expect(removeHandlerMock).toHaveBeenCalledWith('clipboard:readImageThumbnail')
   })
 })

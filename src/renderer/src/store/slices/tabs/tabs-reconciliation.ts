@@ -14,6 +14,11 @@ import {
   buildRemovedTerminalAuxiliaryStatePatch,
   buildTerminalPtyOwnershipReleasePatch
 } from './terminal-pty-ownership-release'
+import {
+  EMPTY_LIVE_EDITOR_IDS,
+  writeBatchedWorkspaceRecordEntry,
+  type WorktreeTabModelReconciliationBatch
+} from './tabs-reconciliation-batch'
 
 export type WorktreeTabModelReconciliation = {
   patch: Partial<AppState>
@@ -21,9 +26,15 @@ export type WorktreeTabModelReconciliation = {
   activeRenderableTabId: string | null
 }
 
+/**
+ * Pure projection of one workspace's reconciliation patch. Passing `batch`
+ * lets a multi-workspace fold reuse its own map drafts and `openFiles` index;
+ * the projected values are identical either way.
+ */
 export function projectWorktreeTabModelReconciliation(
   state: AppState,
-  worktreeId: string
+  worktreeId: string,
+  batch?: WorktreeTabModelReconciliationBatch
 ): WorktreeTabModelReconciliation {
   const unifiedTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
   const groups = state.groupsByWorktree[worktreeId] ?? []
@@ -112,9 +123,13 @@ export function projectWorktreeTabModelReconciliation(
   const liveTerminalIds = new Set(
     runtimeTerminalTabs.filter((tab) => !terminalCleanupIds.has(tab.id)).map((tab) => tab.id)
   )
-  const liveEditorIds = new Set(
-    state.openFiles.filter((file) => file.worktreeId === worktreeId).map((file) => file.id)
-  )
+  // Why batched: the unbatched scan is O(openFiles) per workspace, so a
+  // whole-session reconcile is O(workspaces x openFiles).
+  const liveEditorIds: ReadonlySet<string> = batch
+    ? (batch.liveEditorIdsByWorktree.get(worktreeId) ?? EMPTY_LIVE_EDITOR_IDS)
+    : new Set(
+        state.openFiles.filter((file) => file.worktreeId === worktreeId).map((file) => file.id)
+      )
   const liveBrowserIds = new Set(
     (state.browserTabsByWorktree[worktreeId] ?? []).map((browserTab) => browserTab.id)
   )
@@ -197,7 +212,10 @@ export function projectWorktreeTabModelReconciliation(
     )
     let nextUnreadTerminalTabs = state.unreadTerminalTabs
     if (droppedTerminalEntityIds.length > 0) {
-      const copy = { ...state.unreadTerminalTabs }
+      // A batch that already owns this map published it in an earlier patch, so
+      // draining further entries in place needs no second patch entry.
+      const owned = batch?.ownedStateKeys.has('unreadTerminalTabs') === true
+      const copy = owned ? state.unreadTerminalTabs : { ...state.unreadTerminalTabs }
       let changed = false
       for (const entityId of droppedTerminalEntityIds) {
         if (copy[entityId]) {
@@ -207,6 +225,7 @@ export function projectWorktreeTabModelReconciliation(
       }
       if (changed) {
         nextUnreadTerminalTabs = copy
+        batch?.ownedStateKeys.add('unreadTerminalTabs')
       }
     }
     const terminalCleanupPatch =
@@ -225,22 +244,40 @@ export function projectWorktreeTabModelReconciliation(
           )
         : {}
     patch = {
-      unifiedTabsByWorktree: { ...state.unifiedTabsByWorktree, [worktreeId]: validTabs },
-      groupsByWorktree: { ...state.groupsByWorktree, [worktreeId]: nextGroups },
-      activeGroupIdByWorktree: {
-        ...state.activeGroupIdByWorktree,
-        [worktreeId]: nextActiveGroupId
-      },
+      unifiedTabsByWorktree: writeBatchedWorkspaceRecordEntry(
+        state.unifiedTabsByWorktree,
+        'unifiedTabsByWorktree',
+        worktreeId,
+        validTabs,
+        batch
+      ),
+      groupsByWorktree: writeBatchedWorkspaceRecordEntry(
+        state.groupsByWorktree,
+        'groupsByWorktree',
+        worktreeId,
+        nextGroups,
+        batch
+      ),
+      activeGroupIdByWorktree: writeBatchedWorkspaceRecordEntry(
+        state.activeGroupIdByWorktree,
+        'activeGroupIdByWorktree',
+        worktreeId,
+        nextActiveGroupId,
+        batch
+      ),
       ...(nextUnreadTerminalTabs !== state.unreadTerminalTabs
         ? { unreadTerminalTabs: nextUnreadTerminalTabs }
         : {}),
       ...(nextLayout && layoutChanged
         ? {
-            layoutByWorktree: {
-              ...state.layoutByWorktree,
-              // Why: restored runtime terminals need a concrete leaf before activation.
-              [worktreeId]: nextLayout
-            }
+            // Why: restored runtime terminals need a concrete leaf before activation.
+            layoutByWorktree: writeBatchedWorkspaceRecordEntry(
+              state.layoutByWorktree,
+              'layoutByWorktree',
+              worktreeId,
+              nextLayout,
+              batch
+            )
           }
         : {}),
       ...terminalCleanupPatch,

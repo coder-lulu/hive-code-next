@@ -1,4 +1,5 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type { RuntimeWorktreeScanResult } from './repo-worktree-resolution-scan'
 import type { TerminalWorkspaceLaunchScope } from './runtime-legacy-worker-terminal-recovery-types'
 import type { ResolvedWorktree } from './runtime-worktree-path-identity'
@@ -224,8 +225,8 @@ export function createTerminalRevealWarning(handle: string, error?: unknown): st
       ? ` Reason: ${error.message.trim()}.`
       : ''
   return [
-    `Terminal ${handle} is running, but Orca could not make it discoverable.${reason}`,
-    `Run \`orca terminal focus --terminal ${handle}\` to reveal and focus it.`
+    `Terminal ${handle} is running, but ${APP_DISPLAY_NAME} could not make it discoverable.${reason}`,
+    `Run \`${PRIMARY_CLI_COMMAND} terminal focus --terminal ${handle}\` to reveal and focus it.`
   ].join(' ')
 }
 

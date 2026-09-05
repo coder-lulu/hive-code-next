@@ -15,6 +15,14 @@ upstream history and includes a fork-delta report for the product adaptations.
 Git ancestry and nonempty patch IDs prove inclusion, not that subsequent product
 changes preserved behavior; the reviewer must assess those adaptations.
 
+For each module split, follow the active import/export entry point and compare
+its product behavior with the extracted modules. A clean merge of helper files
+can leave an older monolith active and silently bypass upstream fixes. Review
+the facade, modules, public exports, and existing contract tests together using
+`moduleSplitTargets` in the boundary manifest. Move retained product behavior
+into the active modules and verify callers through the facade. Apply this check
+to newly introduced splits as well as the maintained list.
+
 After the reviewed vendor PR is merged into the product target, later runs use
 that target's `lastReviewedUpstreamSha` as their exclusive lower bound and the
 newly fetched immutable upstream SHA as their inclusive upper bound. They also

@@ -29,7 +29,7 @@ export function UpdateDownloadingContent({
   mediaLoaded: boolean
   onMediaError: () => void
   onMediaLoad: () => void
-  onCollapse: () => void
+  onCollapse?: () => void
   showReleaseNotes: boolean
 }): React.JSX.Element {
   const release = changelog?.release
@@ -48,15 +48,20 @@ export function UpdateDownloadingContent({
             {translate('auto.components.UpdateCard.558842597d', 'Downloading Update')}
           </h3>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
-          onClick={onCollapse}
-          aria-label={translate('auto.components.UpdateCard.8acbdd3961', 'Minimize to status bar')}
-        >
-          <Minus className="size-3.5" />
-        </Button>
+        {onCollapse && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
+            onClick={onCollapse}
+            aria-label={translate(
+              'auto.components.UpdateCard.8acbdd3961',
+              'Minimize to status bar'
+            )}
+          >
+            <Minus className="size-3.5" />
+          </Button>
+        )}
       </div>
       {showMedia && release?.mediaUrl && (
         <div className="relative overflow-hidden rounded-md">
@@ -111,7 +116,7 @@ export function UpdateReadyToInstallContent({
 }: {
   version: string
   onRestart: () => void
-  onClose: () => void
+  onClose?: () => void
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -119,15 +124,20 @@ export function UpdateReadyToInstallContent({
         <h3 className="text-sm font-semibold">
           {translate('auto.components.UpdateCard.17412483da', 'Ready to Install')}
         </h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
-          onClick={onClose}
-          aria-label={translate('auto.components.UpdateCard.8acbdd3961', 'Minimize to status bar')}
-        >
-          <Minus className="size-3.5" />
-        </Button>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
+            onClick={onClose}
+            aria-label={translate(
+              'auto.components.UpdateCard.8acbdd3961',
+              'Minimize to status bar'
+            )}
+          >
+            <Minus className="size-3.5" />
+          </Button>
+        )}
       </div>
       <p className="text-sm text-muted-foreground">
         {translate(

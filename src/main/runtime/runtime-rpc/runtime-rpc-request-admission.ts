@@ -119,6 +119,10 @@ export class RuntimeRpcRequestAdmission extends RuntimeRpcBinaryRouting {
       return { error: this.buildError('unknown', 'bad_request', 'Invalid JSON request') }
     }
 
+    if (typeof request !== 'object' || request === null || Array.isArray(request)) {
+      return { error: this.buildError('unknown', 'bad_request', 'Invalid RPC request') }
+    }
+
     if (typeof request.id !== 'string' || request.id.length === 0) {
       return { error: this.buildError('unknown', 'bad_request', 'Missing request id') }
     }

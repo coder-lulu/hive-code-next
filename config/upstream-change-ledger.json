@@ -212,7 +212,9 @@
       "dependencies": [],
       "conflictReason": "上游链接指向 stablyai/orca 的 Android 0.0.46 制品，HiveCode 当前 androidDownload 为 null 且没有对应发布制品",
       "adaptation": "暂不替换 README 或桌面端下载入口；待 HiveCode Android 制品仓库、版本号和发布签名确认后，再统一更新多语言文档与 MobileSettingsPane",
-      "regressionTests": ["Android download URL consistency"]
+      "regressionTests": ["Android download URL consistency"],
+      "boundaryConflict": "maintained-capability",
+      "reviewReason": "上游链接指向 stablyai/orca 的 Android 0.0.46 制品，HiveCode 当前 androidDownload 为 null 且没有对应发布制品；本次保留产品发布/下载能力与签名边界，后续每次增量审计仍复核此项，不遗漏功能修复。"
     },
     {
       "upstreamSha": "6f8c5888b3acc4011c09498cda27cf3906edd91a",
@@ -376,11 +378,17 @@
     {
       "upstreamSha": "673842db35b37557006d9f20d04e077780253d82",
       "type": "重构",
-      "applied": "暂缓",
+      "applied": "已等价实现",
       "dependencies": [],
       "conflictReason": "后续 9c01e09 已回滚 direct-home 方案",
       "adaptation": "跟随上游最终状态，不移植已回滚的中间提交",
-      "regressionTests": []
+      "regressionTests": [
+        "src/main/codex/codex-home-paths.test.ts",
+        "src/main/codex/codex-session-resume-home.test.ts",
+        "src/main/codex/codex-real-home-path.test.ts"
+      ],
+      "productSha": "c88b03c8b9a5aceeb124621a4ee06074aa1f9d40",
+      "reviewReason": "上游后续 9c01e09ecc9d3c1203968ace9945d16edfb35dd2 已明确回滚 direct-home 中间方案，且该回滚在产品基线中可达。保留上游最终 home 隔离/恢复行为，不重新引入已回滚方案。"
     },
     {
       "upstreamSha": "6256f3d137bd443aa3ba06349d0984fb3d0af3f4",
@@ -429,7 +437,9 @@
       "dependencies": [],
       "conflictReason": "README 下载徽章属于 HiveCode 产品发布边界，不能直接采用 Orca 制品链接",
       "adaptation": "保留 HiveCode 下载与发布入口；待产品发布制品和签名确认后单独更新",
-      "regressionTests": ["brand-boundary", "documentation-governance"]
+      "regressionTests": ["brand-boundary", "documentation-governance"],
+      "boundaryConflict": "maintained-capability",
+      "reviewReason": "README 下载徽章属于 HiveCode 产品发布边界，不能直接采用 Orca 制品链接；本次保留产品发布/下载能力与签名边界，后续每次增量审计仍复核此项，不遗漏功能修复。"
     },
     {
       "upstreamSha": "c226a655adae4239036b319e77ec3a2be6eddeb8",
@@ -438,7 +448,9 @@
       "dependencies": [],
       "conflictReason": "README 下载徽章属于 HiveCode 产品发布边界，不能直接采用 Orca 制品链接",
       "adaptation": "保留 HiveCode 下载与发布入口；待产品发布制品和签名确认后单独更新",
-      "regressionTests": ["brand-boundary", "documentation-governance"]
+      "regressionTests": ["brand-boundary", "documentation-governance"],
+      "boundaryConflict": "maintained-capability",
+      "reviewReason": "README 下载徽章属于 HiveCode 产品发布边界，不能直接采用 Orca 制品链接；本次保留产品发布/下载能力与签名边界，后续每次增量审计仍复核此项，不遗漏功能修复。"
     },
     {
       "upstreamSha": "fd9125ea8c7b347cd8b675a4095e31cd3c865d25",

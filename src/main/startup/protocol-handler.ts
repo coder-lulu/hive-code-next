@@ -12,6 +12,8 @@ export type ProtocolHandlerOptions = {
   onUrl: ProtocolUrlConsumer
   /** Platform override for tests. */
   platform?: NodeJS.Platform
+  /** Entry points with an early open-url listener register OS schemes only. */
+  listenForOpenUrl?: boolean
 }
 
 /**
@@ -19,9 +21,8 @@ export type ProtocolHandlerOptions = {
  * compatibility schemes. On macOS this also wires `app.on('open-url')` so
  * cold-launch deep links are captured.
  *
- * Call this ONCE early in the main-process startup, before `app.whenReady()`.
- * Electron derives protocol registration from `app.name`, so it must be called
- * AFTER `app.setName()` but BEFORE any deep link can arrive.
+ * Register once after app.setName(). If the entry point captures open-url before
+ * ready, pass listenForOpenUrl: false to avoid consuming each link twice.
  */
 export function registerProtocolHandlers(opts: ProtocolHandlerOptions): void {
   const platform = opts.platform ?? process.platform
@@ -35,7 +36,7 @@ export function registerProtocolHandlers(opts: ProtocolHandlerOptions): void {
   }
 
   // macOS delivers cold-launch URLs via the 'open-url' event.
-  if (platform === 'darwin') {
+  if (platform === 'darwin' && opts.listenForOpenUrl !== false) {
     opts.app.on('open-url', (_event, url) => {
       opts.onUrl(url)
     })
@@ -66,3 +67,18 @@ export function extractProtocolUrlFromArgv(
 }
 
 export { ALL_SCHEMES, PRIMARY_SCHEME }
+
+export function isPairingProtocolUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (
+      ALL_SCHEMES.includes(url.protocol.slice(0, -1)) &&
+      url.hostname === 'pair' &&
+      !url.username &&
+      !url.password &&
+      !url.port
+    )
+  } catch {
+    return false
+  }
+}

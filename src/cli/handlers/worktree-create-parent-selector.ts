@@ -58,3 +58,19 @@ export async function resolveCreateParentSelector(
     parentWorktree
   }
 }
+
+export function assertParentWorktreeFlagsCompatible(flags: Map<string, string | boolean>): void {
+  if (flags.has('parent-worktree') && flags.get('no-parent') === true) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Choose either --parent-worktree or --no-parent, not both.'
+    )
+  }
+  const parentWorktree = flags.get('parent-worktree')
+  if (
+    flags.has('parent-worktree') &&
+    (typeof parentWorktree !== 'string' || parentWorktree === '')
+  ) {
+    throw new RuntimeClientError('invalid_argument', 'Missing required --parent-worktree')
+  }
+}

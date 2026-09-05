@@ -167,6 +167,7 @@ const SHARED_PACKAGE_PREFIXES = [
   'config/scripts/smoke-packaged',
   'config/scripts/install-electron-package-binary',
   'config/scripts/verify-packaged',
+  'config/scripts/verify-skills-cli-runtime',
   'config/scripts/verify-linux-glibc',
   'config/scripts/run-electron-vite',
   'skills/',
@@ -180,6 +181,12 @@ const SHARED_PACKAGE_PREFIXES = [
 
 const LINUX_PACKAGE_PREFIXES = [
   ...SHARED_PACKAGE_PREFIXES,
+  'config/docker/cli-launch-contract/',
+  'config/docker/headless-pairing/',
+  'config/docker/headless-serve-shutdown/',
+  'config/scripts/run-linux-cli-launch-contract',
+  'config/scripts/run-headless-linux-pairing-docker',
+  'config/scripts/static-appimage-package-contract',
   'native/computer-use-linux/',
   'resources/linux/',
   'config/scripts/run-headless-serve'
@@ -212,6 +219,7 @@ const WINDOWS_PACKAGE_TESTS = [
   'src/main/agent-hooks/windows-hook-payload-delivery.test.ts',
   'src/main/windows/windows-pty-job.win32.test.ts',
   'src/main/windows/windows-host-job.win32.test.ts',
+  'src/main/windows-live-tree-kill.win32.test.ts',
   'src/main/wsl/wsl-runner.test.ts',
   'src/main/wsl/wsl-guest-environment.test.ts',
   'src/main/wsl/wsl-invocation-boundary.test.ts',
@@ -221,11 +229,20 @@ const WINDOWS_PACKAGE_TESTS = [
   'src/main/cli/wsl-cli-powershell-boundary.test.ts',
   'src/main/cursor/hook-service.test.ts',
   'src/main/orca-profiles/profile-index-store.test.ts',
+  'src/main/startup/windows-install-dir-acl-repair.win32.test.ts',
   'src/main/runtime/repo-worktree-admin-fingerprint.test.ts',
   'src/main/runtime/worktree-scan-admin-fingerprint-gate.test.ts',
   'src/shared/secure-file-fsync-flags.test.ts',
   'src/main/ipc/pty-codex-account-attribution.test.ts',
   'src/main/ipc/pty-spawn-env-codex-resume-provenance.test.ts'
+]
+
+const DESKTOP_IRRELEVANT_PREFIXES = [
+  'cloud/',
+  '.github/workflows/cloud-',
+  '.github/workflows/mobile.yml',
+  '.github/workflows/mobile-ios-release.yml',
+  '.github/workflows/mobile-android-release.yml'
 ]
 
 export function isDocsOnlyPath(file) {
@@ -247,12 +264,22 @@ export function shouldRunPrChecks(changedFiles) {
   // HiveCode's PR aggregate also protects shared contracts used by the mobile
   // client, so mobile-only changes remain code-relevant even though desktop
   // packaging jobs are classified independently below.
-  return changedFiles.some((file) => !isDocsOnlyPath(file))
+  return changedFiles.some(
+    (file) => !isDocsOnlyPath(file) && !matchesPrefix(file, DESKTOP_IRRELEVANT_PREFIXES)
+  )
 }
 
 export function hasNativeCacheInput(changedFiles) {
   // An empty diff indicates detector uncertainty; fail closed and prime once.
   return changedFiles.length === 0 || changedFiles.some(isNativeCacheInputPath)
+}
+
+export function needsMobileDependencies(changedFiles) {
+  // Why: static analysis lints CHANGED files, mobile ones included, and its
+  // type-aware pass resolves types from mobile/node_modules. Mobile is a
+  // separate pnpm project, so without this the root-only install leaves every
+  // mobile type an `error` type and the gate reports phantom findings.
+  return changedFiles.length === 0 || changedFiles.some((file) => file.startsWith('mobile/'))
 }
 
 export function classifyPrJobs(changedFiles) {
@@ -268,6 +295,7 @@ export function classifyPrJobs(changedFiles) {
   return {
     should_run: shouldRun,
     native_cache_changed: shouldRun && hasNativeCacheInput(changedFiles),
+    mobile_dependencies: shouldRun && needsMobileDependencies(changedFiles),
     ...jobs
   }
 }

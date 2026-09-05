@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron'
+import { getProductExternalServiceEndpoints } from '../product/product-external-service-endpoints'
 import { performance } from 'node:perf_hooks'
 import { PluginService } from '../plugins/plugin-service'
 import { PluginKillListService } from '../plugins/plugin-kill-list-service'
@@ -33,12 +34,17 @@ export async function initializeMainProcessPlugins(runtime: OrcaRuntimeService):
     pluginsDataDir: getPluginsDataDir(app.getPath('userData'))
   })
   await state.pluginKillListService.initialize()
+  const officialMarketplaceUrl = getProductExternalServiceEndpoints().pluginMarketplace
+  const officialMarketplaceSource = officialMarketplaceUrl
+    ? ({ kind: 'git', url: officialMarketplaceUrl, ref: 'main' } as const)
+    : null
   state.pluginMarketplaceService = new PluginMarketplaceService({
+    officialSource: officialMarketplaceSource,
     pluginsDataDir: getPluginsDataDir(app.getPath('userData')),
     getKillListEntry: (pluginKey) => state.pluginKillListService?.find(pluginKey) ?? null
   })
   const requestOfficialMarketplaceSeed = (): void => {
-    if (store.getSettings().pluginSystemEnabled !== true) {
+    if (!officialMarketplaceSource || store.getSettings().pluginSystemEnabled !== true) {
       return
     }
     void state.pluginMarketplaceService

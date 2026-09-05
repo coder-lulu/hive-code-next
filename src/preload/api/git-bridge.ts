@@ -67,6 +67,7 @@ export const gitApi: PreloadApi['git'] = {
   }): Promise<GitUpstreamStatus> => ipcRenderer.invoke('git:upstreamStatus', args),
   fetch: (args: {
     worktreePath: string
+    worktreeId?: string
     connectionId?: string
     pushTarget?: GitPushTarget
   }): Promise<void> => ipcRenderer.invoke('git:fetch', args),
@@ -77,6 +78,7 @@ export const gitApi: PreloadApi['git'] = {
   }): Promise<GitForkSyncResult> => ipcRenderer.invoke('git:syncFork', args),
   push: (args: {
     worktreePath: string
+    worktreeId?: string
     publish?: boolean
     forceWithLease?: boolean
     connectionId?: string
@@ -84,11 +86,13 @@ export const gitApi: PreloadApi['git'] = {
   }): Promise<void> => ipcRenderer.invoke('git:push', args),
   pull: (args: {
     worktreePath: string
+    worktreeId?: string
     connectionId?: string
     pushTarget?: GitPushTarget
   }): Promise<void> => ipcRenderer.invoke('git:pull', args),
   fastForward: (args: {
     worktreePath: string
+    worktreeId?: string
     connectionId?: string
     pushTarget?: GitPushTarget
   }): Promise<void> => ipcRenderer.invoke('git:fastForward', args),
@@ -192,4 +196,4 @@ export const gitApi: PreloadApi['git'] = {
     sha: string
     connectionId?: string
   }): Promise<string | null> => ipcRenderer.invoke('git:remoteCommitUrl', args)
-}
+} satisfies PreloadApi['git']

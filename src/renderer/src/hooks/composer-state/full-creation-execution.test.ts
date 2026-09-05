@@ -14,6 +14,7 @@ vi.mock('@/lib/worktree-activation', () => ({
   activateAndRevealWorktree: mocks.activateAndRevealWorktree
 }))
 vi.mock('@/lib/new-workspace', () => ({
+  CLIENT_PLATFORM: 'linux',
   ensureAgentStartupInTerminal: mocks.ensureAgentStartupInTerminal,
   renderIssueCommandTemplate: vi.fn(() => '')
 }))
@@ -124,6 +125,9 @@ describe('useFullCreationExecution cancellation', () => {
         .mockResolvedValue(prepared),
       resolvedInitialWorkspaceStatus: undefined,
       selectedRepoIsGit: true,
+      selectedRepoIsRemote: false,
+      selectedRepoExecutionHostId: 'local',
+      settings: null,
       setSidebarOpen: vi.fn<FullCreationExecutionInput['setSidebarOpen']>(),
       sparseEnabled: false,
       taskSourceContext: null,
@@ -214,8 +218,11 @@ describe('useFullCreationExecution cancellation', () => {
         .fn<FullCreationExecutionInput['prepareFullSubmit']>()
         .mockResolvedValue(prepared),
       resolvedInitialWorkspaceStatus: undefined,
+      selectedRepoExecutionHostId: 'local',
       selectedRepoIsGit: true,
+      selectedRepoIsRemote: false,
       setSidebarOpen: vi.fn<FullCreationExecutionInput['setSidebarOpen']>(),
+      settings: null,
       sparseEnabled: false,
       taskSourceContext: null,
       telemetrySource: undefined,

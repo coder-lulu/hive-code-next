@@ -1,4 +1,6 @@
 import { app, type Event } from 'electron'
+import { stopHiveRuntimeCloud } from './main-process-hive-runtime-cloud'
+import { setPluginServiceForRpc } from '../runtime/rpc/methods/plugins'
 import { closeAllWatchers } from '../ipc/filesystem-watcher'
 import { disposeWorktreeBaseDirectoryWatchers } from '../ipc/worktree-base-directory-watcher'
 import { stopFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade'
@@ -14,6 +16,7 @@ import { clearRuntimeMetadataIfOwned } from '../runtime/runtime-metadata'
 import { shutdownPairedRuntimeBrowserClientHosts } from '../browser/paired-runtime-browser-client-host-runtime'
 import { browserManager } from '../browser/browser-manager'
 import { stopCodexStateDbBackfillRecoveries } from '../codex/codex-state-db-backfill-recovery'
+import { awaitPackedRefsLockRelease } from '../git/local-repo-ref-maintenance'
 import { settleTeardownWithinDeadline, settleWithinMs } from '../quit-teardown-deadline'
 import { quitTeardownStartGate } from '../quit-teardown-start-gate'
 import { setUnreadDockBadgeCount } from '../dock/unread-badge'
@@ -23,6 +26,7 @@ import { shutdownObservability } from '../observability'
 import { isQuittingForUpdate } from '../updater'
 import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
 import { stopTccPromptNotice } from '../macos-tcc-prompt-notice'
+import { cancelHistoryGc } from '../terminal-history-gc'
 import { shouldQuitWhenAllWindowsClosed } from './window-all-closed-quit-policy'
 import { mainProcessState as state } from './main-process-state'
 import { isDevParentShutdownRequested } from './configure-process'
@@ -33,6 +37,8 @@ let daemonDisconnectDone = false
 let watcherShutdownPromise: Promise<void> | null = null
 // Why 2s: a config delete is best-effort, not durable state.
 const GROK_HOOK_CLEANUP_DEADLINE_MS = 2_000
+// Why 2s: long enough for a `pack-refs` child to take SIGTERM and unlink its lock.
+const REF_MAINTENANCE_QUIT_DEADLINE_MS = 2_000
 
 function shutdownWatchersOnce(): Promise<void> {
   if (state.watcherShutdownDone) {
@@ -68,13 +74,22 @@ function installBeforeQuitHandler(): void {
     }
     state.isQuitting = true
     state.desktopRelayService?.fenceAndCloseNow()
+    state.runtimeCloudPresence?.setRuntimeReady(false)
+    state.runtimeCloudPresence?.setAuthorization(null)
     state.runtimeRpc?.setMobileRelayPairingProvider(null)
     state.unsubscribeAgentAwakeStatusChanges?.()
     state.unsubscribeAgentAwakeStatusChanges = null
     state.agentAwakeService?.dispose()
     state.agentAwakeService = null
+    // Why wait but not uninstall: a renderer beforeunload can still veto this
+    // quit, and tearing the sweep down here would kill it for the rest of the
+    // session. `isQuitting` already vetoes new attempts; will-quit does the teardown.
+    state.repoMaintenanceShutdown = awaitPackedRefsLockRelease()
     // Why: defer PTY cleanup to will-quit so the renderer captures scrollback before PTY-exit events unmount TerminalPane (dropping its capture callbacks).
     state.rateLimits?.stop()
+    // Why safe on a vetoed quit: background history GC is idempotent and re-scheduled next launch,
+    // so abandoning the walk here only costs one deferred sweep, never a half-applied prune.
+    cancelHistoryGc()
   })
 }
 
@@ -108,6 +123,7 @@ function installWillQuitHandler(): void {
     }
     // Why: before-quit can still be aborted by renderer beforeunload; only remove the Windows tray icon on the committed quit path.
     destroySystemTray()
+    const runtimeCloudShutdown = stopHiveRuntimeCloud()
     // Why: an agent still working at quit gets no terminating hook, so stats.flushAsync() closes those sessions out synchronously (only the write is deferred) — otherwise their duration is lost.
     state.starNag?.stop()
     state.automations?.stop()
@@ -115,6 +131,7 @@ function installWillQuitHandler(): void {
     // escalates to SIGKILL so they cannot outlive the app. The promise joins
     // the teardown barrier below — quitting before it resolves would let
     // Electron exit first and orphan the hosts.
+    setPluginServiceForRpc(null)
     state.pluginKillListService = null
     state.pluginMarketplaceService = null
     state.pluginMarketplaceInstaller = null
@@ -123,6 +140,16 @@ function installWillQuitHandler(): void {
     const structuredAgentSessionShutdown = stopStructuredAgentSessionRuntime()
     state.pluginService = null
     setUnreadDockBadgeCount(0)
+    // Why wait rather than kill: the child finishes fine orphaned, and signalling
+    // it mid-prune strands a ref lock Git never clears. The wait is only for the
+    // short rewrite window, and is bounded so a quit can never hang on it.
+    const refMaintenanceShutdown = settleWithinMs(
+      Promise.all([state.repoMaintenanceShutdown, state.uninstallRepoMaintenanceIdleGate?.()]).then(
+        () => {}
+      ),
+      REF_MAINTENANCE_QUIT_DEADLINE_MS
+    ).then(() => {})
+    state.uninstallRepoMaintenanceIdleGate = null
     agentHookServer.stop()
     // Why Windows only: POSIX hooks short-circuit on ORCA_PANE_KEY, while Windows must register a
     // bare script path that cannot express the guard and would otherwise keep spawning after quit.
@@ -166,8 +193,7 @@ function installWillQuitHandler(): void {
       .then((routes) => routes.closeAllLocalSshBrowserRoutes())
       .catch(() => {})
     browserManager.setBrowserGuestStateChangedListener(null)
-    const emulatorShutdown =
-      state.runtime?.getEmulatorBridge()?.destroyAllSessions() ?? Promise.resolve()
+    const emulatorShutdown = state.runtime?.getEmulatorBridge()?.onAppQuit() ?? Promise.resolve()
     // Why immediately before store.flushAsync() with no await in between: beginSshShutdown() marks every
     // active SSH lease detached in memory synchronously, and that flush is what persists it.
     const sshShutdown = beginSshShutdown()
@@ -208,6 +234,7 @@ function installWillQuitHandler(): void {
     // Losing at most the last debounce interval beats a quit that never completes, and the
     // temp+rename swap means a write cut short by the deadline leaves the old file intact.
     settleTeardownWithinDeadline([
+      ...runtimeCloudShutdown,
       { name: 'daemon', promise: daemonTeardown },
       { name: 'browser', promise: browserShutdown },
       { name: 'runtime-rpc', promise: rpcStopAndClear },
@@ -219,6 +246,7 @@ function installWillQuitHandler(): void {
       { name: 'plugin-hosts', promise: pluginHostShutdown },
       { name: 'skill-uploads', promise: skillUploadShutdown },
       { name: 'grok-hooks', promise: grokHookCleanup },
+      { name: 'ref-maintenance', promise: refMaintenanceShutdown },
       { name: 'codex-backfill-recovery', promise: codexBackfillRecoveryShutdown },
       { name: 'structured-agent-session', promise: structuredAgentSessionShutdown },
       { name: 'usage-cache', promise: usageCacheFlush },

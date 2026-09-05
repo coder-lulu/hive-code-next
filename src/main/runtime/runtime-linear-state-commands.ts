@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   updateLinearIssueForAgent,
   LinearWriteFailure,
@@ -65,10 +66,10 @@ export class RuntimeLinearStateCommands extends RuntimeLinearSaveCommands {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the state change, but Orca could not confirm it.',
+            `Linear may have applied the state change, but ${APP_DISPLAY_NAME} could not confirm it.`,
             {
               nextSteps: [
-                `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the current state before retrying.`
+                `Run \`${PRIMARY_CLI_COMMAND} linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the current state before retrying.`
               ],
               ...(cause ? { cause } : {})
             }
@@ -113,10 +114,10 @@ export class RuntimeLinearStateCommands extends RuntimeLinearSaveCommands {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the relation change, but Orca could not confirm it.',
+            `Linear may have applied the relation change, but ${APP_DISPLAY_NAME} could not confirm it.`,
             {
               nextSteps: [
-                `Run \`orca linear issue ${target.issue.identifier} --relations --workspace ${target.workspaceId} --json\` before retrying.`
+                `Run \`${PRIMARY_CLI_COMMAND} linear issue ${target.issue.identifier} --relations --workspace ${target.workspaceId} --json\` before retrying.`
               ],
               ...(cause ? { cause } : {})
             }

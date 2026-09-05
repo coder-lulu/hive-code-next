@@ -1,3 +1,4 @@
+import type { HiveRuntimeCloudWebLaunchService } from '../../hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import { randomBytes } from 'node:crypto'
 import type { RuntimeTransportMetadata } from '../../../shared/runtime-bootstrap'
 import type { OrcaRuntimeService } from '../orca-runtime'
@@ -29,6 +30,7 @@ import type {
 import { DEFAULT_WS_PORT } from './runtime-rpc-pairing-types'
 
 export class RuntimeRpcState {
+  protected cloudWebLaunchService: HiveRuntimeCloudWebLaunchService | null = null
   protected readonly runtime: OrcaRuntimeService
   protected readonly dispatcher: RpcDispatcher
   protected readonly userDataPath: string
@@ -92,6 +94,7 @@ export class RuntimeRpcState {
 
   constructor({
     runtime,
+    hiveRuntimeCloud,
     userDataPath,
     pid = process.pid,
     platform = process.platform,
@@ -107,7 +110,7 @@ export class RuntimeRpcState {
     methods
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
-    this.dispatcher = new RpcDispatcher({ runtime, methods: methods ?? ALL_RPC_METHODS })
+    this.dispatcher = new RpcDispatcher({ runtime, methods: methods ?? ALL_RPC_METHODS, hiveRuntimeCloud })
     this.userDataPath = userDataPath
     this.pid = pid
     this.platform = platform

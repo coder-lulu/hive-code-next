@@ -2,7 +2,12 @@ import { app, clipboard, dialog, type BrowserWindow, type Tray } from 'electron'
 import type { UpdateCheckOptions } from '../../shared/update-status-types'
 import { recordCrashBreadcrumb } from '../crash-reporting/crash-breadcrumb-store'
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
-import { checkForUpdatesFromMenu, isQuittingForUpdate } from '../updater'
+import { hasConfiguredProductUpdateChannel } from '../../shared/product-update-policy'
+import {
+  checkForUpdatesFromMenu,
+  isQuittingForUpdate,
+  reportReleaseUpdatesDisabled
+} from '../updater'
 import {
   createSystemTray,
   setMacMenuBarIconVisible,
@@ -12,8 +17,14 @@ import { ensureAutoUpdaterConfigured } from '../window/attach-main-window-servic
 import { focusExistingMainWindow, safelyRevealWindow } from '../window/focus-existing-window'
 import { mainProcessState as state } from './main-process-state'
 import { loadMainWindow } from '../window/createMainWindow'
-import { describeInstallDirAclPoison } from './windows-install-dir-acl-recovery'
-import { presentRendererRecoveryPrompt } from '../window/renderer-recovery-prompt'
+import {
+  describeInstallDirAclPoison,
+  isBlockingInstallDirAclRepairInFlight
+} from './windows-install-dir-acl-recovery'
+import {
+  presentRendererRecoveryPrompt,
+  type RendererRecoveryPromptFailure
+} from '../window/renderer-recovery-prompt'
 
 // The window module injects this callback to avoid a cycle between actions and lifecycle code.
 let openWindow: (options?: { revealOnDidFinishLoad?: boolean }) => BrowserWindow
@@ -28,6 +39,9 @@ export function focusExistingWindow(): void {
     app,
     getWindow: () => state.mainWindow,
     openWindow,
+    // Why: a 20s blank launch invites a second double-click, and icacls is rewriting
+    // the per-file DACLs a fresh renderer would read. The gated launch opens the window.
+    canOpenWindow: () => !isBlockingInstallDirAclRepairInFlight(),
     warn: console.warn
   })
 }
@@ -62,6 +76,10 @@ export function quitFromSystemTray(): void {
 }
 
 export function runUserInitiatedUpdateCheck(options?: UpdateCheckOptions): void {
+  if (!options?.localBuild && !hasConfiguredProductUpdateChannel()) {
+    reportReleaseUpdatesDisabled()
+    return
+  }
   ensureAutoUpdaterConfigured()
   checkForUpdatesFromMenu(options)
 }
@@ -141,9 +159,14 @@ export function sendOpenCrashReport(targetWindow?: BrowserWindow | null): void {
 }
 
 // Why: on renderer crash-loop the breaker stops auto-reloading and the window goes blank, so a main-process dialog is the only retry/quit surface.
-export async function showRendererRecoveryPrompt(recentRecoveryCount: number): Promise<void> {
+export async function showRendererRecoveryPrompt(
+  recentRecoveryCount: number,
+  failure?: RendererRecoveryPromptFailure,
+  retry?: () => void
+): Promise<void> {
   await presentRendererRecoveryPrompt({
     recentRecoveryCount,
+    ...(failure ? { failure } : {}),
     isQuitting: () => state.isQuitting,
     diagnose: describeInstallDirAclPoison,
     showMessageBox: (options) => {
@@ -158,6 +181,12 @@ export async function showRendererRecoveryPrompt(recentRecoveryCount: number): P
       }
       recordDurableCrashBreadcrumb('renderer_recovery_manual_retry')
       // Why: leave the breaker open so a re-crash re-raises this prompt instead of resuming the auto-reload loop.
+      // Why watched: Reload is the dialog's default button, and an unwatched retry that stalls returns the user to
+      // the same silent hang with no further prompt — the watchdog re-raises this dialog instead.
+      if (retry) {
+        retry()
+        return
+      }
       loadMainWindow(state.mainWindow)
     },
     quit: () => {

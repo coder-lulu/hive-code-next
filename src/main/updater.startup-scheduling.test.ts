@@ -42,6 +42,7 @@ describe('updater', () => {
   beforeEach(() => {
     resetUpdaterMocks()
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.61'])
+    vi.useFakeTimers()
   })
 
   it('does not load or configure electron-updater during dev setup', async () => {

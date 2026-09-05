@@ -1,7 +1,25 @@
 #!/usr/bin/env node
 import { performance } from 'node:perf_hooks'
+import { existsSync } from 'node:fs'
+import { registerHooks } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import { planWorktreeSortOrderUpdates } from '../../src/shared/worktree/sort-order-update.ts'
-import { reuseEqualCatalogRows } from '../../src/renderer/src/store/slices/worktree-catalog-reconciliation.ts'
+
+// Match the session-write benchmark: production TypeScript uses extensionless siblings.
+const loader = registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier) && context.parentURL) {
+      const candidate = new URL(`${specifier}.ts`, context.parentURL)
+      if (existsSync(fileURLToPath(candidate))) {
+        return { url: candidate.href, shortCircuit: true }
+      }
+    }
+    return nextResolve(specifier, context)
+  }
+})
+const { reuseEqualCatalogRows } =
+  await import('../../src/renderer/src/store/slices/worktree-catalog-reconciliation.ts')
+loader.deregister()
 
 const WORKTREE_COUNT = 655
 const TAB_COUNT = 1_895

@@ -1,3 +1,4 @@
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   type getLinearIssueByUuidForAgent,
   type LinearIssueTaskUpdateRequest,
@@ -33,7 +34,9 @@ export class RuntimeLinearLabelWriteCommands extends RuntimeLinearProjectWriteCo
           : `Multiple labels exactly matched "${input}".`,
         {
           labels: labels.map((label) => ({ id: label.id, name: label.name })),
-          nextSteps: ['Run `orca linear team labels --team <key-or-id> --json` and retry by id.']
+          nextSteps: [
+            `Run \`${PRIMARY_CLI_COMMAND} linear team labels --team <key-or-id> --json\` and retry by id.`
+          ]
         }
       )
     })

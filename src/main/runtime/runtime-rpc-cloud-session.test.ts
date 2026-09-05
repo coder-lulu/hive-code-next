@@ -32,6 +32,26 @@ function cloudSocket(): AuthenticatedCloudManagedSocket {
 }
 
 describe('OrcaRuntimeRpcServer Cloud-managed session dispatch', () => {
+  it('rejects null RPC envelopes on both local and WebSocket transports', async () => {
+    const server = new OrcaRuntimeRpcServer({
+      runtime: new OrcaRuntimeService(),
+      userDataPath: mkdtempSync(join(tmpdir(), 'hive-cloud-rpc-')),
+      enableWebSocket: false
+    })
+    const reply = vi.fn()
+    await server['handleWebSocketMessage']('null', reply, () => {})
+    expect(JSON.parse(reply.mock.calls[0]![0])).toMatchObject({
+      id: 'unknown',
+      ok: false,
+      error: { code: 'bad_request' }
+    })
+    await expect(server['handleMessage']('null')).resolves.toMatchObject({
+      id: 'unknown',
+      ok: false,
+      error: { code: 'bad_request' }
+    })
+  })
+
   it('revalidates a tokenless RPC under the non-secret Cloud principal', async () => {
     const runtime = new OrcaRuntimeService()
     const server = new OrcaRuntimeRpcServer({

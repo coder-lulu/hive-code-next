@@ -12,8 +12,10 @@ type ActivityUnreadCountSource = Pick<
   | 'agentStatusByPaneKey'
   | 'migrationUnsupportedByPtyId'
   | 'retainedAgentsByPaneKey'
-  | 'worktreesByRepo'
->
+> & {
+  worktreesByRepo?: AppState['worktreesByRepo']
+  activityClearedAtByPaneKey?: Record<string, number>
+}
 
 type ActivityUnreadCountMode = 'agent-events' | 'sidebar-badge'
 
@@ -27,7 +29,8 @@ const DISABLED_ACTIVITY_UNREAD_INPUTS = {
   worktreesByRepo: EMPTY_WORKTREES_BY_REPO,
   migrationUnsupportedByPtyId: EMPTY_MIGRATION_UNSUPPORTED,
   retainedAgentsByPaneKey: EMPTY_RETAINED_AGENTS,
-  acknowledgedAgentsByPaneKey: EMPTY_ACKNOWLEDGED_AGENTS
+  acknowledgedAgentsByPaneKey: EMPTY_ACKNOWLEDGED_AGENTS,
+  activityClearedAtByPaneKey: {} as Record<string, number>
 }
 
 function isUnreadAgentState(state: AgentStatusState): boolean {
@@ -36,12 +39,13 @@ function isUnreadAgentState(state: AgentStatusState): boolean {
 
 export function countActivityUnread(
   source: ActivityUnreadCountSource,
-  mode: ActivityUnreadCountMode
+  mode: ActivityUnreadCountMode = 'agent-events'
 ): number {
   let count = 0
+  const seenPaneKeys = new Set<string>()
 
   if (mode === 'sidebar-badge') {
-    for (const worktrees of Object.values(source.worktreesByRepo)) {
+    for (const worktrees of Object.values(source.worktreesByRepo ?? {})) {
       for (const worktree of worktrees) {
         if (worktree.createdAt && worktree.isUnread) {
           count += 1
@@ -51,6 +55,11 @@ export function countActivityUnread(
   }
 
   const countEntry = (entry: AgentStatusEntry, ackAt: number): void => {
+    if (seenPaneKeys.has(entry.paneKey)) {
+      return
+    }
+    seenPaneKeys.add(entry.paneKey)
+    ackAt = Math.max(ackAt, source.activityClearedAtByPaneKey?.[entry.paneKey] ?? 0)
     if (mode === 'agent-events') {
       // Why: Activity feed surfaces historical done/blocked/waiting events
       // from stateHistory, so the titlebar badge must mirror that event count.
@@ -98,13 +107,17 @@ export function countActivityUnread(
   return count
 }
 
-export function useActivityUnreadCount(enabled: boolean, mode: ActivityUnreadCountMode): number {
+export function useActivityUnreadCount(
+  enabled = true,
+  mode: ActivityUnreadCountMode = 'agent-events'
+): number {
   const {
     sortEpoch,
     worktreesByRepo,
     migrationUnsupportedByPtyId,
     retainedAgentsByPaneKey,
-    acknowledgedAgentsByPaneKey
+    acknowledgedAgentsByPaneKey,
+    activityClearedAtByPaneKey
   } = useAppStore(
     useShallow((state) => {
       if (!enabled) {
@@ -118,7 +131,8 @@ export function useActivityUnreadCount(enabled: boolean, mode: ActivityUnreadCou
         worktreesByRepo: state.worktreesByRepo,
         migrationUnsupportedByPtyId: state.migrationUnsupportedByPtyId,
         retainedAgentsByPaneKey: state.retainedAgentsByPaneKey,
-        acknowledgedAgentsByPaneKey: state.acknowledgedAgentsByPaneKey
+        acknowledgedAgentsByPaneKey: state.acknowledgedAgentsByPaneKey,
+        activityClearedAtByPaneKey: state.activityClearedAtByPaneKey
       }
     })
   )
@@ -134,12 +148,14 @@ export function useActivityUnreadCount(enabled: boolean, mode: ActivityUnreadCou
         migrationUnsupportedByPtyId,
         retainedAgentsByPaneKey,
         worktreesByRepo,
-        acknowledgedAgentsByPaneKey
+        acknowledgedAgentsByPaneKey,
+        activityClearedAtByPaneKey
       },
       mode
     )
   }, [
     acknowledgedAgentsByPaneKey,
+    activityClearedAtByPaneKey,
     enabled,
     migrationUnsupportedByPtyId,
     mode,

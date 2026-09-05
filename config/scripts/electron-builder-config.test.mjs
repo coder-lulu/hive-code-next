@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +9,7 @@ const SRC_MAIN_DIR = join(REPO_ROOT, 'src', 'main')
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
+const FpmTarget = require('app-builder-lib/out/targets/FpmTarget').default
 const electronBuilderNativeRebuild = require('./electron-builder-native-rebuild.cjs')
 const expectedPackagedMetadata = {
   name: 'hivecode',
@@ -211,12 +212,40 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.linux.executableName).toBe('hivecode')
     expect(electronBuilderConfig.appImage.artifactName).toBe('hivecode-linux.${ext}')
     expect(electronBuilderConfig.deb.artifactName).toBe('hivecode_${version}_${arch}.${ext}')
+    expect(electronBuilderConfig.toolsets).toEqual({ appimage: '1.0.3' })
     expect(electronBuilderConfig.rpm).toMatchObject({
       packageName: 'hivecode',
       artifactName: 'hivecode-${version}.${arch}.${ext}'
     })
   })
 
+  it('retains electron-builder runtime dependencies in deb and rpm packages', () => {
+    for (const target of ['deb', 'rpm']) {
+      const dependencies = electronBuilderConfig[target].depends
+      expect(dependencies).toEqual(
+        expect.arrayContaining(FpmTarget.prototype.getDefaultDepends(target))
+      )
+      expect(new Set(dependencies).size).toBe(dependencies.length)
+    }
+  })
+
+  it('validates each AppImage before electron-builder publishes it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-appimage-'))
+    try {
+      const appImage = join(root, 'orca-linux.AppImage')
+      await writeFile(appImage, 'not an ELF')
+      await chmod(appImage, 0o755)
+
+      expect(() =>
+        electronBuilderConfig.artifactBuildCompleted({ file: appImage, arch: 1 })
+      ).toThrow(/ELF header is outside/)
+      expect(() =>
+        electronBuilderConfig.artifactBuildCompleted({ file: join(root, 'orca-ide.deb') })
+      ).not.toThrow()
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
   it('uses a distinct AppImage name for Linux arm64 release uploads', () => {
     const configPath = require.resolve('../electron-builder.config.cjs')
     const original = process.env.ORCA_LINUX_ARM64_RELEASE
@@ -576,4 +605,50 @@ describe('electron-builder config', () => {
       }
     }
   )
+  // Why: the .deb/.rpm update-recovery path keys entirely off the resources/package-type marker that
+  // app-builder-lib's FpmTarget writes. If packaging silently stops shipping an fpm target, or adds
+  // one the recovery path does not cover, getLinuxRootPackageType() returns null, autoInstallOnAppQuit
+  // quietly goes back to true, and no unit test notices.
+  describe('linux root-package update recovery contract', () => {
+    // FpmTarget writes resources/package-type only for targets it supports auto-update for.
+    const MARKER_TARGETS = new Set(['deb', 'rpm', 'pacman'])
+    const RECOVERABLE_TARGETS = new Set(['deb', 'rpm'])
+    const linuxTargets = electronBuilderConfig.linux.target.map((entry) =>
+      typeof entry === 'string' ? entry : entry.target
+    )
+
+    it('still ships an AppImage plus at least one root-package target', () => {
+      expect(linuxTargets).toContain('AppImage')
+      expect(linuxTargets.some((target) => MARKER_TARGETS.has(target))).toBe(true)
+    })
+
+    it('ships no root-package target the recovery path cannot recover', () => {
+      const unrecoverable = linuxTargets.filter(
+        (target) => MARKER_TARGETS.has(target) && !RECOVERABLE_TARGETS.has(target)
+      )
+      expect(unrecoverable).toEqual([])
+    })
+
+    it('accepts exactly the markers electron-updater maps to a root-package updater', async () => {
+      const source = await readFile(
+        new URL('../../src/main/linux-update-package-type.ts', import.meta.url),
+        'utf8'
+      )
+      for (const target of linuxTargets.filter((entry) => RECOVERABLE_TARGETS.has(entry))) {
+        expect(source).toContain(`value === '${target}'`)
+      }
+    })
+
+    it('keeps the pinned FpmTarget overwrite for configured deb and rpm artifacts', async () => {
+      const source = await readFile(
+        require.resolve('app-builder-lib/out/targets/FpmTarget'),
+        'utf8'
+      )
+
+      expect(source).toContain('path.join(resourceDir, "package-type"), target')
+      for (const target of RECOVERABLE_TARGETS) {
+        expect(electronBuilderConfig[target]).toBeDefined()
+      }
+    })
+  })
 })

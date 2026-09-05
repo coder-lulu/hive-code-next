@@ -1,38 +1,4 @@
-import type { ComposerModel } from './composer-model'
-
-type QuickCreationExecutionInput = Pick<
-  ComposerModel,
-  | 'clearNewWorkspaceDraft'
-  | 'createMultiple'
-  | 'effectivePresetId'
-  | 'ephemeralVmRecipes'
-  | 'ephemeralVmsEnabled'
-  | 'isSubmissionCancelled'
-  | 'agentPermissionMode'
-  | 'agentPrompt'
-  | 'linkedGitLabIssue'
-  | 'linkedGitLabMR'
-  | 'normalizedSparseDirectories'
-  | 'onCreated'
-  | 'parentWorktreeId'
-  | 'persistDraft'
-  | 'persistSetupAgentStartupPolicy'
-  | 'prepareQuickSubmit'
-  | 'resetForNextCreate'
-  | 'resolvedInitialWorkspaceStatus'
-  | 'selectedEphemeralVmRecipeId'
-  | 'selectedRepoAgentLaunchPlatform'
-  | 'selectedRepoExecutionHostId'
-  | 'selectedRepoIsGit'
-  | 'selectedRepoIsRemote'
-  | 'selectedRepoSettings'
-  | 'selectedRepoStartupShell'
-  | 'selectedWorkspaceTarget'
-  | 'settings'
-  | 'sparseEnabled'
-  | 'taskSourceContext'
-  | 'telemetrySource'
->
+import type { QuickCreationExecutionInput } from './composer-model'
 
 import { useCallback } from 'react'
 import type { Repo } from '../../../../shared/repo-types'
@@ -48,6 +14,12 @@ import { buildQuickComposerStartup } from './quick-startup-plan'
 import { buildQuickCreationRequest } from './quick-creation-request'
 import { resolveQuickCreationLaunchPrompt } from './quick-creation-launch-prompt'
 import type { PendingSmartGitHubSubmitResolution } from './source-selection-decisions'
+import {
+  hasExplicitTuiLaunchCustomization,
+  resolveAgentLaunchRoute
+} from '@/lib/agent-launch-routing'
+import { readLocalRuntimeCapabilities } from '@/runtime/local-runtime-capabilities'
+import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 
 export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
   const {
@@ -202,6 +174,27 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         }
       }
 
+      const agentLaunchRoute = agent
+        ? resolveAgentLaunchRoute({
+            agent,
+            settings,
+            executionHostId: ephemeralVmRecipe
+              ? 'runtime:pending-ephemeral-vm'
+              : (workspaceRunContext?.hostId ?? selectedRepoExecutionHostId ?? 'local'),
+            platform: CLIENT_PLATFORM,
+            hostCapabilities: readLocalRuntimeCapabilities(),
+            workspaceKind: selectedRepoIsGit ? 'git-worktree' : 'folder',
+            promptDelivery: quickDraftPrompt ? 'draft' : 'auto-submit',
+            launchText: quickDraftPrompt ?? quickPrompt,
+            nativeChatTranscriptIsLocalReadable: !selectedRepoIsRemote,
+            requiresTuiLaunchCustomization:
+              agentPermissionMode !== 'default' ||
+              hasExplicitTuiLaunchCustomization(settings, agent),
+            initialSessionOptions: startupPlan?.sessionOptions
+          })
+        : 'terminal-tui'
+      const structuredLaunch = agentLaunchRoute === 'structured-native-chat'
+
       const request = buildQuickCreationRequest({
         repoId,
         ephemeralVmRecipe,
@@ -226,6 +219,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         linkedPR: submitLinkedPR,
         pushTarget: submitPushTarget,
         agent,
+        agentLaunchRoute,
         linkedLinearIssue,
         linkedLinearIssueWorkspaceId,
         linkedLinearIssueOrganizationUrlKey,
@@ -235,7 +229,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         linkedGitLabMR,
         linkedGitLabIssue,
         includeGitLabLinks: smartGitHubResolution.kind === 'none',
-        startup: backendStartup,
+        startup: structuredLaunch ? undefined : backendStartup,
         issueCommand,
         pendingFirstAgentMessageRename,
         note: trimmedNote,

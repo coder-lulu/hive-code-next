@@ -62,7 +62,11 @@ export type UpdaterModuleFactories = {
   electronUpdaterLoader: () => { loadElectronAutoUpdater: () => AutoUpdaterMock }
   electronToolkitUtils: () => { is: { dev: boolean } }
   ipcPty: () => { killAllPty: UpdaterSpy }
-  linuxUpdatePackageType: () => { getLinuxRootPackageType: Mock<() => 'deb' | 'rpm' | null> }
+  linuxUpdatePackageType: () => {
+    getLinuxRootPackageType: Mock<() => 'deb' | 'rpm' | null>
+    getLinuxPackageType: Mock<() => 'deb' | 'rpm' | 'non-root' | 'unusable'>
+    isExternallyManagedLinuxInstall: Mock<() => boolean>
+  }
   updaterLifecycleDiagnostics: () => { recordUpdaterLifecycle: UpdaterSpy }
   updaterChangelog: () => { fetchChangelog: UpdaterSpy }
   updaterNudge: () => { fetchNudge: UpdaterSpy; shouldApplyNudge: UpdaterSpy }
@@ -87,6 +91,8 @@ export type UpdaterMocks = {
   killAllPtyMock: UpdaterSpy
   powerMonitorOnMock: UpdaterSpy
   getLinuxRootPackageTypeMock: Mock<() => 'deb' | 'rpm' | null>
+  getLinuxPackageTypeMock: Mock<() => 'deb' | 'rpm' | 'non-root' | 'unusable'>
+  isExternallyManagedLinuxInstallMock: Mock<() => boolean>
   recordUpdaterLifecycleMock: UpdaterSpy
   fetchChangelogMock: UpdaterSpy
   fetchNudgeMock: UpdaterSpy

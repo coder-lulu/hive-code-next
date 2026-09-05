@@ -1,3 +1,5 @@
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
+import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runtime-cloud-control'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { RpcAnyMethod } from '../rpc/core'
 import type { DeviceRegistry } from '../device-registry'
@@ -29,6 +31,7 @@ export function formatWsEndpoint(host: string, port: number): string {
 
 export type OrcaRuntimeRpcServerOptions = {
   runtime: OrcaRuntimeService
+  hiveRuntimeCloud?: HiveRuntimeCloudControl
   userDataPath: string
   pid?: number
   platform?: NodeJS.Platform
@@ -99,9 +102,9 @@ export function pairingUnavailable(
 }
 
 export const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE =
-  'The pairing registry is unavailable. Verify that the Orca data directory is writable.'
+  `The pairing registry is unavailable. Verify that the ${APP_DISPLAY_NAME} data directory is writable.`
 export const E2EE_KEY_UNAVAILABLE_GUIDANCE =
-  'The E2EE identity is unavailable. Verify that the Orca data directory is writable.'
+  `The E2EE identity is unavailable. Verify that the ${APP_DISPLAY_NAME} data directory is writable.`
 
 export type MobileRelayPairingProvider = {
   createPairingRelay(

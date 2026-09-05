@@ -1,3 +1,4 @@
+import { readClipboardImageThumbnail } from './preload-api/web-clipboard-api'
 /* eslint-disable max-lines -- Why: browser-side Electron-preload replacement; compatibility surface centralizes here. */
 import type {
   PreloadApi,
@@ -607,6 +608,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       // Staging already wrote through to browser storage, so there is nothing left to join.
       awaitBeforeUnloadCheckpoint: () => Promise.resolve(),
       awaitFirstWindowStartupServices: () => Promise.resolve(),
+      awaitGitEnvironmentStartupBarrier: () => Promise.resolve(),
       prepareTerminalStartupRestoration: () => Promise.resolve(),
       recoverLegacyWorkerTerminalsForRendererStartup: () => Promise.resolve(),
       startupDiagnostic: () => Promise.resolve(),
@@ -673,6 +675,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
           multiProfileUi: false
         }),
       authStatus: webOrcaProfileAuthStatus,
+      onAuthStatusChanged: () => noopUnsubscribe,
       createLocal: () =>
         Promise.resolve({
           activeProfileId: DEFAULT_LOCAL_ORCA_PROFILE_ID,
@@ -1006,6 +1009,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       onLegacyWorkerTerminalRecovery: () => noopUnsubscribe,
       getMigrationUnsupportedSnapshot: () => Promise.resolve([]),
       drop: () => {},
+      dropPersisted: () => {},
       reconcileEndedProcess: () => {},
       dropByTabPrefix: () => {},
       retirePaneAuthority: () => {},
@@ -2904,6 +2908,7 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
         await (navigator.clipboard?.readText?.() ?? ''),
         options
       ),
+    readClipboardImageThumbnail: () => readClipboardImageThumbnail().catch(() => null),
     readSelectionClipboardText: () =>
       Promise.reject(new Error('Selection clipboard is unavailable in the web client')),
     saveClipboardImageAsTempFile: async (args?: {
@@ -3035,6 +3040,8 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     popupMenu: () => {},
     onWindowCloseRequested: () => noopUnsubscribe,
     confirmWindowClose: () => {},
+    onOpenMarkdownFiles: () => noopUnsubscribe,
+    consumePendingMarkdownFileOpens: () => Promise.resolve([]),
     notifyWindowRevealed: () => {}
   }
 }
@@ -3552,7 +3559,7 @@ function createSshApi(): NonNullable<Partial<PreloadApi>['ssh']> {
       return state
     },
     disconnect: () => Promise.resolve(),
-    terminateSessions: () => Promise.resolve(),
+    terminateSessions: () => Promise.resolve({ terminated: 0, unverifiable: 0 }),
     resetRelay: () => Promise.resolve(),
     getState: async (args) => {
       if (!requireActiveEnvironmentOrNull()) {
@@ -4315,7 +4322,15 @@ function mergeHostWebUIState(local: PersistedUIState, incoming: PairedUiState): 
     automationHostFilter: local.automationHostFilter,
     hideWorkspacesFromOtherDevices: local.hideWorkspacesFromOtherDevices === true,
     manualRepoOrder: local.manualRepoOrder,
-    workspaceHostOrder: local.workspaceHostOrder
+    workspaceHostOrder: local.workspaceHostOrder,
+    agentsVisibleHostIds: local.agentsVisibleHostIds,
+    agentsFilterRepoIds: local.agentsFilterRepoIds,
+    agentsShowChildAgents: local.agentsShowChildAgents,
+    agentsCompactMode: local.agentsCompactMode,
+    agentsReadFilter: local.agentsReadFilter,
+    agentsGroupBy: local.agentsGroupBy,
+    activityClearedAtByPaneKey: local.activityClearedAtByPaneKey,
+    manuallyUnreadTurnsByPaneKey: local.manuallyUnreadTurnsByPaneKey
   } satisfies Record<PairingLocalUiField, unknown> & Partial<PersistedUIState>
   return { ...mergeWebUIState(local, incoming), ...pinned }
 }

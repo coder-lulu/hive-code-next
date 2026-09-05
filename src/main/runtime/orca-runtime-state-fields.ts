@@ -80,6 +80,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
       }) => string | null | Promise<string | null>
       buildAgentHookPtyEnv?: () => Record<string, string>
       getDesktopWindowStatus?: () => RuntimeDesktopWindowStatus
+      getRuntimeRecordId?: () => string | null
       agentSessionClaimSigner?: AgentSessionClaimSigner
       skillTransactionRecovery?: Promise<unknown>
       orchestrationEnvironmentTransport?: OrchestrationEnvironmentTransport
@@ -87,6 +88,11 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
   ) {
     super()
     this.store = store
+    store?.onSettingsChanged?.((updates) => {
+      if ('experimentalStructuredNativeChat' in updates) {
+        this.notifyMobileSessionTabsChanged()
+      }
+    })
     const runtime = this as RuntimeCommandSurfaceHost<this>
     installRuntimeFileCommandSurface(runtime, this.fileCommands)
     installRuntimeGitCommandSurface(runtime, this.gitCommands)
@@ -212,6 +218,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
     this.onTerminalAgentStatus = deps?.onTerminalAgentStatus ?? null
     this.buildAgentHookPtyEnv = deps?.buildAgentHookPtyEnv ?? null
     this.getDesktopWindowStatusFn = deps?.getDesktopWindowStatus ?? (() => 'openable')
+    this.getRuntimeRecordIdFn = deps?.getRuntimeRecordId ?? (() => null)
     this.prepareAiVaultSessionResumeFn = deps?.prepareAiVaultSessionResume ?? null
     this.prepareCodexStructuredLaunchFn = deps?.prepareCodexStructuredLaunch ?? null
     this.agentSessionClaimSigner =

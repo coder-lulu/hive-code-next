@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 
-import type { ReactNode } from 'react'
+import { act, type ReactNode } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import { SidebarSettingsHelpMenu } from './SidebarSettingsHelpMenu'
 
@@ -14,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   useShortcutKeyDetails: vi.fn(),
   useSetupGuideProgress: vi.fn(),
   useSetupGuideProgressSnapshot: vi.fn(),
+  /** Counts evaluations of the feedback chunk; a dynamic import evaluates it exactly once. */
+  feedbackChunkLoads: 0,
   setupProgress: {
     ready: true,
     coreDoneCount: 2,
@@ -52,7 +55,18 @@ vi.mock('../setup-guide/SetupGuideProgressRing', () => ({
 }))
 
 vi.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+  DropdownMenu: ({
+    children,
+    onOpenChange
+  }: {
+    children: ReactNode
+    onOpenChange?: (open: boolean) => void
+  }) => (
+    <>
+      <button data-testid="open-menu" onClick={() => onOpenChange?.(true)} />
+      {children}
+    </>
+  ),
   DropdownMenuContent: ({ children }: { children: ReactNode }) => <>{children}</>,
   DropdownMenuItem: ({
     children,
@@ -110,9 +124,10 @@ vi.mock('sonner', () => ({
   }
 }))
 
-vi.mock('./SidebarFeedbackDialog', () => ({
-  SidebarFeedbackDialog: () => <div data-testid="feedback-dialog" />
-}))
+vi.mock('./SidebarFeedbackDialog', () => {
+  mocks.feedbackChunkLoads += 1
+  return { SidebarFeedbackDialog: () => <div data-testid="feedback-dialog" /> }
+})
 
 function installWindowApi(): void {
   Object.assign(window, {
@@ -123,6 +138,24 @@ function installWindowApi(): void {
     }
   })
 }
+
+let mountedRoot: Root | undefined
+let mountedContainer: HTMLDivElement | undefined
+
+async function renderMenu(): Promise<HTMLDivElement> {
+  mountedContainer = document.createElement('div')
+  document.body.append(mountedContainer)
+  mountedRoot = createRoot(mountedContainer)
+  await act(async () => mountedRoot?.render(<SidebarSettingsHelpMenu />))
+  return mountedContainer
+}
+
+afterEach(() => {
+  act(() => mountedRoot?.unmount())
+  mountedContainer?.remove()
+  mountedRoot = undefined
+  mountedContainer = undefined
+})
 
 describe('SidebarSettingsHelpMenu', () => {
   beforeEach(() => {
@@ -209,6 +242,21 @@ describe('SidebarSettingsHelpMenu', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
     expect(html).not.toContain('Check for Updates')
     expect(html).not.toContain(`Restart ${APP_DISPLAY_NAME}`)
+  })
+
+  // No other test in this file opens the menu or selects Send Feedback, so the 0 -> 1
+  // transition below is this warm and nothing else, whatever order the tests run in.
+  it('warms the feedback chunk when the menu opens, before Send Feedback is selected', async () => {
+    const container = await renderMenu()
+    expect(mocks.feedbackChunkLoads).toBe(0)
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="open-menu"]')?.click()
+    })
+
+    expect(mocks.feedbackChunkLoads).toBe(1)
+    // Warming must not mount the dialog: it stays behind its own open state.
+    expect(document.body.querySelector('[data-testid="feedback-dialog"]')).toBeNull()
   })
 
   it('renders shortcut keys in the settings tooltip', () => {

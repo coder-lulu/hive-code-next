@@ -19,6 +19,7 @@ type StoreState = {
     mobilePairingCustomAddresses?: string[]
   }
   updateSettings: () => Promise<void>
+  fetchOrcaProfileAuthStatus: () => Promise<unknown>
 }
 
 const mocks = vi.hoisted(() => ({
@@ -151,7 +152,8 @@ describe('MobilePage pairing connection mode', () => {
       closeMobilePage: vi.fn(),
       orcaProfileAuthStatus: { state: 'connected' },
       settings: { showMobileButton: true },
-      updateSettings: vi.fn().mockResolvedValue(undefined)
+      updateSettings: vi.fn().mockResolvedValue(undefined),
+      fetchOrcaProfileAuthStatus: vi.fn().mockResolvedValue(null)
     }
     Object.defineProperty(window, 'api', {
       configurable: true,

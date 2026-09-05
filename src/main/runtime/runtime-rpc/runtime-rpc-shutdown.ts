@@ -2,8 +2,8 @@ import { RuntimeRpcMobilePairing } from './runtime-rpc-mobile-pairing'
 
 export class RuntimeRpcShutdown extends RuntimeRpcMobilePairing {
   /** Why: test-only seam — runs one ownership check instead of waiting out the poll interval. */
-  checkRuntimeMetadataOwnership(): void {
-    this.metadataOwnershipWatch?.check()
+  checkRuntimeMetadataOwnership(): Promise<void> {
+    return this.metadataOwnershipWatch?.check() ?? Promise.resolve()
   }
 
   async stop(): Promise<void> {
@@ -22,6 +22,7 @@ export class RuntimeRpcShutdown extends RuntimeRpcMobilePairing {
     this.transports = []
     this.metadataOwnershipWatch?.stop()
     this.metadataOwnershipWatch = null
+    this.clearCloudSessionExpiryTimers()
     this.mobileSocketWiring = null
     this.detachWebSocketWiring = null
     const stopResults = await Promise.allSettled(

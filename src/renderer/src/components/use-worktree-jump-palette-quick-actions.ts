@@ -56,6 +56,8 @@ export function useWorktreeJumpPaletteQuickActions({
   sshConnectionStates,
   activeGroupIdByWorktree,
   groupsByWorktree,
+  unifiedTabsByWorktree,
+  isLoading,
   settings,
   runtimeStatusByEnvironmentId,
   deferredQuery,
@@ -127,6 +129,8 @@ export function useWorktreeJumpPaletteQuickActions({
       sshConnectionStates,
       activeGroupIdByWorktree,
       groupsByWorktree,
+      unifiedTabsByWorktree,
+      isLoading,
       settings,
       runtimeStatusByEnvironmentId
     }),
@@ -135,6 +139,8 @@ export function useWorktreeJumpPaletteQuickActions({
       activeView,
       activeWorktreeId,
       groupsByWorktree,
+      unifiedTabsByWorktree,
+      isLoading,
       repos,
       runtimeStatusByEnvironmentId,
       settings,
@@ -145,11 +151,7 @@ export function useWorktreeJumpPaletteQuickActions({
   const availableActionResults = useMemo(() => {
     const context = buildQuickActionContext(quickActionAvailabilityState)
     return actionResults.filter((action) => action.isAvailable(context).available)
-  }, [
-    actionResults,
-    buildQuickActionContext,
-    quickActionAvailabilityState
-  ])
+  }, [actionResults, buildQuickActionContext, quickActionAvailabilityState])
   const middleItems = useMemo<(SettingsPaletteItem | QuickActionPaletteItem)[]>(
     () =>
       rankCmdJMiddleResults({
