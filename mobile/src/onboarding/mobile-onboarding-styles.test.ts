@@ -37,6 +37,6 @@ describe('mobile onboarding Graphite styles', () => {
       backgroundColor: theme.color.bg.surface,
       borderColor: theme.color.border.default
     })
-    expect(styles.error.color).toBe(theme.color.status.danger)
+    expect(styles.error.color).toBe(theme.color.status.dangerText)
   })
 })

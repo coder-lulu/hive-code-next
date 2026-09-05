@@ -56,7 +56,7 @@ export function createFilePreviewStyles(theme: MobileTheme) {
     },
     errorText: {
       ...theme.typography.body,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       textAlign: 'center'
     },
     retryButton: {
@@ -157,7 +157,7 @@ export function createFilePreviewStyles(theme: MobileTheme) {
     saveErrorText: {
       ...theme.typography.caption,
       marginBottom: theme.spacing.space8,
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     },
     editInput: {
       ...theme.typography.code,

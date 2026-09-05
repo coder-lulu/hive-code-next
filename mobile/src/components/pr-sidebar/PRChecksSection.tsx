@@ -15,7 +15,7 @@ import {
   sortPRChecks,
   summarizePRChecks
 } from './pr-checks-presentation'
-import { statusColor } from './pr-sidebar-status-color'
+import { statusColor, statusTextColor } from './pr-sidebar-status-color'
 import { PRSection } from './PRSection'
 import { PRCheckDetailView, type DetailEntry } from './PRCheckDetail'
 import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
@@ -142,7 +142,7 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
           <Text
             style={[
               styles.summaryLabel,
-              { color: statusColor(checkOutcomeToken(summary.outcome), theme) }
+              { color: statusTextColor(checkOutcomeToken(summary.outcome), theme) }
             ]}
           >
             {summary.label}
@@ -219,7 +219,7 @@ export function PRChecksSection({ checks, client, worktreeId, prRepo, actions, t
               {/* Status word + open-on-host icon (desktop ChecksList row), so the
                   outcome reads without expanding. */}
               <Text
-                style={[styles.rowStatus, { color: statusColor(token, theme) }]}
+                style={[styles.rowStatus, { color: statusTextColor(token, theme) }]}
                 numberOfLines={1}
               >
                 {checkStatusLabel(check)}

@@ -126,7 +126,7 @@ export function createMobileLinkPrFormStyles(theme: MobileTheme) {
       fontSize: theme.typography.label.fontSize
     },
     error: {
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       fontSize: theme.typography.caption.fontSize,
       marginTop: theme.spacing.space12
     },

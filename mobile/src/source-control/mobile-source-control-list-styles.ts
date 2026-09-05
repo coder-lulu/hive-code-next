@@ -256,7 +256,7 @@ export function createMobileSourceControlListStyles(theme: MobileTheme) {
     },
     commitFailureLaunchError: {
       ...theme.typography.caption,
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     }
   })
 }

@@ -50,7 +50,7 @@ export const startAndroidStreamSession: StartAndroidStream = async ({
             pts: frame.pts.toString(),
             bytes: toArrayBuffer(frame.data)
           }),
-        onError: () => scrcpyVideoRegistry.stop(serial),
+        onError: (message) => scrcpyVideoRegistry.stop(serial, message),
         onClose: () => scrcpyVideoRegistry.stop(serial)
       }
     )

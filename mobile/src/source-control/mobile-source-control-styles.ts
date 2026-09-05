@@ -112,7 +112,7 @@ export function createMobileSourceControlStyles(theme: MobileTheme) {
     },
     conflictText: {
       ...theme.typography.caption,
-      color: theme.color.status.warning,
+      color: theme.color.status.warningText,
       textTransform: 'capitalize'
     },
     // Match bulk-action hit target so Abort reads as a real control, not a chip.
@@ -136,7 +136,7 @@ export function createMobileSourceControlStyles(theme: MobileTheme) {
     },
     abortText: {
       ...theme.typography.label,
-      color: theme.color.status.warning,
+      color: theme.color.status.warningText,
       fontWeight: '600',
       textTransform: 'capitalize'
     },

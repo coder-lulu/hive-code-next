@@ -66,7 +66,7 @@ export function MobileSourceControlPrChip({ summary, onPress }: Props) {
             <Text
               style={[
                 hubStyles.statePillText,
-                { color: mobilePrStatusColor(theme, summary.stateToken) }
+                { color: mobilePrStatusTextColor(theme, summary.stateToken) }
               ]}
             >
               {localizePrStateLabel(summary.stateLabel)}
@@ -91,10 +91,13 @@ function ChipRollup({ rollup }: { rollup: MobilePrChipRollup }) {
   const theme = useMobileTheme()
   const hubStyles = useMobileThemeStyles(createMobileSourceControlHubStyles)
   const color = mobilePrStatusColor(theme, rollup.token)
+  const textColor = mobilePrStatusTextColor(theme, rollup.token)
   return (
     <View style={hubStyles.rollup}>
       <RollupIcon kind={rollup.kind} color={color} />
-      <Text style={[hubStyles.rollupText, { color }]}>{localizeRollupText(rollup.text)}</Text>
+      <Text style={[hubStyles.rollupText, { color: textColor }]}>
+        {localizeRollupText(rollup.text)}
+      </Text>
     </View>
   )
 }
@@ -142,6 +145,21 @@ function mobilePrStatusColor(theme: MobileTheme, token: MobilePrChipRollup['toke
       return theme.color.status.warning
     case 'statusRed':
       return theme.color.status.danger
+    case 'statusPurple':
+      return theme.color.brand.primary
+    default:
+      return theme.color.text.secondary
+  }
+}
+
+function mobilePrStatusTextColor(theme: MobileTheme, token: MobilePrChipRollup['token']): string {
+  switch (token) {
+    case 'statusGreen':
+      return theme.color.status.successText
+    case 'statusAmber':
+      return theme.color.status.warningText
+    case 'statusRed':
+      return theme.color.status.dangerText
     case 'statusPurple':
       return theme.color.brand.primary
     default:

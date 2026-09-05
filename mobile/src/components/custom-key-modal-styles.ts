@@ -83,7 +83,7 @@ export function createCustomKeyModalStyles(theme: MobileTheme) {
       fontSize: 17,
       fontWeight: '600'
     },
-    keycapTextWarn: { color: theme.color.status.warning },
+    keycapTextWarn: { color: theme.color.status.warningText },
     keycapModifierText: {
       ...theme.typography.code,
       color: theme.color.text.secondary,

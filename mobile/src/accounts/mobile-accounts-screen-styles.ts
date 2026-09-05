@@ -113,7 +113,7 @@ export function createMobileAccountsScreenStyles(theme: MobileTheme) {
     },
     errorText: {
       ...theme.typography.meta,
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     },
     placeholder: {
       minHeight: 240,

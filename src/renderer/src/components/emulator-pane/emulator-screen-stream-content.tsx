@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, type CSSProperties } from 'react'
+import { Button } from '@/components/ui/button'
 import { useEmulatorFrameStream } from './use-emulator-frame-stream'
 import { useEmulatorVideoStream } from './use-emulator-video-stream'
 import { translate } from '@/i18n/i18n'
@@ -12,7 +13,10 @@ type StreamSize = {
 
 type EmulatorScreenStreamContentProps = {
   loading: boolean
+  onAndroidStreamError?: () => void
   onStreamError: () => void
+  onStreamReady?: () => void
+  onStreamRetry?: () => void
   onStreamSize: (size: StreamSize) => void
   previewUrl?: string
   screenAspectRatio?: number
@@ -27,7 +31,10 @@ const SCRCPY_PREFIX = 'scrcpy://'
 
 export function EmulatorScreenStreamContent({
   loading,
+  onAndroidStreamError,
   onStreamError,
+  onStreamReady,
+  onStreamRetry,
   onStreamSize,
   previewUrl,
   screenAspectRatio = 9 / 19,
@@ -41,11 +48,17 @@ export function EmulatorScreenStreamContent({
       ? previewUrl.slice(SCRCPY_PREFIX.length)
       : null
 
-  const video = useEmulatorVideoStream(
+  const {
+    canvasRef: videoCanvasRef,
+    error: videoError,
+    hasFrame: videoHasFrame,
+    recoverable: videoRecoverable
+  } = useEmulatorVideoStream(
     androidDeviceId ?? undefined,
     streamKey,
     showStream && Boolean(androidDeviceId),
-    onStreamSize
+    onStreamSize,
+    onStreamReady
   )
   const frameStream = useEmulatorFrameStream(
     androidDeviceId ? undefined : previewUrl,
@@ -54,10 +67,13 @@ export function EmulatorScreenStreamContent({
   )
 
   useEffect(() => {
-    if (frameStream.error || video.error) {
+    if (frameStream.error) {
       onStreamError()
     }
-  }, [frameStream.error, video.error, onStreamError])
+    if (videoError) {
+      ;(videoRecoverable ? (onAndroidStreamError ?? onStreamError) : onStreamError)()
+    }
+  }, [frameStream.error, onAndroidStreamError, onStreamError, videoError, videoRecoverable])
 
   const mediaStyle = resolveStreamMediaStyle(streamRotation, screenAspectRatio)
   const mediaClassName =
@@ -69,20 +85,20 @@ export function EmulatorScreenStreamContent({
     'Connecting display…'
   )
 
-  if (androidDeviceId && showStream && !video.error) {
+  if (androidDeviceId && showStream && !videoError) {
     return (
       <>
         <canvas
-          ref={video.canvasRef}
+          ref={videoCanvasRef}
           className={mediaClassName}
           style={mediaStyle}
-          aria-hidden={!video.hasFrame}
+          aria-hidden={!videoHasFrame}
           aria-label={translate(
             'auto.components.emulator.pane.emulator.screen.stream.content.5ee64cd44e',
             'Emulator screen'
           )}
         />
-        {!video.hasFrame ? (
+        {!videoHasFrame ? (
           <EmulatorStreamLoadingState label={connectingDisplayLabel} overlay />
         ) : null}
       </>
@@ -108,18 +124,20 @@ export function EmulatorScreenStreamContent({
             return
           }
           onStreamSize({ width: naturalWidth, height: naturalHeight })
+          onStreamReady?.()
         }}
       />
     )
   }
 
-  const waitingForFrame = showStream && !frameStream.error && !video.error
-  const displayError = streamError || Boolean(frameStream.error) || Boolean(video.error)
+  const waitingForFrame = showStream && !frameStream.error && !videoError
+  const displayError = streamError || Boolean(frameStream.error) || Boolean(videoError)
   const startingEmulator = loading && !showStream
+  const reconnectingDisplay = loading && displayError
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/20 text-muted-foreground">
-      {startingEmulator || waitingForFrame ? (
+      {startingEmulator || waitingForFrame || reconnectingDisplay ? (
         <EmulatorStreamLoadingState
           label={
             startingEmulator
@@ -127,16 +145,31 @@ export function EmulatorScreenStreamContent({
                   'auto.components.emulator.pane.emulator.screen.stream.content.startingEmulator',
                   'Starting emulator…'
                 )
-              : connectingDisplayLabel
+              : reconnectingDisplay
+                ? translate(
+                    'auto.components.emulator.pane.emulator.screen.stream.content.reconnectingDisplay',
+                    'Reconnecting display…'
+                  )
+                : connectingDisplayLabel
           }
         />
       ) : displayError ? (
-        <span className="px-6 text-center text-xs">
-          {translate(
-            'auto.components.emulator.pane.emulator.screen.stream.content.36841af608',
-            'Stream disconnected'
-          )}
-        </span>
+        <>
+          <span className="px-6 text-center text-xs">
+            {translate(
+              'auto.components.emulator.pane.emulator.screen.stream.content.36841af608',
+              'Stream disconnected'
+            )}
+          </span>
+          {androidDeviceId && videoRecoverable && onStreamRetry ? (
+            <Button type="button" variant="outline" size="xs" onClick={onStreamRetry}>
+              {translate(
+                'auto.components.emulator.pane.emulator.screen.stream.content.reconnect',
+                'Reconnect'
+              )}
+            </Button>
+          ) : null}
+        </>
       ) : (
         <span className="px-6 text-center text-xs">
           {translate(

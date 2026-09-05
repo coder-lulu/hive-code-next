@@ -21,12 +21,14 @@ let root: Root
 let startFrameStream: ReturnType<typeof vi.fn>
 let stopFrameStream: ReturnType<typeof vi.fn>
 let streamCounter: number
+let frameErrorListeners: ErrorListener[]
 
 beforeEach(() => {
   ;(
     globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true
   streamCounter = 0
+  frameErrorListeners = []
   startFrameStream = vi.fn(async () => ({ streamId: `stream-${++streamCounter}` }))
   stopFrameStream = vi.fn(async () => {})
   Object.defineProperty(URL, 'createObjectURL', {
@@ -41,7 +43,12 @@ beforeEach(() => {
         startFrameStream,
         stopFrameStream,
         onFrameStreamFrame: (_listener: FrameListener) => () => {},
-        onFrameStreamError: (_listener: ErrorListener) => () => {}
+        onFrameStreamError: (listener: ErrorListener) => {
+          frameErrorListeners.push(listener)
+          return () => {
+            frameErrorListeners = frameErrorListeners.filter((current) => current !== listener)
+          }
+        }
       }
     }
   })
@@ -72,16 +79,21 @@ function setDocumentVisibility(state: 'visible' | 'hidden'): void {
   document.dispatchEvent(new Event('visibilitychange'))
 }
 
-async function renderFrame(isActive: boolean): Promise<void> {
+async function renderFrame(
+  isActive: boolean,
+  options?: { onReconnect?: () => void | Promise<void>; streamKey?: string }
+): Promise<void> {
   await act(async () => {
     root.render(
       <EmulatorDeviceFrame
         previewUrl="http://127.0.0.1:3100/stream.mjpeg"
+        streamKey={options?.streamKey}
         wsUrl="ws://127.0.0.1:3100/ws"
         loading={false}
         isLive={true}
         visualOrientation="portrait"
         isActive={isActive}
+        onReconnect={options?.onReconnect}
         onTap={vi.fn()}
         onGesture={vi.fn()}
       />
@@ -113,6 +125,19 @@ describe('EmulatorDeviceFrame visibility gating', () => {
     // Re-showing re-fires the stream; the session was never detached.
     await renderFrame(true)
     expect(startFrameStream).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not start a second attach loop when the self-reconnecting MJPEG stream errors', async () => {
+    const onReconnect = vi.fn(async () => {})
+    await renderFrame(true, { onReconnect, streamKey: 'mjpeg' })
+
+    await act(async () => {
+      frameErrorListeners[0]?.({ streamId: 'stream-1', message: 'closed' })
+    })
+
+    expect(onReconnect).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Stream disconnected')
+    expect(container.textContent).not.toContain('Reconnect')
   })
 })
 

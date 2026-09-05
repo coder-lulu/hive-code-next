@@ -19,11 +19,18 @@ type VideoMetaMessage = {
   meta: { codecId: string; width: number; height: number }
 }
 
+type VideoErrorMessage = {
+  streamId: string
+  deviceId: string
+  message: string
+}
+
 type EmulatorVideoApi = {
   startVideoStream?: (args: { deviceId: string; streamId: string }) => Promise<{ streamId: string }>
   stopVideoStream?: (args: { streamId: string }) => Promise<void>
   onVideoStreamMeta?: (cb: (msg: VideoMetaMessage) => void) => () => void
   onVideoStreamFrame?: (cb: (msg: VideoFrameMessage) => void) => () => void
+  onVideoStreamError?: (cb: (msg: VideoErrorMessage) => void) => () => void
 }
 
 // scrcpy emits Annex-B H.264; the decoder is configured without an avcC
@@ -35,6 +42,7 @@ type StreamSize = { width: number; height: number }
 type EmulatorVideoStreamState = {
   error: string | null
   hasFrame: boolean
+  recoverable: boolean
   streamIdentity: string | null
 }
 
@@ -46,30 +54,35 @@ export function useEmulatorVideoStream(
   deviceId: string | undefined,
   streamKey: string | undefined,
   enabled: boolean,
-  onSize?: (size: StreamSize) => void
+  onSize?: (size: StreamSize) => void,
+  onReady?: () => void
 ): {
   canvasRef: React.RefObject<HTMLCanvasElement | null>
   error: string | null
   hasFrame: boolean
+  recoverable: boolean
 } {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamIdentity = enabled && deviceId ? `${deviceId}::${streamKey ?? ''}` : null
   const [state, setState] = useState<EmulatorVideoStreamState>({
     error: null,
     hasFrame: false,
+    recoverable: false,
     streamIdentity: null
   })
   const onSizeRef = useRef(onSize)
   onSizeRef.current = onSize
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
 
   useEffect(() => {
     const api = (window as { api?: { emulator?: EmulatorVideoApi } }).api?.emulator
     if (!enabled || !deviceId) {
-      setState({ error: null, hasFrame: false, streamIdentity: null })
+      setState({ error: null, hasFrame: false, recoverable: false, streamIdentity: null })
       return
     }
     if (!api?.startVideoStream) {
-      setState({ error: null, hasFrame: false, streamIdentity })
+      setState({ error: null, hasFrame: false, recoverable: false, streamIdentity })
       return
     }
     const DecoderCtor = (globalThis as { VideoDecoder?: typeof VideoDecoder }).VideoDecoder
@@ -82,12 +95,13 @@ export function useEmulatorVideoStream(
           'This build does not support WebCodecs H.264 decoding.'
         ),
         hasFrame: false,
+        recoverable: false,
         streamIdentity
       })
       return
     }
 
-    setState({ error: null, hasFrame: false, streamIdentity })
+    setState({ error: null, hasFrame: false, recoverable: false, streamIdentity })
     let disposed = false
     let configured = false
     let hasPaintedFrame = false
@@ -97,6 +111,7 @@ export function useEmulatorVideoStream(
     let streamId: string | null = currentStreamId
     let unsubMeta: (() => void) | undefined
     let unsubFrame: (() => void) | undefined
+    let unsubError: (() => void) | undefined
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d') ?? null
     if (canvas) {
@@ -107,7 +122,7 @@ export function useEmulatorVideoStream(
     const decoder = new DecoderCtor({
       output: (frame) => {
         if (!disposed && ctx && canvas) {
-          clearFirstFrameTimeout()
+          clearTimeout(firstFrameTimeout)
           // Resizing the canvas reallocates its backing store and forces a
           // reflow, so only do it when the frame dimensions actually change.
           if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
@@ -117,24 +132,18 @@ export function useEmulatorVideoStream(
           ctx.drawImage(frame, 0, 0)
           if (!hasPaintedFrame) {
             hasPaintedFrame = true
-            setState({ error: null, hasFrame: true, streamIdentity })
+            setState({ error: null, hasFrame: true, recoverable: false, streamIdentity })
+            onReadyRef.current?.()
           }
         }
         frame.close()
       },
-      error: (err) => fatal(err.message)
+      error: (err) => fatal(err.message, false)
     })
 
-    let firstFrameTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      fatal('Android video stream did not deliver a frame.')
+    const firstFrameTimeout = setTimeout(() => {
+      fatal('Android video stream did not deliver a frame.', true)
     }, 10_000)
-
-    const clearFirstFrameTimeout = (): void => {
-      if (firstFrameTimeout) {
-        clearTimeout(firstFrameTimeout)
-        firstFrameTimeout = null
-      }
-    }
 
     const stopStream = (): void => {
       if (streamId) {
@@ -144,26 +153,28 @@ export function useEmulatorVideoStream(
     }
 
     const cleanup = (): void => {
+      clearTimeout(firstFrameTimeout)
       if (disposed) {
         return
       }
       disposed = true
-      clearFirstFrameTimeout()
       unsubMeta?.()
       unsubFrame?.()
+      unsubError?.()
       unsubMeta = undefined
       unsubFrame = undefined
+      unsubError = undefined
       stopStream()
       if (decoder.state !== 'closed') {
         decoder.close()
       }
     }
 
-    function fatal(message: string): void {
+    function fatal(message: string, recoverable: boolean): void {
       if (disposed) {
         return
       }
-      setState({ error: message, hasFrame: false, streamIdentity })
+      setState({ error: message, hasFrame: false, recoverable, streamIdentity })
       cleanup()
     }
 
@@ -187,7 +198,10 @@ export function useEmulatorVideoStream(
           try {
             decoder.configure({ codec: H264_CODEC, optimizeForLatency: true })
           } catch (err) {
-            fatal(err instanceof Error ? err.message : 'Failed to configure the H.264 decoder.')
+            fatal(
+              err instanceof Error ? err.message : 'Failed to configure the H.264 decoder.',
+              false
+            )
             return
           }
           configured = true
@@ -220,7 +234,16 @@ export function useEmulatorVideoStream(
           })
         )
       } catch (err) {
-        fatal(err instanceof Error ? err.message : 'Failed to decode an Android video frame.')
+        fatal(
+          err instanceof Error ? err.message : 'Failed to decode an Android video frame.',
+          false
+        )
+      }
+    })
+
+    unsubError = api.onVideoStreamError?.((msg) => {
+      if (!disposed && msg.streamId === streamId && msg.deviceId === deviceId) {
+        fatal(msg.message, true)
       }
     })
 
@@ -232,16 +255,22 @@ export function useEmulatorVideoStream(
         }
       })
       .catch((err: unknown) => {
-        fatal(err instanceof Error ? err.message : 'Failed to start the Android video stream.')
+        fatal(
+          err instanceof Error ? err.message : 'Failed to start the Android video stream.',
+          false
+        )
       })
 
-    return () => {
-      cleanup()
-    }
+    return cleanup
   }, [deviceId, enabled, streamIdentity])
 
   if (state.streamIdentity !== streamIdentity) {
-    return { canvasRef, error: null, hasFrame: false }
+    return { canvasRef, error: null, hasFrame: false, recoverable: false }
   }
-  return { canvasRef, error: state.error, hasFrame: state.hasFrame }
+  return {
+    canvasRef,
+    error: state.error,
+    hasFrame: state.hasFrame,
+    recoverable: state.recoverable
+  }
 }

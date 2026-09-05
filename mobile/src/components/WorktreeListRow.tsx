@@ -9,7 +9,7 @@ import type { MobileTheme } from '../theme/mobile-theme'
 import { AgentSpinner } from './AgentSpinner'
 import { MobileRepoIcon } from './MobileRepoIcon'
 import { WorktreeAgentList } from './WorktreeAgentList'
-import { WorktreeMetaGlyphs, prStateColor } from './WorktreeMetaGlyphs'
+import { WorktreeMetaGlyphs, prStateColor, prStateTextColor } from './WorktreeMetaGlyphs'
 
 // Strip the refs/heads/ prefix for display, matching the desktop sidebar
 // (WorktreeCardHelpers.formatBranchName).
@@ -129,8 +129,10 @@ function WorktreeListRowComponent<T extends WorktreeListRowItem>({
           </Text>
           {item.linkedPR && (
             <View style={styles.prBadge}>
-              <GitPullRequest size={10} color={prStateColor(item.linkedPR.state)} />
-              <Text style={[styles.prNumber, { color: prStateColor(item.linkedPR.state) }]}>
+              <GitPullRequest size={10} color={prStateColor(item.linkedPR.state, theme)} />
+              <Text
+                style={[styles.prNumber, { color: prStateTextColor(item.linkedPR.state, theme) }]}
+              >
                 #{item.linkedPR.number}
               </Text>
             </View>

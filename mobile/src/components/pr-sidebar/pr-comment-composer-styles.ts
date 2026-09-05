@@ -10,7 +10,7 @@ export function createPrCommentComposerStyles(theme: MobileTheme) {
     borderSubtle: theme.color.border.default,
     textPrimary: theme.color.text.primary,
     textSecondary: theme.color.text.secondary,
-    statusRed: theme.color.status.danger
+    statusRed: theme.color.status.dangerText
   }
   const spacing = { sm: theme.spacing.space8, md: theme.spacing.space12 }
   const radii = { button: theme.radii.control, input: theme.radii.control }

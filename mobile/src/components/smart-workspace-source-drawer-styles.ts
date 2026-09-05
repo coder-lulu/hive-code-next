@@ -183,7 +183,7 @@ export function createSmartWorkspaceSourceDrawerStyles(theme: MobileTheme) {
     },
     errorNotice: {
       ...theme.typography.caption,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       paddingHorizontal: theme.spacing.space4,
       paddingBottom: theme.spacing.space8
     },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { prStateToken } from './pr-state-token'
 import { prStateBadge } from './pr-sidebar/pr-checks-presentation'
-import { statusColor } from './pr-sidebar/pr-sidebar-status-color'
+import { statusColor, statusTextColor } from './pr-sidebar/pr-sidebar-status-color'
 import { darkTheme, lightTheme } from '../theme/mobile-theme'
 
 describe('prStateToken', () => {
@@ -24,6 +24,14 @@ describe('prStateToken', () => {
       expect(statusColor(prStateToken('open'), theme)).toBe(theme.color.status.success)
       expect(statusColor(prStateToken('closed'), theme)).toBe(theme.color.status.danger)
       expect(statusColor(prStateToken('draft'), theme)).toBe(theme.color.text.secondary)
+    }
+  })
+
+  it('uses contrast-safe semantic tokens when a status is rendered as text', () => {
+    for (const theme of [lightTheme, darkTheme]) {
+      expect(statusTextColor(prStateToken('open'), theme)).toBe(theme.color.status.successText)
+      expect(statusTextColor(prStateToken('closed'), theme)).toBe(theme.color.status.dangerText)
+      expect(statusTextColor('statusAmber', theme)).toBe(theme.color.status.warningText)
     }
   })
 })

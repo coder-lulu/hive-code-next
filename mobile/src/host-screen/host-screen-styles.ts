@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
+import { createHostScreenRecoveryStyles } from './host-screen-recovery-styles'
 
 /**
  * Shared chrome styles for the host workspace list.
@@ -9,48 +10,140 @@ import type { MobileTheme } from '../theme/mobile-theme'
  * layout provide the available space.
  */
 export function createHostScreenStyles(theme: MobileTheme) {
-  const { color, spacing, typography } = theme
-  return StyleSheet.create({
+  const { color, radii, size, spacing, typography } = theme
+  const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: color.bg.canvas },
-    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.space24 },
-    errorText: { color: color.status.danger, fontSize: 14, textAlign: 'center' },
+    phoneChrome: { backgroundColor: color.bg.canvas },
+    phoneHeaderRow: {
+      minHeight: size.navigationBarHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.space16
+    },
+    phoneHeaderSide: { minWidth: 0, flex: 1 },
+    phoneHeaderRight: { alignItems: 'flex-end' },
+    phoneHeaderTitleWrap: { minWidth: 0, flex: 1, alignItems: 'center' },
+    phoneHeaderTitle: { ...typography.pageTitle, color: color.text.primary },
+    runtimeButton: {
+      minWidth: 0,
+      minHeight: size.minimumTouchTarget,
+      maxWidth: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: spacing.space4,
+      paddingHorizontal: spacing.space8,
+      borderRadius: radii.control
+    },
+    runtimeStatusDot: {
+      width: spacing.space8,
+      height: spacing.space8,
+      flexShrink: 0,
+      borderRadius: radii.circle
+    },
+    runtimeCopy: { minWidth: 0, flexShrink: 1 },
+    runtimeButtonText: {
+      ...typography.meta,
+      minWidth: 0,
+      flexShrink: 1,
+      color: color.text.primary,
+      fontWeight: '600'
+    },
+    runtimeStatusText: { ...typography.caption, color: color.text.secondary },
+    runtimeStatusSuccess: { color: color.status.successText },
+    runtimeStatusWarning: { color: color.status.warningText },
+    runtimeStatusDanger: { color: color.status.dangerText },
+    phoneIconButton: {
+      width: size.minimumTouchTarget,
+      height: size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.control
+    },
+    phoneIconButtonActive: { backgroundColor: color.brand.subtle },
+    controlPressed: { backgroundColor: color.bg.subtle },
+    phoneSearchBar: {
+      paddingHorizontal: spacing.space16,
+      paddingBottom: spacing.space12
+    },
+    workspaceSummary: {
+      minHeight: spacing.space64 + spacing.space12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: spacing.space16,
+      marginBottom: spacing.space12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: color.border.subtle,
+      borderRadius: radii.card,
+      backgroundColor: color.bg.surface
+    },
+    workspaceSummaryItem: {
+      minWidth: 0,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.space4,
+      paddingHorizontal: spacing.space4
+    },
+    workspaceSummaryValueRow: {
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.space4
+    },
+    workspaceSummaryDivider: {
+      width: StyleSheet.hairlineWidth,
+      height: spacing.space40,
+      backgroundColor: color.border.subtle
+    },
+    workspaceSummaryValue: {
+      ...typography.sectionTitle,
+      color: color.text.primary,
+      fontVariant: ['tabular-nums']
+    },
+    workspaceSummaryLabel: { ...typography.caption, color: color.text.secondary },
     topChrome: { backgroundColor: color.bg.surface },
     statusBar: {
-      minHeight: 52,
+      minHeight: size.navigationBarHeight,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: spacing.space12,
       gap: spacing.space8
     },
     backButton: {
-      width: 36,
-      height: 36,
+      width: size.minimumTouchTarget,
+      height: size.minimumTouchTarget,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 18
+      borderRadius: radii.circle
     },
     hostIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.space8 },
-    hostNameText: { flexShrink: 1, color: color.text.primary, fontSize: 16, fontWeight: '600' },
+    hostNameText: {
+      ...typography.sectionTitle,
+      flexShrink: 1,
+      color: color.text.primary
+    },
     reconnectButton: {
       paddingHorizontal: spacing.space12,
       paddingVertical: spacing.space8,
-      borderRadius: spacing.space8,
+      borderRadius: radii.control,
       backgroundColor: color.brand.primary
     },
-    reconnectButtonText: { color: color.text.inverse, fontSize: 13, fontWeight: '600' },
+    reconnectButtonText: { ...typography.meta, color: color.text.inverse, fontWeight: '600' },
     floatingWorkspaceHeaderButton: {
-      width: 36,
-      height: 36,
+      width: size.minimumTouchTarget,
+      height: size.minimumTouchTarget,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: spacing.space8
+      borderRadius: radii.control
     },
     sidebarCollapseButton: {
-      width: 32,
-      height: 32,
+      width: size.minimumTouchTarget,
+      height: size.minimumTouchTarget,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: spacing.space8
+      borderRadius: radii.control
     },
     embeddedToolbar: {
       flexDirection: 'row',
@@ -64,11 +157,11 @@ export function createHostScreenStyles(theme: MobileTheme) {
     embeddedFilterChip: { flexShrink: 1 },
     embeddedModeButton: { flexShrink: 1 },
     embeddedToolbarIconButton: {
-      width: 32,
-      height: 32,
+      width: size.minimumTouchTarget,
+      height: size.minimumTouchTarget,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: spacing.space8
+      borderRadius: radii.control
     },
     toolbar: {
       minHeight: 48,
@@ -81,21 +174,21 @@ export function createHostScreenStyles(theme: MobileTheme) {
     toolbarSpacer: { flex: 1 },
     toolbarIconDisabled: { opacity: 0.45 },
     filterChip: {
-      minHeight: 34,
+      minHeight: size.minimumTouchTarget,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: spacing.space12,
       gap: spacing.space4,
       borderWidth: 1,
       borderColor: color.border.subtle,
-      borderRadius: 17,
+      borderRadius: radii.circle,
       backgroundColor: color.bg.elevated
     },
     filterChipActive: { backgroundColor: color.bg.selected, borderColor: color.bg.selected },
-    filterChipText: { color: color.text.secondary, fontSize: 13 },
+    filterChipText: { ...typography.meta, color: color.text.secondary },
     filterChipTextActive: { color: color.text.inverse, fontWeight: '600' },
     modeButton: {
-      minHeight: 34,
+      minHeight: size.minimumTouchTarget,
       maxWidth: 150,
       flexDirection: 'row',
       alignItems: 'center',
@@ -103,22 +196,23 @@ export function createHostScreenStyles(theme: MobileTheme) {
       gap: spacing.space4,
       borderWidth: 1,
       borderColor: color.border.subtle,
-      borderRadius: 17,
+      borderRadius: radii.circle,
       backgroundColor: color.bg.elevated
     },
-    sortLabel: { flexShrink: 1, color: color.text.secondary, fontSize: 13 },
+    sortLabel: { ...typography.meta, flexShrink: 1, color: color.text.secondary },
     searchToggle: {
-      width: 34,
-      height: 34,
+      width: size.minimumTouchTarget,
+      height: size.minimumTouchTarget,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 17,
+      borderRadius: radii.circle,
       backgroundColor: color.bg.elevated
     },
     searchBar: { paddingHorizontal: spacing.space12, paddingBottom: spacing.space8 },
+    workspaceList: { flex: 1 },
     list: { paddingHorizontal: spacing.space12, paddingTop: spacing.space8 },
     sectionHeader: {
-      minHeight: 34,
+      minHeight: size.minimumTouchTarget,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: spacing.space8,
@@ -127,8 +221,13 @@ export function createHostScreenStyles(theme: MobileTheme) {
     },
     sectionIcon: { marginRight: 2 },
     sectionRepoIcon: { width: 20, alignItems: 'center' },
-    sectionTitle: { flex: 1, color: color.text.secondary, fontSize: 13, fontWeight: '600' },
-    sectionCount: { color: color.text.tertiary, fontSize: 12 },
+    sectionTitle: {
+      ...typography.meta,
+      flex: 1,
+      color: color.text.secondary,
+      fontWeight: '600'
+    },
+    sectionCount: { ...typography.caption, color: color.text.tertiary },
     separator: { height: 1, backgroundColor: color.border.subtle },
     filterModalHeader: {
       flexDirection: 'row',
@@ -137,53 +236,63 @@ export function createHostScreenStyles(theme: MobileTheme) {
       marginBottom: spacing.space16
     },
     filterModalTitle: { ...typography.sectionTitle, color: color.text.primary },
-    clearFiltersText: { color: color.brand.primary, fontSize: 13, fontWeight: '600' },
+    clearFiltersText: { ...typography.meta, color: color.brand.primary, fontWeight: '600' },
     filterSectionLabel: {
       marginBottom: spacing.space8,
       color: color.text.tertiary,
-      fontSize: 12,
+      ...typography.caption,
       fontWeight: '600',
       textTransform: 'uppercase'
     },
     filterGroup: {
       marginBottom: spacing.space16,
       overflow: 'hidden',
-      borderRadius: spacing.space8,
+      borderRadius: radii.control,
       backgroundColor: color.bg.elevated
     },
     filterRow: {
-      minHeight: 46,
+      minHeight: size.groupedListRowMinHeight,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: spacing.space12,
       gap: spacing.space8
     },
-    filterRowText: { flex: 1, color: color.text.primary, fontSize: 14 },
+    filterRowText: { ...typography.label, flex: 1, color: color.text.primary },
+    filterRowValue: { ...typography.meta, color: color.text.secondary },
     filterSeparator: {
       height: 1,
       marginLeft: spacing.space12,
       backgroundColor: color.border.subtle
     },
-    filterRepoDot: { width: 8, height: 8, borderRadius: 4 },
+    filterRepoDot: {
+      width: spacing.space8,
+      height: spacing.space8,
+      borderRadius: radii.circle
+    },
     confirmContent: { paddingHorizontal: spacing.space12, paddingTop: spacing.space12 },
     confirmTitle: {
       ...typography.sectionTitle,
       color: color.text.primary,
       marginBottom: spacing.space8
     },
-    confirmMessage: { color: color.text.secondary, fontSize: 14, lineHeight: 20 },
+    confirmMessage: { ...typography.label, color: color.text.secondary },
     confirmButtons: { flexDirection: 'row', gap: spacing.space8, padding: spacing.space12 },
     confirmBtn: {
       flex: 1,
-      minHeight: 44,
+      minHeight: size.minimumTouchTarget,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: spacing.space8
+      borderRadius: radii.control
     },
     confirmBtnCancel: { backgroundColor: color.bg.elevated },
     confirmBtnDestructive: { backgroundColor: color.status.danger },
-    confirmBtnCancelText: { color: color.text.primary, fontSize: 14, fontWeight: '600' },
-    confirmBtnDestructiveText: { color: color.text.inverse, fontSize: 14, fontWeight: '600' },
+    confirmBtnCancelText: { ...typography.label, color: color.text.primary, fontWeight: '600' },
+    confirmBtnDestructiveText: {
+      ...typography.label,
+      color: color.text.inverse,
+      fontWeight: '600'
+    },
     confirmBtnPressed: { opacity: 0.75 }
   })
+  return { ...createHostScreenRecoveryStyles(theme), ...styles }
 }

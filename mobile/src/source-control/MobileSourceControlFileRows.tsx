@@ -4,7 +4,10 @@ import type { SectionListRenderItem } from 'react-native'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { MOBILE_GIT_STATUS_LABELS, type MobileSourceControlSection } from './mobile-git-status'
 import { formatMobileBranchEntryMeta } from './mobile-branch-entry-format'
-import { statusColor, type MobileGitStatusEntryView } from './mobile-source-control-screen-state'
+import {
+  statusTextColor,
+  type MobileGitStatusEntryView
+} from './mobile-source-control-screen-state'
 import type { MobileSourceControlState } from './use-mobile-source-control-state'
 import { createMobileSourceControlStyles } from './mobile-source-control-styles'
 
@@ -50,7 +53,7 @@ export function makeRenderFileRow(
         accessibilityLabel={`打开已更改文件 ${item.path}`}
       >
         <View style={styles.statusBadge}>
-          <Text style={[styles.statusBadgeText, { color: statusColor(item.status, theme) }]}>
+          <Text style={[styles.statusBadgeText, { color: statusTextColor(item.status, theme) }]}>
             {MOBILE_GIT_STATUS_LABELS[item.status]}
           </Text>
         </View>
@@ -220,7 +223,9 @@ export function BranchCompareFooter({ state }: { state: FooterState }) {
               accessibilityLabel={`打开已提交更改 ${entry.path}`}
             >
               <View style={styles.statusBadge}>
-                <Text style={[styles.statusBadgeText, { color: statusColor(entry.status, theme) }]}>
+                <Text
+                  style={[styles.statusBadgeText, { color: statusTextColor(entry.status, theme) }]}
+                >
                   {MOBILE_GIT_STATUS_LABELS[entry.status]}
                 </Text>
               </View>

@@ -19,6 +19,7 @@ type EmulatorScreenSurfaceProps = {
   isLive: boolean
   keyboardCaptureActive: boolean
   loading: boolean
+  onAndroidStreamError?: () => void
   onBlur: FocusEventHandler<HTMLDivElement>
   onKeyDown: KeyboardEventHandler<HTMLDivElement>
   onPaste: ClipboardEventHandler<HTMLDivElement>
@@ -27,6 +28,8 @@ type EmulatorScreenSurfaceProps = {
   onPointerMove: PointerEventHandler<HTMLDivElement>
   onPointerUp: PointerEventHandler<HTMLDivElement>
   onStreamError: () => void
+  onStreamReady?: () => void
+  onStreamRetry?: () => void
   onStreamSize: (size: StreamSize) => void
   onWheel: WheelEventHandler<HTMLDivElement>
   previewUrl?: string
@@ -42,6 +45,7 @@ export function EmulatorScreenSurface({
   isLive,
   keyboardCaptureActive,
   loading,
+  onAndroidStreamError,
   onBlur,
   onKeyDown,
   onPaste,
@@ -50,6 +54,8 @@ export function EmulatorScreenSurface({
   onPointerMove,
   onPointerUp,
   onStreamError,
+  onStreamReady,
+  onStreamRetry,
   onStreamSize,
   onWheel,
   previewUrl,
@@ -89,7 +95,10 @@ export function EmulatorScreenSurface({
           doubles up with iOS's real status bar and makes bezels lie. */}
       <EmulatorScreenStreamContent
         loading={loading}
+        onAndroidStreamError={onAndroidStreamError}
         onStreamError={onStreamError}
+        onStreamReady={onStreamReady}
+        onStreamRetry={onStreamRetry}
         onStreamSize={onStreamSize}
         previewUrl={previewUrl}
         screenAspectRatio={screenAspectRatio}

@@ -50,7 +50,7 @@ export function MobileUpdateObserver() {
             </Text>
           ) : null}
           {snapshot.state === 'error' ? (
-            <Text style={[theme.typography.body, { color: theme.color.status.danger }]}>
+            <Text style={[theme.typography.body, { color: theme.color.status.dangerText }]}>
               {snapshot.message}
             </Text>
           ) : null}

@@ -77,7 +77,7 @@ export function createMobileBrowserPaneStyles(theme: MobileTheme) {
     errorText: {
       ...theme.typography.meta,
       maxWidth: theme.size.overlayMaxWidth,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       backgroundColor: theme.color.bg.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.color.border.default,

@@ -12,7 +12,7 @@ export function createPrActionsStyles(theme: MobileTheme) {
     borderSubtle: theme.color.border.default,
     textPrimary: theme.color.text.primary,
     textSecondary: theme.color.text.secondary,
-    statusRed: theme.color.status.danger,
+    statusRed: theme.color.status.dangerText,
     mergeGreen: theme.color.status.success,
     onMergeGreen: theme.color.text.inverse
   }

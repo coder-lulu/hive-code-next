@@ -268,7 +268,7 @@ function createStyles(theme: MobileTheme) {
     hint: { ...theme.typography.caption, color: theme.color.text.tertiary },
     error: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       marginTop: theme.spacing.space4
     },
     pressed: { backgroundColor: theme.color.bg.subtle },

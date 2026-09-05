@@ -73,6 +73,16 @@ export const emulatorApi = {
     ipcRenderer.on('emulator:videoStreamFrame', listener)
     return () => ipcRenderer.removeListener('emulator:videoStreamFrame', listener)
   },
+  onVideoStreamError: (
+    callback: (data: { streamId: string; deviceId: string; message: string }) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: { streamId: string; deviceId: string; message: string }
+    ) => callback(data)
+    ipcRenderer.on('emulator:videoStreamError', listener)
+    return () => ipcRenderer.removeListener('emulator:videoStreamError', listener)
+  },
   onPaneFocus: (callback: (data: { worktreeId: string }) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { worktreeId: string }) =>
       callback(data)

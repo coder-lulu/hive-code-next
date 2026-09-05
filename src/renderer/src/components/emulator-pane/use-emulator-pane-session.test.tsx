@@ -271,4 +271,35 @@ describe('useEmulatorPaneSession', () => {
       expect.objectContaining({ method: 'emulator.attach' })
     )
   })
+
+  it('marks a stale live session disconnected when stream recovery fails', async () => {
+    const runtimeCall = vi.fn(async ({ method }: RuntimeCallRequest) => {
+      if (method === 'emulator.listDevices') {
+        return runtimeSuccess(deviceList)
+      }
+      if (method === 'emulator.attach') {
+        return runtimeFailure('emulator_stream_failed', 'scrcpy restart failed')
+      }
+      throw new Error(`Unexpected RPC method: ${method}`)
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { runtime: { call: runtimeCall } }
+    })
+
+    await act(async () => {
+      root.render(<Probe />)
+    })
+    await flushEffects()
+    expect(latest?.isLive).toBe(true)
+
+    await act(async () => {
+      await latest?.reconnectStream()
+    })
+
+    expect(latest?.loading).toBe(false)
+    expect(latest?.isLive).toBe(false)
+    expect(latest?.selectedUdid).toBe('device-a')
+    expect(latest?.error).toContain('scrcpy restart failed')
+  })
 })

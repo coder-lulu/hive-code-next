@@ -1,5 +1,6 @@
+import { useRef } from 'react'
 import { Pressable, Text, View } from 'react-native'
-import { Check, Moon } from 'lucide-react-native'
+import { Check, ChevronRight, Moon } from 'lucide-react-native'
 import { buildWorktreeNavigationActions } from '../agent-history/worktree-navigation-actions'
 import { ActionSheetContent } from '../components/ActionSheetModal'
 import { BottomDrawer } from '../components/BottomDrawer'
@@ -8,6 +9,7 @@ import { NewWorktreeModalController } from '../components/NewWorktreeModalContro
 import { PickerModal } from '../components/PickerModal'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { hostNewWorktreeSessionRoute } from '../host-route-action-state'
+import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'
 import { getWorktreeRowIdentity } from '../worktree/worktree-host-row-identity'
 import {
   WORKSPACE_GROUP_OPTIONS as GROUP_OPTIONS,
@@ -20,6 +22,7 @@ import type { HostScreenController } from './use-host-screen-controller'
 export function HostScreenOverlays({ controller }: { controller: HostScreenController }) {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createHostScreenStyles)
+  const pendingPickerRef = useRef<'group' | 'sort' | null>(null)
   const {
     actions,
     catalog,
@@ -27,6 +30,8 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
     existingWorktreePaths,
     hostCapabilities,
     hostId,
+    runtimeCatalog,
+    runtimeConnectionStates,
     settings,
     showNewWorktree,
     state
@@ -35,9 +40,24 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
 
   return (
     <>
+      <MobileRuntimeSelector
+        catalog={runtimeCatalog}
+        connectionStates={runtimeConnectionStates}
+        onClose={() => state.setShowRuntimeSelector(false)}
+        onPair={() => controller.router.push('/pair-scan')}
+        onSelect={(runtimeId) => {
+          if (runtimeId !== hostId) {
+            controller.router.replace(`/h/${runtimeId}`)
+          }
+        }}
+        selectedId={hostId ?? null}
+        theme={theme}
+        visible={!controller.embedded && state.showRuntimeSelector}
+      />
+
       <PickerModal
         visible={state.showSortPicker}
-        title="Sort By"
+        title="排序方式"
         options={SORT_OPTIONS}
         selected={state.sortMode}
         onSelect={settings.handleSortChange}
@@ -46,34 +66,93 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
 
       <PickerModal
         visible={state.showGroupPicker}
-        title="Group By"
+        title="分组方式"
         options={GROUP_OPTIONS}
         selected={state.groupMode}
         onSelect={settings.handleGroupChange}
         onClose={() => state.setShowGroupPicker(false)}
       />
 
-      <BottomDrawer visible={state.showFilterModal} onClose={() => state.setShowFilterModal(false)}>
+      <BottomDrawer
+        visible={state.showFilterModal}
+        onAfterClose={() => {
+          const pendingPicker = pendingPickerRef.current
+          pendingPickerRef.current = null
+          if (pendingPicker === 'sort') {
+            state.setShowSortPicker(true)
+          } else if (pendingPicker === 'group') {
+            state.setShowGroupPicker(true)
+          }
+        }}
+        onClose={() => state.setShowFilterModal(false)}
+      >
         <View style={styles.filterModalHeader}>
-          <Text style={styles.filterModalTitle}>Filter</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.filterModalTitle}>
+            筛选与视图
+          </Text>
           {settings.activeFilterCount > 0 && (
             <Pressable onPress={settings.clearFilters}>
-              <Text style={styles.clearFiltersText}>Clear filters</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.clearFiltersText}>
+                清除筛选
+              </Text>
             </Pressable>
           )}
         </View>
 
-        <Text style={styles.filterSectionLabel}>Workspaces</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.filterSectionLabel}>
+          视图
+        </Text>
+        <View style={styles.filterGroup}>
+          <Pressable
+            style={styles.filterRow}
+            onPress={() => {
+              pendingPickerRef.current = 'sort'
+              state.setShowFilterModal(false)
+            }}
+          >
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
+              排序
+            </Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowValue}>
+              {settings.selectedSortLabel}
+            </Text>
+            <ChevronRight color={theme.color.text.tertiary} size={18} strokeWidth={1.9} />
+          </Pressable>
+          <View style={styles.filterSeparator} />
+          <Pressable
+            style={styles.filterRow}
+            onPress={() => {
+              pendingPickerRef.current = 'group'
+              state.setShowFilterModal(false)
+            }}
+          >
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
+              分组
+            </Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowValue}>
+              {groupModeLabel(state.groupMode)}
+            </Text>
+            <ChevronRight color={theme.color.text.tertiary} size={18} strokeWidth={1.9} />
+          </Pressable>
+        </View>
+
+        <Text maxFontSizeMultiplier={1.3} style={styles.filterSectionLabel}>
+          工作区
+        </Text>
         <View style={styles.filterGroup}>
           <Pressable style={styles.filterRow} onPress={settings.toggleHideSleeping}>
-            <Text style={styles.filterRowText}>Hide sleeping</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
+              隐藏休眠工作区
+            </Text>
             {state.filters.hideSleeping && (
               <Check size={16} color={theme.color.text.primary} strokeWidth={2} />
             )}
           </Pressable>
           <View style={styles.filterSeparator} />
           <Pressable style={styles.filterRow} onPress={settings.toggleHideDefaultBranch}>
-            <Text style={styles.filterRowText}>Hide default branch</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
+              隐藏默认分支
+            </Text>
             {state.filters.hideDefaultBranch && (
               <Check size={16} color={theme.color.text.primary} strokeWidth={2} />
             )}
@@ -82,7 +161,9 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
 
         {controller.sectionsResult.uniqueRepos.length > 1 && (
           <>
-            <Text style={styles.filterSectionLabel}>Repositories</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterSectionLabel}>
+              代码仓库
+            </Text>
             <View style={styles.filterGroup}>
               {controller.sectionsResult.uniqueRepos.map((repo, i) => (
                 <View key={repo.id}>
@@ -92,7 +173,11 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                     onPress={() => settings.toggleRepoFilter(repo.id)}
                   >
                     <View style={[styles.filterRepoDot, { backgroundColor: repo.color }]} />
-                    <Text style={styles.filterRowText} numberOfLines={1}>
+                    <Text
+                      maxFontSizeMultiplier={1.3}
+                      style={styles.filterRowText}
+                      numberOfLines={1}
+                    >
                       {repo.name}
                     </Text>
                     {state.filters.filterRepoIds.has(repo.id) && (
@@ -117,10 +202,12 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
         {state.confirmDelete ? (
           <View>
             <View style={styles.confirmContent}>
-              <Text style={styles.confirmTitle}>Delete Worktree</Text>
-              <Text style={styles.confirmMessage}>
-                Delete "{state.confirmDelete.displayName || state.confirmDelete.repo}" (
-                {state.confirmDelete.branch})?
+              <Text maxFontSizeMultiplier={1.3} style={styles.confirmTitle}>
+                删除工作区
+              </Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.confirmMessage}>
+                确定删除“{state.confirmDelete.displayName || state.confirmDelete.repo}”（
+                {state.confirmDelete.branch}）吗？
               </Text>
             </View>
             <View style={styles.confirmButtons}>
@@ -132,7 +219,9 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                 ]}
                 onPress={() => state.setConfirmDelete(null)}
               >
-                <Text style={styles.confirmBtnCancelText}>Cancel</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.confirmBtnCancelText}>
+                  取消
+                </Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [
@@ -148,7 +237,9 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                   state.setActionTarget(null)
                 }}
               >
-                <Text style={styles.confirmBtnDestructiveText}>Delete</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.confirmBtnDestructiveText}>
+                  删除
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -166,9 +257,12 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                       hostCapabilities,
                       navigate: actions.navigateFromHostList,
                       onDone: () => state.setActionTarget(null)
-                    }),
+                    }).map((action) => ({
+                      ...action,
+                      label: localizedActionLabel(action.label)
+                    })),
                     {
-                      label: 'Sleep',
+                      label: '休眠',
                       icon: Moon,
                       onPress: () => {
                         if (client) {
@@ -185,14 +279,14 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                       }
                     },
                     {
-                      label: isWorktreePinned(actionTarget, state.pinnedIds) ? 'Unpin' : 'Pin',
+                      label: isWorktreePinned(actionTarget, state.pinnedIds) ? '取消置顶' : '置顶',
                       onPress: () => {
                         actions.togglePin(actionTarget.worktreeId)
                         state.setActionTarget(null)
                       }
                     },
                     {
-                      label: 'Delete',
+                      label: '删除',
                       destructive: true,
                       onPress: () => state.setConfirmDelete(actionTarget)
                     }
@@ -206,9 +300,9 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
       {/* Host remove confirmation */}
       <ConfirmModal
         visible={state.confirmRemoveHost && controller.canRemoveHost}
-        title="Remove Host"
-        message={`Remove "${state.hostName}"? You can re-pair later.`}
-        confirmLabel="Remove"
+        title="移除 Runtime"
+        message={`确定移除“${state.hostName}”吗？之后仍可重新配对。`}
+        confirmLabel="移除"
         destructive
         onConfirm={() => void actions.handleRemoveHost()}
         onCancel={() => state.setConfirmRemoveHost(false)}
@@ -234,4 +328,27 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
       />
     </>
   )
+}
+
+function groupModeLabel(mode: HostScreenController['state']['groupMode']): string {
+  if (mode === 'none') {
+    return '不分组'
+  }
+  if (mode === 'workspaceStatus') {
+    return '状态'
+  }
+  if (mode === 'repo') {
+    return '代码仓库'
+  }
+  return 'PR 状态'
+}
+
+function localizedActionLabel(label: string): string {
+  if (label === 'Source Control') {
+    return '源代码管理'
+  }
+  if (label === 'Agent Session History') {
+    return 'Agent 会话历史'
+  }
+  return label
 }

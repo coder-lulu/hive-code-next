@@ -6,7 +6,7 @@ import type { PRInfo } from '../../../../src/shared/github/pull-request-types'
 import type { GitHubWorkItemDetails } from '../../../../src/shared/github/work-item-types'
 import type { MobilePrTitleAction } from '../../session/use-mobile-pr-title-action'
 import { prStateBadge } from './pr-checks-presentation'
-import { statusColor } from './pr-sidebar-status-color'
+import { statusColor, statusTextColor } from './pr-sidebar-status-color'
 import { canEditPRTitle } from '../../session/pr-title-edit'
 import { openMobilePrUrl } from '../mobile-pr-url'
 import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
@@ -37,6 +37,7 @@ export function PRSidebarHeader({
   const item = details?.item
   const badge = prStateBadge(pr.state)
   const badgeColor = statusColor(badge.token, theme)
+  const badgeTextColor = statusTextColor(badge.token, theme)
   const title = item?.title ?? pr.title
   const author = item?.author ?? null
   const baseRef = item?.baseRefName ?? null
@@ -59,7 +60,7 @@ export function PRSidebarHeader({
               pressed && { opacity: 0.6 }
             ]}
           >
-            <Text style={[styles.badgeText, { color: badgeColor }]}>{badge.label}</Text>
+            <Text style={[styles.badgeText, { color: badgeTextColor }]}>{badge.label}</Text>
           </Pressable>
           <Text
             style={styles.prMetaStrong}

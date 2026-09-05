@@ -57,7 +57,7 @@ export function createMobileSmsLoginStyles(theme: MobileTheme) {
     inputFocused: { borderColor: theme.color.brand.primary },
     error: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       marginTop: theme.spacing.space8
     },
     action: {

@@ -1,4 +1,5 @@
 import { EmulatorError } from '../emulator-errors'
+import type { AndroidAdbDevice, AndroidAdbDeviceState } from './adb-devices'
 import type { AndroidCommandRunner } from './android-command-runner'
 import type { AndroidSdkPaths } from './android-sdk-discovery'
 import { listAvdsArgs, parseAvdList } from './avd-manager'
@@ -11,19 +12,24 @@ import type {
 import {
   androidAvdBootTimedOutError,
   androidAvdLaunchExitedError,
-  externalAndroidEmulatorUnresponsiveError
+  androidAvdStayedOfflineError,
+  externalAndroidEmulatorUnresponsiveError,
+  unidentifiedExternalEmulatorError
 } from './android-avd-boot-errors'
+import {
+  launchManagedAvd,
+  probeDeviceHealthDuringBoot,
+  stopTimedOutManagedAvd,
+  waitForNextPoll,
+  waitForUnidentifiedExternalEmulatorTransition,
+  type AndroidBootBudget
+} from './android-avd-boot-support'
 
 export type AndroidBootOptions = {
   bootTimeoutMs: number
   pollIntervalMs: number
   sleep: (ms: number) => Promise<void>
   managedAvds: AndroidManagedAvdProcesses
-}
-
-type BootBudget = {
-  remainingMs: number
-  usedColdRestart: boolean
 }
 
 // Returns a healthy adb serial. AVDs launched by HiveCode get one automatic
@@ -35,7 +41,7 @@ export async function bootAndroidDevice(
   deviceOrName: string,
   options: AndroidBootOptions
 ): Promise<string> {
-  const budget: BootBudget = {
+  const budget: AndroidBootBudget = {
     remainingMs: options.bootTimeoutMs,
     usedColdRestart: false
   }
@@ -48,9 +54,10 @@ export async function bootAndroidDevice(
   )
   const direct = running.find((device) => device.serial === deviceOrName)
   const namedSerial = [...namesBySerial].find(([, name]) => name === deviceOrName)?.[0]
-  const serial = direct?.serial ?? namedSerial
+  const selectedDevice = direct ?? running.find((device) => device.serial === namedSerial)
 
-  if (serial) {
+  if (selectedDevice) {
+    const serial = selectedDevice.serial
     const managed =
       options.managedAvds.findBySerial(serial) ?? options.managedAvds.findByName(deviceOrName)
     if (managed && !managed.serial) {
@@ -59,7 +66,7 @@ export async function bootAndroidDevice(
     return ensureRunningDeviceHealthy(
       runner,
       sdk,
-      serial,
+      selectedDevice,
       namesBySerial.get(serial) ?? deviceOrName,
       managed,
       options,
@@ -92,14 +99,41 @@ export async function bootAndroidDevice(
   for (const device of running.filter(
     (candidate) => candidate.isEmulator && !namesBySerial.has(candidate.serial)
   )) {
-    const health = await probeAndroidDeviceHealth(runner, sdk, device.serial)
-    if (health === 'unresponsive') {
-      throw externalAndroidEmulatorUnresponsiveError(device.serial, deviceOrName, true)
+    const candidate =
+      device.state === 'offline'
+        ? await waitForUnidentifiedExternalEmulatorTransition(
+            runner,
+            sdk,
+            device,
+            deviceOrName,
+            options,
+            budget
+          )
+        : device
+    if (candidate !== device) {
+      const refreshedNames = await resolveRunningAvdNames(
+        runner,
+        sdk,
+        [candidate],
+        options.managedAvds.namesBySerial()
+      )
+      if (refreshedNames.get(candidate.serial) === deviceOrName) {
+        return ensureRunningDeviceHealthy(
+          runner,
+          sdk,
+          candidate,
+          deviceOrName,
+          null,
+          options,
+          budget
+        )
+      }
     }
-    throw new EmulatorError(
-      'emulator_helper_failed',
-      `Android emulator ${device.serial} is ${health}, but HiveCode cannot determine whether it is AVD "${deviceOrName}". Wait for it to finish starting or select it by serial; HiveCode will not start a possible duplicate.`
-    )
+    const health = await probeAndroidDeviceHealth(runner, sdk, candidate.serial)
+    if (health === 'unresponsive') {
+      throw externalAndroidEmulatorUnresponsiveError(candidate.serial, deviceOrName, true)
+    }
+    throw unidentifiedExternalEmulatorError(candidate.serial, deviceOrName, health)
   }
 
   const process = launchManagedAvd(options.managedAvds, sdk.emulator, deviceOrName, false)
@@ -116,34 +150,36 @@ export async function bootAndroidDevice(
 async function ensureRunningDeviceHealthy(
   runner: AndroidCommandRunner,
   sdk: AndroidSdkPaths,
-  serial: string,
+  device: AndroidAdbDevice,
   name: string,
   managed: AndroidManagedAvdProcess | null,
   options: AndroidBootOptions,
-  budget: BootBudget
+  budget: AndroidBootBudget
 ): Promise<string> {
-  const health = await probeAndroidDeviceHealth(runner, sdk, serial)
+  const health = await probeDeviceHealthDuringBoot(runner, sdk, device)
   if (health === 'booted') {
-    return serial
+    return device.serial
   }
   if (health === 'unresponsive') {
     if (!managed) {
-      throw externalAndroidEmulatorUnresponsiveError(serial, name, false)
+      throw externalAndroidEmulatorUnresponsiveError(device.serial, name, false)
     }
     return restartManagedAvd(runner, sdk, managed, options, budget)
   }
-  return waitForSerialBoot(runner, sdk, serial, name, managed, options, budget)
+  return waitForSerialBoot(runner, sdk, device.serial, device.state, name, managed, options, budget)
 }
 
 async function waitForSerialBoot(
   runner: AndroidCommandRunner,
   sdk: AndroidSdkPaths,
   serial: string,
+  initialState: AndroidAdbDeviceState,
   name: string,
   managed: AndroidManagedAvdProcess | null,
   options: AndroidBootOptions,
-  budget: BootBudget
+  budget: AndroidBootBudget
 ): Promise<string> {
+  let lastObservedState: AndroidAdbDeviceState | null = initialState
   while (budget.remainingMs > 0) {
     if (managed?.exitResult) {
       throw androidAvdLaunchExitedError(managed)
@@ -152,11 +188,14 @@ async function waitForSerialBoot(
     if (managed?.exitResult) {
       throw androidAvdLaunchExitedError(managed)
     }
-    if (!running.some((device) => device.serial === serial)) {
+    const device = running.find((candidate) => candidate.serial === serial)
+    if (!device) {
+      lastObservedState = null
       await waitForNextPoll(options, budget, managed)
       continue
     }
-    const health = await probeAndroidDeviceHealth(runner, sdk, serial)
+    lastObservedState = device.state
+    const health = await probeDeviceHealthDuringBoot(runner, sdk, device)
     if (health === 'booted') {
       return serial
     }
@@ -169,7 +208,13 @@ async function waitForSerialBoot(
     await waitForNextPoll(options, budget, managed)
   }
   if (managed) {
-    await stopTimedOutManagedAvd(managed, options)
+    await stopTimedOutManagedAvd(managed, options.managedAvds)
+  }
+  if (lastObservedState === 'offline') {
+    if (!managed) {
+      throw externalAndroidEmulatorUnresponsiveError(serial, name, false)
+    }
+    throw androidAvdStayedOfflineError(name, serial)
   }
   throw androidAvdBootTimedOutError(name)
 }
@@ -180,8 +225,9 @@ async function waitForManagedBoot(
   process: AndroidManagedAvdProcess,
   knownSerials: Set<string>,
   options: AndroidBootOptions,
-  budget: BootBudget
+  budget: AndroidBootBudget
 ): Promise<string> {
+  let lastObservedState: AndroidAdbDeviceState | null = null
   while (budget.remainingMs > 0) {
     if (process.exitResult) {
       throw androidAvdLaunchExitedError(process)
@@ -194,11 +240,15 @@ async function waitForManagedBoot(
       ? running.filter((device) => device.serial === process.serial)
       : running.filter((device) => device.isEmulator && !knownSerials.has(device.serial))
 
+    if (candidates.length === 0) {
+      lastObservedState = null
+    }
     for (const device of candidates) {
       if (!process.serial) {
         options.managedAvds.bindSerial(process, device.serial)
       }
-      const health = await probeAndroidDeviceHealth(runner, sdk, device.serial)
+      lastObservedState = device.state
+      const health = await probeDeviceHealthDuringBoot(runner, sdk, device)
       if (health === 'booted') {
         return device.serial
       }
@@ -209,7 +259,10 @@ async function waitForManagedBoot(
     await waitForNextPoll(options, budget, process)
   }
 
-  await stopTimedOutManagedAvd(process, options)
+  await stopTimedOutManagedAvd(process, options.managedAvds)
+  if (lastObservedState === 'offline') {
+    throw androidAvdStayedOfflineError(process.avdName, process.serial)
+  }
   throw androidAvdBootTimedOutError(process.avdName)
 }
 
@@ -218,7 +271,7 @@ async function restartManagedAvd(
   sdk: AndroidSdkPaths,
   process: AndroidManagedAvdProcess,
   options: AndroidBootOptions,
-  budget: BootBudget
+  budget: AndroidBootBudget
 ): Promise<string> {
   if (budget.usedColdRestart) {
     await options.managedAvds.terminate(process)
@@ -247,7 +300,7 @@ async function waitForStoppedSerial(
   sdk: AndroidSdkPaths,
   staleSerial: string | null,
   options: AndroidBootOptions,
-  budget: BootBudget
+  budget: AndroidBootBudget
 ): Promise<Set<string>> {
   while (budget.remainingMs > 0) {
     const running = await listRunningAdbDevices(runner, sdk)
@@ -260,53 +313,4 @@ async function waitForStoppedSerial(
     'emulator_helper_failed',
     `The unresponsive emulator ${staleSerial ?? ''} did not stop in time.`.trim()
   )
-}
-
-async function waitForNextPoll(
-  options: AndroidBootOptions,
-  budget: BootBudget,
-  process: AndroidManagedAvdProcess | null
-): Promise<void> {
-  const waitMs = Math.min(options.pollIntervalMs, budget.remainingMs)
-  if (waitMs <= 0) {
-    return
-  }
-  budget.remainingMs -= waitMs
-  if (!process) {
-    await options.sleep(waitMs)
-    return
-  }
-  await Promise.race([options.sleep(waitMs), process.exit.then(() => undefined)])
-  if (process.exitResult) {
-    throw androidAvdLaunchExitedError(process)
-  }
-}
-
-function launchManagedAvd(
-  managedAvds: AndroidManagedAvdProcesses,
-  emulatorPath: string,
-  avdName: string,
-  coldBoot: boolean
-): AndroidManagedAvdProcess {
-  try {
-    return managedAvds.launch(emulatorPath, avdName, { coldBoot })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new EmulatorError(
-      'emulator_helper_failed',
-      `Could not launch AVD "${avdName}": ${message}`
-    )
-  }
-}
-
-async function stopTimedOutManagedAvd(
-  process: AndroidManagedAvdProcess,
-  options: AndroidBootOptions
-): Promise<void> {
-  if (!(await options.managedAvds.terminate(process))) {
-    throw new EmulatorError(
-      'emulator_helper_failed',
-      `AVD "${process.avdName}" timed out and HiveCode could not stop its process safely.`
-    )
-  }
 }

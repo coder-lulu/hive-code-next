@@ -281,8 +281,8 @@ function createStyles(theme: MobileTheme) {
       color: theme.color.text.secondary
     },
     fileStat: { ...theme.typography.code },
-    add: { color: theme.color.status.success },
-    del: { color: theme.color.status.danger },
+    add: { color: theme.color.status.successText },
+    del: { color: theme.color.status.dangerText },
     empty: { ...theme.typography.caption, color: theme.color.text.tertiary }
   })
 }

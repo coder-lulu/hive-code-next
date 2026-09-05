@@ -20,6 +20,7 @@ export default function EmulatorPane({ tab, worktreeId, isActive = true }: Emula
     loading,
     error,
     attach,
+    reconnectStream,
     shutdown,
     sendTap,
     sendButton,
@@ -83,6 +84,7 @@ export default function EmulatorPane({ tab, worktreeId, isActive = true }: Emula
             isLive={isLive}
             visualOrientation={visualOrientation}
             isActive={isActive}
+            onReconnect={reconnectStream}
             onTap={(x, y) => void sendTap(x, y)}
             onGesture={(points) => void sendGesture(points)}
           />

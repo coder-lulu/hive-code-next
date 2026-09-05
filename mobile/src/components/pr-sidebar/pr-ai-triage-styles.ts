@@ -11,6 +11,7 @@ export function createPrAiTriageStyles(theme: MobileTheme) {
     textPrimary: theme.color.text.primary,
     textSecondary: theme.color.text.secondary,
     statusRed: theme.color.status.danger,
+    statusRedText: theme.color.status.dangerText,
     diffDeletedBg: theme.color.bg.surface
   }
   const spacing = { xs: theme.spacing.space4, sm: theme.spacing.space8, md: theme.spacing.space12 }
@@ -87,7 +88,7 @@ export function createPrAiTriageStyles(theme: MobileTheme) {
       fontWeight: '600'
     },
     triageError: {
-      color: colors.statusRed,
+      color: colors.statusRedText,
       fontSize: typography.metaSize
     }
   })

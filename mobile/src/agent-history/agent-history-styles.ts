@@ -157,7 +157,7 @@ export function createAgentHistoryStyles(theme: MobileTheme) {
       borderRadius: theme.radii.control,
       backgroundColor: theme.color.bg.surface
     },
-    noticeText: { ...theme.typography.meta, color: theme.color.status.warning },
+    noticeText: { ...theme.typography.meta, color: theme.color.status.warningText },
     resumeBanner: {
       marginHorizontal: theme.spacing.space16,
       marginTop: theme.spacing.space8,

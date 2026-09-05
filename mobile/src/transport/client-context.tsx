@@ -20,6 +20,7 @@ import {
 } from './host-client-acquisition-registry'
 import { HostOpenRetryScheduler } from './host-open-retry-scheduler'
 import { openHostClientEntry, type HostClientStoreEntry } from './host-entry-opener'
+import { waitForRpcClientReconnected } from './rpc-client-reconnect-wait'
 import { shouldPreserveActiveRelay } from './relay-reconnect-preservation'
 import { recordConnectionRevival } from './persisted-connection-log-store'
 import {
@@ -35,13 +36,14 @@ import {
 import type { ConnectionState, HostProfile } from './types'
 import type { RpcClientContextValue } from './rpc-client-context-contract'
 
-type StoreEntry = HostClientStoreEntry
+type HostClientResult = { client: RpcClient | null; state: ConnectionState }
 
 const Ctx = createContext<RpcClientContextValue | null>(null)
+const RECONNECT_TIMEOUT_MS = 17_000
 
 export function RpcClientProvider({ children }: { children: ReactNode }) {
   // Why: entries in a ref so state changes don't re-render the whole tree; propagation goes through per-host listener Sets.
-  const storeRef = useRef<Map<string, StoreEntry>>(new Map())
+  const storeRef = useRef<Map<string, HostClientStoreEntry>>(new Map())
   const stateListenersRef = useRef<Map<string, Set<(state: ConnectionState) => void>>>(new Map())
   const allHostsListenersRef = useRef<Set<() => void>>(new Set())
 
@@ -84,33 +86,30 @@ export function RpcClientProvider({ children }: { children: ReactNode }) {
     notifyAllHosts()
   }, [])
 
-  const openEntry = useCallback(
-    (hostId: string, allowUnowned = false): Promise<StoreEntry | null> => {
-      const retryScheduler = retrySchedulerRef.current
-      if (!retryScheduler) {
-        throw new Error('host retry scheduler not initialized')
+  const openEntry = useCallback((hostId: string, allowUnowned = false) => {
+    const retryScheduler = retrySchedulerRef.current
+    if (!retryScheduler) {
+      throw new Error('host retry scheduler not initialized')
+    }
+    return openHostClientEntry(
+      {
+        store: storeRef.current,
+        pendingOpens: pendingOpensRef.current,
+        pendingAcquisitions: pendingAcquisitionsRef.current,
+        primedHosts: primedHostsRef.current,
+        retryScheduler,
+        notifyHostState,
+        notifyAllHosts
+      },
+      hostId,
+      allowUnowned
+    ).then((entry) => {
+      if (entry) {
+        manualDemandRef.current.delete(hostId)
       }
-      return openHostClientEntry(
-        {
-          store: storeRef.current,
-          pendingOpens: pendingOpensRef.current,
-          pendingAcquisitions: pendingAcquisitionsRef.current,
-          primedHosts: primedHostsRef.current,
-          retryScheduler,
-          notifyHostState,
-          notifyAllHosts
-        },
-        hostId,
-        allowUnowned
-      ).then((entry) => {
-        if (entry) {
-          manualDemandRef.current.delete(hostId)
-        }
-        return entry
-      })
-    },
-    []
-  )
+      return entry
+    })
+  }, [])
 
   if (!retrySchedulerRef.current) {
     retrySchedulerRef.current = new HostOpenRetryScheduler({
@@ -365,11 +364,12 @@ export function useRpcClientContext(): RpcClientContextValue {
   return ctx
 }
 
+function useRpcClientAction<Key extends keyof RpcClientContextValue>(key: Key) {
+  return useRpcClientContext()[key]
+}
+
 // Primary hook for screens: acquires the shared client on mount, releases on unmount, re-renders on state change.
-export function useHostClient(hostId: string | undefined): {
-  client: RpcClient | null
-  state: ConnectionState
-} {
+export function useHostClient(hostId: string | undefined): HostClientResult {
   const ctx = useRpcClientContext()
   const [, force] = useState(0)
   // Why: an absent entry at mount is almost always the open racing the render, not a
@@ -434,29 +434,30 @@ export function useHostClient(hostId: string | undefined): {
 }
 
 // Why: host-store's removeHost() must close the live client but has no React-side handle; this hook bridges to it.
-export function useRefreshHostClient(): (hostId: string) => void {
-  const ctx = useRpcClientContext()
-  return ctx.refreshHostClient
-}
+export const useRefreshHostClient = () => useRpcClientAction('refreshHostClient')
 
-export function useForgetHostClient(): (hostId: string) => void {
-  const ctx = useRpcClientContext()
-  return ctx.forgetHostClient
-}
+export const useForgetHostClient = () => useRpcClientAction('forgetHostClient')
 
-export function useDisconnectHostClient(): (hostId: string) => void {
-  const ctx = useRpcClientContext()
-  return ctx.disconnectHostClient
-}
+export const useDisconnectHostClient = () => useRpcClientAction('disconnectHostClient')
 
 // Why: future-proof "Connection issues — try again" affordance.
-export function useForceReconnect(): (hostId: string) => Promise<void> {
+export const useForceReconnect = () => useRpcClientAction('forceReconnect')
+
+export function useEnsureHostConnected(): (host: HostProfile) => Promise<boolean> {
   const ctx = useRpcClientContext()
-  return ctx.forceReconnect
+  return useCallback(
+    async (host: HostProfile) => {
+      // Why: account runtimes can become selectable before the passive catalog-registry
+      // effect has published their profile. Prime this exact profile so reconnect cannot
+      // race that effect and fail its host lookup.
+      ctx.primeHosts([host])
+      await ctx.forceReconnect(host.id)
+      const client = ctx.getAllClients().find((entry) => entry.hostId === host.id)?.client
+      return client ? waitForRpcClientReconnected(client, RECONNECT_TIMEOUT_MS) : false
+    },
+    [ctx]
+  )
 }
 
 // Why: primes already-loaded HostProfiles so the provider can skip a second loadHosts()/Keychain pass on cold start.
-export function usePrimeHosts(): (hosts: HostProfile[]) => void {
-  const ctx = useRpcClientContext()
-  return ctx.primeHosts
-}
+export const usePrimeHosts = () => useRpcClientAction('primeHosts')

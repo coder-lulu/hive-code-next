@@ -7,6 +7,7 @@ import { EmulatorScreenStreamContent } from './emulator-screen-stream-content'
 
 type FrameListener = (data: { streamId: string; bytes: ArrayBuffer }) => void
 type ErrorListener = (data: { streamId: string; message: string }) => void
+type VideoErrorListener = (data: { streamId: string; deviceId: string; message: string }) => void
 type DecodedFrame = {
   close: () => void
   displayHeight: number
@@ -17,8 +18,11 @@ let container: HTMLDivElement
 let root: Root
 let frameListeners: FrameListener[]
 let errorListeners: ErrorListener[]
+let videoErrorListeners: VideoErrorListener[]
 let startFrameStream: ReturnType<typeof vi.fn>
 let stopFrameStream: ReturnType<typeof vi.fn>
+let startVideoStream: ReturnType<typeof vi.fn>
+let stopVideoStream: ReturnType<typeof vi.fn>
 let originalCreateObjectURL: typeof URL.createObjectURL | undefined
 let originalRevokeObjectURL: typeof URL.revokeObjectURL | undefined
 let originalCanvasGetContext: typeof HTMLCanvasElement.prototype.getContext
@@ -34,11 +38,14 @@ beforeEach(() => {
   ).IS_REACT_ACT_ENVIRONMENT = true
   frameListeners = []
   errorListeners = []
+  videoErrorListeners = []
   objectUrlCounter = 0
   streamCounter = 0
   decoderOutput = null
   startFrameStream = vi.fn(async () => ({ streamId: `stream-${++streamCounter}` }))
   stopFrameStream = vi.fn(async () => {})
+  startVideoStream = vi.fn(async ({ streamId }: { streamId: string }) => ({ streamId }))
+  stopVideoStream = vi.fn(async () => {})
   originalCreateObjectURL = URL.createObjectURL
   originalRevokeObjectURL = URL.revokeObjectURL
   Object.defineProperty(URL, 'createObjectURL', {
@@ -101,8 +108,14 @@ beforeEach(() => {
         },
         onVideoStreamFrame: () => vi.fn(),
         onVideoStreamMeta: () => vi.fn(),
-        startVideoStream: vi.fn(async ({ streamId }: { streamId: string }) => ({ streamId })),
-        stopVideoStream: vi.fn(async () => {})
+        onVideoStreamError: (listener: VideoErrorListener) => {
+          videoErrorListeners.push(listener)
+          return () => {
+            videoErrorListeners = videoErrorListeners.filter((current) => current !== listener)
+          }
+        },
+        startVideoStream,
+        stopVideoStream
       }
     }
   })
@@ -253,11 +266,13 @@ describe('EmulatorScreenStreamContent', () => {
   })
 
   it('shows display connection progress until the first Android video frame is painted', async () => {
+    const onStreamReady = vi.fn()
     await act(async () => {
       root.render(
         <EmulatorScreenStreamContent
           loading={false}
           onStreamError={vi.fn()}
+          onStreamReady={onStreamReady}
           onStreamSize={vi.fn()}
           previewUrl="scrcpy://emulator-5554"
           showStream={true}
@@ -271,6 +286,7 @@ describe('EmulatorScreenStreamContent', () => {
     expect(canvas).not.toBeNull()
     expect(canvas?.getAttribute('aria-hidden')).toBe('true')
     expect(container.textContent).toContain('Connecting display…')
+    expect(onStreamReady).not.toHaveBeenCalled()
 
     await act(async () => {
       decoderOutput?.({ close: vi.fn(), displayHeight: 2400, displayWidth: 1080 })
@@ -278,5 +294,88 @@ describe('EmulatorScreenStreamContent', () => {
 
     expect(canvas?.getAttribute('aria-hidden')).toBe('false')
     expect(container.textContent).not.toContain('Connecting display…')
+    expect(onStreamReady).toHaveBeenCalledTimes(1)
+  })
+
+  it('surfaces an unexpected Android stream termination and offers reconnect', async () => {
+    const onStreamError = vi.fn()
+    const onAndroidStreamError = vi.fn()
+    const onStreamRetry = vi.fn()
+    await act(async () => {
+      root.render(
+        <EmulatorScreenStreamContent
+          loading={false}
+          onAndroidStreamError={onAndroidStreamError}
+          onStreamError={onStreamError}
+          onStreamRetry={onStreamRetry}
+          onStreamSize={vi.fn()}
+          previewUrl="scrcpy://emulator-5554"
+          showStream={true}
+          streamError={false}
+          streamKey="android-failed"
+        />
+      )
+    })
+    const streamId = startVideoStream.mock.calls[0]?.[0].streamId as string
+
+    await act(async () => {
+      videoErrorListeners[0]?.({
+        streamId: 'stale-stream',
+        deviceId: 'emulator-5554',
+        message: 'stale error'
+      })
+      videoErrorListeners[0]?.({
+        streamId,
+        deviceId: 'another-device',
+        message: 'wrong device'
+      })
+    })
+    expect(onAndroidStreamError).not.toHaveBeenCalled()
+
+    await act(async () => {
+      videoErrorListeners[0]?.({
+        streamId,
+        deviceId: 'emulator-5554',
+        message: 'scrcpy video stream closed'
+      })
+    })
+
+    expect(onAndroidStreamError).toHaveBeenCalledTimes(1)
+    expect(onStreamError).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Stream disconnected')
+    const reconnect = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Reconnect'
+    )
+    expect(reconnect).toBeDefined()
+    act(() => reconnect?.click())
+    expect(onStreamRetry).toHaveBeenCalledTimes(1)
+    expect(stopVideoStream).toHaveBeenCalledWith({ streamId })
+  })
+
+  it('does not restart scrcpy for a local WebCodecs capability failure', async () => {
+    delete (globalThis as { VideoDecoder?: unknown }).VideoDecoder
+    const onAndroidStreamError = vi.fn()
+    const onStreamError = vi.fn()
+
+    await act(async () => {
+      root.render(
+        <EmulatorScreenStreamContent
+          loading={false}
+          onAndroidStreamError={onAndroidStreamError}
+          onStreamError={onStreamError}
+          onStreamRetry={vi.fn()}
+          onStreamSize={vi.fn()}
+          previewUrl="scrcpy://emulator-5554"
+          showStream={true}
+          streamError={false}
+          streamKey="unsupported"
+        />
+      )
+    })
+
+    expect(onStreamError).toHaveBeenCalledTimes(1)
+    expect(onAndroidStreamError).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Stream disconnected')
+    expect(container.textContent).not.toContain('Reconnect')
   })
 })

@@ -189,17 +189,17 @@ export function formatBranchLabel(branch: string | undefined, head: string | und
   return branch || head?.slice(0, 7) || '未关联分支'
 }
 
-export function statusColor(status: MobileGitFileStatus, theme: MobileTheme): string {
+export function statusTextColor(status: MobileGitFileStatus, theme: MobileTheme): string {
   switch (status) {
     case 'added':
     case 'copied':
-      return theme.color.status.success
+      return theme.color.status.successText
     case 'deleted':
-      return theme.color.status.danger
+      return theme.color.status.dangerText
     case 'renamed':
       return theme.color.brand.primary
     case 'untracked':
-      return theme.color.status.warning
+      return theme.color.status.warningText
     case 'modified':
     default:
       return theme.color.text.secondary

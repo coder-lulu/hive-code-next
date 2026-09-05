@@ -22,8 +22,11 @@ export const lightThemeColors = {
   },
   status: {
     success: '#18A979',
+    successText: '#147A58',
     warning: '#C88719',
-    danger: '#E5484D'
+    warningText: '#8A5A12',
+    danger: '#E5484D',
+    dangerText: '#B4232C'
   },
   overlay: 'rgba(13,15,18,0.36)'
 } as const
@@ -52,8 +55,11 @@ export const darkThemeColors = {
   },
   status: {
     success: '#35C998',
+    successText: '#35C998',
     warning: '#E1A53A',
-    danger: '#FF6369'
+    warningText: '#E1A53A',
+    danger: '#FF6369',
+    dangerText: '#FF6369'
   },
   overlay: 'rgba(0,0,0,0.56)'
 } as const
@@ -133,6 +139,10 @@ export const radiusTokens = {
 export const componentSizeTokens = {
   minimumTouchTarget: 44,
   navigationBarHeight: 56,
+  compactLayoutBreakpoint: 380,
+  primaryNavigationHeight: 70,
+  activeIndicatorHeight: 2,
+  floatingActionButtonSize: 48,
   groupedListRowMinHeight: 56,
   overlayMaxWidth: 400
 } as const

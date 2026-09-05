@@ -65,15 +65,26 @@ export function registerEmulatorVideoStreamHandlers(): void {
               deviceId: args.deviceId,
               meta: videoEvent.meta
             })
-          } else {
+          } else if (videoEvent.type === 'frame') {
             owner.send('emulator:videoStreamFrame', {
               streamId,
               deviceId: args.deviceId,
               ...videoEvent.frame
             })
+          } else {
+            owner.send('emulator:videoStreamError', {
+              streamId,
+              deviceId: args.deviceId,
+              message: videoEvent.message
+            })
+            stopSubscription(streamId, owner)
           }
         })
-        pendingSubscription.unsubscribe = unsubscribe
+        if (subscriptions.get(streamId) === pendingSubscription) {
+          pendingSubscription.unsubscribe = unsubscribe
+        } else {
+          unsubscribe()
+        }
       }, 0)
       owner.once('destroyed', onOwnerDestroyed)
       return { streamId }

@@ -70,7 +70,7 @@ export function createMobileNativeChatMessageStyles(theme: MobileTheme) {
     },
     toolRunCount: {
       ...theme.typography.code,
-      color: theme.color.status.success,
+      color: theme.color.status.successText,
       fontWeight: '600'
     },
     toolRunLabel: {
@@ -146,11 +146,11 @@ export function createMobileNativeChatMessageStyles(theme: MobileTheme) {
       paddingHorizontal: theme.spacing.space8
     },
     diffAdd: {
-      color: theme.color.status.success,
+      color: theme.color.status.successText,
       backgroundColor: theme.color.bg.subtle
     },
     diffDel: {
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       backgroundColor: theme.color.bg.subtle
     },
     diffMeta: {

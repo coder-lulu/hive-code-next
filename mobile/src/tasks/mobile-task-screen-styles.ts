@@ -2,6 +2,7 @@ import { StyleSheet } from 'react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { createMobileTaskScreenPalette } from './mobile-task-screen-colors'
 import { createMobileTaskScreenCollectionStyles } from './mobile-task-screen-collection-styles'
+import { createMobileTaskScreenRedesignStyles } from './mobile-task-screen-redesign-styles'
 
 export {
   createMobileTaskCompatColors,
@@ -56,14 +57,17 @@ export function createMobileTaskScreenStyles(theme: MobileTheme) {
       ...theme.typography.caption,
       color: palette.textSecondary
     },
+    providerTabsScroll: {
+      flexGrow: 0,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: palette.borderSubtle
+    },
     providerTabs: {
       minHeight: theme.size.minimumTouchTarget,
       flexDirection: 'row',
       alignItems: 'stretch',
       gap: theme.spacing.space24,
-      paddingHorizontal: theme.spacing.space20,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: palette.borderSubtle
+      paddingHorizontal: theme.spacing.space20
     },
     providerTab: {
       minWidth: theme.size.minimumTouchTarget,
@@ -114,16 +118,30 @@ export function createMobileTaskScreenStyles(theme: MobileTheme) {
     filterButtonPressed: {
       backgroundColor: palette.subtle
     },
+    filterButtonActive: {
+      borderColor: palette.brand,
+      backgroundColor: palette.subtle
+    },
+    filterIconButton: {
+      width: theme.spacing.space48,
+      justifyContent: 'center',
+      paddingHorizontal: 0
+    },
     filterText: {
       ...theme.typography.meta,
       color: palette.textSecondary
     },
     searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
       paddingHorizontal: theme.spacing.space20,
       paddingBottom: theme.spacing.space16
     },
     searchField: {
+      minWidth: 0,
       minHeight: theme.spacing.space48,
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing.space8,
@@ -262,7 +280,7 @@ export function createMobileTaskScreenStyles(theme: MobileTheme) {
     },
     errorText: {
       ...theme.typography.meta,
-      color: palette.danger
+      color: palette.dangerText
     },
     noticeBanner: {
       marginHorizontal: theme.spacing.space20,
@@ -277,6 +295,7 @@ export function createMobileTaskScreenStyles(theme: MobileTheme) {
   })
   return {
     ...screenStyles,
-    ...createMobileTaskScreenCollectionStyles(theme)
+    ...createMobileTaskScreenCollectionStyles(theme),
+    ...createMobileTaskScreenRedesignStyles(theme)
   }
 }

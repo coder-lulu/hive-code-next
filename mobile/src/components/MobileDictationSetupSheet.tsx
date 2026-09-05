@@ -396,11 +396,11 @@ function createStyles(theme: MobileTheme) {
     },
     selectedText: {
       ...theme.typography.meta,
-      color: theme.color.status.success
+      color: theme.color.status.successText
     },
     error: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       marginTop: theme.spacing.space12
     }
   })

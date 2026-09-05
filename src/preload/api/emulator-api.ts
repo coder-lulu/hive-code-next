@@ -34,4 +34,7 @@ export type EmulatorApi = {
       bytes: ArrayBuffer
     }) => void
   ) => () => void
+  onVideoStreamError: (
+    callback: (data: { streamId: string; deviceId: string; message: string }) => void
+  ) => () => void
 }

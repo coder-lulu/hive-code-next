@@ -9,7 +9,8 @@ import {
   type TextInputProps
 } from 'react-native'
 import { Search, X } from 'lucide-react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 // Why: toolbar/list chrome paints and settles after the open tap; native
 // autoFocus alone often fails to raise the soft keyboard on iOS/Android.
@@ -52,6 +53,8 @@ export function MobileSearchField({
   editable = true,
   accessibilityLabel
 }: MobileSearchFieldProps) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createStyles)
   const inputRef = useRef<TextInput>(null)
   const [focused, setFocused] = useState(false)
   const clearVisible = showClear ?? value.length > 0
@@ -95,7 +98,7 @@ export function MobileSearchField({
     <View style={[styles.shell, focused && styles.shellFocused, !editable && styles.shellDisabled]}>
       <Search
         size={15}
-        color={focused ? colors.textPrimary : colors.textSecondary}
+        color={focused ? theme.color.brand.primary : theme.color.text.secondary}
         strokeWidth={2.2}
       />
       <TextInput
@@ -104,9 +107,7 @@ export function MobileSearchField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        // Why: textSecondary keeps the hint readable on bgRaised; textMuted
-        // disappears against the raised shell and makes the field look empty.
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={theme.color.text.tertiary}
         autoCapitalize="none"
         autoCorrect={false}
         // Still request native auto-focus; the delayed ref focus is the reliable path.
@@ -122,7 +123,7 @@ export function MobileSearchField({
         }}
         clearButtonMode="never"
         accessibilityLabel={accessibilityLabel ?? placeholder}
-        selectionColor={colors.accentBlue}
+        selectionColor={theme.color.brand.primary}
       />
       {clearVisible ? (
         <Pressable
@@ -135,7 +136,7 @@ export function MobileSearchField({
           {/* Why: chip + larger hit target — a bare 14px X was hard to tap and
               read as decoration rather than a clear control. */}
           <View style={styles.clearChip}>
-            <X size={12} color={colors.surfaceBright} strokeWidth={2.6} />
+            <X size={12} color={theme.color.text.inverse} strokeWidth={2.6} />
           </View>
         </Pressable>
       ) : null}
@@ -143,58 +144,49 @@ export function MobileSearchField({
   )
 }
 
-const styles = StyleSheet.create({
-  shell: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    // Keep search visually distinct from surrounding panels.
-    backgroundColor: colors.bgRaised,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.input,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.xs,
-    paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xs + 2
-  },
-  shellFocused: {
-    // Why: monochrome focus cue without burning the blue accent token
-    // (reserved for state/selection). textMuted reads clearly on bgRaised.
-    borderColor: colors.textMuted
-  },
-  shellDisabled: {
-    opacity: 0.55
-  },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    padding: 0,
-    margin: 0,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    // Why: Android TextInput draws extra vertical padding that misaligns the
-    // icon/clear chip unless we zero it out.
-    includeFontPadding: false,
-    textAlignVertical: 'center'
-  },
-  clearButton: {
-    minWidth: 36,
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  clearButtonPressed: {
-    opacity: 0.7
-  },
-  clearChip: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Why: textMuted reads as a solid chip on bgRaised; borderSubtle was nearly
-    // invisible and made the clear control feel like decorative chrome.
-    backgroundColor: colors.textMuted
-  }
-})
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    shell: {
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      backgroundColor: theme.color.bg.surface,
+      borderWidth: 1,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.control,
+      paddingLeft: theme.spacing.space12,
+      paddingRight: theme.spacing.space4,
+      paddingVertical: Platform.OS === 'ios' ? theme.spacing.space8 : theme.spacing.space4 + 2
+    },
+    shellFocused: { borderColor: theme.color.brand.primary },
+    shellDisabled: { opacity: 0.55 },
+    input: {
+      ...theme.typography.body,
+      flex: 1,
+      minWidth: 0,
+      padding: 0,
+      margin: 0,
+      color: theme.color.text.primary,
+      // Why: Android TextInput draws extra vertical padding that misaligns the
+      // icon/clear chip unless we zero it out.
+      includeFontPadding: false,
+      textAlignVertical: 'center'
+    },
+    clearButton: {
+      minWidth: theme.size.minimumTouchTarget,
+      minHeight: theme.size.minimumTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    clearButtonPressed: { opacity: 0.7 },
+    clearChip: {
+      width: theme.spacing.space24,
+      height: theme.spacing.space24,
+      borderRadius: theme.radii.circle,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.color.text.secondary
+    }
+  })
+}

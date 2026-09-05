@@ -1,7 +1,12 @@
+import type { ComponentType, ReactNode } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import {
+  Bot,
+  ChevronDown,
   ChevronLeft,
+  CircleAlert,
   Filter,
+  FolderKanban,
   Layers,
   List,
   PanelLeftClose,
@@ -12,28 +17,185 @@ import {
   UserCircle,
   X
 } from 'lucide-react-native'
+import { MobileSearchField } from '../components/MobileSearchField'
 import { StatusDot } from '../components/StatusDot'
-import { classifyConnection, type ConnectionVerdict } from '../transport/connection-health'
+import { presentRuntimeConnection } from '../runtime-directory/runtime-connection-presentation'
+import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { classifyConnection, type ConnectionVerdict } from '../transport/connection-health'
+import { projectMobileWorkspaceSummary } from '../worktree/mobile-workspace-summary'
 import { createHostScreenStyles } from './host-screen-styles'
 import type { HostScreenController } from './use-host-screen-controller'
 
-function isErrorVerdict(v: ConnectionVerdict): boolean {
-  return v.kind === 'warning' || v.kind === 'unreachable' || v.kind === 'auth-failed'
+type SummaryIcon = ComponentType<{ color?: string; size?: number; strokeWidth?: number }>
+function isErrorVerdict(verdict: ConnectionVerdict): boolean {
+  return (
+    verdict.kind === 'warning' || verdict.kind === 'unreachable' || verdict.kind === 'auth-failed'
+  )
 }
 
 export function HostScreenHeader({ controller }: { controller: HostScreenController }) {
+  return controller.embedded ? (
+    <EmbeddedHostScreenHeader controller={controller} />
+  ) : (
+    <PhoneHostScreenHeader controller={controller} />
+  )
+}
+
+function PhoneHostScreenHeader({ controller }: { controller: HostScreenController }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createHostScreenStyles)
+  const summary = projectMobileWorkspaceSummary(
+    controller.displayWorktrees,
+    controller.connState === 'connected',
+    controller.now
+  )
+  const runtimeStatus = presentRuntimeConnection(controller.connState)
+  const statusColor =
+    runtimeStatus.tone === 'success'
+      ? theme.color.status.success
+      : runtimeStatus.tone === 'warning'
+        ? theme.color.status.warning
+        : runtimeStatus.tone === 'danger'
+          ? theme.color.status.danger
+          : theme.color.text.tertiary
+  const statusTextStyle =
+    runtimeStatus.tone === 'success'
+      ? styles.runtimeStatusSuccess
+      : runtimeStatus.tone === 'warning'
+        ? styles.runtimeStatusWarning
+        : runtimeStatus.tone === 'danger'
+          ? styles.runtimeStatusDanger
+          : undefined
+
+  return (
+    <View style={styles.phoneChrome}>
+      <View style={styles.phoneHeaderRow}>
+        <View style={styles.phoneHeaderSide}>
+          <Pressable
+            accessibilityLabel={`选择 Runtime，当前为 ${controller.state.hostName || '未命名设备'}，${runtimeStatus.accessibilityLabel}`}
+            accessibilityRole="button"
+            onPress={() => controller.state.setShowRuntimeSelector(true)}
+            style={({ pressed }) => [styles.runtimeButton, pressed && styles.controlPressed]}
+          >
+            <View style={[styles.runtimeStatusDot, { backgroundColor: statusColor }]} />
+            <View style={styles.runtimeCopy}>
+              <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.runtimeButtonText}>
+                {controller.state.hostName || 'Runtime'}
+              </Text>
+              <Text
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={[styles.runtimeStatusText, statusTextStyle]}
+              >
+                {runtimeStatus.label}
+              </Text>
+            </View>
+            <ChevronDown color={theme.color.text.secondary} size={16} strokeWidth={1.9} />
+          </Pressable>
+        </View>
+
+        <View pointerEvents="none" style={styles.phoneHeaderTitleWrap}>
+          <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.phoneHeaderTitle}>
+            工作区
+          </Text>
+        </View>
+
+        <View style={[styles.phoneHeaderSide, styles.phoneHeaderRight]}>
+          <Pressable
+            accessibilityLabel={`筛选工作区${controller.settings.activeFilterCount > 0 ? `，已启用 ${controller.settings.activeFilterCount} 项` : ''}`}
+            accessibilityRole="button"
+            onPress={() => controller.state.setShowFilterModal(true)}
+            style={({ pressed }) => [
+              styles.phoneIconButton,
+              controller.settings.activeFilterCount > 0 && styles.phoneIconButtonActive,
+              pressed && styles.controlPressed
+            ]}
+          >
+            <Filter
+              color={
+                controller.settings.activeFilterCount > 0
+                  ? theme.color.brand.primary
+                  : theme.color.text.primary
+              }
+              size={20}
+              strokeWidth={1.9}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.phoneSearchBar}>
+        <MobileSearchField
+          accessibilityLabel="搜索工作区、仓库或分支"
+          onChangeText={controller.state.setSearch}
+          placeholder="搜索工作区、仓库或分支"
+          value={controller.state.search}
+        />
+      </View>
+
+      <View accessibilityLabel="工作区概览" style={styles.workspaceSummary}>
+        <WorkspaceSummaryItem
+          Icon={FolderKanban}
+          label="工作区"
+          styles={styles}
+          theme={theme}
+          value={summary.workspaceCount}
+        />
+        <View style={styles.workspaceSummaryDivider} />
+        <WorkspaceSummaryItem
+          Icon={Bot}
+          label="运行中"
+          styles={styles}
+          theme={theme}
+          value={summary.runningAgentCount}
+        />
+        <View style={styles.workspaceSummaryDivider} />
+        <WorkspaceSummaryItem
+          Icon={CircleAlert}
+          label="需处理"
+          styles={styles}
+          theme={theme}
+          value={summary.attentionCount}
+        />
+      </View>
+    </View>
+  )
+}
+
+function WorkspaceSummaryItem(props: {
+  readonly Icon: SummaryIcon
+  readonly label: string
+  readonly styles: ReturnType<typeof createHostScreenStyles>
+  readonly theme: MobileTheme
+  readonly value: string
+}) {
+  const { Icon, label, styles, theme, value } = props
+  return (
+    <View accessible accessibilityLabel={`${label} ${value}`} style={styles.workspaceSummaryItem}>
+      <View style={styles.workspaceSummaryValueRow}>
+        <Icon color={theme.color.text.secondary} size={18} strokeWidth={1.9} />
+        <Text maxFontSizeMultiplier={1.3} style={styles.workspaceSummaryValue}>
+          {value}
+        </Text>
+      </View>
+      <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.workspaceSummaryLabel}>
+        {label}
+      </Text>
+    </View>
+  )
+}
+
+function EmbeddedHostScreenHeader({ controller }: { controller: HostScreenController }) {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createHostScreenStyles)
   const colors = {
     textPrimary: theme.color.text.primary,
-    textSecondary: theme.color.text.secondary,
-    textMuted: theme.color.text.tertiary
+    textSecondary: theme.color.text.secondary
   }
   const {
     actions,
     connState,
-    embedded,
     floatingWorkspaceEnabled,
     forceReconnectHost,
     hostId,
@@ -44,301 +206,181 @@ export function HostScreenHeader({ controller }: { controller: HostScreenControl
     settings,
     state
   } = controller
+  const headerVerdict = classifyConnection({
+    state: connState,
+    reconnectAttempts,
+    lastConnectedAt,
+    ...relayRecovery
+  })
+  const showReconnectButton =
+    connState !== 'connected' &&
+    isErrorVerdict(headerVerdict) &&
+    hostId &&
+    headerVerdict.kind !== 'auth-failed'
 
   return (
     <View style={styles.topChrome}>
       <View style={styles.statusBar}>
         <Pressable
-          style={styles.backButton}
-          onPress={actions.leaveHost}
+          accessibilityLabel="返回设备列表"
           accessibilityRole="button"
-          accessibilityLabel="Back to hosts"
           hitSlop={8}
+          onPress={actions.leaveHost}
+          style={styles.backButton}
         >
-          <ChevronLeft size={22} color={colors.textPrimary} />
+          <ChevronLeft color={colors.textPrimary} size={22} />
         </Pressable>
-        {(() => {
-          const headerVerdict = classifyConnection({
-            state: connState,
-            reconnectAttempts,
-            lastConnectedAt,
-            ...relayRecovery
-          })
-          return (
-            <>
-              <View style={styles.hostIdentity}>
-                <StatusDot state={connState} verdict={headerVerdict} />
-                <Text style={styles.hostNameText} numberOfLines={1}>
-                  {state.hostName || 'Host'}
-                </Text>
-              </View>
-              {connState !== 'connected' &&
-                (() => {
-                  // Why: auth-failed has its own banner, so suppress the Reconnect button for that verdict.
-                  const verdict = headerVerdict
-                  const isError = isErrorVerdict(verdict)
-                  const showReconnectButton = isError && hostId && verdict.kind !== 'auth-failed'
-                  if (!showReconnectButton) {
-                    return null
-                  }
-                  return (
-                    <Pressable
-                      style={styles.reconnectButton}
-                      onPress={() => void forceReconnectHost(hostId!)}
-                      hitSlop={8}
-                    >
-                      <Text style={styles.reconnectButtonText}>Reconnect</Text>
-                    </Pressable>
-                  )
-                })()}
-            </>
-          )
-        })()}
-        {!embedded && floatingWorkspaceEnabled ? (
+        <View style={styles.hostIdentity}>
+          <StatusDot state={connState} verdict={headerVerdict} />
+          <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.hostNameText}>
+            {state.hostName || 'Runtime'}
+          </Text>
+        </View>
+        {showReconnectButton ? (
           <Pressable
-            style={[
-              styles.floatingWorkspaceHeaderButton,
-              connState !== 'connected' && styles.toolbarIconDisabled
-            ]}
-            onPress={actions.openFloatingWorkspace}
-            disabled={connState !== 'connected'}
-            accessibilityRole="button"
-            accessibilityLabel="Floating Workspace"
             hitSlop={8}
+            onPress={() => void forceReconnectHost(hostId!)}
+            style={styles.reconnectButton}
           >
-            <SquareTerminal
-              size={18}
-              color={connState === 'connected' ? colors.textPrimary : colors.textMuted}
-            />
+            <Text maxFontSizeMultiplier={1.3} style={styles.reconnectButtonText}>
+              重新连接
+            </Text>
           </Pressable>
         ) : null}
-        {embedded && onHideSidebar ? (
+        {onHideSidebar ? (
           <Pressable
-            style={styles.sidebarCollapseButton}
-            onPress={onHideSidebar}
+            accessibilityLabel="隐藏侧栏"
             accessibilityRole="button"
-            accessibilityLabel="Hide sidebar"
             hitSlop={8}
+            onPress={onHideSidebar}
+            style={styles.sidebarCollapseButton}
           >
-            <PanelLeftClose size={14} color={colors.textSecondary} />
+            <PanelLeftClose color={colors.textSecondary} size={14} />
           </Pressable>
         ) : null}
       </View>
 
-      {/* Filter/sort/group toolbar */}
-      {embedded ? (
-        <View style={styles.embeddedToolbar}>
-          <View style={styles.embeddedToolbarRow}>
-            <Pressable
-              style={[
-                styles.filterChip,
-                styles.embeddedFilterChip,
-                settings.activeFilterCount > 0 && styles.filterChipActive
-              ]}
-              onPress={() => state.setShowFilterModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Filter workspaces${settings.activeFilterCount > 0 ? `, ${settings.activeFilterCount} active` : ''}`}
-            >
-              <Filter
-                size={12}
-                color={settings.activeFilterCount > 0 ? colors.textPrimary : colors.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.filterChipText,
-                  settings.activeFilterCount > 0 && styles.filterChipTextActive
-                ]}
-                numberOfLines={1}
-              >
-                Filter{settings.activeFilterCount > 0 ? ` ${settings.activeFilterCount}` : ''}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.modeButton, styles.embeddedModeButton]}
-              onPress={() => state.setShowSortPicker(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Sort by ${settings.selectedSortLabel}`}
-            >
-              <SlidersHorizontal size={14} color={colors.textSecondary} />
-              <Text style={styles.sortLabel} numberOfLines={1}>
-                {settings.selectedSortLabel}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.modeButton, styles.embeddedModeButton]}
-              onPress={() => state.setShowGroupPicker(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Group workspaces"
-            >
-              <Layers size={14} color={colors.textSecondary} />
-              <Text style={styles.sortLabel} numberOfLines={1}>
-                {state.groupMode === 'none'
-                  ? 'Group'
-                  : state.groupMode === 'workspaceStatus'
-                    ? 'Status'
-                    : state.groupMode === 'repo'
-                      ? 'Repo'
-                      : 'PR'}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.embeddedToolbarRow}>
-            <Pressable
-              style={[
-                styles.embeddedToolbarIconButton,
-                connState !== 'connected' && styles.toolbarIconDisabled
-              ]}
-              onPress={() => actions.navigateFromHostList(`/h/${hostId}/accounts`)}
-              disabled={connState !== 'connected'}
-              accessibilityRole="button"
-              accessibilityLabel="Accounts"
-            >
-              <UserCircle
-                size={16}
-                color={connState === 'connected' ? colors.textSecondary : colors.textMuted}
-              />
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.embeddedToolbarIconButton,
-                connState !== 'connected' && styles.toolbarIconDisabled
-              ]}
-              onPress={() => actions.navigateFromHostList(`/h/${hostId}/tasks`)}
-              disabled={connState !== 'connected'}
-              accessibilityRole="button"
-              accessibilityLabel="Tasks"
-            >
-              <List
-                size={16}
-                color={connState === 'connected' ? colors.textSecondary : colors.textMuted}
-              />
-            </Pressable>
-
-            {floatingWorkspaceEnabled ? (
-              <Pressable
-                style={[
-                  styles.embeddedToolbarIconButton,
-                  connState !== 'connected' && styles.toolbarIconDisabled
-                ]}
-                onPress={actions.openFloatingWorkspace}
-                disabled={connState !== 'connected'}
-                accessibilityRole="button"
-                accessibilityLabel="Floating Workspace"
-              >
-                <SquareTerminal
-                  size={18}
-                  color={connState === 'connected' ? colors.textSecondary : colors.textMuted}
-                />
-              </Pressable>
-            ) : null}
-
-            <Pressable
-              style={[
-                styles.embeddedToolbarIconButton,
-                connState !== 'connected' && styles.toolbarIconDisabled
-              ]}
-              onPress={actions.openNewWorktreeModal}
-              disabled={connState !== 'connected'}
-              accessibilityRole="button"
-              accessibilityLabel="New workspace"
-            >
-              <Plus
-                size={16}
-                color={connState === 'connected' ? colors.textPrimary : colors.textMuted}
-              />
-            </Pressable>
-
-            <Pressable
-              style={styles.embeddedToolbarIconButton}
-              onPress={() => state.setShowSearch((s) => !s)}
-              accessibilityRole="button"
-              accessibilityLabel={state.showSearch ? 'Close search' : 'Search workspaces'}
-            >
-              {state.showSearch ? (
-                <X size={16} color={colors.textSecondary} />
-              ) : (
-                <Search size={16} color={colors.textSecondary} />
-              )}
-            </Pressable>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.toolbar}>
+      <View style={styles.embeddedToolbar}>
+        <View style={styles.embeddedToolbarRow}>
           <Pressable
-            style={[styles.filterChip, settings.activeFilterCount > 0 && styles.filterChipActive]}
+            accessibilityLabel="筛选工作区"
+            accessibilityRole="button"
             onPress={() => state.setShowFilterModal(true)}
+            style={[
+              styles.filterChip,
+              styles.embeddedFilterChip,
+              settings.activeFilterCount > 0 && styles.filterChipActive
+            ]}
           >
             <Filter
-              size={12}
               color={settings.activeFilterCount > 0 ? colors.textPrimary : colors.textSecondary}
+              size={12}
             />
             <Text
+              maxFontSizeMultiplier={1.3}
+              numberOfLines={1}
               style={[
                 styles.filterChipText,
                 settings.activeFilterCount > 0 && styles.filterChipTextActive
               ]}
             >
-              Filter{settings.activeFilterCount > 0 ? ` (${settings.activeFilterCount})` : ''}
+              筛选{settings.activeFilterCount > 0 ? ` ${settings.activeFilterCount}` : ''}
             </Text>
           </Pressable>
 
-          <Pressable style={styles.modeButton} onPress={() => state.setShowSortPicker(true)}>
-            <SlidersHorizontal size={14} color={colors.textSecondary} />
-            <Text style={styles.sortLabel} numberOfLines={1}>
+          <Pressable
+            accessibilityLabel={`排序：${settings.selectedSortLabel}`}
+            accessibilityRole="button"
+            onPress={() => state.setShowSortPicker(true)}
+            style={[styles.modeButton, styles.embeddedModeButton]}
+          >
+            <SlidersHorizontal color={colors.textSecondary} size={14} />
+            <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.sortLabel}>
               {settings.selectedSortLabel}
             </Text>
           </Pressable>
 
-          <Pressable style={styles.modeButton} onPress={() => state.setShowGroupPicker(true)}>
-            <Layers size={14} color={colors.textSecondary} />
-            <Text style={styles.sortLabel} numberOfLines={1}>
-              {state.groupMode === 'none'
-                ? 'Group'
-                : state.groupMode === 'workspaceStatus'
-                  ? 'Status'
-                  : state.groupMode === 'repo'
-                    ? 'Repo'
-                    : 'PR'}
-            </Text>
-          </Pressable>
-
-          <View style={styles.toolbarSpacer} />
-
           <Pressable
-            style={styles.searchToggle}
-            onPress={() => actions.navigateFromHostList(`/h/${hostId}/accounts`)}
-            disabled={connState !== 'connected'}
+            accessibilityLabel="工作区分组"
+            accessibilityRole="button"
+            onPress={() => state.setShowGroupPicker(true)}
+            style={[styles.modeButton, styles.embeddedModeButton]}
           >
-            <UserCircle
-              size={16}
-              color={connState === 'connected' ? colors.textSecondary : colors.textMuted}
-            />
-          </Pressable>
-
-          <Pressable
-            style={styles.searchToggle}
-            onPress={() => actions.navigateFromHostList(`/h/${hostId}/tasks`)}
-            disabled={connState !== 'connected'}
-          >
-            <List
-              size={16}
-              color={connState === 'connected' ? colors.textSecondary : colors.textMuted}
-            />
-          </Pressable>
-
-          <Pressable style={styles.searchToggle} onPress={() => state.setShowSearch((s) => !s)}>
-            {state.showSearch ? (
-              <X size={16} color={colors.textSecondary} />
-            ) : (
-              <Search size={16} color={colors.textSecondary} />
-            )}
+            <Layers color={colors.textSecondary} size={14} />
           </Pressable>
         </View>
-      )}
+
+        <View style={styles.embeddedToolbarRow}>
+          <EmbeddedIconButton
+            accessibilityLabel="账号"
+            disabled={connState !== 'connected'}
+            onPress={() => actions.navigateFromHostList(`/h/${hostId}/accounts`)}
+            styles={styles}
+          >
+            <UserCircle color={colors.textSecondary} size={16} />
+          </EmbeddedIconButton>
+          <EmbeddedIconButton
+            accessibilityLabel="任务"
+            disabled={connState !== 'connected'}
+            onPress={() => actions.navigateFromHostList(`/h/${hostId}/tasks`)}
+            styles={styles}
+          >
+            <List color={colors.textSecondary} size={16} />
+          </EmbeddedIconButton>
+          {floatingWorkspaceEnabled ? (
+            <EmbeddedIconButton
+              accessibilityLabel="浮动工作区"
+              disabled={connState !== 'connected'}
+              onPress={actions.openFloatingWorkspace}
+              styles={styles}
+            >
+              <SquareTerminal color={colors.textSecondary} size={18} />
+            </EmbeddedIconButton>
+          ) : null}
+          <EmbeddedIconButton
+            accessibilityLabel="新建工作区"
+            disabled={connState !== 'connected'}
+            onPress={actions.openNewWorktreeModal}
+            styles={styles}
+          >
+            <Plus color={colors.textPrimary} size={16} />
+          </EmbeddedIconButton>
+          <EmbeddedIconButton
+            accessibilityLabel={state.showSearch ? '关闭搜索' : '搜索工作区'}
+            onPress={() => state.setShowSearch((visible) => !visible)}
+            styles={styles}
+          >
+            {state.showSearch ? (
+              <X color={colors.textSecondary} size={16} />
+            ) : (
+              <Search color={colors.textSecondary} size={16} />
+            )}
+          </EmbeddedIconButton>
+        </View>
+      </View>
     </View>
+  )
+}
+
+function EmbeddedIconButton(props: {
+  readonly accessibilityLabel: string
+  readonly children: ReactNode
+  readonly disabled?: boolean
+  readonly onPress: () => void
+  readonly styles: ReturnType<typeof createHostScreenStyles>
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={props.accessibilityLabel}
+      accessibilityRole="button"
+      disabled={props.disabled}
+      onPress={props.onPress}
+      style={[
+        props.styles.embeddedToolbarIconButton,
+        props.disabled && props.styles.toolbarIconDisabled
+      ]}
+    >
+      {props.children}
+    </Pressable>
   )
 }

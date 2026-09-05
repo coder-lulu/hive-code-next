@@ -137,7 +137,7 @@ export class ScrcpyStreamSession {
         this.fail('scrcpy server exited before the video stream started')
         return
       }
-      this.close()
+      this.fail(`scrcpy server exited${code == null ? '' : ` with code ${code}`}`)
     })
   }
 
@@ -179,6 +179,12 @@ export class ScrcpyStreamSession {
       this.videoSocket = socket
       socket.on('data', (next: Buffer) => this.handleVideoChunk(next))
       socket.on('error', (error) => this.fail(error.message))
+      socket.on('close', () => {
+        if (this.videoSocket === socket) {
+          this.videoSocket = null
+          this.fail('scrcpy video stream closed')
+        }
+      })
       this.handleVideoChunk(chunk)
       this.openControlSocket()
     })

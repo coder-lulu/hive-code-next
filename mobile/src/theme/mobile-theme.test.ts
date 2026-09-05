@@ -52,6 +52,11 @@ describe('mobile semantic themes', () => {
       expect(
         contrastRatio(theme.color.text.inverse, theme.color.bg.selected)
       ).toBeGreaterThanOrEqual(4.5)
+      for (const surface of surfaces) {
+        expect(contrastRatio(theme.color.status.successText, surface)).toBeGreaterThanOrEqual(4.5)
+        expect(contrastRatio(theme.color.status.warningText, surface)).toBeGreaterThanOrEqual(4.5)
+        expect(contrastRatio(theme.color.status.dangerText, surface)).toBeGreaterThanOrEqual(4.5)
+      }
     }
   )
 
@@ -62,6 +67,10 @@ describe('mobile semantic themes', () => {
   it('defines shared minimum interaction and navigation sizes', () => {
     expect(componentSizeTokens.minimumTouchTarget).toBeGreaterThanOrEqual(44)
     expect(componentSizeTokens.navigationBarHeight).toBe(56)
+    expect(componentSizeTokens.compactLayoutBreakpoint).toBe(380)
+    expect(componentSizeTokens.primaryNavigationHeight).toBe(70)
+    expect(componentSizeTokens.activeIndicatorHeight).toBe(2)
+    expect(componentSizeTokens.floatingActionButtonSize).toBe(48)
     expect(componentSizeTokens.groupedListRowMinHeight).toBe(56)
   })
 

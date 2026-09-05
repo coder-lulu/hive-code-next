@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // Capture the ipcMain handlers the modules register so tests can invoke them
 // directly with a fake WebContents owner.
 const handlers = new Map<string, (event: unknown, args: unknown) => unknown>()
+const videoRegistryMock = vi.hoisted(() => ({
+  subscriber: undefined as ((event: { type: string; message?: string }) => void) | undefined,
+  unsubscribe: vi.fn()
+}))
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -23,7 +27,15 @@ vi.mock('../emulator/mjpeg-frame-stream', () => ({
 }))
 
 vi.mock('../emulator/scrcpy-video-registry', () => ({
-  scrcpyVideoRegistry: { subscribe: () => () => {} }
+  scrcpyVideoRegistry: {
+    subscribe: (
+      _deviceId: string,
+      subscriber: (event: { type: string; message?: string }) => void
+    ) => {
+      videoRegistryMock.subscriber = subscriber
+      return videoRegistryMock.unsubscribe
+    }
+  }
 }))
 
 vi.mock('../emulator/emulator-probe', () => ({ emulatorProbe: () => {} }))
@@ -33,10 +45,13 @@ import { registerEmulatorVideoStreamHandlers } from './emulator-video-stream'
 
 /** A fake main-window WebContents: a real EventEmitter plus the members the
  * stream handlers touch, so we can assert on its real `destroyed` listeners. */
-function makeOwner(): EventEmitter & { isDestroyed: () => boolean; send: () => void } {
+function makeOwner(): EventEmitter & {
+  isDestroyed: () => boolean
+  send: (...args: unknown[]) => void
+} {
   const owner = new EventEmitter() as EventEmitter & {
     isDestroyed: () => boolean
-    send: () => void
+    send: (...args: unknown[]) => void
   }
   owner.isDestroyed = () => false
   owner.send = () => {}
@@ -45,6 +60,8 @@ function makeOwner(): EventEmitter & { isDestroyed: () => boolean; send: () => v
 
 beforeEach(() => {
   handlers.clear()
+  videoRegistryMock.subscriber = undefined
+  videoRegistryMock.unsubscribe.mockReset()
 })
 
 describe('emulator frame stream listener cleanup', () => {
@@ -96,5 +113,27 @@ describe('emulator video stream listener cleanup', () => {
       stop(event, { streamId })
       expect(owner.listenerCount('destroyed')).toBe(0)
     }
+  })
+
+  it('forwards an unexpected scrcpy termination to its renderer subscriber', async () => {
+    registerEmulatorVideoStreamHandlers()
+    const start = handlers.get('emulator:videoStreamStart')!
+    const owner = makeOwner()
+    const send = vi.spyOn(owner, 'send')
+    const { streamId } = start(
+      { sender: owner },
+      { deviceId: 'emulator-5554', streamId: 'video-1' }
+    ) as { streamId: string }
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    videoRegistryMock.subscriber?.({ type: 'error', message: 'scrcpy video stream closed' })
+
+    expect(send).toHaveBeenCalledWith('emulator:videoStreamError', {
+      streamId,
+      deviceId: 'emulator-5554',
+      message: 'scrcpy video stream closed'
+    })
+    expect(videoRegistryMock.unsubscribe).toHaveBeenCalledTimes(1)
+    expect(owner.listenerCount('destroyed')).toBe(0)
   })
 })

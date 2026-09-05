@@ -87,7 +87,7 @@ function createStyles(theme: MobileTheme) {
       color: theme.color.text.primary,
       textAlign: 'center'
     },
-    dangerText: { color: theme.color.status.danger },
+    dangerText: { color: theme.color.status.dangerText },
     description: {
       ...theme.typography.meta,
       maxWidth: 340,

@@ -5,7 +5,7 @@ import { HostDiagnosticsLink } from '../components/HostDiagnosticsLink'
 import { HostRouteNoticeBanner } from '../components/HostRouteNoticeBanner'
 import { MobileRepoIcon } from '../components/MobileRepoIcon'
 import { MobileSearchField } from '../components/MobileSearchField'
-import { NewWorkspaceFab, FAB_SIZE } from '../components/NewWorkspaceFab'
+import { NewWorkspaceFab } from '../components/NewWorkspaceFab'
 import { WorktreeListRow } from '../components/WorktreeListRow'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { getWorktreeRowIdentity } from '../worktree/worktree-host-row-identity'
@@ -28,7 +28,6 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
     embedded,
     forceReconnectHost,
     hostId,
-    insets,
     isReadOnly,
     isWideLayout,
     noticeParam,
@@ -45,11 +44,20 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
   const { rawSections, sections, uniqueRepoColors } = sectionsResult
 
   return (
-    <>
+    <View style={styles.workspaceList}>
       {/* Auth failed: a latched relay rejection must reach the same re-pair affordance. */}
       {(connState === 'auth-failed' || relayRecovery.pairingRejected) && (
         <AuthFailedBanner
           canRetry={!!hostId}
+          copy={{
+            message: '身份验证失败。请先重试连接；若仍失败，请从桌面端重新配对。',
+            retry: '重试',
+            retryAccessibility: '重试身份验证',
+            repair: '重新配对',
+            repairAccessibility: '重新配对这台电脑',
+            remove: '移除',
+            removeAccessibility: '移除这台电脑'
+          }}
           onRetry={() => hostId && void forceReconnectHost(hostId)}
           onRepair={() => router.push('/pair-scan')}
           onRemove={controller.canRemoveHost ? () => state.setConfirmRemoveHost(true) : undefined}
@@ -76,16 +84,16 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
       )}
 
       {/* Search bar */}
-      {state.showSearch && (
+      {embedded && state.showSearch && (
         <View style={styles.searchBar}>
           <MobileSearchField
             value={state.search}
             onChangeText={state.setSearch}
-            placeholder="Search worktrees…"
+            placeholder="搜索工作区…"
             autoFocus
             // Why: new key per open remounts the focus effect across rapid toggles so the keyboard reappears.
             focusKey={state.showSearch}
-            accessibilityLabel="Search worktrees"
+            accessibilityLabel="搜索工作区"
           />
         </View>
       )}
@@ -103,6 +111,7 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
 
       {sections.length > 0 && (
         <SectionList
+          style={styles.workspaceList}
           ref={activeWorktreeScroll.sectionListRef}
           sections={sections}
           keyExtractor={(w) => w.sectionListKey ?? getWorktreeRowIdentity(w)}
@@ -116,8 +125,9 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
             styles.list,
             // Reserve room so the last row stays tappable above the phone's floating "+" (embedded uses the toolbar +).
             {
-              paddingBottom:
-                (embedded ? theme.spacing.space16 : FAB_SIZE + theme.spacing.space24) + insets.bottom
+              paddingBottom: embedded
+                ? theme.spacing.space16
+                : theme.size.floatingActionButtonSize + theme.spacing.space24
             },
             isWideLayout &&
               !embedded && { maxWidth: contentMaxWidth, width: '100%', alignSelf: 'center' }
@@ -133,10 +143,14 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
               state.groupMode === 'repo' ? uniqueRepoColors.get(section.title) : null
             const repoSectionIcon =
               state.groupMode === 'repo' ? state.repoIconsByName.get(section.title) : null
+            const localizedTitle = localizedSectionTitle(section.title)
             return (
               <Pressable
-                style={styles.sectionHeader}
+                accessibilityLabel={`${localizedTitle}，${count} 个工作区，${isCollapsed ? '已折叠' : '已展开'}`}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: !isCollapsed }}
                 onPress={() => settings.toggleCollapsed(section.key)}
+                style={({ pressed }) => [styles.sectionHeader, pressed && styles.controlPressed]}
               >
                 {isCollapsed ? (
                   <ChevronRight
@@ -170,8 +184,12 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
                     />
                   </View>
                 ) : null}
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-                <Text style={styles.sectionCount}>{count}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.sectionTitle}>
+                  {localizedTitle}
+                </Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.sectionCount}>
+                  {count}
+                </Text>
               </Pressable>
             )
           }}
@@ -213,6 +231,20 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
           disabled={connState !== 'connected'}
         />
       )}
-    </>
+    </View>
   )
+}
+
+const SECTION_LABELS: Readonly<Record<string, string>> = {
+  All: '全部',
+  Closed: '已关闭',
+  Done: '已完成',
+  'In Progress': '进行中',
+  'In Review': '审核中',
+  Pinned: '置顶',
+  Todo: '待办'
+}
+
+function localizedSectionTitle(title: string): string {
+  return SECTION_LABELS[title] ?? title
 }

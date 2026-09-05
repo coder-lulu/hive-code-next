@@ -29,7 +29,7 @@ export function createMobileNativeChatViewStyles(theme: MobileTheme) {
     },
     stopLabel: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       fontWeight: '600'
     },
     sendError: {
@@ -39,7 +39,7 @@ export function createMobileNativeChatViewStyles(theme: MobileTheme) {
     },
     sendErrorText: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       fontWeight: '600'
     },
     chromeToggle: {

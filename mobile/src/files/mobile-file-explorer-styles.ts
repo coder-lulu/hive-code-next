@@ -101,7 +101,7 @@ export function createFileExplorerStyles(theme: MobileTheme) {
       ...theme.typography.caption,
       flex: 1,
       minWidth: 0,
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     },
     inlineRetryButton: {
       minHeight: theme.size.minimumTouchTarget,
@@ -129,7 +129,7 @@ export function createFileExplorerStyles(theme: MobileTheme) {
     },
     errorText: {
       ...theme.typography.body,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       textAlign: 'center'
     },
     retryButton: {

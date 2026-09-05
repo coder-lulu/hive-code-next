@@ -10,6 +10,7 @@ import type { ScrcpyVideoMeta } from './android/scrcpy-video-frame-parser'
 // hundreds of deltas. Cap the replayed GOP so memory stays bounded and a
 // late subscriber isn't flooded — always keep the keyframe at index 0.
 const MAX_GOP_FRAMES = 120
+const STREAM_UNAVAILABLE_MESSAGE = 'Android video stream is unavailable.'
 
 export type ScrcpyVideoFrameMessage = {
   config: boolean
@@ -21,6 +22,7 @@ export type ScrcpyVideoFrameMessage = {
 export type ScrcpyVideoEvent =
   | { type: 'meta'; meta: ScrcpyVideoMeta }
   | { type: 'frame'; frame: ScrcpyVideoFrameMessage }
+  | { type: 'error'; message: string }
 
 export type ScrcpyVideoSubscriber = (event: ScrcpyVideoEvent) => void
 
@@ -80,6 +82,7 @@ class ScrcpyVideoRegistry {
   subscribe(deviceId: string, subscriber: ScrcpyVideoSubscriber): () => void {
     const entry = this.entries.get(deviceId)
     if (!entry) {
+      subscriber({ type: 'error', message: STREAM_UNAVAILABLE_MESSAGE })
       return () => {}
     }
     if (entry.meta) {
@@ -96,14 +99,24 @@ class ScrcpyVideoRegistry {
     return () => entry.subscribers.delete(subscriber)
   }
 
-  stop(deviceId: string): void {
+  stop(deviceId: string, message?: string): void {
     const entry = this.entries.get(deviceId)
     if (!entry) {
       return
     }
-    entry.close()
-    entry.subscribers.clear()
+    // Delete before closing because the session's close callback re-enters stop().
+    // Unexpected failures notify active renderers; intentional shutdowns omit a
+    // message so they cannot accidentally trigger a reconnect.
     this.entries.delete(deviceId)
+    if (message) {
+      for (const subscriber of entry.subscribers) {
+        try {
+          subscriber({ type: 'error', message })
+        } catch {}
+      }
+    }
+    entry.subscribers.clear()
+    entry.close()
   }
 
   has(deviceId: string): boolean {

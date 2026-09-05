@@ -1,10 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, StyleSheet } from 'react-native'
+import { Alert } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useOpenMobileAccounts } from '../accounts/use-open-mobile-accounts'
 import { getProvenCachedWorktrees } from '../cache/worktree-cache'
 import { ActionSheetModal } from '../components/ActionSheetModal'
+import {
+  MobilePrimaryNavigation,
+  type MobilePrimaryDestination
+} from '../components/MobilePrimaryNavigation'
 import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { getHostListActionSheetActions } from '../host-list-action-sheet-actions'
@@ -13,14 +17,17 @@ import { hostRouteWithNotice } from '../host-route-notice'
 import { useResponsiveLayout } from '../layout/responsive-layout'
 import { triggerMediumImpact } from '../platform/haptics'
 import { useOpenMobileSession } from '../session/use-open-mobile-session'
+import { floatingWorkspaceSessionPath } from '../session/floating-workspace'
 import type { TaskProvider } from '../tasks/mobile-task-providers'
 import { useOpenMobileTasks } from '../tasks/use-open-mobile-tasks'
 import { hostCatalogEntryHasLocalPairing } from '../runtime-directory/account-runtime-catalog'
+import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
 import {
   useDisconnectHostClient,
   useForceReconnect,
-  useForgetHostClient
+  useForgetHostClient,
+  useHostClient
 } from '../transport/client-context'
 import { hostEndpointLabel } from '../transport/host-endpoint-label'
 import { resolveHomeHostConnectionState } from '../transport/home-host-auto-connect'
@@ -35,6 +42,7 @@ import { MobileHomeHostList } from './MobileHomeHostList'
 import { MobileHomeListFooter } from './MobileHomeListFooter'
 import { MobileHomeDrawer } from './MobileHomeDrawer'
 import { MobileHomeToolbar } from './MobileHomeToolbar'
+import { mobileHomeScreenStyles as styles } from './mobile-home-screen-styles'
 import {
   loadInitialMobileHomeMode,
   persistMobileHomeMode,
@@ -59,6 +67,8 @@ export function MobileHomeScreen() {
   const [confirmRemove, setConfirmRemove] = useState<HostCatalogEntry | null>(null)
   const [homeMode, setHomeMode] = useState<MobileHomeMode | null>(null)
   const [drawerVisible, setDrawerVisible] = useState(false)
+  const [runtimeSelectorVisible, setRuntimeSelectorVisible] = useState(false)
+  const [selectedRuntimeId, setSelectedRuntimeId] = useState<string | null>(null)
   const homeModeHydratedRef = useRef(false)
 
   useEffect(() => {
@@ -84,6 +94,22 @@ export function MobileHomeScreen() {
   }, [])
 
   const effectiveHomeMode = homeMode ?? 'cloud'
+  const selectedRuntime =
+    data.hostCatalog.find((runtime) => runtime.id === selectedRuntimeId) ??
+    (data.primaryHost
+      ? data.hostCatalog.find((runtime) => runtime.id === data.primaryHost?.id)
+      : null) ??
+    data.hostCatalog[0] ??
+    null
+  const effectiveRuntimeId = selectedRuntime?.id ?? null
+  const selectedConnectableRuntimeId = selectedRuntime?.profile ? effectiveRuntimeId : null
+  const { client: selectedRuntimeClient, state: selectedRuntimeConnectionState } = useHostClient(
+    selectedConnectableRuntimeId ?? undefined
+  )
+  const selectedRuntimeConnected =
+    effectiveRuntimeId != null && selectedRuntimeConnectionState === 'connected'
+  const activeConnectedHost = selectedRuntimeConnected ? (selectedRuntime?.profile ?? null) : null
+  const selectedResumeCard = data.resumeCard?.hostId === effectiveRuntimeId ? data.resumeCard : null
 
   const closeDrawer = useCallback(() => {
     setDrawerVisible(false)
@@ -116,11 +142,45 @@ export function MobileHomeScreen() {
 
   const openTasks = useCallback(
     (provider?: TaskProvider) => {
-      if (data.primaryHost) {
-        openMobileTasks(data.primaryHost.id, provider)
+      if (activeConnectedHost) {
+        openMobileTasks(activeConnectedHost.id, provider)
+        return
       }
+      Alert.alert('Runtime 当前不可用', '连接恢复前，任务状态不可验证，也不会切换到其他电脑执行。')
     },
-    [data.primaryHost, openMobileTasks]
+    [activeConnectedHost, openMobileTasks]
+  )
+
+  const openSelectedWorkspace = useCallback(() => {
+    if (activeConnectedHost) {
+      data.router.push(`/h/${activeConnectedHost.id}`)
+      return
+    }
+    if (selectedRuntime) {
+      Alert.alert('Runtime 当前不可用', '连接恢复前，工作区内容不可验证。')
+      return
+    }
+    data.router.push('/pair-scan')
+  }, [activeConnectedHost, data.router, selectedRuntime])
+
+  const selectPrimaryDestination = useCallback(
+    (destination: MobilePrimaryDestination) => {
+      if (destination === 'tasks') {
+        return
+      }
+      if (destination === 'workspace') {
+        openSelectedWorkspace()
+        return
+      }
+      const unavailable = {
+        agents: ['智能体', 'HiveAgent 角色目录的数据契约尚未接入，暂不展示示例角色。'],
+        library: ['资料库', '资料库聚合入口正在接入当前 Runtime 的会话与文件。'],
+        automation: ['自动化', '移动端自动化控制面尚未接入当前 Runtime。']
+      } as const
+      const [title, message] = unavailable[destination]
+      Alert.alert(title, message)
+    },
+    [openSelectedWorkspace]
   )
 
   function openHost(host: HostCatalogEntry): void {
@@ -182,42 +242,24 @@ export function MobileHomeScreen() {
       edges={['top']}
     >
       <MobileHomeToolbar
-        hasConnectedComputer={data.connectedHosts.length > 0}
-        mode={effectiveHomeMode}
-        onChangeMode={changeHomeMode}
         onOpenMenu={() => setDrawerVisible(true)}
+        onOpenRuntimeSelector={() => setRuntimeSelectorVisible(true)}
+        runtimeName={selectedRuntime?.name ?? null}
         theme={theme}
       />
       {effectiveHomeMode === 'cloud' ? (
         <MobileCloudWorkPreview
-          bottomInset={insets.bottom}
-          onMore={() => setDrawerVisible(true)}
-          onNewTask={() => {
-            if (data.primaryHost) {
-              openTasks()
-            } else {
-              data.router.push('/pair-scan')
-            }
-          }}
-          onOpenProject={() => {
-            if (data.primaryHost) {
-              data.router.push(`/h/${data.primaryHost.id}`)
-            } else {
-              data.router.push('/pair-scan')
-            }
-          }}
-          onOpenWorkspace={() => {
-            if (data.primaryHost) {
-              data.router.push(hostNewWorktreeRoute(data.primaryHost.id))
-            } else {
-              data.router.push('/pair-scan')
-            }
-          }}
+          client={selectedRuntimeClient}
+          connectionState={selectedRuntimeConnectionState}
+          onTerminalCreated={(runtimeId) =>
+            data.router.push(floatingWorkspaceSessionPath(runtimeId))
+          }
+          runtimeId={effectiveRuntimeId}
           theme={theme}
         />
       ) : data.hostCatalog.length === 0 ? (
         <MobileComputerEmptyState
-          bottomInset={insets.bottom}
+          bottomInset={0}
           maxWidth={isWideLayout ? contentMaxWidth : undefined}
           onEnterCode={() => data.router.push('/pair')}
           onScan={() => data.router.push('/pair-scan')}
@@ -226,7 +268,7 @@ export function MobileHomeScreen() {
       ) : (
         <MobileHomeHostList
           autoConnectHostIds={data.autoConnectHostIds}
-          bottomInset={insets.bottom}
+          bottomInset={0}
           contentMaxWidth={contentMaxWidth}
           footer={
             <MobileHomeListFooter
@@ -260,46 +302,50 @@ export function MobileHomeScreen() {
           onOpenActions={openHostActions}
         />
       )}
+      <MobilePrimaryNavigation
+        active={effectiveHomeMode === 'cloud' ? 'tasks' : 'workspace'}
+        bottomInset={insets.bottom}
+        onSelect={selectPrimaryDestination}
+        theme={theme}
+      />
       <MobileHomeDrawer
-        canOpenHostActions={data.primaryHost != null}
-        onAccount={() => {
-          closeDrawerAfter(() => data.router.push(session ? '/account' : '/login'))
-        }}
+        canOpenHostActions={activeConnectedHost != null}
+        onAccount={() => closeDrawerAfter(() => data.router.push(session ? '/account' : '/login'))}
         onClose={closeDrawer}
-        onComputers={() => {
-          closeDrawerAfter(() => changeHomeMode('computer'))
-        }}
-        onFeedback={() => {
-          closeDrawerAfter(() => data.router.push('/feedback'))
-        }}
-        onHome={() => {
-          closeDrawerAfter(() => changeHomeMode('cloud'))
-        }}
+        onComputers={() => closeDrawerAfter(() => changeHomeMode('computer'))}
+        onFeedback={() => closeDrawerAfter(() => data.router.push('/feedback'))}
+        onHome={() => closeDrawerAfter(() => changeHomeMode('cloud'))}
         onNewWorkspace={() => {
-          const primaryHostId = data.primaryHost?.id
-          if (primaryHostId) {
-            closeDrawerAfter(() => data.router.push(hostNewWorktreeRoute(primaryHostId)))
+          const activeHostId = activeConnectedHost?.id
+          if (activeHostId) {
+            closeDrawerAfter(() => data.router.push(hostNewWorktreeRoute(activeHostId)))
           } else {
             closeDrawer()
           }
         }}
         onRecentWork={() => {
-          const resumeCard = data.resumeCard
+          const resumeCard = selectedResumeCard
           if (resumeCard) {
             closeDrawerAfter(() => openResume(resumeCard))
           } else {
             closeDrawer()
           }
         }}
-        onSettings={() => {
-          closeDrawerAfter(() => data.router.push('/settings'))
-        }}
-        onTasks={() => {
-          closeDrawerAfter(openTasks)
-        }}
+        onSettings={() => closeDrawerAfter(() => data.router.push('/settings'))}
+        onTasks={() => closeDrawerAfter(openTasks)}
         pairedComputerCount={data.hostCatalog.length}
         theme={theme}
         visible={drawerVisible}
+      />
+      <MobileRuntimeSelector
+        catalog={data.hostCatalog}
+        connectionStates={data.hostStates}
+        onClose={() => setRuntimeSelectorVisible(false)}
+        onPair={() => data.router.push('/pair-scan')}
+        onSelect={setSelectedRuntimeId}
+        selectedId={effectiveRuntimeId}
+        theme={theme}
+        visible={runtimeSelectorVisible}
       />
       <ActionSheetModal
         visible={actionTarget != null}
@@ -339,7 +385,3 @@ export function MobileHomeScreen() {
     </SafeAreaView>
   )
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 }
-})

@@ -1,4 +1,4 @@
-import { productNameText } from '@/product-brand'
+import { APP_DISPLAY_NAME, productNameText } from '@/product-brand'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -26,24 +26,17 @@ import {
   Copy,
   ExternalLink,
   GitBranch,
+  ListTodo,
   Lock,
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Send,
   X
 } from 'lucide-react-native'
 import type { RpcClient } from '../../../src/transport/rpc-client'
 import type { RpcSuccess } from '../../../src/transport/types'
-import { useHostClient } from '../../../src/transport/client-context'
-import {
-  useLastConnectedAt,
-  useRelayRecoveryStatus,
-  useReconnectAttempt
-} from '../../../src/transport/client-context-connection-metrics'
-import { classifyConnection } from '../../../src/transport/connection-health'
-import { StatusDot } from '../../../src/components/StatusDot'
+import { useForceReconnect, useHostClient } from '../../../src/transport/client-context'
 import { ActionSheetModal } from '../../../src/components/ActionSheetModal'
 import { BottomDrawer } from '../../../src/components/BottomDrawer'
 import { ConfirmModal } from '../../../src/components/ConfirmModal'
@@ -53,7 +46,6 @@ import { MobileWorkspaceNameInput } from '../../../src/components/MobileWorkspac
 import { MobileSyntaxSegments } from '../../../src/components/MobileSyntaxSegments'
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
 import { TaskProviderLogo } from '../../../src/components/TaskProviderLogo'
-import { MobileIconButton } from '../../../src/components/ui'
 import {
   buildGitHubPrFileDiffPreview,
   type GitHubPrFileDiffLine
@@ -130,6 +122,22 @@ import {
 } from '../../../src/tasks/mobile-task-screen-styles'
 import { createMobileTaskScreenChromeStyles } from '../../../src/tasks/mobile-task-screen-chrome-styles'
 import { triggerMediumImpact } from '../../../src/platform/haptics'
+import { MobileTasksHeader } from '../../../src/tasks/MobileTasksHeader'
+import { MobileTasksPrimaryNavigation } from '../../../src/tasks/MobileTasksPrimaryNavigation'
+import { MobileTaskRuntimeGate } from '../../../src/tasks/MobileTaskRuntimeGate'
+import { MobileLocalTaskList } from '../../../src/tasks/mobile-local-task-list'
+import { useMobileLocalTasks } from '../../../src/tasks/mobile-local-task-hook'
+import { MobileTasksSourceTabs } from '../../../src/tasks/MobileTasksSourceTabs'
+import {
+  MobileRuntimeTaskSearch,
+  MobileTaskSearchField
+} from '../../../src/tasks/MobileRuntimeTaskSearch'
+import {
+  projectMobileTaskExecutionView,
+  projectMobileTaskSearchView,
+  type MobileTaskExecutionGroupFilter as ExecutionGroupFilter
+} from '../../../src/tasks/mobile-task-execution-view'
+import { resolveMobileTaskRuntimeState } from '../../../src/tasks/mobile-task-runtime-state'
 import {
   groupRows,
   isIterationCurrent,
@@ -145,6 +153,7 @@ import {
   isGitHubWorkItemsSshRemoteRequiredError,
   PER_REPO_FETCH_LIMIT
 } from '../../../src/tasks/mobile-work-items'
+
 import {
   filterAvailableTaskProviders,
   normalizeVisibleTaskProviders,
@@ -702,45 +711,6 @@ type ProjectRepoNotInOrcaPrompt = {
 type TaskListEntry =
   | { type: 'section'; key: string; label: string; color: string }
   | { type: 'item'; key: string; item: TaskItem }
-
-const PROVIDER_OPTIONS: PickerOption<TaskProvider>[] = [
-  {
-    value: 'github',
-    label: 'GitHub',
-    subtitle: 'Issues and pull requests',
-    renderIcon: (selected) => (
-      <TaskProviderLogo
-        provider="github"
-        size={16}
-        color={selected ? colors.textPrimary : colors.textSecondary}
-      />
-    )
-  },
-  {
-    value: 'gitlab',
-    label: 'GitLab',
-    subtitle: 'Issues and merge requests',
-    renderIcon: (selected) => (
-      <TaskProviderLogo
-        provider="gitlab"
-        size={16}
-        color={selected ? colors.textPrimary : colors.textSecondary}
-      />
-    )
-  },
-  {
-    value: 'linear',
-    label: 'Linear',
-    subtitle: 'Assigned and team issues',
-    renderIcon: (selected) => (
-      <TaskProviderLogo
-        provider="linear"
-        size={16}
-        color={selected ? colors.textPrimary : colors.textSecondary}
-      />
-    )
-  }
-]
 
 const GITLAB_FILTER_OPTIONS: PickerOption<GitLabFilter>[] = [
   { value: 'opened', label: 'Open', subtitle: 'Open issues and merge requests' },
@@ -2101,9 +2071,12 @@ export default function MobileTasksScreen() {
   const taskScreenStyles = useMemo(() => createMobileTaskScreenStyles(theme), [theme])
   const taskScreenPalette = useMemo(() => createMobileTaskScreenPalette(theme), [theme])
   const { client, state: connState } = useHostClient(hostId)
-  const reconnectAttempts = useReconnectAttempt(hostId)
-  const lastConnectedAt = useLastConnectedAt(hostId)
-  const relayRecovery = useRelayRecoveryStatus(hostId)
+  const localTaskFeed = useMobileLocalTasks({ client, connectionState: connState })
+  const forceReconnectHost = useForceReconnect()
+  const [showRuntimeSelector, setShowRuntimeSelector] = useState(false)
+  const [taskView, setTaskView] = useState<'all' | 'local' | 'hosted'>(() =>
+    isTaskProvider(taskSource) ? 'hosted' : 'all'
+  )
   const clientRef = useRef<RpcClient | null>(null)
   const loadGenerationRef = useRef(0)
   const taskResumeRef = useRef<TaskResumeState>({})
@@ -2182,8 +2155,9 @@ export default function MobileTasksScreen() {
     Record<string, GitHubRepoSlugCacheEntry | undefined>
   >({})
   const [query, setQuery] = useState(getTaskPresetQuery('issues'))
+  const [localQuery, setLocalQuery] = useState('')
+  const [localTaskGroupFilter, setLocalTaskGroupFilter] = useState<ExecutionGroupFilter>('all')
   const [appliedQuery, setAppliedQuery] = useState(getTaskPresetQuery('issues'))
-  const [searchFocused, setSearchFocused] = useState(false)
   const [showProviderPicker, setShowProviderPicker] = useState(false)
   const [showGitHubKindPicker, setShowGitHubKindPicker] = useState(false)
   const [showGitHubPresetPicker, setShowGitHubPresetPicker] = useState(false)
@@ -2388,6 +2362,17 @@ export default function MobileTasksScreen() {
     tasksSupportState.kind === 'unsupported' &&
     tasksSupportState.client === client
   const taskUiReady = tasksSupported && taskStateHydrated
+  const isAllTaskView = taskView === 'all'
+  const isLocalTaskView = taskView === 'local'
+  const isRuntimeTaskView = taskView !== 'hosted'
+  const activeTaskUiReady = isRuntimeTaskView
+    ? client != null && connState === 'connected'
+    : taskUiReady
+  const taskRuntimeState = resolveMobileTaskRuntimeState({
+    connectionState: connState,
+    tasksSupported,
+    tasksUnsupported
+  })
   const activeGitHubProject = githubProjectSettings.activeProject
   const activeGitHubProjectHost = githubProjectHost(
     githubProjectTable?.project.host ?? activeGitHubProject?.host
@@ -3095,6 +3080,12 @@ export default function MobileTasksScreen() {
     }
     setProvider(resolveVisibleTaskProvider(provider, visibleProviders))
   }, [provider, visibleProviders])
+
+  useEffect(() => {
+    if (requestedTaskSource) {
+      setTaskView('hosted')
+    }
+  }, [requestedTaskSource])
 
   // Selection follows the list rather than the fetch, so it reconciles the same
   // way no matter which caller triggered the load.
@@ -8372,10 +8363,6 @@ export default function MobileTasksScreen() {
     provider === 'github' ? 'GitHub' : provider === 'gitlab' ? 'GitLab' : 'Linear'
   const showHeaderCreateTask =
     provider === 'linear' || (provider === 'github' && githubMode === 'items')
-  const providerOptions = useMemo(
-    () => PROVIDER_OPTIONS.filter((option) => visibleProviders.includes(option.value)),
-    [visibleProviders]
-  )
   const selectedCreateRepo =
     provider === 'github' || provider === 'gitlab'
       ? (selectedCreateTarget as RepoSummary | null)
@@ -8707,31 +8694,36 @@ export default function MobileTasksScreen() {
     setAppliedGithubProjectSearch(next === viewFilter ? undefined : next)
   }, [githubProjectSearch, githubProjectTable?.selectedView.filter])
 
-  const headerVerdict = classifyConnection({
-    state: connState,
-    reconnectAttempts,
-    lastConnectedAt,
-    ...relayRecovery
-  })
   const emptyLabel =
     connState !== 'connected'
-      ? 'Connect to a host to load tasks'
+      ? '当前 Runtime 的任务状态不可验证'
       : query
-        ? 'No matching tasks'
+        ? '没有匹配的任务'
         : provider === 'github'
-          ? 'No GitHub tasks'
+          ? '还没有 GitHub 任务'
           : provider === 'gitlab'
-            ? 'No GitLab tasks'
-            : 'No Linear tasks'
+            ? '还没有 GitLab 任务'
+            : '还没有 Linear 任务'
   const isGithubProjectSearch = provider === 'github' && githubMode === 'project'
-  const searchValue = isGithubProjectSearch ? githubProjectSearch : query
-  const searchPlaceholder = isGithubProjectSearch ? '搜索项目视图' : `搜索 ${providerLabel} 任务`
-  const showSearchClear = isGithubProjectSearch
-    ? githubProjectSearch.length > 0 ||
-      (appliedGithubProjectSearch !== undefined && appliedGithubProjectSearch.length > 0)
-    : provider === 'github'
-      ? query.trim() !== getTaskPresetQuery(githubPreset).trim()
-      : query.length > 0
+  // "全部" remains the Runtime's authoritative execution census; provider tabs browse backlogs.
+  const executionView = projectMobileTaskExecutionView({
+    feed: localTaskFeed,
+    groupFilter: localTaskGroupFilter,
+    query: localQuery,
+    scope: isLocalTaskView ? 'local' : 'all'
+  })
+  const { searchPlaceholder, searchValue, showSearchClear } = projectMobileTaskSearchView({
+    appliedGithubProjectSearch,
+    githubProjectSearch,
+    isGithubProjectSearch,
+    githubPresetQuery: getTaskPresetQuery(githubPreset),
+    isAllTaskView,
+    isRuntimeTaskView,
+    localQuery,
+    provider,
+    providerLabel,
+    query
+  })
   const visibleTaskCount =
     provider === 'github' && githubMode === 'project'
       ? visibleGitHubProjectRows.length
@@ -8739,12 +8731,14 @@ export default function MobileTasksScreen() {
         ? linearIssuesForView.length
         : sortedItems.length
   const showTaskListSummary =
+    !isRuntimeTaskView &&
     tasksSupported &&
     !(provider === 'linear' && !linearConnected) &&
     !(provider === 'github' && githubMode === 'project' && !activeGitHubProject)
 
   function selectTaskProvider(next: TaskProvider) {
     const resume = taskResumeRef.current
+    setTaskView('hosted')
     persistTaskSource(next)
     setProvider(next)
     setItems([])
@@ -8783,6 +8777,9 @@ export default function MobileTasksScreen() {
   }
 
   function submitTaskSearch() {
+    if (isRuntimeTaskView) {
+      return
+    }
     if (!taskUiReady) {
       return
     }
@@ -8806,6 +8803,10 @@ export default function MobileTasksScreen() {
   }
 
   function clearTaskSearch() {
+    if (isRuntimeTaskView) {
+      setLocalQuery('')
+      return
+    }
     if (isGithubProjectSearch) {
       const viewFilter = githubProjectTable?.selectedView.filter ?? ''
       setGithubProjectSearch('')
@@ -8829,296 +8830,101 @@ export default function MobileTasksScreen() {
     }
   }
 
+  function openCreateTaskComposer() {
+    if (isLocalTaskView || !taskUiReady) {
+      return
+    }
+    if (provider === 'linear' && !linearConnected) {
+      setLinearApiKeyDraft('')
+      setLinearConnectState('idle')
+      setLinearConnectError('')
+      setShowLinearConnect(true)
+      return
+    }
+    setCreateTitle('')
+    setCreateBody('')
+    setShowCreateTask(true)
+  }
+
   return (
     <SafeAreaView style={[styles.container, taskScreenStyles.container]} edges={['top']}>
       <View ref={setTaskCopyFeedbackRootRef} style={[styles.topChrome, taskScreenStyles.topChrome]}>
-        <View style={[styles.statusBar, taskScreenStyles.statusBar]}>
-          <View style={taskScreenStyles.headerSide}>
-            <MobileIconButton
-              accessibilityLabel="返回"
-              icon={ChevronLeft}
-              onPress={() => router.back()}
-            />
-          </View>
-          <View style={[styles.titleWrap, taskScreenStyles.titleWrap]}>
-            <Text maxFontSizeMultiplier={1.3} style={[styles.title, taskScreenStyles.title]}>
-              任务中心
-            </Text>
-            <View style={taskScreenStyles.connectionStatus}>
-              <StatusDot state={connState} verdict={headerVerdict} />
-              <Text
-                maxFontSizeMultiplier={1.3}
-                numberOfLines={1}
-                style={taskScreenStyles.connectionStatusText}
-              >
-                {headerVerdict.label}
-              </Text>
-            </View>
-          </View>
-          <View style={[taskScreenStyles.headerSide, taskScreenStyles.headerActions]}>
-            <MobileIconButton
-              accessibilityLabel="刷新任务"
-              icon={RefreshCw}
-              disabled={!taskUiReady || loading || refreshing || githubProjectLoading}
-              loading={loading || refreshing || githubProjectLoading}
-              onPress={() => {
-                if (!taskUiReady) {
-                  return
-                }
-                if (provider === 'github' && githubMode === 'project') {
-                  refreshGitHubProject()
-                  return
-                }
-                refreshTasks()
-              }}
-            />
-            {showHeaderCreateTask ? (
-              <MobileIconButton
-                accessibilityLabel="新建任务"
-                icon={Plus}
+        <MobileTasksHeader
+          busy={
+            isRuntimeTaskView
+              ? localTaskFeed.phase === 'loading' || localTaskFeed.refreshing
+              : loading || refreshing || githubProjectLoading
+          }
+          connectionState={connState}
+          hostId={hostId}
+          onCreate={openCreateTaskComposer}
+          onRefresh={() => {
+            if (isRuntimeTaskView) {
+              localTaskFeed.refresh()
+              return
+            }
+            if (provider === 'github' && githubMode === 'project') {
+              refreshGitHubProject()
+              return
+            }
+            refreshTasks()
+          }}
+          onRuntimeSelectorVisibleChange={setShowRuntimeSelector}
+          runtimeSelectorVisible={showRuntimeSelector}
+          showCreateTask={!isLocalTaskView && showHeaderCreateTask}
+          taskUiReady={isAllTaskView && showHeaderCreateTask ? taskUiReady : activeTaskUiReady}
+        />
+
+        <MobileTasksSourceTabs
+          onCloseProviderPicker={() => setShowProviderPicker(false)}
+          onOpenProviderPicker={() => setShowProviderPicker(true)}
+          onSelectProvider={selectTaskProvider}
+          onSelectView={(view) => setTaskView(view)}
+          provider={provider}
+          providerPickerVisible={showProviderPicker}
+          taskUiReady={taskUiReady}
+          theme={theme}
+          view={taskView}
+          visibleProviders={visibleProviders}
+        />
+
+        {!isRuntimeTaskView && taskUiReady ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={[styles.toolbarScroll, taskScreenStyles.toolbarScroll]}
+            contentContainerStyle={[styles.toolbar, taskScreenStyles.toolbar]}
+          >
+            {provider === 'gitlab' || (provider === 'github' && githubMode !== 'project') ? (
+              <Pressable
+                style={styles.segmentButton}
                 disabled={!taskUiReady}
                 onPress={() => {
                   if (!taskUiReady) {
                     return
                   }
-                  if (provider === 'linear' && !linearConnected) {
-                    setLinearApiKeyDraft('')
-                    setLinearConnectState('idle')
-                    setLinearConnectError('')
-                    setShowLinearConnect(true)
-                    return
-                  }
-                  setCreateTitle('')
-                  setCreateBody('')
-                  setShowCreateTask(true)
+                  setShowRepoPicker(true)
                 }}
-              />
+              >
+                {repoPickerSelectedRepo ? (
+                  <View
+                    style={[
+                      styles.segmentRepoDot,
+                      {
+                        backgroundColor: getRepoBadgeColor(
+                          repoPickerSelectedRepo,
+                          repoPickerSelectedRepo.displayName
+                        )
+                      }
+                    ]}
+                  />
+                ) : null}
+                <Text style={styles.segmentSecondaryText}>{repoPickerLabel}</Text>
+              </Pressable>
             ) : null}
-          </View>
-        </View>
 
-        <View accessibilityRole="tablist" style={taskScreenStyles.providerTabs}>
-          {providerOptions.map((option) => {
-            const selected = option.value === provider
-            return (
-              <Pressable
-                key={option.value}
-                accessibilityRole="tab"
-                accessibilityState={{ disabled: !taskUiReady, selected }}
-                disabled={!taskUiReady}
-                onLongPress={() => setShowProviderPicker(true)}
-                onPress={() => selectTaskProvider(option.value)}
-                style={({ pressed }) => [
-                  taskScreenStyles.providerTab,
-                  selected && taskScreenStyles.providerTabSelected,
-                  pressed && taskScreenStyles.providerTabPressed
-                ]}
-              >
-                <TaskProviderLogo
-                  provider={option.value}
-                  size={16}
-                  color={selected ? taskScreenPalette.textPrimary : taskScreenPalette.textSecondary}
-                />
-                <Text
-                  maxFontSizeMultiplier={1.3}
-                  style={[
-                    taskScreenStyles.providerTabText,
-                    selected && taskScreenStyles.providerTabTextSelected
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={[styles.toolbarScroll, taskScreenStyles.toolbarScroll]}
-          contentContainerStyle={[styles.toolbar, taskScreenStyles.toolbar]}
-        >
-          {provider === 'gitlab' || (provider === 'github' && githubMode !== 'project') ? (
-            <Pressable
-              style={styles.segmentButton}
-              disabled={!taskUiReady}
-              onPress={() => {
-                if (!taskUiReady) {
-                  return
-                }
-                setShowRepoPicker(true)
-              }}
-            >
-              {repoPickerSelectedRepo ? (
-                <View
-                  style={[
-                    styles.segmentRepoDot,
-                    {
-                      backgroundColor: getRepoBadgeColor(
-                        repoPickerSelectedRepo,
-                        repoPickerSelectedRepo.displayName
-                      )
-                    }
-                  ]}
-                />
-              ) : null}
-              <Text style={styles.segmentSecondaryText}>{repoPickerLabel}</Text>
-            </Pressable>
-          ) : null}
-
-          {provider === 'github' && (
-            <>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowGitHubKindPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>{githubModeLabel}</Text>
-              </Pressable>
-              {githubMode === 'items' ? (
-                <>
-                  <Pressable
-                    style={styles.segmentButton}
-                    disabled={!taskUiReady}
-                    onPress={() => {
-                      if (!taskUiReady) {
-                        return
-                      }
-                      setShowGitHubPresetPicker(true)
-                    }}
-                  >
-                    <Text style={styles.segmentSecondaryText}>{githubPresetLabel}</Text>
-                  </Pressable>
-                  {githubIssueSourceRows.length > 0 ? (
-                    <Pressable
-                      style={styles.segmentButton}
-                      disabled={!taskUiReady}
-                      onPress={() => {
-                        if (!taskUiReady) {
-                          return
-                        }
-                        setShowGitHubIssueSourcePicker(true)
-                      }}
-                    >
-                      <Text style={styles.segmentSecondaryText}>
-                        Source: {githubIssueSourceLabel}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <Pressable
-                    style={styles.segmentButton}
-                    disabled={!taskUiReady}
-                    onPress={() => {
-                      if (!taskUiReady) {
-                        return
-                      }
-                      setShowGitHubProjectPicker(true)
-                    }}
-                  >
-                    <Text style={styles.segmentSecondaryText}>{activeProjectLabel}</Text>
-                  </Pressable>
-                  {activeGitHubProjectView ? (
-                    <Pressable
-                      style={styles.segmentButton}
-                      disabled={!taskUiReady}
-                      onPress={() => {
-                        if (!taskUiReady) {
-                          return
-                        }
-                        setShowGitHubProjectViewPicker(true)
-                      }}
-                    >
-                      <Text style={styles.segmentSecondaryText}>
-                        {activeGitHubProjectView.name}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {githubProjectTable ? (
-                    <Pressable
-                      style={styles.segmentButton}
-                      disabled={!taskUiReady}
-                      onPress={() => {
-                        if (!taskUiReady) {
-                          return
-                        }
-                        setShowGitHubProjectSortPicker(true)
-                      }}
-                    >
-                      <Text style={styles.segmentSecondaryText}>
-                        Sort: {githubProjectSortLabel}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {githubProjectAvailableSummaryFields.length > 0 ? (
-                    <Pressable
-                      style={styles.segmentButton}
-                      disabled={!taskUiReady}
-                      onPress={() => {
-                        if (!taskUiReady) {
-                          return
-                        }
-                        setShowGitHubProjectFieldsPicker(true)
-                      }}
-                    >
-                      <Text style={styles.segmentSecondaryText}>
-                        Fields: {githubProjectFieldsLabel}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {githubProjectTable ? (
-                    <View style={styles.segmentCountPill}>
-                      <Text style={styles.segmentSecondaryText}>
-                        {visibleGitHubProjectRows.length}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {selectedGitHubProjectViewUrl ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Open view in GitHub"
-                      style={styles.segmentIconButton}
-                      disabled={!taskUiReady}
-                      onPress={() => {
-                        if (!taskUiReady) {
-                          return
-                        }
-                        void Linking.openURL(selectedGitHubProjectViewUrl)
-                      }}
-                    >
-                      <ExternalLink size={14} color={colors.textSecondary} />
-                    </Pressable>
-                  ) : null}
-                </>
-              )}
-            </>
-          )}
-
-          {provider === 'gitlab' && (
-            <>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowGitLabViewPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>
-                  {gitlabView === 'project' ? 'Project MRs' : 'My Todos'}
-                </Text>
-              </Pressable>
-              {gitlabView === 'project' && (
+            {provider === 'github' && (
+              <>
                 <Pressable
                   style={styles.segmentButton}
                   disabled={!taskUiReady}
@@ -9126,18 +8932,134 @@ export default function MobileTasksScreen() {
                     if (!taskUiReady) {
                       return
                     }
-                    setShowGitLabFilterPicker(true)
+                    setShowGitHubKindPicker(true)
                   }}
                 >
-                  <Text style={styles.segmentSecondaryText}>{gitlabFilterLabel}</Text>
+                  <Text style={styles.segmentSecondaryText}>{githubModeLabel}</Text>
                 </Pressable>
-              )}
-            </>
-          )}
+                {githubMode === 'items' ? (
+                  <>
+                    <Pressable
+                      style={styles.segmentButton}
+                      disabled={!taskUiReady}
+                      onPress={() => {
+                        if (!taskUiReady) {
+                          return
+                        }
+                        setShowGitHubPresetPicker(true)
+                      }}
+                    >
+                      <Text style={styles.segmentSecondaryText}>{githubPresetLabel}</Text>
+                    </Pressable>
+                    {githubIssueSourceRows.length > 0 ? (
+                      <Pressable
+                        style={styles.segmentButton}
+                        disabled={!taskUiReady}
+                        onPress={() => {
+                          if (!taskUiReady) {
+                            return
+                          }
+                          setShowGitHubIssueSourcePicker(true)
+                        }}
+                      >
+                        <Text style={styles.segmentSecondaryText}>
+                          Source: {githubIssueSourceLabel}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <Pressable
+                      style={styles.segmentButton}
+                      disabled={!taskUiReady}
+                      onPress={() => {
+                        if (!taskUiReady) {
+                          return
+                        }
+                        setShowGitHubProjectPicker(true)
+                      }}
+                    >
+                      <Text style={styles.segmentSecondaryText}>{activeProjectLabel}</Text>
+                    </Pressable>
+                    {activeGitHubProjectView ? (
+                      <Pressable
+                        style={styles.segmentButton}
+                        disabled={!taskUiReady}
+                        onPress={() => {
+                          if (!taskUiReady) {
+                            return
+                          }
+                          setShowGitHubProjectViewPicker(true)
+                        }}
+                      >
+                        <Text style={styles.segmentSecondaryText}>
+                          {activeGitHubProjectView.name}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    {githubProjectTable ? (
+                      <Pressable
+                        style={styles.segmentButton}
+                        disabled={!taskUiReady}
+                        onPress={() => {
+                          if (!taskUiReady) {
+                            return
+                          }
+                          setShowGitHubProjectSortPicker(true)
+                        }}
+                      >
+                        <Text style={styles.segmentSecondaryText}>
+                          Sort: {githubProjectSortLabel}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    {githubProjectAvailableSummaryFields.length > 0 ? (
+                      <Pressable
+                        style={styles.segmentButton}
+                        disabled={!taskUiReady}
+                        onPress={() => {
+                          if (!taskUiReady) {
+                            return
+                          }
+                          setShowGitHubProjectFieldsPicker(true)
+                        }}
+                      >
+                        <Text style={styles.segmentSecondaryText}>
+                          Fields: {githubProjectFieldsLabel}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    {githubProjectTable ? (
+                      <View style={styles.segmentCountPill}>
+                        <Text style={styles.segmentSecondaryText}>
+                          {visibleGitHubProjectRows.length}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {selectedGitHubProjectViewUrl ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Open view in GitHub"
+                        style={styles.segmentIconButton}
+                        disabled={!taskUiReady}
+                        onPress={() => {
+                          if (!taskUiReady) {
+                            return
+                          }
+                          void Linking.openURL(selectedGitHubProjectViewUrl)
+                        }}
+                      >
+                        <ExternalLink size={14} color={colors.textSecondary} />
+                      </Pressable>
+                    ) : null}
+                  </>
+                )}
+              </>
+            )}
 
-          {provider === 'linear' && linearConnected && (
-            <>
-              {linearWorkspaces.length > 1 ? (
+            {provider === 'gitlab' && (
+              <>
                 <Pressable
                   style={styles.segmentButton}
                   disabled={!taskUiReady}
@@ -9145,165 +9067,173 @@ export default function MobileTasksScreen() {
                     if (!taskUiReady) {
                       return
                     }
-                    setShowLinearWorkspacePicker(true)
+                    setShowGitLabViewPicker(true)
                   }}
                 >
-                  <Text style={styles.segmentSecondaryText}>{linearWorkspaceLabel}</Text>
+                  <Text style={styles.segmentSecondaryText}>
+                    {gitlabView === 'project' ? 'Project MRs' : 'My Todos'}
+                  </Text>
                 </Pressable>
-              ) : null}
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowLinearTeamPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>{linearTeamLabel}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowLinearFilterPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>{linearFilterLabel}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowLinearViewPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>{linearViewLabel}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowLinearGroupPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>Group: {linearGroupLabel}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowLinearOrderPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>Order: {linearOrderLabel}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => {
-                  if (!taskUiReady) {
-                    return
-                  }
-                  setShowLinearDisplayPicker(true)
-                }}
-              >
-                <Text style={styles.segmentSecondaryText}>Display</Text>
-              </Pressable>
-            </>
-          )}
+                {gitlabView === 'project' && (
+                  <Pressable
+                    style={styles.segmentButton}
+                    disabled={!taskUiReady}
+                    onPress={() => {
+                      if (!taskUiReady) {
+                        return
+                      }
+                      setShowGitLabFilterPicker(true)
+                    }}
+                  >
+                    <Text style={styles.segmentSecondaryText}>{gitlabFilterLabel}</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
 
-          {provider !== 'linear' && !(provider === 'github' && githubMode === 'project') ? (
-            <Pressable
-              style={styles.segmentButton}
-              disabled={!taskUiReady}
-              onPress={() => {
-                if (!taskUiReady) {
-                  return
-                }
-                setShowSortPicker(true)
-              }}
-            >
-              <GitBranch size={14} color={colors.textSecondary} />
-              <Text style={styles.segmentSecondaryText}>Sort: {sortLabel}</Text>
-            </Pressable>
-          ) : null}
-        </ScrollView>
+            {provider === 'linear' && linearConnected && (
+              <>
+                {linearWorkspaces.length > 1 ? (
+                  <Pressable
+                    style={styles.segmentButton}
+                    disabled={!taskUiReady}
+                    onPress={() => {
+                      if (!taskUiReady) {
+                        return
+                      }
+                      setShowLinearWorkspacePicker(true)
+                    }}
+                  >
+                    <Text style={styles.segmentSecondaryText}>{linearWorkspaceLabel}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  style={styles.segmentButton}
+                  disabled={!taskUiReady}
+                  onPress={() => {
+                    if (!taskUiReady) {
+                      return
+                    }
+                    setShowLinearTeamPicker(true)
+                  }}
+                >
+                  <Text style={styles.segmentSecondaryText}>{linearTeamLabel}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.segmentButton}
+                  disabled={!taskUiReady}
+                  onPress={() => {
+                    if (!taskUiReady) {
+                      return
+                    }
+                    setShowLinearFilterPicker(true)
+                  }}
+                >
+                  <Text style={styles.segmentSecondaryText}>{linearFilterLabel}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.segmentButton}
+                  disabled={!taskUiReady}
+                  onPress={() => {
+                    if (!taskUiReady) {
+                      return
+                    }
+                    setShowLinearViewPicker(true)
+                  }}
+                >
+                  <Text style={styles.segmentSecondaryText}>{linearViewLabel}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.segmentButton}
+                  disabled={!taskUiReady}
+                  onPress={() => {
+                    if (!taskUiReady) {
+                      return
+                    }
+                    setShowLinearGroupPicker(true)
+                  }}
+                >
+                  <Text style={styles.segmentSecondaryText}>Group: {linearGroupLabel}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.segmentButton}
+                  disabled={!taskUiReady}
+                  onPress={() => {
+                    if (!taskUiReady) {
+                      return
+                    }
+                    setShowLinearOrderPicker(true)
+                  }}
+                >
+                  <Text style={styles.segmentSecondaryText}>Order: {linearOrderLabel}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.segmentButton}
+                  disabled={!taskUiReady}
+                  onPress={() => {
+                    if (!taskUiReady) {
+                      return
+                    }
+                    setShowLinearDisplayPicker(true)
+                  }}
+                >
+                  <Text style={styles.segmentSecondaryText}>Display</Text>
+                </Pressable>
+              </>
+            )}
 
-        {provider === 'gitlab' && gitlabView === 'todos' ? null : provider === 'linear' &&
+            {provider !== 'linear' && !(provider === 'github' && githubMode === 'project') ? (
+              <Pressable
+                style={styles.segmentButton}
+                disabled={!taskUiReady}
+                onPress={() => {
+                  if (!taskUiReady) {
+                    return
+                  }
+                  setShowSortPicker(true)
+                }}
+              >
+                <GitBranch size={14} color={colors.textSecondary} />
+                <Text style={styles.segmentSecondaryText}>Sort: {sortLabel}</Text>
+              </Pressable>
+            ) : null}
+          </ScrollView>
+        ) : null}
+
+        {isRuntimeTaskView ? (
+          <MobileRuntimeTaskSearch
+            filter={localTaskGroupFilter}
+            onChangeText={setLocalQuery}
+            onFilterChange={setLocalTaskGroupFilter}
+            placeholder={searchPlaceholder}
+            theme={theme}
+            value={localQuery}
+          />
+        ) : provider === 'gitlab' && gitlabView === 'todos' ? null : provider === 'linear' &&
           !linearConnected ? null : (
           <View style={[styles.searchBar, taskScreenStyles.searchBar]}>
-            <View
-              style={[
-                taskScreenStyles.searchField,
-                searchFocused && taskScreenStyles.searchFieldFocused
-              ]}
-            >
-              <Search
-                size={20}
-                strokeWidth={2}
-                color={searchFocused ? taskScreenPalette.brand : taskScreenPalette.textSecondary}
-              />
-              <TextInput
-                accessibilityLabel={searchPlaceholder}
-                maxFontSizeMultiplier={1.3}
-                value={searchValue}
-                onChangeText={isGithubProjectSearch ? setGithubProjectSearch : setQuery}
-                placeholder={searchPlaceholder}
-                placeholderTextColor={taskScreenPalette.textTertiary}
-                selectionColor={taskScreenPalette.brand}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-                style={taskScreenStyles.searchInput}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => {
-                  setSearchFocused(false)
-                  if (isGithubProjectSearch) {
-                    applyGitHubProjectSearch()
-                  }
-                }}
-                onSubmitEditing={submitTaskSearch}
-                editable={taskUiReady}
-              />
-              {showSearchClear ? (
-                <Pressable
-                  accessibilityLabel="清除搜索"
-                  accessibilityRole="button"
-                  onPress={clearTaskSearch}
-                  style={({ pressed }) => [
-                    taskScreenStyles.clearButton,
-                    pressed && taskScreenStyles.clearButtonPressed
-                  ]}
-                >
-                  <X size={16} strokeWidth={2} color={taskScreenPalette.textSecondary} />
-                </Pressable>
-              ) : null}
-            </View>
+            <MobileTaskSearchField
+              editable={taskUiReady}
+              onBlur={isGithubProjectSearch ? applyGitHubProjectSearch : undefined}
+              onChangeText={isGithubProjectSearch ? setGithubProjectSearch : setQuery}
+              onClear={clearTaskSearch}
+              onSubmitEditing={submitTaskSearch}
+              placeholder={searchPlaceholder}
+              showClear={showSearchClear}
+              theme={theme}
+              value={searchValue}
+            />
           </View>
         )}
       </View>
 
-      {error ? (
+      {!isRuntimeTaskView && error ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
 
-      {!error && provider === 'github' && githubMode === 'items'
+      {!isRuntimeTaskView && !error && provider === 'github' && githubMode === 'items'
         ? githubSourceFallbacks.map((fallback) => (
             <View
               key={`github-source-fallback:${fallback.repoId}`}
@@ -9317,7 +9247,7 @@ export default function MobileTasksScreen() {
           ))
         : null}
 
-      {!error && provider === 'github' && githubMode === 'items'
+      {!isRuntimeTaskView && !error && provider === 'github' && githubMode === 'items'
         ? githubSourceErrors.map((sourceError) => {
             const isRetrying = retryingGithubSourceRepoPaths.has(sourceError.repoPath)
             return (
@@ -9353,7 +9283,8 @@ export default function MobileTasksScreen() {
           })
         : null}
 
-      {!error &&
+      {!isRuntimeTaskView &&
+      !error &&
       provider === 'github' &&
       githubMode === 'project' &&
       githubProjectTable?.parentFieldDropped === true ? (
@@ -9380,19 +9311,29 @@ export default function MobileTasksScreen() {
         </View>
       ) : null}
 
-      {!tasksSupported ? (
-        tasksUnsupported ? (
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>{productNameText('请更新 Orca 桌面端')}</Text>
-            <Text style={styles.centeredHint}>
-              当前移动端任务中心需要新版桌面运行时，更新后即可继续使用现有任务功能。
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.centered}>
-            <ActivityIndicator size="small" color={colors.textSecondary} />
-          </View>
-        )
+      {isRuntimeTaskView ? (
+        <MobileLocalTaskList
+          contentBottomInset={spacing.lg}
+          feed={executionView.feed}
+          filterEmpty={executionView.filterEmpty}
+          onOpen={(worktreeId) => {
+            triggerMediumImpact()
+            router.push(
+              `/h/${encodeURIComponent(hostId)}/session/${encodeURIComponent(worktreeId)}`
+            )
+          }}
+          {...(isAllTaskView && taskUiReady ? { onCreate: openCreateTaskComposer } : {})}
+          onSelectRuntime={() => setShowRuntimeSelector(true)}
+          searchEmpty={executionView.searchEmpty}
+          scope={isAllTaskView ? 'all' : 'local'}
+          theme={theme}
+        />
+      ) : !tasksSupported ? (
+        <MobileTaskRuntimeGate
+          onRetry={() => void forceReconnectHost(hostId)}
+          onSelectRuntime={() => setShowRuntimeSelector(true)}
+          state={taskRuntimeState}
+        />
       ) : provider === 'linear' && !linearConnected ? (
         <View style={styles.centered}>
           <TaskProviderLogo provider="linear" size={32} color={colors.textSecondary} />
@@ -9769,7 +9710,43 @@ export default function MobileTasksScreen() {
         </View>
       ) : sortedItems.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyText}>{emptyLabel}</Text>
+          <View style={taskScreenStyles.emptyIcon}>
+            <ListTodo color={taskScreenPalette.textSecondary} size={32} strokeWidth={1.7} />
+          </View>
+          <Text maxFontSizeMultiplier={1.3} style={taskScreenStyles.emptyTitle}>
+            {searchValue.trim() ? '没有匹配的任务' : '还没有任务'}
+          </Text>
+          <Text maxFontSizeMultiplier={1.3} style={taskScreenStyles.emptyDescription}>
+            {connState === 'connected'
+              ? `从一个清晰目标开始，${APP_DISPLAY_NAME} 会在已连接的 Runtime 上执行。`
+              : '当前 Runtime 的任务状态不可验证，连接恢复后可继续。'}
+          </Text>
+          {!searchValue.trim() && showHeaderCreateTask ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={!taskUiReady}
+              onPress={openCreateTaskComposer}
+              style={({ pressed }) => [
+                taskScreenStyles.emptyPrimaryButton,
+                pressed && taskScreenStyles.emptyPrimaryButtonPressed,
+                !taskUiReady && taskScreenStyles.emptyPrimaryButtonDisabled
+              ]}
+            >
+              <Plus color={taskScreenPalette.textInverse} size={20} strokeWidth={2} />
+              <Text maxFontSizeMultiplier={1.3} style={taskScreenStyles.emptyPrimaryButtonText}>
+                新建任务
+              </Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowRuntimeSelector(true)}
+            style={taskScreenStyles.emptySecondaryButton}
+          >
+            <Text maxFontSizeMultiplier={1.3} style={taskScreenStyles.emptySecondaryButtonText}>
+              连接或切换电脑
+            </Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -9998,14 +9975,7 @@ export default function MobileTasksScreen() {
         />
       )}
 
-      <PickerModal
-        visible={taskUiReady && showProviderPicker}
-        title="任务来源"
-        options={providerOptions}
-        selected={provider}
-        onSelect={selectTaskProvider}
-        onClose={() => setShowProviderPicker(false)}
-      />
+      <MobileTasksPrimaryNavigation hostId={hostId} />
 
       <BottomDrawer
         visible={taskUiReady && showRepoPicker}
@@ -14237,7 +14207,7 @@ function createStyles(theme: MobileTheme) {
     },
     projectDataNoticeText: {
       flex: 1,
-      color: colors.statusAmber,
+      color: colors.statusAmberText,
       fontSize: 13
     },
     projectGroupHeader: {
@@ -14430,7 +14400,7 @@ function createStyles(theme: MobileTheme) {
       gap: spacing.sm
     },
     detailError: {
-      color: colors.statusRed,
+      color: colors.statusRedText,
       fontSize: 13
     },
     detailMetaGrid: {
@@ -14760,10 +14730,10 @@ function createStyles(theme: MobileTheme) {
       color: colors.textSecondary
     },
     diffCodeAdded: {
-      color: colors.statusGreen
+      color: colors.statusGreenText
     },
     diffCodeRemoved: {
-      color: colors.statusRed
+      color: colors.statusRedText
     },
     detailMuted: {
       fontSize: 12,
@@ -15104,7 +15074,7 @@ function createStyles(theme: MobileTheme) {
       fontWeight: '700'
     },
     inlineDeleteText: {
-      color: colors.statusRed,
+      color: colors.statusRedText,
       fontSize: 12,
       fontWeight: '600'
     },

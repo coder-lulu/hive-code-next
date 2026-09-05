@@ -123,7 +123,7 @@ export function createMobileOnboardingStyles(theme: MobileTheme) {
     },
     error: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       textAlign: 'center'
     }
   })

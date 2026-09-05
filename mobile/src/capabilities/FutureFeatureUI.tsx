@@ -187,7 +187,7 @@ export function FutureFeatureRow({
           maxFontSizeMultiplier={1.3}
           style={[
             theme.typography.body,
-            { color: destructive ? theme.color.status.danger : theme.color.text.primary }
+            { color: destructive ? theme.color.status.dangerText : theme.color.text.primary }
           ]}
         >
           {label}

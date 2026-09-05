@@ -13,7 +13,8 @@ export function createPrCommentsStyles(theme: MobileTheme) {
     textPrimary: theme.color.text.primary,
     textSecondary: theme.color.text.secondary,
     textMuted: theme.color.text.tertiary,
-    statusRed: theme.color.status.danger
+    statusRed: theme.color.status.danger,
+    statusRedText: theme.color.status.dangerText
   }
   const spacing = {
     xs: theme.spacing.space4,
@@ -248,7 +249,7 @@ export function createPrCommentsStyles(theme: MobileTheme) {
       fontWeight: '600'
     },
     actionButtonDangerText: {
-      color: colors.statusRed
+      color: colors.statusRedText
     },
     // Inline reply composer mounted inside a comment card.
     composer: {
@@ -260,7 +261,7 @@ export function createPrCommentsStyles(theme: MobileTheme) {
       gap: spacing.sm
     },
     actionError: {
-      color: colors.statusRed,
+      color: colors.statusRedText,
       fontSize: typography.metaSize
     }
   })

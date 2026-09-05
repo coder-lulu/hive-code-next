@@ -228,7 +228,7 @@ export default function SettingsScreen() {
               {themePreferenceSaveFailed ? (
                 <Text
                   accessibilityLiveRegion="polite"
-                  style={[theme.typography.caption, { color: theme.color.status.warning }]}
+                  style={[theme.typography.caption, { color: theme.color.status.warningText }]}
                 >
                   主题已临时切换，但未能保存到此设备。
                 </Text>

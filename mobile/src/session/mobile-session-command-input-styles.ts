@@ -41,7 +41,7 @@ export function createMobileSessionCommandInputStyles(theme: MobileTheme) {
     },
     createError: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       marginBottom: theme.spacing.space8,
       textAlign: 'center'
     },

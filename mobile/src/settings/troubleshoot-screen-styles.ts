@@ -67,8 +67,8 @@ export function createTroubleshootScreenStyles(theme: MobileTheme) {
     checkCopy: { minWidth: 0, flex: 1, gap: theme.spacing.space4 },
     checkLabel: { ...theme.typography.body, color: theme.color.text.primary },
     checkDetail: { ...theme.typography.meta, color: theme.color.text.secondary },
-    checkDetailFail: { color: theme.color.status.danger },
-    checkDetailWarn: { color: theme.color.status.warning },
+    checkDetailFail: { color: theme.color.status.dangerText },
+    checkDetailWarn: { color: theme.color.status.warningText },
     accordionHeader: {
       minHeight: theme.size.groupedListRowMinHeight,
       flexDirection: 'row',

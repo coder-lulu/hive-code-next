@@ -52,7 +52,7 @@ export function createVoiceSettingsStyles(theme: MobileTheme) {
       borderRadius: theme.radii.card,
       backgroundColor: theme.color.bg.surface
     },
-    errorText: { ...theme.typography.meta, color: theme.color.status.danger },
+    errorText: { ...theme.typography.meta, color: theme.color.status.dangerText },
     drawerTitle: {
       ...theme.typography.sectionTitle,
       color: theme.color.text.primary,

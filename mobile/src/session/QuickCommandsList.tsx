@@ -220,7 +220,7 @@ function createStyles(theme: MobileTheme) {
     },
     error: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       paddingHorizontal: theme.spacing.space4
     },
     loading: { paddingVertical: theme.spacing.space16 },

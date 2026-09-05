@@ -115,7 +115,7 @@ export function createNewWorktreeModalStyles(theme: MobileTheme) {
     },
     errorInline: {
       ...theme.typography.caption,
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     },
     input: {
       minHeight: theme.size.minimumTouchTarget,
@@ -130,14 +130,14 @@ export function createNewWorktreeModalStyles(theme: MobileTheme) {
     },
     error: {
       ...theme.typography.meta,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       marginBottom: theme.spacing.space16
     },
     sourceWarning: {
       ...theme.typography.caption,
       marginTop: -theme.spacing.space8,
       marginBottom: theme.spacing.space16,
-      color: theme.color.status.warning
+      color: theme.color.status.warningText
     },
     advancedToggle: {
       minHeight: theme.size.minimumTouchTarget,

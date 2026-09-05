@@ -97,7 +97,7 @@ export function createMobileTaskScreenChromeStyles(theme: MobileTheme) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.borderSubtle
     },
-    errorText: { ...theme.typography.meta, color: colors.statusRed },
+    errorText: { ...theme.typography.meta, color: theme.color.status.dangerText },
     sourceErrorBanner: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -111,7 +111,7 @@ export function createMobileTaskScreenChromeStyles(theme: MobileTheme) {
     sourceErrorCopy: { flex: 1, minWidth: 0 },
     sourceErrorText: {
       ...theme.typography.meta,
-      color: colors.statusAmber,
+      color: theme.color.status.warningText,
       fontWeight: theme.typography.sectionTitle.fontWeight
     },
     sourceErrorSlug: { ...theme.typography.code, color: colors.textPrimary },
@@ -139,7 +139,7 @@ export function createMobileTaskScreenChromeStyles(theme: MobileTheme) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.borderSubtle
     },
-    sourceNoticeText: { ...theme.typography.meta, color: colors.statusAmber },
+    sourceNoticeText: { ...theme.typography.meta, color: theme.color.status.warningText },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyText: { ...theme.typography.body, color: colors.textSecondary },
     centeredHint: {

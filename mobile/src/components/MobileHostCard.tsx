@@ -62,10 +62,7 @@ export function MobileHostCard(props: {
       ? localizeConnectionPath(mobileConnectionPathLabel(props.path))
       : null
   const discoveryHint =
-    !cloudOffline &&
-    !cloudUnavailable &&
-    props.verdict.kind === 'unreachable' &&
-    !props.host.relay
+    !cloudOffline && !cloudUnavailable && props.verdict.kind === 'unreachable' && !props.host.relay
       ? productNameText('更新桌面端 Orca 并登录，以便随时随地连接')
       : null
   const credentialHint = credentialMissing
@@ -76,7 +73,7 @@ export function MobileHostCard(props: {
         ? 'Runtime 重新连接 HiveCloud 后即可使用'
         : cloudUnavailable
           ? '请更新 Runtime，或等待运营侧启用安全中继'
-      : null
+          : null
   const accessibilityLabel = [
     `打开 ${props.host.name}`,
     statusLabel,
@@ -115,8 +112,8 @@ export function MobileHostCard(props: {
             <Text
               style={[
                 styles.metaText,
-                isError && { color: props.theme.color.status.danger },
-                credentialUnavailable && { color: props.theme.color.status.warning }
+                isError && { color: props.theme.color.status.dangerText },
+                credentialUnavailable && { color: props.theme.color.status.warningText }
               ]}
               numberOfLines={1}
             >

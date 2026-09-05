@@ -122,7 +122,7 @@ export function FutureFeatureAction({
   const textColor = unavailable
     ? theme.color.text.tertiary
     : destructive
-      ? theme.color.status.danger
+      ? theme.color.status.dangerText
       : theme.color.text.inverse
   const borderColor = focused
     ? theme.color.brand.primary
@@ -196,7 +196,7 @@ export function FutureFeatureNotice({ title, children, danger = false }: FutureF
         maxFontSizeMultiplier={1.3}
         style={[
           theme.typography.sectionTitle,
-          { color: danger ? theme.color.status.danger : theme.color.text.primary }
+          { color: danger ? theme.color.status.dangerText : theme.color.text.primary }
         ]}
       >
         {title}

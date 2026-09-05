@@ -18,7 +18,7 @@ export function createMobileSessionReaderStyles(theme: MobileTheme) {
     },
     markdownError: {
       ...theme.typography.body,
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     },
     markdownRefreshButton: {
       minHeight: theme.size.minimumTouchTarget,
@@ -233,10 +233,10 @@ export function createMobileSessionReaderStyles(theme: MobileTheme) {
       color: theme.color.text.tertiary
     },
     diffPrefixAdded: {
-      color: theme.color.status.success
+      color: theme.color.status.successText
     },
     diffPrefixDeleted: {
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     }
   })
 }

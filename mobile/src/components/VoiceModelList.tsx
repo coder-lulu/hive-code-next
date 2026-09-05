@@ -213,7 +213,7 @@ function createStyles(theme: MobileTheme) {
       alignItems: 'center',
       gap: theme.spacing.space4
     },
-    selectedText: { ...theme.typography.meta, color: theme.color.status.success },
+    selectedText: { ...theme.typography.meta, color: theme.color.status.successText },
     actionButton: {
       minHeight: theme.size.minimumTouchTarget,
       justifyContent: 'center',

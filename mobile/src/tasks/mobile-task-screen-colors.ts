@@ -14,8 +14,11 @@ export function createMobileTaskScreenPalette(theme: MobileTheme) {
     borderSubtle: theme.color.border.subtle,
     brand: theme.color.brand.primary,
     success: theme.color.status.success,
+    successText: theme.color.status.successText,
     warning: theme.color.status.warning,
-    danger: theme.color.status.danger
+    warningText: theme.color.status.warningText,
+    danger: theme.color.status.danger,
+    dangerText: theme.color.status.dangerText
   }
 }
 
@@ -34,8 +37,11 @@ export function createMobileTaskCompatColors(theme: MobileTheme) {
     accentBlue: theme.color.brand.primary,
     onAccent: theme.color.text.inverse,
     statusGreen: theme.color.status.success,
+    statusGreenText: theme.color.status.successText,
     statusAmber: theme.color.status.warning,
+    statusAmberText: theme.color.status.warningText,
     statusRed: theme.color.status.danger,
+    statusRedText: theme.color.status.dangerText,
     mergeGreen: theme.color.status.success,
     onMergeGreen: theme.color.text.inverse
   }

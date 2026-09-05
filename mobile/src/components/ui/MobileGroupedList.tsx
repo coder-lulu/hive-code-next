@@ -126,6 +126,6 @@ function createStyles(theme: MobileTheme) {
       textAlign: 'right'
     },
     trailing: { minWidth: 24, alignItems: 'flex-end', justifyContent: 'center' },
-    danger: { color: theme.color.status.danger }
+    danger: { color: theme.color.status.dangerText }
   })
 }

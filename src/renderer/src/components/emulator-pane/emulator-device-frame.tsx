@@ -32,6 +32,7 @@ import { useEmulatorControlStream } from './use-emulator-control-stream'
 import { useEmulatorPaneSize } from './use-emulator-pane-size'
 import { useEmulatorScreenKeyboard } from './use-emulator-screen-keyboard'
 import { useEmulatorStreamWindowVisible } from './use-emulator-stream-window-visibility'
+import { useEmulatorStreamRecovery } from './use-emulator-stream-recovery'
 
 type EmulatorDeviceFrameProps = {
   previewUrl?: string
@@ -43,6 +44,7 @@ type EmulatorDeviceFrameProps = {
   visualOrientation: EmulatorDeviceVisualOrientation
   /** False when backgrounded; parks the stream with the pane's visibility. */
   isActive: boolean
+  onReconnect?: () => void | Promise<void>
   onTap: (x: number, y: number) => void
   onGesture: (points: EmulatorGesturePoint[]) => void
 }
@@ -70,6 +72,7 @@ export function EmulatorDeviceFrame({
   isLive,
   visualOrientation,
   isActive,
+  onReconnect,
   onTap,
   onGesture
 }: EmulatorDeviceFrameProps) {
@@ -82,6 +85,8 @@ export function EmulatorDeviceFrame({
   const wheelGestureRef = useRef<PendingWheelGesture | null>(null)
   const [streamError, setStreamError] = useState(false)
   const [streamSize, setStreamSize] = useState<StreamSize | null>(null)
+  const { markRecovered, requestAutomaticRecovery, requestManualRecovery } =
+    useEmulatorStreamRecovery(onReconnect)
   const visualStreamGeometry = useMemo(
     () => resolveVisualStreamGeometry(streamSize, visualOrientation),
     [streamSize, visualOrientation]
@@ -336,6 +341,16 @@ export function EmulatorDeviceFrame({
     setStreamError(true)
   }, [])
 
+  const handleAndroidStreamError = useCallback(() => {
+    setStreamError(true)
+    requestAutomaticRecovery()
+  }, [requestAutomaticRecovery])
+
+  const handleStreamRetry = useCallback(() => {
+    setStreamError(true)
+    requestManualRecovery()
+  }, [requestManualRecovery])
+
   // Why: a hidden/occluded window (or a background tab) still receives emulator
   // frames, including over SSH; parking the stream avoids background decode/IPC
   // churn while staying attached. isActive covers the background-tab case;
@@ -386,6 +401,7 @@ export function EmulatorDeviceFrame({
             isLive={isLive}
             keyboardCaptureActive={keyboardCaptureActive}
             loading={loading}
+            onAndroidStreamError={handleAndroidStreamError}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
@@ -393,7 +409,9 @@ export function EmulatorDeviceFrame({
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onStreamRetry={handleStreamRetry}
             onStreamError={handleStreamError}
+            onStreamReady={markRecovered}
             onStreamSize={handleStreamSize}
             onWheel={handleWheel}
             previewUrl={previewUrl}

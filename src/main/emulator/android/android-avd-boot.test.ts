@@ -20,6 +20,12 @@ const SDK: AndroidSdkPaths = {
 const ok = (stdout = ''): AndroidCommandResult => ({ stdout, stderr: '', code: 0 })
 const adbDevices = (...serials: string[]): AndroidCommandResult =>
   ok(['List of devices attached', ...serials.map((serial) => `${serial}\tdevice`)].join('\n'))
+const adbDevicesWithState = (...devices: [serial: string, state: string][]): AndroidCommandResult =>
+  ok(
+    ['List of devices attached', ...devices.map(([serial, state]) => `${serial}\t${state}`)].join(
+      '\n'
+    )
+  )
 
 function fakeChild(pid: number): ChildProcess {
   return Object.assign(new EventEmitter(), {
@@ -89,6 +95,97 @@ describe('bootAndroidDevice recovery', () => {
     expect(sleep.mock.calls.length).toBeLessThan(5)
   })
 
+  it('treats a managed AVD offline transport as booting within the startup budget', async () => {
+    const child = fakeChild(7_001)
+    const spawn = vi.fn(() => child)
+    const terminateTree = vi.fn(async () => true)
+    const managed = new AndroidManagedAvdProcesses(
+      spawn as unknown as AndroidAvdProcessSpawner,
+      terminateTree
+    )
+    const sleep = vi.fn(async () => {})
+    let devicePolls = 0
+    const runner = vi.fn(async (binary: string, args: readonly string[]) => {
+      const joinedArgs = args.join(' ')
+      if (binary === SDK.adb && joinedArgs === 'devices -l') {
+        devicePolls += 1
+        if (devicePolls === 1) {
+          return adbDevices()
+        }
+        if (devicePolls <= 3) {
+          return adbDevicesWithState(['emulator-5554', 'offline'])
+        }
+        return adbDevices('emulator-5554')
+      }
+      if (binary === SDK.emulator && joinedArgs === '-list-avds') {
+        return ok('Pixel_7')
+      }
+      if (joinedArgs === '-s emulator-5554 shell getprop sys.boot_completed') {
+        if (devicePolls <= 3) {
+          return { stdout: '', stderr: 'device offline', code: 1 }
+        }
+        return ok('1')
+      }
+      return ok()
+    })
+
+    await expect(
+      bootAndroidDevice(
+        runner as unknown as AndroidCommandRunner,
+        SDK,
+        'Pixel_7',
+        bootOptions(managed, { sleep })
+      )
+    ).resolves.toBe('emulator-5554')
+
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(terminateTree).not.toHaveBeenCalled()
+    expect(sleep).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports a managed AVD as unresponsive only after it stays offline for the full budget', async () => {
+    const child = fakeChild(7_001)
+    const spawn = vi.fn(() => child)
+    const terminateTree = vi.fn(async () => true)
+    const managed = new AndroidManagedAvdProcesses(
+      spawn as unknown as AndroidAvdProcessSpawner,
+      terminateTree
+    )
+    const sleep = vi.fn(async () => {})
+    let devicePolls = 0
+    const runner = vi.fn(async (binary: string, args: readonly string[]) => {
+      const joinedArgs = args.join(' ')
+      if (binary === SDK.adb && joinedArgs === 'devices -l') {
+        devicePolls += 1
+        return devicePolls === 1 ? adbDevices() : adbDevicesWithState(['emulator-5554', 'offline'])
+      }
+      if (binary === SDK.emulator && joinedArgs === '-list-avds') {
+        return ok('Pixel_7')
+      }
+      if (joinedArgs === '-s emulator-5554 shell getprop sys.boot_completed') {
+        return { stdout: '', stderr: 'device offline', code: 1 }
+      }
+      return ok()
+    })
+
+    await expect(
+      bootAndroidDevice(
+        runner as unknown as AndroidCommandRunner,
+        SDK,
+        'Pixel_7',
+        bootOptions(managed, { bootTimeoutMs: 3, pollIntervalMs: 1, sleep })
+      )
+    ).rejects.toMatchObject({
+      code: 'emulator_device_unresponsive',
+      message: expect.stringContaining('stayed offline')
+    })
+
+    expect(sleep).toHaveBeenCalledTimes(3)
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(terminateTree).toHaveBeenCalledTimes(1)
+    expect(terminateTree).toHaveBeenCalledWith(child)
+  })
+
   it('cold-restarts one unresponsive managed AVD and binds its replacement serial', async () => {
     let phase: 'running' | 'gone' | 'restarted' = 'running'
     const children = [fakeChild(7_001), fakeChild(7_002)]
@@ -153,13 +250,14 @@ describe('bootAndroidDevice recovery', () => {
     expect(managed.findBySerial('emulator-5556')?.avdName).toBe('Pixel_7')
   })
 
-  it('does not launch a duplicate when an external unresponsive emulator hides its AVD name', async () => {
+  it('waits through the startup budget before rejecting an unidentified external offline emulator', async () => {
     const spawn = vi.fn(() => fakeChild(7_001))
     const terminateTree = vi.fn(async () => true)
     const managed = new AndroidManagedAvdProcesses(
       spawn as unknown as AndroidAvdProcessSpawner,
       terminateTree
     )
+    const sleep = vi.fn(async () => {})
     const runner = vi.fn(async (binary: string, args: readonly string[]) => {
       const joinedArgs = args.join(' ')
       if (binary === SDK.adb && joinedArgs === 'devices -l') {
@@ -182,9 +280,10 @@ describe('bootAndroidDevice recovery', () => {
         runner as unknown as AndroidCommandRunner,
         SDK,
         'Pixel_7',
-        bootOptions(managed)
+        bootOptions(managed, { bootTimeoutMs: 3, pollIntervalMs: 1, sleep })
       )
     ).rejects.toMatchObject({ code: 'emulator_device_unresponsive' })
+    expect(sleep).toHaveBeenCalledTimes(3)
     expect(spawn).not.toHaveBeenCalled()
     expect(terminateTree).not.toHaveBeenCalled()
   })

@@ -37,7 +37,34 @@ describe('scrcpyVideoRegistry', () => {
     expect(() =>
       scrcpyVideoRegistry.pushMeta('missing', { codecId: 'h264', width: 1, height: 1 })
     ).not.toThrow()
-    expect(scrcpyVideoRegistry.subscribe('missing', () => {})()).toBeUndefined()
+    const events: ScrcpyVideoEvent[] = []
+    expect(
+      scrcpyVideoRegistry.subscribe('missing', (event) => events.push(event))()
+    ).toBeUndefined()
+    expect(events).toEqual([{ type: 'error', message: 'Android video stream is unavailable.' }])
+  })
+
+  it('notifies subscribers about unexpected termination before closing once', () => {
+    const close = vi.fn(() => scrcpyVideoRegistry.stop('failed'))
+    const events: ScrcpyVideoEvent[] = []
+    scrcpyVideoRegistry.register('failed', close)
+    scrcpyVideoRegistry.subscribe('failed', (event) => events.push(event))
+
+    scrcpyVideoRegistry.stop('failed', 'video socket closed')
+
+    expect(events).toEqual([{ type: 'error', message: 'video socket closed' }])
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(scrcpyVideoRegistry.has('failed')).toBe(false)
+  })
+
+  it('does not report intentional shutdown as a stream failure', () => {
+    const events: ScrcpyVideoEvent[] = []
+    scrcpyVideoRegistry.register('shutdown', () => {})
+    scrcpyVideoRegistry.subscribe('shutdown', (event) => events.push(event))
+
+    scrcpyVideoRegistry.stop('shutdown')
+
+    expect(events).toEqual([])
   })
 
   it('replays the current GOP (keyframe + following deltas) to late subscribers', () => {

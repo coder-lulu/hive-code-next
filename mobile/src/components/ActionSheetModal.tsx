@@ -203,7 +203,7 @@ function createStyles(theme: MobileTheme) {
       color: theme.color.text.secondary
     },
     actionTextDestructive: {
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     },
     actionHint: {
       ...theme.typography.caption,

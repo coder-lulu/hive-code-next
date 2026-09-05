@@ -28,6 +28,9 @@ describe('mobile task screen presentation', () => {
     expect(styles.searchFieldFocused.borderColor).toBe(theme.color.brand.primary)
     expect(chromeStyles.segmentButton.backgroundColor).toBe(theme.color.bg.surface)
     expect(chromeStyles.segmentButton.minHeight).toBe(theme.size.minimumTouchTarget)
+    expect(chromeStyles.errorText.color).toBe(theme.color.status.dangerText)
+    expect(chromeStyles.sourceErrorText.color).toBe(theme.color.status.warningText)
+    expect(chromeStyles.sourceNoticeText.color).toBe(theme.color.status.warningText)
   })
 
   it('keeps controls reachable and task rows grouped', () => {

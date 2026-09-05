@@ -52,6 +52,7 @@ vi.mock('./MobileRepoIcon', () => ({ MobileRepoIcon: () => null }))
 vi.mock('./WorktreeAgentList', () => ({ WorktreeAgentList: () => null }))
 vi.mock('./WorktreeMetaGlyphs', () => ({
   prStateColor: () => '#000000',
+  prStateTextColor: () => '#000000',
   WorktreeMetaGlyphs: () => null
 }))
 

@@ -74,11 +74,11 @@ export function createHostEditStyles(theme: MobileTheme) {
     previewError: {
       ...theme.typography.body,
       marginTop: theme.spacing.space8,
-      color: theme.color.status.danger
+      color: theme.color.status.dangerText
     },
     errorText: {
       ...theme.typography.body,
-      color: theme.color.status.danger,
+      color: theme.color.status.dangerText,
       marginTop: theme.spacing.space12
     },
     errorState: {

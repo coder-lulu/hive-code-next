@@ -22,6 +22,7 @@ import {
 } from '../transport/client-context-connection-metrics'
 import { applyWorktreeRowDisplayState } from '../worktree/worktree-host-row-identity'
 import { useWorkspaceSections } from '../worktree/use-workspace-sections'
+import { useAllHostClients } from '../transport/use-all-host-clients'
 import { useHostRepoMetadata } from './use-host-repo-metadata'
 import { useHostScreenIdentity } from './use-host-screen-identity'
 import { useHostScreenState } from './use-host-screen-state'
@@ -37,6 +38,8 @@ export type HostScreenProps = {
   action?: string
   onHideSidebar?: () => void
 }
+
+const NO_AUTO_CONNECT_HOSTS: readonly string[] = []
 
 export function useHostScreenController({
   embedded = false,
@@ -59,6 +62,21 @@ export function useHostScreenController({
   const { client, state: connState } = useHostClient(hostId)
   const { catalog: accountVisibleHostCatalog, loaded: hostCatalogLoaded } =
     useAccountVisibleHostCatalog()
+  const runtimeHostIds = useMemo(
+    () => accountVisibleHostCatalog.map((entry) => entry.id),
+    [accountVisibleHostCatalog]
+  )
+  const runtimeClients = useAllHostClients(runtimeHostIds, {
+    autoConnectHostIds: NO_AUTO_CONNECT_HOSTS
+  })
+  const runtimeConnectionStates = useMemo(
+    () =>
+      Object.fromEntries([
+        ...runtimeClients.map((entry) => [entry.hostId, entry.state] as const),
+        ...(hostId ? [[hostId, connState] as const] : [])
+      ]),
+    [connState, hostId, runtimeClients]
+  )
   const currentHostCatalogEntry = accountVisibleHostCatalog.find((entry) => entry.id === hostId)
   const canRemoveHost = currentHostCatalogEntry
     ? hostCatalogEntryHasLocalPairing(currentHostCatalogEntry)
@@ -193,6 +211,8 @@ export function useHostScreenController({
     onHideSidebar,
     reconnectAttempts,
     relayRecovery,
+    runtimeCatalog: accountVisibleHostCatalog,
+    runtimeConnectionStates,
     routeNotice,
     router,
     sectionsResult,

@@ -59,6 +59,7 @@ export function useHostScreenState(hostId: string | undefined, action: string | 
   const [showSortPicker, setShowSortPicker] = useState(false)
   const [showGroupPicker, setShowGroupPicker] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
+  const [showRuntimeSelector, setShowRuntimeSelector] = useState(false)
   const [actionTarget, setActionTarget] = useState<Worktree | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Worktree | null>(null)
   const [confirmRemoveHost, setConfirmRemoveHost] = useState(false)
@@ -124,6 +125,7 @@ export function useHostScreenState(hostId: string | undefined, action: string | 
     setSearch,
     setShowFilterModal,
     setShowGroupPicker,
+    setShowRuntimeSelector,
     setShowSearch,
     setShowSortPicker,
     setSleptIds,
@@ -133,6 +135,7 @@ export function useHostScreenState(hostId: string | undefined, action: string | 
     setWorktreesLoaded,
     showFilterModal,
     showGroupPicker,
+    showRuntimeSelector,
     showSearch,
     showSortPicker,
     sleptIds,
