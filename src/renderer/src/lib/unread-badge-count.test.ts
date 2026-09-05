@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import type { Tab } from '../../../shared/tab-types'
 import type { Worktree } from '../../../shared/worktree/types'
-import { getUnreadBadgeCount } from './unread-badge-count'
+import { getUnreadBadgeCount, type UnreadBadgeCountSources } from './unread-badge-count'
+import { createUnreadBadgeCountSelector } from './unread-badge-count-selector'
 
 function worktree(id: string, isUnread: boolean): Worktree {
   return { id, isUnread } as Worktree
@@ -108,6 +109,28 @@ describe('getUnreadBadgeCount', () => {
         },
         unreadTerminalTabs: {},
         unreadAgentCompletionCountByPane: { 'structured-tab:leaf-1': 2 }
+      })
+    ).toBe(2)
+  })
+})
+
+describe('Dock badge completion updates', () => {
+  it('updates completion counts and dedupes a structured tab when its inventory arrives', () => {
+    const select = createUnreadBadgeCountSelector()
+    const state: UnreadBadgeCountSources = {
+      worktreesByRepo: { repo: [worktree('wt-1', true)] },
+      tabsByWorktree: {},
+      unreadTerminalTabs: {},
+      unreadAgentCompletionCountByPane: {}
+    }
+    expect(select(state)).toBe(1)
+
+    const completed = { ...state, unreadAgentCompletionCountByPane: { 'session-1:leaf-1': 2 } }
+    expect(select(completed)).toBe(3)
+    expect(
+      select({
+        ...completed,
+        unifiedTabsByWorktree: { 'wt-1': [unifiedTab('ui-session-1', 'wt-1', 'session-1')] }
       })
     ).toBe(2)
   })

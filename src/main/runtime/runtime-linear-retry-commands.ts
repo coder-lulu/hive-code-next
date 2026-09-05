@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   type LinearAgentAccessError,
   type LinearAgentWriteTarget,
@@ -28,7 +29,7 @@ export class RuntimeLinearRetryCommands extends RuntimeLinearCommandBase {
     const pinned =
       verb === 'create'
         ? [
-            'orca linear create',
+            `${PRIMARY_CLI_COMMAND} linear create`,
             `--workspace=${this.commandToken(workspaceId, 'WORKSPACE_ID')}`,
             `--write-id=${this.commandToken(writeId, 'WRITE_ID')}`,
             '--title TITLE_HERE',
@@ -42,7 +43,7 @@ export class RuntimeLinearRetryCommands extends RuntimeLinearCommandBase {
             ).concat(this.linearCreateFieldRetryTokens(extra.createFields))
           ].join(' ')
         : [
-            `orca linear ${verb === 'attach' ? 'attach' : 'comment add'}`,
+            `${PRIMARY_CLI_COMMAND} linear ${verb === 'attach' ? 'attach' : 'comment add'}`,
             this.commandToken(target?.issue.identifier ?? '', 'ISSUE_ID'),
             `--workspace=${this.commandToken(workspaceId, 'WORKSPACE_ID')}`,
             `--write-id=${this.commandToken(writeId, 'WRITE_ID')}`,
@@ -61,7 +62,7 @@ export class RuntimeLinearRetryCommands extends RuntimeLinearCommandBase {
           : ''
     return linearError(
       'linear_write_unconfirmed',
-      'Linear may have applied the write, but Orca could not confirm it.',
+      `Linear may have applied the write, but ${APP_DISPLAY_NAME} could not confirm it.`,
       {
         writeId,
         workspaceId,

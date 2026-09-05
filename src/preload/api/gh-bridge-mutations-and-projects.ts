@@ -35,6 +35,7 @@ import type {
   UpdateProjectItemFieldArgs
 } from '../../shared/github/project-request-types'
 import type { AppStarSource } from '../../shared/gh-star-source'
+import type { PreloadApi } from '../api-types'
 
 export const ghMutationsAndProjectsApi = {
   setPRAutoMerge: (args: {
@@ -199,4 +200,4 @@ export const ghMutationsAndProjectsApi = {
     ipcRenderer.invoke('gh:listIssueTypesBySlug', args),
   updateIssueTypeBySlug: (args: UpdateIssueTypeBySlugArgs): Promise<GitHubProjectMutationResult> =>
     ipcRenderer.invoke('gh:updateIssueTypeBySlug', args)
-}
+} satisfies Partial<PreloadApi['gh']>

@@ -95,6 +95,11 @@ vi.mock('../shared/product-update-source', () => ({
 
 vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))
 vi.mock('./electron-updater-loader', () => ({ loadElectronAutoUpdater: () => autoUpdaterMock }))
+vi.mock('./linux-update-package-type', () => ({
+  getLinuxPackageType: () => 'non-root',
+  getLinuxRootPackageType: () => null,
+  isExternallyManagedLinuxInstall: () => false
+}))
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 vi.mock('./ipc/pty', () => ({ killAllPty: killAllPtyMock }))
 vi.mock('./updater-changelog', () => ({ fetchChangelog: vi.fn().mockResolvedValue(null) }))
@@ -146,7 +151,7 @@ describe('headless serve update install handoff', () => {
     resetHandlers()
   })
 
-  it('defers install before disconnecting the serving owner or starting session cleanup', async () => {
+  it('ignores a late staged update after refusing an unsupported serving-owner download', async () => {
     const lifecycle: string[] = []
     const pendingInstaller = { version: '1.0.61', staged: true }
     const servingOwner = { version: '1.0.51', connectedClients: 2, verified: true }
@@ -192,12 +197,11 @@ describe('headless serve update install handoff', () => {
     nativeReadyHandler?.()
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(send).toHaveBeenCalledWith(
+    expect(send).not.toHaveBeenCalledWith(
       'updater:status',
       expect.objectContaining({ state: 'downloaded', version: pendingInstaller.version })
     )
-
-    recordUpdaterLifecycleMock.mockClear()
+    expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled()
     quitAndInstall()
     quitAndInstall()
     await vi.advanceTimersByTimeAsync(100)

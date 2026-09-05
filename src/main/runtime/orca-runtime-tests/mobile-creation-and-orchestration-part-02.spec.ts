@@ -91,7 +91,7 @@ describe('OrcaRuntimeService', () => {
       runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 101)
       expect(write).toHaveBeenCalledWith(
         'pty-1',
-        '\nYou have 1 orchestration message. Run `orca orchestration check --run run_mailbox`.\n'
+        '\nYou have 1 orchestration message. Run `hive orchestration check --run run_mailbox`.\n'
       )
       expect(write).not.toHaveBeenCalledWith(
         'pty-1',
@@ -107,7 +107,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       db.close()
@@ -167,7 +167,7 @@ describe('OrcaRuntimeService', () => {
       const pointers = () =>
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       expect(pointers()).toHaveLength(1)
       expect(pointers()[0]?.[1]).toContain('You have 1 orchestration message')
@@ -344,7 +344,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       expect(pendingMailPointerRepoints(runtime)).toBe(0)
@@ -456,7 +456,7 @@ describe('OrcaRuntimeService', () => {
     await vi.waitFor(() => {
       expect(write).toHaveBeenCalledWith(
         'pty-1',
-        '\nYou have 1 orchestration message. Run `orca orchestration check --run run_codex_native_title`.\n'
+        '\nYou have 1 orchestration message. Run `hive orchestration check --run run_codex_native_title`.\n'
       )
     })
     db.close()

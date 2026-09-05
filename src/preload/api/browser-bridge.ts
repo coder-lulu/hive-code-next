@@ -5,4 +5,4 @@ import type { PreloadApi } from '../api-types'
 export const browserApi: PreloadApi['browser'] = {
   ...browserGuestRegistrationAndDownloadsApi,
   ...browserPageInteractionAndSessionsApi
-}
+} satisfies PreloadApi['browser']

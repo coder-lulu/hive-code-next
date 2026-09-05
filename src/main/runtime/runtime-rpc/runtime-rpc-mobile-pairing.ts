@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { MobilePairingConnectionMode } from '../../../shared/mobile-pairing-connection-mode'
 import {
   mobileRelayMintFailureFromUnknown,
@@ -141,7 +142,7 @@ export class RuntimeRpcMobilePairing extends RuntimeRpcPairing {
         available: false,
         reason: 'relay_mint_failed',
         guidance:
-          'Orca Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.',
+          `${APP_DISPLAY_NAME} Relay could not create a pairing invite. Use LAN (Tailscale or same Wi‑Fi) or retry Relay.`,
         relayFailure
       }
     }
@@ -150,7 +151,7 @@ export class RuntimeRpcMobilePairing extends RuntimeRpcPairing {
       return refuseAutomaticWithoutRelay({
         code: 'relay_provider_unavailable',
         stage: 'provider_missing',
-        message: 'Orca Relay is not available on this desktop'
+        message: `${APP_DISPLAY_NAME} Relay is not available on this desktop`
       })
     }
     const device = this.deviceRegistry?.getDevice(direct.deviceId)
@@ -207,6 +208,7 @@ export class RuntimeRpcMobilePairing extends RuntimeRpcPairing {
         message: 'Could not store Relay binding for the pairing device'
       })
     }
+    const runtimeRecordId = this.runtime.getStatus().runtimeRecordId
     return {
       ...direct,
       connectionMode: 'automatic',
@@ -216,6 +218,7 @@ export class RuntimeRpcMobilePairing extends RuntimeRpcPairing {
         deviceToken: device.token,
         publicKeyB64,
         pairedDeviceId: device.deviceId,
+        ...(runtimeRecordId ? { runtimeRecordId } : {}),
         scope: 'mobile',
         relay: relayPairing.relay
       })

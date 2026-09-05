@@ -2,86 +2,81 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+const read = (name: string): string =>
+  readFileSync(join(import.meta.dirname, name), 'utf8').replaceAll('\r\n', '\n')
+const cloud = read('main-process-hive-runtime-cloud.ts')
+const foundation = read('main-process-ready-foundation.ts')
+const ready = read('main-process-ready-runtime.ts')
+const launch = read('main-process-runtime-launch.ts')
+const core = read('main-window-core-services.ts')
+const quit = read('main-process-quit.ts')
+
 describe('Hive Runtime Cloud Presence wiring', () => {
-  const source = readFileSync(join(process.cwd(), 'src/main/index.ts'), 'utf8')
-
-  it('shares one account refresh between desktop IPC and headless Presence', () => {
-    const proxyIndex = source.indexOf('await applyElectronProxySettings(')
-    const accountIndex = source.indexOf('const processHiveAccountService = new HiveAccountService(')
-    const refreshIndex = source.indexOf('.refresh()', accountIndex)
-    const runtimeIndex = source.indexOf('const runtimeService = new OrcaRuntimeService(')
-    const presenceIndex = source.indexOf(
-      'const processRuntimeCloudPresence = new HiveRuntimeCloudPresenceService(',
-      runtimeIndex
+  it('shares one account refresh after the proxy barrier with desktop IPC and headless Presence', () => {
+    expect(foundation.indexOf('state.initialProxyApplicationReady =')).toBeGreaterThanOrEqual(0)
+    expect(foundation.indexOf('initializeHiveAccount()')).toBeGreaterThan(
+      foundation.indexOf('state.initialProxyApplicationReady =')
     )
-
-    expect(proxyIndex).toBeGreaterThanOrEqual(0)
-    expect(accountIndex).toBeGreaterThan(proxyIndex)
-    expect(refreshIndex).toBeGreaterThan(accountIndex)
-    expect(runtimeIndex).toBeGreaterThan(refreshIndex)
-    expect(presenceIndex).toBeGreaterThan(runtimeIndex)
-    expect(source).toContain('hiveAccountService.subscribeRuntimeCloudAuthorization(')
-    expect(source).toContain('hiveAccountService.getRuntimeCloudAuthorization()')
-    expect(source).toContain('...(hiveAccountService ? { hiveAccountService } : {})')
-    expect(source).toContain('...(hiveAccountStartupState ? { hiveAccountStartupState } : {})')
+    expect(cloud).toMatch(
+      /state\.hiveAccountStartupState = state\.initialProxyApplicationReady\s*\.then/
+    )
+    expect(cloud.match(/new HiveAccountService\(/g)).toHaveLength(1)
+    expect(cloud.match(/account\.refresh\(/g)).toHaveLength(1)
+    expect(ready.indexOf('initializeHiveRuntimeCloud(runtime)')).toBeGreaterThan(
+      ready.indexOf('const runtime = initializeMainProcessRuntime()')
+    )
+    expect(cloud).toContain('hiveAccountService.subscribeRuntimeCloudAuthorization(')
+    expect(cloud).toContain('hiveAccountService.getRuntimeCloudAuthorization()')
+    expect(core).toContain('hiveAccountService: state.hiveAccountService')
+    expect(core).toContain('hiveAccountStartupState: state.hiveAccountStartupState')
   })
 
-  it('does not publish readiness until the local Runtime RPC transport starts', () => {
-    const serveIndex = source.indexOf('if (serveOptions) {')
-    const headlessStart = source.indexOf('await runtimeRpc.start()', serveIndex)
-    const headlessReady = source.indexOf(
-      'runtimeCloudPresence?.setRuntimeReady(true)',
-      headlessStart
+  it('publishes readiness only after the local RPC starts, excluding desktop failure', () => {
+    const serve = launch.slice(
+      launch.indexOf('async function launchServeMode('),
+      launch.indexOf('async function launchDesktopMode(')
     )
-    const desktopStart = source.indexOf('desktopRuntimeRpc.start()', headlessReady)
-    const desktopFailure = source.indexOf('if (!runtimeRpcStartResult.ok)', desktopStart)
-    const desktopReady = source.indexOf(
-      'runtimeCloudPresence?.setRuntimeReady(true)',
-      desktopFailure
+    const desktop = launch.slice(
+      launch.indexOf('async function launchDesktopMode('),
+      launch.indexOf('export async function initializeMainProcessRuntimeLaunch(')
     )
-
-    expect(headlessStart).toBeGreaterThan(serveIndex)
-    expect(headlessReady).toBeGreaterThan(headlessStart)
-    expect(desktopStart).toBeGreaterThan(headlessReady)
-    expect(desktopFailure).toBeGreaterThan(desktopStart)
-    expect(desktopReady).toBeGreaterThan(desktopFailure)
+    expect(serve.indexOf('await runtimeRpc.start()')).toBeGreaterThanOrEqual(0)
+    expect(serve.indexOf('state.runtimeCloudPresence?.setRuntimeReady(true)')).toBeGreaterThan(
+      serve.indexOf('await runtimeRpc.start()')
+    )
+    expect(desktop).toMatch(
+      /if \(runtimeRpcStartResult\.ok\) \{\s*state\.runtimeCloudPresence\?\.setRuntimeReady\(true\)/
+    )
+    expect(desktop.indexOf('if (runtimeRpcStartResult.ok)')).toBeGreaterThan(
+      desktop.indexOf('await Promise.all([')
+    )
   })
 
-  it('fences synchronously before quit and joins Presence shutdown to the quit barrier', () => {
-    const relaunch = source.indexOf('onBeforeRelaunch: async () => {')
-    const relaunchReadyFence = source.indexOf(
-      'runtimeCloudPresence?.setRuntimeReady(false)',
-      relaunch
+  it('fences relaunch, update and quit synchronously and joins cloud shutdown to the committed barrier', () => {
+    for (const anchor of ['onBeforeRelaunch: async () => {', 'onBeforeUpdateQuit: () => {']) {
+      const start = core.indexOf(anchor)
+      const end = core.indexOf('preserveAgentAuthBeforeRestart(', start)
+      expect(start).toBeGreaterThanOrEqual(0)
+      expect(end).toBeGreaterThan(start)
+      expect(core.slice(start, end)).toContain('state.runtimeCloudPresence?.setRuntimeReady(false)')
+      expect(core.slice(start, end)).toContain('state.runtimeCloudPresence?.setAuthorization(null)')
+    }
+    const beforeQuit = quit.slice(
+      quit.indexOf("app.on('before-quit'"),
+      quit.indexOf("app.on('will-quit'")
     )
-    const relaunchAuthFence = source.indexOf(
-      'runtimeCloudPresence?.setAuthorization(null)',
-      relaunchReadyFence
+    expect(beforeQuit).toContain('state.runtimeCloudPresence?.setRuntimeReady(false)')
+    expect(beforeQuit).toContain('state.runtimeCloudPresence?.setAuthorization(null)')
+    expect(quit.indexOf('const runtimeCloudShutdown = stopHiveRuntimeCloud()')).toBeGreaterThan(
+      quit.indexOf('quitTeardownStartGate.tryStart(event)')
     )
-    const updateQuit = source.indexOf('onBeforeUpdateQuit: () => {')
-    const updateReadyFence = source.indexOf(
-      'runtimeCloudPresence?.setRuntimeReady(false)',
-      updateQuit
+    expect(quit).toMatch(/settleTeardownWithinDeadline\(\[\s*\.\.\.runtimeCloudShutdown,/)
+    expect(cloud).toContain('state.runtimeCloudPresence?.stop()')
+    expect(cloud).toContain(
+      "{ name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown }"
     )
-    const updateAuthFence = source.indexOf(
-      'runtimeCloudPresence?.setAuthorization(null)',
-      updateReadyFence
+    expect(cloud).toContain(
+      "{ name: 'runtime-cloud-web-session-control', promise: runtimeCloudWebSessionControlShutdown }"
     )
-    const beforeQuit = source.indexOf("app.on('before-quit'")
-    const readyFence = source.indexOf('runtimeCloudPresence?.setRuntimeReady(false)', beforeQuit)
-    const authFence = source.indexOf('runtimeCloudPresence?.setAuthorization(null)', readyFence)
-    const willQuit = source.indexOf("app.on('will-quit'", authFence)
-    const stop = source.indexOf('runtimeCloudPresence?.stop()', willQuit)
-    const barrier = source.indexOf("{ name: 'runtime-cloud-presence'", stop)
-
-    expect(relaunchReadyFence).toBeGreaterThan(relaunch)
-    expect(relaunchAuthFence).toBeGreaterThan(relaunchReadyFence)
-    expect(updateReadyFence).toBeGreaterThan(updateQuit)
-    expect(updateAuthFence).toBeGreaterThan(updateReadyFence)
-    expect(beforeQuit).toBeGreaterThanOrEqual(0)
-    expect(readyFence).toBeGreaterThan(beforeQuit)
-    expect(authFence).toBeGreaterThan(readyFence)
-    expect(willQuit).toBeGreaterThan(authFence)
-    expect(stop).toBeGreaterThan(willQuit)
-    expect(barrier).toBeGreaterThan(stop)
   })
 })

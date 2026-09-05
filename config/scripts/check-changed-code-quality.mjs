@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { resolvePullRequestDiffBase } from './git-pull-request-diff-base.mjs'
 
 const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?)$/
+const ROOT_CODE_QUALITY_IGNORED_PREFIXES = ['cloud/']
 export const OXLINT_SCANS = [
   {
     // Why: no --config, so Oxlint keeps discovering nested configs. Pinning the root
@@ -131,6 +132,10 @@ function splitNullDelimited(output) {
   return output.split('\0').filter(Boolean)
 }
 
+export function isRootCodeQualityPath(file) {
+  return !ROOT_CODE_QUALITY_IGNORED_PREFIXES.some((prefix) => file.startsWith(prefix))
+}
+
 function resolveBase(root, requestedBase) {
   for (const candidate of [
     requestedBase,
@@ -165,7 +170,10 @@ export function collectAddedLineRanges(root, requestedBase) {
   const rangesByFile = new Map()
 
   const changedSourceFiles = changedFiles.filter(
-    (file) => SOURCE_FILE_PATTERN.test(file) && existsSync(path.join(root, file))
+    (file) =>
+      isRootCodeQualityPath(file) &&
+      SOURCE_FILE_PATTERN.test(file) &&
+      existsSync(path.join(root, file))
   )
   for (const fileChunk of chunkFilesForCommand(changedSourceFiles)) {
     const diff = runGit(root, [
@@ -186,7 +194,11 @@ export function collectAddedLineRanges(root, requestedBase) {
 
   for (const file of untrackedFiles) {
     const absolutePath = path.join(root, file)
-    if (!SOURCE_FILE_PATTERN.test(file) || !existsSync(absolutePath)) {
+    if (
+      !isRootCodeQualityPath(file) ||
+      !SOURCE_FILE_PATTERN.test(file) ||
+      !existsSync(absolutePath)
+    ) {
       continue
     }
     const lineCount = readFileSync(absolutePath, 'utf8').split(/\r?\n/).length
@@ -390,7 +402,8 @@ function runOxlintScan(root, scan, files) {
       {
         cwd: root,
         encoding: 'utf8',
-        maxBuffer: 128 * 1024 * 1024
+        maxBuffer: 128 * 1024 * 1024,
+        windowsHide: true
       }
     )
     if (result.error) {

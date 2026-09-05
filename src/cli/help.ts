@@ -92,13 +92,12 @@ Terminals:
   terminal read             Read bounded terminal output
   terminal send             Send input to a live terminal
   terminal wait             Wait for a terminal condition (exit, tui-idle)
-  terminal stop             Stop terminals for a worktree
   terminal create           Create a terminal session in a worktree
   terminal rename           Set or clear the title of a terminal tab
   terminal split            Split an existing terminal pane
   terminal switch           Bring a terminal tab to the foreground
   terminal focus            Alias for terminal switch
-  terminal close            Close a terminal pane/session, or its whole tab with --tab
+  terminal close            Close one terminal, its whole tab with --tab, or all in a worktree
 
 Orchestration:
   orchestration run-create  Create and bind a lightweight orchestration Run
@@ -253,11 +252,10 @@ Common Commands:
   hive terminal read [--terminal <handle>] [--cursor <n>] [--limit <n>] [--json]
   hive terminal send [--terminal <handle>] [--text <text>] [--enter] [--interrupt] [--json]
   hive terminal wait [--terminal <handle>] --for exit|tui-idle [--timeout-ms <ms>] [--json]
-  hive terminal stop --worktree <selector> [--json]
   hive terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--focus] [--json]
   hive terminal split [--terminal <handle>] [--direction horizontal|vertical] [--json]
   hive terminal switch [--terminal <handle>] [--json]
-  hive terminal close [--terminal <handle>] [--tab] [--json]
+  hive terminal close ([--terminal <handle>] [--tab] | --worktree <selector> --all) [--json]
   hive project list [--json]
   hive project setups [--project <id>] [--host <host-id>] [--json]
   hive project setup-existing-folder --project <id> --host <host-id> --path <path> [--kind git|folder] [--display-name <name>] [--json]
@@ -427,7 +425,7 @@ export function formatCommandHelp(spec: CommandSpec): string {
 }
 
 export function formatGroupHelp(specs: CommandSpec[], group: string): string {
-  const groupSpecs = specs.filter((spec) => spec.path[0] === group)
+  const groupSpecs = specs.filter((spec) => spec.path[0] === group && spec.hidden !== true)
   const lines = [`hive ${group}`, '', `Usage: hive ${group} <command> [options]`, '', 'Commands:']
   for (const spec of groupSpecs) {
     lines.push(`  ${spec.path.slice(1).join(' ').padEnd(18)} ${spec.summary}`)

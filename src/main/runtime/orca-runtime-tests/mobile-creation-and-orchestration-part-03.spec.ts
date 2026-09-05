@@ -60,7 +60,7 @@ describe('OrcaRuntimeService', () => {
         .map(([, data]) => data)
         .filter((data): data is string => typeof data === 'string')
       expect(payloads).toContain(
-        '\nYou have 1 orchestration message. Run `orca orchestration check --run run_test`.\n'
+        '\nYou have 1 orchestration message. Run `hive orchestration check --run run_test`.\n'
       )
       expect(payloads.some((data) => data.includes('reserved completion'))).toBe(false)
       expect(status.delivered_at).toEqual(expect.any(String))
@@ -431,7 +431,7 @@ describe('OrcaRuntimeService', () => {
       await Promise.resolve()
 
       const pointerWrites = write.mock.calls.filter(
-        ([, payload]) => typeof payload === 'string' && payload.includes('orca orchestration check')
+        ([, payload]) => typeof payload === 'string' && payload.includes('hive orchestration check')
       )
       expect(pointerWrites).toHaveLength(1)
 
@@ -443,7 +443,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       db.close()
@@ -485,7 +485,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(1)
       expect(second.delivered_at).toBeNull()
@@ -499,7 +499,7 @@ describe('OrcaRuntimeService', () => {
       expect(
         write.mock.calls.filter(
           ([, payload]) =>
-            typeof payload === 'string' && payload.includes('orca orchestration check')
+            typeof payload === 'string' && payload.includes('hive orchestration check')
         )
       ).toHaveLength(2)
       expect(write).toHaveBeenCalledWith(

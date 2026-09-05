@@ -79,7 +79,7 @@ export function UpdateErrorCardContent({
   tertiaryAction,
   footnote,
   onClose
-}: UpdateErrorCardModel & { onClose: () => void }) {
+}: UpdateErrorCardModel & { onClose?: () => void }) {
   // Why: raw error starts collapsed so the card leads with the plain summary, not a stack dump.
   const [showDetails, setShowDetails] = useState(false)
   const detailId = useId()
@@ -102,15 +102,20 @@ export function UpdateErrorCardContent({
           <h3 className="text-sm font-semibold">{title}</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">{summary}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 min-w-[44px] min-h-[44px] -m-2"
-          onClick={onClose}
-          aria-label={translate('auto.components.UpdateCard.8acbdd3961', 'Minimize to status bar')}
-        >
-          <Minus className="size-3.5" />
-        </Button>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 min-w-[44px] min-h-[44px] -m-2"
+            onClick={onClose}
+            aria-label={translate(
+              'auto.components.UpdateCard.8acbdd3961',
+              'Minimize to status bar'
+            )}
+          >
+            <Minus className="size-3.5" />
+          </Button>
+        )}
       </div>
 
       {explainer ? (
@@ -141,7 +146,7 @@ export function UpdateErrorCardContent({
           {showDetails ? (
             <div id={detailId} className="rounded-md bg-muted/40 px-3 py-2">
               <p className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">
-                {translate('auto.components.UpdateCard.3553a8672f', 'Last error')}
+                {translate('auto.components.UpdateCard.3553a8672f', 'Details')}
               </p>
               <p className="scrollbar-sleek max-h-20 overflow-auto break-words font-mono text-xs leading-relaxed text-muted-foreground">
                 {detail}

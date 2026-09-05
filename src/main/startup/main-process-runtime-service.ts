@@ -14,7 +14,10 @@ import type { OrchestrationEnvironmentTransport } from '../runtime/orchestration
 import { resolveEnvironment } from '../../shared/runtime-environment-store'
 import { getPreferredPairingOffer } from '../../shared/runtime-environments'
 import { fingerprintOrchestrationPeer } from '../runtime/orchestration/environment-transport'
-import { callRuntimeEnvironment } from '../ipc/runtime-environment-transport-routing'
+import {
+  callEnvironmentWithCloudFallback,
+  resolveRuntimeEnvironmentCatalogEntry
+} from '../ipc/runtime-environment-account-routing'
 import { mainProcessState as state } from './main-process-state'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
@@ -39,26 +42,41 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
   }
   const orchestrationEnvironmentTransport: OrchestrationEnvironmentTransport = {
     resolve: (selector) => {
-      const environment = resolveEnvironment(app.getPath('userData'), selector)
-      const pairing = getPreferredPairingOffer(environment)
+      const userDataPath = app.getPath('userData')
+      const environment = resolveRuntimeEnvironmentCatalogEntry(userDataPath, selector)
+      const localPairing = environment.accessSources?.includes('local-pairing')
+        ? getPreferredPairingOffer(resolveEnvironment(userDataPath, environment.id))
+        : null
+      const accountRuntimeRecordId = environment.runtimeRecordId
+      if (!localPairing && !accountRuntimeRecordId) {
+        throw new Error('Account Runtime identity is unavailable')
+      }
       return {
         environmentId: environment.id,
         name: environment.name,
-        peerFingerprint: fingerprintOrchestrationPeer(pairing.publicKeyB64)
+        peerFingerprint: localPairing
+          ? fingerprintOrchestrationPeer(localPairing.publicKeyB64)
+          : fingerprintOrchestrationPeer(
+              Buffer.from(`hive-account-runtime:${accountRuntimeRecordId}`).toString('base64')
+            )
       }
     },
-    call: (selector, method, params, timeoutMs, envelope) =>
-      callRuntimeEnvironment(
-        app.getPath('userData'),
-        selector,
+    call: async (selector, method, params, timeoutMs, envelope) => {
+      const userDataPath = app.getPath('userData')
+      const environment = resolveRuntimeEnvironmentCatalogEntry(userDataPath, selector)
+      return callEnvironmentWithCloudFallback(
+        userDataPath,
+        environment,
         method,
         params,
         timeoutMs,
         undefined,
         envelope
       )
+    }
   }
   const runtime = new OrcaRuntimeService(store, stats, {
+    getRuntimeRecordId: () => state.localRuntimeOwnership?.getClaimedRuntimeRecordId() ?? null,
     agentSessionClaimSigner: loadAgentSessionClaimSigner(
       getProfileUserDataPath(),
       getProfileUserDataPath()

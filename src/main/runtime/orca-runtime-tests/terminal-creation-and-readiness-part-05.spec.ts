@@ -1,3 +1,4 @@
+import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import { describe, expect, it, vi } from 'vitest'
 import {
   OrcaRuntimeService,
@@ -571,7 +572,9 @@ describe('OrcaRuntimeService', () => {
       })
       expect(created.warning).toContain('Renderer timed out')
       expect(created.warning).toContain('could not make it discoverable')
-      expect(created.warning).toContain(`orca terminal focus --terminal ${created.handle}`)
+      expect(created.warning).toContain(
+        `${PRIMARY_CLI_COMMAND} terminal focus --terminal ${created.handle}`
+      )
       const spawnCall = spawn.mock.calls[0]?.[0] as { env?: Record<string, string> } | undefined
       const spawnedEnv = spawnCall?.env ?? {}
       expectStablePaneKeyEnv(spawnedEnv)
@@ -610,7 +613,9 @@ describe('OrcaRuntimeService', () => {
       handle: expect.stringMatching(/^term_/)
     })
     expect(created.warning).toContain('could not make it discoverable')
-    expect(created.warning).toContain(`orca terminal focus --terminal ${created.handle}`)
+    expect(created.warning).toContain(
+      `${PRIMARY_CLI_COMMAND} terminal focus --terminal ${created.handle}`
+    )
   })
 
   it('does not warn when background presentation has no renderer notifier', async () => {

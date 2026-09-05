@@ -73,3 +73,23 @@ export function applyLatePersistedTerminalSessionSanitization(
     store.getState().reconcileWorktreeTabModel(worktreeId)
   }
 }
+
+export function scheduleLatePersistedTerminalSessionSanitization(
+  store: StartupTerminalStore,
+  original: WorkspaceSessionState,
+  pending: Promise<WorkspaceSessionState> | null | undefined,
+  isCancelled: () => boolean
+): void {
+  if (!pending) {
+    return
+  }
+  void pending
+    .then((sanitizedSession) => {
+      if (!isCancelled()) {
+        applyLatePersistedTerminalSessionSanitization(store, original, sanitizedSession)
+      }
+    })
+    .catch((error) => {
+      console.warn('Late persisted terminal sanitization failed:', error)
+    })
+}

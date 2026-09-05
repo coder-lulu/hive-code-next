@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { authenticateE2EEChannel } from './e2ee-channel-authentication'
 import { authenticateCloudManagedE2EE } from './cloud-managed-e2ee-auth-validation'
 
 const auth = {
@@ -11,6 +12,21 @@ const auth = {
 }
 
 describe('Cloud-managed E2EE auth validation', () => {
+  it.each([false, true])('rejects null authentication with Cloud resolver enabled=%s', (cloud) => {
+    const resolveDevice = vi.fn()
+    const resolveCloudSession = vi.fn()
+    expect(
+      authenticateE2EEChannel({
+        plaintext: 'null',
+        v2Session: null,
+        resolveDevice,
+        ...(cloud ? { resolveCloudSession } : {})
+      })
+    ).toEqual({ ok: false, principalKind: 'paired_device', code: 'bad_auth' })
+    expect(resolveDevice).not.toHaveBeenCalled()
+    expect(resolveCloudSession).not.toHaveBeenCalled()
+  })
+
   it('resolves the exact Cloud principal frame', () => {
     const resolveSession = vi.fn().mockReturnValue({ kind: 'cloud' })
 

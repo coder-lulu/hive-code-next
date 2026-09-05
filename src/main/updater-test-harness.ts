@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { afterAll, vi } from 'vitest'
 import { applyProductBranding } from '../shared/brand'
 import { createProductUpdaterTestMocks } from './updater-product-test-harness'
 import type {
@@ -9,6 +9,8 @@ import type {
 } from './updater-electron-test-types'
 export type { ProductUpdateSource } from './updater-product-test-harness'
 export type { UpdaterMocks } from './updater-electron-test-types'
+import { clearTrackedRealTimers, trackRealTimers } from './updater-test-timer-tracking'
+type LinuxPackageType = 'deb' | 'rpm' | 'non-root' | 'unusable'
 
 // Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
 export const PRE_COMMIT_INSTALL_FAILURE =
@@ -24,6 +26,10 @@ export const PRE_COMMIT_INSTALL_FAILURE =
  * `vi.hoisted` block so the mocks exist before the mock factories run.
  */
 export function createUpdaterMocks(): UpdaterMocks {
+  afterAll(() => {
+    vi.useRealTimers()
+    clearTrackedRealTimers()
+  })
   const appEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
   const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
 
@@ -138,6 +144,10 @@ export function createUpdaterMocks(): UpdaterMocks {
   const killAllPtyMock = vi.fn()
   const powerMonitorOnMock = vi.fn()
   const getLinuxRootPackageTypeMock = vi.fn<() => 'deb' | 'rpm' | null>(() => null)
+  const getLinuxPackageTypeMock = vi.fn<() => LinuxPackageType>(() => {
+    return getLinuxRootPackageTypeMock() ?? 'non-root'
+  })
+  const isExternallyManagedLinuxInstallMock = vi.fn<() => boolean>(() => false)
   const recordUpdaterLifecycleMock = vi.fn()
   const fetchChangelogMock = vi.fn()
   const fetchNudgeMock = vi.fn()
@@ -176,7 +186,11 @@ export function createUpdaterMocks(): UpdaterMocks {
     electronToolkitUtils: () => ({ is: isMock }),
     ipcPty: () => ({ killAllPty: killAllPtyMock }),
     // Why: only the marker resolver is faked so the real artifact capture/redaction path stays under test.
-    linuxUpdatePackageType: () => ({ getLinuxRootPackageType: getLinuxRootPackageTypeMock }),
+    linuxUpdatePackageType: () => ({
+      getLinuxPackageType: getLinuxPackageTypeMock,
+      getLinuxRootPackageType: getLinuxRootPackageTypeMock,
+      isExternallyManagedLinuxInstall: isExternallyManagedLinuxInstallMock
+    }),
     updaterLifecycleDiagnostics: () => ({ recordUpdaterLifecycle: recordUpdaterLifecycleMock }),
     updaterChangelog: () => ({ fetchChangelog: fetchChangelogMock }),
     updaterNudge: () => ({ fetchNudge: fetchNudgeMock, shouldApplyNudge: shouldApplyNudgeMock }),
@@ -222,6 +236,7 @@ export function createUpdaterMocks(): UpdaterMocks {
   /** Shared `beforeEach` body: fresh module registry plus every mock back to its default. */
   const resetUpdaterMocks = () => {
     vi.clearAllTimers()
+    clearTrackedRealTimers()
     vi.resetModules()
     autoUpdaterMock.reset()
     productUpdaterSessionFetchMock.mockReset().mockImplementation(respondToProductUpdaterRequest)
@@ -239,6 +254,10 @@ export function createUpdaterMocks(): UpdaterMocks {
     disarmExitWatchdogMock.mockReset()
     powerMonitorOnMock.mockReset()
     getLinuxRootPackageTypeMock.mockReset().mockReturnValue(null)
+    getLinuxPackageTypeMock.mockReset().mockImplementation(() => {
+      return getLinuxRootPackageTypeMock() ?? 'non-root'
+    })
+    isExternallyManagedLinuxInstallMock.mockReset().mockReturnValue(false)
     recordUpdaterLifecycleMock.mockReset()
     fetchNudgeMock.mockReset().mockResolvedValue(null)
     shouldApplyNudgeMock.mockReset().mockReturnValue(false)
@@ -252,6 +271,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     })
     vi.unstubAllGlobals()
     vi.useRealTimers()
+    trackRealTimers()
   }
 
   return {
@@ -262,7 +282,9 @@ export function createUpdaterMocks(): UpdaterMocks {
     isMock,
     killAllPtyMock,
     powerMonitorOnMock,
+    getLinuxPackageTypeMock,
     getLinuxRootPackageTypeMock,
+    isExternallyManagedLinuxInstallMock,
     recordUpdaterLifecycleMock,
     fetchChangelogMock,
     fetchNudgeMock,

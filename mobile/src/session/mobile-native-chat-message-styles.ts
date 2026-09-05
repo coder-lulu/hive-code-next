@@ -78,6 +78,18 @@ export function createMobileNativeChatMessageStyles(theme: MobileTheme) {
       flex: 1,
       color: theme.color.text.tertiary
     },
+    toolRunActive: {
+      flex: 1,
+      minHeight: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8
+    },
+    toolRunActiveLabel: {
+      ...theme.typography.body,
+      flex: 1,
+      color: theme.color.text.secondary
+    },
     toolRunBody: {
       paddingLeft: theme.spacing.space8,
       borderLeftWidth: 2,

@@ -4,7 +4,18 @@ import { describe, expect, it } from 'vitest'
 
 describe('serve desktop activation wiring', () => {
   const entrySource = readFileSync(join(process.cwd(), 'src/main/index.ts'), 'utf8')
-  const source = entrySource
+  const pairingSource = readFileSync(
+    join(process.cwd(), 'src/main/startup/main-process-pairing-protocol.ts'),
+    'utf8'
+  )
+  const foundationSource = readFileSync(
+    join(process.cwd(), 'src/main/startup/main-process-ready-foundation.ts'),
+    'utf8'
+  )
+  const controllerSource = readFileSync(
+    join(process.cwd(), 'src/main/startup/main-window-controller.ts'),
+    'utf8'
+  )
   const preflightSource = readFileSync(
     join(process.cwd(), 'src/main/startup/main-process-preflight.ts'),
     'utf8'
@@ -85,22 +96,32 @@ describe('serve desktop activation wiring', () => {
     )
   })
 
-  it('registers protocol handlers for hivecode and orca schemes after setName', () => {
-    expect(source).toContain('registerProtocolHandlers({')
-    expect(source).toContain('onUrl: handleProtocolUrl')
-    expect(source).toContain('extractProtocolUrlFromArgv(argv)')
+  it('registers both product schemes after app identity without adding a duplicate URL consumer', () => {
+    expect(foundationSource.indexOf('registerPairingProtocols()')).toBeGreaterThan(
+      foundationSource.indexOf('app.setName(identity.appName)')
+    )
+    expect(pairingSource).toContain('registerProtocolHandlers({')
+    expect(pairingSource).toContain('listenForOpenUrl: false')
+    expect(entrySource).toContain('isPairingProtocolUrl(url)')
   })
 
-  it('delivers pending protocol URL on first window load', () => {
-    expect(source).toContain("window.webContents.send('protocol:pairing-url'")
-    expect(source).toContain('pendingProtocolUrl = null')
+  it('delivers buffered pairing URLs when the first renderer has loaded', () => {
+    expect(controllerSource.indexOf('publishPendingPairingProtocolUrl(window)')).toBeGreaterThan(
+      controllerSource.indexOf("logStartupMilestone('did-finish-load')")
+    )
+    expect(pairingSource).toContain("window.webContents.send('protocol:pairing-url'")
+    expect(pairingSource).toContain('state.pendingProtocolUrl = null')
   })
 
-  it('routes pairing URLs through handleProtocolUrl when received via argv', () => {
-    const activateFnIndex = source.indexOf('function requestDesktopActivation')
-    const protocolIndex = source.indexOf('extractProtocolUrlFromArgv(argv)', activateFnIndex)
-    const handleIndex = source.indexOf('handleProtocolUrl(protocolUrl)', activateFnIndex)
-    expect(protocolIndex).toBeGreaterThan(activateFnIndex)
-    expect(handleIndex).toBeGreaterThan(protocolIndex)
+  it('captures pairing links from argv while retaining the headless activation guard', () => {
+    const activation = entrySource.slice(
+      entrySource.indexOf('function requestDesktopActivation'),
+      entrySource.indexOf('function publishOsOpenedMarkdownFiles')
+    )
+    expect(activation.indexOf('capturePairingProtocolUrl(argv)')).toBeGreaterThan(
+      activation.indexOf('if (!shouldActivateDesktopForSecondInstance(argv))')
+    )
+    expect(entrySource).toContain('capturePairingProtocolUrl(process.argv)')
+    expect(activation).toContain('if (app.isReady())')
   })
 })

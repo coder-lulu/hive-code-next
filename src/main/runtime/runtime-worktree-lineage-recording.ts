@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { FolderWorkspace, WorkspaceKey } from '../../shared/folder-workspace-types'
 import type { Worktree } from '../../shared/worktree/types'
 import type {
@@ -80,8 +81,7 @@ export function recordCreatedWorktreeLineage(
   } else if (resolution.parent.type === 'worktree') {
     warnings.push({
       code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-      message:
-        'Worktree created, but Orca could not record lineage because instance identity was unavailable.',
+      message: `Worktree created, but ${APP_DISPLAY_NAME} could not record lineage because instance identity was unavailable.`,
       details: {
         childHasInstanceId: Boolean(childInstanceId),
         parentHasInstanceId: Boolean(parentInstanceId),

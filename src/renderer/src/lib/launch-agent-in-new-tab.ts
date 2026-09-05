@@ -1,9 +1,18 @@
+export { shouldQueueTerminalFocusAfterMenuClose } from './launch-agent-in-new-tab-context'
+import {
+  resolveLaunchAgentExecutionContext,
+  type LaunchAgentInNewTabArgs,
+  type LaunchAgentInNewTabResult
+} from './launch-agent-in-new-tab-context'
+export type {
+  LaunchAgentInNewTabArgs,
+  LaunchAgentInNewTabResult
+} from './launch-agent-in-new-tab-context'
 import { useAppStore } from '@/store'
-import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import { planLaunchAgentStartupPrompt } from '@/lib/launch-agent-startup-prompt-plan'
 import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { getAgentLaunchPlatformForRepo } from '@/lib/agent-launch-platform'
-import { reconcileTabOrder } from '@/components/tab-bar/reconcile-order'
+import { persistAgentLaunchTabOrder } from '@/lib/launch-agent-tab-order'
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import { createPasteReadinessTimeoutNotice } from '@/lib/launch-agent-paste-timeout-notice'
 import {
@@ -24,63 +33,18 @@ import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-te
 import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { resolveTuiAgentLaunchPermission } from '../../../shared/tui-agent-permissions'
-import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
-import { repoIsRemote } from '../../../shared/agent-launch-remote'
 import { seedCommandCodeSubmittedPromptStatus } from '@/lib/command-code-prompt-status-seed'
-import type { TuiAgent } from '../../../shared/tui-agent'
-import type { LaunchSource } from '../../../shared/telemetry-events'
-import {
-  getRepoExecutionHostId,
-  LOCAL_EXECUTION_HOST_ID,
-  parseExecutionHostId,
-  type ExecutionHostId
-} from '../../../shared/execution-host'
-import { getConnectionIdFromState } from '@/lib/connection-context'
 import { resolveInitialNativeChatSessionOptions } from '@/components/native-chat/native-chat-launch-session-options'
 import { seedNativeChatAppliedSessionOptions } from '@/components/native-chat/native-chat-session-option-cache'
-import { canUseStructuredNativeChat } from '@/lib/structured-native-chat-availability'
-import { startStructuredCodexLaunch } from '@/lib/structured-agent-session-launch'
-
-export type LaunchAgentInNewTabArgs = {
-  agent: TuiAgent
-  worktreeId: string
-  /** Host owner for colliding worktree IDs and FolderWorkspace scopes. */
-  executionHostId?: ExecutionHostId
-  /** Tab group the user launched from; keeps split-group launches in that pane instead of the active group. */
-  groupId?: string
-  /** Optional initial prompt; delivery depends on `promptDelivery` and the agent's prompt mode. */
-  prompt?: string
-  /** Optional CLI arguments appended to the selected agent command. */
-  agentArgs?: string | null
-  /** Per-launch permission policy. Defaults to the configured agent arguments and environment. */
-  agentPermissionMode?: AgentLaunchPermissionMode
-  initialCwd?: string | null
-  /** How to deliver the prompt: `draft` leaves it editable, `submit-after-ready` sends it once the TUI is ready. */
-  promptDelivery?: 'auto-submit' | 'draft' | 'submit-after-ready'
-  /** Telemetry surface that initiated this launch. Defaults to the tab-bar quick-launch entry point. */
-  launchSource?: LaunchSource
-  /** User-authored Quick Command label for local tabs created from the tab bar. */
-  quickCommandLabel?: string | null
-  /** Shell platform for the startup command; defaults to renderer OS. SSH/WSL worktrees run Linux even from Windows. */
-  launchPlatform?: NodeJS.Platform
-  /** Called after the prompt is actually delivered to the agent input path. */
-  onPromptDelivered?: () => void
-}
-
-export type LaunchAgentInNewTabResult = {
-  tabId: string | null
-  startupPlan: AgentStartupPlan
-  pasteDraftAfterLaunch: boolean
-  /** The host will publish and focus a structured tab asynchronously. */
-  focusAfterMenuClose?: 'structured-session'
-  promptDeliveryResult?: Promise<{ delivered: boolean; failureNotified: boolean }>
-} | null
-
-export function shouldQueueTerminalFocusAfterMenuClose(
-  result: NonNullable<LaunchAgentInNewTabResult>
-): boolean {
-  return result.tabId === null && result.focusAfterMenuClose !== 'structured-session'
-}
+import { startStructuredAgentLaunch } from '@/lib/structured-agent-session-launch'
+import { isAgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
+import {
+  hasExplicitTuiLaunchCustomization,
+  hasExplicitTuiAgentArgs,
+  resolveAgentLaunchRoute
+} from '@/lib/agent-launch-routing'
+import { readLocalRuntimeCapabilities } from '@/runtime/local-runtime-capabilities'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 
 /**
  * Create a new terminal tab and queue the agent's launch command, optionally
@@ -92,7 +56,10 @@ export function shouldQueueTerminalFocusAfterMenuClose(
  *
  * Returns `null` when no startup plan can be built (e.g. a whitespace-only prompt).
  */
-export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentInNewTabResult {
+function launchAgentInNewTabInternal(
+  args: LaunchAgentInNewTabArgs,
+  forceLegacy = false
+): LaunchAgentInNewTabResult {
   const {
     agent,
     worktreeId,
@@ -109,35 +76,22 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     onPromptDelivered
   } = args
   const store = useAppStore.getState()
-  const worktree =
-    store.getKnownWorktreeById?.(worktreeId, executionHostId) ??
-    store.allWorktrees?.().find((entry: { id: string }) => entry.id === worktreeId)
-  const repoCandidates = worktree
-    ? (store.repos?.filter((entry) => entry.id === worktree.repoId) ?? [])
-    : []
-  const worktreeHostId = parseExecutionHostId(worktree?.hostId)?.id
-  const resolvedExecutionHostId =
-    executionHostId ??
-    worktreeHostId ??
-    (repoCandidates[0] ? getRepoExecutionHostId(repoCandidates[0]) : LOCAL_EXECUTION_HOST_ID)
-  const repo =
-    repoCandidates.find((entry) => getRepoExecutionHostId(entry) === resolvedExecutionHostId) ??
-    repoCandidates[0] ??
-    null
-  const parsedExecutionHost = parseExecutionHostId(resolvedExecutionHostId)
-  const remoteHost = parsedExecutionHost?.kind === 'ssh' || parsedExecutionHost?.kind === 'runtime'
+  const { repo, resolvedExecutionHostId, remoteHost, worktreeSshConnectionId } =
+    resolveLaunchAgentExecutionContext(store, worktreeId, executionHostId)
   const resolvedLaunchPlatform =
     launchPlatform ??
     (repo
       ? getAgentLaunchPlatformForRepo(
           repo,
-          repo.connectionId ? undefined : getLocalProjectExecutionRuntimeContext(store, worktreeId)
+          worktreeSshConnectionId
+            ? undefined
+            : getLocalProjectExecutionRuntimeContext(store, worktreeId)
         )
       : remoteHost
         ? 'linux'
         : CLIENT_PLATFORM)
   // Why: SSH remotes deploy the shim as plain `orca`, so skip the Linux-only `orca-ide` rename for remote launches.
-  const isRemote = repo ? repoIsRemote(repo) || remoteHost : remoteHost
+  const isRemote = Boolean(worktreeSshConnectionId)
   const queuedShell = resolveLocalWindowsAgentStartupShell({
     platform: resolvedLaunchPlatform,
     isRemote,
@@ -166,9 +120,8 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     agent,
     promptDelivery: viewModePromptDelivery,
     launchDraftText: trimmedPrompt,
-    nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
-      getConnectionIdFromState(store, worktreeId)
-    )
+    nativeChatTranscriptIsLocalReadable:
+      isNativeChatTranscriptLocalReadable(worktreeSshConnectionId)
   }
   const initialViewModeProps = initialAgentTabViewModeProps(store.settings, initialViewModeOptions)
   const startupPlanBase = {
@@ -227,19 +180,58 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     }
   }
 
-  const launchDirectStructuredChat =
-    agent === 'codex' &&
-    !hasPrompt &&
-    agentPermissionMode === 'default' &&
-    store.settings?.experimentalNativeChat === true &&
-    canUseStructuredNativeChat(store, worktreeId)
-  if (launchDirectStructuredChat) {
-    startStructuredCodexLaunch(worktreeId)
+  const workspaceKind =
+    worktreeId === FLOATING_TERMINAL_WORKTREE_ID
+      ? 'floating'
+      : worktreeId.startsWith('folder:')
+        ? 'folder'
+        : 'git-worktree'
+  const launchRoute = forceLegacy
+    ? 'legacy-native-chat'
+    : resolveAgentLaunchRoute({
+        agent,
+        settings: store.settings,
+        executionHostId: resolvedExecutionHostId,
+        platform: CLIENT_PLATFORM,
+        hostCapabilities: readLocalRuntimeCapabilities(),
+        workspaceKind,
+        projectRuntime: getLocalProjectExecutionRuntimeContext(store, worktreeId),
+        promptDelivery: viewModePromptDelivery,
+        launchText: trimmedPrompt,
+        nativeChatTranscriptIsLocalReadable:
+          initialViewModeOptions.nativeChatTranscriptIsLocalReadable,
+        requiresTuiLaunchCustomization:
+          agentPermissionMode !== 'default' ||
+          Boolean(initialCwd?.trim()) ||
+          hasExplicitTuiAgentArgs(agent, agentArgs) ||
+          hasExplicitTuiLaunchCustomization(store.settings, agent),
+        initialSessionOptions: startupPlan.sessionOptions
+      })
+  if (launchRoute === 'structured-native-chat' && isAgentSessionHandleProvider(agent)) {
+    const structuredLaunch = startStructuredAgentLaunch(worktreeId, agent, {
+      prompt: trimmedPrompt,
+      ...(promptDelivery === 'submit-after-ready' ? { promptDelivery } : {}),
+      onPromptDelivered
+    })
+    void structuredLaunch
+      .claimDefinitiveRefusalFallback(() => {
+        const fallback = launchAgentInNewTabInternal(args, true)
+        return (
+          fallback?.promptDeliveryResult ??
+          (hasPrompt
+            ? { delivered: Boolean(fallback), failureNotified: fallback === null }
+            : undefined)
+        )
+      })
+      .catch((error) => console.error('Structured Codex fallback failed', error))
     return {
       tabId: null,
       startupPlan,
       pasteDraftAfterLaunch: false,
-      focusAfterMenuClose: 'structured-session'
+      focusAfterMenuClose: 'structured-session',
+      ...(structuredLaunch.promptDeliveryResult
+        ? { promptDeliveryResult: structuredLaunch.promptDeliveryResult }
+        : {})
     }
   }
 
@@ -324,19 +316,7 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
   store.setActiveTabType('terminal')
 
   // Why: persist tab-bar order so reconcileTabOrder doesn't fall back to terminals-first and jump the new tab to index 0.
-  const fresh = useAppStore.getState()
-  const termIds = (fresh.tabsByWorktree[worktreeId] ?? []).map((t) => t.id)
-  const editorIds = fresh.openFiles.filter((f) => f.worktreeId === worktreeId).map((f) => f.id)
-  const browserIds = (fresh.browserTabsByWorktree?.[worktreeId] ?? []).map((t) => t.id)
-  const base = reconcileTabOrder(
-    fresh.tabBarOrderByWorktree[worktreeId],
-    termIds,
-    editorIds,
-    browserIds
-  )
-  const order = base.filter((id) => id !== tab.id)
-  order.push(tab.id)
-  fresh.setTabBarOrder(worktreeId, order)
+  persistAgentLaunchTabOrder(worktreeId, tab.id)
 
   return {
     tabId: tab.id,
@@ -344,4 +324,8 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     pasteDraftAfterLaunch: pasteDraftAfterLaunch !== null,
     ...(promptDeliveryResult ? { promptDeliveryResult } : {})
   }
+}
+
+export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentInNewTabResult {
+  return launchAgentInNewTabInternal(args)
 }

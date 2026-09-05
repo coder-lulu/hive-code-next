@@ -272,14 +272,20 @@ describe('connectPanePty', () => {
 
   it('does not spend queued startup from a stale spawn callback', async () => {
     const { connectPanePty } = await import('./pty-connection')
-    const staleTransport = createMockTransport()
+    const staleTransport = createMockTransport('stale-pty')
     transportFactoryQueue.push(staleTransport)
     const paneTransportsRef = { current: new Map<number, MockTransport>() }
     const onStartupBound = vi.fn()
     const startup = { command: 'echo queued-startup' }
-    const deps = createDeps({ paneTransportsRef, startup, onStartupBound })
+    const deps = createDeps({
+      tabId: 'tab-stale-startup',
+      paneTransportsRef,
+      startup,
+      onStartupBound
+    })
     const binding = connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
     await flushAsyncTicks(12)
+    expect(onStartupBound).not.toHaveBeenCalled()
 
     const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
       | ((ptyId: string) => void)
@@ -347,15 +353,17 @@ describe('connectPanePty', () => {
     })
     transportFactoryQueue.push(staleTransport)
     const pane = createPane(1)
-    const manager = createManager(1)
     const paneTransportsRef = { current: new Map<number, MockTransport>() }
+    const onStartupBound = vi.fn()
     const deps = createDeps({
+      startup: { command: 'echo queued-startup' },
+      onStartupBound,
       paneTransportsRef,
       restoredLeafId: LEAF_1,
       restoredPtyIdByLeafId: { [LEAF_1]: 'terminal-old' }
     })
 
-    connectPanePty(pane as never, manager as never, deps as never)
+    connectPanePty(pane as never, createManager(1) as never, deps as never)
     await flushAsyncTicks(4)
     expect(staleTransport.connect).toHaveBeenCalledWith(
       expect.objectContaining({ sessionId: 'terminal-old' })
@@ -367,6 +375,7 @@ describe('connectPanePty', () => {
     reattach.resolve({ id: 'terminal-new', isReattach: true })
     await flushAsyncTicks(12)
 
+    expect(onStartupBound).not.toHaveBeenCalled()
     expect(pane.container.dataset.ptyId).toBe('terminal-current')
     expect(deps.updateTabPtyId).not.toHaveBeenCalled()
     expect(deps.syncPanePtyLayoutBinding).not.toHaveBeenCalledWith(1, 'terminal-new')
@@ -381,20 +390,29 @@ describe('connectPanePty', () => {
     transport.connect.mockImplementation(async () => reattach.promise)
     transportFactoryQueue.push(transport)
     const pane = createPane(1)
-    const manager = createManager(1)
+    const onStartupBound = vi.fn()
     const deps = createDeps({
+      startup: { command: 'echo queued-startup' },
+      onStartupBound,
       restoredLeafId: LEAF_1,
       restoredPtyIdByLeafId: { [LEAF_1]: 'terminal-old' }
     })
 
-    connectPanePty(pane as never, manager as never, deps as never)
+    connectPanePty(pane as never, createManager(1) as never, deps as never)
     await flushAsyncTicks(4)
+    expect(onStartupBound).not.toHaveBeenCalled()
     reattach.resolve({ id: 'terminal-new', isReattach: true })
     await flushAsyncTicks(12)
 
     expect(pane.container.dataset.ptyId).toBe('terminal-new')
     expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-1', 'terminal-new', 'terminal-old')
     expect(deps.syncPanePtyLayoutBinding).toHaveBeenCalledWith(1, 'terminal-new')
+    expect(onStartupBound).toHaveBeenCalledTimes(1)
+
+    transportPtyId = 'terminal-new'
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as (ptyId: string) => void
+    onPtySpawn('terminal-new')
+    expect(onStartupBound).toHaveBeenCalledTimes(1)
   })
 
   it('does not replace a split sibling with the tab-level source PTY', async () => {

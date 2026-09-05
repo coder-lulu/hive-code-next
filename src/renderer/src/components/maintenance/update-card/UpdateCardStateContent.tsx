@@ -20,7 +20,6 @@ export function UpdateCardStateContent({
   errorCard,
   linuxPackageRecovery,
   isLocalBuild,
-  cachedVersion,
   hasStartedDownload,
   prefersReducedMotion,
   mediaFailed,
@@ -40,7 +39,6 @@ export function UpdateCardStateContent({
     diagnostic: string
   } | null
   isLocalBuild: boolean
-  cachedVersion: string | null
   hasStartedDownload: boolean
   prefersReducedMotion: boolean
   mediaFailed: boolean
@@ -49,8 +47,8 @@ export function UpdateCardStateContent({
   onMediaLoad: () => void
   onUpdate: () => void
   onInstallRetry: () => void
-  onDismiss: () => void
-  onCollapse: () => void
+  onDismiss?: () => void
+  onCollapse?: () => void
 }): React.JSX.Element | null {
   if (status.state === 'checking') {
     return (
@@ -71,10 +69,13 @@ export function UpdateCardStateContent({
   if (linuxPackageRecovery) {
     return (
       <LinuxPackageInstallRecoveryCard
+        key={`${linuxPackageRecovery.recovery.packageType}:${linuxPackageRecovery.recovery.version}:${linuxPackageRecovery.recovery.reason}`}
         recovery={linuxPackageRecovery.recovery}
         diagnostic={linuxPackageRecovery.diagnostic}
         releaseUrl={
-          isLocalBuild ? undefined : (getReleaseNotesUrlForVersion(cachedVersion) ?? undefined)
+          isLocalBuild
+            ? undefined
+            : (getReleaseNotesUrlForVersion(linuxPackageRecovery.recovery.version) ?? undefined)
         }
         onClose={onCollapse}
       />
@@ -131,6 +132,7 @@ export function UpdateCardStateContent({
       onMediaLoad={onMediaLoad}
       onUpdate={onUpdate}
       onClose={onDismiss}
+      externallyManaged={status.externallyManaged}
     />
   ) : (
     <UpdateAvailableSimpleContent
@@ -138,6 +140,7 @@ export function UpdateCardStateContent({
       releaseUrl={releaseUrl}
       onUpdate={onUpdate}
       onClose={onDismiss}
+      externallyManaged={status.externallyManaged}
     />
   )
 }

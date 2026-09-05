@@ -1,3 +1,4 @@
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   LINEAR_SEARCH_MAX_LIMIT,
   isLinearUuid,
@@ -60,7 +61,9 @@ export class RuntimeLinearProjectWriteCommands extends RuntimeLinearTeamWriteCom
             name: project.name,
             teams: project.teams
           })),
-          nextSteps: ['Run `orca linear project list --query <name> --json` and retry by id.']
+          nextSteps: [
+            `Run \`${PRIMARY_CLI_COMMAND} linear project list --query <name> --json\` and retry by id.`
+          ]
         }
       )
     }
@@ -73,7 +76,9 @@ export class RuntimeLinearProjectWriteCommands extends RuntimeLinearTeamWriteCom
         name: project.name,
         teams: project.teams
       })),
-      nextSteps: ['Run `orca linear project list --query <name> --json` and retry by id.']
+      nextSteps: [
+        `Run \`${PRIMARY_CLI_COMMAND} linear project list --query <name> --json\` and retry by id.`
+      ]
     })
   }
 

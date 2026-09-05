@@ -95,6 +95,17 @@ describe('docs-only path classification', () => {
     expect(hasNativeCacheInput(['config/patches/node-pty@1.1.0.patch'])).toBe(true)
     expect(hasNativeCacheInput(['config/scripts/ensure-native-runtime.mjs'])).toBe(true)
   })
+
+  it('does not start desktop PR Checks for cloud-only diffs', () => {
+    expect(
+      shouldRunPrChecks([
+        'cloud/apps/relay/src/index.ts',
+        'cloud/package.json',
+        'cloud/.gitleaks.toml',
+        '.github/workflows/cloud-verify.yml'
+      ])
+    ).toBe(false)
+  })
 })
 
 describe('per-job path classification', () => {
@@ -188,6 +199,28 @@ describe('per-job path classification', () => {
       package: true
     })
     expectClassification(['native/computer-use-macos/Package.swift'], {})
+  })
+
+  it('runs Linux packaging when an artifact contract changes', () => {
+    for (const file of [
+      'config/docker/cli-launch-contract/Dockerfile',
+      'config/docker/cli-launch-contract/run-cli-case.sh',
+      'config/docker/headless-pairing/Dockerfile',
+      'config/docker/headless-pairing/run-appimage-case.sh',
+      'config/docker/headless-serve-shutdown/Dockerfile',
+      'config/scripts/run-linux-cli-launch-contract-docker.mjs',
+      'config/scripts/run-headless-linux-pairing-docker.mjs',
+      'config/scripts/static-appimage-package-contract.cjs'
+    ]) {
+      expectClassification([file], { package: true })
+    }
+  })
+
+  it('runs both package jobs when the shared skills runtime verifier changes', () => {
+    expectClassification(['config/scripts/verify-skills-cli-runtime.cjs'], {
+      package: true,
+      package_windows: true
+    })
   })
 
   it('runs shell contracts when live-shell inputs change', () => {
@@ -292,6 +325,24 @@ describe('per-job path classification', () => {
     }
   })
 
+  // Why: static analysis lints changed mobile files with a type-aware pass, and
+  // mobile is a separate pnpm project. Without its node_modules every mobile type
+  // resolves to an `error` type and the changed-code gate fails on phantom
+  // findings, which is exactly how a react-test-renderer union broke a PR.
+  it('installs mobile dependencies exactly when mobile files change', () => {
+    expect(classifyPrJobs([]).mobile_dependencies).toBe(true)
+    expect(classifyPrJobs(['README.md']).mobile_dependencies).toBe(false)
+    expect(classifyPrJobs(['src/main/index.ts']).mobile_dependencies).toBe(false)
+    expect(
+      classifyPrJobs(['src/main/index.ts', 'mobile/src/session/a.test.ts']).mobile_dependencies
+    ).toBe(true)
+    // The product keeps shared contract checks active for mobile-only changes;
+    // their type-aware analysis needs the mobile dependency tree too.
+    expect(classifyPrJobs(['mobile/package.json']).mobile_dependencies).toBe(true)
+    expect(classifyPrJobs(['mobile/package.json']).should_run).toBe(true)
+    expect(classifyPrJobs(['README.md', 'mobile/src/a.ts']).mobile_dependencies).toBe(true)
+  })
+
   it('keeps unit-test-only diffs out of packaging', () => {
     expectClassification(['src/main/git/git-status.test.ts'], {
       git_compatibility: true
@@ -338,6 +389,20 @@ describe('PR Checks skip wiring', () => {
         `\${{ steps.filter.outputs.${jobName} }}`
       )
     }
+  })
+
+  it('gives static analysis the mobile types its type-aware pass resolves', () => {
+    expect(prWorkflow.jobs.code_paths.outputs.mobile_dependencies).toBe(
+      '${{ steps.filter.outputs.mobile_dependencies }}'
+    )
+    const steps = prWorkflow.jobs.static_analysis.steps
+    const install = steps.findIndex((step) => step.name === 'Install mobile dependencies')
+    const gate = steps.findIndex((step) => step.name === 'Enforce changed-code quality')
+    expect(install).toBeGreaterThan(-1)
+    expect(install).toBeLessThan(gate)
+    expect(steps[install].if).toBe("needs.code_paths.outputs.mobile_dependencies == 'true'")
+    expect(steps[install]['working-directory']).toBe('mobile')
+    expect(steps[install].run).toContain('--frozen-lockfile')
   })
 
   it('keeps the cheap root-directory guard on docs-only PRs', () => {

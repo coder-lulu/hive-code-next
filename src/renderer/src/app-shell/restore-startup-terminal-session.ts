@@ -1,3 +1,4 @@
+import { toRuntimeExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import { restoreLocalStructuredSessionTabsOnce } from '../runtime/local-structured-session-tabs-sync'
 import {
   collectTerminalProviderSnapshotPtyIds,
@@ -28,7 +29,20 @@ export async function restoreStartupTerminalSession(
   await timeRendererStartupStep('recover-legacy-worker-terminals-post-reconnect', () =>
     window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
   )
-  await timeRendererStartupStep('project-structured-session-tabs', () =>
-    restoreLocalStructuredSessionTabsOnce()
-  )
+  if (useAppStore.getState().settings?.experimentalStructuredNativeChat === true) {
+    await timeRendererStartupStep('project-structured-session-tabs', () =>
+      restoreLocalStructuredSessionTabsOnce()
+    )
+  }
+}
+
+export async function listRuntimeSessionHostIdsForStartup(): Promise<ExecutionHostId[]> {
+  try {
+    return (await window.api.runtimeEnvironments.list()).map((environment) =>
+      toRuntimeExecutionHostId(environment.id)
+    )
+  } catch (err) {
+    console.warn('Failed to list runtime session hosts for startup:', err)
+    return []
+  }
 }

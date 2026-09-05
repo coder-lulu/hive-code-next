@@ -1,6 +1,15 @@
 import { memo } from 'react'
-import { Bell, ChevronDown, ChevronRight, GitBranch, GitPullRequest } from 'lucide-react-native'
+import {
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  GitBranch,
+  GitPullRequest,
+  Monitor,
+  Server
+} from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../src/shared/execution-host'
 import type { RepoIcon } from '../../../src/shared/repo-icon'
 import type { AgentWorkingMode } from '../../../src/shared/agent-status-types'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
@@ -22,6 +31,11 @@ function displayBranch(branch: string): string {
 export type WorktreeListRowItem = {
   workspaceKind?: 'git' | 'folder-workspace'
   worktreeId: string
+  hostId?: ExecutionHostId
+  /** Present only when the list spans hosts; names the host this row runs on. */
+  hostContextLabel?: string
+  /** Resolved host for the display label; present when legacy rows omit hostId. */
+  hostContextHostId?: ExecutionHostId
   repo: string
   branch: string
   displayName: string
@@ -158,6 +172,20 @@ function WorktreeListRowComponent<T extends WorktreeListRowItem>({
               <Text style={styles.childBadgeText}>子工作区</Text>
             </View>
           )}
+          {item.hostContextLabel ? (
+            <View style={[styles.childBadge, styles.hostBadge]}>
+              {/* Rows from hosts that predate hostId stamping are local: a remote row always carries one. */}
+              {(parseExecutionHostId(item.hostContextHostId ?? item.hostId)?.kind ?? 'local') ===
+              'local' ? (
+                <Monitor size={16} color={theme.color.text.tertiary} />
+              ) : (
+                <Server size={16} color={theme.color.text.tertiary} />
+              )}
+              <Text style={[styles.childBadgeText, styles.hostBadgeText]} numberOfLines={1}>
+                {item.hostContextLabel}
+              </Text>
+            </View>
+          ) : null}
           {/* Repo glyph+name only when not already grouped under this repo;
               MobileRepoIcon falls back to a Folder (matching desktop's default)
               rather than a bare colored dot. */}
@@ -281,6 +309,8 @@ function createStyles(theme: MobileTheme) {
       backgroundColor: theme.color.bg.subtle
     },
     childBadgeText: { ...theme.typography.caption, color: theme.color.text.tertiary },
+    hostBadge: { flexShrink: 1 },
+    hostBadgeText: { flexShrink: 1 },
     lineageToggle: {
       minHeight: theme.size.minimumTouchTarget,
       alignSelf: 'flex-start',

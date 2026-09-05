@@ -13,6 +13,7 @@ const {
   spawnMock,
   childStdinEndMock,
   resolveAuthorizedPathMock,
+  authorizeExternalPathMock,
   fsAccessMock,
   fsLstatMock,
   fsMkdirMock,
@@ -48,6 +49,7 @@ const {
     return child
   }),
   resolveAuthorizedPathMock: vi.fn(),
+  authorizeExternalPathMock: vi.fn(),
   fsAccessMock: vi.fn(),
   fsLstatMock: vi.fn(),
   fsMkdirMock: vi.fn(),
@@ -90,7 +92,8 @@ vi.mock('node:fs/promises', () => ({
 vi.mock('../ipc/filesystem-auth', () => ({
   PATH_ACCESS_DENIED_MESSAGE:
     'Access denied: path resolves outside allowed directories. If this blocks a legitimate workflow, please file a GitHub issue.',
-  resolveAuthorizedPath: resolveAuthorizedPathMock
+  resolveAuthorizedPath: resolveAuthorizedPathMock,
+  authorizeExternalPath: authorizeExternalPathMock
 }))
 
 vi.mock('node:crypto', () => ({

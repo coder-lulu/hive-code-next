@@ -18,7 +18,6 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
     connState,
     setCustomKeys,
     setVisibleBuiltInIds,
-    deviceTokenRef,
     setHostEndpoint,
     connStateRef,
     terminalRefs,
@@ -28,14 +27,13 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
     unsubscribeTerminal,
     subscribeToTerminal
   } = scope
-  // Why: read deviceToken from host record so code can pass client.id on subscribe/send for driver-state-machine identity.
+  // Why: the shared client owns authenticated identity; this host read only supplies connection-hint metadata.
   useEffect(() => {
     if (!hostId) {
       return
     }
     const host = accountVisibleHosts.find((candidate) => candidate.id === hostId)
     if (host) {
-      deviceTokenRef.current = host.deviceToken
       setHostEndpoint(host.endpoint)
       if (!client && (host.accountRuntime || host.accountRuntimeFallback)) {
         refreshHostClient(host.id)

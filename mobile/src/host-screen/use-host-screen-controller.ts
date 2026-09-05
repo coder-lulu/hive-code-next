@@ -21,6 +21,7 @@ import {
   useRelayRecoveryStatus
 } from '../transport/client-context-connection-metrics'
 import { applyWorktreeRowDisplayState } from '../worktree/worktree-host-row-identity'
+import { applyWorktreeHostContextLabels } from '../worktree/worktree-host-context-labels'
 import { useWorkspaceSections } from '../worktree/use-workspace-sections'
 import { useAllHostClients } from '../transport/use-all-host-clients'
 import { useHostRepoMetadata } from './use-host-repo-metadata'
@@ -160,17 +161,23 @@ export function useHostScreenController({
     // Why: live `worktrees` is authoritative only while connected; under the amber
     // mount default, connecting/handshaking must keep the pre-reconnect list too.
     const base = connState === 'connected' ? state.worktrees : state.lastKnownWorktrees
-    return applyWorktreeRowDisplayState(
-      base,
-      state.sleptIds,
-      state.optimisticActiveWorktreeIdentity
+    return applyWorktreeHostContextLabels(
+      applyWorktreeRowDisplayState(base, state.sleptIds, state.optimisticActiveWorktreeIdentity),
+      {
+        repoHostIdByRepoId: state.repoHostIdByRepoId,
+        hostLabelById: state.hostLabelById,
+        hostPlatform: state.hostPlatform
+      }
     )
   }, [
     connState,
     state.worktrees,
     state.lastKnownWorktrees,
     state.sleptIds,
-    state.optimisticActiveWorktreeIdentity
+    state.optimisticActiveWorktreeIdentity,
+    state.repoHostIdByRepoId,
+    state.hostLabelById,
+    state.hostPlatform
   ])
   const sectionsResult = useWorkspaceSections({
     displayWorktrees,

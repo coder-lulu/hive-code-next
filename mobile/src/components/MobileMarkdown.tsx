@@ -199,6 +199,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
           return (
             <Text
               key={index}
+              selectable
               style={[styles.heading, block.level <= 2 ? styles.headingLarge : null]}
             >
               {renderInline(block.text, styles, onOpenFile)}
@@ -208,7 +209,9 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
         if (block.type === 'quote') {
           return (
             <View key={index} style={styles.quote}>
-              <Text style={styles.quoteText}>{renderInline(block.text, styles, onOpenFile)}</Text>
+              <Text selectable style={styles.quoteText}>
+                {renderInline(block.text, styles, onOpenFile)}
+              </Text>
             </View>
           )
         }
@@ -230,7 +233,9 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
           return (
             <View key={index} style={styles.codeBlock}>
               {block.language ? <Text style={styles.codeLanguage}>{block.language}</Text> : null}
-              <Text style={styles.codeText}>{block.text}</Text>
+              <Text selectable style={styles.codeText}>
+                {block.text}
+              </Text>
             </View>
           )
         }
@@ -258,7 +263,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
               <View style={styles.table}>
                 <View style={styles.tableRow}>
                   {visibleHeaders.map((header, cellIndex) => (
-                    <Text key={cellIndex} style={[styles.tableCell, styles.tableHeader]}>
+                    <Text key={cellIndex} selectable style={[styles.tableCell, styles.tableHeader]}>
                       {renderInline(header, styles, onOpenFile)}
                     </Text>
                   ))}
@@ -266,7 +271,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
                 {visibleRows.map((row, rowIndex) => (
                   <View key={rowIndex} style={styles.tableRow}>
                     {visibleHeaders.map((_, cellIndex) => (
-                      <Text key={cellIndex} style={styles.tableCell}>
+                      <Text key={cellIndex} selectable style={styles.tableCell}>
                         {renderInline(row[cellIndex] ?? '', styles, onOpenFile)}
                       </Text>
                     ))}
@@ -297,7 +302,7 @@ function MobileMarkdownInner({ content, fallback = '', textScale = 1, onOpenFile
                         ? '[x]'
                         : '[ ]'}
                   </Text>
-                  <Text style={[styles.listText, listScale]}>
+                  <Text selectable style={[styles.listText, listScale]}>
                     {renderInline(item.text, styles, onOpenFile)}
                   </Text>
                 </View>

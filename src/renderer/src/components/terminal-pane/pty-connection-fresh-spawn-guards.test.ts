@@ -468,11 +468,9 @@ describe('connectPanePty', () => {
       resumeProviderSession: { key: 'session_id', id: 'codex-session-1' } as const
     }
 
-    connectPanePty(
-      createPane(1) as never,
-      createManager(1) as never,
-      createDeps({ startup, onStartupBound }) as never
-    )
+    // A fresh tab must not inherit the fixture's already-bound `tab-pty` session.
+    const deps = createDeps({ tabId: 'tab-startup-confirmation', startup, onStartupBound })
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
 
     expect(onStartupBound).not.toHaveBeenCalled()
     expect(createdTransportOptions[0]).toMatchObject(startup)
@@ -483,6 +481,8 @@ describe('connectPanePty', () => {
     // construction, when it must reject stale ownership.
     await flushAsyncTicks()
 
+    expect(deps.paneTransportsRef.current.get(1)).toBe(transport)
+    expect(transport.getPtyId).toHaveLastReturnedWith('pty-resume')
     const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
       | ((ptyId: string) => void)
       | undefined

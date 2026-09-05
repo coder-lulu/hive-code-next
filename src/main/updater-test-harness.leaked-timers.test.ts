@@ -19,6 +19,11 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
+vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+vi.mock('./product/product-updater-network-boundary', () =>
+  moduleFactories.productUpdaterNetworkBoundary()
+)
 
 const SILENT_SETTLE_DELAY_MS = 1_000
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
@@ -72,6 +77,7 @@ describe('abandoned updater instance', () => {
   })
 
   it('leaves a silent-settle timer armed when its module instance is abandoned', async () => {
+    fetchNewerReleaseTagsMock.mockResolvedValue({ tags: ['v1.0.61'], state: 'ready' })
     let resolveCheck: (value: unknown) => void = () => {}
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       // Why: the checking status is what makes the silent settle publish 'not-available' later.

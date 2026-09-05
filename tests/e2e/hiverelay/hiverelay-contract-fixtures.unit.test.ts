@@ -91,8 +91,9 @@ afterAll(async () => {
 })
 
 describe('HiveRelay vendored contract fixtures', () => {
-  if (process.env.HIVERELAY_CLOUD_ISSUER_FIXTURE_PATH) {
-    it('accepts credentials produced by the current Cloud issuer', () => {
+  it.runIf(process.env.HIVERELAY_CLOUD_ISSUER_FIXTURE_PATH)(
+    'accepts credentials produced by the current Cloud issuer',
+    () => {
       const fixture = parseHiveRelayContractFixture(
         readFileSync(process.env.HIVERELAY_CLOUD_ISSUER_FIXTURE_PATH!, 'utf8')
       )
@@ -102,8 +103,8 @@ describe('HiveRelay vendored contract fixtures', () => {
         verdict: 'ACCEPT',
         reason: 'VALID_JWS'
       })
-    })
-  }
+    }
+  )
 
   it('contains at least one HiveCode-applicable fixture', () => {
     expect(fixtureEntries.some((entry) => entry.applicableComponents.includes('hivecode'))).toBe(

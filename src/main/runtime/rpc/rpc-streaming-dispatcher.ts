@@ -116,6 +116,7 @@ export class RpcStreamingDispatcher {
             pairedDeviceId: options?.pairedDeviceId,
             clientKind: options?.clientKind,
             clientCapabilities: options?.clientCapabilities,
+            updateClientCapabilities: options?.updateClientCapabilities,
             orchestrationCapability: request.orchestrationCapability,
             authenticatedCallerFingerprint:
               mutation?.identity.callerFingerprint ??
@@ -169,6 +170,7 @@ export class RpcStreamingDispatcher {
           pairedDeviceId: options?.pairedDeviceId,
           clientKind: options?.clientKind,
           clientCapabilities: options?.clientCapabilities,
+          updateClientCapabilities: options?.updateClientCapabilities,
           orchestrationCapability: request.orchestrationCapability,
           pairing: options?.pairing,
           sendBinary: options?.sendBinary,

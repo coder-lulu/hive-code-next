@@ -1,3 +1,5 @@
+import type { ExecutionHostId } from '../../shared/execution-host'
+import { hostedReviewSshConnectionId } from '../source-control/hosted-review-execution-host'
 import type {
   CreateStackedHostedReviewInput,
   CreateStackedHostedReviewResult
@@ -20,6 +22,7 @@ import {
 import {
   parseGitHubStackPullRequests,
   parseGitHubStacks,
+  registeredStackNumber,
   type GitHubStack,
   type GitHubStackPullRequest,
   type NumberedHostedReviewSummary
@@ -116,12 +119,14 @@ function validateParentStack(
 export async function prepareGitHubStackedPullRequest(
   repoPath: string,
   input: CreateStackedHostedReviewInput,
-  connectionId?: string | null,
+  executionHostId: ExecutionHostId,
   options: HostedReviewExecutionOptions = {}
 ): Promise<StackedPullRequestPlan> {
   if (input.provider !== 'github') {
     return creationError('Stacked pull request creation is available only for GitHub repositories.')
   }
+  // `gh` runs on this client whatever the host; only the git reads under it are routed.
+  const connectionId = hostedReviewSshConnectionId(executionHostId)
   const repository = await getOriginGitHubApiRepository(
     repoPath,
     connectionId,
@@ -197,39 +202,16 @@ export async function prepareGitHubStackedPullRequest(
   }
 }
 
-function registeredStackNumber(
-  parentReview: NumberedHostedReviewSummary,
-  currentReview: NumberedHostedReviewSummary,
-  parentStacks: GitHubStack[],
-  currentStacks: GitHubStack[]
-): number | null {
-  const parentStack = parentStacks[0]
-  const currentStack = currentStacks[0]
-  if (!parentStack || !currentStack || parentStack.number !== currentStack.number) {
-    return null
-  }
-  const parentPosition = parentStack.pull_requests.findIndex(
-    (pullRequest) => pullRequest.number === parentReview.number
-  )
-  // Why: a miss is -1, and -1 + 1 reads the first entry — which reports "already
-  // registered" whenever the current PR heads a stack the parent has left.
-  if (parentPosition === -1) {
-    return null
-  }
-  return parentStack.pull_requests[parentPosition + 1]?.number === currentReview.number
-    ? parentStack.number
-    : null
-}
-
 export async function registerGitHubStackedPullRequest(args: {
   repoPath: string
   repository: GitHubApiRepository
   parentReview: NumberedHostedReviewSummary
   currentReview: NumberedHostedReviewSummary
-  connectionId?: string | null
+  executionHostId: ExecutionHostId
   options?: HostedReviewExecutionOptions
 }): Promise<CreateStackedHostedReviewResult> {
   const options = args.options ?? {}
+  const connectionId = hostedReviewSshConnectionId(args.executionHostId)
   await acquire()
   try {
     const [parentStacks, currentStacks] = await Promise.all([
@@ -237,14 +219,14 @@ export async function registerGitHubStackedPullRequest(args: {
         args.repoPath,
         args.repository,
         args.parentReview.number,
-        args.connectionId,
+        connectionId,
         options
       ),
       getStacksForPullRequest(
         args.repoPath,
         args.repository,
         args.currentReview.number,
-        args.connectionId,
+        connectionId,
         options
       )
     ])
@@ -285,7 +267,7 @@ export async function registerGitHubStackedPullRequest(args: {
       command.push('-F', `pull_requests[]=${pullRequest}`)
     }
     const { stdout } = await ghExecFileAsync(command, {
-      ...ghOptions(args.repoPath, args.repository, args.connectionId, options),
+      ...ghOptions(args.repoPath, args.repository, connectionId, options),
       idempotent: false
     })
     const stackNumber = Number((JSON.parse(stdout) as { number?: unknown }).number)

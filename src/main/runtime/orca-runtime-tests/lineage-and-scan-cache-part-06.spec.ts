@@ -1,3 +1,4 @@
+import { applyProductBranding } from '../../../shared/brand'
 import { describe, expect, it, vi } from 'vitest'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
@@ -218,8 +219,9 @@ describe('OrcaRuntimeService', () => {
     expect(result.warnings).toEqual([
       expect.objectContaining({
         code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-        message:
+        message: applyProductBranding(
           'Worktree created, but Orca could not validate the current directory as a parent context.'
+        )
       })
     ])
   })

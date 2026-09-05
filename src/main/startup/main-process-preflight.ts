@@ -2,8 +2,10 @@ import { app, ipcMain, powerMonitor, session } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import os from 'node:os'
 import { join } from 'node:path'
-import { maybeRedirectAppImageCliLaunch } from './appimage-cli-redirect'
-import { maybeRedirectPackagedCliEntryLaunch } from './packaged-cli-entry-redirect'
+import { prepareUserDataMigration } from './main-process-user-data-migration'
+import { hasConfiguredProductUpdateChannel } from '../../shared/product-update-policy'
+import { ensureAutoUpdaterConfigured } from '../window/attach-main-window-services'
+import { maybeRedirectCliLaunch } from './cli-launch-redirect'
 import { argvRequestsServeMode, normalizeServeModeArgv } from './serve-mode-argv'
 import {
   configureDevUserDataPath,
@@ -49,6 +51,7 @@ import {
 } from './single-instance-lock'
 import { setAppEnvironment } from '../../shared/app-environment'
 import { ElectronAppEnvironment } from '../host/electron-app-environment'
+import { installMainProcessTreeKillGate } from '../own-chromium-tree-kill-guard'
 import { setSecretStore } from '../../shared/secret-store'
 import { ElectronSecretStore } from '../host/electron-secret-store'
 import { setPtyHostBindings } from '../ipc/pty-host-bindings'
@@ -78,7 +81,11 @@ import { recordCrashBreadcrumb } from '../crash-reporting/crash-breadcrumb-store
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
 import { GpuCrashDiagnosticsRecorder } from '../crash-reporting/gpu-crash-diagnostics'
 import { getMainProcessLifecycleIdentity } from '../crash-reporting/main-process-lifecycle-identity'
-import { ensureVirtualDisplayForHeadlessServe } from './ensure-virtual-display'
+import {
+  ensureVirtualDisplayForHeadlessServe,
+  hasUsableLinuxDisplay,
+  MISSING_LINUX_DISPLAY_MESSAGE
+} from './ensure-virtual-display'
 import { maybeApplyGpuFallbackForThisLaunch, registerGpuLifecycleHandlers } from './gpu-lifecycle'
 import { mainProcessState as state } from './main-process-state'
 import { initializeSyntheticTitleRuntime } from './synthetic-title-runtime'
@@ -91,25 +98,15 @@ export type MainProcessPreflightOptions = {
 /** Performs all module-scope work that must happen before Electron's ready event. */
 export function runMainProcessPreflight(options: MainProcessPreflightOptions): boolean {
   // Why: on Windows a CLI launch that lost ELECTRON_RUN_AS_NODE would boot the GUI and exit silently; redirect to node mode before the lock gate below.
-  // Both redirects run before the serve-argv rewrite so they still match on the launch argv verbatim.
-  // It is load-bearing for the AppImage one: rewriting first replaces the `serve` positional, so its
-  // command-name lookup finds a port number and strands the launch in an in-process serve. The
-  // packaged-CLI one matches on the entry path instead, so order cannot affect it either way.
-  const packagedRedirect = maybeRedirectPackagedCliEntryLaunch({
+  // The redirect runs before the serve-argv rewrite so it still matches on the launch argv verbatim.
+  // Direct serve stays in-process so its signal handlers own all children.
+  const cliLaunchRedirect = maybeRedirectCliLaunch({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     execPath: process.execPath
   })
-  if (packagedRedirect.redirected) {
-    app.exit(packagedRedirect.status)
-  }
-  const appImageRedirect = maybeRedirectAppImageCliLaunch({
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-    execPath: process.execPath
-  })
-  if (appImageRedirect.redirected) {
-    app.exit(appImageRedirect.status)
+  if (cliLaunchRedirect.redirected) {
+    app.exit(cliLaunchRedirect.status)
   }
   // Why: extracted AppRun / binary launches can land CLI-form `serve` args on the
   // Electron process without the CLI rewrite that injects `--serve` (#12677).
@@ -118,6 +115,11 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
     process.argv = normalizeServeModeArgv(process.argv)
   }
   state.isServeMode = process.argv.includes('--serve')
+  // Fail before Chromium's missing-display teardown can segfault (#13719).
+  if (app.isPackaged && !state.isServeMode && !hasUsableLinuxDisplay()) {
+    process.stderr.write(`${MISSING_LINUX_DISPLAY_MESSAGE}\n`)
+    app.exit(1)
+  }
   if (state.isServeMode) {
     reserveServeStdoutForReadiness()
   }
@@ -142,7 +144,12 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   process.env.ORCA_APP_VERSION = app.getVersion()
   configureRemoteServerUpdater({
     getSnapshot: getRemoteServerUpdaterSnapshot,
-    check: checkForRemoteServerUpdate,
+    check: (runtimeId, options) => {
+      if (options?.localBuild || hasConfiguredProductUpdateChannel()) {
+        ensureAutoUpdaterConfigured()
+      }
+      return checkForRemoteServerUpdate(runtimeId, options)
+    },
     download: downloadRemoteServerUpdate,
     install: installRemoteServerUpdate
   })
@@ -163,6 +170,9 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
       }
     })
   }
+  // Why before any spawn: `signalProcessTree` is shared with the CLI and relay, so
+  // it can only reach the main-process guard and breadcrumb store once this is registered.
+  installMainProcessTreeKillGate()
   const isDev = is.dev
   configureDevUserDataPath(isDev)
   configureOrcaUserDataPathEnv()
@@ -288,6 +298,7 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Why: must precede app.whenReady() so Crashpad is installed before the
   // first renderer spawns; a CHECK before this point is still exit-code-only.
   startCrashpadCapture()
+  prepareUserDataMigration()
   state.crashReports = CrashReportStore.fromUserData()
   state.gpuCrashDiagnostics =
     process.platform === 'win32'
@@ -317,6 +328,11 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   state.headlessBrowserDisplayAvailable = ensureVirtualDisplayForHeadlessServe({
     isServeMode: state.isServeMode
   })
+  // Why: continuing without Xvfb lets Ozone initialize without a display and SIGSEGV (#17615).
+  if (state.isServeMode && !state.headlessBrowserDisplayAvailable) {
+    process.stderr.write(`${MISSING_LINUX_DISPLAY_MESSAGE}\n`)
+    app.exit(1)
+  }
   initializeSyntheticTitleRuntime()
   registerGpuLifecycleHandlers()
   return true

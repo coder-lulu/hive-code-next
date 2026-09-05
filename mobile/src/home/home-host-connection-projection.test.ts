@@ -12,13 +12,15 @@ describe('projectHomeHostConnections', () => {
       hostId: 0,
       path: 0,
       pendingPath: 0,
-      pairingRejected: 0
+      pairingRejected: 0,
+      hostSignedOut: 0
     }
     const entries = Array.from({ length: entryCount }, (_, index) => {
       const hostId = index === entryCount - 1 ? '__proto__' : `host-${index}`
       const path: MobileConnectionPath = index % 2 === 0 ? 'lan' : 'relay'
       const pendingPath = index === 1 ? undefined : index % 2 === 0 ? null : 'tailscale'
       const pairingRejected = index % 3 === 0
+      const hostSignedOut = index % 5 === 0
       const entry = {} as HomeHostConnectionProjectionEntry
       Object.defineProperties(entry, {
         hostId: {
@@ -42,6 +44,13 @@ describe('projectHomeHostConnections', () => {
             return pendingPath
           }
         },
+        hostSignedOut: {
+          enumerable: true,
+          get: () => {
+            reads.hostSignedOut += 1
+            return hostSignedOut
+          }
+        },
         pairingRejected: {
           enumerable: true,
           get: () => {
@@ -59,11 +68,15 @@ describe('projectHomeHostConnections', () => {
       hostId: entryCount,
       path: entryCount,
       pendingPath: entryCount,
-      pairingRejected: entryCount
+      pairingRejected: entryCount,
+      hostSignedOut: entryCount
     })
     expect(Object.keys(projection.hostPaths)).toHaveLength(entryCount)
     expect(Object.keys(projection.hostPendingPaths)).toHaveLength(entryCount)
     expect(Object.keys(projection.hostPairingRejected)).toHaveLength(entryCount)
+    expect(Object.keys(projection.hostSignedOut)).toHaveLength(entryCount)
+    expect(projection.hostSignedOut['host-0']).toBe(true)
+    expect(projection.hostSignedOut['host-1']).toBe(false)
     expect(projection.hostPaths['host-0']).toBe('lan')
     expect(projection.hostPaths['host-1']).toBe('relay')
     expect(projection.hostPendingPaths['host-0']).toBeNull()

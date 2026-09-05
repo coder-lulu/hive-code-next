@@ -8,6 +8,7 @@ function readSource(relativePath: string): string {
 
 const APP_PATH = 'src/renderer/src/App.tsx'
 const STARTUP_HYDRATION_PATH = 'src/renderer/src/app-shell/use-app-startup-hydration.ts'
+const TERMINAL_RESTORE_PATH = 'src/renderer/src/app-shell/restore-startup-terminal-session.ts'
 const DEGRADED_RECOVERY_PATH = 'src/renderer/src/startup/startup-degraded-recovery.ts'
 const CHROME_LAYOUT_PATH = 'src/renderer/src/app-shell/use-app-chrome-layout.ts'
 const SHELL_SERVICES_PATH = 'src/renderer/src/app-shell/use-app-shell-services.ts'
@@ -80,8 +81,11 @@ describe('renderer startup runtime routing', () => {
     const hydrationWorktreesIndex = source.indexOf(
       "timeRendererStartupStep('fetch-hydration-worktrees'"
     )
-    const servicesIndex = source.indexOf(
-      "timeRendererStartupStep('first-window-services-await'",
+    // Why this barrier: worktree hydration can spawn host Git, so it must sit behind the
+    // shell-PATH + managed-WSL fence. On packaged Windows the window opens before
+    // shellPathReady resolves, so this really is the fence, not a formality.
+    const gitEnvironmentBarrierIndex = source.indexOf(
+      "timeRendererStartupStep('git-environment-barrier-await'",
       sessionIndex
     )
     const fullWorktreesIndex = source.indexOf('await actions.fetchAllWorktrees()')
@@ -101,8 +105,11 @@ describe('renderer startup runtime routing', () => {
     expect(localReposIndex).toBeLessThan(localGroupsIndex)
     expect(localGroupsIndex).toBeLessThan(localFoldersIndex)
     expect(localReposIndex).toBeLessThan(sessionIndex)
-    expect(sessionIndex).toBeLessThan(servicesIndex)
-    expect(servicesIndex).toBeLessThan(hydrationWorktreesIndex)
+    expect(sessionIndex).toBeLessThan(gitEnvironmentBarrierIndex)
+    expect(gitEnvironmentBarrierIndex).toBeLessThan(hydrationWorktreesIndex)
+    expect(source.slice(gitEnvironmentBarrierIndex, hydrationWorktreesIndex)).toContain(
+      'window.api.app.awaitGitEnvironmentStartupBarrier()'
+    )
     const hydrationWorktreeBlock = source.slice(
       hydrationWorktreesIndex,
       source.indexOf('await keybindingsPromise')
@@ -229,20 +236,30 @@ describe('renderer startup runtime routing', () => {
 
   it('waits for first-window startup services before terminal reconnect', () => {
     const source = readSource(STARTUP_HYDRATION_PATH)
-    const servicesIndex = source.indexOf("timeRendererStartupStep('first-window-services-await'")
-    const preReconnectRecoveryIndex = source.indexOf(
+    const restore = readSource(TERMINAL_RESTORE_PATH)
+    const servicesIndex = source.indexOf(
+      "timeRendererStartupStep('prepare-terminal-startup-restoration'"
+    )
+    const restoreCallIndex = source.indexOf(
+      'await restoreStartupTerminalSession(actions, abortController.signal)'
+    )
+    const preReconnectRecoveryIndex = restore.indexOf(
       "timeRendererStartupStep('recover-legacy-worker-terminals-pre-reconnect'"
     )
-    const capabilityRefreshIndex = source.indexOf(
+    const capabilityRefreshIndex = restore.indexOf(
       "timeRendererStartupStep('terminal-provider-snapshot-capabilities'"
     )
-    const reconnectIndex = source.indexOf("timeRendererStartupStep('reconnect-terminals'")
-    const postReconnectRecoveryIndex = source.indexOf(
+    const reconnectIndex = restore.indexOf("timeRendererStartupStep('reconnect-terminals'")
+    const postReconnectRecoveryIndex = restore.indexOf(
       "timeRendererStartupStep('recover-legacy-worker-terminals-post-reconnect'"
     )
 
     expect(servicesIndex).toBeGreaterThanOrEqual(0)
-    expect(preReconnectRecoveryIndex).toBeGreaterThan(servicesIndex)
+    expect(source.slice(servicesIndex, restoreCallIndex)).toContain(
+      'window.api.app.prepareTerminalStartupRestoration()'
+    )
+    expect(restoreCallIndex).toBeGreaterThan(servicesIndex)
+    expect(preReconnectRecoveryIndex).toBeGreaterThanOrEqual(0)
     expect(capabilityRefreshIndex).toBeGreaterThan(preReconnectRecoveryIndex)
     expect(reconnectIndex).toBeGreaterThan(capabilityRefreshIndex)
     expect(postReconnectRecoveryIndex).toBeGreaterThan(reconnectIndex)
@@ -250,7 +267,7 @@ describe('renderer startup runtime routing', () => {
 
   it('overlaps persisted PTY sanitization without blocking terminal model hydration', () => {
     const source = readSource(STARTUP_HYDRATION_PATH)
-    const servicesIndex = source.indexOf("timeRendererStartupStep('first-window-services-await'")
+    const servicesIndex = source.indexOf("timeRendererStartupStep('git-environment-barrier-await'")
     const sanitizeIndex = source.indexOf("'sanitize-persisted-terminal-session'")
     const completedReadIndex = source.indexOf(
       'const sanitizedSession = terminalSanitization.readCompleted()'
@@ -259,7 +276,7 @@ describe('renderer startup runtime routing', () => {
     const tabHydrationIndex = source.indexOf('actions.hydrateTabsSession(')
     const reconciliationIndex = source.indexOf('reconcileHydratedWorkspaceTabModels(')
     const lateSanitizationIndex = source.indexOf(
-      'applyLatePersistedTerminalSessionSanitization(',
+      'scheduleLatePersistedTerminalSessionSanitization(',
       reconciliationIndex
     )
 
@@ -408,7 +425,7 @@ describe('renderer startup runtime routing', () => {
   })
 
   it('prefetches terminal snapshot capabilities before reconnect unlocks cold activation', () => {
-    const source = readSource(STARTUP_HYDRATION_PATH)
+    const source = readSource(TERMINAL_RESTORE_PATH)
     const capabilityIndex = source.indexOf(
       "timeRendererStartupStep('terminal-provider-snapshot-capabilities'"
     )
@@ -416,6 +433,16 @@ describe('renderer startup runtime routing', () => {
 
     expect(capabilityIndex).toBeGreaterThanOrEqual(0)
     expect(reconnectIndex).toBeGreaterThan(capabilityIndex)
+  })
+
+  it('skips startup structured tab projection while the host setting is off', () => {
+    const source = readSource(TERMINAL_RESTORE_PATH)
+    const projectIndex = source.indexOf("timeRendererStartupStep('project-structured-session-tabs'")
+
+    expect(projectIndex).toBeGreaterThanOrEqual(0)
+    expect(source.slice(projectIndex - 180, projectIndex)).toContain(
+      'settings?.experimentalStructuredNativeChat === true'
+    )
   })
 
   it('orders packaged restoration before adoption, projection, and default creation', () => {
@@ -433,8 +460,12 @@ describe('renderer startup runtime routing', () => {
     const prepareIndex = appSource.indexOf(
       "timeRendererStartupStep('prepare-terminal-startup-restoration'"
     )
-    const reconnectIndex = appSource.indexOf("timeRendererStartupStep('reconnect-terminals'")
-    const projectIndex = appSource.indexOf(
+    const restoreCallIndex = appSource.indexOf(
+      'await restoreStartupTerminalSession(actions, abortController.signal)'
+    )
+    const restoreSource = readSource(TERMINAL_RESTORE_PATH)
+    const reconnectIndex = restoreSource.indexOf("timeRendererStartupStep('reconnect-terminals'")
+    const projectIndex = restoreSource.indexOf(
       "timeRendererStartupStep('project-structured-session-tabs'"
     )
     const readyIndex = appSource.indexOf('actions.setTerminalStartupRestorationReady(true)')
@@ -442,15 +473,18 @@ describe('renderer startup runtime routing', () => {
     const gateEnd = terminalSource.indexOf('const startupResumeWorktreeIdsRef', gateStart)
     const gateBlock = terminalSource.slice(gateStart, gateEnd)
     const gateIndex = gateBlock.indexOf('gateWorktreeAgentActivation(activeWorktreeId)')
+    // Floating sessions have their own earlier branch; assert the worktree creation after adoption.
     const createIndex = gateBlock.indexOf(
-      'createTab(activeWorktreeId, undefined, undefined, { pendingActivationSpawn: true })'
+      'createTab(activeWorktreeId, undefined, undefined, { pendingActivationSpawn: true })',
+      gateIndex
     )
 
     expect(hydrateIndex).toBeGreaterThanOrEqual(0)
     expect(hydrateIndex).toBeLessThan(prepareIndex)
-    expect(prepareIndex).toBeLessThan(reconnectIndex)
+    expect(prepareIndex).toBeLessThan(restoreCallIndex)
+    expect(restoreCallIndex).toBeLessThan(readyIndex)
+    expect(reconnectIndex).toBeGreaterThanOrEqual(0)
     expect(reconnectIndex).toBeLessThan(projectIndex)
-    expect(projectIndex).toBeLessThan(readyIndex)
     expect(gateBlock).toContain('terminalStartupRestorationReady')
     expect(gateBlock).not.toContain('hydrationSucceeded')
     expect(gateIndex).toBeGreaterThanOrEqual(0)
@@ -620,8 +654,9 @@ describe('renderer startup runtime routing', () => {
 
   it('checkpoints activeView and all session snapshots through one beforeunload handler (#9002)', () => {
     const source = readSource(SESSION_PERSISTENCE_PATH)
+    const persistSource = readSource('src/renderer/src/app-shell/shutdown-checkpoint-persist.ts')
     const checkpointStart = source.indexOf(
-      'const shutdownCheckpoint = createShutdownCheckpointGuard('
+      'const shutdownCheckpointPersist = createShutdownCheckpointPersist('
     )
     const checkpointEnd = source.indexOf(
       'const persistBeforeUnload = createShutdownCheckpointBeforeUnloadHandler(shutdownCheckpoint)',
@@ -631,26 +666,32 @@ describe('renderer startup runtime routing', () => {
     expect(checkpointEnd).toBeGreaterThan(checkpointStart)
     const checkpointBlock = source.slice(checkpointStart, checkpointEnd)
 
+    expect(checkpointBlock).toContain('return buildWorkspaceSessionHostSnapshots(')
+    expect(checkpointBlock).toContain('buildWorkspaceSessionPayload(freshState)')
     expect(checkpointBlock).toContain(
-      'let sessionSnapshots: ReturnType<typeof buildWorkspaceSessionHostSnapshots> = []'
+      'buildUiPatch: () => buildActiveViewUnloadPatch(useAppStore.getState())'
     )
     expect(checkpointBlock).toContain(
-      'buildWorkspaceSessionHostSnapshots(buildWorkspaceSessionPayload(freshState), freshState)'
+      'hasDirtyOpenFiles: () => useAppStore.getState().openFiles.some((file) => file.isDirty)'
     )
-    expect(checkpointBlock).toContain('window.api.app.stageBeforeUnloadSync({')
-    expect(checkpointBlock).toContain('sessions: sessionSnapshots')
-    expect(checkpointBlock).toContain('ui: buildActiveViewUnloadPatch(freshState)')
-    expect(checkpointBlock).toContain('!isIntentionalAppRestartInProgress()')
-    expect(checkpointBlock).toContain('freshState.openFiles.some((file) => file.isDirty)')
-    expect(checkpointBlock).toContain('sessions: []')
-    expect(checkpointBlock).toMatch(
-      /return\s*\}\s*window\.api\.app\.stageBeforeUnloadSync\(\{\s*sessions: sessionSnapshots/su
+    expect(checkpointBlock).toContain(
+      'isIntentionalAppRestartInProgress() || isWindowCloseCheckpointInProgress()'
+    )
+    expect(checkpointBlock).toContain(
+      'stageBeforeUnloadSync: (args) => window.api.app.stageBeforeUnloadSync(args)'
+    )
+    expect(checkpointBlock).toContain('shutdownCheckpointPersist.run')
+    expect(checkpointBlock).toContain('shutdownCheckpointPersist.abandonAttempt')
+    expect(persistSource).toContain(
+      'deps.isDegradableShutdownInProgress() && !deps.hasDirtyOpenFiles()'
+    )
+    expect(persistSource).toContain('sessions: degraded ? [] : sessionSnapshots')
+    expect(persistSource).toContain('ui: deps.buildUiPatch()')
+    expect(source).toContain(
+      'window.addEventListener(ORCA_APP_RESTART_ABORTED_EVENT, shutdownCheckpoint.abandonAttempt)'
     )
     expect(source).toContain(
-      'window.addEventListener(ORCA_APP_RESTART_ABORTED_EVENT, shutdownCheckpoint.reset)'
-    )
-    expect(source).toContain(
-      'window.addEventListener(ORCA_RENDERER_UNLOAD_PREVENTED_EVENT, shutdownCheckpoint.reset)'
+      'window.addEventListener(ORCA_RENDERER_UNLOAD_PREVENTED_EVENT, shutdownCheckpoint.abandonAttempt)'
     )
     expect(source).toContain("window.addEventListener('beforeunload', persistBeforeUnload)")
     expect(source.match(/window\.addEventListener\('beforeunload'/g) ?? []).toHaveLength(1)

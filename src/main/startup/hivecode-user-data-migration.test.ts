@@ -567,30 +567,29 @@ describe('user data migration startup policy', () => {
 
 describe('main-process migration wiring', () => {
   it('validates after Store load and completes only after startup succeeds', () => {
-    const mainSource = readFileSync(join(import.meta.dirname, '..', 'index.ts'), 'utf8').replaceAll(
-      '\r\n',
-      '\n'
+    const read = (name: string): string =>
+      readFileSync(join(import.meta.dirname, name), 'utf8').replaceAll('\r\n', '\n')
+    const preflight = read('main-process-preflight.ts')
+    const foundation = read('main-process-ready-foundation.ts')
+    const launch = read('main-process-runtime-launch.ts')
+    const migration = read('main-process-user-data-migration.ts')
+    expect(preflight.indexOf('prepareUserDataMigration()')).toBeGreaterThan(
+      preflight.indexOf('if (!hasLock) {')
     )
-    const prepareOffset = mainSource.indexOf('const migrationResult = migrateUserDataFromOrca({')
-    const storeOffset = mainSource.indexOf('store = new Store(')
-    const validateOffset = mainSource.indexOf(
-      'validateUserDataMigration(getCanonicalUserDataPath())'
+    expect(foundation.indexOf('validatePreparedUserDataMigration()')).toBeGreaterThan(
+      foundation.indexOf('const store = new Store(')
     )
-    const desktopReadyOffset = mainSource.lastIndexOf('completePendingUserDataMigration()')
-    const headlessReadyOffset = mainSource.indexOf(
-      'await printServeReady(serveOptions)\n    completePendingUserDataMigration()'
+    expect(launch).toMatch(
+      /await printServeReady\(serveOptions\)\s*completePendingUserDataMigration\(\)/
     )
-
-    expect(mainSource).toContain('hiveCodeUserData: getCanonicalUserDataPath()')
-    expect(prepareOffset).toBeGreaterThan(-1)
-    expect(storeOffset).toBeGreaterThan(prepareOffset)
-    expect(validateOffset).toBeGreaterThan(storeOffset)
-    expect(headlessReadyOffset).toBeGreaterThan(validateOffset)
-    expect(desktopReadyOffset).toBeGreaterThan(headlessReadyOffset)
-    expect(mainSource).toContain('resolveUserDataMigrationStartupAction(migrationResult)')
-    expect(mainSource).toContain("migrationAction === 'start-clean'")
-    expect(mainSource).toContain('Data from an older app version could not be imported safely.')
-    expect(mainSource).toContain('Your existing data was not changed.')
-    expect(mainSource).not.toContain('Older Orca data could not be imported safely.')
+    expect(launch).toMatch(
+      /await launchDesktopMode\([^\n]+\)\s*completePendingUserDataMigration\(\)/
+    )
+    expect(migration).toContain('hiveCodeUserData: getCanonicalUserDataPath()')
+    expect(migration).toContain('validateUserDataMigration(getCanonicalUserDataPath())')
+    expect(migration).toContain('resolveUserDataMigrationStartupAction(migrationResult)')
+    expect(migration).toContain("migrationAction === 'start-clean'")
+    expect(migration).toContain('Data from an older app version could not be imported safely.')
+    expect(migration).toContain('Your existing data was not changed.')
   })
 })

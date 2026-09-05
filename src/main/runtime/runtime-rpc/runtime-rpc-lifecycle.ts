@@ -174,11 +174,16 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
       host: options.host,
       port: options.port,
       staticRoot: this.webClientRoot,
+      httpRouteHandler: (request, response) =>
+        this.cloudWebLaunchService?.handleHttpRequest(request, response) ?? false,
       ...(options.fallbackPort !== undefined ? { fallbackPort: options.fallbackPort } : {}),
       ...(options.preferPinnedPort ? { preferPinnedPort: true } : {})
     })
     const mobileSocketWiring = this.ensureMobileSocketWiring(deviceRegistry, e2eeKeypair)
-    this.detachWebSocketWiring = mobileSocketWiring.attachTransport(wsTransport)
+    this.detachWebSocketWiring = mobileSocketWiring.attachTransport(wsTransport, (ws) => ({
+      transport: 'direct',
+      request: wsTransport.getConnectionRequest(ws)
+    }))
 
     try {
       await wsTransport.start()
@@ -226,6 +231,25 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         )
       },
       onBinary: (socket, bytes) => this.handleWebSocketBinaryMessage(bytes, socket.ws),
+      resolveCloudManagedSession: (auth, metadata) => {
+        const request = metadata.transport === 'direct' ? metadata.request : undefined
+        return request ? (this.cloudWebLaunchService?.resolveSession(auth, request) ?? null) : null
+      },
+      onCloudText: (socket, plaintext, reply, sendBinary) => {
+        void this.handleWebSocketMessage(
+          plaintext,
+          reply,
+          sendBinary,
+          undefined,
+          socket.ws,
+          null,
+          undefined,
+          socket
+        )
+      },
+      onCloudBinary: (socket, bytes) => this.handleCloudManagedWebSocketBinary(socket, bytes),
+      onCloudReady: (socket) => this.handleCloudSocketReady(socket),
+      onCloudClose: (socket) => this.handleCloudSocketClose(socket),
       onReady: () => {
         // Why: first authenticated mobile/remote client (direct WS and
         // cloud relay both attach here) starts path-candidate tracking.

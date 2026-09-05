@@ -164,12 +164,14 @@ export class RuntimeRpcPairing extends RuntimeRpcNetworkExposure {
       console.error('[runtime] Failed to persist pairing credential:', error)
       return pairingUnavailable('device_registry_unavailable', DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE)
     }
+    const runtimeRecordId = this.runtime.getStatus().runtimeRecordId
     const pairingUrl = encodePairingOffer({
       v: PAIRING_OFFER_VERSION,
       endpoint,
       deviceToken: device.token,
       publicKeyB64,
       pairedDeviceId: device.deviceId,
+      ...(runtimeRecordId ? { runtimeRecordId } : {}),
       scope
     })
     return {

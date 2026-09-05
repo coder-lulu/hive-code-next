@@ -9,7 +9,8 @@ import { appendRecentPtyPathCandidates } from './terminal-output-path-candidates
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 import { resolveLocalProjectRuntimeForWorktreeId } from '../local-project-runtime-resolution'
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
-import { resolveTerminalOrchestrationCliCommand } from './orchestration/cli-command'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
+import { resolveTerminalOrchestrationCliCommand, type OrchestrationCliCommand } from './orchestration/cli-command'
 
 export class OrcaRuntimeWithGetOrchestrationDispatchAuthority extends OrcaRuntimeWithVerifyOrchestrationCompatibilityCaller {
   /** Every pane key this PTY could be addressed by, including restored receipts. */
@@ -188,16 +189,16 @@ export class OrcaRuntimeWithGetOrchestrationDispatchAuthority extends OrcaRuntim
       : undefined
   }
 
-  getTerminalOrchestrationCliCommand(handle: string): 'orca' | 'orca-ide' {
+  getTerminalOrchestrationCliCommand(handle: string): OrchestrationCliCommand {
     let pty: RuntimePtyWorktreeRecord | null = null
     try {
       const ptyId = this.resolveLeafForHandle(handle)?.ptyId
       pty = ptyId ? (this.ptysById.get(ptyId) ?? null) : null
     } catch {
-      return 'orca'
+      return PRIMARY_CLI_COMMAND
     }
     if (!pty) {
-      return 'orca'
+      return PRIMARY_CLI_COMMAND
     }
     return resolveTerminalOrchestrationCliCommand({
       connectionId: pty.connectionId,

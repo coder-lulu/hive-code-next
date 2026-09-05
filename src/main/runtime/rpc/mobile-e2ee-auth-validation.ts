@@ -39,6 +39,9 @@ export function authenticateMobileE2EE<TDevice extends { deviceToken: string }>(
     return { ok: false, code: 'bad_auth' }
   }
   if (
+    typeof auth !== 'object' ||
+    auth === null ||
+    Array.isArray(auth) ||
     auth.type !== 'e2ee_auth' ||
     !auth.deviceToken ||
     !isValidMobileE2EEAuthVersion(auth, args.v2Session)

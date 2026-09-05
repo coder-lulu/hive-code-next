@@ -16,6 +16,8 @@ export type MobileNativeChatViewProps = {
   error?: string
   agent?: string | null
   agentWorking?: boolean
+  /** Structured sessions expose live tool activity and per-turn disclosure. */
+  structuredActivityUi?: boolean
   onStop?: () => void
   streaming: string | null
   hasMore?: boolean
