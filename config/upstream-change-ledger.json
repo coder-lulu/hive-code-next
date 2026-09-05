@@ -456,17 +456,17 @@
       "upstreamSha": "fd9125ea8c7b347cd8b675a4095e31cd3c865d25",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": ["fc36d58bbb697e10ade0ecbd5df22e53bd2e7cf6"],
+      "dependencies": [],
       "conflictReason": "结构化原生聊天与 HiveCode runtime/preload facade 存在拆分差异，包含 runtime 拆分时遗漏的 host 接入点",
       "adaptation": "补齐结构化会话 PTY 写入门禁、退出解绑、web preload 会话恢复和能力暴露，以及 lazy structured-agent-session host、创建意图、重启恢复、agent tab 投影与关闭；保留 HiveCode web API、UI 品牌和移动 session tab 边界",
-      "historicalReference": "旧记录 b4ed53f7c65be1d03ba2896631fe75c62742babf 属于上游开发分支，不在 upstream/main 历史；其 lazy host 文件在主线实际由本条 #16729 引入，因此将适配说明和回归项归并到主线提交，保留原 SHA 供溯源，不将旁支提交计为已审核主线历史",
+      "historicalReference": "旧记录 b4ed53f7c65be1d03ba2896631fe75c62742babf 属于上游开发分支，不在 upstream/main 历史；其 lazy host 文件在主线实际由本条 #16729 引入，因此将适配说明和回归项归并到主线提交，保留原 SHA 供溯源，不将旁支提交计为已审核主线历史；旧依赖 fc36d58bbb697e10ade0ecbd5df22e53bd2e7cf6 同属开发旁支，其 structured host/history/journal/attach/turn/restart/record-store 共17条路径全部由本条主线提交引入。主线提交内部实现不再伪记为跨提交依赖，保留该SHA供溯源。",
       "regressionTests": [
-        "structured agent session PTY binding",
-        "web preload capability parity",
-        "structured agent-session create intent",
-        "structured session cold restoration",
-        "session tab move validation"
-      ]
+        "src/main/native-chat/agent-session-wire/agent-session-history-page.test.ts",
+        "src/main/native-chat/agent-session-wire/agent-session-journal-recovery.test.ts",
+        "src/main/native-chat/agent-session-wire/structured-agent-session-host.test.ts"
+      ],
+      "productSha": "e6e9d9eeb5f7ec83e27e659c8b13a9c5d25e2c9e",
+      "reviewReason": "对比 fc36d58、主线 fd9125e 和候选 e6e9d9e 的提交树：17条路径在主线同一提交全部引入，operation-admission 与 registry 三树blob一致，其余为同名增强或已接线拆分后继实现。候选保留结构化host、历史分页、journal恢复、attach/turn/lease与重启恢复能力；使用实际模块回归核对。"
     },
     {
       "upstreamSha": "98bdd653abcb12e2b8abba57fa0f2aa9ed636110",

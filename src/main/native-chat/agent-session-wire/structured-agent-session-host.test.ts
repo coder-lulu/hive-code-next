@@ -653,6 +653,8 @@ describe('restart', () => {
   async function reboot(
     probeOwner: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe>
   ) {
+    // Simulate process exit: close the old host's journals without changing its persisted lease.
+    await host.flushAllStreamedEvents()
     store = await AgentSessionRecordStore.open({ directory: join(root, 'store'), hostId: 'local' })
     host = new StructuredAgentSessionHost({
       store,
