@@ -1,3 +1,4 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { handleSharedControlTextFrame } from './remote-runtime-shared-control-frame-handler'
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import type { RuntimeCapability } from './protocol-version'
@@ -14,7 +15,7 @@ export function handleRuntimeControlTextFrame(args: {
   socketGeneration: number
   isCurrent: (generation: number) => boolean
   getState: () => SharedControlConnectionState
-  getSharedKey: () => Uint8Array | null
+  getSession: () => RuntimeE2EEClientSession | null
   environmentId?: string
   deviceToken: string
   clientCapabilities: readonly RuntimeCapability[]
@@ -35,7 +36,7 @@ export function handleRuntimeControlTextFrame(args: {
   handleSharedControlTextFrame({
     frame: args.frame,
     state: args.getState(),
-    sharedKey: args.getSharedKey(),
+    session: args.getSession(),
     environmentId: args.environmentId,
     deviceToken: args.deviceToken,
     clientCapabilities: args.clientCapabilities,

@@ -44,10 +44,9 @@ export const hivecodeProductConfig = {
   },
   endpoints: {
     artifacts: null,
-    cloud: 'https://api.hive.test',
-    identityIssuer: 'https://identity.hive.test/realms/hive',
-    relay: null,
-    update: 'https://updates.hive.test/hive/v1/updates/desktop/',
+    cloud: 'https://api.hivekernel.com',
+    identityIssuer: 'https://identity.hivekernel.com/realms/hive',
+    update: null,
     telemetry: null,
     diagnostics: null,
     feedback: null,
@@ -58,10 +57,10 @@ export const hivecodeProductConfig = {
   },
   services: {
     api: {
-      baseUrl: 'https://api.hive.test'
+      baseUrl: 'https://api.hivekernel.com'
     },
     identity: {
-      issuer: 'https://identity.hive.test/realms/hive',
+      issuer: 'https://identity.hivekernel.com/realms/hive',
       clients: {
         desktop: 'hivecode-desktop',
         userWeb: 'hive-cloud-user-web',
@@ -74,16 +73,12 @@ export const hivecodeProductConfig = {
       provider: null
     },
     update: {
-      enabled: true,
-      endpoint: 'https://updates.hive.test/hive/v1/updates/desktop/',
-      checkEndpoint: 'https://updates.hive.test/hive/v1/updates/check',
+      enabled: false,
+      endpoint: null,
+      checkEndpoint: null,
       provider: 'hivecloud',
       channel: 'beta',
       checkIntervalHours: 24
-    },
-    relay: {
-      enabled: false,
-      directorUrl: null
     }
   }
 } as const

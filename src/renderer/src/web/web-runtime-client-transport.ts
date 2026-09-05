@@ -1,4 +1,4 @@
-import { encrypt, encryptBytes } from './web-e2ee'
+import type { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 
 export type WebRuntimeClientTransport = {
   connectionWaiters: {
@@ -11,24 +11,24 @@ export type WebRuntimeClientTransport = {
 export function createWebRuntimeClientTransport(deps: {
   waitForConnected: (timeoutMs?: number) => Promise<void>
   getWebSocket: () => WebSocket | null
-  getSharedKey: () => Uint8Array | null
+  getSession: () => RuntimeE2EEClientSession | null
 }): WebRuntimeClientTransport {
   const sendEncrypted = (message: unknown): boolean => {
     const ws = deps.getWebSocket()
-    const sharedKey = deps.getSharedKey()
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sharedKey) {
+    const session = deps.getSession()
+    if (!ws || ws.readyState !== WebSocket.OPEN || !session) {
       return false
     }
-    ws.send(encrypt(JSON.stringify(message), sharedKey))
+    ws.send(session.sealText(JSON.stringify(message)))
     return true
   }
   const sendEncryptedBinary = (bytes: Uint8Array<ArrayBufferLike>): boolean => {
     const ws = deps.getWebSocket()
-    const sharedKey = deps.getSharedKey()
-    if (!ws || ws.readyState !== WebSocket.OPEN || !sharedKey) {
+    const session = deps.getSession()
+    if (!ws || ws.readyState !== WebSocket.OPEN || !session) {
       return false
     }
-    ws.send(encryptBytes(bytes, sharedKey))
+    ws.send(new Uint8Array(session.sealBinary(bytes)))
     return true
   }
   return {

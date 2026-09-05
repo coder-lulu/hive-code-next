@@ -1,3 +1,5 @@
+import { invalidRemoteRuntimeResponseError } from './remote-runtime-request-frames'
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { parseAuthenticatedFrame, parseReadyFrame } from './remote-runtime-request-frames'
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import type { RuntimeCapability } from './protocol-version'
@@ -15,7 +17,7 @@ import type {
 export function handleSharedControlTextFrame(args: {
   frame: string
   state: SharedControlConnectionState
-  sharedKey: Uint8Array | null
+  session: RuntimeE2EEClientSession | null
   deviceToken: string
   clientCapabilities: readonly RuntimeCapability[]
   environmentId?: string
@@ -30,7 +32,11 @@ export function handleSharedControlTextFrame(args: {
   replaySubscriptions: () => void
 }): void {
   if (args.state === 'awaiting_ready') {
-    const error = parseReadyFrame(args.frame)
+    const error =
+      parseReadyFrame(args.frame) ??
+      (!args.session?.acceptReady(JSON.parse(args.frame))
+        ? invalidRemoteRuntimeResponseError('Invalid E2EE host identity')
+        : null)
     if (error) {
       args.handleSocketClosed(error)
       return
@@ -38,15 +44,21 @@ export function handleSharedControlTextFrame(args: {
     args.setState('awaiting_authenticated')
     args.sendEncrypted({
       type: 'e2ee_auth',
+      v: 2,
+      transcriptHashB64: args.session!.transcriptHashB64,
       deviceToken: args.deviceToken,
       clientCapabilities: args.clientCapabilities
     })
     return
   }
 
-  const parsed = parseSharedControlFrame(args.frame, args.sharedKey, args.state)
+  const parsed = parseSharedControlFrame(args.frame, args.session, args.state)
   if (parsed.type === 'auth') {
-    const error = parseAuthenticatedFrame(parsed.plaintext)
+    const error =
+      parseAuthenticatedFrame(parsed.plaintext) ??
+      (!args.session?.isAuthenticated(parsed.plaintext)
+        ? invalidRemoteRuntimeResponseError('Invalid E2EE authentication transcript')
+        : null)
     if (error) {
       args.handleSocketClosed(error)
       return

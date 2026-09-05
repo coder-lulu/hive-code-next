@@ -12,8 +12,6 @@ import { getInstallCopy, type IosChannel } from './mobile-platform-copy'
 import type { MobilePageStage } from './mobile-page-stage'
 import { MobilePageToolbar } from './MobilePageToolbar'
 import { PhoneCarousel } from './PhoneCarousel'
-import type { MobilePairingConnectionMode } from '../../../../shared/mobile-pairing-connection-mode'
-import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
 
 type MobilePageContentProps = {
   closeMobilePage: () => void
@@ -40,16 +38,10 @@ type MobilePageContentProps = {
   openInstallUrl: () => void
   pairAnotherDevice: () => void
   pairLoading: boolean
-  connectionMode: MobilePairingConnectionMode
-  handleConnectionModeChange: (mode: MobilePairingConnectionMode) => void
   pairQrDataUrl: string | null
   pairQrSize: number | null
   pairingUrl: string | null
   pairingQrError: boolean
-  relayMintFailure: MobileRelayMintFailure | null
-  onUseLan: () => void
-  onRetryRelay: () => void
-  onCopyRelayDiagnostics: () => void
   platform: Platform
   refreshingNetworkInterfaces: boolean
   revokeDevice: (id: string) => void
@@ -88,16 +80,10 @@ export function MobilePageContent({
   openInstallUrl,
   pairAnotherDevice,
   pairLoading,
-  connectionMode,
-  handleConnectionModeChange,
   pairQrDataUrl,
   pairQrSize,
   pairingUrl,
   pairingQrError,
-  relayMintFailure,
-  onUseLan,
-  onRetryRelay,
-  onCopyRelayDiagnostics,
   platform,
   refreshingNetworkInterfaces,
   revokeDevice,
@@ -144,13 +130,7 @@ export function MobilePageContent({
               pairQrSize={pairQrSize}
               pairingUrl={pairingUrl}
               pairingQrError={pairingQrError}
-              relayMintFailure={relayMintFailure}
-              onUseLan={onUseLan}
-              onRetryRelay={onRetryRelay}
-              onCopyRelayDiagnostics={onCopyRelayDiagnostics}
               pairLoading={pairLoading}
-              connectionMode={connectionMode}
-              onConnectionModeChange={handleConnectionModeChange}
               onRegeneratePairing={() => generatePairing(true)}
               canGeneratePairing={canGeneratePairing}
               onCopyPairingCode={copyPairingCode}

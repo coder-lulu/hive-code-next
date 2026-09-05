@@ -6,7 +6,7 @@ import WebSocket from 'ws'
 import type { HiveRuntimeCloudWebLaunchService } from '../hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import { OrcaRuntimeService } from './orca-runtime'
 import { OrcaRuntimeRpcServer } from './runtime-rpc'
-import { decrypt, deriveSharedKey, encrypt, encryptBytes, generateKeyPair } from './rpc/e2ee-crypto'
+import { RuntimeE2EEClientSession } from '../../shared/runtime-e2ee-client-session'
 import { nextWsMessage, waitForWsClose } from './runtime-rpc-mobile-ws-test-harness'
 
 const ORIGIN = 'https://code.hivekernel.com'
@@ -50,24 +50,20 @@ async function openCloudSession(ttl = 60_000) {
       ws.once('open', resolve)
       ws.once('error', reject)
     })
-    const keys = generateKeyPair()
-    const sharedKey = deriveSharedKey(
-      keys.secretKey,
-      Uint8Array.from(Buffer.from(server.getE2EEPublicKey()!, 'base64'))
-    )
-    const ready = nextWsMessage(ws)
-    ws.send(
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: Buffer.from(keys.publicKey).toString('base64')
-      })
-    )
-    expect(JSON.parse(await ready)).toEqual({ type: 'e2ee_ready' })
-    const authenticated = nextWsMessage(ws)
-    ws.send(encrypt(JSON.stringify(auth), sharedKey))
-    expect(JSON.parse(decrypt(await authenticated, sharedKey)!)).toEqual({
-      type: 'e2ee_authenticated'
+    const sharedKey = RuntimeE2EEClientSession.create({
+      desktopPublicKeyB64: server.getE2EEPublicKey()!,
+      transport: 'direct'
     })
+    const ready = nextWsMessage(ws)
+    ws.send(JSON.stringify(sharedKey.hello))
+    expect(sharedKey.acceptReady(JSON.parse(await ready))).toBe(true)
+    const authenticated = nextWsMessage(ws)
+    ws.send(
+      sharedKey.sealText(
+        JSON.stringify({ ...auth, v: 2, transcriptHashB64: sharedKey.transcriptHashB64 })
+      )
+    )
+    expect(sharedKey.isAuthenticated(sharedKey.openText(await authenticated)!)).toBe(true)
     const socket = [...server['mobileSocketWiring']!['authenticatedCloudSockets'].values()][0]!
     return { server, ws, socket, sharedKey, principal, resolveSession, revalidateSession, cleanup }
   } catch (error) {
@@ -81,12 +77,15 @@ describe('Cloud session transport security', () => {
   it('passes the real WebSocket upgrade path and Origin into Cloud authentication', async () => {
     const session = await openCloudSession()
     try {
-      expect(session.resolveSession).toHaveBeenCalledWith(auth, { pathname: PATH, origin: ORIGIN })
+      expect(session.resolveSession).toHaveBeenCalledWith(
+        { ...auth, v: 2, transcriptHashB64: session.sharedKey.transcriptHashB64 },
+        { pathname: PATH, origin: ORIGIN }
+      )
       const response = nextWsMessage(session.ws)
       session.ws.send(
-        encrypt(JSON.stringify({ id: 'status', method: 'status.get' }), session.sharedKey)
+        session.sharedKey.sealText(JSON.stringify({ id: 'status', method: 'status.get' }))
       )
-      expect(JSON.parse(decrypt(await response, session.sharedKey)!)).toMatchObject({
+      expect(JSON.parse(session.sharedKey.openText(await response)!)).toMatchObject({
         id: 'status',
         ok: true
       })
@@ -103,12 +102,12 @@ describe('Cloud session transport security', () => {
     session.server['registerBinaryMessageHandler'](session.socket.connectionId, handleBinary)
     const dispatch = session.server['registerWebSocketDispatchAbort'](session.socket.ws)
     try {
-      session.ws.send(encryptBytes(new Uint8Array([1]), session.sharedKey))
+      session.ws.send(session.sharedKey.sealBinary(new Uint8Array([1])))
       await vi.waitFor(() => expect(handleBinary).toHaveBeenCalledTimes(1))
       // The deadline timer is still a minute away; the frame itself must revalidate the session.
       vi.spyOn(Date, 'now').mockReturnValue(session.principal.expiresAt + 1)
       const closed = waitForWsClose(session.ws)
-      session.ws.send(encryptBytes(new Uint8Array([2]), session.sharedKey))
+      session.ws.send(session.sharedKey.sealBinary(new Uint8Array([2])))
       await closed
       expect(handleBinary).toHaveBeenCalledTimes(1)
       expect(dispatch.signal.aborted).toBe(true)

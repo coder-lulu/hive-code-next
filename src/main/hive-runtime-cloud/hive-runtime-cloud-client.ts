@@ -44,7 +44,6 @@ export type {
   RuntimeClaimChallengePoll,
   RuntimeClaimReconcile
 } from './hive-runtime-cloud-claim-response'
-export type { HiveRuntimeCloudConnectionIntent } from './hive-runtime-cloud-connection-response'
 export {
   HiveRuntimeCloudRequestError,
   HiveRuntimeCloudTransportError

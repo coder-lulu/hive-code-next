@@ -17,7 +17,7 @@ export type HiveRuntimeRelayBindingStore = {
 export type HiveRuntimeRelayAuthorizationOptions = {
   client: Pick<HiveRuntimeRelayCloudClient, 'bindHost' | 'authorize' | 'assign' | 'refresh'>
   currentLeaseContext: () => CurrentHiveRuntimeCloudLeaseContext | null
-  requestedRegion: string
+  requestedRegion?: string
   bindingStore: HiveRuntimeRelayBindingStore
   beforeKeyRotation: () => void | Promise<void>
   now?: () => number

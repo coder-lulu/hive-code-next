@@ -38,7 +38,6 @@ vi.mock('./host-credential-cleanup', () => ({
 }))
 
 import { loadHosts, resetHostStoreForTests, saveHost } from './host-store'
-import { resetMobileRelayHostOverlayStoreForTests } from './mobile-relay-host-overlay-store'
 
 const HOSTS_STORAGE_KEY = 'orca:hosts'
 
@@ -63,7 +62,6 @@ describe('host-store pairing save after an Android encryption rejection', () => 
     vi.clearAllMocks()
     resetHostStoreForTests()
     platformMock.OS = 'android'
-    resetMobileRelayHostOverlayStoreForTests()
     scheduleCleanupMock.mockReset()
     scheduleCleanupMock.mockResolvedValue(undefined)
     cancelCleanupMock.mockReset()

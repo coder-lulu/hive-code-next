@@ -166,7 +166,6 @@ it.skipIf(!origin)(
     const host = new HiveRuntimeRelayHostService({
       apiBaseUrl: 'https://hive.example',
       storageDirectory: storage,
-      requestedRegion: 'cn-east',
       presence,
       getKeypair: () => keypair,
       client: new HiveRuntimeRelayCloudClient('https://hive.example', wireFetch),

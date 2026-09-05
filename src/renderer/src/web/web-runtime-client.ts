@@ -20,14 +20,7 @@ import {
 import { installWindowVisibilityInterval } from '../lib/window-visibility-interval'
 import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime-tailscale-hint'
 import { applyProductBranding } from '../../../shared/brand'
-import {
-  decrypt,
-  decryptBytes,
-  deriveSharedKey,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './web-e2ee'
+import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import {
   AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
   SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
@@ -93,7 +86,8 @@ const HEARTBEAT_PROBE_GRACE_MS = 20_000
 export class WebRuntimeClient {
   private readonly transport: WebRuntimeClientTransport
   private ws: WebSocket | null = null
-  private sharedKey: Uint8Array | null = null
+  private session: RuntimeE2EEClientSession | null = null
+  private inboundChain: Promise<void> = Promise.resolve()
   private state: WebRuntimeConnectionState = 'disconnected'
   private requestCounter = 0
   private reconnectAttempt = 0
@@ -112,16 +106,14 @@ export class WebRuntimeClient {
   private readonly fileWatchTeardownRetries = new Map<string, Set<() => Promise<void>>>()
   private readonly childClients = new Set<WebRuntimeClient>()
   private readonly waiters: { resolve: () => void; reject: (error: Error) => void }[] = []
-  private readonly serverPublicKey: Uint8Array
   private readonly connection: WebRuntimeConnection
 
   constructor(input: WebPairingOffer | CloudLaunchBootstrap | WebRuntimeConnection) {
     this.connection = normalizeConnection(input)
-    this.serverPublicKey = publicKeyFromBase64(this.connection.publicKeyB64)
     this.transport = createWebRuntimeClientTransport({
       waitForConnected: (timeoutMs) => this.waitForConnected(timeoutMs),
       getWebSocket: () => this.ws,
-      getSharedKey: () => this.sharedKey
+      getSession: () => this.session
     })
     this.openConnection()
   }
@@ -396,7 +388,7 @@ export class WebRuntimeClient {
       this.ws.close()
       this.ws = null
     }
-    this.sharedKey = null
+    this.session = null
     this.setState('disconnected')
   }
 
@@ -415,7 +407,7 @@ export class WebRuntimeClient {
 
     ws.binaryType = 'arraybuffer'
     this.ws = ws
-    this.sharedKey = null
+    this.session = null
     this.setState('connecting')
 
     this.connectTimer = window.setTimeout(() => {
@@ -431,14 +423,11 @@ export class WebRuntimeClient {
       }
       this.clearConnectTimer()
       this.setState('handshaking')
-      const keyPair = generateKeyPair()
-      this.sharedKey = deriveSharedKey(keyPair.secretKey, this.serverPublicKey)
-      ws.send(
-        JSON.stringify({
-          type: 'e2ee_hello',
-          publicKeyB64: publicKeyToBase64(keyPair.publicKey)
-        })
-      )
+      this.session = RuntimeE2EEClientSession.create({
+        desktopPublicKeyB64: this.connection.publicKeyB64,
+        transport: 'direct'
+      })
+      ws.send(JSON.stringify(this.session.hello))
       this.handshakeTimer = window.setTimeout(() => {
         if (this.ws === ws && this.state === 'handshaking') {
           ws.close()
@@ -454,7 +443,13 @@ export class WebRuntimeClient {
       // Why: any inbound frame proves the socket is alive — reset the liveness watchdog and clear any outstanding probe.
       this.lastInboundFrameAt = this.now()
       this.heartbeatProbeSentAt = null
-      void this.handleSocketMessage(event.data, ws)
+      this.inboundChain = this.inboundChain
+        .then(() => (this.ws === ws ? this.handleSocketMessage(event.data, ws) : undefined))
+        .catch(() => {
+          if (this.ws === ws) {
+            ws.close()
+          }
+        })
     }
 
     ws.onclose = () => this.handleSocketClosed(ws)
@@ -475,12 +470,16 @@ export class WebRuntimeClient {
   private async handleSocketMessage(rawData: unknown, sourceWs?: WebSocket): Promise<void> {
     const raw = typeof rawData === 'string' ? rawData : null
     if (this.state === 'handshaking') {
-      if (raw === null || !this.sharedKey) {
+      if (raw === null || !this.session) {
         return
       }
       try {
         const control = JSON.parse(raw) as { type?: unknown }
         if (control.type === 'e2ee_ready') {
+          if (!this.session.acceptReady(control)) {
+            this.ws?.close()
+            return
+          }
           this.transport.sendEncrypted(this.authenticationFrame())
           return
         }
@@ -488,7 +487,7 @@ export class WebRuntimeClient {
         // The authenticated control frame is encrypted, so non-JSON is normal here.
       }
 
-      const plaintext = decrypt(raw, this.sharedKey)
+      const plaintext = this.session.openText(raw)
       if (plaintext === null) {
         return
       }
@@ -497,7 +496,7 @@ export class WebRuntimeClient {
           type?: unknown
           error?: { code?: string; message?: string }
         }
-        if (control.type === 'e2ee_authenticated') {
+        if (this.session.isAuthenticated(plaintext)) {
           this.clearHandshakeTimer()
           this.reconnectAttempt = 0
           this.setState('connected')
@@ -514,7 +513,7 @@ export class WebRuntimeClient {
       return
     }
 
-    if (this.state !== 'connected' || !this.sharedKey) {
+    if (this.state !== 'connected' || !this.session) {
       return
     }
 
@@ -526,7 +525,7 @@ export class WebRuntimeClient {
       if (!encrypted) {
         return
       }
-      const plaintext = decryptBytes(encrypted, this.sharedKey)
+      const plaintext = this.session.openBinary(encrypted)
       if (!plaintext) {
         return
       }
@@ -536,7 +535,7 @@ export class WebRuntimeClient {
       return
     }
 
-    const plaintext = decrypt(raw, this.sharedKey)
+    const plaintext = this.session.openText(raw)
     if (plaintext === null) {
       return
     }
@@ -638,7 +637,7 @@ export class WebRuntimeClient {
       return
     }
     this.ws = null
-    this.sharedKey = null
+    this.session = null
     this.clearConnectTimer()
     this.clearHandshakeTimer()
     this.clearHeartbeatTimer()
@@ -872,11 +871,15 @@ export class WebRuntimeClient {
     return this.connection.kind === 'pairing'
       ? {
           type: 'e2ee_auth',
+          v: 2,
+          transcriptHashB64: this.session!.transcriptHashB64,
           deviceToken: this.connection.deviceToken,
           clientCapabilities
         }
       : {
           type: 'e2ee_auth',
+          v: 2,
+          transcriptHashB64: this.session!.transcriptHashB64,
           principalKind: 'cloud_managed_web_session',
           managedWebSessionId: this.connection.managedWebSessionId,
           runtimeSessionId: this.connection.runtimeSessionId,

@@ -1,3 +1,4 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import WebSocket from 'ws'
 import { abortSignalReason } from './abort-signal-reason'
 import { RemoteRuntimeClientError } from './remote-runtime-client-error'
@@ -11,9 +12,9 @@ import type {
 export function isSharedControlReady(args: {
   state: SharedControlConnectionState
   ws: WebSocket | null
-  sharedKey: Uint8Array | null
+  session: RuntimeE2EEClientSession | null
 }): boolean {
-  return args.state === 'ready' && args.ws?.readyState === WebSocket.OPEN && !!args.sharedKey
+  return args.state === 'ready' && args.ws?.readyState === WebSocket.OPEN && !!args.session
 }
 
 export function openIfSocketClosed(ws: WebSocket | null, open: () => void): void {

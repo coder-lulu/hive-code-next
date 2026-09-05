@@ -3,7 +3,7 @@ import WebSocket from 'ws'
 import { parsePairingCode } from '../../shared/pairing'
 import type { RuntimeMobileSessionTabsResult } from '../../shared/runtime-types'
 import type { OrcaRuntimeService } from './orca-runtime'
-import { decrypt, deriveSharedKey, encrypt, generateKeyPair } from './rpc/e2ee-crypto'
+import { RuntimeE2EEClientSession } from '../../shared/runtime-e2ee-client-session'
 
 export const REPO_ID = 'repo-1'
 export const FOLDER_REPO_ID = 'folder-repo-1'
@@ -16,7 +16,7 @@ export const SESSION_WORKTREE_ID = worktreeId('session')
 
 export type PairedSession = {
   ws: WebSocket
-  sharedKey: Uint8Array
+  sharedKey: RuntimeE2EEClientSession
 }
 
 export type ResponseReader = {
@@ -113,27 +113,20 @@ export async function authenticate(pairingUrl: string): Promise<PairedSession> {
     throw new Error('invalid_pairing_url')
   }
   const ws = await connect(pairing.endpoint)
-  const keys = generateKeyPair()
-  const serverPublicKey = Uint8Array.from(Buffer.from(pairing.publicKeyB64, 'base64'))
-  const sharedKey = deriveSharedKey(keys.secretKey, serverPublicKey)
-  ws.send(
-    JSON.stringify({
-      type: 'e2ee_hello',
-      publicKeyB64: Buffer.from(keys.publicKey).toString('base64')
-    })
-  )
-  expect(JSON.parse(await nextMessage(ws))).toEqual({ type: 'e2ee_ready' })
-  ws.send(
-    encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: pairing.deviceToken }), sharedKey)
-  )
-  expect(JSON.parse(decrypt(await nextMessage(ws), sharedKey)!)).toEqual({
-    type: 'e2ee_authenticated'
+  const sharedKey = RuntimeE2EEClientSession.create({
+    desktopPublicKeyB64: pairing.publicKeyB64,
+    transport: 'direct'
   })
+  ws.send(JSON.stringify(sharedKey.hello))
+  expect(sharedKey.acceptReady(JSON.parse(await nextMessage(ws)))).toBe(true)
+  ws.send(sharedKey.sealText(sharedKey.authMessage(pairing.deviceToken)))
+  expect(sharedKey.isAuthenticated(sharedKey.openText(await nextMessage(ws))!)).toBe(true)
+
   return { ws, sharedKey }
 }
 
 export function send(session: PairedSession, request: Record<string, unknown>): void {
-  session.ws.send(encrypt(JSON.stringify(request), session.sharedKey))
+  session.ws.send(session.sharedKey.sealText(JSON.stringify(request)))
 }
 
 export function createReader(session: PairedSession): ResponseReader {
@@ -145,9 +138,8 @@ export function createReader(session: PairedSession): ResponseReader {
   const queued: Record<string, unknown>[] = []
   const waiters: Waiter[] = []
   const onMessage = (data: WebSocket.RawData): void => {
-    const plaintext = decrypt(
-      typeof data === 'string' ? data : data.toString('utf-8'),
-      session.sharedKey
+    const plaintext = session.sharedKey.openText(
+      typeof data === 'string' ? data : data.toString('utf-8')
     )
     if (!plaintext) {
       return

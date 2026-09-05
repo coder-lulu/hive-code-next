@@ -40,7 +40,7 @@ function local(runtimeRecordId?: string): HostCatalogEntry {
 }
 
 describe('account Runtime catalog merge', () => {
-  it('deduplicates only on an explicit runtimeRecordId and preserves both routes', () => {
+  it('deduplicates only on an explicit runtimeRecordId and preserves local pairing', () => {
     const claimed = runtime('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
     const accountRuntime = {
       runtimeRecordId: claimed.runtimeRecordId,
@@ -68,8 +68,7 @@ describe('account Runtime catalog merge', () => {
       profile: {
         id: 'local-host',
         endpoint: 'ws://192.168.1.2:3999',
-        deviceToken: 'local-secret',
-        accountRuntimeFallback: accountRuntime
+        deviceToken: 'local-secret'
       },
       cloudProfile: { id: claimed.runtimeRecordId }
     })

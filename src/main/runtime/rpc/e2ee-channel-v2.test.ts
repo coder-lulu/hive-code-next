@@ -67,7 +67,6 @@ function setup(accountOptions: Partial<E2EEChannelOptions> = {}) {
     onReady,
     onError,
     transportContext: { transport: 'relay', relayHostId: 'AbCdEf0123_-xyZ9' },
-    requireV2: true,
     ...accountOptions
   })
   return { ws, channel, onReady, onError, resolveAuthenticatedDevice }
@@ -142,6 +141,20 @@ describe('E2EEChannel v2', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
+  it('expires an unfinished handshake and rejects malformed hello values', () => {
+    const pending = setup()
+    vi.advanceTimersByTime(10_000)
+    expect(pending.onError).toHaveBeenCalledWith(4002, 'E2EE handshake timeout')
+    expect(pending.resolveAuthenticatedDevice).not.toHaveBeenCalled()
+    for (const raw of ['null', '[]', '{']) {
+      const invalid = setup()
+      expect(() => invalid.channel.handleRawMessage(raw)).not.toThrow()
+      expect(invalid.onError).toHaveBeenCalledWith(4001, expect.any(String))
+      expect(invalid.resolveAuthenticatedDevice).not.toHaveBeenCalled()
+      invalid.channel.destroy()
+    }
+  })
+
   it('confirms the transcript before evaluating DeviceRegistry auth', () => {
     const ctx = setup()
     const { schedule } = startV2(ctx)
@@ -180,12 +193,12 @@ describe('E2EEChannel v2', () => {
     expect(onMessage.mock.calls[0]?.[0]).toBe(capabilityFrame)
   })
 
-  it('rejects legacy downgrade and runtime-only capability metadata when mobile v2 is required', () => {
+  it('rejects an obsolete handshake and unknown authentication fields', () => {
     const legacy = setup()
     legacy.channel.handleRawMessage(
       JSON.stringify({ type: 'e2ee_hello', publicKeyB64: 'legacy-key' })
     )
-    expect(legacy.onError).toHaveBeenCalledWith(4001, 'E2EE v2 required')
+    expect(legacy.onError).toHaveBeenCalledWith(4001, 'Invalid E2EE handshake')
 
     const ctx = setup()
     const { schedule } = startV2(ctx)
@@ -197,7 +210,7 @@ describe('E2EEChannel v2', () => {
           v: 2,
           transcriptHashB64,
           deviceToken: 'valid-token',
-          clientCapabilities: ['session-tabs.close-intent.v1']
+          unknownCredential: 'forbidden'
         }),
         schedule,
         0n

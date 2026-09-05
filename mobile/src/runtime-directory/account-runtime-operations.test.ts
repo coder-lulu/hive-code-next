@@ -31,12 +31,6 @@ const session = { accessToken: 'account-token' } as MobileSession
 const runtimeRecordId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const managedWebSessionId = '11111111-1111-4111-8111-111111111111'
 
-function validRuntimePublicKeyUrl(): string {
-  const basePoint = new Uint8Array(32)
-  basePoint[0] = 9
-  return api.encodeBase64Url(basePoint)
-}
-
 function runtimeSession(id = managedWebSessionId) {
   return {
     managedWebSessionId: id,
@@ -61,50 +55,12 @@ describe('account Runtime cloud operations', () => {
     api.randomToken.mockReturnValueOnce('ticket-secret').mockReturnValue('idempotency-key')
   })
 
-  it('uploads only a ticket digest and the ephemeral public key', async () => {
-    const controller = new AbortController()
-    api.request.mockResolvedValue({
-      connectionIntentId: '11111111-1111-4111-8111-111111111111',
-      ticketId: '22222222-2222-4222-8222-222222222222',
-      runtimeRecordId,
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      runtimePublicKeyB64: validRuntimePublicKeyUrl(),
-      relay: null
-    })
-
-    const result = await createAccountRuntimeConnectionIntent(
-      session,
-      runtimeRecordId,
-      4,
-      controller.signal
-    )
-    const body = api.request.mock.calls[0]![1] as Record<string, unknown>
-    const options = api.request.mock.calls[0]![2] as RequestInit
-
-    expect(body).toMatchObject({ clientKind: 'MOBILE', expectedResourceVersion: 4 })
-    expect(body.ticketSecretSha256).not.toBe('ticket-secret')
-    expect(body.clientEphemeralPublicKey).toMatch(/^[A-Za-z0-9_-]{43}$/)
-    expect(JSON.stringify(body)).not.toContain('ticket-secret')
-    expect(options.signal).toBe(controller.signal)
-    expect(result.ticketSecret).toBe('ticket-secret')
-    expect(result.runtimePublicKeyB64).toBe(
-      `${validRuntimePublicKeyUrl().replace(/-/g, '+').replace(/_/g, '/')}=`
-    )
-  })
-
-  it('rejects a low-order X25519 Runtime public key returned by Cloud', async () => {
-    api.request.mockResolvedValue({
-      connectionIntentId: '11111111-1111-4111-8111-111111111111',
-      ticketId: '22222222-2222-4222-8222-222222222222',
-      runtimeRecordId,
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      runtimePublicKeyB64: api.encodeBase64Url(new Uint8Array(32)),
-      relay: null
-    })
-
+  it('refuses connection intent creation before generating or sending credentials', async () => {
     await expect(createAccountRuntimeConnectionIntent(session, runtimeRecordId, 4)).rejects.toThrow(
-      'runtime_connection_intent_public_key_invalid'
+      'not ready'
     )
+    expect(api.randomToken).not.toHaveBeenCalled()
+    expect(api.request).not.toHaveBeenCalled()
   })
 
   it('lists and revokes MOBILE sessions through the unified endpoints', async () => {

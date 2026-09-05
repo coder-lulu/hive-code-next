@@ -6,14 +6,7 @@ import {
   type WebRuntimeConnectionState
 } from './web-runtime-connection-frame-router'
 import { createWebRuntimeUnauthorizedError } from './web-runtime-client-error'
-import {
-  deriveSharedKey,
-  encrypt,
-  encryptBytes,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './web-e2ee'
+import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import type { WebPairingOffer } from './web-pairing'
 import type { WebRuntimeTransportSubscription } from './web-runtime-subscription-contract'
 import { WebRuntimeSubscriptionRegistry } from './web-runtime-subscription-registry'
@@ -27,7 +20,8 @@ const RECONNECT_DELAYS_MS = [500, 1000, 2000, 4000, 8000, 15_000]
 
 export class WebRuntimeConnectionTransport {
   ws: WebSocket | null = null
-  sharedKey: Uint8Array | null = null
+  session: RuntimeE2EEClientSession | null = null
+  private inboundChain: Promise<void> = Promise.resolve()
   state: WebRuntimeConnectionState = 'disconnected'
   readonly subscriptions: Map<string, WebRuntimeTransportSubscription>
   readonly heartbeat: WebRuntimeConnectionHeartbeat
@@ -37,7 +31,6 @@ export class WebRuntimeConnectionTransport {
   private connectTimer: number | null = null
   private handshakeTimer: number | null = null
   private reconnectTimer: number | null = null
-  private readonly serverPublicKey: Uint8Array
   private readonly subscriptionRegistry: WebRuntimeSubscriptionRegistry
   private readonly requestRegistry: WebRuntimeRequestRegistry
   private readonly connectionWaiters: WebRuntimeConnectionWaiters
@@ -46,7 +39,6 @@ export class WebRuntimeConnectionTransport {
     private readonly pairing: WebPairingOffer,
     clock: { now: () => number; isDocumentVisible: () => boolean }
   ) {
-    this.serverPublicKey = publicKeyFromBase64(pairing.publicKeyB64)
     this.connectionWaiters = new WebRuntimeConnectionWaiters({
       endpoint: pairing.endpoint,
       getState: () => this.state,
@@ -100,14 +92,14 @@ export class WebRuntimeConnectionTransport {
       this.ws.close()
       this.ws = null
     }
-    this.sharedKey = null
+    this.session = null
     this.setState('disconnected')
   }
 
   async handleSocketMessage(rawData: unknown, sourceWs?: WebSocket): Promise<void> {
     await routeWebRuntimeConnectionFrame(rawData, sourceWs, {
       getState: () => this.state,
-      getSharedKey: () => this.sharedKey,
+      getSession: () => this.session,
       getSocket: () => this.ws,
       pairingToken: this.pairing.deviceToken,
       pending: this.requestRegistry.pending,
@@ -133,7 +125,7 @@ export class WebRuntimeConnectionTransport {
       return
     }
     this.ws = null
-    this.sharedKey = null
+    this.session = null
     this.clearConnectTimer()
     this.clearHandshakeTimer()
     this.heartbeat.clear()
@@ -172,7 +164,7 @@ export class WebRuntimeConnectionTransport {
     }
     socket.binaryType = 'arraybuffer'
     this.ws = socket
-    this.sharedKey = null
+    this.session = null
     this.setState('connecting')
     this.connectTimer = window.setTimeout(() => {
       if (this.ws === socket && socket.readyState === WebSocket.CONNECTING) {
@@ -186,11 +178,11 @@ export class WebRuntimeConnectionTransport {
       }
       this.clearConnectTimer()
       this.setState('handshaking')
-      const keyPair = generateKeyPair()
-      this.sharedKey = deriveSharedKey(keyPair.secretKey, this.serverPublicKey)
-      socket.send(
-        JSON.stringify({ type: 'e2ee_hello', publicKeyB64: publicKeyToBase64(keyPair.publicKey) })
-      )
+      this.session = RuntimeE2EEClientSession.create({
+        desktopPublicKeyB64: this.pairing.publicKeyB64,
+        transport: 'direct'
+      })
+      socket.send(JSON.stringify(this.session.hello))
       this.handshakeTimer = window.setTimeout(() => {
         if (this.ws === socket && this.state === 'handshaking') {
           socket.close()
@@ -202,7 +194,13 @@ export class WebRuntimeConnectionTransport {
         return
       }
       this.heartbeat.noteInboundFrame()
-      void this.handleSocketMessage(event.data, socket)
+      this.inboundChain = this.inboundChain
+        .then(() => (this.ws === socket ? this.handleSocketMessage(event.data, socket) : undefined))
+        .catch(() => {
+          if (this.ws === socket) {
+            socket.close()
+          }
+        })
     }
     socket.onclose = () => this.handleSocketClosed(socket)
     socket.onerror = () => {
@@ -214,19 +212,19 @@ export class WebRuntimeConnectionTransport {
 
   sendEncrypted(message: unknown): boolean {
     const socket = this.ws
-    if (!socket || socket.readyState !== WebSocket.OPEN || !this.sharedKey) {
+    if (!socket || socket.readyState !== WebSocket.OPEN || !this.session) {
       return false
     }
-    socket.send(encrypt(JSON.stringify(message), this.sharedKey))
+    socket.send(this.session.sealText(JSON.stringify(message)))
     return true
   }
 
   sendEncryptedBinary(bytes: Uint8Array<ArrayBufferLike>): boolean {
     const socket = this.ws
-    if (!socket || socket.readyState !== WebSocket.OPEN || !this.sharedKey) {
+    if (!socket || socket.readyState !== WebSocket.OPEN || !this.session) {
       return false
     }
-    socket.send(encryptBytes(bytes, this.sharedKey))
+    socket.send(new Uint8Array(this.session.sealBinary(bytes)))
     return true
   }
 

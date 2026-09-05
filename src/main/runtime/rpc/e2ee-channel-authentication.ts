@@ -54,6 +54,7 @@ export function authenticateE2EEChannel(args: {
   if (args.resolveCloudSession) {
     const cloud = authenticateCloudManagedE2EE({
       plaintext: args.plaintext,
+      transcriptHashB64: args.v2Session?.transcriptHashB64 ?? '',
       resolveSession: args.resolveCloudSession
     })
     if (cloud.kind === 'authenticated') {

@@ -1,3 +1,5 @@
+import { createWebRuntimeTestSession } from './web-runtime-e2ee-test-peer'
+import type { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { WebRuntimeClient } from './web-runtime-client'
 
@@ -49,7 +51,7 @@ class FakeWebSocket {
 type HeartbeatInternals = {
   ws: FakeWebSocket | null
   state: string
-  sharedKey: Uint8Array | null
+  session: RuntimeE2EEClientSession | null
   lastInboundFrameAt: number
   lastHeartbeatTickAt: number
   heartbeatProbeSentAt: number | null
@@ -80,7 +82,7 @@ function makeConnectedClient(): {
   const socket = fakeSockets[0]!
   socket.readyState = FakeWebSocket.OPEN
   internals.ws = socket
-  internals.sharedKey = new Uint8Array(32)
+  internals.session = createWebRuntimeTestSession().client
   internals.state = 'connected'
   internals.lastInboundFrameAt = nowMs
   internals.lastHeartbeatTickAt = nowMs

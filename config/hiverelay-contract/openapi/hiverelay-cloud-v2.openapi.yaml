@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HiveRelay v2 contract
-  version: hiverelay-v2-p0.6
+  version: hiverelay-v2-p0.7
   description: >-
     Authority interface shapes. Every implementation remains disabled until its
     corresponding product and capability gates are enabled.
@@ -545,7 +545,7 @@ components:
     AssignmentRequest:
       type: object
       additionalProperties: false
-      required: [protocolVersion, hostPublicKeyB64, requestedRegion]
+      required: [protocolVersion, hostPublicKeyB64]
       properties:
         protocolVersion: {const: 2}
         hostPublicKeyB64: {$ref: '#/components/schemas/Base64Url32'}

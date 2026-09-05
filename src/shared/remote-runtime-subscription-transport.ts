@@ -1,14 +1,8 @@
+import { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import { APP_DISPLAY_NAME } from './brand'
 import type { PairingOffer } from './pairing'
-import {
-  deriveSharedKey,
-  encryptBytes,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './e2ee-crypto'
 import type { RuntimeCapability } from './protocol-version'
 import {
   formatRemoteRuntimeCloseMessage,
@@ -87,9 +81,10 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
     clientCapabilities: remoteRuntimeClientCapabilities(options?.clientCapabilities)
   })
   return await new Promise((resolve, reject) => {
-    const keyPair = generateKeyPair()
-    const serverPublicKey = publicKeyFromBase64(pairing.publicKeyB64)
-    const sharedKey = deriveSharedKey(keyPair.secretKey, serverPublicKey)
+    const session = RuntimeE2EEClientSession.create({
+      desktopPublicKeyB64: pairing.publicKeyB64,
+      transport: 'direct'
+    })
     let settled = false
     let closing = false
     let terminalFailure = false
@@ -102,14 +97,14 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
     })
     const requestChannel = new RemoteRuntimeSubscriptionRequestChannel({
       pairing,
-      sharedKey,
+      session,
       resolveWritableSocket: () =>
         frameRouter.state === 'ready' && ws && ws.readyState === WebSocket.OPEN ? ws : null,
       enqueue: (socket, frame) => outbound.enqueueRequest(socket, frame),
       fail: (error) => fail(error)
     })
     const frameRouter = new RemoteRuntimeSubscriptionFrameRouter({
-      sharedKey,
+      session,
       serializedAuth,
       serializedRequest,
       requestId,
@@ -196,7 +191,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
       ) {
         return false
       }
-      return outbound.enqueueBinary(ws, Buffer.from(encryptBytes(bytes, sharedKey)))
+      return outbound.enqueueBinary(ws, Buffer.from(session.sealBinary(bytes)))
     }
 
     const succeed = (): void => {
@@ -238,9 +233,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
     }
 
     function onOpen(): void {
-      ws?.send(
-        JSON.stringify({ type: 'e2ee_hello', publicKeyB64: publicKeyToBase64(keyPair.publicKey) })
-      )
+      ws?.send(JSON.stringify(session.hello))
     }
 
     function onError(): void {

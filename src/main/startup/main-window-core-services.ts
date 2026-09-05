@@ -15,7 +15,6 @@ import {
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import { prepareCodexSessionResumeForLaunch } from './codex-session-resume-launch'
 import { isRecoveryReloadInFlight } from './main-window-lifecycle-flags'
-import { RELAY_HOST_CLOSE_REASON } from '../../shared/relay-host-close-reason'
 
 export function attachMainWindowCoreServices(
   window: BrowserWindow,
@@ -96,7 +95,6 @@ export function attachMainWindowCoreServices(
         }),
       onBeforeRelaunch: async () => {
         state.isQuitting = true
-        state.desktopRelayService?.fenceAndCloseNow()
         state.runtimeCloudPresence?.setRuntimeReady(false)
         state.runtimeCloudPresence?.setAuthorization(null)
         await preserveAgentAuthBeforeRestart({
@@ -104,12 +102,7 @@ export function attachMainWindowCoreServices(
           claudeRuntimeAuth,
           store
         })
-      },
-      onOrcaProfileAuthMutation: () => state.desktopRelayService?.authMutated(),
-      // Sign-out is the one fence a paired phone can be told about; quit and
-      // relaunch above stay reasonless so a restart never reads as signed out.
-      onBeforeOrcaProfileSignOut: () =>
-        state.desktopRelayService?.fenceAndCloseNow(RELAY_HOST_CLOSE_REASON.SIGNED_OUT)
+      }
     },
     state.pluginService ?? undefined,
     state.pluginMarketplaceService && state.pluginMarketplaceInstaller

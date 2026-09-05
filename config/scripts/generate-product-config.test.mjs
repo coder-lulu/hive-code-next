@@ -48,7 +48,6 @@ const validManifest = {
     artifacts: null,
     cloud: '',
     identityIssuer: null,
-    relay: null,
     update: '',
     telemetry: null,
     diagnostics: '',
@@ -72,8 +71,7 @@ const validManifest = {
       provider: null,
       channel: null,
       checkIntervalHours: 24
-    },
-    relay: { enabled: false, directorUrl: null }
+    }
   }
 }
 
@@ -86,7 +84,7 @@ describe('validateProductManifest', () => {
     )
   })
 
-  it('allows an explicitly disabled Relay without a director URL', () => {
+  it('validates the current grouped service contract', () => {
     expect(() => validateProductManifest(validManifest)).not.toThrow()
   })
 
@@ -108,7 +106,6 @@ describe('validateProductManifest', () => {
         artifacts: null,
         cloud: null,
         identityIssuer: null,
-        relay: null,
         update: null,
         telemetry: null,
         diagnostics: null,

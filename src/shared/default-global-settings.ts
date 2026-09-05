@@ -219,7 +219,6 @@ export function buildDefaultSettings(args: {
     // Why: indefinite hold — the "Restore" banner is the explicit return action, no wall-clock guess. See docs/mobile-fit-hold.md.
     mobileAutoRestoreFitMs: null,
     // Why: Anywhere (Relay + local) is the default; local-only is written only on explicit same-network choice.
-    mobilePairingConnectionMode: 'automatic',
     mobilePairingCustomAddress: null,
     mobilePairingCustomAddresses: [],
     // Why: off keeps the cosmetic overlay unmounted for users who never opt in.

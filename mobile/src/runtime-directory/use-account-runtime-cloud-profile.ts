@@ -49,7 +49,7 @@ export function useAccountRuntimeCloudProfile(args: {
             ) {
               throw new Error('mobile_session_required')
             }
-            const intent = await args.withCurrentSession((session) =>
+            return args.withCurrentSession((session) =>
               createAccountRuntimeConnectionIntent(
                 session,
                 entry.runtimeRecordId,
@@ -57,22 +57,6 @@ export function useAccountRuntimeCloudProfile(args: {
                 signal
               )
             )
-            const currentScope = args.directoryStore.getSnapshot().scope
-            const currentSession = args.sessionRef.current
-            if (
-              !currentSession ||
-              !currentScope ||
-              currentScope.accountId !== expectedScope.accountId ||
-              currentScope.authorityId !== expectedScope.authorityId ||
-              currentSession.account.accountId !== expectedScope.accountId ||
-              currentSession.authorityId !== expectedScope.authorityId
-            ) {
-              throw new Error('mobile_session_required')
-            }
-            if (!intent.relay) {
-              throw new Error('runtime_connection_relay_unavailable')
-            }
-            return { ...intent, relay: intent.relay }
           }
         }
       }

@@ -3,38 +3,179 @@
   "$id": "https://contracts.hive.dev/hiverelay/v2/session-transition.schema.json",
   "title": "HiveRelay managed session transition exchange",
   "oneOf": [
-    {"$ref": "#/$defs/batchRequest"},
-    {"$ref": "#/$defs/batchResponse"},
-    {"$ref": "#/$defs/adjudication"}
+    {
+      "$ref": "#/$defs/batchRequest"
+    },
+    {
+      "$ref": "#/$defs/batchResponse"
+    },
+    {
+      "$ref": "#/$defs/adjudication"
+    }
   ],
   "$defs": {
-    "opaqueId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
-    "uuidV4": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
-    "generation": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
-    "epochMs": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
-    "base64url32": {"type": "string", "pattern": "^[A-Za-z0-9_-]{43}$"},
-    "runtimeProof": {"$ref": "runtime-proof.schema.json"},
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "epochMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "base64url32": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "runtimeProof": {
+      "$ref": "runtime-proof.schema.json"
+    },
     "transition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sequence", "transitionId", "transitionType", "managedSessionId", "runtimeSessionId", "expectedControlVersion", "sessionBindingHash", "occurredAt", "reason"],
+      "required": [
+        "sequence",
+        "transitionId",
+        "transitionType",
+        "managedSessionId",
+        "runtimeSessionId",
+        "expectedControlVersion",
+        "sessionBindingHash",
+        "occurredAt",
+        "reason"
+      ],
       "properties": {
-        "sequence": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
-        "transitionId": {"$ref": "#/$defs/uuidV4"},
-        "transitionType": {"enum": ["ACTIVATE", "ABANDON", "CLOSE", "IDLE_EXPIRE", "AUTHORITY_EXPIRE"]},
-        "managedSessionId": {"$ref": "#/$defs/opaqueId"},
-        "runtimeSessionId": {"$ref": "#/$defs/opaqueId"},
-        "expectedControlVersion": {"$ref": "#/$defs/generation"},
-        "sessionBindingHash": {"$ref": "#/$defs/base64url32"},
-        "occurredAt": {"$ref": "#/$defs/epochMs"},
-        "reason": {"enum": ["ACTIVATED", "ABANDONED_BEFORE_ACTIVATION", "CLIENT_CLOSED", "RUNTIME_SHUTDOWN", "TRANSPORT_CLOSED", "LOCAL_ERROR", "IDLE_TIMEOUT", "SESSION_AUTHORITY_TIMEOUT"]}
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "transitionId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "transitionType": {
+          "enum": ["ACTIVATE", "ABANDON", "CLOSE", "IDLE_EXPIRE", "AUTHORITY_EXPIRE"]
+        },
+        "managedSessionId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "runtimeSessionId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "expectedControlVersion": {
+          "$ref": "#/$defs/generation"
+        },
+        "sessionBindingHash": {
+          "$ref": "#/$defs/base64url32"
+        },
+        "occurredAt": {
+          "$ref": "#/$defs/epochMs"
+        },
+        "reason": {
+          "enum": [
+            "ACTIVATED",
+            "ABANDONED_BEFORE_ACTIVATION",
+            "CLIENT_CLOSED",
+            "RUNTIME_SHUTDOWN",
+            "TRANSPORT_CLOSED",
+            "LOCAL_ERROR",
+            "IDLE_TIMEOUT",
+            "SESSION_AUTHORITY_TIMEOUT"
+          ]
+        }
       },
       "allOf": [
-        {"if": {"properties": {"transitionType": {"const": "ACTIVATE"}}}, "then": {"properties": {"reason": {"const": "ACTIVATED"}}}},
-        {"if": {"properties": {"transitionType": {"const": "ABANDON"}}}, "then": {"properties": {"reason": {"const": "ABANDONED_BEFORE_ACTIVATION"}}}},
-        {"if": {"properties": {"transitionType": {"const": "CLOSE"}}}, "then": {"properties": {"reason": {"enum": ["CLIENT_CLOSED", "RUNTIME_SHUTDOWN", "TRANSPORT_CLOSED", "LOCAL_ERROR"]}}}},
-        {"if": {"properties": {"transitionType": {"const": "IDLE_EXPIRE"}}}, "then": {"properties": {"reason": {"const": "IDLE_TIMEOUT"}}}},
-        {"if": {"properties": {"transitionType": {"const": "AUTHORITY_EXPIRE"}}}, "then": {"properties": {"reason": {"const": "SESSION_AUTHORITY_TIMEOUT"}}}}
+        {
+          "if": {
+            "properties": {
+              "transitionType": {
+                "const": "ACTIVATE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "const": "ACTIVATED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transitionType": {
+                "const": "ABANDON"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "const": "ABANDONED_BEFORE_ACTIVATION"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transitionType": {
+                "const": "CLOSE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "enum": ["CLIENT_CLOSED", "RUNTIME_SHUTDOWN", "TRANSPORT_CLOSED", "LOCAL_ERROR"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transitionType": {
+                "const": "IDLE_EXPIRE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "const": "IDLE_TIMEOUT"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transitionType": {
+                "const": "AUTHORITY_EXPIRE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "const": "SESSION_AUTHORITY_TIMEOUT"
+              }
+            }
+          }
+        }
       ]
     },
     "batchRequest": {
@@ -42,43 +183,161 @@
       "additionalProperties": false,
       "required": ["type", "v", "runtimeId", "runtimeBootId", "runtimeProof", "sessionTransitions"],
       "properties": {
-        "type": {"const": "session-transition-batch"},
-        "v": {"const": 2},
-        "runtimeId": {"$ref": "#/$defs/opaqueId"},
-        "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
-        "runtimeProof": {"$ref": "#/$defs/runtimeProof"},
-        "sessionTransitions": {"type": "array", "minItems": 1, "maxItems": 128, "items": {"$ref": "#/$defs/transition"}}
+        "type": {
+          "const": "session-transition-batch"
+        },
+        "v": {
+          "const": 2
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "runtimeBootId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "runtimeProof": {
+          "$ref": "#/$defs/runtimeProof"
+        },
+        "sessionTransitions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/transition"
+          }
+        }
       },
       "$comment": "Entries are processed in array order. New sequences must be strictly contiguous after highestContiguousAck. A gap or replay conflict stops state evaluation; the offending and every later entry receive stored=false stop adjudications."
     },
     "adjudication": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sequence", "transitionId", "verdict", "stored", "resultingStatus", "resultingControlVersion"],
+      "required": [
+        "sequence",
+        "transitionId",
+        "verdict",
+        "stored",
+        "resultingStatus",
+        "resultingControlVersion"
+      ],
       "properties": {
-        "sequence": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
-        "transitionId": {"$ref": "#/$defs/uuidV4"},
-        "verdict": {"enum": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY", "TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"]},
-        "stored": {"type": "boolean"},
-        "resultingStatus": {"enum": ["PENDING_ACTIVATION", "ACTIVE", "CLOSED", "EXPIRED", "UNVERIFIABLE", "REVOKE_PENDING", "REVOKED"]},
-        "resultingControlVersion": {"$ref": "#/$defs/generation"}
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "transitionId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "verdict": {
+          "enum": [
+            "APPLIED",
+            "REJECTED_NOT_FOUND",
+            "REJECTED_BINDING",
+            "REJECTED_STALE_VERSION",
+            "REJECTED_ILLEGAL_STATE",
+            "REJECTED_DEADLINE",
+            "REJECTED_AUTHORITY",
+            "TRANSITION_REPLAY_CONFLICT",
+            "SEQUENCE_GAP"
+          ]
+        },
+        "stored": {
+          "type": "boolean"
+        },
+        "resultingStatus": {
+          "enum": [
+            "PENDING_ACTIVATION",
+            "ACTIVE",
+            "CLOSED",
+            "EXPIRED",
+            "UNVERIFIABLE",
+            "REVOKE_PENDING",
+            "REVOKED"
+          ]
+        },
+        "resultingControlVersion": {
+          "$ref": "#/$defs/generation"
+        }
       },
       "allOf": [
-        {"if": {"properties": {"verdict": {"enum": ["TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"]}}}, "then": {"properties": {"stored": {"const": false}}}},
-        {"if": {"properties": {"verdict": {"enum": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY"]}}}, "then": {"properties": {"stored": {"const": true}}}}
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "enum": ["TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stored": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "enum": [
+                  "APPLIED",
+                  "REJECTED_NOT_FOUND",
+                  "REJECTED_BINDING",
+                  "REJECTED_STALE_VERSION",
+                  "REJECTED_ILLEGAL_STATE",
+                  "REJECTED_DEADLINE",
+                  "REJECTED_AUTHORITY"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stored": {
+                "const": true
+              }
+            }
+          }
+        }
       ]
     },
     "batchResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "v", "runtimeId", "runtimeBootId", "highestContiguousAck", "adjudications"],
+      "required": [
+        "type",
+        "v",
+        "runtimeId",
+        "runtimeBootId",
+        "highestContiguousAck",
+        "adjudications"
+      ],
       "properties": {
-        "type": {"const": "session-transition-batch-result"},
-        "v": {"const": 2},
-        "runtimeId": {"$ref": "#/$defs/opaqueId"},
-        "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
-        "highestContiguousAck": {"$ref": "#/$defs/generation"},
-        "adjudications": {"type": "array", "minItems": 1, "maxItems": 128, "items": {"$ref": "#/$defs/adjudication"}}
+        "type": {
+          "const": "session-transition-batch-result"
+        },
+        "v": {
+          "const": 2
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "runtimeBootId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "highestContiguousAck": {
+          "$ref": "#/$defs/generation"
+        },
+        "adjudications": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/adjudication"
+          }
+        }
       },
       "$comment": "highestContiguousAck covers only consecutively stored adjudications. Exact replay returns the original adjudication. Runtime deletes an outbox item only after its matching result and a covering ACK are both present."
     }

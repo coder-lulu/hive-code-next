@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.6",
+  "contractRevision": "hiverelay-v2-p0.7",
   "caseId": "v2.frames.boundaries-plus-one.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "frame-limit",

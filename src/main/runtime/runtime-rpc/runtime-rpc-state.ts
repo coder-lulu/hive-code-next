@@ -10,7 +10,6 @@ import type { DeviceRegistry } from '../device-registry'
 import type { E2EEKeypair } from '../e2ee-keypair'
 import type { UnpairedDeviceAuthThrottle } from '../rpc/unpaired-device-auth-throttle'
 import type { MobileSocketWiring } from '../rpc/mobile-socket-wiring'
-import { RelayRevokeOutbox } from '../relay/relay-revoke-outbox'
 import { RuntimeBinaryMessageRouter } from '../runtime-binary-message-router'
 import type { RuntimeMetadataOwnershipWatch } from '../runtime-metadata-ownership-watch'
 import { RUNTIME_METADATA_OWNERSHIP_POLL_MS } from '../runtime-metadata-ownership-watch'
@@ -22,8 +21,6 @@ import {
   SPECIALIZED_LONG_POLL_SHARE
 } from './runtime-rpc-long-poll'
 import type {
-  MobilePairingOffer,
-  MobileRelayPairingProvider,
   OrcaRuntimeRpcServerOptions,
   PairingOfferUnavailable
 } from './runtime-rpc-pairing-types'
@@ -57,7 +54,6 @@ export class RuntimeRpcState {
   protected readonly browserHostLongPollCap: number
   protected readonly browserHostLongPollCapPerDevice: number
   protected readonly specializedLongPollCap: number
-  protected readonly relayRevokeOutbox: RelayRevokeOutbox
   protected deviceRegistry: DeviceRegistry | null = null
   protected e2eeKeypair: E2EEKeypair | null = null
   protected pairingInitializationFailure: PairingOfferUnavailable | null = null
@@ -66,18 +62,8 @@ export class RuntimeRpcState {
   protected transports: RuntimeTransportMetadata[] = []
   protected metadataOwnershipWatch: RuntimeMetadataOwnershipWatch | null = null
   protected mobileSocketWiring: MobileSocketWiring | null = null
-  // Why: detaches the current WebSocketTransport from the session wiring so a pairing rebind can swap
-  // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
+  // A pairing rebind swaps only the listener, retaining connection ownership.
   protected detachWebSocketWiring: (() => void) | null = null
-  protected mobileRelayPairingProvider: MobileRelayPairingProvider | null = null
-  protected mobileRelayPairingOfferQueue: Promise<void> = Promise.resolve()
-  protected mobileRelayPairingOfferInFlight: {
-    generation: number
-    address: string | null
-    rotate: boolean
-    request: Promise<MobilePairingOffer>
-  } | null = null
-  protected mobilePairingOfferGeneration = 0
   protected onUnpairedDeviceAuthFailure: (() => void) | null = null
   protected unpairedDeviceAuthThrottle: UnpairedDeviceAuthThrottle | null = null
   protected readonly binaryMessageRouter = new RuntimeBinaryMessageRouter()
@@ -110,7 +96,11 @@ export class RuntimeRpcState {
     methods
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
-    this.dispatcher = new RpcDispatcher({ runtime, methods: methods ?? ALL_RPC_METHODS, hiveRuntimeCloud })
+    this.dispatcher = new RpcDispatcher({
+      runtime,
+      methods: methods ?? ALL_RPC_METHODS,
+      hiveRuntimeCloud
+    })
     this.userDataPath = userDataPath
     this.pid = pid
     this.platform = platform
@@ -131,6 +121,5 @@ export class RuntimeRpcState {
     )
     this.browserHostLongPollCapPerDevice = Math.max(1, Math.floor(this.browserHostLongPollCap / 2))
     this.specializedLongPollCap = Math.max(1, Math.floor(longPollCap * SPECIALIZED_LONG_POLL_SHARE))
-    this.relayRevokeOutbox = new RelayRevokeOutbox(userDataPath)
   }
 }

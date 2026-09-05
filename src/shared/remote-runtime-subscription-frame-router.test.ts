@@ -1,6 +1,7 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { Buffer } from 'node:buffer'
 import { describe, expect, it, vi } from 'vitest'
-import { encrypt } from './e2ee-crypto'
+import { encrypt, decrypt } from './e2ee-crypto'
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import { RemoteRuntimeSubscriptionFrameRouter } from './remote-runtime-subscription-frame-router'
 
@@ -9,7 +10,10 @@ const SHARED_KEY = new Uint8Array(32).fill(7)
 function createAwaitingAuthRouter() {
   const fail = vi.fn<(error: RemoteRuntimeClientError) => void>()
   const router = new RemoteRuntimeSubscriptionFrameRouter<unknown>({
-    sharedKey: SHARED_KEY,
+    session: {
+      openText: (frame: string) => decrypt(frame, SHARED_KEY),
+      isAuthenticated: (plaintext: string) => JSON.parse(plaintext).type === 'e2ee_authenticated'
+    } as RuntimeE2EEClientSession,
     serializedAuth: '{}',
     serializedRequest: '{}',
     requestId: 'request-1',

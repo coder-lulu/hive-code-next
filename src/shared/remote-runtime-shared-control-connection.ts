@@ -1,3 +1,4 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import type WebSocket from 'ws'
 import type { PairingOffer } from './pairing'
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
@@ -31,7 +32,7 @@ type LogicalSubscription = SharedControlTypes.SharedControlLogicalSubscription<u
 export class RemoteRuntimeSharedControlConnection {
   private state: SharedControlTypes.SharedControlConnectionState = 'closed'
   private ws: WebSocket | null = null
-  private sharedKey: Uint8Array | null = null
+  private session: RuntimeE2EEClientSession | null = null
   private socketCleanup: (() => void) | null = null
   private readonly reconnect = new SharedControlReconnectScheduler()
   private readonly readyStableReset: SharedControlReadyStableResetTimer
@@ -74,7 +75,7 @@ export class RemoteRuntimeSharedControlConnection {
           requestId,
           state: this.state,
           ws: this.ws,
-          sharedKey: this.sharedKey
+          session: this.session
         }),
       retireRequestId: (requestId) => this.retiredRequestIds.retire(requestId),
       signal
@@ -145,7 +146,7 @@ export class RemoteRuntimeSharedControlConnection {
       ready: sharedControlReady.isSharedControlReady({
         state: this.state,
         ws: this.ws,
-        sharedKey: this.sharedKey
+        session: this.session
       }),
       refresh: () => {
         this.closeSocket(
@@ -160,7 +161,7 @@ export class RemoteRuntimeSharedControlConnection {
     return ensureSharedControlReady({
       state: this.state,
       ws: this.ws,
-      sharedKey: this.sharedKey,
+      session: this.session,
       readyWaiters: this.readyWaiters,
       timeoutMs,
       signal,
@@ -198,7 +199,7 @@ export class RemoteRuntimeSharedControlConnection {
       return
     }
     this.ws = opened.socket.ws
-    this.sharedKey = opened.socket.sharedKey
+    this.session = opened.socket.session
     this.socketCleanup = opened.socket.cleanup
     this.state = 'awaiting_ready'
     this.publishDiagnostics()
@@ -210,7 +211,7 @@ export class RemoteRuntimeSharedControlConnection {
       socketGeneration,
       isCurrent: (generation) => this.socketGeneration.isCurrent(generation),
       getState: () => this.state,
-      getSharedKey: () => this.sharedKey,
+      getSession: () => this.session,
       environmentId: this.options.environmentId,
       deviceToken: this.pairing.deviceToken,
       clientCapabilities: remoteRuntimeClientCapabilities(this.options.clientCapabilities),
@@ -262,7 +263,7 @@ export class RemoteRuntimeSharedControlConnection {
     return sharedControlProtocol.sendSharedControlEncrypted({
       state: this.state,
       ws: this.ws,
-      sharedKey: this.sharedKey,
+      session: this.session,
       payload
     })
   }
@@ -304,8 +305,7 @@ export class RemoteRuntimeSharedControlConnection {
       preserveReadyWaitersAndPendingRequests,
       clearReadyStableTimer: () => this.readyStableReset.clear()
     })
-    this.ws = this.sharedKey = null
-    this.socketCleanup = null
+    this.ws = this.session = this.socketCleanup = null
     this.state = 'closed'
     this.publishDiagnostics()
   }

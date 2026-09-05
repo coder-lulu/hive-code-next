@@ -566,7 +566,7 @@ export async function checkMobileUpdate(options?: {
     const previousSnapshot = snapshot
     publish({ ...snapshot, state: 'checking', message: null })
     try {
-      const endpoint = hivecodeProductConfig.services.update.checkEndpoint
+      const endpoint = hivecodeProductConfig.services.update.checkEndpoint as string | null
       if (!endpoint) {
         throw new Error('HiveCloud update check endpoint is not configured')
       }

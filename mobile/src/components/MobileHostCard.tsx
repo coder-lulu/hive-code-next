@@ -62,7 +62,7 @@ export function MobileHostCard(props: {
       ? localizeConnectionPath(mobileConnectionPathLabel(props.path))
       : null
   const discoveryHint =
-    !cloudOffline && !cloudUnavailable && props.verdict.kind === 'unreachable' && !props.host.relay
+    !cloudOffline && !cloudUnavailable && props.verdict.kind === 'unreachable'
       ? productNameText('更新桌面端 Orca 并登录，以便随时随地连接')
       : null
   const credentialHint = credentialMissing

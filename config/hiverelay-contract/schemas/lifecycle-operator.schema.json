@@ -3,25 +3,63 @@
   "$id": "https://contracts.hive.dev/hiverelay/v2/lifecycle-operator.schema.json",
   "title": "HiveRelay Cloud fleet lifecycle operator API",
   "oneOf": [
-    {"$ref": "#/$defs/request"},
-    {"$ref": "#/$defs/response"}
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    }
   ],
   "$defs": {
-    "opaqueId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
-    "uuidV4": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
-    "generation": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
-    "instant": {"type": "string", "format": "date-time"},
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time"
+    },
     "request": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["protocolVersion", "operationId", "action", "expectedResourceVersion", "expectedLifecycleGeneration", "targetIncarnationId"],
+      "required": [
+        "protocolVersion",
+        "operationId",
+        "action",
+        "expectedResourceVersion",
+        "expectedLifecycleGeneration",
+        "targetIncarnationId"
+      ],
       "properties": {
-        "protocolVersion": {"const": "hiverelay-cell-lifecycle-operator/v1"},
-        "operationId": {"$ref": "#/$defs/uuidV4"},
-        "action": {"enum": ["PREPARE_ACTIVATE", "CONFIRM_ROUTABLE", "ABORT", "DRAIN"]},
-        "expectedResourceVersion": {"$ref": "#/$defs/generation"},
-        "expectedLifecycleGeneration": {"$ref": "#/$defs/generation"},
-        "targetIncarnationId": {"$ref": "#/$defs/uuidV4"}
+        "protocolVersion": {
+          "const": "hiverelay-cell-lifecycle-operator/v1"
+        },
+        "operationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "action": {
+          "enum": ["PREPARE_ACTIVATE", "CONFIRM_ROUTABLE", "ABORT", "DRAIN"]
+        },
+        "expectedResourceVersion": {
+          "$ref": "#/$defs/generation"
+        },
+        "expectedLifecycleGeneration": {
+          "$ref": "#/$defs/generation"
+        },
+        "targetIncarnationId": {
+          "$ref": "#/$defs/uuidV4"
+        }
       }
     },
     "delivery": {
@@ -29,74 +67,230 @@
       "additionalProperties": false,
       "required": ["commandId", "commandType", "result", "observedAt"],
       "properties": {
-        "commandId": {"$ref": "#/$defs/uuidV4"},
-        "commandType": {"enum": ["INCARNATION_ACTIVATE", "INCARNATION_DRAIN"]},
-        "result": {"enum": ["APPLIED", "STALE_NOOP", "COMMAND_REPLAY_CONFLICT", "TARGET_MISMATCH"]},
-        "observedAt": {"$ref": "#/$defs/instant"}
+        "commandId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "commandType": {
+          "enum": ["INCARNATION_ACTIVATE", "INCARNATION_DRAIN"]
+        },
+        "result": {
+          "enum": ["APPLIED", "STALE_NOOP", "COMMAND_REPLAY_CONFLICT", "TARGET_MISMATCH"]
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        }
       }
     },
     "response": {
       "type": "object",
       "additionalProperties": false,
       "$comment": "delivery is non-null only for PREPARE_ACTIVATE and DRAIN; privateOrigin and credentials are never exposed.",
-      "required": ["protocolVersion", "operationId", "action", "cellId", "state", "resourceVersion", "lifecycleGeneration", "observedIncarnationId", "routingConfirmedIncarnationId", "routingConfirmedAt", "updatedAt", "duplicate", "delivery"],
+      "required": [
+        "protocolVersion",
+        "operationId",
+        "action",
+        "cellId",
+        "state",
+        "resourceVersion",
+        "lifecycleGeneration",
+        "observedIncarnationId",
+        "routingConfirmedIncarnationId",
+        "routingConfirmedAt",
+        "updatedAt",
+        "duplicate",
+        "delivery"
+      ],
       "properties": {
-        "protocolVersion": {"const": "hiverelay-cell-lifecycle-operator/v1"},
-        "operationId": {"$ref": "#/$defs/uuidV4"},
-        "action": {"enum": ["PREPARE_ACTIVATE", "CONFIRM_ROUTABLE", "ABORT", "DRAIN"]},
-        "cellId": {"$ref": "#/$defs/opaqueId"},
-        "state": {"enum": ["DISCOVERED", "ACTIVATING", "ACTIVE", "DRAINING", "UNHEALTHY", "RETIRED"]},
-        "resourceVersion": {"$ref": "#/$defs/generation"},
-        "lifecycleGeneration": {"$ref": "#/$defs/generation"},
-        "observedIncarnationId": {"oneOf": [{"$ref": "#/$defs/uuidV4"}, {"type": "null"}]},
-        "routingConfirmedIncarnationId": {"oneOf": [{"$ref": "#/$defs/uuidV4"}, {"type": "null"}]},
-        "routingConfirmedAt": {"oneOf": [{"$ref": "#/$defs/instant"}, {"type": "null"}]},
-        "updatedAt": {"$ref": "#/$defs/instant"},
-        "duplicate": {"type": "boolean"},
-        "delivery": {"oneOf": [{"$ref": "#/$defs/delivery"}, {"type": "null"}]}
+        "protocolVersion": {
+          "const": "hiverelay-cell-lifecycle-operator/v1"
+        },
+        "operationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "action": {
+          "enum": ["PREPARE_ACTIVATE", "CONFIRM_ROUTABLE", "ABORT", "DRAIN"]
+        },
+        "cellId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "state": {
+          "enum": ["DISCOVERED", "ACTIVATING", "ACTIVE", "DRAINING", "UNHEALTHY", "RETIRED"]
+        },
+        "resourceVersion": {
+          "$ref": "#/$defs/generation"
+        },
+        "lifecycleGeneration": {
+          "$ref": "#/$defs/generation"
+        },
+        "observedIncarnationId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/uuidV4"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routingConfirmedIncarnationId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/uuidV4"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routingConfirmedAt": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "delivery": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/delivery"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       },
       "allOf": [
         {
-          "if": {"properties": {"action": {"const": "PREPARE_ACTIVATE"}}},
-          "then": {"properties": {
-            "state": {"const": "ACTIVATING"},
-            "routingConfirmedIncarnationId": {"type": "null"},
-            "routingConfirmedAt": {"type": "null"},
-            "delivery": {"allOf": [
-              {"$ref": "#/$defs/delivery"},
-              {"properties": {"commandType": {"const": "INCARNATION_ACTIVATE"}}}
-            ]}
-          }}
+          "if": {
+            "properties": {
+              "action": {
+                "const": "PREPARE_ACTIVATE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "ACTIVATING"
+              },
+              "routingConfirmedIncarnationId": {
+                "type": "null"
+              },
+              "routingConfirmedAt": {
+                "type": "null"
+              },
+              "delivery": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/delivery"
+                  },
+                  {
+                    "properties": {
+                      "commandType": {
+                        "const": "INCARNATION_ACTIVATE"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
         },
         {
-          "if": {"properties": {"action": {"const": "CONFIRM_ROUTABLE"}}},
-          "then": {"properties": {
-            "state": {"const": "ACTIVE"},
-            "routingConfirmedIncarnationId": {"$ref": "#/$defs/uuidV4"},
-            "routingConfirmedAt": {"$ref": "#/$defs/instant"},
-            "delivery": {"type": "null"}
-          }}
+          "if": {
+            "properties": {
+              "action": {
+                "const": "CONFIRM_ROUTABLE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "ACTIVE"
+              },
+              "routingConfirmedIncarnationId": {
+                "$ref": "#/$defs/uuidV4"
+              },
+              "routingConfirmedAt": {
+                "$ref": "#/$defs/instant"
+              },
+              "delivery": {
+                "type": "null"
+              }
+            }
+          }
         },
         {
-          "if": {"properties": {"action": {"const": "ABORT"}}},
-          "then": {"properties": {
-            "state": {"const": "UNHEALTHY"},
-            "routingConfirmedIncarnationId": {"type": "null"},
-            "routingConfirmedAt": {"type": "null"},
-            "delivery": {"type": "null"}
-          }}
+          "if": {
+            "properties": {
+              "action": {
+                "const": "ABORT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "UNHEALTHY"
+              },
+              "routingConfirmedIncarnationId": {
+                "type": "null"
+              },
+              "routingConfirmedAt": {
+                "type": "null"
+              },
+              "delivery": {
+                "type": "null"
+              }
+            }
+          }
         },
         {
-          "if": {"properties": {"action": {"const": "DRAIN"}}},
-          "then": {"properties": {
-            "state": {"const": "DRAINING"},
-            "routingConfirmedIncarnationId": {"type": "null"},
-            "routingConfirmedAt": {"type": "null"},
-            "delivery": {"allOf": [
-              {"$ref": "#/$defs/delivery"},
-              {"properties": {"commandType": {"const": "INCARNATION_DRAIN"}}}
-            ]}
-          }}
+          "if": {
+            "properties": {
+              "action": {
+                "const": "DRAIN"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "DRAINING"
+              },
+              "routingConfirmedIncarnationId": {
+                "type": "null"
+              },
+              "routingConfirmedAt": {
+                "type": "null"
+              },
+              "delivery": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/delivery"
+                  },
+                  {
+                    "properties": {
+                      "commandType": {
+                        "const": "INCARNATION_DRAIN"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
         }
       ]
     }

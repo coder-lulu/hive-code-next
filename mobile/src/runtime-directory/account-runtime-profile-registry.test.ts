@@ -36,9 +36,7 @@ describe('account Runtime profile registry', () => {
       }
     }
     replaceAccountRuntimeProfiles([{ ...profile('cloud', runtimeRecordId), accountRuntime }])
-    expect(mergeAccountRuntimeProfiles([local])).toEqual([
-      { ...local, accountRuntimeFallback: accountRuntime }
-    ])
+    expect(mergeAccountRuntimeProfiles([local])).toEqual([local])
   })
 
   it('does not deduplicate profiles merely because their names match', () => {

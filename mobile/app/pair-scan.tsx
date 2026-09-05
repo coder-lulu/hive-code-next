@@ -43,7 +43,6 @@ import {
   startPreProfilePairing,
   type PreProfilePairingAttempt
 } from '../src/transport/pre-profile-pairing-coordinator'
-import { recoverMobileRelayPairing } from '../src/transport/mobile-relay-pairing-recovery'
 import type { ConnectionLogEntry, PairingOffer } from '../src/transport/types'
 
 const PAIRING_OVERALL_TIMEOUT_MS = 25_000
@@ -129,30 +128,6 @@ export default function PairScanScreen() {
     const pairingGeneration = ++pairingGenerationRef.current
     const pairingIsCurrent = () =>
       mountedRef.current && pairingGenerationRef.current === pairingGeneration
-
-    let recovery
-    try {
-      recovery = await recoverMobileRelayPairing()
-    } catch (error) {
-      if (pairingIsCurrent()) {
-        console.warn('[pair] pairing recovery failed', error)
-        setStatus('error')
-        setErrorMessage(
-          `无法恢复上一次配对：${error instanceof Error ? error.message : String(error)}`
-        )
-        processingRef.current = false
-      }
-      return
-    }
-    if (!pairingIsCurrent()) {
-      return
-    }
-    if (recovery === 'deferred') {
-      setStatus('error')
-      setErrorMessage('上一次配对仍在安全恢复中，请检查网络后重试。')
-      processingRef.current = false
-      return
-    }
 
     const attempt = startPreProfilePairing({
       offer,

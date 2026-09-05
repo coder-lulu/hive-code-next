@@ -1,5 +1,7 @@
 # HiveRelay P3 implementation record
 
+> Superseded product policy (2026-09-06): the user requires one current implementation. The follow-up removes old Relay and E2EE paths and Host/module switches; claimed Host starts automatically with server-selected placement. P3 results below remain historical evidence. Current cleanup and verification are recorded in [single implementation](hiverelay-single-implementation.md).
+
 Status: **HR_P3_VERIFIED / PASS**, 2026-09-06. This record belongs to the HiveCode commit containing it. P3 delivers the Runtime Host; Client composition and real Cell end-to-end acceptance remain P4 work. No public deployment was performed.
 
 ## Baseline and contract

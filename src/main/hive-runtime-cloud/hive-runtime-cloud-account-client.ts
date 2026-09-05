@@ -3,10 +3,6 @@ import type {
   HiveRuntimeSession
 } from '../../shared/hive-runtime-cloud'
 import {
-  normalizeConnectionIntent,
-  type HiveRuntimeCloudConnectionIntent
-} from './hive-runtime-cloud-connection-response'
-import {
   normalizeRuntimeDirectoryEntry,
   normalizeRuntimeDirectoryPage
 } from './hive-runtime-cloud-directory-response'
@@ -53,21 +49,13 @@ export class HiveRuntimeCloudAccountClient extends HiveRuntimeCloudHttpClient {
   }
 
   async createConnectionIntent(
-    runtimeRecordId: string,
-    request: Record<string, unknown>,
-    accessToken: string,
-    idempotencyKey: string,
-    signal?: AbortSignal
-  ): Promise<HiveRuntimeCloudConnectionIntent> {
-    return normalizeConnectionIntent(
-      await this.request(
-        `/hive/v1/runtimes/${encodeURIComponent(runtimeRecordId)}/connection-intents`,
-        request,
-        { authorization: `Bearer ${accessToken}`, 'idempotency-key': idempotencyKey },
-        201,
-        signal
-      )
-    )
+    _runtimeRecordId: string,
+    _request: Record<string, unknown>,
+    _accessToken: string,
+    _idempotencyKey: string,
+    _signal?: AbortSignal
+  ): Promise<never> {
+    throw new Error('Account remote connection is not ready.')
   }
 
   async updateOwnedRuntimeDisplayName(

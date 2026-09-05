@@ -1,4 +1,4 @@
-import { decrypt, encrypt } from './e2ee-crypto'
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { APP_DISPLAY_NAME } from './brand'
 import {
   classifyRemoteRuntimeReadyFrame,
@@ -15,7 +15,7 @@ import { parseRemoteRuntimeJsonText } from './remote-runtime-request-frames'
 import type { RuntimeStatus } from './runtime-types'
 
 type RequestResponseRouterOptions<TResult> = {
-  sharedKey: Uint8Array
+  session: RuntimeE2EEClientSession
   serializedAuth: string
   serializedStatusRequest: string | null
   requestId: string
@@ -51,7 +51,7 @@ export class RemoteRuntimeRequestResponseRouter<TResult> {
       this.handleReadyFrame(frame)
       return
     }
-    const plaintext = decrypt(frame, this.options.sharedKey)
+    const plaintext = this.options.session.openText(frame)
     if (plaintext === null) {
       this.options.finishError(
         new RemoteRuntimeClientError(
@@ -73,7 +73,7 @@ export class RemoteRuntimeRequestResponseRouter<TResult> {
   }
 
   private handleReadyFrame(frame: string): void {
-    const readyFrame = classifyRemoteRuntimeReadyFrame(frame)
+    const readyFrame = classifyRemoteRuntimeReadyFrame(frame, this.options.session)
     if (readyFrame !== 'ready') {
       this.options.finishError(
         new RemoteRuntimeClientError(
@@ -87,11 +87,19 @@ export class RemoteRuntimeRequestResponseRouter<TResult> {
       return
     }
     this.state = 'awaiting_authenticated'
-    this.options.send(encrypt(this.options.serializedAuth, this.options.sharedKey))
+    this.options.send(
+      this.options.session.sealText(
+        JSON.stringify({
+          ...JSON.parse(this.options.serializedAuth),
+          v: 2,
+          transcriptHashB64: this.options.session.transcriptHashB64
+        })
+      )
+    )
   }
 
   private handleAuthenticatedFrame(plaintext: string): void {
-    const authenticated = parseRemoteRuntimeAuthenticatedFrame(plaintext)
+    const authenticated = parseRemoteRuntimeAuthenticatedFrame(plaintext, this.options.session)
     if (authenticated.kind === 'invalid') {
       this.options.finishError(
         new RemoteRuntimeClientError(
@@ -115,7 +123,7 @@ export class RemoteRuntimeRequestResponseRouter<TResult> {
     }
     this.state = 'ready'
     if (this.options.serializedStatusRequest) {
-      this.options.send(encrypt(this.options.serializedStatusRequest, this.options.sharedKey))
+      this.options.send(this.options.session.sealText(this.options.serializedStatusRequest))
       return
     }
     this.options.sendRequestedRpc()

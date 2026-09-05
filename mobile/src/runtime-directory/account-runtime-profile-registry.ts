@@ -32,13 +32,6 @@ export function mergeAccountRuntimeProfiles(localProfiles: HostProfile[]): HostP
       merged.push(accountProfile)
       continue
     }
-    const local = merged[localIndex]!
-    if (accountProfile.accountRuntime) {
-      merged[localIndex] = {
-        ...local,
-        accountRuntimeFallback: accountProfile.accountRuntime
-      }
-    }
   }
   return merged
 }

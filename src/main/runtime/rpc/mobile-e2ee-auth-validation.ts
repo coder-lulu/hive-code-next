@@ -6,22 +6,21 @@ export type MobileE2EEAuth = {
   type: 'e2ee_auth'
   deviceToken: string
   clientCapabilities?: unknown
-  v?: 2
-  transcriptHashB64?: string
+  v: 2
+  transcriptHashB64: string
 }
 
 export function isValidMobileE2EEAuthVersion(
   auth: MobileE2EEAuth,
   v2Session: DesktopMobileE2EEV2Session | null
 ): boolean {
-  if (!v2Session) {
-    return auth.v === undefined && auth.transcriptHashB64 === undefined
-  }
-  // Why: mobile v2 keeps an exact transcript-bound shape; runtime capabilities use legacy paired-runtime auth.
   return (
-    Object.keys(auth).sort().join(',') === 'deviceToken,transcriptHashB64,type,v' &&
+    Object.keys(auth).sort().join(',') ===
+      (auth.clientCapabilities === undefined
+        ? 'deviceToken,transcriptHashB64,type,v'
+        : 'clientCapabilities,deviceToken,transcriptHashB64,type,v') &&
     auth.v === 2 &&
-    auth.transcriptHashB64 === v2Session.transcriptHashB64
+    auth.transcriptHashB64 === v2Session?.transcriptHashB64
   )
 }
 

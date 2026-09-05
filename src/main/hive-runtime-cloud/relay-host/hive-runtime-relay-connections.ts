@@ -88,7 +88,6 @@ export class HiveRuntimeRelayConnections {
       onReady: (ws) => {
         channel = new E2EEChannel(ws, {
           serverSecretKey: keypair.secretKey,
-          requireV2: true,
           transportContext: { transport: 'relay', relayHostId: assignment.relayHostId },
           resolveAuthenticatedDevice: () => null,
           onReady: cleanup,

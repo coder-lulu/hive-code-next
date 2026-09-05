@@ -143,21 +143,6 @@ describe('HiveRelay vendored contract fixtures', () => {
     })
   }
 
-  it('reports legacy v1 fixtures as not applicable to a v2-only Cell', () => {
-    for (const entry of fixtureEntries.filter((candidate) =>
-      candidate.path.startsWith('fixtures/legacy-v1/')
-    )) {
-      const fixture = parseHiveRelayContractFixture(
-        readFileSync(path.join(CONTRACT_ROOT, entry.path), 'utf8')
-      )
-      expect(evaluateHiveRelayContractFixture(fixture, context, 'cell')).toEqual({
-        caseId: entry.caseId,
-        verdict: 'NOT_APPLICABLE',
-        reason: 'COMPONENT_NOT_APPLICABLE'
-      })
-    }
-  })
-
   it('rejects a Runtime tuple duplicated inconsistently inside the protected payload', () => {
     const fixture = parseHiveRelayContractFixture(
       readFileSync(path.join(CONTRACT_ROOT, 'fixtures/v2/runtime-proof-valid.json'), 'utf8')

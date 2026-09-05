@@ -1,14 +1,8 @@
+import { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import { abortSignalReason, throwIfSignalAborted } from './abort-signal-reason'
 import { APP_DISPLAY_NAME } from './brand'
-import {
-  deriveSharedKey,
-  encrypt,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './e2ee-crypto'
 import type { PairingOffer } from './pairing'
 import type { RuntimeCapability } from './protocol-version'
 import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabilities'
@@ -76,8 +70,10 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
   }
   let serializedRequest = takeRemoteRuntimePreparedRequest(pendingRequest)
   return await new Promise<RuntimeRpcResponse<TResult>>((resolve, reject) => {
-    const keyPair = generateKeyPair()
-    const sharedKey = deriveSharedKey(keyPair.secretKey, publicKeyFromBase64(pairing.publicKeyB64))
+    const session = RuntimeE2EEClientSession.create({
+      desktopPublicKeyB64: pairing.publicKeyB64,
+      transport: 'direct'
+    })
     let settled = false
     let ws: WebSocket | null = null
     let router: RemoteRuntimeRequestResponseRouter<TResult>
@@ -160,11 +156,11 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
         )
         return
       }
-      ws?.send(encrypt(request, sharedKey))
+      ws?.send(session.sealText(request))
     }
 
     router = new RemoteRuntimeRequestResponseRouter({
-      sharedKey,
+      session,
       serializedAuth,
       serializedStatusRequest,
       requestId,
@@ -194,12 +190,7 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
     }
 
     function onOpen(): void {
-      ws?.send(
-        JSON.stringify({
-          type: 'e2ee_hello',
-          publicKeyB64: publicKeyToBase64(keyPair.publicKey)
-        })
-      )
+      ws?.send(JSON.stringify(session.hello))
     }
 
     function onError(): void {

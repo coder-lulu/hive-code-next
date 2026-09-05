@@ -67,7 +67,7 @@ function mergeLocalProfileWithAccountRoute(
     return localProfile
   }
   if (localProfile) {
-    return { ...localProfile, accountRuntimeFallback: cloudProfile.accountRuntime }
+    return localProfile
   }
   return {
     ...cloudProfile,

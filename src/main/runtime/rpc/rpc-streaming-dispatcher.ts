@@ -35,8 +35,14 @@ export class RpcStreamingDispatcher {
     reply: (response: string) => void,
     options?: RpcDispatchStreamingOptions
   ): Promise<void> {
-    const { runtime, registry, orchestrationMutations, legacyOrchestration, hiveRuntimeCloud, meta } =
-      this.dependencies
+    const {
+      runtime,
+      registry,
+      orchestrationMutations,
+      legacyOrchestration,
+      hiveRuntimeCloud,
+      meta
+    } = this.dependencies
     const envelopeMeta = meta()
     const method = registry.get(request.method)
     if (!method) {
@@ -124,7 +130,6 @@ export class RpcStreamingDispatcher {
               authenticatedCallerFingerprint,
             recordMutationReceipt: mutation?.recordReceipt,
             orchestrationMutation: mutation?.identity,
-            pairing: options?.pairing,
             sendBinary: options?.sendBinary,
             registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
             registerBinaryMessageHandler: options?.registerBinaryMessageHandler,
@@ -172,7 +177,6 @@ export class RpcStreamingDispatcher {
           clientCapabilities: options?.clientCapabilities,
           updateClientCapabilities: options?.updateClientCapabilities,
           orchestrationCapability: request.orchestrationCapability,
-          pairing: options?.pairing,
           sendBinary: options?.sendBinary,
           registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
           registerBinaryMessageHandler: options?.registerBinaryMessageHandler

@@ -126,7 +126,6 @@
         "artifacts",
         "cloud",
         "identityIssuer",
-        "relay",
         "update",
         "telemetry",
         "diagnostics",
@@ -140,7 +139,6 @@
         "artifacts": { "$ref": "#/$defs/nullableUrl" },
         "cloud": { "$ref": "#/$defs/nullableUrl" },
         "identityIssuer": { "$ref": "#/$defs/nullableUrl" },
-        "relay": { "$ref": "#/$defs/nullableUrl" },
         "update": { "$ref": "#/$defs/nullableUrl" },
         "telemetry": { "$ref": "#/$defs/nullableUrl" },
         "diagnostics": { "$ref": "#/$defs/nullableUrl" },
@@ -154,7 +152,7 @@
     "services": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["api", "identity", "oss", "update", "relay"],
+      "required": ["api", "identity", "oss", "update"],
       "properties": {
         "api": {
           "type": "object",
@@ -193,23 +191,24 @@
         "update": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["enabled", "endpoint", "checkEndpoint", "provider", "channel", "checkIntervalHours"],
+          "required": [
+            "enabled",
+            "endpoint",
+            "checkEndpoint",
+            "provider",
+            "channel",
+            "checkIntervalHours"
+          ],
           "properties": {
             "enabled": { "type": "boolean" },
             "endpoint": { "$ref": "#/$defs/nullableUrl" },
             "checkEndpoint": { "$ref": "#/$defs/nullableUrl" },
             "provider": { "type": ["string", "null"], "enum": ["github", "hivecloud", null] },
-            "channel": { "type": ["string", "null"], "enum": ["internal", "stable", "beta", "rc", null] },
+            "channel": {
+              "type": ["string", "null"],
+              "enum": ["internal", "stable", "beta", "rc", null]
+            },
             "checkIntervalHours": { "type": "number", "minimum": 1, "maximum": 168 }
-          }
-        },
-        "relay": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["enabled", "directorUrl"],
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "directorUrl": { "$ref": "#/$defs/nullableUrl" }
           }
         }
       }

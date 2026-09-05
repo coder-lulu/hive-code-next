@@ -195,7 +195,6 @@ export class MobileSocketWiring {
           metadata.transport === 'relay'
             ? { transport: 'relay', relayHostId: metadata.relayHostId }
             : { transport: 'direct' },
-        requireV2: metadata.transport === 'relay',
         outboundMemoryBudget: this.outboundMemoryBudget,
         resolveAuthenticatedDevice: (token) => {
           const device = this.deviceRegistry.validateToken(token)

@@ -13,8 +13,7 @@ describe('HiveCode cloud auth config', () => {
 
     expect(result.configured).toBe(true)
     if (result.configured) {
-      expect(result.config.apiBaseUrl).toBe('https://api.hive.test')
-      expect(result.config.relayDirectorUrl).toBeNull()
+      expect(result.config.apiBaseUrl).toBe('https://api.hivekernel.com')
     }
   })
 
@@ -31,8 +30,7 @@ describe('HiveCode cloud auth config', () => {
     const result = getProductCloudAuthConfig(
       {
         ORCA_CLOUD_API_URL: 'https://hivecode-cloud.example',
-        ORCA_CLOUD_CLIENT_ID: 'desktop-client',
-        ORCA_RELAY_URL: 'https://hivecode-relay.example'
+        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
       },
       true
     )
@@ -43,8 +41,7 @@ describe('HiveCode cloud auth config', () => {
   it('allows ORCA_CLOUD_* env vars in dev / unpackaged builds', () => {
     const result = getProductCloudAuthConfig({
       ORCA_CLOUD_API_URL: 'https://orca-cloud.example/',
-      ORCA_CLOUD_CLIENT_ID: 'desktop-client',
-      ORCA_RELAY_URL: 'https://orca-relay.example'
+      ORCA_CLOUD_CLIENT_ID: 'desktop-client'
     })
 
     expect(result.configured).toBe(true)
@@ -58,7 +55,6 @@ describe('HiveCode cloud auth config', () => {
     const result = getProductCloudAuthConfig({
       ORCA_CLOUD_API_URL: 'https://orca-cloud.example/',
       ORCA_CLOUD_CLIENT_ID: 'desktop-client',
-      ORCA_RELAY_URL: 'https://orca-relay.example',
       ORCA_CLOUD_AUTH_SCOPE: 'openid profile email offline_access'
     })
 
@@ -80,8 +76,7 @@ describe('HiveCode cloud auth config', () => {
   it('allows loopback HTTP endpoints in dev', () => {
     const result = getProductCloudAuthConfig({
       ORCA_CLOUD_API_URL: 'http://localhost:4100',
-      ORCA_CLOUD_CLIENT_ID: 'desktop-client',
-      ORCA_RELAY_URL: 'http://localhost:4101'
+      ORCA_CLOUD_CLIENT_ID: 'desktop-client'
     })
 
     expect(result.configured).toBe(true)
@@ -91,27 +86,23 @@ describe('HiveCode cloud auth config', () => {
     const result = getProductCloudAuthConfig(
       {
         ORCA_CLOUD_API_URL: 'http://localhost:4100',
-        ORCA_CLOUD_CLIENT_ID: 'desktop-client',
-        ORCA_RELAY_URL: 'http://localhost:4101'
+        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
       },
       true
     )
 
     expect(result.configured).toBe(true)
     if (result.configured) {
-      expect(result.config.apiBaseUrl).toBe('https://api.hive.test')
+      expect(result.config.apiBaseUrl).toBe('https://api.hivekernel.com')
     }
   })
 
-  it('allows Cloud auth when API and client are configured without Relay', () => {
+  it('allows Cloud auth when API and client are configured', () => {
     const result = getProductCloudAuthConfig({
       ORCA_CLOUD_API_URL: 'https://hivecode-cloud.example',
       ORCA_CLOUD_CLIENT_ID: 'desktop-client'
     })
 
     expect(result.configured).toBe(true)
-    if (result.configured) {
-      expect(result.config.relayDirectorUrl).toBeNull()
-    }
   })
 })

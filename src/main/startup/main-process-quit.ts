@@ -73,10 +73,8 @@ function installBeforeQuitHandler(): void {
       })
     }
     state.isQuitting = true
-    state.desktopRelayService?.fenceAndCloseNow()
     state.runtimeCloudPresence?.setRuntimeReady(false)
     state.runtimeCloudPresence?.setAuthorization(null)
-    state.runtimeRpc?.setMobileRelayPairingProvider(null)
     state.unsubscribeAgentAwakeStatusChanges?.()
     state.unsubscribeAgentAwakeStatusChanges = null
     state.agentAwakeService?.dispose()

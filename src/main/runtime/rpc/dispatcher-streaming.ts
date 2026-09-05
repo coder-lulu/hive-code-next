@@ -110,7 +110,6 @@ export async function dispatchStreamingRpc(
             mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint,
           recordMutationReceipt: mutation?.recordReceipt,
           orchestrationMutation: mutation?.identity,
-          pairing: options?.pairing,
           sendBinary: options?.sendBinary,
           registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
           registerBinaryMessageHandler: options?.registerBinaryMessageHandler,
@@ -157,7 +156,6 @@ export async function dispatchStreamingRpc(
         clientKind: options?.clientKind,
         clientCapabilities: options?.clientCapabilities,
         orchestrationCapability: request.orchestrationCapability,
-        pairing: options?.pairing,
         sendBinary: options?.sendBinary,
         registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
         registerBinaryMessageHandler: options?.registerBinaryMessageHandler

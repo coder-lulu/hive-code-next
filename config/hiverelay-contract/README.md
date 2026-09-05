@@ -1,14 +1,16 @@
 # HiveRelay v2 authority contract
 
-Contract revision: `hiverelay-v2-p0.6`
+Contract revision: `hiverelay-v2-p0.7`
 
 This directory is the sole authority copied by HiveCode and HiveRelay Cell. A consumer
 must verify `fixture-manifest.json`, every listed file digest, the revision, and its source
 commit before running fixtures. Extra or missing vendored files fail verification.
 
-Route registration and capability advertisement remain independently gated and default
-off. Legacy Orca bytes and the heartbeat response returned to a Runtime that does not
-declare `runtime-session-control-v1` remain unchanged.
+The product has one current Relay implementation. Runtime Host starts automatically after
+account binding and authority readiness. Cloud selects placement when requestedRegion is
+omitted; an explicit override must be a valid nonempty region. Signed authority, mTLS,
+revocation, rate limits and capacity checks remain mandatory. No old product path or
+version feature switch is retained; protocol IDs continue to bind the current wire contract.
 
 The Relay heartbeat keeps two independent acknowledgements: a boolean
 `controlConnectionAcknowledged` for the Cell control handshake and a structured
@@ -41,9 +43,8 @@ The contract is split into four small surfaces:
 - `schemas/` freezes strict JSON structures. Unknown and duplicate object keys are
   rejected before semantic validation.
 - `registries/` freezes values that code must not invent: credentials, limits, state
-  transitions, close codes, and disabled flags.
-- `fixtures/` supplies language-neutral ACCEPT/REJECT cases. Legacy cases apply to Cloud,
-  HiveCode, and `legacy-orca`, while the v2-only Cell reports `NOT_APPLICABLE` for them.
+  transitions and close codes. The historical flags registry is empty.
+- `fixtures/` supplies language-neutral ACCEPT/REJECT cases for the current stack.
 
 ## Parsing rules
 

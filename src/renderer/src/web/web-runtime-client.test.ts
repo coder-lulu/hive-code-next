@@ -1,15 +1,10 @@
+import { createWebRuntimeTestSession, encrypt, encryptBytes } from './web-runtime-e2ee-test-peer'
+import type { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import WebSocket, { WebSocketServer } from 'ws'
 import { WebRuntimeClient } from './web-runtime-client'
-import { encryptBytes } from './web-e2ee'
-import {
-  decrypt,
-  deriveSharedKey,
-  encrypt,
-  generateKeyPair,
-  publicKeyToBase64,
-  encryptBytes as encryptSharedBytes
-} from '../../../shared/e2ee-crypto'
+import { generateKeyPair, publicKeyToBase64 } from '../../../shared/e2ee-crypto'
+import { DesktopMobileE2EEV2Session } from '../../../shared/runtime-e2ee-server-session'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import {
   AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
@@ -59,30 +54,34 @@ describe('WebRuntimeClient', () => {
   })
 
   it('advertises explicit close intent support in encrypted authentication', async () => {
+    const serverKeys = generateKeyPair()
     const client = new WebRuntimeClient({
       v: 2,
       endpoint: 'ws://127.0.0.1:6768',
       deviceToken: 'token',
-      publicKeyB64: Buffer.alloc(32).toString('base64')
+      publicKeyB64: publicKeyToBase64(serverKeys.publicKey)
     })
     const call = client.call('status.get', {})
     const socket = fakeSockets[0]!
     socket.readyState = FakeWebSocket.OPEN
     socket.onopen?.()
 
-    expect(JSON.parse(String(socket.send.mock.calls[0]?.[0]))).toEqual({
+    expect(JSON.parse(String(socket.send.mock.calls[0]?.[0]))).toMatchObject({
       type: 'e2ee_hello',
-      publicKeyB64: expect.any(String)
+      v: 2
     })
-    socket.onmessage?.({ data: JSON.stringify({ type: 'e2ee_ready' }) })
-    const sharedKey = (
-      client as unknown as {
-        sharedKey: Uint8Array
-      }
-    ).sharedKey
-    const auth = decrypt(String(socket.send.mock.calls[1]?.[0]), sharedKey)
+    const server = DesktopMobileE2EEV2Session.create({
+      hello: JSON.parse(String(socket.send.mock.calls[0]?.[0])),
+      serverSecretKey: serverKeys.secretKey,
+      expectedContext: { transport: 'direct' }
+    })!
+    socket.onmessage?.({ data: JSON.stringify(server.ready) })
+    await vi.waitFor(() => expect(socket.send.mock.calls.length).toBeGreaterThanOrEqual(2))
+    const auth = server.openText(String(socket.send.mock.calls[1]?.[0]))
     expect(JSON.parse(auth!)).toEqual({
       type: 'e2ee_auth',
+      v: 2,
+      transcriptHashB64: server.transcriptHashB64,
       deviceToken: 'token',
       clientCapabilities: [
         SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
@@ -98,12 +97,13 @@ describe('WebRuntimeClient', () => {
   })
 
   it('sends the Cloud token only in the encrypted auth frame', async () => {
+    const serverKeys = generateKeyPair()
     const client = new WebRuntimeClient({
       protocolVersion: 'cloud-launch/v1',
       managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
       runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
       websocketUrl: 'wss://runtime.example/_hive/runtime-rpc',
-      serverPublicKeyB64: Buffer.alloc(32).toString('base64'),
+      serverPublicKeyB64: publicKeyToBase64(serverKeys.publicKey),
       sessionToken: 'A'.repeat(43),
       expiresAt: '2026-08-25T09:00:00.000Z'
     })
@@ -111,11 +111,18 @@ describe('WebRuntimeClient', () => {
     const socket = fakeSockets[0]!
     socket.readyState = FakeWebSocket.OPEN
     socket.onopen?.()
-    socket.onmessage?.({ data: JSON.stringify({ type: 'e2ee_ready' }) })
-    const sharedKey = (client as unknown as { sharedKey: Uint8Array }).sharedKey
+    const server = DesktopMobileE2EEV2Session.create({
+      hello: JSON.parse(String(socket.send.mock.calls[0]?.[0])),
+      serverSecretKey: serverKeys.secretKey,
+      expectedContext: { transport: 'direct' }
+    })!
+    socket.onmessage?.({ data: JSON.stringify(server.ready) })
+    await vi.waitFor(() => expect(socket.send.mock.calls.length).toBeGreaterThanOrEqual(2))
 
-    expect(JSON.parse(decrypt(String(socket.send.mock.calls[1]?.[0]), sharedKey)!)).toEqual({
+    expect(JSON.parse(server.openText(String(socket.send.mock.calls[1]?.[0]))!)).toEqual({
       type: 'e2ee_auth',
+      v: 2,
+      transcriptHashB64: server.transcriptHashB64,
       principalKind: 'cloud_managed_web_session',
       managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
       runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
@@ -130,10 +137,16 @@ describe('WebRuntimeClient', () => {
     })
 
     socket.onmessage?.({
-      data: encrypt(JSON.stringify({ type: 'e2ee_authenticated' }), sharedKey)
+      data: server.sealText(
+        JSON.stringify({
+          type: 'e2ee_authenticated',
+          v: 2,
+          transcriptHashB64: server.transcriptHashB64
+        })
+      )
     })
     await vi.waitFor(() => expect(socket.send.mock.calls.length).toBeGreaterThanOrEqual(3))
-    const rpc = JSON.parse(decrypt(String(socket.send.mock.calls[2]?.[0]), sharedKey)!)
+    const rpc = JSON.parse(server.openText(String(socket.send.mock.calls[2]?.[0]))!)
     expect(rpc).toMatchObject({ method: 'status.get', params: {} })
     expect(rpc).not.toHaveProperty('sessionToken')
     expect(rpc).not.toHaveProperty('deviceToken')
@@ -308,11 +321,10 @@ describe('WebRuntimeClient', () => {
       publicKeyB64: Buffer.alloc(32).toString('base64')
     })
     try {
-      const keyPair = generateKeyPair()
-      const sharedKey = deriveSharedKey(keyPair.secretKey, keyPair.publicKey)
+      const sharedKey = createWebRuntimeTestSession()
       const internals = client as unknown as {
         state: string
-        sharedKey: Uint8Array | null
+        session: RuntimeE2EEClientSession | null
         subscriptions: Map<
           string,
           { callbacks: { onResponse: (response: unknown) => void; onClose?: () => void } }
@@ -320,7 +332,7 @@ describe('WebRuntimeClient', () => {
         handleSocketMessage: (rawData: unknown, sourceWs?: unknown) => Promise<void>
       }
       internals.state = 'connected'
-      internals.sharedKey = sharedKey
+      internals.session = sharedKey.client
       const onResponse = vi.fn()
       internals.subscriptions.set('req-1', { callbacks: { onResponse } })
 
@@ -681,16 +693,16 @@ describe('WebRuntimeClient', () => {
       deviceToken: 'token',
       publicKeyB64: Buffer.alloc(32).toString('base64')
     })
-    const sharedKey = new Uint8Array(32).fill(7)
+    const sharedKey = createWebRuntimeTestSession()
     const onBinary = vi.fn()
     const internals = client as unknown as {
       state: 'connected'
-      sharedKey: Uint8Array
+      session: RuntimeE2EEClientSession | null
       subscriptions: Map<string, { callbacks: { onBinary: typeof onBinary } }>
       handleSocketMessage: (rawData: unknown) => Promise<void>
     }
     internals.state = 'connected'
-    internals.sharedKey = sharedKey
+    internals.session = sharedKey.client
     internals.subscriptions.set('stream-1', { callbacks: { onBinary } })
 
     const frame = new Uint8Array([1, 2, 3, 4])
@@ -709,26 +721,38 @@ describe('WebRuntimeClient', () => {
     const sockets = new Set<WebSocket>()
     wss.on('connection', (socket) => {
       sockets.add(socket)
-      let sharedKey: Uint8Array | null = null
+      let server: DesktopMobileE2EEV2Session | null = null
       let authenticated = false
       socket.on('close', () => sockets.delete(socket))
       socket.on('message', (data, isBinary) => {
-        if (isBinary || !sharedKey) {
-          const raw = data.toString()
-          const hello = JSON.parse(raw) as { publicKeyB64: string }
-          const clientPublicKey = Uint8Array.from(Buffer.from(hello.publicKeyB64, 'base64'))
-          sharedKey = deriveSharedKey(serverKeys.secretKey, clientPublicKey)
-          socket.send(JSON.stringify({ type: 'e2ee_ready' }))
+        if (!server) {
+          server = DesktopMobileE2EEV2Session.create({
+            hello: JSON.parse(data.toString()),
+            serverSecretKey: serverKeys.secretKey,
+            expectedContext: { transport: 'direct' }
+          })!
+          socket.send(JSON.stringify(server.ready))
           return
         }
-        const plaintext = decrypt(data.toString(), sharedKey)
+        if (isBinary) {
+          return
+        }
+        const plaintext = server.openText(data.toString())
         if (!plaintext) {
           return
         }
         const message = JSON.parse(plaintext) as { id?: string; type?: string }
         if (message.type === 'e2ee_auth') {
           authenticated = true
-          socket.send(encrypt(JSON.stringify({ type: 'e2ee_authenticated' }), sharedKey))
+          socket.send(
+            server.sealText(
+              JSON.stringify({
+                type: 'e2ee_authenticated',
+                v: 2,
+                transcriptHashB64: server.transcriptHashB64
+              })
+            )
+          )
           return
         }
         if (!authenticated || !message.id) {
@@ -741,8 +765,8 @@ describe('WebRuntimeClient', () => {
           result: { type: 'ready' },
           _meta: { runtimeId: 'runtime-web-test' }
         } as RuntimeRpcResponse<unknown> & { streaming: true }
-        socket.send(encrypt(JSON.stringify(response), sharedKey))
-        socket.send(Buffer.from(encryptSharedBytes(frame, sharedKey)), { binary: true })
+        socket.send(server.sealText(JSON.stringify(response)))
+        socket.send(Buffer.from(server.sealBinary(frame)), { binary: true })
       })
     })
     await new Promise<void>((resolve) => wss.once('listening', resolve))

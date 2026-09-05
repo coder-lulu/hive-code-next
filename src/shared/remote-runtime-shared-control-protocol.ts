@@ -1,4 +1,4 @@
-import { decrypt, encrypt } from './e2ee-crypto'
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import type WebSocket from 'ws'
 import { APP_DISPLAY_NAME } from './brand'
 import { RemoteRuntimeClientError } from './remote-runtime-client'
@@ -14,7 +14,7 @@ import type {
 
 export function parseSharedControlFrame(
   frame: string,
-  sharedKey: Uint8Array | null,
+  session: RuntimeE2EEClientSession | null,
   state: SharedControlConnectionState
 ):
   | { type: 'auth'; plaintext: string }
@@ -23,7 +23,7 @@ export function parseSharedControlFrame(
       frame: Exclude<ReturnType<typeof parseRemoteRuntimeRpcFrame>, { type: 'error' }>
     }
   | { type: 'error'; error: RemoteRuntimeClientError } {
-  if (!sharedKey) {
+  if (!session) {
     return {
       type: 'error',
       error: invalidRemoteRuntimeResponseError(
@@ -31,7 +31,7 @@ export function parseSharedControlFrame(
       )
     }
   }
-  const plaintext = decrypt(frame, sharedKey)
+  const plaintext = session.openText(frame)
   if (plaintext === null) {
     return {
       type: 'error',
@@ -115,13 +115,13 @@ export function formatSharedControlCloseMessage(code: number, reason: Buffer): s
 export function sendSharedControlEncrypted(args: {
   state: SharedControlConnectionState
   ws: WebSocket | null
-  sharedKey: Uint8Array | null
+  session: RuntimeE2EEClientSession | null
   payload: unknown
 }): boolean {
   if (args.state !== 'ready' && args.state !== 'awaiting_authenticated') {
     return false
   }
-  if (!args.ws || args.ws.readyState !== 1 || !args.sharedKey) {
+  if (!args.ws || args.ws.readyState !== 1 || !args.session) {
     return false
   }
   let serialized: string
@@ -136,19 +136,19 @@ export function sendSharedControlEncrypted(args: {
 export function sendSharedControlEncryptedSerialized(args: {
   state: SharedControlConnectionState
   ws: WebSocket | null
-  sharedKey: Uint8Array | null
+  session: RuntimeE2EEClientSession | null
   serialized: string
 }): boolean {
   if (
     (args.state !== 'ready' && args.state !== 'awaiting_authenticated') ||
     !args.ws ||
     args.ws.readyState !== 1 ||
-    !args.sharedKey
+    !args.session
   ) {
     return false
   }
   try {
-    args.ws.send(encrypt(args.serialized, args.sharedKey))
+    args.ws.send(args.session.sealText(args.serialized))
     return true
   } catch {
     return false

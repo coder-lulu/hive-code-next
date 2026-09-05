@@ -15,7 +15,6 @@ vi.mock('electron', () => ({
 const TEST_PRODUCT_DEFAULTS: ProductCloudDefaults = {
   apiBaseUrl: 'https://login.example.test',
   clientId: 'desktop-client',
-  relayDirectorUrl: 'https://relay.example.test',
   scope: 'openid test.product.scope',
   productLabel: 'Test Cloud'
 }
@@ -49,8 +48,6 @@ describe('Orca cloud auth config', () => {
         profileEndpoint: 'https://orca-cloud.example/v1/desktop/auth/profile',
         orgEndpoint: 'https://orca-cloud.example/v1/desktop/auth/org',
         logoutEndpoint: 'https://orca-cloud.example/v1/desktop/auth/logout',
-        relayTokenEndpoint: 'https://orca-cloud.example/v1/desktop/auth/relay-token',
-        relayDirectorUrl: 'https://relay.example.test',
         clientId: 'desktop-client',
         scope: 'openid test.product.scope'
       }
@@ -69,8 +66,6 @@ describe('Orca cloud auth config', () => {
         profileEndpoint: 'https://login.example.test/v1/desktop/auth/profile',
         orgEndpoint: 'https://login.example.test/v1/desktop/auth/org',
         logoutEndpoint: 'https://login.example.test/v1/desktop/auth/logout',
-        relayTokenEndpoint: 'https://login.example.test/v1/desktop/auth/relay-token',
-        relayDirectorUrl: 'https://relay.example.test',
         clientId: 'desktop-client',
         scope: 'openid test.product.scope'
       }
@@ -90,41 +85,11 @@ describe('Orca cloud auth config', () => {
     expect(state.configured).toBe(true)
   })
 
-  it('does not require Relay for Cloud identity authentication', () => {
-    const state = getOrcaCloudAuthConfig(
-      {
-        ORCA_CLOUD_API_URL: 'https://cloud.example.test',
-        ORCA_CLOUD_CLIENT_ID: 'desktop-client'
-      },
-      undefined,
-      { ...TEST_PRODUCT_DEFAULTS, relayDirectorUrl: null }
-    )
-    expect(state).toMatchObject({
-      configured: true,
-      config: { apiBaseUrl: 'https://cloud.example.test', relayDirectorUrl: null }
-    })
-  })
-
-  it('honors an explicit disabled Relay service in development', () => {
-    const state = getOrcaCloudAuthConfig(
-      {
-        HIVE_PRODUCT_API_BASE_URL: 'https://cloud.example.test',
-        HIVE_PRODUCT_DESKTOP_CLIENT_ID: 'desktop-client',
-        HIVE_PRODUCT_RELAY_ENABLED: 'false',
-        HIVE_PRODUCT_RELAY_DIRECTOR_URL: 'https://relay.example.test'
-      },
-      undefined,
-      TEST_PRODUCT_DEFAULTS
-    )
-    expect(state).toMatchObject({ configured: true, config: { relayDirectorUrl: null } })
-  })
-
   it('ignores all endpoint environment overrides in packaged builds', () => {
     const state = getOrcaCloudAuthConfig(
       {
         ORCA_CLOUD_API_URL: 'http://localhost:4100',
-        ORCA_CLOUD_CLIENT_ID: 'overridden-client',
-        ORCA_RELAY_URL: 'http://localhost:4101'
+        ORCA_CLOUD_CLIENT_ID: 'overridden-client'
       },
       true,
       TEST_PRODUCT_DEFAULTS
@@ -133,8 +98,7 @@ describe('Orca cloud auth config', () => {
       configured: true,
       config: {
         apiBaseUrl: 'https://login.example.test',
-        clientId: 'desktop-client',
-        relayDirectorUrl: 'https://relay.example.test'
+        clientId: 'desktop-client'
       }
     })
   })

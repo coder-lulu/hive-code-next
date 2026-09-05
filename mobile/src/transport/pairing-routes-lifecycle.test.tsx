@@ -5,7 +5,6 @@ import type { PreProfilePairingAttempt } from './pre-profile-pairing-coordinator
 
 const mocks = vi.hoisted(() => ({
   router: { back: vi.fn(), replace: vi.fn() },
-  recover: vi.fn(),
   startPairing: vi.fn(),
   loadOnboarding: vi.fn(),
   onboardingDestination: vi.fn(() => '/onboarding'),
@@ -120,9 +119,6 @@ vi.mock('./pairing', () => ({
 vi.mock('./pre-profile-pairing-coordinator', () => ({
   startPreProfilePairing: (...args: unknown[]) => mocks.startPairing(...args)
 }))
-vi.mock('./mobile-relay-pairing-recovery', () => ({
-  recoverMobileRelayPairing: () => mocks.recover()
-}))
 
 import PairConfirmScreen from '../../app/pair-confirm'
 import PairScanScreen from '../../app/pair-scan'
@@ -158,37 +154,8 @@ function render(component: React.ReactElement): ReactTestRenderer {
 describe('pairing route async lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.recover.mockResolvedValue('none')
     mocks.startPairing.mockImplementation(() => successfulAttempt())
     mocks.loadOnboarding.mockResolvedValue([])
-  })
-
-  it.each([
-    ['confirmation', () => createElement(PairConfirmScreen), '确认并连接'],
-    ['scanner', () => createElement(PairScanScreen), 'CameraView']
-  ])('surfaces pairing recovery failures on the %s route', async (_name, screen, trigger) => {
-    mocks.recover.mockRejectedValue(new Error('secure storage unavailable'))
-    let renderer!: ReactTestRenderer
-    await act(async () => {
-      renderer = render(screen())
-    })
-
-    await act(async () => {
-      if (trigger === 'CameraView') {
-        renderer.root.findByType('CameraView').props.onBarcodeScanned({ data: 'code' })
-      } else {
-        renderer.root
-          .findAllByType('PairingActionButton')
-          .find((button) => button.props.label === trigger)!
-          .props.onPress()
-      }
-      await flushPromises()
-    })
-
-    expect(mocks.startPairing).not.toHaveBeenCalled()
-    expect(renderer.root.findByType('PairingScreenContent').props.description).toContain(
-      'secure storage unavailable'
-    )
   })
 
   it.each([

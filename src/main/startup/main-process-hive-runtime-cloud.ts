@@ -30,7 +30,11 @@ import {
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import { mainProcessState as state } from './main-process-state'
-import { installHiveRuntimeRelay, stopHiveRuntimeRelay } from './main-process-hive-runtime-relay'
+import {
+  getHiveRuntimeRelayStatus,
+  installHiveRuntimeRelay,
+  stopHiveRuntimeRelay
+} from './main-process-hive-runtime-relay'
 
 export function initializeHiveAccount(): void {
   const account = new HiveAccountService(app.getPath('userData'))
@@ -96,7 +100,7 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
     userDataPath: app.getPath('userData'),
     getReport: getRuntimeCloudReport,
     getBootId: () => processRuntimeCloudPresence.getBootId(),
-    getRelayStatus: () => state.desktopRelayStatus,
+    getRelayStatus: getHiveRuntimeRelayStatus,
     onRegistrationChanged: () => processRuntimeCloudPresence.notifyRegistrationChanged(),
     dependencies: serviceOwnedRuntimeCloudStorage
       ? { ...defaultLocalRuntimeOwnershipDependencies, ...serviceOwnedRuntimeCloudStorage }

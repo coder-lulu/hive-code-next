@@ -102,7 +102,7 @@ export default function AccountsScreen() {
     }
     setHostName(host.name)
     setError((current) => (current === 'Host not found' ? null : current))
-    if (!client && (host.accountRuntime || host.accountRuntimeFallback)) {
+    if (!client && host.accountRuntime) {
       refreshHostClient(host.id)
     }
   }, [client, hostCatalogLoaded, hostId, hosts, refreshHostClient])

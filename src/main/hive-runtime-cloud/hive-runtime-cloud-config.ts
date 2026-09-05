@@ -1,7 +1,7 @@
 import { getHiveAccountConfig } from '../hive-account/hive-account-config'
 
 export type HiveRuntimeCloudWebLaunchConfig = Readonly<{
-  publicOrigin: 'https://code.hivekernel.com'
+  publicOrigin: string
   webClientPath: string
   websocketPath: string
 }>
@@ -14,27 +14,13 @@ export type HiveRuntimeCloudConfig =
       webLaunch?: HiveRuntimeCloudWebLaunchConfig
     }
 
-function enabled(value: string | undefined): boolean {
-  return value === '1' || value === 'true'
-}
-
-function presenceEnabled(value: string | undefined): boolean {
-  // HiveCode ships with a validated HiveCloud account origin, so Runtime Cloud is
-  // part of the product contract rather than an opt-in launch-time experiment.
-  // Keep an explicit false value as an operational escape hatch for development.
-  return value === undefined || enabled(value)
-}
-
-function originRelativePath(value: string | undefined): string | null {
+function originRelativePath(value: string | undefined, origin: string): string | null {
   if (!value || value.length > 256 || !value.startsWith('/') || value.includes('\\')) {
     return null
   }
   try {
-    const parsed = new URL(value, 'https://code.hivekernel.com')
-    return parsed.origin === 'https://code.hivekernel.com' &&
-      parsed.pathname === value &&
-      !parsed.search &&
-      !parsed.hash
+    const parsed = new URL(value, origin)
+    return parsed.origin === origin && parsed.pathname === value && !parsed.search && !parsed.hash
       ? value
       : null
   } catch {
@@ -43,13 +29,27 @@ function originRelativePath(value: string | undefined): string | null {
 }
 
 function webLaunchConfig(env: NodeJS.ProcessEnv): HiveRuntimeCloudWebLaunchConfig | undefined {
-  if (!enabled(env.HIVE_RUNTIME_CLOUD_WEB_LAUNCH_ENABLED)) {
+  const origin = env.HIVE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN
+  if (!origin) {
     return undefined
   }
-  const origin = env.HIVE_RUNTIME_CLOUD_WEB_HTTPS_ORIGIN
-  const webClientPath = originRelativePath(env.HIVE_RUNTIME_CLOUD_WEB_CLIENT_PATH)
-  const websocketPath = originRelativePath(env.HIVE_RUNTIME_CLOUD_WEBSOCKET_PATH)
-  return origin === 'https://code.hivekernel.com' && webClientPath && websocketPath
+  try {
+    const url = new URL(origin)
+    if (
+      url.protocol !== 'https:' ||
+      url.origin !== origin ||
+      url.username ||
+      url.password ||
+      url.port
+    ) {
+      return undefined
+    }
+  } catch {
+    return undefined
+  }
+  const webClientPath = originRelativePath(env.HIVE_RUNTIME_CLOUD_WEB_CLIENT_PATH, origin)
+  const websocketPath = originRelativePath(env.HIVE_RUNTIME_CLOUD_WEBSOCKET_PATH, origin)
+  return webClientPath && websocketPath
     ? { publicOrigin: origin, webClientPath, websocketPath }
     : undefined
 }
@@ -57,9 +57,6 @@ function webLaunchConfig(env: NodeJS.ProcessEnv): HiveRuntimeCloudWebLaunchConfi
 export function getHiveRuntimeCloudConfig(
   env: NodeJS.ProcessEnv = process.env
 ): HiveRuntimeCloudConfig {
-  if (!presenceEnabled(env.HIVE_RUNTIME_CLOUD_PRESENCE_ENABLED)) {
-    return { enabled: false }
-  }
   const account = getHiveAccountConfig(env)
   if (!account.configured) {
     return { enabled: false }

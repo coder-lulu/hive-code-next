@@ -3,13 +3,13 @@ import { HiveRuntimeRelayHostService } from '../hive-runtime-cloud/relay-host/hi
 import type { HiveRuntimeCloudConfig } from '../hive-runtime-cloud/hive-runtime-cloud-config'
 import type { HiveRuntimeCloudPresenceService } from '../hive-runtime-cloud/hive-runtime-cloud-presence-service'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
-import {
-  hiveRelayV2HostEnabled,
-  hiveRuntimeRelayRegion
-} from '../hive-runtime-cloud/relay-host/hive-runtime-relay-config'
-export { hiveRelayV2HostEnabled } from '../hive-runtime-cloud/relay-host/hive-runtime-relay-config'
+import { hiveRuntimeRelayRegion } from '../hive-runtime-cloud/relay-host/hive-runtime-relay-config'
 
 let host: HiveRuntimeRelayHostService | null = null
+
+export function getHiveRuntimeRelayStatus() {
+  return host?.getStatus() ?? 'offline'
+}
 
 export function installHiveRuntimeRelay(
   config: HiveRuntimeCloudConfig,
@@ -18,7 +18,7 @@ export function installHiveRuntimeRelay(
   userDataPath: string,
   env: NodeJS.ProcessEnv = process.env
 ): void {
-  if (host || !config.enabled || !hiveRelayV2HostEnabled(env)) {
+  if (host || !config.enabled) {
     return
   }
   const requestedRegion = hiveRuntimeRelayRegion(env)

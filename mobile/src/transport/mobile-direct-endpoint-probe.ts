@@ -3,8 +3,7 @@ import type { MobileConnectionPath } from './stable-logical-rpc-client'
 import type { HostProfile } from './types'
 
 function directEndpointUrls(host: HostProfile): string[] {
-  const endpoints =
-    host.endpoints?.filter(({ kind }) => kind !== 'relay').map(({ url }) => url) ?? []
+  const endpoints = host.endpoints?.map(({ url }) => url) ?? []
   return [...new Set([host.endpoint, ...endpoints])]
 }
 

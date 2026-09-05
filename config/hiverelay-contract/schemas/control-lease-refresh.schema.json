@@ -13,14 +13,26 @@
     "expectedControlLeaseExpiresAt"
   ],
   "properties": {
-    "protocolVersion": { "const": 2 },
-    "runtimeProof": { "$ref": "runtime-proof.schema.json" },
+    "protocolVersion": {
+      "const": 2
+    },
+    "runtimeProof": {
+      "$ref": "runtime-proof.schema.json"
+    },
     "assignmentId": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
-    "assignmentEpoch": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-    "controlGeneration": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "assignmentEpoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "controlGeneration": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
     "expectedControlLeaseExpiresAt": {
       "type": "integer",
       "minimum": 0,

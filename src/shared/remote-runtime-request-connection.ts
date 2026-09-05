@@ -1,14 +1,11 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import { abortSignalReason } from './abort-signal-reason'
 import { APP_DISPLAY_NAME } from './brand'
 import type { PairingOffer } from './pairing'
 import { scheduleOrphanedRemoteRuntimeSocketClose } from './remote-runtime-abort-orphaned-socket'
-import { decrypt, encrypt } from './e2ee-crypto'
-import {
-  serializeRemoteRuntimePayload,
-  serializeRemoteRuntimeRpcRequest
-} from './remote-runtime-memory-limits'
+import { serializeRemoteRuntimeRpcRequest } from './remote-runtime-memory-limits'
 import {
   prepareRemoteRuntimeRequest,
   releaseRemoteRuntimePreparedRequest,
@@ -42,7 +39,7 @@ const INVALID_FRAME_MESSAGE = `Remote ${APP_DISPLAY_NAME} runtime returned an un
 export class RemoteRuntimeRequestConnection {
   private state: ConnectionState = 'closed'
   private ws: WebSocket | null = null
-  private sharedKey: Uint8Array | null = null
+  private session: RuntimeE2EEClientSession | null = null
   private socketCleanup: (() => void) | null = null
   private readonly pendingRequests = new Map<string, RemoteRuntimePendingRequest<unknown>>()
   private readonly readyWaiters: RemoteRuntimeRequestReadyWaiter[] = []
@@ -128,7 +125,7 @@ export class RemoteRuntimeRequestConnection {
   close(error?: Error): void {
     const ws = this.ws
     const cleanup = this.socketCleanup
-    this.ws = this.sharedKey = null
+    this.ws = this.session = null
     this.socketCleanup = null
     this.state = 'closed'
     this.clearIdleCloseTimer()
@@ -152,7 +149,7 @@ export class RemoteRuntimeRequestConnection {
 
   private ensureReady(signal?: AbortSignal): Promise<void> {
     const ws = this.ws
-    if (this.state === 'ready' && ws?.readyState === WebSocket.OPEN && this.sharedKey) {
+    if (this.state === 'ready' && ws?.readyState === WebSocket.OPEN && this.session) {
       return Promise.resolve()
     }
 
@@ -192,7 +189,7 @@ export class RemoteRuntimeRequestConnection {
       return
     }
     this.ws = opened.socket.ws
-    this.sharedKey = opened.socket.sharedKey
+    this.session = opened.socket.session
     this.socketCleanup = opened.socket.cleanup
     this.state = 'awaiting_ready'
   }
@@ -203,11 +200,11 @@ export class RemoteRuntimeRequestConnection {
       return
     }
 
-    const sharedKey = this.sharedKey
-    if (!sharedKey) {
+    const session = this.session
+    if (!session) {
       return
     }
-    const plaintext = decrypt(frame, sharedKey)
+    const plaintext = session.openText(frame)
     if (plaintext === null) {
       this.close(invalidRemoteRuntimeResponseError(INVALID_FRAME_MESSAGE))
       return
@@ -223,29 +220,31 @@ export class RemoteRuntimeRequestConnection {
 
   private handleReadyFrame(frame: string): void {
     const error = parseReadyFrame(frame)
-    if (error) {
-      this.close(error)
+    if (error || !this.session?.acceptReady(JSON.parse(frame))) {
+      this.close(error ?? invalidRemoteRuntimeResponseError('Invalid E2EE host identity'))
       return
     }
     this.state = 'awaiting_authenticated'
-    const sharedKey = this.sharedKey
-    if (!sharedKey) {
+    const session = this.session
+    if (!session) {
       return
     }
     this.ws?.send(
-      encrypt(
-        serializeRemoteRuntimePayload({
-          type: 'e2ee_auth',
-          deviceToken: this.pairing.deviceToken,
-          clientCapabilities: remoteRuntimeClientCapabilities(this.additionalClientCapabilities)
-        }),
-        sharedKey
+      session.sealText(
+        session.authMessage(
+          this.pairing.deviceToken,
+          remoteRuntimeClientCapabilities(this.additionalClientCapabilities)
+        )
       )
     )
   }
 
   private handleAuthenticatedFrame(plaintext: string): void {
-    const error = parseAuthenticatedFrame(plaintext)
+    const error =
+      parseAuthenticatedFrame(plaintext) ??
+      (!this.session?.isAuthenticated(plaintext)
+        ? invalidRemoteRuntimeResponseError('Invalid E2EE authentication transcript')
+        : null)
     if (error) {
       this.close(error)
       return
@@ -272,11 +271,11 @@ export class RemoteRuntimeRequestConnection {
   private sendRequest(requestId: string): void {
     const pending = this.pendingRequests.get(requestId)
     const ws = this.ws
-    const sharedKey = this.sharedKey
+    const session = this.session
     if (!pending) {
       return
     }
-    if (this.state !== 'ready' || !ws || ws.readyState !== WebSocket.OPEN || !sharedKey) {
+    if (this.state !== 'ready' || !ws || ws.readyState !== WebSocket.OPEN || !session) {
       this.rejectPendingRequest(requestId, remoteRuntimeUnavailableError())
       return
     }
@@ -286,7 +285,7 @@ export class RemoteRuntimeRequestConnection {
       return
     }
     try {
-      ws.send(encrypt(serializedRequest, sharedKey))
+      ws.send(session.sealText(serializedRequest))
     } catch (error) {
       this.rejectPendingRequest(requestId, toRemoteRuntimeRequestError(error))
     }

@@ -35,7 +35,7 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
     const host = accountVisibleHosts.find((candidate) => candidate.id === hostId)
     if (host) {
       setHostEndpoint(host.endpoint)
-      if (!client && (host.accountRuntime || host.accountRuntimeFallback)) {
+      if (!client && host.accountRuntime) {
         refreshHostClient(host.id)
       }
     }

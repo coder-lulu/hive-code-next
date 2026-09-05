@@ -1,3 +1,4 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import type WebSocket from 'ws'
 import type {
   SharedControlConnectionState,
@@ -11,7 +12,7 @@ import {
 export function ensureSharedControlReady(args: {
   state: SharedControlConnectionState
   ws: WebSocket | null
-  sharedKey: Uint8Array | null
+  session: RuntimeE2EEClientSession | null
   readyWaiters: SharedControlReadyWaiter[]
   timeoutMs: number
   signal?: AbortSignal

@@ -1,18 +1,6 @@
 import { z } from 'zod'
 import type { MobileSession } from '../auth/mobile-sms-auth'
-import {
-  encodeBase64Url,
-  isRecord,
-  randomToken,
-  request,
-  requestWithMetadata
-} from '../auth/mobile-sms-client'
-import {
-  generateKeyPair,
-  hasNonZeroX25519SharedSecret,
-  publicKeyFromBase64
-} from '../transport/e2ee'
-import { hashMobileRelayCredential } from '../transport/mobile-relay-credential-hash'
+import { isRecord, randomToken, request, requestWithMetadata } from '../auth/mobile-sms-client'
 import {
   AccountRuntimeDirectoryEntrySchema,
   RuntimePresenceEntrySchema,
@@ -27,33 +15,6 @@ const PRESENCE_BATCH_SIZE = 100
 const MAXIMUM_DIRECTORY_ENTRIES = 10_000
 const MAXIMUM_PAGES = MAXIMUM_DIRECTORY_ENTRIES / PAGE_LIMIT
 const CanonicalUuidSchema = z.uuid().refine((value) => value === value.toLowerCase())
-const InstantSchema = z.string().refine((value) => Number.isFinite(Date.parse(value)))
-const RelaySchema = z
-  .object({
-    cellUrl: z.string().url(),
-    relayHostId: z.string().regex(/^[A-Za-z0-9_-]{16}$/),
-    assignmentEpoch: z.number().int().positive(),
-    e2eeFraming: z.union([z.literal(2), z.literal('hive-e2ee-v1')])
-  })
-  .strict()
-  .refine(({ cellUrl }) => new URL(cellUrl).protocol === 'https:')
-
-const ConnectionIntentSchema = z
-  .object({
-    connectionIntentId: CanonicalUuidSchema,
-    ticketId: CanonicalUuidSchema,
-    runtimeRecordId: CanonicalUuidSchema,
-    expiresAt: InstantSchema,
-    runtimePublicKeyB64: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    relay: RelaySchema.nullable()
-  })
-  .strict()
-
-export type AccountRuntimeConnectionIntent = z.infer<typeof ConnectionIntentSchema> & {
-  readonly ticketSecret: string
-  readonly clientKeyPair: { readonly publicKey: Uint8Array; readonly secretKey: Uint8Array }
-}
-
 type CursorPage<T> = { readonly items: readonly T[]; readonly nextCursor: string | null }
 
 export async function loadAllAccountRuntimes(
@@ -134,50 +95,12 @@ export async function loadRuntimePresence(
 }
 
 export async function createAccountRuntimeConnectionIntent(
-  session: MobileSession,
-  runtimeRecordId: string,
-  expectedResourceVersion: number,
-  signal?: AbortSignal
-): Promise<AccountRuntimeConnectionIntent> {
-  CanonicalUuidSchema.parse(runtimeRecordId)
-  if (!Number.isSafeInteger(expectedResourceVersion) || expectedResourceVersion < 1) {
-    throw new Error('runtime_resource_version_invalid')
-  }
-  const ticketSecret = randomToken()
-  const clientKeyPair = generateKeyPair()
-  const value = await request<unknown>(
-    `/hive/v1/runtimes/${encodeURIComponent(runtimeRecordId)}/connection-intents`,
-    {
-      clientKind: 'MOBILE',
-      expectedResourceVersion,
-      ticketSecretSha256: hashMobileRelayCredential(ticketSecret),
-      clientEphemeralPublicKey: encodeBase64Url(clientKeyPair.publicKey)
-    },
-    {
-      headers: {
-        ...bearerHeaders(session.accessToken),
-        'Idempotency-Key': randomToken()
-      },
-      signal
-    }
-  )
-  const parsed = ConnectionIntentSchema.parse(value)
-  if (parsed.runtimeRecordId !== runtimeRecordId || Date.parse(parsed.expiresAt) <= Date.now()) {
-    throw new Error('runtime_connection_intent_invalid')
-  }
-  const normalizedPublicKey = parsed.runtimePublicKeyB64.replace(/-/g, '+').replace(/_/g, '/')
-  const runtimePublicKeyB64 = `${normalizedPublicKey}${'='.repeat((4 - (normalizedPublicKey.length % 4)) % 4)}`
-  if (
-    !hasNonZeroX25519SharedSecret(clientKeyPair.secretKey, publicKeyFromBase64(runtimePublicKeyB64))
-  ) {
-    throw new Error('runtime_connection_intent_public_key_invalid')
-  }
-  return {
-    ...parsed,
-    runtimePublicKeyB64,
-    ticketSecret,
-    clientKeyPair
-  }
+  _session: MobileSession,
+  _runtimeRecordId: string,
+  _expectedResourceVersion: number,
+  _signal?: AbortSignal
+): Promise<never> {
+  throw new Error('Account remote connection is not ready.')
 }
 
 export async function loadRuntimeSessions(session: MobileSession): Promise<RuntimeSession[]> {

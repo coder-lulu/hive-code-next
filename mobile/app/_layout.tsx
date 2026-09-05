@@ -12,7 +12,6 @@ import { RpcClientProvider } from '../src/transport/client-context'
 import { getNotificationNavigationTarget } from '../src/notifications/notification-routing'
 import { useOpenNotificationRoute } from '../src/notifications/use-open-notification-route'
 import { extractPairingCodeFromUrl } from '../src/transport/pairing'
-import { startMobileRelayPairingRecoveryMonitor } from '../src/transport/mobile-relay-pairing-recovery-monitor'
 import { MobileAuthSessionProvider, useMobileAuthSession } from '../src/auth/mobile-auth-session'
 import {
   completeMobileProviderLogin,
@@ -63,14 +62,6 @@ function ThemedRootLayout() {
   const pendingProviderCallbackUrlRef = useRef<string | null>(null)
   const theme = useMobileTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
-
-  useEffect(() => {
-    // Why: pairing publication is journaled across process death; startup must
-    // reconcile the server result before another scan can replace that journal.
-    // Retry on foreground/network revival so a launch-time outage cannot leave
-    // the process permanently blocked until the user force-restarts the app.
-    return startMobileRelayPairingRecoveryMonitor()
-  }, [])
 
   // Why: route `hivecode://pair?...` deep links to the confirm screen so
   // the same pairing flow runs whether the link arrived via QR scan,

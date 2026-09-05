@@ -1,8 +1,4 @@
 import type { WebSocket } from 'ws'
-import type {
-  PairingGetEndpointsParams,
-  PairingProvisionRelayParams
-} from '../../../shared/mobile-relay-credential-contract'
 import { fingerprintAuthenticatedPairingCredential } from '../rpc/orchestration-mutation-executor'
 import type {
   AuthenticatedMobileSocket,
@@ -140,30 +136,6 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
         : reply
 
     const connectionId = ws ? this.mobileSocketWiring?.getConnectionId(ws) : undefined
-    const pairingProvider = this.mobileRelayPairingProvider
-    const pairingContext =
-      pairingProvider && authenticatedSocket
-        ? {
-            getEndpoints: (params: PairingGetEndpointsParams) =>
-              pairingProvider.getEndpoints(
-                {
-                  deviceId: authenticatedSocket.device.deviceId,
-                  connectionId: authenticatedSocket.connectionId,
-                  transport: authenticatedSocket.transport
-                },
-                params
-              ),
-            provisionRelay: (params: PairingProvisionRelayParams) =>
-              pairingProvider.provisionRelay(
-                {
-                  deviceId: authenticatedSocket.device.deviceId,
-                  connectionId: authenticatedSocket.connectionId,
-                  transport: authenticatedSocket.transport
-                },
-                params
-              )
-          }
-        : undefined
     try {
       await this.dispatcher.dispatchStreaming(request, replyForRequest, {
         // Why: the validated credential preserves existing federation ownership without trusting request fields.
@@ -180,7 +152,6 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
                 authenticatedSocket.clientCapabilities = clientCapabilities
               }
             : undefined,
-        pairing: pairingContext,
         signal: abortRegistration?.signal,
         sendBinary,
         registerBinaryStreamHandler: (streamId, handler) =>

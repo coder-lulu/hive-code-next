@@ -1,6 +1,5 @@
 import nacl from 'tweetnacl'
 import { z } from 'zod'
-import { RelayConnectionOpenMessageSchema } from '../../../src/main/runtime/relay/relay-control-protocol'
 import {
   HiveRelayWireMessageSchema,
   deriveHiveRelayHostId,
@@ -18,7 +17,6 @@ import { evaluatePrivateCommand, evaluatePrivateStatus } from './hiverelay-contr
 import { evaluateCloseCodes, evaluateFrame, evaluateReplay } from './hiverelay-contract-state-rules'
 
 const Operation = z.enum([
-  'legacy-bytes',
   'wire-message',
   'jws',
   'runtime-proof',
@@ -41,9 +39,9 @@ const ContractFixtureSchema = z
     schemaVersion: z.literal(1),
     contractRevision: z.string().min(1),
     caseId: z.string().min(1).max(128),
-    suite: z.enum(['legacy-v1-byte-regression', 'hiverelay-v2-conformance']),
+    suite: z.literal('hiverelay-v2-conformance'),
     operation: Operation,
-    applicableComponents: z.array(z.enum(['cloud', 'hivecode', 'cell', 'legacy-orca'])).min(1),
+    applicableComponents: z.array(z.enum(['cloud', 'hivecode', 'cell'])).min(1),
     validationTime: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     input: z.record(z.string(), z.unknown())
   })
@@ -81,18 +79,6 @@ function result(
   reason: string
 ): HiveRelayContractResult {
   return { caseId: fixture.caseId, verdict, reason }
-}
-
-function evaluateLegacy(input: Record<string, unknown>): ['ACCEPT' | 'REJECT', string] {
-  const message = object(input.message)
-  if (!message || typeof input.rawBase64 !== 'string') {
-    return ['REJECT', 'INVALID_LEGACY_BYTES']
-  }
-  const raw = Buffer.from(input.rawBase64, 'base64')
-  const currentWireBytes = Buffer.from(JSON.stringify(message))
-  const valid =
-    raw.equals(currentWireBytes) && RelayConnectionOpenMessageSchema.safeParse(message).success
-  return valid ? ['ACCEPT', 'VALID_LEGACY_BYTES'] : ['REJECT', 'INVALID_LEGACY_BYTES']
 }
 
 function containsForbiddenField(value: unknown): boolean {
@@ -256,8 +242,6 @@ export function evaluateHiveRelayContractFixture(
   }
   const evaluated = (() => {
     switch (fixture.operation) {
-      case 'legacy-bytes':
-        return evaluateLegacy(fixture.input)
       case 'wire-message':
         return evaluateWire(fixture.input)
       case 'jws':

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WebSocket } from 'ws'
 import { E2EEChannel, type E2EEChannelOptions } from './e2ee-channel'
-import { deriveSharedKey, decrypt, encrypt, generateKeyPair } from './e2ee-crypto'
+import { generateKeyPair } from './e2ee-crypto'
+import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import { createMobileE2EEOutboundMemoryBudget } from './mobile-e2ee-outbound-memory-budget'
 import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from '../../../shared/remote-runtime-memory-limits'
 
@@ -48,13 +49,15 @@ function setup(overrides?: Partial<E2EEChannelOptions>) {
     onError,
     ...overrides
   })
-  const sharedKey = deriveSharedKey(clientKeys.secretKey, serverKeys.publicKey)
-  channel.handleRawMessage(
-    JSON.stringify({ type: 'e2ee_hello', publicKeyB64: publicKeyToBase64(clientKeys.publicKey) })
-  )
-  channel.handleRawMessage(
-    encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: 'valid-token' }), sharedKey)
-  )
+  const sharedKey = RuntimeE2EEClientSession.create({
+    desktopPublicKeyB64: publicKeyToBase64(serverKeys.publicKey),
+    transport: 'direct',
+    clientKeyPair: clientKeys
+  })
+  channel.handleRawMessage(JSON.stringify(sharedKey.hello))
+  expect(sharedKey.acceptReady(JSON.parse(ws.sent[0]))).toBe(true)
+  channel.handleRawMessage(sharedKey.sealText(sharedKey.authMessage('valid-token')))
+  expect(sharedKey.isAuthenticated(sharedKey.openText(ws.sent[1])!)).toBe(true)
   return { channel, ws, sharedKey, onError }
 }
 
@@ -63,7 +66,7 @@ function emitReply(ctx: ReturnType<typeof setup>, payload: string): void {
   ctx.channel.onMessage((_plaintext, encryptedReply) => {
     encryptedReply(payload)
   })
-  ctx.channel.handleRawMessage(encrypt('{"id":"x","method":"status.get"}', ctx.sharedKey))
+  ctx.channel.handleRawMessage(ctx.sharedKey.sealText('{"id":"x","method":"status.get"}'))
 }
 
 describe('E2EE text reply backpressure', () => {
@@ -93,7 +96,7 @@ describe('E2EE text reply backpressure', () => {
     ctx.ws.bufferedAmount = 0
     vi.runOnlyPendingTimers()
 
-    const replies = ctx.ws.sent.slice(baseline).map((frame) => decrypt(frame, ctx.sharedKey))
+    const replies = ctx.ws.sent.slice(baseline).map((frame) => ctx.sharedKey.openText(frame))
     expect(replies).toEqual(['{"seq":1}', '{"seq":2}', '{"seq":3}'])
     expect(ctx.onError).not.toHaveBeenCalled()
   })
@@ -103,7 +106,7 @@ describe('E2EE text reply backpressure', () => {
     const baseline = ctx.ws.sent.length
     emitReply(ctx, '{"ok":true}')
     expect(ctx.ws.sent.length).toBe(baseline + 1)
-    expect(decrypt(ctx.ws.sent[baseline]!, ctx.sharedKey)).toBe('{"ok":true}')
+    expect(ctx.sharedKey.openText(ctx.ws.sent[baseline]!)).toBe('{"ok":true}')
   })
 
   it('still closes an oversized reply when telemetry throws', () => {

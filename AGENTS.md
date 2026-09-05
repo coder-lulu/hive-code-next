@@ -1,3 +1,13 @@
+# Single product implementation
+
+HiveCode has no released users requiring old product compatibility. Ship one current
+implementation and update all owned clients/services together. Do not retain old/new,
+v1/v2, development/test product paths, compatibility fallbacks or opt-in feature gates
+unless the user explicitly requests them. Remove superseded code and its UI/settings.
+Protocol schema identifiers, cryptographic domains and third-party version requirements
+are not product editions; keep their validation consistent across the current stack.
+This user policy overrides historical mixed-version and legacy-preservation guidance.
+
 # Design System
 
 ## HiveCode APP UI
@@ -86,7 +96,10 @@ All changes must consider folder workspaces as well as git worktrees. Don't assu
 
 ## Remote Wire Compatibility
 
-Clients and remote HiveCode servers update independently, so mixed versions are the normal state. Before changing anything a paired client and host exchange — RPC params, stream frames, or the content either side publishes over them — follow [`docs/reference/remote-wire-compatibility.md`](./docs/reference/remote-wire-compatibility.md). A new optional field is safe; a new stream opcode must be capability-negotiated because decoders drop unknown opcodes silently; and changing what the host publishes reaches old clients even with no wire change.
+Update owned clients and servers together against one current wire contract. Validate
+RPC, stream and authentication boundaries without adding a second legacy implementation.
+Historical [`remote-wire-compatibility.md`](./docs/reference/remote-wire-compatibility.md)
+does not authorize mixed-version product support; that requires an explicit user request.
 
 ## Git Binary Compatibility
 

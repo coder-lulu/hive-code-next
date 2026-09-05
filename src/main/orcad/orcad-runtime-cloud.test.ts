@@ -52,7 +52,7 @@ it('starts the existing Host only after RPC readiness and shares service-owned r
     userDataPath: '/unused',
     runtimeVersion: '1.0.0',
     runtime: { getStartedAt: () => 1, getStatus: () => ({ graphStatus: 'ready' }) },
-    env: { HIVE_RELAY_V2_HOST_ENABLED: '1', HIVE_RELAY_REGION: 'cn-shanghai' }
+    env: { HIVE_RELAY_REGION: 'cn-shanghai' }
   })
   expect(mock.ready).not.toHaveBeenCalled()
   expect(mock.hostStart).not.toHaveBeenCalled()
@@ -81,7 +81,7 @@ it('starts the existing Host only after RPC readiness and shares service-owned r
   expect(mock.hostStop).toHaveBeenCalledOnce()
 })
 
-it('keeps Host disabled by default and wires Node local control before listening', async () => {
+it('automatically starts Host with server-selected placement and wires local control before listening', async () => {
   const cloud = createOrcadRuntimeCloud({
     userDataPath: '/unused',
     runtimeVersion: '1.0.0',
@@ -89,7 +89,8 @@ it('keeps Host disabled by default and wires Node local control before listening
     env: {}
   })
   cloud.rpcReady({} as OrcaRuntimeRpcServer)
-  expect(mock.hostStart).not.toHaveBeenCalled()
+  expect(mock.hostStart).toHaveBeenCalledOnce()
+  expect(mock.hostOptions.requestedRegion).toBeUndefined()
   await cloud.stop()
   const entry = readFileSync(new URL('./orcad-entry.ts', import.meta.url), 'utf8')
   expect(entry).toContain('hiveRuntimeCloud: runtimeCloud.ownership')

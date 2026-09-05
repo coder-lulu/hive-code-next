@@ -4,6 +4,8 @@ import { authenticateCloudManagedE2EE } from './cloud-managed-e2ee-auth-validati
 
 const auth = {
   type: 'e2ee_auth',
+  v: 2,
+  transcriptHashB64: 'transcript',
   principalKind: 'cloud_managed_web_session',
   managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
   runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
@@ -31,16 +33,21 @@ describe('Cloud-managed E2EE auth validation', () => {
     const resolveSession = vi.fn().mockReturnValue({ kind: 'cloud' })
 
     expect(
-      authenticateCloudManagedE2EE({ plaintext: JSON.stringify(auth), resolveSession })
+      authenticateCloudManagedE2EE({
+        transcriptHashB64: 'transcript',
+        plaintext: JSON.stringify(auth),
+        resolveSession
+      })
     ).toEqual({ kind: 'authenticated', auth, principal: { kind: 'cloud' } })
     expect(resolveSession).toHaveBeenCalledWith(auth)
   })
 
-  it('leaves legacy pairing frames to the existing validator', () => {
+  it('leaves paired-device frames to the device validator', () => {
     const resolveSession = vi.fn()
 
     expect(
       authenticateCloudManagedE2EE({
+        transcriptHashB64: 'transcript',
         plaintext: JSON.stringify({ type: 'e2ee_auth', deviceToken: 'paired-token' }),
         resolveSession
       })
@@ -57,6 +64,7 @@ describe('Cloud-managed E2EE auth validation', () => {
   ])('rejects malformed or mixed-provenance frames', (candidate) => {
     expect(
       authenticateCloudManagedE2EE({
+        transcriptHashB64: 'transcript',
         plaintext: JSON.stringify(candidate),
         resolveSession: () => ({ kind: 'cloud' })
       })
@@ -66,6 +74,7 @@ describe('Cloud-managed E2EE auth validation', () => {
   it('distinguishes a valid frame for a revoked session', () => {
     expect(
       authenticateCloudManagedE2EE({
+        transcriptHashB64: 'transcript',
         plaintext: JSON.stringify(auth),
         resolveSession: () => null
       })

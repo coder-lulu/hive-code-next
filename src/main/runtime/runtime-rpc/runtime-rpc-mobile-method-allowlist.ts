@@ -174,8 +174,6 @@ export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'notifications.getMissedSince',
   'notifications.subscribe',
   'notifications.unsubscribe',
-  'pairing.getEndpoints',
-  'pairing.provisionRelay',
   'preflight.check',
   'preflight.detectAgents',
   'preflight.detectRemoteAgents',

@@ -14,8 +14,8 @@ describe('Hive account product configuration', () => {
     ).toEqual({
       configured: true,
       config: {
-        apiBaseUrl: 'https://api.hive.test',
-        identityIssuer: 'https://identity.hive.test/realms/hive',
+        apiBaseUrl: 'https://api.hivekernel.com',
+        identityIssuer: 'https://identity.hivekernel.com/realms/hive',
         clientId: 'hivecode-desktop',
         scope: 'openid profile email hive.session.exchange'
       }

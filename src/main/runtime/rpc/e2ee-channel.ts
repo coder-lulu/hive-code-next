@@ -1,6 +1,5 @@
 import type { E2EEChannelOptions, E2EETextMessageHandler } from './e2ee-channel-options'
 export type { E2EEChannelOptions } from './e2ee-channel-options'
-import { dispatchLegacyE2EEText } from './e2ee-channel-legacy-dispatch'
 import {
   E2EEAccountAuthentication,
   parseE2EEAccountAuth,
@@ -8,7 +7,6 @@ import {
 } from './e2ee-channel-account-authentication'
 // Why: this channel keeps E2EE framing out of RPC handlers, which consume plaintext across transports.
 import type { WebSocket } from 'ws'
-import { encrypt, decrypt, decryptBytes } from './e2ee-crypto'
 import type {
   DesktopMobileE2EEV2Session,
   DesktopMobileE2EEV2Context
@@ -45,7 +43,6 @@ export class E2EEChannel {
   private destroyed = false
   private state: 'awaiting_hello' | 'awaiting_auth' | 'authenticating_async' | 'ready' =
     'awaiting_hello'
-  private sharedKey: Uint8Array | null = null
   private consecutiveFailures = 0
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null
   private readonly ws: WebSocket
@@ -58,7 +55,6 @@ export class E2EEChannel {
     | undefined
   private readonly onError: E2EEChannelOptions['onError']
   private readonly transportContext: DesktopMobileE2EEV2Context
-  private readonly requireV2: boolean
   private readonly outbound: MobileE2EEDesktopOutboundOwner
   private v2Session: DesktopMobileE2EEV2Session | null = null
   // Why: the handler is set after readiness because its reply closure needs this channel's encryption state.
@@ -79,7 +75,6 @@ export class E2EEChannel {
     this.onCloudReady = options.onCloudReady
     this.onError = options.onError
     this.transportContext = options.transportContext ?? { transport: 'direct' }
-    this.requireV2 = options.requireV2 ?? false
     this.outbound = new MobileE2EEDesktopOutboundOwner(ws, options.outboundMemoryBudget)
 
     this.accountAuthentication = new E2EEAccountAuthentication(
@@ -126,47 +121,7 @@ export class E2EEChannel {
 
     if (this.v2Session) {
       this.handleV2RawMessage(raw)
-      return
     }
-    const sharedKey = this.sharedKey
-    if (!sharedKey) {
-      return
-    }
-
-    if (typeof raw !== 'string') {
-      const plaintextBytes = decryptBytes(raw, sharedKey)
-      if (plaintextBytes === null) {
-        this.trackDecryptFailure()
-        return
-      }
-      this.consecutiveFailures = 0
-      if (this.state !== 'ready') {
-        this.onError(4001, 'Invalid binary message before authentication')
-        return
-      }
-      this.binaryMessageHandler?.(plaintextBytes)
-      return
-    }
-
-    const plaintext = decrypt(raw, sharedKey)
-    if (plaintext === null) {
-      this.trackDecryptFailure()
-      return
-    }
-
-    this.consecutiveFailures = 0
-    if (this.state === 'awaiting_auth') {
-      this.handleAuth(plaintext)
-      return
-    }
-
-    dispatchLegacyE2EEText(plaintext, {
-      ws: this.ws,
-      getKey: () => this.sharedKey,
-      outbound: this.outbound,
-      close: (reason) => this.closeForOutboundBudget(reason),
-      handler: this.messageHandler
-    })
   }
 
   private trackDecryptFailure(): void {
@@ -182,14 +137,12 @@ export class E2EEChannel {
     const result = resolveE2EEChannelHello({
       raw,
       serverSecretKey: this.serverSecretKey,
-      transportContext: this.transportContext,
-      requireV2: this.requireV2
+      transportContext: this.transportContext
     })
     if (!result.ok) {
       this.onError(4001, result.reason)
       return
     }
-    this.sharedKey = result.sharedKey
     this.v2Session = result.v2Session
     this.accountBinding = result.accountBinding
     this.state = 'awaiting_auth'
@@ -249,15 +202,11 @@ export class E2EEChannel {
     }
     // Why: bind the resolved principal before the peer can observe authentication success.
     onReady()
-    this.sendEncryptedControl(
-      this.v2Session
-        ? {
-            type: 'e2ee_authenticated',
-            v: 2,
-            transcriptHashB64: this.v2Session.transcriptHashB64
-          }
-        : { type: 'e2ee_authenticated' }
-    )
+    this.sendEncryptedControl({
+      type: 'e2ee_authenticated',
+      v: 2,
+      transcriptHashB64: this.v2Session!.transcriptHashB64
+    })
   }
 
   private handleV2RawMessage(raw: string | Uint8Array<ArrayBufferLike>): void {
@@ -297,9 +246,6 @@ export class E2EEChannel {
   private sendEncryptedControl(message: unknown): void {
     if (this.v2Session) {
       this.enqueueV2({ kind: 'text', plaintext: JSON.stringify(message) })
-    } else if (this.ws.readyState === this.ws.OPEN && this.sharedKey) {
-      const frame = encrypt(JSON.stringify(message), this.sharedKey)
-      this.outbound.sendLegacyFrame(frame, () => this.closeForOutboundBudget('queue'))
     }
   }
 
@@ -310,7 +256,6 @@ export class E2EEChannel {
       clearTimeout(this.handshakeTimer)
       this.handshakeTimer = null
     }
-    this.sharedKey = null
     this.accountBinding = null
     this.authenticatedCloudSession = null
     this.authenticatedDevice = null

@@ -9,7 +9,6 @@ import {
 import { translate } from '@/i18n/i18n'
 import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 import { useAppStore } from '@/store'
-import { MobileRelayBetaNotice } from './MobileRelayBetaNotice'
 export { getMobileSettingsPaneSearchEntries }
 
 export function MobileSettingsPane(): React.JSX.Element {
@@ -66,7 +65,6 @@ export function MobileSettingsPane(): React.JSX.Element {
               )}
             </p>
           ) : null}
-          <MobileRelayBetaNotice />
         </div>
       </SearchableSetting>
 

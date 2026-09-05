@@ -1,3 +1,4 @@
+import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import { describe, expect, it, vi } from 'vitest'
 import nacl from 'tweetnacl'
 import type { WebSocket } from 'ws'
@@ -9,7 +10,7 @@ import {
 } from '../../../shared/mobile-e2ee-v2-contract'
 import { sealMobileE2EEV2Frame } from '../../../shared/mobile-e2ee-v2-framing'
 import type { DeviceRegistry } from '../device-registry'
-import { deriveSharedKey, encrypt, generateKeyPair } from './e2ee-crypto'
+import { deriveSharedKey, generateKeyPair } from './e2ee-crypto'
 import { deriveMobileE2EEV2KeySchedule } from './mobile-e2ee-v2-key-schedule'
 import {
   MobileSocketWiring,
@@ -47,6 +48,22 @@ class FakeTransport implements MobileSocketTransport {
   disconnect(ws: FakeSocket): void {
     this.closeHandler?.(null, ws as unknown as WebSocket, false)
   }
+}
+
+function openDirect(
+  transport: FakeTransport,
+  ws: FakeSocket,
+  desktop: ReturnType<typeof generateKeyPair>,
+  clientKeyPair: ReturnType<typeof generateKeyPair>
+) {
+  const session = RuntimeE2EEClientSession.create({
+    desktopPublicKeyB64: Buffer.from(desktop.publicKey).toString('base64'),
+    transport: 'direct',
+    clientKeyPair
+  })
+  transport.receive(ws, JSON.stringify(session.hello))
+  expect(session.acceptReady(JSON.parse(ws.sent[0].toString()))).toBe(true)
+  return session
 }
 
 function registryFor(
@@ -135,7 +152,7 @@ describe('MobileSocketWiring', () => {
     ).toBe(true)
   })
 
-  it('preserves the legacy direct handshake, identity, and close cleanup', () => {
+  it('preserves the current direct handshake, identity, and close cleanup', () => {
     const desktop = generateKeyPair()
     const phone = generateKeyPair()
     const ws = new FakeSocket()
@@ -155,26 +172,20 @@ describe('MobileSocketWiring', () => {
     })
     wiring.attachTransport(transport)
 
+    const sharedKey = openDirect(transport, ws, desktop, phone)
     transport.receive(
       ws,
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: Buffer.from(phone.publicKey).toString('base64')
-      })
-    )
-    const sharedKey = deriveSharedKey(phone.secretKey, desktop.publicKey)
-    transport.receive(
-      ws,
-      encrypt(
+      sharedKey.sealText(
         JSON.stringify({
           type: 'e2ee_auth',
+          v: 2,
+          transcriptHashB64: sharedKey.transcriptHashB64,
           deviceToken: 'valid-token',
           clientCapabilities: ['session-tabs.close-intent.v1']
-        }),
-        sharedKey
+        })
       )
     )
-    transport.receive(ws, encrypt('{"id":"rpc-1","method":"status.get"}', sharedKey))
+    transport.receive(ws, sharedKey.sealText('{"id":"rpc-1","method":"status.get"}'))
 
     expect(transport.setClientId).toHaveBeenCalledWith(ws, 'valid-token')
     expect(onText).toHaveBeenCalledOnce()
@@ -225,28 +236,22 @@ describe('MobileSocketWiring', () => {
         origin: 'https://code.hivekernel.com'
       }
     }))
+    const sharedKey = openDirect(transport, ws, desktop, browser)
     transport.receive(
       ws,
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: Buffer.from(browser.publicKey).toString('base64')
-      })
-    )
-    const sharedKey = deriveSharedKey(browser.secretKey, desktop.publicKey)
-    transport.receive(
-      ws,
-      encrypt(
+      sharedKey.sealText(
         JSON.stringify({
           type: 'e2ee_auth',
+          v: 2,
+          transcriptHashB64: sharedKey.transcriptHashB64,
           principalKind: 'cloud_managed_web_session',
           managedWebSessionId,
           runtimeSessionId: principal.runtimeSessionId,
           sessionToken: 'A'.repeat(43)
-        }),
-        sharedKey
+        })
       )
     )
-    transport.receive(ws, encrypt('{"id":"rpc-1","method":"status.get"}', sharedKey))
+    transport.receive(ws, sharedKey.sealText('{"id":"rpc-1","method":"status.get"}'))
 
     expect(validateToken).not.toHaveBeenCalled()
     expect(onText).not.toHaveBeenCalled()
@@ -282,19 +287,9 @@ describe('MobileSocketWiring', () => {
     })
     wiring.attachTransport(transport)
 
-    transport.receive(
-      ws,
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: Buffer.from(phone.publicKey).toString('base64')
-      })
-    )
-    const sharedKey = deriveSharedKey(phone.secretKey, desktop.publicKey)
+    const sharedKey = openDirect(transport, ws, desktop, phone)
     expect(() =>
-      transport.receive(
-        ws,
-        encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: 'stale-token' }), sharedKey)
-      )
+      transport.receive(ws, sharedKey.sealText(sharedKey.authMessage('stale-token')))
     ).not.toThrow()
 
     expect(onUnpairedDeviceAuthFailure).toHaveBeenCalledOnce()
@@ -307,46 +302,6 @@ describe('MobileSocketWiring', () => {
     expect(ws.close).toHaveBeenCalledWith(4001, 'Unauthorized')
     expect(wiring.channelCount).toBe(0)
     consoleError.mockRestore()
-  })
-
-  it('reports auth encrypted to a stale desktop key on the direct path', () => {
-    const currentDesktop = generateKeyPair()
-    const staleDesktop = generateKeyPair()
-    const phone = generateKeyPair()
-    const ws = new FakeSocket()
-    const transport = new FakeTransport()
-    const onUnpairedDeviceAuthFailure = vi.fn()
-    const wiring = new MobileSocketWiring({
-      deviceRegistry: registryFor('device-1', 'valid-token'),
-      e2eeKeypair: {
-        publicKey: currentDesktop.publicKey,
-        secretKey: currentDesktop.secretKey,
-        publicKeyB64: Buffer.from(currentDesktop.publicKey).toString('base64')
-      },
-      onText: vi.fn(),
-      onBinary: vi.fn(),
-      onClose: vi.fn(),
-      onUnpairedDeviceAuthFailure
-    })
-    wiring.attachTransport(transport)
-
-    transport.receive(
-      ws,
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: Buffer.from(phone.publicKey).toString('base64')
-      })
-    )
-    const staleSharedKey = deriveSharedKey(phone.secretKey, staleDesktop.publicKey)
-    transport.receive(
-      ws,
-      encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: 'valid-token' }), staleSharedKey)
-    )
-
-    expect(onUnpairedDeviceAuthFailure).toHaveBeenCalledOnce()
-    expect(onUnpairedDeviceAuthFailure).toHaveBeenCalledWith({ transport: 'direct' })
-    expect(transport.setClientId).not.toHaveBeenCalled()
-    expect(ws.close).toHaveBeenCalledWith(4001, 'Unauthorized')
   })
 
   it('rejects a relay socket whose immutable relayDeviceId differs from E2EE identity', () => {
@@ -524,19 +479,9 @@ describe('mobile capability updates', () => {
     })
     wiring.attachTransport(transport)
 
-    transport.receive(
-      ws,
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: Buffer.from(phone.publicKey).toString('base64')
-      })
-    )
-    const sharedKey = deriveSharedKey(phone.secretKey, desktop.publicKey)
-    transport.receive(
-      ws,
-      encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: 'valid-token' }), sharedKey)
-    )
-    transport.receive(ws, encrypt('{"id":"rpc-1","method":"status.get"}', sharedKey))
+    const sharedKey = openDirect(transport, ws, desktop, phone)
+    transport.receive(ws, sharedKey.sealText(sharedKey.authMessage('valid-token')))
+    transport.receive(ws, sharedKey.sealText('{"id":"rpc-1","method":"status.get"}'))
 
     const socket = onText.mock.calls[0]?.[0]
     expect(socket).toBeDefined()
@@ -549,7 +494,7 @@ describe('mobile capability updates', () => {
 
     // Later requests on the same connection must see the updated set, so the
     // channel is the single source of truth rather than a detached copy.
-    transport.receive(ws, encrypt('{"id":"rpc-2","method":"status.get"}', sharedKey))
+    transport.receive(ws, sharedKey.sealText('{"id":"rpc-2","method":"status.get"}'))
     expect(onText.mock.calls[1]?.[0].clientCapabilities).toEqual(['agent-session.structured.v1'])
   })
 })

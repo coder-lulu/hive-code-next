@@ -150,6 +150,8 @@ describe('Hive Runtime Cloud Web Launch service', () => {
     const principal = service.resolveSession(
       {
         type: 'e2ee_auth',
+        v: 2,
+        transcriptHashB64: 'transcript',
         principalKind: 'cloud_managed_web_session',
         managedWebSessionId: MANAGED_SESSION_ID,
         runtimeSessionId: RUNTIME_SESSION_ID,
@@ -220,6 +222,8 @@ describe('Hive Runtime Cloud Web Launch service', () => {
     const body = (await response.json()) as { sessionToken: string }
     const auth = {
       type: 'e2ee_auth' as const,
+      v: 2 as const,
+      transcriptHashB64: 'transcript',
       principalKind: 'cloud_managed_web_session' as const,
       managedWebSessionId: MANAGED_SESSION_ID,
       runtimeSessionId: RUNTIME_SESSION_ID,
@@ -279,6 +283,8 @@ describe('Hive Runtime Cloud Web Launch service', () => {
       service.resolveSession(
         {
           type: 'e2ee_auth',
+          v: 2,
+          transcriptHashB64: 'transcript',
           principalKind: 'cloud_managed_web_session',
           managedWebSessionId: MANAGED_SESSION_ID,
           runtimeSessionId: RUNTIME_SESSION_ID,

@@ -3,12 +3,10 @@ import {
   CANONICAL_RUNTIME_RECORD_ID_PATTERN,
   PairingOfferSchema as SharedPairingOfferSchema
 } from '../../../src/shared/mobile-relay-pairing-offer'
-import {
-  MobileAccessEndpointSchema,
-  type MobileAccessEndpoint,
-  type MobileRelayHostOverlay
-} from './mobile-relay-host-overlay'
-import { MobileRelayEndpointSchema } from '../../../src/shared/mobile-relay-credential-contract'
+const MobileAccessEndpointSchema = z
+  .object({ id: z.string().min(1), kind: z.enum(['lan', 'tailscale']), url: z.string().min(1) })
+  .strict()
+type MobileAccessEndpoint = z.infer<typeof MobileAccessEndpointSchema>
 
 export const RuntimeRecordIdSchema = z.string().regex(CANONICAL_RUNTIME_RECORD_ID_PATTERN)
 
@@ -102,33 +100,13 @@ export type HostProfile = {
   lastConnected: number
   runtimeRecordId?: string
   endpoints?: MobileAccessEndpoint[]
-  relayHostId?: MobileRelayHostOverlay['relayHostId']
-  relay?: MobileRelayHostOverlay['relay']
   accountRuntime?: AccountRuntimeRoute
-  accountRuntimeFallback?: AccountRuntimeRoute
-}
-
-export type AccountRuntimeConnectionMaterial = {
-  readonly connectionIntentId: string
-  readonly ticketId: string
-  readonly ticketSecret: string
-  readonly expiresAt: string
-  readonly runtimePublicKeyB64: string
-  readonly clientKeyPair: {
-    readonly publicKey: Uint8Array
-    readonly secretKey: Uint8Array
-  }
-  readonly relay: {
-    readonly cellUrl: string
-    readonly relayHostId: string
-    readonly assignmentEpoch: number
-  }
 }
 
 export type AccountRuntimeRoute = {
   readonly runtimeRecordId: string
   readonly resourceVersion: number
-  readonly createConnection: (signal?: AbortSignal) => Promise<AccountRuntimeConnectionMaterial>
+  readonly createConnection: (signal?: AbortSignal) => Promise<never>
 }
 
 export type RuntimeAccessSource = 'manual-pairing' | 'account-claimed'
@@ -157,12 +135,7 @@ export const HostProfileSchema = z.object({
   publicKeyB64: z.string().min(1),
   lastConnected: z.number().finite(),
   runtimeRecordId: RuntimeRecordIdSchema.optional(),
-  endpoints: z.array(MobileAccessEndpointSchema).min(1).max(16).optional(),
-  relayHostId: z
-    .string()
-    .regex(/^[A-Za-z0-9_-]{16}$/)
-    .optional(),
-  relay: MobileRelayEndpointSchema.optional()
+  endpoints: z.array(MobileAccessEndpointSchema).min(1).max(16).optional()
 })
 
 // Why: persisted host record after the v0.0.3 keychain split. The

@@ -24,7 +24,6 @@ export type E2EEChannelOptions = {
     principalKind?: 'paired_device' | 'cloud_managed_web_session' | 'account_runtime_session'
   ) => void
   transportContext?: DesktopMobileE2EEV2Context
-  requireV2?: boolean
   outboundMemoryBudget?: MobileE2EEOutboundMemoryBudget
 }
 

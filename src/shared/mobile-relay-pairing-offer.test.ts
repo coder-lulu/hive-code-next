@@ -1,39 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { createPairingOfferSchema } from './mobile-relay-pairing-offer'
-import { createMobileRelayPairingFixtures } from './mobile-relay-pairing-fixtures'
+import { PairingOfferSchema } from './mobile-relay-pairing-offer'
+import { decodePairingOffer, encodePairingOffer } from './pairing'
 
-describe('desktop mobile-relay pairing contract', () => {
-  const now = Date.UTC(2026, 6, 12, 16)
-  const schema = createPairingOfferSchema(() => now)
-
-  for (const fixture of createMobileRelayPairingFixtures(now)) {
-    it(fixture.name, () => {
-      const result = schema.safeParse(fixture.payload)
-      expect(result.success ? result.data : null).toEqual(fixture.expected)
-    })
-  }
-
-  it('preserves optional paired device identity', () => {
-    const fixture = createMobileRelayPairingFixtures(now)[0]!
-    if (!fixture.expected) {
-      throw new Error('Expected a valid direct pairing fixture')
+const offer = {
+  v: 2 as const,
+  endpoint: 'ws://192.168.1.2:6768',
+  deviceToken: 'device-token',
+  publicKeyB64: 'public-key'
+}
+describe('local pairing contract', () => {
+  it('round-trips the current local QR with optional authenticated identity', () => {
+    const current = {
+      ...offer,
+      pairedDeviceId: 'device-a',
+      runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     }
-    const payload = { ...fixture.expected, pairedDeviceId: 'paired-device-a' }
-
-    expect(schema.parse(payload)).toMatchObject({ pairedDeviceId: 'paired-device-a' })
+    expect(decodePairingOffer(encodePairingOffer(current))).toEqual(current)
   })
-
-  it('preserves an optional canonical Runtime record id without requiring it from old senders', () => {
-    const fixture = createMobileRelayPairingFixtures(now)[0]!
-    if (!fixture.expected) {
-      throw new Error('Expected a valid direct pairing fixture')
-    }
-    expect(schema.parse(fixture.expected)).not.toHaveProperty('runtimeRecordId')
-    expect(
-      schema.parse({
-        ...fixture.expected,
-        runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-      })
-    ).toMatchObject({ runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
+  it.each([
+    { ...offer, v: 1 },
+    { ...offer, relay: { inviteToken: 'obsolete' } }
+  ])('rejects obsolete versions and Relay extensions', (input) => {
+    expect(PairingOfferSchema.safeParse(input).success).toBe(false)
+    expect(() => encodePairingOffer(input as typeof offer)).toThrow()
   })
 })

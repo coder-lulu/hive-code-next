@@ -61,35 +61,81 @@
     "runtimeTuple": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["runtimeId", "runtimeBootId", "authorityGeneration", "fencingEpoch", "leaseEpoch"],
+      "required": [
+        "runtimeId",
+        "runtimeBootId",
+        "authorityGeneration",
+        "fencingEpoch",
+        "leaseEpoch"
+      ],
       "properties": {
-        "runtimeId": {"$ref": "#/$defs/opaqueId"},
-        "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
-        "authorityGeneration": {"$ref": "#/$defs/generation"},
-        "fencingEpoch": {"$ref": "#/$defs/generation"},
-        "leaseEpoch": {"$ref": "#/$defs/generation"}
+        "runtimeId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "runtimeBootId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "authorityGeneration": {
+          "$ref": "#/$defs/generation"
+        },
+        "fencingEpoch": {
+          "$ref": "#/$defs/generation"
+        },
+        "leaseEpoch": {
+          "$ref": "#/$defs/generation"
+        }
       }
     },
     "relayBinding": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "cellId", "cellIncarnationId", "runtimeId", "runtimeBootId",
-        "authorityGeneration", "fencingEpoch", "leaseEpoch", "assignmentId",
-        "assignmentEpoch", "controlGeneration", "relayHostId"
+        "cellId",
+        "cellIncarnationId",
+        "runtimeId",
+        "runtimeBootId",
+        "authorityGeneration",
+        "fencingEpoch",
+        "leaseEpoch",
+        "assignmentId",
+        "assignmentEpoch",
+        "controlGeneration",
+        "relayHostId"
       ],
       "properties": {
-        "cellId": {"$ref": "#/$defs/opaqueId"},
-        "cellIncarnationId": {"$ref": "#/$defs/uuidV4"},
-        "runtimeId": {"$ref": "#/$defs/opaqueId"},
-        "runtimeBootId": {"$ref": "#/$defs/uuidV4"},
-        "authorityGeneration": {"$ref": "#/$defs/generation"},
-        "fencingEpoch": {"$ref": "#/$defs/generation"},
-        "leaseEpoch": {"$ref": "#/$defs/generation"},
-        "assignmentId": {"$ref": "#/$defs/uuidV4"},
-        "assignmentEpoch": {"$ref": "#/$defs/generation"},
-        "controlGeneration": {"$ref": "#/$defs/generation"},
-        "relayHostId": {"$ref": "#/$defs/relayHostId"}
+        "cellId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "cellIncarnationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "runtimeId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "runtimeBootId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "authorityGeneration": {
+          "$ref": "#/$defs/generation"
+        },
+        "fencingEpoch": {
+          "$ref": "#/$defs/generation"
+        },
+        "leaseEpoch": {
+          "$ref": "#/$defs/generation"
+        },
+        "assignmentId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "assignmentEpoch": {
+          "$ref": "#/$defs/generation"
+        },
+        "controlGeneration": {
+          "$ref": "#/$defs/generation"
+        },
+        "relayHostId": {
+          "$ref": "#/$defs/relayHostId"
+        }
       }
     },
     "verdict": {

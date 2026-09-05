@@ -48,7 +48,6 @@ export function installRuntimeRpc(
   state.runtimeRpc = runtimeRpc
   installHiveRuntimeCloudWebLaunch(runtimeRpc)
   registerMobileHandlers(runtimeRpc, {
-    getRelayStatus: () => state.desktopRelayStatus,
     consumePendingUnpairedDeviceAuthFailure: (webContentsId) => {
       if (
         !state.mainWindow ||

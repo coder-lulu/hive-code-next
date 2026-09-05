@@ -2,14 +2,8 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { encodePairingOffer, parsePairingCode, type PairingOffer } from './pairing'
-import {
-  decrypt,
-  deriveSharedKey,
-  encrypt,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './e2ee-crypto'
+import { generateKeyPair, publicKeyToBase64 } from './e2ee-crypto'
+import { DesktopMobileE2EEV2Session } from './runtime-e2ee-server-session'
 import { RemoteRuntimeRequestConnection } from './remote-runtime-request-connection'
 import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabilities'
 
@@ -104,7 +98,7 @@ async function createServer(): Promise<TestServer> {
 
   wss.on('connection', (ws) => {
     connectionCount += 1
-    let sharedKey: Uint8Array | null = null
+    let session: DesktopMobileE2EEV2Session | null = null
     let authenticated = false
 
     ws.on('message', (data, isBinary) => {
@@ -112,15 +106,20 @@ async function createServer(): Promise<TestServer> {
         return
       }
       const frame = data.toString()
-      if (!sharedKey) {
-        const hello = JSON.parse(frame) as { type: string; publicKeyB64: string }
-        const clientPublicKey = publicKeyFromBase64(hello.publicKeyB64)
-        sharedKey = deriveSharedKey(serverKeyPair.secretKey, clientPublicKey)
-        ws.send(JSON.stringify({ type: 'e2ee_ready' }))
+      if (!session) {
+        session = DesktopMobileE2EEV2Session.create({
+          hello: JSON.parse(frame),
+          serverSecretKey: serverKeyPair.secretKey,
+          expectedContext: { transport: 'direct' }
+        })
+        if (!session) {
+          throw new Error('Invalid handshake')
+        }
+        ws.send(JSON.stringify(session.ready))
         return
       }
 
-      const plaintext = decrypt(frame, sharedKey)
+      const plaintext = session.openText(frame)
       if (plaintext === null) {
         return
       }
@@ -129,11 +128,17 @@ async function createServer(): Promise<TestServer> {
         auths.push(auth)
         expect(auth).toEqual({
           type: 'e2ee_auth',
+          v: 2,
+          transcriptHashB64: session.transcriptHashB64,
           deviceToken: 'device-token',
           clientCapabilities: remoteRuntimeClientCapabilities()
         })
         authenticated = true
-        sendEncrypted(ws, sharedKey, { type: 'e2ee_authenticated' })
+        sendEncrypted(ws, session, {
+          type: 'e2ee_authenticated',
+          v: 2,
+          transcriptHashB64: session.transcriptHashB64
+        })
         return
       }
 
@@ -146,7 +151,7 @@ async function createServer(): Promise<TestServer> {
       if (request.method === 'test.hang') {
         return
       }
-      sendEncrypted(ws, sharedKey, {
+      sendEncrypted(ws, session, {
         id: request.id,
         ok: true,
         result: { method: request.method },
@@ -178,6 +183,6 @@ async function createServer(): Promise<TestServer> {
   }
 }
 
-function sendEncrypted(ws: WebSocket, sharedKey: Uint8Array, message: unknown): void {
-  ws.send(encrypt(JSON.stringify(message), sharedKey))
+function sendEncrypted(ws: WebSocket, session: DesktopMobileE2EEV2Session, message: unknown): void {
+  ws.send(session.sealText(JSON.stringify(message)))
 }

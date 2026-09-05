@@ -105,7 +105,6 @@ export const SAFE_SETTINGS_KEYS = [
   'mobileEmulatorDefaultDeviceUdid',
   'androidSdkPath',
   'mobileAutoRestoreFitMs',
-  'mobilePairingConnectionMode',
   'mobilePairingCustomAddress',
   'mobilePairingCustomAddresses',
   'compactWorktreeCards'

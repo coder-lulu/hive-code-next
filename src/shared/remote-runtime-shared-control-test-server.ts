@@ -1,13 +1,7 @@
 import type { AddressInfo } from 'node:net'
 import { WebSocketServer, type WebSocket } from 'ws'
-import {
-  decrypt,
-  deriveSharedKey,
-  encrypt,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './e2ee-crypto'
+import { generateKeyPair, publicKeyToBase64 } from './e2ee-crypto'
+import { DesktopMobileE2EEV2Session } from './runtime-e2ee-server-session'
 import { encodePairingOffer, parsePairingCode, type PairingOffer } from './pairing'
 
 export type SharedControlTestServer = {
@@ -70,36 +64,44 @@ export async function createSharedControlTestServer(
 
   wss.on('connection', (ws) => {
     connectionCount += 1
-    let sharedKey: Uint8Array | null = null
+    let session: DesktopMobileE2EEV2Session | null = null
     let authenticated = false
     ws.on('message', (data, isBinary) => {
       if (isBinary) {
         return
       }
       const frame = data.toString()
-      if (!sharedKey) {
-        const hello = JSON.parse(frame) as { publicKeyB64: string }
-        sharedKey = deriveSharedKey(
-          serverKeyPair.secretKey,
-          publicKeyFromBase64(hello.publicKeyB64)
-        )
+      if (!session) {
+        session = DesktopMobileE2EEV2Session.create({
+          hello: JSON.parse(frame),
+          serverSecretKey: serverKeyPair.secretKey,
+          expectedContext: { transport: 'direct' }
+        })
+        if (!session) {
+          ws.close()
+          return
+        }
         if (
           options.suppressReadyFrame ||
           connectionCount <= (options.suppressReadyFrameCount ?? 0)
         ) {
           return
         }
-        ws.send(JSON.stringify({ type: 'e2ee_ready' }))
+        ws.send(JSON.stringify(session.ready))
         return
       }
-      const plaintext = decrypt(frame, sharedKey)
+      const plaintext = session.openText(frame)
       if (!plaintext) {
         return
       }
       if (!authenticated) {
         auths.push(JSON.parse(plaintext))
         authenticated = true
-        sendEncrypted(ws, sharedKey, { type: 'e2ee_authenticated' })
+        sendEncrypted(ws, session, {
+          type: 'e2ee_authenticated',
+          v: 2,
+          transcriptHashB64: session.transcriptHashB64
+        })
         if (options.sendBinaryAfterAuth) {
           ws.send(Buffer.from([1, 2, 3]), { binary: true })
         }
@@ -107,7 +109,7 @@ export async function createSharedControlTestServer(
       }
       handleRequest(
         ws,
-        sharedKey,
+        session,
         requests,
         JSON.parse(plaintext),
         {
@@ -150,7 +152,7 @@ export async function createSharedControlTestServer(
 
 function handleRequest(
   ws: WebSocket,
-  sharedKey: Uint8Array,
+  session: DesktopMobileE2EEV2Session,
   requests: SharedControlTestServer['requests'],
   request: { id: string; method: string; params?: unknown },
   options: ServerOptions & { closeAfterStreamingResponse?: () => boolean },
@@ -159,7 +161,7 @@ function handleRequest(
   requests.push(request)
   if (options.sendKeepaliveBeforeResponse && options.keepaliveDelayMs !== undefined) {
     const timer = setInterval(
-      () => sendEncrypted(ws, sharedKey, { _keepalive: true }),
+      () => sendEncrypted(ws, session, { _keepalive: true }),
       options.keepaliveDelayMs
     )
     ws.once('close', () => clearInterval(timer))
@@ -177,14 +179,14 @@ function handleRequest(
     : { method: request.method }
   const sendResponse = (): void => {
     if (options.sendUnknownResponseBeforeResponse) {
-      sendEncrypted(ws, sharedKey, {
+      sendEncrypted(ws, session, {
         id: 'unknown-response-id',
         ok: true,
         result: { method: 'unknown' },
         _meta: { runtimeId: 'runtime-test' }
       })
     }
-    sendEncrypted(ws, sharedKey, {
+    sendEncrypted(ws, session, {
       id: request.id,
       ok: true,
       result,
@@ -194,7 +196,7 @@ function handleRequest(
   }
   const closeAfterResponse = streaming && options.closeAfterStreamingResponse?.() === true
   if (options.sendKeepaliveBeforeResponse && options.keepaliveDelayMs === undefined) {
-    sendEncrypted(ws, sharedKey, { _keepalive: true })
+    sendEncrypted(ws, session, { _keepalive: true })
   }
   if (options.delaySubscriptionReady && streaming) {
     delayedResponses.push(sendResponse)
@@ -227,6 +229,6 @@ function isStreamingMethod(method: string): boolean {
   )
 }
 
-function sendEncrypted(ws: WebSocket, sharedKey: Uint8Array, message: unknown): void {
-  ws.send(encrypt(JSON.stringify(message), sharedKey))
+function sendEncrypted(ws: WebSocket, session: DesktopMobileE2EEV2Session, message: unknown): void {
+  ws.send(session.sealText(JSON.stringify(message)))
 }

@@ -2,15 +2,8 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocketClient, { WebSocketServer, type WebSocket } from 'ws'
 import { encodePairingOffer, parsePairingCode, type PairingOffer } from './pairing'
-import {
-  decrypt,
-  decryptBytes,
-  deriveSharedKey,
-  encrypt,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './e2ee-crypto'
+import { generateKeyPair, publicKeyToBase64 } from './e2ee-crypto'
+import { DesktopMobileE2EEV2Session } from './runtime-e2ee-server-session'
 import { sendRemoteRuntimeRequest, subscribeRemoteRuntimeRequest } from './remote-runtime-client'
 import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabilities'
 import { MAX_TIMER_DELAY_MS } from './timer-delay'
@@ -74,6 +67,8 @@ describe('subscribeRemoteRuntimeRequest', () => {
     )
     await expect(server.nextAuth).resolves.toEqual({
       type: 'e2ee_auth',
+      v: 2,
+      transcriptHashB64: expect.any(String),
       deviceToken: 'device-token',
       clientCapabilities: remoteRuntimeClientCapabilities()
     })
@@ -103,6 +98,8 @@ describe('subscribeRemoteRuntimeRequest', () => {
     await vi.waitFor(() => expect(onResponse).toHaveBeenCalled())
     await expect(server.nextAuth).resolves.toEqual({
       type: 'e2ee_auth',
+      v: 2,
+      transcriptHashB64: expect.any(String),
       deviceToken: 'device-token',
       clientCapabilities: remoteRuntimeClientCapabilities([
         BROWSER_NETWORK_TUNNEL_RUNTIME_CAPABILITY
@@ -548,15 +545,15 @@ async function createSubscriptionServer(
   servers.push(wss)
 
   wss.on('connection', (ws) => {
-    let sharedKey: Uint8Array | null = null
+    let session: DesktopMobileE2EEV2Session | null = null
     let authenticated = false
 
     ws.on('message', (data, isBinary) => {
       if (isBinary) {
-        if (!sharedKey) {
+        if (!session) {
           return
         }
-        const plaintext = decryptBytes(new Uint8Array(data as Buffer), sharedKey)
+        const plaintext = session.openBinary(new Uint8Array(data as Buffer))
         if (plaintext) {
           resolveBinary(plaintext)
         }
@@ -564,29 +561,36 @@ async function createSubscriptionServer(
       }
 
       const frame = data.toString()
-      if (!sharedKey) {
-        const hello = JSON.parse(frame) as { publicKeyB64: string }
-        sharedKey = deriveSharedKey(
-          serverKeyPair.secretKey,
-          publicKeyFromBase64(hello.publicKeyB64)
-        )
-        ws.send(JSON.stringify({ type: 'e2ee_ready' }))
+      if (!session) {
+        session = DesktopMobileE2EEV2Session.create({
+          hello: JSON.parse(frame),
+          serverSecretKey: serverKeyPair.secretKey,
+          expectedContext: { transport: 'direct' }
+        })
+        if (!session) {
+          throw new Error('Invalid handshake')
+        }
+        ws.send(JSON.stringify(session.ready))
         return
       }
 
-      const plaintext = decrypt(frame, sharedKey)
+      const plaintext = session.openText(frame)
       if (!plaintext) {
         return
       }
       if (!authenticated) {
         resolveAuth(JSON.parse(plaintext))
         authenticated = true
-        sendEncrypted(ws, sharedKey, { type: 'e2ee_authenticated' })
+        sendEncrypted(ws, session, {
+          type: 'e2ee_authenticated',
+          v: 2,
+          transcriptHashB64: session.transcriptHashB64
+        })
         return
       }
 
       const request = JSON.parse(plaintext) as { id: string }
-      sendEncrypted(ws, sharedKey, {
+      sendEncrypted(ws, session, {
         id: request.id,
         ok: true,
         streaming: true,
@@ -594,7 +598,7 @@ async function createSubscriptionServer(
         _meta: { runtimeId: 'runtime-test' }
       })
       if (options.sendMismatchedResponseAfterSubscribe) {
-        sendEncrypted(ws, sharedKey, {
+        sendEncrypted(ws, session, {
           id: `${request.id}-mismatch`,
           ok: true,
           streaming: true,
@@ -621,8 +625,8 @@ async function createSubscriptionServer(
   return { pairing, nextBinary, nextAuth }
 }
 
-function sendEncrypted(ws: WebSocket, sharedKey: Uint8Array, message: unknown): void {
-  ws.send(encrypt(JSON.stringify(message), sharedKey))
+function sendEncrypted(ws: WebSocket, session: DesktopMobileE2EEV2Session, message: unknown): void {
+  ws.send(session.sealText(JSON.stringify(message)))
 }
 
 async function createClosingServer(
@@ -689,7 +693,7 @@ async function createOneShotServer(
   servers.push(wss)
 
   wss.on('connection', (ws) => {
-    let sharedKey: Uint8Array | null = null
+    let session: DesktopMobileE2EEV2Session | null = null
     let authenticated = false
 
     ws.on('message', (data, isBinary) => {
@@ -697,24 +701,31 @@ async function createOneShotServer(
         return
       }
       const frame = data.toString()
-      if (!sharedKey) {
-        const hello = JSON.parse(frame) as { publicKeyB64: string }
-        sharedKey = deriveSharedKey(
-          serverKeyPair.secretKey,
-          publicKeyFromBase64(hello.publicKeyB64)
-        )
-        ws.send(JSON.stringify({ type: 'e2ee_ready' }))
+      if (!session) {
+        session = DesktopMobileE2EEV2Session.create({
+          hello: JSON.parse(frame),
+          serverSecretKey: serverKeyPair.secretKey,
+          expectedContext: { transport: 'direct' }
+        })
+        if (!session) {
+          throw new Error('Invalid handshake')
+        }
+        ws.send(JSON.stringify(session.ready))
         return
       }
 
-      const plaintext = decrypt(frame, sharedKey)
+      const plaintext = session.openText(frame)
       if (!plaintext) {
         return
       }
       if (!authenticated) {
         options.onAuth?.(JSON.parse(plaintext) as Record<string, unknown>)
         authenticated = true
-        sendEncrypted(ws, sharedKey, { type: 'e2ee_authenticated' })
+        sendEncrypted(ws, session, {
+          type: 'e2ee_authenticated',
+          v: 2,
+          transcriptHashB64: session.transcriptHashB64
+        })
         return
       }
 
@@ -724,7 +735,7 @@ async function createOneShotServer(
         ws.send('not-an-encrypted-frame')
         return
       }
-      const key = sharedKey
+      const key = session
       const keepalive = setInterval(() => {
         sendEncrypted(ws, key, { _keepalive: true })
       }, 100)

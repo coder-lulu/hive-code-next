@@ -1,3 +1,4 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { APP_DISPLAY_NAME } from './brand'
 import { parseRemoteRuntimeJsonText } from './remote-runtime-request-frames'
 
@@ -8,7 +9,10 @@ export type RemoteRuntimeAuthenticatedFrame =
   | { kind: 'rejected'; unauthorized: boolean }
   | { kind: 'invalid' }
 
-export function classifyRemoteRuntimeReadyFrame(frame: string): 'ready' | 'invalid' | 'unexpected' {
+export function classifyRemoteRuntimeReadyFrame(
+  frame: string,
+  session: RuntimeE2EEClientSession
+): 'ready' | 'invalid' | 'unexpected' {
   let ready: unknown
   try {
     ready = parseRemoteRuntimeJsonText(frame)
@@ -17,13 +21,15 @@ export function classifyRemoteRuntimeReadyFrame(frame: string): 'ready' | 'inval
   }
   return typeof ready === 'object' &&
     ready !== null &&
-    (ready as { type?: unknown }).type === 'e2ee_ready'
+    (ready as { type?: unknown }).type === 'e2ee_ready' &&
+    session.acceptReady(ready)
     ? 'ready'
     : 'unexpected'
 }
 
 export function parseRemoteRuntimeAuthenticatedFrame(
-  plaintext: string
+  plaintext: string,
+  session: RuntimeE2EEClientSession
 ): RemoteRuntimeAuthenticatedFrame {
   let authenticated: unknown
   try {
@@ -32,7 +38,7 @@ export function parseRemoteRuntimeAuthenticatedFrame(
     return { kind: 'invalid' }
   }
   if ((authenticated as { type?: unknown }).type === 'e2ee_authenticated') {
-    return { kind: 'authenticated' }
+    return session.isAuthenticated(plaintext) ? { kind: 'authenticated' } : { kind: 'invalid' }
   }
   return {
     kind: 'rejected',

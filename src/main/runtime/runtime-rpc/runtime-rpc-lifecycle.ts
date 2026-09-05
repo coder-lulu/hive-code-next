@@ -201,10 +201,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
     }
   }
 
-  // Why: one MobileSocketWiring per server session. Direct WS and cloud relay both attach to it, and
-  // DesktopRelayService captures it once at construction, so a loopback→wide pairing rebind must swap the
-  // transport under the SAME wiring — replacing the wiring would strand relay sockets (lost connection IDs,
-  // binary handling, and revocation targeting) on a dead object.
+  // Keep connection ownership stable when pairing widens the listener.
   protected ensureMobileSocketWiring(
     deviceRegistry: DeviceRegistry,
     e2eeKeypair: E2EEKeypair
@@ -251,13 +248,11 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
       onCloudReady: (socket) => this.handleCloudSocketReady(socket),
       onCloudClose: (socket) => this.handleCloudSocketClose(socket),
       onReady: () => {
-        // Why: first authenticated mobile/remote client (direct WS and
-        // cloud relay both attach here) starts path-candidate tracking.
+        // The first authenticated client starts path-candidate tracking.
         // Activation is a local-host concern: candidate buffers live on the
         // buffer-owning host's runtime, so a remote runtime proxy may
         // legitimately lack this method (its own server activates it).
         this.runtime.activateRecentPtyPathCandidateTracking?.()
-        this.mobileRelayPairingProvider?.onDemandStateChanged?.()
       },
       onClose: (socket, hasOtherConnections) => {
         if (!socket) {

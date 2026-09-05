@@ -113,7 +113,7 @@ export function useHostScreenController({
     }
     state.setHostName(host.name)
     state.setError((current) => (current === 'Host not found' ? '' : current))
-    if (!client && (host.accountRuntime || host.accountRuntimeFallback)) {
+    if (!client && host.accountRuntime) {
       refreshHostClient(host.id)
     }
   }, [

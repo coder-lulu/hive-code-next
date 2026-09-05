@@ -1,19 +1,16 @@
 import { installRuntimeRpc } from './main-process-runtime-rpc'
-import { app, powerMonitor, type BrowserWindow } from 'electron'
+import { app, type BrowserWindow } from 'electron'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   completePendingUserDataMigration,
   showUserDataMigrationWarning
 } from './main-process-user-data-migration'
-import { getProductCloudAuthConfig } from '../product/product-cloud-config'
-import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import { getLocalPtyProvider, registerHeadlessPtyRuntime } from '../ipc/pty'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-types'
 import { OffscreenBrowserBackend } from '../browser/offscreen-browser-backend'
 import { browserManager } from '../browser/browser-manager'
-import { DesktopRelayService } from '../runtime/relay/desktop-relay-service'
 import { getServeOptions, printServeReady } from './main-process-serve'
 import {
   bindTerminalRuntimeStartupServices,
@@ -182,42 +179,7 @@ async function launchDesktopMode(
     state.runtimeCloudPresence?.setRuntimeReady(true)
   }
   showUserDataMigrationWarning(win)
-  // Why after the window and not before it: the default-session request guard already holds every
-  // fetcher until the persisted proxy lands, so this only has to keep the launch phase itself
-  // ordered ahead of the relay — it must not gate the renderer.
   await state.initialProxyApplicationReady
-  const cloudAuth = getProductCloudAuthConfig()
-  if (cloudAuth.configured) {
-    try {
-      const relayService = new DesktopRelayService({
-        authConfig: cloudAuth.config,
-        userDataPath: getProfileUserDataPath(),
-        appVersion: app.getVersion(),
-        runtimeRpc,
-        onStatus: (status) => {
-          state.desktopRelayStatus = status
-          state.mainWindow?.webContents.send('mobile:relayStatusChanged', status)
-        }
-      })
-      state.desktopRelayService = relayService
-      runtimeRpc.setMobileRelayPairingProvider({
-        createPairingRelay: (relayDeviceId) => relayService.createPairingRelay(relayDeviceId),
-        onDeviceRevokeQueued: (item) => relayService.onDeviceRevokeQueued(item),
-        onDemandStateChanged: () => relayService.demandStateChanged(),
-        getEndpoints: (context, params) => relayService.getEndpoints(context, params),
-        provisionRelay: (context, params) => relayService.provisionRelay(context, params)
-      })
-      relayService.start()
-      // Why: sleeping past relay-token expiry kills the broker with no retry
-      // timer; resume is the moment that state becomes recoverable.
-      powerMonitor.on('resume', () => state.desktopRelayService?.ensureLive())
-    } catch (error) {
-      console.warn(
-        '[relay] Desktop relay startup unavailable:',
-        error instanceof Error ? error.message : String(error)
-      )
-    }
-  }
   // Why: macOS notification permission dialog must fire after the window is shown, else it's hidden behind the maximized window.
   win.once('show', () => {
     // Why: store can be null if init failed earlier; bail rather than throw inside an Electron event listener.

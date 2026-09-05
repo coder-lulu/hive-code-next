@@ -35,12 +35,15 @@ describe('RemoteRuntimeSharedControlConnection', () => {
     expect(server.connectionCount()).toBe(1)
     expect(server.auths).toContainEqual({
       type: 'e2ee_auth',
+      v: 2,
+      transcriptHashB64: expect.any(String),
       deviceToken: 'device-token',
       clientCapabilities: [
         protocolVersion.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
         protocolVersion.SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
         protocolVersion.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
         protocolVersion.SKILL_INSTALL_RESULT_V2_CAPABILITY,
+        protocolVersion.WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
         protocolVersion.WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
         protocolVersion.WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
         protocolVersion.AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY

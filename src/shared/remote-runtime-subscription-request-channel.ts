@@ -1,6 +1,6 @@
+import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { randomUUID } from 'node:crypto'
 import type WebSocket from 'ws'
-import { encrypt } from './e2ee-crypto'
 import type { PairingOffer } from './pairing'
 import { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import { serializeRemoteRuntimeRpcRequest } from './remote-runtime-memory-limits'
@@ -26,7 +26,7 @@ export class RemoteRuntimeSubscriptionRequestChannel {
   constructor(
     private readonly options: {
       pairing: PairingOffer
-      sharedKey: Uint8Array
+      session: RuntimeE2EEClientSession
       // The socket to write on, or null while the subscription is not ready to carry requests.
       resolveWritableSocket: () => WebSocket | null
       enqueue: (socket: WebSocket, frame: string) => boolean
@@ -81,7 +81,7 @@ export class RemoteRuntimeSubscriptionRequestChannel {
           : new RemoteRuntimeClientError('invalid_argument', String(error))
       )
     }
-    const encrypted = encrypt(serialized, this.options.sharedKey)
+    const encrypted = this.options.session.sealText(serialized)
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.options.fail(

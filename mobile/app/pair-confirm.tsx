@@ -25,7 +25,6 @@ import {
   startPreProfilePairing,
   type PreProfilePairingAttempt
 } from '../src/transport/pre-profile-pairing-coordinator'
-import { recoverMobileRelayPairing } from '../src/transport/mobile-relay-pairing-recovery'
 import { useRefreshHostClient } from '../src/transport/client-context'
 import type { ConnectionLogEntry } from '../src/transport/types'
 
@@ -97,28 +96,6 @@ export default function PairConfirmScreen() {
     const pairingGeneration = ++pairingGenerationRef.current
     const pairingIsCurrent = () =>
       mountedRef.current && pairingGenerationRef.current === pairingGeneration
-
-    let recovery
-    try {
-      recovery = await recoverMobileRelayPairing()
-    } catch (error) {
-      if (pairingIsCurrent()) {
-        console.warn('[pair-confirm] pairing recovery failed', error)
-        setStatus('error')
-        setErrorMessage(
-          `无法恢复上一次配对：${error instanceof Error ? error.message : String(error)}`
-        )
-      }
-      return
-    }
-    if (!pairingIsCurrent()) {
-      return
-    }
-    if (recovery === 'deferred') {
-      setStatus('error')
-      setErrorMessage('上一次配对仍在安全恢复中，请检查网络后重试。')
-      return
-    }
 
     const attempt = startPreProfilePairing({
       offer,
@@ -194,8 +171,7 @@ export default function PairConfirmScreen() {
               <View style={styles.deviceCopy}>
                 <Text style={styles.deviceTitle}>{productNameText('Orca 桌面端')}</Text>
                 <Text numberOfLines={1} style={styles.deviceMeta}>
-                  {pairingEndpointLabel(offer.endpoint)} ·{' '}
-                  {offer.relay ? '安全中继可用' : '本地网络'}
+                  {pairingEndpointLabel(offer.endpoint)} · 本地网络
                 </Text>
               </View>
             </View>

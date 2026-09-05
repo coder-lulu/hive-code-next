@@ -7,7 +7,6 @@ export type {
   PairingOfferUnavailableReason,
   PairingOfferUnavailable
 } from './runtime-rpc/runtime-rpc-pairing-types'
-export type { MobilePairingConnectionContext } from './runtime-rpc/runtime-rpc-pairing-types'
 export type { RuntimeLongPollClass } from './runtime-rpc/runtime-rpc-long-poll'
 export { classifyRuntimeLongPoll } from './runtime-rpc/runtime-rpc-long-poll'
 

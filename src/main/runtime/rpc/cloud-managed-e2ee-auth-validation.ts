@@ -7,11 +7,15 @@ const REQUIRED_FIELDS = [
   'principalKind',
   'runtimeSessionId',
   'sessionToken',
-  'type'
+  'type',
+  'v',
+  'transcriptHashB64'
 ] as const
 
 export type CloudManagedE2EEAuth = Readonly<{
   type: 'e2ee_auth'
+  v: 2
+  transcriptHashB64: string
   principalKind: 'cloud_managed_web_session'
   managedWebSessionId: string
   runtimeSessionId: string
@@ -27,6 +31,7 @@ export type CloudManagedE2EEAuthResult<TPrincipal> =
 
 export function authenticateCloudManagedE2EE<TPrincipal>(args: {
   plaintext: string
+  transcriptHashB64: string
   resolveSession: (auth: CloudManagedE2EEAuth) => TPrincipal | null
 }): CloudManagedE2EEAuthResult<TPrincipal> {
   let candidate: unknown
@@ -38,7 +43,11 @@ export function authenticateCloudManagedE2EE<TPrincipal>(args: {
   if (!isRecord(candidate) || candidate.principalKind !== 'cloud_managed_web_session') {
     return { kind: 'not_cloud' }
   }
-  if (!isExactCloudAuth(candidate)) {
+  if (
+    !isExactCloudAuth(candidate) ||
+    candidate.v !== 2 ||
+    candidate.transcriptHashB64 !== args.transcriptHashB64
+  ) {
     return { kind: 'bad_auth' }
   }
   const auth = candidate as CloudManagedE2EEAuth

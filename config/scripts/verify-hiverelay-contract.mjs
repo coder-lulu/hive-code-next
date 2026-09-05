@@ -14,7 +14,7 @@ const SHA256_PATTERN = /^[a-f0-9]{64}$/
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/
 const VERDICTS = new Set(['ACCEPT', 'REJECT'])
 const FILE_KINDS = new Set(['documentation', 'openapi', 'schema', 'registry', 'fixture'])
-const COMPONENTS = new Set(['cloud', 'hivecode', 'cell', 'legacy-orca'])
+const COMPONENTS = new Set(['cloud', 'hivecode', 'cell'])
 
 function assertExactKeys(value, expected, field) {
   const actual = Object.keys(value).sort()

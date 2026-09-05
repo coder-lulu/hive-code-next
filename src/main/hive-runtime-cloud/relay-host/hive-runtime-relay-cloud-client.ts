@@ -157,7 +157,11 @@ export class HiveRuntimeRelayCloudClient extends HiveRuntimeCloudHttpClient {
   }
 
   async assign(
-    input: { hostPublicKeyB64: string; requestedRegion: string; relayToken: RelayTokenForDirector },
+    input: {
+      hostPublicKeyB64: string
+      requestedRegion?: string
+      relayToken: RelayTokenForDirector
+    },
     signal?: AbortSignal
   ) {
     const response = record(
@@ -166,7 +170,7 @@ export class HiveRuntimeRelayCloudClient extends HiveRuntimeCloudHttpClient {
         {
           protocolVersion: 2,
           hostPublicKeyB64: input.hostPublicKeyB64,
-          requestedRegion: input.requestedRegion
+          ...(input.requestedRegion !== undefined ? { requestedRegion: input.requestedRegion } : {})
         },
         { authorization: `Bearer ${input.relayToken}` },
         200,

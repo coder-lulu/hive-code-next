@@ -24,7 +24,7 @@ import type {
 type Options = {
   apiBaseUrl: string
   storageDirectory: string
-  requestedRegion: string
+  requestedRegion?: string
   presence: HiveRuntimeCloudPresenceService
   getKeypair: () => E2EEKeypair | null
   attachRpc: (connection: RuntimeRpcAccountConnection) => () => void
@@ -77,6 +77,13 @@ export class HiveRuntimeRelayHostService {
         options.presence.requestHeartbeat()
       }
     })
+  }
+
+  getStatus(): 'registered' | 'connecting' | 'offline' {
+    if (!this.unsubscribe || this.failed || !this.options.presence.getCurrentLeaseContext()) {
+      return 'offline'
+    }
+    return this.broker.activeAssignment ? 'registered' : 'connecting'
   }
 
   start(): void {

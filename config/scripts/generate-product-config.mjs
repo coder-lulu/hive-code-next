@@ -11,7 +11,6 @@ const ENDPOINT_KEYS = [
   'artifacts',
   'cloud',
   'identityIssuer',
-  'relay',
   'update',
   'telemetry',
   'diagnostics',
@@ -21,7 +20,7 @@ const ENDPOINT_KEYS = [
   'changelog',
   'nudge'
 ]
-const SERVICE_KEYS = ['api', 'identity', 'oss', 'update', 'relay']
+const SERVICE_KEYS = ['api', 'identity', 'oss', 'update']
 const SECRET_KEY_PATTERN = /(secret|token|password|private.?key|api.?key|credential)/i
 const CLI_NAME_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*$/
@@ -76,7 +75,7 @@ const DESKTOP_KEYS = new Set([
 const MOBILE_KEYS = new Set(['bundleId', 'packageId'])
 const CLI_KEYS = new Set(['primary', 'aliases'])
 const SCHEME_KEYS = new Set(['primary', 'aliases'])
-const SERVICE_GROUP_KEYS = new Set(['api', 'identity', 'oss', 'update', 'relay'])
+const SERVICE_GROUP_KEYS = new Set(['api', 'identity', 'oss', 'update'])
 const SERVICE_API_KEYS = new Set(['baseUrl'])
 const SERVICE_IDENTITY_KEYS = new Set(['issuer', 'clients'])
 const SERVICE_IDENTITY_CLIENT_KEYS = new Set(['desktop', 'userWeb', 'operatorWeb'])
@@ -89,7 +88,6 @@ const SERVICE_UPDATE_KEYS = new Set([
   'channel',
   'checkIntervalHours'
 ])
-const SERVICE_RELAY_KEYS = new Set(['enabled', 'directorUrl'])
 
 function assertObject(value, label) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -369,26 +367,12 @@ function assertManifestShape(manifest) {
     throw new Error('services.update.checkIntervalHours must be an integer between 1 and 168')
   }
 
-  const relay = manifest.services.relay
-  assertObject(relay, 'services.relay')
-  assertKnownKeys(relay, SERVICE_RELAY_KEYS, 'services.relay')
-  assertRequiredKeys(relay, SERVICE_RELAY_KEYS, 'services.relay')
-  if (typeof relay.enabled !== 'boolean') {
-    throw new Error('services.relay.enabled must be boolean')
-  }
-  assertOptionalString(relay.directorUrl, 'services.relay.directorUrl')
-  assertEndpoint(relay.directorUrl, 'services.relay.directorUrl')
-  if (relay.enabled && !relay.directorUrl) {
-    throw new Error('services.relay.directorUrl is required when Relay is enabled')
-  }
-
   // During the migration, keep populated legacy endpoint aliases aligned with
   // the canonical services block. Empty legacy values remain valid so older
   // manifests can be upgraded incrementally without reviving disabled services.
   const legacyServiceAliases = {
     cloud: api.baseUrl,
     identityIssuer: identity.issuer,
-    relay: relay.enabled ? relay.directorUrl : null,
     update: update.enabled ? update.endpoint : null,
     artifacts: oss.enabled ? oss.endpoint : null
   }
@@ -521,10 +505,6 @@ export function normalizeProductManifest(manifest) {
         provider: nullableString(manifest.services.update.provider),
         channel: nullableString(manifest.services.update.channel),
         checkIntervalHours: manifest.services.update.checkIntervalHours
-      },
-      relay: {
-        enabled: manifest.services.relay.enabled,
-        directorUrl: nullableString(manifest.services.relay.directorUrl)
       }
     }
   }

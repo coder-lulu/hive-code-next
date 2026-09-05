@@ -22,11 +22,7 @@ import {
   LocalRuntimeOwnershipService
 } from '../hive-runtime-cloud/local-runtime-ownership-service'
 import { HiveRuntimeRelayHostService } from '../hive-runtime-cloud/relay-host/hive-runtime-relay-host-service'
-import { HiveRuntimeRelayCloudClient } from '../hive-runtime-cloud/relay-host/hive-runtime-relay-cloud-client'
-import {
-  hiveRelayV2HostEnabled,
-  hiveRuntimeRelayRegion
-} from '../hive-runtime-cloud/relay-host/hive-runtime-relay-config'
+import { hiveRuntimeRelayRegion } from '../hive-runtime-cloud/relay-host/hive-runtime-relay-config'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 
 /** Plain Node uses the same claimed identity, signed Presence, local claim protocol and Host. */
@@ -38,7 +34,7 @@ export function createOrcadRuntimeCloud(options: {
 }) {
   const env = options.env ?? process.env
   const config = getHiveRuntimeCloudConfig(env)
-  const region = config.enabled && hiveRelayV2HostEnabled(env) ? hiveRuntimeRelayRegion(env) : null
+  const region = config.enabled ? hiveRuntimeRelayRegion(env) : undefined
   const getReport = () =>
     createHiveRuntimeCloudReport(options.runtime, options.runtimeVersion, undefined, Date.now, {
       ...getHiveRuntimeDeviceInfoSnapshot(),
@@ -51,8 +47,7 @@ export function createOrcadRuntimeCloud(options: {
     clearIdentity: clearHiveRuntimeCloudServiceIdentity,
     clearState: clearHiveRuntimeCloudServiceRegistrationState
   }
-  const createClient = (apiBaseUrl: string) =>
-    new HiveRuntimeCloudClient(apiBaseUrl, (url, init) => globalThis.fetch(url, init))
+  const createClient = (apiBaseUrl: string) => new HiveRuntimeCloudClient(apiBaseUrl)
   const presence = new HiveRuntimeCloudPresenceService(
     config,
     options.userDataPath,
@@ -63,16 +58,17 @@ export function createOrcadRuntimeCloud(options: {
       createClient
     }
   )
+  let host: HiveRuntimeRelayHostService | null = null
   const ownership = new LocalRuntimeOwnershipService({
     config,
     userDataPath: options.userDataPath,
     getReport,
     getBootId: () => presence.getBootId(),
+    getRelayStatus: () => host?.getStatus() ?? 'offline',
     onRegistrationChanged: () => presence.notifyRegistrationChanged(),
     dependencies: { ...defaultLocalRuntimeOwnershipDependencies, ...storage, createClient }
   })
   const unsubscribe = presence.subscribeState((state) => ownership.setPresenceState(state))
-  let host: HiveRuntimeRelayHostService | null = null
   let ready = false
   let shutdown: Promise<void> | null = null
   return {
@@ -82,17 +78,14 @@ export function createOrcadRuntimeCloud(options: {
         return
       }
       ready = true
-      if (config.enabled && region) {
+      if (config.enabled) {
         host = new HiveRuntimeRelayHostService({
           apiBaseUrl: config.apiBaseUrl,
           storageDirectory: join(options.userDataPath, 'hive-runtime-relay'),
           requestedRegion: region,
           presence,
           getKeypair: () => rpc.getE2EEKeypair(),
-          attachRpc: (connection) => rpc.attachAccountRuntimeConnection(connection),
-          client: new HiveRuntimeRelayCloudClient(config.apiBaseUrl, (url, init) =>
-            globalThis.fetch(url, init)
-          )
+          attachRpc: (connection) => rpc.attachAccountRuntimeConnection(connection)
         })
         host.start()
       }

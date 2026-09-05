@@ -8,7 +8,7 @@ import {
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
 } from '../../../shared/protocol-version'
 import { createWebRuntimeUnauthorizedError } from './web-runtime-client-error'
-import { decrypt, decryptBytes } from './web-e2ee'
+import type { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import type { WebRuntimeTransportSubscription } from './web-runtime-subscription-contract'
 
 export type WebRuntimeConnectionState =
@@ -27,7 +27,7 @@ export type WebRuntimePendingRequest = {
 
 type WebRuntimeConnectionFrameContext = {
   getState: () => WebRuntimeConnectionState
-  getSharedKey: () => Uint8Array | null
+  getSession: () => RuntimeE2EEClientSession | null
   getSocket: () => WebSocket | null
   pairingToken: string
   pending: Map<string, WebRuntimePendingRequest>
@@ -45,16 +45,22 @@ export async function routeWebRuntimeConnectionFrame(
   context: WebRuntimeConnectionFrameContext
 ): Promise<void> {
   const raw = typeof rawData === 'string' ? rawData : null
-  const sharedKey = context.getSharedKey()
+  const session = context.getSession()
   if (context.getState() === 'handshaking') {
-    if (raw === null || !sharedKey) {
+    if (raw === null || !session) {
       return
     }
     try {
       const control = JSON.parse(raw) as { type?: unknown }
       if (control.type === 'e2ee_ready') {
+        if (!session.acceptReady(control)) {
+          context.getSocket()?.close()
+          return
+        }
         context.sendEncrypted({
           type: 'e2ee_auth',
+          v: 2,
+          transcriptHashB64: session.transcriptHashB64,
           deviceToken: context.pairingToken,
           clientCapabilities: [
             SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
@@ -69,7 +75,7 @@ export async function routeWebRuntimeConnectionFrame(
     } catch {
       // The authenticated control frame is encrypted, so non-JSON is normal here.
     }
-    const plaintext = decrypt(raw, sharedKey)
+    const plaintext = session.openText(raw)
     if (plaintext === null) {
       return
     }
@@ -78,7 +84,7 @@ export async function routeWebRuntimeConnectionFrame(
         type?: unknown
         error?: { code?: string; message?: string }
       }
-      if (control.type === 'e2ee_authenticated') {
+      if (session.isAuthenticated(plaintext)) {
         context.setConnected()
       } else if (control.type === 'e2ee_error' || control.error?.code === 'unauthorized') {
         const error = createWebRuntimeUnauthorizedError()
@@ -93,7 +99,7 @@ export async function routeWebRuntimeConnectionFrame(
     return
   }
 
-  if (context.getState() !== 'connected' || !sharedKey) {
+  if (context.getState() !== 'connected' || !session) {
     return
   }
   if (raw === null) {
@@ -104,7 +110,7 @@ export async function routeWebRuntimeConnectionFrame(
     if (!encrypted) {
       return
     }
-    const plaintext = decryptBytes(encrypted, sharedKey)
+    const plaintext = session.openBinary(encrypted)
     if (!plaintext) {
       return
     }
@@ -114,7 +120,7 @@ export async function routeWebRuntimeConnectionFrame(
     return
   }
 
-  const plaintext = decrypt(raw, sharedKey)
+  const plaintext = session.openText(raw)
   if (plaintext === null) {
     return
   }

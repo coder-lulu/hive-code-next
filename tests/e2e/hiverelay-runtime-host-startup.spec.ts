@@ -5,11 +5,10 @@ import { expect, test } from './helpers/orca-app'
 
 test.use({
   dismissOnboarding: false,
-  seedTestRepo: false,
-  orcaAppExtraEnv: { HIVE_RELAY_V2_HOST_ENABLED: '1', HIVE_RELAY_REGION: 'cn-east' }
+  seedTestRepo: false
 })
 
-test('Desktop Runtime starts with Host enabled and no paired device', async ({ electronApp }) => {
+test('Desktop Runtime starts its Host without flags or paired devices', async ({ electronApp }) => {
   const userData = await electronApp.evaluate(({ app }) => app.getPath('userData'))
   const execute = promisify(execFile)
   await expect
