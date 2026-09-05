@@ -1,18 +1,21 @@
+import type { E2EEChannelOptions, E2EETextMessageHandler } from './e2ee-channel-options'
+export type { E2EEChannelOptions } from './e2ee-channel-options'
+import { dispatchLegacyE2EEText } from './e2ee-channel-legacy-dispatch'
+import {
+  E2EEAccountAuthentication,
+  parseE2EEAccountAuth,
+  type E2EEAccountBinding
+} from './e2ee-channel-account-authentication'
 // Why: this channel keeps E2EE framing out of RPC handlers, which consume plaintext across transports.
 import type { WebSocket } from 'ws'
-import { encrypt, decrypt, encryptBytes, decryptBytes } from './e2ee-crypto'
+import { encrypt, decrypt, decryptBytes } from './e2ee-crypto'
 import type {
   DesktopMobileE2EEV2Session,
   DesktopMobileE2EEV2Context
 } from './mobile-e2ee-v2-desktop-session'
 import type { DesktopMobileE2EEV2OutboundItem as V2OutboundItem } from './mobile-e2ee-v2-desktop-outbound'
 import { handleDesktopMobileE2EEV2Inbound } from './mobile-e2ee-v2-desktop-inbound'
-import {
-  isMobileE2EEBinaryPayloadWithinLimit,
-  isMobileE2EEOutboundItemWithinLimit,
-  isMobileE2EETextPayloadWithinLimit
-} from './mobile-e2ee-outbound-admission'
-import type { MobileE2EEOutboundMemoryBudget } from './mobile-e2ee-outbound-memory-budget'
+import { isMobileE2EEOutboundItemWithinLimit } from './mobile-e2ee-outbound-admission'
 import { MobileE2EEDesktopOutboundOwner } from './mobile-e2ee-desktop-outbound-owner'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
 import {
@@ -36,24 +39,12 @@ export type {
 const HANDSHAKE_TIMEOUT_MS = 10_000
 const MAX_CONSECUTIVE_DECRYPT_FAILURES = 5
 
-export type E2EEChannelOptions = {
-  serverSecretKey: Uint8Array
-  resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | null
-  onReady: (channel: E2EEChannel, device: E2EEAuthenticatedDevice) => void
-  resolveCloudManagedSession?: E2EECloudManagedSessionResolver
-  onCloudReady?: (channel: E2EEChannel, principal: E2EEAuthenticatedCloudSession) => void
-  onError: (
-    code: number,
-    reason: string,
-    principalKind?: 'paired_device' | 'cloud_managed_web_session'
-  ) => void
-  transportContext?: DesktopMobileE2EEV2Context
-  requireV2?: boolean
-  outboundMemoryBudget?: MobileE2EEOutboundMemoryBudget
-}
-
 export class E2EEChannel {
-  private state: 'awaiting_hello' | 'awaiting_auth' | 'ready' = 'awaiting_hello'
+  private readonly accountAuthentication: E2EEAccountAuthentication
+  private accountBinding: E2EEAccountBinding | null = null
+  private destroyed = false
+  private state: 'awaiting_hello' | 'awaiting_auth' | 'authenticating_async' | 'ready' =
+    'awaiting_hello'
   private sharedKey: Uint8Array | null = null
   private consecutiveFailures = 0
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null
@@ -71,13 +62,7 @@ export class E2EEChannel {
   private readonly outbound: MobileE2EEDesktopOutboundOwner
   private v2Session: DesktopMobileE2EEV2Session | null = null
   // Why: the handler is set after readiness because its reply closure needs this channel's encryption state.
-  private messageHandler:
-    | ((
-        plaintext: string,
-        encryptedReply: (response: string) => void,
-        encryptedBinaryReply: (response: Uint8Array<ArrayBufferLike>) => boolean | void
-      ) => void)
-    | null = null
+  private messageHandler: E2EETextMessageHandler | null = null
   private binaryMessageHandler: ((plaintext: Uint8Array<ArrayBufferLike>) => void) | null = null
 
   deviceToken: string | null = null
@@ -97,18 +82,24 @@ export class E2EEChannel {
     this.requireV2 = options.requireV2 ?? false
     this.outbound = new MobileE2EEDesktopOutboundOwner(ws, options.outboundMemoryBudget)
 
+    this.accountAuthentication = new E2EEAccountAuthentication(
+      options.onAccountReady ? options.resolveAccountSession : undefined,
+      (principal, capabilities) => {
+        if (this.destroyed || this.ws.readyState !== this.ws.OPEN) {
+          return
+        }
+        this.clientCapabilities = capabilities
+        this.completeAuthentication(() => options.onAccountReady?.(this, principal))
+      },
+      () => this.rejectAccountAuthentication()
+    )
     this.handshakeTimer = setTimeout(() => {
+      this.destroy()
       this.onError(4002, 'E2EE handshake timeout')
     }, HANDSHAKE_TIMEOUT_MS)
   }
 
-  onMessage(
-    handler: (
-      plaintext: string,
-      encryptedReply: (response: string) => void,
-      encryptedBinaryReply: (response: Uint8Array<ArrayBufferLike>) => boolean | void
-    ) => void
-  ): void {
+  onMessage(handler: E2EETextMessageHandler): void {
     this.messageHandler = handler
   }
 
@@ -117,6 +108,13 @@ export class E2EEChannel {
   }
 
   handleRawMessage(raw: string | Uint8Array<ArrayBufferLike>): void {
+    if (this.destroyed) {
+      return
+    }
+    if (this.state === 'authenticating_async') {
+      this.rejectAccountAuthentication()
+      return
+    }
     if (this.state === 'awaiting_hello') {
       if (typeof raw !== 'string') {
         this.onError(4001, 'Invalid handshake message')
@@ -162,36 +160,13 @@ export class E2EEChannel {
       return
     }
 
-    // Why: streaming emits can outlive destroy(), so late replies must not encrypt with a cleared key.
-    const encryptedReply = (response: string) => {
-      if (!this.sharedKey || this.ws.readyState !== this.ws.OPEN) {
-        return
-      }
-      if (!isMobileE2EETextPayloadWithinLimit(response)) {
-        this.closeForOutboundBudget('size')
-        return
-      }
-      this.outbound.enqueueLegacyText(
-        encrypt(response, this.sharedKey),
-        () => Boolean(this.sharedKey),
-        () => this.closeForOutboundBudget('queue')
-      )
-    }
-    const encryptedBinaryReply = (response: Uint8Array<ArrayBufferLike>): boolean => {
-      if (!this.sharedKey || this.ws.readyState !== this.ws.OPEN) {
-        return false
-      }
-      if (!isMobileE2EEBinaryPayloadWithinLimit(response)) {
-        this.closeForOutboundBudget('size')
-        return false
-      }
-      if (!this.outbound.canSend(response.byteLength + 40)) {
-        return false
-      }
-      this.ws.send(Buffer.from(encryptBytes(response, this.sharedKey)), { binary: true })
-      return true
-    }
-    this.messageHandler?.(plaintext, encryptedReply, encryptedBinaryReply)
+    dispatchLegacyE2EEText(plaintext, {
+      ws: this.ws,
+      getKey: () => this.sharedKey,
+      outbound: this.outbound,
+      close: (reason) => this.closeForOutboundBudget(reason),
+      handler: this.messageHandler
+    })
   }
 
   private trackDecryptFailure(): void {
@@ -216,13 +191,30 @@ export class E2EEChannel {
     }
     this.sharedKey = result.sharedKey
     this.v2Session = result.v2Session
+    this.accountBinding = result.accountBinding
     this.state = 'awaiting_auth'
     if (this.ws.readyState === this.ws.OPEN) {
       this.ws.send(JSON.stringify(result.ready))
     }
   }
 
+  private rejectAccountAuthentication(): void {
+    this.sendEncryptedControl({ type: 'e2ee_error', error: { code: 'unauthorized' } })
+    this.destroy()
+    this.onError(4001, 'Unauthorized', 'account_runtime_session')
+  }
+
   private handleAuth(plaintext: string): void {
+    const account = parseE2EEAccountAuth(plaintext)
+    if (account !== null) {
+      if (!account || !this.accountBinding) {
+        this.rejectAccountAuthentication()
+        return
+      }
+      this.state = 'authenticating_async'
+      void this.accountAuthentication.authenticate(account, this.accountBinding)
+      return
+    }
     const authentication = authenticateE2EEChannel({
       plaintext,
       v2Session: this.v2Session,
@@ -312,11 +304,15 @@ export class E2EEChannel {
   }
 
   destroy(): void {
+    this.destroyed = true
+    this.accountAuthentication.destroy()
     if (this.handshakeTimer) {
       clearTimeout(this.handshakeTimer)
       this.handshakeTimer = null
     }
     this.sharedKey = null
+    this.accountBinding = null
+    this.authenticatedCloudSession = null
     this.authenticatedDevice = null
     this.v2Session = null
     this.messageHandler = null

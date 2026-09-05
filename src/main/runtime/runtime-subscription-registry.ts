@@ -56,6 +56,21 @@ export class RuntimeSubscriptionRegistry {
     return true
   }
 
+  async cleanupAndWaitIfOwnedByConnection(
+    subscriptionId: string,
+    connectionId?: string
+  ): Promise<boolean> {
+    if (
+      connectionId &&
+      this.cleanups.has(subscriptionId) &&
+      this.connectionBySubscription.get(subscriptionId) !== connectionId
+    ) {
+      return false
+    }
+    await this.cleanupAndWait(subscriptionId)
+    return true
+  }
+
   cleanup(subscriptionId: string): void {
     void this.cleanupAndWait(subscriptionId).catch((error) => {
       console.error(`[runtime] subscription cleanup failed for ${subscriptionId}:`, error)

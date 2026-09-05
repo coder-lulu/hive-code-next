@@ -1,10 +1,25 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.session-transition.reason-mismatch.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "session-transition",
   "applicableComponents": ["cloud", "hivecode"],
   "validationTime": 1893456000000,
-  "input": {"highestContiguousAck": 40, "currentStatus": "PENDING_ACTIVATION", "currentControlVersion": 3, "transition": {"sequence": 41, "transitionId": "19191919-1919-4919-8919-191919191919", "transitionType": "ACTIVATE", "managedSessionId": "managed-01", "runtimeSessionId": "runtime-session-01", "expectedControlVersion": 3, "sessionBindingHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "occurredAt": 1893456000000, "reason": "CLIENT_CLOSED"}}
+  "input": {
+    "highestContiguousAck": 40,
+    "currentStatus": "PENDING_ACTIVATION",
+    "currentControlVersion": 3,
+    "transition": {
+      "sequence": 41,
+      "transitionId": "19191919-1919-4919-8919-191919191919",
+      "transitionType": "ACTIVATE",
+      "managedSessionId": "managed-01",
+      "runtimeSessionId": "runtime-session-01",
+      "expectedControlVersion": 3,
+      "sessionBindingHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "occurredAt": 1893456000000,
+      "reason": "CLIENT_CLOSED"
+    }
+  }
 }

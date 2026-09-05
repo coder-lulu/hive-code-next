@@ -8,7 +8,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { safeStorage } from 'electron'
+import { getSecretStore } from '../../shared/secret-store'
 import { bestEffortFsyncDirectorySync, fsyncFileSync } from '../../shared/secure-file'
 
 type ProtectedEnvelope = {
@@ -28,12 +28,12 @@ export function hiveAccountStorageDirectory(userDataPath: string): string {
 
 export function isHiveAccountEncryptionAvailable(): boolean {
   try {
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!getSecretStore().isEncryptionAvailable()) {
       return false
     }
     // Why: Electron's Linux basic_text backend only obfuscates credentials.
     // Cloud identity must remain disabled unless the OS provides a real keyring.
-    return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'
+    return getSecretStore().describeProtectionGap() === null
   } catch {
     return false
   }
@@ -58,7 +58,7 @@ export function readSecureJson<T>(
     ) {
       return { status: 'unreadable' }
     }
-    const plaintext = safeStorage.decryptString(Buffer.from(envelope.ciphertext, 'base64'))
+    const plaintext = getSecretStore().decryptString(Buffer.from(envelope.ciphertext, 'base64'))
     const value: unknown = JSON.parse(plaintext)
     return validate(value) ? { status: 'ok', value } : { status: 'unreadable' }
   } catch {
@@ -76,7 +76,7 @@ export function writeSecureJson(path: string, value: unknown): boolean {
     mkdirSync(directory, { recursive: true })
     const envelope: ProtectedEnvelope = {
       schemaVersion: 1,
-      ciphertext: safeStorage.encryptString(JSON.stringify(value)).toString('base64')
+      ciphertext: getSecretStore().encryptString(JSON.stringify(value)).toString('base64')
     }
     writeFileSync(temporaryPath, JSON.stringify(envelope), { encoding: 'utf8', mode: 0o600 })
     fsyncFileSync(temporaryPath)

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.wire.messages.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "wire-message",
@@ -8,16 +8,78 @@
   "validationTime": 1893456000000,
   "input": {
     "messages": [
-      {"type": "host-hello", "v": 2, "cellId": "cell-01", "cellIncarnationId": "22222222-2222-4222-8222-222222222222", "runtimeId": "runtime-01", "runtimeBootId": "55555555-5555-4555-8555-555555555555", "authorityGeneration": 7, "fencingEpoch": 3, "leaseEpoch": 11, "assignmentId": "33333333-3333-4333-8333-333333333333", "assignmentEpoch": 5, "controlGeneration": 2, "relayHostId": "If4x36FUomFia_hU", "hostPublicKeyB64": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", "capabilities": ["ticket-connect-v2"]},
-      {"type": "host-challenge", "v": 2, "challengeId": "challenge-01", "relayEphemeralPublicKeyB64": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", "nonceB64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "ciphertextB64": "AQIDBA", "expiresAt": 1893456010000},
-      {"type": "host-challenge-ack", "v": 2, "challengeId": "challenge-01", "proofB64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
-      {"type": "host-hello-ack", "v": 2, "leaseExpiresAt": 1893456120000, "controlGeneration": 2},
-      {"type": "relay-auth", "v": 2, "clientAdmissionToken": "eyJhbGciOiJFZERTQSIsInR5cCI6InJlbGF5LWNsaWVudC1hZG1pc3Npb24rand0Iiwia2lkIjoicmVsYXktdGVzdC0yMDI2LTAxIn0.eyJpc3MiOiJodHRwczovL2Nsb3VkLmhpdmUudGVzdC9yZWxheSIsInN1YiI6InJ1bnRpbWUtMDEiLCJqdGkiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJpYXQiOjE4OTM0NTU5NzAsIm5iZiI6MTg5MzQ1NTk3MCwiYXVkIjoiaGl2ZS1yZWxheS1jZWxsIiwic2NvcGUiOiJyZWxheTpjb25uZWN0IiwiZXhwIjoxODkzNDU2MDE1LCJjZWxsSWQiOiJjZWxsLTAxIiwiY2VsbEluY2FybmF0aW9uSWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJhc3NpZ25tZW50SWQiOiIzMzMzMzMzMy0zMzMzLTQzMzMtODMzMy0zMzMzMzMzMzMzMzMiLCJyZWxheUhvc3RJZCI6IkFBQUFBQUFBQUFBQUFBQUEiLCJpbnRlbnRJZCI6IjQ0NDQ0NDQ0LTQ0NDQtNDQ0NC04NDQ0LTQ0NDQ0NDQ0NDQ0NCIsImNsaWVudEtleUhhc2giOiJBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBIiwicnVudGltZVR1cGxlSGFzaCI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEiLCJhdXRob3JpdHlHZW5lcmF0aW9uIjo3LCJmZW5jaW5nRXBvY2giOjMsImxlYXNlRXBvY2giOjExLCJhc3NpZ25tZW50RXBvY2giOjV9.iUHhJR2aL8ACZ7HJgUi3wse3BkwbJE1Js3rolpKtIYQeskPv1g3tyvgOnEnWZxBH6vsWPyW327BM2h1APg0UCQ", "clientPublicKeyB64": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"},
-      {"type": "conn-open", "v": 2, "kind": "ticket", "connId": "conn-01", "connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "intentId": "44444444-4444-4444-8444-444444444444", "clientKeyHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "assignmentEpoch": 5, "controlGeneration": 2, "attachDeadlineMs": 12000},
-      {"type": "host-data-auth", "v": 2, "connId": "conn-01", "connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "assignmentEpoch": 5, "controlGeneration": 2},
-      {"type": "relay-hello", "v": 2, "connId": "conn-01", "cellId": "cell-01", "cellIncarnationId": "22222222-2222-4222-8222-222222222222"},
-      {"type": "auth-refresh", "v": 2, "controlLease": "eyJhbGciOiJFZERTQSIsInR5cCI6InJlbGF5LWNvbnRyb2wrand0Iiwia2lkIjoicmVsYXktdGVzdC0yMDI2LTAxIn0.eyJpc3MiOiJodHRwczovL2Nsb3VkLmhpdmUudGVzdC9yZWxheSIsInN1YiI6InJ1bnRpbWUtMDEiLCJqdGkiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJpYXQiOjE4OTM0NTU5NzAsIm5iZiI6MTg5MzQ1NTk3MCwiYXVkIjoiaGl2ZS1yZWxheS1jZWxsIiwic2NvcGUiOiJyZWxheTpjb250cm9sIiwiZXhwIjoxODkzNDU2MDkwLCJjZWxsSWQiOiJjZWxsLTAxIiwiY2VsbEluY2FybmF0aW9uSWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJhc3NpZ25tZW50SWQiOiIzMzMzMzMzMy0zMzMzLTQzMzMtODMzMy0zMzMzMzMzMzMzMzMiLCJyZWxheUhvc3RJZCI6IkFBQUFBQUFBQUFBQUFBQUEiLCJob3N0S2V5SGFzaCI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEiLCJydW50aW1lVHVwbGVIYXNoIjoiQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQSIsImF1dGhvcml0eUdlbmVyYXRpb24iOjcsImZlbmNpbmdFcG9jaCI6MywibGVhc2VFcG9jaCI6MTEsImFzc2lnbm1lbnRFcG9jaCI6NSwiY29udHJvbEdlbmVyYXRpb24iOjJ9.0BFg3tHiQzOwFqC5a_HGOBFoWBuBGEPpQNb7vp1ZzrYSwhMUlX3Tz3MTtXnbUyhSSK6lWC0PYU3HuHGjQ9g4DQ"},
-      {"type": "drain", "v": 2, "deadlineMs": 120000, "reason": "INCARNATION_DRAIN"}
+      {
+        "type": "host-hello",
+        "v": 2,
+        "cellId": "cell-01",
+        "cellIncarnationId": "22222222-2222-4222-8222-222222222222",
+        "runtimeId": "runtime-01",
+        "runtimeBootId": "55555555-5555-4555-8555-555555555555",
+        "authorityGeneration": 7,
+        "fencingEpoch": 3,
+        "leaseEpoch": 11,
+        "assignmentId": "33333333-3333-4333-8333-333333333333",
+        "assignmentEpoch": 5,
+        "controlGeneration": 2,
+        "relayHostId": "If4x36FUomFia_hU",
+        "hostPublicKeyB64": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "capabilities": ["ticket-connect-v2"]
+      },
+      {
+        "type": "host-challenge",
+        "v": 2,
+        "challengeId": "challenge-01",
+        "relayEphemeralPublicKeyB64": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "nonceB64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "ciphertextB64": "AQIDBA",
+        "expiresAt": 1893456010000
+      },
+      {
+        "type": "host-challenge-ack",
+        "v": 2,
+        "challengeId": "challenge-01",
+        "proofB64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      { "type": "host-hello-ack", "v": 2, "leaseExpiresAt": 1893456120000, "controlGeneration": 2 },
+      {
+        "type": "relay-auth",
+        "v": 2,
+        "clientAdmissionToken": "eyJhbGciOiJFZERTQSIsInR5cCI6InJlbGF5LWNsaWVudC1hZG1pc3Npb24rand0Iiwia2lkIjoicmVsYXktdGVzdC0yMDI2LTAxIn0.eyJpc3MiOiJodHRwczovL2Nsb3VkLmhpdmUudGVzdC9yZWxheSIsInN1YiI6InJ1bnRpbWUtMDEiLCJqdGkiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJpYXQiOjE4OTM0NTU5NzAsIm5iZiI6MTg5MzQ1NTk3MCwiYXVkIjoiaGl2ZS1yZWxheS1jZWxsIiwic2NvcGUiOiJyZWxheTpjb25uZWN0IiwiZXhwIjoxODkzNDU2MDE1LCJjZWxsSWQiOiJjZWxsLTAxIiwiY2VsbEluY2FybmF0aW9uSWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJhc3NpZ25tZW50SWQiOiIzMzMzMzMzMy0zMzMzLTQzMzMtODMzMy0zMzMzMzMzMzMzMzMiLCJyZWxheUhvc3RJZCI6IkFBQUFBQUFBQUFBQUFBQUEiLCJpbnRlbnRJZCI6IjQ0NDQ0NDQ0LTQ0NDQtNDQ0NC04NDQ0LTQ0NDQ0NDQ0NDQ0NCIsImNsaWVudEtleUhhc2giOiJBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBIiwicnVudGltZVR1cGxlSGFzaCI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEiLCJhdXRob3JpdHlHZW5lcmF0aW9uIjo3LCJmZW5jaW5nRXBvY2giOjMsImxlYXNlRXBvY2giOjExLCJhc3NpZ25tZW50RXBvY2giOjV9.iUHhJR2aL8ACZ7HJgUi3wse3BkwbJE1Js3rolpKtIYQeskPv1g3tyvgOnEnWZxBH6vsWPyW327BM2h1APg0UCQ",
+        "clientPublicKeyB64": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      },
+      {
+        "type": "conn-open",
+        "v": 2,
+        "kind": "ticket",
+        "connId": "conn-01",
+        "connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "intentId": "44444444-4444-4444-8444-444444444444",
+        "clientKeyHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "assignmentEpoch": 5,
+        "controlGeneration": 2,
+        "attachDeadlineMs": 12000
+      },
+      {
+        "type": "host-data-auth",
+        "v": 2,
+        "connId": "conn-01",
+        "connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "assignmentEpoch": 5,
+        "controlGeneration": 2
+      },
+      {
+        "type": "relay-hello",
+        "v": 2,
+        "connId": "conn-01",
+        "cellId": "cell-01",
+        "cellIncarnationId": "22222222-2222-4222-8222-222222222222"
+      },
+      {
+        "type": "auth-refresh",
+        "v": 2,
+        "controlLease": "eyJhbGciOiJFZERTQSIsInR5cCI6InJlbGF5LWNvbnRyb2wrand0Iiwia2lkIjoicmVsYXktdGVzdC0yMDI2LTAxIn0.eyJpc3MiOiJodHRwczovL2Nsb3VkLmhpdmUudGVzdC9yZWxheSIsInN1YiI6InJ1bnRpbWUtMDEiLCJqdGkiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJpYXQiOjE4OTM0NTU5NzAsIm5iZiI6MTg5MzQ1NTk3MCwiYXVkIjoiaGl2ZS1yZWxheS1jZWxsIiwic2NvcGUiOiJyZWxheTpjb250cm9sIiwiZXhwIjoxODkzNDU2MDkwLCJjZWxsSWQiOiJjZWxsLTAxIiwiY2VsbEluY2FybmF0aW9uSWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJhc3NpZ25tZW50SWQiOiIzMzMzMzMzMy0zMzMzLTQzMzMtODMzMy0zMzMzMzMzMzMzMzMiLCJyZWxheUhvc3RJZCI6IkFBQUFBQUFBQUFBQUFBQUEiLCJob3N0S2V5SGFzaCI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEiLCJydW50aW1lVHVwbGVIYXNoIjoiQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQSIsImF1dGhvcml0eUdlbmVyYXRpb24iOjcsImZlbmNpbmdFcG9jaCI6MywibGVhc2VFcG9jaCI6MTEsImFzc2lnbm1lbnRFcG9jaCI6NSwiY29udHJvbEdlbmVyYXRpb24iOjJ9.0BFg3tHiQzOwFqC5a_HGOBFoWBuBGEPpQNb7vp1ZzrYSwhMUlX3Tz3MTtXnbUyhSSK6lWC0PYU3HuHGjQ9g4DQ"
+      },
+      { "type": "drain", "v": 2, "deadlineMs": 120000, "reason": "INCARNATION_DRAIN" }
     ]
   }
 }

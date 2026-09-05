@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.close-codes.registry.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "close-code",
@@ -8,19 +8,19 @@
   "validationTime": 1893456000000,
   "input": {
     "mappings": [
-      {"symbol": "PROTOCOL_ERROR", "code": 1002},
-      {"symbol": "FRAME_TOO_LARGE", "code": 1009},
-      {"symbol": "SERVICE_RESTART", "code": 1012},
-      {"symbol": "CAPACITY_EXCEEDED", "code": 1013},
-      {"symbol": "AUTH_REQUIRED", "code": 4401},
-      {"symbol": "ORIGIN_REJECTED", "code": 4403},
-      {"symbol": "AUTH_TIMEOUT", "code": 4408},
-      {"symbol": "REPLAY_DETECTED", "code": 4409},
-      {"symbol": "STALE_BINDING", "code": 4410},
-      {"symbol": "HOST_UNAVAILABLE", "code": 4411},
-      {"symbol": "RELAY_UNAVAILABLE", "code": 4412},
-      {"symbol": "DRAINING", "code": 4413},
-      {"symbol": "UPGRADE_REQUIRED", "code": 4426}
+      { "symbol": "PROTOCOL_ERROR", "code": 1002 },
+      { "symbol": "FRAME_TOO_LARGE", "code": 1009 },
+      { "symbol": "SERVICE_RESTART", "code": 1012 },
+      { "symbol": "CAPACITY_EXCEEDED", "code": 1013 },
+      { "symbol": "AUTH_REQUIRED", "code": 4401 },
+      { "symbol": "ORIGIN_REJECTED", "code": 4403 },
+      { "symbol": "AUTH_TIMEOUT", "code": 4408 },
+      { "symbol": "REPLAY_DETECTED", "code": 4409 },
+      { "symbol": "STALE_BINDING", "code": 4410 },
+      { "symbol": "HOST_UNAVAILABLE", "code": 4411 },
+      { "symbol": "RELAY_UNAVAILABLE", "code": 4412 },
+      { "symbol": "DRAINING", "code": 4413 },
+      { "symbol": "UPGRADE_REQUIRED", "code": 4426 }
     ]
   }
 }

@@ -4,6 +4,10 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HiveAccountState } from '../../shared/hive-account'
 
+vi.mock('../../shared/secret-store', () => ({
+  getSecretStore: () => ({ ...safeStorageMock, describeProtectionGap: () => null })
+}))
+
 const safeStorageMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
   encryptString: vi.fn((value: string) => Buffer.from(value, 'utf8')),

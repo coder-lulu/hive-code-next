@@ -219,7 +219,15 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: 'accounts.unsubscribe',
     params: AccountsUnsubscribeParams,
-    handler: async (params, { runtime }) => {
+    handler: async (params, { runtime, connectionId }) => {
+      if (connectionId) {
+        return {
+          unsubscribed: runtime.cleanupSubscriptionIfOwnedByConnection(
+            params.subscriptionId,
+            connectionId
+          )
+        }
+      }
       runtime.cleanupSubscription(params.subscriptionId)
       return { unsubscribed: true }
     }

@@ -30,6 +30,7 @@ import {
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import { mainProcessState as state } from './main-process-state'
+import { installHiveRuntimeRelay, stopHiveRuntimeRelay } from './main-process-hive-runtime-relay'
 
 export function initializeHiveAccount(): void {
   const account = new HiveAccountService(app.getPath('userData'))
@@ -127,6 +128,12 @@ export function installHiveRuntimeCloudWebLaunch(runtimeRpc: OrcaRuntimeRpcServe
   if (!processRuntimeCloudPresence) {
     return
   }
+  installHiveRuntimeRelay(
+    runtimeCloudConfig,
+    processRuntimeCloudPresence,
+    runtimeRpc,
+    app.getPath('userData')
+  )
   if (runtimeCloudConfig.enabled && runtimeCloudConfig.webLaunch) {
     const processRuntimeCloudWebLaunch = new HiveRuntimeCloudWebLaunchService({
       apiBaseUrl: runtimeCloudConfig.apiBaseUrl,
@@ -150,6 +157,7 @@ export function installHiveRuntimeCloudWebLaunch(runtimeRpc: OrcaRuntimeRpcServe
 }
 
 export function stopHiveRuntimeCloud(): { name: string; promise: Promise<void> }[] {
+  const runtimeRelayShutdown = stopHiveRuntimeRelay()
   state.unsubscribeRuntimeCloudAuthorization?.()
   state.unsubscribeRuntimeCloudAuthorization = null
   state.unsubscribeRuntimeCloudPresenceState?.()
@@ -174,6 +182,7 @@ export function stopHiveRuntimeCloud(): { name: string; promise: Promise<void> }
   state.hiveAccountService = null
   state.hiveAccountStartupState = null
   return [
+    { name: 'runtime-relay', promise: runtimeRelayShutdown },
     { name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown },
     { name: 'runtime-cloud-web-session-control', promise: runtimeCloudWebSessionControlShutdown }
   ]

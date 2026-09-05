@@ -1,6 +1,6 @@
 # HiveRelay v2 authority contract
 
-Contract revision: `hiverelay-v2-p0.5`
+Contract revision: `hiverelay-v2-p0.6`
 
 This directory is the sole authority copied by HiveCode and HiveRelay Cell. A consumer
 must verify `fixture-manifest.json`, every listed file digest, the revision, and its source
@@ -142,3 +142,23 @@ operation after a version conflict reads a new snapshot before attempting CAS.
 
 Once another phase consumes this revision, do not rewrite it. Create a new revision,
 regenerate all digests, update each consumer receipt, and rerun all three validators.
+
+## P0.6 acknowledged control refresh
+
+POST `/hive/v1/runtimes/{runtimeRecordId}/relay/control-leases/refresh` uses
+`control-lease-refresh.schema.json` and returns the existing AssignmentResponse.
+Only the current ACTIVE, acknowledged assignment may renew in place. A refresh
+preserves assignment epoch and control generation; a reconnect continues to use
+`/v1/assign` and receives a higher generation. The expiry is a compare-and-set
+value: matching expiry permits one extension, an older expiry returns the current
+committed lease without extending it, and a newer expiry rejects. Every HTTP
+retry uses a fresh one-use Runtime proof. The Cell requires its existing owner
+socket for auth-refresh, so a second control socket cannot reuse its generation.
+
+A new Runtime boot may retain the latest X25519 Host key after BOOT_ROTATED or
+LEASE_ROTATED fencing with the exact binding version. This creates a successor
+binding, never resurrects the terminal row. A key rotated away to another key or
+a binding revoked for account, device, ownership or credential reasons cannot be
+restored by this exception.
+
+Authorization use is frozen atomically to its first assignment and control generation. Exact retries retain that reservation, including after signing failure. Once another authorization takes over, the old used JTI cannot acquire control again. At the P0.6 migration boundary, preexisting authorizations without provable assignment usage are retired and require fresh authorization; current recorded assignment usage is preserved. No public credential fields change.

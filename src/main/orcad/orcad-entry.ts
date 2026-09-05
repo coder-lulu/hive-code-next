@@ -146,6 +146,7 @@ async function startOrcadRuntime(
   const { startOrcadDaemon, stopOrcadDaemon } = await import('./orcad-daemon-supervision')
   const { daemonOwnsFreshPersistentPtys } = await import('../daemon/daemon-init')
   const { collectOrcadHealth } = await import('./orcad-health')
+  const { createOrcadRuntimeCloud } = await import('./orcad-runtime-cloud')
 
   const runtimeUserDataPath = getAppEnvironment().getPath('userData')
   initOrcaProfilePaths()
@@ -201,8 +202,14 @@ async function startOrcadRuntime(
   await runtime.reconcileLegacyWorkerTerminals()
 
   const bindHost = resolveOrcadBindHost(options.bind)
+  const runtimeCloud = createOrcadRuntimeCloud({
+    userDataPath: runtimeUserDataPath,
+    runtimeVersion: getAppEnvironment().getVersion(),
+    runtime
+  })
   const rpc = new OrcaRuntimeRpcServer({
     runtime,
+    hiveRuntimeCloud: runtimeCloud.ownership,
     userDataPath: runtimeUserDataPath,
     enableWebSocket: true,
     // Why pinned and not `exposeNetworkByDefault`: an unattended host's exposure must be
@@ -212,7 +219,14 @@ async function startOrcadRuntime(
     pinnedBindHost: bindHost,
     ...(options.port !== undefined ? { wsPort: options.port, preferPinnedWsPort: true } : {})
   })
-  await rpc.start()
+  try {
+    await rpc.start()
+    runtimeCloud.rpcReady(rpc)
+  } catch (error) {
+    await runtimeCloud.stop()
+    await rpc.stop()
+    throw error
+  }
   console.error(`[orcad] ${describeOrcadBindExposure(bindHost)}`)
 
   const boundEndpoint = rpc.getWebSocketEndpoint()
@@ -263,7 +277,7 @@ async function startOrcadRuntime(
     readiness,
     stop: async () => {
       try {
-        await rpc.stop()
+        await Promise.all([runtimeCloud.stop(), rpc.stop()])
       } finally {
         // Why disconnect and not shut down: the daemon must outlive this process, or an
         // orcad restart goes back to killing every running terminal. See

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.private-ops.future-issued-at.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-command",
@@ -8,7 +8,16 @@
   "validationTime": 1893456000000,
   "input": {
     "commands": [
-      {"type": "cell-incarnation-fence", "v": 2, "commandType": "INCARNATION_FENCE", "commandId": "16161616-1616-4616-8616-161616161616", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "lifecycleGeneration": 11, "issuedAt": 1893456030001}
+      {
+        "type": "cell-incarnation-fence",
+        "v": 2,
+        "commandType": "INCARNATION_FENCE",
+        "commandId": "16161616-1616-4616-8616-161616161616",
+        "cellId": "cell-01",
+        "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+        "lifecycleGeneration": 11,
+        "issuedAt": 1893456030001
+      }
     ]
   }
 }

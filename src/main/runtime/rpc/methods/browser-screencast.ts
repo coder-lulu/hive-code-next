@@ -31,12 +31,20 @@ export const BROWSER_SCREENCAST_METHODS: RpcAnyMethod[] = [
   defineMethod({
     name: 'browser.screencast.unsubscribe',
     params: ScreencastUnsubscribe,
-    handler: async (params, { runtime }) => {
+    handler: async (params, { runtime, connectionId }) => {
       if (!runtimeBrowserCommandsFactoryIsAvailable()) {
         throw new BrowserError(
           BROWSER_UNAVAILABLE_ERROR_CODE,
           'Browser automation is unavailable on this host.'
         )
+      }
+      if (connectionId) {
+        return {
+          unsubscribed: runtime.cleanupSubscriptionIfOwnedByConnection(
+            params.subscriptionId,
+            connectionId
+          )
+        }
       }
       runtime.cleanupSubscription(params.subscriptionId)
       return { unsubscribed: true }

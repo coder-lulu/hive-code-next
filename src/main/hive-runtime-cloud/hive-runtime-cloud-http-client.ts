@@ -1,4 +1,4 @@
-import { net } from 'electron'
+import { getMainHttpClient } from '../network/http-client'
 import { problemCategory } from './hive-runtime-cloud-response'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -7,7 +7,7 @@ const MAXIMUM_RETRY_AFTER_MS = 2_147_483_647
 
 export type HiveRuntimeCloudFetch = (input: string, init: RequestInit) => Promise<Response>
 
-const electronFetch: HiveRuntimeCloudFetch = (input, init) => net.fetch(input, init)
+const hostFetch: HiveRuntimeCloudFetch = (input, init) => getMainHttpClient().fetch(input, init)
 
 export class HiveRuntimeCloudRequestError extends Error {
   constructor(
@@ -107,7 +107,7 @@ async function requestError(response: Response): Promise<HiveRuntimeCloudRequest
 export class HiveRuntimeCloudHttpClient {
   constructor(
     private readonly apiBaseUrl: string,
-    private readonly fetchImpl: HiveRuntimeCloudFetch = electronFetch
+    private readonly fetchImpl: HiveRuntimeCloudFetch = hostFetch
   ) {}
 
   protected async request(

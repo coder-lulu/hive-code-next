@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.private-ops.stale-generation.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-command",
@@ -8,7 +8,26 @@
   "validationTime": 1893456000000,
   "input": {
     "currentLifecycleGeneration": 12,
-    "command": {"type": "cell-lifecycle-command", "v": 2, "commandType": "INCARNATION_DRAIN", "commandId": "32323232-3232-4232-8232-323232323232", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "lifecycleGeneration": 11, "issuedAt": 1893456000000, "deadlineAt": 1893456120000},
-    "expectedResponse": {"type": "cell-command-result", "v": 2, "commandId": "32323232-3232-4232-8232-323232323232", "commandType": "INCARNATION_DRAIN", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "result": "STALE_NOOP", "observedAt": 1893456000000}
+    "command": {
+      "type": "cell-lifecycle-command",
+      "v": 2,
+      "commandType": "INCARNATION_DRAIN",
+      "commandId": "32323232-3232-4232-8232-323232323232",
+      "cellId": "cell-01",
+      "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+      "lifecycleGeneration": 11,
+      "issuedAt": 1893456000000,
+      "deadlineAt": 1893456120000
+    },
+    "expectedResponse": {
+      "type": "cell-command-result",
+      "v": 2,
+      "commandId": "32323232-3232-4232-8232-323232323232",
+      "commandType": "INCARNATION_DRAIN",
+      "cellId": "cell-01",
+      "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+      "result": "STALE_NOOP",
+      "observedAt": 1893456000000
+    }
   }
 }

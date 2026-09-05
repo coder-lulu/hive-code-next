@@ -1,13 +1,43 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.private-status.cell-binding.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-status",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
   "input": {
-    "auth": {"carrier": "private-https-authorization-header", "method": "GET", "path": "/internal/status", "privateOrigin": "https://cell-01.private.hive.test:8443", "tokenCellId": "cell-01", "tokenNonce": "AAAAAAAAAAAAAAAAAAAAAA", "headerNonce": "AAAAAAAAAAAAAAAAAAAAAA", "tokenJti": "31313131-3131-4131-8131-313131313131", "usedTokenJtis": [], "usedNonces": []},
-    "response": {"type": "cell-status", "v": 2, "nonce": "AAAAAAAAAAAAAAAAAAAAAA", "cellId": "cell-02", "cellIncarnationId": "22222222-2222-4222-8222-222222222222", "publicReady": true, "lifecyclePermit": true, "cryptographicReady": true, "resourceReady": true, "processReady": true, "draining": false, "preAuthSlotsUsed": 0, "authenticatedSlotsUsed": 0, "acceptedVerifierKids": ["relay-test-2026-01"], "keysetDigest": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "buildDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "observedAt": 1893456000000}
+    "auth": {
+      "carrier": "private-https-authorization-header",
+      "method": "GET",
+      "path": "/internal/status",
+      "privateOrigin": "https://cell-01.private.hive.test:8443",
+      "tokenCellId": "cell-01",
+      "tokenNonce": "AAAAAAAAAAAAAAAAAAAAAA",
+      "headerNonce": "AAAAAAAAAAAAAAAAAAAAAA",
+      "tokenJti": "31313131-3131-4131-8131-313131313131",
+      "usedTokenJtis": [],
+      "usedNonces": []
+    },
+    "response": {
+      "type": "cell-status",
+      "v": 2,
+      "nonce": "AAAAAAAAAAAAAAAAAAAAAA",
+      "cellId": "cell-02",
+      "cellIncarnationId": "22222222-2222-4222-8222-222222222222",
+      "publicReady": true,
+      "lifecyclePermit": true,
+      "cryptographicReady": true,
+      "resourceReady": true,
+      "processReady": true,
+      "draining": false,
+      "preAuthSlotsUsed": 0,
+      "authenticatedSlotsUsed": 0,
+      "acceptedVerifierKids": ["relay-test-2026-01"],
+      "keysetDigest": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "buildDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "observedAt": 1893456000000
+    }
   }
 }

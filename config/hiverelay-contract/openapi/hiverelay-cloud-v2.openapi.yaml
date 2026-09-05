@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HiveRelay v2 contract
-  version: hiverelay-v2-p0.5
+  version: hiverelay-v2-p0.6
   description: >-
     Authority interface shapes. Every implementation remains disabled until its
     corresponding product and capability gates are enabled.
@@ -19,6 +19,30 @@ x-hiverelay-public-wss:
     role: client-admission
     credential: clientAdmissionToken
 x-hiverelay-cell-private-paths:
+  /hive/v1/runtimes/{runtimeRecordId}/relay/control-leases/refresh:
+    post:
+      operationId: refreshRuntimeRelayControlLeaseV2
+      security: []
+      description: Runtime-proof-only expiry CAS for the currently acknowledged owner; preserves control generation and never creates an owner.
+      parameters:
+        - name: runtimeRecordId
+          in: path
+          required: true
+          schema: {$ref: '#/components/schemas/UuidV4'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/control-lease-refresh.schema.json'}
+      responses:
+        '200':
+          description: Current assignment and refreshed or replay-stable control lease
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssignmentResponse'}
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '409': {$ref: '#/components/responses/SymbolicConflict'}
+        '503': {$ref: '#/components/responses/RelayUnavailable'}
   - /internal/status
   - /internal/v1/lifecycle
   - /internal/v1/fences

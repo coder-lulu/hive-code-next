@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.private-ops.lifecycle-deadline-too-long.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-command",
@@ -8,7 +8,17 @@
   "validationTime": 1893456000000,
   "input": {
     "commands": [
-      {"type": "cell-lifecycle-command", "v": 2, "commandType": "INCARNATION_DRAIN", "commandId": "27272727-2727-4727-8727-272727272727", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "lifecycleGeneration": 12, "issuedAt": 1893456000000, "deadlineAt": 1893456120001}
+      {
+        "type": "cell-lifecycle-command",
+        "v": 2,
+        "commandType": "INCARNATION_DRAIN",
+        "commandId": "27272727-2727-4727-8727-272727272727",
+        "cellId": "cell-01",
+        "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+        "lifecycleGeneration": 12,
+        "issuedAt": 1893456000000,
+        "deadlineAt": 1893456120001
+      }
     ]
   }
 }

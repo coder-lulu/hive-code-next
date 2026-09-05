@@ -1,3 +1,4 @@
+import { registerMockCellAdmissionGrant } from './hiverelay-mock-cell-admission-grants'
 import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import type { WebSocket } from 'ws'
@@ -25,6 +26,7 @@ import {
   reserveMockCellClient,
   sendMockCellJson,
   type AdmissionRecord,
+  type MockAdmissionGrant,
   type CellConnection,
   type MockCellEvent,
   MockCellEventLog,
@@ -39,26 +41,24 @@ export class ProgrammableHiveRelayMockCell {
   private readonly connections = new Map<string, CellConnection>()
   private readonly heldConnectionOpens: ConnectionOpen[] = []
   private readonly preAuthClients = new Set<WebSocket>()
-  private readonly eventLog = new MockCellEventLog(this.options.eventCapacity ?? 1_024)
-  private currentIncarnationId = this.options.binding.cellIncarnationId
+  private readonly eventLog: MockCellEventLog
+  private currentIncarnationId: string
   private control: WebSocket | null = null
   private hostHello: HostHello | null = null
   private connectionSequence = 0
   private draining = false
-  private holdConnectionOpens = this.options.holdConnectionOpens ?? false
+  private holdConnectionOpens: boolean
 
   constructor(private readonly options: ProgrammableMockCellOptions) {
-    for (const grant of options.admissionGrants) {
-      const tokenDigest = digestMockCellCredential(grant.token)
-      if (this.admissions.has(tokenDigest)) {
-        throw new Error('Duplicate mock admission token')
-      }
-      const { token: _token, ...binding } = grant
-      this.admissions.set(tokenDigest, { ...binding, state: 'UNUSED' })
-    }
-    this.server = new HiveRelayMockCellServer((socket, request, route) =>
-      this.acceptRoute(socket, request, route)
-    )
+    this.eventLog = new MockCellEventLog(options.eventCapacity ?? 1_024)
+    this.currentIncarnationId = options.binding.cellIncarnationId
+    this.holdConnectionOpens = options.holdConnectionOpens ?? false
+    options.admissionGrants.forEach((grant) => this.registerAdmissionGrant(grant))
+    this.server = new HiveRelayMockCellServer(this.acceptRoute.bind(this))
+  }
+
+  registerAdmissionGrant(grant: MockAdmissionGrant): void {
+    registerMockCellAdmissionGrant(this.admissions, grant)
   }
 
   get baseUrl(): string {
@@ -86,7 +86,9 @@ export class ProgrammableHiveRelayMockCell {
   }
 
   pendingConnectionIds(): string[] {
-    return [...this.connections.values()].filter((connection) => connection.state === 'WAIT_HOST_ATTACH').map((connection) => connection.connId)
+    return [...this.connections.values()]
+      .filter((connection) => connection.state === 'WAIT_HOST_ATTACH')
+      .map((connection) => connection.connId)
   }
 
   admissionState(token: string): AdmissionRecord['state'] | null {

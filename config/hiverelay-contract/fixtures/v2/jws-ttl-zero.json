@@ -1,21 +1,15 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.jws.ttl-zero.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "jws",
-  "applicableComponents": [
-    "cloud",
-    "hivecode",
-    "cell"
-  ],
+  "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000,
   "input": {
     "verifierContext": {
       "issuer": "https://cloud.hive.test/relay",
-      "acceptedVerifierKids": [
-        "relay-test-2026-01"
-      ],
+      "acceptedVerifierKids": ["relay-test-2026-01"],
       "privateOriginsByCellId": {
         "cell-01": "https://cell-01.private.hive.test:8443"
       }

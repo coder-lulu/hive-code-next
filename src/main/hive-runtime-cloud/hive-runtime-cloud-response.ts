@@ -1,3 +1,9 @@
+import {
+  HIVE_RELAY_HEARTBEAT_RESPONSE_FIELDS,
+  normalizeHiveRuntimeRelayHeartbeatResponse
+} from './relay-host/hive-runtime-relay-heartbeat-validation'
+import type { HiveRuntimeRelayHeartbeatResponseControl } from './relay-host/hive-runtime-relay-heartbeat-types'
+
 export type RuntimeRegistrationLookup =
   | { exists: false }
   | {
@@ -41,13 +47,14 @@ export type RuntimeLease = {
   fencingEpoch: number
 }
 
-export type RuntimeHeartbeat = RuntimeLease & {
-  acceptedHeartbeatSeq: number
-  observedAt: number
-  leaseExpiresAt: number
-  presence: 'ONLINE' | 'STALE' | 'OFFLINE' | 'FENCED'
-  duplicate: boolean
-}
+export type RuntimeHeartbeat = RuntimeLease &
+  Partial<HiveRuntimeRelayHeartbeatResponseControl> & {
+    acceptedHeartbeatSeq: number
+    observedAt: number
+    leaseExpiresAt: number
+    presence: 'ONLINE' | 'STALE' | 'OFFLINE' | 'FENCED'
+    duplicate: boolean
+  }
 
 export type RuntimeConnectionTicketConsume = Readonly<{
   managedWebSessionId: string
@@ -247,7 +254,8 @@ export function normalizeHeartbeat(value: unknown): RuntimeHeartbeat {
     'observedAt',
     'leaseExpiresAt',
     'presence',
-    'duplicate'
+    'duplicate',
+    ...(Object.hasOwn(value, 'responseVersion') ? HIVE_RELAY_HEARTBEAT_RESPONSE_FIELDS : [])
   ])
   if (
     !['ONLINE', 'STALE', 'OFFLINE', 'FENCED'].includes(String(value.presence)) ||
@@ -264,7 +272,10 @@ export function normalizeHeartbeat(value: unknown): RuntimeHeartbeat {
     observedAt: instant(value.observedAt),
     leaseExpiresAt: instant(value.leaseExpiresAt),
     presence: value.presence as RuntimeHeartbeat['presence'],
-    duplicate: value.duplicate
+    duplicate: value.duplicate,
+    ...(Object.hasOwn(value, 'responseVersion')
+      ? normalizeHiveRuntimeRelayHeartbeatResponse(value, instant(value.observedAt))
+      : {})
   }
 }
 

@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { getAppEnvironment } from '../../shared/app-environment'
 import { hivecodeProductConfig } from '../../shared/generated/product-config'
 
 export type HiveAccountConfig = {
@@ -17,7 +17,7 @@ const SCOPE = 'openid profile email hive.session.exchange'
 
 function isPackagedBuild(): boolean {
   try {
-    return app?.isPackaged === true
+    return getAppEnvironment().isPackaged() === true
   } catch {
     return false
   }

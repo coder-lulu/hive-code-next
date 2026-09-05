@@ -12,7 +12,11 @@ import {
   sealMobileE2EEV2Frame
 } from '../../../shared/mobile-e2ee-v2-framing'
 import { deriveSharedKey } from './e2ee-crypto'
-import { E2EEChannel } from './e2ee-channel'
+import { E2EEChannel, type E2EEChannelOptions } from './e2ee-channel'
+import type {
+  E2EEAuthenticatedAccountSession,
+  E2EEAccountBinding
+} from './e2ee-channel-account-authentication'
 import { deriveMobileE2EEV2KeySchedule } from './mobile-e2ee-v2-key-schedule'
 
 const server = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(1))
@@ -48,7 +52,7 @@ function hello(): MobileE2EEV2Hello {
   }
 }
 
-function setup() {
+function setup(accountOptions: Partial<E2EEChannelOptions> = {}) {
   const ws = createMockWs()
   const onReady = vi.fn()
   const onError = vi.fn()
@@ -63,7 +67,8 @@ function setup() {
     onReady,
     onError,
     transportContext: { transport: 'relay', relayHostId: 'AbCdEf0123_-xyZ9' },
-    requireV2: true
+    requireV2: true,
+    ...accountOptions
   })
   return { ws, channel, onReady, onError, resolveAuthenticatedDevice }
 }
@@ -275,5 +280,88 @@ describe('E2EEChannel v2', () => {
       new Uint8Array([2])
     )
     expect(ctx.ws.sent[3]!.options).toEqual({ binary: true })
+  })
+})
+
+describe('Account asynchronous authentication boundary', () => {
+  const auth = {
+    type: 'e2ee_auth',
+    principalKind: 'account_runtime_session',
+    ticketId: '11111111-1111-4111-8111-111111111111',
+    ticketSecret: 'A'.repeat(43)
+  }
+  function pending() {
+    let resolve!: (principal: E2EEAuthenticatedAccountSession | null) => void
+    const resolver = vi.fn(
+      (_auth: unknown, _signal: AbortSignal, _binding: E2EEAccountBinding) =>
+        new Promise<E2EEAuthenticatedAccountSession | null>((done) => {
+          resolve = done
+        })
+    )
+    const ready = vi.fn()
+    const ctx = setup({ resolveAccountSession: resolver, onAccountReady: ready })
+    const { schedule } = startV2(ctx)
+    const message = vi.fn()
+    ctx.channel.onMessage(message)
+    ctx.channel.handleRawMessage(clientText(JSON.stringify(auth), schedule, 0n))
+    return { ...ctx, resolver, ready, resolve, schedule, message }
+  }
+  const principal = (): E2EEAuthenticatedAccountSession => ({
+    principalKind: 'account_runtime_session',
+    runtimeSessionId: 'session',
+    expiresAt: Date.now() + 60000
+  })
+  it('opens RPC only after the resolver adjudicates activation and never authenticates a device', async () => {
+    const ctx = pending()
+    expect(ctx.ws.sent).toHaveLength(1)
+    expect(ctx.resolver.mock.calls[0]![2]).toEqual({
+      clientPublicKeyB64: Buffer.from(client.publicKey).toString('base64'),
+      transcriptHashB64: Buffer.from(ctx.schedule.transcriptHash).toString('base64')
+    })
+    expect(ctx.ready).not.toHaveBeenCalled()
+    ctx.resolve(principal())
+    await Promise.resolve()
+    expect(ctx.ready).toHaveBeenCalledOnce()
+    expect(ctx.onReady).not.toHaveBeenCalled()
+    expect(ctx.resolveAuthenticatedDevice).not.toHaveBeenCalled()
+    ctx.channel.handleRawMessage(clientText('{"method":"status.get"}', ctx.schedule, 1n))
+    expect(ctx.message).toHaveBeenCalledOnce()
+    ctx.channel.destroy()
+  })
+  it.each(['reentry', 'close', 'deadline'] as const)(
+    'aborts %s and ignores late consume completion',
+    async (cause) => {
+      vi.useFakeTimers()
+      const ctx = pending()
+      if (cause === 'reentry') {
+        ctx.channel.handleRawMessage(clientText(JSON.stringify(auth), ctx.schedule, 1n))
+      }
+      if (cause === 'close') {
+        ctx.channel.destroy()
+      }
+      if (cause === 'deadline') {
+        vi.advanceTimersByTime(10000)
+      }
+      expect(ctx.resolver.mock.calls[0]![1].aborted).toBe(true)
+      ctx.resolve(principal())
+      await Promise.resolve()
+      expect(ctx.resolver).toHaveBeenCalledOnce()
+      expect(ctx.ready).not.toHaveBeenCalled()
+      expect(ctx.message).not.toHaveBeenCalled()
+      ctx.channel.destroy()
+      vi.useRealTimers()
+    }
+  )
+  it('refuses extra authentication credentials before invoking a resolver', () => {
+    const resolver = vi.fn()
+    const ctx = setup({ resolveAccountSession: resolver, onAccountReady: vi.fn() })
+    const { schedule } = startV2(ctx)
+    ctx.channel.handleRawMessage(
+      clientText(JSON.stringify({ ...auth, deviceToken: 'forbidden' }), schedule, 0n)
+    )
+    expect(resolver).not.toHaveBeenCalled()
+    expect(ctx.resolveAuthenticatedDevice).not.toHaveBeenCalled()
+    expect(ctx.onError).toHaveBeenCalledWith(4001, 'Unauthorized', 'account_runtime_session')
+    ctx.channel.destroy()
   })
 })

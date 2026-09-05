@@ -3,6 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../../shared/secret-store', () => ({
+  getSecretStore: () => ({ ...safeStorageMock, describeProtectionGap: () => null })
+}))
+
 const safeStorageMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
   encryptString: vi.fn((value: string) => Buffer.from(value, 'utf8')),

@@ -19,6 +19,7 @@ export type RuntimeServiceCommandSurface = {
   registerOwnedSubscriptionCleanup: RuntimeSubscriptionRegistry['registerOwned']
   cleanupSubscription: RuntimeSubscriptionRegistry['cleanup']
   retrySubscriptionCleanupAfter: RuntimeSubscriptionRegistry['retryAfter']
+  cleanupSubscriptionAndWaitIfOwnedByConnection: RuntimeSubscriptionRegistry['cleanupAndWaitIfOwnedByConnection']
   cleanupSubscriptionAndWait: RuntimeSubscriptionRegistry['cleanupAndWait']
   cleanupSubscriptionsByPrefix: RuntimeSubscriptionRegistry['cleanupByPrefix']
   cleanupSubscriptionsForConnection: RuntimeSubscriptionRegistry['cleanupForConnection']
@@ -98,6 +99,8 @@ export function installRuntimeServiceCommandSurface(
     registerOwnedSubscriptionCleanup: subscriptions.registerOwned.bind(subscriptions),
     cleanupSubscription: subscriptions.cleanup.bind(subscriptions),
     retrySubscriptionCleanupAfter: subscriptions.retryAfter.bind(subscriptions),
+    cleanupSubscriptionAndWaitIfOwnedByConnection:
+      subscriptions.cleanupAndWaitIfOwnedByConnection.bind(subscriptions),
     cleanupSubscriptionAndWait: subscriptions.cleanupAndWait.bind(subscriptions),
     cleanupSubscriptionsByPrefix: subscriptions.cleanupByPrefix.bind(subscriptions),
     cleanupSubscriptionsForConnection: subscriptions.cleanupForConnection.bind(subscriptions),

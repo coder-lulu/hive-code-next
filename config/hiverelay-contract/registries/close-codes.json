@@ -1,21 +1,71 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "codes": [
-    {"symbol": "NORMAL", "code": 1000, "retry": "NONE", "action": "CLOSE"},
-    {"symbol": "PROTOCOL_ERROR", "code": 1002, "retry": "NONE", "action": "UPGRADE_OR_FIX_CLIENT"},
-    {"symbol": "POLICY_REJECTED", "code": 1008, "retry": "NONE", "action": "REAUTHORIZE"},
-    {"symbol": "FRAME_TOO_LARGE", "code": 1009, "retry": "NONE", "action": "REDUCE_MESSAGE"},
-    {"symbol": "SERVICE_RESTART", "code": 1012, "retry": "FULL_JITTER", "action": "RESOLVE_ASSIGNMENT"},
-    {"symbol": "CAPACITY_EXCEEDED", "code": 1013, "retry": "RETRY_AFTER_FULL_JITTER", "action": "RETRY_NEW_CONNECTION"},
-    {"symbol": "AUTH_REQUIRED", "code": 4401, "retry": "NEW_CREDENTIAL_ONLY", "action": "REAUTHORIZE"},
-    {"symbol": "ORIGIN_REJECTED", "code": 4403, "retry": "NONE", "action": "FIX_ORIGIN"},
-    {"symbol": "AUTH_TIMEOUT", "code": 4408, "retry": "NEW_CONNECTION_ONLY", "action": "RECONNECT"},
-    {"symbol": "REPLAY_DETECTED", "code": 4409, "retry": "NEW_CREDENTIAL_ONLY", "action": "REAUTHORIZE"},
-    {"symbol": "STALE_BINDING", "code": 4410, "retry": "NEW_ASSIGNMENT_ONLY", "action": "RESOLVE_ASSIGNMENT"},
-    {"symbol": "HOST_UNAVAILABLE", "code": 4411, "retry": "RETRY_AFTER_FULL_JITTER", "action": "RESOLVE_ASSIGNMENT"},
-    {"symbol": "RELAY_UNAVAILABLE", "code": 4412, "retry": "RETRY_AFTER_FULL_JITTER", "action": "USE_EXPLICIT_ALTERNATE_TRANSPORT"},
-    {"symbol": "DRAINING", "code": 4413, "retry": "NEW_ASSIGNMENT_ONLY", "action": "RESOLVE_ASSIGNMENT"},
-    {"symbol": "UPGRADE_REQUIRED", "code": 4426, "retry": "NONE", "action": "UPGRADE_COMPONENT"}
+    { "symbol": "NORMAL", "code": 1000, "retry": "NONE", "action": "CLOSE" },
+    {
+      "symbol": "PROTOCOL_ERROR",
+      "code": 1002,
+      "retry": "NONE",
+      "action": "UPGRADE_OR_FIX_CLIENT"
+    },
+    { "symbol": "POLICY_REJECTED", "code": 1008, "retry": "NONE", "action": "REAUTHORIZE" },
+    { "symbol": "FRAME_TOO_LARGE", "code": 1009, "retry": "NONE", "action": "REDUCE_MESSAGE" },
+    {
+      "symbol": "SERVICE_RESTART",
+      "code": 1012,
+      "retry": "FULL_JITTER",
+      "action": "RESOLVE_ASSIGNMENT"
+    },
+    {
+      "symbol": "CAPACITY_EXCEEDED",
+      "code": 1013,
+      "retry": "RETRY_AFTER_FULL_JITTER",
+      "action": "RETRY_NEW_CONNECTION"
+    },
+    {
+      "symbol": "AUTH_REQUIRED",
+      "code": 4401,
+      "retry": "NEW_CREDENTIAL_ONLY",
+      "action": "REAUTHORIZE"
+    },
+    { "symbol": "ORIGIN_REJECTED", "code": 4403, "retry": "NONE", "action": "FIX_ORIGIN" },
+    {
+      "symbol": "AUTH_TIMEOUT",
+      "code": 4408,
+      "retry": "NEW_CONNECTION_ONLY",
+      "action": "RECONNECT"
+    },
+    {
+      "symbol": "REPLAY_DETECTED",
+      "code": 4409,
+      "retry": "NEW_CREDENTIAL_ONLY",
+      "action": "REAUTHORIZE"
+    },
+    {
+      "symbol": "STALE_BINDING",
+      "code": 4410,
+      "retry": "NEW_ASSIGNMENT_ONLY",
+      "action": "RESOLVE_ASSIGNMENT"
+    },
+    {
+      "symbol": "HOST_UNAVAILABLE",
+      "code": 4411,
+      "retry": "RETRY_AFTER_FULL_JITTER",
+      "action": "RESOLVE_ASSIGNMENT"
+    },
+    {
+      "symbol": "RELAY_UNAVAILABLE",
+      "code": 4412,
+      "retry": "RETRY_AFTER_FULL_JITTER",
+      "action": "USE_EXPLICIT_ALTERNATE_TRANSPORT"
+    },
+    {
+      "symbol": "DRAINING",
+      "code": 4413,
+      "retry": "NEW_ASSIGNMENT_ONLY",
+      "action": "RESOLVE_ASSIGNMENT"
+    },
+    { "symbol": "UPGRADE_REQUIRED", "code": 4426, "retry": "NONE", "action": "UPGRADE_COMPONENT" }
   ]
 }

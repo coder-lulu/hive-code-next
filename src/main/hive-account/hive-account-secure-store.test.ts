@@ -4,8 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../../shared/secret-store', () => ({ getSecretStore: () => safeStorageMock }))
+
 const safeStorageMock = vi.hoisted(() => ({
   available: true,
+  describeProtectionGap: vi.fn<() => string | null>(() => null),
   isEncryptionAvailable: vi.fn(() => safeStorageMock.available),
   encryptString: vi.fn((value: string) => Buffer.from(value, 'utf8')),
   decryptString: vi.fn((value: Buffer) => value.toString('utf8'))
@@ -25,6 +28,7 @@ let userDataPath: string
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), 'hive-account-store-'))
   safeStorageMock.available = true
+  safeStorageMock.describeProtectionGap.mockReturnValue(null)
   safeStorageMock.isEncryptionAvailable.mockClear()
   safeStorageMock.encryptString.mockClear()
   safeStorageMock.decryptString.mockClear()
@@ -33,6 +37,11 @@ beforeEach(() => {
 afterEach(() => rmSync(userDataPath, { recursive: true, force: true }))
 
 describe('Hive account secure identity and session storage', () => {
+  it('refuses a host store that can round-trip but reports no real keyring protection', () => {
+    safeStorageMock.describeProtectionGap.mockReturnValue('basic_text obfuscation')
+    expect(getOrCreateHiveDeviceIdentity(userDataPath).status).toBe('unavailable')
+    expect(safeStorageMock.encryptString).not.toHaveBeenCalled()
+  })
   it('creates one stable Ed25519 identity and signs the canonical proof', () => {
     const first = getOrCreateHiveDeviceIdentity(userDataPath)
     const second = getOrCreateHiveDeviceIdentity(userDataPath)

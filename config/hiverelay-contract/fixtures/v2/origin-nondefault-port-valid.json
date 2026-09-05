@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.origin.nondefault-port.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "origin",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
-  "input": {"origin": "https://client.hive.test:8443", "allowedOrigins": ["https://client.hive.test:8443"], "browser": true}
+  "input": {
+    "origin": "https://client.hive.test:8443",
+    "allowedOrigins": ["https://client.hive.test:8443"],
+    "browser": true
+  }
 }

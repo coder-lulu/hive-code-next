@@ -180,6 +180,7 @@
     "config/upstream-sync-boundary.json",
     "config/upstream-sync-state.json",
     "docs/engineering/fork-boundary-policy.md",
+    "docs/engineering/hiverelay-p3-implementation.md",
     "docs/engineering/product-design.md",
     "docs/readme/README.es.md",
     "docs/readme/README.fr.md",

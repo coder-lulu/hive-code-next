@@ -1,5 +1,6 @@
 import { createHash, createPrivateKey, randomUUID, sign } from 'node:crypto'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
+import type { HiveRuntimeRelayHeartbeatControl } from './relay-host/hive-runtime-relay-heartbeat-types'
 
 const ALGORITHM = 'Ed25519' as const
 const METHOD = 'POST' as const
@@ -22,6 +23,7 @@ export type HiveRuntimeCloudCapability =
   | 'runtime-health-v1'
   | 'shared-control-v1'
   | 'web-launch-grant-v1'
+  | 'runtime-session-control-v1'
 
 export type HiveRuntimeCloudReadinessReason =
   | 'starting'
@@ -38,6 +40,7 @@ export type HiveRuntimeCloudConnectionCapability =
   | 'hive-direct'
   | 'hive-relay'
   | 'tailscale-embedded-evaluation'
+  | 'ticket-connect-v2'
 
 export type HiveRuntimeCloudReport = Readonly<{
   runtimeVersion: string
@@ -59,6 +62,7 @@ export type HiveRuntimeCloudReport = Readonly<{
   webClientPath?: string
   websocketPath?: string
   webEndpointExpiresAt?: string
+  relayControl?: HiveRuntimeRelayHeartbeatControl
 }>
 
 export type ProofContext = Readonly<{ authorityId: string; issuedAt?: string; nonce?: string }>

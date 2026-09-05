@@ -1,10 +1,22 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.session-transition.sequence-reuse-new-id.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "session-transition",
   "applicableComponents": ["cloud", "hivecode"],
   "validationTime": 1893456000000,
-  "input": {"highestContiguousAck": 41, "stored": {"sequence": 41, "transitionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "replay": {"sequence": 41, "transitionId": "20202020-2020-4020-8020-202020202020", "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
+  "input": {
+    "highestContiguousAck": 41,
+    "stored": {
+      "sequence": 41,
+      "transitionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "replay": {
+      "sequence": 41,
+      "transitionId": "20202020-2020-4020-8020-202020202020",
+      "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
 }

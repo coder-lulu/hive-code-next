@@ -1,13 +1,19 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.private-ops.body-conflict.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-command",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
   "input": {
-    "previous": {"commandId": "77777777-7777-4777-8777-777777777777", "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-    "current": {"commandId": "77777777-7777-4777-8777-777777777777", "bodySha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+    "previous": {
+      "commandId": "77777777-7777-4777-8777-777777777777",
+      "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "current": {
+      "commandId": "77777777-7777-4777-8777-777777777777",
+      "bodySha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
   }
 }

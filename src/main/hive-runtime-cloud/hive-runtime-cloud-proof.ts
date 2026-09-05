@@ -193,6 +193,9 @@ export function createRuntimeHeartbeatRequest(
       readinessReasonCode: input.report.readinessReasonCode,
       startedAt: input.report.startedAt,
       connectionCapabilities: [...input.report.connectionCapabilities],
+      ...(input.report.relayControl
+        ? { relayControl: structuredClone(input.report.relayControl) }
+        : {}),
       ...(input.report.deviceName !== undefined ? { deviceName: input.report.deviceName } : {}),
       ...(input.report.osName !== undefined ? { osName: input.report.osName } : {}),
       ...(input.report.osVersion !== undefined ? { osVersion: input.report.osVersion } : {}),

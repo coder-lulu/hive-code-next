@@ -1,4 +1,5 @@
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
+import type { RuntimeHeartbeat } from './hive-runtime-cloud-response'
 import {
   createRuntimeHeartbeatRequest,
   type HiveRuntimeCloudReport
@@ -11,7 +12,7 @@ import {
 
 export type PendingHeartbeat = Parameters<typeof createRuntimeHeartbeatRequest>[1]
 
-type HeartbeatOptions = {
+export type HeartbeatOptions = {
   client: PresenceClient
   identity: HiveRuntimeCloudIdentity
   authorityId: string
@@ -22,6 +23,7 @@ type HeartbeatOptions = {
   signal: AbortSignal
   onPrepared: (pending: PendingHeartbeat) => void
   assertCurrent: () => void
+  onAccepted?: (response: RuntimeHeartbeat, sent: PendingHeartbeat) => void
 }
 
 export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): Promise<number> {
@@ -35,7 +37,7 @@ export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): 
       fencingEpoch: options.lease.fencingEpoch,
       heartbeatSeq: options.lease.nextHeartbeatSeq,
       sourceReportedAt: new Date(options.now()).toISOString(),
-      report: options.report
+      report: structuredClone(options.report)
     } satisfies PendingHeartbeat)
   options.onPrepared(pending)
   const heartbeat = await options.client.heartbeat(
@@ -57,5 +59,10 @@ export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): 
   if (heartbeat.presence === 'FENCED') {
     throw new FatalPresenceError('heartbeat_fenced')
   }
+  if (pending.report.relayControl && heartbeat.responseVersion !== 'runtime-session-control/v1') {
+    throw new FatalPresenceError('heartbeat_relay_control_missing')
+  }
+  options.onAccepted?.(heartbeat, pending)
+  options.assertCurrent()
   return heartbeat.acceptedHeartbeatSeq + 1
 }

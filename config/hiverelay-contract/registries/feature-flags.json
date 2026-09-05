@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "flags": [
-    {"key": "hive.relay.enabled", "component": "cloud", "default": false},
-    {"key": "hive.relay.assignment.enabled", "component": "cloud", "default": false},
-    {"key": "hive.relay.client-admission.enabled", "component": "cloud", "default": false},
-    {"key": "hive.relay.lifecycle.enabled", "component": "cloud", "default": false},
-    {"key": "hive.relay.heartbeat-control.enabled", "component": "cloud", "default": false},
-    {"key": "hive.relay.quota.enabled", "component": "cloud", "default": false},
-    {"key": "HIVE_RELAY_V2_PUBLIC_ENABLED", "component": "cell", "default": false},
-    {"key": "hiveRelayV2HostEnabled", "component": "hivecode-runtime", "default": false},
-    {"key": "hiveRelayV2DesktopEnabled", "component": "hivecode-desktop", "default": false},
-    {"key": "hiveRelayV2MobileEnabled", "component": "hivecode-mobile", "default": false},
-    {"key": "hiveRelayV2WebEnabled", "component": "hivecode-web", "default": false}
+    { "key": "hive.relay.enabled", "component": "cloud", "default": false },
+    { "key": "hive.relay.assignment.enabled", "component": "cloud", "default": false },
+    { "key": "hive.relay.client-admission.enabled", "component": "cloud", "default": false },
+    { "key": "hive.relay.lifecycle.enabled", "component": "cloud", "default": false },
+    { "key": "hive.relay.heartbeat-control.enabled", "component": "cloud", "default": false },
+    { "key": "hive.relay.quota.enabled", "component": "cloud", "default": false },
+    { "key": "HIVE_RELAY_V2_PUBLIC_ENABLED", "component": "cell", "default": false },
+    { "key": "hiveRelayV2HostEnabled", "component": "hivecode-runtime", "default": false },
+    { "key": "hiveRelayV2DesktopEnabled", "component": "hivecode-desktop", "default": false },
+    { "key": "hiveRelayV2MobileEnabled", "component": "hivecode-mobile", "default": false },
+    { "key": "hiveRelayV2WebEnabled", "component": "hivecode-web", "default": false }
   ],
   "capabilityPublishedByDefault": false
 }

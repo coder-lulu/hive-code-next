@@ -11,7 +11,8 @@ import type {
 import type { RpcRequest, RpcResponse } from '../rpc/core'
 import type { WebSocketTransport } from '../rpc/ws-transport'
 import type { DeviceScope } from '../device-registry'
-import { RuntimeRpcCloudDispatch, LOCAL_ONLY_RPC_METHODS } from './runtime-rpc-cloud-dispatch'
+import { LOCAL_ONLY_RPC_METHODS } from './runtime-rpc-cloud-dispatch'
+import { RuntimeRpcAccountDispatch } from './runtime-rpc-account-dispatch'
 import { classifyRuntimeLongPoll } from './runtime-rpc-long-poll'
 import { MOBILE_RPC_METHOD_ALLOWLIST } from './runtime-rpc-mobile-method-allowlist'
 
@@ -29,7 +30,7 @@ function injectDeviceScope(response: string, scope: DeviceScope): string {
   }
 }
 
-export class RuntimeRpcWebSocketDispatch extends RuntimeRpcCloudDispatch {
+export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
   // Why: WebSocket dispatch is streaming (multiple responses) and auths via per-device tokens, not the shared token.
   protected async handleWebSocketMessage(
     rawMessage: string,

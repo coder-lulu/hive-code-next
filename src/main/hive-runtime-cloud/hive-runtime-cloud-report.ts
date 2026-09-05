@@ -1,12 +1,44 @@
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { HiveRuntimeCloudWebLaunchConfig } from './hive-runtime-cloud-config'
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
+import type { HiveRuntimeRelayHeartbeatSnapshot } from './relay-host/hive-runtime-relay-heartbeat-types'
+import { isHiveRuntimeRelayHeartbeatControl } from './relay-host/hive-runtime-relay-heartbeat-validation'
 import {
   getHiveRuntimeDeviceInfoSnapshot,
   type HiveRuntimeDeviceInfo
 } from './hive-runtime-device-info'
 
 const WEB_ENDPOINT_TTL_MS = 75_000
+
+export function withHiveRuntimeRelayHeartbeatReport(
+  report: HiveRuntimeCloudReport,
+  snapshot: HiveRuntimeRelayHeartbeatSnapshot | null
+): HiveRuntimeCloudReport {
+  if (!snapshot) {
+    return report
+  }
+  if (
+    !isHiveRuntimeRelayHeartbeatControl(snapshot.relayControl) ||
+    typeof snapshot.advertiseRelay !== 'boolean' ||
+    (snapshot.advertiseRelay && !snapshot.relayControl.controlConnectionAcknowledged)
+  ) {
+    throw new Error('invalid_hive_runtime_relay_heartbeat_report')
+  }
+  const capabilities = [...new Set([...report.capabilities, 'runtime-session-control-v1' as const])]
+  const connections: HiveRuntimeCloudReport['connectionCapabilities'][number][] =
+    report.connectionCapabilities.filter(
+      (item) => item !== 'hive-relay' && item !== 'ticket-connect-v2'
+    )
+  if (snapshot.advertiseRelay) {
+    connections.push('hive-relay', 'ticket-connect-v2')
+  }
+  return {
+    ...report,
+    capabilities,
+    connectionCapabilities: connections,
+    relayControl: structuredClone(snapshot.relayControl)
+  }
+}
 
 type RuntimeReportSource = {
   getStartedAt: () => number

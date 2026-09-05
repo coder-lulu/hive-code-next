@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.origin.trailing-label-hyphen.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "origin",
   "applicableComponents": ["cloud", "hivecode", "cell"],
   "validationTime": 1893456000000,
-  "input": {"origin": "https://a-.hive.test", "allowedOrigins": ["https://a-.hive.test"], "browser": true}
+  "input": {
+    "origin": "https://a-.hive.test",
+    "allowedOrigins": ["https://a-.hive.test"],
+    "browser": true
+  }
 }

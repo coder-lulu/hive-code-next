@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.5",
+  "contractRevision": "hiverelay-v2-p0.6",
   "caseId": "v2.private-ops.commands.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-command",
@@ -8,10 +8,50 @@
   "validationTime": 1893456000000,
   "input": {
     "commands": [
-      {"type": "cell-assignment-fence", "v": 2, "commandType": "ASSIGNMENT_FENCE", "commandId": "77777777-7777-4777-8777-777777777777", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "assignmentId": "33333333-3333-4333-8333-333333333333", "rejectAssignmentEpochAtMost": 5, "rejectControlGenerationAtMost": 2, "issuedAt": 1893456000000},
-      {"type": "cell-lifecycle-command", "v": 2, "commandType": "INCARNATION_ACTIVATE", "commandId": "88888888-8888-4888-8888-888888888888", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "lifecycleGeneration": 9, "issuedAt": 1893456000000, "deadlineAt": 1893456120000},
-      {"type": "cell-lifecycle-command", "v": 2, "commandType": "INCARNATION_DRAIN", "commandId": "99999999-9999-4999-8999-999999999999", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "lifecycleGeneration": 10, "issuedAt": 1893456000000, "deadlineAt": 1893456120000},
-      {"type": "cell-incarnation-fence", "v": 2, "commandType": "INCARNATION_FENCE", "commandId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "lifecycleGeneration": 11, "issuedAt": 1893456000000}
+      {
+        "type": "cell-assignment-fence",
+        "v": 2,
+        "commandType": "ASSIGNMENT_FENCE",
+        "commandId": "77777777-7777-4777-8777-777777777777",
+        "cellId": "cell-01",
+        "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+        "assignmentId": "33333333-3333-4333-8333-333333333333",
+        "rejectAssignmentEpochAtMost": 5,
+        "rejectControlGenerationAtMost": 2,
+        "issuedAt": 1893456000000
+      },
+      {
+        "type": "cell-lifecycle-command",
+        "v": 2,
+        "commandType": "INCARNATION_ACTIVATE",
+        "commandId": "88888888-8888-4888-8888-888888888888",
+        "cellId": "cell-01",
+        "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+        "lifecycleGeneration": 9,
+        "issuedAt": 1893456000000,
+        "deadlineAt": 1893456120000
+      },
+      {
+        "type": "cell-lifecycle-command",
+        "v": 2,
+        "commandType": "INCARNATION_DRAIN",
+        "commandId": "99999999-9999-4999-8999-999999999999",
+        "cellId": "cell-01",
+        "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+        "lifecycleGeneration": 10,
+        "issuedAt": 1893456000000,
+        "deadlineAt": 1893456120000
+      },
+      {
+        "type": "cell-incarnation-fence",
+        "v": 2,
+        "commandType": "INCARNATION_FENCE",
+        "commandId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "cellId": "cell-01",
+        "targetIncarnationId": "22222222-2222-4222-8222-222222222222",
+        "lifecycleGeneration": 11,
+        "issuedAt": 1893456000000
+      }
     ]
   }
 }

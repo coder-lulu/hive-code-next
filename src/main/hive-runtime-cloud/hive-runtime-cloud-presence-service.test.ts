@@ -126,6 +126,63 @@ async function startClaimed(service: HiveRuntimeCloudPresenceService): Promise<v
 }
 
 describe('Hive Runtime Cloud Presence service', () => {
+  it('immediately coalesces relay heartbeat requests without concurrent sends or sequence reuse', async () => {
+    const { service, client } = fixture(claimedState())
+    await startClaimed(service)
+    const baseResponse = await client.heartbeat.mock.results[0].value
+    let release: (() => void) | undefined
+    let active = 0
+    let maximumActive = 0
+    client.heartbeat.mockImplementation(async (request: { heartbeatSeq: number }) => {
+      active++
+      maximumActive = Math.max(maximumActive, active)
+      if (request.heartbeatSeq === 2) {
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+      }
+      active--
+      return {
+        ...baseResponse,
+        acceptedHeartbeatSeq: request.heartbeatSeq,
+        responseVersion: 'runtime-session-control/v1',
+        ackedSessionTransitionSequence: 0,
+        sessionTransitionResults: [],
+        sessionAuthorityUntil: null,
+        ackedControlSequence: 0,
+        controlCommands: [],
+        nextControlSequence: 1
+      }
+    })
+    const accept = vi.fn()
+    service.setRelayHeartbeatContributor({
+      snapshot: () => ({
+        advertiseRelay: true,
+        relayControl: {
+          assignmentId: '22000000-0000-4000-8000-000000000001',
+          cellId: 'cell-1',
+          cellIncarnationId: '22000000-0000-4000-8000-000000000002',
+          assignmentEpoch: 1,
+          controlGeneration: 1,
+          controlConnectionAcknowledged: true,
+          controlCommandAck: null,
+          sessionTransitions: []
+        }
+      }),
+      accept
+    })
+    service.requestHeartbeat()
+    service.requestHeartbeat()
+    expect(client.heartbeat).toHaveBeenCalledTimes(2)
+    release!()
+    await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(3))
+    expect(client.heartbeat.mock.calls.map((call) => call[0]?.heartbeatSeq)).toEqual([1, 2, 3])
+    expect(maximumActive).toBe(1)
+    expect(accept).toHaveBeenCalledTimes(2)
+    expect(accept.mock.calls[0][2].assignmentEpoch).toBe(1)
+    await service.stop()
+  })
+
   it('spreads the initial activation after the Runtime becomes ready', async () => {
     vi.useFakeTimers()
     const { service, client } = fixture(claimedState(), () => 0.5)
