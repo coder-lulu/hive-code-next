@@ -27,6 +27,7 @@ import {
   invalidateMobileSessionRefreshes
 } from './mobile-sms-auth'
 import { request } from './mobile-sms-client'
+import { loadStoredMobileSession, parseSession, saveMobileSession } from './mobile-sms-session'
 
 function response(data: unknown, status = 200, headers: Record<string, string> = {}) {
   const text = vi.fn(async () => JSON.stringify(data))
@@ -64,6 +65,43 @@ describe('mobile SMS authentication client', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('restores the exact saved session after process startup without invalidating credentials', async () => {
+    const expected = parseSession(session)
+    await saveMobileSession(expected)
+    const stored = secureStore.setItemAsync.mock.calls.find(
+      ([key]) => key === 'hivecode.mobile.auth.session'
+    )![1]
+    secureStore.getItemAsync.mockResolvedValue(stored)
+    secureStore.deleteItemAsync.mockClear()
+    await expect(loadStoredMobileSession()).resolves.toEqual(expected)
+    expect(secureStore.deleteItemAsync).not.toHaveBeenCalled()
+  })
+
+  it('reads existing numeric and ISO session dates while keeping the API parser strict', async () => {
+    const expected = parseSession(session)
+    for (const stored of [session, expected]) {
+      secureStore.getItemAsync.mockResolvedValue(JSON.stringify(stored))
+      await expect(loadStoredMobileSession()).resolves.toEqual(expected)
+    }
+    expect(() => parseSession(expected)).toThrow('无效会话')
+  })
+
+  it('removes invalid stored dates rather than coercing them into a restored session', async () => {
+    const expected = parseSession(session)
+    for (const invalid of [
+      { expiresAt: null },
+      { expiresAt: 1.5 },
+      { expiresAt: 8.64e15 + 1 },
+      { expiresAt: 'not-a-date' },
+      { sessionExpiresAt: expected.expiresAt }
+    ]) {
+      secureStore.getItemAsync.mockResolvedValue(JSON.stringify({ ...expected, ...invalid }))
+      secureStore.deleteItemAsync.mockClear()
+      await expect(loadStoredMobileSession()).resolves.toBeNull()
+      expect(secureStore.deleteItemAsync).toHaveBeenCalledWith('hivecode.mobile.auth.session')
+    }
   })
 
   it('registers a device, then requests an in-app SMS challenge', async () => {

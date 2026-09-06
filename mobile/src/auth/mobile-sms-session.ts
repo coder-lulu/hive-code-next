@@ -200,11 +200,30 @@ export async function loadStoredMobileSession(): Promise<MobileSession | null> {
     return null
   }
   try {
-    return parseSession(JSON.parse(raw))
+    const stored: unknown = JSON.parse(raw)
+    if (!isRecord(stored)) {
+      throw new Error('登录服务返回了无效会话')
+    }
+    // MobileSession stores epoch milliseconds; the API boundary still requires date strings.
+    return parseSession({
+      ...stored,
+      expiresAt: storedSessionDate(stored.expiresAt),
+      sessionExpiresAt: storedSessionDate(stored.sessionExpiresAt)
+    })
   } catch {
     await clearStoredMobileSession()
     return null
   }
+}
+
+function storedSessionDate(value: unknown): unknown {
+  if (typeof value !== 'number') {
+    return value
+  }
+  if (!Number.isSafeInteger(value) || !Number.isFinite(new Date(value).getTime())) {
+    throw new Error('登录服务返回了无效会话')
+  }
+  return new Date(value).toISOString()
 }
 
 export async function saveMobileSession(session: MobileSession): Promise<void> {
@@ -244,12 +263,21 @@ export async function clearStoredMobileSession(): Promise<void> {
 
 export async function loadMobileAccountSecurity(): Promise<MobileAccountSecurity> {
   const value = await requestWithCurrentSession('/hive/v1/account/security', undefined, 'GET')
-  if (!isRecord(value) || typeof value.accountId !== 'string'
-    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.accountId)
-    || typeof value.userName !== 'string' || !value.userName.trim()
-    || typeof value.displayName !== 'string' || !value.displayName.trim() || typeof value.phoneBound !== 'boolean'
-    || (value.phoneNumber !== null && value.phoneNumber !== undefined
-      && (typeof value.phoneNumber !== 'string' || !value.phoneNumber.trim()))) {
+  if (
+    !isRecord(value) ||
+    typeof value.accountId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value.accountId
+    ) ||
+    typeof value.userName !== 'string' ||
+    !value.userName.trim() ||
+    typeof value.displayName !== 'string' ||
+    !value.displayName.trim() ||
+    typeof value.phoneBound !== 'boolean' ||
+    (value.phoneNumber !== null &&
+      value.phoneNumber !== undefined &&
+      (typeof value.phoneNumber !== 'string' || !value.phoneNumber.trim()))
+  ) {
     throw new Error('登录服务返回了无效账户安全信息')
   }
   return {
@@ -275,10 +303,11 @@ async function requestWithCurrentSession<T>(
   method: 'GET' | 'POST' = 'POST'
 ): Promise<T> {
   const session = await requireMobileAccessToken()
-  const send = (accessToken: string) => request<T>(path, body, {
-    method,
-    headers: { Authorization: `Bearer ${accessToken}` }
-  })
+  const send = (accessToken: string) =>
+    request<T>(path, body, {
+      method,
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
   try {
     return await send(session.accessToken)
   } catch (failure) {
@@ -305,37 +334,68 @@ export async function setMobilePassword(newPassword: string): Promise<void> {
   await clearStoredMobileSession()
 }
 
-export async function startMobilePasswordReset(phoneNumber: string): Promise<MobileAccountSecurityChallenge> {
+export async function startMobilePasswordReset(
+  phoneNumber: string
+): Promise<MobileAccountSecurityChallenge> {
   const value = await request<unknown>('/hive/v1/auth/password-reset/start', { phoneNumber })
-  if (!isRecord(value) || typeof value.challengeId !== 'string' || !value.challengeId.trim()
-    || typeof value.bindingId !== 'string' || !value.bindingId.trim()
-    || typeof value.expiresInSeconds !== 'number' || !Number.isSafeInteger(value.expiresInSeconds)
-    || value.expiresInSeconds <= 0 || typeof value.resendAfterSeconds !== 'number'
-    || !Number.isSafeInteger(value.resendAfterSeconds) || value.resendAfterSeconds < 0
-    || value.resendAfterSeconds > value.expiresInSeconds) {
+  if (
+    !isRecord(value) ||
+    typeof value.challengeId !== 'string' ||
+    !value.challengeId.trim() ||
+    typeof value.bindingId !== 'string' ||
+    !value.bindingId.trim() ||
+    typeof value.expiresInSeconds !== 'number' ||
+    !Number.isSafeInteger(value.expiresInSeconds) ||
+    value.expiresInSeconds <= 0 ||
+    typeof value.resendAfterSeconds !== 'number' ||
+    !Number.isSafeInteger(value.resendAfterSeconds) ||
+    value.resendAfterSeconds < 0 ||
+    value.resendAfterSeconds > value.expiresInSeconds
+  ) {
     throw new Error('登录服务返回了无效密码重置挑战')
   }
   return value as MobileAccountSecurityChallenge
 }
 
 export async function verifyMobilePasswordReset(
-  challengeId: string, bindingId: string, smsCode: string, newPassword: string
+  challengeId: string,
+  bindingId: string,
+  smsCode: string,
+  newPassword: string
 ): Promise<void> {
   if (typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128) {
     throw new Error('密码长度必须为 12-128 个字符')
   }
-  await request('/hive/v1/auth/password-reset/verify', { challengeId, bindingId, smsCode, newPassword })
+  await request('/hive/v1/auth/password-reset/verify', {
+    challengeId,
+    bindingId,
+    smsCode,
+    newPassword
+  })
   await clearStoredMobileSession()
 }
 
-export async function startMobilePhoneBinding(phoneNumber: string): Promise<MobileAccountSecurityChallenge> {
-  const value = await requestWithCurrentSession<unknown>('/hive/v1/account/security/phone/challenge', { phoneNumber })
-  if (!isRecord(value) || typeof value.challengeId !== 'string' || !value.challengeId.trim()
-    || typeof value.bindingId !== 'string' || !value.bindingId.trim()
-    || typeof value.expiresInSeconds !== 'number' || !Number.isSafeInteger(value.expiresInSeconds)
-    || value.expiresInSeconds <= 0 || typeof value.resendAfterSeconds !== 'number'
-    || !Number.isSafeInteger(value.resendAfterSeconds) || value.resendAfterSeconds < 0
-    || value.resendAfterSeconds > value.expiresInSeconds) {
+export async function startMobilePhoneBinding(
+  phoneNumber: string
+): Promise<MobileAccountSecurityChallenge> {
+  const value = await requestWithCurrentSession<unknown>(
+    '/hive/v1/account/security/phone/challenge',
+    { phoneNumber }
+  )
+  if (
+    !isRecord(value) ||
+    typeof value.challengeId !== 'string' ||
+    !value.challengeId.trim() ||
+    typeof value.bindingId !== 'string' ||
+    !value.bindingId.trim() ||
+    typeof value.expiresInSeconds !== 'number' ||
+    !Number.isSafeInteger(value.expiresInSeconds) ||
+    value.expiresInSeconds <= 0 ||
+    typeof value.resendAfterSeconds !== 'number' ||
+    !Number.isSafeInteger(value.resendAfterSeconds) ||
+    value.resendAfterSeconds < 0 ||
+    value.resendAfterSeconds > value.expiresInSeconds
+  ) {
     throw new Error('登录服务返回了无效手机号绑定挑战')
   }
   return value as MobileAccountSecurityChallenge
@@ -346,7 +406,11 @@ export async function verifyMobilePhoneBinding(
   bindingId: string,
   smsCode: string
 ): Promise<void> {
-  await requestWithCurrentSession('/hive/v1/account/security/phone/verify', { challengeId, bindingId, smsCode })
+  await requestWithCurrentSession('/hive/v1/account/security/phone/verify', {
+    challengeId,
+    bindingId,
+    smsCode
+  })
   await clearStoredMobileSession()
 }
 
