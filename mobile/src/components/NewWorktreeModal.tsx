@@ -150,11 +150,17 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
   const selectedProject =
     projectPickerItems.find((project) => project.id === selectedProjectId) ?? null
   const runTargetPickerItems = useMemo(
-    () => buildNewWorkspaceRunTargetOptions(repos, selectedProjectId, hostPlatform),
-    [hostPlatform, repos, selectedProjectId]
+    () =>
+      buildNewWorkspaceRunTargetOptions(
+        repos,
+        selectedProjectId,
+        hostPlatform,
+        props.runtimeSelection?.name
+      ),
+    [hostPlatform, repos, selectedProjectId, props.runtimeSelection?.name]
   )
   const selectedRunTarget = selectedRepo
-    ? getNewWorkspaceRunTarget(selectedRepo, hostPlatform)
+    ? getNewWorkspaceRunTarget(selectedRepo, hostPlatform, props.runtimeSelection?.name)
     : null
   const needsSetupChoice = Boolean(setupScript.setupCommand) && setupScript.setupRunPolicy === 'ask'
   const canCreate =
@@ -231,6 +237,19 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
       />
 
       <NewWorktreeModalDrawers
+        runtimeSelection={props.runtimeSelection}
+        hostId={hostId}
+        onOpenRuntime={() => navigation.transitionDrawer('runtime')}
+        onSelectRuntime={(runtimeId) => {
+          if (runtimeId !== hostId) {
+            onClose()
+            props.runtimeSelection?.onSelect(runtimeId)
+          }
+        }}
+        onPairRuntime={() => {
+          onClose()
+          props.runtimeSelection?.onPair()
+        }}
         visible={visible}
         drawerView={navigation.drawerView}
         client={client}

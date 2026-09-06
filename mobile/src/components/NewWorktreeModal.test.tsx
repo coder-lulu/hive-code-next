@@ -37,6 +37,16 @@ vi.mock(
       }
     )
 )
+vi.mock('../runtime-directory/MobileRuntimeSelector', () => ({
+  MobileRuntimeSelector: 'MobileRuntimeSelector'
+}))
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: (factory: (theme: typeof lightTheme) => unknown) => factory(lightTheme)
+  }
+})
 vi.mock('./BottomDrawer', () => ({ BottomDrawer: 'BottomDrawer' }))
 vi.mock('./bottom-drawer-modal-host', () => ({ BottomDrawerModalHost: 'BottomDrawerModalHost' }))
 vi.mock('./PickerListDrawer', () => ({ PickerListDrawer: 'PickerListDrawer' }))
@@ -92,6 +102,49 @@ describe('NewWorktreeModal project targets', () => {
 
   afterEach(() => {
     act(() => renderer?.unmount())
+  })
+
+  it('offers account Runtime selection without sending the current project to another Runtime', async () => {
+    const sendRequest = vi.fn().mockImplementation((method: string) => {
+      if (method === 'repo.list') {
+        return Promise.resolve({ ok: true, result: { repos } })
+      }
+      return new Promise(() => {})
+    })
+    const onClose = vi.fn()
+    const onSelect = vi.fn()
+    await act(async () => {
+      renderer = create(
+        createElement(NewWorktreeModal, {
+          visible: true,
+          client: { sendRequest } as unknown as RpcClient,
+          hostId: 'host-1',
+          onCreated: vi.fn(),
+          onClose,
+          runtimeSelection: {
+            name: 'DESKTOP-UL1DAG2',
+            catalog: [],
+            connectionStates: {},
+            onSelect,
+            onPair: vi.fn()
+          }
+        })
+      )
+    })
+    await flushUpdates()
+    expect(pickerItems(renderer, 'Run on')).toEqual([
+      expect.objectContaining({ label: 'DESKTOP-UL1DAG2', id: 'repo-1' }),
+      expect.objectContaining({ label: '切换 Runtime', repo: null })
+    ])
+    const selector = renderer.root.findByType('MobileRuntimeSelector')
+    act(() => selector.props.onSelect('host-1'))
+    expect(onClose).not.toHaveBeenCalled()
+    act(() => selector.props.onSelect('host-2'))
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(onSelect).toHaveBeenCalledWith('host-2')
+    expect(
+      sendRequest.mock.calls.some(([method]) => String(method).startsWith('worktree.create'))
+    ).toBe(false)
   })
 
   it('keeps the cached repos when the in-flight repo.list rejects on a dropped connection', async () => {

@@ -208,6 +208,7 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
         authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(clientId),
         connectionId: socket.connectionId,
         clientId,
+        authenticatedAccountRuntimeSessionId: socket.runtimeSessionId,
         clientKind: 'runtime',
         clientCapabilities: socket.channel.clientCapabilities,
         signal: abort.signal,

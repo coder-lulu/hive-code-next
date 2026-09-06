@@ -20,9 +20,7 @@ export function HostScreenView({ controller }: { controller: HostScreenControlle
       return
     }
     if (destination === 'tasks') {
-      if (controller.hostId) {
-        controller.actions.navigateFromHostList(`/h/${controller.hostId}/tasks`)
-      }
+      controller.actions.leaveHost()
       return
     }
     const unavailableCopy = {

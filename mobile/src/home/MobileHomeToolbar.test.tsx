@@ -23,14 +23,14 @@ vi.mock('lucide-react-native', () => ({
   Menu: 'Menu'
 }))
 
-function renderToolbar(): ReactTestRenderer {
+function renderToolbar(runtimeName: string | null = null): ReactTestRenderer {
   let renderer: ReactTestRenderer
   act(() => {
     renderer = create(
       createElement(MobileHomeToolbar, {
         onOpenMenu: vi.fn(),
         onOpenRuntimeSelector: vi.fn(),
-        runtimeName: null,
+        runtimeName,
         theme: lightTheme
       })
     )
@@ -67,5 +67,20 @@ describe('MobileHomeToolbar', () => {
     expect(brand.parent?.props.style.width).toBe(
       lightTheme.spacing.space64 + lightTheme.spacing.space48
     )
+  })
+
+  it('shows the selected Runtime and keeps its full name accessible on narrow screens', () => {
+    viewport.width = 320
+    const runtimeName = 'DESKTOP-UL1DAG2 development computer'
+    renderer = renderToolbar(runtimeName)
+
+    const name = renderer.root.findByProps({ children: runtimeName })
+    expect(name.props.numberOfLines).toBe(1)
+    expect(name.props.style.flexShrink).toBe(1)
+    expect(name.props.maxFontSizeMultiplier).toBe(1.3)
+    expect(
+      renderer.root.findByProps({ accessibilityLabel: `选择 Runtime，当前为 ${runtimeName}` })
+    ).toBeTruthy()
+    expect(renderer.root.findAllByProps({ children: '连接电脑' })).toHaveLength(0)
   })
 })

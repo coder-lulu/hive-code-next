@@ -60,7 +60,8 @@ export function buildNewWorkspaceProjectOptions<TRepo extends WorkspaceRepo>(
 
 export function getNewWorkspaceRunTarget(
   repo: WorkspaceRepo,
-  localPlatform: NodeJS.Platform | null = null
+  localPlatform: NodeJS.Platform | null = null,
+  runtimeName?: string
 ): {
   label: string
   detail: string
@@ -75,7 +76,8 @@ export function getNewWorkspaceRunTarget(
     return { label: `Remote · ${hostLabel}`, detail: repo.path }
   }
   return {
-    label: localPlatform ? getLocalExecutionHostLabel(localPlatform) : 'This computer',
+    label:
+      runtimeName || (localPlatform ? getLocalExecutionHostLabel(localPlatform) : '当前 Runtime'),
     detail: repo.path
   }
 }
@@ -83,7 +85,8 @@ export function getNewWorkspaceRunTarget(
 export function buildNewWorkspaceRunTargetOptions<TRepo extends WorkspaceRepo>(
   repos: readonly TRepo[],
   projectId: string | null,
-  localPlatform: NodeJS.Platform | null = null
+  localPlatform: NodeJS.Platform | null = null,
+  runtimeName?: string
 ): NewWorkspaceRunTargetOption<TRepo>[] {
   if (!projectId) {
     return []
@@ -97,7 +100,7 @@ export function buildNewWorkspaceRunTargetOptions<TRepo extends WorkspaceRepo>(
     if (!options.has(hostId)) {
       options.set(hostId, {
         id: repo.id,
-        ...getNewWorkspaceRunTarget(repo, localPlatform),
+        ...getNewWorkspaceRunTarget(repo, localPlatform, runtimeName),
         repo
       })
     }

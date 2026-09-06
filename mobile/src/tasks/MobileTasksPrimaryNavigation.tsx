@@ -6,6 +6,7 @@ import {
   type MobilePrimaryDestination
 } from '../components/MobilePrimaryNavigation'
 import { useResponsiveLayout } from '../layout/responsive-layout'
+import { leaveHostRoute } from '../host-route-exit'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
 
 export function MobileTasksPrimaryNavigation(props: { readonly hostId: string }) {
@@ -20,6 +21,7 @@ export function MobileTasksPrimaryNavigation(props: { readonly hostId: string })
 
   function selectDestination(destination: MobilePrimaryDestination) {
     if (destination === 'tasks') {
+      leaveHostRoute(router)
       return
     }
     if (destination === 'workspace') {

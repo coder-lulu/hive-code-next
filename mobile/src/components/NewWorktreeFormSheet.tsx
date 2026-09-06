@@ -3,11 +3,11 @@ import { ChevronDown, ChevronUp } from 'lucide-react-native'
 import type { WorkspaceCreateSetupDecision } from '../tasks/workspace-create-params'
 import type { WorkspaceSshGate } from '../tasks/workspace-ssh-gate'
 import type { useMobileComposerSource } from '../tasks/use-mobile-composer-source'
-import { colors } from '../theme/mobile-theme'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { BottomDrawer } from './BottomDrawer'
 import { MobileAgentIcon } from './MobileAgentIcon'
 import type { NewWorktreeAgentOption } from './new-worktree-agent-selection'
-import { newWorktreeFormStyles as styles } from './new-worktree-form-styles'
+import { createNewWorktreeModalStyles } from './new-worktree-modal-styles'
 import type { SetupRunPolicy } from './new-worktree-modal-types'
 import { NewWorktreeProjectTargetFields } from './NewWorktreeProjectTargetFields'
 import { NewWorkspaceSetupScriptField } from './NewWorkspaceSetupScriptField'
@@ -55,6 +55,8 @@ export function NewWorktreeFormSheet(props: {
   onRunSetupChange: (run: boolean) => void
   onCreate: () => void
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createNewWorktreeModalStyles)
   return (
     <BottomDrawer visible={props.visible} interactive={props.interactive} onClose={props.onClose}>
       <View style={styles.header}>
@@ -63,7 +65,7 @@ export function NewWorktreeFormSheet(props: {
 
       {props.loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
+          <ActivityIndicator size="small" color={theme.color.text.secondary} />
         </View>
       ) : !props.hasRepos ? (
         <View style={styles.loadingContainer}>
@@ -103,7 +105,14 @@ export function NewWorktreeFormSheet(props: {
           <View style={styles.field}>
             <Text style={styles.label}>Agent</Text>
             <Pressable
-              style={[styles.fieldButton, props.sshGate.requiresConnection && styles.disabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Select agent"
+              accessibilityState={{ disabled: props.sshGate.requiresConnection }}
+              style={({ pressed }) => [
+                styles.fieldButton,
+                pressed && styles.controlPressed,
+                props.sshGate.requiresConnection && styles.disabled
+              ]}
               disabled={props.sshGate.requiresConnection}
               onPress={props.onOpenAgent}
             >
@@ -113,19 +122,21 @@ export function NewWorktreeFormSheet(props: {
                   ? 'Connect target first'
                   : props.selectedAgent.label}
               </Text>
-              <ChevronDown size={14} color={colors.textMuted} />
+              <ChevronDown size={16} color={theme.color.text.secondary} />
             </Pressable>
           </View>
 
           <Pressable
-            style={styles.advancedToggle}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: props.showAdvanced }}
+            style={({ pressed }) => [styles.advancedToggle, pressed && styles.controlPressed]}
             onPress={() => props.onShowAdvancedChange(!props.showAdvanced)}
           >
             <Text style={styles.advancedText}>Advanced</Text>
             {props.showAdvanced ? (
-              <ChevronUp size={14} color={colors.textSecondary} />
+              <ChevronUp size={16} color={theme.color.text.secondary} />
             ) : (
-              <ChevronDown size={14} color={colors.textSecondary} />
+              <ChevronDown size={16} color={theme.color.text.secondary} />
             )}
           </Pressable>
 
@@ -142,7 +153,7 @@ export function NewWorktreeFormSheet(props: {
                   value={props.note}
                   onChangeText={props.onNoteChange}
                   placeholder="Write a note"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={theme.color.text.tertiary}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
@@ -164,12 +175,18 @@ export function NewWorktreeFormSheet(props: {
           {props.error ? <Text style={styles.error}>{props.error}</Text> : null}
           <View style={styles.actions}>
             <Pressable
-              style={[styles.createButton, !props.canCreate && styles.createButtonDisabled]}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !props.canCreate, busy: props.creating }}
+              style={({ pressed }) => [
+                styles.createButton,
+                pressed && styles.createButtonPressed,
+                !props.canCreate && styles.createButtonDisabled
+              ]}
               disabled={!props.canCreate}
               onPress={props.onCreate}
             >
               {props.creating ? (
-                <ActivityIndicator size="small" color={colors.bgBase} />
+                <ActivityIndicator size="small" color={theme.color.text.inverse} />
               ) : (
                 <Text style={styles.createText}>
                   {props.sshGate.requiresConnection ? 'Connect target' : 'Create worktree'}

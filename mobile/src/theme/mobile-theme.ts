@@ -144,6 +144,7 @@ export const componentSizeTokens = {
   activeIndicatorHeight: 2,
   floatingActionButtonSize: 48,
   groupedListRowMinHeight: 56,
+  actionSheetHeightRatio: 0.6,
   overlayMaxWidth: 400
 } as const
 

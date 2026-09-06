@@ -276,3 +276,26 @@ it('rejects connection credential injection and local pairing methods before dis
   ])
   f.detach()
 })
+
+it('passes the activated account session as creator authority, ignoring payload identity claims', async () => {
+  const f = fixture('trusted-session')
+  f.text({
+    id: 'create',
+    method: 'worktree.create',
+    params: {
+      repo: 'repo-1',
+      authenticatedAccountRuntimeSessionId: 'forged-session',
+      creatorProvenance: { kind: 'host' }
+    }
+  })
+  await tick()
+  expect(mock.dispatch.mock.calls[0]?.[2]).toMatchObject({
+    authenticatedAccountRuntimeSessionId: 'trusted-session'
+  })
+  expect(mock.dispatch.mock.calls[0]?.[2]).not.toHaveProperty('pairedDeviceId')
+  f.invalidate()
+  f.text({ id: 'expired-create', method: 'worktree.create', params: { repo: 'repo-1' } })
+  await tick()
+  expect(mock.dispatch).toHaveBeenCalledTimes(1)
+  f.detach()
+})

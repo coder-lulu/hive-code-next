@@ -1,7 +1,7 @@
 import { Pressable, Switch, Text, View } from 'react-native'
 import type { WorkspaceCreateSetupDecision } from '../tasks/workspace-create-params'
-import { colors } from '../theme/mobile-theme'
-import { newWorktreeFormStyles as styles } from './new-worktree-form-styles'
+import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { createNewWorktreeModalStyles } from './new-worktree-modal-styles'
 import type { SetupRunPolicy } from './new-worktree-modal-types'
 
 export function NewWorkspaceSetupScriptField({
@@ -21,6 +21,8 @@ export function NewWorkspaceSetupScriptField({
   onDecisionChange: (decision: Exclude<WorkspaceCreateSetupDecision, 'inherit'>) => void
   onRunSetupChange: (run: boolean) => void
 }) {
+  const theme = useMobileTheme()
+  const styles = useMobileThemeStyles(createNewWorktreeModalStyles)
   return (
     <View style={styles.field}>
       <View style={styles.setupHeader}>
@@ -43,7 +45,14 @@ export function NewWorkspaceSetupScriptField({
               ]}
               onPress={() => onDecisionChange('run')}
             >
-              <Text style={styles.setupChoiceText}>Run</Text>
+              <Text
+                style={[
+                  styles.setupChoiceText,
+                  decision === 'run' && styles.setupChoiceTextSelected
+                ]}
+              >
+                Run
+              </Text>
             </Pressable>
             <Pressable
               style={[
@@ -52,7 +61,14 @@ export function NewWorkspaceSetupScriptField({
               ]}
               onPress={() => onDecisionChange('skip')}
             >
-              <Text style={styles.setupChoiceText}>Skip</Text>
+              <Text
+                style={[
+                  styles.setupChoiceText,
+                  decision === 'skip' && styles.setupChoiceTextSelected
+                ]}
+              >
+                Skip
+              </Text>
             </Pressable>
           </View>
         ) : (
@@ -61,8 +77,8 @@ export function NewWorkspaceSetupScriptField({
             <Switch
               value={runSetup}
               onValueChange={onRunSetupChange}
-              trackColor={{ false: colors.borderSubtle, true: colors.textSecondary }}
-              thumbColor={colors.textPrimary}
+              trackColor={{ false: theme.color.border.default, true: theme.color.text.secondary }}
+              thumbColor={theme.color.text.primary}
               style={styles.setupSwitch}
             />
           </View>

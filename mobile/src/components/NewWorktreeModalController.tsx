@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react'
 
 import type { RpcClient } from '../transport/rpc-client'
+import type { WorkspaceRuntimeSelection } from './new-worktree-modal-types'
 import { NewWorktreeModal } from './NewWorktreeModal'
 
 export type NewWorktreeModalControllerHandle = {
@@ -8,6 +9,7 @@ export type NewWorktreeModalControllerHandle = {
 }
 
 type Props = {
+  runtimeSelection?: WorkspaceRuntimeSelection
   routeVisible: boolean
   client: RpcClient | null
   hostId?: string
@@ -21,6 +23,7 @@ type Props = {
 export const NewWorktreeModalController = forwardRef<NewWorktreeModalControllerHandle, Props>(
   function NewWorktreeModalController(
     {
+      runtimeSelection,
       routeVisible,
       client,
       hostId,
@@ -56,6 +59,7 @@ export const NewWorktreeModalController = forwardRef<NewWorktreeModalControllerH
 
     return (
       <NewWorktreeModal
+        runtimeSelection={runtimeSelection}
         visible={visible}
         client={client}
         hostId={hostId}

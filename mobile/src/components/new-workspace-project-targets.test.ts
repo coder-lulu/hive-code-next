@@ -9,6 +9,24 @@ import {
 const LOCAL_HOST_LABEL = getLocalExecutionHostLabel('darwin')
 
 describe('new workspace project targets', () => {
+  it('names the connected Runtime without relabeling its SSH checkouts', () => {
+    const local = { id: 'repo-a', displayName: 'project', path: 'E:/project' }
+    expect(getNewWorkspaceRunTarget(local, 'win32', 'DESKTOP-UL1DAG2').label).toBe(
+      'DESKTOP-UL1DAG2'
+    )
+    expect(
+      getNewWorkspaceRunTarget(
+        { ...local, connectionId: 'build-server' },
+        'win32',
+        'DESKTOP-UL1DAG2'
+      ).label
+    ).toBe('SSH · build-server')
+    const projectId = buildNewWorkspaceProjectOptions([local])[0].id
+    expect(
+      buildNewWorkspaceRunTargetOptions([local], projectId, 'win32', 'DESKTOP-UL1DAG2')[0]
+    ).toMatchObject({ id: 'repo-a', label: 'DESKTOP-UL1DAG2' })
+  })
+
   it('groups local and SSH checkouts of the same project', () => {
     const upstream = { owner: 'stablyai', repo: 'orca' }
     const options = buildNewWorkspaceProjectOptions([
@@ -49,7 +67,7 @@ describe('new workspace project targets', () => {
     ).toEqual({ label: LOCAL_HOST_LABEL, detail: '/src/orca' })
     expect(
       getNewWorkspaceRunTarget({ id: 'local', displayName: 'orca', path: 'C:\\src\\orca' })
-    ).toEqual({ label: 'This computer', detail: 'C:\\src\\orca' })
+    ).toEqual({ label: '当前 Runtime', detail: 'C:\\src\\orca' })
     expect(
       getNewWorkspaceRunTarget({ id: 'local', displayName: 'orca', path: 'C:\\src\\orca' }, 'win32')
     ).toEqual({ label: 'Local Windows', detail: 'C:\\src\\orca' })

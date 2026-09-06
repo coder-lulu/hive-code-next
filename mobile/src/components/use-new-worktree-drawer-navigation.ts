@@ -8,6 +8,7 @@ export type NewWorktreeDrawerView =
   | 'source'
   | 'project'
   | 'runTarget'
+  | 'runtime'
   | 'agent'
   | 'trust'
 

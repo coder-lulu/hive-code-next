@@ -1,5 +1,14 @@
 import { useRef, type ReactNode } from 'react'
-import { ActivityIndicator, View, Text, Pressable, StyleSheet } from 'react-native'
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions
+} from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Edit3, Trash2, type LucideIcon } from 'lucide-react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
@@ -23,6 +32,7 @@ type Props = {
   title?: string
   message?: string
   actions: ActionSheetAction[]
+  fixedHeight?: boolean
   onClose: () => void
 }
 
@@ -41,11 +51,69 @@ type ContentProps = {
   message?: string
   actions: ActionSheetAction[]
   onClose?: () => void
+  scrollActions?: boolean
 }
 
-export function ActionSheetContent({ title, message, actions, onClose }: ContentProps) {
+export function ActionSheetContent({
+  title,
+  message,
+  actions,
+  onClose,
+  scrollActions = false
+}: ContentProps) {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
+  const actionGroup = (
+    <View style={styles.actionGroup}>
+      {actions.map((action, i) => {
+        const Icon = iconForAction(action.label, action.destructive, action.icon)
+        const customIcon = action.renderIcon?.()
+        return (
+          <View key={action.label}>
+            {i > 0 && <View style={styles.separator} />}
+            <Pressable
+              style={({ pressed }) => [
+                styles.action,
+                action.disabled && styles.actionDisabled,
+                pressed && !action.disabled && !action.loading && styles.actionPressed
+              ]}
+              disabled={action.disabled || action.loading}
+              onPress={() => {
+                action.onPress()
+                if (!action.skipAutoClose && onClose) {
+                  onClose()
+                }
+              }}
+            >
+              {customIcon ?? (
+                <Icon
+                  size={20}
+                  color={
+                    action.destructive ? theme.color.status.danger : theme.color.text.secondary
+                  }
+                />
+              )}
+              <View style={styles.actionTextBlock}>
+                <Text
+                  style={[
+                    styles.actionText,
+                    action.destructive && styles.actionTextDestructive,
+                    action.disabled && styles.actionTextDisabled
+                  ]}
+                >
+                  {action.label}
+                </Text>
+                {action.hint ? <Text style={styles.actionHint}>{action.hint}</Text> : null}
+              </View>
+              {action.loading ? (
+                <ActivityIndicator size="small" color={theme.color.text.secondary} />
+              ) : null}
+            </Pressable>
+          </View>
+        )
+      })}
+    </View>
+  )
   return (
     <>
       {(title || message) && (
@@ -59,60 +127,40 @@ export function ActionSheetContent({ title, message, actions, onClose }: Content
         </View>
       )}
 
-      <View style={styles.actionGroup}>
-        {actions.map((action, i) => {
-          const Icon = iconForAction(action.label, action.destructive, action.icon)
-          const customIcon = action.renderIcon?.()
-          return (
-            <View key={action.label}>
-              {i > 0 && <View style={styles.separator} />}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.action,
-                  action.disabled && styles.actionDisabled,
-                  pressed && !action.disabled && !action.loading && styles.actionPressed
-                ]}
-                disabled={action.disabled || action.loading}
-                onPress={() => {
-                  action.onPress()
-                  if (!action.skipAutoClose && onClose) {
-                    onClose()
-                  }
-                }}
-              >
-                {customIcon ?? (
-                  <Icon
-                    size={20}
-                    color={
-                      action.destructive ? theme.color.status.danger : theme.color.text.secondary
-                    }
-                  />
-                )}
-                <View style={styles.actionTextBlock}>
-                  <Text
-                    style={[
-                      styles.actionText,
-                      action.destructive && styles.actionTextDestructive,
-                      action.disabled && styles.actionTextDisabled
-                    ]}
-                  >
-                    {action.label}
-                  </Text>
-                  {action.hint ? <Text style={styles.actionHint}>{action.hint}</Text> : null}
-                </View>
-                {action.loading ? (
-                  <ActivityIndicator size="small" color={theme.color.text.secondary} />
-                ) : null}
-              </Pressable>
-            </View>
-          )
-        })}
-      </View>
+      {scrollActions ? (
+        <ScrollView
+          style={styles.actionScroll}
+          showsVerticalScrollIndicator
+          persistentScrollbar
+          keyboardShouldPersistTaps="handled"
+        >
+          {actionGroup}
+        </ScrollView>
+      ) : (
+        actionGroup
+      )}
     </>
   )
 }
 
-export function ActionSheetModal({ visible, title, message, actions, onClose }: Props) {
+export function ActionSheetModal({
+  visible,
+  title,
+  message,
+  actions,
+  onClose,
+  fixedHeight = false
+}: Props) {
+  const { height } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const theme = useMobileTheme()
+  const contentHeight = Math.max(
+    0,
+    Math.min(
+      height * theme.size.actionSheetHeightRatio,
+      height - insets.top - insets.bottom - theme.spacing.space64
+    )
+  )
   const pendingActionRef = useRef<(() => void) | null>(null)
   const sequencedActions = actions.map((action) =>
     action.closeBeforePress
@@ -136,14 +184,18 @@ export function ActionSheetModal({ visible, title, message, actions, onClose }: 
         pendingActionRef.current = null
         pendingAction?.()
       }}
-      dragContentToDismiss
+      dragContentToDismiss={!fixedHeight}
+      contentScrollable={!fixedHeight}
     >
-      <ActionSheetContent
-        title={title}
-        message={message}
-        actions={sequencedActions}
-        onClose={onClose}
-      />
+      <View style={fixedHeight ? { height: contentHeight } : undefined}>
+        <ActionSheetContent
+          title={title}
+          message={message}
+          actions={sequencedActions}
+          scrollActions={fixedHeight}
+          onClose={onClose}
+        />
+      </View>
     </BottomDrawer>
   )
 }
@@ -163,6 +215,10 @@ function createStyles(theme: MobileTheme) {
       ...theme.typography.caption,
       color: theme.color.text.secondary,
       marginTop: theme.spacing.space4
+    },
+    actionScroll: {
+      flex: 1,
+      minHeight: 0
     },
     actionGroup: {
       overflow: 'hidden',

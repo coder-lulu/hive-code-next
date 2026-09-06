@@ -8,7 +8,7 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { NewWorktreeModalController } from '../components/NewWorktreeModalController'
 import { PickerModal } from '../components/PickerModal'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import { hostNewWorktreeSessionRoute } from '../host-route-action-state'
+import { hostNewWorktreeRoute, hostNewWorktreeSessionRoute } from '../host-route-action-state'
 import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'
 import { getWorktreeRowIdentity } from '../worktree/worktree-host-row-identity'
 import {
@@ -309,6 +309,13 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
       />
 
       <NewWorktreeModalController
+        runtimeSelection={{
+          name: state.hostName,
+          catalog: runtimeCatalog,
+          connectionStates: runtimeConnectionStates,
+          onSelect: (runtimeId) => controller.router.replace(hostNewWorktreeRoute(runtimeId)),
+          onPair: () => controller.router.push('/pair-scan')
+        }}
         ref={state.newWorktreeModalRef}
         routeVisible={showNewWorktree}
         client={client}

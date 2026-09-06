@@ -80,4 +80,15 @@ describe('HostScreenView', () => {
 
     expect(renderer.root.findAllByType('HostWorkspaceList')).toHaveLength(1)
   })
+
+  it('returns the primary task tab to home instead of entering a nested task list', () => {
+    const currentController = controller('')
+    act(() => {
+      renderer = create(createElement(HostScreenView, { controller: currentController }))
+    })
+
+    act(() => renderer!.root.findByType('MobilePrimaryNavigation').props.onSelect('tasks'))
+    expect(currentController.actions.leaveHost).toHaveBeenCalledOnce()
+    expect(currentController.actions.navigateFromHostList).not.toHaveBeenCalled()
+  })
 })

@@ -5,7 +5,6 @@ import { Check } from 'lucide-react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { BottomDrawer } from './BottomDrawer'
-import { BOTTOM_DRAWER_HIDE_DURATION_MS } from './bottom-drawer-constants'
 
 type PickerListItem = { id: string; label: string; detail?: string }
 
@@ -31,45 +30,49 @@ export function PickerListDrawer<T extends PickerListItem>({
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const [closing, setClosing] = useState(false)
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingItemRef = useRef<T | null>(null)
+  const selectionClosingRef = useRef(false)
   const drawerVisible = visible && !closing
 
   useEffect(() => {
+    pendingItemRef.current = null
     if (visible) {
+      selectionClosingRef.current = false
       setClosing(false)
-    }
-    return () => {
-      if (closeTimerRef.current) {
-        clearTimeout(closeTimerRef.current)
-        closeTimerRef.current = null
-      }
     }
   }, [visible])
 
   const finishClose = useCallback(() => {
-    setClosing(false)
+    // Native dismissal can arrive after selection; only the completed hide owns that handoff.
+    if (selectionClosingRef.current) {
+      return
+    }
     onClose()
   }, [onClose])
 
-  const closeThenSelect = useCallback(
-    (item: T) => {
-      if (closeTimerRef.current) {
-        clearTimeout(closeTimerRef.current)
-      }
-      setClosing(true)
-      closeTimerRef.current = setTimeout(() => {
-        closeTimerRef.current = null
-        onClose()
-        onSelect(item)
-      }, BOTTOM_DRAWER_HIDE_DURATION_MS)
-    },
-    [onClose, onSelect]
-  )
+  const completeSelection = useCallback(() => {
+    const item = pendingItemRef.current
+    pendingItemRef.current = null
+    if (item) {
+      onClose()
+      onSelect(item)
+    }
+  }, [onClose, onSelect])
+
+  const closeThenSelect = useCallback((item: T) => {
+    if (selectionClosingRef.current) {
+      return
+    }
+    pendingItemRef.current = item
+    selectionClosingRef.current = true
+    setClosing(true)
+  }, [])
 
   return (
     <BottomDrawer
       visible={drawerVisible}
       onClose={finishClose}
+      onAfterClose={completeSelection}
       dragContentToDismiss={false}
       contentScrollable={false}
     >

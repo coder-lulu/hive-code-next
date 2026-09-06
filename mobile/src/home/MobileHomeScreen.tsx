@@ -166,6 +166,7 @@ export function MobileHomeScreen() {
   const selectPrimaryDestination = useCallback(
     (destination: MobilePrimaryDestination) => {
       if (destination === 'tasks') {
+        changeHomeMode('cloud')
         return
       }
       if (destination === 'workspace') {
@@ -180,7 +181,7 @@ export function MobileHomeScreen() {
       const [title, message] = unavailable[destination]
       Alert.alert(title, message)
     },
-    [openSelectedWorkspace]
+    [changeHomeMode, openSelectedWorkspace]
   )
 
   function openHost(host: HostCatalogEntry): void {

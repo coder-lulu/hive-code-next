@@ -159,6 +159,7 @@ export type CliWorkspaceProvenance = {
 export type WorkspaceCreatorProvenance =
   | { kind: 'host' }
   | { kind: 'paired-device'; deviceId: string }
+  | { kind: 'account-runtime'; runtimeSessionId: string }
 
 export type AutomationWorkspaceProvenance = {
   kind: 'created-by-automation'

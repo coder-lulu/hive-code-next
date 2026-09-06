@@ -6,7 +6,14 @@ export function normalizeWorkspaceCreatorProvenance(
   if (!value || typeof value !== 'object') {
     return undefined
   }
-  const candidate = value as { kind?: unknown; deviceId?: unknown }
+  const candidate = value as { kind?: unknown; deviceId?: unknown; runtimeSessionId?: unknown }
+  if (
+    candidate.kind === 'account-runtime' &&
+    typeof candidate.runtimeSessionId === 'string' &&
+    candidate.runtimeSessionId.trim()
+  ) {
+    return { kind: 'account-runtime', runtimeSessionId: candidate.runtimeSessionId }
+  }
   if (candidate.kind === 'host') {
     return { kind: 'host' }
   }

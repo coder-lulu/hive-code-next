@@ -137,6 +137,8 @@ export class RpcDispatcher {
           connectionId: options?.connectionId,
           requestId: request.id,
           clientId: options?.clientId,
+          pairedDeviceId: options?.pairedDeviceId,
+          authenticatedAccountRuntimeSessionId: options?.authenticatedAccountRuntimeSessionId,
           clientKind: options?.clientKind,
           clientCapabilities: options?.clientCapabilities,
           updateClientCapabilities: options?.updateClientCapabilities,

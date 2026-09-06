@@ -47,7 +47,7 @@ export function MobileHomeToolbar({
           style={({ pressed }) => [styles.runtimeButton, pressed && styles.pressed]}
         >
           <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.runtimeLabel}>
-            连接电脑
+            {runtimeName || '连接电脑'}
           </Text>
           <ChevronDown color={theme.color.text.secondary} size={16} strokeWidth={2} />
         </Pressable>

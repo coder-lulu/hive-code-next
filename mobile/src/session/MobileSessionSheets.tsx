@@ -115,6 +115,7 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
       <ActionSheetModal
         visible={showCreateTabDrawer}
         title="New Tab"
+        fixedHeight
         actions={[
           ...createTabAgentActions,
           {
