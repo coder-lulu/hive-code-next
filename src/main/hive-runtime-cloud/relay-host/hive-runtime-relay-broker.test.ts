@@ -28,6 +28,26 @@ vi.mock('./hive-runtime-relay-control-client', () => ({
     })
   }
 }))
+const contextFixture: CurrentHiveRuntimeCloudLeaseContext = {
+  authorityId: 'hive-primary',
+  identity: {
+    schemaVersion: 1,
+    runtimeInstanceId: 'runtime-1',
+    privateKeyPkcs8: 'unused',
+    publicKey: 'A'.repeat(43),
+    createdAt: 1
+  },
+  tuple: {
+    authorityGeneration: 1,
+    runtimeRecordId: 'record-1',
+    runtimeInstanceId: 'runtime-1',
+    bootId: '10000000-0000-4000-8000-000000000001',
+    heartbeatLeaseId: 'lease-1',
+    leaseEpoch: 1,
+    fencingEpoch: 1
+  }
+}
+
 afterEach(() => vi.useRealTimers())
 it.each([0, 0.5])(
   'bounds retry amplification with random=%s and cancels the retry timer on shutdown',
@@ -40,7 +60,7 @@ it.each([0, 0.5])(
     const provider = { resolve, refresh: vi.fn() }
     const broker = new HiveRuntimeRelayBroker({
       provider,
-      getContext: () => ({ authorityId: 'authority' }) as CurrentHiveRuntimeCloudLeaseContext,
+      getContext: () => structuredClone(contextFixture),
       getKeypair: () => ({ ...raw, publicKeyB64: Buffer.from(raw.publicKey).toString('base64') }),
       onAssigned: vi.fn(),
       onConnection: vi.fn(),
@@ -171,5 +191,50 @@ it('refreshes the same control in place and fences late renewal and resolution a
   expect(controls.instances).toHaveLength(1)
   expect(onAssigned).toHaveBeenCalledTimes(2)
   expect(resolve).toHaveBeenCalledTimes(2)
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it('preserves pending resolution and retry delay across repeated heartbeat publications', async () => {
+  vi.useFakeTimers()
+  const raw = nacl.box.keyPair()
+  let rejectResolve!: (error: Error) => void
+  let signal!: AbortSignal
+  const resolve = vi.fn((input: { signal?: AbortSignal }) => {
+    signal = input.signal!
+    return new Promise<HiveRuntimeRelayAssignment>((_complete, reject) => {
+      rejectResolve = reject
+    })
+  })
+  const onUnavailable = vi.fn()
+  const broker = new HiveRuntimeRelayBroker({
+    provider: { resolve, refresh: vi.fn() },
+    getContext: () => structuredClone(contextFixture),
+    getKeypair: () => ({ ...raw, publicKeyB64: Buffer.from(raw.publicKey).toString('base64') }),
+    onAssigned: vi.fn(),
+    onConnection: vi.fn(),
+    onUnavailable,
+    random: () => 0.5
+  })
+  broker.start()
+  await vi.advanceTimersByTimeAsync(0)
+  for (let publication = 0; publication < 100; publication++) {
+    broker.notifyContextChanged()
+  }
+  expect(signal.aborted).toBe(false)
+  expect(onUnavailable).toHaveBeenCalledOnce()
+  expect(resolve).toHaveBeenCalledOnce()
+  rejectResolve(new Error('unavailable'))
+  await vi.advanceTimersByTimeAsync(0)
+  for (let publication = 0; publication < 100; publication++) {
+    broker.notifyContextChanged()
+  }
+  await vi.advanceTimersByTimeAsync(749)
+  expect(resolve).toHaveBeenCalledOnce()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(resolve).toHaveBeenCalledTimes(2)
+  expect(onUnavailable).toHaveBeenCalledOnce()
+  rejectResolve(new Error('unavailable'))
+  await vi.advanceTimersByTimeAsync(0)
+  await broker.stop()
   expect(vi.getTimerCount()).toBe(0)
 })

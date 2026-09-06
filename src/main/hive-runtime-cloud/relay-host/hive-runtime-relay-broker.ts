@@ -35,6 +35,7 @@ export class HiveRuntimeRelayBroker {
   private control: HiveRuntimeRelayControlClient | null = null
   private assignment: HiveRuntimeRelayAssignment | null = null
   private failures = 0
+  private context: CurrentHiveRuntimeCloudLeaseContext | null = null
 
   constructor(private readonly options: Options) {}
 
@@ -53,13 +54,23 @@ export class HiveRuntimeRelayBroker {
     if (this.stopped) {
       return
     }
-    if (this.assignment && this.isCurrent(this.assignment) && this.control?.active) {
+    const context = this.options.getContext()
+    if (
+      context === this.context ||
+      (context &&
+        this.context &&
+        context.authorityId === this.context.authorityId &&
+        context.identity.publicKey === this.context.identity.publicKey &&
+        hiveRuntimeRelayTuplesEqual(context.tuple, this.context.tuple))
+    ) {
       return
     }
-    if (!this.assignment || !this.isCurrent(this.assignment)) {
-      this.invalidate()
-    }
-    if (!this.options.getContext()) {
+    // Heartbeat publications repeat the same tuple while assignment is pending.
+    // Preserve in-flight resolution and its backoff instead of requesting another heartbeat.
+    this.context = context
+    this.invalidate()
+    this.failures = 0
+    if (!context) {
       return
     }
     this.schedule(0)
@@ -78,6 +89,7 @@ export class HiveRuntimeRelayBroker {
 
   async stop(): Promise<void> {
     this.stopped = true
+    this.context = null
     this.invalidate()
     await this.inFlight
   }
