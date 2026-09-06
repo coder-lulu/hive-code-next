@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import nacl from 'tweetnacl'
-import { WebAccountSession } from './web-account-session'
+import { WebAccountSession, requestedWebRuntime, canConnectWebRuntime } from './web-account-session'
 import {
   disposeHiveAccountRelayMaterial,
   relayBase64Url
@@ -12,6 +12,45 @@ const json = (value: unknown, status = 200) =>
 const runtime = { runtimeRecordId: uuid, resourceVersion: 3, status: 'CLAIMED' }
 
 describe('browser account session', () => {
+  it('accepts only one UUID navigation target and requires the current Relay capabilities', () => {
+    expect(requestedWebRuntime('')).toBeNull()
+    expect(requestedWebRuntime(`?runtime=${uuid}`)).toBe(uuid)
+    expect(() => requestedWebRuntime('?runtime=https://attacker.example')).toThrow()
+    expect(() => requestedWebRuntime(`?runtime=${uuid}&runtime=${uuid}`)).toThrow()
+    expect(canConnectWebRuntime(runtime)).toBe(false)
+    expect(
+      canConnectWebRuntime({ ...runtime, connectionCapabilities: ['web-launch-grant-v1'] })
+    ).toBe(false)
+    expect(
+      canConnectWebRuntime({
+        ...runtime,
+        connectionCapabilities: ['hive-relay', 'ticket-connect-v2']
+      })
+    ).toBe(true)
+    expect(
+      canConnectWebRuntime({
+        ...runtime,
+        status: 'UNLINKED',
+        connectionCapabilities: ['hive-relay', 'ticket-connect-v2']
+      })
+    ).toBe(false)
+  })
+
+  it('loads the requested owned runtime through the BFF without trusting URL metadata', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(json(runtime))
+    const session = new WebAccountSession(fetchImpl, 'https://console.hivekernel.com')
+    expect(await session.runtime(uuid)).toEqual(runtime)
+    expect(fetchImpl.mock.calls[0]).toMatchObject([
+      `https://console.hivekernel.com/bff/user/runtimes/${uuid}`,
+      { credentials: 'same-origin', cache: 'no-store', redirect: 'error' }
+    ])
+    await expect(session.runtime('../other')).rejects.toThrow()
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    fetchImpl.mockResolvedValue(
+      json({ ...runtime, runtimeRecordId: '22222222-2222-4222-8222-222222222222' })
+    )
+    await expect(session.runtime(uuid)).rejects.toThrow('Unexpected Runtime identity')
+  })
   it('uses existing same-origin cookie and CSRF with only a secret digest sent for intent issuance', async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()

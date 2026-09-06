@@ -31,6 +31,27 @@ const Runtime = z.object({
 export type WebAccountRuntime = z.infer<typeof Runtime>
 export const WEB_ACCOUNT_LOGIN_PATH = '/login?redirect=%2Fruntime%2F'
 
+export function requestedWebRuntime(search: string): string | null {
+  const values = new URLSearchParams(search).getAll('runtime')
+  if (values.length === 0) {
+    return null
+  }
+  if (values.length !== 1 || !z.string().uuid().safeParse(values[0]).success) {
+    throw new Error('无效的电脑连接地址，请从控制台重新打开。')
+  }
+  return values[0]!.toLowerCase()
+}
+
+export function canConnectWebRuntime(runtime: WebAccountRuntime): boolean {
+  const capabilities =
+    runtime.projection?.connectionCapabilities ?? runtime.connectionCapabilities ?? []
+  return (
+    runtime.status === 'CLAIMED' &&
+    capabilities.includes('hive-relay') &&
+    capabilities.includes('ticket-connect-v2')
+  )
+}
+
 export class WebAccountSession {
   private csrf = ''
   private generation = 0
@@ -106,6 +127,16 @@ export class WebAccountSession {
       throw new Error('Account session changed')
     }
     return material
+  }
+
+  async runtime(runtimeRecordId: string): Promise<WebAccountRuntime> {
+    const id = z.string().uuid().parse(runtimeRecordId)
+    const { value } = await this.request(`/runtimes/${encodeURIComponent(id)}`)
+    const runtime = Runtime.parse(value)
+    if (runtime.runtimeRecordId !== id) {
+      throw new Error('Unexpected Runtime identity')
+    }
+    return runtime
   }
 
   close(): void {

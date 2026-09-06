@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui/button'
 import {
   WebAccountSession,
   WEB_ACCOUNT_LOGIN_PATH,
+  requestedWebRuntime,
+  canConnectWebRuntime,
   type WebAccountRuntime
 } from './web-account-session'
 import {
@@ -47,6 +49,45 @@ export default function WebAccountConnect({
   const [signedIn, setSignedIn] = useState(false)
   const connected = useRef(false)
   const pendingClient = useRef<WebAccountRuntimeClient | null>(null)
+  const onConnectedRef = useRef(onConnected)
+  useEffect(() => {
+    onConnectedRef.current = onConnected
+  }, [onConnected])
+  const [target] = useState(() => {
+    try {
+      return { id: requestedWebRuntime(window.location.search), error: '' }
+    } catch (error) {
+      return { id: null, error: (error as Error).message }
+    }
+  })
+  const loginPath = target.id
+    ? `/login?redirect=${encodeURIComponent(`/runtime/?runtime=${target.id}`)}`
+    : WEB_ACCOUNT_LOGIN_PATH
+
+  const connect = useCallback(
+    async (runtime: WebAccountRuntime) => {
+      setBusy(true)
+      setError('')
+      const client = createWebAccountRelayClient(() => session.material(runtime))
+      pendingClient.current = client
+      try {
+        const status = await client.call('status.get', undefined, { timeoutMs: 15_000 })
+        if (!status.ok) {
+          throw new Error('Runtime unavailable')
+        }
+        connected.current = true
+        onConnectedRef.current({ runtime, session, client })
+      } catch {
+        setError('连接失败，请刷新电脑列表后重试。')
+      } finally {
+        if (!connected.current) {
+          client.close()
+        }
+        setBusy(false)
+      }
+    },
+    [session]
+  )
 
   useEffect(() => {
     let active = true
@@ -60,6 +101,23 @@ export default function WebAccountConnect({
         if (!authenticated) {
           return
         }
+        if (target.error) {
+          setError(target.error)
+          return
+        }
+        if (target.id) {
+          const runtime = await session.runtime(target.id)
+          if (!active) {
+            return
+          }
+          setRuntimes([runtime])
+          if (!canConnectWebRuntime(runtime)) {
+            setError('这台电脑当前没有可用连接路径，请确认电脑在线后重试。')
+            return
+          }
+          await connect(runtime)
+          return
+        }
         const page = await session.runtimes()
         if (active) {
           setRuntimes(page.items)
@@ -67,7 +125,11 @@ export default function WebAccountConnect({
         }
       } catch {
         if (active) {
-          setError('账户服务暂时不可用，请重新登录或重试。')
+          setError(
+            target.id
+              ? '无法加载这台电脑，请确认仍在当前账户中，或刷新后重试。'
+              : '账户服务暂时不可用，请重新登录或重试。'
+          )
         }
       } finally {
         if (active) {
@@ -84,29 +146,7 @@ export default function WebAccountConnect({
         session.close()
       }
     }
-  }, [session])
-
-  const connect = async (runtime: WebAccountRuntime) => {
-    setBusy(true)
-    setError('')
-    const client = createWebAccountRelayClient(() => session.material(runtime))
-    pendingClient.current = client
-    try {
-      const status = await client.call('status.get', undefined, { timeoutMs: 15_000 })
-      if (!status.ok) {
-        throw new Error('Runtime unavailable')
-      }
-      connected.current = true
-      onConnected({ runtime, session, client })
-    } catch {
-      setError('连接失败，请刷新电脑列表后重试。')
-    } finally {
-      if (!connected.current) {
-        client.close()
-      }
-      setBusy(false)
-    }
-  }
+  }, [session, connect, target.id, target.error])
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
@@ -125,7 +165,7 @@ export default function WebAccountConnect({
         )}
         {!signedIn && !busy && (
           <Button asChild>
-            <a href={WEB_ACCOUNT_LOGIN_PATH}>登录 HiveCloud</a>
+            <a href={loginPath}>登录 HiveCloud</a>
           </Button>
         )}
         {signedIn && (
@@ -140,7 +180,7 @@ export default function WebAccountConnect({
                 </span>
                 <Button
                   variant="outline"
-                  disabled={busy || runtime.status !== 'CLAIMED'}
+                  disabled={busy || !canConnectWebRuntime(runtime)}
                   onClick={() => void connect(runtime)}
                 >
                   连接
