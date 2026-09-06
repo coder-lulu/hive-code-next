@@ -7,6 +7,10 @@ import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { AppState } from '@/store/types'
 import { getFolderPathStatusRouteOptionsForRows } from './host-filtering'
+import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { getRenderableFolderWorkspaces } from '../grouping/folder-workspace-lanes'
+import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
 
 type FolderPathStatusRequest = Parameters<AppState['fetchFolderWorkspacePathStatus']>[0]
 
@@ -56,23 +60,6 @@ export function useFolderWorkspacePathStatusRows(args: {
   const folderPathStatusCacheExpiryTick = useFolderWorkspacePathStatusCacheExpiryTick(
     folderWorkspacePathStatuses
   )
-  const projectGroupByIdForFolderPathStatus = useMemo(
-    () => new Map(projectGroups.map((group) => [group.id, group])),
-    [projectGroups]
-  )
-  const folderWorkspaceByIdForFolderPathStatus = useMemo(
-    () => new Map(folderWorkspaces.map((workspace) => [workspace.id, workspace])),
-    [folderWorkspaces]
-  )
-  const getFolderPathStatusRouteOptions = useCallback(
-    (request: FolderPathStatusRequest) =>
-      getFolderPathStatusRouteOptionsForRows({
-        request,
-        projectGroupsById: projectGroupByIdForFolderPathStatus,
-        folderWorkspacesById: folderWorkspaceByIdForFolderPathStatus
-      }),
-    [folderWorkspaceByIdForFolderPathStatus, projectGroupByIdForFolderPathStatus]
-  )
   useEffect(() => {
     const requests = new Map<
       string,
@@ -84,13 +71,18 @@ export function useFolderWorkspacePathStatusRows(args: {
     for (const group of projectGroups) {
       if (group.parentPath) {
         const request = { scope: 'project-group' as const, projectGroupId: group.id }
-        const options = getFolderPathStatusRouteOptions(request)
+        const options = getFolderPathStatusRouteOptionsForRows(getProjectGroupHostId(group))
         requests.set(getFolderWorkspacePathStatusCacheKey(request, options), { request, options })
       }
     }
-    for (const workspace of folderWorkspaces) {
+    for (const { folderWorkspace: workspace, projectGroup } of getRenderableFolderWorkspaces(
+      folderWorkspaces,
+      projectGroups
+    )) {
       const request = { scope: 'folder-workspace' as const, folderWorkspaceId: workspace.id }
-      const options = getFolderPathStatusRouteOptions(request)
+      const options = getFolderPathStatusRouteOptionsForRows(
+        getFolderWorkspaceHostId(workspace, projectGroup, 'local')
+      )
       requests.set(getFolderWorkspacePathStatusCacheKey(request, options), { request, options })
     }
     for (const { request, options } of requests.values()) {
@@ -102,13 +94,12 @@ export function useFolderWorkspacePathStatusRows(args: {
     folderPathStatusRepoMembershipKey,
     folderPathStatusSshConnectionKey,
     folderWorkspaces,
-    getFolderPathStatusRouteOptions,
     getFolderWorkspacePathStatusCacheKey,
     projectGroups
   ])
   const getCachedFolderWorkspacePathStatus = useCallback(
-    (request: FolderPathStatusRequest) => {
-      const options = getFolderPathStatusRouteOptions(request)
+    (request: FolderPathStatusRequest, hostId: ExecutionHostId) => {
+      const options = getFolderPathStatusRouteOptionsForRows(hostId)
       const cacheKey = getFolderWorkspacePathStatusCacheKey(request, options)
       // Why: don't let an expired negative status keep folder workspaces disabled while a refresh is in flight.
       void folderWorkspacePathStatuses[cacheKey]
@@ -118,7 +109,6 @@ export function useFolderWorkspacePathStatusRows(args: {
     [
       folderWorkspacePathStatuses,
       folderPathStatusCacheExpiryTick,
-      getFolderPathStatusRouteOptions,
       getFolderWorkspacePathStatusCacheKey,
       getFreshFolderWorkspacePathStatus
     ]

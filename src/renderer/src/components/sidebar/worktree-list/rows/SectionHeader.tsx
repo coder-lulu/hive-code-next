@@ -56,10 +56,13 @@ export type SectionHeaderRowContext = {
   dragOverStatus: WorkspaceStatus | null
   pinDragOver: boolean
   headerDrag: WorktreeSidebarHeaderDrag
-  getCachedFolderWorkspacePathStatus: (request: {
-    scope: 'project-group'
-    projectGroupId: string
-  }) => FolderWorkspacePathStatus | null
+  getCachedFolderWorkspacePathStatus: (
+    request: {
+      scope: 'project-group'
+      projectGroupId: string
+    },
+    hostId: ExecutionHostId
+  ) => FolderWorkspacePathStatus | null
   toggleGroupWithScrollAnchor: (groupKey: string) => void
   projectActions: RepoHeaderProjectActions
   onRenameProjectGroup: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
@@ -172,10 +175,13 @@ export function renderWorktreeSectionHeaderRow(args: {
       ? row.projectGroup
       : null
   const projectGroupPathStatus = folderBackedProjectGroup
-    ? ctx.getCachedFolderWorkspacePathStatus({
-        scope: 'project-group',
-        projectGroupId: folderBackedProjectGroup.id
-      })
+    ? ctx.getCachedFolderWorkspacePathStatus(
+        {
+          scope: 'project-group',
+          projectGroupId: folderBackedProjectGroup.id
+        },
+        getProjectGroupHostId(folderBackedProjectGroup)
+      )
     : null
   const hasRepositorySource = row.hasRepositorySource === true
   const effectiveProjectGroupPathStatus = hasRepositorySource ? null : projectGroupPathStatus

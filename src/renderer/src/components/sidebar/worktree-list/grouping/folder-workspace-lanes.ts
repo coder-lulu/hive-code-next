@@ -7,6 +7,15 @@ import {
 } from '../../../../../../shared/workspace-statuses'
 import { ALL_GROUP_KEY, getPRLaneKey } from './group-keys'
 import type { WorktreeGroupBy } from './row-types'
+import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
+import { composeWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
+
+export function getProjectGroupIdentity(
+  owner: Pick<ProjectGroup, 'id' | 'executionHostId' | 'connectionId'>,
+  groupId = owner.id
+): string {
+  return composeWorktreeHostIdentity(getProjectGroupHostId(owner), groupId)
+}
 
 /** A folder workspace paired with the project group that owns it. The pair is
  *  carried through grouping because FolderWorkspaceRow needs a non-optional
@@ -27,10 +36,25 @@ export function getRenderableFolderWorkspaces(
   folderWorkspaces: readonly FolderWorkspace[],
   projectGroups: readonly ProjectGroup[]
 ): RenderableFolderWorkspace[] {
-  const projectGroupsById = new Map(projectGroups.map((group) => [group.id, group]))
+  const projectGroupsById = new Map(
+    projectGroups.map((group) => [getProjectGroupIdentity(group), group])
+  )
+  const inheritedLocalGroups = new Map<string, ProjectGroup | null>()
+  for (const group of projectGroups) {
+    if (!getProjectGroupHostId(group).startsWith('runtime:')) {
+      inheritedLocalGroups.set(group.id, inheritedLocalGroups.has(group.id) ? null : group)
+    }
+  }
   const renderable: RenderableFolderWorkspace[] = []
   for (const folderWorkspace of folderWorkspaces) {
-    const projectGroup = projectGroupsById.get(folderWorkspace.projectGroupId)
+    const projectGroup =
+      projectGroupsById.get(
+        getProjectGroupIdentity(folderWorkspace, folderWorkspace.projectGroupId)
+      ) ??
+      // Local catalog workspaces can inherit an SSH target from their owning group.
+      (!folderWorkspace.executionHostId && !folderWorkspace.connectionId
+        ? inheritedLocalGroups.get(folderWorkspace.projectGroupId)
+        : null)
     // A group filtered out for host visibility legitimately hides its workspaces.
     if (!projectGroup?.parentPath) {
       continue

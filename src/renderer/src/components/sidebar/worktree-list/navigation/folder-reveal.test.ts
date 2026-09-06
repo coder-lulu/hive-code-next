@@ -9,6 +9,40 @@ import {
   sidebarWorkspaceStillExists
 } from './folder-reveal'
 import { getProjectGroupHeaderKey } from '../grouping/group-keys'
+import { getSidebarRowRevealAncestorKeys } from './reveal-ancestors'
+
+it('reveals only the owning host ancestors when workspace and group IDs collide', () => {
+  const root = makeProjectGroup({ id: 'root' })
+  const child = makeProjectGroup({ id: 'group-child', parentGroupId: root.id })
+  const remoteRoot = { ...root, executionHostId: 'runtime:other' }
+  const remoteChild = { ...child, executionHostId: 'runtime:other' }
+  const localWorkspace = makeFolderWorkspace()
+  const remoteWorkspace = makeFolderWorkspace({ executionHostId: 'runtime:other' })
+  const projectGroups = [root, child, remoteRoot, remoteChild]
+  expect(
+    getFolderWorkspaceRevealGroupKeys(
+      folderWorkspaceKey(localWorkspace.id),
+      [localWorkspace, remoteWorkspace],
+      projectGroups,
+      {
+        groupBy: 'repo',
+        executionHostId: 'runtime:other',
+        defaultHostId: 'local'
+      }
+    )
+  ).toEqual([
+    getProjectGroupHeaderKey(root.id, remoteRoot),
+    getProjectGroupHeaderKey(child.id, remoteChild),
+    'host:runtime:other'
+  ])
+  expect(
+    getSidebarRowRevealAncestorKeys({
+      rowKey: getProjectGroupHeaderKey(child.id, remoteChild),
+      repoMap: new Map(),
+      projectGroups
+    })
+  ).toEqual([getProjectGroupHeaderKey(root.id, remoteRoot)])
+})
 
 function makeFolderWorkspace(overrides: Partial<FolderWorkspace> = {}): FolderWorkspace {
   return {
@@ -151,7 +185,7 @@ describe('reveal keys under non-repo grouping', () => {
       workspaceStatuses: [],
       defaultHostId: 'local'
     })
-    expect(keys).toContain(getProjectGroupHeaderKey(group.id))
+    expect(keys).toContain(getProjectGroupHeaderKey(group.id, group))
     expect(keys.some((key) => key.startsWith('workspace-status:'))).toBe(false)
   })
 })

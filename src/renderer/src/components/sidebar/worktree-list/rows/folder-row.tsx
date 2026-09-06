@@ -41,10 +41,13 @@ export type FolderWorkspaceRowContext = {
   workspaceLineageByChildKey: Record<string, WorkspaceLineage>
   prCache: AppState['prCache'] | null
   hostedReviewCache: AppState['hostedReviewCache'] | null
-  getCachedFolderWorkspacePathStatus: (request: {
-    scope: 'folder-workspace'
-    folderWorkspaceId: string
-  }) => FolderWorkspacePathStatus | null
+  getCachedFolderWorkspacePathStatus: (
+    request: {
+      scope: 'folder-workspace'
+      folderWorkspaceId: string
+    },
+    hostId: ExecutionHostId
+  ) => FolderWorkspacePathStatus | null
   onSelectionGesture: (event: React.MouseEvent<HTMLElement>, worktree: Worktree) => boolean
   onContextMenuSelect: (
     event: React.MouseEvent<HTMLElement>,
@@ -75,10 +78,13 @@ export function renderFolderWorkspaceVirtualRow(args: {
     (!ctx.activeWorkspaceExecutionHostId ||
       folderWorktreeIdentity ===
         composeWorktreeHostIdentity(ctx.activeWorkspaceExecutionHostId, folderWorktree.id))
-  const pathStatus = ctx.getCachedFolderWorkspacePathStatus({
-    scope: 'folder-workspace',
-    folderWorkspaceId: row.folderWorkspace.id
-  })
+  const pathStatus = ctx.getCachedFolderWorkspacePathStatus(
+    {
+      scope: 'folder-workspace',
+      folderWorkspaceId: row.folderWorkspace.id
+    },
+    hostId
+  )
   const activationDisabled =
     pathStatus?.exists === false &&
     (isConfirmedStaleFolderPathStatus(pathStatus) || pathStatus.reason === 'ambiguous-connection')

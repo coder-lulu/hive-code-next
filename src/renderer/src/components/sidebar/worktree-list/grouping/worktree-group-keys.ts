@@ -8,6 +8,7 @@ import { ALL_GROUP_KEY, getPRGroupKey, getProjectGroupHeaderKey } from './group-
 import { buildProjectGroupingIndex, getProjectGroupingForRepo } from './project-grouping'
 import type { ProjectGroupingModel } from './project-grouping'
 import type { WorktreeGroupBy } from './row-types'
+import { getProjectGroupIdentity } from './folder-workspace-lanes'
 
 export function getGroupKeyForWorktree(
   groupBy: WorktreeGroupBy,
@@ -61,20 +62,22 @@ export function getGroupKeysForWorktree(
   }
   const repo = repoMap.get(worktree.repoId)
   const groupIds: string[] = []
-  const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
+  const groupsById = new Map(projectGroups.map((group) => [getProjectGroupIdentity(group), group]))
+  const owner = repo ?? { id: worktree.repoId, executionHostId: worktree.hostId }
   const visited = new Set<string>()
   let currentGroupId = repo?.projectGroupId ?? null
   while (currentGroupId && !visited.has(currentGroupId)) {
-    const group = groupsById.get(currentGroupId)
+    const group = groupsById.get(getProjectGroupIdentity(owner, currentGroupId))
     if (!group) {
       // Why: repos can arrive before their remote Project Group metadata; reveal
       // keys must match the top-level fallback rows buildRows actually renders.
       break
     }
     visited.add(currentGroupId)
-    groupIds.unshift(currentGroupId)
+    groupIds.unshift(getProjectGroupHeaderKey(currentGroupId, group))
     const parentId = group.parentGroupId ?? null
-    currentGroupId = parentId && groupsById.has(parentId) ? parentId : null
+    currentGroupId =
+      parentId && groupsById.has(getProjectGroupIdentity(owner, parentId)) ? parentId : null
   }
-  return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), groupKey]
+  return [...groupIds, groupKey]
 }

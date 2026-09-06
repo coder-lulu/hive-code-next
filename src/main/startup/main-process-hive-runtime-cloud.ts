@@ -91,10 +91,6 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
   state.runtimeCloudSessions = processRuntimeCloudSessions
   const processRuntimeCloudTransport = new HiveAccountRuntimeTransport(processRuntimeCloudDirectory)
   state.runtimeCloudTransport = processRuntimeCloudTransport
-  state.uninstallRuntimeCloudAccess = installHiveAccountRuntimeAccess({
-    directory: processRuntimeCloudDirectory,
-    transport: processRuntimeCloudTransport
-  })
   const processLocalRuntimeOwnership = new LocalRuntimeOwnershipService({
     config: runtimeCloudConfig,
     userDataPath: app.getPath('userData'),
@@ -107,6 +103,12 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
       : defaultLocalRuntimeOwnershipDependencies
   })
   state.localRuntimeOwnership = processLocalRuntimeOwnership
+  state.uninstallRuntimeCloudAccess = installHiveAccountRuntimeAccess({
+    directory: processRuntimeCloudDirectory,
+    transport: processRuntimeCloudTransport,
+    getLocalRuntimeRecordId: () =>
+      processLocalRuntimeOwnership.getLocalRuntimeStatus().runtimeRecordId
+  })
   state.unsubscribeRuntimeCloudPresenceState = processRuntimeCloudPresence.subscribeState((state) =>
     processLocalRuntimeOwnership.setPresenceState(state)
   )

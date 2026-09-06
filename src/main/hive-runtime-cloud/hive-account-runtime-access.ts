@@ -2,6 +2,7 @@ import type { HiveAccountRuntimeDirectoryService } from './hive-account-runtime-
 import type { HiveAccountRuntimeTransport } from './hive-account-runtime-transport'
 
 export type HiveAccountRuntimeAccess = Readonly<{
+  getLocalRuntimeRecordId: () => string | null
   directory: Pick<HiveAccountRuntimeDirectoryService, 'getState'>
   transport: Pick<HiveAccountRuntimeTransport, 'getStatus' | 'call' | 'subscribe' | 'disconnect'>
 }>

@@ -84,6 +84,48 @@ function folderRows(rows: Row[]): Extract<Row, { type: 'folder-workspace' }>[] {
 const ALL_GROUP_BY: WorktreeGroupBy[] = ['repo', 'workspace-status', 'pr-status', 'none']
 
 describe('folder workspaces render under every Group by mode', () => {
+  it('keeps identical group and workspace IDs on different hosts in their own sections', () => {
+    const remoteGroup = { ...GROUP, executionHostId: 'runtime:other' }
+    const localWorkspace = makeFolderWorkspace()
+    const remoteWorkspace = makeFolderWorkspace({ executionHostId: 'runtime:other' })
+    const rows = buildSidebarRows({
+      groupBy: 'repo',
+      projectGroups: [GROUP, remoteGroup],
+      folderWorkspaces: [localWorkspace, remoteWorkspace],
+      worktrees: []
+    })
+    const folders = folderRows(rows)
+    expect(folders).toHaveLength(2)
+    const headers = rows.filter((row) => row.type === 'header')
+    expect(new Set(headers.map((row) => row.key)).size).toBe(headers.length)
+    const collapsed = buildSidebarRows({
+      groupBy: 'repo',
+      projectGroups: [GROUP, remoteGroup],
+      folderWorkspaces: [localWorkspace, remoteWorkspace],
+      worktrees: [],
+      collapsedGroups: new Set([`project-group:runtime:other|${GROUP.id}`])
+    })
+    expect(folderRows(collapsed).map((row) => row.folderWorkspace.executionHostId)).toEqual([
+      undefined
+    ])
+    expect(
+      folders.map((row) => [row.folderWorkspace.executionHostId, row.projectGroup.executionHostId])
+    ).toEqual([
+      [undefined, undefined],
+      ['runtime:other', 'runtime:other']
+    ])
+    expect(
+      folderRows(
+        buildSidebarRows({
+          groupBy: 'none',
+          projectGroups: [remoteGroup],
+          folderWorkspaces: [localWorkspace],
+          worktrees: []
+        })
+      )
+    ).toHaveLength(0)
+  })
+
   // The three non-repo arms are the acceptance evidence; the repo arm is a
   // deliberate no-regression guard that also passed before the fix.
   for (const groupBy of ALL_GROUP_BY) {

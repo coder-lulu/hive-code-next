@@ -2,6 +2,9 @@ import { CircleX, FolderTree, List, Pin } from 'lucide-react'
 import type React from 'react'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { ProjectGroup } from '../../../../../../shared/project-group-types'
+import { composeWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
+import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import { branchName } from '../../../../lib/git-utils'
 import {
@@ -71,8 +74,14 @@ export const PROJECT_GROUP_META = {
   icon: FolderTree
 } as const
 
-export function getProjectGroupHeaderKey(groupId: string | null): string {
-  return groupId ? `project-group:${groupId}` : UNGROUPED_PROJECT_GROUP_KEY
+export function getProjectGroupHeaderKey(
+  groupId: string | null,
+  owner?: Pick<ProjectGroup, 'executionHostId' | 'connectionId'>
+): string {
+  const hostId = owner ? getProjectGroupHostId(owner) : 'local'
+  return groupId
+    ? `project-group:${hostId === 'local' ? groupId : composeWorktreeHostIdentity(hostId, groupId)}`
+    : UNGROUPED_PROJECT_GROUP_KEY
 }
 
 export const PINNED_GROUP_KEY = 'pinned'

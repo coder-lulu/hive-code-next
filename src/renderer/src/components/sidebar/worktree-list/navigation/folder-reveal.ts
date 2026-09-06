@@ -5,7 +5,11 @@ import { folderWorkspaceToWorktree } from '../../../../../../shared/folder-works
 import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { getProjectGroupHeaderKey } from '../grouping/group-keys'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import { getFolderWorkspaceLaneKey } from '../grouping/folder-workspace-lanes'
+import {
+  getFolderWorkspaceLaneKey,
+  getProjectGroupIdentity,
+  getRenderableFolderWorkspaces
+} from '../grouping/folder-workspace-lanes'
 import type { WorktreeGroupBy } from '../grouping/row-types'
 import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
 
@@ -65,31 +69,43 @@ export function getFolderWorkspaceRevealGroupKeys(
     groupBy?: WorktreeGroupBy
     workspaceStatuses?: readonly WorkspaceStatusDefinition[]
     defaultHostId?: ExecutionHostId
+    executionHostId?: ExecutionHostId
   }
 ): string[] {
-  const folderWorkspace = findFolderWorkspaceByKey(worktreeId, folderWorkspaces)
-  if (!folderWorkspace) {
+  const scope = parseWorkspaceKey(worktreeId)
+  if (scope?.type !== 'folder') {
     return []
   }
-
-  const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
+  const pair = getRenderableFolderWorkspaces(
+    folderWorkspaces.filter((workspace) => workspace.id === scope.folderWorkspaceId),
+    projectGroups
+  ).find(
+    ({ folderWorkspace, projectGroup }) =>
+      !options?.executionHostId ||
+      getFolderWorkspaceHostId(folderWorkspace, projectGroup, options.defaultHostId ?? 'local') ===
+        options.executionHostId
+  )
+  if (!pair) {
+    return []
+  }
+  const { folderWorkspace, projectGroup: owningGroup } = pair
+  const groupsById = new Map(projectGroups.map((group) => [getProjectGroupIdentity(group), group]))
   const keys: string[] = []
   const seen = new Set<string>()
   let groupId: string | null = folderWorkspace.projectGroupId
   while (groupId && !seen.has(groupId)) {
     seen.add(groupId)
-    const group = groupsById.get(groupId)
+    const group = owningGroup && groupsById.get(getProjectGroupIdentity(owningGroup, groupId))
     if (!group) {
       break
     }
-    keys.unshift(getProjectGroupHeaderKey(group.id))
+    keys.unshift(getProjectGroupHeaderKey(group.id, group))
     groupId = group.parentGroupId
   }
 
   // Under non-repo grouping the project-group headers above do not exist, so the
   // lane and host headers are the ones actually hiding the row (#15362). Lane
   // keys come from the same function grouping uses, so the two cannot disagree.
-  const owningGroup = groupsById.get(folderWorkspace.projectGroupId)
   if (options?.groupBy && options.groupBy !== 'repo' && owningGroup) {
     keys.push(
       getFolderWorkspaceLaneKey(

@@ -77,6 +77,7 @@ describe('Runtime environment Cloud fallback safety', () => {
     })
     items.length = 2
     const uninstall = installHiveAccountRuntimeAccess({
+      getLocalRuntimeRecordId: () => null,
       directory: {
         getState: () => ({
           status: 'READY',

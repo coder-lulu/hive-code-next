@@ -6,9 +6,9 @@ import {
   type ExecutionHostId,
   type ExecutionHostScope
 } from '../../../../../../shared/execution-host'
-import type { FolderWorkspacePathStatusRequest } from '../../../../../../shared/folder-workspace-path-status'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
+import { getRenderableFolderWorkspaces } from '../grouping/folder-workspace-lanes'
 
 /** null means "no host filter" — every host is visible. */
 export function getVisibleSidebarHostIdSet(
@@ -45,16 +45,17 @@ export function filterFolderWorkspacesForVisibleHosts(
   if (!visibleHostIdSet) {
     return folderWorkspaces
   }
-  const projectGroupById = new Map(projectGroups.map((group) => [group.id, group]))
-  return folderWorkspaces.filter((folderWorkspace) =>
-    visibleHostIdSet.has(
-      getFolderWorkspaceExecutionHostIdForRows({
-        folderWorkspace,
-        projectGroup: projectGroupById.get(folderWorkspace.projectGroupId),
-        defaultHostId
-      })
+  return getRenderableFolderWorkspaces(folderWorkspaces, projectGroups)
+    .filter(({ folderWorkspace, projectGroup }) =>
+      visibleHostIdSet.has(
+        getFolderWorkspaceExecutionHostIdForRows({
+          folderWorkspace,
+          projectGroup,
+          defaultHostId
+        })
+      )
     )
-  )
+    .map(({ folderWorkspace }) => folderWorkspace)
 }
 
 export function getProjectGroupExecutionHostIdForRows(
@@ -103,44 +104,8 @@ export function getRuntimeEnvironmentIdForFolderPathStatusHost(
   return parsed?.kind === 'runtime' ? parsed.environmentId : null
 }
 
-function getProjectGroupExecutionHostIdForFolderPathStatus(
-  group: Pick<ProjectGroup, 'connectionId' | 'executionHostId'>
-): ExecutionHostId {
-  const executionHostId = normalizeExecutionHostId(group.executionHostId)
-  if (executionHostId) {
-    return executionHostId
-  }
-  return group.connectionId ? toSshExecutionHostId(group.connectionId) : 'local'
-}
-
-export function getFolderPathStatusRouteOptionsForRows({
-  request,
-  projectGroupsById,
-  folderWorkspacesById
-}: {
-  request: FolderWorkspacePathStatusRequest
-  projectGroupsById: ReadonlyMap<string, ProjectGroup>
-  folderWorkspacesById: ReadonlyMap<string, FolderWorkspace>
-}): { runtimeEnvironmentId: string | null } | undefined {
-  const folderWorkspace =
-    request.scope === 'folder-workspace'
-      ? folderWorkspacesById.get(request.folderWorkspaceId)
-      : undefined
-  const group =
-    request.scope === 'project-group'
-      ? projectGroupsById.get(request.projectGroupId)
-      : projectGroupsById.get(folderWorkspace?.projectGroupId ?? '')
-  if (!group) {
-    return undefined
-  }
-  const hostId =
-    request.scope === 'project-group'
-      ? getProjectGroupExecutionHostIdForFolderPathStatus(group)
-      : getFolderWorkspaceExecutionHostIdForRows({
-          folderWorkspace: folderWorkspace ?? { connectionId: null, executionHostId: null },
-          projectGroup: group,
-          defaultHostId: getProjectGroupExecutionHostIdForFolderPathStatus(group)
-        })
-  const runtimeEnvironmentId = getRuntimeEnvironmentIdForFolderPathStatusHost(hostId)
-  return { runtimeEnvironmentId }
+export function getFolderPathStatusRouteOptionsForRows(hostId: ExecutionHostId): {
+  runtimeEnvironmentId: string | null
+} {
+  return { runtimeEnvironmentId: getRuntimeEnvironmentIdForFolderPathStatusHost(hostId) }
 }

@@ -3,6 +3,7 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { PINNED_GROUP_KEY, getProjectGroupHeaderKey } from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
+import { getProjectGroupIdentity } from '../grouping/folder-workspace-lanes'
 
 function getProjectIdFromHeaderRowKey(rowKey: string): string | null {
   if (!rowKey.startsWith('project:')) {
@@ -47,19 +48,22 @@ function getRepoIdsFromHeaderRowKey(
 
 function getProjectGroupAncestorKeys(
   projectGroupId: string | null | undefined,
-  projectGroups: readonly ProjectGroup[]
+  projectGroups: readonly ProjectGroup[],
+  owner?: Pick<ProjectGroup, 'id' | 'executionHostId' | 'connectionId'>
 ): string[] {
-  const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
+  const groupsById = new Map(projectGroups.map((group) => [getProjectGroupIdentity(group), group]))
   const keys: string[] = []
   const seen = new Set<string>()
   let currentGroupId = projectGroupId ?? null
   while (currentGroupId && !seen.has(currentGroupId)) {
-    const group = groupsById.get(currentGroupId)
+    const group = groupsById.get(
+      getProjectGroupIdentity(owner ?? { id: currentGroupId }, currentGroupId)
+    )
     if (!group) {
       break
     }
     seen.add(currentGroupId)
-    keys.unshift(getProjectGroupHeaderKey(group.id))
+    keys.unshift(getProjectGroupHeaderKey(group.id, group))
     currentGroupId = group.parentGroupId
   }
   return keys
@@ -72,9 +76,10 @@ export function getSidebarRowRevealAncestorKeys(args: {
   projectGrouping?: ProjectGroupingModel
 }): string[] {
   if (args.rowKey.startsWith('project-group:')) {
-    const groupId = args.rowKey.slice('project-group:'.length)
-    const group = args.projectGroups.find((candidate) => candidate.id === groupId)
-    return getProjectGroupAncestorKeys(group?.parentGroupId, args.projectGroups)
+    const group = args.projectGroups.find(
+      (candidate) => getProjectGroupHeaderKey(candidate.id, candidate) === args.rowKey
+    )
+    return getProjectGroupAncestorKeys(group?.parentGroupId, args.projectGroups, group)
   }
   const keys = new Set<string>()
   for (const repoId of getRepoIdsFromHeaderRowKey(
@@ -83,7 +88,7 @@ export function getSidebarRowRevealAncestorKeys(args: {
     args.projectGrouping
   )) {
     const repo = args.repoMap.get(repoId)
-    for (const key of getProjectGroupAncestorKeys(repo?.projectGroupId, args.projectGroups)) {
+    for (const key of getProjectGroupAncestorKeys(repo?.projectGroupId, args.projectGroups, repo)) {
       keys.add(key)
     }
   }

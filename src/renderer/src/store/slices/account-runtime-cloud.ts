@@ -36,7 +36,8 @@ export class AccountRuntimeClaimError extends Error {
 }
 
 export function accountRuntimeCatalogAccessFingerprint(
-  directory: HiveAccountRuntimeDirectoryState
+  directory: HiveAccountRuntimeDirectoryState,
+  localRuntimeRecordId: string | null = null
 ): string {
   const runtimes = directory.items
     .map(
@@ -55,7 +56,13 @@ export function accountRuntimeCatalogAccessFingerprint(
         [entry.runtimeRecordId, entry.revision, entry.desiredName, entry.confirmed] as const
     )
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-  return JSON.stringify([directory.accountId, directory.sessionGeneration, runtimes, pending])
+  return JSON.stringify([
+    directory.accountId,
+    directory.sessionGeneration,
+    runtimes,
+    pending,
+    localRuntimeRecordId
+  ])
 }
 
 export function projectAccountRuntimeDirectoryOntoCatalog(
@@ -187,7 +194,10 @@ export const createAccountRuntimeCloudSlice: StateCreator<
     directory: HiveAccountRuntimeDirectoryState,
     isDisposed: () => boolean = () => false
   ): void => {
-    const fingerprint = accountRuntimeCatalogAccessFingerprint(directory)
+    const fingerprint = accountRuntimeCatalogAccessFingerprint(
+      directory,
+      get().localRuntimeOwnership.runtimeRecordId
+    )
     if (runtimeCatalogFingerprint === fingerprint) {
       return
     }
@@ -199,7 +209,10 @@ export const createAccountRuntimeCloudSlice: StateCreator<
         if (
           !isDisposed() &&
           generation === runtimeCatalogGeneration &&
-          accountRuntimeCatalogAccessFingerprint(get().accountRuntimeDirectory) === fingerprint
+          accountRuntimeCatalogAccessFingerprint(
+            get().accountRuntimeDirectory,
+            get().localRuntimeOwnership.runtimeRecordId
+          ) === fingerprint
         ) {
           get().setRuntimeEnvironments(environments)
         }
@@ -220,6 +233,14 @@ export const createAccountRuntimeCloudSlice: StateCreator<
         directory
       )
     }))
+  }
+
+  const publishLocalRuntimeOwnership = (
+    localRuntimeOwnership: HiveLocalRuntimeOwnershipState,
+    isDisposed: () => boolean = () => false
+  ): void => {
+    set({ localRuntimeOwnership })
+    reloadRuntimeEnvironmentCatalog(get().accountRuntimeDirectory, isDisposed)
   }
 
   return {
@@ -244,7 +265,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
       const unsubscribeOwnership = runtimeCloudApi.onOwnershipChanged((state) => {
         if (!disposed) {
           ownershipGeneration += 1
-          set({ localRuntimeOwnership: state })
+          publishLocalRuntimeOwnership(state, () => disposed)
         }
       })
       const initialDirectoryGeneration = directoryGeneration
@@ -263,7 +284,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
         .getLocalOwnership()
         .then((localRuntimeOwnership) => {
           if (!disposed && ownershipGeneration === initialOwnershipGeneration) {
-            set({ localRuntimeOwnership })
+            publishLocalRuntimeOwnership(localRuntimeOwnership, () => disposed)
           }
         })
         .catch(() => undefined)
@@ -288,7 +309,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
         reloadRuntimeEnvironmentCatalog(accountRuntimeDirectory)
       }
       if (ownershipGeneration === initialOwnershipGeneration) {
-        set({ localRuntimeOwnership })
+        publishLocalRuntimeOwnership(localRuntimeOwnership)
       }
     },
 
@@ -312,7 +333,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
           ownershipGeneration === initialOwnershipGeneration
         )
       ) {
-        set({ localRuntimeOwnership })
+        publishLocalRuntimeOwnership(localRuntimeOwnership)
         return localRuntimeOwnership
       }
       return current
@@ -332,7 +353,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
             ownershipGeneration === initialOwnershipGeneration
           )
         ) {
-          set({ localRuntimeOwnership })
+          publishLocalRuntimeOwnership(localRuntimeOwnership)
           return localRuntimeOwnership
         }
         return current
@@ -349,7 +370,7 @@ export const createAccountRuntimeCloudSlice: StateCreator<
               ownershipGeneration === snapshotGeneration
             )
           ) {
-            set({ localRuntimeOwnership })
+            publishLocalRuntimeOwnership(localRuntimeOwnership)
           }
         } catch {
           // The stable renderer error below intentionally hides IPC and credential details.

@@ -26,9 +26,17 @@ export function listRuntimeEnvironmentCatalog(
   userDataPath: string
 ): PublicKnownRuntimeEnvironment[] {
   const local = listEnvironments(userDataPath).map(redactRuntimeEnvironment)
-  const state = getHiveAccountRuntimeAccess()?.directory.getState()
+  const access = getHiveAccountRuntimeAccess()
+  const state = access?.directory.getState()
   const accountRuntimes = state?.items ?? []
-  return mergeHiveAccountRuntimeCatalog(local, accountRuntimes, pendingDisplayNameMap(state))
+  const localRuntimeRecordId = access?.getLocalRuntimeRecordId()
+  return mergeHiveAccountRuntimeCatalog(
+    local.filter(
+      (environment) => !localRuntimeRecordId || environment.runtimeRecordId !== localRuntimeRecordId
+    ),
+    accountRuntimes.filter((runtime) => runtime.runtimeRecordId !== localRuntimeRecordId),
+    pendingDisplayNameMap(state)
+  )
 }
 
 export function resolveRuntimeEnvironmentCatalogEntry(
@@ -36,10 +44,16 @@ export function resolveRuntimeEnvironmentCatalogEntry(
   selector: string
 ): PublicKnownRuntimeEnvironment {
   const local = listEnvironments(userDataPath).map(redactRuntimeEnvironment)
-  const state = getHiveAccountRuntimeAccess()?.directory.getState()
+  const access = getHiveAccountRuntimeAccess()
+  const state = access?.directory.getState()
   const accountRuntimes = state?.items ?? []
   const pending = pendingDisplayNameMap(state)
-  return resolveHiveRuntimeCatalogEntry(local, accountRuntimes, pending, selector)
+  const environment = resolveHiveRuntimeCatalogEntry(local, accountRuntimes, pending, selector)
+  const localRuntimeRecordId = access?.getLocalRuntimeRecordId()
+  if (localRuntimeRecordId && environment.runtimeRecordId === localRuntimeRecordId) {
+    throw new Error('This Runtime is the current computer; use the local workspace.')
+  }
+  return environment
 }
 
 function pendingDisplayNameMap(
