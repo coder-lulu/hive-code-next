@@ -531,6 +531,54 @@ describe('LocalRuntimeOwnershipService', () => {
     service.stop()
   })
 
+  it.each(['UNLINKED', 'NETWORK_FAILURE'])(
+    'rechecks fenced ownership using authoritative lookup: %s',
+    async (outcome) => {
+      const { service, client, getStored, clearIdentity, onRegistrationChanged } = fixture()
+      const lookup = {
+        exists: true,
+        runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
+        status: 'CLAIMED',
+        resourceVersion: 2,
+        authorityGeneration: 1,
+        fencingEpoch: 1,
+        latestLeaseEpoch: 0,
+        identityPublicKeySha256: identityDigest
+      }
+      client.lookup.mockResolvedValue(lookup)
+      service.setAuthorization(authorization)
+      await vi.waitFor(() => expect(service.getState().relation).toBe('CLAIMED_BY_CURRENT'))
+      onRegistrationChanged.mockClear()
+      if (outcome === 'UNLINKED') {
+        client.lookup.mockResolvedValue({ ...lookup, status: 'UNLINKED', resourceVersion: 3 })
+      } else {
+        client.lookup.mockRejectedValue(new Error('network unavailable'))
+      }
+      service.setPresenceState('FENCED')
+      await vi.waitFor(() =>
+        expect(service.getState().relation).toBe(
+          outcome === 'UNLINKED' ? 'UNREGISTERED' : 'UNVERIFIABLE'
+        )
+      )
+      expect(clearIdentity).not.toHaveBeenCalled()
+      if (outcome === 'NETWORK_FAILURE') {
+        expect(getStored()?.status).toBe('CLAIMED')
+        expect(onRegistrationChanged).not.toHaveBeenCalled()
+      } else {
+        expect(getStored()).toBeNull()
+        expect(onRegistrationChanged).toHaveBeenCalledOnce()
+        const openVerification = vi.fn().mockResolvedValue(undefined)
+        await service.claimLocalRuntime(authorization.accountId, openVerification)
+        expect(client.register).not.toHaveBeenCalled()
+        expect(client.reissueClaimCapability).toHaveBeenCalledOnce()
+        expect(openVerification).toHaveBeenCalledWith('ABCD-EFGH')
+        expect(service.getState().relation).toBe('CLAIMED_BY_CURRENT')
+        expect(getStored()?.runtimeRecordId).toBe(lookup.runtimeRecordId)
+      }
+      service.stop()
+    }
+  )
+
   it('clears account-scoped ownership state on sign-out without deleting local state', async () => {
     const { service, getStored } = fixture()
     service.setAuthorization(authorization)

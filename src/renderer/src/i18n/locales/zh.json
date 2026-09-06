@@ -9553,6 +9553,7 @@
           "clientWeb": "网页端",
           "clientDesktop": "桌面端",
           "statusActive": "活跃",
+          "statusPendingActivation": "等待激活",
           "statusRevokePending": "正在结束",
           "statusRevoked": "已结束",
           "statusExpired": "已过期",

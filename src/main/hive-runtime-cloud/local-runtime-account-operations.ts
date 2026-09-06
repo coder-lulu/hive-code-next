@@ -35,10 +35,14 @@ export async function analyzeLocalRuntimeOwnership({
   const lookup = await registration.lookup(identity, authorization.authorityId, signal)
   assertCurrent()
   const stored = registration.readState()
-  if (!lookup.exists) {
+  if (!lookup.exists || lookup.status === 'UNLINKED') {
+    const registrationChanged = lookup.exists && stored !== null
+    if (registrationChanged) {
+      registration.clearRegistration()
+    }
     return {
-      result: ownershipResult('UNREGISTERED', null),
-      registrationChanged: false
+      result: ownershipResult('UNREGISTERED', lookup.exists ? lookup.runtimeRecordId : null),
+      registrationChanged
     }
   }
   if (lookup.status === 'PENDING_CLAIM') {

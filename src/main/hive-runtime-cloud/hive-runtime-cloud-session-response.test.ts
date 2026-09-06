@@ -5,10 +5,11 @@ import {
 } from './hive-runtime-cloud-session-response'
 
 const session = {
-  managedWebSessionId: '11111111-1111-4111-8111-111111111111',
+  managedSessionId: '11111111-1111-4111-8111-111111111111',
   runtimeRecordId: '22222222-2222-4222-8222-222222222222',
   runtimeInstanceId: '33333333-3333-4333-8333-333333333333',
   runtimeSessionId: '44444444-4444-4444-8444-444444444444',
+  backendAuthorityId: 'hive-primary',
   clientKind: 'MOBILE',
   clientLabel: 'Ada phone',
   status: 'ACTIVE',
@@ -23,7 +24,9 @@ const session = {
 describe('Hive Runtime Cloud session responses', () => {
   it('normalizes the client-kind-neutral session contract', () => {
     expect(normalizeRuntimeSession(session)).toEqual({
-      ...session,
+      ...Object.fromEntries(
+        Object.entries(session).filter(([key]) => key !== 'backendAuthorityId')
+      ),
       createdAt: Date.parse(session.createdAt),
       expiresAt: Date.parse(session.expiresAt)
     })
@@ -33,7 +36,7 @@ describe('Hive Runtime Cloud session responses', () => {
     expect(
       normalizeRuntimeSessionPage({ items: [session], nextCursor: 'next-cursor' })
     ).toMatchObject({
-      items: [{ managedWebSessionId: session.managedWebSessionId }],
+      items: [{ managedSessionId: session.managedSessionId }],
       nextCursor: 'next-cursor'
     })
   })

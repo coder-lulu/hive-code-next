@@ -1,6 +1,7 @@
 import type {
   HiveAccountRuntimeDirectoryEntry,
-  HiveRuntimeSession
+  HiveRuntimeSession,
+  HiveRuntimeSessionRevocation
 } from '../../shared/hive-runtime-cloud'
 import {
   normalizeRuntimeDirectoryEntry,
@@ -17,7 +18,7 @@ import {
   parseHiveAccountRelayIntent
 } from '../../shared/hive-account-relay-material'
 import {
-  normalizeRuntimeSession,
+  normalizeRuntimeSessionRevocation,
   normalizeRuntimeSessionPage
 } from './hive-runtime-cloud-session-response'
 
@@ -123,24 +124,25 @@ export class HiveRuntimeCloudAccountClient extends HiveRuntimeCloudHttpClient {
   }
 
   async revokeRuntimeSession(
-    managedWebSessionId: string,
-    expectedControlVersion: number,
+    managedSessionId: string,
+    expectedResourceVersion: number,
     accessToken: string,
-    idempotencyKey: string,
+    operationId: string,
     signal?: AbortSignal
-  ): Promise<HiveRuntimeSession> {
-    return normalizeRuntimeSession(
+  ): Promise<HiveRuntimeSessionRevocation> {
+    return normalizeRuntimeSessionRevocation(
       await this.request(
-        `/hive/v1/runtime-sessions/${encodeURIComponent(managedWebSessionId)}/revoke`,
+        `/hive/v1/runtime-sessions/${encodeURIComponent(managedSessionId)}/revoke`,
         {
-          protocolVersion: 'web-session-revoke/v1',
-          expectedControlVersion,
-          reasonCode: 'USER_REQUESTED'
+          protocolVersion: 'account-runtime-session-revoke/v2',
+          operationId,
+          expectedResourceVersion
         },
-        { authorization: `Bearer ${accessToken}`, 'idempotency-key': idempotencyKey },
+        { authorization: `Bearer ${accessToken}` },
         202,
         signal
-      )
+      ),
+      operationId
     )
   }
 }

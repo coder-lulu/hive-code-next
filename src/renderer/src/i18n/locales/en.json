@@ -11761,6 +11761,7 @@
           "clientWeb": "Web",
           "clientDesktop": "Desktop",
           "statusActive": "Active",
+          "statusPendingActivation": "Waiting for activation",
           "statusRevokePending": "Revocation pending",
           "statusRevoked": "Revoked",
           "statusExpired": "Expired",

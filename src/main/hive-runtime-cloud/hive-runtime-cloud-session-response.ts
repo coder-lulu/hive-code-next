@@ -1,11 +1,16 @@
-import type { HiveRuntimeSession, HiveRuntimeSessionStatus } from '../../shared/hive-runtime-cloud'
+import type {
+  HiveRuntimeSession,
+  HiveRuntimeSessionStatus,
+  HiveRuntimeSessionRevocation
+} from '../../shared/hive-runtime-cloud'
 import { exactKeys, isRecord, positiveInteger, uuid } from './hive-runtime-cloud-response'
 
 const SESSION_KEYS = [
-  'managedWebSessionId',
+  'managedSessionId',
   'runtimeRecordId',
   'runtimeInstanceId',
   'runtimeSessionId',
+  'backendAuthorityId',
   'clientKind',
   'clientLabel',
   'status',
@@ -18,7 +23,9 @@ const SESSION_KEYS = [
 ] as const
 
 const SESSION_STATUSES = new Set<HiveRuntimeSessionStatus>([
+  'PENDING_ACTIVATION',
   'ACTIVE',
+  'CLOSED',
   'REVOKE_PENDING',
   'REVOKED',
   'EXPIRED',
@@ -71,6 +78,12 @@ export function normalizeRuntimeSession(value: unknown): HiveRuntimeSession {
   }
   exactKeys(value, SESSION_KEYS)
   if (
+    typeof value.backendAuthorityId !== 'string' ||
+    !/^[a-zA-Z0-9._-]{1,128}$/.test(value.backendAuthorityId)
+  ) {
+    return invalid()
+  }
+  if (
     value.clientKind !== 'WEB' &&
     value.clientKind !== 'DESKTOP' &&
     value.clientKind !== 'MOBILE'
@@ -83,7 +96,7 @@ export function normalizeRuntimeSession(value: unknown): HiveRuntimeSession {
     return invalid()
   }
   return {
-    managedWebSessionId: uuid(value.managedWebSessionId),
+    managedSessionId: uuid(value.managedSessionId),
     runtimeRecordId: uuid(value.runtimeRecordId),
     runtimeInstanceId: uuid(value.runtimeInstanceId),
     runtimeSessionId: uuid(value.runtimeSessionId),
@@ -121,4 +134,33 @@ export function normalizeRuntimeSessionPage(value: unknown): Readonly<{
     return invalid()
   }
   return { items: value.items.map(normalizeRuntimeSession), nextCursor }
+}
+
+export function normalizeRuntimeSessionRevocation(
+  value: unknown,
+  operationId: string
+): HiveRuntimeSessionRevocation {
+  if (!isRecord(value)) {
+    return invalid()
+  }
+  exactKeys(value, [
+    'protocolVersion',
+    'operationId',
+    'managedSessionId',
+    'status',
+    'resourceVersion',
+    'controlVersion'
+  ])
+  if (
+    value.protocolVersion !== 'account-runtime-session-revoke/v2' ||
+    uuid(value.operationId) !== operationId
+  ) {
+    return invalid()
+  }
+  return {
+    managedSessionId: uuid(value.managedSessionId),
+    status: normalizeStatus(value.status),
+    resourceVersion: positiveInteger(value.resourceVersion),
+    controlVersion: positiveInteger(value.controlVersion)
+  }
 }

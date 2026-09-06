@@ -154,8 +154,8 @@ describe('Hive Runtime Cloud IPC', () => {
     ])
     await expect(
       electronMocks.handlers.get('hiveRuntimeCloud:revokeSession')?.(undefined, {
-        managedWebSessionId: '11111111-1111-4111-8111-111111111111',
-        expectedControlVersion: 3
+        managedSessionId: '11111111-1111-4111-8111-111111111111',
+        expectedResourceVersion: 3
       })
     ).resolves.toEqual({ status: 'REVOKE_PENDING' })
     expect(revoke).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', 3)
@@ -164,14 +164,14 @@ describe('Hive Runtime Cloud IPC', () => {
   it.each([
     null,
     {},
-    { managedWebSessionId: 'not-a-uuid', expectedControlVersion: 1 },
+    { managedSessionId: 'not-a-uuid', expectedResourceVersion: 1 },
     {
-      managedWebSessionId: '11111111-1111-4111-8111-111111111111',
-      expectedControlVersion: 0
+      managedSessionId: '11111111-1111-4111-8111-111111111111',
+      expectedResourceVersion: 0
     },
     {
-      managedWebSessionId: '11111111-1111-4111-8111-111111111111',
-      expectedControlVersion: 1,
+      managedSessionId: '11111111-1111-4111-8111-111111111111',
+      expectedResourceVersion: 1,
       accountId: 'forged'
     }
   ])('rejects malformed renderer input %#', (value) => {

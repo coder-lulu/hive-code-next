@@ -82,7 +82,15 @@ export class LocalRuntimeOwnershipService {
   }
 
   setPresenceState(presence: HiveRuntimeCloudPresenceState): void {
+    const previousPresence = this.session.getState().presence
     this.session.setPresence(presence)
+    if (
+      previousPresence !== presence &&
+      (presence === 'FENCED' ||
+        (presence === 'CLAIM_PENDING' && this.session.getState().relation === 'CLAIMED_BY_CURRENT'))
+    ) {
+      void this.refresh()
+    }
   }
 
   setAuthorization(authorization: HiveRuntimeCloudAuthorization | null): void {

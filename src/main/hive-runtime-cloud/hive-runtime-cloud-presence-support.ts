@@ -136,6 +136,9 @@ export function reconcileRuntimeRegistrationState(
   lookup: Extract<RuntimeRegistrationLookup, { exists: true }>,
   stored: HiveRuntimeCloudRegistrationState | null
 ): HiveRuntimeCloudRegistrationState {
+  if (lookup.status === 'UNLINKED') {
+    throw new ClaimPendingPresenceError('runtime_claim_required')
+  }
   if (lookup.status === 'PENDING_CLAIM') {
     if (stored?.status !== 'PENDING_CLAIM' || stored.runtimeRecordId !== lookup.runtimeRecordId) {
       throw new ClaimPendingPresenceError('claim_capability_unavailable')

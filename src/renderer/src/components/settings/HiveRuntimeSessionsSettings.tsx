@@ -15,7 +15,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
-import { formatAccountAuthorization } from './hive-account-settings-view'
+import { formatAccountAuthorization, sessionStatusLabel } from './hive-account-settings-view'
 
 type CurrentDeviceSummary = {
   label: string
@@ -45,23 +45,8 @@ function clientKindLabel(kind: HiveRuntimeSession['clientKind']): string {
   }
 }
 
-function sessionStatusLabel(status: HiveRuntimeSession['status']): string {
-  switch (status) {
-    case 'ACTIVE':
-      return translate('auto.components.settings.runtimeSessions.statusActive', 'Active')
-    case 'REVOKE_PENDING':
-      return translate('auto.components.settings.runtimeSessions.statusRevokePending', 'Ending')
-    case 'REVOKED':
-      return translate('auto.components.settings.runtimeSessions.statusRevoked', 'Ended')
-    case 'EXPIRED':
-      return translate('auto.components.settings.runtimeSessions.statusExpired', 'Expired')
-    case 'UNVERIFIABLE':
-      return translate('auto.components.settings.runtimeSessions.statusUnverifiable', 'Unverified')
-  }
-}
-
 function canRevoke(status: HiveRuntimeSession['status']): boolean {
-  return status === 'ACTIVE' || status === 'UNVERIFIABLE'
+  return status === 'PENDING_ACTIVATION' || status === 'ACTIVE' || status === 'UNVERIFIABLE'
 }
 
 function RuntimeSessionRow({
@@ -166,12 +151,14 @@ export function HiveRuntimeSessionsSettings({
     setRevoking(true)
     try {
       const updated = await window.api.hiveRuntimeCloud.revokeSession({
-        managedWebSessionId: target.managedWebSessionId,
-        expectedControlVersion: target.controlVersion
+        managedSessionId: target.managedSessionId,
+        expectedResourceVersion: target.resourceVersion
       })
       setSessions((current) =>
         current.map((session) =>
-          session.managedWebSessionId === updated.managedWebSessionId ? updated : session
+          session.managedSessionId === updated.managedSessionId
+            ? { ...session, ...updated }
+            : session
         )
       )
       setTarget(null)
@@ -344,7 +331,7 @@ export function HiveRuntimeSessionsSettings({
             <div className="max-h-80 divide-y divide-border/55 overflow-y-auto scrollbar-sleek">
               {sessions.map((session) => (
                 <RuntimeSessionRow
-                  key={session.managedWebSessionId}
+                  key={session.managedSessionId}
                   session={session}
                   onRevoke={setTarget}
                 />

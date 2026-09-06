@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import type { HiveRuntimeSession } from '../../shared/hive-runtime-cloud'
+import type {
+  HiveRuntimeSession,
+  HiveRuntimeSessionRevocation
+} from '../../shared/hive-runtime-cloud'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import { HiveRuntimeCloudClient } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudConfig } from './hive-runtime-cloud-config'
@@ -13,13 +16,13 @@ type SessionClient = Pick<HiveRuntimeCloudClient, 'listRuntimeSessions' | 'revok
 type SessionDependencies = Readonly<{
   createClient: (apiBaseUrl: string) => SessionClient
   now: () => number
-  idempotencyKey: () => string
+  operationId: () => string
 }>
 
 const defaultDependencies: SessionDependencies = {
   createClient: (apiBaseUrl) => new HiveRuntimeCloudClient(apiBaseUrl),
   now: Date.now,
-  idempotencyKey: randomUUID
+  operationId: randomUUID
 }
 
 export class HiveAccountRuntimeSessionUnavailableError extends Error {
@@ -88,10 +91,10 @@ export class HiveAccountRuntimeSessionService {
         )
         this.assertCurrent(authorization)
         for (const session of page.items) {
-          if (ids.has(session.managedWebSessionId)) {
+          if (ids.has(session.managedSessionId)) {
             throw new Error('hive_account_runtime_session_duplicate')
           }
-          ids.add(session.managedWebSessionId)
+          ids.add(session.managedSessionId)
           items.push(session)
           if (items.length > MAXIMUM_SESSIONS) {
             throw new Error('hive_account_runtime_session_directory_too_large')
@@ -112,20 +115,20 @@ export class HiveAccountRuntimeSessionService {
   }
 
   async revoke(
-    managedWebSessionId: string,
-    expectedControlVersion: number
-  ): Promise<HiveRuntimeSession> {
+    managedSessionId: string,
+    expectedResourceVersion: number
+  ): Promise<HiveRuntimeSessionRevocation> {
     const { authorization, client, controller } = this.startOperation()
     try {
       const session = await client.revokeRuntimeSession(
-        managedWebSessionId,
-        expectedControlVersion,
+        managedSessionId,
+        expectedResourceVersion,
         authorization.accessToken,
-        this.dependencies.idempotencyKey(),
+        this.dependencies.operationId(),
         controller.signal
       )
       this.assertCurrent(authorization)
-      if (session.managedWebSessionId !== managedWebSessionId) {
+      if (session.managedSessionId !== managedSessionId) {
         throw new Error('hive_account_runtime_session_mismatch')
       }
       return session

@@ -19,7 +19,7 @@ const authorization: HiveRuntimeCloudAuthorization = {
 }
 
 const session = {
-  managedWebSessionId: '22222222-2222-4222-8222-222222222222',
+  managedSessionId: '22222222-2222-4222-8222-222222222222',
   runtimeRecordId: '33333333-3333-4333-8333-333333333333',
   runtimeInstanceId: '44444444-4444-4444-8444-444444444444',
   runtimeSessionId: '55555555-5555-4555-8555-555555555555',
@@ -47,7 +47,7 @@ function createService() {
   const service = new HiveAccountRuntimeSessionService(config as never, {
     createClient: () => client,
     now: () => 1_000,
-    idempotencyKey: () => 'idempotency-key-1234'
+    operationId: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   })
   return { client, service }
 }
@@ -58,15 +58,15 @@ describe('Hive account Runtime session service', () => {
     service.setAuthorization(authorization)
 
     await expect(service.list()).resolves.toEqual([session])
-    await expect(service.revoke(session.managedWebSessionId, 1)).resolves.toMatchObject({
+    await expect(service.revoke(session.managedSessionId, 1)).resolves.toMatchObject({
       status: 'REVOKE_PENDING'
     })
     expect(client.listRuntimeSessions.mock.calls.map((call) => call[1])).toEqual([null, 'second'])
     expect(client.revokeRuntimeSession).toHaveBeenCalledWith(
-      session.managedWebSessionId,
+      session.managedSessionId,
       1,
       'account-secret',
-      'idempotency-key-1234',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       expect.any(AbortSignal)
     )
   })
@@ -94,7 +94,7 @@ describe('Hive account Runtime session service', () => {
     const service = new HiveAccountRuntimeSessionService(config as never, {
       createClient: () => ({ listRuntimeSessions, revokeRuntimeSession: vi.fn() }),
       now: () => 1_000,
-      idempotencyKey: vi.fn()
+      operationId: vi.fn()
     })
     service.setAuthorization(authorization)
 
@@ -124,7 +124,7 @@ describe('Hive account Runtime session service', () => {
     const service = new HiveAccountRuntimeSessionService(config as never, {
       createClient: () => ({ listRuntimeSessions, revokeRuntimeSession: vi.fn() }),
       now: () => 1_000,
-      idempotencyKey: vi.fn()
+      operationId: vi.fn()
     })
     service.setAuthorization(authorization)
 
@@ -149,7 +149,7 @@ describe('Hive account Runtime session service', () => {
     const service = new HiveAccountRuntimeSessionService(config as never, {
       createClient: () => ({ listRuntimeSessions, revokeRuntimeSession: vi.fn() }),
       now: () => 1_000,
-      idempotencyKey: vi.fn()
+      operationId: vi.fn()
     })
     service.setAuthorization(authorization)
     const stale = service.list()
@@ -192,7 +192,7 @@ describe('Hive account Runtime session service', () => {
     const service = new HiveAccountRuntimeSessionService(config as never, {
       createClient: () => ({ listRuntimeSessions, revokeRuntimeSession: vi.fn() }),
       now: () => 1_000,
-      idempotencyKey: vi.fn()
+      operationId: vi.fn()
     })
     service.setAuthorization(authorization)
     const stale = service.list()
@@ -223,7 +223,7 @@ describe('Hive account Runtime session service', () => {
     const service = new HiveAccountRuntimeSessionService(config as never, {
       createClient: () => client,
       now: () => 1_000,
-      idempotencyKey: vi.fn()
+      operationId: vi.fn()
     })
     service.setAuthorization(authorization)
     const pending = service.list()

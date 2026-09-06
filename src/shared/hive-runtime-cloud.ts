@@ -182,14 +182,16 @@ export type HiveLocalRuntimeIdentityResetResult = Readonly<{
 }>
 
 export type HiveRuntimeSessionStatus =
+  | 'PENDING_ACTIVATION'
   | 'ACTIVE'
+  | 'CLOSED'
   | 'REVOKE_PENDING'
   | 'REVOKED'
   | 'EXPIRED'
   | 'UNVERIFIABLE'
 
 export type HiveRuntimeSession = Readonly<{
-  managedWebSessionId: string
+  managedSessionId: string
   runtimeRecordId: string
   runtimeInstanceId: string
   runtimeSessionId: string
@@ -205,8 +207,15 @@ export type HiveRuntimeSession = Readonly<{
 }>
 
 export type HiveRuntimeSessionRevokeRequest = Readonly<{
-  managedWebSessionId: string
-  expectedControlVersion: number
+  managedSessionId: string
+  expectedResourceVersion: number
+}>
+
+export type HiveRuntimeSessionRevocation = Readonly<{
+  managedSessionId: string
+  status: HiveRuntimeSessionStatus
+  resourceVersion: number
+  controlVersion: number
 }>
 
 export const EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY: HiveAccountRuntimeDirectoryState = {

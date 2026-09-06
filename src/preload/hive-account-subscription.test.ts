@@ -96,7 +96,7 @@ describe('Hive account and runtime cloud preload bridges', () => {
       expectedCloudDisplayNameVersion: 3
     }
     const claim = { expectedAccountId: 'account-1' }
-    const revoke = { managedWebSessionId: 'session-1', expectedControlVersion: 4 }
+    const revoke = { managedSessionId: 'session-1', expectedResourceVersion: 4 }
 
     await api.hiveRuntimeCloud.updateDisplayName(update)
     await api.hiveRuntimeCloud.claimLocalRuntime(claim)

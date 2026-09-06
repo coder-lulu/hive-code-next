@@ -2431,6 +2431,7 @@
           "empty": "No Runtime sessions are currently recorded.",
           "refresh": "Refresh sessions",
           "revoke": "Revoke",
+          "statusPendingActivation": "Waiting for activation",
           "statusRevokePending": "Revocation pending",
           "statusRevoked": "Revoked",
           "title": "Runtime sessions"

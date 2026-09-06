@@ -52,6 +52,10 @@ export class LocalRuntimeRegistration {
     return this.dependencies.randomUuid()
   }
 
+  clearRegistration(): void {
+    this.dependencies.clearState(this.options.userDataPath)
+  }
+
   clearCloudIdentity(): void {
     this.dependencies.clearState(this.options.userDataPath)
     this.dependencies.clearIdentity(this.options.userDataPath)
@@ -158,7 +162,7 @@ export class LocalRuntimeRegistration {
     authorityId: string,
     signal: AbortSignal
   ): Promise<PendingRegistration> {
-    if (lookup.status !== 'PENDING_CLAIM') {
+    if (lookup.status !== 'PENDING_CLAIM' && lookup.status !== 'UNLINKED') {
       throw new Error('hive_runtime_cloud_claim_state_invalid')
     }
     const stored = this.readState()

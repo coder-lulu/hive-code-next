@@ -59,19 +59,19 @@ export function requireHiveRuntimeSessionRevokeRequest(
   const request = value as Record<string, unknown>
   if (
     Object.keys(request).length !== 2 ||
-    !Object.hasOwn(request, 'managedWebSessionId') ||
-    !Object.hasOwn(request, 'expectedControlVersion') ||
-    typeof request.managedWebSessionId !== 'string' ||
-    !UUID_PATTERN.test(request.managedWebSessionId) ||
-    typeof request.expectedControlVersion !== 'number' ||
-    !Number.isSafeInteger(request.expectedControlVersion) ||
-    request.expectedControlVersion < 1
+    !Object.hasOwn(request, 'managedSessionId') ||
+    !Object.hasOwn(request, 'expectedResourceVersion') ||
+    typeof request.managedSessionId !== 'string' ||
+    !UUID_PATTERN.test(request.managedSessionId) ||
+    typeof request.expectedResourceVersion !== 'number' ||
+    !Number.isSafeInteger(request.expectedResourceVersion) ||
+    request.expectedResourceVersion < 1
   ) {
     throw new Error('Invalid Runtime session revoke request')
   }
   return {
-    managedWebSessionId: request.managedWebSessionId,
-    expectedControlVersion: request.expectedControlVersion
+    managedSessionId: request.managedSessionId,
+    expectedResourceVersion: request.expectedResourceVersion
   }
 }
 
@@ -147,7 +147,7 @@ export function registerHiveRuntimeCloudHandlers(services: HiveRuntimeCloudHandl
   ipcMain.handle('hiveRuntimeCloud:listSessions', () => services.sessions.list())
   ipcMain.handle('hiveRuntimeCloud:revokeSession', (_event, value: unknown) => {
     const request = requireHiveRuntimeSessionRevokeRequest(value)
-    return services.sessions.revoke(request.managedWebSessionId, request.expectedControlVersion)
+    return services.sessions.revoke(request.managedSessionId, request.expectedResourceVersion)
   })
 
   services.directory.subscribe((state: HiveAccountRuntimeDirectoryState) =>

@@ -1,3 +1,4 @@
+import type { HiveRuntimeSession } from '../../../../shared/hive-runtime-cloud'
 import type { HiveAccountState } from '../../../../shared/hive-account'
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import {
@@ -57,4 +58,25 @@ export function accountRuntimeToneClass(tone: HiveAccountRuntimeTone): string {
     return 'bg-destructive'
   }
   return 'bg-muted-foreground/55'
+}
+
+export function sessionStatusLabel(status: HiveRuntimeSession['status']): string {
+  switch (status) {
+    case 'PENDING_ACTIVATION':
+      return translate(
+        'auto.components.settings.runtimeSessions.statusPendingActivation',
+        'Waiting for activation'
+      )
+    case 'ACTIVE':
+      return translate('auto.components.settings.runtimeSessions.statusActive', 'Active')
+    case 'REVOKE_PENDING':
+      return translate('auto.components.settings.runtimeSessions.statusRevokePending', 'Ending')
+    case 'CLOSED':
+    case 'REVOKED':
+      return translate('auto.components.settings.runtimeSessions.statusRevoked', 'Ended')
+    case 'EXPIRED':
+      return translate('auto.components.settings.runtimeSessions.statusExpired', 'Expired')
+    case 'UNVERIFIABLE':
+      return translate('auto.components.settings.runtimeSessions.statusUnverifiable', 'Unverified')
+  }
 }

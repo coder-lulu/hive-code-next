@@ -4,6 +4,7 @@ import type {
   HiveLocalRuntimeOwnershipState,
   HiveRuntimeDisplayNameUpdateRequest,
   HiveRuntimeSession,
+  HiveRuntimeSessionRevocation,
   HiveRuntimeSessionRevokeRequest
 } from '../../shared/hive-runtime-cloud'
 
@@ -19,7 +20,7 @@ export type HiveRuntimeCloudApi = {
     request: HiveLocalRuntimeClaimRequest
   ) => Promise<HiveLocalRuntimeOwnershipState>
   listSessions: () => Promise<readonly HiveRuntimeSession[]>
-  revokeSession: (request: HiveRuntimeSessionRevokeRequest) => Promise<HiveRuntimeSession>
+  revokeSession: (request: HiveRuntimeSessionRevokeRequest) => Promise<HiveRuntimeSessionRevocation>
   onDirectoryChanged: (callback: (state: HiveAccountRuntimeDirectoryState) => void) => () => void
   onOwnershipChanged: (callback: (state: HiveLocalRuntimeOwnershipState) => void) => () => void
 }

@@ -9,7 +9,7 @@ export type RuntimeRegistrationLookup =
   | {
       exists: true
       runtimeRecordId: string
-      status: 'PENDING_CLAIM' | 'CLAIMED'
+      status: 'PENDING_CLAIM' | 'CLAIMED' | 'UNLINKED'
       resourceVersion: number
       authorityGeneration: number
       fencingEpoch: number
@@ -142,7 +142,11 @@ export function normalizeLookup(value: unknown): RuntimeRegistrationLookup {
     'latestLeaseEpoch',
     'identityPublicKeySha256'
   ])
-  if (value.status !== 'PENDING_CLAIM' && value.status !== 'CLAIMED') {
+  if (
+    value.status !== 'PENDING_CLAIM' &&
+    value.status !== 'CLAIMED' &&
+    value.status !== 'UNLINKED'
+  ) {
     throw new Error('invalid_hive_runtime_cloud_lookup_response')
   }
   const digest = text(value.identityPublicKeySha256)
