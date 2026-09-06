@@ -57,7 +57,7 @@ export class HiveRuntimeRelayHostService {
       client,
       getKeypair: options.getKeypair,
       getOutbox: () => this.outbox,
-      isCurrent: (assignment) => this.isCurrent(assignment),
+      isCurrent: (assignment) => this.authorityUntil !== null && this.isCurrent(assignment),
       getSessionAuthorityUntil: () => this.authorityUntil,
       requestHeartbeat: () => options.presence.requestHeartbeat(),
       onPersistenceFailure: () => this.failClosed(),
@@ -182,12 +182,16 @@ export class HiveRuntimeRelayHostService {
         return
       }
       try {
-        // Authority is tied to the accepted signed heartbeat, never local traffic.
-        this.authorityUntil = response.sessionAuthorityUntil
-        const settled = this.outbox.acknowledge({
+        const acknowledgement = {
           ackedSessionTransitionSequence: response.ackedSessionTransitionSequence,
           sessionTransitionResults: response.sessionTransitionResults
-        })
+        }
+        if (sent.sessionTransitions.length === 0) {
+          this.outbox.initializeCursor(acknowledgement)
+        }
+        const settled = this.outbox.acknowledge(acknowledgement)
+        // Persist the global cursor before admitting sessions under this signed authority.
+        this.authorityUntil = response.sessionAuthorityUntil
         for (const item of settled) {
           if (
             item.transition.transitionType === 'ACTIVATE' &&

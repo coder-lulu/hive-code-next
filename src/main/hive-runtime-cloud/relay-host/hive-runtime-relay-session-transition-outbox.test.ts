@@ -53,6 +53,48 @@ function applied(
 }
 
 describe('Hive Runtime durable session transition outbox', () => {
+  it('persists the fresh boot global cursor before allocating sequence 227 across restart', () => {
+    const { outbox, options } = fixture()
+    outbox.initializeCursor({ ackedSessionTransitionSequence: 226, sessionTransitionResults: [] })
+    const persisted = JSON.parse(readFileSync(options.path, 'utf8'))
+    expect(persisted).toMatchObject({ highestAck: 226, nextSequence: 227, entries: [] })
+    outbox.close()
+    const restarted = new HiveRuntimeRelaySessionTransitionOutbox(options)
+    restarted.initializeCursor({
+      ackedSessionTransitionSequence: 900,
+      sessionTransitionResults: []
+    })
+    const handle = restarted.enqueue(input())
+    expect(handle.transition.sequence).toBe(227)
+    expect(() =>
+      restarted.acknowledge({
+        ackedSessionTransitionSequence: 900,
+        sessionTransitionResults: []
+      })
+    ).toThrow('invalid_input')
+  })
+
+  it('never uses cursor initialization to skip pending payloads or accept fabricated results', () => {
+    const { outbox, options } = fixture()
+    const handle = outbox.enqueue(input())
+    const original = readFileSync(options.path, 'utf8')
+    outbox.initializeCursor({ ackedSessionTransitionSequence: 226, sessionTransitionResults: [] })
+    expect(readFileSync(options.path, 'utf8')).toBe(original)
+    expect(() =>
+      outbox.acknowledge({
+        ackedSessionTransitionSequence: 226,
+        sessionTransitionResults: []
+      })
+    ).toThrow('invalid_input')
+    const fresh = fixture().outbox
+    expect(() =>
+      fresh.initializeCursor({
+        ackedSessionTransitionSequence: 226,
+        sessionTransitionResults: [applied(handle.transition)]
+      })
+    ).toThrow('invalid_input')
+  })
+
   it('retains exact restart payload and never lets recovered ACTIVATE activate an old socket', async () => {
     const { outbox, options } = fixture()
     const handle = outbox.enqueue(input())

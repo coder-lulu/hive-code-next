@@ -49,6 +49,7 @@ export class HiveRuntimeRelaySessionTransitionOutbox {
   private readonly path: string
   private readonly maximumEntries: number
   private fault: Failure | null = null
+  private needsCursorInitialization: boolean
   private readonly completions = new Map<
     string,
     (value: HiveRuntimeRelayTransitionSettlement) => void
@@ -78,6 +79,7 @@ export class HiveRuntimeRelaySessionTransitionOutbox {
     if (read.status === 'unreadable') {
       throw new HiveRuntimeRelayTransitionOutboxError('corrupt')
     }
+    this.needsCursorInitialization = read.status === 'missing'
     this.state =
       read.status === 'ok'
         ? read.value
@@ -105,6 +107,32 @@ export class HiveRuntimeRelaySessionTransitionOutbox {
   }
   get canAccept(): boolean {
     return this.fault === null && this.pendingCount < this.maximumEntries
+  }
+
+  /** Seed a fresh boot from its verified empty heartbeat; never acknowledge pending payloads. */
+  initializeCursor(value: HiveRuntimeRelayTransitionAcknowledgement): void {
+    this.assertHealthy()
+    if (!this.needsCursorInitialization) {
+      return
+    }
+    if (
+      this.state.nextSequence !== 1 ||
+      this.state.highestAck !== 0 ||
+      this.state.entries.length !== 0 ||
+      !transitionObject(value) ||
+      Object.keys(value).length !== 2 ||
+      !transitionInteger(value.ackedSessionTransitionSequence) ||
+      value.ackedSessionTransitionSequence >= Number.MAX_SAFE_INTEGER ||
+      !Array.isArray(value.sessionTransitionResults) ||
+      value.sessionTransitionResults.length !== 0
+    ) {
+      return this.fail('invalid_input')
+    }
+    this.persist({
+      ...this.state,
+      highestAck: value.ackedSessionTransitionSequence,
+      nextSequence: value.ackedSessionTransitionSequence + 1
+    })
   }
 
   enqueue(input: HiveRuntimeRelayTransitionInput): HiveRuntimeRelayTransitionHandle {
@@ -234,5 +262,6 @@ export class HiveRuntimeRelaySessionTransitionOutbox {
       this.fail('write_failed')
     }
     this.state = structuredClone(next)
+    this.needsCursorInitialization = false
   }
 }

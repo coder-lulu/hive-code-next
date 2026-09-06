@@ -26,6 +26,7 @@ const mock = vi.hoisted(() => ({
   broker: null as unknown as BrokerMock,
   connections: null as unknown as ConnectionsMock,
   outbox: {
+    initializeCursor: vi.fn(),
     snapshot: vi.fn(() => []),
     acknowledge: vi.fn(() => [] as HiveRuntimeRelayTransitionSettlement[]),
     enqueue: vi.fn(),
@@ -132,12 +133,50 @@ it('advertises only after control ACK and closes resources through shared stop',
     f.contributor.snapshot(f.assignment.context)?.relayControl.controlConnectionAcknowledged
   ).toBe(true)
   expect(mock.connections.options.isCurrent({ ...f.assignment, assignmentEpoch: 2 })).toBe(false)
-  expect(mock.connections.options.isCurrent(f.assignment)).toBe(true)
+  expect(mock.connections.options.isCurrent(f.assignment)).toBe(false)
   await f.host.stop()
   expect(f.unsubscribe).toHaveBeenCalledOnce()
   expect(mock.connections.close).toHaveBeenCalledOnce()
   expect(mock.outbox.close).toHaveBeenCalledOnce()
   expect(f.presence.setRelayHeartbeatContributor).toHaveBeenLastCalledWith(null)
+})
+
+it('establishes the fresh cursor before opening signed session authority', () => {
+  const f = fixture()
+  mock.broker.activeAssignment = f.assignment
+  const sent = f.contributor.snapshot(f.assignment.context)!.relayControl
+  const accepted = { ...response(), ackedSessionTransitionSequence: 226 }
+  mock.outbox.initializeCursor.mockImplementationOnce(() => {
+    expect(mock.connections.options.getSessionAuthorityUntil()).toBeNull()
+    expect(mock.connections.options.isCurrent(f.assignment)).toBe(false)
+  })
+  f.contributor.accept(f.assignment.context, accepted, sent)
+  expect(mock.outbox.initializeCursor).toHaveBeenCalledWith({
+    ackedSessionTransitionSequence: 226,
+    sessionTransitionResults: []
+  })
+  expect(mock.connections.options.getSessionAuthorityUntil()).toBe(accepted.sessionAuthorityUntil)
+  expect(mock.connections.options.isCurrent(f.assignment)).toBe(true)
+  expect(mock.outbox.initializeCursor.mock.invocationCallOrder[0]).toBeLessThan(
+    mock.outbox.acknowledge.mock.invocationCallOrder[0]
+  )
+})
+
+it('keeps session authority closed when initial cursor persistence fails', () => {
+  const f = fixture()
+  mock.broker.activeAssignment = f.assignment
+  const sent = f.contributor.snapshot(f.assignment.context)!.relayControl
+  mock.outbox.initializeCursor.mockImplementationOnce(() => {
+    throw new Error('write_failed')
+  })
+  f.contributor.accept(
+    f.assignment.context,
+    { ...response(), ackedSessionTransitionSequence: 226 },
+    sent
+  )
+  expect(mock.connections.options.getSessionAuthorityUntil()).toBeNull()
+  expect(mock.broker.stop).toHaveBeenCalledOnce()
+  expect(mock.connections.refreshAuthority).not.toHaveBeenCalled()
 })
 
 it('ACKs each next command rather than skipping to the end of a response batch', () => {
