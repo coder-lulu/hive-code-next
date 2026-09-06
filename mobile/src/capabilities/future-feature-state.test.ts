@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import {
   openConfiguredFutureFeatureUrl,
-  resolveFutureFeatureActionState
+  resolveFutureFeatureActionState,
+  resolveProductMobileFeature
 } from './future-feature-state'
 
 const routePaths = [
@@ -16,6 +17,18 @@ const routePaths = [
 ]
 
 describe('future feature action state', () => {
+  it('reports working account sessions as available without enabling account deletion', () => {
+    expect(resolveProductMobileFeature('account')).toMatchObject({
+      status: 'live',
+      isAvailable: true,
+      unavailableReason: null
+    })
+    expect(resolveFutureFeatureActionState('account', false)).toMatchObject({
+      disabled: true,
+      reason: '此功能的服务能力尚未接入。'
+    })
+  })
+
   it('does not enable a planned submit when configuration appears early', () => {
     expect(
       resolveFutureFeatureActionState('feedback', false, {
@@ -124,7 +137,8 @@ describe('future feature route shells', () => {
       ])
     )
 
-    expect(sourceByRoute['../../app/account.tsx']).toContain('当前仅提供账号界面预览')
+    expect(sourceByRoute['../../app/account.tsx']).toContain('useMobileAuthSession')
+    expect(sourceByRoute['../../app/account.tsx']).not.toContain('当前仅提供账号界面预览')
     expect(sourceByRoute['../../app/account/delete.tsx']).toContain('当前不会删除任何数据')
     expect(sourceByRoute['../../app/feedback.tsx']).toContain('内容只保留在当前页面内')
     expect(sourceByRoute['../../app/storage.tsx']).toContain('不展示示例容量')

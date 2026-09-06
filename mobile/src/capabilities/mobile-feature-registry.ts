@@ -23,12 +23,12 @@ export const MOBILE_LIVE_FEATURE_IDS = [
   'notifications',
   'agentHistory',
   'agentAccounts',
-  'settings'
+  'settings',
+  'account'
 ] as const
 
 export const MOBILE_FUTURE_FEATURE_IDS = [
   'cloudWork',
-  'account',
   'login',
   'privacy',
   'legal',
@@ -87,7 +87,6 @@ const liveFeatureDefinitions = MOBILE_LIVE_FEATURE_IDS.map((id) => ({
 
 const futureFeatureDefinitions: readonly MobileFeatureDefinition[] = [
   { id: 'cloudWork', status: 'ui-preview' },
-  { id: 'account', status: 'ui-preview' },
   { id: 'login', status: 'ui-preview' },
   { id: 'privacy', status: 'configured', requiredConfiguration: 'privacyPolicy' },
   { id: 'legal', status: 'configured', requiredConfiguration: 'termsOfService' },

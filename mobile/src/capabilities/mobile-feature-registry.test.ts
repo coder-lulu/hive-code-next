@@ -26,7 +26,7 @@ describe('mobile feature registry', () => {
   })
 
   it('keeps planned UI visible without treating it as operational', () => {
-    for (const id of ['cloudWork', 'account', 'login', 'storage'] as const) {
+    for (const id of ['cloudWork', 'login', 'storage'] as const) {
       expect(resolveMobileFeatureCapability(id)).toMatchObject({
         status: 'ui-preview',
         isAvailable: false,
@@ -40,7 +40,6 @@ describe('mobile feature registry', () => {
       Object.fromEntries(
         [
           'cloudWork',
-          'account',
           'login',
           'privacy',
           'legal',
@@ -56,7 +55,6 @@ describe('mobile feature registry', () => {
       )
     ).toEqual({
       cloudWork: 'ui-preview',
-      account: 'ui-preview',
       login: 'ui-preview',
       privacy: 'configured',
       legal: 'configured',
