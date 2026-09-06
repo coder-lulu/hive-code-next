@@ -13,12 +13,19 @@ import { MOBILE_RUNTIME_CLIENT_CAPABILITIES } from './mobile-runtime-client-capa
 import { mobileRuntimeRandomBytes } from './runtime-random'
 import type { AccountRuntimeRoute, ConnectionLogSink, ConnectionState, RpcResponse } from './types'
 
+function classifyAccountRuntimeRecovery(error: unknown, attempt = 0) {
+  // A changed Runtime revision is a connection conflict, never a pairing failure.
+  const conflict = error && typeof error === 'object' && 'status' in error && error.status === 409
+  return classifyHiveAccountRelayError(conflict ? { ...error, retryable: true } : error, attempt)
+}
+
 /** Mobile lifecycle and presentation adapter for the shared authenticated pool. */
 export class AccountRuntimeRpcClient implements RpcClient {
   private pool: HiveAccountRelayPool | null = null
   private state: ConnectionState = 'connecting'
   private closed = false
   private generation = 0
+  private streamSequence = 0
   private lastConnectedAt: number | null = null
   private lastInboundAt: number | null = null
   private terminalFailure = false
@@ -85,7 +92,16 @@ export class AccountRuntimeRpcClient implements RpcClient {
     if (this.closed) {
       return () => {}
     }
-    const stream: Stream = { method, params, listener, options, physical: null, generation: 0 }
+    const stream: Stream = {
+      method,
+      params,
+      listener,
+      options,
+      physical: null,
+      generation: 0,
+      retryAttempt: 0,
+      retryTimer: null
+    }
     this.streams.add(stream)
     this.resume()
     if (this.pool) {
@@ -93,6 +109,10 @@ export class AccountRuntimeRpcClient implements RpcClient {
     }
     return () => {
       this.streams.delete(stream)
+      if (stream.retryTimer) {
+        clearTimeout(stream.retryTimer)
+        stream.retryTimer = null
+      }
       stream.physical?.close()
       stream.physical = null
       stream.generation = -1
@@ -150,6 +170,10 @@ export class AccountRuntimeRpcClient implements RpcClient {
     const previous = this.pool
     this.pool = null
     for (const stream of this.streams) {
+      if (stream.retryTimer) {
+        clearTimeout(stream.retryTimer)
+        stream.retryTimer = null
+      }
       stream.physical = null
       stream.generation = 0
     }
@@ -180,7 +204,7 @@ export class AccountRuntimeRpcClient implements RpcClient {
           this.publish('connecting')
         } else {
           const error = pool.getLastError()
-          if (error && !classifyHiveAccountRelayError(error).retryable) {
+          if (error && !classifyAccountRuntimeRecovery(error).retryable) {
             this.terminalFailure = true
             this.suspend()
             this.publish('auth-failed')
@@ -220,29 +244,47 @@ export class AccountRuntimeRpcClient implements RpcClient {
   }
 
   private attach(stream: Stream, pool: HiveAccountRelayPool): void {
-    if (stream.generation === this.generation || !this.streams.has(stream)) {
+    if (stream.generation !== 0 || !this.streams.has(stream)) {
       return
     }
-    const generation = this.generation
+    const generation = ++this.streamSequence
     stream.generation = generation
     attachAccountRuntimeStream(stream, pool, {
       current: () =>
         this.pool === pool && this.streams.has(stream) && stream.generation === generation,
       onInbound: () => {
         this.lastInboundAt = Date.now()
+        stream.retryAttempt = 0
       },
-      onEnded: () => {
-        this.streams.delete(stream)
-      },
+      onEnded: () => void this.streams.delete(stream),
       onClosed: (error) => {
-        this.suspend()
-        this.scheduleRecovery(error)
+        // Each subscription owns a separate channel. A failed stream must not
+        // disconnect requests or other screens that still have healthy channels.
+        stream.generation = 0
+        stream.physical?.close()
+        stream.physical = null
+        const recovery = classifyAccountRuntimeRecovery(error, stream.retryAttempt)
+        if (!recovery.retryable || stream.retryAttempt >= 5) {
+          this.streams.delete(stream)
+          stream.listener({ type: 'error', message: '会话连接中断，请重新打开后重试' })
+          return
+        }
+        stream.retryAttempt++
+        stream.retryTimer = setTimeout(
+          () => {
+            stream.retryTimer = null
+            if (this.pool === pool && this.streams.has(stream)) {
+              this.attach(stream, pool)
+            }
+          },
+          Math.max(250, recovery.retryDelayMs)
+        )
       }
     })
   }
 
   private scheduleRecovery(error: unknown): void {
-    const recovery = classifyHiveAccountRelayError(error, this.retryAttempt)
+    const recovery = classifyAccountRuntimeRecovery(error, this.retryAttempt)
     if (!recovery.retryable) {
       this.terminalFailure = true
       this.publish('auth-failed')

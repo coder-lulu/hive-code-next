@@ -75,7 +75,7 @@
       "allowBackup": false,
       "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS", "REQUEST_INSTALL_PACKAGES"],
       "package": "com.hivekernel.hivecode.mobile",
-      "versionCode": 16
+      "versionCode": 17
     },
     "plugins": [
       "expo-router",

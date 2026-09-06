@@ -11,6 +11,8 @@ export type AccountRuntimeStream = {
   options: Parameters<RpcClient['subscribe']>[3]
   physical: { close(): void } | null
   generation: number
+  retryAttempt: number
+  retryTimer: ReturnType<typeof setTimeout> | null
 }
 
 export function attachAccountRuntimeStream(

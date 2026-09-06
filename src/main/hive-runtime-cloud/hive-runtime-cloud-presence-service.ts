@@ -28,7 +28,6 @@ import { HiveRuntimeCloudPresenceScheduler } from './hive-runtime-cloud-presence
 import { HiveRuntimeCloudPresenceRelay } from './hive-runtime-cloud-presence-relay'
 import type { HiveRuntimeRelayHeartbeatContributor } from './relay-host/hive-runtime-relay-heartbeat-types'
 
-const HEARTBEAT_INTERVAL_MS = 30_000
 const INITIAL_ACTIVATION_WINDOW_MS = 15_000
 const STALE_OPERATION = Symbol('stale_operation')
 
@@ -248,7 +247,7 @@ export class HiveRuntimeCloudPresenceService {
     if (!this.client || !this.lease || !this.authorityId) {
       throw new FatalPresenceError('lease_unavailable')
     }
-    this.lease.nextHeartbeatSeq = await this.relayHeartbeat.send({
+    const heartbeat = await this.relayHeartbeat.send({
       client: this.client,
       identity,
       authorityId: this.authorityId,
@@ -259,10 +258,11 @@ export class HiveRuntimeCloudPresenceService {
       signal,
       assertCurrent: () => this.assertCurrent(epoch)
     })
+    this.lease.nextHeartbeatSeq = heartbeat.nextHeartbeatSeq
     this.setState('ONLINE')
     this.publishLeaseContext()
     this.scheduler.scheduleHeartbeat(
-      HEARTBEAT_INTERVAL_MS,
+      heartbeat.heartbeatDelay,
       () => this.epoch === epoch && !this.stopped,
       () => this.startHeartbeat(epoch, identity)
     )

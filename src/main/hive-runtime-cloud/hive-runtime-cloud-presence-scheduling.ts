@@ -1,5 +1,14 @@
 import { schedulePresenceRetry } from './hive-runtime-cloud-presence-support'
 
+export function hiveRuntimeCloudHeartbeatDelay(authorityUntil: number | null, now: number): number {
+  // Cell observations can grant less than 30 seconds. Renew halfway through the
+  // remaining grant to leave room for jitter and latency, with a floor to avoid
+  // immediate heartbeat feedback when a grant is nearly expired.
+  return authorityUntil === null
+    ? 30_000
+    : Math.min(30_000, Math.max(1_000, (authorityUntil - now) / 2))
+}
+
 export function scheduleHiveRuntimeCloudHeartbeat(
   delayMs: number,
   random: () => number,

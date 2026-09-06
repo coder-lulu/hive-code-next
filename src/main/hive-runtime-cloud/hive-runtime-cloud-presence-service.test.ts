@@ -57,7 +57,8 @@ afterEach(() => {
 
 function fixture(
   initialState: HiveRuntimeCloudRegistrationState | null,
-  random: () => number = () => 0
+  random: () => number = () => 0,
+  now: () => number = () => Date.parse('2026-08-25T08:00:00.000Z')
 ) {
   let stored = initialState
   let nextId = 0
@@ -108,7 +109,7 @@ function fixture(
     readState: () => (stored ? { status: 'ok', value: stored } : { status: 'missing' }),
     saveState,
     randomUuid: () => ids[nextId++ % ids.length],
-    now: () => Date.parse('2026-08-25T08:00:00.000Z'),
+    now,
     random
   }
   const service = new HiveRuntimeCloudPresenceService(
@@ -126,6 +127,62 @@ async function startClaimed(service: HiveRuntimeCloudPresenceService): Promise<v
 }
 
 describe('Hive Runtime Cloud Presence service', () => {
+  it('renews short relay authority before expiry without immediate heartbeat feedback', async () => {
+    vi.useFakeTimers()
+    const { service, client } = fixture(claimedState(), () => 0.5, Date.now)
+    service.setRuntimeReady(true)
+    await vi.advanceTimersByTimeAsync(7_500)
+    expect(service.getState()).toBe('ONLINE')
+    const baseResponse = await client.heartbeat.mock.results[0].value
+    let grantMs = 20_000
+    client.heartbeat.mockImplementation(async (request: { heartbeatSeq: number }) => ({
+      ...baseResponse,
+      acceptedHeartbeatSeq: request.heartbeatSeq,
+      responseVersion: 'runtime-session-control/v1',
+      ackedSessionTransitionSequence: 0,
+      sessionTransitionResults: [],
+      sessionAuthorityUntil: Date.now() + grantMs,
+      ackedControlSequence: 0,
+      controlCommands: [],
+      nextControlSequence: 1
+    }))
+    service.setRelayHeartbeatContributor({
+      snapshot: () => ({
+        advertiseRelay: true,
+        relayControl: {
+          assignmentId: '22000000-0000-4000-8000-000000000001',
+          cellId: 'cell-1',
+          cellIncarnationId: '22000000-0000-4000-8000-000000000002',
+          assignmentEpoch: 1,
+          controlGeneration: 1,
+          controlConnectionAcknowledged: true,
+          controlCommandAck: null,
+          sessionTransitions: []
+        }
+      }),
+      accept: vi.fn()
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(client.heartbeat).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(client.heartbeat).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(client.heartbeat).toHaveBeenCalledTimes(3)
+    // Renew repeatedly across several original deadlines, rather than dying at 30s.
+    await vi.advanceTimersByTimeAsync(40_000)
+    expect(client.heartbeat).toHaveBeenCalledTimes(7)
+    grantMs = 1
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(client.heartbeat).toHaveBeenCalledTimes(8)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(client.heartbeat).toHaveBeenCalledTimes(8)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(client.heartbeat).toHaveBeenCalledTimes(9)
+    await service.stop()
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(client.heartbeat).toHaveBeenCalledTimes(9)
+  })
+
   it('immediately coalesces relay heartbeat requests without concurrent sends or sequence reuse', async () => {
     const { service, client } = fixture(claimedState())
     await startClaimed(service)
