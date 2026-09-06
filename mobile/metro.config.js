@@ -8,6 +8,13 @@ const relayJsonParserRoot = path.dirname(
 )
 
 const config = getDefaultConfig(projectRoot)
+// Gradle replaces intermediate directories while building. Watching them can
+// crash Metro on Windows and adds no JavaScript source to the app.
+const blockList = config.resolver.blockList
+config.resolver.blockList = [
+  ...(Array.isArray(blockList) ? blockList : blockList ? [blockList] : []),
+  /[/\\]android[/\\](?:.*[/\\])?(?:build|\.gradle|\.cxx)(?:[/\\]|$)/
+]
 const defaultResolveRequest = config.resolver.resolveRequest
 // The UMD entry shadows require inside its factory, so Metro cannot collect its
 // relative dependencies. Use this package's static ESM entry without changing others.

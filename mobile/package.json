@@ -5,6 +5,7 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "node scripts/start-expo.mjs",
+    "dev:android": "node --dns-result-order=ipv4first node_modules/expo/bin/cli start --dev-client --localhost --android",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "postinstall": "node scripts/build-terminal-webview-engine.mjs && node scripts/build-mermaid-webview-engine.mjs",

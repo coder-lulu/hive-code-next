@@ -9,6 +9,28 @@ Local development uses two processes:
 
 Unless a command says otherwise, run mobile app commands from the `mobile/` directory.
 
+## Android emulator iteration
+
+With a development client installed and the emulator running, use:
+
+```bash
+pnpm dev:android
+```
+
+Keep Metro running. TypeScript and UI edits use Fast Refresh without rebuilding
+an APK. Android Studio can open `mobile/android` for Logcat and native debugging;
+it does not need to rebuild the application for every JavaScript change.
+Native dependency/configuration changes require another native build. Verify a
+release APK before distribution because debug timing and performance differ.
+
+Use the same product code, application ID and public account/Relay services.
+Account Runtime testing uses normal login and device claiming; local QR pairing
+below is a separate connection path, not a prerequisite for account connections.
+The shared test AVD is `hivecode-crash-check`. Preserve its login with an in-place
+update signed by the existing key; do not uninstall or clear data to resolve a
+debug/release signing mismatch. The initial signed development client was built
+locally using the existing protected signing configuration.
+
 ## Prerequisites
 
 - Node.js 24+
