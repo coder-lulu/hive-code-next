@@ -197,6 +197,25 @@ describe('LocalRuntimeOwnershipService', () => {
     service.stop()
   })
 
+  it('keeps the poll interval when the desktop clock is ahead of the server', async () => {
+    const wait = vi.fn(async () => undefined)
+    const { service, client } = fixture(wait)
+    client.createClaimChallenge.mockResolvedValue({
+      ...(await client.createClaimChallenge()),
+      expiresAt: 301_000
+    })
+    client.pollClaimChallenge.mockResolvedValueOnce({ status: 'PENDING', nextPollAt: 3_000 })
+    service.setAuthorization(authorization)
+    await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
+    await service.claimLocalRuntime(authorization.accountId, async () => undefined)
+    expect(wait.mock.calls).toEqual([
+      [5_000, expect.any(AbortSignal)],
+      [5_000, expect.any(AbortSignal)]
+    ])
+    expect(service.getState().relation).toBe('CLAIMED_BY_CURRENT')
+    service.stop()
+  })
+
   it('keeps an expired browser challenge pending and never persists a claimed identity', async () => {
     const { service, client, getStored } = fixture()
     service.setAuthorization(authorization)

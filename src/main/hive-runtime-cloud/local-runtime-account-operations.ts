@@ -151,7 +151,7 @@ export async function claimLocalRuntimeForAccount({
   while (registration.now() < deadline) {
     await waitForPoll(
       Math.min(
-        Math.max(1000, nextPollAt - registration.now()),
+        Math.max(challenge.pollIntervalSeconds * 1000, nextPollAt - registration.now()),
         30_000,
         deadline - registration.now()
       ),
