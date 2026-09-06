@@ -33,6 +33,7 @@ beforeEach(() => {
 describe('Hive Runtime Cloud IPC', () => {
   it('validates and routes an exact Runtime display-name update', async () => {
     const updateDisplayName = vi.fn().mockResolvedValue({ status: 'READY' })
+    const refreshOwnership = vi.fn()
     registerHiveRuntimeCloudHandlers({
       directory: {
         getState: vi.fn(),
@@ -42,12 +43,15 @@ describe('Hive Runtime Cloud IPC', () => {
       },
       ownership: {
         getState: vi.fn(),
-        refresh: vi.fn(),
+        refresh: refreshOwnership,
         claimLocalRuntime: vi.fn(),
         subscribe: vi.fn()
       },
       sessions: { list: vi.fn(), revoke: vi.fn() }
     } as never)
+
+    await electronMocks.handlers.get('hiveRuntimeCloud:refreshLocalOwnership')?.()
+    expect(refreshOwnership).toHaveBeenCalledWith(true)
 
     await expect(
       electronMocks.handlers.get('hiveRuntimeCloud:updateDisplayName')?.(undefined, {

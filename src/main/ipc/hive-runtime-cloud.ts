@@ -132,7 +132,7 @@ export function registerHiveRuntimeCloudHandlers(services: HiveRuntimeCloudHandl
     services.directory.updateDisplayName(requireHiveRuntimeDisplayNameUpdateRequest(value))
   )
   ipcMain.handle('hiveRuntimeCloud:getLocalOwnership', () => services.ownership.getState())
-  ipcMain.handle('hiveRuntimeCloud:refreshLocalOwnership', () => services.ownership.refresh())
+  ipcMain.handle('hiveRuntimeCloud:refreshLocalOwnership', () => services.ownership.refresh(true))
   ipcMain.handle('hiveRuntimeCloud:claimLocalRuntime', (_event, value: unknown) => {
     const request = requireHiveLocalRuntimeClaimRequest(value)
     return services.ownership.claimLocalRuntime(request.expectedAccountId, async (userCode) => {

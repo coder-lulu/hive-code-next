@@ -160,6 +160,36 @@ function fixture(
 }
 
 describe('LocalRuntimeOwnershipService', () => {
+  it.each([true, false])(
+    'retries fenced presence only after an explicit authorized refresh (%s)',
+    async (owned) => {
+      const { service, client, onRegistrationChanged } = fixture()
+      client.lookup.mockResolvedValue({
+        exists: true,
+        runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
+        status: 'CLAIMED',
+        resourceVersion: 2,
+        authorityGeneration: 1,
+        fencingEpoch: 1,
+        latestLeaseEpoch: 0,
+        identityPublicKeySha256: identityDigest
+      })
+      service.setAuthorization(authorization)
+      await vi.waitFor(() => expect(service.getState().relation).toBe('CLAIMED_BY_CURRENT'))
+      onRegistrationChanged.mockClear()
+      service.setPresenceState('FENCED')
+      await vi.waitFor(() => expect(service.getState().relation).toBe('CLAIMED_BY_CURRENT'))
+      expect(onRegistrationChanged).not.toHaveBeenCalled()
+      if (!owned) {
+        client.getOwnedRuntime.mockRejectedValue(new HiveRuntimeCloudRequestError(404, null))
+      }
+      await service.refresh(true)
+      expect(onRegistrationChanged).toHaveBeenCalledTimes(owned ? 1 : 0)
+      expect(service.getState().relation).toBe(owned ? 'CLAIMED_BY_CURRENT' : 'CLAIMED_BY_OTHER')
+      service.stop()
+    }
+  )
+
   it('only probes on account sign-in and leaves an unregistered Runtime untouched', async () => {
     const { service, client, getStored } = fixture()
 

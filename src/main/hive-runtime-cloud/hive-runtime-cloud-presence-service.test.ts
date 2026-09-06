@@ -1,5 +1,6 @@
 import { createHash, generateKeyPairSync } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
@@ -127,6 +128,37 @@ async function startClaimed(service: HiveRuntimeCloudPresenceService): Promise<v
 }
 
 describe('Hive Runtime Cloud Presence service', () => {
+  it.each([409, 410])(
+    'reconciles a changed lease tuple after activation returns %s',
+    async (status) => {
+      vi.useFakeTimers()
+      const { service, client } = fixture(claimedState())
+      client.acquireLease.mockRejectedValueOnce(new HiveRuntimeCloudRequestError(status, null))
+      service.setRuntimeReady(true)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(service.getState()).toBe('OFFLINE_RETRY')
+      expect(client.heartbeat).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1_000)
+      expect(client.lookup).toHaveBeenCalledTimes(2)
+      expect(service.getState()).toBe('ONLINE')
+      await service.stop()
+    }
+  )
+
+  it('keeps an unauthorized activation fenced until registration explicitly changes', async () => {
+    vi.useFakeTimers()
+    const { service, client } = fixture(claimedState())
+    client.acquireLease.mockRejectedValueOnce(new HiveRuntimeCloudRequestError(403, null))
+    service.setRuntimeReady(true)
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(service.getState()).toBe('FENCED')
+    expect(client.acquireLease).toHaveBeenCalledOnce()
+    service.notifyRegistrationChanged()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(service.getState()).toBe('ONLINE')
+    await service.stop()
+  })
+
   it('renews short relay authority before expiry without immediate heartbeat feedback', async () => {
     vi.useFakeTimers()
     const { service, client } = fixture(claimedState(), () => 0.5, Date.now)

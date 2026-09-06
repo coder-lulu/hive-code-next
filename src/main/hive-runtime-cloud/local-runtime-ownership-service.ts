@@ -99,13 +99,13 @@ export class LocalRuntimeOwnershipService {
     }
   }
 
-  async refresh(): Promise<HiveLocalRuntimeOwnershipState> {
+  async refresh(retryPresence = false): Promise<HiveLocalRuntimeOwnershipState> {
     const authorization = this.session.getAuthorization()
     if (!authorization || !this.registration.isAvailable() || this.session.isStopped()) {
       return this.session.getState()
     }
     this.session.markAnalyzing()
-    await this.runAnalysis(authorization)
+    await this.runAnalysis(authorization, retryPresence)
     return this.session.getState()
   }
 
@@ -265,7 +265,10 @@ export class LocalRuntimeOwnershipService {
     this.session.stop()
   }
 
-  private async runAnalysis(authorization: HiveRuntimeCloudAuthorization): Promise<void> {
+  private async runAnalysis(
+    authorization: HiveRuntimeCloudAuthorization,
+    retryPresence = false
+  ): Promise<void> {
     const operation = this.session.startOperation()
     let registrationNotificationPending = false
     try {
@@ -278,6 +281,11 @@ export class LocalRuntimeOwnershipService {
       registrationNotificationPending = analysis.registrationChanged
       this.session.assertAccountCurrent(operation, authorization)
       this.session.publishAnalysis(authorization, analysis.result)
+      registrationNotificationPending ||= Boolean(
+        retryPresence &&
+        analysis.result.relation === 'CLAIMED_BY_CURRENT' &&
+        this.session.getState().presence === 'FENCED'
+      )
       if (registrationNotificationPending) {
         registrationNotificationPending = false
         this.session.notifyRegistrationChanged()

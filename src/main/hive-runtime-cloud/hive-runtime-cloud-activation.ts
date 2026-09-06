@@ -145,7 +145,9 @@ async function claimRuntime(
 }
 
 async function acquireRuntimeLease(
-  options: ActivationOptions,
+  options: Pick<ActivationOptions, 'client' | 'identity' | 'signal' | 'assertCurrent'> & {
+    authorityId: string
+  },
   registration: Extract<HiveRuntimeCloudRegistrationState, { status: 'CLAIMED' }>,
   bootId: string
 ): Promise<ActiveLease> {
@@ -159,7 +161,7 @@ async function acquireRuntimeLease(
           expectedLeaseEpoch: registration.latestLeaseEpoch,
           expectedFencingEpoch: registration.fencingEpoch
         },
-        { authorityId: options.authorization.authorityId }
+        { authorityId: options.authorityId }
       ),
       options.signal
     )
@@ -211,7 +213,11 @@ export async function activateHiveRuntimeCloudPresence(
     throw new FatalPresenceError('runtime_owner_mismatch')
   }
   const bootId = registration.latestLeaseEpoch > 0 ? options.randomUuid() : options.bootId
-  const lease = await acquireRuntimeLease(options, registration, bootId)
+  const lease = await acquireRuntimeLease(
+    { ...options, authorityId: options.authorization.authorityId },
+    registration,
+    bootId
+  )
   return {
     status: 'LEASED',
     identity: options.identity,
@@ -247,19 +253,7 @@ export async function activateClaimedHiveRuntimeCloudPresence(
   const claimed = { ...registration, authorityId }
   options.saveState(claimed)
   const bootId = claimed.latestLeaseEpoch > 0 ? options.randomUuid() : options.bootId
-  const lease = await options.client.acquireLease(
-    createRuntimeLeaseAcquireRequest(
-      options.identity,
-      {
-        bootId,
-        expectedAuthorityGeneration: claimed.authorityGeneration,
-        expectedLeaseEpoch: claimed.latestLeaseEpoch,
-        expectedFencingEpoch: claimed.fencingEpoch
-      },
-      { authorityId }
-    ),
-    options.signal
-  )
+  const lease = await acquireRuntimeLease({ ...options, authorityId }, claimed, bootId)
   options.assertCurrent()
   return {
     status: 'LEASED',
@@ -267,6 +261,6 @@ export async function activateClaimedHiveRuntimeCloudPresence(
     authorityId,
     runtimeRecordId: claimed.runtimeRecordId,
     bootId,
-    lease: { ...lease, bootId, nextHeartbeatSeq: 1 }
+    lease
   }
 }
