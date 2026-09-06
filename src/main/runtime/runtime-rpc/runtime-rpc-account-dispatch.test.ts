@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mock.dispatch.mockImplementation(async () => {})
 })
-function fixture() {
+function fixture(runtimeSessionId = 'runtime-session-1') {
   let text!: (
     raw: string,
     reply: (value: string) => void,
@@ -63,7 +63,7 @@ function fixture() {
   const connection = {
     ws,
     connectionId: 'account-connection-1',
-    runtimeSessionId: 'runtime-session-1',
+    runtimeSessionId,
     revalidate,
     channel: {
       onMessage: (handler: typeof text) => {
@@ -94,6 +94,99 @@ function fixture() {
   }
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve))
+
+it('binds only terminal ownership fields to the authenticated physical session', async () => {
+  const f = fixture()
+  for (const method of [
+    'terminal.subscribe',
+    'terminal.send',
+    'terminal.updateViewport',
+    'terminal.setDisplayMode',
+    'terminal.unsubscribe'
+  ]) {
+    const params = {
+      terminal: 'terminal-1',
+      client: { id: 'another-session', type: 'mobile' },
+      extra: 7
+    }
+    f.text({ id: method, method, params })
+    expect(mock.dispatch).toHaveBeenLastCalledWith(
+      {
+        id: method,
+        method,
+        params: { ...params, client: { ...params.client, id: 'account-runtime:runtime-session-1' } }
+      },
+      expect.any(Function),
+      expect.objectContaining({ clientId: 'account-runtime:runtime-session-1' })
+    )
+  }
+  f.text({
+    id: 'resize',
+    method: 'terminal.resizeForClient',
+    params: { clientId: 'forged', mode: 'restore' }
+  })
+  expect(mock.dispatch.mock.lastCall?.[0]).toMatchObject({
+    params: { clientId: 'account-runtime:runtime-session-1', mode: 'restore' }
+  })
+  const other = fixture('runtime-session-2')
+  other.text({
+    id: 'other',
+    method: 'terminal.send',
+    params: { client: { id: 'another-session', type: 'mobile' }, text: 'hello' }
+  })
+  expect(mock.dispatch.mock.lastCall?.[0]).toMatchObject({
+    params: { client: { id: 'account-runtime:runtime-session-2', type: 'mobile' } }
+  })
+  const untouched = { id: 'read', method: 'runtime.read', params: { client: { id: 'original' } } }
+  f.text(untouched)
+  expect(mock.dispatch.mock.lastCall?.[0]).toEqual(untouched)
+  await tick()
+  f.detach()
+  other.detach()
+})
+
+it('does not repair malformed terminal identity or dispatch a revoked session', async () => {
+  const f = fixture()
+  for (const client of [null, [], { id: '' }, { id: 42 }]) {
+    f.text({ id: 'invalid', method: 'terminal.subscribe', params: { client } })
+  }
+  f.text({ id: 'invalid-resize', method: 'terminal.resizeForClient', params: { clientId: null } })
+  expect(mock.dispatch).not.toHaveBeenCalled()
+  expect(f.reply).toHaveBeenCalledTimes(5)
+  expect(f.reply.mock.calls.every(([raw]) => JSON.parse(raw).code === 'invalid_argument')).toBe(
+    true
+  )
+  f.invalidate()
+  f.text({
+    id: 'revoked',
+    method: 'terminal.send',
+    params: { client: { id: 'valid', type: 'mobile' } }
+  })
+  expect(mock.dispatch).not.toHaveBeenCalled()
+  expect(f.reply).toHaveBeenCalledTimes(5)
+  await tick()
+  f.detach()
+})
+
+it('rewrites only the exact supplied terminal unsubscribe client suffix', async () => {
+  const f = fixture()
+  for (const [subscriptionId, expected] of [
+    ['terminal:handle:account-client:abc', 'terminal:handle:account-runtime:runtime-session-1'],
+    ['terminal:handle:another-client', 'terminal:handle:another-client'],
+    ['bare-handle', 'bare-handle']
+  ]) {
+    f.text({
+      id: 'unsubscribe',
+      method: 'terminal.unsubscribe',
+      params: { subscriptionId, client: { id: 'account-client:abc' } }
+    })
+    expect(mock.dispatch.mock.lastCall?.[0]).toMatchObject({
+      params: { subscriptionId: expected, client: { id: 'account-runtime:runtime-session-1' } }
+    })
+  }
+  await tick()
+  f.detach()
+})
 
 it('revalidates text, binary and delayed output and detaches using only its connection ownership', async () => {
   const f = fixture()

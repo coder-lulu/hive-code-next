@@ -13,6 +13,9 @@ const revival = vi.hoisted(() => ({ callback: null as null | ((reason: 'focus') 
 vi.mock('./host-logical-client', () => ({
   openHostLogicalClient: (...args: unknown[]) => openHostLogicalClientMock(...args)
 }))
+vi.mock('./runtime-random', () => ({
+  mobileRuntimeRandomBytes: (length: number) => new Uint8Array(length).fill(7)
+}))
 vi.mock('./host-store', () => ({
   loadHosts: () => loadHostsMock()
 }))
@@ -92,8 +95,9 @@ describe('wanted host open recovery', () => {
     openHostLogicalClientMock.mockReturnValue(client)
 
     let renderer: MountedRenderer | null = null
+    let observedClientId: string | null = null
     function Probe(): null {
-      useHostClient(HOST.id)
+      observedClientId = useHostClient(HOST.id).clientId
       return null
     }
 
@@ -105,6 +109,7 @@ describe('wanted host open recovery', () => {
 
       expect(mergeAccountRuntimeProfilesMock).toHaveBeenCalledWith([HOST])
       expect(openHostLogicalClientMock).toHaveBeenCalledWith(compositeHost, expect.any(Function))
+      expect(observedClientId).toBe(HOST.deviceToken)
     } finally {
       act(() => renderer?.unmount())
     }
@@ -115,6 +120,7 @@ describe('wanted host open recovery', () => {
     const accountHost = {
       ...HOST,
       id: 'account-runtime',
+      deviceToken: '',
       accountRuntime: {
         runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         resourceVersion: 1,
@@ -141,6 +147,8 @@ describe('wanted host open recovery', () => {
       expect(findAccountRuntimeProfileMock).toHaveBeenCalledWith(accountHost.id)
       expect(openHostLogicalClientMock).toHaveBeenCalledWith(accountHost, expect.any(Function))
       expect(observed).toMatchObject({ client, state: 'connected' })
+      expect(observed).toHaveProperty('clientId', `account-client:${'07'.repeat(16)}`)
+      expect(accountHost.deviceToken).toBe('')
     } finally {
       act(() => renderer?.unmount())
     }

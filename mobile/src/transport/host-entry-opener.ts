@@ -8,6 +8,7 @@ import {
   mergeAccountRuntimeProfiles
 } from '../runtime-directory/account-runtime-profile-registry'
 import { openHostLogicalClient } from './host-logical-client'
+import { mobileRuntimeRandomBytes } from './runtime-random'
 import type { HostClientOpenRegistry } from './host-client-open-registry'
 import type { HostOpenRetryScheduler } from './host-open-retry-scheduler'
 import type { RpcClient } from './rpc-client'
@@ -143,7 +144,13 @@ export async function openHostClientEntry(
       }) ?? (() => {})
     const entry: HostClientStoreEntry = {
       client,
-      clientId: host.deviceToken,
+      // Account routes have no pairing token. Terminal viewport/input ownership
+      // needs a nonempty ID shared by this logical client's streams and requests.
+      clientId: host.accountRuntime
+        ? `account-client:${Array.from(mobileRuntimeRandomBytes(16), (byte) =>
+            byte.toString(16).padStart(2, '0')
+          ).join('')}`
+        : host.deviceToken,
       state: client.getState(),
       refCount: state.pendingAcquisitions.get(hostId) ?? 0,
       unsubState,

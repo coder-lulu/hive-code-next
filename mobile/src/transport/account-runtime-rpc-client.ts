@@ -12,6 +12,7 @@ import { updateTerminalSubscriptionViewport } from './rpc-client-terminal-subscr
 import { MOBILE_RUNTIME_CLIENT_CAPABILITIES } from './mobile-runtime-client-capabilities'
 import { mobileRuntimeRandomBytes } from './runtime-random'
 import type { AccountRuntimeRoute, ConnectionLogSink, ConnectionState, RpcResponse } from './types'
+import { AccountRuntimeRpcRequests } from './account-runtime-rpc-requests'
 
 function classifyAccountRuntimeRecovery(error: unknown, attempt = 0) {
   // A changed Runtime revision is a connection conflict, never a pairing failure.
@@ -33,6 +34,7 @@ export class AccountRuntimeRpcClient implements RpcClient {
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   private readonly listeners = new Set<(state: ConnectionState) => void>()
   private readonly streams = new Set<Stream>()
+  private readonly requests = new AccountRuntimeRpcRequests()
   private readonly unregister: () => void
   private readonly appStateSubscription: { remove(): void }
 
@@ -73,14 +75,12 @@ export class AccountRuntimeRpcClient implements RpcClient {
       return Promise.reject(new Error('Account Runtime is disconnected'))
     }
     this.resume()
-    return this.pool!.request(method, params, options?.timeoutMs).then((response) => {
-      const runtimeId = response._meta?.runtimeId
-      if (typeof runtimeId !== 'string' || !runtimeId) {
-        throw new Error('Account Runtime response identity is missing')
-      }
-      this.lastInboundAt = Date.now()
-      return { ...response, _meta: { runtimeId } }
-    })
+    return this.requests
+      .request(this.pool!, this.streams, method, params, options?.timeoutMs)
+      .then((response) => {
+        this.lastInboundAt = Date.now()
+        return response
+      })
   }
 
   subscribe(

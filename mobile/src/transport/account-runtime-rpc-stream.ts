@@ -9,7 +9,7 @@ export type AccountRuntimeStream = {
   params: unknown
   listener: Parameters<RpcClient['subscribe']>[2]
   options: Parameters<RpcClient['subscribe']>[3]
-  physical: { close(): void } | null
+  physical: Awaited<ReturnType<HiveAccountRelayPool['subscribe']>> | null
   generation: number
   retryAttempt: number
   retryTimer: ReturnType<typeof setTimeout> | null

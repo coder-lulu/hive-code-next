@@ -20,6 +20,18 @@ export type RuntimeRpcAccountConnection = {
   revalidate: (touch?: boolean) => boolean
 }
 
+const ACCOUNT_TERMINAL_CLIENT_METHODS = new Set([
+  'terminal.subscribe',
+  'terminal.send',
+  'terminal.updateViewport',
+  'terminal.setDisplayMode',
+  'terminal.unsubscribe'
+])
+
+function record(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
 /** Account authorization never enters DeviceRegistry or the paired-device dispatcher. */
 export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
   private accountPendingBytes = 0
@@ -142,6 +154,48 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
       return
     }
     const clientId = `account-runtime:${socket.runtimeSessionId}`
+    // Terminal ownership follows the authenticated physical session, never a
+    // caller-supplied ID. Leave all other fields for the existing method schema.
+    if (record(request.params)) {
+      const params = request.params
+      if (ACCOUNT_TERMINAL_CLIENT_METHODS.has(request.method) && params.client !== undefined) {
+        if (
+          !record(params.client) ||
+          typeof params.client.id !== 'string' ||
+          !params.client.id.trim()
+        ) {
+          reply(
+            JSON.stringify(
+              this.buildError(request.id, 'invalid_argument', 'Invalid terminal client')
+            )
+          )
+          return
+        }
+        const boundParams: Record<string, unknown> = {
+          ...params,
+          client: { ...params.client, id: clientId }
+        }
+        if (
+          request.method === 'terminal.unsubscribe' &&
+          typeof params.subscriptionId === 'string' &&
+          params.subscriptionId.endsWith(`:${params.client.id}`)
+        ) {
+          boundParams.subscriptionId =
+            params.subscriptionId.slice(0, -params.client.id.length) + clientId
+        }
+        request = { ...request, params: boundParams }
+      } else if (request.method === 'terminal.resizeForClient') {
+        if (typeof params.clientId !== 'string' || !params.clientId.trim()) {
+          reply(
+            JSON.stringify(
+              this.buildError(request.id, 'invalid_argument', 'Invalid terminal client')
+            )
+          )
+          return
+        }
+        request = { ...request, params: { ...params, clientId } }
+      }
+    }
     const longPoll = classifyRuntimeLongPoll(request)
     const rejection = this.admitLongPoll(longPoll, clientId)
     if (rejection) {
