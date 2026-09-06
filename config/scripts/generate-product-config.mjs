@@ -77,7 +77,7 @@ const CLI_KEYS = new Set(['primary', 'aliases'])
 const SCHEME_KEYS = new Set(['primary', 'aliases'])
 const SERVICE_GROUP_KEYS = new Set(['api', 'identity', 'oss', 'update'])
 const SERVICE_API_KEYS = new Set(['baseUrl'])
-const SERVICE_IDENTITY_KEYS = new Set(['issuer', 'clients'])
+const SERVICE_IDENTITY_KEYS = new Set(['issuer', 'userLoginUrl', 'clients'])
 const SERVICE_IDENTITY_CLIENT_KEYS = new Set(['desktop', 'userWeb', 'operatorWeb'])
 const SERVICE_OSS_KEYS = new Set(['enabled', 'endpoint', 'provider'])
 const SERVICE_UPDATE_KEYS = new Set([
@@ -305,6 +305,10 @@ function assertManifestShape(manifest) {
   if (!identity.issuer) {
     throw new Error('services.identity.issuer is required')
   }
+  assertEndpoint(identity.userLoginUrl, 'services.identity.userLoginUrl')
+  if (!identity.userLoginUrl) {
+    throw new Error('services.identity.userLoginUrl is required')
+  }
   assertObject(identity.clients, 'services.identity.clients')
   assertKnownKeys(identity.clients, SERVICE_IDENTITY_CLIENT_KEYS, 'services.identity.clients')
   assertRequiredKeys(identity.clients, SERVICE_IDENTITY_CLIENT_KEYS, 'services.identity.clients')
@@ -486,6 +490,7 @@ export function normalizeProductManifest(manifest) {
       api: { baseUrl: manifest.services.api.baseUrl.trim() },
       identity: {
         issuer: manifest.services.identity.issuer.trim(),
+        userLoginUrl: manifest.services.identity.userLoginUrl.trim(),
         clients: Object.fromEntries(
           [...SERVICE_IDENTITY_CLIENT_KEYS].map((key) => [
             key,

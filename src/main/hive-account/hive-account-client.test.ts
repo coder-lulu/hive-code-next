@@ -11,6 +11,7 @@ import { HiveAccountClient } from './hive-account-client'
 const config = {
   apiBaseUrl: 'https://api.hivekernel.com',
   identityIssuer: 'https://identity.hivekernel.com/realms/hive',
+  userLoginUrl: 'https://console.hivekernel.com/login',
   clientId: 'hivecode-desktop',
   scope: 'openid profile email hive.session.exchange'
 }
@@ -24,26 +25,39 @@ function jsonResponse(value: unknown, status = 200): Response {
 
 describe('Hive account Native client', () => {
   it('validates account security payloads and security challenge bounds', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({
-        accountId: '123e4567-e89b-42d3-a456-426614174000',
-        userName: 'm13800138000',
-        displayName: 'Ada',
-        phoneNumber: null,
-        phoneBound: false
-      }))
-      .mockResolvedValueOnce(jsonResponse({
-        challengeId: 'challenge', bindingId: 'binding', expiresInSeconds: 300, resendAfterSeconds: 60
-      }))
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          accountId: '123e4567-e89b-42d3-a456-426614174000',
+          userName: 'm13800138000',
+          displayName: 'Ada',
+          phoneNumber: null,
+          phoneBound: false
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeId: 'challenge',
+          bindingId: 'binding',
+          expiresInSeconds: 300,
+          resendAfterSeconds: 60
+        })
+      )
     const client = new HiveAccountClient(config, fetchMock)
     await expect(client.accountSecurity('access')).resolves.toMatchObject({ displayName: 'Ada' })
     await expect(client.startPhoneBinding('access', '+8613800138000')).resolves.toMatchObject({
       expiresInSeconds: 300
     })
 
-    fetchMock.mockResolvedValueOnce(jsonResponse({
-      challengeId: 'challenge', bindingId: 'binding', expiresInSeconds: -1, resendAfterSeconds: 60
-    }))
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        challengeId: 'challenge',
+        bindingId: 'binding',
+        expiresInSeconds: -1,
+        resendAfterSeconds: 60
+      })
+    )
     await expect(client.startPhoneBinding('access', '+8613800138000')).rejects.toThrow(
       'invalid_hive_account_security_challenge'
     )
@@ -129,9 +143,7 @@ describe('Hive account Native client', () => {
       contractRevision: 'hive-login-capabilities-v1',
       clientId: 'hivecode-desktop',
       defaultMethod: 'phone_sms',
-      providers: [
-        { id: 'github', authorizationPath: 'https://attacker.test/authorize' }
-      ]
+      providers: [{ id: 'github', authorizationPath: 'https://attacker.test/authorize' }]
     },
     {
       contractRevision: 'hive-login-capabilities-v1',

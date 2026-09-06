@@ -16,6 +16,7 @@ describe('Hive account product configuration', () => {
       config: {
         apiBaseUrl: 'https://api.hivekernel.com',
         identityIssuer: 'https://identity.hivekernel.com/realms/hive',
+        userLoginUrl: 'https://console.hivekernel.com/login',
         clientId: 'hivecode-desktop',
         scope: 'openid profile email hive.session.exchange'
       }

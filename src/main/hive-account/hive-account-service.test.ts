@@ -26,6 +26,7 @@ import { HiveAccountRequestError } from './hive-account-client'
 const config = {
   apiBaseUrl: 'https://api.hivekernel.com',
   identityIssuer: 'https://identity.hivekernel.com/realms/hive',
+  userLoginUrl: 'https://console.hivekernel.com/login',
   clientId: 'hivecode-desktop',
   scope: 'openid profile email hive.session.exchange'
 }

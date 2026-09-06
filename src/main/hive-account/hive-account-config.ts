@@ -3,6 +3,7 @@ import { hivecodeProductConfig } from '../../shared/generated/product-config'
 
 export type HiveAccountConfig = {
   apiBaseUrl: string
+  userLoginUrl: string
   identityIssuer: string
   clientId: string
   scope: string
@@ -68,7 +69,12 @@ export function getHiveAccountConfig(
       hivecodeProductConfig.services.identity.issuer
   const apiBaseUrl = cleanUrl(apiCandidate, packaged, true)
   const identityIssuer = cleanUrl(issuerCandidate, packaged, false)
-  if (!apiBaseUrl || !identityIssuer) {
+  const userLoginUrl = cleanUrl(
+    hivecodeProductConfig.services.identity.userLoginUrl,
+    packaged,
+    false
+  )
+  if (!apiBaseUrl || !identityIssuer || !userLoginUrl) {
     return {
       configured: false,
       setupMessage: 'HiveCloud sign-in is not configured for this build.'
@@ -76,6 +82,12 @@ export function getHiveAccountConfig(
   }
   return {
     configured: true,
-    config: { apiBaseUrl, identityIssuer, clientId: HIVE_ACCOUNT_CLIENT_ID, scope: SCOPE }
+    config: {
+      apiBaseUrl,
+      identityIssuer,
+      userLoginUrl,
+      clientId: HIVE_ACCOUNT_CLIENT_ID,
+      scope: SCOPE
+    }
   }
 }

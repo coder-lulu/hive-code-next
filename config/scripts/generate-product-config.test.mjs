@@ -61,6 +61,7 @@ const validManifest = {
     api: { baseUrl: 'https://api.example.test' },
     identity: {
       issuer: 'https://identity.example.test/realms/hive',
+      userLoginUrl: 'https://console.example.test/login',
       clients: { desktop: 'desktop', userWeb: 'user-web', operatorWeb: 'operator-web' }
     },
     oss: { enabled: false, endpoint: null, provider: null },

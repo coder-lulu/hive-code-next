@@ -55,6 +55,49 @@ describe('beginHiveAccountPkceFlow', () => {
     })
   })
 
+  it('opens Console SMS login while keeping the verifier local and rejecting a wrong state', async () => {
+    let openedUrl = ''
+    let preparedNonce = ''
+    electronMocks.openExternal.mockImplementation(async (url) => {
+      openedUrl = url
+    })
+    const authorization = beginHiveAccountPkceFlow({
+      authorizationEndpoint:
+        'https://identity.hivekernel.com/realms/hive/protocol/openid-connect/auth',
+      userLoginUrl: 'https://console.hivekernel.com/login',
+      clientId: HIVE_ACCOUNT_CLIENT_ID,
+      scope: 'openid hive.session.exchange',
+      prepareDeviceAuthorization: async (nonce) => {
+        preparedNonce = nonce
+      }
+    })
+    await vi.waitFor(() => expect(openedUrl).not.toBe(''))
+    const loginUrl = new URL(openedUrl)
+    expect(loginUrl.origin + loginUrl.pathname).toBe('https://console.hivekernel.com/login')
+    expect(loginUrl.search).toBe('')
+    const context = JSON.parse(
+      Buffer.from(loginUrl.hash.slice('#native='.length), 'base64url').toString()
+    )
+    expect(Object.keys(context).sort()).toEqual([
+      'clientId',
+      'codeChallenge',
+      'nonce',
+      'redirectUri',
+      'state'
+    ])
+    expect(context.nonce).toBe(preparedNonce)
+    expect(context.redirectUri).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
+    const callback = new URL(context.redirectUri)
+    callback.searchParams.set('code', 'sms-code')
+    callback.searchParams.set('state', 'wrong-state')
+    expect((await fetch(callback)).status).toBe(400)
+    callback.searchParams.set('state', context.state)
+    expect((await fetch(callback)).status).toBe(200)
+    const result = await authorization
+    expect(result.authorizationCode).toBe('sms-code')
+    expect(openedUrl).not.toContain(result.codeVerifier)
+  })
+
   it('requests a fresh LoA 2 authentication only for an explicit step-up flow', async () => {
     let openedUrl = ''
     electronMocks.openExternal.mockImplementation(async (url) => {

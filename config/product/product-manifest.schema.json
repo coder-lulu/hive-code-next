@@ -163,9 +163,10 @@
         "identity": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["issuer", "clients"],
+          "required": ["issuer", "userLoginUrl", "clients"],
           "properties": {
             "issuer": { "$ref": "#/$defs/requiredUrl" },
+            "userLoginUrl": { "$ref": "#/$defs/requiredUrl" },
             "clients": {
               "type": "object",
               "additionalProperties": false,

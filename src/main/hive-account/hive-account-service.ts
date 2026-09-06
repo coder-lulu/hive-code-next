@@ -390,6 +390,9 @@ export class HiveAccountService extends HiveAccountPublication {
         : await client.discoverAuthorizationEndpoint()
       const code = await this.dependencies.beginAuthorization({
         authorizationEndpoint,
+        ...(!options.providerId && options.intent !== 'STEP_UP'
+          ? { userLoginUrl: configured.config.userLoginUrl }
+          : {}),
         clientId: configured.config.clientId,
         scope: configured.config.scope,
         ...(options.intent === 'STEP_UP'

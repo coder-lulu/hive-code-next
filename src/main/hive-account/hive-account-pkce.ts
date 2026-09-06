@@ -16,6 +16,7 @@ export type HiveAuthorizationCode = {
 
 type HivePkceOptions = {
   authorizationEndpoint: string
+  userLoginUrl?: string
   clientId: string
   scope: string
   acrValues?: string
@@ -120,6 +121,20 @@ export function beginHiveAccountPkceFlow(options: HivePkceOptions): Promise<Hive
       void options
         .prepareDeviceAuthorization(nonce)
         .then(async () => {
+          if (options.userLoginUrl && !options.acrValues && !options.prompt) {
+            const loginUrl = new URL(options.userLoginUrl)
+            loginUrl.hash = `native=${Buffer.from(
+              JSON.stringify({
+                clientId: options.clientId,
+                nonce,
+                state,
+                codeChallenge,
+                redirectUri
+              })
+            ).toString('base64url')}`
+            await shell.openExternal(loginUrl.toString())
+            return
+          }
           const authorizeUrl = new URL(options.authorizationEndpoint)
           authorizeUrl.searchParams.set('client_id', options.clientId)
           authorizeUrl.searchParams.set('response_type', 'code')
