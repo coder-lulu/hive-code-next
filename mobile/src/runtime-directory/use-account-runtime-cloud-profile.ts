@@ -37,7 +37,8 @@ export function useAccountRuntimeCloudProfile(args: {
         endpoint: `cloud://${entry.runtimeRecordId}`,
         deviceToken: '',
         publicKeyB64: '',
-        lastConnected: Date.parse(entry.lastHeartbeatAt ?? entry.claimedAt),
+        // Cloud presence does not establish a connection from this phone.
+        lastConnected: 0,
         accountRuntime: {
           runtimeRecordId: entry.runtimeRecordId,
           resourceVersion: entry.resourceVersion,

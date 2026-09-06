@@ -88,7 +88,7 @@ function accountOnlyCatalogEntry(
     name: effectiveRuntimeName(runtime, null, pendingDisplayNames),
     endpoint: profile?.endpoint ?? `cloud://${runtime.runtimeRecordId}`,
     publicKeyB64: profile?.publicKeyB64 ?? '',
-    lastConnected: Date.parse(runtime.lastHeartbeatAt ?? runtime.claimedAt),
+    lastConnected: profile?.lastConnected ?? 0,
     credentialStatus: profile
       ? 'ready'
       : runtime.presence === 'OFFLINE'

@@ -6,6 +6,8 @@ import { useRpcClientContext } from './rpc-client-context-contract'
 import { waitForRpcClientReconnected } from './rpc-client-reconnect-wait'
 
 const RECONNECT_TIMEOUT_MS = 17_000
+// Account connections acquire an API intent (15s) before the Relay handshake (27s).
+const ACCOUNT_RECONNECT_TIMEOUT_MS = 45_000
 
 // Primary hook for screens: acquires the shared client on mount, releases on unmount, re-renders on state change.
 export function useHostClient(hostId: string | undefined): {
@@ -98,7 +100,12 @@ export function useEnsureHostConnected(): (host: HostProfile) => Promise<boolean
       ctx.primeHosts([host])
       await ctx.forceReconnect(host.id)
       const client = ctx.getAllClients().find((entry) => entry.hostId === host.id)?.client
-      return client ? waitForRpcClientReconnected(client, RECONNECT_TIMEOUT_MS) : false
+      return client
+        ? waitForRpcClientReconnected(
+            client,
+            host.accountRuntime ? ACCOUNT_RECONNECT_TIMEOUT_MS : RECONNECT_TIMEOUT_MS
+          )
+        : false
     },
     [ctx]
   )

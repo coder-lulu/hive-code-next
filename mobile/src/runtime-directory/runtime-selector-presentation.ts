@@ -59,6 +59,9 @@ function runtimeStatus(
     return { statusLabel: '正在重连', tone: 'warning' }
   }
   if (connectionState === 'auth-failed' || runtime.credentialStatus === 'missing') {
+    if (runtime.accessSources?.includes('account-claimed')) {
+      return { statusLabel: '连接未通过', tone: 'warning' }
+    }
     return { statusLabel: '需重新配对', tone: 'warning' }
   }
   if (runtime.credentialStatus === 'cloud-offline') {
@@ -85,6 +88,9 @@ function runtimeDetail(
   const prefix = group === 'account' ? '已认领' : '本地配对'
   if (connectionState === 'connected') {
     return `${prefix} · 已连接`
+  }
+  if (group === 'account' && connectionState === 'auth-failed') {
+    return `${prefix} · 暂时无法建立连接`
   }
   switch (runtime.credentialStatus) {
     case 'temporarily-unavailable':

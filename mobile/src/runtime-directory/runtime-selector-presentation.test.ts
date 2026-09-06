@@ -111,9 +111,29 @@ describe('runtime selector presentation', () => {
     )
 
     expect(entries.map((entry) => [entry.id, entry.statusLabel, entry.tone])).toEqual([
-      ['auth-failed', '需重新配对', 'warning'],
+      ['auth-failed', '连接未通过', 'warning'],
       ['relay-unavailable', '不可连接', 'neutral']
     ])
+    expect(entries[0].detail).toBe('已认领 · 暂时无法建立连接')
+  })
+
+  it('reserves re-pairing advice for local pairing and displays actual connection evidence', () => {
+    const entries = projectRuntimeSelectorEntries(
+      [
+        runtime('account', { accessSources: ['account-claimed'], accountPresence: 'ONLINE' }),
+        runtime('local', { accessSources: ['manual-pairing'] })
+      ],
+      { local: 'auth-failed' },
+      null
+    )
+    expect(entries[0].detail).toBe('已认领 · 尚未验证连接')
+    expect(entries[1].statusLabel).toBe('需重新配对')
+    const [connected] = projectRuntimeSelectorEntries(
+      [runtime('account', { accessSources: ['account-claimed'] })],
+      { account: 'connected' },
+      null
+    )
+    expect(connected.detail).toBe('已认领 · 已连接')
   })
 
   it('only enables runtimes with a usable connection profile', () => {

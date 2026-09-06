@@ -40,6 +40,13 @@ function local(runtimeRecordId?: string): HostCatalogEntry {
 }
 
 describe('account Runtime catalog merge', () => {
+  it('does not present a cloud heartbeat or claim as a mobile connection', () => {
+    const claimed = runtime('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+    expect(mergeAccountRuntimeCatalog([], [claimed], () => null)[0].lastConnected).toBe(0)
+    const profile = { ...local().profile!, lastConnected: 123 }
+    expect(mergeAccountRuntimeCatalog([], [claimed], () => profile)[0].lastConnected).toBe(123)
+  })
+
   it('deduplicates only on an explicit runtimeRecordId and preserves local pairing', () => {
     const claimed = runtime('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
     const accountRuntime = {
