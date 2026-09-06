@@ -44,16 +44,24 @@ export async function loadMobileNewTabAgentOptions(args: {
 }
 
 async function loadWorkspaceDetectedAgents(client: RpcClient, worktreeId: string) {
-  const repoResponse = await client.sendRequest('repo.list')
+  const isFolderWorkspace = worktreeId.startsWith('folder:')
+  const repoResponse = await client.sendRequest(
+    isFolderWorkspace ? 'folderWorkspace.list' : 'repo.list'
+  )
   if (!repoResponse.ok) {
     throw new Error((repoResponse as RpcFailure).error.message)
   }
-  const repoId = getRepoIdFromMobileWorktreeId(worktreeId)
-  const repos =
-    ((repoResponse as RpcSuccess).result as { repos?: RuntimeRepoSummary[] }).repos ?? []
+  const repoId = isFolderWorkspace
+    ? worktreeId.slice('folder:'.length)
+    : getRepoIdFromMobileWorktreeId(worktreeId)
+  const catalog = (repoResponse as RpcSuccess).result as {
+    repos?: RuntimeRepoSummary[]
+    folderWorkspaces?: RuntimeRepoSummary[]
+  }
+  const repos = (isFolderWorkspace ? catalog.folderWorkspaces : catalog.repos) ?? []
   const repo = repos.find((candidate) => candidate.id === repoId)
   if (!repo) {
-    throw new Error('worktree_repo_not_found')
+    throw new Error('workspace_not_found')
   }
   const connectionId = repo.connectionId?.trim() || null
   return connectionId

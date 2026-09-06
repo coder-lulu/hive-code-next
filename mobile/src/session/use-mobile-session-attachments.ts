@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { triggerSelection, triggerError } from '../platform/haptics'
@@ -9,6 +9,10 @@ import { useMobileTerminalPaste } from './use-mobile-terminal-paste'
 import type { MobileSessionAccessorySelectionModel } from './use-mobile-session-accessory-selection'
 
 export function useMobileSessionAttachments(scope: MobileSessionAccessorySelectionModel) {
+  const [agentOptionsReload, setAgentOptionsReload] = useState(0)
+  const retryCreateTabAgentOptions = useCallback(() => {
+    setAgentOptionsReload((value) => value + 1)
+  }, [])
   const {
     worktreeId,
     client,
@@ -153,8 +157,16 @@ export function useMobileSessionAttachments(scope: MobileSessionAccessorySelecti
     return () => {
       stale = true
     }
-  }, [client, connState, pendingDiffNotesDelivery, showCreateTabDrawer, worktreeId])
+  }, [
+    client,
+    connState,
+    pendingDiffNotesDelivery,
+    showCreateTabDrawer,
+    worktreeId,
+    agentOptionsReload
+  ])
   return {
+    retryCreateTabAgentOptions,
     handlePaste,
     flushPendingLiveInputBeforeAttachmentSend,
     attachImage,

@@ -48,6 +48,7 @@ vi.mock('lucide-react-native', () => ({
 vi.mock('../components/BottomDrawer', () => ({
   BottomDrawer: (props: { children?: ReactNode }) => props.children
 }))
+vi.mock('../components/MobileAgentIcon', () => ({ MobileAgentIcon: 'MobileAgentIcon' }))
 vi.mock('./MobileHomeResumeCard', () => ({ MobileHomeResumeCard: 'MobileHomeResumeCard' }))
 vi.mock('./mobile-home-assets', () => ({ GRAPHITE_MASCOT: 'graphite-mascot' }))
 vi.mock('../transport/runtime-capability-probe', () => ({

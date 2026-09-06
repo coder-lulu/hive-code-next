@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH } from '../../../src/shared/terminal-quick-commands'
 import { BottomDrawer } from '../components/BottomDrawer'
+import { MobileAgentIcon } from '../components/MobileAgentIcon'
 import { productNameText } from '../product-brand'
 import type { MobileNewTabAgentOption } from '../session/mobile-new-tab-agent-options'
 import type { MobileTheme } from '../theme/mobile-theme'
@@ -115,6 +116,11 @@ export function MobileCloudWorkPreviewView(props: MobileCloudWorkPreviewViewProp
               disabled={!props.canPickAgent}
               label={selectedAgentOption?.label ?? '智能体'}
               Icon={Bot}
+              renderIcon={
+                selectedAgentOption
+                  ? () => <MobileAgentIcon agentId={selectedAgentOption.agent} size={20} />
+                  : undefined
+              }
               onPress={props.onAgentPickerOpen}
               showLabel={!compact}
               styles={styles}
@@ -199,7 +205,7 @@ export function MobileCloudWorkPreviewView(props: MobileCloudWorkPreviewViewProp
                     pressed && styles.pressed
                   ]}
                 >
-                  <Bot color={props.theme.color.text.primary} size={20} strokeWidth={1.9} />
+                  <MobileAgentIcon agentId={option.agent} size={20} />
                   <Text maxFontSizeMultiplier={1.3} style={styles.agentPickerLabel}>
                     {option.label}
                   </Text>

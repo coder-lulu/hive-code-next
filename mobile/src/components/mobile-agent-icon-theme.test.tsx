@@ -30,13 +30,30 @@ vi.mock('../theme/mobile-theme-provider', () => ({
   useMobileTheme: () => ({
     color: {
       text: {
-        primary: themeState.scheme === 'light' ? lightThemeColors.text.primary : darkThemeColors.text.primary
+        primary:
+          themeState.scheme === 'light'
+            ? lightThemeColors.text.primary
+            : darkThemeColors.text.primary
       }
     }
   })
 }))
 
 describe('MobileAgentIcon theme colors', () => {
+  it.each(['light', 'dark'] as const)('keeps both Pi glyph paths readable on %s', (scheme) => {
+    themeState.scheme = scheme
+    let renderer: ReactTestRenderer | null = null
+    act(() => {
+      renderer = create(createElement(MobileAgentIcon, { agentId: 'pi' }))
+    })
+    const color = scheme === 'light' ? lightThemeColors.text.primary : darkThemeColors.text.primary
+    expect(renderer?.root.findAllByType('Path').map((path) => path.props.fill)).toEqual([
+      color,
+      color
+    ])
+    act(() => renderer?.unmount())
+  })
+
   it('uses graphite for the OpenAI icon on a light theme', () => {
     themeState.scheme = 'light'
     let renderer: ReactTestRenderer | null = null

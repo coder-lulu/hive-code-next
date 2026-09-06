@@ -32,6 +32,7 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
     setShowCreateTabDrawer,
     createTabAgentLoadState,
     createTabAgentOptions,
+    retryCreateTabAgentOptions,
     agentSessionHistorySupported,
     clearDeliveredDiffComments,
     handleCreateTerminal
@@ -69,10 +70,10 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
             ? [
                 {
                   label: 'Agent Presets Unavailable',
-                  hint: 'Check the host connection',
+                  hint: 'Tap to retry loading agents',
                   icon: Bot,
-                  disabled: true,
-                  onPress: () => {}
+                  skipAutoClose: true,
+                  onPress: retryCreateTabAgentOptions
                 }
               ]
             : []
@@ -93,7 +94,7 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
           ? createTabAgentOptions.map((option) => ({
               label: option.label,
               hint: 'New agent session',
-              icon: Bot,
+              renderIcon: () => <MobileAgentIcon agentId={option.agent} />,
               onPress: () => {
                 const delivery = pendingDiffNotesDelivery
                 setPendingDiffNotesDelivery(null)
@@ -119,10 +120,10 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
               ? [
                   {
                     label: 'Agent Presets Unavailable',
-                    hint: 'Copy notes instead',
+                    hint: 'Tap to retry loading agents',
                     icon: Bot,
-                    disabled: true,
-                    onPress: () => {}
+                    skipAutoClose: true,
+                    onPress: retryCreateTabAgentOptions
                   }
                 ]
               : []

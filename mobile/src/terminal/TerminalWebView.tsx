@@ -1,5 +1,13 @@
-import { useRef, useCallback, forwardRef, useImperativeHandle, useEffect, useMemo } from 'react'
-import { Platform, View } from 'react-native'
+import {
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  useEffect,
+  useMemo,
+  useState
+} from 'react'
+import { ActivityIndicator, Platform, Text, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 import type { TerminalOscLinkRange } from '../../../src/shared/terminal-osc-link-ranges'
 import type { TerminalWebViewHandle, TerminalWebViewProps } from './terminal-webview-contract'
@@ -45,6 +53,16 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
 ) {
   const webViewRef = useRef<WebView>(null)
   const isWebReadyRef = useRef(false)
+  const [hasPaintedContent, setHasPaintedContent] = useState(false)
+  const [showLoading, setShowLoading] = useState(false)
+  const foreground = terminalTheme?.theme.foreground ?? darkTheme.terminal.foreground
+  useEffect(() => {
+    if (hasPaintedContent) {
+      return
+    }
+    const timer = setTimeout(() => setShowLoading(true), 300)
+    return () => clearTimeout(timer)
+  }, [hasPaintedContent])
   const pendingMessages = useMemo(() => createTerminalWebViewPendingMessages(), [])
   const messageIdRef = useRef(0)
   const pendingPingIdRef = useRef<number | null>(null)
@@ -150,6 +168,8 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
       ) {
         confirmWebReady(false)
       } else if (msg.type === 'ready') {
+        setHasPaintedContent(true)
+        setShowLoading(false)
         // Why: the WebView's init() rAF chain has run — term is open,
         // renderService is populated, first paint has happened. Resolve
         // any pending awaitReady() so a queued measure can now safely
@@ -202,6 +222,8 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
   )
 
   const handleLoadStart = useCallback(() => {
+    setHasPaintedContent(false)
+    setShowLoading(false)
     isWebReadyRef.current = false
     pendingPingIdRef.current = null
     armWebReadyWatchdog()
@@ -396,6 +418,12 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
         }
         onContentProcessDidTerminate={handleContentProcessDidTerminate}
       />
+      {!engineError && !hasPaintedContent && showLoading ? (
+        <View style={frameStyles.loadingOverlay} accessibilityLiveRegion="polite">
+          <ActivityIndicator color={foreground} />
+          <Text style={[frameStyles.loadingText, { color: foreground }]}>正在加载会话内容…</Text>
+        </View>
+      ) : null}
       {engineError ? (
         <TerminalWebViewEngineErrorOverlay
           message={engineError}

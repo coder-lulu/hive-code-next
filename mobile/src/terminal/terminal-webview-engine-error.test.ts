@@ -11,6 +11,7 @@ const nativeWebViewMethods = vi.hoisted(() => ({
 }))
 
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
   AppState: { currentState: 'active' },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
@@ -88,6 +89,27 @@ describe('TerminalWebView engine errors', () => {
     }
     vi.clearAllMocks()
     vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('keeps first-load feedback until terminal paint, without flashing on re-init', () => {
+    vi.useFakeTimers()
+    const ref = createRef<TerminalWebViewHandle>()
+    const { renderer } = createTerminalWebViewRenderer(vi.fn(), { ref })
+    act(() => vi.advanceTimersByTime(300))
+    expect(renderedText(renderer)).toContain('正在加载会话内容')
+    postWebViewMessage(renderer, { type: 'web-ready' })
+    expect(renderedText(renderer)).toContain('正在加载会话内容')
+    postWebViewMessage(renderer, { type: 'ready' })
+    expect(renderedText(renderer)).not.toContain('正在加载会话内容')
+    act(() => {
+      ref.current?.init(80, 24, 'snapshot', true)
+      vi.advanceTimersByTime(300)
+    })
+    expect(renderedText(renderer)).not.toContain('正在加载会话内容')
+    act(() => renderer.root.findByType('WebView').props.onLoadStart())
+    act(() => vi.advanceTimersByTime(300))
+    expect(renderedText(renderer)).toContain('正在加载会话内容')
   })
 
   it('renders the reload overlay for fatal engine errors from the WebView', () => {

@@ -29,7 +29,7 @@ export function useMobileSessionPresentation(scope: MobileSessionBulkCloseModel)
     handleCreateTerminal,
     visibleTabs
   } = scope
-  const showLoadingState = connState === 'connected' && !terminalsLoaded && visibleTabs.length === 0
+  const showLoadingState = !terminalsLoaded && visibleTabs.length === 0
   const showEmptyState =
     connState === 'connected' && terminalsLoaded && visibleTabs.length === 0 && !activeHandle
 

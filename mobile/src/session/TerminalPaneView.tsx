@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { TerminalWebView } from '../terminal/TerminalWebView'
 import type {
@@ -51,12 +51,24 @@ export function TerminalPaneView({
   onOpenUrl,
   onTextScaleChange
 }: TerminalPaneViewProps) {
+  const [visited, setVisited] = useState(active)
+  useEffect(() => {
+    if (active) {
+      setVisited(true)
+    }
+  }, [active])
+
   const setRef = useCallback(
     (ref: TerminalWebViewHandle | null) => {
       onRef(handle, ref)
     },
     [handle, onRef]
   )
+
+  // Avoid allocating xterm and a GL surface for tabs the user has never opened.
+  if (!active && !visited) {
+    return null
+  }
 
   return (
     <View

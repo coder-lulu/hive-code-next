@@ -13,6 +13,45 @@ function createClient(
 }
 
 describe('mobile new-tab agent loading', () => {
+  it.each([null, 'ssh-folder'])(
+    'detects agents on the folder execution target %s',
+    async (connectionId) => {
+      const client = createClient(async (method, params) => {
+        if (method === 'settings.get') {
+          return { ok: true, result: { settings: { disabledTuiAgents: ['claude'] } } }
+        }
+        if (method === 'folderWorkspace.list') {
+          return { ok: true, result: { folderWorkspaces: [{ id: 'folder-1', connectionId }] } }
+        }
+        if (method === (connectionId ? 'preflight.detectRemoteAgents' : 'preflight.detectAgents')) {
+          expect(params).toEqual(connectionId ? { connectionId } : undefined)
+          return { ok: true, result: ['claude', 'codex'] }
+        }
+        throw new Error(`unexpected request: ${method}`)
+      })
+      await expect(
+        loadMobileNewTabAgentOptions({ client, worktreeId: 'folder:folder-1' })
+      ).resolves.toEqual([{ agent: 'codex', label: 'Codex' }])
+      expect(client.sendRequest).not.toHaveBeenCalledWith('repo.list')
+    }
+  )
+
+  it('does not detect agents locally when the folder target cannot be resolved', async () => {
+    const client = createClient(async (method) => {
+      if (method === 'settings.get') {
+        return { ok: true, result: { settings: {} } }
+      }
+      if (method === 'folderWorkspace.list') {
+        return { ok: true, result: { folderWorkspaces: [] } }
+      }
+      throw new Error(`unexpected request: ${method}`)
+    })
+    await expect(
+      loadMobileNewTabAgentOptions({ client, worktreeId: 'folder:missing' })
+    ).rejects.toThrow('workspace_not_found')
+    expect(client.sendRequest).not.toHaveBeenCalledWith('preflight.detectAgents')
+  })
+
   it('detects agents locally for the floating workspace without listing repos', async () => {
     const client = createClient(async (method) => {
       if (method === 'settings.get') {

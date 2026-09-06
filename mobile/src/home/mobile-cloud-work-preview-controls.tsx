@@ -1,4 +1,5 @@
 import { ChevronDown, type LucideIcon } from 'lucide-react-native'
+import type { ReactNode } from 'react'
 import { Pressable, Text } from 'react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import type { MobileCloudWorkPreviewStyles } from './mobile-cloud-work-preview-styles'
@@ -39,6 +40,7 @@ export function ComposerPicker(props: {
   readonly disabled?: boolean
   readonly label: string
   readonly Icon: LucideIcon
+  readonly renderIcon?: () => ReactNode
   readonly onPress?: () => void
   readonly showLabel: boolean
   readonly styles: MobileCloudWorkPreviewStyles
@@ -57,11 +59,15 @@ export function ComposerPicker(props: {
         pressed && props.styles.pressed
       ]}
     >
-      <props.Icon
-        color={props.disabled ? props.theme.color.text.tertiary : props.theme.color.text.primary}
-        size={18}
-        strokeWidth={1.9}
-      />
+      {props.renderIcon ? (
+        props.renderIcon()
+      ) : (
+        <props.Icon
+          color={props.disabled ? props.theme.color.text.tertiary : props.theme.color.text.primary}
+          size={20}
+          strokeWidth={1.9}
+        />
+      )}
       {props.showLabel ? (
         <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={props.styles.composerPickerText}>
           {props.label}

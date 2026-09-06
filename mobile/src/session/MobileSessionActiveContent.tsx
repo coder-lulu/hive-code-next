@@ -85,6 +85,9 @@ export function MobileSessionActiveContent({
   return showLoadingState ? (
     <View style={styles.emptyState}>
       <ActivityIndicator size="small" color={theme.color.text.secondary} />
+      <Text style={styles.emptyText} accessibilityLiveRegion="polite">
+        {connState === 'connected' ? '正在加载会话…' : '正在连接电脑…'}
+      </Text>
     </View>
   ) : showEmptyState ? (
     <View style={styles.emptyState}>
