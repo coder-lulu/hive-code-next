@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const electronMocks = vi.hoisted(() => ({
+  openExternal: vi.fn().mockResolvedValue(undefined),
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
     electronMocks.handlers.set(channel, handler)
@@ -10,7 +11,8 @@ const electronMocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: electronMocks.getAllWindows },
-  ipcMain: { handle: electronMocks.handle }
+  ipcMain: { handle: electronMocks.handle },
+  shell: { openExternal: electronMocks.openExternal }
 }))
 
 import {
@@ -92,7 +94,13 @@ describe('Hive Runtime Cloud IPC', () => {
   })
 
   it('validates and binds a local Runtime claim to the renderer account', async () => {
-    const claimLocalRuntime = vi.fn().mockResolvedValue({ relation: 'CLAIMED_BY_CURRENT' })
+    const claimLocalRuntime = vi.fn(
+      async (_account: string, open: (code: string) => Promise<void>) => {
+        await open('ABCD-EFGH')
+        await expect(open('invalid#code')).rejects.toThrow('Invalid Runtime claim code')
+        return { relation: 'CLAIMED_BY_CURRENT' }
+      }
+    )
     registerHiveRuntimeCloudHandlers({
       directory: { getState: vi.fn(), refresh: vi.fn(), subscribe: vi.fn() },
       ownership: {
@@ -109,7 +117,10 @@ describe('Hive Runtime Cloud IPC', () => {
         expectedAccountId: ACCOUNT_ID
       })
     ).resolves.toEqual({ relation: 'CLAIMED_BY_CURRENT' })
-    expect(claimLocalRuntime).toHaveBeenCalledWith(ACCOUNT_ID)
+    expect(claimLocalRuntime).toHaveBeenCalledWith(ACCOUNT_ID, expect.any(Function))
+    expect(electronMocks.openExternal).toHaveBeenCalledExactlyOnceWith(
+      'https://console.hivekernel.com/runtime-claim#userCode=ABCD-EFGH'
+    )
   })
 
   it.each([

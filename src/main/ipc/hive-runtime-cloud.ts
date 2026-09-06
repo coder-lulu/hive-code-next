@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { hivecodeProductConfig } from '../../shared/generated/product-config'
+import { BrowserWindow, ipcMain, shell } from 'electron'
 import {
   HIVE_RUNTIME_DIRECTORY_CHANGED_CHANNEL,
   HIVE_RUNTIME_OWNERSHIP_CHANGED_CHANNEL,
@@ -134,7 +135,14 @@ export function registerHiveRuntimeCloudHandlers(services: HiveRuntimeCloudHandl
   ipcMain.handle('hiveRuntimeCloud:refreshLocalOwnership', () => services.ownership.refresh())
   ipcMain.handle('hiveRuntimeCloud:claimLocalRuntime', (_event, value: unknown) => {
     const request = requireHiveLocalRuntimeClaimRequest(value)
-    return services.ownership.claimLocalRuntime(request.expectedAccountId)
+    return services.ownership.claimLocalRuntime(request.expectedAccountId, async (userCode) => {
+      if (!/^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(userCode)) {
+        throw new Error('Invalid Runtime claim code')
+      }
+      const url = new URL('/runtime-claim', hivecodeProductConfig.services.identity.userLoginUrl)
+      url.hash = new URLSearchParams({ userCode }).toString()
+      await shell.openExternal(url.toString())
+    })
   })
   ipcMain.handle('hiveRuntimeCloud:listSessions', () => services.sessions.list())
   ipcMain.handle('hiveRuntimeCloud:revokeSession', (_event, value: unknown) => {

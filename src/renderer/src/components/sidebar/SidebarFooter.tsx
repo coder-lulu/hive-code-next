@@ -52,7 +52,6 @@ const NO_UPDATE_CHECK_MODIFIERS = {
   metaKey: false,
   shiftKey: false
 }
-const MAXIMUM_RUNTIME_CLAIM_STEP_UP_ATTEMPTS = 2
 const THEME_OPTIONS = ['system', 'light', 'dark'] as const
 
 const SidebarFooter = React.memo(function SidebarFooter() {
@@ -448,49 +447,9 @@ const SidebarFooter = React.memo(function SidebarFooter() {
         return
       }
 
-      let state: Awaited<ReturnType<typeof claimLocalRuntimeForAccount>> | null = null
-      let stepUpAttempts = 0
-      while (state === null) {
-        try {
-          state = await claimLocalRuntimeForAccount(expectedAccountId)
-          if (state.accountId !== expectedAccountId) {
-            throw new AccountRuntimeClaimError('ACCOUNT_CHANGED')
-          }
-        } catch (error) {
-          if (
-            !(error instanceof AccountRuntimeClaimError) ||
-            error.code !== 'STEP_UP_REQUIRED' ||
-            stepUpAttempts >= MAXIMUM_RUNTIME_CLAIM_STEP_UP_ATTEMPTS
-          ) {
-            throw error
-          }
-          if (!mountedRef.current) {
-            return
-          }
-          stepUpAttempts += 1
-          setSigningIn(true)
-          try {
-            const result = await window.api.hiveAccount.signIn({
-              sessionProfile:
-                accountState?.sessionProfile === 'TEMPORARY' ? 'TEMPORARY' : 'TRUSTED',
-              intent: 'STEP_UP'
-            })
-            if (!mountedRef.current) {
-              return
-            }
-            commitAccountState(result.state)
-            if (result.status !== 'signed-in') {
-              throw new AccountRuntimeClaimError('STEP_UP_REQUIRED')
-            }
-            if (result.state.account?.accountId !== expectedAccountId) {
-              throw new AccountRuntimeClaimError('ACCOUNT_CHANGED')
-            }
-          } finally {
-            if (mountedRef.current) {
-              setSigningIn(false)
-            }
-          }
-        }
+      const state = await claimLocalRuntimeForAccount(expectedAccountId)
+      if (state.accountId !== expectedAccountId) {
+        throw new AccountRuntimeClaimError('ACCOUNT_CHANGED')
       }
       if (state.relation === 'CLAIMED_BY_CURRENT' && mountedRef.current) {
         setClaimSucceeded(true)

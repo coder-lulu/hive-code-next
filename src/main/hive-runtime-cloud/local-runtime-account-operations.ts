@@ -1,7 +1,10 @@
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import type { HiveLocalRuntimeOwnershipState } from '../../shared/hive-runtime-cloud'
 import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
-import { createRuntimeClaimReconcileRequest } from './hive-runtime-cloud-proof'
+import {
+  createRuntimeClaimChallengeRequest,
+  createRuntimeClaimReconcileRequest
+} from './hive-runtime-cloud-proof'
 import { sameRegistrationTuple } from './local-runtime-registration'
 import type { ClaimedRegistration, LocalRuntimeRegistration } from './local-runtime-registration'
 
@@ -84,8 +87,13 @@ export async function claimLocalRuntimeForAccount({
   registration,
   authorization,
   signal,
-  assertCurrent
-}: AccountOperation): Promise<ClaimedRegistration> {
+  assertCurrent,
+  openVerification,
+  waitForPoll
+}: AccountOperation & {
+  openVerification: (userCode: string) => Promise<void>
+  waitForPoll: (milliseconds: number, signal: AbortSignal) => Promise<void>
+}): Promise<ClaimedRegistration> {
   const identity = registration.requireIdentity()
   await registration.requireAccountAuthority(authorization, signal)
   assertCurrent()
@@ -119,36 +127,74 @@ export async function claimLocalRuntimeForAccount({
     ? await registration.pendingFromLookup(lookup, identity, authorization.authorityId, signal)
     : await registration.registerPending(identity, authorization.authorityId, signal)
   assertCurrent()
-  const claim = await registration.requireClient().claim(
-    {
-      runtimeRecordId: pending.runtimeRecordId,
-      claimCapability: pending.claimCapability,
-      expectedVersion: pending.resourceVersion
-    },
-    authorization.accessToken,
-    registration.randomUuid(),
+  const client = registration.requireClient()
+  const challenge = await client.createClaimChallenge(
+    createRuntimeClaimChallengeRequest(
+      identity,
+      {
+        runtimeRecordId: pending.runtimeRecordId,
+        expectedVersion: pending.resourceVersion,
+        expectedAccountId: authorization.accountId
+      },
+      { authorityId: authorization.authorityId }
+    ),
     signal
   )
   assertCurrent()
-  if (
-    claim.runtime.runtimeInstanceId !== identity.runtimeInstanceId ||
-    claim.runtime.runtimeRecordId !== pending.runtimeRecordId ||
-    claim.runtime.ownerAccountId !== authorization.accountId
-  ) {
-    throw new Error('hive_runtime_cloud_claim_identity_mismatch')
+  const deadline = Math.min(challenge.expiresAt, registration.now() + 300_000)
+  if (deadline <= registration.now()) {
+    throw new Error('hive_runtime_cloud_claim_challenge_expired')
   }
-  const claimed: ClaimedRegistration = {
-    schemaVersion: 1,
-    runtimeRecordId: claim.runtime.runtimeRecordId,
-    status: 'CLAIMED',
-    authorityId: authorization.authorityId,
-    resourceVersion: claim.runtime.resourceVersion,
-    authorityGeneration: claim.runtime.authorityGeneration,
-    fencingEpoch: claim.runtime.fencingEpoch,
-    latestLeaseEpoch: pending.latestLeaseEpoch
+  await openVerification(challenge.userCode)
+  assertCurrent()
+  let nextPollAt = registration.now() + challenge.pollIntervalSeconds * 1000
+  while (registration.now() < deadline) {
+    await waitForPoll(
+      Math.min(
+        Math.max(1000, nextPollAt - registration.now()),
+        30_000,
+        deadline - registration.now()
+      ),
+      signal
+    )
+    assertCurrent()
+    if (registration.now() >= deadline) {
+      break
+    }
+    const polled = await client.pollClaimChallenge(
+      challenge.challengeId,
+      challenge.deviceCode,
+      signal
+    )
+    assertCurrent()
+    if (polled.status === 'EXPIRED') {
+      break
+    }
+    if (polled.status === 'PENDING') {
+      nextPollAt = polled.nextPollAt
+      continue
+    }
+    if (
+      polled.runtime.runtimeRecordId !== pending.runtimeRecordId ||
+      polled.runtime.runtimeInstanceId !== identity.runtimeInstanceId
+    ) {
+      throw new Error('hive_runtime_cloud_claim_identity_mismatch')
+    }
+    await registration.requireCurrentAccountOwnership(
+      pending.runtimeRecordId,
+      authorization,
+      signal
+    )
+    assertCurrent()
+    const claimed = registration.claimedFromReconcile(
+      polled.runtime,
+      identity,
+      authorization.authorityId
+    )
+    registration.persist(claimed)
+    return claimed
   }
-  registration.persist(claimed)
-  return claimed
+  throw new Error('hive_runtime_cloud_claim_challenge_expired')
 }
 
 function ownershipResult(

@@ -112,14 +112,15 @@ export function createRuntimeClaimReconcileRequest(
 
 export function createRuntimeClaimChallengeRequest(
   identity: HiveRuntimeCloudIdentity,
-  input: Readonly<{ runtimeRecordId: string; expectedVersion: number }>,
+  input: Readonly<{ runtimeRecordId: string; expectedVersion: number; expectedAccountId?: string }>,
   context: ProofContext
 ) {
   const body = {
     runtimeRecordId: input.runtimeRecordId,
     runtimeInstanceId: identity.runtimeInstanceId,
     identityPublicKey: identity.publicKey,
-    expectedVersion: input.expectedVersion
+    expectedVersion: input.expectedVersion,
+    ...(input.expectedAccountId ? { expectedAccountId: input.expectedAccountId } : {})
   }
   const unsigned = baseProof(
     'hive-runtime-claim-challenge/v1',

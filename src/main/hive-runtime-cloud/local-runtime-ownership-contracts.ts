@@ -19,7 +19,6 @@ export type OwnershipClient = Pick<
   | 'getAuthorityId'
   | 'lookup'
   | 'register'
-  | 'claim'
   | 'getOwnedRuntime'
   | 'reissueClaimCapability'
   | 'reconcileClaim'
@@ -36,6 +35,7 @@ export type LocalRuntimeOwnershipDependencies = Readonly<{
   clearState: (userDataPath: string) => void
   randomUuid: () => string
   now: () => number
+  waitForClaimPoll?: (milliseconds: number, signal: AbortSignal) => Promise<void>
 }>
 
 export const defaultLocalRuntimeOwnershipDependencies: LocalRuntimeOwnershipDependencies = {

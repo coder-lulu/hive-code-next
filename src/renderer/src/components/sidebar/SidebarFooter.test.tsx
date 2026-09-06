@@ -745,111 +745,7 @@ describe('SidebarFooter', () => {
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
-  it('completes a computer claim after one explicit step-up authentication', async () => {
-    setState()
-    mocks.state.localRuntimeOwnership = {
-      ...(mocks.state.localRuntimeOwnership as Record<string, unknown>),
-      relation: 'UNREGISTERED',
-      accountId: 'account-1'
-    }
-    mocks.claimLocalRuntime
-      .mockRejectedValueOnce(new AccountRuntimeClaimError('STEP_UP_REQUIRED'))
-      .mockResolvedValueOnce({
-        stateRevision: 3,
-        relation: 'CLAIMED_BY_CURRENT',
-        accountId: 'account-1',
-        sessionGeneration: 2,
-        runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
-        claimCapabilityAvailable: false,
-        presence: 'ONLINE',
-        checkedAt: 2,
-        errorCode: null
-      })
-    mocks.signIn.mockResolvedValue({
-      status: 'signed-in',
-      state: {
-        configured: true,
-        status: 'signed-in',
-        persistence: 'encrypted',
-        sessionProfile: 'TRUSTED',
-        account: { accountId: 'account-1', displayName: 'Ada' }
-      }
-    })
-    const container = await renderFooter()
-    await act(async () => {
-      mocks.accountStateChanged?.({
-        configured: true,
-        status: 'signed-in',
-        persistence: 'encrypted',
-        account: { accountId: 'account-1', displayName: 'Ada' }
-      })
-    })
-    const claim = container.querySelector<HTMLButtonElement>('[data-local-runtime-ownership]')
-
-    await act(async () => claim?.click())
-
-    expect(mocks.signIn).toHaveBeenCalledWith({
-      sessionProfile: 'TRUSTED',
-      intent: 'STEP_UP'
-    })
-    expect(mocks.claimLocalRuntime).toHaveBeenCalledTimes(2)
-    expect(mocks.toastSuccess).toHaveBeenCalledWith(
-      'This computer is now available through your HiveCloud account.'
-    )
-    expect(mocks.toastError).not.toHaveBeenCalled()
-  })
-
-  it('continues through a second step-up after first-time OTP enrollment', async () => {
-    setState()
-    mocks.state.localRuntimeOwnership = {
-      ...(mocks.state.localRuntimeOwnership as Record<string, unknown>),
-      relation: 'PENDING_CLAIM',
-      accountId: 'account-1'
-    }
-    mocks.claimLocalRuntime
-      .mockRejectedValueOnce(new AccountRuntimeClaimError('STEP_UP_REQUIRED'))
-      .mockRejectedValueOnce(new AccountRuntimeClaimError('STEP_UP_REQUIRED'))
-      .mockResolvedValueOnce({
-        stateRevision: 4,
-        relation: 'CLAIMED_BY_CURRENT',
-        accountId: 'account-1',
-        sessionGeneration: 3,
-        runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
-        claimCapabilityAvailable: false,
-        presence: 'ONLINE',
-        checkedAt: 3,
-        errorCode: null
-      })
-    mocks.signIn.mockResolvedValue({
-      status: 'signed-in',
-      state: {
-        configured: true,
-        status: 'signed-in',
-        persistence: 'encrypted',
-        sessionProfile: 'TRUSTED',
-        account: { accountId: 'account-1', displayName: 'Ada' }
-      }
-    })
-    const container = await renderFooter()
-    await act(async () => {
-      mocks.accountStateChanged?.({
-        configured: true,
-        status: 'signed-in',
-        persistence: 'encrypted',
-        account: { accountId: 'account-1', displayName: 'Ada' }
-      })
-    })
-    const claim = container.querySelector<HTMLButtonElement>('[data-local-runtime-ownership]')
-
-    await act(async () => claim?.click())
-
-    expect(mocks.signIn).toHaveBeenCalledTimes(2)
-    expect(mocks.claimLocalRuntime).toHaveBeenCalledTimes(3)
-    expect(mocks.toastSuccess).toHaveBeenCalledOnce()
-    expect(mocks.toastError).not.toHaveBeenCalled()
-  })
-
-  it('bounds repeated step-up rejections without retrying forever', async () => {
+  it('does not open password sign-in when a claim is rejected', async () => {
     setState()
     mocks.state.localRuntimeOwnership = {
       ...(mocks.state.localRuntimeOwnership as Record<string, unknown>),
@@ -857,35 +753,20 @@ describe('SidebarFooter', () => {
       accountId: 'account-1'
     }
     mocks.claimLocalRuntime.mockRejectedValue(new AccountRuntimeClaimError('STEP_UP_REQUIRED'))
-    mocks.signIn.mockResolvedValue({
-      status: 'signed-in',
-      state: {
-        configured: true,
-        status: 'signed-in',
-        persistence: 'encrypted',
-        sessionProfile: 'TRUSTED',
-        account: { accountId: 'account-1', displayName: 'Ada' }
-      }
-    })
     const container = await renderFooter()
-    await act(async () => {
+    await act(async () =>
       mocks.accountStateChanged?.({
         configured: true,
         status: 'signed-in',
         persistence: 'encrypted',
         account: { accountId: 'account-1', displayName: 'Ada' }
       })
-    })
-
+    )
     await act(async () =>
       container.querySelector<HTMLButtonElement>('[data-local-runtime-ownership]')?.click()
     )
-
-    expect(mocks.signIn).toHaveBeenCalledTimes(2)
-    expect(mocks.claimLocalRuntime).toHaveBeenCalledTimes(3)
-    expect(mocks.toastError).toHaveBeenCalledWith(
-      'Re-authenticate your account before claiming this computer.'
-    )
+    expect(mocks.claimLocalRuntime).toHaveBeenCalledOnce()
+    expect(mocks.signIn).not.toHaveBeenCalled()
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
@@ -941,45 +822,6 @@ describe('SidebarFooter', () => {
       await claimResult.promise
     })
     expect(mocks.toastSuccess).toHaveBeenCalledOnce()
-  })
-
-  it('never claims after step-up switches to a different account', async () => {
-    setState()
-    mocks.state.localRuntimeOwnership = {
-      ...(mocks.state.localRuntimeOwnership as Record<string, unknown>),
-      relation: 'PENDING_CLAIM',
-      accountId: 'account-1'
-    }
-    mocks.claimLocalRuntime.mockRejectedValueOnce(new AccountRuntimeClaimError('STEP_UP_REQUIRED'))
-    mocks.signIn.mockResolvedValue({
-      status: 'signed-in',
-      state: {
-        configured: true,
-        status: 'signed-in',
-        persistence: 'encrypted',
-        sessionProfile: 'TRUSTED',
-        account: { accountId: 'account-2', displayName: 'Grace' }
-      }
-    })
-    const container = await renderFooter()
-    await act(async () => {
-      mocks.accountStateChanged?.({
-        configured: true,
-        status: 'signed-in',
-        persistence: 'encrypted',
-        account: { accountId: 'account-1', displayName: 'Ada' }
-      })
-    })
-
-    await act(async () =>
-      container.querySelector<HTMLButtonElement>('[data-local-runtime-ownership]')?.click()
-    )
-
-    expect(mocks.claimLocalRuntime).toHaveBeenCalledOnce()
-    expect(mocks.toastError).toHaveBeenCalledWith(
-      'The account changed during verification. Sign in with the original account and try again.'
-    )
-    expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
   it('does not expose account ownership actions while signed out', async () => {

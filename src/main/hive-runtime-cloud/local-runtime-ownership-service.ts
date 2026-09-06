@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import type {
   HiveLocalRuntimeClaimPollResult,
@@ -100,7 +101,10 @@ export class LocalRuntimeOwnershipService {
     return this.session.getState()
   }
 
-  async claimLocalRuntime(expectedAccountId: string): Promise<HiveLocalRuntimeOwnershipState> {
+  async claimLocalRuntime(
+    expectedAccountId: string,
+    openVerification: (userCode: string) => Promise<void>
+  ): Promise<HiveLocalRuntimeOwnershipState> {
     const authorization = this.session.getAuthorization()
     if (!authorization || !this.registration.isAvailable() || this.session.isStopped()) {
       throw new Error('hive_runtime_cloud_account_required')
@@ -115,6 +119,10 @@ export class LocalRuntimeOwnershipService {
       const claimed = await claimLocalRuntimeForAccount({
         registration: this.registration,
         authorization,
+        openVerification,
+        waitForPoll:
+          this.options.dependencies?.waitForClaimPoll ??
+          ((milliseconds, signal) => delay(milliseconds, undefined, { signal })),
         signal: operation.controller.signal,
         assertCurrent: () => this.session.assertAccountCurrent(operation, authorization)
       })

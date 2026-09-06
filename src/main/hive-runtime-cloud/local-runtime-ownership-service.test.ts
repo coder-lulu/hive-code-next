@@ -50,7 +50,10 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve }
 }
 
-function fixture() {
+function fixture(
+  waitForClaimPoll: (milliseconds: number, signal: AbortSignal) => Promise<void> = async () =>
+    undefined
+) {
   let stored: HiveRuntimeCloudRegistrationState | null = null
   const onRegistrationChanged = vi.fn()
   const clearIdentity = vi.fn()
@@ -81,7 +84,9 @@ function fixture() {
       credentialActivationToken: 'secret'.repeat(8),
       credentialActivationExpiresAt: 1_900
     }),
-    getOwnedRuntime: vi.fn(),
+    getOwnedRuntime: vi
+      .fn()
+      .mockResolvedValue({ runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000' }),
     reissueClaimCapability: vi.fn().mockResolvedValue({
       runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
       claimCapability: 'r'.repeat(64),
@@ -137,6 +142,7 @@ function fixture() {
       clearIdentity,
       clearState,
       randomUuid: () => '423e4567-e89b-42d3-a456-426614174000',
+      waitForClaimPoll,
       now: () => 1_000
     }
   })
@@ -172,16 +178,15 @@ describe('LocalRuntimeOwnershipService', () => {
     service.setAuthorization(authorization)
     await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
 
-    const result = await service.claimLocalRuntime(authorization.accountId)
+    const result = await service.claimLocalRuntime(authorization.accountId, async () => undefined)
 
     expect(result.relation).toBe('CLAIMED_BY_CURRENT')
     expect(client.register).toHaveBeenCalledOnce()
-    expect(client.claim).toHaveBeenCalledWith(
-      expect.objectContaining({ claimCapability: 'c'.repeat(64) }),
-      authorization.accessToken,
-      expect.any(String),
+    expect(client.createClaimChallenge).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedAccountId: authorization.accountId }),
       expect.any(AbortSignal)
     )
+    expect(client.claim).not.toHaveBeenCalled()
     expect(getStored()).toMatchObject({
       status: 'CLAIMED',
       authorityId: authorization.authorityId
@@ -192,15 +197,54 @@ describe('LocalRuntimeOwnershipService', () => {
     service.stop()
   })
 
+  it('keeps an expired browser challenge pending and never persists a claimed identity', async () => {
+    const { service, client, getStored } = fixture()
+    service.setAuthorization(authorization)
+    await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
+    client.pollClaimChallenge.mockResolvedValue({ status: 'EXPIRED' })
+    const open = vi.fn().mockResolvedValue(undefined)
+    await expect(service.claimLocalRuntime(authorization.accountId, open)).rejects.toThrow(
+      'claim_challenge_expired'
+    )
+    expect(open).toHaveBeenCalledExactlyOnceWith('ABCD-EFGH')
+    expect(getStored()?.status).toBe('PENDING_CLAIM')
+    expect(client.claim).not.toHaveBeenCalled()
+    service.stop()
+  })
+
+  it('cancels pending browser polling when the local account signs out', async () => {
+    let started!: () => void
+    const waiting = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const wait = vi.fn(async (_milliseconds: number, signal: AbortSignal) => {
+      started()
+      await new Promise<void>((_resolve, reject) =>
+        signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+      )
+    })
+    const { service, client, getStored } = fixture(wait)
+    service.setAuthorization(authorization)
+    await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
+    const operation = service.claimLocalRuntime(authorization.accountId, async () => undefined)
+    await waiting
+    service.setAuthorization(null)
+    await operation
+    expect(client.pollClaimChallenge).not.toHaveBeenCalled()
+    expect(getStored()?.status).toBe('PENDING_CLAIM')
+    expect(service.getState().accountId).toBeNull()
+    service.stop()
+  })
+
   it('rejects a claim when the active authorization no longer matches the renderer account', async () => {
     const { service, client } = fixture()
     service.setAuthorization(authorization)
     await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
     const stateBeforeClaim = service.getState()
 
-    await expect(service.claimLocalRuntime('323e4567-e89b-42d3-a456-426614174000')).rejects.toThrow(
-      'hive_runtime_cloud_account_changed'
-    )
+    await expect(
+      service.claimLocalRuntime('323e4567-e89b-42d3-a456-426614174000', async () => undefined)
+    ).rejects.toThrow('hive_runtime_cloud_account_changed')
 
     expect(client.register).not.toHaveBeenCalled()
     expect(client.claim).not.toHaveBeenCalled()
@@ -215,23 +259,23 @@ describe('LocalRuntimeOwnershipService', () => {
     const observed = [] as ReturnType<typeof service.getState>[]
     const unsubscribe = service.subscribe((state) => observed.push(state))
     const claimResult = {
+      status: 'APPROVED' as const,
       runtime: {
         runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
         runtimeInstanceId: identity.runtimeInstanceId,
-        ownerAccountId: authorization.accountId,
         status: 'CLAIMED' as const,
         authorityGeneration: 1,
         fencingEpoch: 1,
-        resourceVersion: 2
-      },
-      credentialActivationToken: 'secret'.repeat(8),
-      credentialActivationExpiresAt: 1_900
+        latestLeaseEpoch: 0,
+        resourceVersion: 2,
+        clientAuthMode: 'IDENTITY_PROOF' as const
+      }
     }
     const claim = deferred<typeof claimResult>()
-    client.claim.mockReturnValueOnce(claim.promise)
+    client.pollClaimChallenge.mockReturnValueOnce(claim.promise)
 
-    const pendingClaim = service.claimLocalRuntime(authorization.accountId)
-    await vi.waitFor(() => expect(client.claim).toHaveBeenCalledOnce())
+    const pendingClaim = service.claimLocalRuntime(authorization.accountId, async () => undefined)
+    await vi.waitFor(() => expect(client.pollClaimChallenge).toHaveBeenCalledOnce())
     claim.resolve(claimResult)
     queueMicrotask(() => service.setAuthorization(switchedAuthorization))
 
@@ -251,7 +295,7 @@ describe('LocalRuntimeOwnershipService', () => {
       expect.objectContaining({ accountId: authorization.accountId })
     )
     expect(result.accountId).toBe(switchedAuthorization.accountId)
-    expect(onRegistrationChanged).toHaveBeenCalledOnce()
+    expect(onRegistrationChanged).not.toHaveBeenCalled()
     unsubscribe()
     service.stop()
   })
@@ -266,7 +310,9 @@ describe('LocalRuntimeOwnershipService', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      await expect(service.claimLocalRuntime(authorization.accountId)).resolves.toMatchObject({
+      await expect(
+        service.claimLocalRuntime(authorization.accountId, async () => undefined)
+      ).resolves.toMatchObject({
         relation: 'CLAIMED_BY_CURRENT',
         accountId: authorization.accountId
       })
@@ -348,9 +394,11 @@ describe('LocalRuntimeOwnershipService', () => {
     const { service, client } = fixture()
     service.setAuthorization(authorization)
     await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
-    client.claim.mockRejectedValue(new HiveRuntimeCloudRequestError(404, null))
+    client.createClaimChallenge.mockRejectedValue(new HiveRuntimeCloudRequestError(404, null))
 
-    await expect(service.claimLocalRuntime(authorization.accountId)).rejects.toMatchObject({
+    await expect(
+      service.claimLocalRuntime(authorization.accountId, async () => undefined)
+    ).rejects.toMatchObject({
       status: 404
     })
 
@@ -365,11 +413,13 @@ describe('LocalRuntimeOwnershipService', () => {
     const { service, client } = fixture()
     service.setAuthorization(authorization)
     await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
-    client.claim.mockRejectedValue(
+    client.createClaimChallenge.mockRejectedValue(
       new HiveRuntimeCloudRequestError(403, 'runtime_claim_step_up_required')
     )
 
-    await expect(service.claimLocalRuntime(authorization.accountId)).rejects.toMatchObject({
+    await expect(
+      service.claimLocalRuntime(authorization.accountId, async () => undefined)
+    ).rejects.toMatchObject({
       status: 403
     })
 
@@ -384,9 +434,13 @@ describe('LocalRuntimeOwnershipService', () => {
     const { service, client } = fixture()
     service.setAuthorization(authorization)
     await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
-    client.claim.mockRejectedValue(new HiveRuntimeCloudRequestError(403, 'insufficient_scope'))
+    client.createClaimChallenge.mockRejectedValue(
+      new HiveRuntimeCloudRequestError(403, 'insufficient_scope')
+    )
 
-    await expect(service.claimLocalRuntime(authorization.accountId)).rejects.toMatchObject({
+    await expect(
+      service.claimLocalRuntime(authorization.accountId, async () => undefined)
+    ).rejects.toMatchObject({
       status: 403
     })
 
@@ -412,13 +466,11 @@ describe('LocalRuntimeOwnershipService', () => {
     service.setAuthorization(authorization)
     await vi.waitFor(() => expect(service.getState().relation).toBe('PENDING_CLAIM'))
 
-    await service.claimLocalRuntime(authorization.accountId)
+    await service.claimLocalRuntime(authorization.accountId, async () => undefined)
 
     expect(client.reissueClaimCapability).toHaveBeenCalledOnce()
-    expect(client.claim).toHaveBeenCalledWith(
-      expect.objectContaining({ claimCapability: 'r'.repeat(64), expectedVersion: 2 }),
-      authorization.accessToken,
-      expect.any(String),
+    expect(client.createClaimChallenge).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedAccountId: authorization.accountId, expectedVersion: 2 }),
       expect.any(AbortSignal)
     )
     service.stop()
@@ -442,7 +494,7 @@ describe('LocalRuntimeOwnershipService', () => {
     service.setAuthorization(authorization)
     await vi.waitFor(() => expect(service.getState().relation).toBe('CLAIMED_BY_CURRENT'))
 
-    await service.claimLocalRuntime(authorization.accountId)
+    await service.claimLocalRuntime(authorization.accountId, async () => undefined)
 
     expect(client.reconcileClaim).toHaveBeenCalledWith(
       '723e4567-e89b-42d3-a456-426614174000',

@@ -111,6 +111,34 @@ describe('Hive Runtime Cloud proofs', () => {
     ])
   })
 
+  it('includes the intended account in the signed challenge body', () => {
+    const request = createRuntimeClaimChallengeRequest(
+      identity,
+      {
+        runtimeRecordId: '623e4567-e89b-42d3-a456-426614174000',
+        expectedVersion: 2,
+        expectedAccountId: '223e4567-e89b-42d3-a456-426614174000'
+      },
+      context
+    )
+    const { proof, ...body } = request
+    expect(proof.bodySha256).toBe(createHash('sha256').update(JSON.stringify(body)).digest('hex'))
+    expect(Object.keys(body)).toEqual([
+      'runtimeRecordId',
+      'runtimeInstanceId',
+      'identityPublicKey',
+      'expectedVersion',
+      'expectedAccountId'
+    ])
+    expect(proof.bodySha256).not.toBe(
+      createHash('sha256')
+        .update(
+          JSON.stringify({ ...body, expectedAccountId: '323e4567-e89b-42d3-a456-426614174000' })
+        )
+        .digest('hex')
+    )
+  })
+
   it('omits algorithm from the fixed-order Lease signature JSON', () => {
     const request = createRuntimeLeaseAcquireRequest(
       identity,
