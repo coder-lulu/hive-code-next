@@ -415,6 +415,60 @@ describe('OrcaRuntimeService', () => {
     expect(runtime.resolveTerminalFileUriHostname(terminal.handle)).toBe('remote-host')
   })
 
+  it.each([
+    { providerAvailable: true, reconcileDuringRead: false },
+    { providerAvailable: false, reconcileDuringRead: false },
+    { providerAvailable: true, reconcileDuringRead: true },
+    { providerAvailable: false, reconcileDuringRead: true }
+  ])(
+    'rejects a partial reattached model (provider: $providerAvailable, reconcile during read: $reconcileDuringRead)',
+    async ({ providerAvailable, reconcileDuringRead }) => {
+      const providerSnapshot = {
+        data: 'Codex conversation before restart\r\nWorking',
+        cols: 129,
+        rows: 60,
+        seq: 1000,
+        source: 'headless' as const,
+        alternateScreen: false
+      }
+      const serializeProviderBuffer = vi
+        .fn()
+        .mockResolvedValue(providerAvailable ? providerSnapshot : null)
+      const serializeBuffer = vi.fn().mockResolvedValue({
+        data: 'incomplete renderer',
+        cols: 129,
+        rows: 60
+      })
+      const runtime = createRuntime()
+      const hasRendererSerializer = vi.fn(() => false)
+      runtime.setPtyController({
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null,
+        getSize: () => ({ cols: 129, rows: 60 }),
+        serializeProviderBuffer,
+        serializeBuffer,
+        hasRendererSerializer
+      })
+      syncSinglePty(runtime, 'pty-1')
+      runtime.onPtyData('pty-1', '\x1b[55;3Horking', 100)
+      hasRendererSerializer.mockReturnValue(true)
+      const readSnapshot = () =>
+        runtime.serializeHiddenOutputRecoveryBuffer('pty-1', { scrollbackRows: 5000 })
+      const pendingSnapshot = reconcileDuringRead ? readSnapshot() : null
+      runtime.synchronizePtyOutputSequenceFromProvider('pty-1', {
+        value: 1000,
+        generation: 'continued'
+      })
+
+      const snapshot = await (pendingSnapshot ?? readSnapshot())
+
+      expect(snapshot).toEqual(providerAvailable ? providerSnapshot : null)
+      expect(serializeProviderBuffer).toHaveBeenCalledWith('pty-1', { scrollbackRows: 5000 })
+      expect(serializeBuffer).not.toHaveBeenCalled()
+    }
+  )
+
   it('falls back to the renderer snapshot for hidden-output recovery without headless state', async () => {
     const serializeBuffer = vi.fn().mockResolvedValue({
       data: '\x1b[?1049hRenderer TUI\r\nStill running\r\n',

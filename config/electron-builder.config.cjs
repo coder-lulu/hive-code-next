@@ -210,6 +210,8 @@ module.exports = {
     '!skill-guides{,/**/*}',
     '!skill-stubs{,/**/*}',
     '!tests{,/**/*}',
+    // Custom output directories must not package sibling release artifacts.
+    '!dist{,/**/*}',
     // Why: examples/ is plugin authoring documentation with no runtime consumer —
     // bundled plugins ship via extraResources from resources/plugins/launch/. It also
     // carries hostile-panel, the adversarial fixture the containment tests point at,
@@ -224,6 +226,7 @@ module.exports = {
     '!{.claude,.grok,.agents,.codex}{,/**/*}',
     // Local sessions, credentials and mutable build evidence must never ship.
     '!{.tmp,.omx,.local-dev,output,test-results,playwright-report}{,/**/*}',
+    '!.tmp-*',
     // Why: local clean-build rehearsals may place pnpm's content-addressed store
     // under the repository root. It is never a runtime input and can exceed 2 GiB.
     '!.pnpm-store{,/**/*}',

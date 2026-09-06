@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import { createTabsSliceMockApi } from './tabs-slice-test-harness'
-import { createTestStore, TEST_REPO } from './store-test-helpers'
+import { createTestStore, makeTab, makeWorktree, TEST_REPO } from './store-test-helpers'
 import { getDefaultWorkspaceSession } from '../../../../shared/constants'
+import { collectFolderWorkspaceKeysFromSession } from '../../lib/workspace-session-hydration-keys'
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
-import { applyLatePersistedTerminalSessionSanitization } from '../../app-shell/apply-startup-terminal-sanitization'
 
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 vi.mock('@/lib/agent-status', async (importOriginal) => {
@@ -278,148 +278,68 @@ describe('terminal PTY ownership reconciliation', () => {
     ])
   })
 
-  it('applies a late dead verdict without rolling back a fresh replacement PTY', () => {
-    const tabId = 'terminal-1'
-    const oldPtyId = 'old-pty'
-    const freshPtyId = 'fresh-pty'
-    const original: WorkspaceSessionState = {
-      ...getDefaultWorkspaceSession(),
-      tabsByWorktree: {
-        [WT]: [
-          {
-            id: tabId,
-            ptyId: oldPtyId,
-            worktreeId: WT,
-            title: tabId,
-            customTitle: null,
-            color: null,
-            sortOrder: 0,
-            createdAt: 1
+  it.each(['repo1::/tmp/feature', 'folder:restore-history'])(
+    'retains checkpoint and agent resume identities through hydration and reconnect for %s',
+    async (worktreeId) => {
+      const tabId = 'restored-terminal'
+      const leafId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      const ptyId = `${worktreeId}@@checkpoint`
+      const paneKey = `${tabId}:${leafId}`
+      const session: WorkspaceSessionState = {
+        ...getDefaultWorkspaceSession(),
+        activeWorktreeId: worktreeId,
+        activeTabId: tabId,
+        activeWorktreeIdsOnShutdown: [worktreeId],
+        tabsByWorktree: { [worktreeId]: [makeTab({ id: tabId, worktreeId, ptyId })] },
+        terminalLayoutsByTabId: {
+          [tabId]: {
+            root: { type: 'leaf', leafId },
+            activeLeafId: leafId,
+            expandedLeafId: null,
+            ptyIdsByLeafId: { [leafId]: ptyId }
           }
-        ]
-      },
-      terminalLayoutsByTabId: {
-        [tabId]: {
-          root: { type: 'leaf', leafId: 'leaf-1' },
-          activeLeafId: 'leaf-1',
-          expandedLeafId: null,
-          ptyIdsByLeafId: { 'leaf-1': oldPtyId }
+        },
+        sleepingAgentSessionsByPaneKey: {
+          [paneKey]: {
+            paneKey,
+            tabId,
+            worktreeId,
+            agent: 'codex',
+            providerSession: { key: 'session_id', id: 'retained-provider-session' },
+            prompt: '',
+            state: 'working',
+            capturedAt: 1,
+            updatedAt: 1,
+            origin: 'live'
+          }
         }
       }
-    }
-    const sanitized: WorkspaceSessionState = {
-      ...original,
-      tabsByWorktree: {
-        [WT]: [{ ...original.tabsByWorktree[WT][0], ptyId: null }]
-      },
-      terminalLayoutsByTabId: {
-        [tabId]: { ...original.terminalLayoutsByTabId[tabId], ptyIdsByLeafId: {} }
+      store.setState({
+        repos: [TEST_REPO],
+        worktreesByRepo: worktreeId.startsWith('folder:')
+          ? {}
+          : { repo1: [makeWorktree({ id: worktreeId, repoId: 'repo1' })] }
+      })
+      const options = {
+        additionalValidWorkspaceKeys: collectFolderWorkspaceKeysFromSession(session)
       }
+      store.getState().hydrateWorkspaceSession(session, options)
+      store.getState().hydrateTabsSession(session, options)
+      store.getState().reconcileWorktreeTabModel(worktreeId)
+      await store.getState().reconnectPersistedTerminals()
+
+      const restored = store.getState()
+      expect(restored.tabsByWorktree[worktreeId]).toHaveLength(1)
+      expect(restored.tabsByWorktree[worktreeId][0]?.ptyId).toBe(ptyId)
+      expect(restored.terminalLayoutsByTabId[tabId]?.ptyIdsByLeafId).toEqual({ [leafId]: ptyId })
+      expect(restored.sleepingAgentSessionsByPaneKey[paneKey]?.providerSession.id).toBe(
+        'retained-provider-session'
+      )
+      expect(restored.unifiedTabsByWorktree[worktreeId]?.map((tab) => tab.entityId)).toEqual([
+        tabId
+      ])
     }
-    store.setState({
-      tabsByWorktree: {
-        [WT]: [{ ...original.tabsByWorktree[WT][0], ptyId: freshPtyId }]
-      },
-      ptyIdsByTabId: { [tabId]: [freshPtyId] },
-      pendingReconnectPtyIdByTabId: { [tabId]: oldPtyId },
-      terminalLayoutsByTabId: original.terminalLayoutsByTabId,
-      unifiedTabsByWorktree: {
-        [WT]: [
-          {
-            id: tabId,
-            entityId: tabId,
-            groupId: 'g-terminal',
-            worktreeId: WT,
-            contentType: 'terminal',
-            label: tabId,
-            customLabel: null,
-            color: null,
-            sortOrder: 0,
-            createdAt: 1
-          }
-        ]
-      },
-      groupsByWorktree: {
-        [WT]: [
-          {
-            id: 'g-terminal',
-            worktreeId: WT,
-            activeTabId: tabId,
-            tabOrder: [tabId]
-          }
-        ]
-      },
-      activeGroupIdByWorktree: { [WT]: 'g-terminal' }
-    })
-
-    applyLatePersistedTerminalSessionSanitization(store, original, sanitized)
-
-    const state = store.getState()
-    expect(state.tabsByWorktree[WT][0]?.ptyId).toBe(freshPtyId)
-    expect(state.ptyIdsByTabId[tabId]).toEqual([freshPtyId])
-    expect(state.pendingReconnectPtyIdByTabId[tabId]).toBeUndefined()
-    expect(state.terminalLayoutsByTabId[tabId]?.ptyIdsByLeafId).toEqual({})
-  })
-
-  it('retires a legacy row that was promoted while its dead verdict was pending', () => {
-    const tabId = 'legacy-terminal-1'
-    const deadPtyId = 'dead-pty'
-    const persistedTab = {
-      id: tabId,
-      ptyId: deadPtyId,
-      worktreeId: WT,
-      title: tabId,
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: 1
-    }
-    const original: WorkspaceSessionState = {
-      ...getDefaultWorkspaceSession(),
-      tabsByWorktree: { [WT]: [persistedTab] }
-    }
-    const sanitized: WorkspaceSessionState = {
-      ...original,
-      tabsByWorktree: { [WT]: [{ ...persistedTab, ptyId: null }] }
-    }
-    store.setState({
-      tabsByWorktree: { [WT]: [{ ...persistedTab, ptyId: null }] },
-      pendingReconnectPtyIdByTabId: { [tabId]: deadPtyId },
-      unifiedTabsByWorktree: {
-        [WT]: [
-          {
-            id: tabId,
-            entityId: tabId,
-            groupId: 'g-terminal',
-            worktreeId: WT,
-            contentType: 'terminal',
-            label: tabId,
-            customLabel: null,
-            color: null,
-            sortOrder: 0,
-            createdAt: 1
-          }
-        ]
-      },
-      groupsByWorktree: {
-        [WT]: [
-          {
-            id: 'g-terminal',
-            worktreeId: WT,
-            activeTabId: tabId,
-            tabOrder: [tabId]
-          }
-        ]
-      },
-      activeGroupIdByWorktree: { [WT]: 'g-terminal' }
-    })
-
-    applyLatePersistedTerminalSessionSanitization(store, original, sanitized)
-
-    expect(store.getState().tabsByWorktree[WT]).toEqual([])
-    expect(store.getState().unifiedTabsByWorktree[WT]).toEqual([])
-  })
-
+  )
   it('releases a shared PTY from a surviving split tab', () => {
     const splitTabId = 'split-terminal-1'
     const mirrorTabId = 'web-terminal-split-terminal-1'

@@ -3,8 +3,6 @@ import { syncZoomCSSVar } from '@/lib/ui-zoom'
 import { installCodexDetachedPaneRestartExecutor } from '@/components/terminal-pane/codex-detached-pane-restart-scheduler'
 import { useAppStore } from '../store'
 import { reconcileHydratedWorkspaceTabModels } from './reconcile-hydrated-workspace-tab-models'
-import { startPersistedTerminalSessionSanitization } from './sanitize-persisted-terminal-session'
-import { scheduleLatePersistedTerminalSessionSanitization } from './apply-startup-terminal-sanitization'
 import {
   listRuntimeSessionHostIdsForStartup,
   restoreStartupTerminalSession
@@ -137,17 +135,6 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           )
         )
         const hydrationSessionChain = sessionReadPromise.then(async (sessionRead) => {
-          // Begin PTY validation as soon as the session is available, then
-          // overlap the provider wait with worktree hydration. Base workspace
-          // chrome must not wait up to the provider fail-open deadline.
-          const terminalSanitization = startPersistedTerminalSessionSanitization(
-            sessionRead.session
-          )
-          const terminalSanitizationCompletion = timeRendererStartupStep(
-            'sanitize-persisted-terminal-session',
-            () => terminalSanitization.completion
-          )
-          terminalSanitizationCompletion.catch(() => {})
           const hydrationRepoIds = collectWorktreeHydrationRepoIdsFromSession(
             sessionRead.session,
             sessionRead.runtimeHostIdByWorkspaceSessionKey
@@ -171,15 +158,8 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
               actions.fetchWorktrees(repo.id, { executionHostId: getRepoExecutionHostId(repo) })
             )
           )
-          // Use an already-completed verdict synchronously. Otherwise hydrate
-          // now and retire only matching dead bindings when the probe settles.
-          const sanitizedSession = terminalSanitization.readCompleted()
-          return {
-            ...sessionRead,
-            session: sanitizedSession ?? sessionRead.session,
-            terminalSanitizationOriginalSession: sessionRead.session,
-            pendingTerminalSanitization: sanitizedSession ? null : terminalSanitizationCompletion
-          }
+          // Dead processes may still have daemon checkpoints and agent resume identities.
+          return sessionRead
         })
         // Why: wait for both writers to settle before recovery so neither can mutate hydrated state afterward.
         const [sessionOutcome, catalogOutcome] = await Promise.allSettled([
@@ -219,12 +199,6 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
             // keeps sessions resumable while making the ordinary Home page the launch target.
             actions.openStartupHome()
           })
-          scheduleLatePersistedTerminalSessionSanitization(
-            useAppStore,
-            sessionRead.terminalSanitizationOriginalSession,
-            sessionRead.pendingTerminalSanitization,
-            () => cancelled
-          )
           await timeRendererStartupStep('prepare-terminal-startup-restoration', () =>
             window.api.app.prepareTerminalStartupRestoration()
           )

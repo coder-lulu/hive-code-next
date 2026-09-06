@@ -103,11 +103,11 @@ describe('electron-builder markdown file associations', () => {
 
   // Why: this include was renamed from daemon-host-uninstall.nsh to carry the markdown
   // hooks too. electron-builder allows only one include, so a merge that drops the daemon
-  // sweep would silently orphan a running orca-terminal-daemon.exe on every uninstall.
+  // sweep would silently orphan a running hive-code-terminal-daemon.exe on every uninstall.
   it('keeps the daemon-host uninstall sweep across the include rename', async () => {
     const hooks = await readInstallerHooks()
 
-    expect(hooks).toContain('orca-terminal-daemon.exe')
+    expect(hooks).toContain('hive-code-terminal-daemon.exe')
     expect(hooks).toContain('$LOCALAPPDATA\\Orca\\daemon-host')
     // Without this guard, uninstallOldVersion would kill the daemon on every update —
     // defeating the relocation that keeps terminals alive across updates.

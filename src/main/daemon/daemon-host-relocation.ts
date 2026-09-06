@@ -38,7 +38,7 @@ const MARKER_NAME = '.materialized.json'
 const LOCAL_HOST_ROOT_NAME = 'Orca'
 
 // Copy of Orca.exe renamed to a distinct image name so the NSIS updater's `taskkill /IM Orca.exe` can't match it.
-const DAEMON_HOST_EXE_NAME = 'orca-terminal-daemon.exe'
+const DAEMON_HOST_EXE_NAME = 'hive-code-terminal-daemon.exe'
 
 // V8 snapshots + ICU data the Electron bootstrap reads even under ELECTRON_RUN_AS_NODE; siblings of Orca.exe.
 const RUNTIME_DATA_FILES = ['icudtl.dat', 'snapshot_blob.bin', 'v8_context_snapshot.bin']

@@ -143,7 +143,7 @@ describe('buildDaemonHostManifest', () => {
     const byDest = new Map(ops.map((op) => [op.destRel, op]))
     // The host exe is renamed to a distinct image name (NOT the source basename)
     // so the NSIS updater's name-based `taskkill /IM Orca.exe` can't kill it.
-    expect(byDest.get('orca-terminal-daemon.exe')?.kind).toBe('file')
+    expect(byDest.get('hive-code-terminal-daemon.exe')?.kind).toBe('file')
     expect(byDest.has('Orca.exe')).toBe(false)
     const exeOp = ops.find((op) => op.sourcePath === 'C:\\app\\Orca.exe')
     expect(exeOp?.destRel).not.toBe('Orca.exe')
@@ -170,7 +170,7 @@ describe('materializeRelocatedDaemonHost', () => {
     const result = materializeRelocatedDaemonHost()
     expect(result).not.toBeNull()
     const dest = join(localAppDataDir, 'Orca', 'daemon-host', '9.9.9')
-    expect(result?.execPath).toBe(join(dest, 'orca-terminal-daemon.exe'))
+    expect(result?.execPath).toBe(join(dest, 'hive-code-terminal-daemon.exe'))
     expect(result?.entryPath).toBe(
       join(dest, 'resources', 'app.asar.unpacked', 'out', 'main', 'daemon-entry.js')
     )
@@ -210,7 +210,7 @@ describe('materializeRelocatedDaemonHost', () => {
     const sentinel = join(dest, 'sentinel.txt')
     writeFileSync(sentinel, 'keep')
     const result = materializeRelocatedDaemonHost()
-    expect(result?.execPath).toBe(join(dest, 'orca-terminal-daemon.exe'))
+    expect(result?.execPath).toBe(join(dest, 'hive-code-terminal-daemon.exe'))
     expect(existsSync(sentinel)).toBe(true)
   })
 

@@ -15,6 +15,7 @@ import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { RuntimeResolvedWorktreeCache } from '../runtime/runtime-resolved-worktree-cache'
 import type { ResolvedWorktree } from '../runtime/runtime-worktree-path-identity'
 import { getWorktreeScanMutationRevision } from '../local-worktree-scan-generation'
+import { pendingByPaneKey, rendererSerializerReadiness } from './pty/pane/serializer-state'
 import {
   registerPtyHandlers,
   clearProviderPtyState,
@@ -69,66 +70,97 @@ vi.mock('../codex/codex-state-db-backfill-recovery', () =>
 describe('registerPtyHandlers', () => {
   const { handlers, mainWindow } = setupPtyIpcSuite()
 
-  it('seeds cold restore at recovered dimensions with a legacy dimensionless fallback', async () => {
-    const oscLinks = [{ row: 0, startCol: 0, endCol: 8, uri: 'https://example.com/restored' }]
-    const coldRestore = {
-      scrollback: 'restored history\r\n',
-      cwd: '/projects/restored',
-      cols: 132,
-      rows: 43,
-      oscLinks
+  it.each([
+    { ownership: 'none', withSnapshot: false },
+    { ownership: 'pending', withSnapshot: false },
+    { ownership: 'registered', withSnapshot: false },
+    { ownership: 'pending', withSnapshot: true },
+    { ownership: 'registered', withSnapshot: true }
+  ])(
+    'seeds cold restore with $ownership renderer ownership (snapshot: $withSnapshot)',
+    async ({ ownership, withSnapshot }) => {
+      const tabId = 'cold-restore-tab'
+      const leafId = '55555555-5555-4555-8555-555555555555'
+      const paneKey = makePaneKey(tabId, leafId)
+      const oscLinks = [{ row: 0, startCol: 0, endCol: 8, uri: 'https://example.com/restored' }]
+      const coldRestore = {
+        scrollback: 'restored history\r\n',
+        cwd: '/projects/restored',
+        cols: 132,
+        rows: 43,
+        oscLinks
+      }
+      const spawn = vi
+        .fn()
+        .mockResolvedValueOnce({
+          id: 'pty-cold-restore',
+          coldRestore,
+          isReattach: ownership === 'registered',
+          ...(withSnapshot
+            ? { snapshot: 'full provider history\r\n', snapshotCols: 132, snapshotRows: 43 }
+            : {})
+        })
+        .mockResolvedValueOnce({
+          id: 'pty-legacy-cold-restore',
+          coldRestore: { scrollback: 'legacy history\r\n', cwd: '/projects/legacy' }
+        })
+      setLocalPtyProvider({
+        spawn,
+        write: vi.fn(),
+        resize: vi.fn(),
+        kill: vi.fn(),
+        shutdown: vi.fn(),
+        onData: vi.fn(() => vi.fn()),
+        onExit: vi.fn(() => vi.fn()),
+        listProcesses: vi.fn(async () => []),
+        getForegroundProcess: vi.fn(async () => null)
+      } as never)
+      const runtime = {
+        setPtyController: vi.fn(),
+        noteTerminalSpawnCommand: vi.fn(),
+        seedHeadlessTerminal: vi.fn(),
+        onPtySpawned: vi.fn(),
+        onPtyData: vi.fn(),
+        onPtyExit: vi.fn(),
+        createPreAllocatedTerminalHandle: vi.fn(() => 'handle-cold-restore'),
+        registerPreAllocatedHandleForPty: vi.fn(),
+        preAllocateHandleForPty: vi.fn()
+      }
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      if (ownership === 'pending') {
+        pendingByPaneKey.set(paneKey, { gen: 1, ownerWebContentsId: null })
+      } else if (ownership === 'registered') {
+        rendererSerializerReadiness.markReady('pty-cold-restore')
+      }
+
+      try {
+        await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24, tabId, leafId })
+      } finally {
+        pendingByPaneKey.delete(paneKey)
+        rendererSerializerReadiness.clear('pty-cold-restore')
+      }
+
+      expect(runtime.seedHeadlessTerminal).toHaveBeenNthCalledWith(
+        1,
+        'pty-cold-restore',
+        withSnapshot ? 'full provider history\r\n' : 'restored history\r\n',
+        { cols: 132, rows: 43 },
+        withSnapshot
+          ? { preferProviderIfExisting: true }
+          : { cwd: '/projects/restored', oscLinks, preferProviderIfExisting: true }
+      )
+
+      await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24 })
+
+      expect(runtime.seedHeadlessTerminal).toHaveBeenNthCalledWith(
+        2,
+        'pty-legacy-cold-restore',
+        'legacy history\r\n',
+        undefined,
+        { cwd: '/projects/legacy', oscLinks: undefined, preferProviderIfExisting: true }
+      )
     }
-    const spawn = vi
-      .fn()
-      .mockResolvedValueOnce({ id: 'pty-cold-restore', coldRestore })
-      .mockResolvedValueOnce({
-        id: 'pty-legacy-cold-restore',
-        coldRestore: { scrollback: 'legacy history\r\n', cwd: '/projects/legacy' }
-      })
-    setLocalPtyProvider({
-      spawn,
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      shutdown: vi.fn(),
-      onData: vi.fn(() => vi.fn()),
-      onExit: vi.fn(() => vi.fn()),
-      listProcesses: vi.fn(async () => []),
-      getForegroundProcess: vi.fn(async () => null)
-    } as never)
-    const runtime = {
-      setPtyController: vi.fn(),
-      noteTerminalSpawnCommand: vi.fn(),
-      seedHeadlessTerminal: vi.fn(),
-      onPtySpawned: vi.fn(),
-      onPtyData: vi.fn(),
-      onPtyExit: vi.fn(),
-      createPreAllocatedTerminalHandle: vi.fn(() => 'handle-cold-restore'),
-      registerPreAllocatedHandleForPty: vi.fn(),
-      preAllocateHandleForPty: vi.fn()
-    }
-    registerPtyHandlers(mainWindow as never, runtime as never)
-
-    await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24 })
-
-    expect(runtime.seedHeadlessTerminal).toHaveBeenNthCalledWith(
-      1,
-      'pty-cold-restore',
-      'restored history\r\n',
-      { cols: 132, rows: 43 },
-      { cwd: '/projects/restored', oscLinks, preferProviderIfExisting: true }
-    )
-
-    await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24 })
-
-    expect(runtime.seedHeadlessTerminal).toHaveBeenNthCalledWith(
-      2,
-      'pty-legacy-cold-restore',
-      'legacy history\r\n',
-      undefined,
-      { cwd: '/projects/legacy', oscLinks: undefined, preferProviderIfExisting: true }
-    )
-  })
+  )
   it('seeds the headless emulator from an SSH relay reattach replay', async () => {
     setLocalPtyProvider({
       spawn: vi.fn(async () => ({

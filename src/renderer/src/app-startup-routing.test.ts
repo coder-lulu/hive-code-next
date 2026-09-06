@@ -265,33 +265,14 @@ describe('renderer startup runtime routing', () => {
     expect(postReconnectRecoveryIndex).toBeGreaterThan(reconnectIndex)
   })
 
-  it('overlaps persisted PTY sanitization without blocking terminal model hydration', () => {
+  it('preserves persisted restore identities until the execution host restores terminals', () => {
     const source = readSource(STARTUP_HYDRATION_PATH)
-    const servicesIndex = source.indexOf("timeRendererStartupStep('git-environment-barrier-await'")
-    const sanitizeIndex = source.indexOf("'sanitize-persisted-terminal-session'")
-    const completedReadIndex = source.indexOf(
-      'const sanitizedSession = terminalSanitization.readCompleted()'
-    )
-    const workspaceHydrationIndex = source.indexOf('actions.hydrateWorkspaceSession(')
-    const tabHydrationIndex = source.indexOf('actions.hydrateTabsSession(')
-    const reconciliationIndex = source.indexOf('reconcileHydratedWorkspaceTabModels(')
-    const lateSanitizationIndex = source.indexOf(
-      'scheduleLatePersistedTerminalSessionSanitization(',
-      reconciliationIndex
-    )
-
-    expect(sanitizeIndex).toBeGreaterThanOrEqual(0)
-    expect(sanitizeIndex).toBeLessThan(servicesIndex)
-    expect(completedReadIndex).toBeGreaterThan(servicesIndex)
-    expect(workspaceHydrationIndex).toBeGreaterThan(completedReadIndex)
-    expect(tabHydrationIndex).toBeGreaterThan(workspaceHydrationIndex)
-    expect(reconciliationIndex).toBeGreaterThan(tabHydrationIndex)
-    expect(lateSanitizationIndex).toBeGreaterThan(reconciliationIndex)
-    expect(source).not.toContain(
-      "await timeRendererStartupStep(\n            'sanitize-persisted-terminal-session'"
-    )
+    // A dead process can still have daemon history and an agent resume record.
+    expect(source).not.toContain('startPersistedTerminalSessionSanitization(')
+    expect(source).not.toContain('scheduleLatePersistedTerminalSessionSanitization(')
+    expect(source).toContain('actions.hydrateWorkspaceSession(sessionRead.session,')
+    expect(source).toContain('await restoreStartupTerminalSession(actions, abortController.signal)')
   })
-
   it('refreshes terminal snapshot capability before degraded reconnect', () => {
     const source = readSource(DEGRADED_RECOVERY_PATH)
     const degradedStart = source.indexOf(

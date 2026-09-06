@@ -34,7 +34,7 @@ Four independent evidence clusters, from six incidents:
 | Cluster           | Incidents | Evidence                                                                                                             |
 | ----------------- | --------- | -------------------------------------------------------------------------------------------------------------------- |
 | **Update**        | A, B, C   | `orca-windows-setup.exe` → `old-uninstaller.exe`, `Uninstall Orca.exe` (electron-builder generates these; they are in no repo file) |
-| **Spawn**         | all six   | `Orca.exe` → `orca-terminal-daemon.exe` → `powershell.exe` / `pwsh.exe` / `cmd.exe` / `reg.exe` → `claude.exe`, `gh.exe`, `codex.cmd` |
+| **Spawn**         | all six   | `Orca.exe` → `hive-code-terminal-daemon.exe` → `powershell.exe` / `pwsh.exe` / `cmd.exe` / `reg.exe` → `claude.exe`, `gh.exe`, `codex.cmd` |
 | **Process table** | D         | "suspicious memory activity" — `OpenProcess` plus a PEB read against every process on a repeating cadence            |
 | **Computer use**  | E, F      | `runtime.ps1`, `computer-sidecar.js`, many `operation.json`, a burst of ~10 short-lived `powershell.exe`             |
 
@@ -46,7 +46,7 @@ by powershell.exe."_ Incident F added _"suspicious MSIL code"_, from the
 operation.
 
 In the update cluster the uninstaller is genuinely `NotSigned`, while `Orca.exe`
-and `orca-terminal-daemon.exe` report `Valid CN=SignPath Foundation`.
+and `hive-code-terminal-daemon.exe` report `Valid CN=SignPath Foundation`.
 
 ## The behaviours, and why each one exists
 
@@ -54,7 +54,7 @@ and `orca-terminal-daemon.exe` report `Valid CN=SignPath Foundation`.
 
 `src/main/daemon/daemon-host-relocation.ts` copies the Electron runtime into
 `%LOCALAPPDATA%\Orca\daemon-host\<version>\` and renames `Orca.exe` to
-`orca-terminal-daemon.exe`. The comment on `DAEMON_HOST_EXE_NAME` states the
+`hive-code-terminal-daemon.exe`. The comment on `DAEMON_HOST_EXE_NAME` states the
 reason without varnish: _"so the NSIS updater's `taskkill /IM Orca.exe` can't
 match it."_
 
@@ -231,7 +231,7 @@ obfuscated-command-line detector is tuned on.
 
 ### The spawn tree itself
 
-`Orca.exe` → `orca-terminal-daemon.exe` → a shell → an agent CLI is what a
+`Orca.exe` → `hive-code-terminal-daemon.exe` → a shell → an agent CLI is what a
 terminal multiplexer for coding agents *is*. `reg.exe` appears from
 `src/main/win32-utils.ts`,
 `src/main/agent-hooks/managed-hook-owner-identity.ts` and
@@ -360,7 +360,7 @@ on:
   `Suspicious PowerShell command line`, plus any further titles your tenant
   actually produced. Take the titles from your own incidents rather than from
   this list.
-- **File paths** — `Orca.exe` and `orca-terminal-daemon.exe` under
+- **File paths** — `Orca.exe` and `hive-code-terminal-daemon.exe` under
   `%LOCALAPPDATA%\Programs\orca\` and `%LOCALAPPDATA%\Orca\daemon-host\`.
 
 Scope it as narrowly as your tenant will tolerate, and review it when Orca

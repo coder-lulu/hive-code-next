@@ -68,6 +68,10 @@ export function registerTerminalPresentationIpcBridge(unsubs: (() => void)[]): v
                 tabId !== undefined ? { preferTabId: tabId } : {}
               )
             : { kind: 'none' as const }
+          // Why: competing persisted bindings cannot authorize another recovery tab on restart.
+          if (ownership.kind === 'ambiguous') {
+            throw new Error('terminal_reveal_ambiguous_pty_owner')
+          }
           const existingTab =
             ownership.kind === 'owned'
               ? worktreeTabs.find((candidate) => candidate.id === ownership.tabId)

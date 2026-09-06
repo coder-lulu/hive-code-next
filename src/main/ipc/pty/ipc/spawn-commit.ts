@@ -32,8 +32,12 @@ export async function commitPtyIpcSpawn(ctx: PtyIpcSpawnState): Promise<PtySpawn
     await persistPtyIpcSpawnCommit(ctx)
 
   // Why: seed the headless emulator before registerPty so concurrent live PTY data lands on top of the seed, not replacing it (mobile keeps the daemon-restored scrollback).
-  // Skip when the renderer will be authoritative — its xterm buffer is richer than the daemon snapshot.
-  if (ctx.deps.runtime && !rendererPreSignaled && !rendererAlreadyRegistered) {
+  // A cold renderer has not painted history yet; its serializer promise cannot make a live suffix authoritative.
+  const hasColdRestoreHistory = Boolean(ctx.result.coldRestore?.scrollback)
+  if (
+    ctx.deps.runtime &&
+    (hasColdRestoreHistory || (!rendererPreSignaled && !rendererAlreadyRegistered))
+  ) {
     const snapshotSeedSize =
       typeof ctx.result.snapshotCols === 'number' && typeof ctx.result.snapshotRows === 'number'
         ? { cols: ctx.result.snapshotCols, rows: ctx.result.snapshotRows }
@@ -41,6 +45,7 @@ export async function commitPtyIpcSpawn(ctx: PtyIpcSpawnState): Promise<PtySpawn
     if (typeof ctx.result.snapshot === 'string' && ctx.result.snapshot.length > 0) {
       // Why kitty flags ride seed metadata: the snapshot omits them, but the re-seeded emulator must answer hidden `CSI ? u` with the running app's flags (terminal-query-authority.md).
       ctx.deps.runtime.seedHeadlessTerminal(ctx.result.id, ctx.result.snapshot, snapshotSeedSize, {
+        ...(hasColdRestoreHistory ? { preferProviderIfExisting: true } : {}),
         ...(typeof ctx.result.snapshotKittyKeyboardFlags === 'number'
           ? { kittyKeyboardFlags: ctx.result.snapshotKittyKeyboardFlags }
           : {}),
