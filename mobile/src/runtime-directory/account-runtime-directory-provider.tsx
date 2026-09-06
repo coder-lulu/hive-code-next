@@ -346,7 +346,8 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
     [createCloudProfile, pendingDisplayNames, visibleEntries]
   )
   const listSessions = useCallback(
-    () => withCurrentSession(loadRuntimeSessions),
+    (cursor: string | null = null) =>
+      withCurrentSession((current) => loadRuntimeSessions(current, cursor)),
     [withCurrentSession]
   )
   const revokeSession = useCallback(

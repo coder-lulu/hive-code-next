@@ -1,18 +1,21 @@
 import { z } from 'zod'
+import { randomUUID } from 'expo-crypto'
 import {
   acquireHiveAccountRelayMaterial,
   type HiveAccountRelayMaterial
 } from '../../../src/shared/hive-account-relay-material'
 import { mobileRuntimeRandomBytes } from '../transport/runtime-random'
 import type { MobileSession } from '../auth/mobile-sms-auth'
-import { isRecord, randomToken, request, requestWithMetadata } from '../auth/mobile-sms-client'
+import { isRecord, request, requestWithMetadata } from '../auth/mobile-sms-client'
 import {
   AccountRuntimeDirectoryEntrySchema,
   RuntimePresenceEntrySchema,
   RuntimeSessionSchema,
   type AccountRuntimeDirectoryEntry,
   type RuntimePresenceEntry,
-  type RuntimeSession
+  type RuntimeSession,
+  type RuntimeSessionPage,
+  type RuntimeSessionRevocation
 } from './account-runtime-directory-types'
 
 const PAGE_LIMIT = 100
@@ -122,70 +125,69 @@ export async function createAccountRuntimeConnectionIntent(
   })
 }
 
-export async function loadRuntimeSessions(session: MobileSession): Promise<RuntimeSession[]> {
-  const sessions: RuntimeSession[] = []
-  const ids = new Set<string>()
-  const cursors = new Set<string>()
-  let cursor: string | null = null
-  let pageCount = 0
-  do {
-    pageCount += 1
-    if (pageCount > 100) {
-      throw new Error('runtime_session_page_limit_exceeded')
-    }
-    const path = `/hive/v1/runtime-sessions?limit=100${
-      cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
-    }`
-    const response = await requestWithMetadata<unknown>(path, undefined, {
+export async function loadRuntimeSessions(
+  session: MobileSession,
+  cursor: string | null = null
+): Promise<RuntimeSessionPage> {
+  if (cursor !== null) {
+    parseNextCursor({ nextCursor: cursor })
+  }
+  const query = new URLSearchParams({ limit: '25' })
+  if (cursor) {
+    query.set('cursor', cursor)
+  }
+  const response = await requestWithMetadata<unknown>(
+    `/hive/v1/runtime-sessions?${query}`,
+    undefined,
+    {
       method: 'GET',
       headers: bearerHeaders(session.accessToken)
-    })
-    for (const entry of parseItems(response.value)) {
-      const parsed = RuntimeSessionSchema.parse(entry)
-      if (ids.has(parsed.managedWebSessionId)) {
-        throw new Error('runtime_session_response_duplicate')
-      }
-      ids.add(parsed.managedWebSessionId)
-      sessions.push(parsed)
-      if (sessions.length > 10_000) {
-        throw new Error('runtime_session_response_too_large')
-      }
     }
-    cursor = parseNextCursor(response.value)
-    if (cursor !== null && cursors.has(cursor)) {
-      throw new Error('runtime_session_cursor_loop')
-    }
-    if (cursor !== null) {
-      cursors.add(cursor)
-    }
-  } while (cursor !== null)
-  return sessions
+  )
+  const page = z
+    .object({ items: z.array(RuntimeSessionSchema).max(25), nextCursor: z.string().nullable() })
+    .strict()
+    .parse(response.value)
+  const nextCursor = parseNextCursor(page)
+  if (nextCursor !== null && nextCursor === cursor) {
+    throw new Error('runtime_session_cursor_loop')
+  }
+  if (new Set(page.items.map((item) => item.managedSessionId)).size !== page.items.length) {
+    throw new Error('runtime_session_response_duplicate')
+  }
+  return { items: page.items, nextCursor }
 }
 
 export async function revokeRuntimeSession(
   session: MobileSession,
-  target: Pick<RuntimeSession, 'managedWebSessionId' | 'controlVersion'>
-): Promise<RuntimeSession> {
-  CanonicalUuidSchema.parse(target.managedWebSessionId)
-  if (!Number.isSafeInteger(target.controlVersion) || target.controlVersion < 1) {
-    throw new Error('runtime_session_control_version_invalid')
+  target: Pick<RuntimeSession, 'managedSessionId' | 'resourceVersion'>
+): Promise<RuntimeSessionRevocation> {
+  CanonicalUuidSchema.parse(target.managedSessionId)
+  if (!Number.isSafeInteger(target.resourceVersion) || target.resourceVersion < 1) {
+    throw new Error('runtime_session_resource_version_invalid')
   }
+  const operationId = randomUUID()
   const value = await request<unknown>(
-    `/hive/v1/runtime-sessions/${encodeURIComponent(target.managedWebSessionId)}/revoke`,
+    `/hive/v1/runtime-sessions/${encodeURIComponent(target.managedSessionId)}/revoke`,
     {
-      protocolVersion: 'web-session-revoke/v1',
-      expectedControlVersion: target.controlVersion,
-      reasonCode: 'USER_REQUESTED'
+      protocolVersion: 'account-runtime-session-revoke/v2',
+      operationId,
+      expectedResourceVersion: target.resourceVersion
     },
-    {
-      headers: {
-        ...bearerHeaders(session.accessToken),
-        'Idempotency-Key': randomToken()
-      }
-    }
+    { headers: bearerHeaders(session.accessToken) }
   )
-  const revoked = RuntimeSessionSchema.parse(value)
-  if (revoked.managedWebSessionId !== target.managedWebSessionId) {
+  const revoked = z
+    .object({
+      protocolVersion: z.literal('account-runtime-session-revoke/v2'),
+      operationId: z.literal(operationId),
+      managedSessionId: CanonicalUuidSchema,
+      status: z.enum(['REVOKE_PENDING', 'REVOKED']),
+      resourceVersion: z.number().int().positive(),
+      controlVersion: z.number().int().positive()
+    })
+    .strict()
+    .parse(value)
+  if (revoked.managedSessionId !== target.managedSessionId) {
     throw new Error('runtime_session_revoke_target_mismatch')
   }
   return revoked

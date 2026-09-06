@@ -17,7 +17,8 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock('expo-crypto', () => ({
-  getRandomBytes: (length: number) => new Uint8Array(length).fill(7)
+  getRandomBytes: (length: number) => new Uint8Array(length).fill(7),
+  randomUUID: () => '55555555-5555-4555-8555-555555555555'
 }))
 vi.mock('../auth/mobile-sms-client', () => api)
 
@@ -32,11 +33,12 @@ import {
 
 const session = { accessToken: 'account-token' } as MobileSession
 const runtimeRecordId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-const managedWebSessionId = '11111111-1111-4111-8111-111111111111'
+const managedSessionId = '11111111-1111-4111-8111-111111111111'
 
-function runtimeSession(id = managedWebSessionId) {
+function runtimeSession(id = managedSessionId) {
   return {
-    managedWebSessionId: id,
+    managedSessionId: id,
+    backendAuthorityId: 'authority',
     runtimeRecordId,
     runtimeInstanceId: '22222222-2222-4222-8222-222222222222',
     runtimeSessionId: '33333333-3333-4333-8333-333333333333',
@@ -52,6 +54,17 @@ function runtimeSession(id = managedWebSessionId) {
   }
 }
 
+function revocation() {
+  return {
+    protocolVersion: 'account-runtime-session-revoke/v2',
+    operationId: '55555555-5555-4555-8555-555555555555',
+    managedSessionId,
+    status: 'REVOKE_PENDING',
+    resourceVersion: 3,
+    controlVersion: 4
+  }
+}
+
 describe('account Runtime cloud operations', () => {
   afterEach(() => vi.unstubAllGlobals())
   beforeEach(() => {
@@ -62,13 +75,13 @@ describe('account Runtime cloud operations', () => {
   it('requests current MOBILE material without sending the ticket secret', async () => {
     api.request.mockResolvedValue({
       protocolVersion: 2,
-      intentId: managedWebSessionId,
+      intentId: managedSessionId,
       ticketId: runtimeRecordId,
       expiresAt: Date.now() + 30_000,
       cellUrl: 'https://relay.hive.test',
       cellId: 'cell-1',
-      cellIncarnationId: managedWebSessionId,
-      assignmentId: managedWebSessionId,
+      cellIncarnationId: managedSessionId,
+      assignmentId: managedSessionId,
       assignmentEpoch: 1,
       relayHostId: 'AbCdEf0123_-xyZ9',
       clientAdmissionToken: `header.payload.${'a'.repeat(86)}`,
@@ -110,14 +123,16 @@ describe('account Runtime cloud operations', () => {
   it('lists and revokes MOBILE sessions through the unified endpoints', async () => {
     const runtimeSessionValue = runtimeSession()
     api.requestWithMetadata.mockResolvedValue({
-      value: { items: [runtimeSessionValue] },
+      value: { items: [runtimeSessionValue], nextCursor: null },
       headers: new Headers()
     })
-    api.request.mockResolvedValue({ ...runtimeSessionValue, status: 'REVOKE_PENDING' })
+    api.request.mockResolvedValue(revocation())
 
-    const [listed] = await loadRuntimeSessions(session)
+    const {
+      items: [listed]
+    } = await loadRuntimeSessions(session)
     expect(listed).toMatchObject({
-      managedWebSessionId: '11111111-1111-4111-8111-111111111111',
+      managedSessionId: '11111111-1111-4111-8111-111111111111',
       clientKind: 'MOBILE'
     })
     await expect(revokeRuntimeSession(session, listed!)).resolves.toMatchObject({
@@ -126,9 +141,9 @@ describe('account Runtime cloud operations', () => {
     expect(api.request).toHaveBeenLastCalledWith(
       '/hive/v1/runtime-sessions/11111111-1111-4111-8111-111111111111/revoke',
       {
-        protocolVersion: 'web-session-revoke/v1',
-        expectedControlVersion: 3,
-        reasonCode: 'USER_REQUESTED'
+        protocolVersion: 'account-runtime-session-revoke/v2',
+        expectedResourceVersion: 2,
+        operationId: '55555555-5555-4555-8555-555555555555'
       },
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer account-token' })
@@ -136,19 +151,42 @@ describe('account Runtime cloud operations', () => {
     )
   })
 
-  it('bounds session pagination even when every cursor is unique', async () => {
-    api.requestWithMetadata.mockImplementation(async () => ({
-      value: {
-        items: [],
-        nextCursor: `cursor-${api.requestWithMetadata.mock.calls.length}`
-      },
+  it('fetches only one bounded page and preserves its cursor', async () => {
+    api.requestWithMetadata.mockResolvedValue({
+      value: { items: [], nextCursor: 'next-page' },
       headers: new Headers()
-    }))
-
-    await expect(loadRuntimeSessions(session)).rejects.toThrow(
-      'runtime_session_page_limit_exceeded'
+    })
+    await expect(loadRuntimeSessions(session)).resolves.toEqual({
+      items: [],
+      nextCursor: 'next-page'
+    })
+    expect(api.requestWithMetadata).toHaveBeenCalledExactlyOnceWith(
+      '/hive/v1/runtime-sessions?limit=25',
+      undefined,
+      expect.any(Object)
     )
-    expect(api.requestWithMetadata).toHaveBeenCalledTimes(100)
+    await loadRuntimeSessions(session, 'page-two')
+    expect(api.requestWithMetadata).toHaveBeenLastCalledWith(
+      '/hive/v1/runtime-sessions?limit=25&cursor=page-two',
+      undefined,
+      expect.any(Object)
+    )
+  })
+
+  it('rejects oversized pages, duplicate ids and invalid cursors', async () => {
+    api.requestWithMetadata.mockResolvedValue({
+      value: { items: Array(26).fill(runtimeSession()), nextCursor: null },
+      headers: new Headers()
+    })
+    await expect(loadRuntimeSessions(session)).rejects.toThrow()
+    api.requestWithMetadata.mockResolvedValue({
+      value: { items: [runtimeSession(), runtimeSession()], nextCursor: null },
+      headers: new Headers()
+    })
+    await expect(loadRuntimeSessions(session)).rejects.toThrow('runtime_session_response_duplicate')
+    api.requestWithMetadata.mockClear()
+    await expect(loadRuntimeSessions(session, 'bad cursor')).rejects.toThrow()
+    expect(api.requestWithMetadata).not.toHaveBeenCalled()
   })
 
   it('rejects an oversized directory cursor before issuing another request', async () => {
@@ -165,7 +203,10 @@ describe('account Runtime cloud operations', () => {
 
   it('rejects a revoke response for a different managed session id', async () => {
     const target = runtimeSession()
-    api.request.mockResolvedValue(runtimeSession('44444444-4444-4444-8444-444444444444'))
+    api.request.mockResolvedValue({
+      ...revocation(),
+      managedSessionId: '44444444-4444-4444-8444-444444444444'
+    })
 
     await expect(revokeRuntimeSession(session, target)).rejects.toThrow(
       'runtime_session_revoke_target_mismatch'
@@ -175,8 +216,8 @@ describe('account Runtime cloud operations', () => {
   it('rejects a malformed revoke target before sending an account request', async () => {
     await expect(
       revokeRuntimeSession(session, {
-        managedWebSessionId: '../other-session',
-        controlVersion: 1
+        managedSessionId: '../other-session',
+        resourceVersion: 1
       })
     ).rejects.toThrow()
     expect(api.request).not.toHaveBeenCalled()

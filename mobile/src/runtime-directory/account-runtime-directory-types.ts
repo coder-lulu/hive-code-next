@@ -110,13 +110,22 @@ export type RuntimePresenceEntry = z.infer<typeof RuntimePresenceEntrySchema>
 
 export const RuntimeSessionSchema = z
   .object({
-    managedWebSessionId: CanonicalUuidSchema,
+    managedSessionId: CanonicalUuidSchema,
+    backendAuthorityId: z.string().regex(/^[a-zA-Z0-9._-]{1,128}$/),
     runtimeRecordId: CanonicalUuidSchema,
     runtimeInstanceId: CanonicalUuidSchema,
     runtimeSessionId: CanonicalUuidSchema,
     clientKind: z.enum(['WEB', 'DESKTOP', 'MOBILE']),
     clientLabel: z.string().min(1).max(128).nullable(),
-    status: z.enum(['ACTIVE', 'REVOKE_PENDING', 'REVOKED', 'EXPIRED', 'UNVERIFIABLE']),
+    status: z.enum([
+      'PENDING_ACTIVATION',
+      'ACTIVE',
+      'CLOSED',
+      'REVOKE_PENDING',
+      'REVOKED',
+      'EXPIRED',
+      'UNVERIFIABLE'
+    ]),
     resourceVersion: z.number().int().positive(),
     controlVersion: z.number().int().positive(),
     createdAt: InstantSchema,
@@ -131,3 +140,12 @@ export const RuntimeSessionSchema = z
   )
 
 export type RuntimeSession = z.infer<typeof RuntimeSessionSchema>
+
+export type RuntimeSessionPage = {
+  readonly items: RuntimeSession[]
+  readonly nextCursor: string | null
+}
+export type RuntimeSessionRevocation = Pick<
+  RuntimeSession,
+  'managedSessionId' | 'status' | 'resourceVersion' | 'controlVersion'
+>

@@ -3,7 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RuntimeSessionsScreen from '../../app/runtime-sessions'
 import type { MobileSession } from '../auth/mobile-sms-auth'
-import type { RuntimeSession } from './account-runtime-directory-types'
+import type { RuntimeSession, RuntimeSessionPage } from './account-runtime-directory-types'
 
 const dependencies = vi.hoisted(() => ({
   accountSession: null as MobileSession | null,
@@ -59,7 +59,8 @@ function account(accountId: string): MobileSession {
 
 function runtimeSession(label: string, id: string): RuntimeSession {
   return {
-    managedWebSessionId: id,
+    managedSessionId: id,
+    backendAuthorityId: 'authority',
     runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     runtimeInstanceId: '22222222-2222-4222-8222-222222222222',
     runtimeSessionId: '33333333-3333-4333-8333-333333333333',
@@ -116,8 +117,10 @@ describe('Runtime sessions account isolation', () => {
   it('hides already-loaded account A rows immediately after switching to B', async () => {
     const a = runtimeSession('A Phone', '11111111-1111-4111-8111-111111111111')
     const b = runtimeSession('B Phone', '44444444-4444-4444-8444-444444444444')
-    const bList = deferred<RuntimeSession[]>()
-    dependencies.listSessions.mockResolvedValueOnce([a]).mockReturnValueOnce(bList.promise)
+    const bList = deferred<RuntimeSessionPage>()
+    dependencies.listSessions
+      .mockResolvedValueOnce({ items: [a], nextCursor: null })
+      .mockReturnValueOnce(bList.promise)
     renderer = await renderScreen()
     await vi.waitFor(() => expect(row(renderer!, '手机 · A Phone')).toBeDefined())
 
@@ -129,7 +132,7 @@ describe('Runtime sessions account isolation', () => {
     expect(row(renderer, '手机 · A Phone')).toBeUndefined()
 
     await act(async () => {
-      bList.resolve([b])
+      bList.resolve({ items: [b], nextCursor: null })
       await bList.promise
     })
     expect(row(renderer, '手机 · B Phone')).toBeDefined()
@@ -139,8 +142,8 @@ describe('Runtime sessions account isolation', () => {
   it('fences an account A list response that arrives after switching to B', async () => {
     const a = runtimeSession('A Phone', '11111111-1111-4111-8111-111111111111')
     const b = runtimeSession('B Phone', '44444444-4444-4444-8444-444444444444')
-    const aList = deferred<RuntimeSession[]>()
-    const bList = deferred<RuntimeSession[]>()
+    const aList = deferred<RuntimeSessionPage>()
+    const bList = deferred<RuntimeSessionPage>()
     dependencies.listSessions.mockReturnValueOnce(aList.promise).mockReturnValueOnce(bList.promise)
     renderer = await renderScreen()
 
@@ -150,13 +153,13 @@ describe('Runtime sessions account isolation', () => {
       await Promise.resolve()
     })
     await act(async () => {
-      aList.resolve([a])
+      aList.resolve({ items: [a], nextCursor: null })
       await aList.promise
     })
     expect(row(renderer, '手机 · A Phone')).toBeUndefined()
 
     await act(async () => {
-      bList.resolve([b])
+      bList.resolve({ items: [b], nextCursor: null })
       await bList.promise
     })
     expect(row(renderer, '手机 · B Phone')).toBeDefined()
@@ -166,7 +169,9 @@ describe('Runtime sessions account isolation', () => {
     const a = runtimeSession('A Phone', '11111111-1111-4111-8111-111111111111')
     const b = runtimeSession('B Phone', '44444444-4444-4444-8444-444444444444')
     const revokeA = deferred<RuntimeSession>()
-    dependencies.listSessions.mockResolvedValueOnce([a]).mockResolvedValueOnce([b])
+    dependencies.listSessions
+      .mockResolvedValueOnce({ items: [a], nextCursor: null })
+      .mockResolvedValueOnce({ items: [b], nextCursor: null })
     dependencies.revokeSession.mockReturnValueOnce(revokeA.promise)
     renderer = await renderScreen()
     await vi.waitFor(() => expect(row(renderer!, '手机 · A Phone')).toBeDefined())
@@ -192,21 +197,39 @@ describe('Runtime sessions account isolation', () => {
     expect(dependencies.alert).toHaveBeenCalledTimes(1)
   })
 
-  it('renders large session directories in bounded batches', async () => {
-    const sessions = Array.from({ length: 101 }, (_, index) =>
-      runtimeSession(`Phone ${index}`, `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`)
-    )
-    dependencies.listSessions.mockResolvedValueOnce(sessions)
+  it('fetches pages only on navigation and replaces the previous page', async () => {
+    const first = runtimeSession('First', '11111111-1111-4111-8111-111111111111')
+    const second = runtimeSession('Second', '44444444-4444-4444-8444-444444444444')
+    dependencies.listSessions
+      .mockResolvedValueOnce({ items: [first], nextCursor: 'second' })
+      .mockResolvedValueOnce({ items: [second], nextCursor: null })
+      .mockResolvedValueOnce({ items: [first], nextCursor: 'second' })
     renderer = await renderScreen()
-    await vi.waitFor(() =>
-      expect(renderer!.root.findAllByType('FutureFeatureRow')).toHaveLength(100)
-    )
-    const showMore = renderer.root
-      .findAllByType('FutureFeatureAction')
-      .find((action) => String(action.props.label).startsWith('显示更多会话'))
+    expect(dependencies.listSessions).toHaveBeenCalledExactlyOnceWith(null)
+    const action = (label: string) =>
+      renderer!.root
+        .findAllByType('FutureFeatureAction')
+        .find((item) => item.props.label === label)!
+    expect(action('上一页').props.disabled).toBe(true)
+    await act(async () => action('下一页').props.onPress())
+    expect(dependencies.listSessions).toHaveBeenLastCalledWith('second')
+    expect(row(renderer, '手机 · First')).toBeUndefined()
+    expect(row(renderer, '手机 · Second')).toBeDefined()
+    expect(action('下一页').props.disabled).toBe(true)
+    await act(async () => action('上一页').props.onPress())
+    expect(dependencies.listSessions).toHaveBeenLastCalledWith(null)
+    expect(row(renderer, '手机 · First')).toBeDefined()
+  })
 
-    act(() => showMore!.props.onPress())
-
-    expect(renderer.root.findAllByType('FutureFeatureRow')).toHaveLength(101)
+  it('shows terminal connection failures without a revoke action', async () => {
+    const ended = {
+      ...runtimeSession('Ended', '11111111-1111-4111-8111-111111111111'),
+      status: 'UNVERIFIABLE'
+    }
+    dependencies.listSessions.mockResolvedValueOnce({ items: [ended], nextCursor: null })
+    renderer = await renderScreen()
+    expect(row(renderer, '手机 · Ended')!.props.value).toBe('连接已失效')
+    expect(row(renderer, '手机 · Ended')!.props.disabled).toBe(true)
+    expect(row(renderer, '手机 · Ended')!.props.onPress).toBeUndefined()
   })
 })

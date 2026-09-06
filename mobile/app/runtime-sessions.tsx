@@ -13,11 +13,13 @@ import { useAccountRuntimeDirectory } from '../src/runtime-directory/account-run
 import type { RuntimeSession } from '../src/runtime-directory/account-runtime-directory-types'
 
 const STATUS_LABELS: Record<RuntimeSession['status'], string> = {
+  PENDING_ACTIVATION: '等待激活',
   ACTIVE: '在线',
+  CLOSED: '已结束',
   REVOKE_PENDING: '正在撤销',
   REVOKED: '已撤销',
   EXPIRED: '已过期',
-  UNVERIFIABLE: '状态待确认'
+  UNVERIFIABLE: '连接已失效'
 }
 
 const CLIENT_LABELS: Record<RuntimeSession['clientKind'], string> = {
@@ -26,11 +28,11 @@ const CLIENT_LABELS: Record<RuntimeSession['clientKind'], string> = {
   MOBILE: '手机'
 }
 
-const SESSION_RENDER_BATCH_SIZE = 100
-
 type ScopedSessions = {
   readonly scopeKey: string
   readonly items: RuntimeSession[]
+  readonly cursors: (string | null)[]
+  readonly nextCursor: string | null
 }
 
 type ScopedError = { readonly scopeKey: string; readonly message: string }
@@ -54,53 +56,52 @@ export default function RuntimeSessionsScreen() {
   const [loadingScope, setLoadingScope] = useState<string | null>(null)
   const [scopedError, setScopedError] = useState<ScopedError | null>(null)
   const [revokeOperation, setRevokeOperation] = useState<RevokeOperation | null>(null)
-  const [renderLimit, setRenderLimit] = useState<{ scopeKey: string; count: number } | null>(null)
   const sessions = loaded?.scopeKey === scopeKey ? loaded.items : []
   const loading = loadingScope === scopeKey
   const error = scopedError?.scopeKey === scopeKey ? scopedError.message : null
   const revokingId = revokeOperation?.scopeKey === scopeKey ? revokeOperation.id : null
-  const visibleLimit =
-    renderLimit?.scopeKey === scopeKey ? renderLimit.count : SESSION_RENDER_BATCH_SIZE
-  const visibleSessions = sessions.slice(0, visibleLimit)
+  const page = loaded?.scopeKey === scopeKey ? loaded : null
 
-  const refresh = useCallback(async () => {
-    const generation = ++generationRef.current
-    const requestedScope = scopeKey
-    if (!requestedScope) {
-      setLoaded(null)
-      setScopedError(null)
-      setLoadingScope(null)
-      return
-    }
-    setLoadingScope(requestedScope)
-    setScopedError((current) => (current?.scopeKey === requestedScope ? null : current))
-    try {
-      const next = await listSessions()
-      if (generation === generationRef.current && scopeRef.current === requestedScope) {
-        setLoaded({ scopeKey: requestedScope, items: next })
-        setRenderLimit({ scopeKey: requestedScope, count: SESSION_RENDER_BATCH_SIZE })
-      }
-    } catch {
-      if (generation === generationRef.current && scopeRef.current === requestedScope) {
-        setScopedError({
-          scopeKey: requestedScope,
-          message: '无法读取 Runtime 会话，请稍后重试。'
-        })
-      }
-    } finally {
-      if (generation === generationRef.current && scopeRef.current === requestedScope) {
+  const loadPage = useCallback(
+    async (cursors: (string | null)[] = [null]) => {
+      const generation = ++generationRef.current
+      const requestedScope = scopeKey
+      if (!requestedScope) {
+        setLoaded(null)
+        setScopedError(null)
         setLoadingScope(null)
+        return
       }
-    }
-  }, [listSessions, scopeKey])
+      setLoadingScope(requestedScope)
+      setScopedError((current) => (current?.scopeKey === requestedScope ? null : current))
+      try {
+        const next = await listSessions(cursors.at(-1) ?? null)
+        if (generation === generationRef.current && scopeRef.current === requestedScope) {
+          setLoaded({ scopeKey: requestedScope, ...next, cursors })
+        }
+      } catch {
+        if (generation === generationRef.current && scopeRef.current === requestedScope) {
+          setScopedError({
+            scopeKey: requestedScope,
+            message: '无法读取 Runtime 会话，请稍后重试。'
+          })
+        }
+      } finally {
+        if (generation === generationRef.current && scopeRef.current === requestedScope) {
+          setLoadingScope(null)
+        }
+      }
+    },
+    [listSessions, scopeKey]
+  )
 
   useFocusEffect(
     useCallback(() => {
-      void refresh()
+      void loadPage()
       return () => {
         generationRef.current += 1
       }
-    }, [refresh])
+    }, [loadPage])
   )
 
   const revoke = useCallback(
@@ -109,7 +110,7 @@ export default function RuntimeSessionsScreen() {
         return
       }
       const operationId = ++revokeOperationRef.current
-      setRevokeOperation({ operationId, scopeKey: requestedScope, id: target.managedWebSessionId })
+      setRevokeOperation({ operationId, scopeKey: requestedScope, id: target.managedSessionId })
       try {
         const updated = await revokeSession(target)
         if (scopeRef.current === requestedScope) {
@@ -118,7 +119,9 @@ export default function RuntimeSessionsScreen() {
               ? {
                   ...current,
                   items: current.items.map((item) =>
-                    item.managedWebSessionId === updated.managedWebSessionId ? updated : item
+                    item.managedSessionId === updated.managedSessionId
+                      ? { ...item, ...updated }
+                      : item
                   )
                 }
               : current
@@ -180,8 +183,11 @@ export default function RuntimeSessionsScreen() {
         ) : sessions.length === 0 ? (
           <FutureFeatureRow label="Runtime 会话" value="暂无会话" />
         ) : (
-          visibleSessions.map((item) => {
-            const canRevoke = item.status === 'ACTIVE' && revokingId === null
+          sessions.map((item) => {
+            const canRevoke =
+              (item.status === 'ACTIVE' || item.status === 'PENDING_ACTIVATION') &&
+              revokingId === null &&
+              !loading
             const client = CLIENT_LABELS[item.clientKind]
             const label = item.clientLabel ? `${client} · ${item.clientLabel}` : client
             const detail = `Runtime ${item.runtimeRecordId.slice(0, 8)} · ${new Date(item.createdAt).toLocaleString()}`
@@ -190,10 +196,10 @@ export default function RuntimeSessionsScreen() {
                 destructive={canRevoke}
                 detail={detail}
                 disabled={!canRevoke}
-                key={item.managedWebSessionId}
+                key={item.managedSessionId}
                 label={label}
                 value={
-                  revokingId === item.managedWebSessionId ? '正在撤销' : STATUS_LABELS[item.status]
+                  revokingId === item.managedSessionId ? '正在撤销' : STATUS_LABELS[item.status]
                 }
                 onPress={canRevoke ? () => confirmRevoke(item) : undefined}
               />
@@ -202,26 +208,33 @@ export default function RuntimeSessionsScreen() {
         )}
       </FutureFeatureSection>
 
-      {sessions.length > visibleSessions.length ? (
-        <FutureFeatureAction
-          disabled={false}
-          label={`显示更多会话（剩余 ${sessions.length - visibleSessions.length}）`}
-          onPress={() => {
-            if (scopeKey) {
-              setRenderLimit({
-                scopeKey,
-                count: visibleLimit + SESSION_RENDER_BATCH_SIZE
-              })
-            }
-          }}
-        />
+      {signedIn && page ? (
+        <>
+          <FutureFeatureNotice title={`第 ${page.cursors.length} 页 · 本页 ${sessions.length} 条`}>
+            每页最多 25 条。重连会产生独立的访问记录，已结束的记录仍可查看。
+          </FutureFeatureNotice>
+          <FutureFeatureAction
+            disabled={loading || revokingId !== null || page.cursors.length <= 1}
+            label="上一页"
+            onPress={() => void loadPage(page.cursors.slice(0, -1))}
+          />
+          <FutureFeatureAction
+            disabled={loading || revokingId !== null || !page.nextCursor}
+            label="下一页"
+            onPress={() => {
+              if (page.nextCursor) {
+                void loadPage([...page.cursors, page.nextCursor])
+              }
+            }}
+          />
+        </>
       ) : null}
 
       <FutureFeatureAction
         disabled={!signedIn || loading || revokingId !== null}
         label="刷新会话"
         loading={loading}
-        onPress={refresh}
+        onPress={() => void loadPage(page?.cursors ?? [null])}
       />
     </FutureFeatureScreen>
   )
