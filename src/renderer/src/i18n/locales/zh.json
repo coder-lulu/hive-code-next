@@ -9557,7 +9557,7 @@
           "statusRevokePending": "正在结束",
           "statusRevoked": "已结束",
           "statusExpired": "已过期",
-          "statusUnverifiable": "未验证",
+          "statusUnverifiable": "连接已失效",
           "sectionTitle": "设备与会话",
           "currentDeviceTab": "登录设备",
           "runtimeAccessTab": "Runtime 访问会话",
@@ -9571,7 +9571,10 @@
           "emptyTitle": "暂无跨端访问会话",
           "emptyDescription": "当你通过 HiveCode Mobile、网页端或其他桌面端连接此 Runtime 后，会话将显示在这里。",
           "learnHowToConnect": "了解如何连接",
-          "authorizedOnly": "仅显示当前账号授权访问的连接。"
+          "authorizedOnly": "这里是当前账号的 Runtime 访问连接记录，不是聊天会话；重连及独立通道会产生不同记录。",
+          "pageSummary": "第 {{page}} 页 · 本页 {{count}} 条",
+          "previousPage": "上一页",
+          "nextPage": "下一页"
         },
         "automations": {
           "showButton": "显示“自动化”按钮",

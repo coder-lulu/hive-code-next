@@ -12,13 +12,16 @@ export type HiveAccountPlatformInfo = {
   arch: string
 }
 
-export function formatAccountAuthorization(value: number | undefined): string {
+export function formatAccountAuthorization(
+  value: number | undefined,
+  timeStyle: 'short' | 'medium' = 'short'
+): string {
   if (!value) {
     return translate('auto.components.settings.orcaAccount.notAvailable', 'Not available')
   }
   return new Intl.DateTimeFormat(getIntlLocale(), {
     dateStyle: 'medium',
-    timeStyle: 'short'
+    timeStyle
   }).format(new Date(value))
 }
 
@@ -77,6 +80,9 @@ export function sessionStatusLabel(status: HiveRuntimeSession['status']): string
     case 'EXPIRED':
       return translate('auto.components.settings.runtimeSessions.statusExpired', 'Expired')
     case 'UNVERIFIABLE':
-      return translate('auto.components.settings.runtimeSessions.statusUnverifiable', 'Unverified')
+      return translate(
+        'auto.components.settings.runtimeSessions.statusUnverifiable',
+        'Connection expired'
+      )
   }
 }

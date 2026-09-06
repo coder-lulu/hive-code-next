@@ -2434,7 +2434,12 @@
           "statusPendingActivation": "Waiting for activation",
           "statusRevokePending": "Revocation pending",
           "statusRevoked": "Revoked",
-          "title": "Runtime sessions"
+          "title": "Runtime sessions",
+          "pageSummary": "Page {{page}} · {{count}} sessions on this page",
+          "previousPage": "Previous",
+          "nextPage": "Next",
+          "statusUnverifiable": "Connection expired",
+          "authorizedOnly": "Runtime access connection history for this account, not chat sessions. Reconnects and separate channels create separate records."
         },
         "settingOwnership": {
           "clientDefaultProjectScopes": "Client default + project scopes",

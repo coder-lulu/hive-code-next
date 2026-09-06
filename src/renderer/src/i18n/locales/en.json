@@ -11765,7 +11765,7 @@
           "statusRevokePending": "Revocation pending",
           "statusRevoked": "Revoked",
           "statusExpired": "Expired",
-          "statusUnverifiable": "Unverified",
+          "statusUnverifiable": "Connection expired",
           "sectionTitle": "Devices & sessions",
           "currentDeviceTab": "Sign-in devices",
           "runtimeAccessTab": "Runtime access sessions",
@@ -11779,8 +11779,11 @@
           "emptyTitle": "No cross-device access sessions",
           "emptyDescription": "Sessions appear here after HiveCode Mobile, Web, or another desktop connects to this Runtime.",
           "learnHowToConnect": "Learn how to connect",
-          "authorizedOnly": "Only connections authorized by the current account are shown.",
-          "runtimeLabel": "Runtime"
+          "authorizedOnly": "Runtime access connection history for this account, not chat sessions. Reconnects and separate channels create separate records.",
+          "runtimeLabel": "Runtime",
+          "pageSummary": "Page {{page}} · {{count}} sessions on this page",
+          "previousPage": "Previous",
+          "nextPage": "Next"
         },
         "automations": {
           "showButton": "Show Automations Button",

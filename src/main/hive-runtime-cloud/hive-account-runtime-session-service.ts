@@ -1,15 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type {
-  HiveRuntimeSession,
+  HiveRuntimeSessionPage,
   HiveRuntimeSessionRevocation
 } from '../../shared/hive-runtime-cloud'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import { HiveRuntimeCloudClient } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudConfig } from './hive-runtime-cloud-config'
 
-const PAGE_SIZE = 100
-const MAXIMUM_SESSIONS = 10_000
-const MAXIMUM_SESSION_PAGES = Math.ceil(MAXIMUM_SESSIONS / PAGE_SIZE)
+const PAGE_SIZE = 25
 
 type SessionClient = Pick<HiveRuntimeCloudClient, 'listRuntimeSessions' | 'revokeRuntimeSession'>
 
@@ -36,7 +34,7 @@ export class HiveAccountRuntimeSessionService {
   private readonly client: SessionClient | null
   private readonly controllers = new Set<AbortController>()
   private authorization: HiveRuntimeCloudAuthorization | null = null
-  private listInFlight: Promise<readonly HiveRuntimeSession[]> | null = null
+  private readonly listsInFlight = new Map<string | null, Promise<HiveRuntimeSessionPage>>()
   private stopped = false
 
   constructor(
@@ -57,58 +55,43 @@ export class HiveAccountRuntimeSessionService {
         : null
   }
 
-  list(): Promise<readonly HiveRuntimeSession[]> {
-    if (this.listInFlight) {
-      return this.listInFlight
+  list(cursor: string | null = null): Promise<HiveRuntimeSessionPage> {
+    if (cursor !== null && (typeof cursor !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(cursor))) {
+      return Promise.reject(new Error('Invalid Runtime session cursor'))
     }
-    const pending = this.loadSessions()
-    this.listInFlight = pending
+    const existing = this.listsInFlight.get(cursor)
+    if (existing) {
+      return existing
+    }
+    const pending = this.loadPage(cursor)
+    this.listsInFlight.set(cursor, pending)
     void pending.then(
-      () => this.finishList(pending),
-      () => this.finishList(pending)
+      () => this.finishList(cursor, pending),
+      () => this.finishList(cursor, pending)
     )
     return pending
   }
 
-  private async loadSessions(): Promise<readonly HiveRuntimeSession[]> {
+  private async loadPage(cursor: string | null): Promise<HiveRuntimeSessionPage> {
     const { authorization, client, controller } = this.startOperation()
     try {
-      const items: HiveRuntimeSession[] = []
-      const ids = new Set<string>()
-      const cursors = new Set<string>()
-      let cursor: string | null = null
-      let pageCount = 0
-      do {
-        pageCount += 1
-        if (pageCount > MAXIMUM_SESSION_PAGES) {
-          throw new Error('hive_account_runtime_session_page_limit')
-        }
-        const page = await client.listRuntimeSessions(
-          authorization.accessToken,
-          cursor,
-          PAGE_SIZE,
-          controller.signal
-        )
-        this.assertCurrent(authorization)
-        for (const session of page.items) {
-          if (ids.has(session.managedSessionId)) {
-            throw new Error('hive_account_runtime_session_duplicate')
-          }
-          ids.add(session.managedSessionId)
-          items.push(session)
-          if (items.length > MAXIMUM_SESSIONS) {
-            throw new Error('hive_account_runtime_session_directory_too_large')
-          }
-        }
-        cursor = page.nextCursor
-        if (cursor !== null && cursors.has(cursor)) {
-          throw new Error('hive_account_runtime_session_cursor_loop')
-        }
-        if (cursor !== null) {
-          cursors.add(cursor)
-        }
-      } while (cursor !== null)
-      return items
+      const page = await client.listRuntimeSessions(
+        authorization.accessToken,
+        cursor,
+        PAGE_SIZE,
+        controller.signal
+      )
+      this.assertCurrent(authorization)
+      if (
+        page.items.length > PAGE_SIZE ||
+        new Set(page.items.map((item) => item.managedSessionId)).size !== page.items.length
+      ) {
+        throw new Error('hive_account_runtime_session_invalid_page')
+      }
+      if (page.nextCursor !== null && page.nextCursor === cursor) {
+        throw new Error('hive_account_runtime_session_cursor_loop')
+      }
+      return page
     } finally {
       this.finishOperation(controller)
     }
@@ -179,14 +162,14 @@ export class HiveAccountRuntimeSessionService {
     this.controllers.delete(controller)
   }
 
-  private finishList(pending: Promise<readonly HiveRuntimeSession[]>): void {
-    if (this.listInFlight === pending) {
-      this.listInFlight = null
+  private finishList(cursor: string | null, pending: Promise<HiveRuntimeSessionPage>): void {
+    if (this.listsInFlight.get(cursor) === pending) {
+      this.listsInFlight.delete(cursor)
     }
   }
 
   private abortOperations(): void {
-    this.listInFlight = null
+    this.listsInFlight.clear()
     for (const controller of this.controllers) {
       controller.abort()
     }

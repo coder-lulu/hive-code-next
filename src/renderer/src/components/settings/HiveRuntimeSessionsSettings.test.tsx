@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -47,7 +47,7 @@ beforeEach(() => {
       hiveRuntimeCloud: { listSessions: mocks.listSessions, revokeSession: mocks.revokeSession }
     }
   })
-  mocks.listSessions.mockResolvedValue([session])
+  mocks.listSessions.mockResolvedValue({ items: [session], nextCursor: null })
   mocks.revokeSession.mockResolvedValue({
     managedSessionId: session.managedSessionId,
     status: 'REVOKE_PENDING',
@@ -99,5 +99,78 @@ describe('HiveRuntimeSessionsSettings', () => {
     )
 
     expect(await screen.findByText(/Local pairing is unaffected/)).toBeInTheDocument()
+  })
+  it('loads only the active tab and navigates one page at a time, preserving the prior page on failure', async () => {
+    const user = userEvent.setup()
+    const props = { currentDevice, onActiveTabChange: vi.fn(), onOpenConnectionHelp: vi.fn() }
+    mocks.listSessions.mockResolvedValueOnce({ items: [session], nextCursor: 'second' })
+    const view = render(<HiveRuntimeSessionsSettings {...props} activeTab="device" />)
+    expect(mocks.listSessions).not.toHaveBeenCalled()
+    view.rerender(<HiveRuntimeSessionsSettings {...props} activeTab="runtime" />)
+    expect(await screen.findByText('Ada phone')).toBeInTheDocument()
+    expect(mocks.listSessions).toHaveBeenCalledExactlyOnceWith(null)
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    mocks.listSessions.mockRejectedValueOnce(new Error('offline'))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText(/Local pairing is unaffected/)).toBeInTheDocument()
+    expect(screen.getByText('Ada phone')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 · 1 sessions on this page')).toBeInTheDocument()
+    mocks.listSessions.mockResolvedValueOnce({
+      items: [
+        {
+          ...session,
+          managedSessionId: 'second-id',
+          clientLabel: 'Second connection',
+          status: 'UNVERIFIABLE'
+        }
+      ],
+      nextCursor: null
+    })
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('Second connection')).toBeInTheDocument()
+    expect(screen.queryByText('Ada phone')).not.toBeInTheDocument()
+    expect(screen.getByText('Connection expired')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'End session Second connection' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Previous' }))
+    expect(await screen.findByText('Ada phone')).toBeInTheDocument()
+    expect(mocks.listSessions.mock.calls.map((call) => call[0])).toEqual([
+      null,
+      'second',
+      'second',
+      null
+    ])
+    await user.click(screen.getByRole('button', { name: 'Refresh sessions' }))
+    await waitFor(() => expect(mocks.listSessions).toHaveBeenCalledTimes(5))
+    expect(mocks.listSessions).toHaveBeenLastCalledWith(null)
+  })
+
+  it('ignores stale revoke completion when leaving the runtime tab', async () => {
+    const user = userEvent.setup()
+    let finish!: (value: unknown) => void
+    mocks.revokeSession.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const props = { currentDevice, onActiveTabChange: vi.fn(), onOpenConnectionHelp: vi.fn() }
+    const view = render(<HiveRuntimeSessionsSettings {...props} activeTab="runtime" />)
+    await user.click(await screen.findByRole('button', { name: 'End session Ada phone' }))
+    await user.click(screen.getByRole('button', { name: 'End session' }))
+    expect(screen.getByRole('button', { name: 'Next', hidden: true })).toBeDisabled()
+    view.rerender(<HiveRuntimeSessionsSettings {...props} activeTab="device" />)
+    await act(async () =>
+      finish({
+        managedSessionId: session.managedSessionId,
+        status: 'REVOKE_PENDING',
+        resourceVersion: 3,
+        controlVersion: 4
+      })
+    )
+    expect(mocks.success).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

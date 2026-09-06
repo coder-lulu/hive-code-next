@@ -53,15 +53,15 @@ function createService() {
 }
 
 describe('Hive account Runtime session service', () => {
-  it('loads every page and revokes with the current account authorization', async () => {
+  it('loads only one page and revokes with the current account authorization', async () => {
     const { client, service } = createService()
     service.setAuthorization(authorization)
 
-    await expect(service.list()).resolves.toEqual([session])
+    await expect(service.list()).resolves.toEqual({ items: [session], nextCursor: 'second' })
     await expect(service.revoke(session.managedSessionId, 1)).resolves.toMatchObject({
       status: 'REVOKE_PENDING'
     })
-    expect(client.listRuntimeSessions.mock.calls.map((call) => call[1])).toEqual([null, 'second'])
+    expect(client.listRuntimeSessions.mock.calls.map((call) => call[1])).toEqual([null])
     expect(client.revokeRuntimeSession).toHaveBeenCalledWith(
       session.managedSessionId,
       1,
@@ -71,66 +71,25 @@ describe('Hive account Runtime session service', () => {
     )
   })
 
-  it('shares one 100-page traversal across concurrent list callers', async () => {
-    let resolveFirstPage!: (value: { items: (typeof session)[]; nextCursor: string }) => void
-    const firstPage = new Promise<{
-      items: (typeof session)[]
-      nextCursor: string
-    }>((resolve) => {
-      resolveFirstPage = resolve
-    })
-    const listRuntimeSessions = vi.fn(
-      (_token: string, cursor: string | null, _limit: number, _signal?: AbortSignal) => {
-        if (cursor === null) {
-          return firstPage
-        }
-        const page = Number(cursor)
-        return Promise.resolve({
-          items: [],
-          nextCursor: page < 99 ? String(page + 1) : null
-        })
-      }
-    )
-    const service = new HiveAccountRuntimeSessionService(config as never, {
-      createClient: () => ({ listRuntimeSessions, revokeRuntimeSession: vi.fn() }),
-      now: () => 1_000,
-      operationId: vi.fn()
-    })
+  it('shares only the same requested page and never follows its next cursor', async () => {
+    const { client, service } = createService()
     service.setAuthorization(authorization)
-
     const first = service.list()
-    const second = service.list()
-    expect(second).toBe(first)
-    expect(listRuntimeSessions).toHaveBeenCalledOnce()
-    resolveFirstPage({ items: [session], nextCursor: '1' })
-
-    await expect(Promise.all([first, second])).resolves.toEqual([[session], [session]])
-    expect(listRuntimeSessions).toHaveBeenCalledTimes(100)
-    expect(listRuntimeSessions.mock.calls.every((call) => call[2] === 100)).toBe(true)
-    expect(new Set(listRuntimeSessions.mock.calls.map((call) => call[3])).size).toBe(1)
-
-    listRuntimeSessions.mockResolvedValueOnce({ items: [], nextCursor: null })
-    await expect(service.list()).resolves.toEqual([])
-    expect(listRuntimeSessions).toHaveBeenCalledTimes(101)
-    service.stop()
+    expect(service.list()).toBe(first)
+    await expect(first).resolves.toEqual({ items: [session], nextCursor: 'second' })
+    expect(client.listRuntimeSessions).toHaveBeenCalledOnce()
+    await expect(service.list('second')).resolves.toEqual({ items: [], nextCursor: null })
+    expect(client.listRuntimeSessions.mock.calls.map((call) => [call[1], call[2]])).toEqual([
+      [null, 25],
+      ['second', 25]
+    ])
   })
 
-  it('rejects a session directory that continues beyond 100 empty pages', async () => {
-    let page = 0
-    const listRuntimeSessions = vi.fn().mockImplementation(async () => ({
-      items: [],
-      nextCursor: `page-${++page}`
-    }))
-    const service = new HiveAccountRuntimeSessionService(config as never, {
-      createClient: () => ({ listRuntimeSessions, revokeRuntimeSession: vi.fn() }),
-      now: () => 1_000,
-      operationId: vi.fn()
-    })
+  it('rejects invalid cursors before requesting the server', async () => {
+    const { client, service } = createService()
     service.setAuthorization(authorization)
-
-    await expect(service.list()).rejects.toThrow('hive_account_runtime_session_page_limit')
-    expect(listRuntimeSessions).toHaveBeenCalledTimes(100)
-    service.stop()
+    await expect(service.list('bad cursor')).rejects.toThrow('Invalid Runtime session cursor')
+    expect(client.listRuntimeSessions).not.toHaveBeenCalled()
   })
 
   it('does not let an aborted account traversal clear the replacement singleflight', async () => {
@@ -169,7 +128,7 @@ describe('Hive account Runtime session service', () => {
 
     expect(service.list()).toBe(current)
     resolveCurrent({ items: [session], nextCursor: null })
-    await expect(current).resolves.toEqual([session])
+    await expect(current).resolves.toEqual({ items: [session], nextCursor: null })
     expect(listRuntimeSessions).toHaveBeenCalledTimes(2)
     service.stop()
   })
@@ -206,7 +165,7 @@ describe('Hive account Runtime session service', () => {
     await staleFailure
 
     resolveCurrent({ items: [session], nextCursor: null })
-    await expect(current).resolves.toEqual([session])
+    await expect(current).resolves.toEqual({ items: [session], nextCursor: null })
     expect(listRuntimeSessions).toHaveBeenCalledTimes(2)
     service.stop()
   })

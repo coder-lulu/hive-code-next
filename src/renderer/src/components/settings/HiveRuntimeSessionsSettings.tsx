@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
 import { Globe2, KeyRound, Laptop, Loader2, RefreshCw, Smartphone } from 'lucide-react'
-import { toast } from 'sonner'
 import type { HiveRuntimeSession } from '../../../../shared/hive-runtime-cloud'
+import { useHiveRuntimeSessionPage } from './use-hive-runtime-session-page'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -46,7 +45,7 @@ function clientKindLabel(kind: HiveRuntimeSession['clientKind']): string {
 }
 
 function canRevoke(status: HiveRuntimeSession['status']): boolean {
-  return status === 'PENDING_ACTIVATION' || status === 'ACTIVE' || status === 'UNVERIFIABLE'
+  return status === 'PENDING_ACTIVATION' || status === 'ACTIVE'
 }
 
 function RuntimeSessionRow({
@@ -68,7 +67,7 @@ function RuntimeSessionRow({
         <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
           {clientKindLabel(session.clientKind)} ·{' '}
           {translate('auto.components.settings.runtimeSessions.connectedAt', 'Connected')}{' '}
-          {formatAccountAuthorization(session.createdAt)} ·{' '}
+          {formatAccountAuthorization(session.createdAt, 'medium')} ·{' '}
           {translate('auto.components.settings.runtimeSessions.runtimeLabel', 'Runtime')}{' '}
           {session.runtimeRecordId.slice(0, 8)}
         </p>
@@ -110,75 +109,21 @@ export function HiveRuntimeSessionsSettings({
   onActiveTabChange: (tab: 'device' | 'runtime') => void
   onOpenConnectionHelp: () => void
 }): React.JSX.Element {
-  const [sessions, setSessions] = useState<readonly HiveRuntimeSession[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const [target, setTarget] = useState<HiveRuntimeSession | null>(null)
-  const [revoking, setRevoking] = useState(false)
-  const requestGeneration = useRef(0)
-
-  const load = useCallback(async (): Promise<void> => {
-    const generation = ++requestGeneration.current
-    setLoading(true)
-    setError(false)
-    try {
-      const result = await window.api.hiveRuntimeCloud.listSessions()
-      if (requestGeneration.current === generation) {
-        setSessions(result)
-      }
-    } catch {
-      if (requestGeneration.current === generation) {
-        setError(true)
-      }
-    } finally {
-      if (requestGeneration.current === generation) {
-        setLoading(false)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-    return () => {
-      requestGeneration.current += 1
-    }
-  }, [load])
-
-  const revoke = async (): Promise<void> => {
-    if (!target || revoking) {
-      return
-    }
-    setRevoking(true)
-    try {
-      const updated = await window.api.hiveRuntimeCloud.revokeSession({
-        managedSessionId: target.managedSessionId,
-        expectedResourceVersion: target.resourceVersion
-      })
-      setSessions((current) =>
-        current.map((session) =>
-          session.managedSessionId === updated.managedSessionId
-            ? { ...session, ...updated }
-            : session
-        )
-      )
-      setTarget(null)
-      toast.success(
-        translate(
-          'auto.components.settings.runtimeSessions.revokeRequested',
-          'Runtime session is being ended'
-        )
-      )
-    } catch {
-      toast.error(
-        translate(
-          'auto.components.settings.runtimeSessions.revokeFailed',
-          'This Runtime session could not be ended. Try again.'
-        )
-      )
-    } finally {
-      setRevoking(false)
-    }
-  }
+  const {
+    sessions,
+    loading,
+    error,
+    target,
+    setTarget,
+    revoking,
+    revoke,
+    page,
+    hasNext,
+    refresh,
+    retry,
+    previous,
+    next
+  } = useHiveRuntimeSessionPage(activeTab === 'runtime')
 
   const targetLabel = target?.clientLabel || (target ? clientKindLabel(target.clientKind) : '')
 
@@ -215,7 +160,6 @@ export function HiveRuntimeSessionsSettings({
               'auto.components.settings.runtimeSessions.runtimeAccessTab',
               'Runtime access sessions'
             )}{' '}
-            <span className="text-muted-foreground">{sessions.length}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -264,8 +208,8 @@ export function HiveRuntimeSessionsSettings({
                 variant="ghost"
                 size="sm"
                 className="h-10"
-                disabled={loading}
-                onClick={() => void load()}
+                disabled={loading || revoking}
+                onClick={() => void retry()}
               >
                 <RefreshCw className={loading ? 'animate-spin' : undefined} />
                 {translate('auto.components.settings.runtimeSessions.retry', 'Retry')}
@@ -333,16 +277,56 @@ export function HiveRuntimeSessionsSettings({
                 <RuntimeSessionRow
                   key={session.managedSessionId}
                   session={session}
-                  onRevoke={setTarget}
+                  onRevoke={(session) => !loading && !revoking && setTarget(session)}
                 />
               ))}
             </div>
           ) : null}
 
+          <div
+            className="flex flex-wrap items-center justify-between gap-2 border-t border-border/55 px-4 py-1.5"
+            aria-busy={loading}
+          >
+            <span role="status" className="text-xs text-muted-foreground">
+              {translate(
+                'auto.components.settings.runtimeSessions.pageSummary',
+                'Page {{page}} · {{count}} sessions on this page',
+                { page, count: sessions.length }
+              )}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={loading || revoking}
+                onClick={() => void refresh()}
+              >
+                <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
+                {translate('auto.components.settings.runtimeSessions.refresh', 'Refresh sessions')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={loading || revoking || page === 1}
+                onClick={() => void previous()}
+              >
+                {translate('auto.components.settings.runtimeSessions.previousPage', 'Previous')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={loading || revoking || !hasNext}
+                onClick={() => void next()}
+              >
+                {translate('auto.components.settings.runtimeSessions.nextPage', 'Next')}
+              </Button>
+            </div>
+          </div>
+
           <p className="border-t border-border/55 px-4 py-1.5 text-[10px] text-muted-foreground [@media(max-height:950px)]:py-1">
             {translate(
               'auto.components.settings.runtimeSessions.authorizedOnly',
-              'Only connections authorized by the current account are shown.'
+              'Runtime access connection history for this account, not chat sessions. Reconnects and separate channels create separate records.'
             )}
           </p>
         </TabsContent>
@@ -370,7 +354,7 @@ export function HiveRuntimeSessionsSettings({
               <p className="mt-1 leading-5 text-muted-foreground">
                 {clientKindLabel(target.clientKind)} ·{' '}
                 {translate('auto.components.settings.runtimeSessions.connectedAt', 'Connected')}{' '}
-                {formatAccountAuthorization(target.createdAt)}
+                {formatAccountAuthorization(target.createdAt, 'medium')}
                 <br />
                 {translate('auto.components.settings.runtimeSessions.runtimeLabel', 'Runtime')}{' '}
                 {target.runtimeRecordId.slice(0, 8)}

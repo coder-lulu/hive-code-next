@@ -206,6 +206,11 @@ export type HiveRuntimeSession = Readonly<{
   revokeAcknowledgedAt: number | null
 }>
 
+export type HiveRuntimeSessionPage = Readonly<{
+  items: readonly HiveRuntimeSession[]
+  nextCursor: string | null
+}>
+
 export type HiveRuntimeSessionRevokeRequest = Readonly<{
   managedSessionId: string
   expectedResourceVersion: number

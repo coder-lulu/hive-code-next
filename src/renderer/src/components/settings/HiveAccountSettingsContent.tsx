@@ -367,6 +367,7 @@ export function HiveAccountSettingsContent(props: Props): React.JSX.Element {
       </div>
 
       <HiveRuntimeSessionsSettings
+        key={`${state.authorityId}:${state.account?.accountId}:${directory.sessionGeneration}`}
         currentDevice={{
           label: deviceLabel,
           platform: system,

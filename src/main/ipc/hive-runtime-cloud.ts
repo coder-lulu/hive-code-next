@@ -144,7 +144,12 @@ export function registerHiveRuntimeCloudHandlers(services: HiveRuntimeCloudHandl
       await shell.openExternal(url.toString())
     })
   })
-  ipcMain.handle('hiveRuntimeCloud:listSessions', () => services.sessions.list())
+  ipcMain.handle('hiveRuntimeCloud:listSessions', (_event, cursor: unknown = null) => {
+    if (cursor !== null && (typeof cursor !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(cursor))) {
+      throw new Error('Invalid Runtime session cursor')
+    }
+    return services.sessions.list(cursor)
+  })
   ipcMain.handle('hiveRuntimeCloud:revokeSession', (_event, value: unknown) => {
     const request = requireHiveRuntimeSessionRevokeRequest(value)
     return services.sessions.revoke(request.managedSessionId, request.expectedResourceVersion)

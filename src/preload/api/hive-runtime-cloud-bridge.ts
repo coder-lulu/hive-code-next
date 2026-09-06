@@ -14,7 +14,7 @@ export const hiveRuntimeCloudApi = {
   getLocalOwnership: () => ipcRenderer.invoke('hiveRuntimeCloud:getLocalOwnership'),
   refreshLocalOwnership: () => ipcRenderer.invoke('hiveRuntimeCloud:refreshLocalOwnership'),
   claimLocalRuntime: (request) => ipcRenderer.invoke('hiveRuntimeCloud:claimLocalRuntime', request),
-  listSessions: () => ipcRenderer.invoke('hiveRuntimeCloud:listSessions'),
+  listSessions: (cursor = null) => ipcRenderer.invoke('hiveRuntimeCloud:listSessions', cursor),
   revokeSession: (request) => ipcRenderer.invoke('hiveRuntimeCloud:revokeSession', request),
   onDirectoryChanged: (callback: (state: HiveAccountRuntimeDirectoryState) => void) => {
     const listener = (

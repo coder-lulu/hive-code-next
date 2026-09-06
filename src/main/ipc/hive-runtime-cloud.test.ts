@@ -156,6 +156,15 @@ describe('Hive Runtime Cloud IPC', () => {
     await expect(electronMocks.handlers.get('hiveRuntimeCloud:listSessions')?.()).resolves.toEqual([
       { status: 'ACTIVE' }
     ])
+    expect(list).toHaveBeenCalledExactlyOnceWith(null)
+    await electronMocks.handlers.get('hiveRuntimeCloud:listSessions')?.(undefined, 'next_cursor')
+    expect(list).toHaveBeenLastCalledWith('next_cursor')
+    for (const cursor of ['', 'a'.repeat(257), 'invalid cursor', {}, 25]) {
+      expect(() =>
+        electronMocks.handlers.get('hiveRuntimeCloud:listSessions')?.(undefined, cursor)
+      ).toThrow('Invalid Runtime session cursor')
+    }
+    expect(list).toHaveBeenCalledTimes(2)
     await expect(
       electronMocks.handlers.get('hiveRuntimeCloud:revokeSession')?.(undefined, {
         managedSessionId: '11111111-1111-4111-8111-111111111111',

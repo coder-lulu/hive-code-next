@@ -89,7 +89,7 @@ beforeEach(() => {
     providers: []
   })
   mocks.onStateChanged.mockReturnValue(vi.fn())
-  mocks.listSessions.mockResolvedValue([])
+  mocks.listSessions.mockResolvedValue({ items: [], nextCursor: null })
   mocks.refreshDirectory.mockResolvedValue({
     status: 'SIGNED_OUT',
     accountId: null,
