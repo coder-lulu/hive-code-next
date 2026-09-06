@@ -109,6 +109,7 @@ export type HiveRuntimeDisplayNameUpdateRequest = Readonly<{
 }>
 
 export type HiveLocalRuntimeOwnershipState = Readonly<{
+  claimUserCode?: string
   stateRevision: number
   relation: HiveRuntimeOwnershipRelation
   accountId: string | null

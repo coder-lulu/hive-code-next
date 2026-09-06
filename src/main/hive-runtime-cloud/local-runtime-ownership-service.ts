@@ -119,7 +119,11 @@ export class LocalRuntimeOwnershipService {
       const claimed = await claimLocalRuntimeForAccount({
         registration: this.registration,
         authorization,
-        openVerification,
+        openVerification: async (code) => {
+          this.session.assertAccountCurrent(operation, authorization)
+          this.session.setClaimUserCode(code)
+          await openVerification(code)
+        },
         waitForPoll:
           this.options.dependencies?.waitForClaimPoll ??
           ((milliseconds, signal) => delay(milliseconds, undefined, { signal })),

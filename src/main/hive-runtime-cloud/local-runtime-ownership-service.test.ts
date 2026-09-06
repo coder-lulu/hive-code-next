@@ -228,11 +228,13 @@ describe('LocalRuntimeOwnershipService', () => {
     await vi.waitFor(() => expect(service.getState().relation).toBe('UNREGISTERED'))
     const operation = service.claimLocalRuntime(authorization.accountId, async () => undefined)
     await waiting
+    expect(service.getState().claimUserCode).toBe('ABCD-EFGH')
     service.setAuthorization(null)
     await operation
     expect(client.pollClaimChallenge).not.toHaveBeenCalled()
     expect(getStored()?.status).toBe('PENDING_CLAIM')
     expect(service.getState().accountId).toBeNull()
+    expect(service.getState().claimUserCode).toBeUndefined()
     service.stop()
   })
 

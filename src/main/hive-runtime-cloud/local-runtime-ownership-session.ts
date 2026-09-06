@@ -84,6 +84,19 @@ export class LocalRuntimeOwnershipSession {
     return true
   }
 
+  setClaimUserCode(code?: string): void {
+    if (this.state.claimUserCode === code) {
+      return
+    }
+    const state = { ...this.state }
+    if (code) {
+      state.claimUserCode = code
+    } else {
+      delete state.claimUserCode
+    }
+    this.setState(state)
+  }
+
   markAnalyzing(): void {
     this.setState({ ...this.state, relation: 'ANALYZING', errorCode: null })
   }
@@ -102,6 +115,7 @@ export class LocalRuntimeOwnershipSession {
   finishOperation(operation: OwnershipOperation): void {
     if (this.controller === operation.controller) {
       this.controller = null
+      this.setClaimUserCode()
     }
   }
 
@@ -224,6 +238,7 @@ export class LocalRuntimeOwnershipSession {
     this.epoch += 1
     this.controller?.abort()
     this.controller = null
+    this.setClaimUserCode()
   }
 
   private setState(state: HiveLocalRuntimeOwnershipState): void {

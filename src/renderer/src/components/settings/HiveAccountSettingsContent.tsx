@@ -324,6 +324,11 @@ export function HiveAccountSettingsContent(props: Props): React.JSX.Element {
               value={runtime.remoteAccess}
             />
           </div>
+          {ownership.claimUserCode ? (
+            <code className="font-mono text-sm" role="status">
+              {ownership.claimUserCode}
+            </code>
+          ) : null}
           <div className="mt-0.5 flex flex-wrap items-center gap-x-4">
             {runtime.canClaim || runtime.canRetry ? (
               <Button

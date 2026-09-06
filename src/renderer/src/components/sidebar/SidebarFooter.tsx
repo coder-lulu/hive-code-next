@@ -495,9 +495,11 @@ const SidebarFooter = React.memo(function SidebarFooter() {
   }
 
   const localRuntimeOwnershipPresentation = (() => {
-    if (claimingLocalRuntime) {
+    if (claimingLocalRuntime || localRuntimeOwnership?.claimUserCode) {
       return {
-        label: translate('components.sidebarAccount.claimingComputer', 'Claiming…'),
+        label:
+          localRuntimeOwnership?.claimUserCode ??
+          translate('components.sidebarAccount.claimingComputer', 'Claiming…'),
         description: translate(
           'components.sidebarAccount.claimingComputerDescription',
           'Claiming this device for {{value0}}.',
