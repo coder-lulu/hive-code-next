@@ -1,6 +1,6 @@
 # HiveRelay v2 authority contract
 
-Contract revision: `hiverelay-v2-p0.8`
+Contract revision: `hiverelay-v2-p0.9`
 
 This directory is the sole authority copied by HiveCode and HiveRelay Cell. A consumer
 must verify `fixture-manifest.json`, every listed file digest, the revision, and its source
@@ -163,3 +163,21 @@ a binding revoked for account, device, ownership or credential reasons cannot be
 restored by this exception.
 
 Authorization use is frozen atomically to its first assignment and control generation. Exact retries retain that reservation, including after signing failure. Once another authorization takes over, the old used JTI cannot acquire control again. At the P0.6 migration boundary, preexisting authorizations without provable assignment usage are retired and require fresh authorization; current recorded assignment usage is preserved. No public credential fields change.
+
+## P0.9 managed Cell recovery and deployment proof
+
+REJOIN is a Cloud-only operator CAS action under relay:fleet:lifecycle. It permits
+only DRAINING to UNHEALTHY for a currently configured routing-enabled Cell, clears
+routing confirmation, increments both versions and emits no private delivery.
+RETIRED and removed/disabled configured Cells cannot rejoin. PREPARE and CONFIRM
+retain their existing evidence and exact-replay requirements. REJOIN is not a new
+Cell private command, token scope or frame type.
+
+POST /hive/v1/relay-cells/{cellId}/deployment-evidence uses a separately pinned
+release-tool mTLS principal with relay:fleet:evidence; lifecycle scope alone does
+not grant evidence submission. The short-lived Docker attestation binds parent
+operation ID, actual container/image/start time, incarnation and lifecycle generation,
+public/private origins and the live WSS x-hive-cell-incarnation response header.
+Missing, expired, replaced-instance or mismatched public-route proof blocks CONFIRM.
+The public header is an instance identifier, never authorization. WSS frame and
+signed credential protocols are unchanged.

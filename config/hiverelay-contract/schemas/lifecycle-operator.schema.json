@@ -53,7 +53,8 @@
             "PREPARE_ACTIVATE",
             "CONFIRM_ROUTABLE",
             "ABORT",
-            "DRAIN"
+            "DRAIN",
+            "REJOIN"
           ]
         },
         "expectedResourceVersion": {
@@ -130,7 +131,8 @@
             "PREPARE_ACTIVATE",
             "CONFIRM_ROUTABLE",
             "ABORT",
-            "DRAIN"
+            "DRAIN",
+            "REJOIN"
           ]
         },
         "cellId": {
@@ -265,7 +267,10 @@
           "if": {
             "properties": {
               "action": {
-                "const": "ABORT"
+                "enum": [
+                  "ABORT",
+                  "REJOIN"
+                ]
               }
             }
           },

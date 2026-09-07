@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/docker-deployment-evidence.schema.json",
+  "title": "Trusted Docker release-tool attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationId",
+    "cellId",
+    "incarnationId",
+    "lifecycleGeneration",
+    "containerId",
+    "imageDigest",
+    "buildDigest",
+    "startedAt",
+    "publicOrigin",
+    "privateOrigin",
+    "publicBinding",
+    "runningInstances",
+    "wssVerified",
+    "wssIncarnationId",
+    "observedAt",
+    "submitter"
+  ],
+  "properties": {
+    "operationId": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/uuidV4"
+    },
+    "cellId": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/opaqueId"
+    },
+    "incarnationId": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/uuidV4"
+    },
+    "lifecycleGeneration": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/generation"
+    },
+    "containerId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "imageDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "buildDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "startedAt": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/instant"
+    },
+    "publicOrigin": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^https://"
+    },
+    "privateOrigin": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^https://"
+    },
+    "publicBinding": {
+      "type": "string",
+      "pattern": "^(127\\.0\\.0\\.1:[0-9]{1,5}->4000/tcp|host:127\\.0\\.0\\.1:[0-9]{1,5})$"
+    },
+    "runningInstances": {
+      "const": 1
+    },
+    "wssVerified": {
+      "const": true
+    },
+    "wssIncarnationId": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/uuidV4"
+    },
+    "observedAt": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/instant"
+    },
+    "submitter": {
+      "$ref": "lifecycle-operator.schema.json#/$defs/opaqueId"
+    }
+  },
+  "$comment": "Requires pinned mTLS relay:fleet:evidence. Server enforces 30 second lifetime and equality of parent/Cell/incarnation/generation/digests/origins to current authoritative observation. wssIncarnationId must equal incarnationId."
+}

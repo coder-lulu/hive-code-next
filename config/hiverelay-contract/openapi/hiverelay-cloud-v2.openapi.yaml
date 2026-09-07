@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HiveRelay v2 contract
-  version: hiverelay-v2-p0.8
+  version: hiverelay-v2-p0.9
   description: >-
     Authority interface shapes. Every implementation remains disabled until its
     corresponding product and capability gates are enabled.
@@ -276,6 +276,29 @@ paths:
         '403': {$ref: '#/components/responses/OperatorScopeRejected'}
         '409': {$ref: '#/components/responses/SymbolicConflict'}
         '503': {$ref: '#/components/responses/LifecycleDeliveryUnavailable'}
+  /hive/v1/relay-cells/{cellId}/deployment-evidence:
+    post:
+      operationId: submitTrustedDockerDeploymentEvidence
+      security: [{relayFleetOperatorMtls: []}]
+      x-hiverelay-required-scope: relay:fleet:evidence
+      description: Trusted release-tool attestation. Browser sessions and lifecycle-only credentials are rejected. Evidence expires after 30 seconds and cannot bypass lifecycle CAS.
+      parameters:
+        - name: cellId
+          in: path
+          required: true
+          schema: {$ref: '#/components/schemas/OpaqueId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/docker-deployment-evidence.schema.json'}
+      responses:
+        '204':
+          description: Bound short-lived evidence accepted; no routing mutation performed
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '401': {$ref: '#/components/responses/OperatorCredentialRejected'}
+        '403': {$ref: '#/components/responses/OperatorScopeRejected'}
+        '503': {$ref: '#/components/responses/RelayUnavailable'}
   /internal/status:
     get:
       operationId: readCellStatusV2

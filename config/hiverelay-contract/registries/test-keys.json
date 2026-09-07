@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.8",
+  "contractRevision": "hiverelay-v2-p0.9",
   "environment": "fixture-only",
   "keys": [
     {
