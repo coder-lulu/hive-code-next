@@ -13,6 +13,9 @@ const state = vi.hoisted(() => ({
 vi.mock('./hive-account-relay-channel', () => ({
   HiveAccountRelayChannel: class {
     isClosed = false
+    get isReady() {
+      return !this.isClosed
+    }
     callbacks: HiveAccountRelaySubscription | null = null
     constructor(private options: { onClosed: (error: Error, intentional: boolean) => void }) {
       state.channels.push(this)
@@ -78,6 +81,53 @@ afterEach(() => {
 })
 
 describe('account relay pool ownership and bounds', () => {
+  it.each(['assignmentEpoch', 'cellIncarnationId'] as const)(
+    'reuses and idles the replacement main after %s changes',
+    async (field) => {
+      vi.useFakeTimers()
+      const replacement = material()
+      if (field === 'assignmentEpoch') {
+        replacement.outer.assignmentEpoch = 2
+      } else {
+        replacement.outer.cellIncarnationId = 'replacement'
+      }
+      const factory = vi
+        .fn()
+        .mockResolvedValueOnce(material())
+        .mockImplementation(async () => replacement)
+      const { pool } = setup(factory)
+      try {
+        await pool.request('status.get', {})
+        await vi.advanceTimersByTimeAsync(30_000)
+        await pool.request('status.get', {})
+        await pool.request('status.get', {})
+        expect(factory).toHaveBeenCalledTimes(2)
+        await vi.advanceTimersByTimeAsync(30_000)
+        expect(state.channels.every((channel) => channel.isClosed)).toBe(true)
+      } finally {
+        pool.close()
+        vi.useRealTimers()
+      }
+    }
+  )
+
+  it('replaces an old main when a stream moves to a new Assignment', async () => {
+    const replacement = material()
+    replacement.outer.assignmentEpoch = 2
+    const factory = vi
+      .fn()
+      .mockResolvedValueOnce(material())
+      .mockImplementation(async () => replacement)
+    const { pool } = setup(factory)
+    await pool.request('status.get', {})
+    const stream = await pool.subscribe('watch', {}, { onResponse: vi.fn() })
+    expect(state.channels[0]!.isClosed).toBe(true)
+    await pool.request('status.get', {})
+    await pool.request('status.get', {})
+    expect(factory).toHaveBeenCalledTimes(3)
+    expect(stream.sendBinary(new Uint8Array([1]))).toBe(true)
+  })
+
   it('does not publish ready after close during a connection completion', async () => {
     const { pool } = setup()
     state.afterConnect = () => pool.close()

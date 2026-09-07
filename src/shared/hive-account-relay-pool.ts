@@ -176,7 +176,6 @@ export class HiveAccountRelayPool {
         for (const channel of this.channels) {
           channel.close()
         }
-        this.main = null
       }
       if (this.getState() === 'closed') {
         disposeHiveAccountRelayMaterial(material)
