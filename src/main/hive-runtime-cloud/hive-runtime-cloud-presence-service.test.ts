@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
+import { HiveRuntimeCloudClient, HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
@@ -128,6 +128,70 @@ async function startClaimed(service: HiveRuntimeCloudPresenceService): Promise<v
 }
 
 describe('Hive Runtime Cloud Presence service', () => {
+  it('recovers automatically from a response body transport interruption', async () => {
+    const http = new HiveRuntimeCloudClient(
+      'https://test.invalid',
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(new DOMException('body interrupted', 'AbortError'))
+            }
+          })
+        )
+    )
+    const failure = await http.lookup({}).catch((error: unknown) => error)
+    vi.useFakeTimers()
+    const { service, client } = fixture(claimedState())
+    try {
+      service.setRuntimeReady(true)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(service.getState()).toBe('ONLINE')
+      client.heartbeat.mockRejectedValueOnce(failure).mockResolvedValueOnce({
+        ...(await client.heartbeat.mock.results[0]!.value),
+        acceptedHeartbeatSeq: 2
+      })
+      await vi.advanceTimersByTimeAsync(27_000)
+      expect(service.getState()).toBe('OFFLINE_RETRY')
+      expect(service.getCurrentLeaseContext()).toBeNull()
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(service.getState()).toBe('ONLINE')
+      expect(client.heartbeat).toHaveBeenCalledTimes(3)
+    } finally {
+      await service.stop()
+    }
+  })
+
+  it.each([500, 502, 504])(
+    'recovers automatically after temporary heartbeat HTTP %s',
+    async (status) => {
+      vi.useFakeTimers()
+      const { service, client } = fixture(claimedState())
+      try {
+        service.setRuntimeReady(true)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(service.getState()).toBe('ONLINE')
+        client.heartbeat
+          .mockRejectedValueOnce(new HiveRuntimeCloudRequestError(status, null, 2000))
+          .mockResolvedValueOnce({
+            ...(await client.heartbeat.mock.results[0]!.value),
+            acceptedHeartbeatSeq: 2
+          })
+        await vi.advanceTimersByTimeAsync(27_000)
+        expect(service.getState()).toBe('OFFLINE_RETRY')
+        expect(service.getCurrentLeaseContext()).toBeNull()
+        expect(client.heartbeat).toHaveBeenCalledTimes(2)
+        await vi.advanceTimersByTimeAsync(1999)
+        expect(client.heartbeat).toHaveBeenCalledTimes(2)
+        await vi.advanceTimersByTimeAsync(1)
+        expect(service.getState()).toBe('ONLINE')
+        expect(client.heartbeat).toHaveBeenCalledTimes(3)
+      } finally {
+        await service.stop()
+      }
+    }
+  )
+
   it.each([409, 410])(
     'reconciles a changed lease tuple after activation returns %s',
     async (status) => {

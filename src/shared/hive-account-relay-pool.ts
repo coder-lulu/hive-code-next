@@ -183,14 +183,16 @@ export class HiveAccountRelayPool {
         throw unavailable()
       }
       this.binding = binding
+      let connected = false
       const channel = new HiveAccountRelayChannel({
         material,
         createSocket: this.options.createSocket,
         clientCapabilities: this.options.clientCapabilities,
         randomBytes: this.options.randomBytes,
-        onClosed: (error) => {
-          if (this.state !== 'closed') {
-            this.lastError = error
+        onClosed: (error, intentional) => {
+          // Handshake failures are recorded once by the awaiting catch below.
+          if (this.state !== 'closed' && !intentional && connected) {
+            this.recordFailure(error)
           }
           this.channels.delete(channel)
           const flight = this.main
@@ -208,6 +210,7 @@ export class HiveAccountRelayPool {
       })
       this.channels.add(channel)
       await channel.connect()
+      connected = true
       this.lastError = null
       this.retryAttempt = 0
       this.nextAttemptAt = 0

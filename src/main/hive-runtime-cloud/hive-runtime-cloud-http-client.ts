@@ -40,17 +40,23 @@ async function parseResponse(response: Response): Promise<unknown> {
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
   let byteLength = 0
-  while (true) {
-    const chunk = await reader.read()
-    if (chunk.done) {
-      break
+  try {
+    while (true) {
+      const chunk = await reader.read().catch(() => {
+        throw new HiveRuntimeCloudTransportError()
+      })
+      if (chunk.done) {
+        break
+      }
+      byteLength += chunk.value.byteLength
+      if (byteLength > MAXIMUM_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined)
+        throw new Error('hive_runtime_cloud_response_too_large')
+      }
+      chunks.push(chunk.value)
     }
-    byteLength += chunk.value.byteLength
-    if (byteLength > MAXIMUM_RESPONSE_BYTES) {
-      await reader.cancel().catch(() => undefined)
-      throw new Error('hive_runtime_cloud_response_too_large')
-    }
-    chunks.push(chunk.value)
+  } finally {
+    reader.releaseLock()
   }
   const bytes = new Uint8Array(byteLength)
   let offset = 0

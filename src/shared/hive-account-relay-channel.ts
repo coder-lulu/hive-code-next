@@ -51,7 +51,7 @@ export class HiveAccountRelayChannel {
     private readonly options: {
       material: HiveAccountRelayMaterial
       createSocket: (url: string) => HiveAccountRelaySocket
-      onClosed?: (error: Error) => void
+      onClosed?: (error: Error, intentional: boolean) => void
       handshakeTimeoutMs?: number
       clientCapabilities?: readonly RuntimeCapability[]
       randomBytes?: (length: number) => Uint8Array
@@ -162,10 +162,12 @@ export class HiveAccountRelayChannel {
     return this.isReady
   }
 
-  close(error: Error = failure('Relay connection disposed')): void {
+  close(error?: Error): void {
     if (this.isClosed) {
       return
     }
+    const intentional = error === undefined
+    error ??= failure('Relay connection disposed')
     this.state = 'closed'
     if (this.timer) {
       clearTimeout(this.timer)
@@ -196,7 +198,7 @@ export class HiveAccountRelayChannel {
     const subscription = this.subscription
     this.subscription = null
     try {
-      this.options.onClosed?.(error)
+      this.options.onClosed?.(error, intentional)
     } finally {
       subscription?.callbacks.onClose?.()
     }

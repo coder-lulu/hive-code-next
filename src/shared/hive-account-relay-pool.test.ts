@@ -14,7 +14,7 @@ vi.mock('./hive-account-relay-channel', () => ({
   HiveAccountRelayChannel: class {
     isClosed = false
     callbacks: HiveAccountRelaySubscription | null = null
-    constructor(private options: { onClosed: () => void }) {
+    constructor(private options: { onClosed: (error: Error, intentional: boolean) => void }) {
       state.channels.push(this)
     }
     async connect() {
@@ -35,7 +35,7 @@ vi.mock('./hive-account-relay-channel', () => ({
       }
       this.isClosed = true
       this.callbacks?.onClose?.()
-      this.options.onClosed()
+      this.options.onClosed(new Error('disposed'), true)
     }
   }
 }))

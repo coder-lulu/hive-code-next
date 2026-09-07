@@ -69,6 +69,7 @@ export class ReconcilePresenceError extends Error {}
 
 const MAXIMUM_LOCAL_RETRY_DELAY_MS = 30_000
 const MAXIMUM_TIMER_DELAY_MS = 2_147_483_647
+const RETRYABLE_HTTP_STATUSES = new Set([429, 500, 502, 503, 504])
 
 export function publicKeyDigest(identity: HiveRuntimeCloudIdentity): string {
   return createHash('sha256').update(Buffer.from(identity.publicKey, 'base64url')).digest('hex')
@@ -78,15 +79,14 @@ export function isRetryablePresenceError(error: unknown): boolean {
   return (
     error instanceof ReconcilePresenceError ||
     error instanceof HiveRuntimeCloudTransportError ||
-    (error instanceof HiveRuntimeCloudRequestError &&
-      (error.status === 429 || error.status === 503))
+    (error instanceof HiveRuntimeCloudRequestError && RETRYABLE_HTTP_STATUSES.has(error.status))
   )
 }
 
 export function presenceRetryAfterDelay(error: unknown, random: () => number): number | undefined {
   if (
     !(error instanceof HiveRuntimeCloudRequestError) ||
-    (error.status !== 429 && error.status !== 503) ||
+    !RETRYABLE_HTTP_STATUSES.has(error.status) ||
     error.retryAfterMs === null ||
     !Number.isFinite(error.retryAfterMs) ||
     error.retryAfterMs < 0

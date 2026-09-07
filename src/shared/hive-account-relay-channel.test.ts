@@ -158,6 +158,7 @@ describe('account relay physical channel', () => {
       await expect(peer.ready).rejects.toThrow()
       expect(peer.getAuth()).toBeNull()
       expect(peer.channel.isClosed).toBe(true)
+      expect(peer.onClosed).toHaveBeenCalledWith(expect.any(Error), false)
       expect(peer.material.inner.ticketSecret.every((byte) => byte === 0)).toBe(true)
     }
   )
@@ -174,6 +175,7 @@ describe('account relay physical channel', () => {
       (await Promise.allSettled(requests)).every((result) => result.status === 'rejected')
     ).toBe(true)
     expect(peer.onClosed).toHaveBeenCalledTimes(1)
+    expect(peer.onClosed).toHaveBeenCalledWith(expect.any(Error), true)
   })
 
   it('routes binary to the exclusive stream and closes its server ownership on unsubscribe', async () => {
