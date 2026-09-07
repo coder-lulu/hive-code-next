@@ -33,6 +33,7 @@ export class HiveRuntimeRelayBroker {
   private abort: AbortController | null = null
   private timer: ReturnType<typeof setTimeout> | null = null
   private control: HiveRuntimeRelayControlClient | null = null
+  private pendingControl: HiveRuntimeRelayControlClient | null = null
   private assignment: HiveRuntimeRelayAssignment | null = null
   private failures = 0
   private context: CurrentHiveRuntimeCloudLeaseContext | null = null
@@ -160,6 +161,7 @@ export class HiveRuntimeRelayBroker {
         this.assignment &&
         hiveRuntimeRelaySameOwner(this.assignment, assignment)
       ) {
+        this.pendingControl = this.control
         await this.control.refresh(assignment)
       } else {
         const previous = this.control
@@ -183,15 +185,23 @@ export class HiveRuntimeRelayBroker {
             }
             this.control = null
             this.options.onUnavailable()
-            this.retry()
+            // A pending connect/refresh rejection owns its retry in resolve's catch.
+            if (this.pendingControl !== control) {
+              this.retry()
+            }
           }
         })
         this.control = control
+        this.pendingControl = control
         await control.connect()
       }
       if (generation !== this.generation || !this.isCurrent(assignment)) {
         return
       }
+      if (!this.control?.active) {
+        throw new Error('hive_runtime_relay_control_closed')
+      }
+      this.pendingControl = null
       this.assignment = assignment
       this.failures = 0
       this.options.onAssigned(assignment)
@@ -204,6 +214,7 @@ export class HiveRuntimeRelayBroker {
     } finally {
       if (this.abort === abort) {
         this.abort = null
+        this.pendingControl = null
       }
     }
   }
