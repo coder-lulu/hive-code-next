@@ -58,6 +58,8 @@ export function HiveAccountSignInConfirmDialog({
   const [phoneNumber, setPhoneNumber] = useState('')
   const [smsCode, setSmsCode] = useState('')
   const [challenge, setChallenge] = useState<HiveAccountSmsChallenge | null>(null)
+  const [resendAt, setResendAt] = useState(0)
+  const [remainingSeconds, setRemainingSeconds] = useState(0)
   const [smsError, setSmsError] = useState<string | null>(null)
   const [smsTermsAccepted, setSmsTermsAccepted] = useState(false)
   const [startingSms, setStartingSms] = useState(false)
@@ -66,6 +68,8 @@ export function HiveAccountSignInConfirmDialog({
 
   useEffect(() => {
     if (!open) {
+      smsAttempt.current += 1
+      setStartingSms(false)
       setMethod('sms')
       setPhoneNumber('')
       setSmsCode('')
@@ -75,7 +79,27 @@ export function HiveAccountSignInConfirmDialog({
     }
   }, [open])
 
+  useEffect(() => {
+    if (!open || !challenge || resendAt <= Date.now()) {
+      setRemainingSeconds(0)
+      return
+    }
+    const tick = (): void => {
+      const seconds = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))
+      setRemainingSeconds(seconds)
+      if (seconds === 0) {
+        window.clearInterval(timer)
+      }
+    }
+    const timer = window.setInterval(tick, 1000)
+    tick()
+    return () => window.clearInterval(timer)
+  }, [open, challenge, resendAt])
+
   const startSms = async (): Promise<void> => {
+    if (smsBusy || (challenge && Date.now() < resendAt)) {
+      return
+    }
     if (!onSmsStart || !/^\+?[0-9]{6,20}$/.test(phoneNumber.trim())) {
       setSmsError(
         translate('components.hiveAccountSignIn.invalidPhone', 'Enter a valid phone number.')
@@ -100,6 +124,8 @@ export function HiveAccountSignInConfirmDialog({
       // default; the modal no longer exposes a pre-auth trust toggle.
       const nextChallenge = await onSmsStart(phoneNumber.trim(), 'TRUSTED')
       if (attempt === smsAttempt.current) {
+        setResendAt(Date.now() + nextChallenge.resendAfterSeconds * 1000)
+        setSmsCode('')
         setChallenge(nextChallenge)
       }
     } catch {
@@ -112,7 +138,9 @@ export function HiveAccountSignInConfirmDialog({
         )
       }
     } finally {
-      setStartingSms(false)
+      if (attempt === smsAttempt.current) {
+        setStartingSms(false)
+      }
     }
   }
 
@@ -156,6 +184,7 @@ export function HiveAccountSignInConfirmDialog({
     if (nextMethod === 'browser') {
       smsAttempt.current += 1
       void onSmsCancel?.()
+      setStartingSms(false)
       setChallenge(null)
       setSmsCode('')
     }
@@ -312,15 +341,24 @@ export function HiveAccountSignInConfirmDialog({
                         'Enter the 6-digit code'
                       )}
                     />
-                    <p className="hive-account-code-hint">
-                      {translate(
-                        'components.hiveAccountSignIn.resendCountdown',
-                        'Resend in {{seconds}}s',
-                        {
-                          seconds: challenge.expiresInSeconds
-                        }
-                      )}
-                    </p>
+                    {remainingSeconds > 0 ? (
+                      <p className="hive-account-code-hint">
+                        {translate(
+                          'components.hiveAccountSignIn.resendCountdown',
+                          'Resend in {{seconds}}s',
+                          { seconds: remainingSeconds }
+                        )}
+                      </p>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={smsBusy}
+                        onClick={() => void startSms()}
+                      >
+                        {translate('components.hiveAccountSignIn.resendCode', 'Resend code')}
+                      </Button>
+                    )}
                   </div>
                 ) : null}
                 {!challenge ? (

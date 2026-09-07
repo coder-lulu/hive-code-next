@@ -17241,6 +17241,7 @@
       "codeSentTo": "Code sent to",
       "codeLabel": "Verification code",
       "codePlaceholder": "Enter the 6-digit code",
+      "resendCode": "Resend code",
       "resendCountdown": "Resend in {{seconds}}s",
       "termsPrefix": "I have read and agree to",
       "terms": "Terms of Service",

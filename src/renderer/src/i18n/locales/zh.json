@@ -15302,6 +15302,7 @@
       "codeSentTo": "验证码已发送至",
       "codeLabel": "验证码",
       "codePlaceholder": "请输入 6 位验证码",
+      "resendCode": "重新发送",
       "resendCountdown": "{{seconds}} 秒后重新发送",
       "termsPrefix": "我已阅读并同意",
       "terms": "《服务条款》",
