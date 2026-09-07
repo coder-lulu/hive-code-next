@@ -88,8 +88,11 @@ type ScriptedCliReport = {
 }
 
 const scratchDirs: string[] = []
-afterEach(() => {
+const spawnedChildClosures: Promise<void>[] = []
+afterEach(async () => {
   vi.unstubAllEnvs()
+  // Windows retains the child's working directory until its process handles close.
+  await Promise.all(spawnedChildClosures.splice(0))
   for (const dir of scratchDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -133,13 +136,15 @@ function recordingSpawner(spawns: SpawnSeen[]) {
       cwd: opts.cwd,
       env: { ...opts.env }
     })
-    return spawnProcess({
+    const child = spawnProcess({
       program: opts.command,
       args: opts.args,
       cwd: opts.cwd,
       env: opts.env as NodeJS.ProcessEnv,
       signal: opts.signal
-    }) as unknown as SdkSpawnedProcess
+    })
+    spawnedChildClosures.push(new Promise<void>((resolve) => child.once('close', () => resolve())))
+    return child as unknown as SdkSpawnedProcess
   }
 }
 
@@ -392,7 +397,8 @@ describe('Claude Agent SDK contract pins', () => {
       options: {
         pathToClaudeCodeExecutable: FAKE_CLI,
         cwd: scenario.cwd,
-        env: scenarioEnv(scenario)
+        env: scenarioEnv(scenario),
+        spawnClaudeCodeProcess: recordingSpawner([])
       }
     })
     try {
@@ -400,6 +406,7 @@ describe('Claude Agent SDK contract pins', () => {
       expect(read, 'the SDK no longer exposes get_settings at runtime').not.toBeNull()
       await expect(read?.()).resolves.toEqual(settings)
     } finally {
+      session.close()
       await session.return(undefined)
     }
   })

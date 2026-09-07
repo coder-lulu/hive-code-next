@@ -1,7 +1,9 @@
 # P4 account Runtime clients
 
-Status: `PARTIAL` — implementation and service integration are available; device
-acceptance remains incomplete. No separate product editions or version switches
+Status: `VERIFIED_WITH_IOS_DEFERRED` — Android manual acceptance is confirmed by
+the user on 2026-09-07; iOS acceptance is explicitly deferred because no Apple
+development machine is available. P5 may proceed for this accepted scope.
+No separate product editions or version switches
 were introduced. This record supersedes historical P4 instructions preserving old
 Relay clients or requiring default-off flags.
 
@@ -78,3 +80,20 @@ Use a disposable PostgreSQL database initialized from the existing base SQL, set
   production-HA claim is made.
 
 P4 must remain `PARTIAL` until the missing platform journeys have actual evidence.
+
+## User acceptance follow-up (2026-09-07)
+
+The user reports that all eight manual checks passed: account computer listing and
+workspace connection; directory/file contents; terminal `echo P4_OK` input/output;
+three minutes switching files and terminals without noticeable stalls or duplicate
+output; recovery after 30 seconds in the background without command replay;
+reconnection after 10 seconds offline; logout closing the previous account's
+connection; and Runtime session revocation preventing further operations.
+
+The user subsequently identified Android as passed and explicitly deferred iOS
+until an Apple development machine is available. This supersedes the historical
+requirement to block P5 on missing iOS acceptance. iOS remains unverified and must
+not be included in any RC platform claim. The installed artifact was not specified;
+do not equate this manual result with the current checkout automatically. The
+public deployment record also contains earlier Android account/workspace/terminal
+read-navigation evidence from 2026-09-07. Earlier PARTIAL statements are historical.

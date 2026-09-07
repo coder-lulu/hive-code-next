@@ -63,8 +63,9 @@ File.write!(
   Jason.encode!(Map.put(identity, "port", :ranch.get_port(:hive_relay_public)))
 )
 
+lifetime = if System.get_env("HIVE_RELAY_CLOUD_PAUSE_TEST") == "1", do: 300_000, else: 90_000
 wait = fn wait ->
-  if File.exists?(Path.join(directory, "stop")) or System.system_time(:millisecond) > now + 90_000,
+  if File.exists?(Path.join(directory, "stop")) or System.system_time(:millisecond) > now + lifetime,
     do: :ok,
     else:
       (

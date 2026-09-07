@@ -1,5 +1,6 @@
-import { mkdtempSync, readFileSync, readdirSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import nacl from 'tweetnacl'
 import { expect, it, vi } from 'vitest'
@@ -7,7 +8,10 @@ vi.mock('electron', () => ({ net: { fetch: globalThis.fetch } }))
 import { HiveRuntimeRelayHostService } from '../../../src/main/hive-runtime-cloud/relay-host/hive-runtime-relay-host-service'
 import { HiveRuntimeRelayCloudClient } from '../../../src/main/hive-runtime-cloud/relay-host/hive-runtime-relay-cloud-client'
 import { HiveRuntimeCloudClient } from '../../../src/main/hive-runtime-cloud/hive-runtime-cloud-client'
-import { createRuntimeHeartbeatRequest } from '../../../src/main/hive-runtime-cloud/hive-runtime-cloud-proof'
+import {
+  createRuntimeHeartbeatRequest,
+  createRuntimeLeaseAcquireRequest
+} from '../../../src/main/hive-runtime-cloud/hive-runtime-cloud-proof'
 import { createHiveRuntimeRelayBindingStore } from '../../../src/main/hive-runtime-cloud/relay-host/hive-runtime-relay-storage'
 import type { CurrentHiveRuntimeCloudLeaseContext } from '../../../src/main/hive-runtime-cloud/hive-runtime-cloud-lease-context'
 import type { HiveRuntimeCloudPresenceService } from '../../../src/main/hive-runtime-cloud/hive-runtime-cloud-presence-service'
@@ -23,6 +27,7 @@ import type { OrcaRuntimeService } from '../../../src/main/runtime/orca-runtime'
 import { startAccountRelayCell } from './hive-account-relay-cell-fixture'
 import { startAccountRelayBrowser } from './hive-account-relay-browser-fixture'
 const origin = process.env.HIVE_RUNTIME_HOST_HTTP_FIXTURE
+const pauseCloud = process.env.HIVE_RELAY_CLOUD_PAUSE_TEST === '1'
 it.skipIf(!origin)(
   'uses the current client through real TLS Cell, Host, Cloud PostgreSQL and account RPC',
   async () => {
@@ -39,7 +44,7 @@ it.skipIf(!origin)(
       return result.json()
     }
     const fixture = await fixtureFetch('/fixture')
-    const context = {
+    let context = {
       authorityId: fixture.authorityId,
       identity: fixture.identity,
       tuple: fixture.tuple
@@ -143,6 +148,7 @@ it.skipIf(!origin)(
           failure = error
         })
     }
+    const leaseListener: { current: (() => void) | null } = { current: null }
     const presence = {
       getCurrentLeaseContext: () => context,
       requestHeartbeat,
@@ -150,8 +156,11 @@ it.skipIf(!origin)(
         contributor = value
       },
       subscribeLeaseContext: (listener: () => void) => {
+        leaseListener.current = listener
         listener()
-        return () => {}
+        return () => {
+          leaseListener.current = null
+        }
       }
     } as unknown as HiveRuntimeCloudPresenceService
     const cleanup = vi.fn()
@@ -243,6 +252,30 @@ it.skipIf(!origin)(
         ok: true,
         result: { principal: expect.stringMatching(/^account-runtime:/) }
       })
+      if (!response.ok) {
+        throw new Error('Initial Relay RPC failed')
+      }
+      const rpcLatencies = await Promise.all(
+        Array.from({ length: 20 }, async (_, index) => {
+          const id = `concurrent-read-${index}`
+          const requestStarted = performance.now()
+          const result = await client!.request({ id, method: 'fixture.read' })
+          expect(result).toMatchObject({ id, ok: true, result: response.result })
+          return performance.now() - requestStarted
+        })
+      )
+      rpcLatencies.sort((left, right) => left - right)
+      // Local acceptance target for a 20-request burst, independent of Cell forwarding RTT.
+      expect(rpcLatencies[18]).toBeLessThan(1000)
+      writeFileSync(
+        join(storage, 'rpc-latency.json'),
+        JSON.stringify({
+          requests: 20,
+          errors: 0,
+          p95Ms: rpcLatencies[18],
+          maxMs: rpcLatencies[19]
+        })
+      )
       const onResponse = vi.fn(),
         onBinary = vi.fn(),
         onClose = vi.fn()
@@ -262,13 +295,120 @@ it.skipIf(!origin)(
         clientPublicKeyB64: Buffer.from(material.clientKeyPair.publicKey).toString('base64url')
       })
       await browser.current!.run()
+      if (pauseCloud) {
+        const acquire = () =>
+          acquireHiveAccountRelayMaterial({
+            clientKind: 'DESKTOP',
+            expectedResourceVersion: 7,
+            createIntent: (request) =>
+              fixtureFetch('/fixture/intent', {
+                secretHash: request.ticketSecretSha256,
+                clientPublicKey: request.clientPublicKeyB64
+              })
+          })
+        const unusedMaterial = await acquire()
+        const outageStarted = performance.now()
+        await fixtureFetch('/fixture/cloud-pause', {})
+        await vi.waitFor(
+          async () => {
+            await expect(
+              fetch(`${origin}/fixture`, { signal: AbortSignal.timeout(2000) })
+            ).rejects.toThrow()
+          },
+          { timeout: 5000 }
+        )
+        await vi.waitFor(() => expect(client!.isClosed).toBe(true), { timeout: 120_000 })
+        const authorityLostMs = performance.now() - outageStarted
+        expect(authorityLostMs).toBeLessThan(120_000)
+        await expect(client.request({ id: 'outage', method: 'fixture.read' })).rejects.toThrow()
+        await vi.waitFor(() => expect(host.getStatus()).toBe('connecting'), {
+          timeout: 120_000 - authorityLostMs
+        })
+        const controlLostMs = performance.now() - outageStarted
+        expect(controlLostMs).toBeLessThan(120_000)
+        await vi.waitFor(
+          async () => {
+            expect(
+              (await fetch(`${origin}/fixture`, { signal: AbortSignal.timeout(2000) })).ok
+            ).toBe(true)
+          },
+          { timeout: 135_000, interval: 1000 }
+        )
+        // A fresh observation of the still-running local Cell replaces the expired catalog observation.
+        await fixtureFetch('/fixture/cell', {
+          cellIncarnationId: cell.cellIncarnationId,
+          cellOrigin: `https://localhost:${cell.port}`
+        })
+        await heartbeatTail
+        const bootId = randomUUID()
+        const lease = await cloud.acquireLease(
+          createRuntimeLeaseAcquireRequest(
+            context.identity,
+            {
+              bootId,
+              expectedAuthorityGeneration: context.tuple.authorityGeneration,
+              expectedLeaseEpoch: context.tuple.leaseEpoch,
+              expectedFencingEpoch: context.tuple.fencingEpoch
+            },
+            { authorityId: context.authorityId }
+          )
+        )
+        context = {
+          ...context,
+          tuple: {
+            ...context.tuple,
+            bootId,
+            heartbeatLeaseId: lease.leaseId,
+            authorityGeneration: lease.authorityGeneration,
+            leaseEpoch: lease.leaseEpoch,
+            fencingEpoch: lease.fencingEpoch
+          }
+        }
+        sequence = 1
+        leaseListener.current?.()
+        await vi.waitFor(
+          () =>
+            expect(host.getStatus(), JSON.stringify(observations.slice(-12))).toBe('registered'),
+          { timeout: 45_000 }
+        )
+        await heartbeatTail
+        const createSocket = (url: string) =>
+          new WebSocket(url, {
+            ca: cell.ca,
+            perMessageDeflate: false
+          }) as unknown as HiveAccountRelaySocket
+        const stale = new HiveAccountRelayChannel({ material: unusedMaterial, createSocket })
+        try {
+          await expect(stale.connect()).rejects.toThrow('Relay admission expired')
+        } finally {
+          stale.close()
+        }
+        expect(client.isClosed).toBe(true)
+        client = new HiveAccountRelayChannel({ material: await acquire(), createSocket })
+        await client.connect()
+        expect(await client.request({ id: 'recovered', method: 'fixture.read' })).toMatchObject({
+          ok: true,
+          result: { principal: expect.stringMatching(/^account-runtime:/) }
+        })
+        writeFileSync(
+          join(storage, 'cloud-recovery.json'),
+          JSON.stringify({
+            pauseMillis: 125_000,
+            authorityLostMs,
+            controlLostMs,
+            expiredMaterialRejectedLocally: true,
+            oldChannelStillClosed: true,
+            freshRpcSucceeded: true
+          })
+        )
+      }
       await fixtureFetch('/fixture/revoke', {})
       requestHeartbeat()
       await vi.waitFor(() => expect(client!.isClosed).toBe(true), { timeout: 8000 })
       await heartbeatTail
       await browser.current!.assertRevoked()
       expect(onClose).toHaveBeenCalledTimes(1)
-      expect(cleanup).toHaveBeenCalledTimes(3)
+      expect(cleanup).toHaveBeenCalledTimes(pauseCloud ? 4 : 3)
       await vi.waitFor(
         async () => expect((await fixtureFetch('/fixture/status')).status).toBe('REVOKED'),
         { timeout: 5000 }
@@ -298,5 +438,5 @@ it.skipIf(!origin)(
       await heartbeatTail
     }
   },
-  60000
+  pauseCloud ? 270_000 : 60_000
 )

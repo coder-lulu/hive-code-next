@@ -206,6 +206,8 @@ describe('Hive Runtime Relay authorization boundary', () => {
 
   it.each([
     'cellId',
+    'cellIncarnationId',
+    'assignmentId',
     'runtimeTupleHash',
     'hostKeyHash',
     'assignmentEpoch',
@@ -217,6 +219,16 @@ describe('Hive Runtime Relay authorization boundary', () => {
     f.token()
     await expect(f.provider.resolve(f)).rejects.toThrow('credential_binding_rejected')
   })
+
+  it.each(['authorityGeneration', 'fencingEpoch', 'leaseEpoch', 'assignmentEpoch'] as const)(
+    'rejects a stale numeric %s even when the tuple hash and other bindings match',
+    async (field) => {
+      const f = fixture()
+      f.claims[field]--
+      f.token()
+      await expect(f.provider.resolve(f)).rejects.toThrow('credential_binding_rejected')
+    }
+  )
 
   it('stops the chain after a late binding response observes a fenced tuple', async () => {
     const f = fixture()
@@ -230,11 +242,17 @@ describe('Hive Runtime Relay authorization boundary', () => {
     expect(f.requests).toHaveLength(1)
   })
 
-  it('bounds concurrent authorization to one network chain', async () => {
+  it('bounds 20 concurrent authorizations to one network chain', async () => {
     const f = fixture()
-    const first = f.provider.resolve(f)
-    await expect(f.provider.resolve(f)).rejects.toThrow('in_progress')
-    await first
+    const results = await Promise.allSettled(
+      Array.from({ length: 20 }, () => f.provider.resolve(f))
+    )
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+    const rejected = results.filter((result) => result.status === 'rejected')
+    expect(rejected).toHaveLength(19)
+    for (const result of rejected) {
+      expect(result.reason.message).toContain('in_progress')
+    }
     expect(f.requests).toHaveLength(3)
   })
 })
