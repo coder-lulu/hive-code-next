@@ -215,6 +215,12 @@ export const createAccountRuntimeCloudSlice: StateCreator<
           ) === fingerprint
         ) {
           get().setRuntimeEnvironments(environments)
+          // Newly discovered hosts need a status probe before project subscriptions can start.
+          void Promise.allSettled(
+            environments
+              .filter((environment) => !get().runtimeStatusByEnvironmentId.has(environment.id))
+              .map((environment) => get().refreshRuntimeEnvironmentStatus(environment.id))
+          )
         }
       })
       .catch(() => {

@@ -12,6 +12,7 @@ import {
   type HiveLocalRuntimeOwnershipState
 } from '../../../../shared/hive-runtime-cloud'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
+import type { RuntimeStatusSlice } from './runtime-status-types'
 import {
   AccountRuntimeClaimError,
   createAccountRuntimeCloudSlice,
@@ -33,10 +34,11 @@ function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
-type TestAccountRuntimeCloudState = AccountRuntimeCloudSlice & {
-  runtimeEnvironments: readonly PublicKnownRuntimeEnvironment[]
-  setRuntimeEnvironments: (environments: readonly PublicKnownRuntimeEnvironment[]) => void
-}
+type TestAccountRuntimeCloudState = AccountRuntimeCloudSlice &
+  Pick<RuntimeStatusSlice, 'runtimeStatusByEnvironmentId' | 'refreshRuntimeEnvironmentStatus'> & {
+    runtimeEnvironments: readonly PublicKnownRuntimeEnvironment[]
+    setRuntimeEnvironments: (environments: readonly PublicKnownRuntimeEnvironment[]) => void
+  }
 
 function createSliceStore(): StoreApi<TestAccountRuntimeCloudState> {
   const store = createStore<TestAccountRuntimeCloudState>()(
@@ -44,6 +46,8 @@ function createSliceStore(): StoreApi<TestAccountRuntimeCloudState> {
   )
   store.setState({
     runtimeEnvironments: [],
+    runtimeStatusByEnvironmentId: new Map(),
+    refreshRuntimeEnvironmentStatus: vi.fn().mockResolvedValue(true),
     setRuntimeEnvironments: (runtimeEnvironments) => store.setState({ runtimeEnvironments })
   })
   return store
@@ -839,6 +843,9 @@ describe('account Runtime Cloud store sync', () => {
     await Promise.resolve()
 
     expect(store.getState().runtimeEnvironments).toEqual([currentEnvironment])
+    expect(store.getState().refreshRuntimeEnvironmentStatus).toHaveBeenCalledExactlyOnceWith(
+      currentEnvironment.id
+    )
     stop()
   })
 })

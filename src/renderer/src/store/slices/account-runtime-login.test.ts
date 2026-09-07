@@ -4,10 +4,10 @@ import type { StateCreator } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY,
   EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP,
   type HiveAccountRuntimeDirectoryEntry,
-  type HiveAccountRuntimeDirectoryState,
-  type HiveLocalRuntimeOwnershipState
+  type HiveAccountRuntimeDirectoryState
 } from '../../../../shared/hive-runtime-cloud'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 import type { RuntimeStatusSlice } from './runtime-status-types'
@@ -15,20 +15,6 @@ import {
   createAccountRuntimeCloudSlice,
   type AccountRuntimeCloudSlice
 } from './account-runtime-cloud'
-
-function deferred<T>(): {
-  promise: Promise<T>
-  resolve: (value: T) => void
-  reject: (reason?: unknown) => void
-} {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((next, fail) => {
-    resolve = next
-    reject = fail
-  })
-  return { promise, resolve, reject }
-}
 
 type TestAccountRuntimeCloudState = AccountRuntimeCloudSlice &
   Pick<RuntimeStatusSlice, 'runtimeStatusByEnvironmentId' | 'refreshRuntimeEnvironmentStatus'> & {
@@ -95,49 +81,63 @@ function environment(id: string): PublicKnownRuntimeEnvironment {
   return { id, name: id, createdAt: 1 } as PublicKnownRuntimeEnvironment
 }
 
-describe('local Runtime identity catalog refresh', () => {
-  it('reloads the catalog when local identity arrives and fences an older self mirror reply', async () => {
-    const staleCatalog = deferred<PublicKnownRuntimeEnvironment[]>()
-    const freshCatalog = deferred<PublicKnownRuntimeEnvironment[]>()
-    let pushOwnership!: (state: HiveLocalRuntimeOwnershipState) => void
-    const directory = readyDirectory('account-1', 1, [directoryEntry('self')])
-    const list = vi
-      .fn()
-      .mockReturnValueOnce(staleCatalog.promise)
-      .mockReturnValueOnce(freshCatalog.promise)
+describe('account Runtime login discovery', () => {
+  it('probes newly discovered account hosts after login without restarting', async () => {
+    let pushDirectory!: (state: HiveAccountRuntimeDirectoryState) => void
+    const known = environment('paired-runtime')
+    const discovered = environment('account-runtime:runtime-1')
+    const failing = environment('account-runtime:runtime-2')
+    const list = vi.fn().mockResolvedValue([known, failing, discovered])
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
         runtimeEnvironments: { list },
         hiveRuntimeCloud: {
-          getDirectory: async () => directory,
-          getLocalOwnership: async () => EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP,
-          onDirectoryChanged: () => () => undefined,
-          onOwnershipChanged: (listener: typeof pushOwnership) => {
-            pushOwnership = listener
-            return () => undefined
-          }
+          getDirectory: vi.fn().mockResolvedValue(EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY),
+          getLocalOwnership: vi.fn().mockResolvedValue(EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP),
+          onDirectoryChanged: (listener: typeof pushDirectory) => {
+            pushDirectory = listener
+            return vi.fn()
+          },
+          onOwnershipChanged: () => vi.fn()
         }
       }
     })
     const store = createSliceStore()
-    const mirroredSelf = environment('account-runtime:self')
-    store.setState({ accountRuntimeDirectory: directory, runtimeEnvironments: [mirroredSelf] })
-    const publishCatalog = vi.fn(store.getState().setRuntimeEnvironments)
-    store.setState({ setRuntimeEnvironments: publishCatalog })
+    const probe = vi.fn(async (id: string) => {
+      expect(store.getState().runtimeEnvironments).toContain(discovered)
+      if (id === failing.id) {
+        throw new Error('Host unavailable')
+      }
+      store.setState({
+        runtimeStatusByEnvironmentId: new Map([
+          ...store.getState().runtimeStatusByEnvironmentId,
+          [id, { status: null, checkedAt: 1 }]
+        ])
+      })
+      return true
+    })
+    store.setState({
+      runtimeEnvironments: [known],
+      runtimeStatusByEnvironmentId: new Map([[known.id, { status: null, checkedAt: 1 }]]),
+      refreshRuntimeEnvironmentStatus: probe
+    })
     const stop = store.getState().startAccountRuntimeCloudSync()
     await Promise.resolve()
-    pushOwnership({ ...EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP, runtimeRecordId: 'self' })
-    expect(list).toHaveBeenCalledTimes(2)
-    const remote = environment('another-computer')
-    freshCatalog.resolve([remote])
-    await freshCatalog.promise
-    staleCatalog.resolve([mirroredSelf, remote])
-    await staleCatalog.promise
-    expect(publishCatalog).toHaveBeenCalledExactlyOnceWith([remote])
-    expect(store.getState().runtimeEnvironments).toEqual([remote])
-    pushOwnership({ ...EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP, runtimeRecordId: 'self', checkedAt: 10 })
-    expect(list).toHaveBeenCalledTimes(2)
+    expect(probe).not.toHaveBeenCalled()
+
+    const directory = readyDirectory('account-1', 1, [
+      directoryEntry('runtime-1'),
+      directoryEntry('runtime-2')
+    ])
+    pushDirectory(directory)
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledWith(discovered.id))
+    expect(probe).toHaveBeenCalledWith(failing.id)
+    expect(probe).not.toHaveBeenCalledWith(known.id)
+
+    pushDirectory({ ...directory, lastSyncedAt: 2 })
+    await Promise.resolve()
+    expect(probe).toHaveBeenCalledTimes(2)
     stop()
   })
 })
