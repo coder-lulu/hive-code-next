@@ -3,6 +3,10 @@ import nacl from 'tweetnacl'
 import type WebSocket from 'ws'
 import { afterEach, expect, it, vi } from 'vitest'
 import { HiveRuntimeRelayBroker } from './hive-runtime-relay-broker'
+import {
+  HiveRuntimeCloudRequestError,
+  HiveRuntimeCloudTransportError
+} from '../hive-runtime-cloud-http-client'
 import type { HiveRuntimeRelayAssignment } from './hive-runtime-relay-types'
 
 // Keep the real control state machine; cryptographic proof vectors have separate coverage.
@@ -33,6 +37,41 @@ class Socket extends EventEmitter {
 }
 
 afterEach(() => vi.useRealTimers())
+
+it.each([
+  new HiveRuntimeCloudRequestError(403, 'forbidden'),
+  new HiveRuntimeCloudRequestError(503, 'relay_unavailable', 2_000),
+  new HiveRuntimeCloudTransportError()
+])(
+  'withdraws active control on refresh failure and re-handshakes after recovery: %s',
+  async (error) => {
+    const { broker, assignment, resolve, refresh, sockets } = fixture()
+    try {
+      broker.start()
+      await vi.advanceTimersByTimeAsync(0)
+      await finishHandshake(sockets[0], assignment)
+      expect(broker.activeAssignment).not.toBeNull()
+      refresh.mockRejectedValueOnce(error)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(broker.activeAssignment).toBeNull()
+      expect(sockets[0].close).toHaveBeenCalledOnce()
+      const delay =
+        error instanceof HiveRuntimeCloudRequestError && error.retryAfterMs
+          ? error.retryAfterMs
+          : 750
+      await vi.advanceTimersByTimeAsync(delay - 1)
+      expect(resolve).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(resolve).toHaveBeenCalledTimes(2)
+      expect(broker.activeAssignment).toBeNull()
+      await finishHandshake(sockets[1], assignment)
+      expect(broker.activeAssignment).not.toBeNull()
+    } finally {
+      await broker.stop()
+      expect(vi.getTimerCount()).toBe(0)
+    }
+  }
+)
 
 function fixture() {
   vi.useFakeTimers()

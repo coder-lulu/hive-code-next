@@ -209,6 +209,13 @@ export class HiveRuntimeRelayBroker {
       this.schedule(Math.max(1_000, Math.floor(remaining / 2)))
     } catch (error) {
       if (generation === this.generation) {
+        const control = this.control
+        this.control = null
+        this.assignment = null
+        control?.close()
+        if (control) {
+          this.options.onUnavailable()
+        }
         this.retry(error)
       }
     } finally {
