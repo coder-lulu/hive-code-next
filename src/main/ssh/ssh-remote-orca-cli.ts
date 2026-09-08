@@ -22,6 +22,7 @@ import {
   optionalRemoteCliNumber,
   optionalRemoteCliString,
   parseRemoteCliArgs,
+  readRemoteRetryRequestFlag,
   requiredRemoteCliString,
   resolveRemoteCliHandle
 } from './ssh-remote-cli-args'
@@ -161,7 +162,7 @@ async function dispatchRemoteCli(
   const compatibilityEnvelope: RuntimeOrchestrationEnvelope = {
     compatibilityInvocationId: randomUUID(),
     orchestrationRequestId:
-      optionalRemoteCliString(parsed.flags, 'retry-request') ??
+      readRemoteRetryRequestFlag(parsed.flags) ??
       (command === 'orchestration check' || command === 'orchestration ask'
         ? randomUUID()
         : undefined),

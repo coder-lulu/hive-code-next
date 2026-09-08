@@ -5,6 +5,11 @@ import type { ConnectionState } from './types'
 import type { RpcClient } from './rpc-client'
 import type { MobileConnectionPath } from './stable-logical-rpc-client'
 
+vi.mock('./runtime-random', async () => {
+  const { randomBytes } = await import('node:crypto')
+  return { mobileRuntimeRandomBytes: randomBytes }
+})
+
 const connectMock = vi.fn()
 const loadHostsMock = vi.fn()
 

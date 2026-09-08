@@ -38,7 +38,11 @@ const SidebarHeader = React.memo(function SidebarHeader({
   const acknowledgeIntro = React.useCallback(() => {
     void updateSettings?.({ agentsSidebarIntroShown: true })
   }, [updateSettings])
-  const sidebarTitle = sectionTitle ?? (groupBy === 'repo' ? 'Projects' : 'Workspaces')
+  const sidebarTitle =
+    sectionTitle ??
+    (groupBy === 'repo'
+      ? translate('dashboard.sidebar.projects', 'Projects')
+      : translate('dashboard.sidebar.workspaces', 'Workspaces'))
   const activityLabel = translate(
     agentsViewActive ? 'dashboard.sidebar.closeActivity' : 'dashboard.sidebar.openActivity',
     agentsViewActive ? 'Turn off activity view' : 'View activity'

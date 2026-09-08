@@ -1,3 +1,4 @@
+import { translate } from '../../i18n/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui/button'
 import {
@@ -23,7 +24,7 @@ export function accountRuntimeEnvironment(runtime: WebAccountRuntime): StoredWeb
   const now = Date.now()
   return {
     id: `account-${runtime.runtimeRecordId}`,
-    name: runtime.cloudDisplayName || runtime.deviceName || 'Hive Runtime',
+    name: runtime.cloudDisplayName || runtime.deviceName || translate('auto.web.WebAccountConnect.runtimeName', 'Hive Runtime'),
     runtimeId: null,
     runtimeRecordId: runtime.runtimeRecordId,
     preferredEndpointId: `account-${runtime.runtimeRecordId}`,
@@ -151,8 +152,8 @@ export default function WebAccountConnect({
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
       <section className="flex w-full max-w-lg flex-col gap-4 rounded-lg border border-border bg-card p-5">
-        <h1 className="text-base font-semibold">连接账户中的电脑</h1>
-        <p className="text-sm text-muted-foreground">使用 HiveCloud 账户连接你的电脑 Runtime。</p>
+        <h1 className="text-base font-semibold">{translate('auto.web.WebAccountConnect.title', 'Connect to your computers')}</h1>
+        <p className="text-sm text-muted-foreground">{translate('auto.web.WebAccountConnect.description', 'Connect to your computer Runtime with your HiveCloud account.')}</p>
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -160,12 +161,12 @@ export default function WebAccountConnect({
         )}
         {busy && (
           <p role="status" className="text-sm text-muted-foreground">
-            正在连接…
+            {translate('auto.web.WebAccountConnect.connecting', 'Connecting…')}
           </p>
         )}
         {!signedIn && !busy && (
           <Button asChild>
-            <a href={loginPath}>登录 HiveCloud</a>
+            <a href={loginPath}>{translate('auto.web.WebAccountConnect.signIn', 'Sign in to HiveCloud')}</a>
           </Button>
         )}
         {signedIn && (
@@ -176,19 +177,19 @@ export default function WebAccountConnect({
                 className="flex items-center justify-between gap-3 py-3"
               >
                 <span className="min-w-0 truncate text-sm">
-                  {runtime.cloudDisplayName || runtime.deviceName || 'Hive Runtime'}
+                  {runtime.cloudDisplayName || runtime.deviceName || translate('auto.web.WebAccountConnect.runtimeName', 'Hive Runtime')}
                 </span>
                 <Button
                   variant="outline"
                   disabled={busy || !canConnectWebRuntime(runtime)}
                   onClick={() => void connect(runtime)}
                 >
-                  连接
+                  {translate('auto.web.WebAccountConnect.connect', 'Connect')}
                 </Button>
               </div>
             ))}
             {!runtimes.length && !busy && (
-              <p className="py-3 text-sm text-muted-foreground">账户中暂无已认领的电脑。</p>
+              <p className="py-3 text-sm text-muted-foreground">{translate('auto.web.WebAccountConnect.empty', 'No claimed computers in this account.')}</p>
             )}
           </div>
         )}
@@ -208,11 +209,11 @@ export default function WebAccountConnect({
                 .finally(() => setBusy(false))
             }}
           >
-            下一页
+            {translate('auto.web.WebAccountConnect.nextPage', 'Next page')}
           </Button>
         )}
         <Button variant="outline" disabled={busy} onClick={() => window.location.reload()}>
-          刷新
+          {translate('auto.web.WebAccountConnect.refresh', 'Refresh')}
         </Button>
         {children}
       </section>

@@ -37,6 +37,12 @@ import {
   stopStructuredAgentSessionRuntime
 } from './structured-agent-session-runtime'
 
+// The fake child has a synthetic PID; its process-tree proof must be synthetic too.
+vi.mock('../codex/codex-structured-turn-processes', () => ({
+  captureCodexTurnProcesses: async () => ({ platform: 'win32', identities: new Map() }),
+  terminateCodexTurnProcesses: async () => true
+}))
+
 const journals = createTrackedJournalOpener()
 
 const SESSION = 'session-integration-1'
@@ -290,6 +296,7 @@ beforeEach(async () => {
   configuredCodexProfile = 'configured'
   const runtime = {
     getRuntimeId: () => 'runtime-1',
+    getClientSettings: () => ({ experimentalStructuredNativeChat: true }),
     getStructuredAgentSessionCreateSupport: async () => ({ supported: true }),
     resolveStructuredAgentSessionCreateIntent: async () => {
       const {

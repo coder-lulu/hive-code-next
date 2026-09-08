@@ -290,10 +290,6 @@
           "4c8e1a72b9": "A recurring agent task",
           "6f309eef8d": "HiveCode"
         },
-        "AutomationListSortHeader": {
-          "sortedAscending": "{{value0}}, sorted ascending",
-          "sortedDescending": "{{value0}}, sorted descending"
-        },
         "AutomationMissedRunGraceField": {
           "3d70c185c8": "If HiveCode or the execution host was unavailable at the scheduled time, HiveCode runs one missed occurrence when it becomes available within this window. Older missed runs are skipped."
         },
@@ -771,6 +767,7 @@
           },
           "ProjectPicker": {
             "43a88ae574": "BOARD_LAYOUT",
+            "ab1a2c357d": "Roadmap (unsupported)",
             "b787682111": "Browse all",
             "ba0ab9a117": "Browse all (loading…)",
             "cafb908f34": "TABLE_LAYOUT"
@@ -1397,7 +1394,13 @@
           "cedfab35ab": "Optional. HiveCode can use your normal Codex login; add accounts only if you want quick switching in HiveCode.",
           "codexConfigSyncManagedHomeUnavailable": "HiveCode could not read this account’s Codex files just now, so settings may not be syncing. This usually clears on its own — antivirus or a backup tool briefly locks them.",
           "d0d53b7eb0": "Manage which Codex account HiveCode uses for live rate limit fetching.",
-          "d676c41fc6": "Extracts OAuth credentials from your local Gemini CLI installation to authenticate with Google. This uses credentials issued to the Gemini CLI app, not HiveCode. May break if Google updates the CLI. Use at your own risk."
+          "d676c41fc6": "Extracts OAuth credentials from your local Gemini CLI installation to authenticate with Google. This uses credentials issued to the Gemini CLI app, not HiveCode. May break if Google updates the CLI. Use at your own risk.",
+          "15e831350e": "Configure MiniMax usage tracking from platform.minimax.io.",
+          "1fd1b1b6b4": "Cookie not set",
+          "5e08b0fe57": "Stored locally and sent only to platform.minimax.io for usage refreshes.",
+          "79418c782a": "Open platform.minimax.io/console/usage in your browser, sign in, then copy the Cookie request header from DevTools (Network → any remains request → Cookie).",
+          "b43e761fe5": "MiniMax cookie update failed.",
+          "f5d8d2a6a1": "Open platform.minimax.io/console/usage in your browser and sign in."
         },
         "AdvancedNetworkSettingsSection": {
           "823e0f15b1": "Proxy URL for HiveCode network requests and local terminal children.",
@@ -2070,7 +2073,16 @@
           "ask_before_closing_running_terminals_description": "Show a confirmation before closing a terminal that has a running command or agent.",
           "ask_before_closing_running_terminals_title": "Ask Before Closing Running Terminals",
           "cc8c5ca224": "Windows default",
-          "d78fc4fdef": "Loading distributions"
+          "d78fc4fdef": "Loading distributions",
+          "minimumContrast": {
+            "automatic": "Automatic: {{light}} on light backgrounds, {{dark}} on dark.",
+            "description": "Lifts terminal foreground colors that sit too close to the background. Leave blank for automatic, or set 1 to render program colors exactly as sent.",
+            "disabled": "Correction off. Programs that rely on low contrast, like Powerline separators, render as sent.",
+            "pinned": "Targets {{ratio}}:1 contrast for foreground colors, where possible.",
+            "placeholder": "Auto",
+            "suffix": "blank = automatic, 1 = off",
+            "title": "Minimum Contrast Ratio"
+          }
         },
         "TerminalSettingsPreview": {
           "d06664e889": "dark"
@@ -2173,7 +2185,6 @@
             "07c7c38fac": "Choose the font used by the HiveCode interface.",
             "18b4c4c30b": "Show HiveCode in the titlebar.",
             "1de96ec8a6": "Show HiveCode Mobile Button",
-            "1f2880a9d5": "orca",
             "4d5b9427b5": "When enabled, closing the window keeps HiveCode running in the system tray instead of quitting.",
             "682293cadf": "Show the HiveCode Mobile button at the top of the left sidebar."
           }
@@ -2342,7 +2353,6 @@
             "search": {
               "2348045036": "Choose which emulator device HiveCode opens by default.",
               "2e0b45b2ba": "Use HiveCode CLI commands to list, attach, tap, and type into a mobile emulator.",
-              "9353854ff3": "orca emulator",
               "9595354cff": "Configure mobile emulator support for HiveCode and coding agents.",
               "d4b7833894": "HiveCode CLI"
             }
@@ -3860,12 +3870,12 @@
         "thinking": "Thinking",
         "toggleDetails": "Toggle turn details",
         "workedFor": "Worked for {{value0}}",
-        "working": "Working…",
         "workingFor": "Working for {{value0}}"
       },
       "tool": {
         "countN": "{{value0}} tool calls",
         "countOne": "1 tool call",
+        "moreCalls": "+{{value0}} more",
         "ranCommandManyToolsSummary": "Ran {{commandCount}} command and used {{toolCount}} tools",
         "ranCommandOneToolSummary": "Ran {{commandCount}} command and used {{toolCount}} tool",
         "ranCommandsManyToolsSummary": "Ran {{commandCount}} commands and used {{toolCount}} tools",

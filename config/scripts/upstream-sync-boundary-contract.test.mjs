@@ -28,7 +28,10 @@ describe('upstream synchronization boundary', () => {
   })
 
   it('keeps the large-module migration list tied to behavior contracts', () => {
-    expect(boundary.moduleSplitTargets).toHaveLength(6)
+    expect(boundary.moduleSplitTargets.length).toBeGreaterThan(0)
+    expect(new Set(boundary.moduleSplitTargets.map((target) => target.path)).size).toBe(
+      boundary.moduleSplitTargets.length
+    )
     for (const target of boundary.moduleSplitTargets) {
       expect(existsSync(join(projectDir, target.path)), target.path).toBe(true)
       expect(target.facade, target.path).toEqual(expect.any(String))

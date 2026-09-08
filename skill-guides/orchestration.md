@@ -1,441 +1,199 @@
 ---
 name: orchestration
 description: >-
-  Use HiveCode orchestration for structured multi-agent coordination: threaded
-  messages, blocking ask/reply flows, task dispatch, worker_done/escalation
-  waits, task DAGs, decision gates, coordinator loops, or decomposing work
-  across agents. Use `orca-cli` instead for full ownership handoffs, including
-  requests phrased as "hand off", "handoff", "handover", "give this to another
-  agent", or "another worktree" when the user did not explicitly ask to
-  supervise, monitor, wait for results, or coordinate a DAG. Use `orca-cli` for
-  terminal control, lightweight terminal prompts, shell commands, HiveCode
-  worktree management, reading or waiting on terminals, and automation of the
-  browser embedded inside HiveCode. Use Computer Use for external browser windows,
-  webviews, HiveCode app UI, or desktop UI outside HiveCode's embedded browser only when
-  the task requires OS/window-level control such as focus, menus, dialogs,
-  coordinates, or screenshots. Use `orca-cli` for HiveCode's embedded pages and a
-  page-automation tool such as Playwright or CDP for external pages.
+  Coordinate supervised HiveCode workers: threaded messages, blocking ask/reply,
+  task dispatch, worker_done/escalation waits, task DAGs, decision gates,
+  coordinator loops, and decomposing work across agents. Use `orca-cli` for full
+  ownership handoffs — "hand off", "handoff", "handover", "give this to another
+  agent", "another worktree" — unless asked to supervise, monitor, or coordinate
+  a DAG, and for terminal control, lightweight terminal prompts, shell commands,
+  HiveCode worktree management, and reading or waiting on terminals. Use Computer
+  Use for external browser windows, webviews, HiveCode app UI, or desktop UI outside
+  HiveCode's embedded browser only when the task requires OS/window-level control
+  such as focus, menus, dialogs, coordinates, or screenshots. Use `orca-cli` for
+  HiveCode's embedded pages and a page-automation tool such as Playwright or CDP for
+  external pages.
 ---
 
-# HiveCode Inter-Agent Orchestration
+# HiveCode orchestration
 
-Orchestration is HiveCode's structured coordination layer for agent messages, task ownership, dispatch state, and worker completion tracking.
+Orchestration is HiveCode's structured coordination layer. It records who owns work,
+which attempt is authoritative, and when supervised work has settled.
 
-Use this skill when coordination state matters. For lightweight terminal prompts or basic worktree/terminal/built-in-browser control, use `orca-cli`.
+## Outcome
 
-## Tool Boundary
+**Result:** every in-scope Task has one explicit outcome and every settled worker
+terminal has a next owner or cleanup decision. **Next consumer:** the user who
+requested supervision. **Done:** all expected Dispatches have settled, every
+delivered message was processed before acknowledgment, each settled worker was
+reused, explicitly retained, or released, and the turn ends only when the report
+to that user names, per Task, its outcome, the evidence behind it, and any
+unresolved blocker.
 
-If a task says to use HiveCode orchestration, the coordinator must create or bind a Run, create the Task with `hive orchestration task-create`, then attach the worker with either the preferred `hive orchestration worker-start` composition or the low-level `hive orchestration dispatch --inject` path.
+**Safe failure:** preserve work and authority and report the state as unknown or
+`unverifiable`. Only positive proof of exit authorizes stop, abandon, or retry,
+and only an accepted settlement authorizes release. Every other observation,
+absence included, is a checkpoint.
 
-Do not substitute non-HiveCode subagent tools, generic agent-spawn APIs, or chat-only parallel worker features. Those may create useful workers, but they do not create HiveCode task/dispatch provenance, injected lifecycle preambles, `worker_done` authority, or decision gates.
+## Classify the role
 
-Before claiming a worker was orchestrated, verify the task/dispatch exists:
+| Current context                                                                                                                                | Role                    | Route                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| The user explicitly asks to supervise, monitor, wait for results, track completion, coordinate a DAG, use a decision gate, or manage ask/reply | Coordinator             | Use the supervised loop below                                                  |
+| The current prompt contains a live injected preamble with Task and Dispatch IDs                                                                | Dispatched worker       | Follow the preamble and the worker obligations below                           |
+| The user asks to hand off ownership or start another agent/worktree without supervision                                                        | Handoff owner           | Use `orca-cli`; create no Run, Task, or Dispatch and do not monitor completion |
+| A message carries a legacy authority label                                                                                                     | Compatibility operator  | Load the legacy contract reference before any lifecycle mutation               |
+| No live preamble and no explicit supervision                                                                                                   | Ordinary terminal agent | Do not emit lifecycle messages; use `orca-cli` for terminal/worktree work      |
 
-```bash
-hive orchestration task-list --json
-hive orchestration dispatch-show --task <task_id> --json
-```
+Model or effort selection does not make a handoff supervised. Never substitute a
+non-HiveCode subagent tool when HiveCode orchestration provenance was requested.
 
-If the work was accidentally run outside HiveCode orchestration, say so plainly. To repair provenance, rerun or revalidate the needed work through a fresh HiveCode terminal plus injected dispatch; do not retroactively describe the external worker as orchestrated.
+## Authority and safety floor
 
-## When To Use
+- A Run is a durable namespace and coordinator inbox; it does not schedule or
+  place workers. A Task is work. A Dispatch is one authoritative Task attempt.
+- Lifecycle authority comes from the active Dispatch, not a terminal title,
+  copied ID, old database row, provider transcript, or visible pane.
+- Workers use the exact executable, handle, capability, Task ID, and Dispatch ID
+  in the live preamble. Never reconstruct, translate, or broaden those arguments.
+- After remote start, address the worker by Dispatch ID. The execution host owns
+  process, filesystem, transcript, stop, and cleanup facts. Preserve the verdicts
+  `live` / `unverifiable` / `exited`; contact loss is not process death.
+- Liveness is layered: `worker-list`'s `projection.liveness` is the fleet verdict
+  for the agent; `worker-show`'s `observation.status` is PTY liveness only. A live
+  terminal can still hold a dead or stuck agent.
+- Folder workspaces are valid; never require Git or assume a worktree.
+- Clients and remote servers update independently. Treat unknown optional fields
+  as absent. A new stream operation requires advertised capability because old
+  decoders may silently drop unknown opcodes. Never fall back to local execution
+  when remote authority or capability is unproven.
+- Use the executable you used to run `skills get` for the entire run. Examples below use `hive`; substitute the pinned executable when needed. If it fails, report that exact error instead of switching.
+- A successful `orchestration send` proves durable enqueue; its wake or nudge is
+  best-effort attention only and does not prove the recipient read or accepted it.
 
-- Send/reply/ask between agent terminals with persistent messages.
-- Dispatch structured tasks to workers and wait for `worker_done` or `escalation`.
-- Track task DAGs with dependencies.
-- Run coordinator loops or decision gates.
+## Worker obligations
 
-Do not use orchestration merely because the user says "hand off", "handoff", "handover", "give this to another agent", or asks for another worktree/agent/model/effort. Those are full ownership transfers unless the user explicitly asks to supervise, monitor, wait for worker completion/results, coordinate a DAG, use decision gates, or keep a blocking ask/reply loop.
+The injected preamble is authoritative. A dispatched worker must:
 
-## Preconditions
+1. Do only the current Task and use the preamble's `ask` command for a blocking
+   coordinator question. Never open a local question TUI the coordinator cannot
+   answer. Resume the same message ID after an ask timeout.
+2. Send heartbeats only at the cadence in the preamble. A heartbeat proves
+   liveness, not completion.
+3. Read coordinator follow-ups at each natural checkpoint — before starting a
+   new file, after a test run — and once more immediately before `worker_done`:
+   `hive orchestration check --terminal <your_handle> --json`.
+4. Send `worker_done` exactly once, from the dispatched terminal, with a
+   three-sentence executive summary, both lifecycle IDs, and explicit
+   `--outcome succeeded` or `--outcome failed`. Never encode failure only in prose.
+5. Append `--files-modified` and `--report-path` only with real values when
+   applicable. After `worker_done`, end the dispatched turn and idle; do not poll
+   or start new work.
 
-- `hive status --json` should show a running runtime.
-- `hive` must be on PATH. Older installations may expose the compatibility aliases
-  `orca-ide`, `orca-dev`, or `orca` instead.
-- The orchestration experimental feature must be enabled in Settings > Experimental.
-- `hive orchestration` commands are RPC calls to the running HiveCode runtime.
+A direct user instruction after completion starts new user-owned work and takes
+precedence over the idle rule. Do not reuse the settled lifecycle IDs.
 
-## Contract Migration
+## Canonical supervised loop
 
-HiveCode adopts a live pre-update orchestration assignment into an ordinary Run. Adoption preserves the existing agent process, PTY/session, terminal handle, tab/leaf/pane, worktree or folder workspace, Task, and Dispatch; it never restarts or replaces the worker. The retired scheduler is not revived, and a newly created attempt uses the current grammar.
+Confirm the runtime, bind one Run, and start the full independent wave before
+waiting. `worker-start --spec` creates the Task and its attempt in one call:
 
-Treat the authority label on injected or formatted messages as definitive:
-
-- `[LEGACY COMPATIBILITY]` is live and attested. Run only the exact supported command printed with the message, using the same CLI executable and arguments that the original prompt supplied.
-- `[LEGACY RECOVERY REPLAY — MAY HAVE BEEN SEEN]` is one bounded, at-least-once cutover replay. Process it idempotently and acknowledge it only through the exact displayed guidance.
-- `[LEGACY READ-ONLY]` is inspection-only. It has no reply, acknowledgment, or lifecycle action.
-- An unlabeled current message uses the current guide and current grammar.
-
-An explicitly selected current Run, attested current Run binding, current Dispatch, or federated attachment takes precedence over legacy fallback. A retained adoption record alone never turns a current command into a legacy call.
-
-Database provenance, an old-looking terminal, or a legacy Run ID does not prove mutation authority. If the runtime cannot prove liveness, principal ownership, capability, or the exact legacy contract, it degrades to read-only inspection and must not fall back to local execution. Exact recovery may restore the already-live PTY once in its original inactive background tab. It must not spawn, write, signal, stop, switch, focus, split, or inject a terminal. Loss of lifecycle authority does not invalidate the existing assignment, process, or filesystem work.
-
-Compatibility retries have narrow guarantees. A pending ask, a reply, a final Dispatch settlement, and a consuming check have durable recovery identities. A-era heartbeat and escalation calls remain at-least-once across a manual A-to-B retry because identical later signals may be intentional. If an A-era ask may already have been answered, run the exact non-consuming recovery check printed by the runtime first; after its answer is printed and acknowledged, a new invocation with the same question creates a new question. Never guess among multiple identical question threads.
-
-When a compatibility or recovery command returns structured next-step arguments, run those exact arguments with the same CLI executable. The arguments intentionally omit the executable name so the guidance works with `hive`, the legacy `orca`, `orca-ide`, or `orca-dev` aliases, or another configured HiveCode CLI command. Do not translate the command from memory, broaden its recipient, or retry it as a current mutation unless the returned guidance explicitly says to.
-
-On packaged Windows, a legacy ask uses a two-step commit/resume protocol. The initial command durably commits the question, prints its exact `ask --resume <message_id>` command, and exits with launcher status `75`; it does not wait for the answer. Run that exact resume command after the launcher or update boundary. Resume is idempotent and read-oriented: it waits for the already-committed question and does not create another one. For a WSL process that received compatibility proof at launch, use the printed executable `orca-ide` WSL resume command so the same distro and packaged launcher authority are preserved; do not substitute a PATH-resolved local CLI. Older WSL processes that never received the hidden launch token remain lifecycle read-only after the update, even while their terminal and filesystem work continue.
-
-Legacy inspection remains available without consuming mail:
-
-```bash
-hive orchestration run-list --json
-# run_legacy_local is an empty audit tombstone after adoption.
-hive orchestration run-show --id run_legacy_local --json
-# In run-list, find the ordinary Run whose objective is:
-# "Recovered orchestration work from a contract update"
-hive orchestration run-show --id <adopted_run_id> --json
-hive orchestration task-list --run <adopted_run_id> --json
-hive orchestration inbox --full --json
-hive orchestration check --terminal <legacy_handle> --peek --format --json
-hive terminal read --terminal <legacy_handle> --json
-hive terminal wait --terminal <legacy_handle> --for tui-idle --timeout-ms 60000 --json
-```
-
-If the original coordinator is unavailable or cannot prove its retained authority, a current coordinator may explicitly take over the adopted Run from its own live agent terminal:
-
-```bash
-hive orchestration run-use --id <adopted_run_id> --takeover-legacy --json
-hive orchestration check --run <adopted_run_id> --json
-```
-
-Takeover fences only the old coordinator, binds the current one, and moves pending worker mail into current Run Delivery. It is bound to the authenticated invoking terminal; `--from` cannot name another coordinator. Live legacy workers keep their original Tasks, Dispatches, processes, filesystems, and old prompt commands; their later questions, escalations, and completion reports route to the current coordinator. Do not use takeover while the original coordinator is still actively coordinating, because its later lifecycle mutations are rejected.
-
-Do not launch a replacement editor merely because the desktop app or runtime was updated. If adoption cannot prove continuing authority, keep the original worker as the only editor until it reaches a stable handoff point, then use a new current Dispatch in a conflict-free placement for any remaining work.
-
-## Ownership
-
-New orchestration messages and tasks belong to one explicitly bound Run. A Run is only a durable namespace and coordinator inbox; it never schedules or places workers. Lifecycle authority comes from the active Dispatch, and terminal handles remain routing metadata rather than durable identity. Send `worker_done` and `heartbeat` from the worker's own terminal; HiveCode routes them to that Dispatch's Run.
-
-Classify inherited context before sending lifecycle messages:
-
-- Coordinated subtask: a live coordinator owns the DAG and waits on this dispatch. Follow the preamble exactly, including `worker_done`, heartbeat/status, `ask`, and `escalation`.
-- Full handoff means ownership transfer, not supervised dispatch. The original actor is not monitoring a DAG, so do not create lifecycle obligations unless the user explicitly asks you to supervise.
-- Classify requests containing "hand off", "handoff", "handover", "give this to another agent", "give this to another worktree", "another agent", or "another worktree" as full handoffs by default, even when the user names a custom model or reasoning effort.
-- Use supervised orchestration only when the user explicitly asks you to "supervise", "monitor", "wait", "track completion", "wait for worker_done", return results, coordinate a DAG, use a decision gate, or manage ask/reply flow.
-- Do not use `hive orchestration dispatch --inject` for full handoffs. It injects a coordinator preamble that tells the worker to send `worker_done`, heartbeat, and `ask` messages, then end its turn under the original terminal's dispatch lifecycle.
-- Do not run `hive orchestration task-create`, `hive orchestration dispatch --inject`, or `hive orchestration check --wait` for full handoffs. Do not peek at terminal output after prompt delivery to monitor progress.
-- A review-only `worker_done` reports findings; it does not authorize coordinator file edits. After a review-only completion, synthesize findings, ask a decision gate if ownership is unclear, and dispatch or hand off fixes unless the user explicitly asked the coordinator to own fixes.
-- If the user's plan names a next owner agent (for example, "then use opencode to create a PR"), post-review corrections and PR prep belong to that named owner. The coordinator routes, synthesizes, asks decision gates when needed, and supervises; the named owner edits files and creates the PR.
-
-If unclear, inspect orchestration state before sending lifecycle messages:
-
-```bash
-hive orchestration task-list --json
-hive terminal list --json
-# If inherited context includes a task id:
-hive orchestration dispatch-show --task <task_id> --json
-```
-
-## Messaging
-
-```bash
-hive orchestration send --subject <text> [--to <run:id|dispatch:id|legacy_handle>] [--from <handle>] [--body <text>] [--type <type>] [--priority <level>] [--thread-id <id>] [--payload <json>] [--json]
-hive orchestration check [--terminal <handle>] [--ack <delivery_id>] [--peek|--all] [--types <type,...>] [--format] [--wait] [--timeout-ms <n>] [--json]
-hive orchestration reply --id <msg_id> --body <text> [--from <handle>] [--json]
-hive orchestration ask (--question <text>|--resume <msg_id>) [--options <csv>] [--timeout-ms <n>] [--from <handle>] [--json]
-hive orchestration inbox [--limit <n>] [--json]
-```
-
-Rules:
-
-- Omit `--from` unless impersonating another terminal; HiveCode auto-resolves it from the current terminal.
-- A coordinator `check` returns the bound Run's oldest FIFO Delivery (up to 50 messages) and replays that exact batch until `--ack <delivery_id>`. Process every message before acknowledging; `check --ack <id> --wait` acknowledges, checks, and waits in one operation.
-- Use `--peek` and `--all` only for read-only history/debugging. Type filters decide when a waiter wakes; the returned actionable Delivery is still the oldest full batch.
-- Use `dispatch:<id>` for coordinator guidance to one supervised worker. HiveCode routes that stable address locally or through the connected-server relay; do not substitute a remote terminal handle.
-- Terminal handles remain appropriate for low-level pre-Dispatch messaging. Prefer `agentTerminalHandle` from the create response, fall back to `startupTerminal.handle` for older runtimes, then re-resolve with `hive terminal list --worktree ... --json` if missing or stale. Continue with the replacement handle only; never dual-send to old and new handles.
-- `terminal list --json` omits `visualLayouts` because handle recovery does not need topology. Add `--include-visual-layouts` only for explicit tab and pane inspection.
-- `hive orchestration check --peek --format --json` returns locally formatted unread mail without consuming it; it never writes to terminal input or remotely wakes another terminal. Use `orchestration dispatch --inject` to deliver a tracked task, or `terminal send` when an existing agent needs a free-form prompt.
-- While supervising workers manually, use `check --wait --types worker_done,escalation,question --timeout-ms <n>` instead of sleep/poll loops. Process the whole Delivery, reply to `question` messages with `hive orchestration reply --id <msg_id> --body <answer> --json`, then acknowledge and keep waiting.
-- `check --json` prints exactly one JSON document on stdout. While `--wait` blocks it also prints keepalive lines (`{"_keepalive":true,...}`) to stderr so you can tell the process is alive; those are never on stdout. Do not merge the streams before a parser — `check --wait --json 2>&1 | <parser>` fails with "Extra data: line 2". Pipe stdout only.
-- Treat a `check --wait` timeout or `{count:0}` as a checkpoint, not a worker failure. Long coding tasks routinely run 15-60 minutes; keep using rolling waits unless you receive `worker_done`/`escalation`, the terminal exits or disappears, or the user explicitly asks you to stop.
-- Heartbeats and visible terminal activity mean the worker is alive, not done. Do not stop, close, kill, or restart a worker just because it has not produced a completion message yet.
-- Use `ask` when a worker needs a blocking answer from the coordinator; it defaults to the active Dispatch's Run. Timeout or disconnect leaves the question pending, so resume by its original message ID instead of asking again.
-- `check --wait` returns one bounded Delivery, not every future completion. Process every message, acknowledge it, then keep waiting until every expected Dispatch settles.
-- Group addresses include `@all`, `@idle`, `@claude`, `@codex`, `@opencode`, `@gemini`, `@droid`, `@grok`, `@cursor`, and `@worktree:<id>`.
-- Message types include `status`, `dispatch`, `worker_done`, `merge_ready`, `escalation`, `handoff`, `question`, `decision_gate` (legacy/gates), and `heartbeat`.
-- Use group addresses only for messages that are genuinely useful to many terminals, such as `status` broadcasts or intentional fan-out questions. Do not send dispatch lifecycle messages to groups.
-- `worker_done` belongs to the active Dispatch and defaults to its Run mailbox; never target a group.
-- A valid `worker_done` for the active `taskId` + `dispatchId` marks the task and dispatch completed automatically. Do not follow it with `task-update --status completed`; reserve manual updates for explicit recovery or overrides.
-- `heartbeat` is also Dispatch-scoped. Include both IDs and omit `--to` so HiveCode uses the owning Run; use `status` for broad progress updates.
-
-## Tasks And Dispatch
-
-A Run is the namespace/inbox, a Task is the work item, and a Dispatch assigns one Task attempt to a terminal. Create or bind a Run once before the common loop.
-
-```bash
-hive orchestration run-create --objective <text> --json
-hive orchestration task-create --spec <text> [--deps <json_array>] [--parent <task_id>] [--json]
-hive orchestration task-list [--status <status>] [--ready] [--brief] [--json]
-hive orchestration task-update --id <task_id> --status <status> [--result <json>] [--json]
-hive orchestration dispatch --task <task_id> --to <handle> [--from <handle>] [--inject] [--json]
-hive orchestration dispatch-show --task <task_id> [--json]
-```
-
-Task statuses: `pending`, `ready`, `dispatched`, `completed`, `failed`, `blocked`.
-
-Dispatch rules:
-
-- `--inject` sends the task spec plus preamble into a recognized agent CLI so it can report `worker_done`.
-- If the target is a bare shell, omit `--inject`, dispatch for tracking if needed, then send the prompt manually with `hive terminal send --terminal <handle> --text <prompt> --enter --json`.
-- After 3 consecutive failures on one task, the dispatch context circuit-breaks and the task is marked failed.
-- Use `task-list --brief --json` for coordinator sweeps; it collapses whitespace and caps each echoed spec at 160 characters (`spec_truncated` marks shortened rows). Omit `--brief` when the full spec is required, or when an older CLI rejects it as an unknown flag.
-
-## How deep workers can nest
-
-A dispatched worker normally cannot dispatch sub-workers. Attempting it fails with
-`nested_worker_depth_exceeded` and a message telling the worker to complete the task
-itself. Do that — do not try to route around it.
-
-The limit is a number, not an on/off switch. `Settings -> Orchestration -> Nested worker depth`
-sets how many generations are allowed:
-
-- `1` (default): a coordinator dispatches workers; those workers do not dispatch.
-- `2`: workers may dispatch one further generation.
-
-Depth is counted from the terminal that issues the command, not from the Run. Creating a
-new Run does not reset it — a worker that runs `run-create` then `worker-start` is still a
-worker, and still counted. This is the part that changed: the old behaviour rejected
-sub-dispatch only because a worker's terminal was not bound to a Run, so creating a Run was
-enough to slip past it.
-
-Two limits worth knowing:
-
-- **It is a guardrail, not a security boundary.** A caller that declares another terminal's
-  handle while its own launch evidence is unverifiable (an ordinary restored terminal, for
-  example) can be counted as that terminal instead. HiveCode does not treat workers as hostile.
-- **It applies while a Dispatch is active.** After `worker_done`, or after a coordinator
-  settles the task, the terminal is no longer a worker and is counted as a root again. The
-  process may still be alive; that is the documented boundary, not an accident.
-
-## Preferred Supervised Worker Loop
-
-Use `worker-start` for the normal supervised path. It composes the existing worktree, terminal, readiness, and dispatch primitives while returning exact created/reused effects. Agents still choose placement and concurrency; HiveCode does not schedule workers or infer conflicts.
-
-Create the Run and every independent Task first, then start all independent workers before waiting:
-
-```bash
+```text
+hive status --json
 hive orchestration run-create --objective "<objective>" --json
-hive orchestration task-create --spec "<worker A task>" --json
-hive orchestration task-create --spec "<worker B task>" --json
-hive orchestration worker-start --task <task_a> --worktree current --agent codex --json
-hive orchestration worker-start --task <task_b> --worktree current --agent claude --json
+hive orchestration worker-start --spec "<worker A task>" --worktree current --agent codex --json
+hive orchestration worker-start --spec "<worker B task>" --worktree current --agent claude --json
+hive orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json
 ```
 
-`current` and exact existing worktrees create a fresh agent terminal and do not rerun setup. Reuse an existing agent only with `--terminal <handle>`.
+If `worker-start` exits non-zero, do not relaunch. Read the receipt's
+`failedStage` and `residualResources`, then load
+`references/recovery-and-cleanup.md`.
 
-For a per-invocation Claude, Codex, or Cursor launch, pass an opaque provider model id with `--model`; add `--effort` only when that agent/model supports the level. These options apply only to fresh agent terminals, override general agent default arguments, and are reported under `launch.requested` and `launch.effective` in the receipt:
+Use `task-create` plus `worker-start --task <task_id>` for planned fan-out with
+dependencies or a retry of a known Task. Use dependencies only for real ordering
+and prefer parallel waves over chains deeper than three or four steps; nested
+workers obey the depth limit, and a new Run does not reset the caller's depth.
 
-```bash
-hive orchestration worker-start --task <task_id> --worktree current --agent claude --model opus --effort high --json
-```
+A consuming `check` names its caller with `--terminal <handle>`, never `--from`;
+omit it inside the coordinator's own HiveCode terminal. It returns the bound Run's
+oldest FIFO Delivery and replays that batch until acknowledged. Process every
+message: reply to questions, validate each `worker_done` against the expected
+active Dispatch, and decide each settled terminal's next owner before the ack:
 
-`--effort` requires `--model`, and neither option can combine with `--terminal`. A connected worker server must advertise launch-preference support before HiveCode forwards either option.
-
-For a new worktree, setup runs by default and agent-first creation reuses the returned startup agent terminal:
-
-```bash
-hive orchestration worker-start --task <task_id> --worktree new-child --name <name> --agent codex --setup run --json
-# Independent/top-level:
-hive orchestration worker-start --task <task_id> --worktree new-top-level --name <name> --agent codex --setup run --json
-```
-
-Setup normally starts alongside the agent. Only a repository explicitly configured with `wait-for-setup` delays agent launch until setup succeeds. Use `--setup skip` or `--setup inherit` only for a concrete reason.
-
-Read the returned receipt before continuing: `ready` plus setup `running` is normal for start-immediately, while wait-for-setup returns setup `succeeded` before accepting task input. A failed or unknown start exits nonzero; inspect its `stage`, `effects`, and `residualResources` instead of guessing or automatically retrying. A wait-for-setup timeout can honestly leave setup `running`, which is not proof of failure.
-
-To run the worker on another connected HiveCode server, add `--on <saved-environment>`. The Run and Tasks remain authoritative on the current server; later commands route by Dispatch ID, so never repeat `--on`:
-
-```bash
-# Mac Run home -> Windows worker (the reverse is identical from a Windows Run home)
-hive orchestration worker-start --task <task_id> --on windows --worktree new-top-level --repo <exact_remote_repo_selector> --name <name> --agent codex --setup run --json
-hive orchestration worker-show --dispatch <dispatch_id> --json
-hive orchestration worker-read --dispatch <dispatch_id> --limit 50 --json
-hive orchestration send --to dispatch:<dispatch_id> --subject "Follow-up" --body "<attempt-specific guidance>" --json
-```
-
-Remote `current` and `new-child` are intentionally invalid because those words are ambiguous across servers. Use an exact discovered remote worktree selector or `new-top-level` with an explicit remote repo selector.
-
-The follow-up is structured inbox mail, not prompt injection. The worker's next
-`orchestration check` receives it even when the Dispatch is on another connected HiveCode server.
-
-`worker-read` defaults to `--source auto`: HiveCode returns the exact hook-reported Codex, Claude, OpenClaude, or Grok transcript when it can prove the worker session, otherwise it returns bounded terminal output with `source: "terminal"` and a typed `fallbackReason`. Continue with the returned top-level `cursor`; it stays pinned to that exact source. If HiveCode reports `source_changed`, start a fresh read without the old cursor. Never supply or guess a provider session ID or transcript path.
-
-Wait until every expected Dispatch settles, not for a fixed number of batches:
-
-```bash
-hive orchestration check --wait --types worker_done,escalation,question --timeout-ms 900000 --json
-# Process every message. For each accepted worker_done that is not immediately reused:
-hive orchestration worker-release --dispatch <dispatch_id> --json
-# Acknowledge only after every message and required release decision is handled:
-hive orchestration check --ack <delivery_id> --wait --types worker_done,escalation,question --timeout-ms 900000 --json
-```
-
-After processing each accepted `worker_done`, choose the terminal's next owner before you acknowledge the Delivery or wait again. If the same exact agent has an immediate follow-up Task, read the `worker.agent_terminal_handle` field of `worker-show --dispatch <dispatch_id> --json`, then run `hive orchestration worker-start --task <next_task_id> --terminal <handle> --json` so HiveCode transfers cleanup ownership to the new Dispatch. Otherwise run `hive orchestration worker-release --dispatch <dispatch_id> --json`.
-
-Run `worker-release` after both succeeded and failed `worker_done` reports unless the user explicitly asked to keep that worker live. Release is post-completion cleanup, not cancellation: HiveCode first preserves inspectable output, then closes only the exact agent terminal owned by that settled Dispatch. Reused or pre-existing terminals, setup terminals, coordinators, active workers, user-taken-over terminals, and identities HiveCode cannot prove are retained. If the user explicitly asks to keep the live terminal for debugging, record that exception with `hive orchestration worker-retain --dispatch <dispatch_id> --json` instead of silently skipping cleanup. When the user is finished, the same Dispatch can be passed to `worker-release`, which clears the requested retention and releases the terminal.
-
-Do not release a worker because of a timeout, TUI idle state, heartbeat, status, question, escalation, or rejected/stale `worker_done`. If release returns `release_pending` or `release_unknown`, do not substitute `terminal close`; follow the exact recovery action in the receipt. A replayed Delivery may repeat `worker-release` safely.
-
-Workers report exactly once using the IDs and capability injected by HiveCode; they do not supply Run/server/terminal identity:
-
-```bash
-hive orchestration send --type worker_done --subject "<status>" --body "<what changed, findings, and what remains>" --task-id <task_id> --dispatch-id <dispatch_id> --outcome succeeded --files-modified "path/a,path/b" --json
-# On failure, use --outcome failed; never encode failure only in prose.
-```
-
-A worker question defaults to its owning Run. Timeout leaves it pending:
-
-```bash
-hive orchestration ask --question "<question>" --options "yes,no" --timeout-ms 600000 --json
-hive orchestration ask --resume <message_id> --timeout-ms 600000 --json
-# Coordinator:
+```text
 hive orchestration reply --id <message_id> --body "<answer>" --json
+hive orchestration worker-release --dispatch <dispatch_id> --json
+hive orchestration check --ack <delivery_id> --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json
 ```
 
-Recovery is conditional, never a fixed destructive sequence:
+Keep waiting until every expected Dispatch settles. A timeout or empty result is
+a checkpoint, not a failure. Do not stop, retry, release, or launch a duplicate
+editor without the positive proof `## Outcome` requires.
 
-- The response was lost and named no Dispatch: run `orca orchestration request-show --request <request_id> --json` first. It is read-only. `completed` means the mutation already took effect. `pending` means the original mutation is still running or HiveCode restarted before recording its outcome. For either state, replaying the original command with `--retry-request <request_id>` reuses the same operation identity so HiveCode can replay, join, or safely recover it without starting a separate duplicate. `absent` means this runtime holds no receipt under your caller identity and is not proof that nothing happened; inspect the affected state before deciding whether to retry.
-- `worker-show --dispatch <id>` says `ready`: keep waiting or read bounded output.
-- It proves `failed` or `stopped`: start a replacement with `worker-start --task <task> --retry-of <id>` plus an explicit `--on`/`--worktree` and `--agent`/`--terminal` choice. Retry does not silently inherit placement.
-- It remains `outcome_unknown`: either `worker-stop --dispatch <id>` and inspect again, or explicitly `worker-abandon --dispatch <id>` while accepting that resources may still be live. Abandon performs no remote, process, or filesystem action.
-- `worker-stop` closes only the exact supervised agent terminal. It never deletes the worktree, setup terminal, configured tabs, or unrelated processes.
+After three consecutive empty waits, stop waiting blindly and enumerate with
+`hive orchestration worker-list --include-remote --json` (defaults to the bound
+Run; `--run <run_id>` overrides; the receipt's `scope` names which), acting on
+each row's `projection.attention` categories, `projection.attention.requiresAction`, and literal `projection.nextAction` argv.
+A `none` `nextAction` has no argv to run: read `liveness.reason` and keep waiting
+with `check --wait`. Absence never earns an argv; settlement and pending work still do.
+Leave the wait only on positive proof the agent stopped: `exited` liveness, the
+worker's own observation of process exit, or a transcript whose final agent turn
+sent no `worker_done`. Then load `references/recovery-and-cleanup.md` and choose
+`worker-stop` or `worker-abandon` explicitly. `unverifiable` is absence,
+including when `worker-show` reports `agentWait` null. Absence never authorizes
+stop, abandon, retry, or release; keep waiting or inspect.
 
-Low-level `worktree create`, `terminal create`, and `dispatch --inject` remain valid recipes for custom argv or topology that `worker-start` does not express.
+`worker-start` is the normal path, composing placement, terminal readiness,
+prompt injection, and supervised resource ownership. `dispatch --inject` leaves
+an operator-created process unsupervised and is only for an expressiveness gap.
 
-`dispatch --inject` deliberately keeps an operator-started terminal unsupervised: it never creates a `worker_dispatches` row and `worker-stop`/`worker-abandon` never close that process. The dispatch context is still authoritative, so `worker-show`, `worker-read`, and `worker-list` report it as `unsupervised`; settled `worker-retain` and `worker-release` report `retained` with `no_owned_resource` and take no process action. Use `worker-start --terminal <handle>` when supervision and worker lifecycle state are required.
+## Task-spec contract
 
-## Gates And Legacy Inspection
+Every Task spec must be self-contained and name:
 
-```bash
-hive orchestration gate-create --task <task_id> --question <text> [--options <json_array>] [--json]
-hive orchestration gate-resolve --id <gate_id> --resolution <text> [--json]
-hive orchestration gate-list [--task <task_id>] [--status <status>] [--json]
-```
+- **Target:** the files, component, or environment in scope.
+- **Change:** the concrete result to produce.
+- **Constraints:** invariants, compatibility rules, and do-not-touch boundaries.
+- **Ownership:** what this worker may edit and any coordination boundary.
+- **Observable acceptance:** the test, output, or evidence that proves completion.
 
-Use `ask` for worker-to-coordinator questions; it creates a `question` message that the coordinator answers with `reply`. Use `gate-create` only for coordinator-managed task DAG decisions, not for answering a worker's `ask`.
+## Completion accounting
 
-`coordinator-start`, `coordinator-stop`, `run`, and `run-stop` are retired scheduler commands. They perform no effects and return the current-skill recovery action. They are not aliases for lightweight Run creation or binding.
+After an accepted success or failure report, immediately do exactly one:
 
-Recovery only: `hive orchestration reset --tasks|--messages|--all --json` clears the selected local orchestration database state. Do not run it during active coordination unless explicitly abandoning that state.
+1. Reuse the same proven agent terminal for an immediate follow-up Dispatch.
+2. Record user-requested retention with `worker-retain`.
+3. Run `worker-release`.
 
-## Full Handoffs
+Release is post-settlement cleanup, not cancellation. Only an accepted
+settlement authorizes it; no other observation does. If release is uncertain,
+follow its exact recovery receipt and never substitute `terminal close`.
 
-For full ownership transfer, use non-lifecycle terminal/worktree commands and then stop monitoring unless the user asks for supervision.
+A valid `worker_done` settles the Task and Dispatch automatically; do not follow
+it with `task-update --status completed`. Enumerate the terminals still owing a
+decision with `worker-list --run <run_id> --terminal-state reclaimable --json`,
+and do not end the coordinator turn until it returns none.
 
-Treat these as full handoff requests by default: "hand off", "handoff", "handover", "give this to another agent", "give this to another worktree", "send this to another agent", "another agent", "another worktree", or "launch another agent to own this." Custom model or reasoning effort words such as `gpt-5.5`, `high`, or `xhigh` do not make the handoff supervised.
+## Conditional references
 
-Supervised orchestration remains available only when the user explicitly asks for supervision or coordination: "supervise", "monitor", "wait for worker_done", "wait for results", "track completion", "DAG", "decision gate", "ask/reply", or "coordinate workers."
+This compact guide is sufficient for the normal local loop. At an action gate
+below, run `hive skills get orchestration --reference references/<file>.md` and
+read only that document; `--references` lists the names. If the CLI rejects
+`--reference`, run `hive skills get orchestration --full` once instead: it
+returns this exact kernel and every reference, so read only the named one. If an
+older CLI rejects `--full`, keep this kernel's safety floor, use that command's
+`--help`, and never guess newer flags.
 
-Do not run `hive orchestration task-create`, `hive orchestration dispatch --inject`, or `hive orchestration check --wait` for full handoffs. `task-create` is also forbidden because it records coordinator-owned tracking state; if a task row is needed, the user asked for supervised orchestration. Do not create a `taskId`/`dispatchId`, inject a lifecycle preamble, wait for completion, or read the worker terminal after prompt delivery except to avoid losing the initial prompt.
+| Action gate                                                                                                   | Bundled reference                         |
+| ------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Expanded DAG waves, launch model/effort, same-terminal reuse, or review ownership                             | `references/coordinator-loop.md`          |
+| You are a dispatched worker and the live preamble does not answer your question, or `check` returned an error | `references/worker-contract.md`           |
+| New worktree, exact workspace, SSH, WSL, or connected-server placement                                        | `references/placement-and-remote.md`      |
+| Inbox replay, follow-up messages, group addresses, or decision gates                                          | `references/messaging-and-gates.md`       |
+| Failed/stopped/unknown attempts, retry, stop, abandon, retain, or uncertain release                           | `references/recovery-and-cleanup.md`      |
+| Custom argv or terminal topology that `worker-start` cannot express                                           | `references/low-level-topology.md`        |
+| Any legacy label, adopted Run, compatibility receipt, or takeover                                             | `references/legacy-contract-migration.md` |
 
-New top-level worktree handoff:
-
-```bash
-hive worktree create --name <task-name> --no-parent --agent codex --prompt "<task brief>" --setup run --json
-```
-
-Before creating a new worktree from an active feature branch, decide and state whether the desired HiveCode lineage is child or top-level. Use child worktree lineage only when the new work is conceptually stacked under or dependent on the active worktree. For independent repo-wide fixes, standalone feature work, or unrelated follow-up tasks, create a top-level worktree with `--no-parent`.
-
-Existing terminal handoff:
-
-```bash
-hive terminal send --terminal <handle> --text "<task brief>" --enter --json
-```
-
-Custom Codex model/effort handoff:
-
-`hive worktree create --agent codex --prompt ...` launches the known Codex agent but does not accept Codex-specific `--model` or `-c model_reasoning_effort=...` arguments. When the user asks for a specific Codex model or effort, create the independent worktree first, launch Codex with the requested command in that worktree, wait only for TUI readiness if prompt delivery would otherwise race startup, send the prompt, and stop.
-
-The two-step custom-argv path cannot enforce a repository's explicit `wait-for-setup` startup policy because the later `terminal create` is not the startup owned by `worktree create`. Use it only when the repository starts agents immediately. If the repository requires `wait-for-setup`, use an agent-first configured launcher that can preserve sequencing, or stop and ask rather than silently bypassing the policy.
-
-Note: when no repo default-terminal configuration supplies a primary terminal, bare create opens a fallback shell before `terminal create` adds the agent. Configured default tabs are materialized instead and may run real commands. Prefer `--agent` whenever custom argv is not required. With the two-step path, target only the agent handle; close a prior terminal only after `terminal list` or `terminal show` confirms it is an unused shell.
-
-Use the exact full `<repo-id>::<path>` worktree id returned by `hive worktree create --json`; a bare repo id cannot target the new worktree.
-
-```bash
-hive worktree create --name <task-name> --no-parent --setup run --json
-hive terminal create --worktree id:<newFullWorktreeId> --title <task-name> --command 'codex --model gpt-5.5 -c model_reasoning_effort="xhigh"' --json
-hive terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
-hive terminal send --terminal <handle> --text "<task brief>" --enter --json
-```
-
-Wait only for `tui-idle` when needed to avoid losing the prompt. Do not monitor task completion.
-
-`--no-parent` only controls HiveCode lineage; it does not choose the Git base. If the work should start from the repo default base, omit `--base-branch` so HiveCode uses that default, or explicitly pass the repo default base (`origin/main`, `origin/master`, or the `hive repo show --repo <selector> --json` value); never base it on the current feature branch unless the user explicitly asks for stacked work or "branch from current". Put current-branch context in the prompt instead.
-
-## Worker Terminals
-
-Choose the worker location before creating a terminal. `Fresh worker` means a fresh agent session, not a new git worktree. For parallel work, create one fresh agent terminal per worker in the same required worktree, falling back to the active worktree when none is named. If the task says current worktree only, depends on uncommitted files/artifacts, or must validate/PR the current branch, keep every worker in the active worktree:
-
-```bash
-hive terminal create --worktree active --title <task-name> --command "codex" --json
-hive terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
-hive orchestration dispatch --task <task_id> --to <handle> --inject --json
-```
-
-Reuse an idle agent in the required worktree only if the prompt allows reuse; otherwise create a fresh terminal there. Create a new worktree only when the user explicitly requests one or a concrete checkout or filesystem conflict makes sharing unsafe or impossible; if the user did not request it, state that conflict before running `worktree create`. Independent tasks, parallel execution, convenience, or a preference for separate checkouts are not isolation requirements.
-
-When a new worktree is allowed, use child lineage for isolated work that is stacked under or dependent on the active worktree, and use `--no-parent` when it is not stacked. Decide the Git base separately: `--no-parent` makes the worktree top-level in HiveCode, while omitted `--base-branch` uses the repo default base.
-
-For every new worktree, pass `--setup run` so any configured repository setup hook runs. This does not mean waiting for setup before agent launch: preserve the repository's startup policy, whose default starts setup and the agent side by side. Use `--setup skip` or `--setup inherit` only when there is a concrete task-specific reason, and state that reason before creating the worktree. This rule does not rerun setup for current or existing worktrees.
-
-```bash
-hive worktree create --name <task-name> --agent codex --setup run --json
-# or: --agent claude | omp | pi | grok | ...
-# Read <handle> from agentTerminalHandle, falling back to startupTerminal.handle.
-hive terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
-hive orchestration dispatch --task <task_id> --to <handle> --inject --json
-```
-
-For new-worktree workers, read the id and `agentTerminalHandle` from `worktree create`, falling back to `startupTerminal.handle` for older runtimes. Use that as the sole worker handle when present; otherwise use `terminal list` to resolve the agent handle. Omit `--repo` only inside a HiveCode-managed worktree; otherwise pass `--repo <selector>`.
-
-**For an allowed new worktree, use agent-first:** `--agent` reveals the new worktree and launches the selected agent **in its first terminal**, without adding a separate fallback shell for that worker. Pass `--setup run`; repo setup and default-terminal settings may add intentional tabs or splits. Do **not** run bare `worktree create` and then `terminal create --command <agent>` for the same worker when agent-first create is available: without configured default tabs, that two-step path leaves a fallback shell + agent pair. Only use it when custom agent argv is required (for example Codex model/effort flags) or when an older CLI rejects `--agent`; if you must, message only the agent handle. Configured default tabs are intentional surfaces, so close a prior terminal only after `terminal list` or `terminal show` confirms it is an unused shell. Do not run `worktree create` when the task must stay in the current worktree.
-
-Use `hive worktree create --prompt ...` or `hive terminal send ...` for full handoffs or untracked/lightweight prompts. Those paths do not attach `taskId`/`dispatchId`; the worker should not send lifecycle messages unless the prompt supplies a live orchestration preamble.
-
-Sidebar lineage and orchestration lifecycle are related but not identical. A same-worktree worker may appear as a peer under that worktree in the sidebar while remaining a child dispatch in orchestration state; only an actual child worktree creates visible parent/child worktree lineage.
-
-Other terminal commands coordinators often need:
-
-```bash
-hive terminal list [--worktree <selector>] [--include-visual-layouts] [--json]
-hive terminal create [--worktree <selector>] [--title <text>] [--command <cmd>] [--json]
-hive terminal split --terminal <handle> [--direction horizontal|vertical] [--command <cmd>] [--json]
-hive terminal wait --terminal <handle> --for tui-idle --timeout-ms <n> --json
-hive terminal read --terminal <handle> --json
-hive terminal send --terminal <handle> --text <text> --enter --json
-```
-
-If an older CLI rejects `worktree create --agent`, create the worktree normally, then run `hive terminal create --worktree <selector> --command "codex" --json` or `--command "claude"`.
-
-Wait for `tui-idle` before dispatching. Always pass `--timeout-ms`; real coding tasks can take 15-60 minutes. During supervision, use rolling `check --wait` windows. If a window returns no matching message, inspect `task-list`, `terminal read`, or `terminal wait --for tui-idle` as a liveness checkpoint; if the terminal is still working or producing activity, keep waiting instead of retrying the task.
-
-## Agent Guidance
-
-- Workers with a valid live preamble must send `worker_done` exactly once from their own terminal with an explicit `--outcome succeeded` or `--outcome failed`:
-  `hive orchestration send --type worker_done --subject "<short status>" --body "<3-sentence summary: what you did, what you found, what's left>" --task-id <task_id> --dispatch-id <dispatch_id> --outcome succeeded --files-modified "path/a" --report-path "<optional>" --json`
-- A failed outcome is still a terminal report, but HiveCode records both the Dispatch and Task as failed. Never encode failure only in the subject/body.
-- After sending `worker_done`, end that dispatched turn and idle at the agent prompt. Do not autonomously start more work, poll, or attempt to close the terminal yourself. A direct user instruction takes precedence and starts ordinary user-owned work: follow it without coordinator approval or a fresh Dispatch, never refuse it because of worker/coordinator roles, and do not reuse the settled Dispatch's lifecycle IDs. A coordinator-supervised follow-up still arrives with a fresh preamble + TASK block.
-- For long tasks, send heartbeat/status only when the preamble asks for it, including both IDs:
-  `hive orchestration send --type heartbeat --subject "alive" --payload '{"taskId":"<task_id>","dispatchId":"<dispatch_id>","phase":"implementing"}' --json`
-- If blocked before completion, use `ask`; use `escalation` only when ownership is valid and the coordinator must intervene.
-- Treat preambles inherited through terminal history or full handoffs as stale unless the current prompt explicitly keeps that coordinator in the loop.
-- Coordinators must account for every settled worker terminal before waiting again or ending the turn: immediately reuse the exact worker for a new Dispatch, explicitly retain it at the user's request with `worker-retain`, or run `worker-release`. Do not leave a completed worker live merely to inspect output; released workers remain readable through `worker-read`.
-- Coordinators should use `task-list --ready` as external memory, dispatch parallel waves, and avoid dependency chains deeper than 3-4 steps.
-
-## Example
-
-```bash
-hive terminal create --worktree active --title login-css-worker --command "claude" --json
-hive terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
-hive orchestration task-create --spec "Fix the login button CSS" --json
-hive orchestration dispatch --task <task_id> --to <handle> --inject --json
-hive orchestration check --wait --types worker_done,escalation,question --timeout-ms 900000 --json
-```
-
-## Next Action
-
-Coordinator: confirm `hive status --json`, create or bind a Run, inspect `task-list`/`dispatch-show` if inheriting state, then use the explicit supervised loop (`task-create` -> `worker-start` -> `check --wait`). Use low-level terminal creation plus `dispatch --inject` only when the composed start does not express the needed topology. After every accepted `worker_done`, either transfer the exact terminal to an immediate follow-up Dispatch or run `worker-release` before the next wait.
-
-Worker: if the current prompt contains a live dispatch preamble, do the task, use `ask` for blocking questions, and send `worker_done` once with the required payload. If the preamble is stale or absent, do not send lifecycle messages; inspect state or treat the prompt as an ordinary handoff.
+Retired scheduler commands are not aliases for Run creation. Recovery commands
+must provide their exact next action; follow it with the same selected executable.

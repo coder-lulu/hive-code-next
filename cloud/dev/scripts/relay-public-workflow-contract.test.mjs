@@ -22,7 +22,7 @@ const UNGATED = relayWorkflowFile('verify.yml')
 const relayWorkflows = () => workflowFiles().filter((file) => file !== UNGATED)
 
 test('the copy carries every relay workflow', () => {
-  assert.equal(relayWorkflows().length, 24)
+  assert.equal(relayWorkflows().length, 25)
 })
 
 // Why: workflow_run chains match by display name, not filename. Renaming a file is safe; renaming

@@ -87,7 +87,7 @@ describe('future feature Graphite shell', () => {
       createElement(
         FutureFeatureScreen,
         {
-          capabilityId: 'account',
+          capabilityId: 'cloudWork',
           description: '账号能力说明',
           title: '产品账号'
         },

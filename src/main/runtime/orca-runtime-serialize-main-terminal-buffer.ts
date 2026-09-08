@@ -49,7 +49,7 @@ export class OrcaRuntimeWithSerializeMainTerminalBuffer extends OrcaRuntimeWithA
   } | null> {
     // Restored PTYs may have only post-restart bytes in main; never repaint that suffix as history.
     if (this.providerSnapshotPreferredPtys.has(ptyId)) {
-      return this.serializeProviderTerminalBuffer(ptyId, opts)
+      return this.serializePreferredRestoredTerminalBuffer(ptyId, opts)
     }
     const headlessSnapshot = await this.serializeHeadlessTerminalBuffer(ptyId, {
       ...opts,
@@ -57,7 +57,7 @@ export class OrcaRuntimeWithSerializeMainTerminalBuffer extends OrcaRuntimeWithA
     })
     // Attach can prove missing history while the snapshot waits for queued writes to parse.
     if (this.providerSnapshotPreferredPtys.has(ptyId)) {
-      return this.serializeProviderTerminalBuffer(ptyId, opts)
+      return this.serializePreferredRestoredTerminalBuffer(ptyId, opts)
     }
     if (headlessSnapshot) {
       return headlessSnapshot

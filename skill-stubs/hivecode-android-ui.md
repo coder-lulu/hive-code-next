@@ -12,17 +12,18 @@ accessibility output, and run mobile tests. It also records the Windows SDK
 fallback and the project-specific startup/recovery traps. For raw emulator
 control without UI work, use `orca-emulator-android` instead.
 
+<!-- shared: resolver -->
+
 ## Load the full guide before acting
 
 ```text
 hive skills get hivecode-android-ui
 ```
 
-Use `hive` in current builds. If the compatibility environment variable
-`ORCA_CLI_COMMAND` is set, use its pinned executable instead. Older builds may
-expose `orca-dev`, `orca-ide`, or `orca`; use one only when `hive` is unavailable.
 Read the returned guide before starting an emulator or editing the mobile UI. It
 links the lower-level `orca-emulator-android` compatibility skill.
+
+<!-- shared: no-guessing -->
 
 ## If an older HiveCode does not recognize `skills get`
 

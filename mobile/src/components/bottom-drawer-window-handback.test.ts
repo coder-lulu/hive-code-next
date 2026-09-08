@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const withTimingCalls = vi.hoisted(() => [] as { to: number; duration: number | undefined }[])
 const sharedWrites = vi.hoisted(() => [] as { key: string; value: unknown }[])
 
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: { getItem: vi.fn(), setItem: vi.fn() }
+}))
 vi.mock('react-native', () => ({
   BackHandler: { addEventListener: () => ({ remove: () => {} }) },
   Keyboard: {
@@ -12,6 +15,7 @@ vi.mock('react-native', () => ({
     dismiss: () => {},
     metrics: () => null
   },
+  useColorScheme: () => 'light',
   Modal: 'Modal',
   Platform: { OS: 'ios', select: (options: { ios?: unknown }) => options.ios },
   Pressable: 'Pressable',
@@ -73,6 +77,7 @@ vi.mock('react-native-reanimated', () => {
   }
 })
 
+import { MobileThemeProvider } from '../theme/mobile-theme-provider'
 import { MountedBottomDrawer } from './mounted-bottom-drawer'
 
 const noop = () => {}
@@ -88,11 +93,11 @@ function SheetBody() {
 }
 
 function drawer(interactive: boolean) {
-  return createElement(
+  return createElement(MobileThemeProvider, { initialPreference: 'light' }, createElement(
     MountedBottomDrawer,
     { visible: true, interactive, onClose: noop, onHidden: noop },
     createElement(SheetBody)
-  )
+  ))
 }
 
 function render(interactive: boolean): ReactTestRenderer {

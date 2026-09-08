@@ -12,9 +12,9 @@ import {
 } from '../../../src/shared/native-chat-tool-summary'
 import {
   describeActiveToolCall,
-  isCommandToolName,
   selectActiveToolCall
 } from '../../../src/shared/native-chat-tool-activity'
+import { isShellActivityToolCall } from '../../../src/shared/native-chat-tool-icon'
 import type { NativeChatBlock } from '../../../src/shared/native-chat-types'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
@@ -220,7 +220,10 @@ export function ToolRun({
   const activitySubject = activity?.isCommand
     ? activity.preview || '命令'
     : [activity?.toolName, activity?.preview].filter(Boolean).join(' ')
-  const ActiveToolIcon = activeCall && isCommandToolName(activeCall.name) ? SquareTerminal : Wrench
+  // The call's input, not its word: Codex names a classified shell row
+  // `read`/`search`/`list` and keeps the command it ran, while Claude's `Read`
+  // shares that word and ran none.
+  const ActiveToolIcon = activeCall && isShellActivityToolCall(activeCall) ? SquareTerminal : Wrench
   return (
     <View style={styles.toolRun}>
       <View style={styles.toolRunHeader}>

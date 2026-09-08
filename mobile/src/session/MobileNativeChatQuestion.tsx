@@ -4,7 +4,8 @@ import { ArrowUp, Check, CircleHelp } from 'lucide-react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import {
-  formatQuestionAnswer,
+  formatQuestionAnswerByIndexes,
+  formatQuestionAnswerWithOtherByIndexes,
   formatQuestionFreeTextAnswer,
   type MobileChatQuestion
 } from './mobile-native-chat-question'
@@ -18,7 +19,7 @@ type Props = {
 export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.JSX.Element {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
-  const [selected, setSelected] = useState<string[]>([])
+  const [selectedOptionIndexes, setSelectedOptionIndexes] = useState<number[]>([])
   const [freeText, setFreeText] = useState('')
   const [sending, setSending] = useState(false)
   const sendingRef = useRef(false)
@@ -27,9 +28,11 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
   const hasOptions = question.options.length > 0
   const trimmedFreeText = freeText.trim()
 
-  const toggle = (option: string): void => {
-    setSelected((prev) =>
-      prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]
+  const toggle = (optionIndex: number): void => {
+    setSelectedOptionIndexes((prev) =>
+      prev.includes(optionIndex)
+        ? prev.filter((index) => index !== optionIndex)
+        : [...prev, optionIndex]
     )
   }
 
@@ -47,34 +50,51 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
     }
   }
 
-  const answerSingle = async (option: string, optionIndex: number): Promise<void> => {
+  const answerSingle = async (optionIndex: number): Promise<void> => {
     const token = question.optionTokens[optionIndex]
-    await sendAnswer(token && token.length > 0 ? token : formatQuestionAnswer(question, [option]))
+    await sendAnswer(
+      token && token.length > 0 ? token : formatQuestionAnswerByIndexes(question, [optionIndex])
+    )
   }
 
   const submitMulti = async (): Promise<void> => {
-    if (selected.length === 0) {
+    if (selectedOptionIndexes.length === 0) {
       return
     }
-    await sendAnswer(formatQuestionAnswer(question, selected))
+    const answer =
+      question.freeTextToken && trimmedFreeText.length > 0
+        ? formatQuestionAnswerWithOtherByIndexes(question, selectedOptionIndexes, trimmedFreeText)
+        : formatQuestionAnswerByIndexes(question, selectedOptionIndexes)
+    if (await sendAnswer(answer)) {
+      setFreeText('')
+    }
   }
 
   const submitFreeText = async (): Promise<void> => {
     if (!allowOther || trimmedFreeText.length === 0) {
       return
     }
-    if (await sendAnswer(formatQuestionFreeTextAnswer(question, trimmedFreeText))) {
+    const answer =
+      question.multiSelect && question.freeTextToken && selectedOptionIndexes.length > 0
+        ? formatQuestionAnswerWithOtherByIndexes(question, selectedOptionIndexes, trimmedFreeText)
+        : formatQuestionFreeTextAnswer(question, trimmedFreeText)
+    if (await sendAnswer(answer)) {
       setFreeText('')
     }
   }
 
-  const canSubmitMulti = selected.length > 0 && !sending
+  const canSubmitMulti = selectedOptionIndexes.length > 0 && !sending
   const canSendFreeText = allowOther && trimmedFreeText.length > 0 && !sending
 
   // Stable keys for option rows even if an agent repeats a label.
   const optionRows = useMemo(
-    () => question.options.map((label, index) => ({ label, key: `${index}:${label}` })),
-    [question.options]
+    () =>
+      question.options.map((label, index) => ({
+        label,
+        description: question.optionDescriptions?.[index],
+        key: `${index}:${label}`
+      })),
+    [question.optionDescriptions, question.options]
   )
 
   return (
@@ -86,8 +106,8 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
 
       {hasOptions ? (
         <View style={styles.options}>
-          {optionRows.map(({ label, key }, optIndex) => {
-            const isSelected = selected.includes(label)
+          {optionRows.map(({ label, description, key }, optIndex) => {
+            const isSelected = selectedOptionIndexes.includes(optIndex)
             return (
               <Pressable
                 key={key}
@@ -98,9 +118,7 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
                   isSelected && styles.optionSelected,
                   pressed && styles.pressed
                 ]}
-                onPress={() =>
-                  question.multiSelect ? toggle(label) : answerSingle(label, optIndex)
-                }
+                onPress={() => (question.multiSelect ? toggle(optIndex) : answerSingle(optIndex))}
               >
                 {question.multiSelect ? (
                   <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
@@ -109,7 +127,14 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
                     ) : null}
                   </View>
                 ) : null}
-                <Text style={styles.optionText}>{label}</Text>
+                <View style={styles.optionBody}>
+                  <Text style={styles.optionText}>{label}</Text>
+                  {description ? (
+                    <Text style={styles.optionDescription} numberOfLines={2}>
+                      {description}
+                    </Text>
+                  ) : null}
+                </View>
               </Pressable>
             )
           })}
@@ -128,7 +153,7 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
           disabled={!canSubmitMulti}
         >
           <Text style={[styles.submitText, !canSubmitMulti && styles.submitTextDisabled]}>
-            提交{selected.length > 0 ? `（${selected.length}）` : ''}
+            提交{selectedOptionIndexes.length > 0 ? `（${selectedOptionIndexes.length}）` : ''}
           </Text>
         </Pressable>
       ) : null}
@@ -209,9 +234,16 @@ function createStyles(theme: MobileTheme) {
     optionSelected: {
       borderColor: theme.color.brand.primary
     },
+    optionBody: {
+      flex: 1,
+      gap: theme.spacing.space4
+    },
+    optionDescription: {
+      ...theme.typography.meta,
+      color: theme.color.text.secondary
+    },
     optionText: {
       ...theme.typography.body,
-      flex: 1,
       color: theme.color.text.primary
     },
     checkbox: {

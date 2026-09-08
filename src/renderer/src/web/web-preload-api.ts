@@ -1,3 +1,4 @@
+import { createMiniMaxCredentialsApi } from './preload-api/web-agent-accounts-api'
 import { readClipboardImageThumbnail } from './preload-api/web-clipboard-api'
 /* eslint-disable max-lines -- Why: browser-side Electron-preload replacement; compatibility surface centralizes here. */
 import type {
@@ -113,7 +114,7 @@ import {
   normalizeComputerAwakeMode
 } from '../../../shared/computer-awake-mode'
 import { normalizeWorktreeVisibilityDefaults } from '../../../shared/external-worktree-visibility'
-import type { RateLimitState } from '../../../shared/rate-limit-types'
+import { createRateLimitsApi } from './preload-api/web-rate-limits-api'
 import type { RuntimeStatus, RuntimeSyncWindowGraph } from '../../../shared/runtime-types'
 import { assertFileMutationOwnershipCapability } from '../../../shared/file-mutation-ownership'
 import {
@@ -3271,49 +3272,6 @@ function createNotificationsApi(): NonNullable<Partial<PreloadApi>['notification
   }
 }
 
-function createRateLimitsApi(): NonNullable<Partial<PreloadApi>['rateLimits']> {
-  const empty: RateLimitState = {
-    claude: null,
-    codex: null,
-    gemini: null,
-    opencodeGo: null,
-    kimi: null,
-    antigravity: null,
-    minimax: null,
-    grok: null,
-    minimaxCookieConfigured: false,
-    grokAuthConfigured: false,
-    claudeTarget: { runtime: 'host', wslDistro: null },
-    codexTarget: { runtime: 'host', wslDistro: null },
-    inactiveClaudeAccounts: [],
-    inactiveCodexAccounts: []
-  }
-  return {
-    get: () => Promise.resolve(empty),
-    refresh: () => Promise.resolve(empty),
-    refreshCodexForTarget: () => Promise.resolve(empty),
-    // Why: web clients don't own local Codex auth; report the safe no-credit outcome since redemption is desktop-only.
-    consumeCodexResetCredit: () => Promise.resolve({ outcome: 'noCredit', state: empty }),
-    refreshClaudeForTarget: () => Promise.resolve(empty),
-    setPollingInterval: () => Promise.resolve(),
-    fetchInactiveClaudeAccounts: () => Promise.resolve(),
-    fetchInactiveCodexAccounts: () => Promise.resolve(),
-    refreshMiniMax: () => Promise.resolve(empty),
-    refreshGrok: () => Promise.resolve(empty),
-    onUpdate: () => noopUnsubscribe
-  }
-}
-
-function createMiniMaxCredentialsApi(): NonNullable<Partial<PreloadApi>['minimaxCredentials']> {
-  const notConfigured = { configured: false }
-  const unsupportedError = new Error('MiniMax cookie storage is only available in the desktop app.')
-  return {
-    getStatus: () => Promise.resolve(notConfigured),
-    saveCookie: () => Promise.reject(unsupportedError),
-    clearCookie: () => Promise.resolve(notConfigured)
-  }
-}
-
 function createGrokAccountsApi(): NonNullable<Partial<PreloadApi>['grokAccounts']> {
   const unsigned = {
     signedIn: false,
@@ -4065,6 +4023,9 @@ async function getRuntimeBackedStoredSettings(): Promise<GlobalSettings> {
     if (typeof result.settings.minimaxUsageModels === 'string') {
       runtimeSettings.minimaxUsageModels = result.settings.minimaxUsageModels
     }
+    if (result.settings.minimaxEndpoint === 'overseas' || result.settings.minimaxEndpoint === 'cn') {
+      runtimeSettings.minimaxEndpoint = result.settings.minimaxEndpoint
+    }
     if (Array.isArray(result.settings.prBotAuthorOverrides)) {
       runtimeSettings.prBotAuthorOverrides = normalizePRBotAuthorOverrides(
         result.settings.prBotAuthorOverrides
@@ -4126,6 +4087,9 @@ async function syncRuntimeBackedSettings(
   }
   if (typeof updates.minimaxUsageModels === 'string') {
     runtimeUpdates.minimaxUsageModels = updates.minimaxUsageModels
+  }
+  if (updates.minimaxEndpoint === 'overseas' || updates.minimaxEndpoint === 'cn') {
+    runtimeUpdates.minimaxEndpoint = updates.minimaxEndpoint
   }
   if (Array.isArray(updates.prBotAuthorOverrides)) {
     runtimeUpdates.prBotAuthorOverrides = normalizePRBotAuthorOverrides(
@@ -4327,6 +4291,7 @@ function mergeHostWebUIState(local: PersistedUIState, incoming: PairedUiState): 
     agentsVisibleHostIds: local.agentsVisibleHostIds,
     agentsFilterRepoIds: local.agentsFilterRepoIds,
     agentsShowChildAgents: local.agentsShowChildAgents,
+    agentsShowSearch: local.agentsShowSearch,
     agentsCompactMode: local.agentsCompactMode,
     agentsReadFilter: local.agentsReadFilter,
     agentsGroupBy: local.agentsGroupBy,

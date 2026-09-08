@@ -104,6 +104,7 @@ function validProductConfig() {
         },
         identity: {
           issuer: 'https://identity.hivekernel.com/realms/hive',
+          userLoginUrl: 'https://console.hivekernel.com/login',
           clients: {
             desktop: 'hivecode-desktop',
             userWeb: 'hive-cloud-user-web',

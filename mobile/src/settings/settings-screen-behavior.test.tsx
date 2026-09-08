@@ -61,6 +61,7 @@ vi.mock('lucide-react-native', () => {
     'MessageSquare',
     'Mic',
     'MonitorDown',
+    'MonitorSmartphone',
     'Palette',
     'RefreshCw',
     'Scale',
@@ -84,6 +85,14 @@ vi.mock('../theme/mobile-theme-provider', async () => {
     })
   }
 })
+
+vi.mock('../auth/mobile-auth-session', () => ({
+  useMobileAuthSession: () => ({ hydrated: true, session: null })
+}))
+
+vi.mock('../update/use-mobile-update', () => ({
+  useMobileUpdate: () => ({ snapshot: { state: 'idle' }, checkNow: vi.fn(), install: vi.fn() })
+}))
 
 vi.mock('../transport/host-credential-cleanup', () => ({
   loadPendingHostCredentialCleanup: dependencies.loadCleanup,

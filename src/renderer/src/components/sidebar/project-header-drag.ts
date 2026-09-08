@@ -20,6 +20,8 @@ import {
 import { createProjectHeaderDragSession } from './project-header-drag-start'
 import { getWorktreeSidebarDragAutoscroll } from './worktree-sidebar-drag-autoscroll'
 import type { Repo } from '../../../../shared/repo-types'
+import { hasPointerBeenReleased } from './header-drag-pointer-release'
+import { swallowNextClickOnDragHandle } from './header-drag-click-swallow'
 
 // Why pointer events instead of HTML5 DnD: rows are absolutely-positioned by
 // react-virtual and unmount/remount as scroll changes, so DnD enter/leave fire
@@ -134,20 +136,7 @@ export function useRepoHeaderDrag({
         // capture may already be released (pointercancel, element unmounted)
       }
       if (session.promoted) {
-        const handleEl = session.handleEl
-        const swallow = (e: MouseEvent): void => {
-          const target = e.target as Node | null
-          if (target && handleEl.contains(target)) {
-            e.stopPropagation()
-            e.preventDefault()
-          }
-          window.removeEventListener('click', swallow, true)
-        }
-        window.addEventListener('click', swallow, true)
-        clickSwallowTimeoutRef.current = setTimeout(() => {
-          window.removeEventListener('click', swallow, true)
-          clickSwallowTimeoutRef.current = null
-        }, 0)
+        clickSwallowTimeoutRef.current = swallowNextClickOnDragHandle(session.handleEl)
       }
       const drop = commit && session.promoted ? latestDropRef.current : null
       latestDropRef.current = null
@@ -221,6 +210,10 @@ export function useRepoHeaderDrag({
     const onPointerMove = (e: PointerEvent): void => {
       const session = dragSessionRef.current
       if (!session || e.pointerId !== session.pointerId) {
+        return
+      }
+      if (hasPointerBeenReleased(e)) {
+        endDrag(false)
         return
       }
       session.latestPointerY = e.clientY

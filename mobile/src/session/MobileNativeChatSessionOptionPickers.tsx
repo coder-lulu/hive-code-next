@@ -67,6 +67,11 @@ export function MobileNativeChatSessionOptionPickers({
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const [openDescriptorId, setOpenDescriptorId] = useState<string | null>(null)
+  const [lastRequest, setLastRequest] = useState(controller.optionPickerRequest)
+  if (controller.optionPickerRequest && lastRequest !== controller.optionPickerRequest) {
+    setLastRequest(controller.optionPickerRequest)
+    setOpenDescriptorId(controller.optionPickerRequest.id)
+  }
   const { snapshot, pendingId } = controller
   const model = snapshot.find((descriptor) => descriptor.category === 'model')
   const options = sortNativeChatSessionOptions(snapshot)

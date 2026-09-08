@@ -2,6 +2,7 @@
 import type { CommandSpec } from './args'
 import { findCommandSpec, isCommandGroup, supportsBrowserPageFlag } from './args'
 import { unknownCommandData } from './command-suggestion'
+import { formatSkillsCommandFlagHelp } from './skills-command-flag-help'
 
 const ROOT_HELP_TEXT = `hive
 
@@ -123,8 +124,8 @@ Orchestration:
   orchestration worker-release Release a settled worker's terminal after archiving its output
   orchestration worker-retain Keep a worker terminal live for debugging
   orchestration worker-list Report worker terminal resource accounting
-  orchestration coordinator-start Start the legacy automatic coordinator loop
-  orchestration coordinator-stop Stop the legacy automatic coordinator loop
+  orchestration coordinator-start Retired: load the current orchestration skill
+  orchestration coordinator-stop Retired: load the current orchestration skill
   orchestration gate-create Create a decision gate blocking a task
   orchestration gate-resolve Resolve a pending decision gate
   orchestration gate-list   List decision gates
@@ -250,7 +251,7 @@ Common Commands:
   hive terminal list [--worktree <selector>] [--limit <n>] [--include-visual-layouts] [--json]
   hive terminal show [--terminal <handle>] [--json]
   hive terminal read [--terminal <handle>] [--cursor <n>] [--limit <n>] [--json]
-  hive terminal send [--terminal <handle>] [--text <text>] [--enter] [--interrupt] [--json]
+  hive terminal send [--terminal <handle>] [--text <text>] [--enter] [--interrupt] [--wait-submit <seconds>] [--retry-request <id>] [--json]
   hive terminal wait [--terminal <handle>] --for exit|tui-idle [--timeout-ms <ms>] [--json]
   hive terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--focus] [--json]
   hive terminal split [--terminal <handle>] [--direction horizontal|vertical] [--json]
@@ -280,6 +281,8 @@ Terminal Send Options:
   --text <text>             Text to send to the terminal
   --enter                   Append Enter after sending text
   --interrupt               Send as an interrupt-style input when supported
+  --wait-submit <seconds>   Observe this accepted prompt without resending it
+  --retry-request <id>      Resume the same durable prompt request after an ambiguous transport failure
 
 Terminal List Options:
   --include-visual-layouts  Include tab and pane topology in JSON output
@@ -436,8 +439,9 @@ export function formatGroupHelp(specs: CommandSpec[], group: string): string {
 
 function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   const command = commandPath.join(' ')
-  if (command === 'skills install' && flag === 'agent') {
-    return '--agent <names>        Comma-separated install targets; default is detected agents'
+  const skillsHelp = formatSkillsCommandFlagHelp(command, flag)
+  if (skillsHelp) {
+    return skillsHelp
   }
   if (command === 'terminal close' && flag === 'tab') {
     return '--tab                  Close the whole tab and wait for durable persistence'
@@ -469,8 +473,17 @@ function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   if (command === 'orchestration worker-read' && flag === 'cursor') {
     return '--cursor <cursor>      Opaque cursor returned by a previous worker-read page'
   }
+  if (command === 'orchestration worker-list' && flag === 'cursor') {
+    return '--cursor <cursor>      Opaque page cursor copied from page.nextCursor'
+  }
   if (command === 'orchestration worker-list' && flag === 'terminal-state') {
     return '--terminal-state <state> Terminal accounting filter: active, reclaimable, retained, release_pending, release_unknown, or released'
+  }
+  if (command === 'skills get' && flag === 'full') {
+    return '--full                 Print the full guide with bundled references'
+  }
+  if (command === 'orchestration worker-list' && flag === 'include-remote') {
+    return '--include-remote      Include connected-server worker observations'
   }
   if (command === 'linear list-issues' && flag === 'workspace') {
     return '--workspace <id|all>  Connected Linear workspace id, or all'

@@ -24,19 +24,12 @@ export class OrcaRuntimeWithSerializeTerminalBufferFromAvailableState extends Or
     terminalOwner?: 'shell'
   } | null> {
     if (this.providerSnapshotPreferredPtys.has(ptyId)) {
-      // Why: pre-attach stream bytes only form a suffix of restored state. A
-      // sequenced provider snapshot safely reconciles live bytes; renderer is
-      // the fallback when an older provider cannot expose that boundary.
-      const providerSnapshot = await this.serializeProviderTerminalBuffer(ptyId, opts)
-      if (providerSnapshot) {
-        return providerSnapshot
-      }
-      const rendererSnapshot = await this.serializeRendererTerminalBuffer(ptyId, opts)
-      if (rendererSnapshot) {
-        return rendererSnapshot
-      }
+      return this.serializePreferredRestoredTerminalBuffer(ptyId, opts)
     }
     const headlessSnapshot = await this.serializeHeadlessTerminalBuffer(ptyId, opts)
+    if (this.providerSnapshotPreferredPtys.has(ptyId)) {
+      return this.serializePreferredRestoredTerminalBuffer(ptyId, opts)
+    }
     if (headlessSnapshot) {
       return headlessSnapshot
     }
@@ -56,6 +49,20 @@ export class OrcaRuntimeWithSerializeTerminalBufferFromAvailableState extends Or
       (providerSnapshot.data.length > 0 || Boolean(providerSnapshot.scrollbackAnsi))
       ? providerSnapshot
       : rendererSnapshot
+  }
+
+  protected async serializePreferredRestoredTerminalBuffer(
+    ptyId: string,
+    opts: { scrollbackRows?: number } = {}
+  ) {
+    if (!this.providerSnapshotPreferredPtys.has(ptyId)) {
+      return null
+    }
+    // Pre-attach bytes are only a suffix; older providers can fall back to the renderer.
+    return (
+      (await this.serializeProviderTerminalBuffer(ptyId, opts)) ??
+      (await this.serializeRendererTerminalBuffer(ptyId, opts))
+    )
   }
 
   async serializeRendererTerminalBuffer(

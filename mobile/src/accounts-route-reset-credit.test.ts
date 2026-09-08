@@ -70,7 +70,16 @@ vi.mock('./theme/mobile-theme-provider', async () => {
   }
 })
 
-vi.mock('./transport/host-store', () => ({ loadHosts: dependencies.loadHosts }))
+vi.mock('./transport/host-store', () => ({
+  loadHostCatalog: async () => (await dependencies.loadHosts()).map((profile: unknown) => ({
+    credentialStatus: 'ready', profile
+  }))
+}))
+
+vi.mock('./runtime-directory/account-runtime-directory-provider', () => {
+  const mergeCatalog = (catalog: unknown) => catalog
+  return { useAccountRuntimeDirectory: () => ({ mergeCatalog }) }
+})
 
 vi.mock('./transport/client-context', () => {
   const client = {
@@ -105,7 +114,8 @@ vi.mock('./transport/client-context', () => {
     }
   }
   return {
-    useHostClient: () => ({ client, state: 'connected' })
+    useHostClient: () => ({ client, state: 'connected' }),
+    useRefreshHostClient: () => vi.fn()
   }
 })
 

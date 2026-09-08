@@ -9,7 +9,7 @@ import {
   featureEntryFromRuntime,
   featureIdentity,
   readEphemeralVmRuntimeFeatureStore,
-  restoreRuntimeFeatures,
+  restoreRuntimeFeatureList,
   runtimeFeaturesEqual,
   writeEphemeralVmRuntimeFeatureStore,
   type EphemeralVmRuntimeFeatureStoreSnapshot
@@ -226,9 +226,9 @@ function readEphemeralVmRuntimeStore(userDataPath: string): LoadedEphemeralVmRun
     const features = readEphemeralVmRuntimeFeatureStore(userDataPath)
     const store: EphemeralVmRuntimeStore = {
       version: 1,
-      runtimes: parsed.runtimes
-        .map((entry) => restoreRuntimeFeatures(entry, features.features))
-        .sort(compareRuntimeRecords)
+      runtimes: restoreRuntimeFeatureList(parsed.runtimes, features.features).sort(
+        compareRuntimeRecords
+      )
     }
     if (features.writable && !RollbackEphemeralVmRuntimeStoreSchema.safeParse(persisted).success) {
       try {

@@ -1,12 +1,9 @@
 ---
 name: computer-use
 description: >-
-  Use HiveCode's computer-use CLI for OS/window-level inspection and input in visible
-  local app windows. Use when a task must read or operate a native app or an
-  external browser window (for example, Chrome, Edge, or Safari) or an app
-  webview. Do not use for HiveCode's embedded browser or page-only browser
-  automation. Use `orca-cli` for HiveCode's embedded pages and a page-automation
-  tool such as Playwright or CDP for external pages.
+  OS/window-level inspection and input in visible local app windows through `hive computer`:
+  native apps, external browser windows (Chrome, Edge, Safari), and app webviews. Not for
+  HiveCode's embedded browser (use `orca-cli`) or page-only automation (use Playwright or CDP).
 ---
 
 # Computer Use
@@ -28,7 +25,6 @@ Use this skill for desktop UI through `hive computer`. For a website or web app,
 - If an app contains sensitive content, read only what the user requested.
 
 ```text
-hive status --json
 hive computer capabilities --json
 ```
 
@@ -92,18 +88,18 @@ printf '%s' "$TEXT" | hive computer set-value --app <app> --element-index <index
 
 ## Action Rules
 
-- Read every action's verification separately from whether its provider call succeeded:
+- An action's verification is separate from whether its provider call succeeded:
   - `verified` means the changed value was read back.
   - `unverified (accessibility action unasserted)` means the accessibility call succeeded but no post-state assertion was made.
   - `unverified (synthetic input)` means input was fired into the void and is unverifiable.
   - Missing verification metadata is unverified, including responses from older runtimes.
-- Prefer semantic actions: `set-value` for editable fields, `click` for controls, `perform-secondary-action` only for listed action names.
+  - Never report an unverified action as success. If it could have sent, submitted, bought, or deleted something, say the effect is unproven.
+- Prefer semantic actions: `set-value` for editable fields, `click` for controls, and `perform-secondary-action` only for listed action names.
 - After any UI-changing action, use the returned state or rerun `get-app-state` before choosing the next element index.
 - Use `type-text` only after focusing a field and confirming the app has a focused text receiver; synthetic keyboard delivery is reported as unverified, so inspect the returned state before assuming text landed.
 - Use `press-key` for single/navigation keys such as Return, Escape, Tab, and arrows. Use `hotkey` only for one modifier chord plus one key, such as `CmdOrCtrl+A` or `CmdOrCtrl+Shift+P`; prefer `CmdOrCtrl+...` for cross-platform combos.
 - Use `click --modifiers <chord>` for modifier-clicks. Never synthesize separate modifier-down and modifier-up commands around a click; interruption can leave a modifier logically held.
 - Some actions work in background apps, but this is app-dependent. If success does not change the UI, refresh state and choose a more semantic action or restore/focus the window.
-- Prefer `set-value` for text fields that expose values; it can report verified value writes when the provider can read the refreshed value.
 - Coordinates are window-local; use coordinates from the latest screenshot/state for the same target window.
 
 ## Screenshots
@@ -159,7 +155,3 @@ Slack: the accessibility tree may be shallow while the screenshot contains usefu
 - `accessibility_error`: run `hive computer capabilities --json`; if the message names Accessibility permission, run `hive computer permissions --id accessibility --json`.
 - Empty tree or no screenshot: app may have no visible window, be minimized, or need permissions.
 - Permission errors: run `hive computer permissions --json`, or `hive computer permissions --id accessibility --json` / `--id screenshots --json` when the message names one permission, use the setup UI, then retry.
-
-## Next Action
-
-Confirm HiveCode status unless already checked, then run `hive computer capabilities --json`. For external browser targets such as Gmail, identify the desktop browser app/window that contains the page, then get that target app state with `hive computer get-app-state --app <app> --json`.

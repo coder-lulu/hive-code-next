@@ -4,7 +4,9 @@ import { useShallow } from 'zustand/react/shallow'
 import { migrationUnsupportedToAgentStatusEntry } from '@/lib/migration-unsupported-agent-entry'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import type { AgentStatusEntry, AgentStatusState } from '../../../../shared/agent-status-types'
+import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
+
+import { freshActivityLiveAgentState, isHistoricalActivityState } from './activity-event-state'
 
 type ActivityUnreadCountSource = Pick<
   AppState,
@@ -25,7 +27,7 @@ const EMPTY_RETAINED_AGENTS: AppState['retainedAgentsByPaneKey'] = {}
 const EMPTY_ACKNOWLEDGED_AGENTS: AppState['acknowledgedAgentsByPaneKey'] = {}
 
 const DISABLED_ACTIVITY_UNREAD_INPUTS = {
-  sortEpoch: 0,
+  agentStatusEpoch: 0,
   worktreesByRepo: EMPTY_WORKTREES_BY_REPO,
   migrationUnsupportedByPtyId: EMPTY_MIGRATION_UNSUPPORTED,
   retainedAgentsByPaneKey: EMPTY_RETAINED_AGENTS,
@@ -33,14 +35,15 @@ const DISABLED_ACTIVITY_UNREAD_INPUTS = {
   activityClearedAtByPaneKey: {} as Record<string, number>
 }
 
-function isUnreadAgentState(state: AgentStatusState): boolean {
-  return state === 'done' || state === 'blocked' || state === 'waiting'
-}
-
 export function countActivityUnread(
   source: ActivityUnreadCountSource,
-  mode: ActivityUnreadCountMode = 'agent-events'
+  modeOrNow: ActivityUnreadCountMode | number = 'agent-events',
+  now = Date.now()
 ): number {
+  const mode = typeof modeOrNow === 'number' ? 'agent-events' : modeOrNow
+  if (typeof modeOrNow === 'number') {
+    now = modeOrNow
+  }
   let count = 0
   const seenPaneKeys = new Set<string>()
 
@@ -54,7 +57,7 @@ export function countActivityUnread(
     }
   }
 
-  const countEntry = (entry: AgentStatusEntry, ackAt: number): void => {
+  const countEntry = (entry: AgentStatusEntry, ackAt: number, live = false): void => {
     if (seenPaneKeys.has(entry.paneKey)) {
       return
     }
@@ -64,7 +67,7 @@ export function countActivityUnread(
       // Why: Activity feed surfaces historical done/blocked/waiting events
       // from stateHistory, so the titlebar badge must mirror that event count.
       for (const history of entry.stateHistory) {
-        if (isUnreadAgentState(history.state) && ackAt < history.startedAt) {
+        if (isHistoricalActivityState(history.state) && ackAt < history.startedAt) {
           count += 1
         }
       }
@@ -74,22 +77,25 @@ export function countActivityUnread(
     // displaced (the slice pushes it on done→done), so sidebar-badge mode — which skips the
     // history loop above — must still count that displaced completion or the badge silently
     // drops an unacknowledged finish the moment its session is resumed.
+    // Why 'working' only: a monitoring turn surfaces through the live snapshot, never as an
+    // unread event, so counting it here would light the badge with no unread row to clear.
     if (
-      isUnreadAgentState(entry.state) &&
+      (isHistoricalActivityState(entry.state) ||
+        (mode === 'agent-events' && live && freshActivityLiveAgentState(entry, now) === 'working')) &&
       entry.sessionBoundary !== true &&
       ackAt < entry.stateStartedAt
     ) {
       count += 1
     } else if (mode === 'sidebar-badge' && entry.state === 'done' && entry.sessionBoundary) {
       const displaced = entry.stateHistory.at(-1)
-      if (displaced && isUnreadAgentState(displaced.state) && ackAt < displaced.startedAt) {
+      if (displaced && isHistoricalActivityState(displaced.state) && ackAt < displaced.startedAt) {
         count += 1
       }
     }
   }
 
   for (const [paneKey, entry] of Object.entries(source.agentStatusByPaneKey)) {
-    countEntry(entry, source.acknowledgedAgentsByPaneKey[paneKey] ?? 0)
+    countEntry(entry, source.acknowledgedAgentsByPaneKey[paneKey] ?? 0, true)
   }
   for (const [paneKey, retained] of Object.entries(source.retainedAgentsByPaneKey)) {
     if (mode === 'sidebar-badge' && retained.entry.state !== 'done') {
@@ -112,7 +118,7 @@ export function useActivityUnreadCount(
   mode: ActivityUnreadCountMode = 'agent-events'
 ): number {
   const {
-    sortEpoch,
+    agentStatusEpoch,
     worktreesByRepo,
     migrationUnsupportedByPtyId,
     retainedAgentsByPaneKey,
@@ -124,10 +130,8 @@ export function useActivityUnreadCount(
         return DISABLED_ACTIVITY_UNREAD_INPUTS
       }
       return {
-        // Why: live status prompt/tool updates churn agentStatusByPaneKey but
-        // cannot change unread count unless a sort-relevant state transition
-        // or removal occurred. sortEpoch is the cheap invalidation signal.
-        sortEpoch: state.sortEpoch,
+        // Freshness transitions change the Activity count even without a new historical event.
+        agentStatusEpoch: state.agentStatusEpoch,
         worktreesByRepo: state.worktreesByRepo,
         migrationUnsupportedByPtyId: state.migrationUnsupportedByPtyId,
         retainedAgentsByPaneKey: state.retainedAgentsByPaneKey,
@@ -141,7 +145,7 @@ export function useActivityUnreadCount(
     if (!enabled) {
       return 0
     }
-    void sortEpoch
+    void agentStatusEpoch
     return countActivityUnread(
       {
         agentStatusByPaneKey: useAppStore.getState().agentStatusByPaneKey,
@@ -160,7 +164,7 @@ export function useActivityUnreadCount(
     migrationUnsupportedByPtyId,
     mode,
     retainedAgentsByPaneKey,
-    sortEpoch,
+    agentStatusEpoch,
     worktreesByRepo
   ])
 }

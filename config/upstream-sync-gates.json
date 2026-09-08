@@ -7,14 +7,25 @@
         "category": "brand",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "check:brand-boundary"]
+        "argv": [
+          "pnpm",
+          "run",
+          "check:brand-boundary"
+        ]
       },
       {
         "id": "hivecloud-account-and-endpoints",
         "category": "hivecloud",
         "kind": "vitest",
         "cwd": ".",
-        "argv": ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"],
+        "argv": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "config/vitest.config.ts"
+        ],
         "paths": [
           "src/main/hive-account/hive-account-client.test.ts",
           "src/main/hive-account/hive-account-config.test.ts",
@@ -32,7 +43,14 @@
         "category": "updater",
         "kind": "vitest",
         "cwd": ".",
-        "argv": ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"],
+        "argv": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "config/vitest.config.ts"
+        ],
         "paths": [
           "src/main/updater.product-boundary.test.ts",
           "src/main/updater.product-feed-policy.test.ts",
@@ -47,15 +65,22 @@
         "category": "mobile",
         "kind": "vitest",
         "cwd": "mobile",
-        "argv": ["pnpm", "exec", "vitest", "run"],
+        "argv": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run"
+        ],
         "paths": [
           "src/transport/pairing.test.ts",
-          "src/transport/pairing-relay-candidate.test.ts",
           "src/transport/connection-revival-triggers.test.ts",
-          "src/transport/mobile-relay-pairing-recovery.test.ts",
-          "src/transport/mobile-relay-reconnect-controller.test.ts",
           "src/worktree/new-workspace-dialog-repo-selection.test.ts",
-          "src/worktree/worktree-activation-result.test.ts"
+          "src/worktree/worktree-activation-result.test.ts",
+          "src/transport/account-runtime-rpc-client.test.ts",
+          "src/transport/account-runtime-rpc-requests.test.ts",
+          "src/transport/rpc-client-live-recovery.test.ts",
+          "src/transport/rpc-client-reconnect-wait.test.ts",
+          "src/transport/rpc-client-terminal-reconnect.test.ts"
         ]
       },
       {
@@ -63,7 +88,14 @@
         "category": "runtime-rpc",
         "kind": "vitest",
         "cwd": ".",
-        "argv": ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"],
+        "argv": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "config/vitest.config.ts"
+        ],
         "paths": [
           "src/main/runtime/runtime-rpc-cloud-transport-security.test.ts",
           "src/main/runtime/rpc/cloud-managed-e2ee-auth-validation.test.ts",
@@ -81,63 +113,103 @@
         "category": "generated",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "verify:product-config"]
+        "argv": [
+          "pnpm",
+          "run",
+          "verify:product-config"
+        ]
       },
       {
         "id": "generated-files-skills",
         "category": "generated",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "verify:bundled-skill-guides"]
+        "argv": [
+          "pnpm",
+          "run",
+          "verify:bundled-skill-guides"
+        ]
       },
       {
         "id": "generated-files-manifest",
         "category": "generated",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "verify:skill-bundle-manifest"]
+        "argv": [
+          "pnpm",
+          "run",
+          "verify:skill-bundle-manifest"
+        ]
       },
       {
         "id": "generated-files-documentation",
         "category": "generated",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "verify:documentation-governance"]
+        "argv": [
+          "pnpm",
+          "run",
+          "verify:documentation-governance"
+        ]
       },
       {
         "id": "generated-files-localization-catalog",
         "category": "generated",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "verify:localization-catalog"]
+        "argv": [
+          "pnpm",
+          "run",
+          "verify:localization-catalog"
+        ]
       },
       {
         "id": "generated-files-localization-extraction",
         "category": "generated",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "verify:localization-extraction"]
+        "argv": [
+          "pnpm",
+          "run",
+          "verify:localization-extraction"
+        ]
       },
       {
         "id": "generated-files-localization-coverage",
         "category": "generated",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "run", "verify:localization-coverage"]
+        "argv": [
+          "pnpm",
+          "run",
+          "verify:localization-coverage"
+        ]
       },
       {
         "id": "root-lockfile",
         "category": "lockfile",
         "kind": "command",
         "cwd": ".",
-        "argv": ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts", "--lockfile-only"]
+        "argv": [
+          "pnpm",
+          "install",
+          "--frozen-lockfile",
+          "--ignore-scripts",
+          "--lockfile-only"
+        ]
       },
       {
         "id": "mobile-lockfile",
         "category": "lockfile",
         "kind": "command",
         "cwd": "mobile",
-        "argv": ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts", "--lockfile-only"]
+        "argv": [
+          "pnpm",
+          "install",
+          "--frozen-lockfile",
+          "--ignore-scripts",
+          "--lockfile-only"
+        ]
       }
     ],
     "platform": [
@@ -146,7 +218,14 @@
         "category": "platform",
         "kind": "vitest",
         "cwd": ".",
-        "argv": ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"],
+        "argv": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "config/vitest.config.ts"
+        ],
         "paths": [
           "src/renderer/src/components/terminal-pane/pty-connection-agent-session-resume.test.ts",
           "src/renderer/src/components/terminal-pane/pty-connection-cold-restore-agent-resume.test.ts",
