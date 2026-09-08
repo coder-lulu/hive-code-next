@@ -122,12 +122,22 @@ describe('upstream synchronization boundary', () => {
     expect(workflow.on.workflow_dispatch.inputs.target_branch.default).toBe('hivecode/main-next')
     expect(workflow.env.TARGET_BRANCH).toContain("'hivecode/main-next'")
     expect(syncJob.outputs.target_sha).toBe('${{ steps.sync.outputs.target_sha }}')
+    expect(syncJob.outputs.node_version).toBe('${{ steps.sync.outputs.node_version }}')
     expect(syncStep.env.GH_TOKEN).toBe('${{ secrets.GITHUB_TOKEN }}')
     expect(syncScript.indexOf('gh auth setup-git --hostname github.com')).toBeLessThan(
       syncScript.indexOf('git fetch --no-tags origin')
     )
     expect(syncScript).toContain('refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH')
     expect(syncScript).toContain('echo "target_sha=$target_sha"')
+    expect(syncScript).toContain("jq -er '.engines.node")
+    expect(syncScript).toContain('echo "node_version=$node_version"')
+    const syncNodeSetup = findStep(
+      syncJob,
+      (step) => step.uses === 'actions/setup-node@v6',
+      'sync Node.js setup must exist'
+    )
+    expect(syncNodeSetup.with['node-version']).toBe('${{ steps.sync.outputs.node_version }}')
+    expect(syncNodeSetup.with['node-version-file']).toBeUndefined()
     expect(mergeStep.env.TARGET_SHA).toBe('${{ steps.sync.outputs.target_sha }}')
     expect(mergeStep.env.UPSTREAM_SHA).toBe('${{ steps.sync.outputs.upstream_sha }}')
     expect(mergeCommands).toHaveLength(2)
@@ -141,6 +151,13 @@ describe('upstream synchronization boundary', () => {
       'gates checkout must exist'
     )
     expect(checkoutStep.with.ref).toBe('${{ needs.sync.outputs.vendor_sha }}')
+    const gatesNodeSetup = findStep(
+      workflow.jobs.gates,
+      (step) => step.uses === 'actions/setup-node@v6',
+      'gates Node.js setup must exist'
+    )
+    expect(gatesNodeSetup.with['node-version']).toBe('${{ needs.sync.outputs.node_version }}')
+    expect(gatesNodeSetup.with['node-version-file']).toBeUndefined()
   })
 
   it('refuses a proposal when the tested vendor or product target has moved', () => {

@@ -37,6 +37,7 @@ jobs:
       target_sha: ${{ steps.sync.outputs.target_sha }}
       vendor_sha: ${{ steps.publish.outputs.vendor_sha }}
       vendor_base_sha: ${{ steps.sync.outputs.vendor_base_sha }}
+      node_version: ${{ steps.sync.outputs.node_version }}
       has_changes: ${{ steps.checkpoint.outputs.has_changes }}
     steps:
       - name: Checkout repository without publication credentials
@@ -88,11 +89,13 @@ jobs:
           # Run privileged intake code from the reviewed product, not the incoming tree.
           mkdir -p "$RUNNER_TEMP/upstream-sync-control"
           git archive "$target_sha" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          node_version="$(jq -er '.engines.node | select(type == "string" and length > 0)' "$RUNNER_TEMP/upstream-sync-control/package.json")"
+          echo "node_version=$node_version" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js for dependency-free intake
         uses: actions/setup-node@v6
         with:
-          node-version-file: ${{ runner.temp }}/upstream-sync-control/package.json
+          node-version: ${{ steps.sync.outputs.node_version }}
 
       - name: Merge product first and upstream second
         shell: bash
@@ -226,7 +229,7 @@ jobs:
       - name: Setup Node.js for reviewed audit code
         uses: actions/setup-node@v6
         with:
-          node-version-file: ${{ runner.temp }}/upstream-sync-control/package.json
+          node-version: ${{ needs.sync.outputs.node_version }}
 
       - uses: ./.github/actions/install-node-dependencies
 
