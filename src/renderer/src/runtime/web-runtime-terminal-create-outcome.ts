@@ -20,13 +20,13 @@ export function reportWebRuntimeTerminalCreateFailure(
 }
 
 export function disconnectedWebRuntimeTerminalCreateOutcome(): CreatedWebRuntimeSessionTerminal {
-    return {
-      outcome: {
-        status: 'failed',
-        message: translate(
-          'auto.runtime.webRuntimeSession.remoteHostDisconnected',
-          'The workspace is not connected to a remote Orca host.'
-        )
-      }
+  return {
+    outcome: {
+      status: 'failed',
+      message: translate(
+        'auto.runtime.webRuntimeSession.remoteHostDisconnected',
+        'The workspace is not connected to a remote Orca host.'
+      )
     }
+  }
 }

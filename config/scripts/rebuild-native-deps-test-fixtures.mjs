@@ -374,7 +374,10 @@ export function writeFakeWindowsRegistry(projectDir) {
 export function writeFakeWindowsProcessTree(projectDir) {
   const processTreeDir = join(projectDir, 'node_modules', '@vscode', 'windows-process-tree')
   mkdirSync(processTreeDir, { recursive: true })
-  writeFileSync(join(processTreeDir, 'index.js'), 'module.exports = { supportedProcessDataFlags: 4 }\n')
+  writeFileSync(
+    join(processTreeDir, 'index.js'),
+    'module.exports = { supportedProcessDataFlags: 4 }\n'
+  )
 }
 
 export function writeFakeWindowsProcessTreeWithNodeAddonApi(

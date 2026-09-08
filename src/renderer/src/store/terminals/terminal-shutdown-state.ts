@@ -94,7 +94,9 @@ export function commitTerminalShutdownState({
     const unreadAgentCompletionPanes = copyOnWriteRecord(state.unreadAgentCompletionPanes)
     const lastTerminalInputAtByPaneKey = copyOnWriteRecord(state.lastTerminalInputAtByPaneKey)
     const currentUnreadAgentCompletionCountByPane = state.unreadAgentCompletionCountByPane ?? {}
-    const unreadAgentCompletionCountByPane = copyOnWriteRecord(currentUnreadAgentCompletionCountByPane)
+    const unreadAgentCompletionCountByPane = copyOnWriteRecord(
+      currentUnreadAgentCompletionCountByPane
+    )
 
     for (const tab of tabs) {
       pendingSetupSplitByTabId.delete(tab.id)

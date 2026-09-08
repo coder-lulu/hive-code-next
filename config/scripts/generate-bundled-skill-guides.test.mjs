@@ -323,9 +323,7 @@ describe('bundled skill guide generator', () => {
     for (const name of CANONICAL_GUIDE_NAMES.filter((name) => name !== 'orchestration')) {
       const source = await readFile(path.join(projectDir, 'skill-guides', `${name}.md`), 'utf8')
 
-      expect(source.replace(/\s+/gu, ' '), name).toContain(
-        'ORCA_CLI_COMMAND'
-      )
+      expect(source.replace(/\s+/gu, ' '), name).toContain('ORCA_CLI_COMMAND')
     }
   })
 

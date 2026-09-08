@@ -81,7 +81,9 @@ export function countActivityUnread(
     // unread event, so counting it here would light the badge with no unread row to clear.
     if (
       (isHistoricalActivityState(entry.state) ||
-        (mode === 'agent-events' && live && freshActivityLiveAgentState(entry, now) === 'working')) &&
+        (mode === 'agent-events' &&
+          live &&
+          freshActivityLiveAgentState(entry, now) === 'working')) &&
       entry.sessionBoundary !== true &&
       ackAt < entry.stateStartedAt
     ) {

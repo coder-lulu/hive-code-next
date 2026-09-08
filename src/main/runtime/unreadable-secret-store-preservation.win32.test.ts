@@ -201,9 +201,8 @@ describeOnWindows('a secure store that exists but cannot be read', () => {
   })
 
   it('does not overwrite an unreadable HiveRelay transition outbox', async () => {
-    const { HiveRuntimeRelaySessionTransitionOutbox } = await import(
-      '../hive-runtime-cloud/relay-host/hive-runtime-relay-session-transition-outbox'
-    )
+    const { HiveRuntimeRelaySessionTransitionOutbox } =
+      await import('../hive-runtime-cloud/relay-host/hive-runtime-relay-session-transition-outbox')
     const dir = join(root, 'hive-relay')
     mkdirSync(dir, { recursive: true })
     const filePath = join(dir, 'transition-outbox.json')

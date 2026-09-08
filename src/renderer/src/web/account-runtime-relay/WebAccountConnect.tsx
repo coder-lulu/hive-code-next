@@ -24,7 +24,10 @@ export function accountRuntimeEnvironment(runtime: WebAccountRuntime): StoredWeb
   const now = Date.now()
   return {
     id: `account-${runtime.runtimeRecordId}`,
-    name: runtime.cloudDisplayName || runtime.deviceName || translate('auto.web.WebAccountConnect.runtimeName', 'Hive Runtime'),
+    name:
+      runtime.cloudDisplayName ||
+      runtime.deviceName ||
+      translate('auto.web.WebAccountConnect.runtimeName', 'Hive Runtime'),
     runtimeId: null,
     runtimeRecordId: runtime.runtimeRecordId,
     preferredEndpointId: `account-${runtime.runtimeRecordId}`,
@@ -152,8 +155,15 @@ export default function WebAccountConnect({
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
       <section className="flex w-full max-w-lg flex-col gap-4 rounded-lg border border-border bg-card p-5">
-        <h1 className="text-base font-semibold">{translate('auto.web.WebAccountConnect.title', 'Connect to your computers')}</h1>
-        <p className="text-sm text-muted-foreground">{translate('auto.web.WebAccountConnect.description', 'Connect to your computer Runtime with your HiveCloud account.')}</p>
+        <h1 className="text-base font-semibold">
+          {translate('auto.web.WebAccountConnect.title', 'Connect to your computers')}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {translate(
+            'auto.web.WebAccountConnect.description',
+            'Connect to your computer Runtime with your HiveCloud account.'
+          )}
+        </p>
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -166,7 +176,9 @@ export default function WebAccountConnect({
         )}
         {!signedIn && !busy && (
           <Button asChild>
-            <a href={loginPath}>{translate('auto.web.WebAccountConnect.signIn', 'Sign in to HiveCloud')}</a>
+            <a href={loginPath}>
+              {translate('auto.web.WebAccountConnect.signIn', 'Sign in to HiveCloud')}
+            </a>
           </Button>
         )}
         {signedIn && (
@@ -177,7 +189,9 @@ export default function WebAccountConnect({
                 className="flex items-center justify-between gap-3 py-3"
               >
                 <span className="min-w-0 truncate text-sm">
-                  {runtime.cloudDisplayName || runtime.deviceName || translate('auto.web.WebAccountConnect.runtimeName', 'Hive Runtime')}
+                  {runtime.cloudDisplayName ||
+                    runtime.deviceName ||
+                    translate('auto.web.WebAccountConnect.runtimeName', 'Hive Runtime')}
                 </span>
                 <Button
                   variant="outline"
@@ -189,7 +203,12 @@ export default function WebAccountConnect({
               </div>
             ))}
             {!runtimes.length && !busy && (
-              <p className="py-3 text-sm text-muted-foreground">{translate('auto.web.WebAccountConnect.empty', 'No claimed computers in this account.')}</p>
+              <p className="py-3 text-sm text-muted-foreground">
+                {translate(
+                  'auto.web.WebAccountConnect.empty',
+                  'No claimed computers in this account.'
+                )}
+              </p>
             )}
           </div>
         )}

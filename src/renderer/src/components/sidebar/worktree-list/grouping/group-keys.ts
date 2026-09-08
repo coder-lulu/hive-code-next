@@ -3,7 +3,10 @@ import type React from 'react'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
-import { composeWorktreeHostIdentity, getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
+import {
+  composeWorktreeHostIdentity,
+  getWorktreeHostIdentity
+} from '../../../../../../shared/worktree/host-qualified-identity'
 import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
 import { branchName } from '../../../../lib/git-utils'
 import {

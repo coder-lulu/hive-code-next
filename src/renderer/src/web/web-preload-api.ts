@@ -4023,7 +4023,10 @@ async function getRuntimeBackedStoredSettings(): Promise<GlobalSettings> {
     if (typeof result.settings.minimaxUsageModels === 'string') {
       runtimeSettings.minimaxUsageModels = result.settings.minimaxUsageModels
     }
-    if (result.settings.minimaxEndpoint === 'overseas' || result.settings.minimaxEndpoint === 'cn') {
+    if (
+      result.settings.minimaxEndpoint === 'overseas' ||
+      result.settings.minimaxEndpoint === 'cn'
+    ) {
       runtimeSettings.minimaxEndpoint = result.settings.minimaxEndpoint
     }
     if (Array.isArray(result.settings.prBotAuthorOverrides)) {

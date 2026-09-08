@@ -93,11 +93,15 @@ function SheetBody() {
 }
 
 function drawer(interactive: boolean) {
-  return createElement(MobileThemeProvider, { initialPreference: 'light' }, createElement(
-    MountedBottomDrawer,
-    { visible: true, interactive, onClose: noop, onHidden: noop },
-    createElement(SheetBody)
-  ))
+  return createElement(
+    MobileThemeProvider,
+    { initialPreference: 'light' },
+    createElement(
+      MountedBottomDrawer,
+      { visible: true, interactive, onClose: noop, onHidden: noop },
+      createElement(SheetBody)
+    )
+  )
 }
 
 function render(interactive: boolean): ReactTestRenderer {

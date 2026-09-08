@@ -42,4 +42,3 @@ function readInlineArgValue(arg, flag) {
   }
   return value
 }
-

@@ -44,7 +44,10 @@ import {
   type WebRuntimeSessionWorkspaceSelectionRollback
 } from './web-runtime-session-workspace-selection'
 import { createdTerminalLeafId } from './web-runtime-terminal-identity'
-import { reportWebRuntimeTerminalCreateFailure, disconnectedWebRuntimeTerminalCreateOutcome } from './web-runtime-terminal-create-outcome'
+import {
+  reportWebRuntimeTerminalCreateFailure,
+  disconnectedWebRuntimeTerminalCreateOutcome
+} from './web-runtime-terminal-create-outcome'
 import { settleWebRuntimeTerminalPlacement } from './web-runtime-terminal-placement-settlement'
 
 export async function createWebRuntimeSessionTerminalResult(

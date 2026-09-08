@@ -136,4 +136,3 @@ export function reportRendererPtyVisibility(
     setRendererPtyVisibilityClaim(transport, ptyId, visible)
   }
 }
-

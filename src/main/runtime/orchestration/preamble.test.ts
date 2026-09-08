@@ -121,12 +121,16 @@ describe('buildDispatchPreamble', () => {
     expect(result).toContain('before starting.\n\n---')
   })
 
-  it.skipIf(process.platform === 'win32')('sub-dispatch fence passes bash -n', { timeout: 15_000 }, () => {
-    const result = buildDispatchPreamble(baseParams({ canDispatchSubWorkers: true }))
-    const { codeBlocks } = markdownBlocks(result)
-    const check = spawnSync('bash', ['-n'], { input: codeBlocks[1].value, encoding: 'utf8' })
-    expect(check.status).toBe(0)
-  })
+  it.skipIf(process.platform === 'win32')(
+    'sub-dispatch fence passes bash -n',
+    { timeout: 15_000 },
+    () => {
+      const result = buildDispatchPreamble(baseParams({ canDispatchSubWorkers: true }))
+      const { codeBlocks } = markdownBlocks(result)
+      const check = spawnSync('bash', ['-n'], { input: codeBlocks[1].value, encoding: 'utf8' })
+      expect(check.status).toBe(0)
+    }
+  )
 
   it('includes heartbeat CLI block with taskId and dispatchId and 5-minute cadence', () => {
     const result = buildDispatchPreamble(baseParams())

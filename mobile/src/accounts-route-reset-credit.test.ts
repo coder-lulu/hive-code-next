@@ -71,9 +71,11 @@ vi.mock('./theme/mobile-theme-provider', async () => {
 })
 
 vi.mock('./transport/host-store', () => ({
-  loadHostCatalog: async () => (await dependencies.loadHosts()).map((profile: unknown) => ({
-    credentialStatus: 'ready', profile
-  }))
+  loadHostCatalog: async () =>
+    (await dependencies.loadHosts()).map((profile: unknown) => ({
+      credentialStatus: 'ready',
+      profile
+    }))
 }))
 
 vi.mock('./runtime-directory/account-runtime-directory-provider', () => {
