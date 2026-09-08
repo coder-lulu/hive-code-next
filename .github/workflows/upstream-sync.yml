@@ -49,9 +49,11 @@ jobs:
         id: sync
         shell: bash
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPSTREAM_URL: https://github.com/${{ env.UPSTREAM_REPOSITORY }}.git
         run: |
           set -euo pipefail
+          gh auth setup-git --hostname github.com
           for branch in "$VENDOR_BRANCH" "$TARGET_BRANCH" "$UPSTREAM_BRANCH"; do
             git check-ref-format --branch "$branch"
           done
@@ -159,13 +161,13 @@ jobs:
           VENDOR_BASE_SHA: ${{ steps.sync.outputs.vendor_base_sha }}
         run: |
           set -euo pipefail
+          gh auth setup-git --hostname github.com
           test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$TARGET_SHA"
           # An open PR must not retain ready status while its candidate is unverified.
           ready_pr="$(gh pr list --head "$VENDOR_BRANCH" --base "$TARGET_BRANCH" --state open --json number,isDraft --jq 'map(select(.isDraft == false))[0].number // empty')"
           if [[ -n "$ready_pr" ]]; then
             gh pr ready "$ready_pr" --undo
           fi
-          gh auth setup-git --hostname github.com
           git push --force-with-lease="refs/heads/$VENDOR_BRANCH:$VENDOR_BASE_SHA" \
             origin "HEAD:refs/heads/$VENDOR_BRANCH"
           vendor_sha="$(git rev-parse HEAD)"
@@ -421,9 +423,11 @@ jobs:
         id: proposal
         shell: bash
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          gh auth setup-git --hostname github.com
           test "$(git ls-remote origin "refs/heads/$VENDOR_BRANCH" | cut -f1)" = "$VENDOR_SHA"
           test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$TARGET_SHA"
           git fetch --no-tags origin \
@@ -450,6 +454,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          gh auth setup-git --hostname github.com
           test "$(git ls-remote origin "refs/heads/$VENDOR_BRANCH" | cut -f1)" = "$VENDOR_SHA"
           test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$TARGET_SHA"
           pr_number="$(gh pr list --head "$VENDOR_BRANCH" --base "$TARGET_BRANCH" --state open --json number --jq '.[0].number // empty')"

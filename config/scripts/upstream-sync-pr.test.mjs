@@ -151,6 +151,10 @@ describe('upstream workflow evidence and publication contract', () => {
     expect(runSteps[publish].run).toContain(
       '--force-with-lease="refs/heads/$VENDOR_BRANCH:$VENDOR_BASE_SHA"'
     )
+    expect(runSteps[publish].env.GH_TOKEN).toBe('${{ secrets.GITHUB_TOKEN }}')
+    expect(runSteps[publish].run.indexOf('gh auth setup-git --hostname github.com')).toBeLessThan(
+      runSteps[publish].run.indexOf('git ls-remote origin')
+    )
     expect(runSteps[publish].run.indexOf('gh pr ready "$ready_pr" --undo')).toBeLessThan(
       runSteps[publish].run.indexOf('git push ')
     )

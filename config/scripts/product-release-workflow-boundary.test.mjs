@@ -122,6 +122,10 @@ describe('upstream synchronization boundary', () => {
     expect(workflow.on.workflow_dispatch.inputs.target_branch.default).toBe('hivecode/main-next')
     expect(workflow.env.TARGET_BRANCH).toContain("'hivecode/main-next'")
     expect(syncJob.outputs.target_sha).toBe('${{ steps.sync.outputs.target_sha }}')
+    expect(syncStep.env.GH_TOKEN).toBe('${{ secrets.GITHUB_TOKEN }}')
+    expect(syncScript.indexOf('gh auth setup-git --hostname github.com')).toBeLessThan(
+      syncScript.indexOf('git fetch --no-tags origin')
+    )
     expect(syncScript).toContain('refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH')
     expect(syncScript).toContain('echo "target_sha=$target_sha"')
     expect(mergeStep.env.TARGET_SHA).toBe('${{ steps.sync.outputs.target_sha }}')
@@ -152,6 +156,10 @@ describe('upstream synchronization boundary', () => {
 
     expect(workflow.jobs.propose.env.TARGET_SHA).toBe('${{ needs.sync.outputs.target_sha }}')
     expect(workflow.jobs.propose.env.VENDOR_SHA).toBe('${{ needs.sync.outputs.vendor_sha }}')
+    expect(proposeStep.env.GH_TOKEN).toBe('${{ secrets.GITHUB_TOKEN }}')
+    expect(proposeScript.indexOf('gh auth setup-git --hostname github.com')).toBeLessThan(
+      proposeScript.indexOf('git ls-remote origin')
+    )
     for (const [branch, sha] of [
       ['VENDOR_BRANCH', 'VENDOR_SHA'],
       ['TARGET_BRANCH', 'TARGET_SHA']
