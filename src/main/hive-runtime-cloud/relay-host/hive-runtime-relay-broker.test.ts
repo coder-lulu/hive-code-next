@@ -148,7 +148,7 @@ it('refreshes the same control in place and fences late renewal and resolution a
   expect(controls.instances).toHaveLength(1)
   const control = controls.instances[0]
   const unavailableAtConnect = onUnavailable.mock.calls.length
-  await vi.advanceTimersByTimeAsync(30_000)
+  await vi.advanceTimersByTimeAsync(15_000)
   expect(resolve).toHaveBeenCalledOnce()
   expect(refresh).toHaveBeenCalledOnce()
   expect(control.refresh).toHaveBeenCalledOnce()
@@ -163,7 +163,7 @@ it('refreshes the same control in place and fences late renewal and resolution a
         finishRefresh = complete
       })
   )
-  await vi.advanceTimersByTimeAsync(30_000)
+  await vi.advanceTimersByTimeAsync(15_000)
   expect(refresh).toHaveBeenCalledTimes(2)
   context = { ...context, tuple: { ...context.tuple, leaseEpoch: 2, heartbeatLeaseId: 'lease-2' } }
   broker.notifyContextChanged()

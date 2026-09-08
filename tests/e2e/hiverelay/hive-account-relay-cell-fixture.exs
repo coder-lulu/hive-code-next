@@ -7,6 +7,28 @@ input = File.read!(Path.join(directory, "input.json")) |> Jason.decode!()
 {:ok, port} = :inet.port(reservation)
 :gen_tcp.close(reservation)
 
+private_config =
+  if pki = input["privatePki"] do
+    {:ok, socket} = :gen_tcp.listen(0, ip: {127, 0, 0, 1})
+    {:ok, private_port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+
+    %{
+      private_ip: {127, 0, 0, 1},
+      private_port: private_port,
+      private_origin: "https://localhost:#{private_port}",
+      private_tls: [
+        certfile: String.to_charlist(pki["serverCertPath"]),
+        keyfile: String.to_charlist(pki["serverKeyPath"]),
+        cacertfile: String.to_charlist(pki["caPemPath"]),
+        verify: :verify_peer,
+        fail_if_no_peer_cert: true
+      ]
+    }
+  else
+    %{}
+  end
+
 config =
   Map.merge(Config.defaults(), %{
     cell_id: input["cellId"],
@@ -16,6 +38,7 @@ config =
     public_port: port,
     public_origin: "https://localhost:#{port}",
     browser_origins: input["browserOrigins"],
+    authenticated_slots: Map.get(input, "authenticatedSlots", 32),
     public_tls: [
       certfile: String.to_charlist(Path.join(directory, "cert.pem")),
       keyfile: String.to_charlist(Path.join(directory, "key.pem"))
@@ -29,6 +52,7 @@ config =
       }
     }
   })
+  |> Map.merge(private_config)
   |> Config.enrich()
 
 {:ok, domain} = Domain.start_link(config)
@@ -56,22 +80,55 @@ claims = %{
 }
 
 {:ok, %{"result" => "APPLIED"}} = Domain.ops(domain, claims, command)
-{:ok, _} = Supervisor.start_link([Listener.spec(:public, config, domain)], strategy: :one_for_one)
+listeners = [Listener.spec(:public, config, domain)]
+
+listeners =
+  if input["privatePki"],
+    do: listeners ++ [Listener.spec(:private, config, domain)],
+    else: listeners
+
+{:ok, _} = Supervisor.start_link(listeners, strategy: :one_for_one)
 
 File.write!(
   Path.join(directory, "ready.json"),
-  Jason.encode!(Map.put(identity, "port", :ranch.get_port(:hive_relay_public)))
+  Jason.encode!(
+    identity
+    |> Map.put("port", :ranch.get_port(:hive_relay_public))
+    |> Map.put("processPid", :os.getpid() |> List.to_string())
+    |> Map.put("privateOrigin", private_config[:private_origin])
+    |> Map.put("caPemPath", get_in(input, ["privatePki", "caPemPath"]))
+    |> Map.put("clientPkcs12Path", get_in(input, ["privatePki", "clientPkcs12Path"]))
+  )
 )
 
-lifetime = if System.get_env("HIVE_RELAY_CLOUD_PAUSE_TEST") == "1", do: 300_000, else: 90_000
+default_lifetime =
+  if System.get_env("HIVE_RELAY_CLOUD_PAUSE_TEST") == "1", do: 300_000, else: 90_000
+
+lifetime = Map.get(input, "lifetimeMs", default_lifetime)
+
 wait = fn wait ->
-  if File.exists?(Path.join(directory, "stop")) or System.system_time(:millisecond) > now + lifetime,
-    do: :ok,
-    else:
-      (
-        Process.sleep(100)
-        wait.(wait)
-      )
+  if File.exists?(Path.join(directory, "stop")) or
+       System.system_time(:millisecond) > now + lifetime,
+     do: :ok,
+     else:
+       (
+         if Map.has_key?(input, "lifetimeMs") do
+           observation = %{
+             "observedAt" => System.system_time(:millisecond),
+             "status" => Domain.status(domain),
+             "metrics" => Domain.metrics(domain)
+           }
+
+           temporary = Path.join(directory, "observation.json.tmp")
+           File.write!(temporary, Jason.encode!(observation))
+           File.rename!(temporary, Path.join(directory, "observation.json"))
+           Process.sleep(1000)
+         else
+           Process.sleep(100)
+         end
+
+         wait.(wait)
+       )
 end
 
 wait.(wait)

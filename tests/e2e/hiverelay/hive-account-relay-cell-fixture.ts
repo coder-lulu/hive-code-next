@@ -3,13 +3,28 @@ import { join, resolve } from 'node:path'
 import { once } from 'node:events'
 import { runProcess, spawnProcess } from '../../../src/shared/child-process/run-process'
 import { expect, vi } from 'vitest'
+import { createCellObservationReader } from './hive-account-relay-observation'
+import { createCellPrivatePki } from './hive-account-relay-private-pki'
 
 export async function startAccountRelayCell(
   directory: string,
   cellId: string,
   relaySigningPublicKey: string,
-  certificateReady?: () => Promise<string>
+  certificateReady?: () => Promise<string>,
+  capacity?: { lifetimeMs: number; authenticatedSlots: number },
+  privateOps = false
 ) {
+  if (
+    capacity &&
+    (!Number.isSafeInteger(capacity.lifetimeMs) ||
+      capacity.lifetimeMs < 90_000 ||
+      capacity.lifetimeMs > 1_200_000 ||
+      !Number.isSafeInteger(capacity.authenticatedSlots) ||
+      capacity.authenticatedSlots < 32 ||
+      capacity.authenticatedSlots > 384)
+  ) {
+    throw new Error('Invalid bounded Cell capacity fixture')
+  }
   const openssl =
     process.platform === 'win32' ? 'C:/Program Files/Git/usr/bin/openssl.exe' : 'openssl'
   const certificate = await runProcess({
@@ -35,10 +50,11 @@ export async function startAccountRelayCell(
     ]
   })
   expect(certificate.code).toBe(0)
+  const privatePki = privateOps ? await createCellPrivatePki(directory, openssl) : undefined
   const browserOrigins = certificateReady ? [await certificateReady()] : []
   writeFileSync(
     join(directory, 'input.json'),
-    JSON.stringify({ cellId, relaySigningPublicKey, browserOrigins })
+    JSON.stringify({ cellId, relaySigningPublicKey, browserOrigins, ...capacity, privatePki })
   )
   const child = spawnProcess({
     program: 'mise',
@@ -77,9 +93,13 @@ export async function startAccountRelayCell(
       },
       { timeout: 30000 }
     )
+    const observation = createCellObservationReader(join(directory, 'observation.json'))
     return {
       ...JSON.parse(readFileSync(join(directory, 'ready.json'), 'utf8')),
       ca: readFileSync(join(directory, 'cert.pem')),
+      privatePki,
+      readObservation: observation.read,
+      observationReadGaps: () => ({ cellId, gaps: observation.gaps() }),
       stop,
       diagnostic: () => diagnostic
     }

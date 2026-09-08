@@ -1,4 +1,5 @@
 import type { E2EEKeypair } from '../../runtime/e2ee-keypair'
+import limits from '../../../../config/hiverelay-contract/registries/limits.json'
 import type { CurrentHiveRuntimeCloudLeaseContext } from '../hive-runtime-cloud-lease-context'
 import { HiveRuntimeCloudRequestError } from '../hive-runtime-cloud-http-client'
 import { HiveRuntimeRelayControlClient } from './hive-runtime-relay-control-client'
@@ -205,7 +206,12 @@ export class HiveRuntimeRelayBroker {
       this.assignment = assignment
       this.failures = 0
       this.options.onAssigned(assignment)
-      const remaining = assignment.controlLeaseExpiresAt - (this.options.now ?? Date.now)()
+      // The Cell retires control at signed expiry minus its maximum clock error.
+      // Refresh halfway through that usable window, not halfway to the signed expiry.
+      const remaining =
+        assignment.controlLeaseExpiresAt -
+        (this.options.now ?? Date.now)() -
+        limits.time.clockSkewSeconds * 1000
       this.schedule(Math.max(1_000, Math.floor(remaining / 2)))
     } catch (error) {
       if (generation === this.generation) {

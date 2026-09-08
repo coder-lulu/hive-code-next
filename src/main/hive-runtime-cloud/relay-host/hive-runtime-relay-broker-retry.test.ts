@@ -8,6 +8,7 @@ import {
   HiveRuntimeCloudTransportError
 } from '../hive-runtime-cloud-http-client'
 import type { HiveRuntimeRelayAssignment } from './hive-runtime-relay-types'
+import limits from '../../../../config/hiverelay-contract/registries/limits.json'
 
 // Keep the real control state machine; cryptographic proof vectors have separate coverage.
 vi.mock('./hive-runtime-relay-host-proof-v2', () => ({
@@ -52,7 +53,7 @@ it.each([
       await finishHandshake(sockets[0], assignment)
       expect(broker.activeAssignment).not.toBeNull()
       refresh.mockRejectedValueOnce(error)
-      await vi.advanceTimersByTimeAsync(30_000)
+      await vi.advanceTimersByTimeAsync(15_000)
       expect(broker.activeAssignment).toBeNull()
       expect(sockets[0].close).toHaveBeenCalledOnce()
       const delay =
@@ -73,7 +74,7 @@ it.each([
   }
 )
 
-function fixture() {
+function fixture(controlLeaseRemainingMs = 60_000) {
   vi.useFakeTimers()
   vi.setSystemTime(1_800_000_000_000)
   const keys = nacl.box.keyPair()
@@ -110,7 +111,7 @@ function fixture() {
     controlGeneration: 1,
     relayHostId: 'abcdefghijklmnop',
     controlLease: 'initial' as HiveRuntimeRelayAssignment['controlLease'],
-    controlLeaseExpiresAt: Date.now() + 60_000,
+    controlLeaseExpiresAt: Date.now() + controlLeaseRemainingMs,
     hostPublicKeyB64: 'A'.repeat(43)
   }
   const sockets: Socket[] = []
@@ -136,6 +137,80 @@ function fixture() {
   })
   return { broker, assignment, resolve, refresh, sockets }
 }
+
+it('renews 60-second control leases before the Cell clock-safety cutoff despite HTTP latency', async () => {
+  const { broker, assignment, refresh, sockets } = fixture()
+  let cellTimer: ReturnType<typeof setTimeout> | undefined
+  let cellExpirations = 0
+  let nextExpiresAt = assignment.controlLeaseExpiresAt
+  const armCellDeadline = (socket: Socket) => {
+    if (cellTimer) {
+      clearTimeout(cellTimer)
+    }
+    cellTimer = setTimeout(
+      () => {
+        cellExpirations += 1
+        socket.emit('close', 4410)
+      },
+      nextExpiresAt - Date.now() - limits.time.clockSkewSeconds * 1000
+    )
+  }
+  refresh.mockImplementation(async () => {
+    await new Promise((done) => setTimeout(done, 100))
+    // Cloud signs whole JWT seconds, so a refresh can lose a fractional second.
+    nextExpiresAt = Math.floor((Date.now() + 60_000) / 1000) * 1000
+    return { ...assignment, controlLeaseExpiresAt: nextExpiresAt }
+  })
+  try {
+    broker.start()
+    await vi.advanceTimersByTimeAsync(0)
+    const socket = sockets[0]
+    await finishHandshake(socket, assignment)
+    armCellDeadline(socket)
+    socket.send.mockImplementation((raw, callback) => {
+      callback()
+      if (JSON.parse(raw).type === 'auth-refresh') {
+        armCellDeadline(socket)
+        socket.receive({
+          type: 'host-hello-ack',
+          v: 2,
+          controlGeneration: assignment.controlGeneration,
+          leaseExpiresAt: nextExpiresAt
+        })
+      }
+    })
+    await vi.advanceTimersByTimeAsync(35_000)
+    expect(cellExpirations).toBe(0)
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(sockets).toHaveLength(1)
+    expect(broker.activeAssignment).not.toBeNull()
+  } finally {
+    if (cellTimer) {
+      clearTimeout(cellTimer)
+    }
+    await broker.stop()
+    expect(vi.getTimerCount()).toBe(0)
+  }
+})
+
+it.each([30_000, 30_500])(
+  'bounds renewal when only %s ms of nominal lease remains',
+  async (remaining) => {
+    const { broker, assignment, refresh, sockets } = fixture(remaining)
+    try {
+      broker.start()
+      await vi.advanceTimersByTimeAsync(0)
+      await finishHandshake(sockets[0], assignment)
+      await vi.advanceTimersByTimeAsync(999)
+      expect(refresh).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(refresh).toHaveBeenCalledOnce()
+    } finally {
+      await broker.stop()
+      expect(vi.getTimerCount()).toBe(0)
+    }
+  }
+)
 
 async function finishHandshake(
   socket: Socket,
@@ -182,7 +257,7 @@ it.each([
       expect(broker.activeAssignment).not.toBeNull()
     }
     if (phase === 'refresh') {
-      await vi.advanceTimersByTimeAsync(30_000)
+      await vi.advanceTimersByTimeAsync(15_000)
       expect(refresh).toHaveBeenCalledOnce()
     }
     if (failure === 'timeout') {
