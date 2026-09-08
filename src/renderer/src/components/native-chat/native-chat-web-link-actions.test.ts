@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import type { LinkActionRequest } from '@/components/link-actions/link-action-request'
 import type * as HttpLinkDestinations from '@/lib/http-link-destinations'
 import type { HttpLinkActionDestinations } from '@/lib/http-link-destinations'
@@ -96,7 +97,7 @@ describe('handleNativeChatWebLink', () => {
       kind: 'url'
     })
     expect(requests[0]?.primary.label).toBe('System Browser')
-    expect(requests[0]?.alternate?.label).toBe('HiveCode Browser')
+    expect(requests[0]?.alternate?.label).toBe(`${APP_DISPLAY_NAME} Browser`)
   })
 
   it('routes the popover actions to their destinations', () => {
