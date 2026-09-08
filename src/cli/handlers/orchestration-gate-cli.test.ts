@@ -236,7 +236,9 @@ describe('orchestration gate commands carry caller identity', () => {
     const output = JSON.parse(String(logSpy.mock.calls[0]?.[0])) as {
       error: { message: string; data: Record<string, unknown> }
     }
-    expect(output.error.message).toContain('--retry-request mutation_1')
+    expect(output.error.message).toContain(
+      process.platform === 'win32' ? '"--retry-request" "mutation_1"' : '--retry-request mutation_1'
+    )
     expect(output.error.message).toContain('may already have taken effect')
     expect(output.error.message).toContain('Failed stage: dispatch_input')
     expect(output.error.message).toMatch(/Residual resources:.*repo::child.*term_worker/)

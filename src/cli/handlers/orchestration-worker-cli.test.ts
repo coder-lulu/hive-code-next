@@ -235,14 +235,19 @@ describe('orchestration worker-start CLI contract', () => {
         boolean,
         (result: RecoveryWorkerStartResult) => string
       ]
-      expect(response.result.nextCommands).toEqual([
-        `${executable} orchestration worker-show --dispatch ctx_unknown --json`,
-        `${executable} orchestration worker-abandon --dispatch ctx_unknown --json`
-      ])
+      const expectedCommands =
+        process.platform === 'win32'
+          ? [
+              `"${executable}" "orchestration" "worker-show" "--dispatch" "ctx_unknown" "--json"`,
+              `"${executable}" "orchestration" "worker-abandon" "--dispatch" "ctx_unknown" "--json"`
+            ]
+          : [
+              `${executable} orchestration worker-show --dispatch ctx_unknown --json`,
+              `${executable} orchestration worker-abandon --dispatch ctx_unknown --json`
+            ]
+      expect(response.result.nextCommands).toEqual(expectedCommands)
       if (!json) {
-        expect(formatter(response.result)).toContain(
-          `Next command: ${executable} orchestration worker-show --dispatch ctx_unknown --json`
-        )
+        expect(formatter(response.result)).toContain(`Next command: ${expectedCommands[0]}`)
       }
     }
   )

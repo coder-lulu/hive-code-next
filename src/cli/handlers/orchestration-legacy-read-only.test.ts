@@ -218,7 +218,7 @@ describe('legacy orchestration CLI inspection', () => {
     expect(response.result.formatted).not.toContain('RUNTIME_SENTINEL')
     expect(
       response.result.formatted.split('\n').filter((line) => line.startsWith('[Reply:'))
-    ).toEqual(['[Reply: orca orchestration reply --id msg_current --body "..."]'])
+    ).toEqual(['[Reply: hive orchestration reply --id msg_current --body "..."]'])
     expect(response.result.formatted).not.toContain('--from run:run_current')
   })
 

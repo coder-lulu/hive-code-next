@@ -1,6 +1,16 @@
 # Upstream synchronization: 2026-09-08
 
-Status: conflict resolution in progress; no candidate publication or product promotion.
+Status: all original conflicts resolved; candidate published to vendor-integration; product promotion remains on HOLD pending independent review and incomplete validation. Early Pending entries below describe historical checkpoints, not current approval.
+
+## Functional review follow-up
+
+- Reviewed candidate: `a5326f3be760d9ba004f96cdbbc5e24fd44668d6`; remote product remains `7fa4dd4d4b95ec2286f5431d2307448b6cd989d7`.
+- Fresh Hive account, Runtime Cloud, Relay, login discovery, and project-owner routing regression: 50 files / 399 tests passed.
+- Corrected upstream test adaptation omissions: HiveCode preview messages, accepted Hive CLI names, current Japanese generic-agent terminology, and platform-specific Windows recovery-command quoting. Runtime behavior and request-identity assertions were retained.
+- Expanded orchestration, recovery-command, translation-policy, and document-preview regression after corrections: 33 files / 299 tests passed. React act-environment warnings remain in preview tests.
+- Evidence: `E:/projects/hive-platform/upstream-review-hive-features.log`, `upstream-review-followup-failures.log`, and `upstream-review-adaptation-tests.log`.
+- This bounded verification does not close the root full-suite, macOS/Linux, or live cross-Cell validation gaps. Native role routing remains unavailable, so there is no independent code-reviewer APPROVE / architect CLEAR. Do not treat this authoring-lane evidence as merge approval.
+- GitHub Actions was confirmed disabled. No workflow was dispatched and no product promotion was performed.
 
 - Upstream: `12f53da542d03473367e48a63b85a49eae7c5f8b`
 - Product: `7fa4dd4d4b95ec2286f5431d2307448b6cd989d7`
