@@ -1,6 +1,6 @@
 # Upstream integration: 2026-09-09
 
-Scope: upstream `12f53da542d03473367e48a63b85a49eae7c5f8b` through `4f0e3806a94009c0c3d9fe698b844d3421921c6e`, plus the three existing pending product decisions. Frozen product: `308d4da18ab7038227816842bc3cfdc52fabce58`. Vendor publication lease: `b471648085824cc49813e3885866fde0ad7f01eb`.
+Scope: upstream `12f53da542d03473367e48a63b85a49eae7c5f8b` through `6b60c23e07de7b2602b796176db94d6430d725f9`, plus the three existing pending product decisions. Frozen product: `308d4da18ab7038227816842bc3cfdc52fabce58`. Vendor publication lease: `b471648085824cc49813e3885866fde0ad7f01eb`.
 
 The user authorized cleanup of merged branches, pointer updates, preservation of upstream fixes, direct review by this agent, and product promotion after review. GitHub Actions remains disabled; all checks are local. No independent-role approval is claimed.
 
@@ -15,7 +15,10 @@ The user authorized cleanup of merged branches, pointer updates, preservation of
 | `8f78c28248` | Absorb mobile takeover reports after accepted sends. Reports use the owning client and handle, throttle per client/terminal, retry boundedly, and enter through the authenticated mobile RPC allowlist. Raw byte lanes do not perform orchestration SQL. Hive account RPC methods remain present. |
 | `4f0e3806a9` | Absorb effort-picker ordering after the model picker without changing option payloads. |
 
-All six decisions are recorded in `config/upstream-change-ledger.json`. The upstream main branch, rather than arbitrary upstream development branches, defines the ongoing sync boundary.
+| `d7d21b2c55` | Absorb picker-selected skill pills using the existing Tiptap dependency and theme primitives. Text transport retains exact invocation tokens; clipboard input stays literal; document caching remains bounded and pane-scoped. This composer presentation does not copy the retired skill-installer implementation. |
+| `6b60c23e07` | Absorb keyboard focus-visible reveal and visible touch message actions, retaining timestamp and copy behavior. |
+
+All eight decisions are recorded in `config/upstream-change-ledger.json`. The upstream main branch, rather than arbitrary upstream development branches, defines the ongoing sync boundary.
 
 ## Conflict resolutions
 

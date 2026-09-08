@@ -5,6 +5,33 @@
   "productBranches": ["hivecode/main-next"],
   "entries": [
     {
+      "upstreamSha": "d7d21b2c55cd512b7f5a3011e4fa07ef11d9facb",
+      "type": "新功能",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Native chat editor must retain exact text transport, pane ownership, IME and attachment behavior",
+      "adaptation": "Absorb picker-created skill pills using existing Tiptap and theme primitives. Preserve literal clipboard text, exact skill invocation serialization, bounded pane-scoped draft caching and composition ownership. This is composer presentation, not the prohibited upstream skill-installer implementation.",
+      "regressionTests": [
+        "NativeChatPromptEditor",
+        "native-chat-composer-composition",
+        "native-chat-structured-send-composition-clear",
+        "native-chat renderer suite"
+      ]
+    },
+    {
+      "upstreamSha": "6b60c23e07de7b2602b796176db94d6430d725f9",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Message actions must remain reachable on keyboard and touch",
+      "adaptation": "Absorb focus-visible reveal and always-visible touch actions while retaining existing Hive theme, timestamp and copy behavior.",
+      "regressionTests": [
+        "NativeChatMessageRow",
+        "NativeChatMessageList",
+        "hover-reveal-touch-action-visibility"
+      ]
+    },
+    {
       "upstreamSha": "bba68b1bddf1276c8bd27ad4ca41efcbd4260321",
       "type": "BUG",
       "applied": "已移植",
