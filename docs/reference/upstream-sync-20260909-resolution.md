@@ -27,9 +27,10 @@ Two paths conflicted. `docs/assets/readme-downloads.svg` remains deleted under t
 ## Verification and limits
 
 - Initial desktop/Runtime/Pi/UI focused regression: 10 files, 161 tests passed.
+- Expanded native-chat regression initially passed 1202 tests with two stale Orca Browser label assertions. Both positive and negative assertions now use the actual HiveCode Browser product label, retaining the destination and modifier behavior checks. Final rerun evidence is recorded in the PR.
 - Mobile full suite: 4411 passed, 6 failed, 3 skipped. The six failures are the previously reproduced product-baseline failures in workspace-creation-graphite, notification-route-coordination and future-settings-graphite; they are not marked passed. Mobile route parity and takeover send-site tests pass in this run.
 - Broader Worker/Pi regression: 407 tests passed, 6 skipped; the unchanged agent-status-producer-census suite could not load because its Electron binary download failed. The suite-load failure is not counted as a passing test.
-- Root and mobile typechecks, mobile lint and Web build passed. Full root lint, generated-file checks and final immutable-candidate gates are recorded in the integration PR and local `E:/projects/hive-platform/upstream-0909-*` artifacts. Do not infer their status from this pre-publication document.
+- Root and mobile typechecks, root/mobile lint and Web build passed for the initial six changes; root typecheck also passed after the two chat updates. Final lint/build, generated-file checks and immutable-candidate gates are recorded in the integration PR and local `E:/projects/hive-platform/upstream-0909-*` artifacts. Do not infer their status from this pre-publication document.
 - No desktop installer build, live cross-Cell deployment, macOS or Linux execution is claimed. This scoped review does not turn the existing full-root-suite baseline failures into passes.
 
 ## Branch housekeeping
