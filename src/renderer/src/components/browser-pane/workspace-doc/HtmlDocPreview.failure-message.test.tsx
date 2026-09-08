@@ -13,6 +13,7 @@ import type * as WebviewRegistryModule from '../host-guest/webview-registry'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { DocPreviewFailure } from '../../../../../shared/doc-preview-scheme'
 
 const GRANT_ID = 'a'.repeat(32)
@@ -192,7 +193,7 @@ describe('HtmlDocPreview failure messages', () => {
     })
 
     expect(container.textContent).toContain(
-      'HiveCode could not read assets/logo.png from the workspace.'
+      `${APP_DISPLAY_NAME} could not read assets/logo.png from the workspace.`
     )
 
     await act(async () => {
@@ -212,7 +213,7 @@ describe('HtmlDocPreview failure messages', () => {
     })
 
     expect(container.textContent).toContain(
-      'HiveCode could not read assets/logo.png from the workspace.'
+      `${APP_DISPLAY_NAME} could not read assets/logo.png from the workspace.`
     )
     expect(container.textContent).not.toContain('files in this document')
   })
@@ -446,7 +447,7 @@ describe('HtmlDocPreview failure messages', () => {
 
     expect(container.textContent).toContain('Downloads are disabled in document previews.')
     expect(container.textContent).toContain(
-      'HiveCode could not read assets/logo.png from the workspace.'
+      `${APP_DISPLAY_NAME} could not read assets/logo.png from the workspace.`
     )
     // The asset count describes files the document could not load; a refusal is not one of them.
     expect(container.textContent).not.toContain('2 files in this document')
@@ -469,7 +470,9 @@ describe('HtmlDocPreview failure messages', () => {
       emitFailure({ grantId: GRANT_ID, relativePath: ENTRY_RELATIVE_PATH, reason: 'unreadable' })
     })
 
-    expect(container.textContent).toContain('HiveCode could not read this file from the workspace.')
+    expect(container.textContent).toContain(
+      `${APP_DISPLAY_NAME} could not read this file from the workspace.`
+    )
   })
 
   it('ignores a failure minted for another preview tab', async () => {

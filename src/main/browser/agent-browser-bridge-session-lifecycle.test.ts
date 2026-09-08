@@ -114,7 +114,11 @@ describe('AgentBrowserBridge', () => {
 
     expect(await bridge.snapshot()).toMatchObject({ snapshot: 'ready' })
     expect(closeCallCount()).toBe(0)
-    expect(lstatSyncMock).toHaveBeenCalledWith('/tmp/orca-ab-test/orca-tab-tab-1.sock')
+    expect(lstatSyncMock).toHaveBeenCalledWith(
+      process.platform === 'win32'
+        ? '\\tmp\\orca-ab-test\\orca-tab-tab-1.sock'
+        : '/tmp/orca-ab-test/orca-tab-tab-1.sock'
+    )
   })
 
   it('fails closed when stale agent-browser session ownership cannot be reset', async () => {

@@ -1,6 +1,16 @@
 # Upstream synchronization: 2026-09-08
 
-Status: all original conflicts resolved; candidate published to vendor-integration; product promotion remains on HOLD pending independent review and incomplete validation. Early Pending entries below describe historical checkpoints, not current approval.
+Status: all original conflicts resolved; single-agent functional review completed under the user's 2026-09-09 instruction to review directly and merge. Promotion requires final candidate gates and unchanged remote tips. Earlier HOLD/Pending entries below describe historical checkpoints, not the current review mode.
+
+## Direct review and promotion decision (2026-09-09)
+
+- The user explicitly replaced the unavailable two-role review with direct review by this agent and authorized merging to the product branch after review. No independent code-reviewer/architect approval is claimed. GitHub Actions remains disabled; validation is local.
+- Reviewed product preservation: account login directory subscription and startup wiring; Runtime ownership/reclaim/unlink; HiveRelay authorization/control recovery; per-host project mutations; restored terminal history; dispatcher Hive control context and mutation identity; Web session retirement-proof capability; product signing/update boundaries.
+- Re-ran historical failing files on candidate `f6c415c05c` (1114 tests: 956 passed, 130 failed, 28 skipped) and the unchanged product `7fa4dd4d4b` (896 tests: 742 passed, 126 failed, 28 skipped). Matching by file and full test name, 125 of the candidate's failures also fail on the product baseline. This is a bounded comparison, not a passing full-suite claim.
+- The five failures not reproduced as baseline failures were test adaptations: one newly added browser socket path expectation; one newly added signing-hook expectation; and three existing PTY tests mixing mocked Linux/macOS with the Windows host PATH delimiter. Corrected each to the product/platform contract. Also closed the test-owned Claude translation journal before deleting its fixture and replaced literal preview branding with the product constant.
+- Follow-up: all 94 tests in the five affected browser/journal/PTY/preview files passed; the hardware-signing test passed (the other 16 tests were not selected in that focused run). Changed-file lint and brand-boundary verification are required before publication.
+- Remaining limitations: pre-existing full-suite failures include unavailable WSL/symlink prerequisites and stale mocks/product expectations. macOS/Linux execution, live cross-Cell deployment, and a desktop installer build are not covered. No new production regression was established by the scoped review; the baseline issues remain follow-up work and are not marked passed.
+- Evidence: `E:/projects/hive-platform/upstream-final-failure-recheck.{json,log}`, `upstream-final-baseline-recheck.{json,log}`, `upstream-final-adapted-fixtures.log`, and final candidate gate/intake artifacts recorded in PR #8.
 
 ## Functional review follow-up
 

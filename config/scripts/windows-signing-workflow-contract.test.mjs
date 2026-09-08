@@ -448,13 +448,23 @@ describe('Windows NSIS uninstaller signing', () => {
     expect(verify.run).toContain('$script:advisories.Add($problem)')
   })
 
-  it('wires the electron-builder sign hook that the relay depends on', () => {
+  it('wires the Hive hardware-signing hook when hardware signing is selected', () => {
     const require = createRequire(import.meta.url)
     const configPath = resolve(projectDir, 'config/electron-builder.config.cjs')
-    delete require.cache[require.resolve(configPath)]
-    const config = require(configPath)
-
-    expect(typeof config.win.signtoolOptions.sign).toBe('function')
-    delete require.cache[require.resolve(configPath)]
+    const originalSigning = process.env.HIVECODE_WINDOWS_HARDWARE_SIGNING
+    try {
+      process.env.HIVECODE_WINDOWS_HARDWARE_SIGNING = '1'
+      delete require.cache[require.resolve(configPath)]
+      const config = require(configPath)
+      expect(config.win.signtoolOptions.sign).toBe('./config/scripts/sign-windows-artifact.mjs')
+      expect(config.win.signtoolOptions.signingHashAlgorithms).toEqual(['sha256'])
+    } finally {
+      if (originalSigning === undefined) {
+        delete process.env.HIVECODE_WINDOWS_HARDWARE_SIGNING
+      } else {
+        process.env.HIVECODE_WINDOWS_HARDWARE_SIGNING = originalSigning
+      }
+      delete require.cache[require.resolve(configPath)]
+    }
   })
 })

@@ -170,12 +170,15 @@ const JOURNAL_IDENTITY: AgentSessionJournalIdentity = {
 }
 
 let journalRoot = ''
+let openedJournal: Awaited<ReturnType<typeof openAgentSessionJournal>> | undefined
 
 beforeEach(async () => {
   journalRoot = await mkdtemp(join(tmpdir(), 'orca-claude-journal-translation-'))
 })
 
 afterEach(async () => {
+  await openedJournal?.close()
+  openedJournal = undefined
   await rm(journalRoot, { recursive: true, force: true })
 })
 
@@ -240,6 +243,7 @@ describe('Claude structured journal translation', () => {
       now: () => 1_700_000_000_000,
       mintEpoch: () => 'epoch-1'
     })
+    openedJournal = journal
     const deferred = createDeferredStructuredAgentSessionEventSink()
     deferred.bind({ journal, fence: 1, publish: vi.fn() })
     let scheduled: (() => void) | null = null
