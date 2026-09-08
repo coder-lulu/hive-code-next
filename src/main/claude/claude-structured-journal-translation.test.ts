@@ -170,12 +170,15 @@ const JOURNAL_IDENTITY: AgentSessionJournalIdentity = {
 }
 
 let journalRoot = ''
+let openedJournal: Awaited<ReturnType<typeof openAgentSessionJournal>> | undefined
 
 beforeEach(async () => {
   journalRoot = await mkdtemp(join(tmpdir(), 'orca-claude-journal-translation-'))
 })
 
 afterEach(async () => {
+  await openedJournal?.close()
+  openedJournal = undefined
   await rm(journalRoot, { recursive: true, force: true })
 })
 
@@ -240,6 +243,7 @@ describe('Claude structured journal translation', () => {
       now: () => 1_700_000_000_000,
       mintEpoch: () => 'epoch-1'
     })
+    openedJournal = journal
     const deferred = createDeferredStructuredAgentSessionEventSink()
     deferred.bind({ journal, fence: 1, publish: vi.fn() })
     let scheduled: (() => void) | null = null
@@ -342,10 +346,7 @@ describe('Claude structured journal translation', () => {
       state.items.flatMap((item) =>
         item.body.kind === 'message' && item.body.role === 'user' ? [item.body.blocks] : []
       )
-    ).toEqual([
-      [{ type: 'text', text: 'Reply with exactly PROBE_OK_1 and nothing else.' }],
-      [{ type: 'text', text: '[Request interrupted by user]' }]
-    ])
+    ).toEqual([])
     expect(
       state.items.some((item) => item.body.kind === 'status' && !item.body.turnLifecycle)
     ).toBe(false)
@@ -521,10 +522,7 @@ describe('Claude structured journal translation', () => {
     const keyed = new Map(
       state.items.map((item) => [agentJournalItemKey(item.identity), item.body])
     )
-    expect(keyed.get('claude:claude-session:user-1')).toMatchObject({
-      kind: 'message',
-      role: 'user'
-    })
+    expect(keyed.has('claude:claude-session:user-1')).toBe(false)
     expect(keyed.get('orca:claude-tool%3Aclaude-session%3Atool-1')).toMatchObject({
       kind: 'tool-call',
       name: 'Bash',
@@ -683,7 +681,6 @@ describe('Claude structured journal translation', () => {
         'message:system:local_command_output',
         'message:system:command_started',
         'message:result',
-        'message:user:content:document',
         'control_request:future_control'
       ])
     )

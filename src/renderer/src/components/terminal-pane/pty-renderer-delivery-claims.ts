@@ -1,3 +1,4 @@
+import type { PtyTransport } from './pty-transport'
 import { redactPtyIdForDiagnostics } from '../../../../shared/pty-delivery-diagnostics'
 import { recordTerminalFreezeBreadcrumb } from './terminal-freeze-breadcrumbs'
 
@@ -119,4 +120,19 @@ export function _resetPtyRendererDeliveryClaimsForTest(): void {
   hiddenClaimCounts.clear()
   visibilityClaimsByOwner.clear()
   visibleClaimCounts.clear()
+}
+
+export function reportRendererPtyVisibility(
+  paneTransports: ReadonlyMap<number, PtyTransport>,
+  visible: boolean
+): void {
+  for (const transport of paneTransports.values()) {
+    const ptyId = transport.getPtyId()
+    if (!ptyId || ptyId.startsWith('remote:')) {
+      // Why: remote-runtime PTYs use a relay path outside main's local
+      // renderer-visibility registry, so reporting them here is misleading.
+      continue
+    }
+    setRendererPtyVisibilityClaim(transport, ptyId, visible)
+  }
 }

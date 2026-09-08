@@ -35,9 +35,4 @@ inline src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.ts
 inline src/renderer/src/store/slices/account-runtime-cloud.ts
 inline src/renderer/src/web/web-preload-api.ts
 inline src/renderer/src/web/web-runtime-client.ts
-mobile-config app/h/*/files/*.tsx
-mobile-config app/h/*/source-control/*.tsx
 mobile-config app/h/*/tasks.tsx
-mobile-config app/index.tsx
-mobile-config scripts/mock-server.ts
-mobile-config src/transport/rpc-client.ts

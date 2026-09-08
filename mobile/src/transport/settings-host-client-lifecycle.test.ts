@@ -14,6 +14,11 @@ import { selectHomeAutoConnectHostIds } from './home-host-auto-connect'
 import type { RpcClient } from './rpc-client'
 import type { ConnectionState, HostProfile } from './types'
 
+vi.mock('./runtime-random', async () => {
+  const { randomBytes } = await import('node:crypto')
+  return { mobileRuntimeRandomBytes: randomBytes }
+})
+
 const connectMock = vi.fn()
 const loadHostsMock = vi.fn()
 const routeFocus = vi.hoisted(() => ({

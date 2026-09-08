@@ -1,25 +1,21 @@
 ---
 name: orca-emulator
-description: >
-  Control a mobile (iOS) emulator / simulator stream from inside HiveCode using the `hive` CLI.
-  Use for taps, gestures, typing, hardware buttons, camera injection, permissions, accessibility tree, and more — all while seeing the live view in HiveCode's emulator pane.
-  Prefer this over raw `npx serve-sim` or direct simctl when running agents inside HiveCode (the HiveCode surface handles device scoping, helper lifecycle, and worktree context).
-  Complements the orca-cli skill for terminals, worktrees, and the built-in browser.
+description: >-
+  iOS Simulator control from inside HiveCode, with the live device view in HiveCode's
+  emulator pane. Use when driving a booted Apple Simulator on macOS: taps,
+  gestures, typing, hardware buttons, rotation, and the accessibility tree, or
+  when an iOS change needs simulator evidence. For an Android device or emulator
+  use the Android emulator skill; build and install the app with xcodebuild or
+  simctl first.
 license: Apache-2.0
 ---
 
 # HiveCode Emulator
 
-This file is a discovery stub, not the usage guide. The full, version-matched HiveCode emulator
-reference is served by the `hive` binary itself — kept out of this file on purpose so it can
-never drift from the binary that will actually run your commands.
+This discovery stub loads the version-matched guide from the HiveCode executable used for this session.
 
-Engage HiveCode whenever you drive a mobile (iOS) emulator / simulator stream from inside the
-HiveCode app: taps, gestures, typing, hardware buttons, camera injection, runtime permissions,
-the accessibility tree, and more — all while the live view stays in HiveCode's emulator pane.
-Prefer this over raw `serve-sim` or direct `simctl` when running agents inside HiveCode, which
-handles device scoping, helper lifecycle, and worktree context for you. It complements the
-orca-cli skill for terminals, worktrees, and the built-in browser.
+Prefer HiveCode over raw `serve-sim` or direct `simctl` for simulator control inside HiveCode; it
+handles device scoping, helper lifecycle, and worktree context.
 
 ## Resolve the CLI for this session
 
@@ -38,21 +34,17 @@ only when the active HiveCode build requires it. If that executable cannot run, 
 exact error and stop; do not fall through to another executable that may target a different
 HiveCode build.
 
-## Load the full guide before running HiveCode commands
+The same executable selection works in POSIX shells, PowerShell, and cmd.exe.
+
+## Load the version-matched guide before running HiveCode commands
 
 ```text
 hive skills get orca-emulator
 ```
 
-That prints the complete, version-matched guide for the exact binary that will handle your
-next commands — booting devices, taps and gestures, typing, hardware buttons, camera
-injection, permissions, and the accessibility tree. Read it first, then run the specific
-command you need.
-
-Don't guess subcommands or flags from memory or from a cached copy of this stub. They
-change between HiveCode releases, and this file deliberately no longer lists them. Confirm the
-app is up with `hive status --json` (start it with `hive open --json` if needed), and
-prefer `--json` for agent-driven calls.
+Prefer `--json`. Use the selected executable's `--help` for commands or flags the guide does
+not cover. If HiveCode is not running, start it with `hive open --json` and retry.
+If `skills get` is unknown, use the bounded read-only fallback below; do not guess flags.
 
 ## If an older HiveCode does not recognize `skills get`
 

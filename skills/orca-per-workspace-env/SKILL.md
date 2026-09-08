@@ -1,30 +1,17 @@
 ---
 name: orca-per-workspace-env
 description: >-
-  Set up, review, debug, or validate HiveCode per-workspace environment recipes —
-  on-demand, disposable runtimes (cloud sandboxes, VMs, or local) created fresh
-  for each workspace. Covers first-time setup (provider prerequisites, the
-  reusable base snapshot, the coding-agent auth snapshot, credentials, and
-  state), not just the per-workspace lifecycle scripts. Use to stand up
-  per-workspace environments, fix an `environmentRecipes` entry in `orca.yaml`, scaffold
-  provider lifecycle scripts, or resolve an `hive vm recipe doctor` failure.
+  Set up, review, debug, or validate an HiveCode per-workspace environment recipe: the
+  on-demand, disposable runtime (cloud sandbox, VM, SSH host, or local container)
+  HiveCode creates fresh for each workspace. Use to stand up a new recipe end to end,
+  fix an `environmentRecipes` entry in `orca.yaml`, scaffold provider lifecycle
+  scripts, or resolve an `hive vm recipe doctor` failure. Use `orca-cli` for
+  ordinary worktree and workspace creation with no recipe involved.
 ---
 
 # Per-Workspace Environments
 
-This file is a discovery stub, not the usage guide. The full, version-matched per-workspace
-environment reference is served by the `hive` binary itself — kept out of this file on
-purpose so it can never drift from the binary that will actually run your commands.
-
-Engage HiveCode whenever you set up, review, debug, or validate a per-workspace environment
-recipe — the on-demand, disposable runtimes (cloud sandboxes, VMs, or local) created fresh
-for each workspace. This covers first-time setup (provider prerequisites, the reusable base
-snapshot, the coding-agent auth snapshot, credentials, and state), not just the
-per-workspace lifecycle scripts. Use it to stand up per-workspace environments, fix an
-`environmentRecipes` entry in `orca.yaml`, scaffold provider lifecycle scripts, or resolve
-an `hive vm recipe doctor` failure. HiveCode is a thin wrapper: you guide, detect, and scaffold;
-you never own the user's cloud account, billing, images, or credentials, and never spend
-money without an explicit user OK.
+This discovery stub loads the version-matched guide from the HiveCode executable used for this session.
 
 ## Resolve the CLI for this session
 
@@ -43,21 +30,17 @@ only when the active HiveCode build requires it. If that executable cannot run, 
 exact error and stop; do not fall through to another executable that may target a different
 HiveCode build.
 
-## Load the full guide before running HiveCode commands
+The same executable selection works in POSIX shells, PowerShell, and cmd.exe.
+
+## Load the version-matched guide before running HiveCode commands
 
 ```text
 hive skills get orca-per-workspace-env
 ```
 
-That prints the complete, version-matched guide for the exact binary that will handle your
-next commands — provider setup, base and auth snapshots, `environmentRecipes` in
-`orca.yaml`, lifecycle scripts, and `hive vm recipe doctor`. Read it first, then run the
-specific command you need.
-
-Don't guess subcommands or flags from memory or from a cached copy of this stub. They
-change between HiveCode releases, and this file deliberately no longer lists them. Confirm the
-app is up with `hive status --json` (start it with `hive open --json` if needed), and
-prefer `--json` for agent-driven calls.
+Prefer `--json`. Use the selected executable's `--help` for commands or flags the guide does
+not cover. If HiveCode is not running, start it with `hive open --json` and retry.
+If `skills get` is unknown, use the bounded read-only fallback below; do not guess flags.
 
 ## If an older HiveCode does not recognize `skills get`
 

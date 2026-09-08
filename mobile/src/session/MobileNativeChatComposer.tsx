@@ -13,6 +13,8 @@ import { ArrowUp, ImagePlus, Mic, Square, X } from 'lucide-react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { getVerifiedNativeChatCommands } from '../../../src/shared/native-chat-agent-profiles'
+import { structuredSlashCommands } from '../../../src/shared/structured-agent-session-composer'
+import type { AgentSessionConversationCommand } from '../../../src/shared/agent-session-conversation-command'
 import {
   applyAutocomplete,
   detectAutocompleteTrigger,
@@ -34,6 +36,7 @@ const NO_FILE_PATHS: string[] = []
 const NO_ATTACHMENTS: PendingNativeChatImage[] = []
 
 type Props = {
+  structuredCommands?: readonly AgentSessionConversationCommand[]
   /** Controlled composer text — owned by the parent so dictation can write to it. */
   value: string
   onChangeText: (text: string) => void
@@ -75,6 +78,7 @@ export function MobileNativeChatComposer({
   getSendCompletionGeneration,
   getComposerEditGeneration,
   agent,
+  structuredCommands,
   sessionOptions,
   onAttachImage,
   attachments = NO_ATTACHMENTS,
@@ -127,7 +131,12 @@ export function MobileNativeChatComposer({
       return []
     }
     if (trigger.kind === 'slash') {
-      const commands = agent ? getVerifiedNativeChatCommands(agent) : []
+      const commands =
+        structuredCommands !== undefined
+          ? structuredSlashCommands(structuredCommands)
+          : agent
+            ? getVerifiedNativeChatCommands(agent)
+            : []
       // Why: Codex's catalog is 45 commands and this list is a plain ScrollView
       // (~5 rows visible), so an uncapped `/` would mount every row and
       // re-reconcile them on each streaming tick right above the transcript.
@@ -140,7 +149,7 @@ export function MobileNativeChatComposer({
       kind: 'file' as const,
       path
     }))
-  }, [trigger, filePaths, agent])
+  }, [trigger, filePaths, agent, structuredCommands])
 
   useEffect(() => {
     if (trigger?.kind === 'file') {

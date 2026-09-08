@@ -24,7 +24,7 @@ import type { TabDropZone } from './useTabDragSplit'
 import { translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { AiVaultPrepareSessionResumeResult } from '../../../../shared/ai-vault-resume-preparation'
-import { activateStructuredAgentSessionById } from '@/lib/structured-agent-session-tab-activation'
+import { activateAiVaultStructuredSession } from '@/lib/activate-ai-vault-structured-session'
 
 type PaneDropTarget = {
   groupId: string
@@ -178,15 +178,9 @@ export default function AiVaultSessionDropLayer({
         return true
       }
       if (payload.structuredSession) {
-        const { sessionId, workspaceId } = payload.structuredSession
-        if (!activateStructuredAgentSessionById({ worktreeId: workspaceId, sessionId })) {
-          toast.error(
-            translate(
-              'auto.lib.activateAiVaultStructuredSession.unavailable',
-              'The structured agent session is not available yet. Retry in a moment.'
-            )
-          )
-        }
+        // Same row, same reveal as clicking Resume. Activating by id alone cannot reach a chat
+        // whose tab is closed, which is the case this drop is most often used for.
+        void activateAiVaultStructuredSession(payload)
         return true
       }
 

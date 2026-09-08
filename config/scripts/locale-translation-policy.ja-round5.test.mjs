@@ -119,7 +119,7 @@ describe('locale-translation-policy ja round 5', () => {
         localeValue: 'Agent のスキル',
         locale: 'ja'
       })
-    ).toBe('Agent のスキル')
+    ).toBe('エージェントのスキル')
     expect(
       repairTranslatedValue({
         key: 'auto.components.tab.bar.TabBar.3d5d6c960d',

@@ -5,7 +5,7 @@ import {
   type DaemonSpawnCall,
   createDaemonActiveProviderFixtures
 } from './pty-ipc-daemon-provider-fixtures'
-import { delimiter, join } from 'node:path'
+import { join } from 'node:path'
 import type { TuiAgent } from '../../shared/tui-agent'
 import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../pty/legacy-terminal-shim-dir'
 import { wslHookRelayManager } from '../agent-hooks/wsl-hook-relay-manager'
@@ -398,11 +398,10 @@ describe('registerPtyHandlers', () => {
           value: 'linux'
         })
         try {
-          // Why: overriding process.platform doesn't change the loaded node:path dialect; keep this synthetic PATH consistent.
           const env = await daemonSpawnAndGetEnv({
-            PATH: ['/usr/local/bin', '/usr/bin'].join(delimiter)
+            PATH: '/usr/local/bin:/usr/bin'
           })
-          const entries = env.PATH.split(delimiter)
+          const entries = env.PATH.split(':')
           const shimDir = join('/tmp/orca-user-data', 'linux-orca-cli-shim')
           // Why: bare `orca` must resolve to the Orca CLI before /usr/bin/orca (the GNOME screen reader) in Orca terminals (#7904).
           expect(entries.indexOf(shimDir)).toBeGreaterThanOrEqual(0)
@@ -423,7 +422,7 @@ describe('registerPtyHandlers', () => {
         })
         try {
           const env = await daemonSpawnAndGetEnv({ PATH: '/usr/bin' })
-          expect(env.PATH.split(delimiter)[0]).toBe(join('/tmp/orca-resources', 'bin'))
+          expect(env.PATH.split(':')[0]).toBe(join('/tmp/orca-resources', 'bin'))
         } finally {
           if (resourcesPathDescriptor) {
             Object.defineProperty(process, 'resourcesPath', resourcesPathDescriptor)

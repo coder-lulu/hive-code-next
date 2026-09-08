@@ -23,17 +23,37 @@ accessibility output, and run mobile tests. It also records the Windows SDK
 fallback and the project-specific startup/recovery traps. For raw emulator
 control without UI work, use `orca-emulator-android` instead.
 
+## Resolve the CLI for this session
+
+Choose the executable once and reuse it for every later command:
+
+- Use `hive` in current production builds.
+- If the compatibility environment variable `ORCA_CLI_COMMAND` is set, use its value instead;
+  HiveCode exports it when a managed session must pin a specific executable.
+- Older development, Linux, or production installs may expose `orca-dev`, `orca-ide`, or
+  `orca`. Treat these as compatibility aliases and use one only when `hive` is unavailable.
+  On unmanaged Linux, never try bare `orca` first because it normally resolves to the
+  GNOME Orca screen reader (`/usr/bin/orca`) and starts speech on the user's machine.
+
+Examples use the current `hive` command. Substitute the pinned executable or a legacy alias
+only when the active HiveCode build requires it. If that executable cannot run, report its
+exact error and stop; do not fall through to another executable that may target a different
+HiveCode build.
+
+The same executable selection works in POSIX shells, PowerShell, and cmd.exe.
+
 ## Load the full guide before acting
 
 ```text
 hive skills get hivecode-android-ui
 ```
 
-Use `hive` in current builds. If the compatibility environment variable
-`ORCA_CLI_COMMAND` is set, use its pinned executable instead. Older builds may
-expose `orca-dev`, `orca-ide`, or `orca`; use one only when `hive` is unavailable.
 Read the returned guide before starting an emulator or editing the mobile UI. It
 links the lower-level `orca-emulator-android` compatibility skill.
+
+Prefer `--json`. Use the selected executable's `--help` for commands or flags the guide does
+not cover. If HiveCode is not running, start it with `hive open --json` and retry.
+If `skills get` is unknown, use the bounded read-only fallback below; do not guess flags.
 
 ## If an older HiveCode does not recognize `skills get`
 

@@ -32,7 +32,7 @@ export async function sendRequest<TResult>(
       return
     }
     const socket = createConnection(transport.endpoint)
-    let buffer = ''
+    let lineSegments: string[] = []
     let settled = false
     const requestId = randomUUID()
 
@@ -41,6 +41,7 @@ export async function sendRequest<TResult>(
         return
       }
       settled = true
+      lineSegments = []
       socket.destroy()
       reject(
         new RuntimeClientError(
@@ -57,6 +58,7 @@ export async function sendRequest<TResult>(
         return
       }
       settled = true
+      lineSegments = []
       clearTimeout(timeout)
       socket.end()
       if (result.ok === false) {
@@ -90,18 +92,27 @@ export async function sendRequest<TResult>(
       })
     })
     socket.on('data', (chunk: string) => {
-      buffer += chunk
       // Why: the server may interleave `{"_keepalive":true}\n` frames with the
       // final success/failure frame to keep both idle timers alive during a
       // long-poll (see design doc §3.1). Read frames in a loop until we see a
       // terminal frame. Each keepalive refreshes the client-side timer so a
       // 10 min wait doesn't trip the 60 s default ceiling.
-      let newlineIndex = buffer.indexOf('\n')
-      while (newlineIndex !== -1 && !settled) {
-        const line = buffer.slice(0, newlineIndex)
-        buffer = buffer.slice(newlineIndex + 1)
+      let cursor = 0
+      while (cursor < chunk.length && !settled) {
+        const newlineIndex = chunk.indexOf('\n', cursor)
+        if (newlineIndex === -1) {
+          lineSegments.push(chunk.slice(cursor))
+          return
+        }
+        const segment = chunk.slice(cursor, newlineIndex)
+        let line = segment
+        if (lineSegments.length > 0) {
+          lineSegments.push(segment)
+          line = lineSegments.join('')
+          lineSegments = []
+        }
+        cursor = newlineIndex + 1
         if (line.trim().length === 0) {
-          newlineIndex = buffer.indexOf('\n')
           continue
         }
 
@@ -125,7 +136,6 @@ export async function sendRequest<TResult>(
         // major). See §7 risk #9.
         if (isKeepaliveFrame(raw)) {
           timeout.refresh()
-          newlineIndex = buffer.indexOf('\n')
           continue
         }
 
@@ -151,7 +161,6 @@ export async function sendRequest<TResult>(
         const frame = parsed.data
         if ('_keepalive' in frame) {
           timeout.refresh()
-          newlineIndex = buffer.indexOf('\n')
           continue
         }
 

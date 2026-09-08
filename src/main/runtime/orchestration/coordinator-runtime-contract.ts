@@ -6,7 +6,15 @@ export type WorktreeDrift = {
 } | null
 
 export type CoordinatorRuntime = {
-  sendTerminalAgentPrompt(handle: string, prompt: string): Promise<unknown>
+  sendTerminalAgentPrompt(
+    handle: string,
+    prompt: string,
+    options?: {
+      acceptQueued?: boolean
+      observationTimeoutMs?: number
+      requestId?: string
+    }
+  ): Promise<unknown>
   listTerminals(
     worktreeSelector?: string,
     limit?: number,

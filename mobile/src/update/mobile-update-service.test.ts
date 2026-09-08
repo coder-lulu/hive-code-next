@@ -7,6 +7,21 @@ import {
   requestApkInstallPermission
 } from '@hivecode/expo-hivecode-updater'
 
+vi.mock('../generated/product-config', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../generated/product-config')>()
+  return {
+    hivecodeProductConfig: {
+      ...actual.hivecodeProductConfig,
+      services: {
+        ...actual.hivecodeProductConfig.services,
+        update: {
+          ...actual.hivecodeProductConfig.services.update,
+          checkEndpoint: 'https://updates.hive.test/hive/v1/updates/check'
+        }
+      }
+    }
+  }
+})
 vi.mock('react-native', () => ({
   Linking: { openURL: vi.fn(), canOpenURL: vi.fn() },
   Platform: { OS: 'android', constants: { Architecture: 'arm64-v8a' } }

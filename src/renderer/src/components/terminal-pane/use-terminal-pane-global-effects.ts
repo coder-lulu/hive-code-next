@@ -24,8 +24,9 @@ import {
 import { useTerminalWindowWakeRecovery } from './use-terminal-window-wake-recovery'
 import {
   releaseRendererPtyVisibilityClaim,
-  setRendererPtyVisibilityClaim
+  reportRendererPtyVisibility
 } from './pty-renderer-delivery-claims'
+import { activePaneIsCoveredByNativeChat } from './native-chat-covered-pane'
 
 type UseTerminalPaneGlobalEffectsArgs = {
   tabId: string
@@ -33,6 +34,7 @@ type UseTerminalPaneGlobalEffectsArgs = {
   cwd?: string
   isActive: boolean
   isVisible: boolean
+  isChatViewMode?: boolean
   isWorktreeActive?: boolean
   isSyncFitEnabled: boolean
   paneCount: number
@@ -45,27 +47,13 @@ type UseTerminalPaneGlobalEffectsArgs = {
   toggleExpandPane: (paneId: number) => void
 }
 
-function reportRendererPtyVisibility(
-  paneTransports: ReadonlyMap<number, PtyTransport>,
-  visible: boolean
-): void {
-  for (const transport of paneTransports.values()) {
-    const ptyId = transport.getPtyId()
-    if (!ptyId || ptyId.startsWith('remote:')) {
-      // Why: remote-runtime PTYs use a relay path outside main's local
-      // renderer-visibility registry, so reporting them here is misleading.
-      continue
-    }
-    setRendererPtyVisibilityClaim(transport, ptyId, visible)
-  }
-}
-
 export function useTerminalPaneGlobalEffects({
   tabId,
   worktreeId,
   cwd,
   isActive,
   isVisible,
+  isChatViewMode = false,
   isWorktreeActive = isVisible,
   isSyncFitEnabled,
   paneCount,
@@ -121,6 +109,7 @@ export function useTerminalPaneGlobalEffects({
   })
   useTerminalWindowWakeRecovery({
     isVisible: rendererVisible,
+    isChatViewMode,
     managerRef,
     isActiveRef,
     isVisibleRef,
@@ -156,6 +145,9 @@ export function useTerminalPaneGlobalEffects({
       resumeTerminalVisibility({
         manager,
         isActive,
+        // Why: chat mode is tab-wide, but only the chat leaf's xterm is covered;
+        // a split terminal leaf that is active must still regain focus on reveal.
+        isChatViewMode: isChatViewMode && activePaneIsCoveredByNativeChat(manager),
         wasVisible,
         shouldUseLightTabResume,
         captureViewportPositions,
@@ -183,7 +175,7 @@ export function useTerminalPaneGlobalEffects({
     wasVisibleRef.current = false
     wasWorktreeActiveRef.current = isWorktreeActive
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isWorktreeActive, rendererVisible])
+  }, [isActive, isChatViewMode, isWorktreeActive, rendererVisible])
 
   useEffect(() => {
     const ptyId = isActive && isVisible && isWorktreeActive ? activeLeafPtyId : null

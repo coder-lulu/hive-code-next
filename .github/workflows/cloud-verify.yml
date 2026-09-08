@@ -25,6 +25,7 @@ defaults:
     working-directory: cloud
 
 jobs:
+  # Public-repository hosted runners preserve Blacksmith allowance for macOS.
   security:
     name: Secret scan
     runs-on: ubuntu-latest

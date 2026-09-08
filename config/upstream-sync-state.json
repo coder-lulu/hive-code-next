@@ -3,19 +3,19 @@
   "upstream": "stablyai/orca",
   "targetBranch": "hivecode/main-next",
   "initialAuditCompleted": true,
-  "lastReviewedUpstreamSha": "0bbf86bb7a070c2b56025bba59251b3f34080e42",
+  "lastReviewedUpstreamSha": "12f53da542d03473367e48a63b85a49eae7c5f8b",
   "pendingShas": [
     "c226a655adae4239036b319e77ec3a2be6eddeb8",
     "b63c006ae9fad412ede61c2070f64354c7426db8",
     "808fc3563dbfb5d4a369d1d874cf2c94e86236bb"
   ],
   "lastAudit": {
-    "mode": "full",
-    "baseSha": null,
-    "inclusionHeadSha": "ad0be6eceea0074246974eb9415abd3f3b2e252e",
-    "productSha": "c88b03c8b9a5aceeb124621a4ee06074aa1f9d40",
-    "commitCount": 10193,
-    "generatedAt": "2026-09-05T13:17:06.589Z",
+    "mode": "incremental",
+    "baseSha": "0bbf86bb7a070c2b56025bba59251b3f34080e42",
+    "inclusionHeadSha": "87448af25df4dcc72942bd08d42e6bd2bb9ca6ec",
+    "productSha": "7fa4dd4d4b95ec2286f5431d2307448b6cd989d7",
+    "commitCount": 349,
+    "generatedAt": "2026-09-08T10:57:04.118Z",
     "activation": "Only after gates and human review merge this record into the product branch"
   }
 }

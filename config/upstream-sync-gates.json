@@ -50,12 +50,14 @@
         "argv": ["pnpm", "exec", "vitest", "run"],
         "paths": [
           "src/transport/pairing.test.ts",
-          "src/transport/pairing-relay-candidate.test.ts",
           "src/transport/connection-revival-triggers.test.ts",
-          "src/transport/mobile-relay-pairing-recovery.test.ts",
-          "src/transport/mobile-relay-reconnect-controller.test.ts",
           "src/worktree/new-workspace-dialog-repo-selection.test.ts",
-          "src/worktree/worktree-activation-result.test.ts"
+          "src/worktree/worktree-activation-result.test.ts",
+          "src/transport/account-runtime-rpc-client.test.ts",
+          "src/transport/account-runtime-rpc-requests.test.ts",
+          "src/transport/rpc-client-live-recovery.test.ts",
+          "src/transport/rpc-client-reconnect-wait.test.ts",
+          "src/transport/rpc-client-terminal-reconnect.test.ts"
         ]
       },
       {

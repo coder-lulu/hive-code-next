@@ -18,9 +18,15 @@
  * to pure-JS CPU feature detection automatically.
  */
 
+import { readCliOptions } from './native-rebuild-cli-options.mjs'
 import { rebuild } from '@electron/rebuild'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { stageWindowsProcessTreeNodeAddonApiHeaders } from './windows-process-tree-gyp-rebuild.mjs'
+import {
+  ensureWindowsProcessTreeCommandLinePatch,
+  inspectWindowsProcessTreeAddon,
+  stageWindowsProcessTreeNodeAddonApiHeaders,
+  windowsProcessTreeAddonPath
+} from './windows-process-tree-gyp-rebuild.mjs'
 import {
   copyFileSync,
   existsSync,
@@ -142,11 +148,22 @@ if (!ignoreModules.includes('cpu-features')) {
   }
 }
 
-if (rebuildPlatform === 'win32' && modulesToRebuild.includes('@vscode/windows-process-tree')) {
-  prepareWindowsProcessTreeBuild()
-}
-
 try {
+  // Why inside the try: the patch guard deletes a stale addon binary, and that
+  // delete fails EPERM when the addon is loaded -- exactly the running-Orca case
+  // the catch below is written for. Outside, it aborted `pnpm install` with a
+  // raw stack instead of the "close running Orca/Electron processes" message.
+  if (
+    rebuildPlatform === 'win32' &&
+    modulesToRebuild.includes('@vscode/windows-process-tree') &&
+    existsSync(join(projectDir, 'node_modules', '@vscode', 'windows-process-tree', 'package.json'))
+  ) {
+    stageWindowsProcessTreeNodeAddonApiHeaders()
+    if (ensureWindowsProcessTreeCommandLinePatch()) {
+      console.warn('[rebuild] Repaired the un-applied windows-process-tree command-line patch.')
+    }
+    prepareWindowsProcessTreeBuild()
+  }
   await rebuild({
     buildPath: projectDir,
     electronVersion,
@@ -163,6 +180,7 @@ try {
     force: true
   })
   restoreNodePtyWindowsConptyRuntime()
+  assertWindowsProcessTreeAddonIsPatched()
 } catch (/** @type {any} */ err) {
   console.error('[rebuild] Native module rebuild failed:', err?.message ?? err)
   if (isWindowsNativeLockError(err)) {
@@ -250,6 +268,40 @@ function prepareWindowsProcessTreeBuild() {
   if (bindingGyp !== originalBinding || processCc !== originalProcess) {
     console.warn('[rebuild] Repaired windows-process-tree build settings for pnpm.')
   }
+}
+
+/**
+ * The binary this rebuild just produced is the one the packaged app ships.
+ *
+ * The relay build asserts its own artifact and `ensure-native-runtime.mjs`
+ * asserts what it loads, but nothing checked the addon that gets copied into the
+ * packaged `node_modules` -- so a rebuild that silently produced the upstream
+ * reader would reach users. Anything but `clean` fails: after a rebuild that
+ * reported success the binary must exist, so `missing` is a broken build, not an
+ * absence to shrug at. This is the caller that needs the state to be a state and
+ * not a boolean.
+ */
+function assertWindowsProcessTreeAddonIsPatched() {
+  if (
+    rebuildPlatform !== 'win32' ||
+    !modulesToRebuild.includes('@vscode/windows-process-tree') ||
+    !existsSync(join(projectDir, 'node_modules', '@vscode', 'windows-process-tree', 'package.json'))
+  ) {
+    return
+  }
+  const addonPath = windowsProcessTreeAddonPath()
+  const state = inspectWindowsProcessTreeAddon(addonPath)
+  if (state === 'clean') {
+    return
+  }
+  throw new Error(
+    state === 'missing'
+      ? `the rebuild reported success but ${addonPath} is not there, so the packaged app would ` +
+          'ship no windows-process-tree addon at all.'
+      : `${addonPath} still imports ReadProcessMemory, so it was not built from the patched ` +
+          'command-line reader. The packaged app would carry the primitive MDE scores as ' +
+          'credential dumping.'
+  )
 }
 
 function restoreNodePtyWindowsConptyRuntime() {
@@ -435,51 +487,6 @@ function getElectronPlatformPath() {
   }
 }
 
-function readCliOptions(args) {
-  const options = { force: false }
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index]
-    if (arg === '--force') {
-      options.force = true
-      continue
-    }
-    if (arg === '--platform') {
-      options.platform = readRequiredArgValue(args, (index += 1), '--platform')
-      continue
-    }
-    if (arg.startsWith('--platform=')) {
-      options.platform = readInlineArgValue(arg, '--platform')
-      continue
-    }
-    if (arg === '--arch') {
-      options.arch = readRequiredArgValue(args, (index += 1), '--arch')
-      continue
-    }
-    if (arg.startsWith('--arch=')) {
-      options.arch = readInlineArgValue(arg, '--arch')
-      continue
-    }
-    throw new Error(`Unknown argument: ${arg}`)
-  }
-  return options
-}
-
-function readRequiredArgValue(args, index, flag) {
-  const value = args[index]
-  if (!value || value.startsWith('--')) {
-    throw new Error(`Missing value for ${flag}`)
-  }
-  return value
-}
-
-function readInlineArgValue(arg, flag) {
-  const value = arg.slice(`${flag}=`.length)
-  if (!value) {
-    throw new Error(`Missing value for ${flag}`)
-  }
-  return value
-}
-
 function getElectronExecutablePath() {
   const platformPath = getElectronPlatformPath()
   return process.env.ELECTRON_OVERRIDE_DIST_PATH
@@ -587,6 +594,15 @@ function loadNativeModule(moduleName) {
           '; expected build/Release so Orca\\'s node-pty patch is active'
       )
     }
+    return
+  }
+  if (moduleName === '@vscode/windows-process-tree') {
+    // The tarball prebuilt loads under Electron too -- the addon is N-API, so
+    // a bare require proves nothing about which source it was built from.
+    const { assertWindowsProcessTreeCreationTime } = projectRequire(
+      './config/scripts/windows-process-tree-creation-time.cjs'
+    )
+    assertWindowsProcessTreeCreationTime({ module: projectRequire(moduleName) })
     return
   }
   projectRequire(moduleName)

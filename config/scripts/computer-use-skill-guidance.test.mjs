@@ -19,20 +19,10 @@ describe('computer-use skill guidance', () => {
 
     expect(description).toContain('OS/window-level inspection and input')
     expect(description).toContain('external browser window')
-    expect(description).toContain("Do not use for HiveCode's embedded browser")
-    expect(description).toContain('page-only browser automation')
-    expect(description).toContain("`orca-cli` for HiveCode's embedded pages")
-    expect(description).toContain(
-      'page-automation tool such as Playwright or CDP for external pages'
-    )
+    expect(description).toContain("Not for HiveCode's embedded browser (use `orca-cli`)")
+    expect(description).toContain('page-only automation (use Playwright or CDP)')
     expect(description).not.toContain('read Slack')
     expect(description).not.toContain('get app state')
-
-    const orcaCli = readFileSync(join(projectDir, 'skill-guides', 'orca-cli.md'), 'utf8').replace(
-      /\s+/gu,
-      ' '
-    )
-    expect(orcaCli).toContain('browser embedded inside the HiveCode app')
   })
 
   it('keeps web-app targeting on the computer-use surface', () => {
@@ -107,14 +97,6 @@ describe('computer-use install stub', () => {
     expect(stub).toContain('GNOME Orca screen reader')
     expect(stub).toMatch(/^hive .+--json$/mu)
     expect(stub).not.toMatch(/^orca /mu)
-  })
-
-  it('gives older binaries a bounded fallback instead of a dead end', () => {
-    const stub = readFileSync(stubPath, 'utf8').replace(/\s+/gu, ' ')
-
-    expect(stub).toContain('explicitly reports that `skills get` is an unknown command')
-    expect(stub).toContain('do not invent commands')
-    expect(stub).toContain('ask the user rather than guessing')
   })
 
   it('drops the changing command reference from the installable file', () => {

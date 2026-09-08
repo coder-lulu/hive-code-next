@@ -43,7 +43,7 @@ import {
   hasExplicitTuiAgentArgs,
   resolveAgentLaunchRoute
 } from '@/lib/agent-launch-routing'
-import { readLocalRuntimeCapabilities } from '@/runtime/local-runtime-capabilities'
+import { readLocalRuntimeCapabilitiesOrUnknown } from '@/runtime/local-runtime-capabilities'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 
 /**
@@ -192,8 +192,7 @@ function launchAgentInNewTabInternal(
         agent,
         settings: store.settings,
         executionHostId: resolvedExecutionHostId,
-        platform: CLIENT_PLATFORM,
-        hostCapabilities: readLocalRuntimeCapabilities(),
+        hostCapabilities: readLocalRuntimeCapabilitiesOrUnknown(),
         workspaceKind,
         projectRuntime: getLocalProjectExecutionRuntimeContext(store, worktreeId),
         promptDelivery: viewModePromptDelivery,

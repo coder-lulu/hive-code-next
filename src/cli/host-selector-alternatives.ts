@@ -1,7 +1,13 @@
 import type { RuntimeClient } from './runtime-client'
 import { APP_DISPLAY_NAME } from '../shared/brand'
 
-export type SshTargetSummary = { id: string; label: string }
+export type SshTargetSummary = {
+  id: string
+  label: string
+  remotePlatform?: 'linux' | 'darwin' | 'win32'
+  connected?: boolean
+  connectionStatus?: string
+}
 export type EnvironmentSummary = { id: string; name: string }
 
 export type HostAlternatives = {
@@ -107,13 +113,41 @@ export async function listSshTargets(client: RuntimeClient): Promise<SshTargetSu
     if (error instanceof Error && 'code' in error && error.code === 'method_not_found') {
       try {
         const legacy = await client.call<{ targets: SshTargetSummary[] }>('ssh.listTargets')
-        return legacy.result.targets
+        return await enrichLegacySshTargetStates(client, legacy.result.targets)
       } catch {
         return []
       }
     }
     return []
   }
+}
+
+async function enrichLegacySshTargetStates(
+  client: RuntimeClient,
+  targets: SshTargetSummary[]
+): Promise<SshTargetSummary[]> {
+  return Promise.all(
+    targets.map(async (target) => {
+      try {
+        const response = await client.call<{
+          state: {
+            status?: string
+            remotePlatform?: 'linux' | 'darwin' | 'win32'
+          } | null
+        }>('ssh.getState', { targetId: target.id })
+        const state = response.result.state
+        return {
+          ...target,
+          ...(state?.status === undefined
+            ? {}
+            : { connected: state.status === 'connected', connectionStatus: state.status }),
+          ...(state?.remotePlatform === undefined ? {} : { remotePlatform: state.remotePlatform })
+        }
+      } catch {
+        return target
+      }
+    })
+  )
 }
 
 // Why: `--host ssh:<id>` was never validated, so an unknown target answered ok:true with an

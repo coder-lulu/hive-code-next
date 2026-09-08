@@ -25,7 +25,7 @@ it('requires a trusted client certificate on the optional private Cell listener'
     const fetchMetrics = (authenticated: boolean) =>
       new Promise<number>((done, fail) => {
         const req = request(
-          new URL('/metrics', cell!.privateOrigin),
+          new URL('/metrics', cell!.privateOrigin!),
           {
             ca: readFileSync(pki.caPemPath),
             ...(authenticated

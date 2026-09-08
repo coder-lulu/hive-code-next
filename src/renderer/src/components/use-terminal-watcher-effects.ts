@@ -14,6 +14,8 @@ import { gateWorktreeAgentActivation } from '@/lib/worktree-agent-activation-gat
 import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
 import { resumeSleepingAgentSessionsForWorktree } from '@/lib/resume-sleeping-agent-session'
 import { createWorkspaceTerminalHostAuthoritySelector } from '@/lib/workspace-terminal-host-authority'
+import { getStructuredAgentLaunchStatus } from '@/lib/structured-agent-session-launch'
+import { AGENT_SESSION_PROVIDER_HANDLE_PROVIDERS } from '../../../shared/agent-session-provider-handle'
 import type { TerminalColdActivationController } from './terminal-cold-activation'
 
 export function useTerminalWatcherEffects(controller: TerminalColdActivationController): void {
@@ -167,6 +169,14 @@ export function useTerminalWatcherEffects(controller: TerminalColdActivationCont
         cancelled ||
         outcome !== 'empty' ||
         useAppStore.getState().activeWorktreeId !== activeWorktreeId
+      ) {
+        return
+      }
+      // A pending or unanswered chat create owns the surface even before its tab is published.
+      if (
+        AGENT_SESSION_PROVIDER_HANDLE_PROVIDERS.some(
+          (agent) => getStructuredAgentLaunchStatus(activeWorktreeId, agent) !== 'idle'
+        )
       ) {
         return
       }

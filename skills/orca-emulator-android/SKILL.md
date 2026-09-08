@@ -1,25 +1,18 @@
 ---
 name: orca-emulator-android
-description: >
-  Control an Android emulator / device from inside HiveCode using the `hive` CLI.
-  Use for listing/booting AVDs, taps, swipes, typing, hardware buttons (incl. Back
-  and Recents), rotation, app install/launch, runtime permissions, the accessibility
-  tree, and logcat — driving a real adb-connected device or emulator. Cross-platform
-  (Windows, Linux, macOS). Complements the orca-emulator (iOS) and orca-cli skills.
+description: >-
+  Android device and emulator control from inside HiveCode over adb, with the live
+  device view in HiveCode's emulator pane. Use when driving an adb-connected emulator
+  or phone on Windows, Linux, or macOS: booting AVDs, taps, swipes, typing,
+  hardware buttons, rotation, app install and launch, runtime permissions, the
+  accessibility tree, and logcat. For an iOS simulator use the iOS emulator
+  skill; build the APK with Gradle first.
 license: Apache-2.0
 ---
 
 # HiveCode Emulator (Android)
 
-This file is a discovery stub, not the usage guide. The full, version-matched HiveCode Android
-emulator reference is served by the `hive` binary itself — kept out of this file on purpose
-so it can never drift from the binary that will actually run your commands.
-
-Engage HiveCode whenever you drive an adb-connected Android emulator or device from inside the
-HiveCode app: listing/booting AVDs, taps, swipes, typing, hardware buttons (including Back and
-Recents), rotation, app install/launch, runtime permissions, the accessibility tree, and
-logcat. It is cross-platform (Windows, Linux, macOS) and complements the orca-emulator (iOS)
-and orca-cli skills.
+This discovery stub loads the version-matched guide from the HiveCode executable used for this session.
 
 ## Resolve the CLI for this session
 
@@ -38,21 +31,17 @@ only when the active HiveCode build requires it. If that executable cannot run, 
 exact error and stop; do not fall through to another executable that may target a different
 HiveCode build.
 
-## Load the full guide before running HiveCode commands
+The same executable selection works in POSIX shells, PowerShell, and cmd.exe.
+
+## Load the version-matched guide before running HiveCode commands
 
 ```text
 hive skills get orca-emulator-android
 ```
 
-That prints the complete, version-matched guide for the exact binary that will handle your
-next commands — booting AVDs, taps and swipes, typing, hardware buttons, app lifecycle,
-permissions, the accessibility tree, and logcat. Read it first, then run the specific
-command you need.
-
-Don't guess subcommands or flags from memory or from a cached copy of this stub. They
-change between HiveCode releases, and this file deliberately no longer lists them. Confirm the
-app is up with `hive status --json` (start it with `hive open --json` if needed), and
-prefer `--json` for agent-driven calls.
+Prefer `--json`. Use the selected executable's `--help` for commands or flags the guide does
+not cover. If HiveCode is not running, start it with `hive open --json` and retry.
+If `skills get` is unknown, use the bounded read-only fallback below; do not guess flags.
 
 ## If an older HiveCode does not recognize `skills get`
 

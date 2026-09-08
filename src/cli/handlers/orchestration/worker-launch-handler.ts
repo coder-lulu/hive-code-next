@@ -1,6 +1,6 @@
 import type { CommandHandler } from '../../dispatch'
 import { printResult } from '../../format'
-import { getOptionalStringFlag, getRequiredStringFlag } from '../../flags'
+import { getOptionalStringFlag } from '../../flags'
 import { RuntimeClientError } from '../../runtime-client'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
@@ -9,6 +9,8 @@ import { callOrchestrationMutation } from './mutation-request'
 import { getOptionalPositiveIntegerValueFlag } from './numeric-flags'
 import { isDevCliInvocation } from './runtime-compatibility'
 import { resolveCoordinatorTerminalHandle } from './terminal-identity'
+import { formatWorkerStart } from './worker-output'
+import { renderResolvedOrchestrationCommand } from '../../orchestration-mutation-recovery'
 
 export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler> = {
   'orchestration worker-start': async ({ flags, client, cwd, json }) => {
@@ -27,6 +29,11 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
         )
       }
     }
+    const task = getOptionalStringFlag(flags, 'task')
+    const spec = getOptionalStringFlag(flags, 'spec')
+    const taskTitle = getOptionalStringFlag(flags, 'task-title')
+    const deps = getOptionalStringFlag(flags, 'deps')
+    const parent = getOptionalStringFlag(flags, 'parent')
     const result = await callOrchestrationMutation<{
       runId: string
       taskId: string
@@ -35,10 +42,16 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
       failedStage?: string
       lastError?: string
       warning?: string
+      mode?: { mode: string; preferred: string; reason: string; detail: string }
       effects: unknown[]
       residualResources: unknown[]
+      nextCommands?: string[]
     }>(client, flags, 'orchestration.workerStart', {
-      task: getRequiredStringFlag(flags, 'task'),
+      task,
+      ...(spec ? { spec } : {}),
+      ...(taskTitle ? { taskTitle } : {}),
+      ...(deps ? { deps } : {}),
+      ...(parent ? { parent } : {}),
       on: getOptionalStringFlag(flags, 'on'),
       worktree: getOptionalStringFlag(flags, 'worktree'),
       name: getOptionalStringFlag(flags, 'name'),
@@ -60,12 +73,17 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
     if (result.result.state !== 'ready') {
       process.exitCode = 1
     }
-    printResult(result, json, (worker) => {
-      const base = `Worker ${worker.dispatchId} [${worker.state}] for ${worker.taskId}`
-      if (worker.lastError) {
-        return `${base}\n${worker.failedStage ?? 'start'}: ${worker.lastError}`
-      }
-      return worker.warning ? `${base}\nWarning: ${worker.warning}` : base
-    })
+    const renderedResult = result.result.nextCommands
+      ? {
+          ...result,
+          result: {
+            ...result.result,
+            nextCommands: result.result.nextCommands.map((command) =>
+              renderResolvedOrchestrationCommand(command)
+            )
+          }
+        }
+      : result
+    printResult(renderedResult, json, formatWorkerStart)
   }
 }

@@ -65,10 +65,10 @@ export function formatPermissionNotice(event: BrowserPermissionDeniedEvent): str
   return `${target} asked for ${humanizePermission(event.permission)}, and ${APP_DISPLAY_NAME} denied it.`
 }
 
-export function formatPopupNotice(event: BrowserPopupEvent): string {
+export function formatPopupNotice(event: BrowserPopupEvent): string | null {
   const target = event.origin === 'unknown' ? 'A site' : event.origin
   if (event.action === 'opened-in-orca') {
-    return `${target} opened a new page in ${APP_DISPLAY_NAME}.`
+    return null
   }
   if (event.action === 'opened-external') {
     return `${target} opened a new window in your default browser.`

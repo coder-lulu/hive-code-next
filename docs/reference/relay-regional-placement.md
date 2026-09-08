@@ -1,20 +1,20 @@
-# Relay regional placement
+# Relay placement: Hive product boundary
 
-HiveCode selects a Relay region in the Electron main process before requesting a new assignment. The
-director publishes an allowlisted region catalog containing only HTTPS cell subdomains of that
-director; HiveCode takes three bounded `/health` latency samples per region and caches the stable choice
-for 24 hours. A cached region changes only when the alternative is materially faster.
+HiveCode uses account-authorized HiveRelay tickets and the Fleet/control-plane assignment.
+The active host implementation is `src/main/hive-runtime-cloud/relay-host/`; the client uses account runtime
+transport. The old `src/main/runtime/relay/` broker and mobile invite-based transport are
+retired. Their regional latency cache and `ORCA_RELAY_REGION_OVERRIDE` do not configure
+HiveRelay placement.
 
-The assignment request sends only `preferredRegion`. It does not send latency, IP address, country,
-pairing data, or credentials. Catalog, probe, and cache failures fall back to an assignment without
-a region preference. A rolled-back director that rejects the new field is retried once without
-only that field while preserving reconnect behavior.
+## Upstream review (2026-09-08)
 
-The selection measures the desktop network path. Folder workspaces and SSH workspaces share the
-same local broker and do not run probes on remote hosts. The phone continues to connect to the
-exact cell URL in the desktop pairing payload, so its location is not measured independently and
-no mobile protocol update is required.
+Upstream Orca added warm-up health probes, minimum-of-three latency selection, bounded
+no-hint caching, and assigned-cell cache invalidation to its invite-based director flow.
+Those fixes depend on the retired broker, its region catalog, and the old assignment
+request. They must not be reconnected to Hive account transport as a conflict resolution.
+In particular, `us-central1` and `asia-east2` are upstream deployment choices, not Hive
+production defaults.
 
-For deterministic local diagnostics, set `ORCA_RELAY_REGION_OVERRIDE` to `us-central1` or
-`asia-east2` before launching HiveCode. The override is not an end-user setting and is not written to
-the preference cache.
+Hive placement changes must follow the HiveRelay Fleet activation and ticket-generation
+contracts. See `upstream-sync-20260908-resolution.md` for protocol review and local test
+evidence; this review does not claim cross-region production latency testing.

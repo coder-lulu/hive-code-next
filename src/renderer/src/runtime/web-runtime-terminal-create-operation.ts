@@ -5,7 +5,6 @@ import type {
   RuntimeEnsureAgentSessionResult
 } from '../../../shared/agent-session-host-authority'
 import { toRuntimeExecutionHostId } from '../../../shared/execution-host'
-import { translate } from '../i18n/i18n'
 import { useAppStore } from '../store'
 import {
   createAgentSessionCreateOperation,
@@ -45,7 +44,10 @@ import {
   type WebRuntimeSessionWorkspaceSelectionRollback
 } from './web-runtime-session-workspace-selection'
 import { createdTerminalLeafId } from './web-runtime-terminal-identity'
-import { reportWebRuntimeTerminalCreateFailure } from './web-runtime-terminal-create-outcome'
+import {
+  reportWebRuntimeTerminalCreateFailure,
+  disconnectedWebRuntimeTerminalCreateOutcome
+} from './web-runtime-terminal-create-outcome'
 import { settleWebRuntimeTerminalPlacement } from './web-runtime-terminal-placement-settlement'
 
 export async function createWebRuntimeSessionTerminalResult(
@@ -56,15 +58,7 @@ export async function createWebRuntimeSessionTerminalResult(
     useAppStore.getState().settings?.activeRuntimeEnvironmentId
   )
   if (!environmentId || !isWebRuntimeSessionActive(environmentId)) {
-    return {
-      outcome: {
-        status: 'failed',
-        message: translate(
-          'auto.runtime.webRuntimeSession.remoteHostDisconnected',
-          'The workspace is not connected to a remote Orca host.'
-        )
-      }
-    }
+    return disconnectedWebRuntimeTerminalCreateOutcome()
   }
   const intentOwner = captureWebSessionIntentOwner(environmentId)
   const callEnvironment = captureRuntimeEnvironmentCall(environmentId, intentOwner.pairingRevision)
@@ -275,20 +269,26 @@ export async function createWebRuntimeSessionTerminalResult(
       // tab to THIS new terminal, instead of sticky-keeping the prior tab.
       recordWebSessionFocusIntent(intentOwner, args.worktreeId, createdTabId, createdLeafId)
     }
+    const placementTabId =
+      createdTabId && (args.targetGroupId || args.afterTabId) ? createdTabId : undefined
     await refreshWebRuntimeSessionTabsSnapshot(environmentId, args.worktreeId, {
       expectedEnvironmentPairingRevision: intentOwner.pairingRevision,
       // Why: the publication can beat the RPC response; replay it once after caller intent exists.
       acceptCurrentSnapshot:
-        Boolean(createdTabId) && (args.activate !== false || Boolean(args.targetGroupId)),
+        Boolean(createdTabId) && (args.activate !== false || Boolean(placementTabId)),
       // Why: a placement record needs a post-create list; a deduped in-flight one can predate it.
-      ...(args.targetGroupId && createdTabId ? { afterCurrentInFlight: true } : {})
+      ...(placementTabId ? { afterCurrentInFlight: true } : {})
     })
-    if (args.targetGroupId && createdTabId) {
+    if (placementTabId) {
       await settleWebRuntimeTerminalPlacement(
         environmentId,
         args.worktreeId,
-        webTerminalPlacementParentTabId(createdTabId),
-        { groupId: args.targetGroupId, activate: args.activate !== false }
+        webTerminalPlacementParentTabId(placementTabId),
+        {
+          groupId: args.targetGroupId,
+          afterTabId: args.afterTabId,
+          activate: args.activate !== false
+        }
       )
     }
     return {
