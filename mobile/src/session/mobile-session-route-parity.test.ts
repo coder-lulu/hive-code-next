@@ -62,17 +62,16 @@ const HOST_COMPONENT_NAMES = new Set([
   'View'
 ])
 
-// Reconciled 2026-09-08: product baseline already includes the newer session UI.
-// Only nested launch bodies and runtime strings differ from the frozen product tree.
+// Hive route baseline; accepted-send takeover reports update callback/nested bodies only.
 const HEAD_MAIN_HOOK_SHA256 = 'e471d41748fc7da3dcf54087d6968c608d18b312ffa80877859ee152d5602f1c'
 const HEAD_HOOK_BINDING_SHA256 = 'e6281c2ba99ca485f7764540107df1dd620fcca88dc7e69f5bb67b7c8dbd5eae'
 const HEAD_CALLBACK_IDENTITY_SHA256 =
   'cad8b6e3c8ff4889e72272659a4b4b52730909c1e410107aab7606729f60b5d7'
-const HEAD_CALLBACK_BODY_SHA256 = '68f4d3fa532fb6f4e75f6133e906a34d6f22367c5557ebb55589222457b50ac0'
+const HEAD_CALLBACK_BODY_SHA256 = '3bab990c09b8ebeca8763fe990985678596f0e24cc66deeee981684c1d73cacc'
 const HEAD_EFFECT_SHA256 = 'ec67f7c5cdd8926842f2bccbcccf4d3d922ec6086d5cd66c785071492fec2b3c'
 const HEAD_CONTENT_HOOK_SHA256 = 'f0c5809b641fc16a2ae59548785e3d0e6d318f311d568f9ad324382f02599177'
 const HEAD_NESTED_FUNCTION_SHA256 =
-  '4cb748bdecf5a551ab2721c47f6b70d5aa11795eecfdb1868e7d281c71884840'
+  '04221c2e33c7d1cb56bdaaf82efb9e3eaab5241528b5a44119f0b3bc24c526b6'
 const HEAD_NATIVE_REGISTRATION_SHA256 =
   'cab85e4e4a3f43289ba93ddea9ccce57aea83e0bf14fd1620a965aad0c1cb49e'
 const HEAD_NATIVE_REMOVAL_SHA256 =

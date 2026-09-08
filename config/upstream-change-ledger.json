@@ -5,6 +5,97 @@
   "productBranches": ["hivecode/main-next"],
   "entries": [
     {
+      "upstreamSha": "d7d21b2c55cd512b7f5a3011e4fa07ef11d9facb",
+      "type": "新功能",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Native chat editor must retain exact text transport, pane ownership, IME and attachment behavior",
+      "adaptation": "Absorb picker-created skill pills using existing Tiptap and theme primitives. Preserve literal clipboard text, exact skill invocation serialization, bounded pane-scoped draft caching and composition ownership. This is composer presentation, not the prohibited upstream skill-installer implementation.",
+      "regressionTests": [
+        "NativeChatPromptEditor",
+        "native-chat-composer-composition",
+        "native-chat-structured-send-composition-clear",
+        "native-chat renderer suite"
+      ]
+    },
+    {
+      "upstreamSha": "6b60c23e07de7b2602b796176db94d6430d725f9",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Message actions must remain reachable on keyboard and touch",
+      "adaptation": "Absorb focus-visible reveal and always-visible touch actions while retaining existing Hive theme, timestamp and copy behavior.",
+      "regressionTests": [
+        "NativeChatMessageRow",
+        "NativeChatMessageList",
+        "hover-reveal-touch-action-visibility"
+      ]
+    },
+    {
+      "upstreamSha": "bba68b1bddf1276c8bd27ad4ca41efcbd4260321",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Pi prompt/titlebar status must retain Hive branding and current host identity",
+      "adaptation": "Absorb dialog-wait completion and nested/modal failure handling on every Pi surface; retain the Hive managed-hook identity. The upstream esbuild dev dependency exercises emitted extension source in the existing test harness.",
+      "regressionTests": ["Pi agent-status UI prompt", "Pi titlebar extension source"]
+    },
+    {
+      "upstreamSha": "6108ce617c8696c3d52a97d29911aed630a22e78",
+      "type": "新功能",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Activity controls share Hive host/project scope and unread state",
+      "adaptation": "Group filters and view controls without changing scope ownership, unread filtering or activity actions; keep product theme primitives and localized labels.",
+      "regressionTests": ["ActivityThreadOptionsMenu"]
+    },
+    {
+      "upstreamSha": "e829bb523a77bbc2f357c8d1237e5a8750fc3d49",
+      "type": "新功能",
+      "applied": "需要产品决定",
+      "dependencies": [],
+      "conflictReason": "The Orca download-count badge is deliberately absent from Hive product documentation",
+      "adaptation": "Keep the deleted upstream badge absent; carry the publication decision forward alongside the three existing download/badge decisions.",
+      "regressionTests": ["product brand boundary", "documentation governance"],
+      "boundaryConflict": "maintained-capability",
+      "reviewReason": "Upstream download statistics are not Hive downloads. This display-only product boundary does not defer a functional, security or stability fix."
+    },
+    {
+      "upstreamSha": "2ba2c90cb602d54240b307c02986e5ae53cfc4ae",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Worker creation/recovery must preserve exact runtime, pane and process ownership",
+      "adaptation": "Record terminal custody at creation before the boot wait; keep takeover state on failed/successful start receipts and prevent later cleanup from closing a user-owned terminal.",
+      "regressionTests": [
+        "worker-terminal-custody-at-creation",
+        "orca-runtime-terminal-handle-incarnation"
+      ]
+    },
+    {
+      "upstreamSha": "8f78c28248fbfa4d55fb837ab6698ac77d4e35c5",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": ["2ba2c90cb602d54240b307c02986e5ae53cfc4ae"],
+      "conflictReason": "Mobile route parity fingerprints differ from Hive's maintained route; RPC allowlist must retain Hive account methods",
+      "adaptation": "Report accepted user input through its owning client/terminal, throttle reports and retry boundedly, and fence host worker release. Keep Hive route identities, listeners, styles and account methods; update only audited callback/nested-body fingerprints.",
+      "regressionTests": [
+        "mobile-worker-takeover-send-sites",
+        "worker-terminal-takeover-report",
+        "worker-release-mobile-report",
+        "mobile-session-route-parity"
+      ]
+    },
+    {
+      "upstreamSha": "4f0e3806a94009c0c3d9fe698b844d3421921c6e",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Native chat option order should match the active model context",
+      "adaptation": "Place effort after the model picker without changing model selection or session option payloads.",
+      "regressionTests": ["NativeChatSessionOptionPickers"]
+    },
+    {
       "upstreamSha": "2ac23c29be2a00c55263ead03f249e936e52e319",
       "type": "新功能",
       "applied": "已移植",

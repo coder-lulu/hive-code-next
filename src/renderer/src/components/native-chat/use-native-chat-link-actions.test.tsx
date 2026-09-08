@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useRef } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { LinkActionPopover } from '@/components/link-actions/LinkActionPopover'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { useNativeChatLinkActions } from './use-native-chat-link-actions'
@@ -121,7 +122,7 @@ describe('native chat transcript links', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'the PR' }))
 
     expect(screen.getByText('https://github.com/o/r/pull/1')).toBeTruthy()
-    expect(screen.getByText('Orca Browser')).toBeTruthy()
+    expect(screen.getByText(`${APP_DISPLAY_NAME} Browser`)).toBeTruthy()
     expect(screen.getByText('System Browser')).toBeTruthy()
     expect(mocks.openHttpLink).not.toHaveBeenCalled()
   })
@@ -166,7 +167,7 @@ describe('native chat transcript links', () => {
 
     fireEvent.click(await screen.findByRole('link', { name: 'the PR' }))
 
-    expect(screen.queryByText('Orca Browser')).toBeNull()
+    expect(screen.queryByText(`${APP_DISPLAY_NAME} Browser`)).toBeNull()
     expect(mocks.openHttpLink).toHaveBeenCalledWith(
       'https://github.com/o/r/pull/1',
       expect.objectContaining({ forceInApp: true })
