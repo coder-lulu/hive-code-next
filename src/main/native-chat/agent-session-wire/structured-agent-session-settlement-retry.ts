@@ -1,3 +1,4 @@
+import { agentSessionJournalCloseRetries } from '../agent-session-journal/journal-close-retry'
 import type { AgentSessionAttachParams } from './structured-agent-session-attach'
 import { attachJournal } from './structured-agent-session-attach'
 import type {
@@ -21,6 +22,7 @@ export async function retryPendingStructuredAgentSessionSettlement(input: {
     return true
   }
   let journal = input.sessions.get(input.sessionId)?.journal
+  const openedForRetry = !journal
   if (!journal) {
     try {
       journal = (
@@ -46,12 +48,19 @@ export async function retryPendingStructuredAgentSessionSettlement(input: {
       hasProviderChild: false,
       acquisitionGeneration: null
     } as StructuredAgentSessionHostSession)
-  return retryLoadedStructuredAgentSessionSettlement({
-    deps: input.deps,
-    sessionId: input.sessionId,
-    session: retrySession,
-    now: input.now
-  })
+  try {
+    return await retryLoadedStructuredAgentSessionSettlement({
+      deps: input.deps,
+      sessionId: input.sessionId,
+      session: retrySession,
+      now: input.now
+    })
+  } finally {
+    // A temporary recovery journal is never indexed in the host session map.
+    if (openedForRetry) {
+      await agentSessionJournalCloseRetries.closeOrRetain(journal)
+    }
+  }
 }
 
 export async function retryLoadedStructuredAgentSessionSettlement(input: {

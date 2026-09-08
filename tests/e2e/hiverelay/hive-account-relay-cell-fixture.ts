@@ -6,6 +6,16 @@ import { expect, vi } from 'vitest'
 import { createCellObservationReader } from './hive-account-relay-observation'
 import { createCellPrivatePki } from './hive-account-relay-private-pki'
 
+type CellReady = {
+  cellId: string
+  cellIncarnationId: string
+  port: number
+  processPid: string
+  privateOrigin: string | null
+  caPemPath: string | null
+  clientPkcs12Path: string | null
+}
+
 export async function startAccountRelayCell(
   directory: string,
   cellId: string,
@@ -94,8 +104,9 @@ export async function startAccountRelayCell(
       { timeout: 30000 }
     )
     const observation = createCellObservationReader(join(directory, 'observation.json'))
+    const ready: CellReady = JSON.parse(readFileSync(join(directory, 'ready.json'), 'utf8'))
     return {
-      ...JSON.parse(readFileSync(join(directory, 'ready.json'), 'utf8')),
+      ...ready,
       ca: readFileSync(join(directory, 'cert.pem')),
       privatePki,
       readObservation: observation.read,

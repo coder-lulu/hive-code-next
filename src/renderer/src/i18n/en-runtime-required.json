@@ -87,7 +87,7 @@
         "ce44fad849": "Missing dependencies",
         "ec43b38ba7": "Starred on GitHub",
         "f05d237049": "Add a project first",
-        "f9eaa9e12d": "Add Project",
+        "f9eaa9e12d": "Add project",
         "preflightDismiss": "Dismiss"
       },
       "LinearIssueTextEditor": {
@@ -775,6 +775,10 @@
           "ProjectRow": {
             "c3b81ddea2": "DRAFT_ISSUE"
           },
+          "ProjectViewStates": {
+            "ac83c45672": "Switch to a Table or Roadmap view to work with this project in Orca.",
+            "e4cc8b14f2": "Orca renders table and roadmap project views. This view uses a layout it cannot render yet."
+          },
           "ProjectViewWrapper": {
             "1850fceac8": "{{value0}}/{{value1}} isn't added to HiveCode. Add it to start work, or open in GitHub.",
             "1bf8c01c8b": "Switch to a Table view to work with this project in HiveCode.",
@@ -852,13 +856,19 @@
           "bb0074ce11": "Pairing QR code",
           "ca85e595a7": "No interfaces found",
           "d1495e5e64": "Open HiveCode Mobile, tap",
+          "directAddressDisclosure": "Also use a faster local path",
+          "directAddressHint": "Optional. Pick the Wi‑Fi or Tailscale address your phone should use when nearby — usually faster than Relay. Relay still works when you’re away.",
           "e75647ace0": "Scan the QR with your phone or open the install link to grab HiveCode Mobile.",
+          "noRelayCode": "No pairing code available",
           "pairingQrError": "This pairing code couldn’t be rendered as a QR code. Copy it into HiveCode Mobile instead.",
+          "qrSignInRequired": "Sign in to create a Relay pairing code",
           "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your LAN or Tailscale."
         },
         "MobilePage": {
           "1b4509a8a1": "paired",
-          "c5909374cf": "intro"
+          "c5909374cf": "intro",
+          "diagnosticsCopied": "Diagnostics copied",
+          "diagnosticsCopyFailed": "Failed to copy diagnostics"
         },
         "MobilePageToolbar": {
           "9883b58693": "Close HiveCode Mobile",
@@ -866,8 +876,18 @@
           "b7e3d1c84a": "Show in sidebar"
         },
         "MobileRelayMintFailureNotice": {
+          "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",
+          "copyDiagnostics": "Copy diagnostics",
+          "reconnectBody": "Sign in again to use Orca Relay, or use LAN to pair over Tailscale or the same Wi‑Fi.",
+          "reconnectTitle": "Your Orca account session expired.",
+          "retry": "Retry Relay",
+          "retrying": "Retrying…",
+          "retryingBody": "Creating a new pairing code. This can take a moment over a remote connection.",
           "retryingTitle": "Retrying HiveCode Relay…",
-          "unavailableTitle": "HiveCode Relay isn’t available on this desktop."
+          "title": "Couldn’t create a Relay pairing code.",
+          "unavailableBody": "Use LAN to pair over Tailscale or the same Wi‑Fi.",
+          "unavailableTitle": "HiveCode Relay isn’t available on this desktop.",
+          "useLan": "Use LAN"
         },
         "PhoneCarousel": {
           "89c7713645": "HiveCode Mobile home screen"
@@ -1376,6 +1396,8 @@
       },
       "settings": {
         "AccountsPane": {
+          "15e831350e": "Configure MiniMax usage tracking from platform.minimax.io.",
+          "1fd1b1b6b4": "Cookie not set",
           "340d6f7a85": "Each account keeps its own local sign-in context in HiveCode. Account auth stays on this device.",
           "3455cf43fa": "Claude login.",
           "350b2a1aa7": "Use your current",
@@ -1383,11 +1405,14 @@
           "3fe7862418": "No managed Claude accounts for {{value0}}. HiveCode will use that environment's system default Claude login until you add one here.",
           "4e32e030b2": "Stored locally. HiveCode sends it only to platform.minimax.io for usage refreshes.",
           "566d9a99ab": "_token=…; minimax_group_id_v2=…",
+          "5e08b0fe57": "Stored locally and sent only to platform.minimax.io for usage refreshes.",
           "72b36ea174": "Optional. HiveCode can use your normal Claude login; add accounts only if you want quick switching without moving chat sessions.",
+          "79418c782a": "Open platform.minimax.io/console/usage in your browser, sign in, then copy the Cookie request header from DevTools (Network → any remains request → Cookie).",
           "854ebbcc45": "HiveCode will delete the managed Claude auth for this saved account. If it is currently active, HiveCode falls back to the system default Claude login.",
           "9107406589": "Could not load Claude accounts.",
           "b10cb4f696": "adding",
           "b11078a9c2": "wsl",
+          "b43e761fe5": "MiniMax cookie update failed.",
           "b4c9450319": "No managed Codex accounts for {{value0}}. HiveCode will use that environment's system default Codex login until you add one here.",
           "b8c2905c2b": "Could not load Codex accounts.",
           "c2aee76420": "Extracts OAuth credentials from your local Gemini CLI installation to authenticate with Google for {{value0}}. This uses credentials issued to the Gemini CLI app, not HiveCode. May break if Google updates the CLI. Use at your own risk.",
@@ -1395,11 +1420,6 @@
           "codexConfigSyncManagedHomeUnavailable": "HiveCode could not read this account’s Codex files just now, so settings may not be syncing. This usually clears on its own — antivirus or a backup tool briefly locks them.",
           "d0d53b7eb0": "Manage which Codex account HiveCode uses for live rate limit fetching.",
           "d676c41fc6": "Extracts OAuth credentials from your local Gemini CLI installation to authenticate with Google. This uses credentials issued to the Gemini CLI app, not HiveCode. May break if Google updates the CLI. Use at your own risk.",
-          "15e831350e": "Configure MiniMax usage tracking from platform.minimax.io.",
-          "1fd1b1b6b4": "Cookie not set",
-          "5e08b0fe57": "Stored locally and sent only to platform.minimax.io for usage refreshes.",
-          "79418c782a": "Open platform.minimax.io/console/usage in your browser, sign in, then copy the Cookie request header from DevTools (Network → any remains request → Cookie).",
-          "b43e761fe5": "MiniMax cookie update failed.",
           "f5d8d2a6a1": "Open platform.minimax.io/console/usage in your browser and sign in."
         },
         "AdvancedNetworkSettingsSection": {
@@ -1771,11 +1791,32 @@
           "d536b5e20d": "Choose which network address to advertise in the QR code. Use your LAN address for same-network pairing, or an overlay network address (Tailscale, ZeroTier) for cross-network access."
         },
         "MobilePairingConnectionOptions": {
+          "anywhereDescription": "Phone can be on cellular or any Wi‑Fi. Sign-in required for Relay only.",
           "anywhereTitle": "HiveCode Relay",
-          "relayUnavailable": "HiveCode Relay isn’t available in this build. Use LAN."
+          "available": "Available",
+          "connecting": "Connecting",
+          "localDescription": "Phone must be on this Wi‑Fi or connected through Tailscale. No account needed.",
+          "localTitle": "LAN",
+          "pathGroup": "How the phone reaches this computer",
+          "ready": "Ready",
+          "reconnecting": "Reconnecting",
+          "relayCell": "Relay cell",
+          "relayUnavailable": "HiveCode Relay isn’t available in this build. Use LAN.",
+          "retrying": "Retrying",
+          "signIn": "Sign in for Relay",
+          "signInAgain": "Sign in again for Relay",
+          "signInRequired": "Relay only — LAN does not need an account.",
+          "unavailable": "Unavailable"
+        },
+        "MobilePairingSetupSection": {
+          "step1Title": "Connection",
+          "step2RelayDescription": "Optional. Pick the Wi‑Fi or Tailscale address your phone should use when nearby — usually faster than Relay. Relay still works when you’re away.",
+          "step2RelayDisclosure": "Also use a faster local path"
         },
         "MobilePane": {
           "35100bca5d": "While you're using a terminal on your phone, HiveCode shrinks it to fit your phone screen. When you close the app or switch away, this controls whether it stays at phone size (so interactive CLI tools don't reflow) or resizes back to your desktop. You can always use Restore this terminal or Restore all terminals on the banner to resize manually.",
+          "diagnosticsCopied": "Diagnostics copied",
+          "diagnosticsCopyFailed": "Failed to copy diagnostics",
           "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your LAN or Tailscale. Regenerate to try again."
         },
         "MobileRelayBetaAvailability": {
@@ -2073,16 +2114,7 @@
           "ask_before_closing_running_terminals_description": "Show a confirmation before closing a terminal that has a running command or agent.",
           "ask_before_closing_running_terminals_title": "Ask Before Closing Running Terminals",
           "cc8c5ca224": "Windows default",
-          "d78fc4fdef": "Loading distributions",
-          "minimumContrast": {
-            "automatic": "Automatic: {{light}} on light backgrounds, {{dark}} on dark.",
-            "description": "Lifts terminal foreground colors that sit too close to the background. Leave blank for automatic, or set 1 to render program colors exactly as sent.",
-            "disabled": "Correction off. Programs that rely on low contrast, like Powerline separators, render as sent.",
-            "pinned": "Targets {{ratio}}:1 contrast for foreground colors, where possible.",
-            "placeholder": "Auto",
-            "suffix": "blank = automatic, 1 = off",
-            "title": "Minimum Contrast Ratio"
-          }
+          "d78fc4fdef": "Loading distributions"
         },
         "TerminalSettingsPreview": {
           "d06664e889": "dark"
@@ -2185,6 +2217,7 @@
             "07c7c38fac": "Choose the font used by the HiveCode interface.",
             "18b4c4c30b": "Show HiveCode in the titlebar.",
             "1de96ec8a6": "Show HiveCode Mobile Button",
+            "1f2880a9d5": "orca",
             "4d5b9427b5": "When enabled, closing the window keeps HiveCode running in the system tray instead of quitting.",
             "682293cadf": "Show the HiveCode Mobile button at the top of the left sidebar."
           }
@@ -2353,6 +2386,7 @@
             "search": {
               "2348045036": "Choose which emulator device HiveCode opens by default.",
               "2e0b45b2ba": "Use HiveCode CLI commands to list, attach, tap, and type into a mobile emulator.",
+              "9353854ff3": "orca emulator",
               "9595354cff": "Configure mobile emulator support for HiveCode and coding agents.",
               "d4b7833894": "HiveCode CLI"
             }
@@ -2439,17 +2473,10 @@
         "runtimeSessions": {
           "description": "Review Web, desktop, and mobile connections to your claimed Runtimes.",
           "empty": "No Runtime sessions are currently recorded.",
-          "refresh": "Refresh sessions",
           "revoke": "Revoke",
-          "statusPendingActivation": "Waiting for activation",
           "statusRevokePending": "Revocation pending",
           "statusRevoked": "Revoked",
-          "title": "Runtime sessions",
-          "pageSummary": "Page {{page}} · {{count}} sessions on this page",
-          "previousPage": "Previous",
-          "nextPage": "Next",
-          "statusUnverifiable": "Connection expired",
-          "authorizedOnly": "Runtime access connection history for this account, not chat sessions. Reconnects and separate channels create separate records."
+          "title": "Runtime sessions"
         },
         "settingOwnership": {
           "clientDefaultProjectScopes": "Client default + project scopes",
@@ -2698,12 +2725,12 @@
           "signOutSuccess": "Signed out of HiveCloud"
         },
         "SidebarHeader": {
-          "25a95899c9": "Add Project",
           "49f62c5665": "Workspace board",
           "5c9c7c16aa": "Add a project to create workspaces",
           "92154beb7e": "New workspace",
           "a30e34eb5c": "Close workspace board",
-          "ca6f729da2": "New workspace ({{value0}})",
+          "addProject": "Add project",
+          "createMenu": "Create",
           "projects": "Projects",
           "spaces": "Spaces",
           "views": "Sidebar view"
@@ -3840,9 +3867,6 @@
     "native-chat": {
       "composer": {
         "effort": "Effort"
-      },
-      "orchestrationPaused": {
-        "message": "Structured Chat blocks terminal prompts and sends. Orchestration messages remain queued; switch to Terminal, then check the HiveCode inbox with"
       },
       "question": {
         "other": "Other…"

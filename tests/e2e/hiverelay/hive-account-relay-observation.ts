@@ -1,5 +1,11 @@
 import { readFileSync } from 'node:fs'
 
+type CellObservation = {
+  observedAt: number
+  metrics: Record<string, number>
+  status: { publicReady: boolean; cellIncarnationId: string }
+}
+
 type ObservationReadOptions = {
   readFile?: (path: string) => string
   wait?: (milliseconds: number) => void
@@ -20,7 +26,7 @@ export function createCellObservationReader(
 ) {
   const readFile = options.readFile ?? ((target: string) => readFileSync(target, 'utf8'))
   const wait = options.wait ?? waitForReplacement
-  let latest: ReturnType<typeof JSON.parse> | undefined
+  let latest: CellObservation | undefined
   const gaps: { at: number; observedAt: number; ageMs: number }[] = []
   return {
     read: () => {
@@ -40,7 +46,7 @@ export function createCellObservationReader(
             wait(replacementRetryDelayMs)
           }
         }
-        const observation = JSON.parse(contents!)
+        const observation: CellObservation = JSON.parse(contents!)
         if (!Number.isFinite(observation?.observedAt)) {
           throw new Error('Invalid Cell observation timestamp')
         }
@@ -48,7 +54,7 @@ export function createCellObservationReader(
         return observation
       } catch (error) {
         const at = now()
-        const ageMs = at - latest?.observedAt
+        const ageMs = latest ? at - latest.observedAt : Number.NaN
         if (
           (error as NodeJS.ErrnoException).code !== 'ENOENT' ||
           !latest ||
