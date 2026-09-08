@@ -172,6 +172,7 @@
     "config/scripts/verify-windows-inner-signature.mjs",
     "config/scripts/windows-native-build-patch-contract.test.mjs",
     "config/scripts/windows-process-tree-gyp-path.test.mjs",
+    "config/scripts/windows-signing-workflow-contract.test.mjs",
     "config/upstream-change-ledger.json",
     "config/upstream-change-priority.json",
     "config/upstream-sync-boundary.json",
