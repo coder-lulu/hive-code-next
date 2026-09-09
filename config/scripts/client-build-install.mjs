@@ -3,12 +3,30 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve, relative } from 'node:path'
 import { inputFiles, readJson, sha256 } from './client-build-contract.mjs'
 
+export function hasBuildToolEntrypoints(cwd, specifiers) {
+  const require = createRequire(join(cwd, 'package.json'))
+  try {
+    for (const specifier of specifiers) {
+      require.resolve(specifier)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Adopt a previously installed tree only when its graph, layout and patches agree.
 export function canReuseInstalledDependencies(context, name) {
   const cwd = name === 'android' ? join(context.root, 'mobile') : context.root
   const modules = join(cwd, 'node_modules/.modules.yaml')
   const virtualLock = join(cwd, 'node_modules/.pnpm/lock.yaml')
   if (!existsSync(modules) || !existsSync(virtualLock)) {
+    return false
+  }
+  if (
+    name === 'android' &&
+    !hasBuildToolEntrypoints(cwd, ['@expo/cli', '@expo/prebuild-config', 'uuid'])
+  ) {
     return false
   }
   try {

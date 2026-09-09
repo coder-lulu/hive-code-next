@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import {
@@ -148,6 +148,7 @@ async function main() {
             [
               'install',
               '--frozen-lockfile',
+              ...(existsSync(join(cwd, 'node_modules/.modules.yaml')) ? ['--force'] : []),
               '--store-dir',
               context.store,
               ...(name === 'android' ? ['--node-linker=hoisted'] : ['--ignore-scripts'])
