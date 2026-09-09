@@ -57,7 +57,7 @@ pnpm run clients:version -- --version 1.5.0-beta.3 --desktop-build 3 --android-c
 
 每个平台交付到 dist/<版本>/<目标>/<尝试编号>/，含安装包、SHA256SUMS.txt、build-manifest.json。
 dist/<版本>/<目标>/latest.json 只在验证通过后更新，各架构与失败尝试不覆盖已有成功结果。
-Android 验证现有密钥证书、应用标识、版本和架构；Windows 记录实际 Authenticode 状态，要求硬件签名时不得降级。
+Android 验证现有密钥证书、应用标识、版本和架构；Windows 固定构建与发布流程不要求或校验 Authenticode 签名，构建清单记录 `not-checked`；自动更新关闭证书签名校验，保留 HTTPS、包哈希和发布凭据校验。Windows 发布不需要 `HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT`，服务端使用 `windows-hash` 发布证明且不标记为签名已验证。
 固定输入和流程不代表带签名时间戳的安装包逐字节一致。
 
 ## 本机验证记录（2026-09-09）

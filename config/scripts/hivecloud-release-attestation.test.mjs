@@ -13,6 +13,16 @@ const input = {
 }
 
 describe('HiveCloud release verification attestation', () => {
+  it('attests unsigned Windows artifacts by hash without a certificate', () => {
+    expect(
+      createReleaseVerificationAttestation({
+        ...input,
+        platform: 'windows',
+        signingFingerprint: ''
+      })
+    ).toContain('.none.windows.windows-hash.')
+  })
+
   it('binds a native verifier, artifact identity, hashes, fingerprint, and timestamp', () => {
     const token = createReleaseVerificationAttestation(input)
 

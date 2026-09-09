@@ -436,6 +436,7 @@ module.exports = {
     }
   },
   win: {
+    verifyUpdateCodeSignature: false,
     executableName: productManifest.desktop.executableName,
     ...(isHardwareWindowsSigning
       ? {

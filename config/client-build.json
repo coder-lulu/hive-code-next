@@ -1,5 +1,5 @@
 {
-  "desktopBuildNumber": 3,
+  "desktopBuildNumber": 4,
   "channel": "beta",
   "windows": {
     "msvc": "14.44.35207"

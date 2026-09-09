@@ -4,7 +4,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i
 const SHA512_PATTERN = /^[0-9a-f]{128}$/i
 const PLATFORM_VERIFIERS = new Map([
-  ['windows', 'windows-authenticode'],
+  ['windows', 'windows-hash'],
   ['macos', 'macos-codesign'],
   ['android', 'android-apksigner'],
   ['ios', 'ios-codesign'],
@@ -37,7 +37,10 @@ export function createReleaseVerificationAttestation({
   if (!verifier) {
     throw new Error(`Unsupported attestation platform: ${normalizedPlatform}`)
   }
-  if (normalizedPlatform !== 'linux' && !SHA256_PATTERN.test(normalizedFingerprint)) {
+  if (
+    !['windows', 'linux'].includes(normalizedPlatform) &&
+    !SHA256_PATTERN.test(normalizedFingerprint)
+  ) {
     throw new Error('Signed release attestations require a SHA-256 certificate fingerprint')
   }
   const keyBytes = decodeAttestationKey(key)

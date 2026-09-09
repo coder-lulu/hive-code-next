@@ -54,7 +54,7 @@ describe('HiveCloud release publishing contract', () => {
     ).toContain('publish-hivecloud-desktop-release.mjs')
     expect(
       readFileSync(join(projectDir, 'config/scripts/build-windows-x64-hardware-signed.mjs'), 'utf8')
-    ).toContain("'--publish',\n        'never'")
+    ).toMatch(/'--publish',\s*'never'/)
   })
 
   it('keeps the Android release job off GitHub release asset uploads', () => {

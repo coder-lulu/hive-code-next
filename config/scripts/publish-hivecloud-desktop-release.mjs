@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream, openAsBlob } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { createReleaseVerificationAttestation } from './hivecloud-release-attestation.mjs'
 
 const apiBase = String(process.env.HIVECLOUD_API_URL ?? '')
@@ -97,7 +98,7 @@ function validateInputs() {
     throw new Error(`Unsupported HiveCloud release channel: ${channel}`)
   }
   if (
-    ((platform === 'windows' || platform === 'macos') && !signingFingerprint) ||
+    (platform === 'macos' && !signingFingerprint) ||
     (signingFingerprint && !/^(?:[0-9a-fA-F]{2}:?){32}$/.test(signingFingerprint))
   ) {
     throw new Error(
@@ -264,7 +265,7 @@ async function digestFile(path) {
   return { sha256: sha256.digest('hex'), sha512: sha512.digest('hex') }
 }
 
-async function main() {
+export async function main() {
   validateInputs()
   const buildNumber = Number.parseInt(String(process.env.HIVECODE_BUILD_NUMBER ?? ''), 10)
   if (!Number.isSafeInteger(buildNumber) || buildNumber < 1) {
@@ -583,7 +584,9 @@ function findReleaseIdentity(candidates, buildNumber) {
   )
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error))
-  process.exitCode = 1
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  })
+}

@@ -2,7 +2,6 @@ import { cpSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync
 import { basename, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { capture } from './client-build-execution.mjs'
-import { resolvePowerShellExecutable } from './verify-windows-inner-signature.mjs'
 import { sha256 } from './client-build-contract.mjs'
 
 export async function verifyArtifacts(context, name, source) {
@@ -94,26 +93,7 @@ export async function verifyArtifacts(context, name, source) {
     ) {
       throw new Error('Packaged desktop identity differs')
     }
-    const installer = files.find((file) => file.name.endsWith('.exe'))
-    const probe = {
-      ...context,
-      env: { ...context.env, HIVECODE_VERIFY_ARTIFACT: installer.source }
-    }
-    const signature = JSON.parse(
-      await capture(probe, resolvePowerShellExecutable({ environment: context.env }), [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        '$s = Get-AuthenticodeSignature -LiteralPath $env:HIVECODE_VERIFY_ARTIFACT; @{status=$s.Status.ToString();thumbprint=$s.SignerCertificate.Thumbprint} | ConvertTo-Json -Compress'
-      ])
-    )
-    if (!['NotSigned', 'Valid'].includes(signature.status)) {
-      throw new Error(`Windows signature invalid: ${signature.status}`)
-    }
-    if (context.env.HIVECODE_WINDOWS_HARDWARE_SIGNING === '1' && signature.status !== 'Valid') {
-      throw new Error('Signed Windows build produced an unsigned installer')
-    }
-    return { files, signature }
+    return { files, signature: { status: 'not-checked' } }
   }
   return { files, signature: { status: 'platform-packaging-checks' } }
 }

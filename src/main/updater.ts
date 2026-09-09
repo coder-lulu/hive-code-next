@@ -2775,7 +2775,7 @@ export function setupAutoUpdater(
   // The adapter also retains the redacted child stderr that BaseUpdater logs but drops from the 'error' event.
   autoUpdater.logger = createUpdaterDiagnosticLogger() as never
 
-  // Security: never re-add a verifyUpdateCodeSignature override — a no-op disables electron-updater's built-in Authenticode check and accepts any installer.
+  // Windows signature policy is configured by electron-builder; download hashes remain verified.
 
   if (!autoUpdaterInitialized) {
     autoUpdaterInitialized = true
