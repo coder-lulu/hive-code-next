@@ -196,6 +196,7 @@
             "enabled",
             "endpoint",
             "checkEndpoint",
+            "artifactCdnOrigin",
             "provider",
             "channel",
             "checkIntervalHours"
@@ -204,6 +205,7 @@
             "enabled": { "type": "boolean" },
             "endpoint": { "$ref": "#/$defs/nullableUrl" },
             "checkEndpoint": { "$ref": "#/$defs/nullableUrl" },
+            "artifactCdnOrigin": { "$ref": "#/$defs/nullableUrl" },
             "provider": { "type": ["string", "null"], "enum": ["github", "hivecloud", null] },
             "channel": {
               "type": ["string", "null"],

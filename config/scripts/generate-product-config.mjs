@@ -84,6 +84,7 @@ const SERVICE_UPDATE_KEYS = new Set([
   'enabled',
   'endpoint',
   'checkEndpoint',
+  'artifactCdnOrigin',
   'provider',
   'channel',
   'checkIntervalHours'
@@ -338,6 +339,7 @@ function assertManifestShape(manifest) {
   }
   assertEndpoint(update.endpoint, 'services.update.endpoint')
   assertEndpoint(update.checkEndpoint, 'services.update.checkEndpoint', true)
+  assertEndpoint(update.artifactCdnOrigin, 'services.update.artifactCdnOrigin', true, true)
   if (
     update.checkEndpoint &&
     (() => {
@@ -351,6 +353,11 @@ function assertManifestShape(manifest) {
   }
   if (update.enabled && !update.checkEndpoint) {
     throw new Error('services.update.checkEndpoint must be an HTTPS URL when enabled')
+  }
+  if (update.enabled && update.provider === 'hivecloud' && !update.artifactCdnOrigin) {
+    throw new Error(
+      'services.update.artifactCdnOrigin must be an HTTPS origin when HiveCloud updates are enabled'
+    )
   }
   assertOptionalString(update.provider, 'services.update.provider')
   assertOptionalString(update.channel, 'services.update.channel')
@@ -507,6 +514,7 @@ export function normalizeProductManifest(manifest) {
         enabled: manifest.services.update.enabled,
         endpoint: nullableString(manifest.services.update.endpoint),
         checkEndpoint: nullableString(manifest.services.update.checkEndpoint),
+        artifactCdnOrigin: nullableString(manifest.services.update.artifactCdnOrigin),
         provider: nullableString(manifest.services.update.provider),
         channel: nullableString(manifest.services.update.channel),
         checkIntervalHours: manifest.services.update.checkIntervalHours

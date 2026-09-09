@@ -11,6 +11,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
+import java.net.CookieHandler
 import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
@@ -44,6 +45,7 @@ class ExpoHiveCodeUpdaterModule : Module() {
         AsyncFunction("downloadVerifiedApk") {
                 downloadUrl: String,
                 allowedOrigin: String,
+                allowedCdnOrigin: String?,
                 expectedSize: Long,
                 expectedSha256: String ->
             val context = appContext.reactContext
@@ -69,7 +71,7 @@ class ExpoHiveCodeUpdaterModule : Module() {
             val partial = File(updateDirectory, "hivecode-update-$identity.apk.partial")
             val completed = File(updateDirectory, "hivecode-update-$identity.apk")
             try {
-                downloadAndVerify(source.toURL(), partial, expectedSize, expectedSha256)
+                downloadAndVerify(source.toURL(), allowedCdnOrigin, partial, expectedSize, expectedSha256)
                 require(partial.renameTo(completed)) { "Could not finalize verified APK" }
                 FileProvider.getUriForFile(
                     context,
@@ -168,60 +170,98 @@ class ExpoHiveCodeUpdaterModule : Module() {
 
     private fun downloadAndVerify(
         source: URL,
+        allowedCdnOrigin: String?,
         destination: File,
         expectedSize: Long,
         expectedSha256: String
     ) {
+        val connection = openArtifactConnection(source, allowedCdnOrigin)
+        try {
+            val status = connection.responseCode
+            require(status == HttpURLConnection.HTTP_OK) {
+                "HiveCloud APK download failed ($status)"
+            }
+            verifyArtifactConnection(connection, destination, expectedSize, expectedSha256)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun openArtifactConnection(source: URL, allowedCdnOrigin: String?): HttpsURLConnection {
+        // Fail closed if another library installs a process-wide cookie jar.
+        require(CookieHandler.getDefault() == null) { "APK transport requires a cookie-free connection" }
+        var current = source
+        var redirects = 0
+        while (true) {
+            val connection = newArtifactConnection(current)
+            try {
+                val status = connection.responseCode
+                if (status != 302 && status != 307) return connection
+                val location = connection.getHeaderField("Location")
+                    ?: error("APK redirect location is missing")
+                current = ArtifactCdnRedirectPolicy.target(location, allowedCdnOrigin, redirects).toURL()
+                redirects += 1
+            } catch (failure: Throwable) {
+                connection.disconnect()
+                throw failure
+            }
+            connection.disconnect()
+        }
+    }
+
+    private fun newArtifactConnection(source: URL): HttpsURLConnection {
         val connection = source.openConnection() as? HttpsURLConnection
             ?: error("APK download requires HTTPS")
         connection.instanceFollowRedirects = false
+        connection.useCaches = false
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
         connection.requestMethod = "GET"
         connection.setRequestProperty("Accept", "application/vnd.android.package-archive")
         connection.setRequestProperty("Accept-Encoding", "identity")
         connection.setRequestProperty("User-Agent", "HiveCode-Android-Updater/1")
-        try {
-            val status = connection.responseCode
-            require(status == HttpURLConnection.HTTP_OK) {
-                "HiveCloud APK download failed ($status); redirects are not allowed"
-            }
-            val contentType = connection.contentType?.substringBefore(';')?.trim()?.lowercase()
-            require(
-                contentType == "application/vnd.android.package-archive" ||
-                    contentType == "application/octet-stream"
-            ) { "HiveCloud returned a non-APK content type" }
-            val declaredSize = connection.contentLengthLong
-            require(declaredSize == -1L || declaredSize == expectedSize) {
-                "APK Content-Length did not match release metadata"
-            }
-            val digest = MessageDigest.getInstance("SHA-256")
-            var total = 0L
-            connection.inputStream.use { input ->
-                FileOutputStream(destination).use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count == -1) break
-                        total += count
-                        require(total <= expectedSize && total <= maximumApkBytes) {
-                            "APK exceeded the permitted download size"
-                        }
-                        digest.update(buffer, 0, count)
-                        output.write(buffer, 0, count)
+        return connection
+    }
+
+    private fun verifyArtifactConnection(
+        connection: HttpsURLConnection,
+        destination: File,
+        expectedSize: Long,
+        expectedSha256: String
+    ) {
+        val contentType = connection.contentType?.substringBefore(';')?.trim()?.lowercase()
+        require(
+            contentType == "application/vnd.android.package-archive" ||
+                contentType == "application/octet-stream"
+        ) { "HiveCloud returned a non-APK content type" }
+        val declaredSize = connection.contentLengthLong
+        require(declaredSize == -1L || declaredSize == expectedSize) {
+            "APK Content-Length did not match release metadata"
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+        var total = 0L
+        connection.inputStream.use { input ->
+            FileOutputStream(destination).use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count == -1) break
+                    total += count
+                    require(total <= expectedSize && total <= maximumApkBytes) {
+                        "APK exceeded the permitted download size"
                     }
-                    output.fd.sync()
+                    digest.update(buffer, 0, count)
+                    output.write(buffer, 0, count)
                 }
+                output.fd.sync()
             }
-            require(total == expectedSize) { "APK download was incomplete" }
-            val actualSha256 = digest.digest().joinToString("") {
-                "%02x".format(it.toInt() and 0xff)
-            }
-            require(actualSha256.equals(expectedSha256, ignoreCase = true)) {
-                "APK SHA-256 verification failed"
-            }
-        } finally {
-            connection.disconnect()
+        }
+        require(total == expectedSize) { "APK download was incomplete" }
+        val actualSha256 = digest.digest().joinToString("") {
+            "%02x".format(it.toInt() and 0xff)
+        }
+        require(actualSha256.equals(expectedSha256, ignoreCase = true)) {
+            "APK SHA-256 verification failed"
         }
     }
 }

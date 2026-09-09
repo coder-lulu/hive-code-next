@@ -25,7 +25,7 @@ function validMainBundle(
     electron.session.fromPartition(\`electron-updater\`, { cache: !1 })
     autoUpdater.autoInstallOnAppQuit = !1
     executor.request = function boundedRequest() {}
-    const updaterHeaderAllowlist = new Set([\`accept\`, \`accept-encoding\`, \`cache-control\`, \`pragma\`, \`user-agent\`])
+    const updaterHeaderAllowlist = new Set([\`accept\`, \`accept-encoding\`, \`cache-control\`, \`pragma\`, \`range\`, \`if-range\`, \`user-agent\`])
     const MAX_UPDATER_ARTIFACT_BYTES = 2147483648
     const config = {
       updateRepository: null,
@@ -89,7 +89,7 @@ function validProductConfig() {
         artifacts: null,
         cloud: 'https://api.hivekernel.com',
         identityIssuer: 'https://identity.hivekernel.com/realms/hive',
-        update: null,
+        update: 'https://releases.hivekernel.com/hive/v1/updates/desktop/',
         telemetry: null,
         diagnostics: null,
         feedback: null,
@@ -117,9 +117,10 @@ function validProductConfig() {
           provider: null
         },
         update: {
-          enabled: false,
-          endpoint: null,
-          checkEndpoint: null,
+          enabled: true,
+          endpoint: 'https://releases.hivekernel.com/hive/v1/updates/desktop/',
+          checkEndpoint: 'https://releases.hivekernel.com/hive/v1/updates/check',
+          artifactCdnOrigin: 'https://oss.cloud.hivekernel.com',
           provider: 'hivecloud',
           channel: 'beta',
           checkIntervalHours: 24
@@ -403,7 +404,7 @@ describe('packaged updater security boundary', () => {
   it('rejects a packaged updater authority that differs from the canonical HiveCloud feed', async () => {
     const fixture = await createFixture({
       productConfig: validProductConfig().replace(
-        'update: null',
+        "update: 'https://releases.hivekernel.com/hive/v1/updates/desktop/'",
         "update: 'https://updates.attacker.test/hive/v1/updates/desktop/'"
       )
     })

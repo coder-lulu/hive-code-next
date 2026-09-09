@@ -6,6 +6,7 @@ type ExpoHiveCodeUpdaterNativeModule = {
   downloadVerifiedApk: (
     downloadUrl: string,
     allowedOrigin: string,
+    allowedCdnOrigin: string | null,
     expectedSize: number,
     expectedSha256: string
   ) => Promise<string>
@@ -37,6 +38,7 @@ export async function requestApkInstallPermission(): Promise<boolean> {
 export async function downloadVerifiedApk(options: {
   downloadUrl: string
   allowedOrigin: string
+  allowedCdnOrigin: string | null
   expectedSize: number
   expectedSha256: string
 }): Promise<string> {
@@ -46,6 +48,7 @@ export async function downloadVerifiedApk(options: {
   return nativeModule.downloadVerifiedApk(
     options.downloadUrl,
     options.allowedOrigin,
+    options.allowedCdnOrigin,
     options.expectedSize,
     options.expectedSha256
   )

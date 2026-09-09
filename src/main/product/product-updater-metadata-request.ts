@@ -1,6 +1,7 @@
 import type { RequestOptions } from 'node:http'
 import { HttpError, type CancellationToken } from 'builder-util-runtime'
 import { session } from 'electron'
+import { isHiveCloudReleaseFeed } from './hivecloud-updater-network-policy'
 import { readResponseTextWithLimit } from '../updater-response-body'
 import {
   stripUnsafeCrossOriginHeaders,
@@ -72,6 +73,9 @@ async function fetchUpdaterMetadata(
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location')
       await cancelResponseBody(response)
+      if (isHiveCloudReleaseFeed(state.getReleaseFeedUrl())) {
+        throw new Error('HiveCloud update metadata redirects are not allowed')
+      }
       if (!location) {
         throw new Error('Updater metadata redirect did not include a location')
       }

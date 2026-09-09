@@ -15,6 +15,13 @@ const internalArtifact =
   'https://updates.hivekernel.example/hive/v1/internal-update-artifacts/4f1f7c54-06f2-4a22-b4a9-26c9c9b0c3f5/download'
 
 describe('HiveCloud updater network policy', () => {
+  it('permits a configured CDN capability only as an artifact redirect target', () => {
+    const cdn = `https://oss.cloud.hivekernel.com/releases/windows/Setup.exe?e=${Math.floor(Date.now() / 1000) + 600}&token=test:signature`
+    expect(isAllowedProductUpdaterRequest(cdn, null, 'release', null, [], feed)).toBe(false)
+    expect(isFinalUpdaterArtifactUrl(cdn, null, 'release', null, feed)).toBe(false)
+    expect(isAllowedProductUpdaterRedirectTarget(cdn, null, 'release', null, feed)).toBe(true)
+    expect(isFinalUpdaterRedirectArtifactUrl(cdn, null, 'release', null, feed)).toBe(true)
+  })
   it.each([`${feed}latest.yml`, `${feed}latest.yml?noCache=1j4abc`, artifact])(
     'allows an authoritative HiveCloud request: %s',
     (url) => {

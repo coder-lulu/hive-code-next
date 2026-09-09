@@ -460,6 +460,7 @@ describe('mobile update contract', () => {
     expect(downloadVerifiedApk).toHaveBeenCalledWith({
       downloadUrl: androidArtifact.downloadUrl,
       allowedOrigin: 'https://updates.hive.test',
+      allowedCdnOrigin: 'https://oss.cloud.hivekernel.com',
       expectedSize: 12,
       expectedSha256: 'a'.repeat(64)
     })

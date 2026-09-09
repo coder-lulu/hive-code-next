@@ -726,6 +726,7 @@ export async function downloadAndInstallAndroidUpdate(): Promise<MobileUpdateSna
     contentUri = await downloadVerifiedApk({
       downloadUrl: artifact.downloadUrl!,
       allowedOrigin,
+      allowedCdnOrigin: hivecodeProductConfig.services.update.artifactCdnOrigin,
       expectedSize: artifact.size!,
       expectedSha256: artifact.sha256!
     })

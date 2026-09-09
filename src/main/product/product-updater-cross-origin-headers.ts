@@ -5,6 +5,8 @@ const SAFE_CROSS_ORIGIN_HEADER_NAMES = new Set([
   'accept-encoding',
   'cache-control',
   'pragma',
+  'range',
+  'if-range',
   'user-agent'
 ])
 

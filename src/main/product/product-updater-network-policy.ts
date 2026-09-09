@@ -3,6 +3,7 @@ import {
   HIVECLOUD_UPDATE_CHECK_PATH,
   hasAllowedUpdaterCacheQuery,
   isAllowedHiveCloudArtifactRequest,
+  isAllowedHiveCloudArtifactCdnRequest,
   isAllowedHiveCloudReleaseFeedRequest,
   isHiveCloudReleaseFeed
 } from './hivecloud-updater-network-policy'
@@ -173,7 +174,11 @@ export function isAllowedProductUpdaterRedirectTarget(
     return true
   }
   if (isHiveCloudReleaseFeed(releaseFeedUrl)) {
-    return false
+    try {
+      return mode === 'release' && isAllowedHiveCloudArtifactCdnRequest(new URL(url))
+    } catch {
+      return false
+    }
   }
   if (
     mode !== 'release' ||
@@ -258,7 +263,10 @@ export function isFinalUpdaterRedirectArtifactUrl(
     return true
   }
   if (isHiveCloudReleaseFeed(releaseFeedUrl)) {
-    return isAllowedHiveCloudArtifactRequest(parsed, releaseFeedUrl)
+    return (
+      isAllowedHiveCloudArtifactRequest(parsed, releaseFeedUrl) ||
+      isAllowedHiveCloudArtifactCdnRequest(parsed)
+    )
   }
   if (isAllowedHiveCloudReleaseFeedRequest(parsed, releaseFeedUrl)) {
     return true

@@ -30,6 +30,27 @@ export function installProductUpdaterNetworkBoundary(
 ): void {
   const updaterSession = session.fromPartition('electron-updater', { cache: false })
   const authorizedRedirectUrls = new Map<string, number>()
+  let cachedAuthorityEpoch = getAuthorityEpoch()
+  const pruneRedirectAuthority = (): void => {
+    const epoch = getAuthorityEpoch()
+    if (epoch !== cachedAuthorityEpoch) {
+      authorizedRedirectUrls.clear()
+      cachedAuthorityEpoch = epoch
+    }
+    for (const url of authorizedRedirectUrls.keys()) {
+      if (
+        !isAllowedProductUpdaterRedirectTarget(
+          url,
+          productRepository,
+          getMode(),
+          getLocalFeedUrl(),
+          getReleaseFeedUrl()
+        )
+      ) {
+        authorizedRedirectUrls.delete(url)
+      }
+    }
+  }
   const normalizeUrl = (url: string): string | null => {
     try {
       return new URL(url).href
@@ -38,12 +59,14 @@ export function installProductUpdaterNetworkBoundary(
     }
   }
   const isAuthorizedRedirectUrl = (url: string): boolean => {
+    pruneRedirectAuthority()
     const normalizedUrl = normalizeUrl(url)
     return (
       normalizedUrl !== null && authorizedRedirectUrls.get(normalizedUrl) === getAuthorityEpoch()
     )
   }
   const authorizeRedirectUrl = (url: string, epoch: number): void => {
+    pruneRedirectAuthority()
     const normalizedUrl = normalizeUrl(url)
     if (
       normalizedUrl !== null &&
@@ -56,22 +79,24 @@ export function installProductUpdaterNetworkBoundary(
         getReleaseFeedUrl()
       )
     ) {
+      if (!authorizedRedirectUrls.has(normalizedUrl) && authorizedRedirectUrls.size >= 128) {
+        authorizedRedirectUrls.delete(authorizedRedirectUrls.keys().next().value!)
+      }
       authorizedRedirectUrls.set(normalizedUrl, epoch)
     }
   }
+  const isRequestAllowed = (url: string): boolean =>
+    isAuthorizedRedirectUrl(url) ||
+    isAllowedProductUpdaterRequest(
+      url,
+      productRepository,
+      getMode(),
+      getLocalFeedUrl(),
+      getAdditionalReleaseControlUrls(),
+      getReleaseFeedUrl()
+    )
   updaterSession.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
-    callback({
-      cancel:
-        !isAuthorizedRedirectUrl(details.url) &&
-        !isAllowedProductUpdaterRequest(
-          details.url,
-          productRepository,
-          getMode(),
-          getLocalFeedUrl(),
-          getAdditionalReleaseControlUrls(),
-          getReleaseFeedUrl()
-        )
-    })
+    callback({ cancel: !isRequestAllowed(details.url) })
   })
   updaterSession.webRequest.onHeadersReceived({ urls: ['<all_urls>'] }, (details, callback) => {
     const localFeedUrl = getLocalFeedUrl()
@@ -96,10 +121,11 @@ export function installProductUpdaterNetworkBoundary(
     const isSuccessfulArtifactResponse = details.statusCode === 200 || details.statusCode === 206
     callback({
       cancel:
-        isArtifact &&
-        !isRedirect &&
-        (!isSuccessfulArtifactResponse ||
-          getBoundedArtifactContentLength(details.responseHeaders) === null)
+        !isRequestAllowed(details.url) ||
+        (isArtifact &&
+          !isRedirect &&
+          (!isSuccessfulArtifactResponse ||
+            getBoundedArtifactContentLength(details.responseHeaders) === null))
     })
   })
   if (executor) {

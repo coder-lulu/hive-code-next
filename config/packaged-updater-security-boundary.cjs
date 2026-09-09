@@ -34,7 +34,7 @@ const REQUIRED_MAIN_PATTERNS = [
   ['bounded download override', /\.doDownload\s*=\s*function\b/],
   [
     'cross-origin updater header allowlist',
-    /new Set\(\[\s*[`"']accept[`"']\s*,\s*[`"']accept-encoding[`"']\s*,\s*[`"']cache-control[`"']\s*,\s*[`"']pragma[`"']\s*,\s*[`"']user-agent[`"']\s*\]\)/
+    /new Set\(\[\s*[`"']accept[`"']\s*,\s*[`"']accept-encoding[`"']\s*,\s*[`"']cache-control[`"']\s*,\s*[`"']pragma[`"']\s*,\s*[`"']range[`"']\s*,\s*[`"']if-range[`"']\s*,\s*[`"']user-agent[`"']\s*\]\)/
   ],
   [
     '2 GiB updater artifact limit',

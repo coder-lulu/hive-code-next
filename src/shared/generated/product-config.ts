@@ -77,6 +77,7 @@ export const hivecodeProductConfig = {
       enabled: true,
       endpoint: 'https://releases.hivekernel.com/hive/v1/updates/desktop/',
       checkEndpoint: 'https://releases.hivekernel.com/hive/v1/updates/check',
+      artifactCdnOrigin: 'https://oss.cloud.hivekernel.com',
       provider: 'hivecloud',
       channel: 'beta',
       checkIntervalHours: 24

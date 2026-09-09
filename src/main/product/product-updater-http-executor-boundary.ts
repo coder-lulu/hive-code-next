@@ -1,4 +1,10 @@
 import type { RequestOptions } from 'node:http'
+import { CancellationError } from 'builder-util-runtime'
+import {
+  isAllowedHiveCloudArtifactRequest,
+  isAllowedHiveCloudArtifactCdnRequest,
+  isHiveCloudReleaseFeed
+} from './hivecloud-updater-network-policy'
 import {
   isAllowedProductUpdaterRedirectTarget,
   type ProductUpdaterNetworkMode
@@ -45,7 +51,11 @@ function isAuthorizedExecutorRequest(
   state: ProductUpdaterExecutorState
 ): boolean {
   if (!hasRedirectAuthority(options, state)) {
-    return isInitialRequestWithinActiveFeed(options, state)
+    return (
+      isInitialRequestWithinActiveFeed(options, state) ||
+      (state.getMode() === 'release' &&
+        isAllowedHiveCloudArtifactRequest(requestOptionsToUrl(options), state.getReleaseFeedUrl()))
+    )
   }
   return isAllowedProductUpdaterRedirectTarget(
     requestOptionsToUrl(options).href,
@@ -74,6 +84,7 @@ function patchRedirectOptionPropagation(executor: ProductUpdaterHttpExecutor): v
       return
     }
     const previousUrl = requestOptionsToUrl(options)
+    const authorityEpoch = state.getAuthorityEpoch()
     return originalAddRedirectHandlers.call(
       this,
       request,
@@ -83,6 +94,11 @@ function patchRedirectOptionPropagation(executor: ProductUpdaterHttpExecutor): v
       (next) => {
         const nextUrl = requestOptionsToUrl(next)
         if (
+          state.getAuthorityEpoch() !== authorityEpoch ||
+          (isHiveCloudReleaseFeed(state.getReleaseFeedUrl()) &&
+            (getRedirectDepth(options) !== 0 ||
+              !isAllowedHiveCloudArtifactRequest(previousUrl, state.getReleaseFeedUrl()) ||
+              !isAllowedHiveCloudArtifactCdnRequest(nextUrl))) ||
           !isAllowedProductUpdaterRedirectTarget(
             nextUrl.href,
             state.productRepository,
@@ -96,9 +112,9 @@ function patchRedirectOptionPropagation(executor: ProductUpdaterHttpExecutor): v
         }
         if (nextUrl.origin !== previousUrl.origin) {
           next.headers = sanitizeCrossOriginHeaders(next.headers)
+          Object.assign(next, { credentials: 'omit', useSessionCookies: false })
         }
         setRedirectDepth(next, getRedirectDepth(options) + 1)
-        const authorityEpoch = state.getAuthorityEpoch()
         ;(next as unknown as Record<PropertyKey, unknown>)[REDIRECT_AUTHORITY] = authorityEpoch
         state.authorizeRedirectUrl(nextUrl.href, authorityEpoch)
         handler(next)
@@ -179,6 +195,34 @@ export function installProductUpdaterHttpExecutorBoundary(
     const state = executorStates.get(this)
     if (!state || !isAuthorizedExecutorRequest(options, state)) {
       downloadOptions.callback(new Error('Updater request is outside the active update feed'))
+      return
+    }
+    if (isAllowedHiveCloudArtifactCdnRequest(requestOptionsToUrl(options))) {
+      const report = (error: unknown): void => {
+        if (error == null) {
+          downloadOptions.callback(null)
+          return
+        }
+        if (error instanceof CancellationError) {
+          downloadOptions.callback(new CancellationError())
+          return
+        }
+        const status =
+          error instanceof Error ? /\bstatus ([45]\d{2})\b/.exec(error.message)?.[1] : undefined
+        downloadOptions.callback(
+          new Error(`HiveCloud CDN download failed${status ? ` (HTTP ${status})` : ''}`)
+        )
+      }
+      try {
+        originalDoDownload.call(
+          this,
+          options,
+          { ...downloadOptions, callback: report },
+          redirectCount
+        )
+      } catch (error) {
+        report(error)
+      }
       return
     }
     originalDoDownload.call(this, options, downloadOptions, redirectCount)

@@ -69,6 +69,7 @@ const validManifest = {
       enabled: false,
       endpoint: null,
       checkEndpoint: null,
+      artifactCdnOrigin: null,
       provider: null,
       channel: null,
       checkIntervalHours: 24
@@ -172,6 +173,7 @@ describe('validateProductManifest', () => {
             enabled: true,
             endpoint: 'https://updates.example.test/hive/v1/updates/desktop/',
             checkEndpoint,
+            artifactCdnOrigin: null,
             provider: 'hivecloud',
             channel: 'beta',
             checkIntervalHours: 24
@@ -277,3 +279,30 @@ describe('generateProductConfig', () => {
     }
   })
 })
+
+it.each([null, undefined, ''])(
+  'rejects enabled HiveCloud updates without a CDN origin: %s',
+  (artifactCdnOrigin) => {
+    const update = {
+      enabled: true,
+      endpoint: 'https://updates.example.test/hive/v1/updates/desktop/',
+      checkEndpoint: 'https://updates.example.test/hive/v1/updates/check',
+      artifactCdnOrigin,
+      provider: 'hivecloud',
+      channel: 'beta',
+      checkIntervalHours: 24
+    }
+    expect(() =>
+      validateProductManifest({ ...validManifest, services: { ...validManifest.services, update } })
+    ).toThrow('artifactCdnOrigin')
+    expect(() =>
+      validateProductManifest({
+        ...validManifest,
+        services: {
+          ...validManifest.services,
+          update: { ...update, artifactCdnOrigin: 'https://oss.cloud.hivekernel.com' }
+        }
+      })
+    ).not.toThrow()
+  }
+)

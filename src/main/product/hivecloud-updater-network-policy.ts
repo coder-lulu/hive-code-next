@@ -1,3 +1,6 @@
+import { hivecodeProductConfig } from '../../shared/generated/product-config'
+import { isHiveCloudArtifactCdnUrl } from '../../shared/hivecloud-artifact-cdn'
+
 export const HIVECLOUD_UPDATE_CHECK_PATH = '/hive/v1/updates/check'
 const HIVECLOUD_UPDATE_FEED_PREFIX = '/hive/v1/updates/desktop/'
 const HIVECLOUD_UPDATE_FEED_PATH_PATTERN =
@@ -132,4 +135,10 @@ export function isHiveCloudReleaseFeed(releaseFeedUrl: string | null): boolean {
   } catch {
     return false
   }
+}
+export function isAllowedHiveCloudArtifactCdnRequest(url: URL): boolean {
+  return isHiveCloudArtifactCdnUrl(
+    url.href,
+    hivecodeProductConfig.services.update.artifactCdnOrigin
+  )
 }

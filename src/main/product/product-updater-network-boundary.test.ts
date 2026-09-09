@@ -504,6 +504,123 @@ describe('installProductUpdaterHttpExecutorBoundary', () => {
     expect(redirected.headers).not.toHaveProperty('x-user-staging-id')
   })
 
+  it('allows one UUID artifact redirect to the configured CDN without credential headers', () => {
+    const feed = 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+    const { executor, originalDoDownload } = createExecutor(() => feed)
+    const options: RequestOptions = {
+      protocol: 'https:',
+      hostname: 'updates.hivekernel.example',
+      path: '/hive/v1/update-artifacts/4f1f7c54-06f2-4a22-b4a9-26c9c9b0c3f5/download',
+      headers: {
+        Authorization: 'Bearer secret',
+        Cookie: 'session=secret',
+        'X-CSRF-Token': 'secret',
+        Range: 'bytes=0-99',
+        'If-Range': '"etag"'
+      }
+    }
+    const cdn = `https://oss.cloud.hivekernel.com/releases/windows/Setup.exe?e=${Math.floor(Date.now() / 1000) + 600}&token=test:signature`
+    const redirected = followElectronArtifactRedirect(executor, options, cdn)
+    expect(redirected.headers).toMatchObject({ Range: 'bytes=0-99', 'If-Range': '"etag"' })
+    for (const name of ['Authorization', 'Cookie', 'X-CSRF-Token']) {
+      expect(redirected.headers).not.toHaveProperty(name)
+    }
+    expect(redirected).toMatchObject({ credentials: 'omit', useSessionCookies: false })
+    executor.doDownload(redirected, { callback: vi.fn() }, 1)
+    expect(originalDoDownload).toHaveBeenCalledOnce()
+    expect(() => followElectronArtifactRedirect(executor, redirected, cdn)).toThrow()
+    expect(() =>
+      followElectronArtifactRedirect(
+        executor,
+        { ...options, path: `${new URL(feed).pathname}latest.yml` },
+        cdn
+      )
+    ).toThrow()
+    expect(() =>
+      followElectronArtifactRedirect(
+        executor,
+        options,
+        cdn.replace('oss.cloud.hivekernel.com', 'attacker.test')
+      )
+    ).toThrow()
+    const callback = vi.fn()
+    executor.doDownload(
+      {
+        protocol: 'https:',
+        hostname: 'oss.cloud.hivekernel.com',
+        path: new URL(cdn).pathname + new URL(cdn).search
+      },
+      { callback },
+      0
+    )
+    expect(callback).toHaveBeenCalledWith(expect.any(Error))
+  })
+
+  it('does not grant CDN redirect authority to HiveCloud metadata', async () => {
+    const feed = 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+    const { executor } = createExecutor(() => feed)
+    sessionFetchMock.mockReset().mockResolvedValueOnce(
+      new Response(null, {
+        status: 302,
+        headers: {
+          location: `https://oss.cloud.hivekernel.com/releases/latest.yml?e=${Math.floor(Date.now() / 1000) + 600}&token=test:signature`
+        }
+      })
+    )
+    await expect(
+      executor.request({
+        protocol: 'https:',
+        hostname: 'updates.hivekernel.example',
+        path: `${new URL(feed).pathname}latest.yml`
+      })
+    ).rejects.toThrow('metadata redirects are not allowed')
+    expect(sessionFetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a late artifact redirect after the update authority changes', () => {
+    const feed = 'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/'
+    const { executor } = createExecutor(() => feed)
+    let epoch = 1
+    const authorize = vi.fn()
+    installProductUpdaterHttpExecutorBoundary(
+      executor,
+      null,
+      () => 'release',
+      () => null,
+      () => feed,
+      () => epoch,
+      authorize
+    )
+    let redirect: ((...args: unknown[]) => void) | undefined
+    const request = {
+      on: (_event: string, handler: (...args: unknown[]) => void) => {
+        redirect = handler
+      }
+    }
+    const reject = vi.fn(),
+      proceed = vi.fn()
+    executor.addRedirectHandlers(
+      request,
+      {
+        protocol: 'https:',
+        hostname: 'updates.hivekernel.example',
+        path: '/hive/v1/update-artifacts/4f1f7c54-06f2-4a22-b4a9-26c9c9b0c3f5/download'
+      },
+      reject,
+      0,
+      proceed
+    )
+    epoch = 2
+    redirect!(
+      302,
+      'GET',
+      `https://oss.cloud.hivekernel.com/releases/windows/Setup.exe?e=${Math.floor(Date.now() / 1000) + 600}&token=test:signature`
+    )
+    expect(reject).toHaveBeenCalledWith(expect.any(Error))
+    expect(proceed).not.toHaveBeenCalled()
+    expect(authorize).not.toHaveBeenCalled()
+  })
+
   it('allows at most three redirects while reading updater metadata', async () => {
     const { executor } = createExecutor()
     sessionFetchMock

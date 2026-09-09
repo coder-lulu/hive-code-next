@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const packageRoot = resolve(import.meta.dirname, '../../packages/expo-hivecode-updater')
 
 describe('Android updater transport boundary', () => {
-  it('rejects redirects and enforces streaming byte and digest limits natively', () => {
+  it('follows only one configured CDN redirect and preserves native byte and digest limits', () => {
     const kotlin = readFileSync(
       resolve(
         packageRoot,
@@ -14,6 +14,13 @@ describe('Android updater transport boundary', () => {
       'utf8'
     )
     expect(kotlin).toContain('instanceFollowRedirects = false')
+    expect(kotlin).toContain('status != 302 && status != 307')
+    expect(kotlin).toContain(
+      'ArtifactCdnRedirectPolicy.target(location, allowedCdnOrigin, redirects)'
+    )
+    expect(kotlin).toContain('redirects += 1')
+    expect(kotlin).toContain('connection.useCaches = false')
+    expect(kotlin).toContain('CookieHandler.getDefault() == null')
     expect(kotlin).toContain('total <= expectedSize && total <= maximumApkBytes')
     expect(kotlin).toContain('total == expectedSize')
     expect(kotlin).toContain('MessageDigest.getInstance("SHA-256")')
