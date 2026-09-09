@@ -1,7 +1,9 @@
 {
-  "desktopBuildNumber": 2,
+  "desktopBuildNumber": 3,
   "channel": "beta",
-  "windows": { "msvc": "14.44.35207" },
+  "windows": {
+    "msvc": "14.44.35207"
+  },
   "android": {
     "java": "17.0.18",
     "gradle": "8.13",
