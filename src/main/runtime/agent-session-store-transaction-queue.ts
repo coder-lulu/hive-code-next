@@ -1,4 +1,5 @@
 import type { AgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
+import { AGENT_SESSION_OPERATION_FUTURE_SKEW_MS } from '../../shared/agent-session-host-authority'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { raiseAgentSessionFencesAfterBackupRecovery } from './agent-session-backup-recovery-fence'
 import {
@@ -96,6 +97,8 @@ export class AgentSessionStoreTransactionQueue {
         }
         await this.refreshExternallyChangedState()
         const records = new Map(this.state.records)
+        const hiveSessions = new Map(this.state.hiveSessions)
+        const hiveRecoveryFenceAt = this.state.hiveRecoveryFenceAt
         const operations = new Map(this.state.operations)
         const retiredClaimKeys = [...this.state.retiredClaimKeys]
         const unreadableRecords = new Map(this.state.unreadableRecords)
@@ -108,11 +111,16 @@ export class AgentSessionStoreTransactionQueue {
           const recovering = this.diskRecoveredFromBackup
           if (recovering) {
             raiseAgentSessionFencesAfterBackupRecovery(this.state)
+            this.state.hiveRecoveryFenceAt = Math.max(
+              this.state.hiveRecoveryFenceAt ?? 0,
+              Date.now() + AGENT_SESSION_OPERATION_FUTURE_SKEW_MS
+            )
           }
           const result = apply()
           if (
             !recovering &&
             !this.needsRewrite &&
+            mapEntriesMatch(this.state.hiveSessions ?? new Map(), hiveSessions) &&
             !agentSessionStoreStateChanged(
               this.state,
               records,
@@ -136,6 +144,8 @@ export class AgentSessionStoreTransactionQueue {
           return result
         } catch (error) {
           this.state.records = records
+          this.state.hiveSessions = hiveSessions
+          this.state.hiveRecoveryFenceAt = hiveRecoveryFenceAt
           this.state.operations = operations
           this.state.retiredClaimKeys = retiredClaimKeys
           this.state.unreadableRecords = unreadableRecords

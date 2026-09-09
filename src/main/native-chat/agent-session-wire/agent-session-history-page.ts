@@ -21,7 +21,7 @@ import {
   type AgentSessionHistoryRequest,
   type AgentSessionHistoryResult
 } from '../../../shared/agent-session-wire'
-import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
+import type { AgentSessionJournalReader } from '../agent-session-journal/journal-store-contracts'
 import { projectJournalBatch } from './agent-session-journal-batch'
 import {
   boundHistoryItemsByBytes,
@@ -44,7 +44,7 @@ export function resolveHistoryLimit(limit: number | undefined): number {
 }
 
 export function readAgentSessionHistory(
-  journal: AgentSessionJournal,
+  journal: AgentSessionJournalReader,
   request: AgentSessionHistoryRequest,
   /** Reduced state to read against. A synchronous multi-page catch-up passes one
    *  snapshot for the whole run so each page costs its own rows, not the timeline. */
@@ -98,7 +98,7 @@ export function readAgentSessionHistory(
  * check re-reduces if anything did advance the journal between pages.
  */
 export function createAgentSessionCatchUpReader(
-  journal: AgentSessionJournal
+  journal: AgentSessionJournalReader
 ): (request: AgentSessionHistoryRequest) => AgentSessionHistoryResult {
   let snapshot = journal.snapshot()
   return (request) => {
@@ -111,7 +111,7 @@ export function createAgentSessionCatchUpReader(
 }
 
 export function readAgentSessionHydrationPage(
-  journal: AgentSessionJournal,
+  journal: AgentSessionJournalReader,
   fence?: number
 ): AgentSessionHistoryPage {
   return buildHydrationPage(journal.snapshot(), fence)
@@ -154,7 +154,7 @@ function historyReset(
 }
 
 function readForward(
-  journal: AgentSessionJournal,
+  journal: AgentSessionJournalReader,
   snapshot: AgentJournalSnapshot,
   cursor: AgentJournalCursor | undefined,
   limit: number

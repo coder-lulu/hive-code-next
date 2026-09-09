@@ -1,4 +1,5 @@
 import { setVisibleSessionId } from './agent-session-visible-tab-index'
+import { HiveAgentSessionPersistence } from './hive-agent-session-transactions'
 import { commitConversationCommandRecord } from './agent-session-conversation-command-record'
 /** Durable single-writer session records and their operation ledger. */
 
@@ -75,7 +76,9 @@ export const AGENT_SESSION_LEASE_TTL_MS = 30_000,
 export const AGENT_SESSION_CLAIM_KEY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 export class AgentSessionRecordStore {
-  private constructor(private readonly transactions: AgentSessionStoreTransactionQueue) {}
+  private constructor(private readonly transactions: AgentSessionStoreTransactionQueue) {
+    this.hive = new HiveAgentSessionPersistence(transactions)
+  }
 
   static async open(args: { directory: string; hostId: string }): Promise<AgentSessionRecordStore> {
     const filePath = agentSessionStorePath(args.directory)
@@ -116,6 +119,8 @@ export class AgentSessionRecordStore {
     this.state.records.get(sessionId) ?? null
 
   listRecords = (): AgentSessionRecord[] => [...this.state.records.values()]
+
+  readonly hive: HiveAgentSessionPersistence
 
   listVisibleSessionIds = (): string[] =>
     [...this.state.visibleSessionIds].filter((sessionId) => this.state.records.has(sessionId))
@@ -192,13 +197,8 @@ export class AgentSessionRecordStore {
     })
   }
 
-  async commitProcessIdentity(
-    args: AgentSessionProcessIdentityCommit
-  ): Promise<AgentSessionRecord> {
-    return this.mutate(args.sessionId, (record) =>
-      commitAgentSessionProcessIdentity({ ...args, record })
-    )
-  }
+  commitProcessIdentity = (args: AgentSessionProcessIdentityCommit): Promise<AgentSessionRecord> =>
+    this.mutate(args.sessionId, (record) => commitAgentSessionProcessIdentity({ ...args, record }))
 
   setReservationProcesslessProof = (
     args: AgentSessionReservationProcesslessProof & { processlessAt: number | null }
@@ -237,10 +237,8 @@ export class AgentSessionRecordStore {
     args: AgentSessionFailedPostAcquisitionAttachmentSettlement
   ) => this.transact(() => settleFailedAgentSessionPostAcquisitionAttachment(this.state, args))
 
-  async renewLease(args: AgentSessionLeaseRenewal): Promise<AgentSessionRecord> {
-    const [renewed] = await this.renewLeases([args])
-    return renewed
-  }
+  renewLease = (args: AgentSessionLeaseRenewal): Promise<AgentSessionRecord> =>
+    this.renewLeases([args]).then(([renewed]) => renewed)
 
   async renewLeases(renewals: readonly AgentSessionLeaseRenewal[]): Promise<AgentSessionRecord[]> {
     return this.transact(() =>

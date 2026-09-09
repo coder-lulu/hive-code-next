@@ -53,7 +53,17 @@ function findBlock(source, name, fromIndex = 0) {
 
 export function configureReleaseSigning(source) {
   if (source.includes('HIVECODE_ANDROID_KEYSTORE_PATH')) {
-    throw new Error('Generated Android build.gradle was already configured for HiveCode signing')
+    const buildTypes = findBlock(source, 'buildTypes')
+    const release = findBlock(source, 'release', buildTypes.open)
+    if (
+      release.close > buildTypes.close ||
+      !source.includes(RELEASE_SIGNING_BLOCK) ||
+      !/signingConfig\s+signingConfigs\.release/.test(source.slice(release.open, release.close)) ||
+      /signingConfig\s+signingConfigs\.debug/.test(source.slice(release.open, release.close))
+    ) {
+      throw new Error('Existing HiveCode signing configuration has drifted')
+    }
+    return source
   }
   const signingConfigs = findBlock(source, 'signingConfigs')
   let patched = `${source.slice(0, signingConfigs.close)}${RELEASE_SIGNING_BLOCK}${source.slice(signingConfigs.close)}`

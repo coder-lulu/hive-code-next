@@ -23,6 +23,14 @@ export function resolveSharedElectronDistEntry(options) {
   if (![version, targetPlatform, targetArch].every((part) => IDENTITY_PATTERN.test(part ?? ''))) {
     return null
   }
+  if (env.HIVECODE_BUILD_HOME) {
+    const cacheRoot = path.join(path.resolve(env.HIVECODE_BUILD_HOME), 'cache', 'electron-dist')
+    return {
+      cacheRoot,
+      entryPath: path.join(cacheRoot, `${version}-${targetPlatform}-${targetArch}`),
+      markerPath: path.join(options.electronPackageDir, MARKER_FILENAME)
+    }
+  }
   let gitCommonDir
   try {
     gitCommonDir = resolveGitCommonDir(repoRoot, options.execFile ?? execFileSync)

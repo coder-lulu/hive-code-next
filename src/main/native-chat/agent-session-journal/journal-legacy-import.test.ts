@@ -17,7 +17,8 @@ import {
   importLegacyTranscriptIntoJournal
 } from './journal-legacy-import'
 import { DEFAULT_JOURNAL_PAYLOAD_LIMITS } from './journal-payload-bounds'
-import { openAgentSessionJournal } from './journal-store-factory'
+import type { openAgentSessionJournal } from './journal-store-factory'
+import { createTrackedJournalOpener } from './journal-store-test-open'
 import type { AgentSessionJournal } from './journal-store'
 
 const CLAUDE_SESSION = '29eb22a4-6a5f-4f21-9b0c-1d7f3a2e5c88'
@@ -25,6 +26,7 @@ const CODEX_SESSION = '019fd532-7c11-7a90-b6de-4e1a2c3d5f60'
 
 let root: string
 let clock = 1_000
+const journals = createTrackedJournalOpener()
 
 function tick(): number {
   clock += 1
@@ -57,7 +59,7 @@ async function open(
   sessionId: string,
   overrides: Partial<Parameters<typeof openAgentSessionJournal>[0]> = {}
 ): Promise<AgentSessionJournal> {
-  return openAgentSessionJournal({
+  return journals.open({
     identity: identity(agent, sessionId),
     journalDir: root,
     now: tick,
@@ -189,6 +191,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  await journals.closeAll()
   await rm(root, { recursive: true, force: true })
 })
 

@@ -1,6 +1,9 @@
 allowBuilds:
   esbuild: true
 
+# Keep Android CMake paths short and the install layout stable across pnpm commands.
+nodeLinker: hoisted
+
 minimumReleaseAge: 4320
 
 overrides:

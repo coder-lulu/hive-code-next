@@ -1,3 +1,4 @@
+import { emptyState, parseState } from './agent-session-store-parsing'
 /**
  * On-disk layer for the durable agent-session store.
  *
@@ -10,26 +11,18 @@
 import { createHash } from 'node:crypto'
 import { chmod, mkdir, readFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import {
-  agentSessionOperationKey,
-  isAgentSessionOperationRow,
-  type AgentSessionOperationRow
-} from '../../shared/agent-session-operation-ledger'
-import {
-  AGENT_SESSION_RECORD_SCHEMA_VERSION,
-  isAgentSessionRecord,
-  type AgentSessionRecord
-} from '../../shared/agent-session-record'
+import type { AgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import {
   copyFileDurable,
   durableWriteTempPath,
   renameDurable,
   writeTempFileDurable
 } from '../durable-file-write'
-import { parseVisibleSessionIds } from './agent-session-visible-tab-index'
 import { serializeAgentSessionStoreState } from './agent-session-store-serialization'
+import type { HiveAgentSessionEntry } from '../../shared/hive-agent-session-entry'
 
-export const AGENT_SESSION_STORE_SCHEMA_VERSION = 2 as const
+export const AGENT_SESSION_STORE_SCHEMA_VERSION = 3 as const
 
 export const AGENT_SESSION_STORE_FILE_NAME = 'agent-sessions.json'
 
@@ -47,6 +40,8 @@ export type AgentSessionStoreState = {
   visibleSessionIds: Set<string>
   /** True once this store has committed the visibility index field. */
   visibleSessionIdsIndexPresent: boolean
+  hiveSessions?: Map<string, HiveAgentSessionEntry>
+  hiveRecoveryFenceAt?: number
 }
 
 export type LoadedAgentSessionStore = {
@@ -66,166 +61,12 @@ export function agentSessionStorePath(directory: string): string {
 
 const backupPath = (filePath: string): string => `${filePath}.bak`
 
-function emptyState(hostId: string): AgentSessionStoreState {
-  return {
-    schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION,
-    hostId,
-    records: new Map(),
-    operations: new Map(),
-    retiredClaimKeys: [],
-    unreadableRecords: new Map(),
-    visibleSessionIds: new Set(),
-    visibleSessionIdsIndexPresent: false
-  }
-}
-
 export function agentSessionStoreRevision(state: AgentSessionStoreState): string {
   return createHash('sha256')
     .update(String(state.schemaVersion))
     .update('\0')
     .update(serializeAgentSessionStoreState(state))
     .digest('hex')
-}
-
-function parseState(
-  raw: string,
-  hostId: string
-): { state: AgentSessionStoreState; needsRewrite: boolean } | null {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return null
-  }
-  if (typeof parsed !== 'object' || parsed === null) {
-    return null
-  }
-  const file = parsed as {
-    schemaVersion?: unknown
-    hostId?: unknown
-    records?: unknown
-    operations?: unknown
-    retiredClaimKeys?: unknown
-    unusableRecords?: unknown
-    visibleSessionIds?: unknown
-  }
-  if (
-    !Number.isSafeInteger(file.schemaVersion) ||
-    (file.schemaVersion as number) < 0 ||
-    typeof file.hostId !== 'string'
-  ) {
-    return null
-  }
-  const schemaVersion = file.schemaVersion as number
-  if (schemaVersion < AGENT_SESSION_STORE_SCHEMA_VERSION) {
-    return null
-  }
-  if (
-    schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION &&
-    (typeof file.records !== 'object' || file.records === null || Array.isArray(file.records))
-  ) {
-    return null
-  }
-  if (
-    schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION &&
-    (typeof file.operations !== 'object' ||
-      file.operations === null ||
-      Array.isArray(file.operations) ||
-      !Array.isArray(file.retiredClaimKeys) ||
-      typeof file.unusableRecords !== 'object' ||
-      file.unusableRecords === null ||
-      Array.isArray(file.unusableRecords))
-  ) {
-    return null
-  }
-  const state = emptyState(hostId)
-  state.schemaVersion = schemaVersion
-  state.hostId = file.hostId
-  let needsRewrite = false
-  if (typeof file.records === 'object' && file.records !== null) {
-    for (const [sessionId, value] of Object.entries(file.records)) {
-      const record = isAgentSessionRecord(value) ? value : null
-      if (record?.sessionId === sessionId) {
-        state.records.set(sessionId, record)
-      } else {
-        const valueSchemaVersion =
-          typeof value === 'object' &&
-          value !== null &&
-          (value as { schemaVersion?: unknown }).schemaVersion
-        const reason = record
-          ? 'record_key_session_id_mismatch'
-          : valueSchemaVersion === AGENT_SESSION_RECORD_SCHEMA_VERSION
-            ? 'current_shape_invalid'
-            : 'unsupported_schema'
-        state.unreadableRecords.set(sessionId, { reason, raw: value })
-        needsRewrite ||= schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION
-      }
-    }
-  }
-  if (typeof file.unusableRecords === 'object' && file.unusableRecords !== null) {
-    for (const [sessionId, value] of Object.entries(file.unusableRecords)) {
-      if (typeof value !== 'object' || value === null) {
-        if (schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION) {
-          return null
-        }
-        continue
-      }
-      const unusable = value as { reason?: unknown; raw?: unknown }
-      if (typeof unusable.reason !== 'string' || unusable.reason.length === 0) {
-        if (schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION) {
-          return null
-        }
-        continue
-      }
-      state.unreadableRecords.set(sessionId, { reason: unusable.reason, raw: unusable.raw })
-    }
-  }
-  if (typeof file.operations === 'object' && file.operations !== null) {
-    for (const [key, value] of Object.entries(file.operations)) {
-      if (!isAgentSessionOperationRow(value)) {
-        if (schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION) {
-          return null
-        }
-        continue
-      }
-      if (key !== agentSessionOperationKey(value.callerKey, value.operationId)) {
-        if (schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION) {
-          return null
-        }
-        continue
-      }
-      state.operations.set(key, value)
-    }
-  }
-  if (Array.isArray(file.retiredClaimKeys)) {
-    for (const entry of file.retiredClaimKeys) {
-      const key = entry as Partial<RetiredAgentSessionClaimKey>
-      if (
-        typeof key?.keyId !== 'string' ||
-        key.keyId.length === 0 ||
-        key.keyId.length > 512 ||
-        !Number.isSafeInteger(key.retiredAt) ||
-        (key.retiredAt as number) < 0
-      ) {
-        if (schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION) {
-          return null
-        }
-        continue
-      }
-      state.retiredClaimKeys.push({ keyId: key.keyId, retiredAt: key.retiredAt as number })
-    }
-  }
-  const visibleSessionIds = parseVisibleSessionIds(
-    file.visibleSessionIds,
-    schemaVersion,
-    AGENT_SESSION_STORE_SCHEMA_VERSION
-  )
-  if (!visibleSessionIds.valid) {
-    return null
-  }
-  state.visibleSessionIdsIndexPresent = visibleSessionIds.present
-  visibleSessionIds.ids.forEach((sessionId) => state.visibleSessionIds.add(sessionId))
-  return { state, needsRewrite }
 }
 
 /** A record the primary retained as unreadable may still have a valid copy in the previous
@@ -331,7 +172,14 @@ export async function saveAgentSessionStore(
   await chmod(directory, 0o700)
   const tmpPath = durableWriteTempPath(filePath)
   try {
-    await writeTempFileDurable(tmpPath, serializeAgentSessionStoreState(state), 0o600)
+    await writeTempFileDurable(
+      tmpPath,
+      serializeAgentSessionStoreState({
+        ...state,
+        schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION
+      }),
+      0o600
+    )
     // Only a primary parsed under the transaction lock may replace the backup. During recovery the
     // primary is corrupt or absent, so the known-good backup must survive until publication.
     if (options.primaryStatus === 'validated') {

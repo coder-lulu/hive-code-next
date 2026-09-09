@@ -185,3 +185,7 @@ tests/e2e/.cross-version-checkouts/
 # Local Android release signing identity and recovery metadata.
 # CI receives these values through GitHub Actions Secrets; never commit them.
 /mobile/.secrets/
+
+# Local client build configuration and workspace mutex.
+/.client-build.local.json
+/.client-build.lock

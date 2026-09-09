@@ -69,11 +69,21 @@ const baseOptions = {
 describe('resolveSharedElectronDistEntry', () => {
   it('keys the entry by version, platform, and arch under the git common dir', () => {
     const entry = resolveSharedElectronDistEntry(baseOptions)
-    expect(entry?.cacheRoot).toBe(path.join('/repo/.git', 'orca-cache', 'electron'))
+    expect(entry?.cacheRoot).toBe(path.resolve('/repo/.git', 'orca-cache', 'electron'))
     expect(entry?.entryPath).toBe(
-      path.join('/repo/.git', 'orca-cache', 'electron', '43.4.1-darwin-arm64')
+      path.resolve('/repo/.git', 'orca-cache', 'electron', '43.4.1-darwin-arm64')
     )
     expect(entry?.markerPath).toBe(path.join('/repo/node_modules/electron', '.orca-shared-dist'))
+  })
+
+  it('uses the configured machine cache independently of the checkout', () => {
+    const entry = resolveSharedElectronDistEntry({
+      ...baseOptions,
+      env: { HIVECODE_BUILD_HOME: '/build-cache' }
+    })
+    expect(entry?.entryPath).toBe(
+      path.resolve('/build-cache/cache/electron-dist/43.4.1-darwin-arm64')
+    )
   })
 
   it('offers an entry on every platform a worktree is developed on', () => {
@@ -125,7 +135,11 @@ describe('isUsableElectronDist', () => {
   it('rejects a symlink so a redirected entry is never treated as cache content', () => {
     const root = makeRoot()
     writeDist(path.join(root, 'real'))
-    symlinkSync(path.join(root, 'real'), path.join(root, 'link'), 'dir')
+    symlinkSync(
+      path.join(root, 'real'),
+      path.join(root, 'link'),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    )
     expect(isUsableElectronDist(path.join(root, 'link'), VERSION, PLATFORM_PATH)).toBe(false)
   })
 })

@@ -1,0 +1,17 @@
+{
+  "desktopBuildNumber": 2,
+  "channel": "beta",
+  "windows": { "msvc": "14.44.35207" },
+  "android": {
+    "java": "17.0.18",
+    "gradle": "8.13",
+    "gradleSha256": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+    "buildTools": "36.0.0",
+    "compileSdk": 36,
+    "targetSdk": 36,
+    "minSdk": 24,
+    "ndk": "27.1.12297006",
+    "cmake": "3.22.1",
+    "architectures": ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+  }
+}

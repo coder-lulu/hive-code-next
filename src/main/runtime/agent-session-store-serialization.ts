@@ -16,5 +16,9 @@ export function serializeAgentSessionStoreState(state: AgentSessionStoreState): 
   if (state.visibleSessionIdsIndexPresent) {
     serialized.visibleSessionIds = [...state.visibleSessionIds]
   }
+  serialized.hiveSessions = Object.fromEntries(state.hiveSessions ?? [])
+  if (state.hiveRecoveryFenceAt !== undefined) {
+    serialized.hiveRecoveryFenceAt = state.hiveRecoveryFenceAt
+  }
   return JSON.stringify(serialized)
 }

@@ -90,9 +90,11 @@ export function readJournalSince(
   if (!resume.ok) {
     return { ok: false, reset: resume.reset }
   }
+  const rows = source.rowsAfter(resume.afterSequence)
   return {
     ok: true,
-    rows: source.rowsAfter(resume.afterSequence),
-    cursor: currentCursor()
+    rows,
+    // A bounded page must not acknowledge rows it did not return.
+    cursor: { epoch: currentCursor().epoch, sequence: rows.at(-1)?.seq ?? cursor.sequence }
   }
 }

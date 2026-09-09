@@ -32,6 +32,7 @@ import {
 } from './journal-row-builders'
 import type {
   AgentSessionJournalOptions,
+  AgentSessionJournalReader,
   JournalAppendResult,
   JournalItemAppendOptions,
   JournalLifecycleBatchInput,
@@ -49,10 +50,12 @@ import { createJournalStoreCollaborators } from './journal-store-collaborators'
 import { ensureJournalDir, journalStoreLoadedFields } from './journal-store-open'
 import type { JournalItemAppender } from './journal-item-appender'
 import type { JournalLifecycleBatchAppender } from './journal-lifecycle-batch-appender'
+import { publishNewEpoch } from './journal-epoch-rollover'
+import { assertJournalFence, assertJournalWritable } from './journal-write-guards'
 
 export { AgentSessionJournalError } from './journal-write-guards'
 
-export class AgentSessionJournal {
+export class AgentSessionJournal implements AgentSessionJournalReader {
   private readonly identity: AgentSessionJournalIdentity
   private readonly journalDir: string
   private readonly dbPath: string
@@ -131,6 +134,30 @@ export class AgentSessionJournal {
   /** What the last open's repair did. */
   get repair(): { malformedRows: number } {
     return { malformedRows: this.malformedRows }
+  }
+
+  /** Explicit retention deletion on an owned journal, serialized with its existing writer. */
+  purgeContent(fence: number): Promise<void> {
+    return this.queue.serialize(async () => {
+      assertJournalWritable(this.readOnly, this.identity.sessionId)
+      assertJournalFence(fence, this.state.highestFence)
+      const { db } = this.requireDatabase()
+      db.pragma('secure_delete = ON')
+      publishNewEpoch({
+        db,
+        sessionId: this.identity.sessionId,
+        providerHandle: this.identity.providerHandle,
+        epoch: this.mintEpoch(),
+        reason: 'session_created',
+        fence,
+        now: this.now(),
+        onPublished: (loaded) => this.adoptLoadedJournal(loaded)
+      })
+      const checkpoint = db.pragma('wal_checkpoint(TRUNCATE)') as { busy: number }[]
+      if (checkpoint.some((entry) => entry.busy !== 0)) {
+        throw new Error('hive_agent_outcome_unknown')
+      }
+    })
   }
 
   async open(): Promise<void> {

@@ -70,6 +70,30 @@ afterEach(async () => {
 })
 
 describe('sequences', () => {
+  it('advances a bounded read only through returned rows, including after reopen', async () => {
+    const journal = await open()
+    const cursor = journal.cursor()
+    for (let index = 0; index < 5; index += 1) {
+      await journal.appendItem(item(index), body(`m${index}`), { fence: 1 })
+    }
+    await journal.close()
+    const reopened = await open()
+    let after = cursor
+    const sequences: number[] = []
+    for (let page = 0; page < 3; page += 1) {
+      const result = reopened.readSince(after, 2)
+      expect(result.ok).toBe(true)
+      if (!result.ok) {
+        throw new Error('Expected readable journal')
+      }
+      sequences.push(...result.rows.map((row) => row.seq))
+      expect(result.cursor.sequence).toBe(result.rows.at(-1)?.seq)
+      after = result.cursor
+    }
+    expect(sequences).toEqual([2, 3, 4, 5, 6])
+    expect(reopened.readSince(after, 2)).toEqual({ ok: true, rows: [], cursor: after })
+  })
+
   it('assigns a contiguous sequence with no gaps or reuse under concurrent appends', async () => {
     const journal = await open()
     const results = await Promise.all(

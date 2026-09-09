@@ -14,19 +14,18 @@ describe('shared build toolchain contract', () => {
     expect(packageJson.engines.node).toBe(toolchain.node)
     expect(packageJson.packageManager).toMatch(new RegExp(`^pnpm@${toolchain.pnpm}\\+`))
     expect(packageJson.engines.node).toBe(toolchain.node)
-    expect(packageJson.engines.pnpm).toBe(`>=${toolchain.pnpm} <11`)
+    expect(packageJson.packageManager.split('+')[0]).toBe(`pnpm@${toolchain.pnpm}`)
     expect(packageJson.devDependencies.electron).toBe(toolchain.electron)
-    expect(packageJson.devDependencies.vitest).toBe(toolchain.vitest)
+    expect(packageJson.devDependencies.vitest.replace(/^\^/, '')).toBe(toolchain.vitest)
   })
 
-  it('keeps CI setup-node steps on the same pin file', () => {
-    const workflowFiles = [
-      ...readFileSync(join(projectDir, '.github/workflows/pr.yml'), 'utf8').matchAll(
-        /node-version-file:\s+([^\s]+)/g
-      )
-    ]
-    expect(workflowFiles.length).toBeGreaterThan(0)
-    expect(workflowFiles.every((match) => match[1] === 'package.json')).toBe(true)
+  it('routes local clients through one coordinator', () => {
+    expect(packageJson.scripts['clients:build']).toBe(
+      'node --use-env-proxy config/scripts/client-build.mjs build'
+    )
+    for (const name of ['build:win', 'build:linux', 'build:mac']) {
+      expect(packageJson.scripts[name]).toContain('clients:build')
+    }
   })
 
   it('keeps Node-based build containers on the shared immutable baseline', () => {

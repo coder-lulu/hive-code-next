@@ -54,6 +54,7 @@ describe('unsupported agent session record schema', () => {
     const unsupported = { ...agentSessionRecordFixture(), schemaVersion: 1 }
     const payload = JSON.stringify({
       schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION,
+      hiveSessions: {},
       hostId: 'local',
       records: { [SESSION_ID]: unsupported },
       operations: {},

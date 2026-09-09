@@ -38,9 +38,11 @@ describe('Android release signing configuration', () => {
         )
       )
     ).toThrow('exactly one debug signing config')
-    expect(() => configureReleaseSigning(configureReleaseSigning(generatedGradle))).toThrow(
-      'already configured'
-    )
+    const configured = configureReleaseSigning(generatedGradle)
+    expect(configureReleaseSigning(configured)).toBe(configured)
+    expect(() =>
+      configureReleaseSigning(configured.replace('signingConfigs.release', 'signingConfigs.debug'))
+    ).toThrow('drifted')
   })
 
   it('rejects malformed or empty keystore material', () => {

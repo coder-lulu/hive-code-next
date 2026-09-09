@@ -4,6 +4,7 @@ import type {
   AgentJournalItemIdentity,
   AgentJournalMessageItem,
   AgentJournalResetReason,
+  AgentJournalSnapshot,
   AgentSessionJournalIdentity
 } from '../../../shared/agent-session-journal-types'
 import type { JournalLoad } from './journal-open'
@@ -20,8 +21,18 @@ export type AgentSessionJournalOptions = {
 }
 
 export type JournalReadSince =
+  /** cursor acknowledges only returned rows, not the live journal tip. */
   | { ok: true; rows: JournalRow[]; cursor: AgentJournalCursor }
   | { ok: false; reset: AgentJournalResetReason }
+
+/** Read projection boundary; ownership, writes and lifecycle stay with the existing host. */
+export type AgentSessionJournalReader = {
+  readonly isReadOnly: boolean
+  cursor(): AgentJournalCursor
+  snapshot(): AgentJournalSnapshot
+  readSince(cursor: AgentJournalCursor, limit?: number): JournalReadSince
+  canonicalItemId(itemId: string): string
+}
 
 export type ResolveDispatchInput = {
   clientMessageId: string

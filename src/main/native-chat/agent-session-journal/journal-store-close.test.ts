@@ -196,9 +196,14 @@ describe('a rejected close is a real retry', () => {
     const injected = injectReleaseFailure(journal)
     const first = journal.close()
     const second = journal.close()
-    await expect(first).rejects.toThrow('injected release failure')
-    await expect(second).rejects.toThrow('injected release failure')
-    expect(injected.calls()).toBe(1)
+    try {
+      await expect(first).rejects.toThrow('injected release failure')
+      await expect(second).rejects.toThrow('injected release failure')
+      expect(injected.calls()).toBe(1)
+    } finally {
+      injected.stopFailing()
+      await journal.close()
+    }
   })
 })
 

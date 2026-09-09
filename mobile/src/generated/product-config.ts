@@ -46,7 +46,7 @@ export const hivecodeProductConfig = {
     artifacts: null,
     cloud: 'https://api.hivekernel.com',
     identityIssuer: 'https://identity.hivekernel.com/realms/hive',
-    update: null,
+    update: 'https://releases.hivekernel.com/hive/v1/updates/desktop/',
     telemetry: null,
     diagnostics: null,
     feedback: null,
@@ -74,9 +74,9 @@ export const hivecodeProductConfig = {
       provider: null
     },
     update: {
-      enabled: false,
-      endpoint: null,
-      checkEndpoint: null,
+      enabled: true,
+      endpoint: 'https://releases.hivekernel.com/hive/v1/updates/desktop/',
+      checkEndpoint: 'https://releases.hivekernel.com/hive/v1/updates/check',
       provider: 'hivecloud',
       channel: 'beta',
       checkIntervalHours: 24
