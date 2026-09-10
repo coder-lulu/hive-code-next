@@ -126,6 +126,9 @@ export async function prepareElectronHeaders(context) {
       join(extracted, process.arch, 'node.lib'),
       expected(`win-${process.arch}/node.lib`)
     )
+    // Electron's custom-nodedir rebuild resolves the import library under Release.
+    mkdirSync(join(extracted, 'Release'), { recursive: true })
+    cpSync(join(extracted, process.arch, 'node.lib'), join(extracted, 'Release', 'node.lib'))
   }
   context.env.npm_config_nodedir = extracted
 }
