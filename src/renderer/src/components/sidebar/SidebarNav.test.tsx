@@ -232,7 +232,7 @@ describe('SidebarNav', () => {
     const container = await renderSidebarNav()
     const buttons = Array.from(container.querySelectorAll('button'))
     const sessions = getButtonByText(container, 'Sessions')
-    const projects = getButtonByText(container, 'Manage projects')
+    const projects = getButtonByText(container, 'Projects')
     const newTask = container.querySelector('button[aria-label="New task"]')
     expect(buttons.indexOf(sessions)).toBe(buttons.indexOf(newTask as HTMLButtonElement) + 1)
     expect(buttons.indexOf(projects)).toBe(buttons.indexOf(sessions) + 1)
@@ -429,11 +429,17 @@ describe('SidebarNav', () => {
     expect(mocks.updateSettings).toHaveBeenCalledWith({ showAutomationsButton: false })
   })
 
-  it('does not duplicate the titlebar search in the sidebar', async () => {
+  it('places the search above New task with its shortcut and original action', async () => {
     const container = await renderSidebarNav()
-    expect(
-      container.querySelector('button[aria-label="Search worktrees and browser tabs"]')
-    ).toBeNull()
+    const search = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Search worktrees and browser tabs"]'
+    )!
+    expect(search).not.toBeNull()
+    expect(search.textContent).toContain('J')
+    const newTask = container.querySelector('button[aria-label="New task"]')!
+    expect(search.compareDocumentPosition(newTask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await clickButton(search)
+    expect(mocks.openModal).toHaveBeenCalledWith('worktree-palette')
   })
 
   it('keeps task source shortcuts keyboard-reachable and revealed on Tasks row hover or focus', async () => {

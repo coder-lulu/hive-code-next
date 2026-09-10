@@ -1,3 +1,4 @@
+import { TitlebarSearchButton } from '@/app-shell/TitlebarSearchButton'
 import React from 'react'
 import {
   Bell,
@@ -5,7 +6,7 @@ import {
   CalendarClock,
   EyeOff,
   Files,
-  FolderKanban,
+  FolderClosed,
   MessageSquarePlus,
   Smartphone
 } from 'lucide-react'
@@ -125,6 +126,9 @@ const SidebarNav = React.memo(function SidebarNav() {
       aria-label={translate('components.sidebar.primaryNavigation', 'Primary navigation')}
       data-contextual-tour-target="sidebar-navigation"
     >
+      <div className="mb-1">
+        <TitlebarSearchButton placement="sidebar" />
+      </div>
       <button
         type="button"
         className={cn('sidebar-new-task-button', newTaskActive && 'is-active')}
@@ -144,9 +148,10 @@ const SidebarNav = React.memo(function SidebarNav() {
         variant="ghost"
         size="sm"
         className={cn(
-          'w-full justify-start gap-2 px-2',
-          projectManagementActive &&
-            'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+          'w-full justify-start gap-2 px-2 text-[13px]',
+          projectManagementActive
+            ? 'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+            : 'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
         )}
         aria-current={projectManagementActive ? 'page' : undefined}
         onClick={() => {
@@ -154,8 +159,8 @@ const SidebarNav = React.memo(function SidebarNav() {
           updateSessionsView({ navigation: 'projects', query: '' })
         }}
       >
-        <FolderKanban className="size-4 shrink-0" />
-        {translate('components.sessions.manageProjects', 'Manage projects')}
+        <FolderClosed className="size-4 shrink-0" />
+        {translate('components.sessions.projectNavigation', 'Projects')}
       </Button>
       <SetupGuideSidebarEntry />
       <SidebarTaskNavButton />

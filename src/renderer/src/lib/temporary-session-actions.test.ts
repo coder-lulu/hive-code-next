@@ -70,6 +70,34 @@ describe('temporary session deletion', () => {
     mocks.resolvePinnedTabLabel.mockReset().mockReturnValue('Temporary investigation')
   })
 
+  it('closes a workspace session only when explicitly allowed with an exact bucket and host', async () => {
+    mocks.state.tabsByWorktree = {
+      'folder:notes': [{ id: 'terminal', worktreeId: 'folder:notes', executionHostId: 'local' }]
+    }
+    const target = {
+      ownerBucketKey: 'folder:notes',
+      terminalTabId: 'terminal',
+      executionHostId: 'local' as const
+    }
+    expect(await deleteTemporarySession(target)).toBe(false)
+    expect(mocks.closeTerminalTab).not.toHaveBeenCalled()
+    expect(await deleteTemporarySession(target, { allowWorkspaceOwner: true })).toBe(true)
+    expect(mocks.closeTerminalTab).toHaveBeenCalledWith(
+      'terminal',
+      expect.objectContaining({
+        precomputedCloseState: expect.objectContaining({ owningWorktreeId: 'folder:notes' })
+      })
+    )
+    mocks.closeTerminalTab.mockClear()
+    expect(
+      await deleteTemporarySession(
+        { ...target, executionHostId: 'ssh:wrong' },
+        { allowWorkspaceOwner: true }
+      )
+    ).toBe(false)
+    expect(mocks.closeTerminalTab).not.toHaveBeenCalled()
+  })
+
   it('closes the terminal identity instead of guessing from the unified tab id', async () => {
     const ownerBucketKey = `runtime:environment-a|${FLOATING_TERMINAL_WORKTREE_ID}`
     const otherBucketKey = `runtime:environment-b|${FLOATING_TERMINAL_WORKTREE_ID}`

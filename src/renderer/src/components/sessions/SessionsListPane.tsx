@@ -8,6 +8,7 @@ import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { partitionSessionList } from '../../../../shared/session-list-metadata'
 import SessionListRow from './SessionListRow'
+import { useNavigationPaneResize } from './useNavigationPaneResize'
 import type { SessionListItem, SessionProjectOption } from './session-list-types'
 import SessionScopePicker from './SessionScopePicker'
 import SessionCreationMenu from './SessionCreationMenu'
@@ -28,6 +29,10 @@ export default function SessionsListPane({
   updateView: (patch: Partial<SessionListViewState>) => void
   onArchive?: (key: string) => void
 }): React.JSX.Element {
+  const { containerRef, resizeHandle } = useNavigationPaneResize(
+    'hive-sessions-pane-width',
+    translate('components.sessions.resizeSessions', 'Resize sessions pane')
+  )
   const metadata = useAppStore((state) => state.sessionListMetadata)
   const updateMetadata = useAppStore((state) => state.updateSessionListMetadata)
   const [archiveExpanded, setArchiveExpanded] = useState(false)
@@ -90,9 +95,11 @@ export default function SessionsListPane({
   const optionId = (key: string): string => `session-option-${encodeURIComponent(key)}`
   return (
     <aside
+      ref={containerRef}
       className="sessions-list-pane"
       aria-label={translate('components.sessions.current', 'Current restorable sessions')}
     >
+      {resizeHandle}
       <div className="sessions-list-heading">
         <SessionScopePicker
           scope={view.scope}

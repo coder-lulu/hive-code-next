@@ -7,7 +7,11 @@ import { useShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 
-export function TitlebarSearchButton(): React.JSX.Element {
+export function TitlebarSearchButton({
+  placement = 'titlebar'
+}: {
+  placement?: 'titlebar' | 'sidebar'
+}): React.JSX.Element {
   useTranslation()
   const openModal = useAppStore((s) => s.openModal)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
@@ -25,7 +29,12 @@ export function TitlebarSearchButton(): React.JSX.Element {
           variant="outline"
           size="xs"
           className="h-7 justify-start gap-2 text-muted-foreground shadow-none"
-          style={{ width: `calc(${sidebarWidth}px - var(--spacing) * 4)` }}
+          style={{
+            width:
+              placement === 'sidebar'
+                ? '100%'
+                : `calc((${sidebarWidth}px - var(--spacing) * 4) * 0.6)`
+          }}
           aria-label={label}
           onClick={() => openModal('worktree-palette')}
         >

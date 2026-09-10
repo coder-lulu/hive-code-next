@@ -1,16 +1,20 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { SessionListItem } from './session-list-types'
 import type { SessionListMetadata } from '../../../../shared/session-list-metadata'
 
 const mocks = vi.hoisted(() => ({
+  terminate: vi.fn(),
+  error: vi.fn(),
   state: {
     sessionListMetadata: {} as SessionListMetadata,
     updateSessionListMetadata: vi.fn(),
     openNewTaskHome: vi.fn()
   }
 }))
+vi.mock('@/lib/temporary-session-actions', () => ({ deleteTemporarySession: mocks.terminate }))
+vi.mock('sonner', () => ({ toast: { error: mocks.error } }))
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: typeof mocks.state) => unknown) => selector(mocks.state)
 }))
@@ -92,4 +96,60 @@ it('shows the archive group when the filtered view contains only archived sessio
   fireEvent.click(screen.getByRole('button', { name: /Archived/ }))
   expect(screen.getAllByRole('option')).toHaveLength(1)
   expect(screen.queryByText('Second session')).toBeNull()
+})
+
+it('offers termination only after archiving and passes the exact owner without hiding the row optimistically', async () => {
+  const item = {
+    ...items[0],
+    ownerBucketKey: 'folder:one',
+    executionHostId: 'local' as const,
+    terminalTabId: 'terminal',
+    unifiedTabId: 'unified'
+  }
+  const view = render(pane([item]))
+  expect(screen.queryByRole('button', { name: 'Terminate session' })).toBeNull()
+  mocks.state.sessionListMetadata = { one: { archived: true } }
+  view.rerender(pane([item]))
+  fireEvent.click(screen.getByRole('button', { name: /Archived/ }))
+  mocks.terminate.mockResolvedValue(false)
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Terminate session' }))
+  })
+  expect(mocks.terminate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ownerBucketKey: 'folder:one',
+      executionHostId: 'local',
+      terminalTabId: 'terminal',
+      unifiedTabId: 'unified'
+    }),
+    { allowWorkspaceOwner: true }
+  )
+  expect(mocks.error).toHaveBeenCalledOnce()
+  expect(screen.getByRole('option', { name: /First session/ })).toBeTruthy()
+  expect(updateView).not.toHaveBeenCalled()
+})
+
+it('resizes the sessions pane independently and restores its saved width', () => {
+  localStorage.setItem('hive-projects-pane-width', '400')
+  localStorage.removeItem('hive-sessions-pane-width')
+  const result = render(pane())
+  const handle = screen.getByRole('separator', { name: 'Resize sessions pane' })
+  const container = screen.getByRole('complementary')
+  expect(container.style.width).toBe('320px')
+  fireEvent.keyDown(handle, { key: 'ArrowRight' })
+  expect(container.style.width).toBe('336px')
+  fireEvent.keyDown(handle, { key: 'Home' })
+  fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+  expect(container.style.width).toBe('240px')
+  fireEvent.keyDown(handle, { key: 'End' })
+  fireEvent.keyDown(handle, { key: 'ArrowRight' })
+  expect(container.style.width).toBe('520px')
+  expect(localStorage.getItem('hive-projects-pane-width')).toBe('400')
+  result.unmount()
+  render(pane())
+  expect(screen.getByRole('complementary').style.width).toBe('520px')
+  fireEvent.doubleClick(screen.getByRole('separator', { name: 'Resize sessions pane' }))
+  expect(screen.getByRole('complementary').style.width).toBe('320px')
+  localStorage.removeItem('hive-projects-pane-width')
+  localStorage.removeItem('hive-sessions-pane-width')
 })

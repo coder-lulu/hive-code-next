@@ -31,6 +31,7 @@ import ProjectsNavigationPane from './ProjectsNavigationPane'
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  localStorage.clear()
 })
 it('selects the scoped host and canonical workspace without opening a terminal on mount', () => {
   const open = vi.fn()
@@ -81,4 +82,21 @@ it('uses original worktree activation and active-owner selection in the workbenc
   render(<ProjectsNavigationPane scope={{ kind: 'all' }} useActiveWorkspace />)
   expect(mocks.props?.onOpenWorkspace).toBeUndefined()
   expect(mocks.props?.selectedWorkspace).toBeUndefined()
+})
+
+it('resizes with the keyboard, clamps bounds and remembers the chosen width', () => {
+  const view = render(<ProjectsNavigationPane scope={{ kind: 'all' }} useActiveWorkspace />)
+  const handle = screen.getByRole('separator', { name: 'Resize projects pane' })
+  const pane = screen.getByTestId('projects-navigation-pane')
+  expect(pane.style.width).toBe('320px')
+  fireEvent.keyDown(handle, { key: 'ArrowRight' })
+  expect(pane.style.width).toBe('336px')
+  fireEvent.keyDown(handle, { key: 'End' })
+  fireEvent.keyDown(handle, { key: 'ArrowRight' })
+  expect(pane.style.width).toBe('520px')
+  view.unmount()
+  render(<ProjectsNavigationPane scope={{ kind: 'all' }} useActiveWorkspace />)
+  expect(screen.getByTestId('projects-navigation-pane').style.width).toBe('520px')
+  fireEvent.doubleClick(screen.getByRole('separator'))
+  expect(screen.getByTestId('projects-navigation-pane').style.width).toBe('320px')
 })

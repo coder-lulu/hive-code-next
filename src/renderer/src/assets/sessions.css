@@ -17,7 +17,9 @@
 }
 .sessions-list-pane {
   display: flex;
-  flex: 0 0 var(--sessions-list-width);
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--sessions-list-width);
   flex-direction: column;
   min-height: 0;
   min-width: 0;
@@ -279,6 +281,9 @@ html[data-session-dragging='true'] * {
   cursor: grabbing !important;
 }
 @container sessions (max-width: 640px) {
+  .navigation-pane-resize-handle {
+    display: none;
+  }
   .sessions-page[data-has-selection='false'] .session-panel-workspace {
     display: none;
   }
@@ -491,4 +496,54 @@ html[data-session-dragging='true'] * {
   .session-row-time {
     display: none;
   }
+}
+
+/* Project navigation is a content column, distinct from the application sidebar. */
+.projects-navigation-pane {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--sessions-list-width);
+  background: var(--background);
+  --worktree-sidebar: var(--background);
+  --worktree-sidebar-accent: var(--accent);
+  --worktree-sidebar-accent-foreground: var(--accent-foreground);
+}
+.projects-navigation-pane .sessions-list-heading {
+  font-size: 13px;
+}
+.projects-navigation-pane [data-project-group-header-id],
+.projects-navigation-pane [data-ungrouped-project-group-header] {
+  color: var(--muted-foreground);
+}
+.projects-navigation-pane [data-project-group-header-id] .font-semibold,
+.projects-navigation-pane [data-ungrouped-project-group-header] .font-semibold {
+  font-size: 11px;
+  font-weight: 500;
+}
+.projects-navigation-pane [data-repo-header-id] {
+  color: var(--foreground);
+}
+.projects-navigation-pane [data-worktree-id]::before {
+  content: '';
+  position: absolute;
+  left: var(--project-tree-indent, 12px);
+  top: 4px;
+  bottom: 4px;
+  border-left: 1px solid var(--border);
+  pointer-events: none;
+}
+.navigation-pane-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 5px;
+  z-index: 20;
+  cursor: col-resize;
+  -webkit-app-region: no-drag;
+}
+.navigation-pane-resize-handle:hover,
+.navigation-pane-resize-handle:focus-visible {
+  background: var(--ring);
+  outline: none;
 }

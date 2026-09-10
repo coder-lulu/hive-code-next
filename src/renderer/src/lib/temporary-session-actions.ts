@@ -76,10 +76,11 @@ function closeOwnedTerminalTab(
  * resolves to a live tab.
  */
 export async function deleteTemporarySession(
-  target: TemporarySessionDeleteTarget
+  target: TemporarySessionDeleteTarget,
+  options?: { allowWorkspaceOwner?: boolean }
 ): Promise<boolean> {
   const state = useAppStore.getState()
-  const owner = resolveTemporarySessionOwner(state, target)
+  const owner = resolveTemporarySessionOwner(state, target, undefined, options)
   if (!owner) {
     if (target.paneKey) {
       state.dropAgentStatus(target.paneKey)

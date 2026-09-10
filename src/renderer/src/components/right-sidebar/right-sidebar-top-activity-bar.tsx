@@ -77,7 +77,7 @@ export function RightSidebarTopActivityBar({
             </ContextMenuTrigger>
             <div
               className={cn(
-                'flex shrink-0 items-center pr-1',
+                'flex min-w-0 justify-end items-center pr-1',
                 RIGHT_SIDEBAR_HEADER_NO_DRAG_CLASS_NAME
               )}
             >
@@ -90,7 +90,7 @@ export function RightSidebarTopActivityBar({
           <TooltipProvider delayDuration={400}>
             <div
               className={cn(
-                'ml-auto flex shrink-0 items-center pr-1',
+                'ml-auto flex min-w-0 flex-1 justify-end items-center pr-1',
                 RIGHT_SIDEBAR_HEADER_NO_DRAG_CLASS_NAME
               )}
             >

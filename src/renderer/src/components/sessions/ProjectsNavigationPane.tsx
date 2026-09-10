@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import type { VirtualizedScrollAnchor } from '@/hooks/useVirtualizedScrollAnchor'
 import type { SessionListScope } from '../../../../shared/session-list-scope'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import { useNavigationPaneResize } from './useNavigationPaneResize'
 import WorktreeList from '../sidebar/WorktreeList'
 import SidebarWorkspaceOptionsMenu from '../sidebar/SidebarWorkspaceOptionsMenu'
 import SessionCreationMenu from './SessionCreationMenu'
@@ -21,6 +22,10 @@ export default memo(function ProjectsNavigationPane({
   onOpenWorkspace?: (worktreeId: string, executionHostId: ExecutionHostId) => void
 }): React.JSX.Element {
   useTranslation()
+  const { containerRef, resizeHandle } = useNavigationPaneResize(
+    'hive-projects-pane-width',
+    translate('components.sessions.resizeProjects', 'Resize projects pane')
+  )
   const scrollOffsetRef = useRef(0)
   const scrollAnchorRef = useRef<VirtualizedScrollAnchor>(null)
   const openModal = useAppStore((s) => s.openModal)
@@ -36,13 +41,15 @@ export default memo(function ProjectsNavigationPane({
   )
   return (
     <section
-      className="sessions-list-pane"
+      ref={containerRef}
+      className="sessions-list-pane projects-navigation-pane"
       data-testid="projects-navigation-pane"
-      aria-label={translate('components.sessions.manageProjects', 'Manage projects')}
+      aria-label={translate('components.sessions.projectNavigation', 'Projects')}
     >
+      {resizeHandle}
       <div className="sessions-list-heading">
         <span className="min-w-0 flex-1 truncate font-medium">
-          {translate('components.sessions.manageProjects', 'Manage projects')}
+          {translate('components.sessions.projectNavigation', 'Projects')}
         </span>
         <Button
           variant="ghost"

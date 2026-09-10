@@ -122,7 +122,12 @@ export function renderFolderWorkspaceVirtualRow(args: {
       data-index={vItem.index}
       ref={args.measureVirtualRowElement}
       className="absolute left-0 right-0 top-0"
-      style={{ transform: getVirtualRowTransform(vItem.start) }}
+      style={
+        {
+          transform: getVirtualRowTransform(vItem.start),
+          '--project-tree-indent': `${Math.max(12, surfaceInset + cardContentIndent - 8)}px`
+        } as React.CSSProperties
+      }
       onClickCapture={ctx.onRowClickCapture}
       onPointerDown={(event) => ctx.onRowPointerDown(event, folderWorktree, folderRowKey)}
     >

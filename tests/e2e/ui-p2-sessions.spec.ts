@@ -103,9 +103,35 @@ test('reuses the full workbench from project management and creates in context',
     })
     return tab.id
   }, fixture.worktreeId)
-  await page.getByRole('button', { name: 'Manage projects', exact: true }).click()
+  const searchControl = page.getByRole('button', {
+    name: 'Search worktrees and browser tabs',
+    exact: true
+  })
+  await expect(
+    page
+      .locator('.sidebar-primary-nav')
+      .getByRole('button', { name: 'Search worktrees and browser tabs', exact: true })
+  ).toBeVisible()
+  const searchBounds = (await searchControl.boundingBox())!
+  const newTaskBounds = (await page
+    .locator('.sidebar-primary-nav')
+    .getByRole('button', { name: 'New task', exact: true })
+    .boundingBox())!
+  expect(searchBounds.y + searchBounds.height).toBeLessThanOrEqual(newTaskBounds.y)
+  await expect(searchControl).toContainText('Shift')
+  await page.getByRole('button', { name: 'Projects', exact: true }).click()
   const pane = page.getByTestId('projects-navigation-pane')
   await expect(pane).toBeVisible()
+  const resizeHandle = pane.getByRole('separator', { name: 'Resize projects pane' })
+  const beforeWidth = (await pane.boundingBox())!.width
+  const handleBox = (await resizeHandle.boundingBox())!
+  await page.mouse.move(handleBox.x + 2, handleBox.y + 100)
+  await page.mouse.down()
+  await page.mouse.move(handleBox.x + 82, handleBox.y + 100, { steps: 8 })
+  await page.mouse.up()
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBeGreaterThan(beforeWidth + 60)
+  await resizeHandle.dblclick()
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBe(320)
   await expect(page.getByRole('button', { name: 'Project sessions', exact: true })).toHaveCount(0)
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(pane.getByText('Ungrouped', { exact: true })).toHaveCount(0)
@@ -136,6 +162,14 @@ test('reuses the full workbench from project management and creates in context',
   await expect(page.getByTestId('session-detail')).toHaveCount(0)
   await page.getByRole('button', { name: 'Toggle right sidebar', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Find files', exact: true })).toBeVisible()
+  const toggleRect = (await page
+    .getByRole('button', { name: 'Toggle right sidebar', exact: true })
+    .boundingBox())!
+  const minimizeRect = (await page
+    .getByRole('button', { name: 'Minimize', exact: true })
+    .boundingBox())!
+  expect(toggleRect.x + toggleRect.width).toBeLessThanOrEqual(minimizeRect.x)
+
   await capture(page, 'projects-workspace-tabs-light')
   await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
   await capture(page, 'projects-workspace-tabs-dark')
@@ -437,7 +471,7 @@ test('restores a virtual list position and selected row after leaving the sessio
   await capture(page, 'p2-review-narrow-list-return')
   await expect(page.getByTestId('session-navigation')).toHaveCount(0)
   await expect(page.locator('.sidebar-workspace-section')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Manage projects', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Projects', exact: true })).toBeVisible()
 })
 
 test('keeps connection and activity indicators within a session row', async ({
@@ -467,4 +501,71 @@ test('keeps connection and activity indicators within a session row', async ({
     return [...indicators].map((indicator) => indicator.getBoundingClientRect().right - rect.right)
   })
   expect(bounds.every((overflow) => overflow <= 0)).toBe(true)
+})
+
+test('terminates an archived session through its real terminal owner', async ({
+  orcaPage: page
+}) => {
+  test.setTimeout(150_000)
+  await seedSessions(page, 1)
+  await openSessions(page)
+  const row = page.getByTestId('session-center-row').filter({ hasText: 'P2 Temporary 00' })
+  await row.click()
+  const terminal = page.locator('[data-session-terminal]:visible [data-pty-id]').first()
+  await expect(terminal).toHaveAttribute('data-pty-id', /\S+/, { timeout: 30_000 })
+  const ptyId = (await terminal.getAttribute('data-pty-id'))!
+  await row.hover()
+  await row.getByRole('button', { name: 'Archive session', exact: true }).click()
+  await expect(row).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async (id) => (await window.api.pty.listSessions()).some((s) => s.id === id),
+        ptyId
+      )
+    )
+    .toBe(true)
+  await page.getByRole('button', { name: /Archived/ }).click()
+  await row.hover()
+  await row.getByRole('button', { name: 'Terminate session', exact: true }).click()
+  await expect(row).toHaveCount(0, { timeout: 20_000 })
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          async (id) => (await window.api.pty.listSessions()).some((s) => s.id === id),
+          ptyId
+        ),
+      { timeout: 20_000 }
+    )
+    .toBe(false)
+  await expect(
+    page.getByTestId('session-center-row').filter({ hasText: 'P2 Workspace continuity' })
+  ).toBeVisible()
+})
+
+test('resizes the sessions column and remembers its width across navigation', async ({
+  orcaPage: page
+}) => {
+  await seedSessions(page, 1)
+  await openSessions(page)
+  const pane = page.locator('aside.sessions-list-pane')
+  const handle = pane.getByRole('separator', { name: 'Resize sessions pane' })
+  await expect(pane).toBeVisible()
+  const beforeWidth = (await pane.boundingBox())!.width
+  const box = (await handle.boundingBox())!
+  await page.mouse.move(box.x + 2, box.y + 100)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 82, box.y + 100, { steps: 8 })
+  await page.mouse.up()
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBeGreaterThan(beforeWidth + 60)
+  const resizedWidth = (await pane.boundingBox())!.width
+  await page.getByRole('button', { name: 'Projects', exact: true }).click()
+  await openSessions(page)
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBe(resizedWidth)
+  await handle.dblclick()
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBe(320)
+  await expect(
+    page.getByTestId('session-center-row').filter({ hasText: 'P2 Temporary 00' })
+  ).toBeVisible()
 })

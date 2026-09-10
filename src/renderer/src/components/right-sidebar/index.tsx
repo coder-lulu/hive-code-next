@@ -121,7 +121,7 @@ function RightSidebarInner({
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="sidebar-toggle mr-1"
+          className="sidebar-toggle shrink-0 mr-1"
           onClick={toggleRightSidebar}
           aria-label={translate(
             'auto.components.right.sidebar.index.e8e2e4ce74',
@@ -184,11 +184,11 @@ function RightSidebarInner({
              (138-40=98px) as padding-right so the close button clears the
              minimize button without the full 138px gap. */
           <div className="flex items-center justify-between h-[36px] min-h-[36px] px-3 border-b border-border right-sidebar-header-side-inset right-sidebar-header-drag">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+            <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wider text-foreground">
               {visibleItems.find((item) => item.id === effectiveTab)?.title ?? ''}
             </span>
             <TooltipProvider delayDuration={400}>
-              <div className="flex items-center">
+              <div className="flex min-w-0 items-center">
                 {settingsHelpControls}
                 {closeButton}
               </div>

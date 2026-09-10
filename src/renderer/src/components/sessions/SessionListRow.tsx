@@ -1,6 +1,17 @@
-import { Archive, ArchiveRestore, MessageSquare, Pin, PinOff, TerminalSquare } from 'lucide-react'
+import {
+  Archive,
+  ArchiveRestore,
+  MessageSquare,
+  Pin,
+  PinOff,
+  TerminalSquare,
+  Square,
+  LoaderCircle
+} from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
-import { useCallback } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { deleteTemporarySession } from '@/lib/temporary-session-actions'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTime } from '@/i18n/relative-time-format'
@@ -36,6 +47,42 @@ export default function SessionListRow({
   onPin: () => void
   onArchive: () => void
 }): React.JSX.Element {
+  const [terminating, setTerminating] = useState(false)
+  const terminationPending = useRef(false)
+  const terminateLabel = translate('components.sessions.terminate', 'Terminate session')
+  const terminate = async () => {
+    if (!archived || terminationPending.current) {
+      return
+    }
+    terminationPending.current = true
+    setTerminating(true)
+    try {
+      const handled = await deleteTemporarySession(
+        {
+          ownerBucketKey: item.ownerBucketKey,
+          executionHostId: item.executionHostId,
+          unifiedTabId: item.unifiedTabId,
+          terminalTabId: item.terminalTabId,
+          tabId: item.tabId,
+          sessionId: item.providerSessionId
+        },
+        { allowWorkspaceOwner: true }
+      )
+      if (!handled) {
+        throw new Error('Session owner is no longer available')
+      }
+    } catch {
+      toast.error(
+        translate(
+          'components.sessions.terminateFailed',
+          'Could not terminate this session. Check its host connection and try again.'
+        )
+      )
+    } finally {
+      terminationPending.current = false
+      setTerminating(false)
+    }
+  }
   const drag = useDraggable({ id: `session-list:${item.key}`, data: { sessionKey: item.key } })
   const { setNodeRef } = drag
   const setRowRef = useCallback(
@@ -111,20 +158,38 @@ export default function SessionListRow({
         </span>
       </button>
       <span className="session-row-actions">
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={onPin}
-          aria-label={pinLabel}
-          title={pinLabel}
-          aria-pressed={pinned}
-        >
-          {pinned ? (
-            <PinOff className="size-3.5" aria-hidden />
-          ) : (
-            <Pin className="size-3.5" aria-hidden />
-          )}
-        </Button>
+        {archived ? (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            disabled={terminating}
+            onClick={() => void terminate()}
+            aria-label={terminateLabel}
+            title={terminateLabel}
+            className="text-destructive hover:text-destructive"
+          >
+            {terminating ? (
+              <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Square className="size-3.5" aria-hidden />
+            )}
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={onPin}
+            aria-label={pinLabel}
+            title={pinLabel}
+            aria-pressed={pinned}
+          >
+            {pinned ? (
+              <PinOff className="size-3.5" aria-hidden />
+            ) : (
+              <Pin className="size-3.5" aria-hidden />
+            )}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-xs"

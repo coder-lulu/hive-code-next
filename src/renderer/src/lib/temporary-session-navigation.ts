@@ -108,7 +108,8 @@ function bucketContainsTarget(
 export function resolveTemporarySessionOwner(
   state: TemporarySessionLookupState,
   targetInput: string | TemporarySessionNavigationTarget,
-  executionHostId?: ExecutionHostId | null
+  executionHostId?: ExecutionHostId | null,
+  options?: { allowWorkspaceOwner?: boolean }
 ): TemporarySessionOwner | null {
   const target = normalizedTarget(targetInput, executionHostId)
   const bucketKeys = target.ownerBucketKey
@@ -116,7 +117,10 @@ export function resolveTemporarySessionOwner(
     : new Set([...Object.keys(state.tabsByWorktree), ...Object.keys(state.unifiedTabsByWorktree)])
   const matches: TemporarySessionOwner[] = []
   for (const bucketKey of bucketKeys) {
-    if (!isFloatingTerminalWorkspaceId(bucketKey)) {
+    if (
+      !isFloatingTerminalWorkspaceId(bucketKey) &&
+      !(options?.allowWorkspaceOwner && target.ownerBucketKey && target.executionHostId)
+    ) {
       continue
     }
     const match = bucketContainsTarget(state, bucketKey, target)

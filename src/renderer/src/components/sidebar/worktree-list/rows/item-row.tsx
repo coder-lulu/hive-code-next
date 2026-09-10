@@ -182,9 +182,12 @@ export function renderWorktreeItemRow(
         }
         ctx.onRowPointerDown(event, itemRow.worktree, itemRow.rowKey)
       }}
-      style={{
-        paddingLeft: surfaceInset > 0 ? `${surfaceInset}px` : undefined
-      }}
+      style={
+        {
+          paddingLeft: surfaceInset > 0 ? `${surfaceInset}px` : undefined,
+          '--project-tree-indent': `${Math.max(12, surfaceInset + cardContentIndent - 8)}px`
+        } as React.CSSProperties
+      }
     >
       <WorktreeCard
         worktree={itemRow.worktree}
