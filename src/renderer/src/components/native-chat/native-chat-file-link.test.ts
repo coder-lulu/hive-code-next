@@ -23,6 +23,24 @@ function terminalTab(overrides: Partial<TerminalTab> = {}): TerminalTab {
   }
 }
 
+function createStructuredTab(overrides: Partial<Tab> = {}): Tab {
+  return {
+    id: 'chat',
+    worktreeId: 'wt-1',
+    contentType: 'agent-session',
+    entityId: 'session-1',
+    groupId: 'group-1',
+    label: 'Chat',
+    customLabel: null,
+    color: null,
+    sortOrder: 0,
+    createdAt: 0,
+    executionHostId: 'local',
+    agentSessionAgent: 'codex',
+    ...overrides
+  }
+}
+
 function state(overrides: Partial<AppState> = {}): AppState {
   return {
     folderWorkspaces: [],
@@ -49,6 +67,95 @@ const context: NativeChatFileLinkContext = {
 }
 
 describe('resolveNativeChatFileLinkContext', () => {
+  it('uses the unique structured runtime owner instead of the globally selected runtime', () => {
+    const worktree = {
+      id: 'wt-1',
+      repoId: 'repo',
+      path: '/peer/worktree',
+      hostId: 'runtime:peer'
+    } as const
+    expect(
+      resolveNativeChatFileLinkContext(
+        state({
+          settings: { activeRuntimeEnvironmentId: 'other' } as AppState['settings'],
+          tabsByWorktree: {},
+          unifiedTabsByWorktree: {
+            'wt-1': [createStructuredTab({ executionHostId: 'runtime:peer' })]
+          },
+          worktreesByRepo: { repo: [worktree as never] },
+          getKnownWorktreeById: () => worktree as never
+        }),
+        'chat'
+      )
+    ).toEqual({ worktreeId: 'wt-1', worktreePath: '/peer/worktree', runtimeEnvironmentId: 'peer' })
+  })
+
+  it('refuses an ambiguous workspace catalog even when the structured tab id is unique', () => {
+    expect(
+      resolveNativeChatFileLinkContext(
+        state({
+          tabsByWorktree: {},
+          unifiedTabsByWorktree: {
+            'wt-1': [createStructuredTab()]
+          },
+          worktreesByRepo: {
+            local: [{ id: 'wt-1', repoId: 'local', path: '/local', hostId: 'local' } as never],
+            peer: [{ id: 'wt-1', repoId: 'peer', path: '/peer', hostId: 'runtime:peer' } as never]
+          }
+        }),
+        'chat'
+      )
+    ).toBeNull()
+  })
+
+  it('refuses a structured tab id repeated in different owner buckets', () => {
+    const tab = createStructuredTab()
+    expect(
+      resolveNativeChatFileLinkContext(
+        state({
+          tabsByWorktree: {},
+          unifiedTabsByWorktree: {
+            'wt-1': [tab],
+            'runtime:peer|wt-1': [{ ...tab, executionHostId: 'runtime:peer' }]
+          }
+        }),
+        'chat'
+      )
+    ).toBeNull()
+  })
+
+  it('refuses a terminal id colliding with a structured tab on another owner', () => {
+    expect(
+      resolveNativeChatFileLinkContext(
+        state({
+          unifiedTabsByWorktree: {
+            'runtime:peer|wt-1': [
+              createStructuredTab({ id: 'tab-1', executionHostId: 'runtime:peer' })
+            ]
+          }
+        }),
+        'tab-1'
+      )
+    ).toBeNull()
+  })
+
+  it('does not resolve a structured runtime tab through a local workspace catalog', () => {
+    expect(
+      resolveNativeChatFileLinkContext(
+        state({
+          tabsByWorktree: {},
+          unifiedTabsByWorktree: {
+            'wt-1': [createStructuredTab({ executionHostId: 'runtime:peer' })]
+          },
+          worktreesByRepo: {
+            repo: [{ id: 'wt-1', repoId: 'repo', path: '/local', hostId: 'local' } as never]
+          }
+        }),
+        'chat'
+      )
+    ).toBeNull()
+  })
+
   it('returns the owner worktree path and runtime for a native chat terminal tab', () => {
     expect(
       resolveNativeChatFileLinkContext(

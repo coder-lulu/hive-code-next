@@ -7,6 +7,8 @@ import {
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import type { AppState } from '@/store/types'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
+import { resolveWorktreeOperationRouteResult } from '@/lib/worktree-operation-route'
+import { getExecutionHostIdFromWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 
 export type NativeChatFileLinkContext = {
   worktreeId: string
@@ -47,18 +49,6 @@ export function findTerminalTabWorktreeId(
   return null
 }
 
-function findStructuredTabWorktreeId(
-  unifiedTabsByWorktree: NativeChatFileLinkState['unifiedTabsByWorktree'],
-  tabId: string
-): string | null {
-  for (const [worktreeId, tabs] of Object.entries(unifiedTabsByWorktree ?? {})) {
-    if (tabs.some((tab) => tab.id === tabId && tab.contentType === 'agent-session')) {
-      return worktreeId
-    }
-  }
-  return null
-}
-
 function findWorktreeFallback(
   worktreesByRepo: NativeChatFileLinkState['worktreesByRepo'],
   worktreeId: string
@@ -76,14 +66,50 @@ export function resolveNativeChatFileLinkContext(
   state: NativeChatFileLinkState,
   terminalTabId: string
 ): NativeChatFileLinkContext | null {
-  const worktreeId =
-    findTerminalTabWorktreeId(state.tabsByWorktree, terminalTabId) ??
-    findStructuredTabWorktreeId(state.unifiedTabsByWorktree, terminalTabId)
-  if (!worktreeId) {
+  const terminalOwners = Object.entries(state.tabsByWorktree).flatMap(([bucket, tabs]) =>
+    tabs.filter((tab) => tab.id === terminalTabId).map(() => bucket)
+  )
+  const structuredOwners = Object.entries(state.unifiedTabsByWorktree ?? {}).flatMap(
+    ([bucket, tabs]) =>
+      tabs
+        .filter((tab) => tab.id === terminalTabId && tab.contentType === 'agent-session')
+        .map((tab) => ({ bucket, tab }))
+  )
+  // File/image consumers have only a tab id: an ambiguous owner must never win by insertion order.
+  if (terminalOwners.length + structuredOwners.length !== 1) {
     return null
   }
+  const structured = structuredOwners[0]
+  const worktreeId = terminalOwners[0] ?? structured.bucket
+  const bucketHost = getExecutionHostIdFromWorktreeHostIdentity(worktreeId)
+  const tabHost =
+    structured?.tab.executionHostId ??
+    getExecutionHostIdFromWorktreeHostIdentity(structured?.tab.worktreeId ?? '')
+  const expectedHost = bucketHost ?? tabHost
+  let runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+  if (structured) {
+    const resolution = resolveWorktreeOperationRouteResult(
+      {
+        ...state,
+        activeWorktreeId: null,
+        activeWorkspaceExecutionHostId: null
+      },
+      worktreeId
+    )
+    if (
+      (bucketHost && tabHost && bucketHost !== tabHost) ||
+      resolution.kind === 'ambiguous' ||
+      (expectedHost &&
+        (resolution.kind !== 'resolved' || resolution.route.executionHostId !== expectedHost))
+    ) {
+      return null
+    }
+    if (expectedHost && resolution.kind === 'resolved') {
+      runtimeEnvironmentId = resolution.route.runtimeEnvironmentId
+    }
+  }
 
-  const knownWorktree = state.getKnownWorktreeById(worktreeId)
+  const knownWorktree = state.getKnownWorktreeById(worktreeId, expectedHost)
   const worktree = knownWorktree?.path
     ? knownWorktree
     : findWorktreeFallback(state.worktreesByRepo, worktreeId)
@@ -102,7 +128,7 @@ export function resolveNativeChatFileLinkContext(
   return {
     worktreeId,
     worktreePath,
-    runtimeEnvironmentId: getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+    runtimeEnvironmentId
   }
 }
 

@@ -46,6 +46,35 @@ function state(): AppState {
 }
 
 describe('resolveNativeChatImageRuntimeContext', () => {
+  it('does not read images through a different active host from the structured chat owner', () => {
+    const source = state()
+    source.tabsByWorktree = {}
+    source.unifiedTabsByWorktree = {
+      'wt-1': [
+        {
+          id: 'chat',
+          worktreeId: 'wt-1',
+          contentType: 'agent-session',
+          executionHostId: 'local'
+        } as never
+      ]
+    }
+    source.activeWorkspaceExecutionHostId = 'runtime:other'
+    expect(resolveNativeChatImageRuntimeContext(source, 'chat')).toBeNull()
+  })
+
+  it('does not read images for the first of two structured owners with the same tab id', () => {
+    const source = state()
+    source.tabsByWorktree = {}
+    source.unifiedTabsByWorktree = {
+      'wt-1': [{ id: 'chat', contentType: 'agent-session', executionHostId: 'local' } as never],
+      'runtime:peer|wt-1': [
+        { id: 'chat', contentType: 'agent-session', executionHostId: 'runtime:peer' } as never
+      ]
+    }
+    expect(resolveNativeChatImageRuntimeContext(source, 'chat')).toBeNull()
+  })
+
   it('keeps unrelated store writes out of the image-owner selector', () => {
     const storeState = state()
     const first = selectNativeChatImageOwnerState(storeState)

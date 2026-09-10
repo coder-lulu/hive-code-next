@@ -138,6 +138,9 @@ export function resolveNativeChatImageRuntimeContext(
     return null
   }
   const route = routeResolution.route
+  if (route.runtimeEnvironmentId !== linkContext.runtimeEnvironmentId) {
+    return null
+  }
   const executionHostId =
     route.executionHostId ??
     (route.runtimeEnvironmentId ? toRuntimeExecutionHostId(route.runtimeEnvironmentId) : null)

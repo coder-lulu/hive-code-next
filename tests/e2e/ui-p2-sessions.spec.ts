@@ -23,6 +23,17 @@ async function capture(page: Page, name: string): Promise<void> {
       ?.getBoundingClientRect()
       .toJSON(),
     scrollTop: document.querySelector('[data-testid="sessions-list-scroll"]')?.scrollTop,
+    recentSessions: document
+      .querySelector('[data-testid="session-navigation"]')
+      ?.getBoundingClientRect()
+      .toJSON(),
+    recentRows: [...document.querySelectorAll('.session-quick-row')].map((row) =>
+      row.getBoundingClientRect().toJSON()
+    ),
+    workspaceSection: document
+      .querySelector('.sidebar-workspace-section')
+      ?.getBoundingClientRect()
+      .toJSON(),
     rows: [...document.querySelectorAll('[data-testid="session-center-row"]')].map((row) => ({
       key: row.getAttribute('data-session-key'),
       selected: row.getAttribute('aria-selected'),
@@ -272,4 +283,47 @@ test('restores a virtual list position and selected row after leaving the sessio
   ).toHaveAttribute('data-session-key', selectedKey!)
   await expect(page.getByTestId('session-detail')).toBeVisible()
   await capture(page, 'p2-08-virtual-list-restored')
+  await page.setViewportSize({ width: 900, height: 760 })
+  await page.getByRole('button', { name: 'Back to session list', exact: true }).click()
+  await expect(list).toBeVisible()
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(500)
+  await expect(page.locator(`[data-session-key="${selectedKey}"]`).last()).toBeVisible()
+  await capture(page, 'p2-review-narrow-list-return')
+  const sidebarBounds = await page.getByTestId('session-navigation').evaluate((element) => ({
+    sectionBottom: element.getBoundingClientRect().bottom,
+    lastRowBottom: element.querySelector('.session-quick-row:last-child')!.getBoundingClientRect()
+      .bottom,
+    workspaceTop: document.querySelector('.sidebar-workspace-section')!.getBoundingClientRect().top
+  }))
+  expect(sidebarBounds.lastRowBottom).toBeLessThanOrEqual(sidebarBounds.sectionBottom)
+  expect(sidebarBounds.lastRowBottom).toBeLessThanOrEqual(sidebarBounds.workspaceTop)
+})
+
+test('keeps connection and activity indicators within a session row', async ({
+  orcaPage: page
+}) => {
+  await seedSessions(page, 1)
+  await page.evaluate(() => {
+    const store = window.__store!
+    const bucket = 'global-floating-terminal'
+    store.setState({
+      unifiedTabsByWorktree: {
+        ...store.getState().unifiedTabsByWorktree,
+        [bucket]: store.getState().unifiedTabsByWorktree[bucket].map((tab) => ({
+          ...tab,
+          executionHostId: 'ssh:p2-offline'
+        }))
+      }
+    })
+  })
+  await openSessions(page)
+  const row = page.getByTestId('session-center-row').filter({ hasText: 'P2 Temporary 00' })
+  await expect(row.locator('.session-connection')).toBeVisible()
+  await capture(page, 'p2-review-offline-row')
+  const bounds = await row.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const indicators = element.querySelectorAll('.session-activity, .session-connection')
+    return [...indicators].map((indicator) => indicator.getBoundingClientRect().right - rect.right)
+  })
+  expect(bounds.every((overflow) => overflow <= 0)).toBe(true)
 })

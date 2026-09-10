@@ -286,6 +286,9 @@
   user-select: text;
 }
 
+.sidebar-session-section.session-navigation {
+  max-height: none;
+}
 .session-quick-list {
   padding: 0 4px;
 }
