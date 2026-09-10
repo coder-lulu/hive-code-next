@@ -1,13 +1,10 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import { ArrowLeft, ArrowUpRight, FolderOpen, MessageSquare, TerminalSquare } from 'lucide-react'
+import { useLayoutEffect, useRef } from 'react'
+import { ArrowLeft, FolderOpen, MessageSquare, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { requestBackgroundTerminalWorktreeMount } from '@/components/terminal/background-terminal-worktree-mount'
-import { runtimeTargetForExecutionHostId } from '@/runtime/runtime-client-target'
-import { sessionDetailAnchorStyle } from './session-detail-anchor'
 import type { SessionListItem } from './session-list-types'
 import SessionStatus, { SessionConnection } from './SessionStatus'
-import { useOpenSession } from './use-open-session'
+import SessionContent from './SessionContent'
 
 export default function SessionDetail({
   item,
@@ -16,7 +13,6 @@ export default function SessionDetail({
   item: SessionListItem | null
   onBack: () => void
 }): React.JSX.Element {
-  const { openingKey, openSession } = useOpenSession()
   const backRef = useRef<HTMLButtonElement>(null)
   const selectedKey = item?.key
   useLayoutEffect(() => {
@@ -24,29 +20,12 @@ export default function SessionDetail({
       backRef.current.focus({ preventScroll: true })
     }
   }, [selectedKey])
-  const canShowChat =
-    item?.kind === 'structured' &&
-    item.executionHostId !== null &&
-    runtimeTargetForExecutionHostId(item.executionHostId) !== null
-  useEffect(() => {
-    if (canShowChat && item?.ownerBucketKey && item.unifiedTabId) {
-      requestBackgroundTerminalWorktreeMount({
-        worktreeId: item.ownerBucketKey,
-        tabIds: [item.unifiedTabId]
-      })
-    }
-  }, [canShowChat, item?.ownerBucketKey, item?.unifiedTabId])
   if (!item) {
     return (
       <section className="session-detail session-detail-empty">
         <MessageSquare className="size-8 text-muted-foreground" aria-hidden />
         <h2>{translate('components.sessions.select', 'Select a session')}</h2>
-        <p>
-          {translate(
-            'components.sessions.selectHint',
-            'Read a conversation or return to its workspace to continue.'
-          )}
-        </p>
+        <p>{translate('components.sessions.selectHint', 'Select a session to continue here.')}</p>
       </section>
     )
   }
@@ -63,18 +42,30 @@ export default function SessionDetail({
         >
           <ArrowLeft className="size-4" aria-hidden />
         </Button>
-        <h2 title={item.title}>{item.title}</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          className="session-open-workspace"
-          aria-label={translate('components.sessions.openWorkspace', 'Open workspace')}
-          disabled={openingKey !== null}
-          onClick={() => void openSession(item)}
+        <div
+          className="session-current-tab"
+          role="tablist"
+          aria-label={translate('components.sessions.title', 'Sessions')}
         >
-          <ArrowUpRight className="size-4" aria-hidden />
-          <span>{translate('components.sessions.openWorkspace', 'Open workspace')}</span>
-        </Button>
+          <button
+            id="session-current-tab"
+            role="tab"
+            aria-selected="true"
+            aria-controls="session-content"
+            type="button"
+          >
+            <MessageSquare className="size-4 shrink-0" aria-hidden />
+            <h2 title={item.title}>{item.title}</h2>
+          </button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onBack}
+            aria-label={translate('components.sessions.closeView', 'Close session view')}
+          >
+            <X className="size-4" aria-hidden />
+          </Button>
+        </div>
       </header>
       <div className="session-context-bar">
         <span
@@ -104,44 +95,7 @@ export default function SessionDetail({
           )}
         </p>
       )}
-      {canShowChat ? (
-        <div
-          className="session-chat-anchor"
-          style={sessionDetailAnchorStyle}
-          data-testid="session-chat-anchor"
-        />
-      ) : (
-        <div className="session-terminal-detail">
-          <TerminalSquare className="size-9 text-muted-foreground" aria-hidden />
-          <h3>{translate('components.sessions.continueWorkspace', 'Continue in the workspace')}</h3>
-          <p>
-            {translate(
-              'components.sessions.terminalHint',
-              'This session uses its workspace terminal. Open the workspace to continue with the existing terminal and layout.'
-            )}
-          </p>
-          <dl>
-            <div>
-              <dt>{translate('components.sessions.workspace', 'Workspace')}</dt>
-              <dd>
-                {item.workspacePath ??
-                  item.workspaceLabel ??
-                  translate('components.sessions.unassigned', 'Unassigned')}
-              </dd>
-            </div>
-            <div>
-              <dt>{translate('components.sessions.host', 'Host')}</dt>
-              <dd>
-                {item.hostLabel || translate('components.sessions.unknownHost', 'Unknown host')}
-              </dd>
-            </div>
-          </dl>
-          <Button disabled={openingKey !== null} onClick={() => void openSession(item)}>
-            <ArrowUpRight className="size-4" aria-hidden />
-            {translate('components.sessions.openWorkspace', 'Open workspace')}
-          </Button>
-        </div>
-      )}
+      <SessionContent item={item} />
     </section>
   )
 }

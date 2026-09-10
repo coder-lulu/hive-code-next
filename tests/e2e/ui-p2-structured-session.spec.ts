@@ -355,11 +355,10 @@ test('keeps the real structured chat, approval routing and draft resident betwee
     await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
     await expect(page.locator('html')).toHaveClass(/dark/)
     await capture(page, 'p2-structured-02-dark-draft')
-    await page
-      .getByTestId('session-detail')
-      .getByRole('button', { name: 'Open workspace', exact: true })
-      .click()
-    await expect(page.getByTestId('sessions-page')).not.toBeVisible()
+    await page.getByRole('button', { name: 'Close session view', exact: true }).click()
+    await expect(page.getByTestId('sessions-page')).toBeVisible()
+    await expect(chat).not.toBeVisible()
+    await page.getByTestId('session-center-row').filter({ hasText: TITLE }).click()
     await expect(chat).toBeVisible()
     await expect(composer).toHaveText('P2 preserved draft 中文输入')
     await expect(page.locator('.terminal-tab-strip').first().locator('[data-tab-id]')).toHaveCount(
@@ -381,9 +380,9 @@ test('keeps the real structured chat, approval routing and draft resident betwee
     await expect(composer).toBeVisible()
     await capture(page, 'p2-structured-03-narrow-return')
     const evidence = await stats(electronApp)
-    expect(evidence.calls.filter((call) => call.method === 'agentSession.hold')).toHaveLength(1)
+    expect(evidence.calls.filter((call) => call.method === 'agentSession.hold')).toHaveLength(2)
     expect(evidence).toMatchObject({
-      subscriptionCount: 1,
+      subscriptionCount: 2,
       activeSubscriptions: 1,
       activeHolds: 1,
       maxSubscriptions: 1,

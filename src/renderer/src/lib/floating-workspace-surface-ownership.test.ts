@@ -7,6 +7,18 @@ import {
 } from './floating-workspace-surface-ownership'
 
 describe('floating workspace surface ownership', () => {
+  it('gives session content exclusive ownership without changing the active worktree', () => {
+    const mainOwns = mainWorkbenchOwnsFloatingWorkspace('sessions', 'project-worktree')
+    expect(mainOwns).toBe(true)
+    expect(
+      shouldMountFloatingWorkspacePanel({
+        enabled: true,
+        open: true,
+        visibleTabCount: 2,
+        mainWorkbenchOwnsWorkspace: mainOwns
+      })
+    ).toBe(false)
+  })
   it('gives the active main workbench exclusive ownership', () => {
     const mainOwns = mainWorkbenchOwnsFloatingWorkspace('terminal', FLOATING_TERMINAL_WORKTREE_ID)
 

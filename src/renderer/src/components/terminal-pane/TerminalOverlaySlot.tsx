@@ -6,6 +6,7 @@ import { SYNC_FIT_PANES_EVENT } from '@/constants/terminal'
 import { tabGroupBodyAnchorName } from '../tab-group/tab-group-body-anchor'
 import type { ActivityTerminalPortalTarget } from '../activity/activity-terminal-portal'
 import TerminalPane from './TerminalPane'
+import { SESSION_DETAIL_ANCHOR_NAME } from '../sessions/session-detail-anchor'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { shouldDeferParkedPtyExitTabClose } from './terminal-parked-tab-watchers'
 
@@ -56,14 +57,20 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
   startupCwd,
   groupId,
   isWorktreeActive,
-  isVisible,
+  isVisible: isGroupVisible,
   isActive,
   activityTerminalPortal,
   onFocusOwningGroup,
   consumeSuppressedPtyExit,
   leaveWorktreeIfEmpty
 }: TerminalOverlaySlotProps): React.JSX.Element {
-  const anchorName = groupId !== undefined ? tabGroupBodyAnchorName(groupId) : undefined
+  const isSessionDetail = activityTerminalPortal?.slotId === 'session-detail'
+  const isVisible = isGroupVisible || isSessionDetail
+  const anchorName = isSessionDetail
+    ? SESSION_DETAIL_ANCHOR_NAME
+    : groupId !== undefined
+      ? tabGroupBodyAnchorName(groupId)
+      : undefined
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const [measuredFallbackRect, setMeasuredFallbackRect] = useState<MeasuredFallbackRect | null>(
     null
@@ -77,11 +84,14 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     }
   }, [isVisible, shouldMeasureHiddenStartup])
   useLayoutEffect(() => {
-    if (!anchorName || shouldUseCssAnchorPositioning() || !groupId) {
+    if (!anchorName || shouldUseCssAnchorPositioning() || (!groupId && !isSessionDetail)) {
       return
     }
 
     const findBody = (): HTMLElement | null => {
+      if (isSessionDetail) {
+        return activityTerminalPortal?.target ?? null
+      }
       for (const candidate of document.querySelectorAll<HTMLElement>('[data-tab-group-body-id]')) {
         if (candidate.dataset.tabGroupBodyId === groupId) {
           return candidate
@@ -133,7 +143,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       resizeObserver.disconnect()
       window.removeEventListener('resize', updateRect)
     }
-  }, [anchorName, groupId, isVisible])
+  }, [anchorName, groupId, isVisible, isSessionDetail, activityTerminalPortal?.target])
 
   useLayoutEffect(() => {
     if (!isVisible || !anchorName) {
@@ -210,10 +220,10 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     [anchorName, isVisible, measuredFallbackRect, shouldMeasureHiddenStartup]
   )
   const focusGroup = useCallback(() => {
-    if (groupId !== undefined && onFocusOwningGroup) {
+    if (!isSessionDetail && groupId !== undefined && onFocusOwningGroup) {
       onFocusOwningGroup(groupId)
     }
-  }, [groupId, onFocusOwningGroup])
+  }, [groupId, onFocusOwningGroup, isSessionDetail])
 
   const terminalPane = (
     <TerminalPane
@@ -227,7 +237,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       // flag still lets hidden tabs throttle rendering.
       isVisible={isVisible || activityTerminalPortal !== null}
       isWorktreeActive={isWorktreeActive || activityTerminalPortal !== null}
-      isolatedPaneKey={activityTerminalPortal?.paneKey ?? null}
+      isolatedPaneKey={activityTerminalPortal?.paneKey || null}
       onPtyExit={(ptyId, exitCode) => {
         if (consumeSuppressedPtyExit(ptyId)) {
           return
@@ -258,7 +268,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     />
   )
 
-  if (activityTerminalPortal) {
+  if (activityTerminalPortal && !isSessionDetail) {
     return createPortal(
       terminalPane,
       activityTerminalPortal.target,
@@ -266,10 +276,12 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     )
   }
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
       style={style}
+      className="z-10"
+      data-session-terminal={isSessionDetail ? terminalTabId : undefined}
       data-terminal-overlay-tab-id={terminalTabId}
       onPointerDown={focusGroup}
       onFocusCapture={focusGroup}
@@ -278,6 +290,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       {/* The chat/terminal toggle now lives in the pane header's action cluster
           (TerminalPaneHeaderOverlay), beside split/close — not as a separate
           floating overlay. */}
-    </div>
+    </div>,
+    document.body
   )
 })

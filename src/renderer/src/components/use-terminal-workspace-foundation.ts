@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
@@ -30,21 +31,33 @@ export function useTerminalWorkspaceFoundation() {
   const worktreesById = useWorktreeMap()
   const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
-  const activeFloatingWorkspaceId = isFloatingTerminalWorkspaceId(activeWorktreeId)
-    ? activeWorktreeId
-    : null
+  const activeView = useAppStore((state) => state.activeView)
+  const floatingWorkspaceIds = useAppStore(
+    useShallow((state) =>
+      state.activeView === 'sessions'
+        ? [
+            ...new Set([
+              ...Object.keys(state.tabsByWorktree),
+              ...Object.keys(state.unifiedTabsByWorktree)
+            ])
+          ].filter(isFloatingTerminalWorkspaceId)
+        : isFloatingTerminalWorkspaceId(state.activeWorktreeId)
+          ? [state.activeWorktreeId!]
+          : []
+    )
+  )
+  const needsLocalFloatingCwd = floatingWorkspaceIds.includes(FLOATING_TERMINAL_WORKTREE_ID)
   const floatingTerminalCwd = useAppStore((state) => state.settings?.floatingTerminalCwd ?? '')
   const [floatingCwdResolution, setFloatingCwdResolution] = useState<{
     requestedPath: string
     cwd: string
   } | null>(null)
   const resolvedFloatingTerminalCwd =
-    activeFloatingWorkspaceId === FLOATING_TERMINAL_WORKTREE_ID &&
-    floatingCwdResolution?.requestedPath === floatingTerminalCwd
+    needsLocalFloatingCwd && floatingCwdResolution?.requestedPath === floatingTerminalCwd
       ? floatingCwdResolution.cwd
       : null
   useEffect(() => {
-    if (activeFloatingWorkspaceId !== FLOATING_TERMINAL_WORKTREE_ID) {
+    if (!needsLocalFloatingCwd) {
       return
     }
     let cancelled = false
@@ -61,7 +74,7 @@ export function useTerminalWorkspaceFoundation() {
     return () => {
       cancelled = true
     }
-  }, [activeFloatingWorkspaceId, floatingTerminalCwd])
+  }, [needsLocalFloatingCwd, floatingTerminalCwd])
   const renderedActiveWorktreeId = activeWorktreeId
   const activeWorktreeDeferralHostId = useAppStore((state) =>
     getResolvedExecutionHostIdForWorktree(state, renderedActiveWorktreeId)
@@ -79,15 +92,16 @@ export function useTerminalWorkspaceFoundation() {
       activeWorkspaceId: renderedActiveWorktreeId,
       activeWorkspaceResolvedHostId: activeFolderSurfaceHostId
     })
-    const floatingSurface = resolveActiveFloatingWorkspaceSurface(
-      activeFloatingWorkspaceId,
-      resolvedFloatingTerminalCwd
-    )
-    return floatingSurface && !surfaces.some((surface) => surface.id === floatingSurface.id)
-      ? [...surfaces, floatingSurface]
-      : surfaces
+    const floatingSurfaces = floatingWorkspaceIds.flatMap((id) => {
+      const surface = resolveActiveFloatingWorkspaceSurface(
+        id,
+        id === FLOATING_TERMINAL_WORKTREE_ID ? resolvedFloatingTerminalCwd : null
+      )
+      return surface && !surfaces.some((entry) => entry.id === id) ? [surface] : []
+    })
+    return [...surfaces, ...floatingSurfaces]
   }, [
-    activeFloatingWorkspaceId,
+    floatingWorkspaceIds,
     activeFolderSurfaceHostId,
     folderWorkspaces,
     renderedActiveWorktreeId,
@@ -105,7 +119,6 @@ export function useTerminalWorkspaceFoundation() {
     () => new Set(workspaceSurfaceIds),
     [workspaceSurfaceIds]
   )
-  const activeView = useAppStore((state) => state.activeView)
   // Why: terminal titles are leaf chrome. The root host only subscribes to
   // mount/parking semantics; a real transition publishes fresh tab objects,
   // while LiveTerminalTabBar reads title-only updates from the active bucket.

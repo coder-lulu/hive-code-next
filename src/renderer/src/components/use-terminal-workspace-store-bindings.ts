@@ -64,7 +64,7 @@ export function useTerminalWorkspaceStoreBindings(controller: TerminalWorkspaceF
     ? tabBarOrderByWorktree[renderedActiveWorktreeId]
     : undefined
   const activityTerminalPortals: ActivityTerminalPortalTarget[] = useActivityTerminalPortals(
-    activeView === 'activity'
+    activeView === 'activity' || activeView === 'sessions'
   )
 
   return {

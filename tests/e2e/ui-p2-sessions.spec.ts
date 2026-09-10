@@ -12,6 +12,7 @@ async function capture(page: Page, name: string): Promise<void> {
   if (!directory) {
     return
   }
+  await page.mouse.move(900, 900)
   await page.evaluate(() => document.fonts.ready)
   const metrics = await page.evaluate(() => ({
     viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
@@ -116,6 +117,7 @@ test('filters real session rows and preserves search through narrow list/detail 
   await expect(
     page.getByTestId('session-detail').getByRole('heading', { name: /P2 Temporary 01/ })
   ).toBeVisible()
+  await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible({ timeout: 30_000 })
   await capture(page, 'p2-02-light-filtered-detail')
 
   await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
@@ -130,7 +132,16 @@ test('filters real session rows and preserves search through narrow list/detail 
   await expect(list).toBeFocused()
   await expect(page.locator(':focus')).toBeVisible()
   await rows.first().click()
-  await expect(back).toBeFocused()
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Boolean(
+          document.activeElement?.closest('[data-session-terminal]') ||
+          document.activeElement?.getAttribute('aria-label') === 'Back to session list'
+        )
+      )
+    )
+    .toBe(true)
   await expect(page.locator(':focus')).toBeVisible()
   await expect(search).not.toBeVisible()
   await capture(page, 'p2-04-dark-narrow-detail')
@@ -159,7 +170,7 @@ test('filters real session rows and preserves search through narrow list/detail 
   await expect(
     page
       .getByTestId('session-detail')
-      .getByRole('button', { name: '进入工作台', exact: true })
+      .getByRole('button', { name: '关闭会话视图', exact: true })
       .first()
   ).toBeVisible()
   await capture(page, 'p2-09-zh-light')
@@ -206,25 +217,52 @@ test('returns to the same terminal and browser guest without duplicate tabs or P
     )
     const tabs = page.locator('.terminal-tab-strip').first().locator('[data-tab-id]')
     await expect(tabs).toHaveCount(2)
-    await openSessions(page)
+    await page.locator('.session-quick-row').filter({ hasText: 'P2 Workspace continuity' }).click()
+    await expect(page.getByTestId('sessions-page')).toBeVisible()
+    await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible()
+    expect(await page.evaluate(() => window.__store!.getState().activeWorktreeId)).toBe(
+      fixture.worktreeId
+    )
+    await page.locator('.session-project-row').first().click()
+    await expect(page.getByTestId('session-center-row')).toHaveCount(1)
     const search = page.getByRole('textbox', { name: 'Search sessions', exact: true })
     await search.fill('P2 Workspace continuity')
     await page.getByTestId('session-center-row').click()
-    await page
-      .getByTestId('session-detail')
-      .getByRole('button', { name: 'Open workspace', exact: true })
-      .first()
-      .click()
-    await expect(page.getByTestId('sessions-page')).not.toBeVisible()
-    await expect(page.locator(`[data-tab-id="${fixture.terminalId}"]`)).toHaveAttribute(
-      'data-active',
-      'true'
+    await expect(page.getByTestId('sessions-page')).toBeVisible()
+    await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible()
+    expect(await page.evaluate(() => window.__store!.getState().activeWorktreeId)).toBe(
+      fixture.worktreeId
     )
+    await expect(page.getByRole('button', { name: 'Open workspace', exact: true })).toHaveCount(0)
+    await page.locator('[data-session-terminal] .xterm-helper-textarea').focus()
+    await page.keyboard.type('echo P2_DIRECT_SESSION_INPUT')
+    await page.keyboard.press('Enter')
+    await expect
+      .poll(() =>
+        page.evaluate((tabId) => {
+          const terminal = window.__paneManagers?.get(tabId)?.getPanes?.()[0]?.terminal
+          const buffer = terminal?.buffer.active
+          if (!buffer) {
+            return ''
+          }
+          return Array.from(
+            { length: buffer.length },
+            (_, index) => buffer.getLine(index)?.translateToString() ?? ''
+          ).join('\n')
+        }, fixture.terminalId)
+      )
+      .toContain('P2_DIRECT_SESSION_INPUT')
+    await expect(page.getByTestId('sessions-page')).toBeVisible()
+    expect(await page.evaluate(() => window.__store!.getState().activeWorktreeId)).toBe(
+      fixture.worktreeId
+    )
+    await capture(page, 'p2-corrected-terminal-three-columns')
     await expect(boundPane).toBeVisible()
     await expect(boundPane).toHaveAttribute('data-pty-id', ptyId)
     await expect(tabs).toHaveCount(2)
     expect(await xterm!.evaluate((element) => element.isConnected)).toBe(true)
     expect(await guest!.evaluate((element) => element.isConnected)).toBe(true)
+    await page.evaluate(() => window.__store!.setState({ activeView: 'terminal' }))
     await page.locator(`[data-tab-id="${browserId}"]`).click()
     await expect(browser).toBeVisible()
     expect(

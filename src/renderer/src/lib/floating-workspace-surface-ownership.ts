@@ -27,7 +27,10 @@ export function mainWorkbenchOwnsFloatingWorkspace(
   activeView: string,
   activeWorktreeId: string | null
 ): boolean {
-  return activeView === 'terminal' && isFloatingTerminalWorkspaceId(activeWorktreeId)
+  return (
+    activeView === 'sessions' ||
+    (activeView === 'terminal' && isFloatingTerminalWorkspaceId(activeWorktreeId))
+  )
 }
 
 export function shouldMountFloatingWorkspacePanel(args: {

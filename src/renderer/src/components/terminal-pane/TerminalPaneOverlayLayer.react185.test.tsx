@@ -143,7 +143,7 @@ describe('TerminalPaneOverlayLayer fallback measure<->fit loop (React #185)', ()
   it('settles sub-pixel jitter across an integer boundary without losing precision', () => {
     bodyRect = createRect({ top: 32.1, left: 0.1, width: 799.1, height: 567.1 })
     renderSlot()
-    const overlay = container.querySelector<HTMLElement>('[data-terminal-overlay-tab-id]')
+    const overlay = document.querySelector<HTMLElement>('[data-terminal-overlay-tab-id]')
     expect(overlay?.style.top).toBe('32.1px')
     expect(overlay?.style.width).toBe('799.1px')
 
@@ -166,7 +166,7 @@ describe('TerminalPaneOverlayLayer fallback measure<->fit loop (React #185)', ()
 
   it('commits a genuine geometry change', () => {
     renderSlot()
-    const overlay = container.querySelector<HTMLElement>('[data-terminal-overlay-tab-id]')
+    const overlay = document.querySelector<HTMLElement>('[data-terminal-overlay-tab-id]')
     const rendersAfterMount = terminalPaneRenderCount
 
     bodyRect = createRect({ top: 34, width: 760, height: 566 })

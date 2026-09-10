@@ -4,8 +4,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { useSessionCollection } from './use-session-collection'
-import { useOpenSession } from './use-open-session'
 import SessionStatus from './SessionStatus'
+import { filterSessionInventory } from './session-list-model'
 import {
   getSidebarActiveSessionTarget,
   isSidebarSessionActive
@@ -19,7 +19,7 @@ export default function SessionNavigationSection(): React.JSX.Element {
   const selectedKey = useAppStore((state) =>
     state.activeView === 'sessions' ? state.sessionsView.selectedSessionKey : null
   )
-  const { openingKey, openSession } = useOpenSession()
+  const updateSessionsView = useAppStore((state) => state.updateSessionsView)
   const activeTarget = useAppStore(useShallow(getSidebarActiveSessionTarget))
   const activeHost = useAppStore((state) => state.activeWorkspaceExecutionHostId)
   return (
@@ -66,8 +66,15 @@ export default function SessionNavigationSection(): React.JSX.Element {
                   ? 'true'
                   : undefined
               }
-              disabled={openingKey !== null}
-              onClick={() => void openSession(item)}
+              onClick={() => {
+                const view = useAppStore.getState().sessionsView
+                const inView = filterSessionInventory([item], view.scope, view.query).length > 0
+                openSessionsPage(inView ? undefined : { kind: 'all' })
+                updateSessionsView({
+                  selectedSessionKey: item.key,
+                  ...(!inView ? { query: '', scrollTop: 0 } : {})
+                })
+              }}
               title={[item.title, item.projectLabel, item.workspaceLabel, item.hostLabel]
                 .filter(Boolean)
                 .join(' · ')}

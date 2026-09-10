@@ -150,7 +150,14 @@
   --tab-active-surface: var(--card);
   --tab-hover-surface: color-mix(in srgb, var(--foreground) 6%, var(--tab-strip-surface));
   --tab-divider: var(--border);
-  --sessions-list-width: 280px;
+  --sessions-list-width: 320px;
+  --sessions-nav-row-height: 32px;
+  --sessions-nav-font-size: 13px;
+  --sessions-project-list-max-height: 192px;
+  --sessions-space-1: 4px;
+  --sessions-space-2: 8px;
+  --sessions-space-3: 12px;
+  --sessions-space-6: 24px;
   --sessions-row-height: 56px;
   --sessions-header-height: 44px;
   --session-quick-row-height: 44px;

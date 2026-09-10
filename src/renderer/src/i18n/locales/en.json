@@ -18089,7 +18089,8 @@
     },
     "sessions": {
       "select": "Select a session",
-      "selectHint": "Read a conversation or return to its workspace to continue.",
+      "selectHint": "Select a session to continue here.",
+      "closeView": "Close session view",
       "backToList": "Back to session list",
       "openWorkspace": "Open workspace",
       "unassigned": "Unassigned",

@@ -68,7 +68,7 @@ export function resolveSessionConnectionState(
     : 'unknown'
 }
 
-function resolveCurrentSession(state: AppState, item: SessionListItem) {
+export function resolveCurrentSession(state: AppState, item: SessionListItem) {
   const bucketKey = item.ownerBucketKey
   const host = parseExecutionHostId(item.executionHostId)
   if (!bucketKey || !host) {
