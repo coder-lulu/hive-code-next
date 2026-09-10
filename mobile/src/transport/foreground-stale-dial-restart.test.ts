@@ -15,6 +15,12 @@ import { classifyConnection, verdictDisplayLabel } from './connection-health'
 // desktop that was answering the whole time. By the next foreground the client
 // had landed in 'reconnecting', where the nudge works, so it connected at once.
 
+// Socket timing tests isolate framing; direct-v2 integration tests use real crypto.
+vi.mock('./mobile-e2ee-v2-client-session', () => ({
+  MobileE2EEV2ClientSession: { create: () => ({}) }
+}))
+vi.mock('./mobile-e2ee-v2-physical-channel', () => import('./rpc-client-test-channel'))
+
 vi.mock('./e2ee', () => ({
   generateKeyPair: () => ({ publicKey: new Uint8Array(32), secretKey: new Uint8Array(32) }),
   deriveSharedKey: () => new Uint8Array(32),

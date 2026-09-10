@@ -15,6 +15,8 @@ type Props = {
   visible: boolean
   title: string
   message?: string
+  errorMessage?: string
+  submitting?: boolean
   defaultValue?: string
   placeholder?: string
   submitLabel?: string
@@ -29,6 +31,8 @@ export function TextInputModal({
   visible,
   title,
   message,
+  errorMessage,
+  submitting = false,
   defaultValue = '',
   placeholder,
   submitLabel = 'Save',
@@ -58,12 +62,12 @@ export function TextInputModal({
 
   function handleSubmit() {
     const trimmed = value.trim()
-    if (trimmed || allowEmpty) {
+    if (!submitting && (trimmed || allowEmpty)) {
       onSubmit(trimmed)
     }
   }
 
-  const canSubmit = allowEmpty || value.trim().length > 0
+  const canSubmit = !submitting && (allowEmpty || value.trim().length > 0)
 
   return (
     <BottomDrawer visible={visible} onClose={onCancel}>
@@ -98,6 +102,16 @@ export function TextInputModal({
         maxFontSizeMultiplier={1.3}
       />
 
+      {errorMessage ? (
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          maxFontSizeMultiplier={1.3}
+          style={styles.error}
+        >
+          {errorMessage}
+        </Text>
+      ) : null}
       <View style={styles.actions}>
         <Pressable
           accessibilityLabel="Cancel"
@@ -116,7 +130,7 @@ export function TextInputModal({
         <Pressable
           accessibilityLabel={submitLabel}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !canSubmit }}
+          accessibilityState={{ disabled: !canSubmit, busy: submitting }}
           style={({ pressed }) => [
             styles.button,
             styles.submitButton,
@@ -146,6 +160,11 @@ function createStyles(theme: MobileTheme) {
       ...theme.typography.meta,
       color: theme.color.text.secondary,
       marginTop: theme.spacing.space4
+    },
+    error: {
+      ...theme.typography.meta,
+      color: theme.color.status.danger,
+      marginTop: theme.spacing.space8
     },
     input: {
       minHeight: theme.spacing.space48,

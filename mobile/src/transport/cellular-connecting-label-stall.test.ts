@@ -9,6 +9,12 @@ import { classifyConnection, verdictDisplayLabel } from './connection-health'
 // reverted to "Connecting…" on every redial, so no escalation assertion here
 // could pass: the label looped "Connecting…" forever.
 
+// Socket timing tests isolate framing; direct-v2 integration tests use real crypto.
+vi.mock('./mobile-e2ee-v2-client-session', () => ({
+  MobileE2EEV2ClientSession: { create: () => ({}) }
+}))
+vi.mock('./mobile-e2ee-v2-physical-channel', () => import('./rpc-client-test-channel'))
+
 vi.mock('./e2ee', () => ({
   generateKeyPair: () => ({ publicKey: new Uint8Array(32), secretKey: new Uint8Array(32) }),
   deriveSharedKey: () => new Uint8Array(32),

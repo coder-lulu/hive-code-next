@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { i18n } from '../../i18n/i18n'
 import WebAccountConnect from './WebAccountConnect'
 import type * as WebAccountSessionModule from './web-account-session'
 
@@ -35,14 +36,21 @@ const runtime = {
 }
 
 describe('console Runtime launch', () => {
-  beforeEach(() => {
+  let previousLanguage: string
+
+  beforeEach(async () => {
+    previousLanguage = i18n.language
+    await i18n.changeLanguage('zh')
     vi.clearAllMocks()
     window.history.replaceState({}, '', `/runtime/?runtime=${id}`)
     mocks.restore.mockResolvedValue(true)
     mocks.runtime.mockResolvedValue(runtime)
     mocks.call.mockResolvedValue({ ok: true })
   })
-  afterEach(cleanup)
+  afterEach(async () => {
+    cleanup()
+    await i18n.changeLanguage(previousLanguage)
+  })
 
   it('automatically connects only the fresh authorized requested runtime once', async () => {
     const onConnected = vi.fn()

@@ -1,11 +1,9 @@
+import { publicKeyToBase64 } from './e2ee'
+import { MobileE2EEV2ClientSession } from './mobile-e2ee-v2-client-session'
 import {
-  decrypt,
-  decryptBytes,
-  deriveSharedKey,
-  encrypt,
-  generateKeyPair,
-  publicKeyToBase64
-} from './e2ee'
+  MobileE2EEAuthenticationError,
+  MobileE2EEV2PhysicalChannel
+} from './mobile-e2ee-v2-physical-channel'
 import { isRpcResponse } from './rpc-response-shape'
 import { isStaleRpcSocketEvent, logRpcSocketClose } from './rpc-socket-close-evidence'
 import { describeSocketEvent, redactSocketEndpoint } from './socket-event-debug'
@@ -39,7 +37,7 @@ type SocketSessionOptions = {
 export class RpcClientSocketSession {
   readonly socket: WebSocket
   readonly constructedAt = Date.now()
-  private sharedKey: Uint8Array | null = null
+  private channel: MobileE2EEV2PhysicalChannel | null = null
   private authenticated = false
   private lastInboundAt: number | null = null
   private connectTimer: ReturnType<typeof setTimeout> | null = null
@@ -52,10 +50,9 @@ export class RpcClientSocketSession {
   }
 
   sendEncrypted(request: unknown): boolean {
-    if (this.socket.readyState === WebSocket.OPEN && this.sharedKey) {
+    if (this.socket.readyState === WebSocket.OPEN && this.channel) {
       try {
-        this.socket.send(encrypt(JSON.stringify(request), this.sharedKey))
-        return true
+        return this.channel.sendText(JSON.stringify(request))
       } catch {
         if (this.options.getCurrentSocket() === this.socket) {
           this.options.onForcedClose(this)
@@ -66,7 +63,7 @@ export class RpcClientSocketSession {
     console.log('[net] sendEncrypted FAILED — channel not ready', {
       hasWs: this.options.getCurrentSocket() !== null,
       readyState: this.socket.readyState,
-      hasKey: this.sharedKey !== null,
+      hasKey: this.channel !== null,
       state: this.options.getState()
     })
     if (
@@ -98,7 +95,8 @@ export class RpcClientSocketSession {
   }
 
   clearKey(): void {
-    this.sharedKey = null
+    this.channel?.dispose()
+    this.channel = null
   }
 
   private attachHandlers(): void {
@@ -110,19 +108,62 @@ export class RpcClientSocketSession {
       this.clearConnectTimer()
       this.options.onHandshakeStarted()
       this.options.emitLog('success', 'WebSocket open', 'Starting E2EE handshake')
-      const ephemeral = generateKeyPair()
-      const hello = JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: publicKeyToBase64(ephemeral.publicKey)
-      })
       try {
-        this.socket.send(hello)
+        this.channel = new MobileE2EEV2PhysicalChannel({
+          session: MobileE2EEV2ClientSession.create({
+            desktopPublicKeyB64: publicKeyToBase64(this.options.serverPublicKey),
+            transport: 'direct'
+          }),
+          socket: this.socket,
+          deviceToken: this.options.deviceToken,
+          decodeBinary: websocketPayloadToUint8,
+          onAuthenticated: () => {
+            if (this.isStale('authenticated')) {
+              return
+            }
+            this.clearHandshakeTimer()
+            this.authenticated = true
+            this.options.onAuthenticated(this)
+          },
+          onText: (plaintext) => {
+            if (this.isStale('text')) {
+              return
+            }
+            this.options.onAuthenticatedInbound(this)
+            try {
+              const response: unknown = JSON.parse(plaintext)
+              if (isRpcResponse(response)) {
+                this.options.onRpcResponse(response)
+              }
+            } catch {
+              // Malformed application JSON is not an RPC response.
+            }
+          },
+          onBinary: (bytes) => {
+            if (this.isStale('binary')) {
+              return
+            }
+            this.options.onAuthenticatedInbound(this)
+            this.options.onBinary(bytes)
+          },
+          onError: (error) => {
+            if (this.isStale('channel-error')) {
+              return
+            }
+            this.clearHandshakeTimer()
+            if (error instanceof MobileE2EEAuthenticationError) {
+              this.options.onAuthRejected('Unauthorized — pairing may be revoked')
+            } else {
+              this.options.onForcedClose(this)
+            }
+          }
+        })
+        this.channel.start()
       } catch {
         this.options.onForcedClose(this)
         return
       }
       this.options.emitLog('info', 'Sent e2ee_hello', 'Awaiting server e2ee_ready')
-      this.sharedKey = deriveSharedKey(ephemeral.secretKey, this.options.serverPublicKey)
       this.armHandshakeTimeout()
     }
     this.socket.onmessage = (event) => {
@@ -163,88 +204,7 @@ export class RpcClientSocketSession {
     const receivedAt = Date.now()
     this.lastInboundAt = receivedAt
     this.options.onAnyInbound(receivedAt)
-    const raw = typeof rawData === 'string' ? rawData : null
-    if (!this.authenticated) {
-      this.handleHandshakeMessage(raw)
-      return
-    }
-    if (!this.sharedKey || this.sharedKey.length !== 32) {
-      return
-    }
-    if (raw === null) {
-      const bytes = await websocketPayloadToUint8(rawData)
-      if (this.options.getCurrentSocket() !== this.socket || !bytes) {
-        return
-      }
-      const plaintext = decryptBytes(bytes, this.sharedKey)
-      if (!plaintext) {
-        return
-      }
-      this.options.onAuthenticatedInbound(this)
-      this.options.onBinary(plaintext)
-      return
-    }
-    const plaintext = decrypt(raw, this.sharedKey)
-    if (plaintext === null) {
-      return
-    }
-    this.options.onAuthenticatedInbound(this)
-    let response: unknown
-    try {
-      response = JSON.parse(plaintext)
-    } catch {
-      return
-    }
-    if (isRpcResponse(response)) {
-      this.options.onRpcResponse(response)
-    }
-  }
-
-  private handleHandshakeMessage(raw: string | null): void {
-    if (raw === null) {
-      return
-    }
-    try {
-      const message = JSON.parse(raw) as { type?: unknown }
-      if (message.type === 'e2ee_ready') {
-        this.options.emitLog('success', 'Received e2ee_ready', 'Sending device token')
-        this.sendEncrypted({ type: 'e2ee_auth', deviceToken: this.options.deviceToken })
-        return
-      }
-    } catch {
-      // The authenticated handshake messages are encrypted.
-    }
-    if (!this.sharedKey || this.sharedKey.length !== 32) {
-      return
-    }
-    const plaintext = decrypt(raw, this.sharedKey)
-    if (plaintext === null) {
-      return
-    }
-    try {
-      const message = JSON.parse(plaintext) as {
-        type?: unknown
-        ok?: unknown
-        error?: { code?: unknown }
-      }
-      if (message.type === 'e2ee_authenticated') {
-        this.clearHandshakeTimer()
-        this.authenticated = true
-        this.options.onAuthenticated(this)
-      } else if (
-        message.type === 'e2ee_error' ||
-        (message.ok === false && message.error?.code === 'unauthorized')
-      ) {
-        console.log('[net] e2ee auth FAILED', {
-          msgType: message.type,
-          error: message.error
-        })
-        this.clearHandshakeTimer()
-        this.options.onAuthRejected('Unauthorized — pairing may be revoked')
-      }
-    } catch {
-      // Ignore malformed handshake payloads.
-    }
+    await this.channel?.handleMessage(rawData)
   }
 
   private armConnectTimeout(): void {

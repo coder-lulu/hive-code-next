@@ -20,6 +20,12 @@ import { classifyConnection, verdictDisplayLabel } from './connection-health'
 // Opt-in like rpc-client-live-recovery.test.ts — needs ~22s wall-clock:
 //   ORCA_MOBILE_LIVE_REPRO=1 pnpm vitest run src/transport/cellular-handshake-stall-real-socket.test.ts
 
+// Socket timing tests isolate framing; direct-v2 integration tests use real crypto.
+vi.mock('./mobile-e2ee-v2-client-session', () => ({
+  MobileE2EEV2ClientSession: { create: () => ({}) }
+}))
+vi.mock('./mobile-e2ee-v2-physical-channel', () => import('./rpc-client-test-channel'))
+
 vi.mock('./e2ee', () => ({
   generateKeyPair: () => ({ publicKey: new Uint8Array(32), secretKey: new Uint8Array(32) }),
   deriveSharedKey: () => new Uint8Array(32),

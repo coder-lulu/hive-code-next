@@ -97,3 +97,76 @@ not be included in any RC platform claim. The installed artifact was not specifi
 do not equate this manual result with the current checkout automatically. The
 public deployment record also contains earlier Android account/workspace/terminal
 read-navigation evidence from 2026-09-07. Earlier PARTIAL statements are historical.
+
+## Verification refresh (2026-09-10)
+
+This is a current-checkout regression check, not a new all-platform acceptance or
+public deployment. The Android acceptance and explicit iOS deferral above remain
+historical evidence with their original artifact limitation.
+
+Verified revisions:
+
+- HiveCode: `39e80295062c9f296bda5dd32e96117244529ede`
+- Cloud: `f0a93f3021167fb8efccd9667de8353928788841`
+- Cell: `07ac3bf94a4efcd493f97a20b06203b4a80001de`
+
+| Check | Fresh result |
+| --- | --- |
+| Shared/Desktop service/Web focused Vitest tests | 46 passed, 1 failed across 7 files |
+| Mobile directory, reconciliation and RPC tests | 19 passed across 5 files |
+| Node, Web and Mobile TypeScript checks | All three passed |
+| `node config/scripts/verify-hiverelay-contract.mjs` | 147 passed, 1 skipped; integrity PASS |
+| Cloud, HiveCode and Cell contract receipt hashes | All 114 files match in each repository |
+| Real PostgreSQL + Cloud HTTP + TLS Cell + Runtime Host + headless Chrome bridge | 1 test passed, 0 failures/errors/skips |
+
+The current contract is `hiverelay-v2-p0.9`, not the older p0.8 mentioned in the
+phase plan. Manifest SHA-256:
+`6cffb6deb3a9b8dfa31ea20db2663fc4cb66ed64435abea9aa2a0c126f941d4e`.
+The generated integrity report is `config/hiverelay-contract-report.json`.
+
+### Regression finding (resolved in follow-up below)
+
+`src/renderer/src/web/account-runtime-relay/WebAccountConnect.test.tsx:63`
+expects an accessible button named `刷新`, but the rendered button is `Refresh`.
+The application boots in English and the test does not explicitly select a locale.
+The preceding assertions for the unavailable/unauthorized alert and absence of an
+RPC connection passed. This establishes a test-language mismatch, not a demonstrated
+connection or refresh logic defect. Align the test locale or expected accessible
+name and rerun before claiming the focused suite is green. No product or test code
+was changed during this verification-only pass.
+
+### Integration reproduction and limits
+
+Prepare the Cloud reactor using `mvn -o -pl ruoyi-admin -am install
+-Dmaven.test.skip=true`, then run `mvn -o -Pstage2b-e2e -pl ruoyi-admin test
+-Dtest=Stage2bHiveRelayMigrationPostgresTest#realRuntimeHostHttpBridgeWithMockCell
+-Dsurefire.failIfNoSpecifiedTests=true -Dmaven.test.skip=false` with the PostgreSQL
+and HiveCode repository environment variables described above. Quote individual
+`-D` arguments in PowerShell. The bridge test resides in `ruoyi-admin/src/test/java`.
+Despite its historical method name, selecting
+`tests/e2e/hiverelay/hive-account-relay-cell.unit.test.ts` starts the real TLS Cell
+fixture and headless Chrome. Use `ORCA_BACKGROUND_LAUNCH=1` for background checks.
+
+The bridge passed in 56.42 seconds and exercised principal-bound RPC, JSON/binary
+and stream traffic, fresh browser connection material, revocation propagation,
+database REVOKED status, cleanup and secret-canary checks. The optional
+`HIVE_RELAY_CLOUD_PAUSE_TEST` branch was not enabled; this run does not establish
+fresh Cloud-outage/deadline evidence. It also does not establish current Android,
+iOS or packaged Electron UI acceptance, public-server health, or sustained load.
+
+Local build and integration logs were captured at
+`E:/hive-build/p4-build-20260910.log` and
+`E:/hive-build/p4-verification-20260910.log`. The isolated loopback PostgreSQL
+container `hive-p4-verify-20260910` and its disposable database volume were removed
+after verification. No public services or user databases were changed.
+
+### Web test locale fix and rerun (2026-09-10)
+
+`WebAccountConnect.test.tsx` now saves the current language, awaits
+`i18n.changeLanguage('zh')` before each test, and restores the saved language after
+unmounting the component. The existing Chinese accessible-name assertion is kept;
+no product behavior or translation catalog was changed.
+
+Reran the same seven Shared/Desktop service/Web test files: **47 passed, 0 failed**.
+The Web TypeScript check also passed. This resolves the language mismatch recorded
+above; the other platform and integration verification limits are unchanged.

@@ -33,6 +33,9 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
     setShowQuickCommands,
     setShowCreateBrowserModal,
     showCreateBrowserModal,
+    createError,
+    setCreateError,
+    creatingBrowser,
     showHeaderMoreActions,
     setShowHeaderMoreActions,
     actionTarget,
@@ -142,6 +145,7 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
                       return
                     }
                     setShowCreateBrowserModal(true)
+                    setCreateError('')
                   }
                 },
                 {
@@ -327,10 +331,12 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
       <TextInputModal
         visible={showCreateBrowserModal}
         title="New Browser"
+        errorMessage={createError}
+        submitting={creatingBrowser}
         message="Enter a URL, or leave blank for a new tab."
         defaultValue=""
         placeholder="https://example.com"
-        submitLabel="Open"
+        submitLabel={creatingBrowser ? '正在创建…' : 'Open'}
         allowEmpty
         selectTextOnFocus
         keyboardType={Platform.OS === 'ios' ? 'url' : 'default'}
