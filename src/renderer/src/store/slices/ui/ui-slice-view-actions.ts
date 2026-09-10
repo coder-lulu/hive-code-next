@@ -33,7 +33,7 @@ export function createUiViewActions(set: UISliceSet, get: UISliceGet): Partial<U
         activeView: 'sessions',
         sessionsView:
           scope && !sameSessionScope(scope, state.sessionsView.scope)
-            ? emptySessionsView(scope)
+            ? { ...emptySessionsView(scope), navigation: state.sessionsView.navigation }
             : state.sessionsView
       }))
     },
@@ -41,7 +41,7 @@ export function createUiViewActions(set: UISliceSet, get: UISliceGet): Partial<U
       set((state) => ({
         sessionsView: {
           ...(patch.scope && !sameSessionScope(patch.scope, state.sessionsView.scope)
-            ? emptySessionsView(patch.scope)
+            ? { ...emptySessionsView(patch.scope), navigation: state.sessionsView.navigation }
             : state.sessionsView),
           ...patch
         }

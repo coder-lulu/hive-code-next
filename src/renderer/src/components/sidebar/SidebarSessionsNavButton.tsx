@@ -5,8 +5,12 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 
 export default function SidebarSessionsNavButton(): React.JSX.Element {
-  const active = useAppStore((state) => state.activeView === 'sessions')
+  const active = useAppStore(
+    (state) => state.activeView === 'sessions' && state.sessionsView.navigation !== 'projects'
+  )
   const openSessionsPage = useAppStore((state) => state.openSessionsPage)
+  const projectNavigation = useAppStore((state) => state.sessionsView.navigation === 'projects')
+  const updateSessionsView = useAppStore((state) => state.updateSessionsView)
   return (
     <Button
       variant="ghost"
@@ -18,7 +22,14 @@ export default function SidebarSessionsNavButton(): React.JSX.Element {
           : 'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
       )}
       aria-current={active ? 'page' : undefined}
-      onClick={() => openSessionsPage()}
+      onClick={() => {
+        if (projectNavigation) {
+          openSessionsPage({ kind: 'all' })
+        } else {
+          openSessionsPage()
+        }
+        updateSessionsView({ navigation: 'sessions' })
+      }}
     >
       <MessagesSquare className="size-4 shrink-0" />
       {translate('components.sessions.title', 'Sessions')}

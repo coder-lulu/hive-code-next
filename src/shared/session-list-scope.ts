@@ -8,6 +8,7 @@ export type SessionListScope =
   | { kind: 'workspace'; workspaceKey: string; executionHostId: ExecutionHostId }
 
 export type SessionListViewState = {
+  navigation?: 'sessions' | 'projects'
   scope: SessionListScope
   query: string
   selectedSessionKey: string | null

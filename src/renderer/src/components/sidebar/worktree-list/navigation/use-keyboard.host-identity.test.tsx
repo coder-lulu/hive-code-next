@@ -1,3 +1,7 @@
+import {
+  OpenWorkspaceInSurfaceContext,
+  type OpenWorkspaceInSurface
+} from './workspace-activation-context'
 // @vitest-environment happy-dom
 
 import { act } from 'react'
@@ -46,6 +50,7 @@ const renderRows = rows as unknown as RenderRow[]
 
 let container: HTMLDivElement
 let root: Root
+let containerKeyDown: ReturnType<typeof useWorktreeListKeyboardNavigation>['handleContainerKeyDown']
 
 function press(direction: 'up' | 'down'): void {
   const mod = getShortcutPlatform() === 'darwin' ? { metaKey: true } : { ctrlKey: true }
@@ -63,9 +68,13 @@ function press(direction: 'up' | 'down'): void {
   })
 }
 
-function renderProbe(activeWorktreeId: string, activeHostId: 'local' | null): void {
+function renderProbe(
+  activeWorktreeId: string,
+  activeHostId: 'local' | null,
+  onOpenWorkspace?: OpenWorkspaceInSurface
+): void {
   function Probe(): null {
-    useWorktreeListKeyboardNavigation({
+    const navigation = useWorktreeListKeyboardNavigation({
       rows,
       renderRows,
       activeWorktreeId,
@@ -76,9 +85,16 @@ function renderProbe(activeWorktreeId: string, activeHostId: 'local' | null): vo
       activeModal: 'none',
       markDirectScrollInput: () => {}
     })
+    containerKeyDown = navigation.handleContainerKeyDown
     return null
   }
-  act(() => root.render(<Probe />))
+  act(() =>
+    root.render(
+      <OpenWorkspaceInSurfaceContext.Provider value={onOpenWorkspace}>
+        <Probe />
+      </OpenWorkspaceInSurfaceContext.Provider>
+    )
+  )
 }
 
 beforeEach(() => {
@@ -94,6 +110,25 @@ afterEach(() => {
 })
 
 describe('worktree keyboard cycling with a resolved active host', () => {
+  it('does not focus a hidden old terminal when Enter is pressed in project navigation', () => {
+    const textarea = document.createElement('textarea')
+    textarea.className = 'xterm-helper-textarea'
+    document.body.appendChild(textarea)
+    const focus = vi.spyOn(textarea, 'focus')
+    renderProbe('b', 'local', vi.fn())
+    act(() => containerKeyDown({ key: 'Enter', preventDefault: vi.fn() } as never))
+    expect(focus).not.toHaveBeenCalled()
+    textarea.remove()
+  })
+
+  it('routes keyboard selection to project sessions without activating terminals', () => {
+    const openWorkspace = vi.fn()
+    renderProbe('b', 'local', openWorkspace)
+    press('down')
+    expect(openWorkspace).toHaveBeenCalledWith('c', 'local')
+    expect(activateAndRevealWorktree).not.toHaveBeenCalled()
+  })
+
   it('steps to the next row when the active host resolved to local but rows are unqualified', () => {
     // Why: a sidebar click activates with the repo-resolved host (`local`), while
     // local rows carry no hostId; a raw identity compare misses and wraps to the top.

@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
   openNewTaskHome: vi.fn(),
   openSessionsPage: vi.fn(),
+  updateSessionsView: vi.fn(),
   openTaskPage: vi.fn(),
   openAutomationsPage: vi.fn(),
   openActivityPage: vi.fn(),
@@ -42,10 +43,6 @@ vi.mock('@/store/selectors', () => ({
 
 vi.mock('@/components/activity/useActivityUnreadCount', () => ({
   useActivityUnreadCount: () => 0
-}))
-
-vi.mock('@/components/sessions/SessionProjectsMenu', () => ({
-  default: () => <button type="button">Projects</button>
 }))
 
 vi.mock('../mobile/paired-mobile-devices', () => ({
@@ -139,6 +136,8 @@ function setSidebarState({
     activeWorkspaceKey,
     openNewTaskHome: mocks.openNewTaskHome,
     openSessionsPage: mocks.openSessionsPage,
+    updateSessionsView: mocks.updateSessionsView,
+    sessionsView: { scope: { kind: 'all' }, navigation: 'sessions' },
     openTaskPage: mocks.openTaskPage,
     openAutomationsPage: mocks.openAutomationsPage,
     openActivityPage: mocks.openActivityPage,
@@ -233,13 +232,15 @@ describe('SidebarNav', () => {
     const container = await renderSidebarNav()
     const buttons = Array.from(container.querySelectorAll('button'))
     const sessions = getButtonByText(container, 'Sessions')
-    const projects = getButtonByText(container, 'Projects')
+    const projects = getButtonByText(container, 'Manage projects')
     const newTask = container.querySelector('button[aria-label="New task"]')
     expect(buttons.indexOf(sessions)).toBe(buttons.indexOf(newTask as HTMLButtonElement) + 1)
     expect(buttons.indexOf(projects)).toBe(buttons.indexOf(sessions) + 1)
     expect(sessions.getAttribute('aria-current')).toBe('page')
     await clickButton(sessions)
     expect(mocks.openSessionsPage).toHaveBeenCalledWith()
+    await clickButton(projects)
+    expect(mocks.updateSessionsView).toHaveBeenCalledWith({ navigation: 'projects', query: '' })
   })
 
   it('keeps the Agent Dashboard row unmounted while its experiment is off', async () => {

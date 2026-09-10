@@ -28,6 +28,19 @@ function createViewStore() {
 afterEach(() => setWorktreeNavViewActivator(null))
 
 describe('sessions page navigation memory', () => {
+  it('keeps project hierarchy navigation when selecting or creating a workspace on another host', () => {
+    const store = createViewStore()
+    store.getState().updateSessionsView({ navigation: 'projects' })
+    store.getState().updateSessionsView({
+      scope: { kind: 'workspace', workspaceKey: 'one', executionHostId: 'local' }
+    })
+    expect(store.getState().sessionsView.navigation).toBe('projects')
+    store
+      .getState()
+      .openSessionsPage({ kind: 'workspace', workspaceKey: 'two', executionHostId: 'ssh:other' })
+    expect(store.getState().sessionsView.navigation).toBe('projects')
+    expect(store.getState().sessionsView.selectedSessionKey).toBeNull()
+  })
   it('keeps scope, search, selection and scroll when leaving and returning', () => {
     const store = createViewStore()
     store.getState().openSessionsPage({ kind: 'project', projectKey: 'project-1' })

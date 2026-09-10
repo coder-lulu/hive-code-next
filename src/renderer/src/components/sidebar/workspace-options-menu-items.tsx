@@ -84,8 +84,10 @@ export function useWorkspaceOptionsFilterBadge(): {
 }
 
 export function WorkspaceOptionsMenuItems({
+  fixedProjectHierarchy = false,
   preserveWorkspaceBoardOpen = false
 }: {
+  fixedProjectHierarchy?: boolean
   preserveWorkspaceBoardOpen?: boolean
 }): JSX.Element {
   const repos = useAppStore((s) => s.repos)
@@ -136,14 +138,21 @@ export function WorkspaceOptionsMenuItems({
         </>
       )}
 
-      <DropdownMenuLabel>
-        {translate('auto.components.sidebar.SidebarWorkspaceOptionsMenu.dc0bb670bc', 'Group by')}
-      </DropdownMenuLabel>
-      <div className="px-2 pt-0.5 pb-1">
-        <SidebarGroupByToggle groupBy={groupBy} setGroupBy={setGroupBy} />
-      </div>
+      {!fixedProjectHierarchy && (
+        <>
+          <DropdownMenuLabel>
+            {translate(
+              'auto.components.sidebar.SidebarWorkspaceOptionsMenu.dc0bb670bc',
+              'Group by'
+            )}
+          </DropdownMenuLabel>
+          <div className="px-2 pt-0.5 pb-1">
+            <SidebarGroupByToggle groupBy={groupBy} setGroupBy={setGroupBy} />
+          </div>
 
-      <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
+        </>
+      )}
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
           <span className="flex flex-1 items-center justify-between">
@@ -191,7 +200,7 @@ export function WorkspaceOptionsMenuItems({
 
       {/* Why: project order only has a visible effect when grouping by
           project; hide it in none/status/PR modes to avoid a dead control. */}
-      {groupBy === 'repo' && (
+      {(fixedProjectHierarchy || groupBy === 'repo') && (
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <span className="flex flex-1 items-center justify-between">

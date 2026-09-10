@@ -15790,7 +15790,12 @@
         "ambiguous": "此工作区存在多个执行归属，请从项目管理中打开。",
         "failed": "无法启动会话。",
         "unknown": "会话尚未出现，请先检查会话列表，避免重复创建。"
-      }
+      },
+      "workspaceEmpty": "此工作区暂无会话",
+      "chooseWorkspace": "选择一个工作区",
+      "workspaceSessionsHint": "选择工作区后，在右侧标签页中查看和继续它的会话。",
+      "backToProjects": "返回项目",
+      "reopenWorkspaceSessions": "打开此工作区会话"
     }
   },
   "dashboardPopout": {

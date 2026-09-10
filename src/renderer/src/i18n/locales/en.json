@@ -18167,7 +18167,12 @@
         "ambiguous": "This workspace has multiple execution owners. Open it from project management.",
         "failed": "Could not start the session.",
         "unknown": "The session has not appeared yet. Check the session list before trying again."
-      }
+      },
+      "workspaceEmpty": "No sessions in this workspace",
+      "chooseWorkspace": "Select a workspace",
+      "workspaceSessionsHint": "Select a workspace to open its sessions as tabs here.",
+      "backToProjects": "Back to projects",
+      "reopenWorkspaceSessions": "Open workspace sessions"
     }
   },
   "dashboardPopout": {

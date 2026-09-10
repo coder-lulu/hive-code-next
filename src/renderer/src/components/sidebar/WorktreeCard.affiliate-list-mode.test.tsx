@@ -1,3 +1,4 @@
+import { OpenWorkspaceInSurfaceContext } from './worktree-list/navigation/workspace-activation-context'
 // @vitest-environment happy-dom
 
 import { act, type ReactNode } from 'react'
@@ -161,6 +162,47 @@ describe('WorktreeCard affiliate list mode', () => {
       root.unmount()
     })
     container.remove()
+  })
+
+  it('opens the selected workspace in the enclosing project surface without terminal activation', () => {
+    const openWorkspace = vi.fn()
+    act(() =>
+      root.render(
+        <OpenWorkspaceInSurfaceContext.Provider value={openWorkspace}>
+          <WorktreeCard worktree={makeWorktree()} repo={makeRepo()} isActive={false} />
+        </OpenWorkspaceInSurfaceContext.Provider>
+      )
+    )
+    const surface = container.querySelector<HTMLElement>('[data-worktree-card-surface="true"]')
+    act(() => {
+      surface?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(openWorkspace).toHaveBeenCalledWith('repo-1::/repo/worktrees/affiliate', 'local')
+    expect(testDoubles.activateWorktreeFromSidebar).not.toHaveBeenCalled()
+  })
+
+  it('preserves selection-only gestures in project navigation without opening a workspace', () => {
+    const openWorkspace = vi.fn()
+    const selectionOnly = vi.fn(() => true)
+    act(() =>
+      root.render(
+        <OpenWorkspaceInSurfaceContext.Provider value={openWorkspace}>
+          <WorktreeCard
+            worktree={makeWorktree()}
+            repo={makeRepo()}
+            isActive={false}
+            onSelectionGesture={selectionOnly}
+          />
+        </OpenWorkspaceInSurfaceContext.Provider>
+      )
+    )
+    const surface = container.querySelector<HTMLElement>('[data-worktree-card-surface="true"]')
+    act(() => {
+      surface?.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }))
+    })
+    expect(selectionOnly).toHaveBeenCalledOnce()
+    expect(openWorkspace).not.toHaveBeenCalled()
+    expect(testDoubles.activateWorktreeFromSidebar).not.toHaveBeenCalled()
   })
 
   it('keeps the card visual surface but disables mutating list interactions', () => {

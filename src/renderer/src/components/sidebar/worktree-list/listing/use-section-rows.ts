@@ -22,6 +22,7 @@ import { buildSidebarHostOptions } from '../../sidebar-host-options'
 import { selectPendingWorktreeCreationKeys } from './pending-worktree-creation-keys'
 
 type SectionRowsArgs = {
+  showUngroupedProjectGroup?: boolean
   groupBy: WorktreeGroupBy
   projectOrderBy: ProjectOrderBy
   pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy
@@ -166,12 +167,11 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         hostLabelById,
         defaultHostId,
         args.pinnedDisplayPolicy,
-        // Keep the Spaces → (derived) Ungrouped space → repository hierarchy
-        // visible even before a persisted ProjectGroup is available.
-        true
+        args.showUngroupedProjectGroup ?? true
       ),
     [
       args.groupBy,
+      args.showUngroupedProjectGroup,
       worktrees,
       repoMap,
       args.prCache,

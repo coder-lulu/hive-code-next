@@ -88,50 +88,86 @@ test.beforeEach(async ({ orcaPage: page, electronApp }) => {
   ).toBe(true)
 })
 
-test('creates from project context and keeps workspace management available', async ({
+test('opens worktree sessions as tabs from the project hierarchy and creates in context', async ({
   orcaPage: page
 }) => {
-  await seedSessions(page, 0)
-  await page.locator('.session-project-navigation-row .session-project-row').first().click()
-  const pane = page.locator('.sessions-list-pane')
-  await expect(page.getByTestId('session-workspace-filter')).toBeVisible()
-  await page.getByTestId('session-workspace-filter').click()
-  await expect(page.getByRole('option', { name: 'All workspaces', exact: true })).toBeVisible()
-  await page.getByRole('option').last().click()
-  await pane.getByRole('button', { name: 'New session', exact: true }).first().click()
+  test.setTimeout(150_000)
+  const fixture = await seedSessions(page, 0)
+  await page.evaluate((id) => {
+    const store = window.__store!
+    const tab = store.getState().createTab(id, undefined, undefined, { activate: false })
+    store.getState().setAiVaultTabTitle(tab.id, {
+      agent: 'codex',
+      sessionId: 'project-second',
+      title: 'Project second session'
+    })
+  }, fixture.worktreeId)
+  await page.getByRole('button', { name: 'Manage projects', exact: true }).click()
+  const pane = page.getByTestId('projects-navigation-pane')
+  await expect(pane).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Project sessions', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(pane.getByText('Ungrouped', { exact: true })).toHaveCount(0)
+  await pane.locator(`[data-worktree-id="${fixture.worktreeId}"]`).first().click()
+  await expect(
+    page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })
+  ).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Project second session', exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Project second session', exact: true }).click()
+  await expect(
+    page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByRole('tab', { name: 'Project second session', exact: true })
+  ).toHaveAttribute('aria-selected', 'true')
+  await capture(page, 'projects-workspace-tabs-light')
+  await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
+  await capture(page, 'projects-workspace-tabs-dark')
+  await page.evaluate(async (id) => {
+    const state = window.__store!.getState()
+    const repo = state.repos.find((candidate) =>
+      state.worktreesByRepo[candidate.id]?.some((worktree) => worktree.id === id)
+    )!
+    const group = await state.createProjectGroup('Project navigation group')
+    if (
+      !group ||
+      !(await state.moveProjectToGroup(repo.id, group.id, undefined, { hostId: 'local' }))
+    ) {
+      throw new Error('Could not seed project group')
+    }
+  }, fixture.worktreeId)
+  await expect(pane.getByText('Project navigation group', { exact: true })).toBeVisible()
+  await pane
+    .locator(`[data-worktree-id]:not([data-worktree-id="${fixture.worktreeId}"])`)
+    .first()
+    .click()
+  await expect(page.getByTestId('project-sessions-empty')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })).toHaveCount(
+    0
+  )
+  await pane.locator(`[data-worktree-id="${fixture.worktreeId}"]`).first().click()
+  await expect(
+    page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })
+  ).toBeVisible()
+  await capture(page, 'projects-grouped-workspace-tabs')
+  await pane.getByRole('button', { name: 'New session', exact: true }).click()
   await page.getByRole('menuitem', { name: 'New session', exact: true }).click()
-  await expect(page.getByRole('dialog')).toContainText('Start session')
   await expect(page.locator('#session-create-workspace')).not.toContainText('Choose a workspace')
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).first().click()
-  await pane.getByRole('button', { name: 'New session', exact: true }).first().click()
-  await page.getByRole('menuitem', { name: 'New worktree', exact: true }).click()
-  await expect(
-    page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true })
-  ).toBeEnabled()
-  await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByRole('dialog')).not.toContainText('Choose the repository and device')
-  await page.keyboard.press('Escape')
-  await expect(page.getByTestId('sessions-page')).toBeVisible()
-  await page.getByRole('button', { name: 'Manage projects', exact: true }).click()
-  await expect(page.getByTestId('project-manager-workspaces')).toBeVisible()
-  await expect(page.getByRole('dialog')).toContainText('Workspaces and groups')
-  await capture(page, 'project-manager-light')
-  await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
-  await capture(page, 'project-manager-dark')
-  await page.keyboard.press('Escape')
-  await expect(page.getByTestId('sessions-page')).toBeVisible()
-  await pane.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await pane.getByRole('button', { name: 'New session', exact: true }).click()
   await page.getByRole('menuitem', { name: 'New worktree', exact: true }).click()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   const composer = page.getByRole('dialog', { name: /Create (Workspace|Worktree)/i })
-  const workspaceName = `session-entry-${Date.now()}`
+  const workspaceName = `project-entry-${Date.now()}`
   await composer.getByPlaceholder(/Type a name/i).fill(workspaceName)
   await composer.getByRole('button', { name: /Create (Workspace|Worktree)/i }).click()
   await expect(composer).toBeHidden({ timeout: 20_000 })
-  await expect(page.getByTestId('sessions-page')).toBeVisible({ timeout: 30_000 })
-  await expect(pane.getByRole('button', { name: 'Session scope', exact: true })).toContainText(
+  await expect(pane).toBeVisible({ timeout: 30_000 })
+  await expect(pane.locator('[data-worktree-id][aria-current="page"]').first()).toContainText(
     workspaceName
+  )
+  await expect(page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })).toHaveCount(
+    0
   )
 })
 
@@ -269,7 +305,8 @@ test('returns to the same terminal and browser guest without duplicate tabs or P
     expect(await page.evaluate(() => window.__store!.getState().activeWorktreeId)).toBe(
       fixture.worktreeId
     )
-    await page.locator('.session-project-row').first().click()
+    await page.getByRole('button', { name: 'Session scope', exact: true }).click()
+    await page.getByRole('option', { name: /^orca-e2e-repo/ }).click()
     await expect(page.getByTestId('session-center-row')).toHaveCount(1)
     const search = page.getByRole('textbox', { name: 'Search sessions', exact: true })
     await search.fill('P2 Workspace continuity')

@@ -14,12 +14,14 @@ import {
 } from './workspace-options-menu-items'
 
 type SidebarWorkspaceOptionsMenuProps = {
+  fixedProjectHierarchy?: boolean
   preserveWorkspaceBoardOpen?: boolean
   onMenuOpenChange?: (open: boolean) => void
 }
 
 const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsMenu({
   preserveWorkspaceBoardOpen = false,
+  fixedProjectHierarchy = false,
   onMenuOpenChange
 }: SidebarWorkspaceOptionsMenuProps) {
   const [open, setOpen] = useState(false)
@@ -91,7 +93,10 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
         className="w-72 pb-2"
         data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
       >
-        <WorkspaceOptionsMenuItems preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen} />
+        <WorkspaceOptionsMenuItems
+          preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen}
+          fixedProjectHierarchy={fixedProjectHierarchy}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )

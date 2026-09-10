@@ -5,6 +5,7 @@ import {
   CalendarClock,
   EyeOff,
   Files,
+  FolderKanban,
   MessageSquarePlus,
   Smartphone
 } from 'lucide-react'
@@ -21,7 +22,6 @@ import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { SetupGuideSidebarEntry } from './SetupGuideSidebarEntry'
 import { SidebarTaskNavButton } from './SidebarTaskNavButton'
 import SidebarSessionsNavButton from './SidebarSessionsNavButton'
-import SessionProjectsMenu from '@/components/sessions/SessionProjectsMenu'
 import { HideSidebarMenu } from './sidebar-nav-controls'
 import { translate } from '@/i18n/i18n'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -67,16 +67,14 @@ export function shouldShowAgentDashboardButton(
 
 const AgentDashboardSidebarEntry = lazyWithRetry(() => import('./AgentDashboardSidebarEntry'))
 
-const SidebarNav = React.memo(function SidebarNav({
-  projectManagement
-}: {
-  projectManagement?: React.ReactNode
-}) {
+const SidebarNav = React.memo(function SidebarNav() {
   // Why: this memo boundary needs its own language subscription, while
   // translate() preserves Orca's pseudo-localization behavior.
   useTranslation()
   const newTaskShortcutLabel = useShortcutLabel('home.newTask')
   const openNewTaskHome = useAppStore((s) => s.openNewTaskHome)
+  const openSessionsPage = useAppStore((s) => s.openSessionsPage)
+  const updateSessionsView = useAppStore((s) => s.updateSessionsView)
   const newTaskActive = useAppStore(
     (s) => s.homeNewTaskMode && s.activeView === 'terminal' && s.activeWorkspaceKey === null
   )
@@ -87,6 +85,9 @@ const SidebarNav = React.memo(function SidebarNav({
   const openSkillsPage = useAppStore((s) => s.openSkillsPage)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const activeView = useAppStore((s) => s.activeView)
+  const projectManagementActive = useAppStore(
+    (s) => s.activeView === 'sessions' && s.sessionsView.navigation === 'projects'
+  )
   const showAgentsButton = useAppStore((s) => shouldShowAgentsButton(s.settings))
   const showMobileButton = useAppStore((s) => shouldShowMobileButton(s.settings))
   const showAgentDashboardButton = useAppStore((s) => shouldShowAgentDashboardButton(s.settings))
@@ -135,8 +136,23 @@ const SidebarNav = React.memo(function SidebarNav({
         <span className="sidebar-new-task-shortcut">{newTaskShortcutLabel}</span>
       </button>
       <SidebarSessionsNavButton />
-      <SessionProjectsMenu />
-      {projectManagement}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn(
+          'w-full justify-start gap-2 px-2',
+          projectManagementActive &&
+            'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+        )}
+        aria-current={projectManagementActive ? 'page' : undefined}
+        onClick={() => {
+          openSessionsPage()
+          updateSessionsView({ navigation: 'projects', query: '' })
+        }}
+      >
+        <FolderKanban className="size-4 shrink-0" />
+        {translate('components.sessions.manageProjects', 'Manage projects')}
+      </Button>
       <SetupGuideSidebarEntry />
       <SidebarTaskNavButton />
       {showArtifactsButton ? (

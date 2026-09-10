@@ -5,7 +5,6 @@ import { useSidebarResize } from '@/hooks/useSidebarResize'
 import SidebarHeader from './SidebarHeader'
 import SidebarNav from './SidebarNav'
 import SetupScriptPromptCard from './SetupScriptPromptCard'
-import SidebarProjectManager from './SidebarProjectManager'
 import SidebarFooter from './SidebarFooter'
 import WorkspaceKanbanDrawer from './WorkspaceKanbanDrawer'
 import type { VirtualizedScrollAnchor } from '@/hooks/useVirtualizedScrollAnchor'
@@ -46,11 +45,7 @@ type SidebarProps = {
   workspaceBoardPanel: WorkspaceBoardPanelState
 }
 
-function Sidebar({
-  worktreeScrollOffsetRef,
-  worktreeScrollAnchorRef,
-  workspaceBoardPanel
-}: SidebarProps): React.JSX.Element {
+function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
@@ -105,10 +100,7 @@ function Sidebar({
     workspaceBoardMenuOpen,
     handleWorkspaceBoardOpenChange,
     setWorkspaceBoardMenuOpen,
-    closeWorkspaceBoard,
-    previewWorkspaceBoardFromDrag,
-    solidifyWorkspaceBoardFromDrag,
-    cancelWorkspaceBoardDragPreview
+    closeWorkspaceBoard
   } = workspaceBoardPanel
 
   const setLiveSidebarWidth = React.useCallback((width: number) => {
@@ -162,18 +154,7 @@ function Sidebar({
         {sidebarOpen && (
           <>
             {/* Fixed controls */}
-            <SidebarNav
-              projectManagement={
-                <SidebarProjectManager
-                  scrollOffsetRef={worktreeScrollOffsetRef}
-                  scrollAnchorRef={worktreeScrollAnchorRef}
-                  workspaceBoardOpen={workspaceBoardOpen}
-                  onWorkspaceBoardDragPreviewStart={previewWorkspaceBoardFromDrag}
-                  onWorkspaceBoardDragPreviewCommit={solidifyWorkspaceBoardFromDrag}
-                  onWorkspaceBoardDragPreviewCancel={cancelWorkspaceBoardDragPreview}
-                />
-              }
-            />
+            <SidebarNav />
             {sidebarBody === 'agents' && (
               <section
                 className="sidebar-workspace-section"

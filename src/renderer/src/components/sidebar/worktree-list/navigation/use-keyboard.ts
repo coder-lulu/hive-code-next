@@ -1,9 +1,13 @@
 import { useCallback, useContext, useEffect } from 'react'
-import { WorkspaceActivatedContext } from './workspace-activation-context'
+import {
+  WorkspaceActivatedContext,
+  OpenWorkspaceInSurfaceContext
+} from './workspace-activation-context'
 import type React from 'react'
 import type { Virtualizer } from '@tanstack/react-virtual'
 import { useAppStore } from '@/store'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
+import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { getShortcutPlatform } from '@/lib/shortcut-platform'
 import { keybindingMatchesAction } from '../../../../../../shared/keybindings'
@@ -50,6 +54,7 @@ export function useWorktreeListKeyboardNavigation(args: {
   markDirectScrollInput: () => void
 }) {
   const onWorkspaceActivated = useContext(WorkspaceActivatedContext)
+  const openWorkspaceInSurface = useContext(OpenWorkspaceInSurfaceContext)
   const {
     rows,
     renderRows,
@@ -81,21 +86,33 @@ export function useWorktreeListKeyboardNavigation(args: {
       if (nextWorktreeIdentity === null) {
         return
       }
-      const nextWorktree = worktreeRows.find(
+      const nextRow = worktreeRows.find(
         (row) => getCyclableRowIdentity(row) === nextWorktreeIdentity
-      )?.worktree
+      )
+      const nextWorktree = nextRow?.worktree
       if (!nextWorktree) {
         return
       }
 
       // Why: keyboard cycling is real navigation; route through the activation helper that records history.
-      const activated = activateAndRevealWorktree(
-        nextWorktree.id,
-        nextWorktree.hostId ? { executionHostId: nextWorktree.hostId } : {}
-      )
+      if (openWorkspaceInSurface) {
+        const host =
+          nextWorktree.hostId ??
+          (nextRow && 'repo' in nextRow && nextRow.repo
+            ? getRepoExecutionHostId(nextRow.repo)
+            : undefined)
+        if (host) {
+          openWorkspaceInSurface(nextWorktree.id, host)
+        }
+      } else {
+        const activated = activateAndRevealWorktree(
+          nextWorktree.id,
+          nextWorktree.hostId ? { executionHostId: nextWorktree.hostId } : {}
+        )
 
-      if (activated) {
-        onWorkspaceActivated?.()
+        if (activated) {
+          onWorkspaceActivated?.()
+        }
       }
 
       const rowIndex = findPreferredRenderRowIndexForWorktreeIdentity(
@@ -114,7 +131,8 @@ export function useWorktreeListKeyboardNavigation(args: {
       activeWorkspaceExecutionHostId,
       virtualizer,
       pinnedDisplayPolicy,
-      onWorkspaceActivated
+      onWorkspaceActivated,
+      openWorkspaceInSurface
     ]
   )
 
@@ -156,7 +174,7 @@ export function useWorktreeListKeyboardNavigation(args: {
         markDirectScrollInput()
         navigateWorktree(e.key === 'ArrowUp' ? 'up' : 'down')
         e.preventDefault()
-      } else if (e.key === 'Enter') {
+      } else if (e.key === 'Enter' && !openWorkspaceInSurface) {
         const helper = document.querySelector(
           '.xterm-helper-textarea'
         ) as HTMLTextAreaElement | null
@@ -168,7 +186,7 @@ export function useWorktreeListKeyboardNavigation(args: {
         markDirectScrollInput()
       }
     },
-    [markDirectScrollInput, navigateWorktree]
+    [markDirectScrollInput, navigateWorktree, openWorkspaceInSurface]
   )
 
   return { handleContainerKeyDown }

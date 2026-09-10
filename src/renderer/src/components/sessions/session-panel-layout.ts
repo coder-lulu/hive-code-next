@@ -118,3 +118,40 @@ export function resizeSessionPanel(
     ? { ...state, layout: updateSplitRatio(state.layout, path ? path.split('.') : [], ratio) }
     : state
 }
+
+/** Reconcile a workspace collection without resetting user-created splits or closed tabs. */
+export function syncSessionPanelCollection(
+  state: SessionPanelLayout,
+  keys: readonly string[],
+  selectedKey: string | null,
+  closedKeys: ReadonlySet<string>,
+  newGroupId: string
+): SessionPanelLayout {
+  const visible = new Set(keys.filter((key) => !closedKeys.has(key)))
+  let next = state
+  for (const key of state.groups.flatMap((group) => group.keys)) {
+    if (!visible.has(key)) {
+      next = closeSessionPanelTab(next, key)
+    }
+  }
+  const existing = new Set(next.groups.flatMap((group) => group.keys))
+  const added = [...visible].filter((key) => !existing.has(key))
+  if (added.length) {
+    const target = next.groups.find((group) => group.id === next.focusedGroupId) ?? next.groups[0]
+    next = target
+      ? {
+          ...next,
+          groups: next.groups.map((group) =>
+            group === target ? { ...group, keys: [...group.keys, ...added] } : group
+          )
+        }
+      : {
+          layout: { type: 'leaf', groupId: newGroupId },
+          groups: [{ id: newGroupId, keys: added, activeKey: added[0] }],
+          focusedGroupId: newGroupId
+        }
+  }
+  return selectedKey && visible.has(selectedKey)
+    ? openSessionPanelTab(next, selectedKey, { newGroupId })
+    : next
+}

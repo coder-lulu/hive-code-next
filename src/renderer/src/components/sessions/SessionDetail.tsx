@@ -10,6 +10,7 @@ import SessionContent from './SessionContent'
 export default function SessionDetail({
   item,
   onBack,
+  backLabel,
   groupId,
   tabItems,
   isFocused = true,
@@ -20,6 +21,7 @@ export default function SessionDetail({
 }: {
   item: SessionListItem | null
   onBack: () => void
+  backLabel?: string
   groupId?: string
   tabItems?: SessionListItem[]
   isFocused?: boolean
@@ -61,7 +63,9 @@ export default function SessionDetail({
           size="icon-sm"
           className="session-detail-back"
           onClick={onBack}
-          aria-label={translate('components.sessions.backToList', 'Back to session list')}
+          aria-label={
+            backLabel ?? translate('components.sessions.backToList', 'Back to session list')
+          }
         >
           <ArrowLeft className="size-4" aria-hidden />
         </Button>
