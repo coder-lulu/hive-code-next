@@ -143,6 +143,12 @@
   --tab-width: 180px;
   --tab-width-wide: 220px;
   --tab-min-width: 128px;
+  --tab-drag-inset: 4px;
+  --tab-corner-size: var(--radius);
+  --tab-strip-surface: var(--worktree-sidebar);
+  --tab-active-surface: var(--card);
+  --tab-hover-surface: color-mix(in srgb, var(--foreground) 6%, var(--tab-strip-surface));
+  --tab-divider: var(--border);
   --orca-security-background: #fff;
   --orca-security-foreground: #0a0a0a;
   --orca-security-card: #fff;
@@ -264,6 +270,10 @@
 /* ── Dark Mode ───────────────────────────────────────── */
 
 .dark {
+  --tab-strip-surface: var(--worktree-sidebar);
+  --tab-active-surface: var(--card);
+  --tab-hover-surface: color-mix(in srgb, var(--foreground) 6%, var(--tab-strip-surface));
+  --tab-divider: var(--border);
   --orca-security-background: #0a0a0a;
   --orca-security-foreground: #fafafa;
   --orca-security-card: #171717;
@@ -718,11 +728,6 @@
   mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1.5rem), transparent);
 }
 
-/* Tab activity affordance (amber wash) is rendered as a React DOM child in
-   SortableTab.tsx rather than via ::after here, so the drop-indicator
-   ::before/::after pseudo-elements stay free for drag-and-drop feedback. See
-   drop-indicator.ts and SortableTab.tsx for the implementation. */
-
 /* ── Layout ──────────────────────────────────────────── */
 
 #root {
@@ -745,6 +750,121 @@ html.native-shell body,
 html.native-shell #root,
 html.native-shell .app-layout {
   height: 100%;
+}
+
+.tab-group-strip {
+  container: tab-group-strip / inline-size;
+  height: var(--tab-strip-height);
+  padding-top: var(--tab-drag-inset);
+  background: var(--tab-strip-surface);
+}
+
+.tab-window-drag-band {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--tab-drag-inset);
+  z-index: 10;
+  background: var(--tab-strip-surface);
+}
+
+.tab-bar-surface {
+  background: var(--tab-strip-surface);
+}
+
+@container tab-group-strip (max-width: 600px) {
+  .tab-quick-command-add {
+    width: 24px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .tab-quick-command-label,
+  .tab-quick-command-run {
+    display: none;
+  }
+}
+
+.tab-container:not(:last-child) {
+  background: linear-gradient(var(--tab-divider), var(--tab-divider)) right center / 1px 16px
+    no-repeat;
+}
+
+.tab-container:has(.tab-item-active),
+.tab-container:has(+ .tab-container .tab-item-active) {
+  background-image: none;
+}
+
+.tab-item {
+  isolation: isolate;
+  padding-inline: calc(var(--tab-corner-size) + 4px);
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.tab-item:not(.tab-item-active):hover {
+  border-radius: var(--radius-md);
+  color: var(--foreground);
+  background: var(--tab-hover-surface);
+}
+
+.tab-item:focus-visible {
+  border-radius: var(--radius);
+  outline: 2px solid var(--ring);
+  outline-offset: -4px;
+}
+
+/* All painted corners fit inside the tab rectangle, including the last scrollable tab. */
+.tab-active-shape {
+  position: absolute;
+  inset: 0 var(--tab-corner-size);
+  z-index: -1;
+  pointer-events: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--tab-active-surface);
+}
+
+.tab-active-shape::before,
+.tab-active-shape::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: var(--tab-corner-size);
+  height: var(--tab-corner-size);
+}
+
+.tab-active-shape::before {
+  left: calc(-1 * var(--tab-corner-size));
+  background: radial-gradient(
+    circle at 0 0,
+    transparent var(--tab-corner-size),
+    var(--tab-active-surface) var(--tab-corner-size)
+  );
+}
+
+.tab-active-shape::after {
+  right: calc(-1 * var(--tab-corner-size));
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent var(--tab-corner-size),
+    var(--tab-active-surface) var(--tab-corner-size)
+  );
+}
+
+.tab-close-button {
+  opacity: 0;
+  color: var(--muted-foreground);
+}
+
+.tab-item-active .tab-close-button,
+.tab-item:hover .tab-close-button,
+.tab-item:focus-within .tab-close-button {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .tab-close-button {
+    opacity: 1;
+  }
 }
 
 /* Tab-group split resize handle — wide hit area, visible center line. */

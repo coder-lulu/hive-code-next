@@ -1,12 +1,9 @@
 import { Laptop, Loader2, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
-import {
-  ACTIVE_TAB_INDICATOR_CLASSES,
-  getTabRootStateClasses,
-  getTabStripBorderClasses
-} from './drop-indicator'
+import { ACTIVE_TAB_SHAPE_CLASSES, getTabRootStateClasses } from './drop-indicator'
 import {
   describeClientHostedBrowserRowHost,
   getClientHostedBrowserRowLabel
@@ -24,17 +21,13 @@ import { TAB_CONTAINER_WIDTH_CLASSES, TAB_LABEL_WIDTH_CLASSES } from './tab-widt
 export default function ClientHostedBrowserTab({
   row,
   isActive,
-  hasTabsToRight,
   onActivate,
-  onClose,
-  includeTopTabBorder = true
+  onClose
 }: {
   row: ClientHostedBrowserRow
   isActive: boolean
-  hasTabsToRight: boolean
   onActivate: () => void
   onClose: () => void
-  includeTopTabBorder?: boolean
 }): React.JSX.Element {
   const loading = row.loading && !row.hostAbsent
   const PageIcon = loading ? Loader2 : Laptop
@@ -47,8 +40,21 @@ export default function ClientHostedBrowserTab({
         <TooltipTrigger asChild>
           <div
             data-client-hosted-browser-row-id={row.browserPageId}
-            className={`group relative flex h-full cursor-pointer select-none items-center px-1.5 text-xs outline-none focus:outline-none focus-visible:outline-none ${getTabStripBorderClasses(hasTabsToRight, { includeTopBorder: includeTopTabBorder })} ${getTabRootStateClasses(isActive)}`}
+            data-active={isActive ? 'true' : 'false'}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isActive}
+            className={`${getTabRootStateClasses(isActive)}`}
             onPointerDown={onActivate}
+            onKeyDown={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                (event.key === 'Enter' || event.key === ' ')
+              ) {
+                event.preventDefault()
+                onActivate()
+              }
+            }}
             onMouseDown={(event) => {
               if (event.button === 1) {
                 event.preventDefault()
@@ -63,9 +69,9 @@ export default function ClientHostedBrowserTab({
               }
             }}
           >
-            {isActive && <span className={ACTIVE_TAB_INDICATOR_CLASSES} aria-hidden />}
+            {isActive && <span className={ACTIVE_TAB_SHAPE_CLASSES} aria-hidden />}
             <PageIcon
-              className={`mr-1 size-3 shrink-0 ${loading ? 'motion-safe:animate-spin' : ''} ${row.hostAbsent ? 'text-muted-foreground' : 'text-blue-500'}`}
+              className={`mr-1 size-4 shrink-0 ${loading ? 'motion-safe:animate-spin' : ''} ${row.hostAbsent ? 'text-muted-foreground' : 'text-blue-500'}`}
               aria-hidden
             />
             <span
@@ -73,14 +79,13 @@ export default function ClientHostedBrowserTab({
             >
               {label}
             </span>
-            <button
+            <Button
+              variant="ghost"
+              size="icon-xs"
               type="button"
+              data-tab-close-button="true"
               aria-label={translate('browser.clientHosted.hostRowClose', 'Close hosted page')}
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm ${
-                isActive
-                  ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  : 'text-transparent group-hover:text-muted-foreground hover:!bg-muted hover:!text-foreground'
-              }`}
+              className="tab-close-button motion-reduce:transition-none"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation()
@@ -88,7 +93,7 @@ export default function ClientHostedBrowserTab({
               }}
             >
               <X className="h-3 w-3" />
-            </button>
+            </Button>
           </div>
         </TooltipTrigger>
         <TooltipContent

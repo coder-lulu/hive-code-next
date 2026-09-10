@@ -104,7 +104,6 @@ function activeFlags(
     props: makeProps(activeTabType),
     runtime: RUNTIME,
     dropIndicatorByVisibleId: new Map(),
-    includeTopTabBorder: true,
     activeClientHostedBrowserRowId,
     togglePinned: () => {}
   })
@@ -152,7 +151,6 @@ describe('client-hosted row while a real tab is activated', () => {
         props: makeProps('terminal'),
         runtime: RUNTIME,
         dropIndicatorByVisibleId: new Map(),
-        includeTopTabBorder: true,
         activeClientHostedBrowserRowId: 'page-1',
         togglePinned: () => {}
       })

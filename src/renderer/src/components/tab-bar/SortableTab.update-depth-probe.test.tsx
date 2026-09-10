@@ -101,6 +101,7 @@ vi.mock('@/components/ui/input', () => ({
 // Counts SortableTab's own renders: it is rendered unconditionally inside the tab body, so one
 // stub render == one SortableTab render, which the Harness counter above cannot see.
 vi.mock('./TerminalTabLeadingIcon', () => ({
+  TerminalTabActivityIndicator: () => null,
   TerminalTabLeadingIcon: () => {
     tabRenderCount += 1
     return <span />

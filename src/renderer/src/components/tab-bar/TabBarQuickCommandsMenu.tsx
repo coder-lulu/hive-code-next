@@ -69,8 +69,7 @@ export function TabBarQuickCommandsMenu({
   const commandListRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
   const menuImeEnter = useImeEnterGestureOwnership()
-  // Why: closing restores focus to the chevron for accessibility, but that
-  // focus restoration should not immediately reopen its tooltip.
+  // Keep focus restoration from immediately reopening the chevron tooltip.
   const suppressMoreCommandsTooltipRef = useRef(false)
   const showSearch = repoCommands.length + globalCommands.length > 1
   const filteredRepoCommands = useMemo(
@@ -187,6 +186,7 @@ export function TabBarQuickCommandsMenu({
     'my-auto flex h-7 shrink-0 items-stretch overflow-hidden rounded-md border border-border/60 text-muted-foreground'
   const innerButtonBase =
     'flex items-center bg-transparent leading-none text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+  const runButtonClass = 'tab-quick-command-run gap-1.5 rounded-l-md rounded-r-none px-1.5'
   return (
     <div className={splitButtonClass}>
       <Tooltip>
@@ -195,7 +195,7 @@ export function TabBarQuickCommandsMenu({
             type="button"
             onClick={() => mostRecent && runAndClose(mostRecent)}
             disabled={!mostRecent}
-            className={cn(innerButtonBase, 'gap-1.5 rounded-l-md rounded-r-none px-1.5')}
+            className={cn(innerButtonBase, runButtonClass)}
             aria-label={
               mostRecent
                 ? translate(

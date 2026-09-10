@@ -1,17 +1,10 @@
 import { X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 
-export function EditorFileTabCloseButton({
-  fileIsDirty,
-  showsSelectionChrome,
-  onClose
-}: {
-  fileIsDirty: boolean
-  showsSelectionChrome: boolean
-  onClose: () => void
-}): React.JSX.Element {
+export function EditorFileTabCloseButton({ onClose }: { onClose: () => void }): React.JSX.Element {
   const closeShortcut = useOptionalShortcutLabel('tab.close')
   const closeLabel = translate(
     'auto.components.tab.bar.EditorFileTabCloseButton.a768f428f1',
@@ -21,14 +14,10 @@ export function EditorFileTabCloseButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          className={`flex items-center justify-center w-4 h-4 rounded-sm ${
-            fileIsDirty
-              ? 'hidden group-hover:flex text-muted-foreground hover:text-foreground hover:bg-muted'
-              : showsSelectionChrome
-                ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                : 'text-transparent group-hover:text-muted-foreground hover:!text-foreground hover:!bg-muted'
-          }`}
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="tab-close-button motion-reduce:transition-none"
           type="button"
           // Why: simulator unified tabs reuse this tab chrome, so E2E needs
           // the same stable close affordance on the real button users click.
@@ -44,7 +33,7 @@ export function EditorFileTabCloseButton({
           }}
         >
           <X className="w-3 h-3" />
-        </button>
+        </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={6}>
         {closeShortcut ? `${closeLabel} (${closeShortcut})` : closeLabel}

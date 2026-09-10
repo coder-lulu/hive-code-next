@@ -296,21 +296,12 @@ export default function TabGroupSplitLayout({
         // so disabling it is the simplest fix.
         autoScroll={false}
       >
-        {/* Why: the 4px drag strip sits ABOVE the split layout — lifted out of
-          each pane — so vertical split resize handles don't extend into the
-          window-drag region at the top. Only the split layout's own panes
-          own the resize handles, while this strip keeps the whole top of the
-          center column draggable regardless of how the splits are arranged.
-          Why `border-l` on the wrapper: paint the single full-height divider
-          between the left sidebar and the terminal area, regardless of split
-          state. The leftmost pane suppresses its own `border-l` via
-          `touchesLeftEdge`, so the seam is always exactly 1px — previously
-          both painted and stacked into a 2px bar below the drag strip. */}
+        {/* Keep one sidebar divider and reserve the top drag band above split-resize hit targets. */}
         <div
           ref={dragSplit.setDragRootNode}
-          className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden border-l border-border"
+          className="relative flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden border-l border-border"
         >
-          <div className="h-[4px] shrink-0 bg-card" data-terminal-focus-release-surface="true" />
+          <div className="tab-window-drag-band" data-terminal-focus-release-surface="true" />
           <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
             <SplitNode
               node={layout}

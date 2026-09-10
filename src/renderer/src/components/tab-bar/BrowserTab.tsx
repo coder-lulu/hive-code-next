@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import {
@@ -25,10 +26,9 @@ import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from './SortableTab'
 import { getLiveBrowserUrl } from '../browser-pane/describe-page/live-browser-url-registry'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import {
-  ACTIVE_TAB_INDICATOR_CLASSES,
+  ACTIVE_TAB_SHAPE_CLASSES,
   getDropIndicatorClasses,
   getTabRootStateClasses,
-  getTabStripBorderClasses,
   type DropIndicator
 } from './drop-indicator'
 import { preventMiddleButtonDefault } from './middle-button-default-guard'
@@ -83,8 +83,7 @@ export default function BrowserTab({
   onDuplicate,
   onTogglePin,
   dragData,
-  dropIndicator,
-  includeTopTabBorder = true
+  dropIndicator
 }: {
   tab: BrowserTabState
   isActive: boolean
@@ -101,7 +100,6 @@ export default function BrowserTab({
   onTogglePin: () => void
   dragData: TabDragItemData
   dropIndicator?: DropIndicator
-  includeTopTabBorder?: boolean
 }): React.JSX.Element {
   // Why: no transform/transition/isDragging styling — the drag design is
   // that tabs stay visually anchored; only the blue insertion bar moves.
@@ -157,7 +155,7 @@ export default function BrowserTab({
       data-pinned={isPinned ? 'true' : 'false'}
       {...attributes}
       {...listeners}
-      className={`group relative flex items-center h-full px-1.5 text-xs cursor-pointer select-none outline-none focus:outline-none focus-visible:outline-none ${getTabStripBorderClasses(hasTabsToRight, { includeTopBorder: includeTopTabBorder })} ${getDropIndicatorClasses(dropIndicator ?? null)} ${getTabRootStateClasses(isActive)}`}
+      className={`${getDropIndicatorClasses(dropIndicator ?? null)} ${getTabRootStateClasses(isActive)}`}
       onPointerDown={(e) => {
         onTabPointerDown(
           e,
@@ -181,7 +179,7 @@ export default function BrowserTab({
         }
       }}
     >
-      {isActive && <span className={ACTIVE_TAB_INDICATOR_CLASSES} aria-hidden />}
+      {isActive && <span className={ACTIVE_TAB_SHAPE_CLASSES} aria-hidden />}
       {/* Why: the browser tab icon is the only non-terminal, non-editor
           surface in the tab strip. Coloring the Globe blue (matching the
           in-app browser's identity and the default tab insertion bar)
@@ -192,18 +190,25 @@ export default function BrowserTab({
       <BrowserFavicon
         faviconUrl={tab.faviconUrl}
         loading={tab.loading && !tab.loadError && !isBlankBrowserTab(tab)}
-        className="size-3 mr-1"
+        className="size-4 mr-1"
         fallbackClassName="text-blue-500"
       />
-      {isPinned && <Pin className="mr-1 size-3 shrink-0 text-muted-foreground" aria-hidden />}
       <span className={`${TAB_LABEL_WIDTH_CLASSES} mr-1`}>{tabLabel}</span>
-      {!isPinned && (
-        <button
-          className={`flex items-center justify-center w-4 h-4 rounded-sm shrink-0 ${
-            isActive
-              ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              : 'text-transparent group-hover:text-muted-foreground hover:!text-foreground hover:!bg-muted'
-          }`}
+      {isPinned ? (
+        <span className="inline-flex size-6 shrink-0 items-center justify-center" aria-hidden>
+          <Pin className="size-3 text-muted-foreground" />
+        </span>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          type="button"
+          data-tab-close-button="true"
+          aria-label={translate(
+            'auto.components.tab.bar.EditorFileTabCloseButton.4655cf570e',
+            'Close tab'
+          )}
+          className="tab-close-button motion-reduce:transition-none"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
@@ -211,37 +216,35 @@ export default function BrowserTab({
           }}
         >
           <X className="w-3 h-3" />
-        </button>
+        </Button>
       )}
     </div>
   )
 
   return (
-    <>
-      <div
-        className={TAB_CONTAINER_WIDTH_CLASSES}
-        onContextMenuCapture={(event) => {
-          event.preventDefault()
-          window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT))
-          setMenuPoint({ x: event.clientX, y: event.clientY })
-          setMenuOpen(true)
-        }}
-      >
-        {menuOpen ? (
-          tabRoot
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>{tabRoot}</TooltipTrigger>
-            <TooltipContent
-              side="bottom"
-              sideOffset={6}
-              className="max-w-80 whitespace-normal break-words text-left"
-            >
-              {tabLabel}
-            </TooltipContent>
-          </Tooltip>
-        )}
-      </div>
+    <div
+      className={TAB_CONTAINER_WIDTH_CLASSES}
+      onContextMenuCapture={(event) => {
+        event.preventDefault()
+        window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT))
+        setMenuPoint({ x: event.clientX, y: event.clientY })
+        setMenuOpen(true)
+      }}
+    >
+      {menuOpen ? (
+        tabRoot
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>{tabRoot}</TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            sideOffset={6}
+            className="max-w-80 whitespace-normal break-words text-left"
+          >
+            {tabLabel}
+          </TooltipContent>
+        </Tooltip>
+      )}
 
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
         <DropdownMenuTrigger asChild>
@@ -253,10 +256,7 @@ export default function BrowserTab({
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className={cn(
-            'rounded-[11px] border-border/80 p-1 shadow-[0_16px_36px_rgba(0,0,0,0.24)]',
-            TAB_CONTEXT_MENU_CONTENT_CLASS
-          )}
+          className={cn('p-1', TAB_CONTEXT_MENU_CONTENT_CLASS)}
           sideOffset={0}
           align="start"
         >
@@ -306,6 +306,6 @@ export default function BrowserTab({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </>
+    </div>
   )
 }

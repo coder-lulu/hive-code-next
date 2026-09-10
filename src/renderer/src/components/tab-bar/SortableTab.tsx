@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button'
 import { useCallback, useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { X, Minimize2, Pin } from 'lucide-react'
@@ -10,10 +11,9 @@ import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import { useAppStore } from '../../store'
 import {
-  ACTIVE_TAB_INDICATOR_CLASSES,
+  ACTIVE_TAB_SHAPE_CLASSES,
   getDropIndicatorClasses,
   getTabRootStateClasses,
-  getTabStripBorderClasses,
   type DropIndicator
 } from './drop-indicator'
 import { preventMiddleButtonDefault } from './middle-button-default-guard'
@@ -23,7 +23,7 @@ import { translate } from '@/i18n/i18n'
 import { TAB_CONTAINER_WIDTH_CLASSES, TAB_LABEL_WIDTH_CLASSES } from './tab-width-rules'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { useTabStripPointerActivation } from './tab-strip-pointer-activation'
-import { TerminalTabLeadingIcon } from './TerminalTabLeadingIcon'
+import { TerminalTabLeadingIcon, TerminalTabActivityIndicator } from './TerminalTabLeadingIcon'
 import {
   isTerminalTabActivityLive,
   resolveTerminalTabActivityStatus,
@@ -51,7 +51,6 @@ type SortableTabProps = {
   onToggleExpand: (tabId: string) => void
   dragData: TabDragItemData
   dropIndicator?: DropIndicator
-  includeTopTabBorder?: boolean
   /** True when this agent terminal can switch between the terminal and native chat views; surfaces the "Switch view" context-menu item. */
   canToggleViewMode?: boolean
   /** True when the tab is currently showing the native chat view. */
@@ -84,7 +83,6 @@ export default function SortableTab({
   onToggleExpand,
   dragData,
   dropIndicator,
-  includeTopTabBorder = true,
   canToggleViewMode = false,
   isChatView = false,
   onToggleViewMode,
@@ -188,8 +186,7 @@ export default function SortableTab({
       data-agent-activity-status={activityStatus}
       {...attributes}
       {...dragListeners}
-      // Why: subtle amber wash flags unread activity at a glance, layered over the active highlight so it still reads selected.
-      className={`group relative flex items-center h-full px-1.5 text-xs cursor-pointer select-none outline-none focus:outline-none focus-visible:outline-none ${getTabStripBorderClasses(hasTabsToRight, { includeTopBorder: includeTopTabBorder })} ${getDropIndicatorClasses(dropIndicator ?? null)} ${getTabRootStateClasses(isActive)}`}
+      className={`${getDropIndicatorClasses(dropIndicator ?? null)} ${getTabRootStateClasses(isActive)}`}
       onDoubleClick={(e) => {
         if (isEditing) {
           return
@@ -224,21 +221,8 @@ export default function SortableTab({
         }
       }}
     >
-      {isActive && <span className={ACTIVE_TAB_INDICATOR_CLASSES} aria-hidden />}
-      {showUnreadActivity && (
-        // Why: a real DOM child keeps both drop-indicator pseudo-elements free and pointer events reaching the tab.
-        <span aria-hidden className="pointer-events-none absolute inset-0 bg-amber-500/10" />
-      )}
-      <TerminalTabLeadingIcon
-        agent={tabAgent}
-        activityStatus={activityStatus}
-        shell={shellForIcon}
-        showUnreadActivity={showUnreadActivity}
-        isActive={isActive}
-      />
-      {isPinned && !isEditing && (
-        <Pin className="mr-1 size-3 shrink-0 text-muted-foreground" aria-hidden />
-      )}
+      {isActive && <span className={ACTIVE_TAB_SHAPE_CLASSES} aria-hidden />}
+      <TerminalTabLeadingIcon agent={tabAgent} shell={shellForIcon} isActive={isActive} />
       {isEditing ? (
         <Input
           ref={setRenameInputElement}
@@ -296,6 +280,14 @@ export default function SortableTab({
           </TooltipContent>
         </Tooltip>
       )}
+      {!isEditing && (
+        <span className="mr-1 inline-flex size-4 shrink-0 items-center justify-center">
+          <TerminalTabActivityIndicator
+            activityStatus={activityStatus}
+            showUnreadActivity={showUnreadActivity}
+          />
+        </span>
+      )}
       {tab.color && !isEditing && (
         <span
           className="mr-1.5 size-2 rounded-full shrink-0"
@@ -320,15 +312,18 @@ export default function SortableTab({
           <Minimize2 className="w-3 h-3" />
         </button>
       )}
+      {isPinned && !isEditing && (
+        <span className="inline-flex size-6 shrink-0 items-center justify-center" aria-hidden>
+          <Pin className="size-3 text-muted-foreground" />
+        </span>
+      )}
       {!isEditing && !isPinned && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              className={`relative z-10 flex items-center justify-center w-4 h-4 rounded-sm shrink-0 ${
-                isActive
-                  ? 'text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:text-foreground focus-visible:bg-muted'
-                  : 'text-transparent group-hover:text-muted-foreground hover:!text-foreground hover:!bg-muted focus-visible:!text-foreground focus-visible:!bg-muted'
-              }`}
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="tab-close-button relative z-10 motion-reduce:transition-none"
               // Why: stable accessible name lets E2E drive the real close path (hover, then X) instead of calling the store.
               aria-label={translate(
                 'auto.components.tab.bar.SortableTab.6df69d9388',
@@ -354,7 +349,7 @@ export default function SortableTab({
               }}
             >
               <X className="w-3 h-3" />
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
             {closeShortcut ? `${closeLabel} (${closeShortcut})` : closeLabel}
@@ -365,18 +360,16 @@ export default function SortableTab({
   )
 
   return (
-    <>
-      <div
-        className={TAB_CONTAINER_WIDTH_CLASSES}
-        onContextMenuCapture={(event) => {
-          event.preventDefault()
-          window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT))
-          setMenuPoint({ x: event.clientX, y: event.clientY })
-          setMenuOpen(true)
-        }}
-      >
-        {tabRoot}
-      </div>
+    <div
+      className={TAB_CONTAINER_WIDTH_CLASSES}
+      onContextMenuCapture={(event) => {
+        event.preventDefault()
+        window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT))
+        setMenuPoint({ x: event.clientX, y: event.clientY })
+        setMenuOpen(true)
+      }}
+    >
+      {tabRoot}
 
       <SortableTabContextMenu
         tab={tab}
@@ -403,6 +396,6 @@ export default function SortableTab({
         onToggleViewMode={onToggleViewMode}
         canSplitTerminal={canSplitTerminal}
       />
-    </>
+    </div>
   )
 }

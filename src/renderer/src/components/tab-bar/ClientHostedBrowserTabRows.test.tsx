@@ -44,7 +44,6 @@ function rowsTree(groupActiveTabId: string | null): React.JSX.Element {
         worktreeId="wt-1"
         groupId="group-1"
         groupActiveTabId={groupActiveTabId}
-        includeTopTabBorder
       />
     </TooltipProvider>
   )
@@ -105,7 +104,22 @@ afterEach(() => {
 })
 
 describe('ClientHostedBrowserTabRows selection', () => {
-  it('underlines the row the user picked', () => {
+  it.each(['Enter', ' '])('activates the focused row with %s', (key) => {
+    const container = renderRows('tab-a')
+    const row = rowElement(container)
+    expect(row.tabIndex).toBe(0)
+    act(() => row.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })))
+    expect(row.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('does not activate the row when a close-button key event bubbles', () => {
+    const container = renderRows('tab-a')
+    const button = rowElement(container).querySelector('button')!
+    act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+    expect(isRowActive(container)).toBe(false)
+  })
+
+  it('selects the row the user picked', () => {
     const container = renderRows('tab-a')
 
     clickRow(container)
@@ -115,10 +129,10 @@ describe('ClientHostedBrowserTabRows selection', () => {
 
   /**
    * The other half of the strip paints itself from the group's `activeTabId`, which a keyboard
-   * switch or the command palette moves without ever touching this row. Holding the underline
+   * switch or the command palette moves without ever touching this row. Holding the selection
    * through that move is how the strip ends up showing two active tabs.
    */
-  it('drops the underline once the group activates a real tab', () => {
+  it('drops the selection once the group activates a real tab', () => {
     const container = renderRows('tab-a')
     clickRow(container)
 

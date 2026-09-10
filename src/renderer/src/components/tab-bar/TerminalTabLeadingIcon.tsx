@@ -13,9 +13,7 @@ import { translate } from '@/i18n/i18n'
 
 type TerminalTabLeadingIconProps = {
   agent: TuiAgent | null
-  activityStatus: TerminalTabActivityStatus
   shell: TerminalTab['shellOverride']
-  showUnreadActivity: boolean
   isActive: boolean
 }
 
@@ -37,19 +35,18 @@ function TerminalTabAgentIdentityIcon({
       data-agent-icon={agent}
       aria-hidden
     >
-      <AgentIcon agent={agent} size={12} />
+      <AgentIcon agent={agent} size={16} />
     </span>
   )
 }
 
-/** Render a terminal tab's current state without hiding its agent or shell identity. */
-export function TerminalTabLeadingIcon({
-  agent,
+export function TerminalTabActivityIndicator({
   activityStatus,
-  shell,
-  showUnreadActivity,
-  isActive
-}: TerminalTabLeadingIconProps): React.JSX.Element {
+  showUnreadActivity
+}: {
+  activityStatus: TerminalTabActivityStatus
+  showUnreadActivity: boolean
+}): React.JSX.Element | null {
   if (showUnreadActivity) {
     return (
       <span
@@ -58,10 +55,9 @@ export function TerminalTabLeadingIcon({
           'auto.components.tab.bar.TerminalTabLeadingIcon.7ab2964bea',
           'Unread agent completion'
         )}
-        className="mr-1 inline-flex shrink-0 items-center gap-1"
+        className="inline-flex shrink-0 items-center"
       >
-        <FilledBellIcon className="size-3 text-amber-500 drop-shadow-sm" />
-        {agent ? <TerminalTabAgentIdentityIcon agent={agent} isActive={isActive} /> : null}
+        <FilledBellIcon className="size-3 text-amber-500" />
       </span>
     )
   }
@@ -74,16 +70,22 @@ export function TerminalTabLeadingIcon({
       <span
         data-testid="tab-agent-activity-indicator"
         data-agent-activity-status={activityStatus}
-        className="mr-1 inline-flex shrink-0 items-center gap-1"
+        className="inline-flex shrink-0 items-center"
       >
         <AgentStateDot state={dotState} size="md" />
-        {/* Why: status and identity answer different questions. Keep the agent
-            logo beside the state glyph so parallel tabs remain scannable. */}
-        {agent ? <TerminalTabAgentIdentityIcon agent={agent} isActive={isActive} /> : null}
       </span>
     )
   }
 
+  return null
+}
+
+/** Keep agent or shell identity visible independently of the trailing activity state. */
+export function TerminalTabLeadingIcon({
+  agent,
+  shell,
+  isActive
+}: TerminalTabLeadingIconProps): React.JSX.Element {
   if (agent) {
     return (
       <TerminalTabAgentIdentityIcon agent={agent} isActive={isActive} className="mr-1 shrink-0" />
@@ -98,7 +100,7 @@ export function TerminalTabLeadingIcon({
       data-shell-icon={shell ?? 'generic'}
       aria-hidden
     >
-      <ShellIcon shell={shell} size={12} />
+      <ShellIcon shell={shell} size={16} />
     </span>
   )
 }

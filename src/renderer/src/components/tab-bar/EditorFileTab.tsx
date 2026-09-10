@@ -19,10 +19,9 @@ import { preventMiddleButtonDefault } from './middle-button-default-guard'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from './SortableTab'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import {
-  ACTIVE_TAB_INDICATOR_CLASSES,
+  ACTIVE_TAB_SHAPE_CLASSES,
   getDropIndicatorClasses,
   getTabRootStateClasses,
-  getTabStripBorderClasses,
   type DropIndicator
 } from './drop-indicator'
 import { canOpenMarkdownPreview } from '@/components/editor/markdown-preview-controls'
@@ -49,8 +48,7 @@ export default function EditorFileTab({
   onMakePermanent,
   onTogglePin,
   dragData,
-  dropIndicator,
-  includeTopTabBorder = true
+  dropIndicator
 }: {
   file: OpenFile & { tabId?: string }
   isActive: boolean
@@ -69,7 +67,6 @@ export default function EditorFileTab({
   onTogglePin: () => void
   dragData: TabDragItemData
   dropIndicator?: DropIndicator
-  includeTopTabBorder?: boolean
 }): React.JSX.Element {
   const worktree = useWorktreeById(file.worktreeId)
   const repo = useRepoById(worktree?.repoId ?? null)
@@ -232,9 +229,10 @@ export default function EditorFileTab({
       data-tab-id={file.tabId ?? file.id}
       data-active={isActive ? 'true' : 'false'}
       data-pinned={isPinned ? 'true' : 'false'}
+      data-dirty={file.isDirty ? 'true' : 'false'}
       {...attributes}
       {...dragListeners}
-      className={`group relative flex items-center h-full px-1.5 text-xs cursor-pointer select-none outline-none focus:outline-none focus-visible:outline-none ${getTabStripBorderClasses(hasTabsToRight, { includeTopBorder: includeTopTabBorder })} ${getDropIndicatorClasses(dropIndicator ?? null)} ${getTabRootStateClasses(isActive)}`}
+      className={`${getDropIndicatorClasses(dropIndicator ?? null)} ${getTabRootStateClasses(isActive)}`}
       onPointerDown={(e) => {
         onTabPointerDown(
           e,
@@ -263,29 +261,28 @@ export default function EditorFileTab({
         }
       }}
     >
-      {isActive && <span className={ACTIVE_TAB_INDICATOR_CLASSES} aria-hidden />}
+      {isActive && <span className={ACTIVE_TAB_SHAPE_CLASSES} aria-hidden />}
       {isConflictReview ? (
         <ShieldAlert
-          className={`w-3 h-3 mr-1 shrink-0 ${isActive ? 'text-orange-400' : 'text-orange-400/70'}`}
+          className={`size-4 mr-1 shrink-0 ${isActive ? 'text-orange-400' : 'text-orange-400/70'}`}
         />
       ) : isCheckDetails ? (
         <ListChecks
-          className={`w-3 h-3 mr-1 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+          className={`size-4 mr-1 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
         />
       ) : isDiff ? (
         <GitCompareArrows
-          className={`w-3 h-3 mr-1 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+          className={`size-4 mr-1 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
         />
       ) : isMarkdownPreviewTab ? (
         <Eye
-          className={`w-3.5 h-3.5 mr-1.5 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+          className={`size-4 mr-1 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
         />
       ) : (
         createElement(FileIcon, {
-          className: `w-3 h-3 mr-1 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`
+          className: `size-4 mr-1 shrink-0 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`
         })
       )}
-      {isPinned && <Pin className="mr-1 size-3 shrink-0 text-muted-foreground" aria-hidden />}
       <span className="mr-1 flex min-w-0 flex-1 items-baseline gap-1">
         {isRenaming ? (
           <Input
@@ -361,50 +358,45 @@ export default function EditorFileTab({
           </span>
         )}
       </span>
-      {/* Dirty dot and close button share the same slot to prevent tab width shift during auto-save.
-         When dirty: dot is shown, close button appears on hover (replacing the dot).
-         When clean: close button is shown normally (visible on active tab, on hover for others). */}
-      <div className="relative flex items-center justify-center w-4 h-4 shrink-0">
-        {file.isDirty && (
-          <span className="absolute size-1.5 rounded-full bg-foreground/60 group-hover:hidden group-focus-within:hidden" />
-        )}
-        {!isPinned && (
-          <EditorFileTabCloseButton
-            fileIsDirty={file.isDirty}
-            showsSelectionChrome={isActive}
-            onClose={onClose}
-          />
-        )}
-      </div>
+      <span
+        data-tab-dirty-marker
+        aria-hidden
+        className={`mr-1 size-1.5 shrink-0 rounded-full bg-foreground/60 ${file.isDirty ? '' : 'invisible'}`}
+      />
+      {isPinned ? (
+        <span className="inline-flex size-6 shrink-0 items-center justify-center" aria-hidden>
+          <Pin className="size-3 text-muted-foreground" />
+        </span>
+      ) : (
+        <EditorFileTabCloseButton onClose={onClose} />
+      )}
     </div>
   )
 
   return (
-    <>
-      <div
-        className={TAB_CONTAINER_WIDTH_CLASSES}
-        onContextMenuCapture={(event) => {
-          event.preventDefault()
-          window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT))
-          setMenuPoint({ x: event.clientX, y: event.clientY })
-          setMenuOpen(true)
-        }}
-      >
-        {isRenaming || menuOpen ? (
-          tabRoot
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>{tabRoot}</TooltipTrigger>
-            <TooltipContent
-              side="bottom"
-              sideOffset={6}
-              className="max-w-80 whitespace-normal break-words text-left"
-            >
-              {tabLabel}
-            </TooltipContent>
-          </Tooltip>
-        )}
-      </div>
+    <div
+      className={TAB_CONTAINER_WIDTH_CLASSES}
+      onContextMenuCapture={(event) => {
+        event.preventDefault()
+        window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT))
+        setMenuPoint({ x: event.clientX, y: event.clientY })
+        setMenuOpen(true)
+      }}
+    >
+      {isRenaming || menuOpen ? (
+        tabRoot
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>{tabRoot}</TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            sideOffset={6}
+            className="max-w-80 whitespace-normal break-words text-left"
+          >
+            {tabLabel}
+          </TooltipContent>
+        </Tooltip>
+      )}
 
       <EditorFileTabContextMenu
         open={menuOpen}
@@ -433,6 +425,6 @@ export default function EditorFileTab({
         onCloseToLeft={onCloseToLeft}
         onOpenMarkdownPreview={openMarkdownPreview}
       />
-    </>
+    </div>
   )
 }

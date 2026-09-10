@@ -21,7 +21,6 @@ export function renderTabBarItems({
   props,
   runtime,
   dropIndicatorByVisibleId,
-  includeTopTabBorder,
   activeClientHostedBrowserRowId,
   togglePinned
 }: {
@@ -29,7 +28,6 @@ export function renderTabBarItems({
   props: TabBarProps
   runtime: TabBarRuntimeModel
   dropIndicatorByVisibleId: Map<string, DropIndicator>
-  includeTopTabBorder: boolean
   activeClientHostedBrowserRowId: string | null
   togglePinned: (item: TabBarItem) => void
 }): React.ReactNode[] {
@@ -151,7 +149,6 @@ export function renderTabBarItems({
           onToggleExpand={onTogglePaneExpand}
           dragData={dragData}
           dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
-          includeTopTabBorder={includeTopTabBorder}
         />
       )
     }
@@ -182,7 +179,6 @@ export function renderTabBarItems({
           onTogglePin={() => togglePinned(item)}
           dragData={dragData}
           dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
-          includeTopTabBorder={includeTopTabBorder}
         />
       )
     }
@@ -223,7 +219,6 @@ export function renderTabBarItems({
           onTogglePin={() => togglePinned(item)}
           dragData={dragData}
           dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
-          includeTopTabBorder={includeTopTabBorder}
         />
       )
     }
@@ -269,7 +264,6 @@ export function renderTabBarItems({
           canSplitTerminal={false}
           dragData={dragData}
           dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
-          includeTopTabBorder={includeTopTabBorder}
         />
       )
     }
@@ -297,7 +291,6 @@ export function renderTabBarItems({
         onTogglePin={() => togglePinned(item)}
         dragData={dragData}
         dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
-        includeTopTabBorder={includeTopTabBorder}
       />
     )
   })

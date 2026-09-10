@@ -1,20 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { TerminalTabLeadingIcon } from './TerminalTabLeadingIcon'
+import { TerminalTabLeadingIcon, TerminalTabActivityIndicator } from './TerminalTabLeadingIcon'
 import type { TerminalTabActivityStatus } from './terminal-tab-activity-status'
 
 /** Render one activity status through the production leading-icon component. */
 function renderStatus(status: TerminalTabActivityStatus): string {
   return renderToStaticMarkup(
     <TooltipProvider>
-      <TerminalTabLeadingIcon
-        agent="codex"
-        activityStatus={status}
-        shell={undefined}
-        showUnreadActivity={false}
-        isActive={false}
-      />
+      <TerminalTabLeadingIcon agent="codex" shell={undefined} isActive={false} />
+      <TerminalTabActivityIndicator activityStatus={status} showUnreadActivity={false} />
     </TooltipProvider>
   )
 }
@@ -57,28 +52,19 @@ describe('TerminalTabLeadingIcon', () => {
 
   it('falls back to the shell icon when a plain tab is inactive', () => {
     const markup = renderToStaticMarkup(
-      <TerminalTabLeadingIcon
-        agent={null}
-        activityStatus="inactive"
-        shell={undefined}
-        showUnreadActivity={false}
-        isActive={false}
-      />
+      <TerminalTabLeadingIcon agent={null} shell={undefined} isActive={false} />
     )
 
     expect(markup).toContain('data-shell-icon="generic"')
     expect(markup).not.toContain('data-testid="tab-agent-activity-indicator"')
   })
 
-  it('keeps the unread bell in the icon slot after an unvisited completion', () => {
+  it('keeps the unread bell and identity after an unvisited completion', () => {
     const markup = renderToStaticMarkup(
-      <TerminalTabLeadingIcon
-        agent="codex"
-        activityStatus="done"
-        shell={undefined}
-        showUnreadActivity={true}
-        isActive={false}
-      />
+      <>
+        <TerminalTabLeadingIcon agent="codex" shell={undefined} isActive={false} />
+        <TerminalTabActivityIndicator activityStatus="done" showUnreadActivity />
+      </>
     )
 
     expect(markup).toContain('data-testid="tab-activity-bell"')
