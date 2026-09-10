@@ -50,9 +50,11 @@ export function SessionConnection({
 }
 
 export default function SessionStatus({
-  status
+  status,
+  iconOnly = false
 }: {
   status: SessionListStatus
+  iconOnly?: boolean
 }): React.JSX.Element {
   const Icon = {
     running: LoaderCircle,
@@ -67,12 +69,13 @@ export default function SessionStatus({
       className="session-activity"
       data-activity={status.activity}
       title={sessionActivityLabel(status.activity)}
+      aria-label={iconOnly ? sessionActivityLabel(status.activity) : undefined}
     >
       <Icon
         className={status.activity === 'running' ? 'size-3 motion-safe:animate-spin' : 'size-3'}
         aria-hidden
       />
-      <span>{sessionActivityLabel(status.activity)}</span>
+      {!iconOnly && <span>{sessionActivityLabel(status.activity)}</span>}
     </span>
   )
 }

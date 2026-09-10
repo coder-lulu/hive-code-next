@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { ArrowLeft, FolderOpen, MessageSquare, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
+import { AgentIcon, getAgentCatalog } from '@/lib/agent-catalog'
 import type { SessionListItem } from './session-list-types'
 import SessionStatus, { SessionConnection } from './SessionStatus'
 import SessionContent from './SessionContent'
@@ -29,6 +30,7 @@ export default function SessionDetail({
       </section>
     )
   }
+  const agent = getAgentCatalog().find((entry) => entry.id === item.agent)
   return (
     <section className="session-detail" data-testid="session-detail">
       <header className="session-detail-header">
@@ -54,7 +56,13 @@ export default function SessionDetail({
             aria-controls="session-content"
             type="button"
           >
-            <MessageSquare className="size-4 shrink-0" aria-hidden />
+            <span className="session-tab-icon" title={agent?.label}>
+              {agent ? (
+                <AgentIcon agent={agent.id} size={16} />
+              ) : (
+                <SessionStatus status={item.status} iconOnly />
+              )}
+            </span>
             <h2 title={item.title}>{item.title}</h2>
           </button>
           <Button
@@ -80,12 +88,11 @@ export default function SessionDetail({
               translate('components.sessions.unassigned', 'Unassigned')}
           </span>
         </span>
+        <SessionStatus status={item.status} />
+        <SessionConnection status={item.status} />
         <span className="session-host-label" title={item.hostLabel}>
           {item.hostLabel || translate('components.sessions.unknownHost', 'Unknown host')}
         </span>
-        <SessionStatus status={item.status} />
-        <SessionConnection status={item.status} />
-        {item.agent && <span>{item.agent}</span>}
       </div>
       {item.status.connection !== 'connected' && (
         <p className="session-availability-note">

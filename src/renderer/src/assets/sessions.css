@@ -191,15 +191,21 @@
 .session-current-tab {
   display: flex;
   align-items: center;
+  align-self: flex-end;
   min-width: 0;
-  height: 100%;
-  border: 1px solid var(--border);
-  border-bottom-color: var(--background);
+  width: var(--tab-width-wide);
+  max-width: 100%;
+  height: var(--tab-strip-height);
+  margin-bottom: -1px;
+  padding-right: var(--sessions-space-1);
+  border: 1px solid var(--tab-divider);
+  border-bottom-color: var(--tab-active-surface);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background: var(--background);
+  background: var(--tab-active-surface);
 }
 .session-current-tab > [role='tab'] {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: var(--sessions-space-2);
   min-width: 0;
@@ -207,6 +213,17 @@
 }
 .session-current-tab h2 {
   text-align: left;
+  font-size: var(--sessions-nav-font-size);
+  font-weight: 500;
+}
+.session-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.session-current-tab > button:last-child {
+  flex-shrink: 0;
 }
 .session-project-heading,
 .session-project-row {
@@ -265,12 +282,15 @@
 }
 .session-context-path {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
 }
 .session-host-label {
+  margin-left: auto;
+  text-align: right;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
