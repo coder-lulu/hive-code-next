@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
+const { writePackagedUpdaterConfig } = require('../packaged-updater-config.cjs')
 const {
   verifyPackagedUpdaterSecurityBoundary
 } = require('../packaged-updater-security-boundary.cjs')
@@ -173,6 +174,7 @@ async function createFixture({
   roots.push(root)
   const resourcesDir = join(root, 'resources')
   await mkdir(resourcesDir, { recursive: true })
+  writePackagedUpdaterConfig(resourcesDir)
   await writeFile(join(resourcesDir, 'app.asar'), 'fixture', 'utf8')
 
   const updaterDir = join(resourcesDir, 'node_modules', 'electron-updater')
@@ -545,7 +547,7 @@ describe('packaged updater security boundary', () => {
     )
   })
 
-  it('rejects app-update.yml because product updates are disabled', async () => {
+  it('rejects an app-update.yml that redirects updates outside the product', async () => {
     const fixture = await createFixture()
     await writeFile(join(fixture.resourcesDir, 'app-update.yml'), 'provider: github', 'utf8')
 

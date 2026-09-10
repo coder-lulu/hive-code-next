@@ -22,6 +22,7 @@ const {
 } = require('./scripts/verify-packaged-node-pty-job-ownership.cjs')
 const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.cjs')
 const productManifest = require('./product/hivecode.product.json')
+const { writePackagedUpdaterConfig } = require('./packaged-updater-config.cjs')
 const packageJson = require('../package.json')
 const { verifyStaticAppImagePackage } = require('./scripts/static-appimage-package-contract.cjs')
 
@@ -343,6 +344,7 @@ module.exports = {
     if (!existsSync(resourcesDir)) {
       throw new Error(`Missing packaged resources directory: ${resourcesDir}`)
     }
+    writePackagedUpdaterConfig(resourcesDir)
     // FpmTarget replaces this with deb/rpm while building those artifacts from the shared app tree.
     if (context.electronPlatformName === 'linux') {
       writeFileSync(join(resourcesDir, 'package-type'), 'AppImage')

@@ -2,6 +2,7 @@ const { createHash } = require('node:crypto')
 const { existsSync, readFileSync } = require('node:fs')
 const { join, posix } = require('node:path')
 const { isDeepStrictEqual } = require('node:util')
+const { verifyPackagedUpdaterConfig } = require('./packaged-updater-config.cjs')
 
 const { $schema: _productSchema, ...EXPECTED_PRODUCT_CONFIG } = require(
   join(__dirname, 'product', 'hivecode.product.json')
@@ -616,10 +617,7 @@ function verifyPackagedUpdaterSecurityBoundary(resourcesDir, asar = require('@el
   if (!existsSync(asarPath)) {
     throw new Error(`Packaged app.asar is missing at ${asarPath}`)
   }
-  const appUpdateYmlPath = join(resourcesDir, 'app-update.yml')
-  if (existsSync(appUpdateYmlPath)) {
-    throw new Error('Packaged app-update.yml is forbidden while product updates are disabled')
-  }
+  verifyPackagedUpdaterConfig(resourcesDir)
 
   const entries = asar.listPackage(asarPath)
   const packageJson = JSON.parse(extractAsarText(asar, asarPath, entries, 'package.json'))

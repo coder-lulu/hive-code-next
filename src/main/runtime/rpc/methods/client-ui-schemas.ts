@@ -152,6 +152,12 @@ const UiUpdateFields = z
     uiZoomLevel: z.number().finite().optional(),
     editorFontZoomLevel: z.number().finite().optional(),
     worktreeCardProperties: WorktreeCardProperties.optional(),
+    sessionListMetadata: z
+      .record(
+        z.string(),
+        z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional() }).strict()
+      )
+      .optional(),
     _worktreeCardModeDefaulted: z.boolean().optional(),
     agentActivityDisplayMode: AgentActivityDisplayMode.optional(),
     workspaceStatuses: z.array(WorkspaceStatusDefinition).optional(),

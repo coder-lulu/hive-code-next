@@ -3,6 +3,7 @@ allowBuilds:
 
 # Keep Android CMake paths short and the install layout stable across pnpm commands.
 nodeLinker: hoisted
+verifyDepsBeforeRun: false
 
 minimumReleaseAge: 4320
 
