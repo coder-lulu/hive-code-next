@@ -329,7 +329,15 @@ function restoreNodePtyWindowsConptyRuntime() {
     if (!existsSync(sourceFile)) {
       throw new Error(`node-pty is missing ${sourceFile}`)
     }
-    copyFileSync(sourceFile, join(runtimeDir, filename))
+    const destinationFile = join(runtimeDir, filename)
+    // Running terminals lock these files; identical payloads need no replacement.
+    if (
+      existsSync(destinationFile) &&
+      readFileSync(sourceFile).equals(readFileSync(destinationFile))
+    ) {
+      continue
+    }
+    copyFileSync(sourceFile, destinationFile)
   }
   // Why: @electron/rebuild bypasses node-pty's postinstall step that normally copies these DLLs.
   console.log(`[rebuild] Restored node-pty ConPTY runtime files for win10-${rebuildArch}.`)
