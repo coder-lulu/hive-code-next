@@ -428,21 +428,11 @@ describe('SidebarNav', () => {
     expect(mocks.updateSettings).toHaveBeenCalledWith({ showAutomationsButton: false })
   })
 
-  it('hides the worktree palette shortcut until the search field is hovered or focused', async () => {
+  it('does not duplicate the titlebar search in the sidebar', async () => {
     const container = await renderSidebarNav()
-
-    const searchButton = container.querySelector(
-      'button[aria-label="Search worktrees and browser tabs"]'
-    )
-    expect(searchButton).not.toBeNull()
-
-    const shortcuts = searchButton?.querySelector('span.hidden')
-    expect(shortcuts?.className).toContain('hidden')
-    expect(shortcuts?.className).toContain('group-hover:inline-flex')
-    expect(shortcuts?.className).toContain('group-focus-within:inline-flex')
-    expect(shortcuts?.textContent).toContain('⌘')
-    expect(shortcuts?.textContent).toContain('J')
-    expect(searchButton?.querySelector('kbd')).toBeNull()
+    expect(
+      container.querySelector('button[aria-label="Search worktrees and browser tabs"]')
+    ).toBeNull()
   })
 
   it('keeps task source shortcuts keyboard-reachable and revealed on Tasks row hover or focus', async () => {

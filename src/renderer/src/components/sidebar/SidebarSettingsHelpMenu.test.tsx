@@ -35,7 +35,8 @@ vi.mock('@/store', () => ({
 }))
 
 vi.mock('@/hooks/useShortcutLabel', () => ({
-  useShortcutKeyDetails: mocks.useShortcutKeyDetails
+  useShortcutKeyDetails: mocks.useShortcutKeyDetails,
+  useShortcutKeyComboDetails: () => [{ keys: ['Ctrl', 'J'], doubleTap: false }]
 }))
 
 vi.mock('../onboarding/show-onboarding-event', () => ({
@@ -171,6 +172,21 @@ describe('SidebarSettingsHelpMenu', () => {
     }
     mocks.useSetupGuideProgress.mockImplementation(() => mocks.setupProgress)
     mocks.useSetupGuideProgressSnapshot.mockImplementation(() => mocks.setupProgress)
+  })
+
+  it('opens the existing search palette from the button immediately before settings', async () => {
+    const container = await renderMenu()
+    const search = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Search worktrees and browser tabs"]'
+    )
+    const settings = container.querySelector<HTMLButtonElement>('button[aria-label="Settings"]')
+    expect(search).not.toBeNull()
+    expect(search?.parentElement).toBe(settings?.parentElement)
+    expect(
+      search!.compareDocumentPosition(settings!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    await act(async () => search!.click())
+    expect(mocks.openModal).toHaveBeenCalledWith('worktree-palette')
   })
 
   it('renders the help button with correct aria-label', () => {

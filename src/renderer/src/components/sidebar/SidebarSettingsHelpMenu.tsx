@@ -10,6 +10,7 @@ import {
   ScrollText,
   Settings
 } from 'lucide-react'
+import { TitlebarSearchButton } from '@/app-shell/TitlebarSearchButton'
 import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
 import {
   PRODUCT_CHANGELOG_URL,
@@ -141,7 +142,8 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
 
   return (
     <>
-      <div className="right-sidebar-header-no-drag mr-1 flex items-center gap-0.5">
+      <div className="right-sidebar-header-no-drag mr-1 flex shrink-0 items-center gap-0.5">
+        <TitlebarSearchButton />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
