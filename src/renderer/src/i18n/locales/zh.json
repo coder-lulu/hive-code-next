@@ -14652,7 +14652,6 @@
           "filtersSection": "筛选",
           "viewSection": "视图"
         },
-
         "ActivityScopeFilterControls": {
           "resetScope": "显示所有主机和项目"
         },
@@ -15710,6 +15709,53 @@
         "copySessionIdSuccess": "已复制会话 ID",
         "copySessionIdError": "复制会话 ID 失败"
       }
+    },
+    "sessions": {
+      "title": "会话",
+      "status": {
+        "running": "工作中",
+        "waiting": "等待输入",
+        "permission": "等待确认",
+        "completed": "已完成",
+        "error": "需要处理",
+        "unknown": "状态未知"
+      },
+      "reconnecting": "正在重连",
+      "connectionUnknown": "连接状态未知",
+      "disconnected": "设备暂不可用",
+      "openDisconnected": "请先恢复设备连接，再打开此会话。",
+      "openUnavailable": "当前工作区暂时无法恢复此会话。请刷新所属设备后重试。",
+      "openFailed": "无法打开此会话，请重试。",
+      "recent": "最近会话",
+      "new": "新任务",
+      "noRecent": "当前可恢复的会话将在此显示。",
+      "projects": "项目会话",
+      "searchProjects": "搜索项目…",
+      "noProjects": "没有匹配的项目",
+      "projectScope": "项目会话",
+      "workspaceScope": "工作区会话",
+      "unassigned": "未关联项目",
+      "all": "全部会话",
+      "scope": "会话范围",
+      "searchScopes": "搜索项目或工作区…",
+      "noScopes": "没有匹配的范围",
+      "current": "当前可恢复会话",
+      "search": "搜索会话",
+      "searchPlaceholder": "搜索会话…",
+      "clearSearch": "清除搜索",
+      "noMatches": "当前范围没有会话",
+      "trySearch": "试试其他标题、项目、工作区或设备名称。",
+      "loadedOnly": "这里只显示当前已加载且可恢复的会话。",
+      "select": "选择一个会话",
+      "selectHint": "查看对话，或回到对应工作区继续处理。",
+      "backToList": "返回会话列表",
+      "openWorkspace": "进入工作台",
+      "unknownHost": "未知设备",
+      "hostHint": "设备连接暂不可用或尚未确认。最后已知的活动状态不能证明会话仍在运行。",
+      "continueWorkspace": "在工作台中继续",
+      "terminalHint": "此会话使用工作区终端。进入工作台后可继续使用原有终端和布局。",
+      "workspace": "工作区",
+      "host": "运行设备"
     }
   },
   "dashboardPopout": {

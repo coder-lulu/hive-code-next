@@ -8,6 +8,7 @@ import {
   type AgentStatusEntry
 } from '../../../../shared/agent-status-types'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { AgentSessionStatusSummary } from '../../../../shared/agent-session-wire'
 import type { RemoteForegroundEvidence } from '../../../../shared/foreground-process-evidence'
 import type { RuntimeHostConnectionState } from '../../../../shared/runtime-host-connection-state'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
@@ -35,10 +36,16 @@ type ActivityStatus = { activity: Activity; reason: string | null; lastActivityA
 type ActivityEvidence =
   | { kind: 'hook'; entry: AgentStatusEntry }
   | {
+      kind: 'summary'
+      sessionId: string
+      summary: AgentSessionStatusSummary
+      receivedAt: number
+    }
+  | {
       kind: 'journal'
       items: readonly AgentJournalRenderItem[]
       latestSubmission?: AgentJournalSubmission
-      /** Replica receipt when activity evidence advances; replay/heartbeat must retain it. */
+      /** Receipt measures freshness; journal timestamps alone determine activity ordering. */
       receivedAt: number
     }
 
@@ -74,6 +81,49 @@ function eventTime(value: number | undefined): number | null {
 
 function unknownActivity(lastActivityAt: number | null = null): ActivityStatus {
   return { activity: 'unknown', reason: null, lastActivityAt }
+}
+
+export function isSessionActivityReceiptFresh(receivedAt: number | null, now: number): boolean {
+  return (
+    receivedAt !== null &&
+    eventTime(receivedAt) !== null &&
+    Number.isFinite(now) &&
+    receivedAt <= now &&
+    now - receivedAt <= AGENT_STATUS_STALE_AFTER_MS
+  )
+}
+
+function summaryActivity(
+  identity: SessionListIdentity,
+  evidence: Extract<ActivityEvidence, { kind: 'summary' }>,
+  now: number
+): ActivityStatus {
+  const { summary, sessionId, receivedAt } = evidence
+  const hostId = getExecutionHostIdFromWorktreeHostIdentity(summary.workspaceId)
+  if (
+    summary.sessionId !== sessionId ||
+    getWorktreeIdFromHostIdentity(summary.workspaceId) !==
+      getWorktreeIdFromHostIdentity(identity.ownerBucketKey) ||
+    (hostId !== undefined && hostId !== identity.executionHostId) ||
+    (identity.providerSessionId !== null &&
+      summary.providerSession?.id !== identity.providerSessionId)
+  ) {
+    return unknownActivity()
+  }
+  const lastActivityAt = eventTime(summary.updatedAt)
+  if (!isSessionActivityReceiptFresh(receivedAt, now)) {
+    return unknownActivity(lastActivityAt)
+  }
+  return {
+    activity:
+      summary.status === 'working'
+        ? 'running'
+        : summary.status === 'attention'
+          ? 'waiting'
+          : 'unknown',
+    reason: null,
+    lastActivityAt
+  }
 }
 
 function hookActivity(
@@ -134,11 +184,7 @@ function journalActivity(
   const { items, latestSubmission, receivedAt } = evidence
   const latest = items.at(-1)
   const lastActivityAt = eventTime(latest?.observedAt)
-  if (
-    eventTime(receivedAt) === null ||
-    receivedAt > now ||
-    now - receivedAt > AGENT_STATUS_STALE_AFTER_MS
-  ) {
+  if (!isSessionActivityReceiptFresh(receivedAt, now)) {
     return unknownActivity(lastActivityAt)
   }
   const status = projectStructuredAgentSessionStatus(items)
@@ -183,7 +229,9 @@ export function resolveSessionListStatus(input: SessionListStatusInput): Session
       ? unknownActivity()
       : evidence.kind === 'hook'
         ? hookActivity(identity, evidence.entry, now)
-        : journalActivity(evidence, now)
+        : evidence.kind === 'summary'
+          ? summaryActivity(identity, evidence, now)
+          : journalActivity(evidence, now)
   const execution =
     connection === 'connected' && input.execution && sameSession(identity, input.execution.identity)
       ? input.execution.value

@@ -141,6 +141,8 @@ Capture the current UI and run focused behavior checks before changing product s
 
 The Tab dimensions use `--tab-strip-height`, `--tab-width`, `--tab-width-wide`, and `--tab-min-width`. Drag split hit-testing reads the measured body edge. The resizable sidebar's initial width is owned by `DEFAULT_SIDEBAR_WIDTH` in `src/shared/constants.ts`, shared by renderer and persisted-state initialization. Surface, divider, hover, text, and focus continue to use `card`, `border`, `accent`, `muted-foreground`, and `ring`. The existing 4px window drag strip remains; its seam with the 36px Tab row is part of P1.
 
+P2 consumes `--sessions-list-width` (280px), `--sessions-row-height` (56px), `--sessions-header-height` (44px), and `--session-quick-row-height` (44px) from `main.css`; its virtualizer reads the CSS row token. `sessions.css` owns page-local layout and inherits existing theme colors. At 640px of available content width the list and detail use a return action; keyboard arrows highlight, Enter opens, and Back restores list focus. Headers reserve custom window controls when sharing the top chrome band. Session lists reflect the currently restorable inventory only; provider/owner identity, connection, activity and execution evidence remain separate.
+
 ### Other primitives in this repo
 
 Browse `src/renderer/src/components/ui/` for the full list. Most wrap a Radix UI primitive — exceptions are `command` (wraps `cmdk`), `sonner` (wraps `sonner`), and the visual-only wrappers (`badge`, `button-group`, `card`, `input`) which apply tokens and Tailwind utilities directly. Never reimplement headless behavior; extend the existing wrapper.

@@ -17,10 +17,15 @@ import {
 import { subscribeStructuredAgentSessionStatus } from './structured-agent-session-client'
 
 export type StructuredAgentSessionStatusSnapshot = ReadonlyMap<string, AgentSessionStatusSummary>
+export type StructuredAgentSessionStatusEvidence = {
+  summary: AgentSessionStatusSummary
+  receivedAt: number
+}
 
 export type StructuredAgentSessionStatusFeedOwner = {
   activate: () => () => void
   getSnapshot: () => StructuredAgentSessionStatusSnapshot
+  getEvidenceSnapshot: () => ReadonlyMap<string, StructuredAgentSessionStatusEvidence>
   subscribe: (listener: () => void) => () => void
 }
 
@@ -37,6 +42,7 @@ export function structuredAgentSessionStatusFeedKey(target: RuntimeClientTarget)
 
 function createOwner(target: RuntimeClientTarget): OwnedStatusFeed {
   let snapshot: StructuredAgentSessionStatusSnapshot = new Map()
+  let evidenceSnapshot: ReadonlyMap<string, StructuredAgentSessionStatusEvidence> = new Map()
   const listeners = new Set<() => void>()
   const activations = new Set<symbol>()
   let generation = 0
@@ -49,27 +55,28 @@ function createOwner(target: RuntimeClientTarget): OwnedStatusFeed {
       listener()
     }
   }
-  const setSnapshot = (next: StructuredAgentSessionStatusSnapshot): void => {
-    snapshot = next
-    emit()
-  }
   const applyEvent = (event: AgentSessionStatusEvent): void => {
-    if (event.type === 'snapshot') {
-      reconnectAttempt = 0
-      // Merged, not replaced: a restarted host restores its readable sessions asynchronously, so
-      // the first snapshot can be empty and dropping those rows flickers every one to no-status.
-      const next = new Map(snapshot)
-      for (const session of event.sessions) {
-        next.set(session.sessionId, session)
-      }
-      setSnapshot(next)
+    if (event.type === 'end') {
       return
     }
-    if (event.type === 'status') {
-      const next = new Map(snapshot)
-      next.set(event.session.sessionId, event.session)
-      setSnapshot(next)
+    if (event.type === 'snapshot') {
+      reconnectAttempt = 0
     }
+    const sessions = event.type === 'snapshot' ? event.sessions : [event.session]
+    if (sessions.length === 0) {
+      return
+    }
+    // An empty restart snapshot neither retracts cached rows nor renews their receipt.
+    const next = new Map(snapshot)
+    const nextEvidence = new Map(evidenceSnapshot)
+    const receivedAt = Date.now()
+    for (const session of sessions) {
+      next.set(session.sessionId, session)
+      nextEvidence.set(session.sessionId, { summary: session, receivedAt })
+    }
+    snapshot = next
+    evidenceSnapshot = nextEvidence
+    emit()
   }
   const active = (candidate: number): boolean => activations.size > 0 && candidate === generation
   const clearReconnect = (): void => {
@@ -97,6 +104,14 @@ function createOwner(target: RuntimeClientTarget): OwnedStatusFeed {
     }, delay)
   }
   const subscribeToHost = (candidate: number): void => {
+    const retire = (): void => {
+      if (!active(candidate)) {
+        return
+      }
+      generation += 1
+      dropHandle()
+      scheduleReconnect(generation)
+    }
     void subscribeStructuredAgentSessionStatus(
       target,
       (event) => {
@@ -104,24 +119,13 @@ function createOwner(target: RuntimeClientTarget): OwnedStatusFeed {
           return
         }
         if (event.type === 'end') {
-          dropHandle()
-          scheduleReconnect(candidate)
+          retire()
           return
         }
         applyEvent(event)
       },
-      () => {
-        if (active(candidate)) {
-          dropHandle()
-          scheduleReconnect(candidate)
-        }
-      },
-      () => {
-        if (active(candidate)) {
-          dropHandle()
-          scheduleReconnect(candidate)
-        }
-      }
+      retire,
+      retire
     )
       .then((opened) => {
         if (active(candidate)) {
@@ -181,6 +185,7 @@ function createOwner(target: RuntimeClientTarget): OwnedStatusFeed {
       }
     },
     getSnapshot: () => snapshot,
+    getEvidenceSnapshot: () => evidenceSnapshot,
     subscribe: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

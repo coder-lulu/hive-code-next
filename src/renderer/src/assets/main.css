@@ -6,6 +6,7 @@
 @import './markdown-preview.css';
 @import './terminal.css';
 @import './mobile-page.css';
+@import './sessions.css';
 
 @font-face {
   font-family: 'Geist';
@@ -149,6 +150,10 @@
   --tab-active-surface: var(--card);
   --tab-hover-surface: color-mix(in srgb, var(--foreground) 6%, var(--tab-strip-surface));
   --tab-divider: var(--border);
+  --sessions-list-width: 280px;
+  --sessions-row-height: 56px;
+  --sessions-header-height: 44px;
+  --session-quick-row-height: 44px;
   --orca-security-background: #fff;
   --orca-security-foreground: #0a0a0a;
   --orca-security-card: #fff;

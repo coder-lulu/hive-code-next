@@ -1,0 +1,15 @@
+import type { ExecutionHostId } from './execution-host'
+
+/** Navigation filters only; execution ownership remains on the session. */
+export type SessionListScope =
+  | { kind: 'all' }
+  | { kind: 'unassigned' }
+  | { kind: 'project'; projectKey: string }
+  | { kind: 'workspace'; workspaceKey: string; executionHostId: ExecutionHostId }
+
+export type SessionListViewState = {
+  scope: SessionListScope
+  query: string
+  selectedSessionKey: string | null
+  scrollTop: number
+}

@@ -1,8 +1,51 @@
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
 import { rewindHistoryIndexPastView } from '../worktree-nav-history'
+import type {
+  SessionListScope,
+  SessionListViewState
+} from '../../../../../shared/session-list-scope'
+
+function sameSessionScope(left: SessionListScope, right: SessionListScope): boolean {
+  if (left.kind !== right.kind) {
+    return false
+  }
+  if (left.kind === 'project' && right.kind === 'project') {
+    return left.projectKey === right.projectKey
+  }
+  if (left.kind === 'workspace' && right.kind === 'workspace') {
+    return (
+      left.workspaceKey === right.workspaceKey && left.executionHostId === right.executionHostId
+    )
+  }
+  return true
+}
+
+function emptySessionsView(scope: SessionListScope): SessionListViewState {
+  return { scope, query: '', selectedSessionKey: null, scrollTop: 0 }
+}
 
 export function createUiViewActions(set: UISliceSet, get: UISliceGet): Partial<UISlice> {
   return {
+    sessionsView: emptySessionsView({ kind: 'all' }),
+    openSessionsPage: (scope) => {
+      get().recordViewVisit('sessions')
+      set((state) => ({
+        activeView: 'sessions',
+        sessionsView:
+          scope && !sameSessionScope(scope, state.sessionsView.scope)
+            ? emptySessionsView(scope)
+            : state.sessionsView
+      }))
+    },
+    updateSessionsView: (patch) =>
+      set((state) => ({
+        sessionsView: {
+          ...(patch.scope && !sameSessionScope(patch.scope, state.sessionsView.scope)
+            ? emptySessionsView(patch.scope)
+            : state.sessionsView),
+          ...patch
+        }
+      })),
     openActivityPage: (options) => {
       const scope = options?.scope ?? 'all'
       set((state) => ({

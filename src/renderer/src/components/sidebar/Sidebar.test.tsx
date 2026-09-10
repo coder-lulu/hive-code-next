@@ -59,6 +59,10 @@ vi.mock('./SidebarNav', () => ({
   default: () => <div data-testid="sidebar-nav" />
 }))
 
+vi.mock('@/components/sessions/SessionNavigationSection', () => ({
+  default: () => <div data-testid="session-navigation" />
+}))
+
 vi.mock('./SetupScriptPromptCard', () => ({
   default: () => <div data-testid="setup-script-prompt-card" />
 }))
@@ -153,6 +157,15 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Sidebar', () => {
+  it('retains the workspace list beneath shared session navigation on the sessions page', () => {
+    setSidebarState(getDefaultSettings(tmpdir()))
+    mocks.state = { ...mocks.state, activeView: 'sessions' }
+    const view = render(sidebarElement())
+    expect(view.getByTestId('session-navigation')).toBeTruthy()
+    expect(view.getByTestId('worktree-list')).toBeTruthy()
+    expect(view.getByTestId('sidebar-footer')).toBeTruthy()
+  })
+
   it('anchors the setup script popup to the bottom footer', () => {
     setSidebarState(getDefaultSettings(tmpdir()))
     const view = render(sidebarElement())

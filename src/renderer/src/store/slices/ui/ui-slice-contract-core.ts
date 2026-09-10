@@ -11,6 +11,10 @@ import type { TaskSourceContext } from '../../../../../shared/task-source-contex
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import type { WorkspaceScope } from '../../../../../shared/folder-workspace-types'
 import type { TaskResumeState, TopLevelView } from '../../../../../shared/ui-chrome-types'
+import type {
+  SessionListScope,
+  SessionListViewState
+} from '../../../../../shared/session-list-scope'
 
 export type PendingSidebarWorktreeReveal = {
   worktreeId: string
@@ -106,6 +110,7 @@ export type NewWorkspaceDraft = {
 
 export type UiViewHistory =
   | 'terminal'
+  | 'sessions'
   | 'settings'
   | 'tasks'
   | 'activity'
@@ -159,6 +164,10 @@ export type UISliceCore = {
   manuallyUnreadTurnsByPaneKey: Record<string, number>
   clearManuallyUnreadTurns: (paneKeys: string[]) => void
   activeView: TopLevelView
+  /** Local navigation memory; loaded session identities are revalidated by the page. */
+  sessionsView: SessionListViewState
+  openSessionsPage: (scope?: SessionListScope) => void
+  updateSessionsView: (patch: Partial<SessionListViewState>) => void
   homeTaskDraft: string
   setHomeTaskDraft: (draft: string) => void
   homePendingSessionAssignment: HomePendingSessionAssignment | null

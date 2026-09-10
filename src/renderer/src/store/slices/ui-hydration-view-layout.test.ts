@@ -135,6 +135,30 @@ describe('createUISlice hydratePersistedUI', () => {
     expect(store.getState().activeView).toBe('tasks')
   })
 
+  it('restores the sessions page without inventing a selected session at startup', () => {
+    const store = createUIStore()
+    store.getState().hydratePersistedUI(makePersistedUI({ activeView: 'sessions' }), 'startup')
+    expect(store.getState().activeView).toBe('sessions')
+    expect(store.getState().sessionsView).toEqual({
+      scope: { kind: 'all' },
+      query: '',
+      selectedSessionKey: null,
+      scrollTop: 0
+    })
+  })
+
+  it('keeps local session navigation memory through cross-window UI hydration', () => {
+    const store = createUIStore()
+    store.getState().openSessionsPage({ kind: 'project', projectKey: 'project-1' })
+    store
+      .getState()
+      .updateSessionsView({ query: 'local search', selectedSessionKey: 'one', scrollTop: 112 })
+    const saved = store.getState().sessionsView
+    store.getState().hydratePersistedUI(makePersistedUI({ activeView: 'terminal' }), 'sync')
+    expect(store.getState().activeView).toBe('sessions')
+    expect(store.getState().sessionsView).toBe(saved)
+  })
+
   it('falls back to terminal when persisted active view is missing (older data)', () => {
     const store = createUIStore()
     store.setState({ activeView: 'tasks' })

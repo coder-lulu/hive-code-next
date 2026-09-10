@@ -22,6 +22,8 @@ import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { SetupGuideSidebarEntry } from './SetupGuideSidebarEntry'
 import { SidebarTaskNavButton } from './SidebarTaskNavButton'
+import SidebarSessionsNavButton from './SidebarSessionsNavButton'
+import SessionProjectsMenu from '@/components/sessions/SessionProjectsMenu'
 import { HideSidebarMenu } from './sidebar-nav-controls'
 import { translate } from '@/i18n/i18n'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -132,6 +134,8 @@ const SidebarNav = React.memo(function SidebarNav() {
         <span className="flex-1">{translate('components.sidebar.newTask', 'New task')}</span>
         <span className="sidebar-new-task-shortcut">{newTaskShortcutLabel}</span>
       </button>
+      <SidebarSessionsNavButton />
+      <SessionProjectsMenu />
       <SetupGuideSidebarEntry />
       <SidebarTaskNavButton />
       {showArtifactsButton ? (

@@ -27,6 +27,7 @@ const WorktreeCreationPanel = lazy(
   () => import('../components/worktree-creation/WorktreeCreationPanel')
 )
 const TaskPage = lazy(() => import('../components/task-page/TaskPage'))
+const SessionsPage = lazy(() => import('../components/sessions/SessionsPage'))
 const AutomationsPage = lazy(() => import('../components/automations/AutomationsPage'))
 const ActivityPrototypePage = lazy(() => import('../components/activity/ActivityPrototypePage'))
 const TemporarySessionsActivityView = lazy(
@@ -89,6 +90,9 @@ function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element 
       {activeView === 'skills' ? <SkillsPage /> : null}
       {activeView === 'artifacts' ? <ArtifactsPage /> : null}
       {activeView === 'tasks' ? <TaskPage /> : null}
+      {activeView === 'sessions' ? (
+        <SessionsPage reserveTopChrome={layout.stackedSidebarOpen} />
+      ) : null}
       {activeView === 'automations' ? <AutomationsPage /> : null}
       {activeView === 'activity' ? (
         activityPageScope === 'temporary-sessions' ? (
@@ -120,6 +124,7 @@ export function AppWorkspaceShell(props: {
   const workspaceBoardPanel = useWorkspaceBoardPanel()
   const stackedMainStripMounted =
     layout.stackedSidebarOpen &&
+    layout.activeView !== 'sessions' &&
     layout.activeView !== 'automations' &&
     layout.activeView !== 'artifacts'
   const settingsHelpPlacement = resolveSettingsHelpPlacement({
@@ -270,7 +275,7 @@ export function AppWorkspaceShell(props: {
                     </RecoverableRenderErrorBoundary>
                   </Suspense>
                 </div>
-                {floatingWorkspace.showToggleButton ? (
+                {floatingWorkspace.showToggleButton && layout.activeView !== 'sessions' ? (
                   <FloatingTerminalToggleButton
                     open={floatingWorkspace.open}
                     onToggle={() => floatingWorkspace.setOpenWithFocus((open) => !open)}

@@ -14,7 +14,15 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
-import type { AppState } from '@/store/types'
+import {
+  getSidebarActiveSessionTarget,
+  isSidebarSessionActive
+} from './sidebar-session-active-target'
+export {
+  getSidebarActiveSessionTarget,
+  isSidebarSessionActive,
+  type SidebarActiveSessionTarget
+} from './sidebar-session-active-target'
 import {
   temporarySessionIdentityKey,
   useTemporarySessionCollection,
@@ -31,59 +39,6 @@ export {
   activateTemporarySession as activateSidebarSession,
   confirmTemporarySessionDeletion as confirmSidebarSessionDeletion
 } from '@/hooks/use-temporary-session-list-actions'
-
-export type SidebarActiveSessionTarget = {
-  ownerBucketKey: string
-  unifiedTabId: string | null
-  terminalTabId: string | null
-}
-
-type SidebarActiveSessionState = Pick<
-  AppState,
-  | 'activeView'
-  | 'activeWorktreeId'
-  | 'activeTabType'
-  | 'activeTabId'
-  | 'activeGroupIdByWorktree'
-  | 'groupsByWorktree'
->
-
-export function getSidebarActiveSessionTarget(
-  state: SidebarActiveSessionState
-): SidebarActiveSessionTarget | null {
-  if (
-    state.activeView !== 'terminal' ||
-    !state.activeWorktreeId ||
-    (state.activeTabType !== 'terminal' && state.activeTabType !== 'agent-session')
-  ) {
-    return null
-  }
-
-  const ownerBucketKey = state.activeWorktreeId
-  const activeGroupId = state.activeGroupIdByWorktree[ownerBucketKey]
-  const activeUnifiedTabId =
-    (state.groupsByWorktree[ownerBucketKey] ?? []).find((group) => group.id === activeGroupId)
-      ?.activeTabId ?? null
-  const activeTerminalTabId = state.activeTabType === 'terminal' ? state.activeTabId : null
-
-  if (!activeUnifiedTabId && !activeTerminalTabId) {
-    return null
-  }
-  return { ownerBucketKey, unifiedTabId: activeUnifiedTabId, terminalTabId: activeTerminalTabId }
-}
-
-export function isSidebarSessionActive(
-  item: TemporarySessionItem,
-  activeTarget: SidebarActiveSessionTarget | null
-): boolean {
-  if (!activeTarget || (item.ownerBucketKey ?? item.worktreeId) !== activeTarget.ownerBucketKey) {
-    return false
-  }
-  return Boolean(
-    (item.unifiedTabId && item.unifiedTabId === activeTarget.unifiedTabId) ||
-    (item.terminalTabId && item.terminalTabId === activeTarget.terminalTabId)
-  )
-}
 
 function statusIcon(status: SidebarSessionStatus): React.JSX.Element {
   if (status === 'running') {

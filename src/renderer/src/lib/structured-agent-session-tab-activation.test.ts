@@ -105,9 +105,30 @@ describe('activateStructuredAgentSessionTab', () => {
       worktreeId: 'runtime:host-a|wt-1'
     })
     expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
-      { kind: 'environment', environmentId: 'env-1' },
+      { kind: 'environment', environmentId: 'host-a' },
       'session.tabs.activate',
       { worktree: 'id:wt-1', tabId: 'agent-session:session-1' }
+    )
+  })
+
+  it('dispatches a temporary structured session to its explicit runtime owner', () => {
+    const tab = (mocks.state.unifiedTabsByWorktree as Record<string, Tab[]>)['wt-1'][0]
+    mocks.state.unifiedTabsByWorktree = {
+      'runtime:remote|global-floating-terminal': [
+        { ...tab, worktreeId: 'global-floating-terminal', executionHostId: 'runtime:remote' }
+      ]
+    }
+    expect(
+      activateStructuredAgentSessionTab({
+        worktreeId: 'global-floating-terminal',
+        tabId: tab.id,
+        executionHostId: 'runtime:remote'
+      })
+    ).toBe(true)
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'remote' },
+      'session.tabs.activate',
+      { worktree: 'id:global-floating-terminal', tabId: 'agent-session:session-1' }
     )
   })
 

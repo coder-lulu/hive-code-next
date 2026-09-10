@@ -20,6 +20,8 @@ import { startStructuredAgentSessionReadTransport } from './structured-agent-ses
 export type StructuredAgentSessionReadSnapshot = {
   state: StructuredAgentSessionState
   loadingOlder: boolean
+  /** Receipt of current journal evidence; older-history reads do not renew it. */
+  receivedAt: number | null
   providerSession?: AgentProviderSessionMetadata
 }
 
@@ -33,6 +35,21 @@ export type StructuredAgentSessionReadOwner = {
 }
 
 const owners = new Map<string, StructuredAgentSessionReadOwner>()
+const snapshotListeners = new Set<() => void>()
+
+function notifySnapshotListeners(): void {
+  for (const listener of snapshotListeners) {
+    listener()
+  }
+}
+
+/** Passive list observation must not instantiate or activate a transcript reader. */
+export function subscribeStructuredAgentSessionReadSnapshots(listener: () => void): () => void {
+  snapshotListeners.add(listener)
+  return () => {
+    snapshotListeners.delete(listener)
+  }
+}
 
 function countsTowardInitialHistory(item: AgentJournalRenderItem): boolean {
   return item.body.kind !== 'status' || !item.body.providerFrame
@@ -50,7 +67,8 @@ function createReadOwner(
 ): StructuredAgentSessionReadOwner {
   let snapshot: StructuredAgentSessionReadSnapshot = {
     state: EMPTY_STRUCTURED_AGENT_SESSION,
-    loadingOlder: false
+    loadingOlder: false,
+    receivedAt: null
   }
   let stopActiveRun: (() => void) | null = null
   let refreshActiveRun = (): void => {}
@@ -63,6 +81,7 @@ function createReadOwner(
     for (const listener of listeners) {
       listener()
     }
+    notifySnapshotListeners()
   }
   const setSnapshot = (next: StructuredAgentSessionReadSnapshot): void => {
     if (next === snapshot) {
@@ -73,8 +92,22 @@ function createReadOwner(
   }
   const apply = (action: StructuredAgentSessionAction): void => {
     const state = reduceStructuredAgentSession(snapshot.state, action)
-    if (state !== snapshot.state) {
-      setSnapshot({ ...snapshot, state })
+    const isJournalRead =
+      action.type === 'tail-page' || (action.type === 'event' && action.event.type !== 'end')
+    const cursor =
+      action.type === 'tail-page'
+        ? (action.page.liveCursor ?? action.page.window.newest)
+        : action.type === 'event' && action.event.type === 'batch'
+          ? action.event.batch.cursor
+          : null
+    const confirmsCurrentCursor =
+      cursor !== null && cursor.epoch === state.epoch && cursor.sequence === state.cursor?.sequence
+    const receivedAt =
+      isJournalRead && (state !== snapshot.state || confirmsCurrentCursor)
+        ? Date.now()
+        : snapshot.receivedAt
+    if (state !== snapshot.state || receivedAt !== snapshot.receivedAt) {
+      setSnapshot({ ...snapshot, state, receivedAt })
     }
   }
   const setProviderSession = (providerSession: AgentProviderSessionMetadata | undefined): void => {
@@ -181,6 +214,7 @@ function createReadOwner(
   const deleteIfUnused = (): void => {
     if (activations.size === 0 && listeners.size === 0 && owners.get(key) === owner) {
       owners.delete(key)
+      notifySnapshotListeners()
     }
   }
   owner = {
@@ -264,9 +298,17 @@ export function getStructuredAgentSessionReadOwner(
   return owner
 }
 
+export function getExistingStructuredAgentSessionReadOwner(
+  sessionId: string,
+  target: RuntimeClientTarget
+): StructuredAgentSessionReadOwner | null {
+  return owners.get(ownerKey(sessionId, target)) ?? null
+}
+
 export function resetStructuredAgentSessionReadOwnersForTests(): void {
   for (const owner of owners.values()) {
     owner.dispose()
   }
   owners.clear()
+  notifySnapshotListeners()
 }

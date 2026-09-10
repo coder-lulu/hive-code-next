@@ -19,7 +19,7 @@ import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
-import SidebarSessionSection from './SidebarSessionSection'
+import SessionNavigationSection from '@/components/sessions/SessionNavigationSection'
 
 // Why lazy: the Agents list pulls the whole activity pipeline (virtualizer, markdown
 // previews, thread derivation); users on the workspace view should not load or render any of it.
@@ -164,7 +164,7 @@ function Sidebar({
           <>
             {/* Fixed controls */}
             <SidebarNav />
-            <SidebarSessionSection />
+            <SessionNavigationSection />
             <section
               className="sidebar-workspace-section"
               aria-label={translate('components.desktopHome.spaces', 'Spaces')}

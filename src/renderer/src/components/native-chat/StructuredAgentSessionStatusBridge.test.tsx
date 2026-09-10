@@ -71,6 +71,7 @@ const structuredTab = {
   groupId: 'group-1',
   contentType: 'agent-session',
   entityId: 'session-1',
+  executionHostId: 'local',
   label: 'Codex Chat',
   customLabel: null,
   color: null,
@@ -397,7 +398,9 @@ describe('StructuredAgentSessionStatusBridge', () => {
   })
 
   it('keys the feed by the worktree runtime environment', async () => {
-    mocks.store?.setState({ testRuntimeOwner: 'env-1' })
+    mocks.store?.setState({
+      unifiedTabsByWorktree: { 'wt-1': [{ ...structuredTab, executionHostId: 'runtime:env-1' }] }
+    })
     render(<StructuredAgentSessionStatusBridge />)
     await waitFor(() => expect(mocks.subscribeStatus).toHaveBeenCalledOnce())
 

@@ -137,4 +137,67 @@ describe('structured agent session status feed', () => {
     await vi.advanceTimersByTimeAsync(10_000)
     expect(mocks.subscribeStatus).toHaveBeenCalledOnce()
   })
+
+  it('records receipt only for sessions actually present in a host publication', async () => {
+    vi.setSystemTime(1_000)
+    const feed = getStructuredAgentSessionStatusFeed(LOCAL)
+    feed.activate()
+    await vi.advanceTimersByTimeAsync(0)
+    hostEmit()({ type: 'snapshot', sessions: [summary('session-1', 'working')] })
+    expect(feed.getEvidenceSnapshot().get('session-1')).toEqual({
+      summary: summary('session-1', 'working'),
+      receivedAt: 1_000
+    })
+    vi.setSystemTime(2_000)
+    hostEmit()({ type: 'snapshot', sessions: [] })
+    expect(feed.getEvidenceSnapshot().get('session-1')?.receivedAt).toBe(1_000)
+    hostEmit()({ type: 'status', session: summary('session-2') })
+    expect(feed.getEvidenceSnapshot().get('session-2')?.receivedAt).toBe(2_000)
+    expect(feed.getEvidenceSnapshot().get('session-1')?.receivedAt).toBe(1_000)
+  })
+
+  it('renewing a current snapshot never advances its host activity timestamp', async () => {
+    vi.setSystemTime(1_000)
+    const feed = getStructuredAgentSessionStatusFeed(LOCAL)
+    feed.activate()
+    await vi.advanceTimersByTimeAsync(0)
+    hostEmit()({ type: 'snapshot', sessions: [summary('session-1', 'working')] })
+    vi.setSystemTime(2_000)
+    hostEmit()({ type: 'snapshot', sessions: [summary('session-1', 'working')] })
+    expect(feed.getEvidenceSnapshot().get('session-1')).toMatchObject({
+      summary: { updatedAt: 1 },
+      receivedAt: 2_000
+    })
+  })
+
+  it('does not refresh evidence on a closed or retired stream', async () => {
+    vi.setSystemTime(1_000)
+    const feed = getStructuredAgentSessionStatusFeed(LOCAL)
+    const stop = feed.activate()
+    await vi.advanceTimersByTimeAsync(0)
+    hostEmit()({ type: 'status', session: summary('session-1', 'working') })
+    vi.setSystemTime(2_000)
+    hostEmit()({ type: 'end' })
+    expect(feed.getEvidenceSnapshot().get('session-1')?.receivedAt).toBe(1_000)
+    stop()
+    hostEmit()({ type: 'status', session: summary('session-1', 'attention') })
+    expect(feed.getEvidenceSnapshot().get('session-1')).toMatchObject({
+      summary: { status: 'working' },
+      receivedAt: 1_000
+    })
+  })
+
+  it('keeps passive host observers and same-session host receipts isolated', async () => {
+    const local = getStructuredAgentSessionStatusFeed(LOCAL)
+    const remote = getStructuredAgentSessionStatusFeed(REMOTE)
+    const unsubscribe = remote.subscribe(vi.fn())
+    expect(mocks.subscribeStatus).not.toHaveBeenCalled()
+    local.activate()
+    await vi.advanceTimersByTimeAsync(0)
+    hostEmit()({ type: 'status', session: summary('same-session', 'working') })
+    expect(local.getEvidenceSnapshot().has('same-session')).toBe(true)
+    expect(remote.getEvidenceSnapshot().has('same-session')).toBe(false)
+    expect(mocks.subscribeStatus).toHaveBeenCalledOnce()
+    unsubscribe()
+  })
 })

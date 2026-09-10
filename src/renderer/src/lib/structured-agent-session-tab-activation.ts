@@ -2,7 +2,11 @@ import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
 import { useAppStore } from '@/store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
-import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host'
 import type { Tab } from '../../../shared/tab-types'
 import {
   getExecutionHostIdFromWorktreeHostIdentity,
@@ -114,7 +118,15 @@ export function activateStructuredAgentSessionTab(args: {
   state.focusGroup(bucketKey, tab.groupId)
   state.activateTab(tab.id, { worktreeId: bucketKey })
   state.setActiveTabType('agent-session', bucketKey)
-  const environmentId = getRuntimeEnvironmentIdForWorktree(state, runtimeWorktreeId)
+  const ownerHost = parseExecutionHostId(
+    args.executionHostId ??
+      tab.executionHostId ??
+      getExecutionHostIdFromWorktreeHostIdentity(bucketKey)
+  )
+  const environmentId =
+    ownerHost?.kind === 'runtime'
+      ? ownerHost.environmentId
+      : getRuntimeEnvironmentIdForWorktree(state, runtimeWorktreeId)
   void callRuntimeRpc(
     getActiveRuntimeTarget({ activeRuntimeEnvironmentId: environmentId }),
     'session.tabs.activate',

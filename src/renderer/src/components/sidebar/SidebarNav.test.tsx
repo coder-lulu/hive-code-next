@@ -14,6 +14,7 @@ import { PSEUDO_LOCALIZATION_LOCALE } from '../../i18n/pseudo-localization'
 const mocks = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
   openNewTaskHome: vi.fn(),
+  openSessionsPage: vi.fn(),
   openTaskPage: vi.fn(),
   openAutomationsPage: vi.fn(),
   openActivityPage: vi.fn(),
@@ -41,6 +42,14 @@ vi.mock('@/store/selectors', () => ({
 
 vi.mock('@/components/activity/useActivityUnreadCount', () => ({
   useActivityUnreadCount: () => 0
+}))
+
+vi.mock('@/components/sessions/SessionProjectsMenu', () => ({
+  default: () => <button type="button">Projects</button>
+}))
+
+vi.mock('../mobile/paired-mobile-devices', () => ({
+  usePairedMobileDevices: () => ({ loaded: true, error: null, hasPairedDevice: false })
 }))
 
 vi.mock('@/components/dashboard/useAgentBucketCounts', () => ({
@@ -129,6 +138,7 @@ function setSidebarState({
     homeNewTaskMode,
     activeWorkspaceKey,
     openNewTaskHome: mocks.openNewTaskHome,
+    openSessionsPage: mocks.openSessionsPage,
     openTaskPage: mocks.openTaskPage,
     openAutomationsPage: mocks.openAutomationsPage,
     openActivityPage: mocks.openActivityPage,
@@ -216,6 +226,20 @@ describe('SidebarNav', () => {
     await i18n.changeLanguage('en')
     mocks.agentBucketCounts = { attention: 0, working: 0, done: 0, idle: 0 }
     setSidebarState()
+  })
+
+  it('places Sessions and Projects immediately after New task and returns to remembered session scope', async () => {
+    setSidebarState({ activeView: 'sessions' })
+    const container = await renderSidebarNav()
+    const buttons = Array.from(container.querySelectorAll('button'))
+    const sessions = getButtonByText(container, 'Sessions')
+    const projects = getButtonByText(container, 'Projects')
+    const newTask = container.querySelector('button[aria-label="New task"]')
+    expect(buttons.indexOf(sessions)).toBe(buttons.indexOf(newTask as HTMLButtonElement) + 1)
+    expect(buttons.indexOf(projects)).toBe(buttons.indexOf(sessions) + 1)
+    expect(sessions.getAttribute('aria-current')).toBe('page')
+    await clickButton(sessions)
+    expect(mocks.openSessionsPage).toHaveBeenCalledWith()
   })
 
   it('keeps the Agent Dashboard row unmounted while its experiment is off', async () => {

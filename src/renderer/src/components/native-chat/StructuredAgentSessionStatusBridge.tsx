@@ -5,12 +5,14 @@ import type { AgentSessionStatusSummary } from '../../../../shared/agent-session
 import { structuredAgentSessionPaneKey } from '../../../../shared/structured-agent-session-projection'
 import type { Tab } from '../../../../shared/tab-types'
 import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { useAppStore } from '@/store'
-import { getActiveRuntimeTarget, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { getStructuredAgentSessionStatusFeed } from '@/runtime/structured-agent-session-status-feed'
+import { resolveStructuredSessionRuntimeTarget } from './structured-session-runtime-target'
+import { getWorktreeIdFromHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 
 type StructuredTab = Tab & { contentType: 'agent-session' }
+type OwnedStructuredTab = { tab: StructuredTab; bucket: string; uniquePaneKey: boolean }
 
 function isStructuredTab(tab: Tab): tab is StructuredTab {
   return tab.contentType === 'agent-session' && isAgentSessionHandleProvider(tab.agentSessionAgent)
@@ -18,40 +20,59 @@ function isStructuredTab(tab: Tab): tab is StructuredTab {
 
 const structuredTabsByUnifiedTabsSnapshot = new WeakMap<
   Record<string, Tab[]>,
-  readonly StructuredTab[]
+  { tabs: readonly StructuredTab[]; owners: readonly OwnedStructuredTab[] }
 >()
 
 /** Project structured-session tabs once per immutable tab-map snapshot. */
 export function getStructuredAgentSessionTabs(
   unifiedTabsByWorktree: Record<string, Tab[]>
 ): readonly StructuredTab[] {
+  return getStructuredTabOwners(unifiedTabsByWorktree).tabs
+}
+
+function getStructuredTabOwners(unifiedTabsByWorktree: Record<string, Tab[]>) {
   const cached = structuredTabsByUnifiedTabsSnapshot.get(unifiedTabsByWorktree)
   if (cached) {
     return cached
   }
 
   const tabs: StructuredTab[] = []
-  for (const worktreeTabs of Object.values(unifiedTabsByWorktree)) {
+  const owners: OwnedStructuredTab[] = []
+  const counts = new Map<string, number>()
+  for (const [bucket, worktreeTabs] of Object.entries(unifiedTabsByWorktree)) {
     for (const tab of worktreeTabs) {
       if (isStructuredTab(tab)) {
         tabs.push(tab)
+        owners.push({ tab, bucket, uniquePaneKey: false })
+        const key = structuredAgentSessionPaneKey(tab.id, tab.entityId)
+        counts.set(key, (counts.get(key) ?? 0) + 1)
       }
     }
   }
-  structuredTabsByUnifiedTabsSnapshot.set(unifiedTabsByWorktree, tabs)
-  return tabs
+  for (const entry of owners) {
+    entry.uniquePaneKey =
+      counts.get(structuredAgentSessionPaneKey(entry.tab.id, entry.tab.entityId)) === 1
+  }
+  const result = { tabs, owners }
+  structuredTabsByUnifiedTabsSnapshot.set(unifiedTabsByWorktree, result)
+  return result
 }
+
+const subscribeEmpty = (): (() => void) => () => {}
 
 /** The host's projected status for one session, live while the caller is mounted. */
 function useStructuredAgentSessionStatusSummary(
   sessionId: string,
-  target: RuntimeClientTarget
+  target: RuntimeClientTarget | null
 ): AgentSessionStatusSummary | null {
-  const feed = useMemo(() => getStructuredAgentSessionStatusFeed(target), [target])
-  useEffect(() => feed.activate(), [feed])
+  const feed = useMemo(
+    () => (target ? getStructuredAgentSessionStatusFeed(target) : null),
+    [target]
+  )
+  useEffect(() => feed?.activate(), [feed])
   return useSyncExternalStore(
-    feed.subscribe,
-    () => feed.getSnapshot().get(sessionId) ?? null,
+    feed?.subscribe ?? subscribeEmpty,
+    () => feed?.getSnapshot().get(sessionId) ?? null,
     () => null
   )
 }
@@ -129,18 +150,34 @@ function projectStatus(tab: StructuredTab, summary: AgentSessionStatusSummary | 
   )
 }
 
-function StructuredAgentSessionStatusProjection({ tab }: { tab: StructuredTab }): null {
-  const environmentId = useAppStore((state) =>
-    getRuntimeEnvironmentIdForWorktree(state, tab.worktreeId)
+function StructuredAgentSessionStatusProjection({
+  tab,
+  bucket,
+  uniquePaneKey
+}: OwnedStructuredTab): null {
+  const catalog = useAppStore(
+    useShallow((state) => ({
+      repos: state.repos,
+      worktreesByRepo: state.worktreesByRepo,
+      folderWorkspaces: state.folderWorkspaces,
+      projectGroups: state.projectGroups
+    }))
   )
   const target = useMemo(
-    () => getActiveRuntimeTarget({ activeRuntimeEnvironmentId: environmentId }),
-    [environmentId]
+    () => resolveStructuredSessionRuntimeTarget(catalog, bucket, tab),
+    [catalog, bucket, tab]
   )
   const summary = useStructuredAgentSessionStatusSummary(tab.entityId, target)
   useEffect(() => {
-    projectStatus(tab, summary)
-  }, [summary, tab])
+    // The legacy pane map cannot represent two owners sharing the same tab/session ids.
+    const ownedSummary =
+      uniquePaneKey &&
+      summary &&
+      getWorktreeIdFromHostIdentity(summary.workspaceId) === getWorktreeIdFromHostIdentity(bucket)
+        ? summary
+        : null
+    projectStatus(tab, ownedSummary)
+  }, [summary, tab, bucket, uniquePaneKey])
   useEffect(
     () => () =>
       useAppStore.getState().removeAgentStatus(structuredAgentSessionPaneKey(tab.id, tab.entityId)),
@@ -150,13 +187,16 @@ function StructuredAgentSessionStatusProjection({ tab }: { tab: StructuredTab })
 }
 
 export function StructuredAgentSessionStatusBridge(): React.JSX.Element {
-  const tabs = useAppStore(
-    useShallow((state) => getStructuredAgentSessionTabs(state.unifiedTabsByWorktree))
+  const owners = useAppStore(
+    useShallow((state) => getStructuredTabOwners(state.unifiedTabsByWorktree).owners)
   )
   return (
     <>
-      {tabs.map((tab) => (
-        <StructuredAgentSessionStatusProjection key={`${tab.id}:${tab.entityId}`} tab={tab} />
+      {owners.map((owner) => (
+        <StructuredAgentSessionStatusProjection
+          key={JSON.stringify([owner.bucket, owner.tab.id, owner.tab.entityId])}
+          {...owner}
+        />
       ))}
     </>
   )
