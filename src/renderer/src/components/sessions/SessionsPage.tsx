@@ -13,9 +13,6 @@ import TabPaneColumnSplitDragOverlay from '../tab-group/TabPaneColumnSplitDragOv
 import { TabDragProvider } from '../tab-group/tab-drag-context'
 import { useSessionPanels } from './use-session-panels'
 import { useSessionPanelDrag } from './use-session-panel-drag'
-import ProjectsNavigationPane from './ProjectsNavigationPane'
-import SessionCreationMenu from './SessionCreationMenu'
-import { Button } from '@/components/ui/button'
 
 export default function SessionsPage({
   reserveTopChrome = false
@@ -26,21 +23,18 @@ export default function SessionsPage({
   const { items, projects } = useSessionCollection()
   const view = useAppStore((state) => state.sessionsView)
   const updateView = useAppStore((state) => state.updateSessionsView)
-  const projectMode = view.navigation === 'projects'
   const filtered = useMemo(
     () => filterSessionInventory(items, view.scope, view.query),
     [items, view.scope, view.query]
   )
-  const panelItems = projectMode ? (view.scope.kind === 'workspace' ? filtered : []) : items
-  const selected = panelItems.find((item) => item.key === view.selectedSessionKey) ?? null
+  const panelItemsByKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items])
+  const selected = panelItemsByKey.get(view.selectedSessionKey ?? '') ?? null
   const select = useCallback(
     (key: string | null) => updateView({ selectedSessionKey: key }),
     [updateView]
   )
-  const collectionKey = projectMode ? JSON.stringify(view.scope) : undefined
-  const panel = useSessionPanels(panelItems, view.selectedSessionKey, select, collectionKey)
-  const back = () =>
-    projectMode ? updateView({ scope: { kind: 'all' }, selectedSessionKey: null }) : select(null)
+  const panel = useSessionPanels(items, view.selectedSessionKey, select)
+  const back = () => select(null)
   const drag = useSessionPanelDrag(panel.open)
   const isDraggingRef = useRef(false)
   isDraggingRef.current = drag.activeKey !== null
@@ -68,40 +62,24 @@ export default function SessionsPage({
           ref={pageRef}
           className="sessions-page"
           data-testid="sessions-page"
-          data-has-selection={projectMode ? view.scope.kind === 'workspace' : selected !== null}
+          data-has-selection={selected !== null}
           data-reserve-top-chrome={reserveTopChrome}
         >
           <h1 className="sr-only">{translate('components.sessions.title', 'Sessions')}</h1>
           <div className="sessions-layout">
-            {projectMode ? (
-              <ProjectsNavigationPane
-                scope={view.scope}
-                onOpenWorkspace={(workspaceKey, executionHostId) => {
-                  if (!panel.panels.groups.length) {
-                    panel.reopenAll()
-                  }
-                  updateView({
-                    scope: { kind: 'workspace', workspaceKey, executionHostId },
-                    query: '',
-                    selectedSessionKey: null
-                  })
-                }}
-              />
-            ) : (
-              <SessionsListPane
-                items={filtered}
-                allItems={items}
-                projects={projects}
-                view={view}
-                onArchive={panel.close}
-                updateView={(patch) => {
-                  if (patch.selectedSessionKey) {
-                    panel.open(patch.selectedSessionKey)
-                  }
-                  updateView(patch)
-                }}
-              />
-            )}
+            <SessionsListPane
+              items={filtered}
+              allItems={items}
+              projects={projects}
+              view={view}
+              onArchive={panel.close}
+              updateView={(patch) => {
+                if (patch.selectedSessionKey) {
+                  panel.open(patch.selectedSessionKey)
+                }
+                updateView(patch)
+              }}
+            />
             <div className="session-panel-workspace" data-dragging={Boolean(drag.activeKey)}>
               {selected && panel.panels.layout ? (
                 <TabGroupSplitLayout
@@ -116,9 +94,7 @@ export default function SessionsPage({
                       const group = panel.panels.groups.find(
                         (candidate) => candidate.id === groupId
                       )!
-                      const groupItems = group.keys.flatMap(
-                        (key) => panelItems.find((item) => item.key === key) ?? []
-                      )
+                      const groupItems = group.keys.flatMap((key) => panelItemsByKey.get(key) ?? [])
                       const activeItem =
                         groupItems.find((item) => item.key === group.activeKey) ?? null
                       return (
@@ -132,50 +108,11 @@ export default function SessionsPage({
                           onActivate={(key) => panel.open(key)}
                           onClose={panel.close}
                           onBack={back}
-                          backLabel={
-                            projectMode
-                              ? translate('components.sessions.backToProjects', 'Back to projects')
-                              : undefined
-                          }
                         />
                       )
                     }
                   }}
                 />
-              ) : projectMode ? (
-                <section
-                  className="session-detail session-detail-empty"
-                  data-testid="project-sessions-empty"
-                >
-                  <h2>
-                    {view.scope.kind === 'workspace' && !panelItems.length
-                      ? translate(
-                          'components.sessions.workspaceEmpty',
-                          'No sessions in this workspace'
-                        )
-                      : translate('components.sessions.chooseWorkspace', 'Select a workspace')}
-                  </h2>
-                  <p>
-                    {translate(
-                      'components.sessions.workspaceSessionsHint',
-                      'Select a workspace to open its sessions as tabs here.'
-                    )}
-                  </p>
-                  {view.scope.kind === 'workspace' && (
-                    <SessionCreationMenu scope={view.scope} showLabel />
-                  )}
-                  {panelItems.length > 0 && (
-                    <Button variant="outline" onClick={panel.reopenAll}>
-                      {translate(
-                        'components.sessions.reopenWorkspaceSessions',
-                        'Open workspace sessions'
-                      )}
-                    </Button>
-                  )}
-                  <Button variant="ghost" className="session-detail-back" onClick={back}>
-                    {translate('components.sessions.backToProjects', 'Back to projects')}
-                  </Button>
-                </section>
               ) : (
                 <SessionDetail item={null} onBack={back} />
               )}

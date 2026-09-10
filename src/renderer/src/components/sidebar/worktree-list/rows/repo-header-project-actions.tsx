@@ -49,7 +49,7 @@ export type RepoHeaderProjectActions = {
   onMoveProjectToGroup: (repo: Repo, groupId: string) => void
   onRemoveProjectFromGroup: (repo: Repo) => void
   onRemoveProject: (repo: Repo) => void
-  onCreateForRepo: (projectId: string) => void
+  onCreateForRepo: (repo: Repo) => void
 }
 
 export function RepoHeaderProjectActionsMenu({
@@ -167,7 +167,7 @@ export function RepoHeaderCreateWorkspaceButton({
   repo: Repo
   label: string
   createState: ReturnType<typeof getRepoHeaderCreateState> | null
-  onCreateForRepo: (projectId: string) => void
+  onCreateForRepo: (repo: Repo) => void
 }): React.JSX.Element {
   const fallbackLabel = translate(
     'auto.components.sidebar.WorktreeList.bb85cd86ba',
@@ -214,7 +214,7 @@ export function RepoHeaderCreateWorkspaceButton({
             onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
-              onCreateForRepo(repo.id)
+              onCreateForRepo(repo)
             }}
           >
             <Plus className="size-3" />

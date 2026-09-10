@@ -1,3 +1,5 @@
+export const WORKSPACE_REVEAL_LIST_READY_EVENT = 'orca-workspace-reveal-list-ready'
+
 export const SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT =
   'orca-scroll-to-current-workspace-reveal-request'
 

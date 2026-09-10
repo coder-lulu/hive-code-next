@@ -88,12 +88,12 @@ test.beforeEach(async ({ orcaPage: page, electronApp }) => {
   ).toBe(true)
 })
 
-test('opens worktree sessions as tabs from the project hierarchy and creates in context', async ({
+test('reuses the full workbench from project management and creates in context', async ({
   orcaPage: page
 }) => {
   test.setTimeout(150_000)
   const fixture = await seedSessions(page, 0)
-  await page.evaluate((id) => {
+  const secondTabId = await page.evaluate((id) => {
     const store = window.__store!
     const tab = store.getState().createTab(id, undefined, undefined, { activate: false })
     store.getState().setAiVaultTabTitle(tab.id, {
@@ -101,6 +101,7 @@ test('opens worktree sessions as tabs from the project hierarchy and creates in 
       sessionId: 'project-second',
       title: 'Project second session'
     })
+    return tab.id
   }, fixture.worktreeId)
   await page.getByRole('button', { name: 'Manage projects', exact: true }).click()
   const pane = page.getByTestId('projects-navigation-pane')
@@ -110,16 +111,31 @@ test('opens worktree sessions as tabs from the project hierarchy and creates in 
   await expect(pane.getByText('Ungrouped', { exact: true })).toHaveCount(0)
   await pane.locator(`[data-worktree-id="${fixture.worktreeId}"]`).first().click()
   await expect(
-    page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })
-  ).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Project second session', exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: 'Project second session', exact: true }).click()
-  await expect(
-    page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })
+    page.locator(
+      `[data-terminal-workbench-container] [data-tab-id="${fixture.terminalId}"]:visible`
+    )
   ).toBeVisible()
   await expect(
-    page.getByRole('tab', { name: 'Project second session', exact: true })
-  ).toHaveAttribute('aria-selected', 'true')
+    page.locator(`[data-terminal-workbench-container] [data-tab-id="${secondTabId}"]:visible`)
+  ).toBeVisible()
+  await page
+    .locator(`[data-terminal-workbench-container] [data-tab-id="${secondTabId}"]:visible`)
+    .click()
+  await expect(
+    page.locator(
+      `[data-terminal-workbench-container] [data-tab-id="${fixture.terminalId}"]:visible`
+    )
+  ).toBeVisible()
+  await expect(
+    page.locator(`[data-terminal-workbench-container] [data-tab-id="${secondTabId}"]:visible`)
+  ).toHaveAttribute('data-active', 'true')
+  await expect(page.locator('[data-terminal-workbench-container]')).toHaveAttribute(
+    'aria-hidden',
+    'false'
+  )
+  await expect(page.getByTestId('session-detail')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Toggle right sidebar', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Find files', exact: true })).toBeVisible()
   await capture(page, 'projects-workspace-tabs-light')
   await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
   await capture(page, 'projects-workspace-tabs-dark')
@@ -141,13 +157,20 @@ test('opens worktree sessions as tabs from the project hierarchy and creates in 
     .locator(`[data-worktree-id]:not([data-worktree-id="${fixture.worktreeId}"])`)
     .first()
     .click()
-  await expect(page.getByTestId('project-sessions-empty')).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })).toHaveCount(
-    0
+  await expect(page.locator('[data-terminal-workbench-container]')).toHaveAttribute(
+    'aria-hidden',
+    'false'
   )
+  await expect(
+    page.locator(
+      `[data-terminal-workbench-container] [data-tab-id="${fixture.terminalId}"]:visible`
+    )
+  ).toHaveCount(0)
   await pane.locator(`[data-worktree-id="${fixture.worktreeId}"]`).first().click()
   await expect(
-    page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })
+    page.locator(
+      `[data-terminal-workbench-container] [data-tab-id="${fixture.terminalId}"]:visible`
+    )
   ).toBeVisible()
   await capture(page, 'projects-grouped-workspace-tabs')
   await pane.getByRole('button', { name: 'New session', exact: true }).click()
@@ -166,9 +189,11 @@ test('opens worktree sessions as tabs from the project hierarchy and creates in 
   await expect(pane.locator('[data-worktree-id][aria-current="page"]').first()).toContainText(
     workspaceName
   )
-  await expect(page.getByRole('tab', { name: 'P2 Workspace continuity', exact: true })).toHaveCount(
-    0
-  )
+  await expect(
+    page.locator(
+      `[data-terminal-workbench-container] [data-tab-id="${fixture.terminalId}"]:visible`
+    )
+  ).toHaveCount(0)
 })
 
 test('filters real session rows and preserves search through narrow list/detail navigation', async ({

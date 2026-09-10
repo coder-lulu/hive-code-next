@@ -1,77 +1,65 @@
 // @vitest-environment happy-dom
-
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT } from '@/lib/scroll-to-current-workspace-status'
-import { useWorkspaceRevealBodyRedirect } from './use-workspace-reveal-body-redirect'
-
-;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
-const mocks = vi.hoisted(() => ({ setSidebarBody: vi.fn() }))
-
-vi.mock('@/store', () => ({
-  useAppStore: (selector: (state: { setSidebarBody: typeof mocks.setSidebarBody }) => unknown) =>
-    selector({ setSidebarBody: mocks.setSidebarBody })
+import { act, cleanup, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import {
+  SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT as REQUEST,
+  WORKSPACE_REVEAL_LIST_READY_EVENT as READY
+} from '@/lib/scroll-to-current-workspace-status'
+const mocks = vi.hoisted(() => ({
+  state: {
+    activeView: 'terminal',
+    activeWorktreeId: 'wt',
+    sessionsView: { navigation: 'sessions' },
+    updateSessionsView: vi.fn(),
+    openSessionsPage: vi.fn()
+  }
 }))
-
-function Host({ agentsBodyShowing }: { agentsBodyShowing: boolean }): null {
-  useWorkspaceRevealBodyRedirect(agentsBodyShowing)
-  return null
-}
-
-let container: HTMLDivElement
-let root: Root
-
+vi.mock('@/store', () => ({ useAppStore: { getState: () => mocks.state } }))
+import { useWorkspaceRevealBodyRedirect } from './use-workspace-reveal-body-redirect'
 beforeEach(() => {
-  mocks.setSidebarBody.mockClear()
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
-})
-
-afterEach(() => {
-  act(() => root.unmount())
-  container.remove()
-})
-
-describe('useWorkspaceRevealBodyRedirect', () => {
-  it('switches the body to Spaces and replays the request once the list is mounted', () => {
-    act(() => {
-      root.render(<Host agentsBodyShowing />)
-    })
-    const seen: unknown[] = []
-    const listener = (event: Event): void => {
-      seen.push(event instanceof CustomEvent ? event.detail : null)
-    }
-
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT, {
-          detail: { target: { type: 'active-workspace' }, beginRename: true }
-        })
-      )
-    })
-    expect(mocks.setSidebarBody).toHaveBeenCalledWith('workspaces')
-    expect(seen).toEqual([])
-
-    // The worktree list mounts (and registers its listener) when the body flips.
-    window.addEventListener(SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT, listener)
-    act(() => {
-      root.render(<Host agentsBodyShowing={false} />)
-    })
-    window.removeEventListener(SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT, listener)
-
-    expect(seen).toEqual([{ target: { type: 'active-workspace' }, beginRename: true }])
+  vi.clearAllMocks()
+  mocks.state.activeView = 'terminal'
+  mocks.state.sessionsView.navigation = 'sessions'
+  mocks.state.updateSessionsView.mockImplementation((patch) =>
+    Object.assign(mocks.state.sessionsView, patch)
+  )
+  mocks.state.openSessionsPage.mockImplementation(() => {
+    mocks.state.activeView = 'sessions'
   })
-
-  it('does not intercept requests while Spaces is already showing', () => {
-    act(() => {
-      root.render(<Host agentsBodyShowing={false} />)
-    })
-    act(() => {
-      window.dispatchEvent(new CustomEvent(SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT))
-    })
-    expect(mocks.setSidebarBody).not.toHaveBeenCalled()
+})
+afterEach(cleanup)
+it('keeps the active workbench and waits for lazy tree readiness before replaying rename', () => {
+  renderHook(() => useWorkspaceRevealBodyRedirect())
+  const detail = { target: { type: 'active-workspace' }, beginRename: true }
+  act(() => {
+    window.dispatchEvent(new CustomEvent(REQUEST, { detail }))
   })
+  expect(mocks.state.updateSessionsView).toHaveBeenCalledWith({ navigation: 'projects' })
+  expect(mocks.state.openSessionsPage).not.toHaveBeenCalled()
+  const listener = vi.fn()
+  window.addEventListener(REQUEST, listener)
+  expect(listener).not.toHaveBeenCalled()
+  act(() => {
+    window.dispatchEvent(new Event(READY))
+    window.dispatchEvent(new Event(READY))
+  })
+  window.removeEventListener(REQUEST, listener)
+  expect(listener).toHaveBeenCalledTimes(1)
+  expect(listener.mock.calls[0][0].detail).toEqual(detail)
+})
+it('opens project management from a page without a tree', () => {
+  mocks.state.activeView = 'settings'
+  renderHook(() => useWorkspaceRevealBodyRedirect())
+  act(() => {
+    window.dispatchEvent(new CustomEvent(REQUEST))
+  })
+  expect(mocks.state.openSessionsPage).toHaveBeenCalledOnce()
+})
+it('does not redirect an already visible project tree', () => {
+  mocks.state.sessionsView.navigation = 'projects'
+  renderHook(() => useWorkspaceRevealBodyRedirect())
+  act(() => {
+    window.dispatchEvent(new CustomEvent(REQUEST))
+  })
+  expect(mocks.state.updateSessionsView).not.toHaveBeenCalled()
 })

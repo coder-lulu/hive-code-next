@@ -3,6 +3,7 @@ import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import Sidebar from '../components/Sidebar'
+import { useWorkspaceRevealBodyRedirect } from '../components/sidebar/use-workspace-reveal-body-redirect'
 import RightSidebar from '../components/right-sidebar'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
 import { FloatingTerminalToggleButton } from '../components/floating-terminal/FloatingTerminalToggleButton'
@@ -27,6 +28,9 @@ const WorktreeCreationPanel = lazy(
   () => import('../components/worktree-creation/WorktreeCreationPanel')
 )
 const TaskPage = lazy(() => import('../components/task-page/TaskPage'))
+const ProjectWorkspaceNavigation = lazy(
+  () => import('../components/sessions/ProjectWorkspaceNavigation')
+)
 const SessionsPage = lazy(() => import('../components/sessions/SessionsPage'))
 const AutomationsPage = lazy(() => import('../components/automations/AutomationsPage'))
 const ActivityPrototypePage = lazy(() => import('../components/activity/ActivityPrototypePage'))
@@ -83,6 +87,7 @@ function WorktreeSidebar({
 
 function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element {
   const { activeView, activeWorktreeId, activePendingCreationId, creationLayoutActive } = layout
+  const projectNavigation = useAppStore((s) => s.sessionsView.navigation === 'projects')
   const activityPageScope = useAppStore((state) => state.activityPageScope)
   return (
     <>
@@ -90,7 +95,7 @@ function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element 
       {activeView === 'skills' ? <SkillsPage /> : null}
       {activeView === 'artifacts' ? <ArtifactsPage /> : null}
       {activeView === 'tasks' ? <TaskPage /> : null}
-      {activeView === 'sessions' ? (
+      {activeView === 'sessions' && !projectNavigation ? (
         <SessionsPage reserveTopChrome={layout.stackedSidebarOpen} />
       ) : null}
       {activeView === 'automations' ? <AutomationsPage /> : null}
@@ -120,6 +125,13 @@ export function AppWorkspaceShell(props: {
   floatingWorkspace: FloatingWorkspacePanelState
 }): React.JSX.Element {
   const { layout, floatingWorkspace } = props
+  useWorkspaceRevealBodyRedirect()
+  const projectNavigation = useAppStore(
+    (s) =>
+      s.sessionsView.navigation === 'projects' &&
+      (s.activeView === 'sessions' ||
+        (s.activeView === 'terminal' && Boolean(s.activeWorktreeId || s.activePendingCreationId)))
+  )
   const mandatoryUpdate = useAppStore((state) => state.updateStatus.mandatory === true)
   const workspaceBoardPanel = useWorkspaceBoardPanel()
   const stackedMainStripMounted =
@@ -213,6 +225,11 @@ export function AppWorkspaceShell(props: {
                 />
               )
             ) : null}
+            {projectNavigation && (
+              <Suspense fallback={<AppPageLoadingFallback />}>
+                <ProjectWorkspaceNavigation />
+              </Suspense>
+            )}
             <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
               {/* Why: automations/artifacts own their page headers; the stacked titlebar would be an empty 36px stripe. */}
               {stackedMainStripMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}
@@ -271,7 +288,18 @@ export function AppWorkspaceShell(props: {
                         { value0: APP_DISPLAY_NAME }
                       )}
                     >
-                      <ActivePage layout={layout} />
+                      {projectNavigation && layout.activeView === 'sessions' ? (
+                        <section
+                          className="session-detail session-detail-empty"
+                          data-testid="project-workspace-empty"
+                        >
+                          <h2>
+                            {translate('components.sessions.chooseWorkspace', 'Select a workspace')}
+                          </h2>
+                        </section>
+                      ) : (
+                        <ActivePage layout={layout} />
+                      )}
                     </RecoverableRenderErrorBoundary>
                   </Suspense>
                 </div>

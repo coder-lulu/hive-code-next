@@ -4,6 +4,7 @@ import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import {
+  WORKSPACE_REVEAL_LIST_READY_EVENT,
   SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT,
   type ScrollToCurrentWorkspaceRevealRequestDetail
 } from '@/lib/scroll-to-current-workspace-status'
@@ -194,6 +195,7 @@ export function useSidebarRevealRequests(args: {
       SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT,
       handleRevealCurrentWorkspaceRequest
     )
+    window.dispatchEvent(new Event(WORKSPACE_REVEAL_LIST_READY_EVENT))
     return () => {
       window.removeEventListener(
         SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT,

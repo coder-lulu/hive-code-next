@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LoaderCircle } from 'lucide-react'
 import { useAppStore } from '@/store'
+import { activateWorktreeFromSidebar } from '@/lib/sidebar-worktree-activation'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,9 +40,11 @@ import {
 
 export default function SessionCreateDialog({
   scope,
-  onClose
+  onClose,
+  returnToSessions = true
 }: {
   scope: SessionListScope
+  returnToSessions?: boolean
   onClose: () => void
 }) {
   useTranslation()
@@ -119,8 +122,12 @@ export default function SessionCreateDialog({
       }
       settled = true
       stop()
-      useAppStore.getState().openSessionsPage(scope)
-      useAppStore.getState().updateSessionsView({ selectedSessionKey: matches[0].key })
+      if (returnToSessions) {
+        useAppStore.getState().openSessionsPage(scope)
+        useAppStore.getState().updateSessionsView({ selectedSessionKey: matches[0].key })
+      } else {
+        void activateWorktreeFromSidebar(owner.worktreeId, owner.executionHostId)
+      }
       onClose()
     }
     unsubscribe = useAppStore.subscribe(inspect)

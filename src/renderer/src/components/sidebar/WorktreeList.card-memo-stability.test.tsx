@@ -27,6 +27,7 @@ const cardRenderSpy = vi.hoisted(() => vi.fn())
 const trackSpy = vi.hoisted(() => vi.fn())
 
 type WorktreeListComponent = React.ComponentType<{
+  projectHierarchy?: boolean
   scrollOffsetRef: React.RefObject<number>
   scrollAnchorRef: React.RefObject<unknown>
 }>
@@ -282,6 +283,34 @@ describe('WorktreeCard memo bail-out across epoch bumps', () => {
       }
     })
     document.body.innerHTML = ''
+  })
+
+  it('carries the repository host into the original workspace composer', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    mountedRoots.push(root)
+    await act(async () => {
+      root.render(
+        <WorktreeList
+          projectHierarchy
+          scrollOffsetRef={{ current: 0 }}
+          scrollAnchorRef={{ current: null }}
+        />
+      )
+    })
+    const button = container.querySelector<HTMLButtonElement>(
+      'button[aria-label^="Create new worktree for"]'
+    )
+    expect(button).not.toBeNull()
+    await act(async () => button!.click())
+    expect(mockStore.openModal).toHaveBeenCalledWith(
+      'new-workspace-composer',
+      expect.objectContaining({
+        initialRepoId: 'repo-1',
+        initialExecutionHostId: 'local'
+      })
+    )
   })
 
   it('does not re-render cards on an order-preserving sortEpoch bump', async () => {

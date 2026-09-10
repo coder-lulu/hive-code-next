@@ -67,3 +67,18 @@ it('preserves folder workspace keys instead of treating them as raw git ids', ()
     executionHostId: 'local'
   })
 })
+
+it('does not rerender the tree for unrelated parent updates', () => {
+  const scope = { kind: 'all' } as const
+  const open = vi.fn()
+  const view = render(<ProjectsNavigationPane scope={scope} onOpenWorkspace={open} />)
+  const props = mocks.props
+  view.rerender(<ProjectsNavigationPane scope={scope} onOpenWorkspace={open} />)
+  expect(mocks.props).toBe(props)
+})
+
+it('uses original worktree activation and active-owner selection in the workbench', () => {
+  render(<ProjectsNavigationPane scope={{ kind: 'all' }} useActiveWorkspace />)
+  expect(mocks.props?.onOpenWorkspace).toBeUndefined()
+  expect(mocks.props?.selectedWorkspace).toBeUndefined()
+})

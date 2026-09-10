@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderPlus } from 'lucide-react'
 import { useAppStore } from '@/store'
@@ -11,24 +11,29 @@ import WorktreeList from '../sidebar/WorktreeList'
 import SidebarWorkspaceOptionsMenu from '../sidebar/SidebarWorkspaceOptionsMenu'
 import SessionCreationMenu from './SessionCreationMenu'
 
-export default function ProjectsNavigationPane({
+export default memo(function ProjectsNavigationPane({
   scope,
-  onOpenWorkspace
+  onOpenWorkspace,
+  useActiveWorkspace = false
 }: {
   scope: SessionListScope
-  onOpenWorkspace: (worktreeId: string, executionHostId: ExecutionHostId) => void
+  useActiveWorkspace?: boolean
+  onOpenWorkspace?: (worktreeId: string, executionHostId: ExecutionHostId) => void
 }): React.JSX.Element {
   useTranslation()
   const scrollOffsetRef = useRef(0)
   const scrollAnchorRef = useRef<VirtualizedScrollAnchor>(null)
   const openModal = useAppStore((s) => s.openModal)
-  const selectedWorkspace =
-    scope.kind === 'workspace'
-      ? {
-          worktreeId: scope.workspaceKey.replace(/^worktree:/, ''),
-          executionHostId: scope.executionHostId
-        }
-      : null
+  const selectedWorkspace = useMemo(
+    () =>
+      scope.kind === 'workspace'
+        ? {
+            worktreeId: scope.workspaceKey.replace(/^worktree:/, ''),
+            executionHostId: scope.executionHostId
+          }
+        : null,
+    [scope]
+  )
   return (
     <section
       className="sessions-list-pane"
@@ -49,7 +54,10 @@ export default function ProjectsNavigationPane({
           <FolderPlus className="size-4" />
         </Button>
         <SidebarWorkspaceOptionsMenu fixedProjectHierarchy />
-        <SessionCreationMenu scope={scope.kind === 'workspace' ? scope : { kind: 'all' }} />
+        <SessionCreationMenu
+          returnToSessions={!useActiveWorkspace}
+          scope={scope.kind === 'workspace' ? scope : { kind: 'all' }}
+        />
       </div>
       <div
         className="sidebar-workspace-section min-h-0 flex-1 bg-worktree-sidebar"
@@ -59,10 +67,10 @@ export default function ProjectsNavigationPane({
           scrollOffsetRef={scrollOffsetRef}
           scrollAnchorRef={scrollAnchorRef}
           projectHierarchy
-          selectedWorkspace={selectedWorkspace}
+          selectedWorkspace={useActiveWorkspace ? undefined : selectedWorkspace}
           onOpenWorkspace={onOpenWorkspace}
         />
       </div>
     </section>
   )
-}
+})

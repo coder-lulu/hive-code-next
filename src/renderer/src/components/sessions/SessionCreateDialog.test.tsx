@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
+  activate: vi.fn(),
   launch: vi.fn(),
   close: vi.fn(),
   update: vi.fn(),
@@ -27,6 +28,9 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({}) }))
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
+vi.mock('@/lib/sidebar-worktree-activation', () => ({
+  activateWorktreeFromSidebar: mocks.activate
+}))
 vi.mock('@/lib/launch-agent-in-new-tab', () => ({ launchAgentInNewTab: mocks.launch }))
 vi.mock('@/lib/agent-catalog', () => ({
   getAgentCatalog: () => [{ id: 'claude', label: 'Claude' }]
@@ -141,4 +145,31 @@ it('does not relaunch after an uncertain async timeout', () => {
     (screen.getByRole('button', { name: 'Start session' }) as HTMLButtonElement).disabled
   ).toBe(true)
   expect(mocks.launch).toHaveBeenCalledOnce()
+})
+
+it('keeps a project-created session in the original workbench', () => {
+  render(
+    <SessionCreateDialog
+      scope={{ kind: 'project', projectKey: 'project' }}
+      onClose={mocks.close}
+      returnToSessions={false}
+    />
+  )
+  mocks.launch.mockImplementation(() => {
+    mocks.items = [
+      {
+        key: 'new',
+        worktreeId: 'main',
+        executionHostId: 'ssh:server',
+        agent: 'claude',
+        tabId: 'new-tab'
+      }
+    ]
+    return { tabId: 'new-tab' }
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
+  expect(mocks.close).toHaveBeenCalledOnce()
+  expect(mocks.activate).toHaveBeenCalledWith('main', 'ssh:server')
+  expect(mocks.open).not.toHaveBeenCalled()
+  expect(mocks.update).not.toHaveBeenCalled()
 })

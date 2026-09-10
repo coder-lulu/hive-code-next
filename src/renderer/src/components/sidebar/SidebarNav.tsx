@@ -86,7 +86,11 @@ const SidebarNav = React.memo(function SidebarNav() {
   const updateSettings = useAppStore((s) => s.updateSettings)
   const activeView = useAppStore((s) => s.activeView)
   const projectManagementActive = useAppStore(
-    (s) => s.activeView === 'sessions' && s.sessionsView.navigation === 'projects'
+    (s) =>
+      (s.activeView === 'sessions' ||
+        (s.activeView === 'terminal' &&
+          Boolean(s.activeWorktreeId || s.activePendingCreationId))) &&
+      s.sessionsView.navigation === 'projects'
   )
   const showAgentsButton = useAppStore((s) => shouldShowAgentsButton(s.settings))
   const showMobileButton = useAppStore((s) => shouldShowMobileButton(s.settings))

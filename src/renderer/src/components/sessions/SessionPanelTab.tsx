@@ -1,4 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -21,8 +22,38 @@ export default function SessionPanelTab({
 }): React.JSX.Element {
   const agent = getAgentCatalog().find((entry) => entry.id === item.agent)
   const drag = useDraggable({ id: `session-tab:${item.key}`, data: { sessionKey: item.key } })
+  const { setNodeRef: setDragNodeRef } = drag
+  const tabRef = useRef<HTMLDivElement | null>(null)
+  const setNodeRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      tabRef.current = node
+      setDragNodeRef(node)
+    },
+    [setDragNodeRef]
+  )
+  useLayoutEffect(() => {
+    const tab = tabRef.current
+    const strip = tab?.parentElement
+    if (!selected || !tab || !strip) {
+      return
+    }
+    const reveal = () => {
+      const bounds = tab.getBoundingClientRect()
+      const viewport = strip.getBoundingClientRect()
+      if (bounds.left < viewport.left) {
+        strip.scrollLeft += bounds.left - viewport.left
+      } else if (bounds.right > viewport.right) {
+        strip.scrollLeft += bounds.right - viewport.right
+      }
+    }
+    reveal()
+    const observer = new ResizeObserver(reveal)
+    observer.observe(strip)
+    observer.observe(tab)
+    return () => observer.disconnect()
+  }, [selected, item.title])
   return (
-    <div className="session-current-tab" data-selected={selected} ref={drag.setNodeRef}>
+    <div className="session-current-tab" data-selected={selected} ref={setNodeRef}>
       {selected && <span className="tab-active-shape" aria-hidden />}
       <button
         {...drag.attributes}

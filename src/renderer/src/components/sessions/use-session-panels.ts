@@ -111,12 +111,13 @@ export function useSessionPanels(
     setPanels((state) => ({ ...state, focusedGroupId: groupId }))
     select(group.activeKey)
   }
+  const reopenAll = useCallback(() => {
+    collection.current.closed.clear()
+    setPanels({ ...EMPTY_SESSION_PANELS })
+  }, [])
   return {
     panels,
-    reopenAll: () => {
-      collection.current.closed.clear()
-      setPanels({ ...EMPTY_SESSION_PANELS })
-    },
+    reopenAll,
     open,
     close,
     focus,

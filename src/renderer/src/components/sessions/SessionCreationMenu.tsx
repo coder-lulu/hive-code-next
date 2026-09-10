@@ -32,9 +32,11 @@ import SessionCreateDialog from './SessionCreateDialog'
 
 export default function SessionCreationMenu({
   scope,
+  returnToSessions = true,
   showLabel = false
 }: {
   scope: SessionListScope
+  returnToSessions?: boolean
   showLabel?: boolean
 }): React.JSX.Element {
   const [mode, setMode] = useState<'session' | 'worktree' | null>(null)
@@ -76,7 +78,7 @@ export default function SessionCreationMenu({
     openModal('new-workspace-composer', {
       initialRepoId: selected.id,
       initialExecutionHostId: getRepoExecutionHostId(selected),
-      returnToSessions: true,
+      returnToSessions,
       telemetrySource: 'sidebar'
     })
   }
@@ -107,7 +109,13 @@ export default function SessionCreationMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {mode === 'session' && <SessionCreateDialog scope={scope} onClose={() => setMode(null)} />}
+      {mode === 'session' && (
+        <SessionCreateDialog
+          returnToSessions={returnToSessions}
+          scope={scope}
+          onClose={() => setMode(null)}
+        />
+      )}
       <Dialog
         open={mode === 'worktree'}
         onOpenChange={(open) => {

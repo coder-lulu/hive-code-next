@@ -13,7 +13,6 @@ import { FolderPlus, Loader2 } from 'lucide-react'
 import { ActivityThreadCollapseContext } from '@/components/activity/activity-thread-collapse-context'
 import { useSidebarProjectDrop } from './useSidebarProjectDrop'
 import type { WorkspaceBoardPanelState } from './useWorkspaceBoardPanel'
-import { useWorkspaceRevealBodyRedirect } from './use-workspace-reveal-body-redirect'
 import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -139,8 +138,6 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
     setWidth: setSidebarWidth,
     onDraftWidthChange: setLiveSidebarWidth
   })
-
-  useWorkspaceRevealBodyRedirect(sidebarOpen && sidebarBody === 'agents')
 
   return (
     <TooltipProvider delayDuration={400}>

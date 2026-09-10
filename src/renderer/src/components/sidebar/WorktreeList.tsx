@@ -227,8 +227,12 @@ const WorktreeList = React.memo(function WorktreeList({
   }, [])
 
   const handleCreateForRepo = useCallback(
-    (projectId: string) => {
-      openModal('new-workspace-composer', { initialRepoId: projectId, telemetrySource: 'sidebar' })
+    (repo: Repo) => {
+      openModal('new-workspace-composer', {
+        initialRepoId: repo.id,
+        initialExecutionHostId: getRepoExecutionHostId(repo),
+        telemetrySource: 'sidebar'
+      })
     },
     [openModal]
   )
@@ -322,6 +326,7 @@ const WorktreeList = React.memo(function WorktreeList({
         // enters the canonical worktree composer with that repo preselected.
         openModal('new-workspace-composer', {
           initialRepoId: repo.id,
+          initialExecutionHostId: getRepoExecutionHostId(repo),
           telemetrySource: 'sidebar'
         })
         return
