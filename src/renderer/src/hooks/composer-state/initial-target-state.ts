@@ -7,6 +7,7 @@ type ComposerInitialTargetStateInput = Pick<
   | 'decisions'
   | 'initialProjectGroupId'
   | 'initialRepoId'
+  | 'initialExecutionHostId'
   | 'initialTaskSourceContext'
   | 'initialWorkspaceStatus'
   | 'newWorkspaceDraft'
@@ -33,6 +34,7 @@ export function useComposerInitialTargetState(input: ComposerInitialTargetStateI
     eligibleRepos,
     initialProjectGroupId,
     initialRepoId,
+    initialExecutionHostId,
     initialTaskSourceContext,
     initialWorkspaceStatus,
     newWorkspaceDraft,
@@ -59,12 +61,15 @@ export function useComposerInitialTargetState(input: ComposerInitialTargetStateI
     ? (newWorkspaceDraft?.projectHostSetupId ?? null)
     : null
 
-  const initialRunSeed = resolveInitialWorkspaceRunSeed({
-    draftProjectId,
-    draftHostId,
-    draftProjectHostSetupId,
-    initialTaskSourceContext
-  })
+  const initialRunSeed = {
+    ...resolveInitialWorkspaceRunSeed({
+      draftProjectId,
+      draftHostId: initialExecutionHostId ?? draftHostId,
+      draftProjectHostSetupId,
+      initialTaskSourceContext
+    }),
+    ...(initialExecutionHostId ? { projectHostSetupId: null } : {})
+  }
 
   const resolvedInitialWorkspaceStatus = useMemo(
     () =>
@@ -75,7 +80,10 @@ export function useComposerInitialTargetState(input: ComposerInitialTargetStateI
   )
 
   const resolvedInitialWorkspaceTarget = resolveWorkspaceCreationTarget({
-    eligibleRepos,
+    eligibleRepos:
+      initialExecutionHostId && initialRepoId
+        ? eligibleRepos.filter((repo) => repo.id === initialRepoId)
+        : eligibleRepos,
     projects,
     projectHostSetups,
     draftRepoId,

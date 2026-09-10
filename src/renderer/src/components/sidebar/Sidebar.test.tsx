@@ -153,12 +153,12 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Sidebar', () => {
-  it('keeps the workspace list without a duplicate recent-session section', () => {
+  it('moves workspaces out of the sidebar without a duplicate recent-session section', () => {
     setSidebarState(getDefaultSettings(tmpdir()))
     mocks.state = { ...mocks.state, activeView: 'sessions' }
     const view = render(sidebarElement())
     expect(view.queryByTestId('session-navigation')).toBeNull()
-    expect(view.getByTestId('worktree-list')).toBeTruthy()
+    expect(view.queryByTestId('worktree-list')).toBeNull()
     expect(view.getByTestId('sidebar-footer')).toBeTruthy()
   })
 

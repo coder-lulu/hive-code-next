@@ -25,6 +25,7 @@ import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-per
 
 export type ComposerTargetStoreModel = {
   initialRepoId: string | undefined
+  initialExecutionHostId: ExecutionHostId | undefined
   initialEphemeralVmRecipeId: string | undefined
   initialName: string
   initialPrompt: string

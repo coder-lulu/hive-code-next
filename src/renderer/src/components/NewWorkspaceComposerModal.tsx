@@ -20,6 +20,7 @@ import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
+import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
@@ -36,6 +37,7 @@ const HostedAddRepoDialog = lazyWithRetry(() => import('@/components/sidebar/Add
 })
 
 type ComposerModalData = {
+  returnToSessions?: boolean
   prefilledName?: string
   /** Optional task authored before the workspace exists (for example on the desktop home). */
   initialPrompt?: string
@@ -44,6 +46,7 @@ type ComposerModalData = {
   /** Optional per-launch permission policy selected alongside `initialPrompt`. */
   initialAgentPermissionMode?: AgentLaunchPermissionMode
   initialRepoId?: string
+  initialExecutionHostId?: ExecutionHostId
   initialEphemeralVmRecipeId?: string
   initialProjectGroupId?: string
   linkedWorkItem?: LinkedWorkItemSummary | null
@@ -124,6 +127,24 @@ function QuickTabBody({
   active: boolean
 }): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
+  const handleCreated = useCallback(() => {
+    if (isSubmissionCancelled()) {
+      return
+    }
+    if (modalData.returnToSessions) {
+      const state = useAppStore.getState()
+      const pendingId = state.activePendingCreationId
+      const pending = pendingId ? state.pendingWorktreeCreations[pendingId] : undefined
+      if (pending && pendingId) {
+        // Quick creation closes the composer at acceptance; hand off only after
+        // the captured pending request actually completes (including retries).
+        state.updatePendingWorktreeCreation(pendingId, {
+          returnToSessions: true
+        })
+      }
+    }
+    onClose()
+  }, [isSubmissionCancelled, modalData.returnToSessions, onClose])
   const [agentPermissionMode, setAgentPermissionMode] = useState<AgentLaunchPermissionMode>(
     modalData.initialAgentPermissionMode ?? 'default'
   )
@@ -146,12 +167,13 @@ function QuickTabBody({
     initialGitHubWorkItem: modalData.initialGitHubWorkItem ?? null,
     initialTaskSourceContext: modalData.taskSourceContext ?? null,
     initialRepoId: modalData.initialRepoId,
+    initialExecutionHostId: modalData.initialExecutionHostId,
     initialEphemeralVmRecipeId: modalData.initialEphemeralVmRecipeId,
     initialProjectGroupId: modalData.initialProjectGroupId,
     initialWorkspaceStatus: modalData.initialWorkspaceStatus,
     ...(modalData.initialBaseBranch ? { initialBaseBranch: modalData.initialBaseBranch } : {}),
     persistDraft: false,
-    onCreated: onClose,
+    onCreated: handleCreated,
     isSubmissionCancelled,
     ...(modalData.telemetrySource ? { telemetrySource: modalData.telemetrySource } : {}),
     enableIssueAutomation: modalData.enableIssueAutomation === true,

@@ -15760,7 +15760,37 @@
       "terminalHint": "此会话使用工作区终端。进入工作台后可继续使用原有终端和布局。",
       "workspace": "工作区",
       "host": "运行设备",
-      "loading": "正在加载会话…"
+      "loading": "正在加载会话…",
+      "newWorktree": "新建 worktree",
+      "chooseWorktreeRepo": "选择新 worktree 所属的仓库和设备。",
+      "repository": "仓库",
+      "continueCreate": "继续",
+      "manageProjects": "项目管理",
+      "manageProjectsHint": "管理仓库、worktree、文件夹及可选分组。打开工作区可使用其开发工具。",
+      "addProject": "添加项目",
+      "workspacesAndGroups": "工作区与分组",
+      "allWorkspaces": "全部工作区",
+      "workspaceUnavailable": "工作区不可用",
+      "filterWorkspace": "按工作区筛选",
+      "searchWorkspaces": "搜索工作区…",
+      "noWorkspaces": "没有匹配的工作区",
+      "create": {
+        "title": "新建会话",
+        "description": "选择工作区和智能体，当前会话保持打开。",
+        "workspace": "工作区",
+        "chooseWorkspace": "选择工作区",
+        "temporary": "临时会话（本地）",
+        "noWorkspace": "暂无可用工作区，请先从加号菜单创建 worktree。",
+        "agent": "智能体",
+        "chooseAgent": "选择智能体",
+        "noAgents": "此设备暂无可用智能体。",
+        "refresh": "刷新",
+        "prompt": "首条消息（可选）",
+        "start": "开始会话",
+        "ambiguous": "此工作区存在多个执行归属，请从项目管理中打开。",
+        "failed": "无法启动会话。",
+        "unknown": "会话尚未出现，请先检查会话列表，避免重复创建。"
+      }
     }
   },
   "dashboardPopout": {

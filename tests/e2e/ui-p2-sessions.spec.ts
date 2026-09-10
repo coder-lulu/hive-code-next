@@ -88,6 +88,53 @@ test.beforeEach(async ({ orcaPage: page, electronApp }) => {
   ).toBe(true)
 })
 
+test('creates from project context and keeps workspace management available', async ({
+  orcaPage: page
+}) => {
+  await seedSessions(page, 0)
+  await page.locator('.session-project-navigation-row .session-project-row').first().click()
+  const pane = page.locator('.sessions-list-pane')
+  await expect(page.getByTestId('session-workspace-filter')).toBeVisible()
+  await page.getByTestId('session-workspace-filter').click()
+  await expect(page.getByRole('option', { name: 'All workspaces', exact: true })).toBeVisible()
+  await page.getByRole('option').last().click()
+  await pane.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('menuitem', { name: 'New session', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('Start session')
+  await expect(page.locator('#session-create-workspace')).not.toContainText('Choose a workspace')
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).first().click()
+  await pane.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('menuitem', { name: 'New worktree', exact: true }).click()
+  await expect(
+    page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true })
+  ).toBeEnabled()
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('dialog')).not.toContainText('Choose the repository and device')
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('sessions-page')).toBeVisible()
+  await page.getByRole('button', { name: 'Manage projects', exact: true }).click()
+  await expect(page.getByTestId('project-manager-workspaces')).toBeVisible()
+  await expect(page.getByRole('dialog')).toContainText('Workspaces and groups')
+  await capture(page, 'project-manager-light')
+  await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
+  await capture(page, 'project-manager-dark')
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('sessions-page')).toBeVisible()
+  await pane.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('menuitem', { name: 'New worktree', exact: true }).click()
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  const composer = page.getByRole('dialog', { name: /Create (Workspace|Worktree)/i })
+  const workspaceName = `session-entry-${Date.now()}`
+  await composer.getByPlaceholder(/Type a name/i).fill(workspaceName)
+  await composer.getByRole('button', { name: /Create (Workspace|Worktree)/i }).click()
+  await expect(composer).toBeHidden({ timeout: 20_000 })
+  await expect(page.getByTestId('sessions-page')).toBeVisible({ timeout: 30_000 })
+  await expect(pane.getByRole('button', { name: 'Session scope', exact: true })).toContainText(
+    workspaceName
+  )
+})
+
 test('filters real session rows and preserves search through narrow list/detail navigation', async ({
   orcaPage: page
 }) => {
@@ -327,7 +374,8 @@ test('restores a virtual list position and selected row after leaving the sessio
   await expect(page.locator(`[data-session-key="${selectedKey}"]`).last()).toBeVisible()
   await capture(page, 'p2-review-narrow-list-return')
   await expect(page.getByTestId('session-navigation')).toHaveCount(0)
-  await expect(page.locator('.sidebar-workspace-section')).toBeVisible()
+  await expect(page.locator('.sidebar-workspace-section')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Manage projects', exact: true })).toBeVisible()
 })
 
 test('keeps connection and activity indicators within a session row', async ({

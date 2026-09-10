@@ -220,6 +220,7 @@ export type WorktreeSlice = {
       error?: string
       loaderVisible?: boolean
       request?: PendingWorktreeCreation['request']
+      returnToSessions?: boolean
       provisioningLog?: string
       structuredLaunchRecoveryWorktreeId?: string
     }

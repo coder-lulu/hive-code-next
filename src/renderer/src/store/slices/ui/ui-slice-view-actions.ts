@@ -10,7 +10,7 @@ function sameSessionScope(left: SessionListScope, right: SessionListScope): bool
     return false
   }
   if (left.kind === 'project' && right.kind === 'project') {
-    return left.projectKey === right.projectKey
+    return left.projectKey === right.projectKey && left.workspaceKey === right.workspaceKey
   }
   if (left.kind === 'workspace' && right.kind === 'workspace') {
     return (

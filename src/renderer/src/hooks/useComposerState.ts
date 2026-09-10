@@ -32,6 +32,7 @@ import type {
 
 export type UseComposerStateOptions = {
   initialRepoId?: string
+  initialExecutionHostId?: ExecutionHostId
   initialEphemeralVmRecipeId?: string
   initialProjectGroupId?: string
   initialName?: string

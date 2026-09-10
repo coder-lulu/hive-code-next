@@ -452,6 +452,23 @@ describe('session scope and search', () => {
       sessionProjects(source.entities, (host) => host).map((project) => project.key)
     ).toHaveLength(3)
   })
+
+  it('narrows a project to the actual workspace owner without matching another host or unassigned session', () => {
+    const source = input({ tabsByWorktree: { shared: [terminal()] } })
+    const [base] = buildSessionInventory(source)
+    const projectKey = base.projectKey!
+    const items = [
+      base,
+      { ...base, key: 'other-workspace', worktreeId: 'feature', ownerBucketKey: 'local|feature' },
+      { ...base, key: 'other-host', executionHostId: 'ssh:alpha' as const },
+      { ...base, key: 'unassigned', projectKey: null }
+    ]
+    const scope = { kind: 'project' as const, projectKey, workspaceKey: 'local|shared' }
+    expect(filterSessionInventory(items, scope, '')).toEqual([base])
+    expect(filterSessionInventory(items, scope, 'no matching title')).toEqual([])
+    expect(filterSessionInventory(items, { ...scope, workspaceKey: 'local|empty' }, '')).toEqual([])
+    expect(filterSessionInventory(items, { kind: 'project', projectKey }, '')).toHaveLength(3)
+  })
 })
 
 describe('current provider metadata and semantic deduplication', () => {

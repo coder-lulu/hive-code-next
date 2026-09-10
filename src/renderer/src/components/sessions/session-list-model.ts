@@ -164,6 +164,15 @@ export function filterSessionInventory(
       return false
     }
     if (
+      scope.kind === 'project' &&
+      scope.workspaceKey &&
+      (!item.executionHostId ||
+        !item.worktreeId ||
+        composeWorktreeHostIdentity(item.executionHostId, item.worktreeId) !== scope.workspaceKey)
+    ) {
+      return false
+    }
+    if (
       scope.kind === 'workspace' &&
       (item.worktreeId !== scope.workspaceKey.replace(/^worktree:/, '') ||
         item.executionHostId !== scope.executionHostId)

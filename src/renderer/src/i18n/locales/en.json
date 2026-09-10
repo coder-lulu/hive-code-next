@@ -18137,7 +18137,37 @@
       "openDisconnected": "Reconnect this host, then try opening the session again.",
       "openUnavailable": "This session is no longer available in the current workspace. Refresh its host and try again.",
       "openFailed": "Could not open this session. Please try again.",
-      "loading": "Loading session…"
+      "loading": "Loading session…",
+      "newWorktree": "New worktree",
+      "chooseWorktreeRepo": "Choose the repository and device for the new worktree.",
+      "repository": "Repository",
+      "continueCreate": "Continue",
+      "manageProjects": "Manage projects",
+      "manageProjectsHint": "Manage repositories, worktrees, folders and optional groups. Open a workspace to use its development tools.",
+      "addProject": "Add project",
+      "workspacesAndGroups": "Workspaces and groups",
+      "allWorkspaces": "All workspaces",
+      "workspaceUnavailable": "Workspace unavailable",
+      "filterWorkspace": "Filter by workspace",
+      "searchWorkspaces": "Search workspaces…",
+      "noWorkspaces": "No matching workspace",
+      "create": {
+        "title": "New session",
+        "description": "Choose a workspace and agent. Your current sessions stay open.",
+        "workspace": "Workspace",
+        "chooseWorkspace": "Choose a workspace",
+        "temporary": "Temporary session (local)",
+        "noWorkspace": "No workspace is available. Create a worktree from the + menu first.",
+        "agent": "Agent",
+        "chooseAgent": "Choose an agent",
+        "noAgents": "No available agents on this device.",
+        "refresh": "Refresh",
+        "prompt": "Initial message (optional)",
+        "start": "Start session",
+        "ambiguous": "This workspace has multiple execution owners. Open it from project management.",
+        "failed": "Could not start the session.",
+        "unknown": "The session has not appeared yet. Check the session list before trying again."
+      }
     }
   },
   "dashboardPopout": {

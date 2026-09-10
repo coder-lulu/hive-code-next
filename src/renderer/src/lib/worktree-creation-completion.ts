@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store'
+import { returnCreatedWorkspaceToSessions } from '@/lib/workspace-creation-session-return'
 import { needsPostCreateAgentStartup } from '@/lib/worktree-creation-followup-startup'
 import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
@@ -19,6 +20,8 @@ export async function completeWorktreeCreation(args: {
   focusOnCompletion: boolean
 }): Promise<void> {
   const { request } = args
+  const returnToSessions =
+    useAppStore.getState().pendingWorktreeCreations[args.creationId]?.returnToSessions === true
   // Why: clearing synchronously after activation lets React commit the panel-to-terminal swap in one frame.
   useAppStore.getState().removePendingWorktreeCreation(args.creationId, { cleanupVm: false })
   if (!args.structuredLaunchAccepted) {
@@ -53,6 +56,10 @@ export async function completeWorktreeCreation(args: {
     args.focusOnCompletion
   ) {
     queueWorkspaceActivationTerminalFocus(args.worktreeId, args.activation)
+  }
+
+  if (returnToSessions && args.focusOnCompletion) {
+    returnCreatedWorkspaceToSessions(args.worktreeId)
   }
 
   // Why: note persistence is cosmetic and should not delay the visible workspace handoff.

@@ -1,4 +1,5 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useContext, useEffect } from 'react'
+import { WorkspaceActivatedContext } from './workspace-activation-context'
 import type React from 'react'
 import type { Virtualizer } from '@tanstack/react-virtual'
 import { useAppStore } from '@/store'
@@ -48,6 +49,7 @@ export function useWorktreeListKeyboardNavigation(args: {
   activeModal: string
   markDirectScrollInput: () => void
 }) {
+  const onWorkspaceActivated = useContext(WorkspaceActivatedContext)
   const {
     rows,
     renderRows,
@@ -87,10 +89,14 @@ export function useWorktreeListKeyboardNavigation(args: {
       }
 
       // Why: keyboard cycling is real navigation; route through the activation helper that records history.
-      activateAndRevealWorktree(
+      const activated = activateAndRevealWorktree(
         nextWorktree.id,
         nextWorktree.hostId ? { executionHostId: nextWorktree.hostId } : {}
       )
+
+      if (activated) {
+        onWorkspaceActivated?.()
+      }
 
       const rowIndex = findPreferredRenderRowIndexForWorktreeIdentity(
         renderRows,
@@ -107,7 +113,8 @@ export function useWorktreeListKeyboardNavigation(args: {
       activeWorktreeId,
       activeWorkspaceExecutionHostId,
       virtualizer,
-      pinnedDisplayPolicy
+      pinnedDisplayPolicy,
+      onWorkspaceActivated
     ]
   )
 

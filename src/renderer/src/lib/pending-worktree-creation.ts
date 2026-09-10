@@ -121,6 +121,8 @@ export type WorktreeCreationRequest = {
  *  (name, repo, agent) live on `request`, the single source of truth reused on
  *  retry. */
 export type PendingWorktreeCreation = {
+  /** Return a successful foreground create to the session surface. */
+  returnToSessions?: boolean
   creationId: string
   phase: WorktreeCreationPhase
   status: 'creating' | 'error'

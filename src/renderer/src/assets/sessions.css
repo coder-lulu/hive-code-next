@@ -532,3 +532,16 @@ html[data-session-dragging='true'] * {
     display: none;
   }
 }
+
+.session-project-navigation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sessions-space-1);
+}
+.session-project-navigation-row .session-project-row {
+  flex: 1;
+  min-width: 0;
+}
+.session-project-navigation-row > [data-slot='dropdown-menu-trigger'] {
+  flex-shrink: 0;
+}

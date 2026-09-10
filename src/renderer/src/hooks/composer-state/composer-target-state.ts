@@ -22,6 +22,7 @@ export function useComposerTargetState(
     eligibleRepos: composerTargetStore.eligibleRepos,
     initialProjectGroupId: composerTargetStore.initialProjectGroupId,
     initialRepoId: composerTargetStore.initialRepoId,
+    initialExecutionHostId: composerTargetStore.initialExecutionHostId,
     initialTaskSourceContext: composerTargetStore.initialTaskSourceContext,
     initialWorkspaceStatus: composerTargetStore.initialWorkspaceStatus,
     newWorkspaceDraft: composerTargetStore.newWorkspaceDraft,

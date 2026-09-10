@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- The sidebar owns the virtualized hierarchy and its creation actions. */
 
 import React, { useCallback, useMemo } from 'react'
+import { WorkspaceActivatedContext } from './worktree-list/navigation/workspace-activation-context'
 import { useAppStore } from '@/store'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -47,6 +48,7 @@ import {
 } from '../landing/desktop-home-session-drag'
 
 type WorktreeListProps = {
+  onWorkspaceActivated?: () => void
   scrollOffsetRef: React.MutableRefObject<number>
   scrollAnchorRef: React.MutableRefObject<VirtualizedScrollAnchor>
   workspaceBoardOpen?: boolean
@@ -58,6 +60,7 @@ type WorktreeListProps = {
 const WorktreeList = React.memo(function WorktreeList({
   scrollOffsetRef,
   scrollAnchorRef,
+  onWorkspaceActivated,
   workspaceBoardOpen = false,
   onWorkspaceBoardDragPreviewStart = NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK,
   onWorkspaceBoardDragPreviewCommit = NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK,
@@ -483,7 +486,7 @@ const WorktreeList = React.memo(function WorktreeList({
   }
 
   return (
-    <>
+    <WorkspaceActivatedContext.Provider value={onWorkspaceActivated}>
       <SidebarWorktreeListDialogs
         dialogs={projectGroupDialogs}
         repos={repos}
@@ -583,7 +586,7 @@ const WorktreeList = React.memo(function WorktreeList({
         scrollOffsetRef={scrollOffsetRef}
         scrollAnchorRef={scrollAnchorRef}
       />
-    </>
+    </WorkspaceActivatedContext.Provider>
   )
 })
 

@@ -14,9 +14,11 @@ import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../..
 import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import type { ComposerDecisions } from './composer-decisions'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 
 export type ComposerStateInput = {
   initialRepoId?: string
+  initialExecutionHostId?: ExecutionHostId
   initialEphemeralVmRecipeId?: string
   initialProjectGroupId?: string
   initialName?: string
@@ -42,6 +44,7 @@ const NEVER_CANCEL_COMPOSER_SUBMIT = (): boolean => false
 export function useComposerTargetStore(options: ComposerStateInput, decisions: ComposerDecisions) {
   const {
     initialRepoId,
+    initialExecutionHostId,
     initialEphemeralVmRecipeId,
     initialName = '',
     initialPrompt = '',
@@ -166,6 +169,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
 
   return {
     initialRepoId,
+    initialExecutionHostId,
     initialEphemeralVmRecipeId,
     initialName,
     initialPrompt,

@@ -1,5 +1,6 @@
-import React, { useCallback, useLayoutEffect, useRef } from 'react'
+import React, { useCallback, useContext, useLayoutEffect, useRef } from 'react'
 
+import { WorkspaceActivatedContext } from './worktree-list/navigation/workspace-activation-context'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-diagnostics'
 import { activateWorktreeFromSidebar } from '@/lib/sidebar-worktree-activation'
@@ -37,6 +38,7 @@ export function useWorktreeCardActivationActions({
 > &
   Pick<Foundation, 'isSshDisconnected' | 'updateWorktreeMeta' | 'openModal'> &
   Pick<LinkedDetails, 'isDeleting'>) {
+  const onWorkspaceActivated = useContext(WorkspaceActivatedContext)
   const worktreeRef = useRef(worktree)
   useLayoutEffect(() => {
     worktreeRef.current = worktree
@@ -83,7 +85,8 @@ export function useWorktreeCardActivationActions({
       onImmediateActivate?.(worktree.id, activationRowKey)
       void activateWorktreeFromSidebar(
         worktree.id,
-        worktree.hostId ?? (repo ? getRepoExecutionHostId(repo) : undefined)
+        worktree.hostId ?? (repo ? getRepoExecutionHostId(repo) : undefined),
+        ...(onWorkspaceActivated ? ([onWorkspaceActivated] as const) : [])
       )
       onActivate?.()
     },
@@ -98,6 +101,7 @@ export function useWorktreeCardActivationActions({
       activationRowKey,
       isSshDisconnected,
       onActivate,
+      onWorkspaceActivated,
       onImmediateActivate,
       onSelectionGesture
     ]

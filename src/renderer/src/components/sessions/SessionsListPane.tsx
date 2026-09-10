@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ChevronRight, Plus, Search, SearchX, X } from 'lucide-react'
+import { Archive, ChevronRight, Search, SearchX, X } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionListViewState } from '../../../../shared/session-list-scope'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,8 @@ import { partitionSessionList } from '../../../../shared/session-list-metadata'
 import SessionListRow from './SessionListRow'
 import type { SessionListItem, SessionProjectOption } from './session-list-types'
 import SessionScopePicker from './SessionScopePicker'
+import SessionCreationMenu from './SessionCreationMenu'
+import SessionWorkspaceFilter from './SessionWorkspaceFilter'
 
 export default function SessionsListPane({
   items: filteredItems,
@@ -39,7 +41,6 @@ export default function SessionsListPane({
     : active
   const scrollRef = useRef<HTMLDivElement>(null)
   const [highlightedKey, setHighlightedKey] = useState(view.selectedSessionKey)
-  const openNewTaskHome = useAppStore((state) => state.openNewTaskHome)
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => scrollRef.current,
@@ -100,15 +101,9 @@ export default function SessionsListPane({
           onChange={(scope) => updateView({ scope })}
         />
         <span className="session-count">{active.length}</span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => openNewTaskHome()}
-          aria-label={translate('components.sessions.new', 'New session')}
-        >
-          <Plus className="size-4" aria-hidden />
-        </Button>
+        <SessionCreationMenu scope={view.scope} />
       </div>
+      <SessionWorkspaceFilter scope={view.scope} onChange={(scope) => updateView({ scope })} />
       <div className="sessions-search">
         <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         <Input
@@ -144,12 +139,7 @@ export default function SessionsListPane({
                   'Only currently loaded, restorable sessions are shown.'
                 )}
           </span>
-          {!allItems.length && (
-            <Button size="sm" onClick={() => openNewTaskHome()}>
-              <Plus className="size-4" aria-hidden />
-              {translate('components.sessions.new', 'New session')}
-            </Button>
-          )}
+          <SessionCreationMenu scope={view.scope} showLabel />
         </div>
       ) : (
         <div

@@ -5,7 +5,7 @@ import { useSidebarResize } from '@/hooks/useSidebarResize'
 import SidebarHeader from './SidebarHeader'
 import SidebarNav from './SidebarNav'
 import SetupScriptPromptCard from './SetupScriptPromptCard'
-import WorktreeList from './WorktreeList'
+import SidebarProjectManager from './SidebarProjectManager'
 import SidebarFooter from './SidebarFooter'
 import WorkspaceKanbanDrawer from './WorkspaceKanbanDrawer'
 import type { VirtualizedScrollAnchor } from '@/hooks/useVirtualizedScrollAnchor'
@@ -162,17 +162,28 @@ function Sidebar({
         {sidebarOpen && (
           <>
             {/* Fixed controls */}
-            <SidebarNav />
-            <section
-              className="sidebar-workspace-section"
-              aria-label={translate('components.desktopHome.spaces', 'Spaces')}
-            >
-              <SidebarHeader
-                sectionTitle={translate('components.desktopHome.spaces', 'Spaces')}
-                onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
-                activityOptionsTarget={setAgentOptionsTarget}
-              />
-              {sidebarBody === 'agents' ? (
+            <SidebarNav
+              projectManagement={
+                <SidebarProjectManager
+                  scrollOffsetRef={worktreeScrollOffsetRef}
+                  scrollAnchorRef={worktreeScrollAnchorRef}
+                  workspaceBoardOpen={workspaceBoardOpen}
+                  onWorkspaceBoardDragPreviewStart={previewWorkspaceBoardFromDrag}
+                  onWorkspaceBoardDragPreviewCommit={solidifyWorkspaceBoardFromDrag}
+                  onWorkspaceBoardDragPreviewCancel={cancelWorkspaceBoardDragPreview}
+                />
+              }
+            />
+            {sidebarBody === 'agents' && (
+              <section
+                className="sidebar-workspace-section"
+                aria-label={translate('components.desktopHome.spaces', 'Spaces')}
+              >
+                <SidebarHeader
+                  sectionTitle={translate('components.desktopHome.spaces', 'Spaces')}
+                  onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
+                  activityOptionsTarget={setAgentOptionsTarget}
+                />
                 <React.Suspense fallback={<div className="min-h-0 flex-1" />}>
                   <ActivityThreadCollapseContext.Provider value={agentsCollapseState}>
                     <SidebarAgentsList
@@ -187,18 +198,10 @@ function Sidebar({
                     />
                   </ActivityThreadCollapseContext.Provider>
                 </React.Suspense>
-              ) : (
-                <WorktreeList
-                  scrollOffsetRef={worktreeScrollOffsetRef}
-                  scrollAnchorRef={worktreeScrollAnchorRef}
-                  workspaceBoardOpen={workspaceBoardOpen}
-                  onWorkspaceBoardDragPreviewStart={previewWorkspaceBoardFromDrag}
-                  onWorkspaceBoardDragPreviewCommit={solidifyWorkspaceBoardFromDrag}
-                  onWorkspaceBoardDragPreviewCancel={cancelWorkspaceBoardDragPreview}
-                />
-              )}
-            </section>
+              </section>
+            )}
 
+            {sidebarBody !== 'agents' && <div className="min-h-0 flex-1" />}
             <div className="relative shrink-0">
               <SetupScriptPromptCard />
 

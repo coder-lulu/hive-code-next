@@ -4,7 +4,7 @@ import type { ExecutionHostId } from './execution-host'
 export type SessionListScope =
   | { kind: 'all' }
   | { kind: 'unassigned' }
-  | { kind: 'project'; projectKey: string }
+  | { kind: 'project'; projectKey: string; workspaceKey?: string }
   | { kind: 'workspace'; workspaceKey: string; executionHostId: ExecutionHostId }
 
 export type SessionListViewState = {

@@ -67,7 +67,11 @@ export function shouldShowAgentDashboardButton(
 
 const AgentDashboardSidebarEntry = lazyWithRetry(() => import('./AgentDashboardSidebarEntry'))
 
-const SidebarNav = React.memo(function SidebarNav() {
+const SidebarNav = React.memo(function SidebarNav({
+  projectManagement
+}: {
+  projectManagement?: React.ReactNode
+}) {
   // Why: this memo boundary needs its own language subscription, while
   // translate() preserves Orca's pseudo-localization behavior.
   useTranslation()
@@ -132,6 +136,7 @@ const SidebarNav = React.memo(function SidebarNav() {
       </button>
       <SidebarSessionsNavButton />
       <SessionProjectsMenu />
+      {projectManagement}
       <SetupGuideSidebarEntry />
       <SidebarTaskNavButton />
       {showArtifactsButton ? (

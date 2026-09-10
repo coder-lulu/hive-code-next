@@ -28,6 +28,8 @@ vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => f
 vi.mock('@/i18n/relative-time-format', () => ({ formatUiRelativeTime: () => 'now' }))
 vi.mock('@/hooks/use-now', () => ({ useNow: () => 1000 }))
 vi.mock('@/lib/agent-catalog', () => ({ getAgentCatalog: () => [], AgentIcon: () => null }))
+vi.mock('./SessionCreationMenu', () => ({ default: () => <button>New session</button> }))
+vi.mock('./SessionWorkspaceFilter', () => ({ default: () => null }))
 vi.mock('./SessionScopePicker', () => ({ default: () => null }))
 vi.mock('./SessionStatus', () => ({ default: () => null, SessionConnection: () => null }))
 import SessionsListPane from './SessionsListPane'
