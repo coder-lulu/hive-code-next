@@ -23,7 +23,7 @@ vi.mock('@/lib/session-navigation', () => ({
   resolveSessionConnectionState: () => mocks.connection
 }))
 vi.mock('../activity/activity-terminal-portal', () => ({
-  setActivityTerminalPortals: mocks.publish
+  setSessionPanelPortal: mocks.publish
 }))
 vi.mock('../terminal/background-terminal-worktree-mount', () => ({
   requestBackgroundTerminalWorktreeMount: mocks.mount
@@ -71,21 +71,23 @@ afterEach(cleanup)
 it('publishes the exact terminal owner and keeps the content target stable when switching', () => {
   const view = render(<SessionContent item={item} />)
   const target = screen.getByRole('tabpanel')
-  expect(mocks.publish).toHaveBeenLastCalledWith([
+  expect(mocks.publish).toHaveBeenLastCalledWith(
+    'session-detail',
     expect.objectContaining({ target, worktreeId: 'workspace', tabId: 'terminal' })
-  ])
+  )
   view.rerender(
     <SessionContent
       item={{ ...item, key: 'other|second', ownerBucketKey: 'other', terminalTabId: 'second' }}
     />
   )
   expect(screen.getByRole('tabpanel')).toBe(target)
-  expect(mocks.publish).toHaveBeenLastCalledWith([
+  expect(mocks.publish).toHaveBeenLastCalledWith(
+    'session-detail',
     expect.objectContaining({ target, worktreeId: 'other', tabId: 'second' })
-  ])
+  )
   expect(mocks.mount).toHaveBeenLastCalledWith({ worktreeId: 'other', tabIds: ['second'] })
   view.unmount()
-  expect(mocks.publish).toHaveBeenLastCalledWith([])
+  expect(mocks.publish).toHaveBeenLastCalledWith('session-detail', null)
 })
 
 it('clears the previous content and does not mount a disconnected terminal', () => {
@@ -93,7 +95,7 @@ it('clears the previous content and does not mount a disconnected terminal', () 
   mocks.connection = 'disconnected'
   mocks.mount.mockClear()
   view.rerender(<SessionContent item={{ ...item }} />)
-  expect(mocks.publish).toHaveBeenLastCalledWith([])
+  expect(mocks.publish).toHaveBeenLastCalledWith('session-detail', null)
   expect(mocks.mount).not.toHaveBeenCalled()
   expect(screen.getByRole('status').textContent).toContain('Reconnect')
 })
@@ -102,12 +104,15 @@ it('rejects an ambiguous owner in place without mounting another workspace', () 
   mocks.error = 'ambiguous'
   render(<SessionContent item={item} />)
   expect(mocks.mount).not.toHaveBeenCalled()
-  expect(mocks.publish).toHaveBeenLastCalledWith([])
+  expect(mocks.publish).toHaveBeenLastCalledWith('session-detail', null)
   expect(screen.getByRole('status').textContent).toContain('no longer available')
 })
 
-it('mounts structured content through its existing owner without publishing a terminal', () => {
+it('publishes structured content through its exact existing owner', () => {
   render(<SessionContent item={{ ...item, kind: 'structured', terminalTabId: null }} />)
   expect(mocks.mount).toHaveBeenLastCalledWith({ worktreeId: 'workspace', tabIds: ['tab'] })
-  expect(mocks.publish).toHaveBeenLastCalledWith([])
+  expect(mocks.publish).toHaveBeenLastCalledWith(
+    'session-detail',
+    expect.objectContaining({ worktreeId: 'workspace', tabId: 'tab' })
+  )
 })

@@ -1,3 +1,4 @@
+import { normalizeSessionListMetadata } from '../../../../../shared/session-list-metadata'
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
 import {
   DEFAULT_AGENTS_GROUP_BY,
@@ -40,6 +41,15 @@ import {
 
 export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Partial<UISlice> {
   return {
+    sessionListMetadata: {},
+    updateSessionListMetadata: (key, patch) => {
+      const sessionListMetadata = normalizeSessionListMetadata({
+        ...get().sessionListMetadata,
+        [key]: { ...get().sessionListMetadata[key], ...patch }
+      })
+      set({ sessionListMetadata })
+      window.api.ui.set({ sessionListMetadata }).catch(console.error)
+    },
     sidebarBody: 'workspaces',
     setSidebarBody: (body) => set({ sidebarBody: body }),
 

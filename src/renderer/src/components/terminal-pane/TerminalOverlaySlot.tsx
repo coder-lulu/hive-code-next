@@ -64,10 +64,11 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
   consumeSuppressedPtyExit,
   leaveWorktreeIfEmpty
 }: TerminalOverlaySlotProps): React.JSX.Element {
-  const isSessionDetail = activityTerminalPortal?.slotId === 'session-detail'
+  const isSessionDetail = activityTerminalPortal?.slotId.startsWith('session-detail') === true
   const isVisible = isGroupVisible || isSessionDetail
   const anchorName = isSessionDetail
-    ? SESSION_DETAIL_ANCHOR_NAME
+    ? activityTerminalPortal?.target.style.getPropertyValue('anchor-name') ||
+      SESSION_DETAIL_ANCHOR_NAME
     : groupId !== undefined
       ? tabGroupBodyAnchorName(groupId)
       : undefined
@@ -219,11 +220,15 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
             },
     [anchorName, isVisible, measuredFallbackRect, shouldMeasureHiddenStartup]
   )
+  const onSessionFocus = activityTerminalPortal?.onFocus
   const focusGroup = useCallback(() => {
+    if (isSessionDetail) {
+      onSessionFocus?.()
+    }
     if (!isSessionDetail && groupId !== undefined && onFocusOwningGroup) {
       onFocusOwningGroup(groupId)
     }
-  }, [groupId, onFocusOwningGroup, isSessionDetail])
+  }, [groupId, onFocusOwningGroup, isSessionDetail, onSessionFocus])
 
   const terminalPane = (
     <TerminalPane
@@ -231,7 +236,11 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       tabId={terminalTabId}
       worktreeId={worktreeId}
       cwd={startupCwd ?? worktreePath}
-      isActive={isActive || activityTerminalPortal?.active === true}
+      isActive={
+        isSessionDetail
+          ? activityTerminalPortal?.active === true
+          : isActive || activityTerminalPortal?.active === true
+      }
       // Why: split-group changes reparent TabGroupPanel subtrees. Keeping the
       // TerminalPane mounted here preserves alt-screen TUI state while this
       // flag still lets hidden tabs throttle rendering.

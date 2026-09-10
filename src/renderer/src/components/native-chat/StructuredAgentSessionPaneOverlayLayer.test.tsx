@@ -1,3 +1,4 @@
+import { setActivityTerminalPortals } from '../activity/activity-terminal-portal'
 // @vitest-environment happy-dom
 
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
@@ -106,6 +107,7 @@ const SECOND_TAB_ID = 'structured-agent-session-session-2'
 
 describe('StructuredAgentSessionPaneOverlayLayer', () => {
   beforeEach(() => {
+    setActivityTerminalPortals([])
     mocks.focusGroup.mockClear()
     mocks.mountsByTabId.clear()
     mocks.unmountsByTabId.clear()
@@ -212,6 +214,19 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
     fireEvent.change(composer, { target: { value: 'unsent draft' } })
 
     act(() => {
+      const target = document.createElement('div')
+      target.style.setProperty('anchor-name', '--hive-session-detail')
+      setActivityTerminalPortals([
+        {
+          slotId: 'session-detail',
+          requestToken: FIRST_TAB_ID,
+          target,
+          worktreeId: WORKTREE_ID,
+          tabId: FIRST_TAB_ID,
+          paneKey: '',
+          active: true
+        }
+      ])
       mocks.store?.setState({
         activeView: 'sessions',
         sessionsView: { selectedSessionKey: `${WORKTREE_ID}|${FIRST_TAB_ID}` }
@@ -258,18 +273,44 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
     const view = render(
       <StructuredAgentSessionPaneOverlayLayer worktreeId={WORKTREE_ID} isWorktreeActive />
     )
-    act(() =>
+    act(() => {
+      const target = document.createElement('div')
+      target.style.setProperty('anchor-name', '--hive-session-detail')
+      setActivityTerminalPortals([
+        {
+          slotId: 'session-detail',
+          requestToken: SECOND_TAB_ID,
+          target,
+          worktreeId: WORKTREE_ID,
+          tabId: SECOND_TAB_ID,
+          paneKey: '',
+          active: true
+        }
+      ])
       mocks.store?.setState({
         activeView: 'sessions',
         sessionsView: { selectedSessionKey: `${WORKTREE_ID}|${SECOND_TAB_ID}` }
       })
-    )
+    })
     expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatVisible).toBe('false')
     expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatVisible).toBe('true')
   })
 
   it('keeps a qualified session on its explicit runtime despite a different focused environment', () => {
     const ownerBucketKey = `runtime:remote-a|${WORKTREE_ID}`
+    const target = document.createElement('div')
+    target.style.setProperty('anchor-name', '--hive-session-detail-a')
+    setActivityTerminalPortals([
+      {
+        slotId: 'session-detail:a',
+        requestToken: FIRST_TAB_ID,
+        target,
+        worktreeId: ownerBucketKey,
+        tabId: FIRST_TAB_ID,
+        paneKey: '',
+        active: true
+      }
+    ])
     mocks.store?.setState({
       activeView: 'sessions',
       sessionsView: { selectedSessionKey: `${ownerBucketKey}|${FIRST_TAB_ID}` },

@@ -15711,6 +15711,11 @@
       }
     },
     "sessions": {
+      "pin": "置顶会话",
+      "unpin": "取消置顶",
+      "archive": "归档会话",
+      "restore": "取消归档",
+      "archived": "已归档",
       "title": "会话",
       "status": {
         "running": "工作中",

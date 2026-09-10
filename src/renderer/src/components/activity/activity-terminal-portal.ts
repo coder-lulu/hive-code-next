@@ -12,6 +12,7 @@ export type ActivityTerminalPortalTarget = {
   paneKey: string
   forceUnavailable?: boolean
   active: boolean
+  onFocus?: () => void
 }
 
 let currentTargets: ActivityTerminalPortalTarget[] = []
@@ -35,7 +36,8 @@ const ACTIVITY_TERMINAL_PORTAL_FIELD_EQUALS: readonly ActivityTerminalPortalFiel
     tabId: (left, right) => left.tabId === right.tabId,
     paneKey: (left, right) => left.paneKey === right.paneKey,
     forceUnavailable: (left, right) => left.forceUnavailable === right.forceUnavailable,
-    active: (left, right) => left.active === right.active
+    active: (left, right) => left.active === right.active,
+    onFocus: (left, right) => left.onFocus === right.onFocus
   } satisfies Record<keyof ActivityTerminalPortalTarget, ActivityTerminalPortalFieldEquals>)
 
 function haveSameActivityTerminalPortals(
@@ -70,6 +72,14 @@ export function setActivityTerminalPortals(targets: ActivityTerminalPortalTarget
   for (const subscriber of subscribers) {
     subscriber()
   }
+}
+
+export function setSessionPanelPortal(
+  slotId: string,
+  target: ActivityTerminalPortalTarget | null
+): void {
+  const others = currentTargets.filter((entry) => entry.slotId !== slotId)
+  setActivityTerminalPortals(target ? [...others, target] : others)
 }
 
 function subscribeActivityTerminalPortals(onStoreChange: () => void): () => void {

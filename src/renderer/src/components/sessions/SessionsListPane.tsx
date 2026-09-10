@@ -1,56 +1,54 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { MessageSquare, Plus, Search, SearchX, TerminalSquare, X } from 'lucide-react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Archive, ChevronRight, Plus, Search, SearchX, X } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionListViewState } from '../../../../shared/session-list-scope'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { formatUiRelativeTime } from '@/i18n/relative-time-format'
 import { useAppStore } from '@/store'
-import { AgentIcon, getAgentCatalog } from '@/lib/agent-catalog'
-import { useNow } from '@/hooks/use-now'
+import { partitionSessionList } from '../../../../shared/session-list-metadata'
+import SessionListRow from './SessionListRow'
 import type { SessionListItem, SessionProjectOption } from './session-list-types'
 import SessionScopePicker from './SessionScopePicker'
-import SessionStatus, { SessionConnection } from './SessionStatus'
-
-function SessionTime({ timestamp }: { timestamp: number }): React.JSX.Element | null {
-  const now = useNow(60_000, timestamp > 0)
-  const date = new Date(timestamp)
-  if (timestamp <= 0 || !Number.isFinite(date.getTime())) {
-    return null
-  }
-  return (
-    <time className="session-row-time" dateTime={date.toISOString()}>
-      {formatUiRelativeTime(timestamp - now)}
-    </time>
-  )
-}
 
 export default function SessionsListPane({
-  items,
+  items: filteredItems,
   allItems,
   projects,
   view,
-  updateView
+  updateView,
+  onArchive
 }: {
   items: readonly SessionListItem[]
   allItems: readonly SessionListItem[]
   projects: readonly SessionProjectOption[]
   view: SessionListViewState
   updateView: (patch: Partial<SessionListViewState>) => void
+  onArchive?: (key: string) => void
 }): React.JSX.Element {
+  const metadata = useAppStore((state) => state.sessionListMetadata)
+  const updateMetadata = useAppStore((state) => state.updateSessionListMetadata)
+  const [archiveExpanded, setArchiveExpanded] = useState(false)
+  const { active, archived } = useMemo(
+    () => partitionSessionList(filteredItems, metadata),
+    [filteredItems, metadata]
+  )
+  const items = archiveExpanded ? [...active, ...archived] : active
+  const entries: (SessionListItem | null)[] = archived.length
+    ? [...active, null, ...(archiveExpanded ? archived : [])]
+    : active
   const scrollRef = useRef<HTMLDivElement>(null)
   const [highlightedKey, setHighlightedKey] = useState(view.selectedSessionKey)
   const openNewTaskHome = useAppStore((state) => state.openNewTaskHome)
   const virtualizer = useVirtualizer({
-    count: items.length,
+    count: entries.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () =>
       Number.parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue('--sessions-row-height')
       ),
     overscan: 8,
-    getItemKey: (index) => items[index].key,
+    getItemKey: (index) => entries[index]?.key ?? 'archive-group',
     initialOffset: view.scrollTop
   })
   const previousFilter = useRef(`${JSON.stringify(view.scope)}|${view.query}`)
@@ -62,6 +60,9 @@ export default function SessionsListPane({
     }
   }, [view.scope, view.query, virtualizer])
   const handleKeys = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (event.target !== event.currentTarget) {
+      return
+    }
     if (event.key === 'Enter' && items.some((item) => item.key === highlightedKey)) {
       event.preventDefault()
       updateView({ selectedSessionKey: highlightedKey })
@@ -79,11 +80,13 @@ export default function SessionsListPane({
           ? items.length - 1
           : Math.max(0, Math.min(items.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)))
     setHighlightedKey(items[index].key)
-    virtualizer.scrollToIndex(index, { align: 'auto' })
+    virtualizer.scrollToIndex(
+      entries.findIndex((entry) => entry?.key === items[index].key),
+      { align: 'auto' }
+    )
   }
   const visibleRows = virtualizer.getVirtualItems()
   const optionId = (key: string): string => `session-option-${encodeURIComponent(key)}`
-  const agents = getAgentCatalog()
   return (
     <aside
       className="sessions-list-pane"
@@ -96,7 +99,7 @@ export default function SessionsListPane({
           projects={projects}
           onChange={(scope) => updateView({ scope })}
         />
-        <span className="session-count">{items.length}</span>
+        <span className="session-count">{active.length}</span>
         <Button
           variant="ghost"
           size="icon-xs"
@@ -126,7 +129,7 @@ export default function SessionsListPane({
           </Button>
         )}
       </div>
-      {items.length === 0 ? (
+      {entries.length === 0 ? (
         <div className="sessions-list-empty">
           <SearchX className="size-6 text-muted-foreground" aria-hidden />
           <p>{translate('components.sessions.noMatches', 'No sessions in this view')}</p>
@@ -156,7 +159,7 @@ export default function SessionsListPane({
           tabIndex={0}
           aria-label={translate('components.sessions.title', 'Sessions')}
           aria-activedescendant={
-            highlightedKey && visibleRows.some((row) => items[row.index].key === highlightedKey)
+            highlightedKey && visibleRows.some((row) => entries[row.index]?.key === highlightedKey)
               ? optionId(highlightedKey)
               : undefined
           }
@@ -166,65 +169,55 @@ export default function SessionsListPane({
         >
           <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
             {visibleRows.map((row) => {
-              const item = items[row.index]
-              const Icon = item.kind === 'structured' ? MessageSquare : TerminalSquare
-              const agent = agents.find((entry) => entry.id === item.agent)
-              const context = [item.hostLabel, item.workspaceLabel ?? item.projectLabel]
-                .filter(Boolean)
-                .join(' · ')
+              const item = entries[row.index]
+              if (!item) {
+                return (
+                  <button
+                    key="archive-group"
+                    type="button"
+                    className="session-archive-group"
+                    ref={virtualizer.measureElement}
+                    data-index={row.index}
+                    style={{ transform: `translateY(${row.start}px)` }}
+                    aria-expanded={archiveExpanded}
+                    onClick={() => setArchiveExpanded((expanded) => !expanded)}
+                  >
+                    <Archive className="size-4" aria-hidden />
+                    <span>{translate('components.sessions.archived', 'Archived')}</span>
+                    <span className="session-count">{archived.length}</span>
+                    <ChevronRight className="size-4" aria-hidden />
+                  </button>
+                )
+              }
               return (
-                <button
-                  ref={virtualizer.measureElement}
-                  data-index={row.index}
-                  id={optionId(item.key)}
-                  type="button"
-                  role="option"
-                  tabIndex={-1}
-                  aria-selected={item.key === view.selectedSessionKey}
-                  data-highlighted={item.key === highlightedKey}
+                <SessionListRow
                   key={item.key}
-                  className="session-center-row"
-                  style={{ transform: `translateY(${row.start}px)` }}
-                  onClick={() => {
+                  item={item}
+                  rowRef={virtualizer.measureElement}
+                  index={row.index}
+                  offset={row.start}
+                  optionId={optionId(item.key)}
+                  selected={item.key === view.selectedSessionKey}
+                  highlighted={item.key === highlightedKey}
+                  pinned={metadata[item.key]?.pinned === true}
+                  archived={metadata[item.key]?.archived === true}
+                  onSelect={() => {
                     setHighlightedKey(item.key)
                     updateView({ selectedSessionKey: item.key })
                     scrollRef.current?.focus({ preventScroll: true })
                   }}
-                  title={[
-                    item.title,
-                    item.agent,
-                    item.projectLabel,
-                    item.workspaceLabel,
-                    item.hostLabel
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                  data-testid="session-center-row"
-                  data-session-key={item.key}
-                >
-                  <span
-                    className="session-row-icon size-4 shrink-0"
-                    title={agent?.label ?? item.agent ?? undefined}
-                    aria-label={agent?.label ?? item.agent ?? undefined}
-                  >
-                    {agent ? (
-                      <AgentIcon agent={agent.id} size={16} />
-                    ) : (
-                      <Icon className="size-4" aria-hidden />
-                    )}
-                  </span>
-                  <span className="session-row-copy">
-                    <span className="session-row-top">
-                      <span className="session-row-title">{item.title}</span>
-                      <SessionTime timestamp={item.lastActivityAt} />
-                    </span>
-                    <span className="session-row-meta">
-                      <SessionStatus status={item.status} />
-                      <SessionConnection status={item.status} />
-                      <span className="truncate">{context}</span>
-                    </span>
-                  </span>
-                </button>
+                  onPin={() => updateMetadata(item.key, { pinned: !metadata[item.key]?.pinned })}
+                  onArchive={() => {
+                    updateMetadata(item.key, { archived: !metadata[item.key]?.archived })
+                    if (!metadata[item.key]?.archived) {
+                      if (onArchive) {
+                        onArchive(item.key)
+                      } else if (item.key === view.selectedSessionKey) {
+                        updateView({ selectedSessionKey: null })
+                      }
+                    }
+                  }}
+                />
               )
             })}
           </div>

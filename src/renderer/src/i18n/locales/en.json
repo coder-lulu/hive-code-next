@@ -18088,6 +18088,11 @@
       }
     },
     "sessions": {
+      "pin": "Pin session",
+      "unpin": "Unpin session",
+      "archive": "Archive session",
+      "restore": "Unarchive session",
+      "archived": "Archived",
       "select": "Select a session",
       "selectHint": "Select a session to continue here.",
       "closeView": "Close session view",

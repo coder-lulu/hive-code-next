@@ -6,7 +6,7 @@ import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-p
 import { useAppStore } from '@/store'
 import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { tabGroupBodyAnchorName } from '../tab-group/tab-group-body-anchor'
-import { SESSION_DETAIL_ANCHOR_NAME } from '../sessions/session-detail-anchor'
+import { useActivityTerminalPortals } from '../activity/activity-terminal-portal'
 import NativeChatView from './NativeChatView'
 import { resolveStructuredSessionRuntimeTarget } from './structured-session-runtime-target'
 
@@ -22,25 +22,28 @@ const StructuredAgentSessionOverlaySlot = memo(function StructuredAgentSessionOv
   tab,
   groupId,
   isActive,
-  isSessionDetail,
+  sessionAnchorName,
   target,
-  onFocusOwningGroup
+  onFocusOwningGroup,
+  onSessionFocus
 }: {
   tab: StructuredAgentSessionTab
   groupId: string | undefined
   isActive: boolean
-  isSessionDetail: boolean
+  sessionAnchorName?: string
   target: RuntimeClientTarget
+  onSessionFocus?: () => void
   onFocusOwningGroup: ((groupId: string) => void) | undefined
 }): React.JSX.Element {
+  const isSessionDetail = Boolean(sessionAnchorName)
   const environmentId = target.kind === 'environment' ? target.environmentId : null
   // Tab metadata refreshes must not restart the chat's target-dependent effects.
   const stableTarget = useMemo<RuntimeClientTarget>(
     () => (environmentId === null ? { kind: 'local' } : { kind: 'environment', environmentId }),
     [environmentId]
   )
-  const anchorName = isSessionDetail
-    ? SESSION_DETAIL_ANCHOR_NAME
+  const anchorName = sessionAnchorName
+    ? sessionAnchorName
     : groupId !== undefined
       ? tabGroupBodyAnchorName(groupId)
       : undefined
@@ -61,10 +64,13 @@ const StructuredAgentSessionOverlaySlot = memo(function StructuredAgentSessionOv
     [anchorName, isActive]
   )
   const focusOwningGroup = useCallback(() => {
+    if (isSessionDetail) {
+      onSessionFocus?.()
+    }
     if (!isSessionDetail && groupId !== undefined && onFocusOwningGroup) {
       onFocusOwningGroup(groupId)
     }
-  }, [groupId, isSessionDetail, onFocusOwningGroup])
+  }, [groupId, isSessionDetail, onFocusOwningGroup, onSessionFocus])
 
   // A stable portal escapes the hidden workbench without remounting the composer.
   return createPortal(
@@ -105,7 +111,7 @@ const StructuredAgentSessionPaneOverlayLayer = memo(
       worktreesByRepo,
       folderWorkspaces,
       projectGroups,
-      selectedSessionKey,
+      sessionsVisible,
       workbenchVisible
     } = useAppStore(
       useShallow((state) => ({
@@ -116,10 +122,10 @@ const StructuredAgentSessionPaneOverlayLayer = memo(
         folderWorkspaces: state.folderWorkspaces,
         projectGroups: state.projectGroups,
         workbenchVisible: state.activeView === 'terminal' && isWorktreeActive,
-        selectedSessionKey:
-          state.activeView === 'sessions' ? state.sessionsView.selectedSessionKey : null
+        sessionsVisible: state.activeView === 'sessions'
       }))
     )
+    const sessionPortals = useActivityTerminalPortals(sessionsVisible)
     const focusGroup = useAppStore((state) => state.focusGroup)
     const focusOwningGroup = useCallback(
       (groupId: string) => focusGroup(worktreeId, groupId),
@@ -150,20 +156,25 @@ const StructuredAgentSessionPaneOverlayLayer = memo(
 
     return (
       <>
-        {structuredTabs.map(({ tab, target }) => (
-          <StructuredAgentSessionOverlaySlot
-            key={tab.id}
-            tab={tab}
-            groupId={tab.groupId}
-            isActive={Boolean(
-              selectedSessionKey === `${worktreeId}|${tab.id}` ||
-              (workbenchVisible && groupActiveTabById.get(tab.groupId) === tab.id)
-            )}
-            isSessionDetail={selectedSessionKey === `${worktreeId}|${tab.id}`}
-            target={target}
-            onFocusOwningGroup={focusOwningGroup}
-          />
-        ))}
+        {structuredTabs.map(({ tab, target }) => {
+          const portal = sessionPortals.find(
+            (entry) => entry.worktreeId === worktreeId && entry.tabId === tab.id
+          )
+          return (
+            <StructuredAgentSessionOverlaySlot
+              key={tab.id}
+              tab={tab}
+              groupId={tab.groupId}
+              isActive={Boolean(
+                portal || (workbenchVisible && groupActiveTabById.get(tab.groupId) === tab.id)
+              )}
+              sessionAnchorName={portal?.target.style.getPropertyValue('anchor-name') || undefined}
+              target={target}
+              onSessionFocus={portal?.onFocus}
+              onFocusOwningGroup={focusOwningGroup}
+            />
+          )
+        })}
       </>
     )
   }

@@ -8,6 +8,12 @@ import { TabDragProvider } from './tab-drag-context'
 import TabPaneColumnSplitDragOverlay from './TabPaneColumnSplitDragOverlay'
 import { type HoveredTabInsertion, useTabDragSplit } from './useTabDragSplit'
 
+export type TabGroupSplitSurface = {
+  renderGroup: (groupId: string, edges: { top: boolean; right: boolean }) => React.ReactNode
+  onRatioChange: (nodePath: string, ratio: number) => void
+  isDragging: boolean
+}
+
 const MIN_RATIO = 0.15
 const MAX_RATIO = 0.85
 
@@ -156,7 +162,8 @@ function SplitNode({
   suppressRightBorder,
   suppressBottomBorder,
   isTabDragActive,
-  hoveredTabInsertion
+  hoveredTabInsertion,
+  surface
 }: {
   node: TabGroupLayoutNode
   nodePath: string
@@ -173,11 +180,17 @@ function SplitNode({
   suppressBottomBorder: boolean
   isTabDragActive: boolean
   hoveredTabInsertion: HoveredTabInsertion | null
+  surface?: TabGroupSplitSurface
 }): React.JSX.Element {
   const setTabGroupSplitRatio = useAppStore((state) => state.setTabGroupSplitRatio)
   const recordFeatureInteraction = useAppStore((state) => state.recordFeatureInteraction)
 
   if (node.type === 'leaf') {
+    if (surface) {
+      return (
+        <>{surface.renderGroup(node.groupId, { top: touchesTopEdge, right: touchesRightEdge })}</>
+      )
+    }
     return (
       <TabGroupPanel
         groupId={node.groupId}
@@ -232,12 +245,17 @@ function SplitNode({
           suppressBottomBorder={isHorizontal ? suppressBottomBorder : true}
           isTabDragActive={isTabDragActive}
           hoveredTabInsertion={hoveredTabInsertion}
+          surface={surface}
         />
       </div>
       <ResizeHandle
         direction={node.direction}
         onResizeStart={() => recordFeatureInteraction('terminal-panes')}
-        onRatioChange={(nextRatio) => setTabGroupSplitRatio(worktreeId, nodePath, nextRatio)}
+        onRatioChange={(nextRatio) =>
+          surface
+            ? surface.onRatioChange(nodePath, nextRatio)
+            : setTabGroupSplitRatio(worktreeId, nodePath, nextRatio)
+        }
       />
       <div className="flex min-w-0 min-h-0 overflow-hidden" style={{ flex: `${1 - ratio} 1 0%` }}>
         <SplitNode
@@ -256,6 +274,7 @@ function SplitNode({
           suppressBottomBorder={suppressBottomBorder}
           isTabDragActive={isTabDragActive}
           hoveredTabInsertion={hoveredTabInsertion}
+          surface={surface}
         />
       </div>
     </div>
@@ -266,15 +285,42 @@ export default function TabGroupSplitLayout({
   layout,
   worktreeId,
   focusedGroupId,
-  isWorktreeActive
+  isWorktreeActive,
+  surface
 }: {
   layout: TabGroupLayoutNode
   worktreeId: string
   focusedGroupId?: string
   isWorktreeActive: boolean
+  /** The caller owns drag routing for sessions with distinct execution owners. */
+  surface?: TabGroupSplitSurface
 }): React.JSX.Element {
-  const dragSplit = useTabDragSplit({ worktreeId, enabled: isWorktreeActive })
+  const dragSplit = useTabDragSplit({ worktreeId, enabled: isWorktreeActive && !surface })
   const hasSplits = layout.type === 'split'
+
+  const tree = (
+    <SplitNode
+      node={layout}
+      nodePath=""
+      worktreeId={worktreeId}
+      focusedGroupId={focusedGroupId}
+      isWorktreeActive={isWorktreeActive}
+      hasSplitGroups={hasSplits}
+      touchesTopEdge={true}
+      touchesRightEdge={true}
+      touchesLeftEdge={true}
+      touchesBottomEdge={false}
+      suppressLeftBorder={false}
+      suppressRightBorder={false}
+      suppressBottomBorder={false}
+      isTabDragActive={surface?.isDragging ?? dragSplit.activeDrag !== null}
+      hoveredTabInsertion={dragSplit.hoveredTabInsertion}
+      surface={surface}
+    />
+  )
+  if (surface) {
+    return tree
+  }
 
   return (
     <TabDragProvider
@@ -302,25 +348,7 @@ export default function TabGroupSplitLayout({
           className="relative flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden border-l border-border"
         >
           <div className="tab-window-drag-band" data-terminal-focus-release-surface="true" />
-          <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
-            <SplitNode
-              node={layout}
-              nodePath=""
-              worktreeId={worktreeId}
-              focusedGroupId={focusedGroupId}
-              isWorktreeActive={isWorktreeActive}
-              hasSplitGroups={hasSplits}
-              touchesTopEdge={true}
-              touchesRightEdge={true}
-              touchesLeftEdge={true}
-              touchesBottomEdge={false}
-              suppressLeftBorder={false}
-              suppressRightBorder={false}
-              suppressBottomBorder={false}
-              isTabDragActive={dragSplit.activeDrag !== null}
-              hoveredTabInsertion={dragSplit.hoveredTabInsertion}
-            />
-          </div>
+          <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">{tree}</div>
         </div>
         {/* Why: the sortable tab is anchored inside its source tab strip (no
           transform while dragging), and that strip uses overflow-hidden so

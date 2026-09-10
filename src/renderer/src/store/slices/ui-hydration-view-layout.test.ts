@@ -708,3 +708,28 @@ describe('createUISlice hydratePersistedUI', () => {
     expect(store.getState().rightSidebarWidth).toBe(360)
   })
 })
+
+describe('session list metadata persistence', () => {
+  it('persists pin/archive independently of session execution and restores them on hydration', () => {
+    const write = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', { api: { ui: { set: write } } })
+    const store = createUIStore()
+    store.getState().updateSessionListMetadata('host-a:session', { pinned: true })
+    store.getState().updateSessionListMetadata('host-a:session', { archived: true })
+    expect(write).toHaveBeenLastCalledWith({
+      sessionListMetadata: { 'host-a:session': { pinned: true, archived: true } }
+    })
+    const restored = createUIStore()
+    restored
+      .getState()
+      .hydratePersistedUI(
+        makePersistedUI({ sessionListMetadata: store.getState().sessionListMetadata }),
+        'startup'
+      )
+    expect(restored.getState().sessionListMetadata).toEqual(store.getState().sessionListMetadata)
+    restored.getState().updateSessionListMetadata('host-a:session', { archived: false })
+    expect(restored.getState().sessionListMetadata).toEqual({ 'host-a:session': { pinned: true } })
+    restored.getState().updateSessionListMetadata('host-a:session', { pinned: false })
+    expect(restored.getState().sessionListMetadata).toEqual({})
+  })
+})

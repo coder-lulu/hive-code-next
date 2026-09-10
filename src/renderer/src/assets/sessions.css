@@ -203,6 +203,64 @@
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   background: var(--tab-active-surface);
 }
+.session-panel-workspace {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.session-panel-tabs {
+  display: flex;
+  align-self: stretch;
+  align-items: flex-end;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.sessions-page[data-reserve-top-chrome='true']
+  .session-detail[data-panel-top-right='false']
+  .session-detail-header {
+  padding-right: var(--sessions-space-3);
+}
+.session-panel-tabs .session-current-tab {
+  flex-shrink: 0;
+}
+.session-current-tab[data-selected='false'] {
+  background: var(--tab-strip-surface);
+  color: var(--muted-foreground);
+  border-bottom-color: var(--tab-divider);
+}
+.session-current-tab[data-selected='false']:hover {
+  background: var(--tab-hover-surface);
+}
+.session-drag-preview {
+  transform: translate(var(--sessions-space-3), var(--sessions-space-3));
+  max-width: var(--tab-width-wide);
+  padding: var(--sessions-space-2) var(--sessions-space-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--tab-active-surface);
+  border: 1px solid var(--tab-divider);
+  border-radius: var(--radius-md);
+  font-size: var(--sessions-nav-font-size);
+}
+.session-row-select,
+.session-current-tab > [role='tab'] {
+  cursor: grab;
+}
+html[data-session-dragging='true'],
+html[data-session-dragging='true'] * {
+  cursor: grabbing !important;
+}
+@container sessions (max-width: 640px) {
+  .sessions-page[data-has-selection='false'] .session-panel-workspace {
+    display: none;
+  }
+}
 .session-current-tab > [role='tab'] {
   display: flex;
   flex: 1;
@@ -407,5 +465,84 @@
     min-height: calc(var(--sessions-header-height) + var(--window-controls-height, 36px));
     padding-top: var(--window-controls-height, 36px);
     padding-right: 12px;
+  }
+}
+
+.session-row-select {
+  display: flex;
+  align-items: center;
+  gap: var(--sessions-space-3);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.session-row-actions {
+  position: absolute;
+  top: var(--sessions-space-1);
+  right: var(--sessions-space-2);
+  display: flex;
+  gap: var(--sessions-space-1);
+  opacity: 0;
+  pointer-events: none;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+}
+.session-center-row:hover .session-row-actions,
+.session-center-row:has(:focus-visible) .session-row-actions,
+.sessions-list-scroll:focus-visible
+  .session-center-row[data-highlighted='true']
+  .session-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.session-archive-group {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sessions-space-3);
+  width: 100%;
+  height: var(--sessions-row-height);
+  padding: 0 var(--sessions-space-3);
+  text-align: left;
+  color: var(--muted-foreground);
+  font-size: var(--sessions-nav-font-size);
+}
+.session-archive-group:hover {
+  background: var(--accent);
+}
+.session-archive-group[aria-expanded='true'] > svg:last-child {
+  transform: rotate(90deg);
+}
+.session-archive-group:focus-visible,
+.session-row-select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+@media (hover: none) {
+  .session-row-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.session-center-row:hover .session-row-top,
+.session-center-row:has(:focus-visible) .session-row-top,
+.sessions-list-scroll:focus-visible .session-center-row[data-highlighted='true'] .session-row-top {
+  padding-right: calc(var(--sessions-space-6) * 2 + var(--sessions-space-1));
+}
+.session-center-row:hover .session-row-time,
+.session-center-row:has(:focus-visible) .session-row-time,
+.sessions-list-scroll:focus-visible .session-center-row[data-highlighted='true'] .session-row-time {
+  display: none;
+}
+@media (hover: none) {
+  .session-row-top {
+    padding-right: calc(var(--sessions-space-6) * 2 + var(--sessions-space-1));
+  }
+  .session-row-time {
+    display: none;
   }
 }

@@ -5,11 +5,25 @@ import { translate } from '@/i18n/i18n'
 import { resolveCurrentSession, resolveSessionConnectionState } from '@/lib/session-navigation'
 import { runtimeTargetForExecutionHostId } from '@/runtime/runtime-client-target'
 import { requestBackgroundTerminalWorktreeMount } from '../terminal/background-terminal-worktree-mount'
-import { setActivityTerminalPortals } from '../activity/activity-terminal-portal'
-import { sessionDetailAnchorStyle } from './session-detail-anchor'
+import { setSessionPanelPortal } from '../activity/activity-terminal-portal'
+import { sessionPanelAnchorName } from './session-detail-anchor'
 import type { SessionListItem } from './session-list-types'
 
-export default function SessionContent({ item }: { item: SessionListItem }): React.JSX.Element {
+export default function SessionContent({
+  item,
+  groupId,
+  isFocused = true,
+  onFocus
+}: {
+  item: SessionListItem
+  groupId?: string
+  isFocused?: boolean
+  onFocus?: () => void
+}): React.JSX.Element {
+  const slotId = groupId ? `session-detail:${groupId}` : 'session-detail'
+  const onFocusRef = useRef(onFocus)
+  onFocusRef.current = onFocus
+  const focusPanel = useCallback(() => onFocusRef.current?.(), [])
   const anchor = useRef<HTMLDivElement | null>(null)
   const owner = useAppStore(
     useShallow((state) => {
@@ -38,42 +52,55 @@ export default function SessionContent({ item }: { item: SessionListItem }): Rea
       }
     })
   )
-  const setAnchor = useCallback((node: HTMLDivElement | null) => {
-    anchor.current = node
-    if (!node) {
-      setActivityTerminalPortals([])
-    }
-  }, [])
+  const setAnchor = useCallback(
+    (node: HTMLDivElement | null) => {
+      anchor.current = node
+      if (!node) {
+        setSessionPanelPortal(slotId, null)
+      }
+    },
+    [slotId]
+  )
   useLayoutEffect(() => {
     const target = anchor.current
-    setActivityTerminalPortals(
-      target && !owner.error && owner.bucket && owner.tabId && item.kind === 'terminal'
-        ? [
-            {
-              slotId: 'session-detail',
-              requestToken: item.key,
-              target,
-              worktreeId: owner.bucket,
-              tabId: owner.tabId,
-              paneKey: item.paneKey ?? '',
-              active: true
-            }
-          ]
-        : []
+    setSessionPanelPortal(
+      slotId,
+      target && !owner.error && owner.bucket && owner.tabId
+        ? {
+            slotId,
+            requestToken: item.key,
+            target,
+            worktreeId: owner.bucket,
+            tabId: owner.tabId,
+            paneKey: item.paneKey ?? '',
+            active: isFocused,
+            onFocus: focusPanel
+          }
+        : null
     )
     if (!owner.error && owner.bucket && owner.tabId) {
       requestBackgroundTerminalWorktreeMount({ worktreeId: owner.bucket, tabIds: [owner.tabId] })
     }
-  }, [owner.error, owner.bucket, owner.tabId, item.key, item.kind, item.paneKey])
+  }, [
+    owner.error,
+    owner.bucket,
+    owner.tabId,
+    item.key,
+    item.kind,
+    item.paneKey,
+    isFocused,
+    slotId,
+    focusPanel
+  ])
   return (
     <div
       ref={setAnchor}
       className="session-chat-anchor"
-      style={sessionDetailAnchorStyle}
+      style={{ anchorName: sessionPanelAnchorName(groupId) } as React.CSSProperties}
       data-testid="session-chat-anchor"
       role="tabpanel"
-      id="session-content"
-      aria-labelledby="session-current-tab"
+      id={groupId ? `session-content-${groupId}` : 'session-content'}
+      aria-labelledby={groupId ? `session-current-tab-${groupId}` : 'session-current-tab'}
     >
       {owner.error && (
         <p className="session-availability-note" role="status">

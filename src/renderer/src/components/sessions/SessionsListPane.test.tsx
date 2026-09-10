@@ -1,0 +1,93 @@
+// @vitest-environment happy-dom
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import type { SessionListItem } from './session-list-types'
+import type { SessionListMetadata } from '../../../../shared/session-list-metadata'
+
+const mocks = vi.hoisted(() => ({
+  state: {
+    sessionListMetadata: {} as SessionListMetadata,
+    updateSessionListMetadata: vi.fn(),
+    openNewTaskHome: vi.fn()
+  }
+}))
+vi.mock('@/store', () => ({
+  useAppStore: (selector: (state: typeof mocks.state) => unknown) => selector(mocks.state)
+}))
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, index) => ({ index, start: index * 56 })),
+    getTotalSize: () => count * 56,
+    measureElement: vi.fn(),
+    scrollToOffset: vi.fn(),
+    scrollToIndex: vi.fn()
+  })
+}))
+vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
+vi.mock('@/i18n/relative-time-format', () => ({ formatUiRelativeTime: () => 'now' }))
+vi.mock('@/hooks/use-now', () => ({ useNow: () => 1000 }))
+vi.mock('@/lib/agent-catalog', () => ({ getAgentCatalog: () => [], AgentIcon: () => null }))
+vi.mock('./SessionScopePicker', () => ({ default: () => null }))
+vi.mock('./SessionStatus', () => ({ default: () => null, SessionConnection: () => null }))
+import SessionsListPane from './SessionsListPane'
+
+const items = [
+  { key: 'one', title: 'First session', kind: 'terminal', lastActivityAt: 1, hostLabel: 'Local' },
+  { key: 'two', title: 'Second session', kind: 'terminal', lastActivityAt: 2, hostLabel: 'Local' }
+] as SessionListItem[]
+const updateView = vi.fn()
+function pane(filtered = items) {
+  return (
+    <SessionsListPane
+      items={filtered}
+      allItems={items}
+      projects={[]}
+      view={{ scope: { kind: 'all' }, query: '', selectedSessionKey: 'one', scrollTop: 0 }}
+      updateView={updateView}
+    />
+  )
+}
+afterEach(cleanup)
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.state.sessionListMetadata = {}
+  mocks.state.updateSessionListMetadata.mockImplementation((key: string, patch: object) => {
+    mocks.state.sessionListMetadata = {
+      ...mocks.state.sessionListMetadata,
+      [key]: { ...mocks.state.sessionListMetadata[key], ...patch }
+    }
+  })
+})
+it('keeps row actions separate from opening and moves archived sessions into an expandable group', () => {
+  const result = render(pane())
+  expect(result.container.querySelector('button button')).toBeNull()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Archive session' })[0])
+  expect(updateView).toHaveBeenCalledExactlyOnceWith({ selectedSessionKey: null })
+  result.rerender(pane())
+  expect(screen.queryByRole('option', { name: /First session/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /Archived/ }))
+  expect(screen.getByRole('option', { name: /First session/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Unarchive session' }))
+  result.rerender(pane())
+  expect(screen.queryByRole('button', { name: /Archived/ })).toBeNull()
+  expect(screen.getAllByRole('option')).toHaveLength(2)
+})
+it('pins before other rows, remains reversible and never selects via the pin action', () => {
+  const result = render(pane())
+  fireEvent.click(screen.getAllByRole('button', { name: 'Pin session' })[1])
+  result.rerender(pane())
+  expect(screen.getAllByRole('option')[0].textContent).toContain('Second session')
+  expect(updateView).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Unpin session' }))
+  result.rerender(pane())
+  expect(screen.getAllByRole('option')[0].textContent).toContain('First session')
+})
+it('shows the archive group when the filtered view contains only archived sessions', () => {
+  mocks.state.sessionListMetadata = { one: { archived: true } }
+  render(pane([items[0]]))
+  expect(screen.getByRole('button', { name: /Archived/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: /Archived/ }))
+  expect(screen.getAllByRole('option')).toHaveLength(1)
+  expect(screen.queryByText('Second session')).toBeNull()
+})

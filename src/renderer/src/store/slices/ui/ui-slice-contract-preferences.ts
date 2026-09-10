@@ -1,3 +1,4 @@
+import type { SessionListMetadata } from '../../../../../shared/session-list-metadata'
 import type { PersistedUIState } from '../../../../../shared/persisted-ui-state-types'
 import type {
   ActivityGroupBy,
@@ -24,6 +25,8 @@ import type { PersistedUIWriteBaseline } from '../persisted-ui-write-baseline'
 import type { UISliceCore } from './ui-slice-contract-core'
 
 export type UISlicePreferences = {
+  sessionListMetadata: SessionListMetadata
+  updateSessionListMetadata: (key: string, patch: { pinned?: boolean; archived?: boolean }) => void
   /** Which list the sidebar body shows. Navigator-only; does not change the active view. */
   sidebarBody: 'workspaces' | 'agents'
   setSidebarBody: (body: UISlicePreferences['sidebarBody']) => void

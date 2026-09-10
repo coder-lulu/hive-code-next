@@ -1,38 +1,59 @@
 import { useLayoutEffect, useRef } from 'react'
-import { ArrowLeft, FolderOpen, MessageSquare, X } from 'lucide-react'
+import { ArrowLeft, FolderOpen, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { AgentIcon, getAgentCatalog } from '@/lib/agent-catalog'
+import SessionPanelTab from './SessionPanelTab'
 import type { SessionListItem } from './session-list-types'
 import SessionStatus, { SessionConnection } from './SessionStatus'
 import SessionContent from './SessionContent'
 
 export default function SessionDetail({
   item,
-  onBack
+  onBack,
+  groupId,
+  tabItems,
+  isFocused = true,
+  onActivate,
+  onClose,
+  onFocus,
+  reserveTopChrome = true
 }: {
   item: SessionListItem | null
   onBack: () => void
+  groupId?: string
+  tabItems?: SessionListItem[]
+  isFocused?: boolean
+  onActivate?: (key: string) => void
+  onClose?: (key: string) => void
+  onFocus?: () => void
+  reserveTopChrome?: boolean
 }): React.JSX.Element {
   const backRef = useRef<HTMLButtonElement>(null)
   const selectedKey = item?.key
   useLayoutEffect(() => {
-    if (selectedKey && backRef.current?.getClientRects().length) {
+    if (isFocused && selectedKey && backRef.current?.getClientRects().length) {
       backRef.current.focus({ preventScroll: true })
     }
-  }, [selectedKey])
+  }, [selectedKey, isFocused])
   if (!item) {
     return (
-      <section className="session-detail session-detail-empty">
+      <section className="session-detail session-detail-empty" data-session-panel="">
         <MessageSquare className="size-8 text-muted-foreground" aria-hidden />
         <h2>{translate('components.sessions.select', 'Select a session')}</h2>
         <p>{translate('components.sessions.selectHint', 'Select a session to continue here.')}</p>
       </section>
     )
   }
-  const agent = getAgentCatalog().find((entry) => entry.id === item.agent)
   return (
-    <section className="session-detail" data-testid="session-detail">
+    <section
+      className="session-detail"
+      data-testid="session-detail"
+      data-session-panel={groupId}
+      data-focused={isFocused}
+      data-panel-top-right={reserveTopChrome}
+      onPointerDownCapture={onFocus}
+      onFocusCapture={onFocus}
+    >
       <header className="session-detail-header">
         <Button
           ref={backRef}
@@ -45,34 +66,20 @@ export default function SessionDetail({
           <ArrowLeft className="size-4" aria-hidden />
         </Button>
         <div
-          className="session-current-tab"
+          className="session-panel-tabs"
           role="tablist"
           aria-label={translate('components.sessions.title', 'Sessions')}
         >
-          <button
-            id="session-current-tab"
-            role="tab"
-            aria-selected="true"
-            aria-controls="session-content"
-            type="button"
-          >
-            <span className="session-tab-icon" title={agent?.label}>
-              {agent ? (
-                <AgentIcon agent={agent.id} size={16} />
-              ) : (
-                <SessionStatus status={item.status} iconOnly />
-              )}
-            </span>
-            <h2 title={item.title}>{item.title}</h2>
-          </button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onBack}
-            aria-label={translate('components.sessions.closeView', 'Close session view')}
-          >
-            <X className="size-4" aria-hidden />
-          </Button>
+          {(tabItems ?? [item]).map((tabItem) => (
+            <SessionPanelTab
+              key={tabItem.key}
+              item={tabItem}
+              groupId={groupId}
+              selected={tabItem.key === item.key}
+              onActivate={() => onActivate?.(tabItem.key)}
+              onClose={() => (onClose ? onClose(tabItem.key) : onBack())}
+            />
+          ))}
         </div>
       </header>
       <div className="session-context-bar">
@@ -102,7 +109,7 @@ export default function SessionDetail({
           )}
         </p>
       )}
-      <SessionContent item={item} />
+      <SessionContent item={item} groupId={groupId} isFocused={isFocused} onFocus={onFocus} />
     </section>
   )
 }
