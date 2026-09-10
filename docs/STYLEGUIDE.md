@@ -129,6 +129,18 @@ Variants in priority order:
 
 Sizes: `default` (36px), `sm` (32px), `xs` (24px), `lg` (40px), plus `icon`, `icon-xs`, `icon-sm`, `icon-lg`. Match the size to the surrounding row height — don't drop a `default` button into a 28px toolbar.
 
+Icon sizes are `icon` (36px), `icon-sm` (32px), `icon-xs` (24px), and `icon-lg` (40px). A compact 24px action uses `icon-xs`; it does not redefine `icon`. Its default glyph is 12px; use the existing `size-4` class when the design calls for a 16px glyph.
+
+### Desktop navigation and Tab baseline (P0, 2026-09-10)
+
+This scope covers the sessions page, project overview/detail, shared project/session navigation, and workspace Tab chrome. The 44px content title belongs only to the new pages; native window chrome retains its existing dimensions and platform safe areas.
+
+Target dimensions: sidebar default 240px with the existing 220–500px resize range and saved width preserved; workspace Tab strip 36px; ordinary Tab width 180px, 220px at the existing wide breakpoint, and minimum 128px before horizontal overflow. The connected active-Tab shape is a P1 change. Geist, Lucide, the base radius, button sizes, editor/terminal themes, and plugin security colors retain their existing contracts.
+
+Capture the current UI and run focused behavior checks before changing product styles. Define and consume missing scoped tokens in `main.css`; avoid duplicate values in CSS and JS. Add new-page tokens with their actual consumers. P0 provides a tested session-status adapter; sessions/navigation integrate it in P2 and project pages in P4. Missing or stale activity stays unknown, ordinary waiting is distinct from permission approval, and disconnection makes execution `unverifiable`.
+
+The Tab dimensions use `--tab-strip-height`, `--tab-width`, `--tab-width-wide`, and `--tab-min-width`. Drag split hit-testing reads the measured body edge. The resizable sidebar's initial width is owned by `DEFAULT_SIDEBAR_WIDTH` in `src/shared/constants.ts`, shared by renderer and persisted-state initialization. Surface, divider, hover, text, and focus continue to use `card`, `border`, `accent`, `muted-foreground`, and `ring`. The existing 4px window drag strip remains; its seam with the 36px Tab row is part of P1.
+
 ### Other primitives in this repo
 
 Browse `src/renderer/src/components/ui/` for the full list. Most wrap a Radix UI primitive — exceptions are `command` (wraps `cmdk`), `sonner` (wraps `sonner`), and the visual-only wrappers (`badge`, `button-group`, `card`, `input`) which apply tokens and Tailwind utilities directly. Never reimplement headless behavior; extend the existing wrapper.

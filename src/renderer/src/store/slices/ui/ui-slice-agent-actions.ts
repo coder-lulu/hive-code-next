@@ -1,4 +1,5 @@
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
+import { DEFAULT_SIDEBAR_WIDTH } from '../../../../../shared/constants'
 import { formatAgentTypeLabel, agentKindForAgentType } from '../../../lib/agent-status'
 import {
   deriveRunningAgentSendTargets,
@@ -42,7 +43,7 @@ export function createUiAgentActions(
   return {
     ...createUiActivityActions(set, get),
     sidebarOpen: true,
-    sidebarWidth: 256,
+    sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
     toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
     setSidebarOpen: (open) => set({ sidebarOpen: open }),
     setSidebarWidth: (width) => set({ sidebarWidth: width }),

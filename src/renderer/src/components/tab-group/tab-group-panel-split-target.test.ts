@@ -7,7 +7,7 @@ import {
   resolveActivePaneColumnSplitTarget,
   resolvePanelEdgePaneColumnSplit
 } from './tab-group-panel-split-target'
-import { TAB_GROUP_TAB_STRIP_HEIGHT_PX } from './tab-drop-zone'
+const TAB_GROUP_TAB_STRIP_HEIGHT_PX = 48
 
 function makeDragData(overrides: Partial<TabDragItemData> = {}): TabDragItemData {
   return {

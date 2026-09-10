@@ -139,6 +139,10 @@
     'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
     monospace;
   --radius: 0.625rem;
+  --tab-strip-height: 36px;
+  --tab-width: 180px;
+  --tab-width-wide: 220px;
+  --tab-min-width: 128px;
   --orca-security-background: #fff;
   --orca-security-foreground: #0a0a0a;
   --orca-security-card: #fff;

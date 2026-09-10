@@ -66,6 +66,14 @@ describe('sidebar reveal actions', () => {
 })
 
 describe('createUISlice hydratePersistedUI', () => {
+  it('starts with a 240px sidebar and preserves the saved width on startup', () => {
+    const store = createUIStore()
+    expect(store.getState().sidebarWidth).toBe(240)
+    expect(getDefaultUIState().sidebarWidth).toBe(240)
+    store.getState().hydratePersistedUI(makePersistedUI({ sidebarWidth: 280 }), 'startup')
+    expect(store.getState().sidebarWidth).toBe(280)
+  })
+
   it('defaults persisted right sidebar visibility to open', () => {
     expect(getDefaultUIState().rightSidebarOpen).toBe(true)
   })

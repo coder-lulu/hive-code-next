@@ -1,11 +1,7 @@
 import type { DragEndEvent, DragMoveEvent, DragOverEvent } from '@dnd-kit/core'
 import type { TabGroup, TabGroupLayoutNode } from '../../../../shared/tab-types'
 import { isPaneColumnSplitDropNoOp } from '../../store/slices/pane-column-split-drop-no-op'
-import {
-  resolvePaneColumnEdgeZone,
-  TAB_GROUP_TAB_STRIP_HEIGHT_PX,
-  type PaneColumnSplitTarget
-} from './tab-drop-zone'
+import { resolvePaneColumnEdgeZone, type PaneColumnSplitTarget } from './tab-drop-zone'
 import {
   canDropTabIntoPaneBody,
   isPaneDropData,
@@ -164,8 +160,7 @@ export function resolvePanelEdgePaneColumnSplit({
   const bodyRect = providedBodyRect ?? getTabGroupBodyRect(targetGroupId, worktreeId)
 
   const zone = resolvePaneColumnEdgeZone(panelRect, pointer, {
-    bodyRect: bodyRect ?? null,
-    tabStripHeightPx: TAB_GROUP_TAB_STRIP_HEIGHT_PX
+    bodyRect
   })
   if (!zone) {
     return null
@@ -228,12 +223,16 @@ export function resolveActivePaneColumnSplitTarget({
 
   const overData = event.over?.data.current
   const panelHit = findTabGroupPanelUnderPointer(worktreeId, pointer, { geometry })
+  const hitBodyRect = panelHit
+    ? (geometry?.byGroupId.get(panelHit.groupId)?.bodyRect ??
+      getTabGroupBodyRect(panelHit.groupId, worktreeId))
+    : null
 
   if (isTabDragData(overData)) {
     // Why: tab-strip drags target reorder/insertion slots. Split creation stays
     // on pane/body edges so hovering over a tab never surprises the user with a
     // new split.
-    if (!panelHit || pointer.y < panelHit.panelRect.top + TAB_GROUP_TAB_STRIP_HEIGHT_PX) {
+    if (!hitBodyRect || pointer.y < hitBodyRect.top) {
       return null
     }
   }
@@ -258,7 +257,7 @@ export function resolveActivePaneColumnSplitTarget({
     groupsByWorktree,
     layoutByWorktree,
     panelRect,
-    bodyRect: targetGeometry?.bodyRect
+    bodyRect: hitBodyRect ?? targetGeometry?.bodyRect
   })
   return splitTarget ? { ...splitTarget, panelRect } : null
 }

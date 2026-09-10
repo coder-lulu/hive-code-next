@@ -239,12 +239,14 @@ export function getDefaultPersistedState(homedir: string): PersistedState {
   }
 }
 
+export const DEFAULT_SIDEBAR_WIDTH = 240
+
 export function getDefaultUIState(): PersistedUIState {
   return {
     lastActiveRepoId: null,
     lastActiveWorktreeId: null,
     activeView: 'terminal',
-    sidebarWidth: 280,
+    sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
     rightSidebarOpen: true,
     rightSidebarTab: 'explorer',
     rightSidebarExplorerView: 'files',

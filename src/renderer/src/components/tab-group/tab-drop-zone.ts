@@ -1,8 +1,5 @@
 import type { TabDropZone } from './tab-drag-data'
 
-/** Matches TabGroupPanel tab row height (`h-[32px]`). */
-export const TAB_GROUP_TAB_STRIP_HEIGHT_PX = 32
-
 type PaneRect = { left: number; top: number; width: number; height: number }
 
 export function resolveDropZone(
@@ -40,9 +37,8 @@ export function resolveDropZone(
 export function resolvePaneColumnEdgeZone(
   panelRect: PaneRect,
   point: { x: number; y: number },
-  options?: {
-    bodyRect?: PaneRect | null
-    tabStripHeightPx?: number
+  options: {
+    bodyRect: PaneRect | null
   }
 ): Exclude<TabDropZone, 'center'> | null {
   const localX = point.x - panelRect.left
@@ -55,24 +51,10 @@ export function resolvePaneColumnEdgeZone(
     return 'right'
   }
 
-  const tabStripHeight = options?.tabStripHeightPx ?? TAB_GROUP_TAB_STRIP_HEIGHT_PX
-  const tabStripBottom = panelRect.top + tabStripHeight
+  const bodyRect = options.bodyRect
   // Why: the tab strip is for reorder/insertion targets. Vertical pane splits
   // belong on the terminal/editor body edges only.
-  if (point.y < tabStripBottom) {
-    return null
-  }
-
-  const bodyRect =
-    options?.bodyRect ??
-    ({
-      left: panelRect.left,
-      top: tabStripBottom,
-      width: panelRect.width,
-      height: Math.max(0, panelRect.height - tabStripHeight)
-    } satisfies PaneRect)
-
-  if (bodyRect.height <= 0) {
+  if (!bodyRect || point.y < bodyRect.top || bodyRect.height <= 0) {
     return null
   }
 
