@@ -1,4 +1,5 @@
 import type { ManagedPaneInternal } from './pane-manager-types'
+import { cancelInitialPaneWebgl, queueInitialPaneWebgl } from './pane-initial-webgl-queue'
 import { safeFit } from './pane-tree-ops'
 import {
   attachPaneFitResizeObserver,
@@ -44,6 +45,12 @@ export function openTerminal(pane: ManagedPaneInternal, ligaturesEnabled = false
 
   // Open terminal into DOM
   terminal.open(xtermContainer)
+  if (pane.gpuRenderingEnabled) {
+    queueInitialPaneWebgl(pane, () => {
+      attachWebgl(pane)
+      safeFit(pane)
+    })
+  }
   // Why: terminal.element sits under the padded xterm container. Pane-level
   // placement keeps the hover URL on the true bottom-left window corner.
   container.appendChild(linkTooltip)
@@ -103,9 +110,6 @@ export function openTerminal(pane: ManagedPaneInternal, ligaturesEnabled = false
   // Configure the first atlas with ligatures instead of immediately rebuilding it.
   if (ligaturesEnabled) {
     attachLigatures(pane)
-  }
-  if (pane.gpuRenderingEnabled) {
-    attachWebgl(pane)
   }
 
   attachPaneFitResizeObserver(pane)
@@ -174,6 +178,7 @@ export function disposePane(
   pane: ManagedPaneInternal,
   panes: Map<number, ManagedPaneInternal>
 ): void {
+  cancelInitialPaneWebgl(pane)
   if (pane.pendingInitialFitRafId != null) {
     cancelAnimationFrame(pane.pendingInitialFitRafId)
     pane.pendingInitialFitRafId = null

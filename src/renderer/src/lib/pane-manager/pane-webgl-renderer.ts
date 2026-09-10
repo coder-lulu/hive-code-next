@@ -1,4 +1,5 @@
 import type { WebglAddon } from '@xterm/addon-webgl'
+import { isInitialPaneWebglPending } from './pane-initial-webgl-queue'
 import type { ManagedPaneInternal } from './pane-manager-types'
 import { recordTerminalWebglDiagnostic } from '../../../../shared/terminal-webgl-diagnostics'
 import { getLivePaneCensus } from './pane-manager-registry'
@@ -257,6 +258,9 @@ setPaneFitWebglAttachHook((pane) => {
 })
 
 export function attachWebgl(pane: ManagedPaneInternal): void {
+  if (isInitialPaneWebglPending(pane)) {
+    return
+  }
   if (
     !ENABLE_WEBGL_RENDERER ||
     !pane.gpuRenderingEnabled ||
@@ -272,7 +276,10 @@ export function attachWebgl(pane: ManagedPaneInternal): void {
     disposeWebgl(pane, { refreshDimensions: true })
     return
   }
-  // Single-addon invariant: never stack a second addon on a live one.
+  // Explicit rebuild callers dispose first; normal attach must preserve a healthy atlas.
+  if (pane.webglAddon && !isPaneWebglContextLost(pane)) {
+    return
+  }
   disposeWebgl(pane)
   const WebglAddonConstructor = getTerminalWebglAddonConstructor()
   if (!WebglAddonConstructor) {

@@ -13,6 +13,7 @@ import {
 import { notifyPaneFitSucceeded } from './pane-fit-webgl-attach-signal'
 import { safeFit } from './pane-fit'
 import { disposePane } from './pane-lifecycle'
+import { rebuildAttachedWebgl } from './pane-webgl-reattach'
 
 function createPane(options: { loadAddon?: () => void } = {}): ManagedPaneInternal {
   const leafId = '22222222-2222-4222-8222-222222222222' as never
@@ -143,14 +144,14 @@ describe('terminal WebGL addon lifecycle', () => {
     expect(pane.webglAddon).toBeNull()
   })
 
-  it('disposes the previous addon before attaching a replacement', () => {
+  it('disposes the previous addon only for an explicit rebuild', () => {
     const pane = createPane()
     attachWebgl(pane)
     const firstAddon = pane.webglAddon
     expect(firstAddon).not.toBeNull()
     const disposeSpy = vi.spyOn(firstAddon as WebglAddon, 'dispose')
 
-    attachWebgl(pane)
+    rebuildAttachedWebgl(pane)
 
     expect(disposeSpy).toHaveBeenCalledTimes(1)
     expect(pane.webglAddon).not.toBeNull()

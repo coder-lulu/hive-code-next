@@ -221,6 +221,17 @@ describe('attachWebgl', () => {
     vi.unstubAllGlobals()
   })
 
+  it('reuses a live WebGL addon across repeated attach requests', () => {
+    const pane = createPane()
+    pane.terminalGpuAcceleration = 'on'
+    attachWebgl(pane)
+    const addon = pane.webglAddon
+    attachWebgl(pane)
+    expect(pane.webglAddon).toBe(addon)
+    expect(pane.terminal.loadAddon).toHaveBeenCalledTimes(1)
+    expect(webglMock.dispose).not.toHaveBeenCalled()
+  })
+
   it('keeps a pane on the DOM renderer after WebGL context loss', () => {
     const pane = createPane()
     pane.terminalGpuAcceleration = 'on'
@@ -393,7 +404,7 @@ describe('attachWebgl', () => {
 
     attachWebgl(pane)
 
-    expect(pane.terminal.loadAddon).toHaveBeenCalledTimes(1)
+    expect(pane.terminal.loadAddon).not.toHaveBeenCalled()
   })
 
   it('keeps later auto panes on DOM after WebGL attach fails', () => {
@@ -599,7 +610,14 @@ describe('openTerminal — addon and provider wiring', () => {
     pane.terminalGpuAcceleration = 'auto'
     pane.gpuRenderingEnabled = true
 
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+      frames.push(callback)
+    )
     openTerminal(pane, true)
+    expect(pane.webglAddon).toBeNull()
+    frames.shift()!(0)
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(pane.ligaturesAddon).not.toBeNull()
     expect(pane.webglAddon).not.toBeNull()
     const addons = vi.mocked(pane.terminal.loadAddon).mock.calls.map(([addon]) => addon)
