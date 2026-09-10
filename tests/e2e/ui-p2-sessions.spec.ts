@@ -118,6 +118,8 @@ test('filters real session rows and preserves search through narrow list/detail 
     page.getByTestId('session-detail').getByRole('heading', { name: /P2 Temporary 01/ })
   ).toBeVisible()
   await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('session-content-loading')).toHaveCount(0)
+  await expect(page.getByTestId('session-chat-anchor')).toHaveAttribute('aria-busy', 'false')
   await capture(page, 'p2-02-light-filtered-detail')
 
   await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))

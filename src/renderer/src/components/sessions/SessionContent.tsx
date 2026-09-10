@@ -1,4 +1,5 @@
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { LoaderCircle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
@@ -25,6 +26,8 @@ export default function SessionContent({
   onFocusRef.current = onFocus
   const focusPanel = useCallback(() => onFocusRef.current?.(), [])
   const anchor = useRef<HTMLDivElement | null>(null)
+  const [readyKey, setReadyKey] = useState<string | null>(null)
+  const contentReady = useCallback(() => setReadyKey(item.key), [item.key])
   const owner = useAppStore(
     useShallow((state) => {
       const resolved = resolveCurrentSession(state, item)
@@ -74,7 +77,8 @@ export default function SessionContent({
             tabId: owner.tabId,
             paneKey: item.paneKey ?? '',
             active: isFocused,
-            onFocus: focusPanel
+            onFocus: focusPanel,
+            onReady: contentReady
           }
         : null
     )
@@ -90,7 +94,8 @@ export default function SessionContent({
     item.paneKey,
     isFocused,
     slotId,
-    focusPanel
+    focusPanel,
+    contentReady
   ])
   return (
     <div
@@ -101,7 +106,18 @@ export default function SessionContent({
       role="tabpanel"
       id={groupId ? `session-content-${groupId}` : 'session-content'}
       aria-labelledby={groupId ? `session-current-tab-${groupId}` : 'session-current-tab'}
+      aria-busy={!owner.error && readyKey !== item.key}
     >
+      {!owner.error && readyKey !== item.key && (
+        <div
+          className="session-content-loading"
+          role="status"
+          data-testid="session-content-loading"
+        >
+          <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden />
+          <span>{translate('components.sessions.loading', 'Loading session…')}</span>
+        </div>
+      )}
       {owner.error && (
         <p className="session-availability-note" role="status">
           {owner.error === 'disconnected'

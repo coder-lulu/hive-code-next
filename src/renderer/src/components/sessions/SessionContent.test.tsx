@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { SessionListItem } from './session-list-types'
 
@@ -67,6 +67,19 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 afterEach(cleanup)
+
+it('shows loading until its content is ready and resets when switching sessions', () => {
+  const view = render(<SessionContent item={item} />)
+  expect(screen.getByTestId('session-content-loading')).toBeTruthy()
+  expect(screen.getByRole('tabpanel').getAttribute('aria-busy')).toBe('true')
+  act(() => mocks.publish.mock.calls.at(-1)![1].onReady())
+  expect(screen.queryByTestId('session-content-loading')).toBeNull()
+  expect(screen.getByRole('tabpanel').getAttribute('aria-busy')).toBe('false')
+  view.rerender(<SessionContent item={{ ...item, key: 'other', terminalTabId: 'other' }} />)
+  expect(screen.getByTestId('session-content-loading')).toBeTruthy()
+  act(() => mocks.publish.mock.calls.at(-1)![1].onReady())
+  expect(screen.queryByTestId('session-content-loading')).toBeNull()
+})
 
 it('publishes the exact terminal owner and keeps the content target stable when switching', () => {
   const view = render(<SessionContent item={item} />)

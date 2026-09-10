@@ -15761,7 +15761,8 @@
       "continueWorkspace": "在工作台中继续",
       "terminalHint": "此会话使用工作区终端。进入工作台后可继续使用原有终端和布局。",
       "workspace": "工作区",
-      "host": "运行设备"
+      "host": "运行设备",
+      "loading": "正在加载会话…"
     }
   },
   "dashboardPopout": {

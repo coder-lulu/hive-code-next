@@ -18138,7 +18138,8 @@
       "disconnected": "Host unavailable",
       "openDisconnected": "Reconnect this host, then try opening the session again.",
       "openUnavailable": "This session is no longer available in the current workspace. Refresh its host and try again.",
-      "openFailed": "Could not open this session. Please try again."
+      "openFailed": "Could not open this session. Please try again.",
+      "loading": "Loading session…"
     }
   },
   "dashboardPopout": {

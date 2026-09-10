@@ -11,6 +11,7 @@ export type TerminalPaneProps = {
   showSplitButton?: boolean
   onPtyExit: (ptyId: string, exitCode?: number) => void
   onCloseTab: () => void
+  onReady?: () => void
 }
 
 export type TerminalPaneHandle = {

@@ -13,6 +13,7 @@ export type ActivityTerminalPortalTarget = {
   forceUnavailable?: boolean
   active: boolean
   onFocus?: () => void
+  onReady?: () => void
 }
 
 let currentTargets: ActivityTerminalPortalTarget[] = []
@@ -37,7 +38,8 @@ const ACTIVITY_TERMINAL_PORTAL_FIELD_EQUALS: readonly ActivityTerminalPortalFiel
     paneKey: (left, right) => left.paneKey === right.paneKey,
     forceUnavailable: (left, right) => left.forceUnavailable === right.forceUnavailable,
     active: (left, right) => left.active === right.active,
-    onFocus: (left, right) => left.onFocus === right.onFocus
+    onFocus: (left, right) => left.onFocus === right.onFocus,
+    onReady: (left, right) => left.onReady === right.onReady
   } satisfies Record<keyof ActivityTerminalPortalTarget, ActivityTerminalPortalFieldEquals>)
 
 function haveSameActivityTerminalPortals(

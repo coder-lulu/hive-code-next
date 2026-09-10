@@ -235,6 +235,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       key={`${terminalTabId}-${terminalGeneration ?? 0}`}
       tabId={terminalTabId}
       worktreeId={worktreeId}
+      onReady={isSessionDetail ? activityTerminalPortal?.onReady : undefined}
       cwd={startupCwd ?? worktreePath}
       isActive={
         isSessionDetail

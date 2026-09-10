@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback, useMemo, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import type { Tab, TabGroup } from '../../../../shared/tab-types'
@@ -25,7 +25,8 @@ const StructuredAgentSessionOverlaySlot = memo(function StructuredAgentSessionOv
   sessionAnchorName,
   target,
   onFocusOwningGroup,
-  onSessionFocus
+  onSessionFocus,
+  onSessionReady
 }: {
   tab: StructuredAgentSessionTab
   groupId: string | undefined
@@ -33,9 +34,15 @@ const StructuredAgentSessionOverlaySlot = memo(function StructuredAgentSessionOv
   sessionAnchorName?: string
   target: RuntimeClientTarget
   onSessionFocus?: () => void
+  onSessionReady?: () => void
   onFocusOwningGroup: ((groupId: string) => void) | undefined
 }): React.JSX.Element {
   const isSessionDetail = Boolean(sessionAnchorName)
+  useLayoutEffect(() => {
+    if (isActive && isSessionDetail) {
+      onSessionReady?.()
+    }
+  }, [isActive, isSessionDetail, onSessionReady])
   const environmentId = target.kind === 'environment' ? target.environmentId : null
   // Tab metadata refreshes must not restart the chat's target-dependent effects.
   const stableTarget = useMemo<RuntimeClientTarget>(
@@ -171,6 +178,7 @@ const StructuredAgentSessionPaneOverlayLayer = memo(
               sessionAnchorName={portal?.target.style.getPropertyValue('anchor-name') || undefined}
               target={target}
               onSessionFocus={portal?.onFocus}
+              onSessionReady={portal?.onReady}
               onFocusOwningGroup={focusOwningGroup}
             />
           )
