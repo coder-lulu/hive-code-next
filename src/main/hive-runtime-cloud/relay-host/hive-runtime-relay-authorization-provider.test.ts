@@ -127,6 +127,34 @@ function fixture() {
 }
 
 describe('Hive Runtime Relay authorization boundary', () => {
+  it('persists a recovered receipt before authorization fails and uses it on the next retry', async () => {
+    const f = fixture()
+    const hostPublicKeyB64 = Buffer.from(f.keypair.publicKey).toString('base64url')
+    f.setBinding({
+      relayHostId: String(f.claims.relayHostId),
+      hostPublicKeyB64,
+      hostBindingVersion: 558
+    })
+    const original = f.fetch.getMockImplementation()!
+    let authorizationAttempts = 0
+    f.fetch.mockImplementation(async (url, init) => {
+      const response = await original(url, init)
+      if (url.endsWith('/relay/authorizations') && authorizationAttempts++ === 0) {
+        return new Response(JSON.stringify({ category: 'STALE_BINDING' }), { status: 409 })
+      }
+      return response
+    })
+    await expect(f.provider.resolve(f)).rejects.toThrow()
+    expect(f.requests.some((request) => request.url.endsWith('/assign'))).toBe(false)
+    const connected = await f.provider.resolve(f)
+    expect(
+      f.requests
+        .filter((request) => request.url.endsWith('/runtime-relay-hosts'))
+        .map((request) => request.body.expectedBindingVersion)
+    ).toEqual([558, 559])
+    expect(connected.binding.hostBindingVersion).toBe(560)
+  })
+
   it('refreshes the current owner through expiry CAS without a Director token or generation takeover', async () => {
     const f = fixture()
     const original = await f.provider.resolve(f)
