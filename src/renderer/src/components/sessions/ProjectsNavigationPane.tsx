@@ -10,13 +10,17 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { useNavigationPaneResize } from './useNavigationPaneResize'
 import WorktreeList from '../sidebar/WorktreeList'
 import SidebarWorkspaceOptionsMenu from '../sidebar/SidebarWorkspaceOptionsMenu'
+import { WorkspaceBoardButton } from '../sidebar/WorkspaceBoardButton'
+import type { WorkspaceBoardPanelState } from '../sidebar/useWorkspaceBoardPanel'
 import SessionCreationMenu from './SessionCreationMenu'
 
 export default memo(function ProjectsNavigationPane({
   scope,
+  workspaceBoardPanel,
   onOpenWorkspace,
   useActiveWorkspace = false
 }: {
+  workspaceBoardPanel?: WorkspaceBoardPanelState
   scope: SessionListScope
   useActiveWorkspace?: boolean
   onOpenWorkspace?: (worktreeId: string, executionHostId: ExecutionHostId) => void
@@ -51,6 +55,7 @@ export default memo(function ProjectsNavigationPane({
         <span className="min-w-0 flex-1 truncate font-medium">
           {translate('components.sessions.projectNavigation', 'Projects')}
         </span>
+        {workspaceBoardPanel && <WorkspaceBoardButton workspaceBoardPanel={workspaceBoardPanel} />}
         <Button
           variant="ghost"
           size="icon-xs"

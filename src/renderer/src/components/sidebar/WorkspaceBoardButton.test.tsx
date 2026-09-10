@@ -4,7 +4,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceBoardPanelState } from './useWorkspaceBoardPanel'
-import { WorkspaceTitlebarControls } from './WorkspaceTitlebarControls'
+import { WorkspaceBoardButton } from './WorkspaceBoardButton'
 
 const mocks = vi.hoisted(() => ({
   activeTooltipOpen: false,
@@ -60,11 +60,11 @@ async function renderControls(panel = createPanel()): Promise<HTMLDivElement> {
   document.body.appendChild(container)
   const root = createRoot(container)
   roots.push(root)
-  await act(async () => root.render(<WorkspaceTitlebarControls workspaceBoardPanel={panel} />))
+  await act(async () => root.render(<WorkspaceBoardButton workspaceBoardPanel={panel} />))
   return container
 }
 
-describe('WorkspaceTitlebarControls', () => {
+describe('WorkspaceBoardButton', () => {
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     window.localStorage.clear()
@@ -78,11 +78,11 @@ describe('WorkspaceTitlebarControls', () => {
     vi.clearAllMocks()
   })
 
-  it('keeps the reveal and workspace board actions in the titlebar cluster', async () => {
+  it('toggles the existing workspace board', async () => {
     const panel = createPanel()
     const container = await renderControls(panel)
 
-    expect(container.textContent).toContain('Current workspace')
+    expect(container.textContent).not.toContain('Current workspace')
     const boardButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Workspace board"]'
     )
@@ -92,20 +92,13 @@ describe('WorkspaceTitlebarControls', () => {
     expect(panel.toggleWorkspaceBoard).toHaveBeenCalledOnce()
   })
 
-  it('shows the relocation hint once to existing board users', async () => {
-    mocks.state = {
-      persistedUIReady: true,
-      featureInteractions: {
-        'workspace-board': { firstInteractedAt: 100, interactionCount: 2 }
-      }
-    }
-
-    const container = await renderControls()
-
-    expect(container.textContent).toContain('Workspace board moved to the bottom bar')
-    expect(container.querySelector('[data-testid="workspace-board-tooltip"]')?.className).toContain(
-      'bg-popover'
-    )
-    expect(window.localStorage.getItem('orca.workspaceBoardMovedHintSeen.v2')).toBe('true')
+  it('reflects the open state and drag preview', async () => {
+    const panel = createPanel()
+    panel.workspaceBoardOpen = true
+    panel.workspaceBoardDragPreviewOpen = true
+    const container = await renderControls(panel)
+    const button = container.querySelector('[data-workspace-board-trigger]')
+    expect(button?.getAttribute('aria-pressed')).toBe('true')
+    expect(button?.getAttribute('data-workspace-board-preview')).toBe('true')
   })
 })

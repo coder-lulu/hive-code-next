@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 type SidebarHeaderProps = {
   onWorkspaceBoardMenuOpenChange: (open: boolean) => void
+  hideWorkspaceOptions?: boolean
   sectionTitle?: string
   activityOptionsTarget?: React.Ref<HTMLDivElement>
 }
@@ -18,6 +19,7 @@ type SidebarHeaderProps = {
 const SidebarHeader = React.memo(function SidebarHeader({
   onWorkspaceBoardMenuOpenChange,
   activityOptionsTarget,
+  hideWorkspaceOptions = false,
   sectionTitle
 }: SidebarHeaderProps) {
   // Subscribe this memoized header to locale changes before using translate().
@@ -130,7 +132,7 @@ const SidebarHeader = React.memo(function SidebarHeader({
         ) : null}
         <SidebarHeaderActions
           onWorkspaceBoardMenuOpenChange={onWorkspaceBoardMenuOpenChange}
-          hideWorkspaceOptions={agentsViewActive}
+          hideWorkspaceOptions={hideWorkspaceOptions || agentsViewActive}
         />
       </div>
     </div>

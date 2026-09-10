@@ -569,3 +569,57 @@ test('resizes the sessions column and remembers its width across navigation', as
     page.getByTestId('session-center-row').filter({ hasText: 'P2 Temporary 00' })
   ).toBeVisible()
 })
+
+test('keeps the activity toggle available after closing its sidebar view', async ({
+  orcaPage: page
+}) => {
+  await openSessions(page)
+  const open = page.getByRole('button', { name: 'View activity', exact: true })
+  const close = page.getByRole('button', { name: 'Turn off activity view', exact: true })
+  if (await close.isVisible()) {
+    await close.click()
+  }
+  await expect(open).toBeVisible()
+  await open.click()
+  await expect(close).toHaveAttribute('aria-pressed', 'true')
+  await close.click()
+  await expect(open).toHaveAttribute('aria-pressed', 'false')
+  await open.click()
+  await expect(close).toBeVisible()
+  await expect(page.getByTestId('sessions-page')).toBeVisible()
+})
+
+test('opens the workspace board from the projects heading', async ({ orcaPage: page }) => {
+  await page.getByRole('button', { name: 'Projects', exact: true }).click()
+  const pane = page.getByTestId('projects-navigation-pane')
+  const board = pane.getByRole('button', { name: 'Workspace board', exact: true })
+  await expect(page.getByRole('button', { name: 'Workspace board', exact: true })).toHaveCount(1)
+  await expect(page.getByRole('region', { name: 'Activity view', exact: true })).toBeVisible()
+  const boardBox = (await board.boundingBox())!
+  const addBox = (await pane
+    .getByRole('button', { name: 'Add project', exact: true })
+    .boundingBox())!
+  expect(boardBox.x + boardBox.width).toBeLessThanOrEqual(addBox.x)
+  await board.click()
+  await expect(page.locator('[data-workspace-board-sheet]')).toBeVisible()
+  await expect(board).toHaveAttribute('aria-pressed', 'true')
+  const sheet = page.locator('[data-workspace-board-sheet]')
+  const region = page.locator('[data-workspace-content-region]')
+  await expect
+    .poll(async () => Math.abs((await sheet.boundingBox())!.x - (await region.boundingBox())!.x))
+    .toBeLessThan(2)
+  const bounds = (await sheet.boundingBox())!
+  expect(Math.abs(bounds.x + bounds.width - page.viewportSize()!.width)).toBeLessThan(2)
+  await expect(pane).toBeVisible()
+  await page.setViewportSize({ width: 1280, height: 960 })
+  await expect
+    .poll(async () => {
+      const next = (await sheet.boundingBox())!
+      return Math.abs(next.x + next.width - 1280)
+    })
+    .toBeLessThan(2)
+
+  await page.keyboard.press('Escape')
+  await expect(page.locator('[data-workspace-board-sheet]')).not.toBeVisible()
+  await expect(board).toHaveAttribute('aria-pressed', 'false')
+})

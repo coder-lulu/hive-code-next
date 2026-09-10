@@ -17384,6 +17384,8 @@
       "contextDetails": "Encrypted credentials are stored on this device and can be revoked in Account settings."
     },
     "sidebarAccount": {
+      "openWeb": "Open Web app",
+      "openWebFailed": "Could not open the Web app. Please try again.",
       "connected": "HiveCloud connected",
       "signInSuccess": "Signed in to HiveCloud",
       "signInFailed": "HiveCloud sign-in failed. Try again or check the service status.",
@@ -18337,6 +18339,7 @@
       "label": "Agents",
       "dashboardLabel": "Agent Dashboard",
       "openActivity": "View activity",
+      "activityView": "Activity view",
       "closeActivity": "Turn off activity view",
       "projects": "Projects",
       "workspaces": "Workspaces"

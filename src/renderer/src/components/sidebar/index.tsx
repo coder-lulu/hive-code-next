@@ -152,16 +152,17 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
           <>
             {/* Fixed controls */}
             <SidebarNav />
-            {sidebarBody === 'agents' && (
-              <section
-                className="sidebar-workspace-section"
-                aria-label={translate('components.desktopHome.spaces', 'Spaces')}
-              >
-                <SidebarHeader
-                  sectionTitle={translate('components.desktopHome.spaces', 'Spaces')}
-                  onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
-                  activityOptionsTarget={setAgentOptionsTarget}
-                />
+            <section
+              className="sidebar-workspace-section"
+              aria-label={translate('dashboard.sidebar.activityView', 'Activity view')}
+            >
+              <SidebarHeader
+                hideWorkspaceOptions
+                sectionTitle={translate('dashboard.sidebar.activityView', 'Activity view')}
+                onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
+                activityOptionsTarget={setAgentOptionsTarget}
+              />
+              {sidebarBody === 'agents' && (
                 <React.Suspense fallback={<div className="min-h-0 flex-1" />}>
                   <ActivityThreadCollapseContext.Provider value={agentsCollapseState}>
                     <SidebarAgentsList
@@ -176,10 +177,9 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
                     />
                   </ActivityThreadCollapseContext.Provider>
                 </React.Suspense>
-              </section>
-            )}
+              )}
+            </section>
 
-            {sidebarBody !== 'agents' && <div className="min-h-0 flex-1" />}
             <div className="relative shrink-0">
               <SetupScriptPromptCard />
 

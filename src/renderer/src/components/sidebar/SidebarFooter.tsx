@@ -5,6 +5,8 @@ import {
   Bell,
   ChevronRight,
   CircleHelp,
+  Globe,
+  ExternalLink,
   Link2,
   LogIn,
   LogOut,
@@ -17,7 +19,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { APP_DISPLAY_NAME } from '@/product-brand'
+import { APP_DISPLAY_NAME, PRODUCT_CONFIG } from '@/product-brand'
 import { useAppStore } from '@/store'
 import { AccountRuntimeClaimError } from '@/store/slices/account-runtime-cloud'
 import type { HiveAccountSignInOptions, HiveAccountState } from '../../../../shared/hive-account'
@@ -814,6 +816,26 @@ const SidebarFooter = React.memo(function SidebarFooter() {
               ) : null}
 
               <div className="hive-account-menu-group">
+                <DropdownMenuItem
+                  className="hive-account-menu-item"
+                  onSelect={() => {
+                    void window.api.shell
+                      .openUrl(new URL('/', PRODUCT_CONFIG.services.identity.userLoginUrl).href)
+                      .catch(() => {
+                        toast.error(
+                          translate(
+                            'components.sidebarAccount.openWebFailed',
+                            'Could not open the Web app. Please try again.'
+                          )
+                        )
+                      })
+                  }}
+                >
+                  <Globe className="hive-account-menu-icon" />
+                  <span>{translate('components.sidebarAccount.openWeb', 'Open Web app')}</span>
+                  <ExternalLink className="hive-account-menu-chevron" />
+                </DropdownMenuItem>
+
                 <DropdownMenuItem
                   className="hive-account-menu-item"
                   onSelect={() => openSettingsPane('general')}

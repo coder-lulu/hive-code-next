@@ -145,9 +145,7 @@ export function AppWorkspaceShell(props: {
     workspaceChromeActive: layout.workspaceChromeActive,
     rightSidebarVisible: layout.showRightSidebarControls && layout.rightSidebarOpen
   })
-  const titlebarLeftControls = (
-    <TitlebarLeftControls layout={layout} workspaceBoardPanel={workspaceBoardPanel} />
-  )
+  const titlebarLeftControls = <TitlebarLeftControls layout={layout} />
   const titlebarMainStrip = (
     <TitlebarMainStrip
       layout={layout}
@@ -227,10 +225,13 @@ export function AppWorkspaceShell(props: {
             ) : null}
             {projectNavigation && (
               <Suspense fallback={<AppPageLoadingFallback />}>
-                <ProjectWorkspaceNavigation />
+                <ProjectWorkspaceNavigation workspaceBoardPanel={workspaceBoardPanel} />
               </Suspense>
             )}
-            <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
+            <div
+              data-workspace-content-region
+              className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden"
+            >
               {/* Why: automations/artifacts own their page headers; the stacked titlebar would be an empty 36px stripe. */}
               {stackedMainStripMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}
               <div

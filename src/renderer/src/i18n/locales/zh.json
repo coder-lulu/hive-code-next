@@ -15388,6 +15388,8 @@
       "contextDetails": "当前设备将保存加密凭据，后续可在账户设置中撤销。"
     },
     "sidebarAccount": {
+      "openWeb": "打开 Web 端",
+      "openWebFailed": "无法打开 Web 端，请重试。",
       "connected": "HiveCloud 已连接",
       "signInSuccess": "已登录 HiveCloud",
       "signInFailed": "HiveCloud 登录失败，请重试或检查服务状态。",
@@ -15901,6 +15903,7 @@
       "label": "智能体",
       "dashboardLabel": "智能体仪表盘",
       "openActivity": "查看活动",
+      "activityView": "活动视图",
       "closeActivity": "关闭活动视图",
       "projects": "项目",
       "workspaces": "工作区"

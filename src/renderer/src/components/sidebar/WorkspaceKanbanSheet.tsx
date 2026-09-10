@@ -28,10 +28,32 @@ export default function WorkspaceKanbanSheet({
   sidebarWidth,
   statusBarVisible
 }: WorkspaceKanbanSheetProps): React.JSX.Element {
-  const drawerLeft = sidebarOpen ? sidebarWidth : 0
-  const drawerLeftCss = sidebarOpen
-    ? `var(--workspace-sidebar-live-width, ${sidebarWidth}px)`
-    : '0px'
+  const [contentLeft, setContentLeft] = React.useState<number | null>(null)
+  React.useLayoutEffect(() => {
+    if (!open) {
+      return
+    }
+    const region = document.querySelector<HTMLElement>('[data-workspace-content-region]')
+    if (!region) {
+      return
+    }
+    const updateBounds = () => setContentLeft(region.getBoundingClientRect().left)
+    updateBounds()
+    const observer = new ResizeObserver(updateBounds)
+    observer.observe(region)
+    window.addEventListener('resize', updateBounds)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateBounds)
+    }
+  }, [open])
+  const drawerLeft = contentLeft ?? (sidebarOpen ? sidebarWidth : 0)
+  const drawerLeftCss =
+    contentLeft !== null
+      ? `${contentLeft}px`
+      : sidebarOpen
+        ? `var(--workspace-sidebar-live-width, ${sidebarWidth}px)`
+        : '0px'
   const drawerBottom = `${statusBarVisible ? STATUS_BAR_RESERVE_HEIGHT : 0}px`
   const keepOpenForOutsideEvent = (event: {
     preventDefault: () => void
@@ -66,7 +88,7 @@ export default function WorkspaceKanbanSheet({
       modal={false}
     >
       <SheetContent
-        side="left"
+        side="right"
         showCloseButton={false}
         className="workspace-kanban-sheet-content bg-worktree-sidebar p-0 sm:max-w-none"
         overlayStyle={{
@@ -79,10 +101,11 @@ export default function WorkspaceKanbanSheet({
           {
             ...leftSidebarStyle,
             left: drawerLeftCss,
+            right: 0,
             top: WORKSPACE_TOP_CHROME_HEIGHT,
             bottom: drawerBottom,
             height: 'auto',
-            width: `min(calc(100vw - ${drawerLeftCss}), 1294px)`
+            width: 'auto'
           } as React.CSSProperties
         }
         data-contextual-tour-target="workspace-board-surface"
