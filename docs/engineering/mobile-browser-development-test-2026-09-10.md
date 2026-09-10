@@ -18,7 +18,7 @@
 
 本轮手机相关测试 24 文件、112 通过、3 项原有跳过；手机类型检查、本次改动 lint 和格式检查通过。日志位于 `E:/hive-build/browser-direct-final-tests.log`、`browser-mobile-typecheck.log`、`browser-direct-mobile-all-lint.log`。
 
-## 尚未通过：重启恢复
+## 重启恢复：缺陷复现记录
 
 使用正常文件夹空间结构创建 Browser，正常退出开发端后以同一数据目录重启。恢复后：
 
@@ -27,7 +27,7 @@
 - Runtime 返回给手机的 `session.tabs.list` 却为空；按原标签 ID 调用 `session.tabs.close` 返回 `tab_not_found`。
 - `runtime-mobile-session-projection.ts` 会过滤 `getLiveBrowserTabs` 中不存在的页面。恢复页尚未挂载/注册，因而不对手机发布。
 
-下一步应处理恢复页按需挂载/注册与目录发布的衔接，并复测重启后打开、传流、关闭；不能仅移除 live-page 过滤，否则会发布不可操作或已销毁的页面。
+上述缺口已按下节方案修复。保留 live-page 过滤，避免发布不可操作或已销毁的页面。
 
 本轮未复现“Browser 变为空白 Terminal”，也不能宣称此现象已修复。公网账号中继及 DESKTOP-UL1DAG2 上的安装包尚未使用这次代码完成复测。
 
@@ -45,3 +45,20 @@
 随后关闭该实例，去掉 `ORCA_BACKGROUND_LAUNCH`，按用户要求以正常可见模式启动，
 保留原开发数据目录。Windows 原生窗口截图与 CDP 均确认首页和侧栏已显示。
 这项启动方式修正不代表上述 Browser 重启恢复缺口已解决。
+
+## 重启恢复修复与复测
+
+根因是恢复链路缺少按需挂载：持久化标签已恢复，但后台 Browser 尚未注册，因此 Runtime 在发布手机会话时过滤了它；手机也无法通过选择该标签触发挂载。此前创建流程的修复没有覆盖这条链路。
+
+配对客户端请求具体工作区的会话时，现在复用 `browser:activateView` 后台挂载机制，等待真实页面注册后再返回会话。仅处理 renderer 所有的恢复快照；不因全量目录查询加载全部网页，不切换桌面焦点、不新建标签。相同窗口和工作区的并发恢复共享任务，每批最多恢复四页；失败后允许重试，且等待当前批次全部结束后才释放共享任务。
+
+验证结果：
+
+- 普通文件夹重启后恢复原标签与页面 ID，手机收到网页画面；通过手机协议关闭成功，桌面没有遗留 Browser 或新增 Terminal。
+- Git 工作区重启后恢复原标签 `04f6789c-fa24-4938-9c0e-3024fa914a39` 和页面 `1fbe10a6-e715-4457-81de-12467018d1f8`；手机显示测试网页，手机点击后桌面 DOM 计数从 0 变为 1。随后手机协议关闭返回 `closed: true`，桌面 Browser 与 Terminal 数量均为 0。
+- 5 个针对性测试文件共 45 项通过；主进程类型检查、改动文件 lint 通过。覆盖重复请求合并、并发上限、失败重试、批次失败等待、窗口和工作区隔离，以及现有 Browser / 会话恢复行为。
+- 测试证据保存在 `E:/hive-build/browser-restore-final-tests.log`、`browser-restore-typecheck.log`、`browser-restored-mobile.png`、`browser-git-restored.png` 和 `browser-git-click.png`。
+
+Git 连续传流测试期间存在其他前端改动及热重载；重新启动开发实例并重连 Android 后完成上述画面与点击验证。该次 Runtime 使用自动选择的端口 53860，模拟器通过 `adb reverse tcp:6769 tcp:53860` 访问。
+
+本次修复仍是开发源码，未生成新安装包，也未在公网账号中继或已安装的 DESKTOP-UL1DAG2 客户端验证；不能据此宣称旧安装包已更新，或所有“空白 Terminal”现象均已解决。

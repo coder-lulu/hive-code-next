@@ -4,6 +4,7 @@ import type { RuntimeMobileSessionTabsResult, RuntimeSyncedTab } from '../../sha
 import type { RuntimeLeafRecord } from './runtime-terminal-state-records'
 import type { PtyControllerInventory } from './runtime-pty-controller-contract'
 import { parseExecutionHostId } from '../../shared/execution-host'
+import { restoreRendererBrowserSessionTabs } from './restore-renderer-browser-session-tabs'
 
 export class OrcaRuntimeWithCollectMobileVisibleGraphChangedWorktrees extends OrcaRuntimeWithSyncWindowGraph {
   // Why: toMobileSessionTabsResult resolves handles/titles from this.tabs and
@@ -59,6 +60,7 @@ export class OrcaRuntimeWithCollectMobileVisibleGraphChangedWorktrees extends Or
       this.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(explicitWorktreeId)
       await this.refreshMobileSessionPtyRecords(explicitWorktreeId)
       this.restoreLivePairedRendererSessionOwnedMobileTerminals(explicitWorktreeId)
+      await this.restoreRequestedBrowserSessionTabs(explicitWorktreeId, clientNavigationId)
       return this.getMobileSessionTabsForWorktree(explicitWorktreeId, clientNavigationId)
     }
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
@@ -69,7 +71,22 @@ export class OrcaRuntimeWithCollectMobileVisibleGraphChangedWorktrees extends Or
     this.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(worktree.id)
     await this.refreshMobileSessionPtyRecords()
     this.restoreLivePairedRendererSessionOwnedMobileTerminals(worktree.id)
+    await this.restoreRequestedBrowserSessionTabs(worktree.id, clientNavigationId)
     return this.getMobileSessionTabsForWorktree(worktree.id, clientNavigationId)
+  }
+
+  private async restoreRequestedBrowserSessionTabs(
+    worktreeId: string,
+    clientNavigationId?: string
+  ): Promise<void> {
+    if (!clientNavigationId) {
+      return
+    }
+    await restoreRendererBrowserSessionTabs({
+      window: this.getAvailableAuthoritativeWindow(),
+      snapshot: this.mobileSessionTabsByWorktree.get(worktreeId),
+      getLivePageIds: () => new Set(this.getLiveBrowserTabsByPageId(worktreeId).keys())
+    })
   }
 
   async listAllMobileSessionTabs(
