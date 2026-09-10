@@ -771,7 +771,9 @@ html.native-shell .app-layout {
   background: var(--tab-strip-surface);
 }
 
-@container tab-group-strip (max-width: 600px) {
+/* Reserve a full 128px tab alongside overflow arrows, the longest command label,
+   workspace actions, and the 138px desktop window controls. */
+@container tab-group-strip (max-width: 700px) {
   .tab-quick-command-add {
     width: 24px;
     padding-inline: 0;
@@ -781,6 +783,12 @@ html.native-shell .app-layout {
   .tab-quick-command-label,
   .tab-quick-command-run {
     display: none;
+  }
+
+  .tab-quick-command-more {
+    width: 24px;
+    border-left: 0;
+    border-radius: inherit;
   }
 }
 

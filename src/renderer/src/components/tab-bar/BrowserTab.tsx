@@ -225,6 +225,10 @@ export default function BrowserTab({
     <div
       className={TAB_CONTAINER_WIDTH_CLASSES}
       onContextMenuCapture={(event) => {
+        // Portaled menu events bubble through React, but must not reopen the tab menu.
+        if (!event.currentTarget.contains(event.target as Node)) {
+          return
+        }
         event.preventDefault()
         window.dispatchEvent(new Event(CLOSE_ALL_CONTEXT_MENUS_EVENT))
         setMenuPoint({ x: event.clientX, y: event.clientY })

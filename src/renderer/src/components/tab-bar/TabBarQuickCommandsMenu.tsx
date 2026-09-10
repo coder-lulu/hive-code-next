@@ -246,7 +246,7 @@ export function TabBarQuickCommandsMenu({
                 type="button"
                 className={cn(
                   innerButtonBase,
-                  'justify-center rounded-l-none rounded-r-md border-l border-border/60 px-1'
+                  'tab-quick-command-more justify-center rounded-l-none rounded-r-md border-l border-border/60 px-1'
                 )}
                 aria-label={moreCommandsLabel}
                 onPointerEnter={allowMoreCommandsTooltip}
