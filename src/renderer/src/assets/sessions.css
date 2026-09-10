@@ -250,7 +250,7 @@
 }
 .session-row-select,
 .session-current-tab > [role='tab'] {
-  cursor: grab;
+  cursor: default;
 }
 html[data-session-dragging='true'],
 html[data-session-dragging='true'] * {
