@@ -397,57 +397,6 @@ html[data-session-dragging='true'] * {
   font-size: 13px;
   color: var(--muted-foreground);
 }
-.sidebar-session-section.session-navigation {
-  max-height: none;
-}
-.session-quick-list {
-  padding: 0 4px;
-}
-.session-quick-row {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  width: 100%;
-  height: var(--session-quick-row-height);
-  padding: 0 8px;
-  border-radius: var(--radius-sm);
-  text-align: left;
-}
-.session-quick-row:hover,
-.session-quick-row[aria-current='true'] {
-  background: var(--worktree-sidebar-accent);
-}
-.session-quick-row:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: -2px;
-}
-.session-quick-row:disabled {
-  opacity: 0.6;
-}
-.session-quick-title {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-}
-.session-quick-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  max-width: 100%;
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-.session-quick-empty {
-  padding: 8px 12px 12px;
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-
 @container sessions (max-width: 640px) {
   .sessions-list-pane {
     flex: 1;

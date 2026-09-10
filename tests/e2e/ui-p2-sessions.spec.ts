@@ -24,13 +24,6 @@ async function capture(page: Page, name: string): Promise<void> {
       ?.getBoundingClientRect()
       .toJSON(),
     scrollTop: document.querySelector('[data-testid="sessions-list-scroll"]')?.scrollTop,
-    recentSessions: document
-      .querySelector('[data-testid="session-navigation"]')
-      ?.getBoundingClientRect()
-      .toJSON(),
-    recentRows: [...document.querySelectorAll('.session-quick-row')].map((row) =>
-      row.getBoundingClientRect().toJSON()
-    ),
     workspaceSection: document
       .querySelector('.sidebar-workspace-section')
       ?.getBoundingClientRect()
@@ -219,7 +212,11 @@ test('returns to the same terminal and browser guest without duplicate tabs or P
     )
     const tabs = page.locator('.terminal-tab-strip').first().locator('[data-tab-id]')
     await expect(tabs).toHaveCount(2)
-    await page.locator('.session-quick-row').filter({ hasText: 'P2 Workspace continuity' }).click()
+    await openSessions(page)
+    await page
+      .getByTestId('session-center-row')
+      .filter({ hasText: 'P2 Workspace continuity' })
+      .click()
     await expect(page.getByTestId('sessions-page')).toBeVisible()
     await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible()
     expect(await page.evaluate(() => window.__store!.getState().activeWorktreeId)).toBe(
@@ -329,14 +326,8 @@ test('restores a virtual list position and selected row after leaving the sessio
   await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(500)
   await expect(page.locator(`[data-session-key="${selectedKey}"]`).last()).toBeVisible()
   await capture(page, 'p2-review-narrow-list-return')
-  const sidebarBounds = await page.getByTestId('session-navigation').evaluate((element) => ({
-    sectionBottom: element.getBoundingClientRect().bottom,
-    lastRowBottom: element.querySelector('.session-quick-row:last-child')!.getBoundingClientRect()
-      .bottom,
-    workspaceTop: document.querySelector('.sidebar-workspace-section')!.getBoundingClientRect().top
-  }))
-  expect(sidebarBounds.lastRowBottom).toBeLessThanOrEqual(sidebarBounds.sectionBottom)
-  expect(sidebarBounds.lastRowBottom).toBeLessThanOrEqual(sidebarBounds.workspaceTop)
+  await expect(page.getByTestId('session-navigation')).toHaveCount(0)
+  await expect(page.locator('.sidebar-workspace-section')).toBeVisible()
 })
 
 test('keeps connection and activity indicators within a session row', async ({
