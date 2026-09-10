@@ -188,20 +188,44 @@
 .session-detail-back {
   display: none;
 }
+.session-detail-header {
+  background: var(--tab-strip-surface);
+}
 .session-current-tab {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   align-self: flex-end;
   min-width: 0;
-  width: var(--tab-width-wide);
+  width: var(--tab-width);
   max-width: 100%;
   height: var(--tab-strip-height);
   margin-bottom: -1px;
-  padding-right: var(--sessions-space-1);
+  padding-inline: var(--tab-corner-size);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.session-current-tab .tab-active-shape {
   border: 1px solid var(--tab-divider);
-  border-bottom-color: var(--tab-active-surface);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background: var(--tab-active-surface);
+  border-bottom: 0;
+}
+.session-current-tab .tab-active-shape::before {
+  background: radial-gradient(
+    circle at 0 0,
+    transparent calc(var(--tab-corner-size) - 1px),
+    var(--tab-divider) calc(var(--tab-corner-size) - 1px),
+    var(--tab-divider) var(--tab-corner-size),
+    var(--tab-active-surface) var(--tab-corner-size)
+  );
+}
+.session-current-tab .tab-active-shape::after {
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent calc(var(--tab-corner-size) - 1px),
+    var(--tab-divider) calc(var(--tab-corner-size) - 1px),
+    var(--tab-divider) var(--tab-corner-size),
+    var(--tab-active-surface) var(--tab-corner-size)
+  );
 }
 .session-panel-workspace {
   display: flex;
@@ -229,9 +253,7 @@
   flex-shrink: 0;
 }
 .session-current-tab[data-selected='false'] {
-  background: var(--tab-strip-surface);
   color: var(--muted-foreground);
-  border-bottom-color: var(--tab-divider);
 }
 .session-current-tab[data-selected='false']:hover {
   background: var(--tab-hover-surface);

@@ -23,6 +23,7 @@ export default function SessionPanelTab({
   const drag = useDraggable({ id: `session-tab:${item.key}`, data: { sessionKey: item.key } })
   return (
     <div className="session-current-tab" data-selected={selected} ref={drag.setNodeRef}>
+      {selected && <span className="tab-active-shape" aria-hidden />}
       <button
         {...drag.attributes}
         {...drag.listeners}
