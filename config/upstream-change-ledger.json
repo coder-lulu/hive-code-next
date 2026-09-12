@@ -2,7 +2,9 @@
   "schemaVersion": 1,
   "upstream": "stablyai/orca",
   "integrationBranch": "vendor-integration",
-  "productBranches": ["hivecode/main-next"],
+  "productBranches": [
+    "hivecode/main-next"
+  ],
   "entries": [
     {
       "upstreamSha": "d7d21b2c55cd512b7f5a3011e4fa07ef11d9facb",
@@ -38,7 +40,10 @@
       "dependencies": [],
       "conflictReason": "Pi prompt/titlebar status must retain Hive branding and current host identity",
       "adaptation": "Absorb dialog-wait completion and nested/modal failure handling on every Pi surface; retain the Hive managed-hook identity. The upstream esbuild dev dependency exercises emitted extension source in the existing test harness.",
-      "regressionTests": ["Pi agent-status UI prompt", "Pi titlebar extension source"]
+      "regressionTests": [
+        "Pi agent-status UI prompt",
+        "Pi titlebar extension source"
+      ]
     },
     {
       "upstreamSha": "6108ce617c8696c3d52a97d29911aed630a22e78",
@@ -47,7 +52,9 @@
       "dependencies": [],
       "conflictReason": "Activity controls share Hive host/project scope and unread state",
       "adaptation": "Group filters and view controls without changing scope ownership, unread filtering or activity actions; keep product theme primitives and localized labels.",
-      "regressionTests": ["ActivityThreadOptionsMenu"]
+      "regressionTests": [
+        "ActivityThreadOptionsMenu"
+      ]
     },
     {
       "upstreamSha": "e829bb523a77bbc2f357c8d1237e5a8750fc3d49",
@@ -81,7 +88,9 @@
       "upstreamSha": "8f78c28248fbfa4d55fb837ab6698ac77d4e35c5",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": ["2ba2c90cb602d54240b307c02986e5ae53cfc4ae"],
+      "dependencies": [
+        "2ba2c90cb602d54240b307c02986e5ae53cfc4ae"
+      ],
       "conflictReason": "Mobile route parity fingerprints differ from Hive's maintained route; RPC allowlist must retain Hive account methods",
       "adaptation": "Report accepted user input through its owning client/terminal, throttle reports and retry boundedly, and fence host worker release. Keep Hive route identities, listeners, styles and account methods; update only audited callback/nested-body fingerprints.",
       "regressionTests": [
@@ -98,7 +107,9 @@
       "dependencies": [],
       "conflictReason": "Native chat option order should match the active model context",
       "adaptation": "Place effort after the model picker without changing model selection or session option payloads.",
-      "regressionTests": ["NativeChatSessionOptionPickers"]
+      "regressionTests": [
+        "NativeChatSessionOptionPickers"
+      ]
     },
     {
       "upstreamSha": "2ac23c29be2a00c55263ead03f249e936e52e319",
@@ -117,10 +128,14 @@
       "upstreamSha": "6f3c5cc03995ceeb7181ba421dfa58a50ea77f71",
       "type": "UI",
       "applied": "已移植",
-      "dependencies": ["2ac23c29be2a00c55263ead03f249e936e52e319"],
+      "dependencies": [
+        "2ac23c29be2a00c55263ead03f249e936e52e319"
+      ],
       "conflictReason": "无",
       "adaptation": "仅同步 parent-worktree 中文术语",
-      "regressionTests": ["i18n"]
+      "regressionTests": [
+        "i18n"
+      ]
     },
     {
       "upstreamSha": "aab6464a6a35791bee23c14fdd3ba56eb0b9c4a1",
@@ -129,7 +144,9 @@
       "dependencies": [],
       "conflictReason": "无",
       "adaptation": "保留现有编辑器主题与 UI",
-      "regressionTests": ["rich-markdown-indent"]
+      "regressionTests": [
+        "rich-markdown-indent"
+      ]
     },
     {
       "upstreamSha": "87ede54eb807d06697c45651b43712d167d3ea04",
@@ -138,16 +155,22 @@
       "dependencies": [],
       "conflictReason": "无",
       "adaptation": "保留 HiveCode automation 页面样式，采用上游 host admission 行为",
-      "regressionTests": ["automation"]
+      "regressionTests": [
+        "automation"
+      ]
     },
     {
       "upstreamSha": "52ade074a9a92e1d2ce78bba02d03ba73c559c29",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": ["87ede54eb807d06697c45651b43712d167d3ea04"],
+      "dependencies": [
+        "87ede54eb807d06697c45651b43712d167d3ea04"
+      ],
       "conflictReason": "无",
       "adaptation": "保留 HiveCode details/dialog UI",
-      "regressionTests": ["automation-host-detail"]
+      "regressionTests": [
+        "automation-host-detail"
+      ]
     },
     {
       "upstreamSha": "bf5660df51950ab88f37b86914b997dc91837558",
@@ -156,7 +179,9 @@
       "dependencies": [],
       "conflictReason": "mobile home 变更与本地未提交 UI 冲突，手工保留本地 home 改动",
       "adaptation": "诊断数据链路、relay 日志与 diagnostics UI 采用上游；HiveCode home UI 保留",
-      "regressionTests": ["mobile diagnostics"]
+      "regressionTests": [
+        "mobile diagnostics"
+      ]
     },
     {
       "upstreamSha": "b19a397d3e7fe7a65dc4271379ed8b67fb14a58b",
@@ -165,16 +190,22 @@
       "dependencies": [],
       "conflictReason": "main/index 与既有产品服务存在边界冲突",
       "adaptation": "采用上游 remote HTML preview 能力，保留 HiveCode 主进程服务与品牌化文案",
-      "regressionTests": ["browser preview"]
+      "regressionTests": [
+        "browser preview"
+      ]
     },
     {
       "upstreamSha": "cb848647e5fc85c8b9af0c598cd7e53106e61572",
       "type": "安全",
       "applied": "已移植",
-      "dependencies": ["b19a397d3e7fe7a65dc4271379ed8b67fb14a58b"],
+      "dependencies": [
+        "b19a397d3e7fe7a65dc4271379ed8b67fb14a58b"
+      ],
       "conflictReason": "无",
       "adaptation": "完整采用显式 preview capability 与 guest policy",
-      "regressionTests": ["browser preview capability"]
+      "regressionTests": [
+        "browser preview capability"
+      ]
     },
     {
       "upstreamSha": "3179a5761f3262e676197086067d6b6e894e0d45",
@@ -183,7 +214,9 @@
       "dependencies": [],
       "conflictReason": "无",
       "adaptation": "保留 quick command UI",
-      "regressionTests": ["quick command"]
+      "regressionTests": [
+        "quick command"
+      ]
     },
     {
       "upstreamSha": "61c8f85d52df27503ca7add3a248537190ec0e19",
@@ -192,7 +225,9 @@
       "dependencies": [],
       "conflictReason": "无",
       "adaptation": "保留 Sidebar UI",
-      "regressionTests": ["sidebar"]
+      "regressionTests": [
+        "sidebar"
+      ]
     },
     {
       "upstreamSha": "58232cd7974620dbe7347f8a93291e8d5a0ad937",
@@ -201,7 +236,9 @@
       "dependencies": [],
       "conflictReason": "无",
       "adaptation": "保留 floating workspace 样式",
-      "regressionTests": ["floating workspace"]
+      "regressionTests": [
+        "floating workspace"
+      ]
     },
     {
       "upstreamSha": "07b7e9e68d304d24af068ed8aa6b4bfec0ee718b",
@@ -210,7 +247,9 @@
       "dependencies": [],
       "conflictReason": "browser manager 与 HiveCode host policy 需合并",
       "adaptation": "采用上游 popup/new-tab 行为，保留 host authority policy",
-      "regressionTests": ["browser popup"]
+      "regressionTests": [
+        "browser popup"
+      ]
     },
     {
       "upstreamSha": "9a0a2b1c316be50c7da27f53f558069d9623eeee",
@@ -219,7 +258,10 @@
       "dependencies": [],
       "conflictReason": "reliability gate 仅有产品配置差异",
       "adaptation": "采用 worker release null-safe membership 行为，保留 HiveCode gate 配置",
-      "regressionTests": ["worker release", "session terminal persistence"]
+      "regressionTests": [
+        "worker release",
+        "session terminal persistence"
+      ]
     },
     {
       "upstreamSha": "913509edeb0ada8e6a8c57f3b2360dd60d424de1",
@@ -228,16 +270,25 @@
       "dependencies": [],
       "conflictReason": "runtime-rpc 与 HiveCode browser-host classifier 手工合并",
       "adaptation": "采用 worker-start budgets、recovery receipts 与 long-poll keepalive，保留品牌与 host policy",
-      "regressionTests": ["orchestration recovery", "runtime RPC", "CLI"]
+      "regressionTests": [
+        "orchestration recovery",
+        "runtime RPC",
+        "CLI"
+      ]
     },
     {
       "upstreamSha": "de73ac89c63714f99ed4ce0bec58dda908810e4c",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": ["06272109daa309c3e015e11862f186eb0188ac35"],
+      "dependencies": [
+        "06272109daa309c3e015e11862f186eb0188ac35"
+      ],
       "conflictReason": "bridge 中既有 probe 逻辑与上游 fold 冲突",
       "adaptation": "将 reconnect re-probe fold 到 runtime-status refresh，保留现有环境订阅与 browser-host 行为",
-      "regressionTests": ["runtime status", "reconnect probe"]
+      "regressionTests": [
+        "runtime status",
+        "reconnect probe"
+      ]
     },
     {
       "upstreamSha": "1485aa4de2e1b60110fbd0fb37a7c2bc142ec372",
@@ -246,7 +297,10 @@
       "dependencies": [],
       "conflictReason": "无",
       "adaptation": "采用上游 query/reply 顺序修复，保留现有 PTY renderer 边界",
-      "regressionTests": ["PTY capability replies", "terminal query reply"]
+      "regressionTests": [
+        "PTY capability replies",
+        "terminal query reply"
+      ]
     },
     {
       "upstreamSha": "9e0704b9d46209885e95f1a24292a486b041dc73",
@@ -255,13 +309,17 @@
       "dependencies": [],
       "conflictReason": "E2E workflow 原有 native toolchain 步骤与 composite action 合并",
       "adaptation": "保留 HiveCode Linux native toolchain，同时使用 node runtime composite install",
-      "regressionTests": ["E2E gate contract"]
+      "regressionTests": [
+        "E2E gate contract"
+      ]
     },
     {
       "upstreamSha": "8dd7d6060c7d724c4cdb85f3072a1e502e47dc54",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": ["bf5660df51950ab88f37b86914b997dc91837558"],
+      "dependencies": [
+        "bf5660df51950ab88f37b86914b997dc91837558"
+      ],
       "conflictReason": "native patch 与 HiveCode 既有 Windows 路径、job ownership 和 glibc patch 冲突",
       "adaptation": "按 hunk 合并 node-pty/@vscode patch、逐模块 node-gyp rebuild、ConPTY artifact 校验及 lockfile hash，保留 HiveCode 原生边界",
       "regressionTests": [
@@ -274,7 +332,9 @@
       "upstreamSha": "971d987c4b99e84c18fc1447ca4ee18d02eb308a",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": ["2ac23c29be2a00c55263ead03f249e936e52e319"],
+      "dependencies": [
+        "2ac23c29be2a00c55263ead03f249e936e52e319"
+      ],
       "conflictReason": "SSH Docker lane 与 HiveCode 专用 gate/workflow 需要逐 job 合并",
       "adaptation": "增加 SSH source trigger、Docker-gated spec 全量 claim、workspace restore route 和 restart tab identity 回归，保留产品 gate 与安全检查",
       "regressionTests": [
@@ -287,19 +347,29 @@
       "upstreamSha": "350423b7cbb640cf47e46c55187d5d3b85eee511",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": ["8dd7d6060c7d724c4cdb85f3072a1e502e47dc54"],
+      "dependencies": [
+        "8dd7d6060c7d724c4cdb85f3072a1e502e47dc54"
+      ],
       "conflictReason": "完整 path classifier 与 HiveCode 产品 gate 有边界差异",
       "adaptation": "吸收 native cache scope、persist=false ABI 隔离、Windows launcher/native cache；保留现有产品路径分类与安全门禁",
-      "regressionTests": ["native cache action contract", "Windows launcher"]
+      "regressionTests": [
+        "native cache action contract",
+        "Windows launcher"
+      ]
     },
     {
       "upstreamSha": "ebe6b559eff3385db7e456a0c76c02ea1ecca3d2",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": ["f96dfd58103cd822a7d399a377421591094dc8d5"],
+      "dependencies": [
+        "f96dfd58103cd822a7d399a377421591094dc8d5"
+      ],
       "conflictReason": "完整 fan-out/classifier 与 HiveCode PR gate 拓扑不同",
       "adaptation": "吸收 pnpm 版本固定、native cache 输入哈希和单 Node24 primer；保留现有十六分片矩阵与产品 required gates",
-      "regressionTests": ["native cache action contract", "PR scope/workflow contract"]
+      "regressionTests": [
+        "native cache action contract",
+        "PR scope/workflow contract"
+      ]
     },
     {
       "upstreamSha": "b63c006ae9fad412ede61c2070f64354c7426db8",
@@ -324,10 +394,15 @@
       "upstreamSha": "6f8c5888b3acc4011c09498cda27cf3906edd91a",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": ["3d796b82cba90ffec6018410931bfd40e2287318"],
+      "dependencies": [
+        "3d796b82cba90ffec6018410931bfd40e2287318"
+      ],
       "conflictReason": "上游将 PR 主矩阵重排为 reusable workflow，与 HiveCode 现有 PR gate 不同",
       "adaptation": "新增独立 Node 26 daily/manual reusable unit-test lane；保留 HiveCode Node 24 PR 主矩阵、16 shard 和 required gates",
-      "regressionTests": ["Node compatibility workflow contract", "PR workflow parallelism"]
+      "regressionTests": [
+        "Node compatibility workflow contract",
+        "PR workflow parallelism"
+      ]
     },
     {
       "upstreamSha": "8217e6838ff51deac804d93b7ce0a01de3412bca",
@@ -336,7 +411,11 @@
       "dependencies": [],
       "conflictReason": "上游模块拆分会破坏 HiveCode 现有 CLI/runtime public contract",
       "adaptation": "保留现有兼容 API、capability、CloudLaunchBootstrap、队列与 E2EE 行为；仅记录拆分作为后续内部重构，不视为功能缺陷",
-      "regressionTests": ["CLI tsc", "remote runtime transport", "runtime contract parity"]
+      "regressionTests": [
+        "CLI tsc",
+        "remote runtime transport",
+        "runtime contract parity"
+      ]
     },
     {
       "upstreamSha": "0b66daffcc18a5f107888d011df3f79685033e87",
@@ -345,7 +424,9 @@
       "dependencies": [],
       "conflictReason": "产品分支已有相同 orchestration handler 拆分",
       "adaptation": "patch-id/内容等价，无需重复提交",
-      "regressionTests": ["CLI tsc"]
+      "regressionTests": [
+        "CLI tsc"
+      ]
     },
     {
       "upstreamSha": "d456549c223e1a3bf8952429274eeee4356ce690",
@@ -354,7 +435,9 @@
       "dependencies": [],
       "conflictReason": "产品分支已有相同 runtime Git bridge 拆分",
       "adaptation": "patch-id/内容等价，无需重复提交",
-      "regressionTests": ["runtime git"]
+      "regressionTests": [
+        "runtime git"
+      ]
     },
     {
       "upstreamSha": "2b391652b1842e4c4931b33454a501d3fbc47c70",
@@ -384,10 +467,14 @@
       "upstreamSha": "8b99c8365d6bd9cbc7e50d9d4a5a73b5005c2f80",
       "type": "BUG",
       "applied": "已等价实现",
-      "dependencies": ["2b391652b1842e4c4931b33454a501d3fbc47c70"],
+      "dependencies": [
+        "2b391652b1842e4c4931b33454a501d3fbc47c70"
+      ],
       "conflictReason": "remote workspace merge 已有本地存活行保护",
       "adaptation": "主机无响应不删除未经主机确认的本地行",
-      "regressionTests": ["remote-workspace-session-merge-local-survival"]
+      "regressionTests": [
+        "remote-workspace-session-merge-local-survival"
+      ]
     },
     {
       "upstreamSha": "6ba6d58cd2d3d6abd4a08bfd8eaed8ae64195c08",
@@ -396,7 +483,10 @@
       "dependencies": [],
       "conflictReason": "agent identity/launch authority 已在 PTY 与 orchestration 链路实现",
       "adaptation": "按 resolved identity 路由 @agent，保留 HiveCode pane/title UI",
-      "regressionTests": ["agent identity routing", "pty launch authority"]
+      "regressionTests": [
+        "agent identity routing",
+        "pty launch authority"
+      ]
     },
     {
       "upstreamSha": "efb4050f4da3a3ffb30c6bfa02a9b9be6f9d5592",
@@ -405,7 +495,10 @@
       "dependencies": [],
       "conflictReason": "AI Vault scanner 已包含 Cline source/parser",
       "adaptation": "保留 HiveCode vault UI，使用上游 Cline manifest/messages 配对规则",
-      "regressionTests": ["remote-session-scanner", "session-scanner-cline-parser"]
+      "regressionTests": [
+        "remote-session-scanner",
+        "session-scanner-cline-parser"
+      ]
     },
     {
       "upstreamSha": "b241a68ae4467253beaac3ed1bb6a663fd9c5a01",
@@ -414,7 +507,10 @@
       "dependencies": [],
       "conflictReason": "execution-host worktree identity 已在 runtime/repo scan 中统一",
       "adaptation": "跨 host 保持 workspace identity 隔离",
-      "regressionTests": ["repo-worktree-row-resolution", "workspace-cleanup-broad-scan"]
+      "regressionTests": [
+        "repo-worktree-row-resolution",
+        "workspace-cleanup-broad-scan"
+      ]
     },
     {
       "upstreamSha": "f400f8fd5f35f0f27ad4697af8789f99fd9a4fa4",
@@ -423,7 +519,9 @@
       "dependencies": [],
       "conflictReason": "macOS 输入偏好实现已存在",
       "adaptation": "保留产品启动流程，应用一次性 press-and-hold 默认并尊重用户设置",
-      "regressionTests": ["macos-press-and-hold-default"]
+      "regressionTests": [
+        "macos-press-and-hold-default"
+      ]
     },
     {
       "upstreamSha": "3558cf943f2284b6d3335df386d711cf1adf5b10",
@@ -432,7 +530,10 @@
       "dependencies": [],
       "conflictReason": "WSL hook healing 已接入 typed launch 前置流程",
       "adaptation": "保留 HiveCode WSL host 路由，沿用异步修复避免阻塞启动",
-      "regressionTests": ["agent-hooks", "pty-daemon-spawn-wsl-runtime"]
+      "regressionTests": [
+        "agent-hooks",
+        "pty-daemon-spawn-wsl-runtime"
+      ]
     },
     {
       "upstreamSha": "cc384c5a3d12508684156dd7ce5d3eaff121380f",
@@ -441,7 +542,10 @@
       "dependencies": [],
       "conflictReason": "POSIX hook ingest 已按 JSON payload 处理",
       "adaptation": "保持 HiveCode hook endpoint 与 trust boundary，采用结构化 JSON 解析",
-      "regressionTests": ["server-hook-http-ingest", "hook-post-command"]
+      "regressionTests": [
+        "server-hook-http-ingest",
+        "hook-post-command"
+      ]
     },
     {
       "upstreamSha": "f352e3e27dc887fb96a6bd3cfe77a82aae7cc38a",
@@ -450,7 +554,10 @@
       "dependencies": [],
       "conflictReason": "Cursor managed hook 已采用 Cursor 顶层 command schema",
       "adaptation": "保留用户 hook 条目，managed hook 输出协议合法 JSON",
-      "regressionTests": ["cursor-hook-service", "agent-hook-installer"]
+      "regressionTests": [
+        "cursor-hook-service",
+        "agent-hook-installer"
+      ]
     },
     {
       "upstreamSha": "de6fe8b7eabd220d100e4cc652413461d444d2ba",
@@ -459,7 +566,10 @@
       "dependencies": [],
       "conflictReason": "worktree id selector 已采用 path-equivalence fallback",
       "adaptation": "保留 HiveCode selector/UI 语义，使用上游路径等价解析",
-      "regressionTests": ["repo-worktree-row-resolution", "worktree-rm-id-selector-path-spelling"]
+      "regressionTests": [
+        "repo-worktree-row-resolution",
+        "worktree-rm-id-selector-path-spelling"
+      ]
     },
     {
       "upstreamSha": "caef20fec8dee3d5c7df6ff23600938da381a4b7",
@@ -468,7 +578,10 @@
       "dependencies": [],
       "conflictReason": "GitLab runtime facade 未同步分页参数与 totalPages 返回值",
       "adaptation": "恢复 page 参数、local git options 正确传递和 totalPages，保持现有 GitLab UI 映射",
-      "regressionTests": ["GitLab RPC listIssues", "GitLab TaskPage pagination"]
+      "regressionTests": [
+        "GitLab RPC listIssues",
+        "GitLab TaskPage pagination"
+      ]
     },
     {
       "upstreamSha": "df95f03101e94e377659f3e511315887096c5114",
@@ -477,7 +590,10 @@
       "dependencies": [],
       "conflictReason": "GitHub runtime facade 缺少 draft PR ready action，Web GitLab facade 也遗漏旧 runtime 能力门禁",
       "adaptation": "恢复 GitHub markRepoPRReadyForReview runtime bridge，并为 Web GitLab readyForReview 增加 capability gate；保留 HiveCode checks panel/UI",
-      "regressionTests": ["GitHub PR update RPC", "Web GitLab ready-for-review capability"]
+      "regressionTests": [
+        "GitHub PR update RPC",
+        "Web GitLab ready-for-review capability"
+      ]
     },
     {
       "upstreamSha": "673842db35b37557006d9f20d04e077780253d82",
@@ -498,10 +614,15 @@
       "upstreamSha": "6256f3d137bd443aa3ba06349d0984fb3d0af3f4",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": ["06272109daa309c3e015e11862f186eb0188ac35"],
+      "dependencies": [
+        "06272109daa309c3e015e11862f186eb0188ac35"
+      ],
       "conflictReason": "产品 runtime 已拆分 session-tabs RPC，无法直接覆盖单体 runtime",
       "adaptation": "在现有 runtime 中补回全局 change sequence、coalesced watermark 与 inventory API，保留 HiveCode 的 census/host-authority 逻辑",
-      "regressionTests": ["session-tabs inventory census race", "session restart tab persistence"]
+      "regressionTests": [
+        "session-tabs inventory census race",
+        "session restart tab persistence"
+      ]
     },
     {
       "upstreamSha": "c5591d089398d25a24285f95d5b4b94ca4475c13",
@@ -523,7 +644,10 @@
       "dependencies": [],
       "conflictReason": "README downloads badge 属于产品发布入口，HiveCode 当前无批准公开制品链接",
       "adaptation": "保留 HiveCode 删除下载徽章的产品边界，不恢复上游发布暗示",
-      "regressionTests": ["documentation governance", "brand boundary"]
+      "regressionTests": [
+        "documentation governance",
+        "brand boundary"
+      ]
     },
     {
       "upstreamSha": "212c0e42a6518bc558ba75a61f8b76af64b894d2",
@@ -532,7 +656,10 @@
       "dependencies": [],
       "conflictReason": "上游仅更新 Orca 下载量徽章（33m 至 34m）；HiveCode 没有批准公开制品链接，且产品文档已省略该徽章",
       "adaptation": "保留 HiveCode 不展示上游下载量或发布入口的产品边界，不引入 Orca 制品暗示",
-      "regressionTests": ["documentation governance", "brand boundary"]
+      "regressionTests": [
+        "documentation governance",
+        "brand boundary"
+      ]
     },
     {
       "upstreamSha": "808fc3563dbfb5d4a369d1d874cf2c94e86236bb",
@@ -589,7 +716,9 @@
       "dependencies": [],
       "conflictReason": "Web 单体 preload 未吸收拆分模块中的 transcriptPending 协议",
       "adaptation": "在 HiveCode Web 运行入口声明 transcriptPending 能力，并保证 pending 空快照不消耗首个有效快照",
-      "regressionTests": ["web native-chat pending transcript"]
+      "regressionTests": [
+        "web native-chat pending transcript"
+      ]
     },
     {
       "upstreamSha": "5c10bf9001a820612e2d98e528ec2d266296005a",
@@ -598,7 +727,9 @@
       "dependencies": [],
       "conflictReason": "Web 单体 preload 缺少需要主机确认的 UI 状态写入入口",
       "adaptation": "保留 set 的离线 best-effort 行为，新增 setWithAck 让依赖持久化确认的调用方感知 host 写入失败",
-      "regressionTests": ["web ui setWithAck transport failure"]
+      "regressionTests": [
+        "web ui setWithAck transport failure"
+      ]
     },
     {
       "upstreamSha": "b5a85890acff397adcea565733766190bfd75462",
@@ -607,7 +738,9 @@
       "dependencies": [],
       "conflictReason": "Git 调度器参数已进入共享类型，但 Web 单体 preload 未向 runtime 转发",
       "adaptation": "转发 status.includeLineStats 与 branchCompare.admissionTier，使 Web 调用受上游原子 admission scheduler 约束",
-      "regressionTests": ["web git admission parameters"]
+      "regressionTests": [
+        "web git admission parameters"
+      ]
     },
     {
       "upstreamSha": "8f15f217a22953cc4e5da20010fc9a3de930aeea",
@@ -616,7 +749,9 @@
       "dependencies": [],
       "conflictReason": "Web 单体 preload 创建工作树时丢失 displayNameKind",
       "adaptation": "按可选字段转发 displayNameKind，保留用户显式命名，避免分支变化覆盖工作区名称",
-      "regressionTests": ["web worktree display name kind"]
+      "regressionTests": [
+        "web worktree display name kind"
+      ]
     },
     {
       "upstreamSha": "a651e81843bdf7c37979b8f761ada500a6738e8a",
@@ -625,7 +760,10 @@
       "dependencies": [],
       "conflictReason": "上游已删除无消费者的 agentHooks IPC，但冲突合并误恢复了 Web fallback",
       "adaptation": "删除 Web 单体与拆分模块中的死 agentHooks fallback，继续通过现有 agent defaults/status 路径提供能力",
-      "regressionTests": ["web preload exact API composition", "web product branding"]
+      "regressionTests": [
+        "web preload exact API composition",
+        "web product branding"
+      ]
     },
     {
       "upstreamSha": "b35791365427f097c134d7d856f31053f8aa399a",
@@ -1198,7 +1336,9 @@
       "upstreamSha": "da5d555259fc63cb0e39b848e677987a98cbf493",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": ["ebb1acfa3772337c68676a17ad2c28433ba70c52"],
+      "dependencies": [
+        "ebb1acfa3772337c68676a17ad2c28433ba70c52"
+      ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1247,7 +1387,9 @@
       "upstreamSha": "729491597f33031089148bc2fba41a99e0b95de7",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": ["cd9aa43a2c76513d3c3ceca75356bd4c44ac305b"],
+      "dependencies": [
+        "cd9aa43a2c76513d3c3ceca75356bd4c44ac305b"
+      ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "New foreign Orca remote Push/desktop Relay infrastructure crosses Hive account endpoints, pairing/wire authority and native registration. Preserve final archive safety fixes, but live Hive local notifications and account relay remain the maintained owners; require a separate product/wire decision before activation.",
       "regressionTests": [
@@ -1425,7 +1567,9 @@
       "upstreamSha": "a0799d8f1c0fe37ddcef17e63498069f34f25669",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": ["7d367b2aa4f1d7b6d4668927fe0c582e8ace3d62"],
+      "dependencies": [
+        "7d367b2aa4f1d7b6d4668927fe0c582e8ace3d62"
+      ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1622,7 +1766,9 @@
       "upstreamSha": "3b82d8de6422ed415e80dd2fdb75d73bcae610ea",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": ["da5d555259fc63cb0e39b848e677987a98cbf493"],
+      "dependencies": [
+        "da5d555259fc63cb0e39b848e677987a98cbf493"
+      ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1896,7 +2042,9 @@
       "upstreamSha": "1fedda14caa29bf88b609c2035fd1fc04d6daea6",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": ["2c984bcdaa7950e628a18180aad9537243e1a92f"],
+      "dependencies": [
+        "2c984bcdaa7950e628a18180aad9537243e1a92f"
+      ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain shared transcript reader and the final upstream index/query/indexer library. Windows identities use exact decimal uint64 dev/ino and schema6 TEXT, old cache rebuilt, unsafe numeric-only identity fails closed without extra per-file stat. Final upstream also has no application engine/indexer wiring; do not claim a live new search UI. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2052,7 +2200,9 @@
       "upstreamSha": "d33354cfd22bd3459c8dc75b399adf34cef0bea3",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": ["74cc9b50390b481009b34823a35eee01a5b90e40"],
+      "dependencies": [
+        "74cc9b50390b481009b34823a35eee01a5b90e40"
+      ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "New foreign Orca remote Push/desktop Relay infrastructure crosses Hive account endpoints, pairing/wire authority and native registration. Preserve final archive safety fixes, but live Hive local notifications and account relay remain the maintained owners; require a separate product/wire decision before activation.",
       "regressionTests": [
@@ -2452,7 +2602,9 @@
       "upstreamSha": "74cc9b50390b481009b34823a35eee01a5b90e40",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": ["eb2f2d52aee2ebbdc18cbb4244d8347440b3e17c"],
+      "dependencies": [
+        "eb2f2d52aee2ebbdc18cbb4244d8347440b3e17c"
+      ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "New foreign Orca remote Push/desktop Relay infrastructure crosses Hive account endpoints, pairing/wire authority and native registration. Preserve final archive safety fixes, but live Hive local notifications and account relay remain the maintained owners; require a separate product/wire decision before activation.",
       "regressionTests": [
@@ -3051,7 +3203,9 @@
       "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "",
-      "regressionTests": ["final fixed product gates"],
+      "regressionTests": [
+        "final fixed product gates"
+      ],
       "reviewReason": " Verification is candidate-specific; incomplete/failed broad or platform gates hold promotion, and are not represented as passed by this ledger."
     },
     {
