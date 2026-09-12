@@ -159,7 +159,7 @@
   --sessions-space-3: 12px;
   --sessions-space-6: 24px;
   --sessions-row-height: 56px;
-  --sessions-header-height: 44px;
+  --sessions-header-height: 36px;
   --orca-security-background: #fff;
   --orca-security-foreground: #0a0a0a;
   --orca-security-card: #fff;
@@ -3422,7 +3422,7 @@ html.native-shell .app-layout {
   background: #c88719;
 }
 .hive-account-popover {
-  width: min(432px, calc(100vw - 24px)) !important;
+  width: min(360px, calc(100vw - 24px)) !important;
   max-height: min(
     680px,
     calc(100dvh - 24px),
@@ -3721,6 +3721,13 @@ button.hive-account-ownership-control:focus-visible {
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;
+}
+.hive-account-update-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--destructive);
 }
 .hive-account-menu-chevron {
   width: 16px;

@@ -117,6 +117,17 @@ function setup(options: { wrongCell?: boolean; wrongKey?: boolean; silent?: bool
 }
 
 describe('account relay physical channel', () => {
+  it('absorbs the asynchronous ws error when disposed during handshake', async () => {
+    const peer = setup({ silent: true })
+    Object.defineProperty(peer.socket, 'readyState', { value: 0 })
+
+    peer.channel.close()
+
+    expect(peer.socket.onerror).toEqual(expect.any(Function))
+    peer.socket.onerror?.()
+    await expect(peer.ready).rejects.toThrow('Relay connection disposed')
+  })
+
   it('keeps credentials inside pinned E2EE and dispatches RPC without device identity', async () => {
     const peer = setup()
     await peer.ready

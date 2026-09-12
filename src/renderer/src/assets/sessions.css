@@ -510,6 +510,9 @@ html[data-session-dragging='true'] * {
 }
 .projects-navigation-pane .sessions-list-heading {
   font-size: 13px;
+  /* Keep the project column aligned with the 36px workspace titlebar at the left. */
+  height: 36px;
+  min-height: 36px;
 }
 .projects-navigation-pane [data-project-group-header-id],
 .projects-navigation-pane [data-ungrouped-project-group-header] {

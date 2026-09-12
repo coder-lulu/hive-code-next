@@ -177,6 +177,9 @@ export class HiveAccountRelayChannel {
     this.socket = null
     if (socket) {
       socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null
+      if (socket.readyState === 0) {
+        socket.onerror = () => undefined
+      }
       try {
         socket.close(1000, 'Connection disposed')
       } catch {

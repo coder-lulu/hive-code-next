@@ -31,7 +31,7 @@ import {
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { SessionListScope } from '../../../../shared/session-list-scope'
 import { selectSessionCatalog } from './session-catalog'
-import { createSessionCollectionSelector } from './use-session-collection'
+import { createSessionLaunchTracker } from './session-launch-tracker'
 import {
   sessionCreateDetectionTarget,
   sessionCreateOwner,
@@ -89,49 +89,31 @@ export default function SessionCreateDialog({
     }
     setPending(true)
     setError('')
-    const select = createSessionCollectionSelector()
-    const before = new Set(select(useAppStore.getState()).items.map((item) => item.key))
-    let tabId: string | null = null
-    let launched = false
-    let settled = false
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    let unsubscribe = () => {}
-    const stop = () => {
-      unsubscribe()
-      if (timeout) {
-        clearTimeout(timeout)
+    const tracker = createSessionLaunchTracker({
+      ownerWorktreeId: owner.worktreeId,
+      executionHostId: owner.executionHostId,
+      agent: selectedAgent,
+      onMatch: (item) => {
+        if (returnToSessions) {
+          useAppStore.getState().openSessionsPage(scope)
+          useAppStore.getState().updateSessionsView({ selectedSessionKey: item.key })
+        } else {
+          void activateWorktreeFromSidebar(owner.worktreeId, owner.executionHostId)
+        }
+        onClose()
+      },
+      onTimeout: () => {
+        setPending(false)
+        setUnknown(true)
+        setError(
+          translate(
+            'components.sessions.create.unknown',
+            'The session has not appeared yet. Check the session list before starting another.'
+          )
+        )
       }
-    }
-    const inspect = () => {
-      if (!launched || settled) {
-        return
-      }
-      const matches = select(useAppStore.getState()).items.filter(
-        (item) =>
-          !before.has(item.key) &&
-          item.worktreeId === owner.worktreeId &&
-          item.executionHostId === owner.executionHostId &&
-          item.agent === selectedAgent &&
-          (!tabId ||
-            item.tabId === tabId ||
-            item.terminalTabId === tabId ||
-            item.unifiedTabId === tabId)
-      )
-      if (matches.length !== 1) {
-        return
-      }
-      settled = true
-      stop()
-      if (returnToSessions) {
-        useAppStore.getState().openSessionsPage(scope)
-        useAppStore.getState().updateSessionsView({ selectedSessionKey: matches[0].key })
-      } else {
-        void activateWorktreeFromSidebar(owner.worktreeId, owner.executionHostId)
-      }
-      onClose()
-    }
-    unsubscribe = useAppStore.subscribe(inspect)
-    cleanup.current = stop
+    })
+    cleanup.current = tracker.stop
     try {
       const result = launchAgentInNewTab({
         agent: selectedAgent,
@@ -143,23 +125,9 @@ export default function SessionCreateDialog({
           translate('components.sessions.create.failed', 'Could not start the session.')
         )
       }
-      tabId = result.tabId
-      launched = true
-      inspect()
-      if (!settled) {
-        timeout = setTimeout(() => {
-          setPending(false)
-          setUnknown(true)
-          setError(
-            translate(
-              'components.sessions.create.unknown',
-              'The session has not appeared yet. Check the session list before starting another.'
-            )
-          )
-        }, 30000)
-      }
+      tracker.markLaunched(result.tabId)
     } catch (cause) {
-      stop()
+      tracker.stop()
       setPending(false)
       // A launcher can throw after publishing its intent; never create a duplicate automatically.
       setUnknown(true)

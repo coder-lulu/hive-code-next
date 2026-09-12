@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { makeRepo, makeTab, makeWorktree } from './ActivityPrototypePage-test-fixtures'
 import type { AgentPaneThread } from './activity-thread-types'
 
 const mocks = vi.hoisted(() => ({
   getState: vi.fn(),
-  activateTabAndFocusPane: vi.fn(),
-  activateStructuredAgentSessionTab: vi.fn(),
-  activateAndRevealWorkspace: vi.fn()
+  focusPane: vi.fn(),
+  structured: vi.fn(),
+  activateAndRevealWorkspace: vi.fn(),
+  openActivityPage: vi.fn(),
+  openSessionsPage: vi.fn(),
+  updateSessionsView: vi.fn()
 }))
 
 vi.mock('@/store', () => ({ useAppStore: { getState: mocks.getState } }))
-vi.mock('@/lib/activate-tab-and-focus-pane', () => ({
-  activateTabAndFocusPane: mocks.activateTabAndFocusPane
-}))
+vi.mock('@/lib/activate-tab-and-focus-pane', () => ({ activateTabAndFocusPane: mocks.focusPane }))
 vi.mock('@/lib/structured-agent-session-tab-activation', () => ({
-  activateStructuredAgentSessionTab: mocks.activateStructuredAgentSessionTab
+  activateStructuredAgentSessionTab: mocks.structured
 }))
 vi.mock('@/lib/worktree-activation', () => ({
   activateAndRevealWorkspace: mocks.activateAndRevealWorkspace
@@ -43,7 +45,7 @@ function makeRemoteThread(): AgentPaneThread {
   }
 }
 
-describe('activity thread host routing', () => {
+describe('activity thread destination routing', () => {
   const thread = makeRemoteThread()
   const getKnownWorktreeById = vi.fn()
   const setActiveWorktree = vi.fn()
@@ -62,7 +64,7 @@ describe('activity thread host routing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.activateStructuredAgentSessionTab.mockReturnValue(false)
+    mocks.structured.mockReturnValue(false)
     mocks.activateAndRevealWorkspace.mockReturnValue({ primaryTabId: null })
     getKnownWorktreeById.mockReturnValue(thread.worktree)
     state = {
@@ -70,6 +72,8 @@ describe('activity thread host routing', () => {
       worktreesByRepo: { [thread.worktree.repoId]: [thread.worktree] },
       detectedWorktreesByRepo: {},
       folderWorkspaces: [],
+      projects: [],
+      projectHostSetups: [],
       showSleepingWorkspaces: true,
       filterRepoIds: [],
       hideDefaultBranchWorkspace: false,
@@ -89,87 +93,109 @@ describe('activity thread host routing', () => {
       setActiveWorktree,
       setActiveTabType: vi.fn()
     }
+    state.openActivityPage = mocks.openActivityPage
+    state.openSessionsPage = mocks.openSessionsPage
+    state.updateSessionsView = mocks.updateSessionsView
     mocks.getState.mockImplementation(() => state)
   })
 
-  it('routes the row click through the full activation sequence for the matching host', () => {
+  it('opens the existing project navigation and selects the project workspace', () => {
     makeActions().selectThread(thread)
 
-    // Bare setActiveWorktree skips setActiveView('terminal'), initial-terminal seeding and
-    // sleeping-session resume — the workspace dispatcher is the only path that runs them.
+    expect(mocks.openSessionsPage).toHaveBeenCalledWith()
+    expect(mocks.updateSessionsView).toHaveBeenCalledWith({ navigation: 'projects', query: '' })
     expect(mocks.activateAndRevealWorkspace).toHaveBeenCalledWith(thread.worktree.id, {
-      executionHostId: REMOTE_HOST,
-      revealInSidebar: false,
-      clearSidebarFilters: false
+      executionHostId: REMOTE_HOST
     })
-    expect(setActiveWorktree).not.toHaveBeenCalled()
-    expect(mocks.activateTabAndFocusPane).toHaveBeenCalledWith(
+    expect(mocks.focusPane).toHaveBeenCalledWith(
       thread.tab.id,
       '11111111-1111-4111-8111-111111111111',
       { flashFocusedPane: true, scrollToBottomIfOutputSinceLastView: true }
     )
+    expect(acknowledgeAgents).toHaveBeenCalledWith([thread.paneKey])
   })
 
-  it('opens a cold-parked remote thread whose tab activation revives', () => {
-    // The reported SSH symptom: the tab is not resident because the session was never
-    // revived, so a residency probe before activation made the click a silent no-op.
-    state.tabsByWorktree = {}
-    mocks.activateAndRevealWorkspace.mockImplementation(() => {
-      state.tabsByWorktree = { [thread.worktree.id]: [thread.tab] }
-      return { primaryTabId: thread.tab.id }
-    })
-
-    makeActions().selectThread(thread)
-
-    expect(setSelectedPaneKey).toHaveBeenCalledWith(thread.paneKey)
-    expect(mocks.activateAndRevealWorkspace).toHaveBeenCalledWith(thread.worktree.id, {
-      executionHostId: REMOTE_HOST,
-      revealInSidebar: false,
-      clearSidebarFilters: false
-    })
-    expect(mocks.activateTabAndFocusPane).toHaveBeenCalledWith(
-      thread.tab.id,
-      '11111111-1111-4111-8111-111111111111',
-      { flashFocusedPane: true, scrollToBottomIfOutputSinceLastView: true }
-    )
-  })
-
-  it('still activates the workspace when a retained thread has no tab to focus', () => {
-    state.tabsByWorktree = {}
-
-    makeActions().selectThread(thread)
-
-    expect(mocks.activateAndRevealWorkspace).toHaveBeenCalledWith(thread.worktree.id, {
-      executionHostId: REMOTE_HOST,
-      revealInSidebar: false,
-      clearSidebarFilters: false
-    })
-    expect(mocks.activateTabAndFocusPane).not.toHaveBeenCalled()
-  })
-
-  it('focuses nothing when the workspace itself is gone', () => {
-    mocks.activateAndRevealWorkspace.mockReturnValue(false)
-
-    makeActions().selectThread(thread)
-
-    expect(mocks.activateStructuredAgentSessionTab).not.toHaveBeenCalled()
-    expect(mocks.activateTabAndFocusPane).not.toHaveBeenCalled()
-  })
-
-  it('activates a structured agent session instead of looking for a terminal pane', () => {
-    mocks.activateStructuredAgentSessionTab.mockReturnValue(true)
-    state.tabsByWorktree = { [thread.worktree.id]: [] }
-    state.unifiedTabsByWorktree = {
-      [thread.worktree.id]: [{ id: thread.tab.id, contentType: 'agent-session' }]
+  it('opens the temporary session list for a floating thread', () => {
+    const floatingThread: AgentPaneThread = {
+      ...thread,
+      worktree: {
+        ...thread.worktree,
+        id: FLOATING_TERMINAL_WORKTREE_ID,
+        hostId: undefined,
+        repoId: '__activity_standalone__'
+      },
+      repo: null
     }
 
-    makeActions().selectThread(thread)
+    state.tabsByWorktree = {
+      [FLOATING_TERMINAL_WORKTREE_ID]: [
+        { ...thread.tab, worktreeId: FLOATING_TERMINAL_WORKTREE_ID }
+      ]
+    }
+    state.unifiedTabsByWorktree = {
+      [FLOATING_TERMINAL_WORKTREE_ID]: [
+        {
+          id: 'unified-tab',
+          entityId: thread.tab.id,
+          contentType: 'terminal',
+          worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+          executionHostId: 'local'
+        }
+      ]
+    }
 
-    expect(mocks.activateStructuredAgentSessionTab).toHaveBeenCalledWith({
-      worktreeId: thread.worktree.id,
-      tabId: thread.tab.id
+    makeActions().selectThread(floatingThread)
+
+    expect(mocks.openActivityPage).not.toHaveBeenCalled()
+    expect(mocks.openSessionsPage).toHaveBeenCalledWith({ kind: 'all' })
+    expect(mocks.activateAndRevealWorkspace).not.toHaveBeenCalled()
+    expect(mocks.updateSessionsView).toHaveBeenCalledWith({
+      navigation: 'sessions',
+      query: '',
+      scrollTop: 0,
+      selectedSessionKey: `${FLOATING_TERMINAL_WORKTREE_ID}|unified-tab`
     })
-    expect(mocks.activateTabAndFocusPane).not.toHaveBeenCalled()
+  })
+
+  it('selects the remote temporary session without selecting its local same-id twin', () => {
+    const bucket = `runtime:remote|${FLOATING_TERMINAL_WORKTREE_ID}`
+    state.tabsByWorktree = {
+      [bucket]: [{ ...thread.tab, worktreeId: bucket }],
+      [FLOATING_TERMINAL_WORKTREE_ID]: [
+        { ...thread.tab, worktreeId: FLOATING_TERMINAL_WORKTREE_ID }
+      ]
+    }
+    makeActions().selectThread({
+      ...thread,
+      repo: null,
+      worktree: { ...thread.worktree, id: bucket, hostId: 'runtime:remote' }
+    })
+    expect(mocks.updateSessionsView).toHaveBeenCalledWith({
+      navigation: 'sessions',
+      query: '',
+      scrollTop: 0,
+      selectedSessionKey: `${bucket}|${thread.tab.id}`
+    })
+    expect(mocks.openActivityPage).not.toHaveBeenCalled()
+  })
+
+  it('does not focus another tab after failed project activation', () => {
+    mocks.activateAndRevealWorkspace.mockReturnValueOnce(false)
+    makeActions().selectThread(thread)
+    expect(mocks.focusPane).not.toHaveBeenCalled()
+    expect(mocks.structured).not.toHaveBeenCalled()
+  })
+
+  it('opens the existing project navigation without activating an unavailable workspace', () => {
+    const unassignedThread: AgentPaneThread = { ...thread, repo: null }
+    getKnownWorktreeById.mockReturnValue(undefined)
+    state.worktreesByRepo = {}
+
+    makeActions().selectThread(unassignedThread)
+
+    expect(mocks.openSessionsPage).toHaveBeenCalledWith()
+    expect(mocks.updateSessionsView).toHaveBeenCalledWith({ navigation: 'projects', query: '' })
+    expect(mocks.activateAndRevealWorkspace).not.toHaveBeenCalled()
   })
 
   it('jumps to and probes the matching host-qualified workspace', () => {

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   toastInfo: vi.fn(),
   appRestart: vi.fn(),
   updaterCheck: vi.fn(),
+  updaterGetVersion: vi.fn(),
   claimLocalRuntime: vi.fn(),
   refreshRuntimeCloud: vi.fn(),
   refreshLocalRuntimeOwnership: vi.fn(),
@@ -249,7 +250,8 @@ describe('SidebarFooter', () => {
           onOwnershipChanged: vi.fn()
         },
         updater: {
-          check: mocks.updaterCheck
+          check: mocks.updaterCheck,
+          getVersion: mocks.updaterGetVersion
         }
       }
     })
@@ -265,6 +267,7 @@ describe('SidebarFooter', () => {
     mocks.appRestart.mockResolvedValue(undefined)
     mocks.confirmAction.mockResolvedValue(true)
     mocks.updaterCheck.mockResolvedValue(undefined)
+    mocks.updaterGetVersion.mockResolvedValue('1.5.0-beta.7')
     mocks.refreshRuntimeCloud.mockResolvedValue(undefined)
     mocks.refreshLocalRuntimeOwnership.mockResolvedValue({
       stateRevision: 1,
@@ -415,12 +418,30 @@ describe('SidebarFooter', () => {
     expect(mocks.updateSettings).toHaveBeenCalledWith({ theme: 'light' })
   })
 
-  it('keeps the checking update state understandable without relying on its spinner', async () => {
+  it('keeps the installed version visible while an update check is running', async () => {
     setState()
     mocks.state.updateStatus = { state: 'checking' }
     const container = await renderFooter()
 
-    expect(container.textContent).toContain('Checking…')
+    expect(container.textContent).toContain('1.5.0-beta.7')
+  })
+
+  it('shows the installed version and marks an available update with a dot', async () => {
+    const current = await renderFooter()
+    expect(current.textContent).toContain('1.5.0-beta.7')
+    expect(current.querySelector('.hive-account-update-dot')).toBeNull()
+
+    roots.splice(-1).forEach((root) => act(() => root.unmount()))
+    setState()
+    mocks.state.updateStatus = {
+      state: 'available',
+      version: '1.5.0-beta.8',
+      changelog: null
+    }
+    const available = await renderFooter()
+    expect(available.textContent).toContain('1.5.0-beta.7')
+    expect(available.textContent).not.toContain('New version 1.5.0-beta.8')
+    expect(available.querySelector('.hive-account-update-dot')).not.toBeNull()
   })
 
   it('uses the identity header as the only account-center entry', async () => {

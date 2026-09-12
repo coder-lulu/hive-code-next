@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
@@ -33,7 +33,9 @@ const mocks = vi.hoisted(() => {
     updateSettings: vi.fn(),
     openSettingsPage: vi.fn(),
     openSettingsTarget: vi.fn(),
-    openModal: vi.fn()
+    openModal: vi.fn(),
+    openSessionsPage: vi.fn(),
+    updateSessionsView: vi.fn()
   }
   const useAppStore = Object.assign(
     (selector: (value: typeof state) => unknown) => selector(state),
@@ -43,7 +45,11 @@ const mocks = vi.hoisted(() => {
     state,
     useAppStore,
     launchAgentInNewTab: vi.fn(),
-    activateTemporarySessionInMain: vi.fn()
+    activateTemporarySessionInMain: vi.fn(),
+    createSessionLaunchTracker: vi.fn(() => ({
+      markLaunched: vi.fn(() => false),
+      stop: vi.fn()
+    }))
   }
 })
 
@@ -59,6 +65,9 @@ vi.mock('@/lib/launch-agent-in-new-tab', () => ({
 }))
 vi.mock('@/lib/temporary-session-navigation', () => ({
   activateTemporarySessionInMain: mocks.activateTemporarySessionInMain
+}))
+vi.mock('./sessions/session-launch-tracker', () => ({
+  createSessionLaunchTracker: mocks.createSessionLaunchTracker
 }))
 vi.mock('@/lib/worktree-activation', () => ({ activateAndRevealWorkspace: vi.fn(() => true) }))
 vi.mock('./landing/DesktopHomeComposerFooter', () => ({
@@ -121,6 +130,25 @@ describe('Landing permission mode wiring', () => {
 
     expect(mocks.launchAgentInNewTab).toHaveBeenCalledWith(
       expect.objectContaining({ agent: 'codex', agentPermissionMode: 'manual' })
+    )
+  })
+
+  it('opens the sessions page after a temporary session receives its inventory key', () => {
+    render(<Landing />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }))
+    const [[options]] = mocks.createSessionLaunchTracker.mock.calls as unknown as [
+      [{ onMatch: (item: { key: string }) => void }]
+    ]
+
+    act(() => options.onMatch({ key: 'global-floating-terminal|floating-agent-tab' }))
+
+    expect(mocks.state.openSessionsPage).toHaveBeenCalledWith({ kind: 'all' })
+    expect(mocks.state.updateSessionsView).toHaveBeenCalledWith(
+      expect.objectContaining({
+        navigation: 'sessions',
+        selectedSessionKey: 'global-floating-terminal|floating-agent-tab'
+      })
     )
   })
 

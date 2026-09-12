@@ -79,6 +79,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
   const [claimingLocalRuntime, setClaimingLocalRuntime] = React.useState(false)
   const [claimSucceeded, setClaimSucceeded] = React.useState(false)
   const [claimErrorMessage, setClaimErrorMessage] = React.useState<string | null>(null)
+  const [appVersion, setAppVersion] = React.useState<string | null>(null)
   const claimingLocalRuntimeRef = React.useRef(false)
   const mountedRef = useMountedRef()
   const accountStateRevisionRef = React.useRef(0)
@@ -89,6 +90,19 @@ const SidebarFooter = React.memo(function SidebarFooter() {
   const notificationUnreadCount = useActivityUnreadCount(showActivity, 'sidebar-badge')
   const mobileOnboardingBadge = useMobileSidebarOnboardingBadge(showMobile)
   const connected = accountState?.status === 'signed-in'
+  React.useEffect(() => {
+    let cancelled = false
+    void Promise.resolve(window.api?.updater?.getVersion?.())
+      .then((version) => {
+        if (!cancelled && typeof version === 'string' && version.trim()) {
+          setAppVersion(version.trim())
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const secureStorageBlocked =
     accountState?.errorCode === 'secure_storage_unavailable' ||
     accountState?.errorCode === 'credential_unreadable'
@@ -642,6 +656,11 @@ const SidebarFooter = React.memo(function SidebarFooter() {
         return translate('components.sidebarAccount.checkNow', 'Check now')
     }
   })()
+  const updateAvailable =
+    updateStatus.state === 'available' ||
+    updateStatus.state === 'downloading' ||
+    updateStatus.state === 'downloaded' ||
+    (updateStatus.state === 'error' && Boolean(updateStatus.version))
   const notificationStatusLabel =
     notificationUnreadCount > 0
       ? translate('components.sidebarAccount.unreadCount', '{{count}} unread', {
@@ -915,15 +934,24 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                     {translate('components.sidebarAccount.checkUpdates', 'Check for updates')}
                   </span>
                   <span className="hive-account-menu-value hive-account-update-status">
-                    {updateStatus.state === 'checking' ? (
-                      <>
-                        <Loader2 className="size-3 animate-spin" aria-hidden="true" />
-                        <span>{updateStatusLabel}</span>
-                      </>
-                    ) : (
-                      updateStatusLabel
-                    )}
+                    {updateStatus.state === 'checking' || updateStatus.state === 'downloading' ? (
+                      <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+                    ) : null}
+                    <span>{appVersion ?? updateStatusLabel}</span>
                   </span>
+                  {updateAvailable ? (
+                    <span
+                      className="hive-account-update-dot"
+                      title={translate(
+                        'components.sidebarAccount.updateAvailable',
+                        'Update available'
+                      )}
+                      aria-label={translate(
+                        'components.sidebarAccount.updateAvailable',
+                        'Update available'
+                      )}
+                    />
+                  ) : null}
                   <ChevronRight className="hive-account-menu-chevron" />
                 </DropdownMenuItem>
                 <DropdownMenuItem

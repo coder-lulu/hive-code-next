@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, Code2, LayoutTemplate, Sparkles, Workflow } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Code2, Sparkles, Workflow } from 'lucide-react'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import {
   supportsTuiAgentLaunchPermission,
@@ -21,28 +21,23 @@ import {
   pickQuickWorkspaceAgent,
   resolveQuickWorkspaceAgentSelection
 } from '@/lib/quick-workspace-agent-selection'
-import { activateTemporarySessionInMain } from '@/lib/temporary-session-navigation'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { DesktopHomeComposerFooter } from './landing/DesktopHomeComposerFooter'
 import { desktopHomeProjectIdentityFromSelection } from './landing/desktop-home-selection'
 import { buildDesktopHomeModel, findDesktopHomeWorkspace } from './landing/desktop-home-model'
+import { createSessionLaunchTracker } from './sessions/session-launch-tracker'
 import mascotUrl from '../../../../resources/desktop-home-mascot-float.png'
 import { translate } from '@/i18n/i18n'
 
-type HomeScene = 'code' | 'automation' | 'collaboration'
+type HomeScene = 'code' | 'automation'
 const SCENES: { id: HomeScene; icon: typeof Code2; labelKey: string; placeholderKey: string }[] = [
+  { id: 'code', icon: Code2, labelKey: 'sceneCode', placeholderKey: 'placeholderCode' },
   {
     id: 'automation',
     icon: Workflow,
     labelKey: 'sceneAutomation',
     placeholderKey: 'placeholderAutomation'
-  },
-  { id: 'code', icon: Code2, labelKey: 'sceneCode', placeholderKey: 'placeholderCode' },
-  {
-    id: 'collaboration',
-    icon: LayoutTemplate,
-    labelKey: 'sceneCollaboration',
-    placeholderKey: 'placeholderCollaboration'
   }
 ]
 const CAPABILITIES: Record<HomeScene, string[]> = {
@@ -55,8 +50,7 @@ const CAPABILITIES: Record<HomeScene, string[]> = {
     'generateCommit',
     'architecture'
   ],
-  automation: ['scheduledBuild', 'summarizeChanges', 'batchTasks'],
-  collaboration: ['breakDownRequirements', 'parallelReview', 'planDelivery']
+  automation: ['scheduledBuild', 'summarizeChanges', 'batchTasks']
 }
 
 export default function Landing(): React.JSX.Element {
@@ -125,12 +119,12 @@ export default function Landing(): React.JSX.Element {
     ]
   )
   // Keep the development surface as the default so the hero copy, composer
-  // affordances, and first-time experience stay aligned.  The renamed
-  // everyday-office and design tabs remain one-click alternatives.
+  // affordances, and first-time experience stay aligned.
   const [scene, setScene] = useState<HomeScene>('code')
   const [agentOverride, setAgentOverride] = useState<TuiAgent | null | undefined>(undefined)
   const [permissionMode, setPermissionMode] = useState<AgentLaunchPermissionMode>('default')
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const temporaryLaunchCleanup = useRef<(() => void) | null>(null)
   const [workspaceId, setWorkspaceId] = useState('')
   const capabilitiesRef = useRef<HTMLDivElement>(null)
   const [capabilityScroll, setCapabilityScroll] = useState({ atStart: true, atEnd: true })
@@ -218,6 +212,7 @@ export default function Landing(): React.JSX.Element {
       setWorkspaceId('')
     }
   }, [homeNewTaskMode])
+  useEffect(() => () => temporaryLaunchCleanup.current?.(), [])
   const submit = (): void => {
     const prompt = homeTaskDraft.trim()
     if (!prompt) {
@@ -252,18 +247,59 @@ export default function Landing(): React.JSX.Element {
       if (!agent) {
         return
       }
-      const launched = launchAgentInNewTab({
+      temporaryLaunchCleanup.current?.()
+      temporaryLaunchCleanup.current = null
+      const tracker = createSessionLaunchTracker({
+        ownerWorktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+        executionHostId: LOCAL_EXECUTION_HOST_ID,
         agent,
-        worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
-        prompt,
-        agentPermissionMode: resolvedPermissionMode,
-        promptDelivery: 'auto-submit',
-        launchSource: 'unknown'
+        onMatch: (item) => {
+          const state = useAppStore.getState()
+          state.openSessionsPage({ kind: 'all' })
+          state.updateSessionsView({
+            navigation: 'sessions',
+            selectedSessionKey: item.key,
+            query: '',
+            scrollTop: 0
+          })
+          setHomeTaskDraft('')
+          exitNewTaskHome()
+        },
+        onTimeout: () => {
+          const state = useAppStore.getState()
+          state.openSessionsPage({ kind: 'all' })
+          state.updateSessionsView({
+            navigation: 'sessions',
+            selectedSessionKey: null,
+            query: '',
+            scrollTop: 0
+          })
+        }
       })
-      if (launched) {
-        activateTemporarySessionInMain(launched.tabId)
+      temporaryLaunchCleanup.current = tracker.stop
+      let launched: ReturnType<typeof launchAgentInNewTab> = null
+      try {
+        launched = launchAgentInNewTab({
+          agent,
+          worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+          prompt,
+          agentPermissionMode: resolvedPermissionMode,
+          promptDelivery: 'auto-submit',
+          launchSource: 'unknown'
+        })
+      } catch (error) {
+        tracker.stop()
+        temporaryLaunchCleanup.current = null
+        console.error('Could not launch temporary session', error)
+      }
+      if (launched && tracker.markLaunched(launched.tabId)) {
+        temporaryLaunchCleanup.current = null
+      } else if (launched) {
         setHomeTaskDraft('')
         exitNewTaskHome()
+      } else {
+        tracker.stop()
+        temporaryLaunchCleanup.current = null
       }
       return
     }
@@ -354,11 +390,7 @@ export default function Landing(): React.JSX.Element {
                   <Icon className="size-3.5" />
                   {translate(
                     `components.desktopHome.${entry.labelKey}`,
-                    entry.id === 'code'
-                      ? 'Code development'
-                      : entry.id === 'automation'
-                        ? 'Everyday office'
-                        : 'Design & creative'
+                    entry.id === 'code' ? 'Code development' : 'Everyday office'
                   )}
                 </button>
               )
@@ -434,9 +466,7 @@ export default function Landing(): React.JSX.Element {
                 `components.desktopHome.${activeScene.placeholderKey}`,
                 activeScene.id === 'code'
                   ? 'Describe the development task to complete…'
-                  : activeScene.id === 'automation'
-                    ? 'Describe the repetitive work to automate…'
-                    : 'Describe the task that needs multiple agents…'
+                  : 'Describe the repetitive work to automate…'
               )}
               aria-label={translate('components.desktopHome.taskDescription', 'Task description')}
             />
