@@ -122,7 +122,9 @@ function matchLiteral(
     if (word) {
       return { quality: 'word-exact', ranges: toRanges(field, word.start, word.end) }
     }
-    const atom = field.atoms.find((entry) => normalized.slice(entry.start, entry.end) === text)
+    const atom = field.atoms.find(
+      (entry) => entry.end - entry.start === text.length && normalized.startsWith(text, entry.start)
+    )
     if (atom) {
       return { quality: 'word-exact', ranges: toRanges(field, atom.start, atom.end) }
     }
