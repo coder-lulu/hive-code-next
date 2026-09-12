@@ -23,6 +23,37 @@ function skill(id: string, name: string): DiscoveredSkill {
 }
 
 describe('agent skill selection', () => {
+  it('keeps the first exact ID match ahead of an identically named skill', () => {
+    const first = skill('selector', 'first')
+    expect(
+      selectDiscoveredSkills(
+        [first, skill('selector', 'second'), skill('other', 'selector')],
+        ['selector']
+      )
+    ).toEqual([first])
+  })
+
+  it('bounds discovery reads when selecting a large batch by name', () => {
+    let reads = 0
+    const entries = Array.from({ length: 100 }, (_, index) => {
+      const entry = skill(`id-${index}`, `name-${index}`)
+      return {
+        ...entry,
+        get name() {
+          reads++
+          return entry.name
+        }
+      }
+    })
+    expect(
+      selectDiscoveredSkills(
+        entries,
+        entries.map((entry) => entry.name)
+      )
+    ).toHaveLength(100)
+    expect(reads).toBeLessThanOrEqual(entries.length * 6)
+  })
+
   it('accepts exact IDs and unambiguous names while deduplicating repeats', () => {
     expect(
       selectDiscoveredSkills(

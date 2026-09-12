@@ -31,7 +31,6 @@ import type { PluginMarketplaceService } from '../plugins/plugin-marketplace-ser
 import type { PluginMarketplaceInstaller } from '../plugins/plugin-marketplace-installer'
 import type { KeybindingService } from '../keybindings/keybinding-service'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
-import type { AgentHookProviderSessionIdentity } from '../agent-hooks/server'
 import type { EmulatorBridge } from '../emulator/emulator-bridge'
 import type { GpuFallbackMarker, GpuFallbackEnvironment } from './gpu-fallback-marker'
 import type { createCodexSessionMigrationScheduler } from '../codex/codex-session-migration-scheduler'
@@ -93,9 +92,6 @@ export const mainProcessState = {
   repoMaintenanceShutdown: Promise.resolve() as Promise<void>,
   crashReports: null as CrashReportStore | null,
   unsubscribeAgentAwakeStatusChanges: null as (() => void) | null,
-  publishProviderSessionChanges: null as
-    | ((identities: AgentHookProviderSessionIdentity[]) => void)
-    | null,
   unsubscribeSystemResumeBroadcast: null as (() => void) | null,
   watcherShutdownPromise: null as Promise<void> | null,
   watcherShutdownDone: false,

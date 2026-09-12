@@ -1,5 +1,6 @@
 import { app, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
+import { listEnvironments } from '../../shared/runtime-environment-store'
 import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
 import { REMOTE_RUNTIME_MAX_SUBSCRIPTIONS } from '../../shared/remote-runtime-memory-limits'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
@@ -13,16 +14,16 @@ import {
   registerRuntimeEnvironmentConnectivityHandlers,
   registerRuntimeEnvironmentPassiveHandlers
 } from './runtime-environment-connectivity-handlers'
-import { closeRemoteRuntimeRequestConnection } from './runtime-environment-request-connections'
+import {
+  closeRemoteRuntimeRequestConnection,
+  getRuntimeEnvironmentStatusOwner
+} from './runtime-environment-request-connections'
 import { registerRuntimeEnvironmentRecoveryHandler } from './runtime-environment-recovery-handler'
 import {
   advanceRuntimeEnvironmentTransportGeneration,
   getRuntimeEnvironmentTransportGeneration
 } from './runtime-environment-transport-generation'
-import {
-  clearSharedControlSupport,
-  resetSharedControlSupport
-} from './runtime-environment-transport-routing'
+import { resetSharedControlSupport } from './runtime-environment-transport-routing'
 import { RUNTIME_ENVIRONMENT_HANDLER_CHANNELS } from './runtime-environment-handler-channels'
 import { retirePairedRuntimeBrowserClientHostEnvironment } from '../browser/paired-runtime-browser-client-host-runtime'
 import { registerRuntimeEnvironmentBrowserClientHostHandler } from './runtime-environment-browser-client-host-handler'
@@ -69,7 +70,6 @@ export function invalidateRuntimeEnvironmentTransport(environmentId: string): Pr
   advanceRuntimeEnvironmentCapabilityIncarnation(environmentId)
   advanceRuntimeEnvironmentTransportGeneration(environmentId)
   closeRemoteRuntimeRequestConnection(environmentId)
-  clearSharedControlSupport(environmentId)
   closeSubscriptionsForEnvironment(environmentId)
   return retirePairedRuntimeBrowserClientHostEnvironment(
     environmentId,
@@ -102,6 +102,11 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
   })
   registerRuntimeEnvironmentRecoveryHandler()
   registerRuntimeEnvironmentPassiveHandlers(getUserDataPath)
+  for (const environment of listEnvironments(getUserDataPath())) {
+    if (!isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
+      getRuntimeEnvironmentStatusOwner(getUserDataPath(), environment.id).activate()
+    }
+  }
   ipcMain.handle(
     'runtimeEnvironments:subscribe',
     async (

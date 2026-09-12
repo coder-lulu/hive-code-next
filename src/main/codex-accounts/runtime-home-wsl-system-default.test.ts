@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type * as CodexConfigMirror from '../codex/codex-config-mirror'
 import { createSettings } from './runtime-home-settings-test-fixtures'
+import { isolateRuntimeHomeWslCollaborators } from './runtime-home-wsl-test-fixtures'
 import {
   createCodexAuthJson,
   createManagedAuth,
@@ -11,6 +12,23 @@ import {
   teardownRuntimeHomeTest,
   testState
 } from './runtime-home-service-test-harness'
+
+const { rejectRealProcess } = vi.hoisted(() => ({
+  rejectRealProcess: vi.fn(() => {
+    throw new Error('WSL account unit tests must not launch a real child process')
+  })
+}))
+
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()), // eslint-disable-line @typescript-eslint/consistent-type-imports -- mock requires module export types
+  exec: rejectRealProcess,
+  execSync: rejectRealProcess,
+  execFile: rejectRealProcess,
+  execFileSync: rejectRealProcess,
+  spawn: rejectRealProcess,
+  spawnSync: rejectRealProcess,
+  fork: rejectRealProcess
+}))
 
 vi.mock('electron', () => ({
   app: {
@@ -29,10 +47,12 @@ vi.mock('node:os', async () => {
 describe('CodexRuntimeHomeService', () => {
   beforeEach(() => {
     setupRuntimeHomeTest()
+    isolateRuntimeHomeWslCollaborators()
   })
 
   afterEach(() => {
     teardownRuntimeHomeTest()
+    expect(rejectRealProcess).not.toHaveBeenCalled()
   })
 
   it('reads WSL system-default rate limits from the live system home without materializing', async () => {
@@ -92,7 +112,7 @@ describe('CodexRuntimeHomeService', () => {
             managedHomePath: ubuntuHomePath,
             managedHomeRuntime: 'wsl',
             wslDistro: 'Ubuntu',
-            wslLinuxHomePath: '/home/alice/.local/share/orca/codex-accounts/ubuntu/home',
+            wslLinuxHomePath: '/home/alice/.local/share/orca/codex-accounts/ubuntu-account/home',
             providerAccountId: 'acct-ubuntu',
             workspaceLabel: null,
             workspaceAccountId: 'acct-ubuntu',
@@ -106,7 +126,7 @@ describe('CodexRuntimeHomeService', () => {
             managedHomePath: debianHomePath,
             managedHomeRuntime: 'wsl',
             wslDistro: 'Debian',
-            wslLinuxHomePath: '/home/alice/.local/share/orca/codex-accounts/debian/home',
+            wslLinuxHomePath: '/home/alice/.local/share/orca/codex-accounts/debian-account/home',
             providerAccountId: 'acct-debian',
             workspaceLabel: null,
             workspaceAccountId: 'acct-debian',

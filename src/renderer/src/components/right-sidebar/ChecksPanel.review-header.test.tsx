@@ -83,7 +83,7 @@ describe('ChecksPanelReviewHeader', () => {
     expect(markup).toContain('More PR actions')
     expect(markup).toContain('Unlink PR from workspace')
     expect(markup).toContain(
-      'Orca will hide PR #2964 details for this workspace. The PR and branch on GitHub won’t be changed.'
+      `${APP_DISPLAY_NAME} will hide PR #2964 details for this workspace. The PR and branch on GitHub won’t be changed.`
     )
     expect(markup).toContain('Link another PR')
     expect(markup).toContain('lucide-ellipsis')
@@ -135,7 +135,7 @@ describe('ChecksPanelReviewHeader', () => {
     expect(markup).toContain('More MR actions')
     expect(markup).toContain('Unlink MR from workspace')
     expect(markup).toContain(
-      'Orca will hide MR !31 details for this workspace. The MR and branch on GitLab won’t be changed.'
+      `${APP_DISPLAY_NAME} will hide MR !31 details for this workspace. The MR and branch on GitLab won’t be changed.`
     )
     expect(markup).toContain('Link another MR')
   })

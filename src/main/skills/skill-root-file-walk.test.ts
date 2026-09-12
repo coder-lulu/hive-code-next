@@ -66,10 +66,9 @@ describe('findSkillFiles', () => {
 
     expect(await findSkillFiles(root, 4)).toEqual([join(edge, 'SKILL.md')])
     expect(statPaths).toEqual([])
-    expect(await findSkillFiles(root, 5)).toEqual([
-      join(edge, 'SKILL.md'),
-      join(edge, 'link00', 'SKILL.md')
-    ])
+    expect((await findSkillFiles(root, 5)).sort()).toEqual(
+      [join(edge, 'SKILL.md'), join(edge, 'link00', 'SKILL.md')].sort()
+    )
     expect(statPaths).toHaveLength(32)
   })
 

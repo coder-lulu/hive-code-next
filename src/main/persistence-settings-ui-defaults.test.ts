@@ -124,7 +124,7 @@ describe('Store', () => {
   it('returns default UI state when no data file exists', async () => {
     const store = await createStore()
     const ui = store.getUI()
-    expect(ui.sidebarWidth).toBe(280)
+    expect(ui.sidebarWidth).toBe(240)
     expect(ui.rightSidebarOpen).toBe(true)
     expect(ui.rightSidebarTab).toBe('explorer')
     expect(ui.groupBy).toBe('repo')

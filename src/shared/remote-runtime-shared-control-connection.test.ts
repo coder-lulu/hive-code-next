@@ -39,6 +39,9 @@ describe('RemoteRuntimeSharedControlConnection', () => {
       transcriptHashB64: expect.any(String),
       deviceToken: 'device-token',
       clientCapabilities: [
+        protocolVersion.AGENT_SESSION_BACKGROUND_TASK_STOP_CAPABILITY,
+        protocolVersion.AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY,
+        protocolVersion.AGENT_SESSION_TURN_ITEM_CAPABILITY,
         protocolVersion.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
         protocolVersion.SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
         protocolVersion.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,

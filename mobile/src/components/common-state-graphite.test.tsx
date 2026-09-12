@@ -164,7 +164,7 @@ describe('Graphite common states and overlays', () => {
     const submit = renderer!.root
       .findAllByType('Pressable')
       .find((node) => node.props.accessibilityLabel === 'Save')!
-    expect(submit.props.accessibilityState).toEqual({ disabled: true })
+    expect(submit.props.accessibilityState).toEqual({ disabled: true, busy: false })
     expect(resolvedStyle(submit).minHeight).toBe(44)
 
     const input = renderer!.root.findByType('TextInput')
@@ -176,7 +176,7 @@ describe('Graphite common states and overlays', () => {
     const enabledSubmit = renderer!.root
       .findAllByType('Pressable')
       .find((node) => node.props.accessibilityLabel === 'Save')!
-    expect(enabledSubmit.props.accessibilityState).toEqual({ disabled: false })
+    expect(enabledSubmit.props.accessibilityState).toEqual({ disabled: false, busy: false })
     act(() => enabledSubmit.props.onPress())
     expect(onSubmit).toHaveBeenCalledWith('graphite')
   })

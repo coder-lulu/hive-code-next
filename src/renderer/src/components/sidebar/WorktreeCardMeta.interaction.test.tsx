@@ -3,6 +3,7 @@
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { WorktreeCardDetailsHover } from './WorktreeCardMeta'
 
 const toastMocks = vi.hoisted(() => ({
@@ -302,7 +303,7 @@ describe('WorktreeCardDetailsHover interactions', () => {
     })
 
     const browserButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Open in Orca browser')
+      button.textContent?.includes(`Open in ${APP_DISPLAY_NAME} browser`)
     )
 
     act(() => {
@@ -324,7 +325,7 @@ describe('WorktreeCardDetailsHover interactions', () => {
       interactionMocks.onReviewMenuOpenChange?.(true)
     })
     const browserButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Open in Orca browser')
+      button.textContent?.includes(`Open in ${APP_DISPLAY_NAME} browser`)
     )
 
     act(() => {
@@ -387,7 +388,7 @@ describe('WorktreeCardDetailsHover interactions', () => {
       interactionMocks.onReviewMenuOpenChange?.(true)
     })
     const browserButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Open in Orca browser')
+      button.textContent?.includes(`Open in ${APP_DISPLAY_NAME} browser`)
     )
 
     act(() => {

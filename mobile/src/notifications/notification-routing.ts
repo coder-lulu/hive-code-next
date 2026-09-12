@@ -5,13 +5,13 @@ import type { HostCredentialStatus } from '../transport/types'
 export type DesktopNotificationSource = 'agent-task-complete' | 'terminal-bell' | 'test'
 
 export type DesktopNotificationEvent = {
-  source: DesktopNotificationSource
+  source?: DesktopNotificationSource
   worktreeId?: string
   notificationId?: string
 }
 
 export type LocalNotificationData = {
-  source: DesktopNotificationSource
+  source?: DesktopNotificationSource
   hostId: string
   worktreeId?: string
   notificationId?: string
@@ -81,7 +81,13 @@ export function getNotificationNavigationTarget(
   const credentialStatus = options.credentialStatusByHostId?.get(hostId)
   return {
     hostId,
-    sessionTarget: worktreeId ? mobileSessionRouteTarget({ hostId, worktreeId }) : null,
+    sessionTarget: worktreeId
+      ? mobileSessionRouteTarget({
+          hostId,
+          worktreeId,
+          paneKey: readNonEmptyString(record.paneKey) ?? undefined
+        })
+      : null,
     ...(credentialStatus === 'missing'
       ? { credentialRecovery: 're-pair' as const }
       : credentialStatus === 'temporarily-unavailable'

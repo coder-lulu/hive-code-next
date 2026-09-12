@@ -11,6 +11,7 @@ type MockAppState = {
   sessionsView: { selectedSessionKey: string | null }
   unifiedTabsByWorktree: Record<string, readonly Tab[]>
   groupsByWorktree: Record<string, readonly TabGroup[]>
+  activeGroupIdByWorktree: Record<string, string>
   runtimeEnvironmentId: string | null
   repos: []
   worktreesByRepo: Record<
@@ -21,6 +22,10 @@ type MockAppState = {
   projectGroups: []
   focusGroup: (worktreeId: string, groupId: string) => void
 }
+
+vi.hoisted(() => {
+  vi.stubGlobal('CSS', { supports: () => true })
+})
 
 const mocks = vi.hoisted(() => ({
   store: null as null | { setState: (state: Partial<MockAppState>) => void },
@@ -38,6 +43,7 @@ vi.mock('@/store', async () => {
     sessionsView: { selectedSessionKey: null },
     unifiedTabsByWorktree: {},
     groupsByWorktree: {},
+    activeGroupIdByWorktree: {},
     runtimeEnvironmentId: null,
     repos: [],
     worktreesByRepo: {},
@@ -71,11 +77,13 @@ vi.mock('./NativeChatView', async () => {
       tabId,
       groupId,
       isVisible,
+      isFocusedGroup,
       target
     }: {
       tabId: string
       groupId?: string
       isVisible: boolean
+      isFocusedGroup: boolean
       target: RuntimeClientTarget
     }) {
       mocks.groupIdByTabId.set(tabId, groupId)
@@ -90,6 +98,7 @@ vi.mock('./NativeChatView', async () => {
         <input
           data-chat-tab-id={tabId}
           data-chat-visible={String(isVisible)}
+          data-chat-focused-group={String(isFocusedGroup)}
           data-chat-target={target.kind === 'environment' ? target.environmentId : target.kind}
           data-native-chat-working="true"
         />
@@ -102,10 +111,45 @@ import StructuredAgentSessionPaneOverlayLayer from './StructuredAgentSessionPane
 
 const WORKTREE_ID = 'wt-1'
 const GROUP_ID = 'group-1'
+const SECOND_GROUP_ID = 'group-2'
 const FIRST_TAB_ID = 'structured-agent-session-session-1'
 const SECOND_TAB_ID = 'structured-agent-session-session-2'
 
 describe('StructuredAgentSessionPaneOverlayLayer', () => {
+  it('isolates retained chat panes and reports the active split group', () => {
+    const state = createState(FIRST_TAB_ID)
+    mocks.store?.setState({
+      unifiedTabsByWorktree: {
+        [WORKTREE_ID]: state.unifiedTabsByWorktree[WORKTREE_ID].map((tab) =>
+          tab.id === SECOND_TAB_ID ? { ...tab, groupId: SECOND_GROUP_ID } : tab
+        )
+      },
+      groupsByWorktree: {
+        [WORKTREE_ID]: [
+          { ...createGroup(FIRST_TAB_ID), tabOrder: [FIRST_TAB_ID] },
+          { ...createGroup(SECOND_TAB_ID), id: SECOND_GROUP_ID, tabOrder: [SECOND_TAB_ID] }
+        ]
+      }
+    })
+    const view = render(
+      <StructuredAgentSessionPaneOverlayLayer worktreeId={WORKTREE_ID} isWorktreeActive />
+    )
+    const slot = view.baseElement.querySelector<HTMLElement>(
+      `[data-structured-agent-session-overlay-tab-id="${FIRST_TAB_ID}"]`
+    )!
+    expect(slot.hasAttribute('data-retained-pane-host')).toBe(true)
+    expect(slot.classList.contains('isolate')).toBe(true)
+    expect(slot.classList.contains('overflow-hidden')).toBe(true)
+    expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatFocusedGroup).toBe('true')
+    expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatVisible).toBe('true')
+    expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatFocusedGroup).toBe('false')
+    act(() =>
+      mocks.store?.setState({ activeGroupIdByWorktree: { [WORKTREE_ID]: SECOND_GROUP_ID } })
+    )
+    expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatFocusedGroup).toBe('false')
+    expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatFocusedGroup).toBe('true')
+  })
+
   beforeEach(() => {
     setActivityTerminalPortals([])
     mocks.focusGroup.mockClear()
@@ -185,7 +229,7 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
     expect(mocks.focusGroup).toHaveBeenCalledWith(WORKTREE_ID, GROUP_ID)
   })
 
-  it('keeps the base z-layer overridable by the working-chat stylesheet rule', () => {
+  it('keeps the working-chat layer inside the retained pane stacking context', () => {
     const view = render(
       <StructuredAgentSessionPaneOverlayLayer worktreeId={WORKTREE_ID} isWorktreeActive />
     )
@@ -194,10 +238,15 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
     )
 
     expect(slot).not.toBeNull()
-    expect(slot?.classList.contains('native-chat-pane-shell')).toBe(true)
+    const chatShell = slot?.querySelector<HTMLElement>('.native-chat-pane-shell')
+    expect(chatShell).not.toBeNull()
+    expect(slot?.classList.contains('isolate')).toBe(true)
+    expect(slot?.classList.contains('overflow-hidden')).toBe(true)
     expect(slot?.classList.contains('z-10')).toBe(true)
     expect(slot?.style.zIndex).toBe('')
-    expect(slot?.querySelector('[data-native-chat-working="true"]')).not.toBeNull()
+    expect(chatShell?.classList.contains('z-10')).toBe(true)
+    expect(chatShell?.style.zIndex).toBe('')
+    expect(chatShell?.querySelector('[data-native-chat-working="true"]')).not.toBeNull()
   })
 
   it('retains one composer outside the hidden workbench when showing session detail', () => {
@@ -238,7 +287,7 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
     expect(composer.value).toBe('unsent draft')
     expect(composer.dataset.chatVisible).toBe('true')
     expect(composer.closest('[inert], [hidden]')).toBeNull()
-    const slot = composer.parentElement!
+    const slot = composer.closest<HTMLElement>('[data-retained-pane-host]')!
     expect(slot.style.positionAnchor).toBe('--hive-session-detail')
     expect(mocks.groupIdByTabId.get(FIRST_TAB_ID)).toBeUndefined()
     fireEvent.pointerDown(composer)
@@ -267,6 +316,46 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
     )
     expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatVisible).toBe('false')
     expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatVisible).toBe('false')
+  })
+
+  it('keeps both projected sessions visible while only the selected split is focused', () => {
+    const target = document.createElement('div')
+    target.style.setProperty('anchor-name', '--hive-session-detail-split')
+    const portals = [FIRST_TAB_ID, SECOND_TAB_ID].map((tabId) => ({
+      slotId: `session-detail:${tabId}`,
+      requestToken: tabId,
+      target,
+      worktreeId: WORKTREE_ID,
+      tabId,
+      paneKey: '',
+      active: tabId === FIRST_TAB_ID
+    }))
+    setActivityTerminalPortals(portals)
+    mocks.store?.setState({ activeView: 'sessions' })
+    const view = render(
+      <StructuredAgentSessionPaneOverlayLayer worktreeId={WORKTREE_ID} isWorktreeActive={false} />
+    )
+
+    expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatVisible).toBe('true')
+    expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatVisible).toBe('true')
+    expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatFocusedGroup).toBe('true')
+    expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatFocusedGroup).toBe('false')
+
+    act(() => {
+      setActivityTerminalPortals(
+        portals.map((portal) => ({
+          ...portal,
+          active: portal.tabId === SECOND_TAB_ID
+        }))
+      )
+    })
+
+    expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatVisible).toBe('true')
+    expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatVisible).toBe('true')
+    expect(chatSurface(view.baseElement, FIRST_TAB_ID).dataset.chatFocusedGroup).toBe('false')
+    expect(chatSurface(view.baseElement, SECOND_TAB_ID).dataset.chatFocusedGroup).toBe('true')
+    expect(mocks.mountsByTabId.get(FIRST_TAB_ID)).toBe(1)
+    expect(mocks.mountsByTabId.get(SECOND_TAB_ID)).toBe(1)
   })
 
   it('hides the former workbench tab immediately when session navigation changes', () => {
@@ -405,6 +494,7 @@ function createState(activeTabId: string): MockAppState {
       ]
     },
     groupsByWorktree: { [WORKTREE_ID]: [createGroup(activeTabId)] },
+    activeGroupIdByWorktree: { [WORKTREE_ID]: GROUP_ID },
     runtimeEnvironmentId: null,
     repos: [],
     folderWorkspaces: [],

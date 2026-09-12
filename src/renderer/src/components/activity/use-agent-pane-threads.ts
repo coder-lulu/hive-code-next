@@ -39,6 +39,7 @@ export type AgentPaneThreadsStoreData = Pick<
   | 'detectedWorktreesByRepo'
   | 'getKnownWorktreeById'
   | 'acknowledgedAgentsByPaneKey'
+  | 'manuallyUnreadTurnsByPaneKey'
   | 'activityClearedAtByPaneKey'
   | 'acknowledgeAgents'
   | 'unacknowledgeAgents'
@@ -107,6 +108,7 @@ export function useAgentPaneThreads(args: {
       worktreeMap: getWorktreeMapFromState(s),
       repoMap: getRepoMapFromState(s),
       acknowledgedAgentsByPaneKey: s.acknowledgedAgentsByPaneKey,
+      manuallyUnreadTurnsByPaneKey: s.manuallyUnreadTurnsByPaneKey,
       activityClearedAtByPaneKey: s.activityClearedAtByPaneKey,
       acknowledgeAgents: s.acknowledgeAgents,
       unacknowledgeAgents: s.unacknowledgeAgents,

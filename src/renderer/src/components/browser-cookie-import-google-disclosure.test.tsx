@@ -12,7 +12,6 @@ import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const DISCLOSURE_TITLE = "Google logins aren't imported"
 const DISCLOSURE_DESCRIPTION = `Sign in to Google directly in ${APP_DISPLAY_NAME}.`
-const CATALOG_DESCRIPTION = 'Sign in to Google directly in Orca.'
 
 vi.mock('@/components/ui/dropdown-menu', () => dropdownMenuStubs())
 vi.mock('../ui/dropdown-menu', () => dropdownMenuStubs())
@@ -116,7 +115,7 @@ describe('cookie-import Google disclosure footer', () => {
       DISCLOSURE_TITLE
     )
     expect(catalogEntry('auto.components.BrowserCookieImportDisclosure.description')).toBe(
-      CATALOG_DESCRIPTION
+      DISCLOSURE_DESCRIPTION
     )
   })
 })

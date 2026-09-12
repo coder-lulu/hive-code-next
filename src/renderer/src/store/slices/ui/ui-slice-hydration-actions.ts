@@ -53,6 +53,7 @@ import {
 } from '../persisted-ui-write-baseline'
 import {
   hydrateTrustedOrcaHooks,
+  hydrateUnexpectedSignoutDismissal,
   normalizeHydratedVisibleWorkspaceHostIds,
   preserveStringArrayIdentity,
   sanitizeHydratedActiveView,
@@ -215,19 +216,16 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           customPets,
           // Why: fall back to default when the persisted id is unknown (e.g. custom pet removed elsewhere) so the overlay renders.
           petId: ((): string => {
-            const id = petId
-            if (typeof id !== 'string') {
+            if (typeof petId !== 'string') {
               return DEFAULT_PET_ID
             }
-            if (isBundledPetId(id)) {
-              return id
-            }
-            if (customPets.some((m) => m.id === id)) {
-              return id
+            if (isBundledPetId(petId) || customPets.some((m) => m.id === petId)) {
+              return petId
             }
             return DEFAULT_PET_ID
           })(),
           dismissedUpdateVersion: ui.dismissedUpdateVersion ?? null,
+          ...hydrateUnexpectedSignoutDismissal(s, ui.dismissedUnexpectedSignoutVersion),
           // Why: a persisted value from a build that knew a different channel set
           // would otherwise survive as-is; activeChannel only falls back on null,
           // so an unknown string reaches listBuilds and the segmented control.

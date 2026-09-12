@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { HiveAccountRuntimeDirectoryEntry } from '../../shared/hive-runtime-cloud'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import { installHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-account-runtime-access'
@@ -9,6 +9,8 @@ import {
   isPreDeliveryConnectionFailure,
   resolveRuntimeEnvironmentCatalogEntry
 } from './runtime-environment-account-routing'
+
+vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }))
 
 describe('Runtime environment Cloud fallback safety', () => {
   it('retries only failures proven to precede Runtime RPC delivery', () => {

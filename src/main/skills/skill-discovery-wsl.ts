@@ -10,6 +10,7 @@ import { runWslProcess } from '../wsl/wsl-runner'
 import {
   buildSkillDiscoverySources,
   compareSkills,
+  skillLabelCollator,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
@@ -163,9 +164,7 @@ export function parseWslSkillDiscoveryOutput(
   })
   return {
     skills: [...skillsByCanonicalPath.values()].sort(compareSkills),
-    sources: sources.sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
-    ),
+    sources: sources.sort((a, b) => skillLabelCollator.compare(a.label, b.label)),
     scannedAt
   }
 }

@@ -1,3 +1,4 @@
+import { NotificationCardStack } from '../components/NotificationCardStack'
 import { Suspense } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
@@ -142,6 +143,7 @@ export function AppRootSurfaces(props: {
 
   const shouldMountSetupGuideTelemetryObserver = persistedUIReady
   const shouldMountUpdateCard = shouldMountUpdateCardForStatus(updateStatus)
+  const isMandatoryUpdate = updateStatus.mandatory === true
   const shouldMountDictationController = voiceEnabled || dictationState !== 'idle'
   const renderPetOverlay = shouldRenderPetOverlay({ persistedUIReady, petEnabled, petVisible })
 
@@ -273,16 +275,25 @@ export function AppRootSurfaces(props: {
           </OverlayBoundary>
         </Suspense>
       ) : null}
-      {shouldMountUpdateCard ? (
+      {shouldMountUpdateCard && isMandatoryUpdate ? (
         <Suspense fallback={null}>
           <OverlayBoundary boundaryId="overlay.update-card" resetKey={activeView}>
             <UpdateCard />
           </OverlayBoundary>
         </Suspense>
       ) : null}
-      <OverlayBoundary boundaryId="overlay.star-nag" resetKey={activeView}>
-        <StarNagCard />
-      </OverlayBoundary>
+      <NotificationCardStack>
+        {shouldMountUpdateCard && !isMandatoryUpdate ? (
+          <Suspense fallback={null}>
+            <OverlayBoundary boundaryId="overlay.update-card" resetKey={activeView}>
+              <UpdateCard />
+            </OverlayBoundary>
+          </Suspense>
+        ) : null}
+        <OverlayBoundary boundaryId="overlay.star-nag" resetKey={activeView}>
+          <StarNagCard />
+        </OverlayBoundary>
+      </NotificationCardStack>
       <OverlayBoundary boundaryId="overlay.star-nag-toast" resetKey={activeView}>
         <StarNagToastHost />
       </OverlayBoundary>

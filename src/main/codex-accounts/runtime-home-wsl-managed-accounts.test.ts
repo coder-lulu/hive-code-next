@@ -7,6 +7,7 @@ import type * as CodexPaneAccountRegistry from '../codex/codex-pane-account-regi
 import type * as LegacyWslRuntimeAuthDrain from './legacy-wsl-runtime-auth-drain'
 import type * as WslCodexAuthBatchReader from './wsl-codex-auth-batch-reader'
 import { createSettings } from './runtime-home-settings-test-fixtures'
+import { isolateRuntimeHomeWslCollaborators } from './runtime-home-wsl-test-fixtures'
 import {
   createCodexAuthJson,
   createManagedAuth,
@@ -16,6 +17,23 @@ import {
   teardownRuntimeHomeTest,
   testState
 } from './runtime-home-service-test-harness'
+
+const { rejectRealProcess } = vi.hoisted(() => ({
+  rejectRealProcess: vi.fn(() => {
+    throw new Error('WSL account unit tests must not launch a real child process')
+  })
+}))
+
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()), // eslint-disable-line @typescript-eslint/consistent-type-imports -- mock requires module export types
+  exec: rejectRealProcess,
+  execSync: rejectRealProcess,
+  execFile: rejectRealProcess,
+  execFileSync: rejectRealProcess,
+  spawn: rejectRealProcess,
+  spawnSync: rejectRealProcess,
+  fork: rejectRealProcess
+}))
 
 vi.mock('electron', () => ({
   app: {
@@ -34,10 +52,12 @@ vi.mock('node:os', async () => {
 describe('CodexRuntimeHomeService', () => {
   beforeEach(() => {
     setupRuntimeHomeTest()
+    isolateRuntimeHomeWslCollaborators()
   })
 
   afterEach(() => {
     teardownRuntimeHomeTest()
+    expect(rejectRealProcess).not.toHaveBeenCalled()
   })
 
   it('does not touch host auth on startup when the active account is WSL-backed', async () => {

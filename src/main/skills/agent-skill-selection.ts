@@ -10,14 +10,28 @@ export function selectDiscoveredSkills(
   skills: readonly DiscoveredSkill[],
   selectors: readonly string[]
 ): DiscoveredSkill[] {
+  const ids = new Map<string, DiscoveredSkill>()
+  const names = new Map<string, DiscoveredSkill[]>()
+  for (const skill of skills) {
+    if (!ids.has(skill.id)) {
+      ids.set(skill.id, skill)
+    }
+    const name = skill.name
+    const matches = names.get(name)
+    if (matches) {
+      matches.push(skill)
+    } else {
+      names.set(name, [skill])
+    }
+  }
   const selected = new Map<string, DiscoveredSkill>()
   for (const selector of selectors) {
-    const exactId = skills.find((skill) => skill.id === selector)
+    const exactId = ids.get(selector)
     if (exactId) {
       selected.set(exactId.id, exactId)
       continue
     }
-    const named = skills.filter((skill) => skill.name === selector)
+    const named = names.get(selector) ?? []
     if (named.length === 0) {
       throw new AgentSkillSharingError(
         AGENT_SKILL_SELECTOR_NOT_FOUND_CODE,
@@ -37,7 +51,13 @@ export function selectDiscoveredSkills(
   const values = [...selected.values()]
   const byName = new Map<string, DiscoveredSkill[]>()
   for (const skill of values) {
-    byName.set(skill.name, [...(byName.get(skill.name) ?? []), skill])
+    const name = skill.name
+    const matches = byName.get(name)
+    if (matches) {
+      matches.push(skill)
+    } else {
+      byName.set(name, [skill])
+    }
   }
   const collision = [...byName.entries()].find(([, named]) => named.length > 1)
   if (collision) {

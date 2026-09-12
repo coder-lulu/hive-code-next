@@ -11,7 +11,6 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import type { DashboardCard } from '../../../../shared/dashboard-snapshot'
 import { AgentMap } from './AgentMap'
 import * as StoreSelectors from '@/store/selectors'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const NOW = 2_000_000_000
 const EXECUTION_HOST_ID = 'runtime:env-1' as const
@@ -316,7 +315,7 @@ describe('Agent Map workspace context menu', () => {
       clientY: 110
     })
     const createWorktree = await screen.findByText(
-      `Create new worktree for ${APP_DISPLAY_NAME}`,
+      `Create new worktree for ${repo.displayName}`,
       {},
       { timeout: 5_000 }
     )
@@ -381,14 +380,14 @@ describe('Agent Map workspace context menu', () => {
     fireEvent.contextMenu(container.querySelector('[data-agent-map-project]')!)
     await act(async () => new Promise((resolve) => window.setTimeout(resolve, 0)))
     expect(
-      screen.queryByText(`Create new worktree for ${APP_DISPLAY_NAME}`)
+      screen.queryByText(`Create new worktree for ${repo.displayName}`)
     ).not.toBeInTheDocument()
 
     act(() => {
       useAppStore.setState({ repos: [repo] })
     })
     expect(
-      screen.queryByText(`Create new worktree for ${APP_DISPLAY_NAME}`)
+      screen.queryByText(`Create new worktree for ${repo.displayName}`)
     ).not.toBeInTheDocument()
   })
 })

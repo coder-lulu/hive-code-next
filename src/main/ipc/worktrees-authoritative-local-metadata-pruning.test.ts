@@ -1,11 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resolve } from 'node:path'
 import type { GitWorktreeInfo } from '../../shared/worktree/types'
 import type { NativeLocalWorktreeMetadataScanExpectation } from '../persistence/tracking-repos/missing-local-worktree-metadata-pruning'
 import { notifyWorktreesChanged } from './worktree-remote'
 import {
   listWorktreesMock,
   pruneCleanupScanSnapshotsMock,
-  pruneSpaceAnalysisSnapshotsMock
+  pruneSpaceAnalysisSnapshotsMock,
+  ORIGINAL_PLATFORM,
+  setPlatform
 } from './worktrees-test-module-mocks'
 import { handlers, mainWindow, setupWorktreeHandlers, store } from './worktrees-test-harness'
 import { mockSelectedWslProjectRuntime } from './worktrees-test-fixtures'
@@ -173,11 +176,17 @@ const localListingCalls = [
 describe('authoritative local worktree metadata pruning integration', () => {
   beforeEach(() => {
     setupWorktreeHandlers()
+    // These mocked Git registrations use POSIX absolute paths; keep their host explicit.
+    setPlatform('linux')
     localWorktreePathPresenceMock.mockReset()
     localWorktreePathPresenceMock.mockImplementation(
       async (pathValues: readonly string[]) =>
         new Map(pathValues.map((pathValue) => [pathValue, false]))
     )
+  })
+
+  afterEach(() => {
+    setPlatform(ORIGINAL_PLATFORM)
   })
 
   it('captures metadata expectations before starting the Git scan', async () => {
@@ -344,7 +353,7 @@ describe('authoritative local worktree metadata pruning integration', () => {
     await pending
 
     expect(store.removeWorktreeLineage).not.toHaveBeenCalled()
-    expect(isRegisteredWorktreePath(newPath)).toBe(true)
+    expect(isRegisteredWorktreePath(resolve(newPath))).toBe(true)
   })
 
   it.each(['scan generation', 'caller request'] as const)(
@@ -441,7 +450,7 @@ describe('authoritative local worktree metadata pruning integration', () => {
 
     expect(store.pruneSessionlessMissingLocalWorktreeMetadataForRepo).toHaveBeenCalledTimes(1)
     expect(store.removeWorktreeLineage).not.toHaveBeenCalled()
-    expect(isRegisteredWorktreePath(newPath)).toBe(true)
+    expect(isRegisteredWorktreePath(resolve(newPath))).toBe(true)
   })
 
   it('does not capture or prune on an initial WSL scan', async () => {

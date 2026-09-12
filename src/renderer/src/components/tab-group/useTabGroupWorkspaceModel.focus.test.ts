@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   closeTab: vi.fn(),
   closeUnifiedTab: vi.fn(),
   closeWebRuntimeSessionTab: vi.fn(),
+  consumeFirstAgentCompletionUnreadForTab: vi.fn(),
   callRuntimeRpc: vi.fn(),
   runtimeEnvironmentSupportsCapability: vi.fn(),
   createBrowserTab: vi.fn(),
@@ -158,6 +159,7 @@ function resetStore(): void {
     closeFile: mocks.closeFile,
     closeTab: mocks.closeTab,
     closeUnifiedTab: mocks.closeUnifiedTab,
+    consumeFirstAgentCompletionUnreadForTab: mocks.consumeFirstAgentCompletionUnreadForTab,
     recordClientHostedBrowserCloseIntents: vi.fn(),
     createBrowserTab: mocks.createBrowserTab,
     createEmptySplitGroup: mocks.createEmptySplitGroup,
@@ -211,6 +213,7 @@ describe('useTabGroupWorkspaceModel terminal activation focus', () => {
     expect(mocks.activateTab).toHaveBeenCalledWith('unified-terminal-1')
     expect(mocks.setActiveTab).toHaveBeenCalledWith('terminal-1')
     expect(mocks.setActiveTabType).toHaveBeenCalledWith('terminal')
+    expect(mocks.consumeFirstAgentCompletionUnreadForTab).toHaveBeenCalledWith('terminal-1')
     expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('terminal-1', null)
   })
 

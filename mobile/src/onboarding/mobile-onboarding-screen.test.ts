@@ -109,6 +109,31 @@ describe('MobileOnboardingScreen', () => {
     expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
   })
 
+  it.each([true, false])(
+    'saves permission result %s through the consent owner once',
+    async (granted) => {
+      mocks.params = { hostId: 'paired-host', steps: 'notifications' }
+      mocks.ensureNotificationPermissions.mockResolvedValue(granted)
+      await renderScreen()
+      await act(async () => pages()[0].props.onNotificationChoice('enable'))
+      expect(mocks.savePushNotificationsEnabled).toHaveBeenCalledExactlyOnceWith(granted)
+      expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
+    }
+  )
+
+  it('keeps notification consent retryable when its local write fails', async () => {
+    mocks.params = { hostId: 'paired-host', steps: 'notifications' }
+    mocks.savePushNotificationsEnabled.mockRejectedValueOnce(new Error('disk full'))
+    await renderScreen()
+    await act(async () => pages()[0].props.onNotificationChoice('enable'))
+    expect(pages()[0].props.error).toBe('未能更新通知设置，请重试。')
+    expect(mocks.replace).not.toHaveBeenCalled()
+    await act(async () => pages()[0].props.onNotificationChoice('enable'))
+    expect(mocks.savePushNotificationsEnabled).toHaveBeenCalledTimes(2)
+    expect(mocks.savePushNotificationsEnabled).toHaveBeenLastCalledWith(true)
+    expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
+  })
+
   it('finishes immediately when the plan contains only one outstanding step', async () => {
     mocks.params = { hostId: 'paired-host', steps: 'session-view' }
     await renderScreen()

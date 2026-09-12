@@ -15,25 +15,18 @@ describe('Windows terminal capability probe ordering', () => {
     vi.unstubAllGlobals()
   })
 
-  it('does not let an older forced probe overwrite a newer identity proof', async () => {
-    let resolveOlderStatus!: (status: { hostPlatform: NodeJS.Platform }) => void
-    let resolveNewerStatus!: (status: {
+  it('coalesces forced same-owner probes and publishes one host identity proof', async () => {
+    let resolveStatus!: (status: {
       hostPlatform: NodeJS.Platform
       windowsProcessStartTimeAvailable: boolean
     }) => void
-    const olderStatus = new Promise<{ hostPlatform: NodeJS.Platform }>((resolve) => {
-      resolveOlderStatus = resolve
-    })
-    const newerStatus = new Promise<{
+    const pendingStatus = new Promise<{
       hostPlatform: NodeJS.Platform
       windowsProcessStartTimeAvailable: boolean
     }>((resolve) => {
-      resolveNewerStatus = resolve
+      resolveStatus = resolve
     })
-    const runtimeGetStatus = vi
-      .fn<() => Promise<unknown>>()
-      .mockReturnValueOnce(olderStatus)
-      .mockReturnValueOnce(newerStatus)
+    const runtimeGetStatus = vi.fn().mockReturnValue(pendingStatus)
     vi.stubGlobal('window', {
       api: {
         wsl: {
@@ -57,24 +50,12 @@ describe('Windows terminal capability probe ordering', () => {
       now: 2_000
     })
 
-    resolveNewerStatus({ hostPlatform: 'win32', windowsProcessStartTimeAvailable: true })
-    await expect(newerProbe).resolves.toMatchObject({
-      hostPlatform: 'win32',
-      windowsProcessStartTimeAvailable: true
-    })
-    expect(getCachedWindowsTerminalCapabilities('local')).toMatchObject({
-      hostPlatform: 'win32',
-      windowsProcessStartTimeAvailable: true
-    })
-
-    resolveOlderStatus({ hostPlatform: 'win32' })
-    await expect(olderProbe).resolves.toMatchObject({
-      hostPlatform: 'win32',
-      windowsProcessStartTimeAvailable: true
-    })
-    expect(getCachedWindowsTerminalCapabilities('local')).toMatchObject({
-      hostPlatform: 'win32',
-      windowsProcessStartTimeAvailable: true
-    })
+    expect(newerProbe).toBe(olderProbe)
+    expect(runtimeGetStatus).toHaveBeenCalledTimes(1)
+    resolveStatus({ hostPlatform: 'win32', windowsProcessStartTimeAvailable: true })
+    const identityProof = { hostPlatform: 'win32', windowsProcessStartTimeAvailable: true }
+    await expect(newerProbe).resolves.toMatchObject(identityProof)
+    await expect(olderProbe).resolves.toMatchObject(identityProof)
+    expect(getCachedWindowsTerminalCapabilities('local')).toMatchObject(identityProof)
   })
 })

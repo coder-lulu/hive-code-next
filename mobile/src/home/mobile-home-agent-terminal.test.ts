@@ -6,7 +6,24 @@ import {
   createMobileHomeAgentTerminalMutationId
 } from './mobile-home-agent-terminal'
 
-function success(result: unknown = {}): RpcResponse {
+function terminalResult() {
+  return {
+    tab: {
+      type: 'terminal',
+      id: 'tab-1',
+      title: 'Agent',
+      parentTabId: 'tab-1',
+      leafId: 'leaf-1',
+      isActive: true,
+      status: 'pending-handle',
+      terminal: null
+    },
+    publicationEpoch: 'epoch-1',
+    snapshotVersion: 1
+  }
+}
+
+function success(result: unknown = terminalResult()): RpcResponse {
   return { id: 'request', ok: true, result, _meta: { runtimeId: 'runtime' } }
 }
 
@@ -25,11 +42,7 @@ function clientReturning(response: RpcResponse) {
 
 describe('mobile home agent terminal creation', () => {
   it('atomically creates a selected agent in the floating workspace with the normalized prompt', async () => {
-    const result = {
-      tab: { type: 'terminal', id: 'tab-1' },
-      publicationEpoch: 'epoch-1',
-      snapshotVersion: 1
-    }
+    const result = terminalResult()
     const client = clientReturning(success(result))
 
     await expect(
@@ -42,15 +55,19 @@ describe('mobile home agent terminal creation', () => {
     ).resolves.toBe(result)
 
     expect(client.sendRequest).toHaveBeenCalledOnce()
-    expect(client.sendRequest).toHaveBeenCalledWith('session.tabs.createTerminal', {
-      worktree: 'id:global-floating-terminal',
-      agent: 'codex',
-      agentPrompt: 'Review this diff',
-      clientMutationId: 'submit-1',
-      activate: false,
-      select: true,
-      navigation: 'caller'
-    })
+    expect(client.sendRequest).toHaveBeenCalledWith(
+      'session.tabs.createTerminal',
+      {
+        worktree: 'id:global-floating-terminal',
+        agent: 'codex',
+        agentPrompt: 'Review this diff',
+        clientMutationId: 'submit-1',
+        activate: false,
+        select: true,
+        navigation: 'caller'
+      },
+      undefined
+    )
   })
 
   it.each(['', ' ', '\n\t'])(
@@ -82,7 +99,8 @@ describe('mobile home agent terminal creation', () => {
     })
     expect(client.sendRequest).toHaveBeenCalledWith(
       'session.tabs.createTerminal',
-      expect.objectContaining({ agentPrompt: maximumPrompt })
+      expect.objectContaining({ agentPrompt: maximumPrompt }),
+      undefined
     )
 
     client.sendRequest.mockClear()
@@ -157,5 +175,18 @@ describe('mobile home agent terminal creation', () => {
 
     expect(clientMutationId).toMatch(/^mobile-home-agent:[a-z0-9]+-[a-z0-9]+$/)
     expect(clientMutationId.length).toBeLessThanOrEqual(128)
+  })
+
+  it('rejects an incompatible admitted creation reply without retrying the mutation', async () => {
+    const client = clientReturning(success({ tab: { id: 'tab-1' } }))
+    await expect(
+      createMobileHomeAgentTerminal({
+        client,
+        agent: 'codex',
+        prompt: 'Inspect',
+        clientMutationId: 'submit-invalid'
+      })
+    ).rejects.toThrow('incompatible_reply')
+    expect(client.sendRequest).toHaveBeenCalledOnce()
   })
 })

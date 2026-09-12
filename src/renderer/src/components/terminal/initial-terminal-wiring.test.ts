@@ -22,14 +22,16 @@ describe('Terminal auto-create wiring', () => {
   it('passes that derivation into shouldAutoCreateInitialTerminal', () => {
     // Why: the regression #14590 fixed is re-introduced by dropping this second argument, and a
     // literal here would pin nothing — it has to be the identifier the effect actually derives.
-    // Exactly one call site: a second (flagless) call could otherwise hide behind this one.
+    // Both floating and project-workspace paths must honor the same closed-terminal tombstone.
     expect(
       source.split('shouldAutoCreateInitialTerminal(').length - 1,
-      'expected exactly one shouldAutoCreateInitialTerminal call in the watcher owner'
-    ).toBe(1)
-    expect(source).toContain(
-      'shouldAutoCreateInitialTerminal(renderableTabCount, activeWorktreeHasTerminalState)'
-    )
+      'expected one guarded call in each floating and project-workspace path'
+    ).toBe(2)
+    expect(
+      source.match(
+        /shouldAutoCreateInitialTerminal\(renderableTabCount, activeWorktreeHasTerminalState\)/g
+      )
+    ).toHaveLength(2)
   })
 
   it('keeps that derivation in the effect dependencies', () => {

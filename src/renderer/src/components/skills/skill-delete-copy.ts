@@ -46,6 +46,8 @@ export function skillDeleteActionLabel(count: number): string {
     : translate('auto.components.skills.count.deleteOther', 'Delete {{count}} skills', { count })
 }
 
+const deletePlacementCollator = new Intl.Collator(undefined, { sensitivity: 'base' })
+
 function foldersLabel(count: number): string {
   return count === 1
     ? translate('auto.components.skills.count.deleteFolderOne', '{{count}} folder', { count })
@@ -74,7 +76,7 @@ export function skillDeletePlacementSummary(plan: SkillDeletePlan): string | nul
     links > 0 ? linksLabel(links) : null
   ].filter((part): part is string => part !== null)
   const roots = [...new Set(placements.map((placement) => placement.rootLabel))].sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: 'base' })
+    deletePlacementCollator.compare(a, b)
   )
   return translate(
     'auto.components.skills.SkillDelete.placementSummaryParts',

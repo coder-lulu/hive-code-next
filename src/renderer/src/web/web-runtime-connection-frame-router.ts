@@ -1,13 +1,5 @@
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { isKeepaliveFrame } from '../../../shared/runtime-rpc-envelope'
-import {
-  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-  SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY,
-  WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-} from '../../../shared/protocol-version'
 import { createWebRuntimeUnauthorizedError } from './web-runtime-client-error'
 import type { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import type { WebRuntimeTransportSubscription } from './web-runtime-subscription-contract'
@@ -30,7 +22,7 @@ type WebRuntimeConnectionFrameContext = {
   getState: () => WebRuntimeConnectionState
   getSession: () => RuntimeE2EEClientSession | null
   getSocket: () => WebSocket | null
-  pairingToken: string
+  authenticationFrame: () => Record<string, unknown>
   pending: Map<string, WebRuntimePendingRequest>
   subscriptions: Map<string, WebRuntimeTransportSubscription>
   sendEncrypted: (message: unknown) => boolean
@@ -58,20 +50,7 @@ export async function routeWebRuntimeConnectionFrame(
           context.getSocket()?.close()
           return
         }
-        context.sendEncrypted({
-          type: 'e2ee_auth',
-          v: 2,
-          transcriptHashB64: session.transcriptHashB64,
-          deviceToken: context.pairingToken,
-          clientCapabilities: [
-            SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-            SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY,
-            AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-            WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
-            WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-            WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-          ]
-        })
+        context.sendEncrypted(context.authenticationFrame())
         return
       }
     } catch {

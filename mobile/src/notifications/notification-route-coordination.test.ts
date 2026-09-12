@@ -102,15 +102,15 @@ describe('notification route coordination', () => {
   })
 
   it('routes notification taps through the coordinated transition, not a bare push', () => {
-    const start = rootLayoutSource.indexOf('// ─── Notification tap routing ───')
-    const end = rootLayoutSource.indexOf('// ─── End notification tap routing ───', start)
+    const start = rootLayoutSource.indexOf('function AccountAwareNotificationResponseObserver()')
+    const end = rootLayoutSource.indexOf('\nfunction ', start + 1)
 
     // Assert the markers first: a renamed banner would otherwise slice garbage and report a
     // missing call instead of the real cause.
     expect(start).toBeGreaterThanOrEqual(0)
-    expect(end).toBeGreaterThan(start)
+    expect(end === -1 || end > start).toBe(true)
 
-    const notificationEffect = rootLayoutSource.slice(start, end)
+    const notificationEffect = rootLayoutSource.slice(start, end === -1 ? undefined : end)
     expect(notificationEffect).toContain('openNotificationRoute(target)')
     expect(notificationEffect).not.toContain('router.push(')
   })

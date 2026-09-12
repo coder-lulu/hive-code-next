@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RuntimeHostStatusRow } from './RuntimeHostStatusRow'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenuItem: ({
@@ -114,7 +115,7 @@ describe('RuntimeHostStatusRow', () => {
       />
     )
 
-    expect(container.textContent).toContain('Orca unavailable')
+    expect(container.textContent).toContain(`${APP_DISPLAY_NAME} unavailable`)
     expect(container.textContent).toContain('SSH transport is connected')
     expect(container.textContent).toContain('may still be running')
     expect(container.textContent).toContain('Disconnect')

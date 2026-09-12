@@ -42,7 +42,6 @@ import type {
   ResolveDispatchInput
 } from './journal-store-contracts'
 import type { AgentJournalEpochReason, JournalRow } from './journal-row-schema'
-import { AgentSessionJournalError } from './journal-write-guards'
 import type { JournalRowWriter } from './journal-row-writer'
 import type { JournalEpochController } from './journal-epoch-controller'
 import { JournalConnectionCloser, JournalWriteQueue } from './journal-store-close'
@@ -51,7 +50,11 @@ import { ensureJournalDir, journalStoreLoadedFields } from './journal-store-open
 import type { JournalItemAppender } from './journal-item-appender'
 import type { JournalLifecycleBatchAppender } from './journal-lifecycle-batch-appender'
 import { publishNewEpoch } from './journal-epoch-rollover'
-import { assertJournalFence, assertJournalWritable } from './journal-write-guards'
+import {
+  AgentSessionJournalError,
+  assertJournalFence,
+  assertJournalWritable
+} from './journal-write-guards'
 
 export { AgentSessionJournalError } from './journal-write-guards'
 
@@ -189,6 +192,13 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
 
   snapshot = (): AgentJournalSnapshot => renderJournalState(this.state)
 
+  /** Visits reduced items without allocating and sorting a full snapshot. */
+  visitItems = (visit: (itemId: string, sequence: number) => void): void => {
+    for (const item of this.state.items.values()) {
+      visit(item.itemId, item.sequence)
+    }
+  }
+
   /** Includes revisions and completion tombstones, whose timestamps disappear from render items. */
   lastActivityAt = (): number => this.state.lastActivityAt
 
@@ -259,7 +269,7 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
   }
 
   /**
-   * Advance a submission to exactly one of accepted / rejected / unknown.
+   * Record a dispatch transition, including a proven retry returning to pending.
    *
    * Accepting REQUIRES the provider identity rather than a free-form id: the
    * adopted key is what the provider's echo will upsert into, so a mismatched
@@ -272,10 +282,9 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
     }))
   }
 
-  /** On restart every `pending` submission becomes `unknown` before the session
-   *  accepts a writer. Orca never re-sends on the user's behalf. */
-  async markPendingSubmissionsUnknown(fence: number): Promise<string[]> {
-    return markJournalPendingSubmissionsUnknown(this, fence)
+  /** Retire unanswered sends after their execution owner ended, without assuming delivery. */
+  async markPendingSubmissionsUnknown(fence: number, reason?: string): Promise<string[]> {
+    return markJournalPendingSubmissionsUnknown(this, fence, reason)
   }
 
   /** The escape hatch for corruption, an unreconcilable prefix, a forked handle,

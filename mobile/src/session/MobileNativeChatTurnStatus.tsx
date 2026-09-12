@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
-import { ChevronRight } from 'lucide-react-native'
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ChevronRight, Circle } from 'lucide-react-native'
 import {
   describeNativeChatTurnStatus,
   nativeChatElapsedSeconds
@@ -26,63 +26,45 @@ function useElapsedSeconds(startedAt: number | null, counting: boolean): number 
   return counting ? nativeChatElapsedSeconds(startedAt, mountedAt, now) : 0
 }
 
-/** The per-turn status row — "Thinking", then "Working for 12s" while the turn
- *  runs, settling to a tappable "Worked for 3m 4s" that discloses the turn's
- *  tool activity. Desktop parity: `NativeChatWorkingStatus`. */
+/** The per-turn status row. While the turn runs it is the one live indicator — a
+ *  spinner beside what the provider says it is doing, else "Thinking", else
+ *  "Working for 12s". It settles to a tappable "Worked for 3m 4s" that discloses
+ *  the turn's tool activity. Desktop parity: `NativeChatTurnActivityLine` for the
+ *  live row, `NativeChatWorkingStatus` for the settled one. */
 export function MobileNativeChatTurnStatus({
   startedAt,
   thinking,
   workedSeconds,
+  activityText,
   expanded = false,
   onToggleExpanded
 }: {
   startedAt: number | null
   thinking: boolean
   workedSeconds?: number | null
+  /** Provider activity copy for a live turn; outranks the other two labels. */
+  activityText?: string | null
   expanded?: boolean
   onToggleExpanded?: () => void
 }): React.JSX.Element {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const reducedMotion = useReducedMotionEnabled()
-  const counting = !thinking && workedSeconds == null
+  const settled = workedSeconds != null
+  const counting = !settled && !thinking && !activityText?.trim()
   const elapsedSeconds = useElapsedSeconds(startedAt, counting)
   const status = describeNativeChatTurnStatus({ thinking, workedSeconds, elapsedSeconds })
   const label =
-    status.key === 'thinking'
-      ? '思考中'
-      : `${status.key === 'workingFor' ? '正在处理' : '处理完成'} · ${status.duration}`
+    !settled && activityText?.trim()
+      ? activityText.trim()
+      : status.key === 'thinking'
+        ? '思考中'
+        : `${status.key === 'workingFor' ? '正在处理' : '处理完成'} · ${status.duration}`
 
-  const pulse = useRef(new Animated.Value(1)).current
-  useEffect(() => {
-    if (!thinking || reducedMotion) {
-      pulse.setValue(1)
-      return
-    }
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 0.45,
-          duration: theme.motion.standardDurationMs,
-          useNativeDriver: true
-        }),
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: theme.motion.standardDurationMs,
-          useNativeDriver: true
-        })
-      ])
-    )
-    animation.start()
-    return () => animation.stop()
-  }, [pulse, thinking, reducedMotion, theme.motion.standardDurationMs])
-
-  const rowStyle = [styles.row, thinking ? null : styles.rowSettled]
-
-  if (workedSeconds != null && onToggleExpanded) {
+  if (settled && onToggleExpanded) {
     return (
       <Pressable
-        style={({ pressed }) => [...rowStyle, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.row, styles.rowSettled, pressed && styles.pressed]}
         onPress={onToggleExpanded}
         hitSlop={6}
         accessibilityRole="button"
@@ -98,8 +80,19 @@ export function MobileNativeChatTurnStatus({
   }
 
   return (
-    <View style={rowStyle} accessibilityLiveRegion="polite" accessibilityLabel="智能体正在回复">
-      <Animated.Text style={[styles.label, thinking && { opacity: pulse }]}>{label}</Animated.Text>
+    <View
+      style={[styles.row, settled ? styles.rowSettled : null]}
+      accessibilityLiveRegion="polite"
+      accessibilityLabel="智能体正在回复"
+    >
+      {settled ? null : reducedMotion ? (
+        <Circle size={16} color={theme.color.text.tertiary} strokeWidth={2} />
+      ) : (
+        <ActivityIndicator size="small" color={theme.color.text.tertiary} />
+      )}
+      <Text style={styles.label} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   )
 }
@@ -122,7 +115,8 @@ function createStyles(theme: MobileTheme) {
     },
     label: {
       ...theme.typography.body,
-      color: theme.color.text.secondary
+      color: theme.color.text.secondary,
+      flexShrink: 1
     },
     caretOpen: {
       transform: [{ rotate: '90deg' }]

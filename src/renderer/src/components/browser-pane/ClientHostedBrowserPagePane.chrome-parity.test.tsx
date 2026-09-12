@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type {
   BrowserCertificateFailure,
   BrowserLoadError,
@@ -314,7 +315,7 @@ describe('ClientHostedBrowserPagePane chrome parity', () => {
     expect(screen.queryByRole('button', { name: 'Copy Address' })).toBeNull()
   })
 
-  it('says so when the page asks for a permission Orca denied', () => {
+  it('says so when the page asks for a permission the app denied', () => {
     renderPane()
 
     act(() =>
@@ -326,7 +327,7 @@ describe('ClientHostedBrowserPagePane chrome parity', () => {
     )
 
     expect(toastMocks.message).toHaveBeenCalledWith(
-      'https://example.internal asked for camera or microphone access, and Orca denied it.',
+      `https://example.internal asked for camera or microphone access, and ${APP_DISPLAY_NAME} denied it.`,
       { id: 'browser-permission-denied:page-a:media' }
     )
   })

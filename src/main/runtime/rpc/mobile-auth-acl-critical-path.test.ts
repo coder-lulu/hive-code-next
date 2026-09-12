@@ -10,7 +10,8 @@ import type { ProcessResult, ProcessSpec } from '../../../shared/child-process/r
 import { runProcess, runProcessSync } from '../../../shared/child-process/run-process'
 import { DEVICE_REGISTRY_FILENAME } from '../mobile-pairing-files'
 import { DeviceRegistry, type DeviceEntry } from '../device-registry'
-import { decrypt, deriveSharedKey, encrypt, generateKeyPair } from './e2ee-crypto'
+import { generateKeyPair } from './e2ee-crypto'
+import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import { MobileSocketWiring, type MobileSocketTransport } from './mobile-socket-wiring'
 
 // Why this module and not `node:child_process`: hardening reaches the OS only through
@@ -139,19 +140,24 @@ describe('mobile auth critical path', () => {
     rmSync(userDataPath, { recursive: true, force: true })
   })
 
-  function authenticate(
-    registry: DeviceRegistry,
-    device: DeviceEntry
-  ): { ws: FakeSocket; sharedKey: Uint8Array } {
+  function authenticate(registry: DeviceRegistry, device: DeviceEntry): { ws: FakeSocket } {
     const desktop = generateKeyPair()
-    const phone = generateKeyPair()
+    const phone = RuntimeE2EEClientSession.create({
+      desktopPublicKeyB64: Buffer.from(desktop.publicKey).toString('base64'),
+      transport: 'direct'
+    })
     const ws = new FakeSocket()
-    const sharedKey = deriveSharedKey(phone.secretKey, desktop.publicKey)
     ws.send = vi.fn((data: string | Buffer) => {
       ws.sent.push(data)
       const text = data.toString()
-      const plaintext = text.startsWith('{') ? text : (decrypt(text, sharedKey) ?? '')
+      if (text.startsWith('{')) {
+        expect(phone.acceptReady(JSON.parse(text))).toBe(true)
+      }
+      const plaintext = text.startsWith('{') ? text : (phone.openText(text) ?? '')
       const type = (JSON.parse(plaintext || '{}') as { type?: string }).type
+      if (type === 'e2ee_authenticated') {
+        expect(phone.isAuthenticated(plaintext)).toBe(true)
+      }
       timeline.push(type === 'e2ee_ready' || type === 'e2ee_authenticated' ? type : 'other-frame')
     })
     const transport = new FakeTransport()
@@ -167,18 +173,9 @@ describe('mobile auth critical path', () => {
       onClose: vi.fn()
     })
     wiring.attachTransport(transport)
-    transport.receive(
-      ws,
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: Buffer.from(phone.publicKey).toString('base64')
-      })
-    )
-    transport.receive(
-      ws,
-      encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: device.token }), sharedKey)
-    )
-    return { ws, sharedKey }
+    transport.receive(ws, JSON.stringify(phone.hello))
+    transport.receive(ws, phone.sealText(phone.authMessage(device.token)))
+    return { ws }
   }
 
   function readPersistedDevices(): DeviceEntry[] {

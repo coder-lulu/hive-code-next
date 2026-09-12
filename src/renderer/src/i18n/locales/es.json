@@ -4443,7 +4443,6 @@
           "a30e34eb5c": "Cerrar tablero del espacio de trabajo",
           "spaces": "Espacios",
           "views": "Vista de la barra lateral",
-          "createMenu": "Crear",
           "addProject": "Agregar proyecto"
         },
         "SidebarNav": {
@@ -5522,7 +5521,11 @@
           "emptyTitle": "No hay sesiones de acceso remoto",
           "emptyDescription": "Las sesiones aparecerán aquí cuando HiveCode Mobile, Web u otro escritorio se conecte a este Runtime.",
           "learnHowToConnect": "Aprender a conectarse",
-          "authorizedOnly": "Solo se muestran las conexiones autorizadas por la cuenta actual."
+          "authorizedOnly": "Solo se muestran las conexiones autorizadas por la cuenta actual.",
+          "pageSummary": "Página {{page}} · {{count}} sesiones en esta página",
+          "previousPage": "Anterior",
+          "nextPage": "Siguiente",
+          "statusPendingActivation": "Esperando activación"
         },
         "automations": {
           "showButton": "Mostrar botón de Automatizaciones",
@@ -15107,7 +15110,8 @@
       "securityTitle": "Las credenciales del dispositivo están protegidas",
       "securityDescription": "Después de iniciar sesión, las credenciales se almacenan de forma segura en este dispositivo.",
       "contextSummary": "HiveCode Desktop · Dispositivo actual · Sesión protegida",
-      "contextDetails": "Las credenciales cifradas se almacenan en este dispositivo y se pueden revocar en los ajustes de Cuenta."
+      "contextDetails": "Las credenciales cifradas se almacenan en este dispositivo y se pueden revocar en los ajustes de Cuenta.",
+      "resendCode": "Reenviar código"
     },
     "desktopHome": {
       "sceneCode": "Desarrollo de código",
@@ -15347,7 +15351,9 @@
       "computerTransferPending": "Transferencia pendiente",
       "computerTransferPendingDescription": "Hay una transferencia de propiedad del dispositivo en curso.",
       "retryComputerAnalysis": "Estado desconocido · Reintentar",
-      "retryComputerAnalysisDescription": "No se pudo verificar la propiedad del dispositivo. Vuelve a intentarlo."
+      "retryComputerAnalysisDescription": "No se pudo verificar la propiedad del dispositivo. Vuelve a intentarlo.",
+      "openWeb": "Abrir la aplicación Web",
+      "openWebFailed": "No se pudo abrir la aplicación Web. Inténtalo de nuevo."
     },
     "native-chat": {
       "composer": {
@@ -15729,6 +15735,14 @@
       "hide": "Ocultar Agentes",
       "action": "Probar Agentes",
       "hiddenToast": "La pestaña Agentes está oculta. Vuelve a activarla en Configuración → Experimental."
+    }
+  },
+  "notifications": {
+    "agentStatus": {
+      "needsInput": "necesita información",
+      "working": "trabajando",
+      "stopped": "detenido",
+      "finished": "finalizado"
     }
   }
 }

@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { getDefaultSettings } from '../../../../shared/constants'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { ExperimentalPane } from './ExperimentalPane'
 import { getExperimentalPaneSearchEntries } from './experimental-search'
 
@@ -263,7 +264,7 @@ describe('ExperimentalPane', () => {
       'Opt in to the host-owned structured chat runtime for Codex and Claude.'
     )
     expect(container.textContent).toContain(
-      'Local sessions only for now. WSL and remote execution hosts (including SSH) continue to use terminal chat, and Windows falls back to it unless Orca can read process start times.'
+      `Local sessions only for now. WSL and remote execution hosts (including SSH) continue to use terminal chat, and Windows falls back to it unless ${APP_DISPLAY_NAME} can read process start times.`
     )
     expect(container.textContent).toContain('Default view')
     root.unmount()

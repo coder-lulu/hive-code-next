@@ -118,6 +118,24 @@ describe('projectWorkspaceSurfaces', () => {
     expect(surfaces).toEqual([{ id: 'folder:folder-shared', path: '/remote/orca' }])
   })
 
+  it('ignores the active workspace id entirely when no resolved host disambiguates', () => {
+    // The terminal foundation memo relies on this: with no resolved folder host it passes
+    // `null` instead of the active id, so a worktree switch cannot change the projection.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const folderWorkspaces = [localFolder, runtimeFolder]
+    const worktrees = [localWorktree]
+
+    const withoutActiveId = project({ worktrees, folderWorkspaces, activeWorkspaceId: null })
+    for (const activeWorkspaceId of [
+      'folder:folder-shared',
+      'folder:other-workspace',
+      SHARED_WORKTREE_ID
+    ]) {
+      expect(project({ worktrees, folderWorkspaces, activeWorkspaceId })).toEqual(withoutActiveId)
+    }
+    warn.mockRestore()
+  })
+
   it('keeps the first row when no resolved host disambiguates the folder collision', () => {
     const surfaces = project({
       folderWorkspaces: [runtimeFolder, localFolder]
@@ -375,6 +393,6 @@ describe('Terminal workbench surface feed', () => {
       'workspace-surface-projection.ts'
     ])
     expect(source.split('projectWorkspaceSurfaces(').length - 1).toBe(1)
-    expect(source).toContain('worktreesById,\n        folderWorkspaces,')
+    expect(source).toMatch(/projectWorkspaceSurfaces\(\{\s*worktreesById,\s*folderWorkspaces,/)
   })
 })

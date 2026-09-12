@@ -1,5 +1,5 @@
 import { createMiniMaxCredentialsApi } from './preload-api/web-agent-accounts-api'
-import { readClipboardImageThumbnail } from './preload-api/web-clipboard-api'
+import { readClipboardImageThumbnail } from './web-clipboard-image-thumbnail'
 /* eslint-disable max-lines -- Why: browser-side Electron-preload replacement; compatibility surface centralizes here. */
 import type {
   PreloadApi,
@@ -141,7 +141,11 @@ import {
 } from './web-runtime-environment'
 import { parseWebPairingInput } from './web-pairing'
 import { copyClipboardTextViaExecCommand } from './web-clipboard-copy-fallback'
-import { WebRuntimeClient } from './web-runtime-client'
+import { WebRuntimeClient, type WebRuntimeStatusOptions } from './web-runtime-client'
+import type {
+  RuntimeHostStatusSnapshot,
+  RuntimeHostStatusResponse
+} from '../../../shared/runtime-host-status'
 import { createWebAccountPreloadApi } from './account-runtime-relay/web-account-preload-api'
 import {
   createWebAccountRelayClient,
@@ -567,6 +571,7 @@ export function installWebPreloadApi(
   if (accountBootstrap) {
     activeClient = accountBootstrap.client
     activeClientEnvironmentId = activeEnvironment!.id
+    activeClient.configureStatusOwner?.(webRuntimeStatusOptions(activeEnvironment!))
   }
   const webWindow = window as unknown as { __ORCA_WEB_CLIENT__?: boolean }
   webWindow.__ORCA_WEB_CLIENT__ = true
@@ -1519,6 +1524,11 @@ function createRuntimeApi(): NonNullable<Partial<PreloadApi>['runtime']> {
 
 function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtimeEnvironments']> {
   return {
+    onStatusChanged: subscribeWebRuntimeStatus,
+    getStatusSnapshots: async () => {
+      const snapshot = activeClient?.statusOwner?.read()
+      return snapshot ? [snapshot] : []
+    },
     list: async () => {
       const environment = requireActiveEnvironmentOrNull()
       return environment ? [redactStoredWebRuntimeEnvironment(environment)] : []
@@ -1634,6 +1644,12 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
       closeActiveRuntimeClients()
       activeCloudBootstrap = null
       activeEnvironment = nextEnvironment
+      getClientForEnvironment(nextEnvironment).statusOwner?.acceptVerified({
+        id: 'status.get',
+        ok: true,
+        result: runtimeStatus,
+        _meta: { runtimeId: runtimeStatus.runtimeId }
+      })
       return {
         ok: true,
         environment: redactStoredWebRuntimeEnvironment(nextEnvironment),
@@ -1661,6 +1677,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
     connect: ({ selector, timeoutMs }) => {
       const environment = resolveEnvironment(selector)
       manuallyDisconnectedEnvironmentIds.delete(environment.id)
+      closeActiveRuntimeClients()
       return callEnvironmentEnvelope<RuntimeStatus>(
         environment.id,
         'status.get',
@@ -1668,8 +1685,10 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
         timeoutMs
       )
     },
-    getStatus: ({ selector, timeoutMs }) =>
-      callEnvironmentEnvelope<RuntimeStatus>(selector, 'status.get', undefined, timeoutMs),
+    getStatus: ({ selector, timeoutMs, observeOnly }) =>
+      observeOnly
+        ? observeWebRuntimeStatus(selector, timeoutMs)
+        : callEnvironmentEnvelope<RuntimeStatus>(selector, 'status.get', undefined, timeoutMs),
     prepareBrowserClientHostPlacement: async () => ({ kind: 'server' }),
     call: ({ selector, method, params, timeoutMs }) =>
       callEnvironmentEnvelope(selector, method, params, timeoutMs),
@@ -3262,6 +3281,7 @@ function createSkillsApi(): NonNullable<Partial<PreloadApi>['skills']> {
 
 function createNotificationsApi(): NonNullable<Partial<PreloadApi>['notifications']> {
   return {
+    getDesktopAwayState: async () => undefined,
     dispatch: () => Promise.resolve({ delivered: false, reason: 'not-supported' }),
     dismiss: () => Promise.resolve({ dismissed: 0 }),
     openSystemSettings: () => Promise.resolve(),
@@ -3765,17 +3785,80 @@ function getClientForEnvironment(
   if (!activeClient || activeClientEnvironmentId !== environment.id) {
     activeClient?.close()
     const account = activeAccountBootstrap
+    const status = webRuntimeStatusOptions(environment)
     activeClient =
       account && environment.id === `account-${account.runtime.runtimeRecordId}`
         ? createWebAccountRelayClient(() => account.session.material(account.runtime))
         : new WebRuntimeClient(
             activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)
               ? activeCloudBootstrap
-              : getPreferredWebPairingOffer(environment)
+              : getPreferredWebPairingOffer(environment),
+            { status }
           )
     activeClientEnvironmentId = environment.id
   }
+  activeClient.configureStatusOwner?.(webRuntimeStatusOptions(environment))
   return activeClient
+}
+
+const webRuntimeStatusListeners = new Set<(snapshot: RuntimeHostStatusSnapshot) => void>()
+function subscribeWebRuntimeStatus(
+  callback: (snapshot: RuntimeHostStatusSnapshot) => void
+): () => void {
+  webRuntimeStatusListeners.add(callback)
+  return () => {
+    webRuntimeStatusListeners.delete(callback)
+  }
+}
+
+function webRuntimeStatusOptions(
+  environment: StoredWebRuntimeEnvironment
+): WebRuntimeStatusOptions {
+  return {
+    environmentId: environment.id,
+    pairingRevision: environment.pairingRevision ?? environment.createdAt,
+    publish: (snapshot) => {
+      for (const listener of webRuntimeStatusListeners) {
+        listener(snapshot)
+      }
+    },
+    verified: (response) => updateEnvironmentFromResponse(environment, response)
+  }
+}
+
+async function observeWebRuntimeStatus(
+  selector: string,
+  timeoutMs?: number
+): Promise<RuntimeHostStatusResponse> {
+  const environment = resolveEnvironment(selector)
+  if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
+    return manuallyDisconnectedResponse(environment)
+  }
+  const existing = activeClient?.statusOwner
+  if (existing) {
+    return existing.refresh({ timeoutMs, observeOnly: true })
+  }
+  if (activeAccountBootstrap) {
+    return callEnvironmentEnvelope<RuntimeStatus>(
+      environment.id,
+      'status.get',
+      undefined,
+      timeoutMs
+    )
+  }
+  const transient = new WebRuntimeClient(
+    activeCloudBootstrap && environment.id === cloudEnvironmentId(activeCloudBootstrap)
+      ? activeCloudBootstrap
+      : getPreferredWebPairingOffer(environment),
+    { reconnect: false }
+  )
+  try {
+    return (await transient.call('status.get', undefined, {
+      timeoutMs
+    })) as RuntimeHostStatusResponse
+  } finally {
+    transient.close()
+  }
 }
 
 export function closeActiveRuntimeClients(): void {

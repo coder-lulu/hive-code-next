@@ -64,6 +64,8 @@ describe('desktop home new-task state', () => {
       activeWorktreeId: 'wt-1',
       activeRepoId: 'repo-1',
       activeWorkspaceExecutionHostId: 'runtime:cloud-1',
+      getKnownWorktreeById: vi.fn(() => undefined),
+      repos: [],
       setActiveWorktree
     } as unknown as Partial<AppState>)
 

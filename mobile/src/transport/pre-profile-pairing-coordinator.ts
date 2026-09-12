@@ -1,3 +1,4 @@
+import { requireRpcResultOrThrowCodedError } from './rpc-acceptance-policies'
 import { connect, type ConnectOptions, type RpcClient } from './rpc-client'
 import { resolvePairingHostIdentity, saveHost } from './host-store'
 import type { HostProfile, PairingOffer } from './types'
@@ -102,10 +103,8 @@ async function runPairing(
   )
   clients.add(client)
   const response = await client.sendRequest('status.get')
-  if (!response.ok) {
-    throw new Error('local pairing authentication failed')
-  }
-  const authenticated = offerWithAuthenticatedRuntimeRecordId(offer, response.result)
+  const status = requireRpcResultOrThrowCodedError(response)
+  const authenticated = offerWithAuthenticatedRuntimeRecordId(offer, status)
   assertActive(isDisposed)
   const host: HostProfile = {
     id: hostId,

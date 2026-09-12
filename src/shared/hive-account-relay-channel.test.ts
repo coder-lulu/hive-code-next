@@ -117,6 +117,24 @@ function setup(options: { wrongCell?: boolean; wrongKey?: boolean; silent?: bool
 }
 
 describe('account relay physical channel', () => {
+  it('cancels only the pending status read and retains the authenticated channel', async () => {
+    const peer = setup()
+    await peer.ready
+    const controller = new AbortController()
+    const cancelled = peer.channel.request(
+      { id: 'cancelled', method: 'status.get' },
+      15_000,
+      controller.signal
+    )
+    controller.abort(new Error('retired status receipt'))
+    await expect(cancelled).rejects.toThrow('retired status receipt')
+    expect(peer.channel.isReady).toBe(true)
+    expect(peer.onClosed).not.toHaveBeenCalled()
+    peer.response({ id: 'cancelled', ok: true, result: 'late', _meta: { runtimeId: 'runtime-01' } })
+    const current = peer.channel.request({ id: 'current', method: 'status.get' })
+    peer.response({ id: 'current', ok: true, result: 'fresh', _meta: { runtimeId: 'runtime-01' } })
+    await expect(current).resolves.toMatchObject({ result: 'fresh' })
+  })
   it('absorbs the asynchronous ws error when disposed during handshake', async () => {
     const peer = setup({ silent: true })
     Object.defineProperty(peer.socket, 'readyState', { value: 0 })

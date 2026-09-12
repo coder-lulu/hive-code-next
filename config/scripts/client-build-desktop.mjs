@@ -5,9 +5,12 @@ import {
   readFileSync,
   statSync,
   writeFileSync,
-  chmodSync
+  chmodSync,
+  lstatSync,
+  readdirSync,
+  realpathSync,
+  renameSync
 } from 'node:fs'
-import { lstatSync, readdirSync, realpathSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { nodeStep, step, pnpmStep } from './client-build-execution.mjs'
 import { sha256, targets } from './client-build-contract.mjs'

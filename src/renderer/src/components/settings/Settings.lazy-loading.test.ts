@@ -27,7 +27,15 @@ describe('Settings lazy-loading contract', () => {
     expect(loaderSource).toContain("import('./HiveAccountSettingsPane')")
     expect(paneSource).toContain("import('./GeneralPane')")
     expect(paneSource).toContain('{ fallback: createElement(SettingsPaneLoading) }')
-    expect(settingsSource).toContain("isSectionMounted('input') ? (")
+    const rendererSource = readSource(
+      'src/renderer/src/components/settings/settings-page-renderer.tsx'
+    )
+    const inputSectionSource = readSource(
+      'src/renderer/src/components/settings/settings-interface-secondary-section-renderers.tsx'
+    )
+    expect(settingsSource).toContain('return renderSettingsPage(context)')
+    expect(rendererSource).toContain('renderInputSettingsSection(context)')
+    expect(inputSectionSource).toContain("view.isSectionMounted('input') ? (")
     expect(paneSource).toContain(
       'return props.mounted ? createElement(LazyPluginsSettingsSection, props) : null'
     )

@@ -58,9 +58,7 @@ describe('RuntimeHostAccessForm', () => {
         onSubmit={vi.fn()}
       />
     )
-    expect(markup).toContain(
-      applyProductBranding('Enter an Orca access link or bare pairing code.')
-    )
+    expect(markup).toContain(applyProductBranding('Enter a Orca access link or bare pairing code.'))
     expect(markup).toContain('aria-invalid="true"')
   })
 

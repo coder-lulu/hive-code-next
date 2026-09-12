@@ -11,8 +11,33 @@ const routePaths = [
   '../../app/connection-log.tsx'
 ] as const
 
-function routeSource(path: (typeof routePaths)[number]): string {
-  return readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
+function routeSource(relativePath: string): string {
+  const extracted: Record<string, string[]> = {
+    '../../app/about.tsx': ['./about-screen.tsx'],
+    '../../app/browser-settings.tsx': ['./browser-settings-screen.tsx'],
+    '../../app/notifications.tsx': [
+      './notification-settings-screen.tsx',
+      './native-notification-settings-operations.ts'
+    ],
+    '../../app/voice-settings.tsx': [
+      './voice-settings-screen.tsx',
+      './native-voice-settings-operations.ts'
+    ],
+    '../../app/troubleshoot.tsx': [
+      '../diagnostics/use-troubleshoot-diagnostics.ts',
+      '../diagnostics/troubleshoot-view.tsx',
+      '../diagnostics/native-diagnostics-operations.ts'
+    ],
+    '../../app/connection-log.tsx': [
+      '../diagnostics/connection-diagnostics-screen.tsx',
+      '../diagnostics/connection-diagnostics-screen-data.ts',
+      '../diagnostics/connection-diagnostics-view.tsx',
+      '../diagnostics/native-diagnostics-operations.ts'
+    ]
+  }
+  return [relativePath, ...(extracted[relativePath] ?? [])]
+    .map((file) => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8'))
+    .join('\n')
 }
 
 describe('Graphite settings subpages', () => {
@@ -31,7 +56,9 @@ describe('Graphite settings subpages', () => {
 
   it('keeps browser preference persistence and Chinese picker copy', () => {
     const source = routeSource('../../app/browser-settings.tsx')
-    expect(source).toContain('loadTerminalLinkOpenMode().then(setLinkMode)')
+    expect(source).toContain('loadTerminalLinkOpenMode().then(')
+    expect(source).toContain('if (active)')
+    expect(source).toContain('setLinkMode(mode)')
     expect(source).toContain('saveTerminalLinkOpenMode(mode)')
     expect(source).toContain("value: 'orca-browser'")
     expect(source).toContain("value: 'phone-browser'")
@@ -43,7 +70,8 @@ describe('Graphite settings subpages', () => {
     const source = routeSource('../../app/notifications.tsx')
     expect(source).toContain('ensureNotificationPermissions()')
     expect(source).toContain('getNotificationPermissionState()')
-    expect(source).toContain('savePushNotificationsEnabled(false)')
+    expect(source).toContain('operations.preference(value && permission.granted)')
+    expect(source).toContain('savePushNotificationsEnabled(enabled)')
     expect(source).toContain('Linking.openSettings()')
     expect(source).toContain('系统设置中已关闭通知权限')
   })
@@ -96,7 +124,7 @@ describe('Graphite settings subpages', () => {
     expect(source).toContain('useSyncExternalStore(subscribe, getSnapshot)')
     expect(source).toContain('buildConnectionDiagnosticsReport')
     expect(source).toContain('Clipboard.setStringAsync(report)')
-    expect(source).toContain('复制诊断信息')
+    expect(source).toContain('复制报告')
   })
 
   it('keeps configured About links and runtime version metadata', () => {
@@ -105,6 +133,6 @@ describe('Graphite settings subpages', () => {
     expect(source).toContain('PRODUCT_SOURCE_REPOSITORY_URL')
     expect(source).toContain('PRODUCT_PUBLIC_LINKS.social')
     expect(source).toContain('Constants.expoConfig?.version')
-    expect(source).toContain("productNameText('关于 Orca')")
+    expect(source).toContain("productNameText('关于 HiveCode')")
   })
 })

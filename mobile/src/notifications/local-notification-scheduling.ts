@@ -6,7 +6,7 @@ import { ensureNotificationPermissions } from './notification-permissions'
 
 export type NotificationEvent = {
   type: 'notification'
-  source: DesktopNotificationSource
+  source?: DesktopNotificationSource
   title: string
   body: string
   worktreeId?: string

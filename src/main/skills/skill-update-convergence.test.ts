@@ -46,6 +46,24 @@ const PRE_STUB = revision(1, 'f3727995')
 const STUB = revision(2, '091d9bcc')
 
 describe('convergableSkillNames', () => {
+  it('bounds placement reads across many independently locked names', () => {
+    let reads = 0
+    const entries = Array.from({ length: 100 }, (_, index) => {
+      const entry = placement(`skill-${index}`, 1)
+      return {
+        ...entry,
+        get name() {
+          reads++
+          return entry.name
+        }
+      }
+    })
+    const locks = new Map(entries.map((entry) => [entry.name, '091d9bcc']))
+    const snapshots = Object.fromEntries(entries.map((entry) => [entry.name, [PRE_STUB, STUB]]))
+    expect([...convergableSkillNames(entries, locks, snapshots)]).toEqual([])
+    expect(reads).toBeLessThanOrEqual(entries.length * 5)
+  })
+
   // The real reported case: the lock records the stub tree (091d9bcc) while disk
   // still holds the pre-stub revision (f3727995). `skills update` compares lock to
   // source, sees no work, exits 0 and writes nothing — forever.

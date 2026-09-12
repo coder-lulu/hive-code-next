@@ -136,6 +136,38 @@ describe('useMobileLocalTasks', () => {
     }
   })
 
+  it('keeps the stream census when the original list reply arrives later', async () => {
+    const runtime = makeClient()
+    const probe = mountFeed(runtime.client)
+    mounted.push(probe)
+    act(() =>
+      runtime.emit({
+        type: 'snapshots',
+        authoritative: true,
+        snapshots: [sessionSnapshot('wt-live', 'live-pane', 'Live task')]
+      })
+    )
+    await resolveInAct(runtime.worktrees, success({ worktrees: [] }))
+    expect(probe.feed.inProgress.map((row) => row.worktreeId)).toEqual(['wt-live'])
+    act(() =>
+      runtime.emit({
+        type: 'updated',
+        ...sessionSnapshot('wt-live', 'live-pane', 'Updated task'),
+        snapshotVersion: 2
+      })
+    )
+    expect(probe.feed.inProgress[0]?.title).toBe('Updated task')
+    await resolveInAct(
+      runtime.list,
+      success({
+        authoritative: true,
+        snapshots: [sessionSnapshot('wt-stale', 'stale-pane', 'Old task')]
+      })
+    )
+    expect(probe.feed.inProgress.map((row) => row.worktreeId)).toEqual(['wt-live'])
+    expect(probe.feed.isVerifiable).toBe(true)
+  })
+
   it('starts listAll, subscribeAll, and worktree.ps from the connected real RpcClient', async () => {
     const runtime = makeClient()
     const probe = mountFeed(runtime.client)
@@ -146,8 +178,8 @@ describe('useMobileLocalTasks', () => {
       null,
       expect.any(Function)
     )
-    expect(runtime.sendRequest).toHaveBeenCalledWith('session.tabs.listAll')
-    expect(runtime.sendRequest).toHaveBeenCalledWith('worktree.ps', { limit: 10_000 })
+    expect(runtime.sendRequest).toHaveBeenCalledWith('session.tabs.listAll', undefined, undefined)
+    expect(runtime.sendRequest).toHaveBeenCalledWith('worktree.ps', { limit: 10_000 }, undefined)
 
     await resolveInAct(
       runtime.list,

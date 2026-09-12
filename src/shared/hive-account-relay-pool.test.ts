@@ -81,6 +81,33 @@ afterEach(() => {
 })
 
 describe('account relay pool ownership and bounds', () => {
+  it('verifies on an authenticated stream and retires only its status receipt when it closes', async () => {
+    const createMaterial = vi.fn(async () => material())
+    const onStatusReceiptLost = vi.fn()
+    const onStateChange = vi.fn()
+    const pool = new HiveAccountRelayPool({
+      createMaterial,
+      createSocket: vi.fn(),
+      onStatusReceiptLost,
+      onStateChange
+    })
+    pools.push(pool)
+    const first = await pool.subscribe('first', {}, { onResponse: vi.fn() })
+    const second = await pool.subscribe('second', {}, { onResponse: vi.fn() })
+    await pool.requestStatus(new AbortController().signal)
+    expect(createMaterial).toHaveBeenCalledTimes(2)
+    first.close()
+    await Promise.resolve()
+    expect(onStatusReceiptLost).toHaveBeenCalledOnce()
+    expect(pool.getState()).toBe('ready')
+    expect(onStateChange).not.toHaveBeenCalledWith('idle')
+    await pool.requestStatus(new AbortController().signal)
+    expect(createMaterial).toHaveBeenCalledTimes(2)
+    second.close()
+    await Promise.resolve()
+    expect(onStatusReceiptLost).toHaveBeenCalledTimes(2)
+    expect(pool.getState()).toBe('idle')
+  })
   it.each(['assignmentEpoch', 'cellIncarnationId'] as const)(
     'reuses and idles the replacement main after %s changes',
     async (field) => {

@@ -124,6 +124,7 @@ export type StoreState = {
   markTerminalTabUnread: ReturnType<typeof vi.fn>
   markTerminalPaneUnread: ReturnType<typeof vi.fn>
   markAgentCompletionPaneUnread: ReturnType<typeof vi.fn>
+  incrementAgentCompletionUnread: ReturnType<typeof vi.fn>
   directSshPaneRetryByTabId?: Record<
     string,
     {

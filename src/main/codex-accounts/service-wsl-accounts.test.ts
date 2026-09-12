@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -14,6 +14,23 @@ import {
   registerCodexAccountsTestHomes,
   testState
 } from './service-test-harness'
+
+const { rejectRealProcess } = vi.hoisted(() => ({
+  rejectRealProcess: vi.fn(() => {
+    throw new Error('WSL account unit tests must not launch a real child process')
+  })
+}))
+
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()), // eslint-disable-line @typescript-eslint/consistent-type-imports -- mock requires module export types
+  exec: rejectRealProcess,
+  execSync: rejectRealProcess,
+  execFile: rejectRealProcess,
+  execFileSync: rejectRealProcess,
+  spawn: rejectRealProcess,
+  spawnSync: rejectRealProcess,
+  fork: rejectRealProcess
+}))
 
 vi.mock('electron', () => ({
   app: {
@@ -45,6 +62,10 @@ function wslFailed(code: number, stderr = ''): WslResult {
 describe('CodexAccountService config sync', () => {
   registerCodexAccountsTestHomes()
 
+  afterEach(() => {
+    expect(rejectRealProcess).not.toHaveBeenCalled()
+  })
+
   it('preserves WSL account-home project trust while refreshing canonical settings', async () => {
     const wslManagedHomePath = join(testState.userDataDir, 'wsl-account', 'home')
     const wslCanonicalHomePath = join(testState.userDataDir, 'wsl-home', '.codex')
@@ -63,6 +84,19 @@ describe('CodexAccountService config sync', () => {
       'sandbox_mode = "danger-full-access"\n',
       'utf-8'
     )
+
+    const validateWslHome = vi.fn((command: string, args: string[]) => {
+      expect(command).toBe('wsl.exe')
+      expect(args.slice(0, 5)).toEqual(['-d', 'Ubuntu', '--exec', 'bash', '-lc'])
+      const script = decodeEncodedWslBashCommand(args[5])
+      expect(script).toContain('candidate_real=$(readlink -f -- "$candidate")')
+      expect(script).toContain("expected_marker='account-1'")
+      return `${wslLinuxHomePath}\n`
+    })
+    vi.doMock('node:child_process', () => ({
+      execFileSync: validateWslHome,
+      spawn: rejectRealProcess
+    }))
 
     vi.doMock('../../shared/wsl-paths', () => ({
       parseWslUncPath: (path: string) => {
@@ -111,6 +145,7 @@ describe('CodexAccountService config sync', () => {
       createRuntimeHome() as never
     )
 
+    expect(validateWslHome).toHaveBeenCalled()
     expect(readFileSync(join(wslManagedHomePath, 'config.toml'), 'utf-8')).toBe(
       'sandbox_mode = "danger-full-access"\n\n' +
         '[projects."/workspace"]\ntrust_level = "trusted"\n'

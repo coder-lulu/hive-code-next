@@ -59,7 +59,8 @@ describe('agent pane authority', () => {
           capturedAt: 1,
           updatedAt: 1
         }
-      }
+      },
+      unreadAgentCompletionCountByPane: { [TARGET]: 2, [SIBLING]: 3 }
     })
 
     store.getState().retireAgentPaneAuthority(TARGET)
@@ -70,6 +71,7 @@ describe('agent pane authority', () => {
     expect(state.agentLaunchConfigByPaneKey[TARGET]).toBeUndefined()
     expect(state.sleepingAgentSessionsByPaneKey[TARGET]).toBeUndefined()
     expect(state.agentStatusByPaneKey[SIBLING]).toBeDefined()
+    expect(state.unreadAgentCompletionCountByPane).toEqual({ [SIBLING]: 3 })
     expect(state.recentlyRetiredAgentStatusPaneKeys[TARGET]).toBe(true)
     expect(retirePaneAuthority).toHaveBeenCalledWith(TARGET)
   })

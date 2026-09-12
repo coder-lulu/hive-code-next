@@ -2730,7 +2730,6 @@
           "92154beb7e": "New workspace",
           "a30e34eb5c": "Close workspace board",
           "addProject": "Add project",
-          "createMenu": "Create",
           "projects": "Projects",
           "spaces": "Spaces",
           "views": "Sidebar view"
@@ -3840,6 +3839,12 @@
       "sessions": "Sessions",
       "templateHint": "Generate a structured result from the current workspace",
       "templates": "Recommended task templates",
+      "time": {
+        "daysAgo": "{{value}} days ago",
+        "hoursAgo": "{{value}} hr ago",
+        "justNow": "Just now",
+        "minutesAgo": "{{value}} min ago"
+      },
       "unnamedBranch": "Unnamed branch",
       "workOverview": "Work overview",
       "workspaceSection": "Workspace"
@@ -3921,6 +3926,43 @@
           "reviewStatus": "See issue state, review status, and CI checks on every worktree",
           "startWorkspaceFromIssue": "Start a workspace from any GitHub issue or pull request, prefilled with its title and context"
         }
+      }
+    },
+    "sessions": {
+      "backToProjects": "Back to projects",
+      "continueWorkspace": "Continue in the workspace",
+      "create": {
+        "chooseAgent": "Choose an agent",
+        "description": "Choose a workspace and agent. Your current sessions stay open.",
+        "noAgents": "No available agents on this device.",
+        "noWorkspace": "No workspace is available. Create a worktree from the + menu first.",
+        "refresh": "Refresh",
+        "temporary": "Temporary session (local)",
+        "unknown": "The session has not appeared yet. Check the session list before trying again."
+      },
+      "host": "Host",
+      "manageProjects": "Manage projects",
+      "manageProjectsHint": "Manage repositories, worktrees, folders and optional groups. Open a workspace to use its development tools.",
+      "noProjects": "No matching projects",
+      "openFailed": "Could not open this session. Please try again.",
+      "openWorkspace": "Open workspace",
+      "projects": "Project sessions",
+      "reopenWorkspaceSessions": "Open workspace sessions",
+      "searchProjects": "Search projects…",
+      "terminalHint": "This session uses its workspace terminal. Open the workspace to continue with the existing terminal and layout.",
+      "workspace": "Workspace",
+      "workspaceEmpty": "No sessions in this workspace",
+      "workspaceSessionsHint": "Select a workspace to open its sessions as tabs here.",
+      "workspacesAndGroups": "Workspaces and groups"
+    },
+    "sidebar": {
+      "sessions": {
+        "delete": "Delete temporary session",
+        "empty": "No temporary sessions yet",
+        "new": "New session",
+        "temporary": "Temporary session",
+        "viewAll": "View all",
+        "workspaceSession": "Workspace session"
       }
     },
     "sidebarAccount": {

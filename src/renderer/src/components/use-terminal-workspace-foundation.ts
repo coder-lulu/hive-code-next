@@ -85,11 +85,12 @@ export function useTerminalWorkspaceFoundation() {
     parseWorkspaceKey(renderedActiveWorktreeId ?? '')?.type === 'folder'
       ? activeWorktreeDeferralHostId
       : null
+  const activeFolderSurfaceId = activeFolderSurfaceHostId ? renderedActiveWorktreeId : null
   const workspaceSurfaces = useMemo(() => {
     const surfaces = projectWorkspaceSurfaces({
       worktreesById,
       folderWorkspaces,
-      activeWorkspaceId: renderedActiveWorktreeId,
+      activeWorkspaceId: activeFolderSurfaceId,
       activeWorkspaceResolvedHostId: activeFolderSurfaceHostId
     })
     const floatingSurfaces = floatingWorkspaceIds.flatMap((id) => {
@@ -104,7 +105,7 @@ export function useTerminalWorkspaceFoundation() {
     floatingWorkspaceIds,
     activeFolderSurfaceHostId,
     folderWorkspaces,
-    renderedActiveWorktreeId,
+    activeFolderSurfaceId,
     resolvedFloatingTerminalCwd,
     worktreesById
   ])

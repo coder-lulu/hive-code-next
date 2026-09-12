@@ -206,7 +206,7 @@ describe('Activity auto mark-read loop (React #185)', () => {
     expect(useAppStore.getState().acknowledgedAgentsByPaneKey[PANE_A]).toBeGreaterThan(0)
   })
 
-  it('leaves the selected thread unread after the user marks it unread', async () => {
+  it('preserves manual unread for the selected turn and acknowledges the next turn', async () => {
     seedThreadStampedByLocalClock()
     await mountActivityPage()
     await selectSeededThread()
@@ -220,5 +220,11 @@ describe('Activity auto mark-read loop (React #185)', () => {
     })
 
     expect(useAppStore.getState().acknowledgedAgentsByPaneKey[PANE_A]).toBeUndefined()
+    await act(async () => {
+      seedRetainedThread(Date.now() + 120_000, 'next turn on the execution host')
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    expect(useAppStore.getState().acknowledgedAgentsByPaneKey[PANE_A]).toBeGreaterThan(0)
+    expect(useAppStore.getState().manuallyUnreadTurnsByPaneKey[PANE_A]).toBeUndefined()
   })
 })

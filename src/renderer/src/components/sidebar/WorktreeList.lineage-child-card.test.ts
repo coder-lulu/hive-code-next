@@ -182,23 +182,25 @@ describe('WorktreeList lineage child card renderer', () => {
     expect(parentRow).not.toContain('padding-left')
   })
 
-  it('passes one group indentation step into the card when grouped by project', async () => {
+  it('keeps ungrouped repositories under the derived group indentation step', async () => {
     setLineageFixtureState('repo')
     const markup = await renderWorktreeListMarkup()
 
     const parentRow = getOptionOpeningTag(markup, 'parent')
 
-    expect(parentRow).not.toContain('padding-left')
-    expect(getCardOpeningTag(markup, 'parent')).toContain('data-content-indent="20"')
+    expect(markup).toContain('Ungrouped')
+    expect(parentRow).toContain('padding-left:14px')
+    expect(getCardOpeningTag(markup, 'parent')).toContain('data-content-indent="24"')
     expect(getCardOpeningTag(markup, 'parent')).toContain('data-flush-surface="true"')
   })
 
-  it('keeps nested card inner padding aligned with grouped parent cards', async () => {
+  it('keeps nested card inner padding aligned inside the derived ungrouped space', async () => {
     setLineageFixtureState('repo')
     const markup = await renderWorktreeListMarkup()
 
     expect(getOptionOpeningTag(markup, 'child')).toContain('padding-left:14px')
-    expect(getCardOpeningTag(markup, 'child')).toContain('data-content-indent="6"')
+    expect(markup).toContain('Ungrouped')
+    expect(getCardOpeningTag(markup, 'child')).toContain('data-content-indent="24"')
     expect(getCardOpeningTag(markup, 'child')).toContain('data-flush-surface="true"')
   })
 

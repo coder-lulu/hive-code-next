@@ -1,14 +1,8 @@
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocketServer, type WebSocket } from 'ws'
-import {
-  decrypt,
-  deriveSharedKey,
-  encrypt,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './e2ee-crypto'
+import { generateKeyPair, publicKeyToBase64 } from './e2ee-crypto'
+import { DesktopMobileE2EEV2Session } from './runtime-e2ee-server-session'
 import { encodePairingOffer, parsePairingCode, type PairingOffer } from './pairing'
 import {
   subscribeRemoteRuntimeRequest,
@@ -266,24 +260,41 @@ async function createServer(options: ServerOptions = {}): Promise<{
   const wss = new WebSocketServer({ host: '127.0.0.1', port: 0 })
   servers.push(wss)
   wss.on('connection', (ws) => {
-    let sharedKey: Uint8Array | null = null
+    let session: DesktopMobileE2EEV2Session | null = null
     let authenticated = false
     const responses: { id: string; index?: number }[] = []
     ws.on('message', (data) => {
       const frame = Buffer.from(data as Buffer).toString('utf8')
-      if (!sharedKey) {
-        const hello = JSON.parse(frame) as { publicKeyB64: string }
-        sharedKey = deriveSharedKey(keyPair.secretKey, publicKeyFromBase64(hello.publicKeyB64))
-        ws.send(JSON.stringify({ type: 'e2ee_ready' }))
+      if (!session) {
+        session = DesktopMobileE2EEV2Session.create({
+          hello: JSON.parse(frame),
+          serverSecretKey: keyPair.secretKey,
+          expectedContext: { transport: 'direct' }
+        })
+        if (!session) {
+          ws.close()
+          return
+        }
+        ws.send(JSON.stringify(session.ready))
         return
       }
-      const plaintext = decrypt(frame, sharedKey)
+      const plaintext = session.openText(frame)
       if (!plaintext) {
         return
       }
       if (!authenticated) {
         authenticated = true
-        sendEncrypted(ws, sharedKey, { type: 'e2ee_authenticated' })
+        expect(JSON.parse(plaintext)).toMatchObject({
+          type: 'e2ee_auth',
+          v: 2,
+          deviceToken: 'device-token',
+          transcriptHashB64: session.transcriptHashB64
+        })
+        sendEncrypted(ws, session, {
+          type: 'e2ee_authenticated',
+          v: 2,
+          transcriptHashB64: session.transcriptHashB64
+        })
         return
       }
       const request = JSON.parse(plaintext) as {
@@ -292,7 +303,7 @@ async function createServer(options: ServerOptions = {}): Promise<{
         params?: { index?: number }
       }
       if (request.method !== 'browser.clientHost.commandResult') {
-        sendEncrypted(ws, sharedKey, {
+        sendEncrypted(ws, session, {
           id: request.id,
           ok: true,
           streaming: true,
@@ -307,20 +318,20 @@ async function createServer(options: ServerOptions = {}): Promise<{
       }
       const response = { id: request.id, index: request.params?.index }
       if (options.unknownResponse) {
-        sendResponse(ws, sharedKey, { ...response, id: `${request.id}-unknown` })
+        sendResponse(ws, session, { ...response, id: `${request.id}-unknown` })
         return
       }
       if (options.reverseResponses) {
         responses.push(response)
         if (responses.length === 2) {
-          sendResponse(ws, sharedKey, responses[1]!)
-          sendResponse(ws, sharedKey, responses[0]!)
+          sendResponse(ws, session, responses[1]!)
+          sendResponse(ws, session, responses[0]!)
         }
         return
       }
-      sendResponse(ws, sharedKey, response)
+      sendResponse(ws, session, response)
       if (options.duplicateResponse) {
-        sendResponse(ws, sharedKey, response)
+        sendResponse(ws, session, response)
       }
     })
   })
@@ -341,16 +352,16 @@ async function createServer(options: ServerOptions = {}): Promise<{
   return { pairing, nextRequest }
 }
 
-function sendEncrypted(ws: WebSocket, sharedKey: Uint8Array, message: unknown): void {
-  ws.send(encrypt(JSON.stringify(message), sharedKey))
+function sendEncrypted(ws: WebSocket, session: DesktopMobileE2EEV2Session, message: unknown): void {
+  ws.send(session.sealText(JSON.stringify(message)))
 }
 
 function sendResponse(
   ws: WebSocket,
-  sharedKey: Uint8Array,
+  session: DesktopMobileE2EEV2Session,
   response: { id: string; index?: number }
 ): void {
-  sendEncrypted(ws, sharedKey, {
+  sendEncrypted(ws, session, {
     id: response.id,
     ok: true,
     result: { accepted: true, ...(response.index ? { index: response.index } : {}) },

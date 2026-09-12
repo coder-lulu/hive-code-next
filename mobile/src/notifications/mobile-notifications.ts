@@ -1,4 +1,10 @@
 import type { RpcClient } from '../transport/rpc-client'
+import { runRpcOperation } from '../transport/rpc-operation'
+import {
+  missedNotifications,
+  unsubscribeNotifications,
+  parseNotificationStreamEvent
+} from './mobile-notification-operations'
 // Re-exported so the existing importers (and their vi.mock paths) keep working.
 export {
   ensureNotificationPermissions,
@@ -27,13 +33,6 @@ import {
   shouldQueueShowForNotificationId
 } from './notification-reconnect-catchup'
 
-type SubscribeResult = {
-  type: 'ready'
-  subscriptionId: string
-  // Desktop counter lifetime (#8591); absent from runtimes that predate it.
-  epoch?: string
-}
-
 // Per-connection subscription; a reconnect `ready` triggers watermarked catch-up (#8129) so already-pushed events aren't re-sent.
 export function subscribeToDesktopNotifications(client: RpcClient, hostId: string): () => void {
   configureNotificationChannel()
@@ -53,21 +52,18 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
    * outstanding. Inside the queued task the first has already finished, so the
    * overlap is no longer observable — it has to be checked before enqueueing.
    */
-  function queueDelivery(
-    type: 'notification' | 'dismiss',
-    event: NotificationEvent | DismissNotificationEvent
-  ): Promise<void> {
+  function queueDelivery(event: NotificationEvent | DismissNotificationEvent): Promise<void> {
     if (
-      type === 'notification' &&
+      event.type === 'notification' &&
       !shouldQueueShowForNotificationId(session, event.notificationId)
     ) {
       return Promise.resolve()
     }
     return enqueueHostDelivery(session, async () => {
       try {
-        await deliverLive(type, event)
+        await deliverLive(event)
       } finally {
-        if (type === 'notification') {
+        if (event.type === 'notification') {
           releaseQueuedShowNotificationId(session, event.notificationId)
         }
       }
@@ -77,16 +73,13 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
     }).catch(() => {})
   }
 
-  async function deliverLive(
-    type: 'notification' | 'dismiss',
-    event: NotificationEvent | DismissNotificationEvent
-  ): Promise<void> {
+  async function deliverLive(event: NotificationEvent | DismissNotificationEvent): Promise<void> {
     adoptNotificationEpoch(session, hostId, event.notificationEpoch)
     const epochAtDelivery = session.lastDeliveredEpoch
-    if (type === 'notification') {
-      await showLocalNotification(event as NotificationEvent, hostId)
+    if (event.type === 'notification') {
+      await showLocalNotification(event, hostId)
     } else {
-      await dismissLocalNotification(event as DismissNotificationEvent, hostId)
+      await dismissLocalNotification(event, hostId)
     }
     // Why after the await, exactly like the watermark below: `seen` asserts this event
     // reached the user (#8129). Marked before, a rejected show leaves the key behind and
@@ -128,14 +121,14 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
         return
       }
       try {
-        await deliverLive('notification', event)
+        await deliverLive(event)
       } finally {
         releaseQueuedShowNotificationId(session, event.notificationId)
       }
       return
     }
     if (event.type === 'dismiss') {
-      await deliverLive('dismiss', event)
+      await deliverLive(event)
     }
   }
 
@@ -147,18 +140,16 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
     // Captured before the request: everything at or below it is known delivered, so
     // it is the floor the watermark falls back to if this catch-up never completes.
     const askFrom = catchUpWatermarkSeq(session)
-    const missed = await client
-      .sendRequest('notifications.getMissedSince', {
-        lastSeenSeq: askFrom,
-        // Why: sending the epoch lets the desktop reject a watermark from a counter
-        // it no longer has and return the whole retained buffer instead of nothing.
-        ...(session.lastDeliveredEpoch != null ? { epoch: session.lastDeliveredEpoch } : {})
-      })
-      .then((response) => {
-        if (!response.ok) {
+    const missed = await runRpcOperation(client, missedNotifications, {
+      lastSeenSeq: askFrom,
+      // Why: sending the epoch lets the desktop reject a watermark from a counter
+      // it no longer has and return the whole retained buffer instead of nothing.
+      ...(session.lastDeliveredEpoch != null ? { epoch: session.lastDeliveredEpoch } : {})
+    })
+      .then((result) => {
+        if (!result) {
           return null
         }
-        const result = response.result as { notifications?: unknown[]; epoch?: string } | undefined
         adoptNotificationEpoch(session, hostId, result?.epoch)
         return Array.isArray(result?.notifications) ? result.notifications : []
       })
@@ -187,7 +178,7 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
           if (disposed) {
             return
           }
-          const event = raw as NotificationEvent | DismissNotificationEvent
+          const event = raw
           await deliverMissedEvent(event)
           contiguousSeq = event.notificationSeq ?? contiguousSeq
         }
@@ -209,18 +200,17 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
 
   function unsubscribeServer(id: string) {
     if (client.getState() === 'connected') {
-      client.sendRequest('notifications.unsubscribe', { subscriptionId: id }).catch(() => {})
+      runRpcOperation(client, unsubscribeNotifications, { subscriptionId: id }).catch(() => {})
     }
   }
 
   const unsubscribeStream = client.subscribe('notifications.subscribe', {}, (data: unknown) => {
-    const event = data as
-      | NotificationEvent
-      | DismissNotificationEvent
-      | SubscribeResult
-      | { type: 'end' }
+    const event = parseNotificationStreamEvent(data)
+    if (!event) {
+      return
+    }
     if (event.type === 'ready') {
-      subscriptionId = (event as SubscribeResult).subscriptionId
+      subscriptionId = event.subscriptionId
       const isReconnect = session.connectedBefore
       session.connectedBefore = true
       if (disposed) {
@@ -228,7 +218,7 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
         unsubscribeStream()
         return
       }
-      const readyEpoch = (event as SubscribeResult).epoch
+      const readyEpoch = event.epoch
       // Why (#8591) the await: on a cold app open the persisted read is still in
       // flight, so deciding here would see watermarkLoaded false and skip catch-up —
       // which is precisely the post-upgrade / post-process-death case that loses
@@ -276,10 +266,7 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
       }
       // Why the queue (#8591): a live event must not overtake an in-flight
       // catch-up replay, or it persists a watermark past seqs still unshown.
-      await queueDelivery(
-        liveEvent.type === 'notification' ? 'notification' : 'dismiss',
-        liveEvent as NotificationEvent | DismissNotificationEvent
-      )
+      await queueDelivery(liveEvent)
     })()
   })
 

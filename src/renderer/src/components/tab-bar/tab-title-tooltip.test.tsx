@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +11,8 @@ import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import BrowserTab from './BrowserTab'
 import EditorFileTab from './EditorFileTab'
 import SortableTab from './SortableTab'
+
+const tabTokenCss = readFileSync(new URL('../../assets/main.css', import.meta.url), 'utf8')
 
 let mockTabAgent: TuiAgent | null = null
 
@@ -186,13 +189,16 @@ function textSpanHtml(markup: string, text: string): string {
 
 function expectTabContainerWidth(markup: string, root: string): void {
   const container = firstOpeningTag(markup)
-  // Why: pinned literally — a definite `w-*` is what stops live title updates from resizing
-  // every tab, so asserting against the constant would let that guarantee be edited away.
-  const widthClasses = 'w-[180px] min-w-[72px] min-[1280px]:w-[220px]'
+  // Why: definite semantic widths keep live title updates from resizing every tab.
+  const widthClasses =
+    'w-[var(--tab-width)] min-w-[var(--tab-min-width)] min-[1280px]:w-[var(--tab-width-wide)]'
+  expect(tabTokenCss).toContain('--tab-width: 180px;')
+  expect(tabTokenCss).toContain('--tab-width-wide: 220px;')
+  expect(tabTokenCss).toContain('--tab-min-width: 128px;')
   expect(container).toContain(widthClasses)
-  expect(root).not.toContain('w-[180px]')
-  expect(root).not.toContain('min-w-[72px]')
-  expect(root).not.toContain('min-[1280px]:w-[220px]')
+  expect(root).not.toContain('w-[var(--tab-width)]')
+  expect(root).not.toContain('min-w-[var(--tab-min-width)]')
+  expect(root).not.toContain('min-[1280px]:w-[var(--tab-width-wide)]')
 }
 
 function expectTooltipContent(markup: string, text: string): void {

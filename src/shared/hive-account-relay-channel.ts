@@ -1,6 +1,7 @@
 import { relayBase64Url, type HiveAccountRelayMaterial } from './hive-account-relay-material'
 import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { HiveAccountRelayHandshake } from './hive-account-relay-channel-handshake'
+import { HiveAccountRelayRequests } from './hive-account-relay-requests'
 import { RemoteRuntimeClientError } from './remote-runtime-client-error'
 import { HiveAccountRelayClosedError } from './hive-account-relay-errors'
 import { parseRemoteRuntimeRpcFrame } from './remote-runtime-request-frames'
@@ -21,11 +22,6 @@ export type {
   HiveAccountRelaySocket,
   HiveAccountRelaySubscription
 } from './hive-account-relay-channel-protocol'
-type Pending = {
-  resolve: (value: RuntimeRpcResponse<unknown>) => void
-  reject: (error: Error) => void
-  timer: ReturnType<typeof setTimeout>
-}
 const MAX_BUFFER = 16 * 1024 * 1024
 const MAX_FRAME = 8 * 1024 * 1024 + 82
 const failure = (message: string) =>
@@ -37,7 +33,7 @@ export class HiveAccountRelayChannel {
   private handshake: HiveAccountRelayHandshake | null = null
   private socket: HiveAccountRelaySocket | null = null
   private session: RuntimeE2EEClientSession | null = null
-  private pending = new Map<string, Pending>()
+  private pending = new HiveAccountRelayRequests()
   private subscription: { id: string; callbacks: HiveAccountRelaySubscription } | null = null
   private incoming = Promise.resolve()
   private incomingBytes = 0
@@ -121,7 +117,8 @@ export class HiveAccountRelayChannel {
 
   request(
     request: HiveAccountRelayRequest,
-    timeoutMs = 30_000
+    timeoutMs = 30_000,
+    signal?: AbortSignal
   ): Promise<RuntimeRpcResponse<unknown>> {
     try {
       assertRelayRequest(request, this.isReady, this.pending.has(request.id))
@@ -131,17 +128,13 @@ export class HiveAccountRelayChannel {
     if (this.pending.size >= 64) {
       return Promise.reject(failure('Relay pending request limit reached'))
     }
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => {
-          this.pending.delete(request.id)
-          reject(new RemoteRuntimeClientError('runtime_timeout', 'Runtime request timed out'))
-        },
-        Math.max(1, Math.min(timeoutMs, 300_000))
-      )
-      this.pending.set(request.id, { resolve, reject, timer })
-      this.guard(() => this.send(this.session!.sealText(serializeRemoteRuntimePayload(request))))
-    })
+    return this.pending.request(
+      request.id,
+      timeoutMs,
+      () =>
+        this.guard(() => this.send(this.session!.sealText(serializeRemoteRuntimePayload(request)))),
+      signal
+    )
   }
 
   subscribe(request: HiveAccountRelayRequest, callbacks: HiveAccountRelaySubscription): () => void {
@@ -193,11 +186,7 @@ export class HiveAccountRelayChannel {
     this.handshake = null
     this.rejectConnection?.(error)
     this.resolveConnection = this.rejectConnection = null
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer)
-      pending.reject(error)
-    }
-    this.pending.clear()
+    this.pending.rejectAll(error)
     const subscription = this.subscription
     this.subscription = null
     try {
@@ -307,12 +296,6 @@ export class HiveAccountRelayChannel {
       }
       return
     }
-    const pending = this.pending.get(response.id)
-    if (!pending) {
-      return
-    }
-    clearTimeout(pending.timer)
-    this.pending.delete(response.id)
-    pending.resolve(response)
+    this.pending.resolve(response)
   }
 }

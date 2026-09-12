@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const componentSources = [
-  'NewWorktreeModal.tsx',
+  'NewWorktreeFormSheet.tsx',
   'NewWorktreeProjectTargetFields.tsx',
   'SmartWorkspaceAdvancedFields.tsx',
   'SmartWorkspaceSourceField.tsx',

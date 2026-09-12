@@ -197,6 +197,10 @@ function findChildrenByType(node: unknown, typeName: string): ReactElementLike[]
       return
     }
     const el = current as ReactElementLike
+    if (typeof el.type === 'function' && el.type.name === 'TabBarStaticCreateMenu') {
+      visit(el.type(el.props))
+      return
+    }
     const type = el.type as { name?: string } | string | undefined
     const matchedName = typeof type === 'string' ? type : type?.name
     if (matchedName === typeName) {

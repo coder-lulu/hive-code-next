@@ -44,7 +44,17 @@ it(
       ]
     })
     const runtime = {
+      configureNotificationDismissalStore: () => {},
       getRuntimeId: () => 'close-intent-runtime-test',
+      getStatus: () => ({
+        runtimeId: 'close-intent-runtime-test',
+        startedAt: 1,
+        version: '1.0.0',
+        protocolVersion: 1,
+        minCompatibleDesktopVersion: '1.0.0',
+        minCompatibleMobileVersion: '1.0.0',
+        capabilities: []
+      }),
       getStartedAt: () => 1,
       cleanupSubscriptionsForConnection: () => {},
       cancelMobileDictationForConnection: () => {},

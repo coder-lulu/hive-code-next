@@ -1,3 +1,4 @@
+import { readNativeNotificationData } from '../src/notifications/native-notification-data'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Alert, View, StyleSheet } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
@@ -257,12 +258,15 @@ function AccountAwareNotificationResponseObserver(): null {
       }
 
       const hosts = catalogRef.current
-      const target = getNotificationNavigationTarget(response.notification.request.content.data, {
-        knownHostIds: new Set(hosts.map((host) => host.id)),
-        credentialStatusByHostId: new Map(
-          hosts.map((host) => [host.id, host.credentialStatus] as const)
-        )
-      })
+      const target = getNotificationNavigationTarget(
+        readNativeNotificationData(response.notification.request),
+        {
+          knownHostIds: new Set(hosts.map((host) => host.id)),
+          credentialStatusByHostId: new Map(
+            hosts.map((host) => [host.id, host.credentialStatus] as const)
+          )
+        }
+      )
       clearLastNotificationResponse()
       if (target) {
         openNotificationRoute(target)

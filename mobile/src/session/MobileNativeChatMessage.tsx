@@ -1,7 +1,8 @@
-import { memo, useEffect, useRef, useState } from 'react'
-import { Image, Pressable, Text, View } from 'react-native'
+import { MobileSelectableText as Text } from '../components/MobileSelectableText'
+import { memo, useCallback } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { ArrowUp, Copy } from 'lucide-react-native'
+import { Image, Pressable, View } from 'react-native'
 import { splitNativeChatBlocks } from '../../../src/shared/native-chat-tool-fold'
 import { selectActiveToolCall } from '../../../src/shared/native-chat-tool-activity'
 import { isImageRefBlock, isTextBlock } from '../../../src/shared/native-chat-types'
@@ -48,7 +49,12 @@ function Prose({
       )
     }
     return (
-      <MobileMarkdown content={block.text} textScale={1.25 * fontScale} onOpenFile={onOpenFile} />
+      <MobileMarkdown
+        content={block.text}
+        rangeSelectable
+        textScale={1.25 * fontScale}
+        onOpenFile={onOpenFile}
+      />
     )
   }
   if (isImageRefBlock(block)) {
@@ -99,6 +105,7 @@ function AgentControls({
         style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}
         onPress={onCopy}
         hitSlop={8}
+        accessibilityRole="button"
         accessibilityLabel="复制消息"
       >
         <Copy size={16} color={theme.color.text.tertiary} strokeWidth={2} />
@@ -108,6 +115,7 @@ function AgentControls({
           style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}
           onPress={onScrollToTop}
           hitSlop={8}
+          accessibilityRole="button"
           accessibilityLabel="将此消息滚动到顶部"
         >
           <ArrowUp size={16} color={theme.color.text.tertiary} strokeWidth={2} />
@@ -135,12 +143,10 @@ function MobileNativeChatMessageImpl({
   toolsExpanded?: boolean
   /** Multiplies all chat text sizes for pinch-to-zoom (1 = no change). */
   fontScale?: number
-  /** This message's index in the list, paired with onScrollToMessage. */
   messageIndex?: number
-  /** Ask the list to align this message's top to the top of the viewport. */
   onScrollToMessage?: (index: number) => void
   onOpenFile?: (relativePath: string) => void
-  /** This turn's status row, rendered under a user message (desktop parity). */
+  /** This settled turn's status row, rendered under its user message. */
   turnStatus?: NativeChatTurnStatus | null
   /** Whether the turn caret has disclosed this turn's activity. */
   turnExpanded?: boolean
@@ -154,20 +160,11 @@ function MobileNativeChatMessageImpl({
   structuredActivityUi?: boolean
 }): React.JSX.Element {
   const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
+  const copyMessage = useCallback(() => {
+    void Clipboard.setStringAsync(nativeChatMessageText(message.blocks)).catch(() => {})
+  }, [message])
   const isUser = message.role === 'user'
   const isReasoning = message.role === 'reasoning'
-  const isAgent = !isUser
-  // Briefly tint the bubble to confirm a copy landed.
-  const [copied, setCopied] = useState(false)
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(
-    () => () => {
-      if (copyTimer.current) {
-        clearTimeout(copyTimer.current)
-      }
-    },
-    []
-  )
   // Separate the agent's words from its tool activity: prose renders first, the
   // tool calls fold into a collapsible run beneath. The user's own messages get
   // an inverted (filled accent) bubble so they stand apart from agent prose.
@@ -187,43 +184,22 @@ function MobileNativeChatMessageImpl({
     !toolsExpanded
   const showToolRun = tools.length > 0 && !settledToolsHidden
 
-  const handleCopy = (): void => {
-    const text = nativeChatMessageText(message.blocks)
-    if (!text) {
-      return
-    }
-    void Clipboard.setStringAsync(text)
-    setCopied(true)
-    if (copyTimer.current) {
-      clearTimeout(copyTimer.current)
-    }
-    copyTimer.current = setTimeout(() => setCopied(false), 700)
-  }
-
-  // Copy + scroll-to-top, shown inline with the first tool call (or after the
-  // prose when there are no tools).
-  const controls = isAgent ? (
-    <AgentControls
-      onCopy={handleCopy}
-      onScrollToTop={
-        onScrollToMessage && messageIndex !== undefined
-          ? () => onScrollToMessage(messageIndex)
-          : undefined
-      }
-    />
-  ) : null
-
   return (
     <>
       <View style={[styles.row, isUser && styles.rowUser]}>
         <View
-          style={[
-            styles.content,
-            isUser && styles.userBubble,
-            isReasoning && styles.reasoning,
-            copied && styles.copied
-          ]}
+          style={[styles.content, isUser && styles.userBubble, isReasoning && styles.reasoning]}
         >
+          {!isUser && prose.length > 0 ? (
+            <AgentControls
+              onCopy={copyMessage}
+              onScrollToTop={
+                messageIndex != null && onScrollToMessage
+                  ? () => onScrollToMessage(messageIndex)
+                  : undefined
+              }
+            />
+          ) : null}
           {prose.map((block, index) => (
             <Prose
               key={index}
@@ -242,11 +218,8 @@ function MobileNativeChatMessageImpl({
               defaultExpanded={turnExpanded || toolsExpanded}
               expandChildren={turnExpanded ? false : toolsExpanded}
               activeCall={activeCall}
-              trailing={controls}
               onOpenFile={onOpenFile}
             />
-          ) : controls ? (
-            <View style={styles.controlsRow}>{controls}</View>
           ) : null}
         </View>
       </View>

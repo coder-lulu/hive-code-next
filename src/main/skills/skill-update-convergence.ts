@@ -27,6 +27,19 @@ export function convergableSkillNames(
   globalSkillLocks: ReadonlyMap<string, string>,
   knownSnapshots: Readonly<Record<string, SkillKnownSnapshot[]>>
 ): ReadonlySet<string> {
+  const placements = new Map<string, SkillFreshnessInstallation[]>()
+  for (const entry of installations) {
+    if (!SUPPORTED_GLOBAL_SKILL_TOPOLOGIES.has(entry.topology) || !entry.observedPackageDigest) {
+      continue
+    }
+    const name = entry.name
+    const matches = placements.get(name)
+    if (matches) {
+      matches.push(entry)
+    } else {
+      placements.set(name, [entry])
+    }
+  }
   const convergable = new Set(globalSkillLocks.keys())
   for (const [name, lockHash] of globalSkillLocks) {
     // Why: judged only over the placements the command writes, like eligibility
@@ -34,12 +47,7 @@ export function convergableSkillNames(
     // it must neither gate the name nor rescue it — an unidentifiable cache copy
     // (or one parked at the lock's own revision) would otherwise defeat the gate
     // and re-arm the unwinnable update.
-    const observable = installations.filter(
-      (entry) =>
-        entry.name === name &&
-        SUPPORTED_GLOBAL_SKILL_TOPOLOGIES.has(entry.topology) &&
-        entry.observedPackageDigest
-    )
+    const observable = placements.get(name) ?? []
     if (observable.length === 0) {
       continue
     }

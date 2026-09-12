@@ -126,7 +126,7 @@ export async function openHostClientEntry(
       client.close()
       return state.store.get(hostId) ?? null
     }
-    const unsubState = client.onStateChange((next) => {
+    const unsubscribeState = client.onStateChange((next) => {
       const current = state.store.get(hostId)
       if (!current) {
         return
@@ -153,7 +153,9 @@ export async function openHostClientEntry(
         : host.deviceToken,
       state: client.getState(),
       refCount: state.pendingAcquisitions.get(hostId) ?? 0,
-      unsubState,
+      unsubState: () => {
+        unsubscribeState()
+      },
       unsubConnectionPath
     }
     state.pendingAcquisitions.delete(hostId)
