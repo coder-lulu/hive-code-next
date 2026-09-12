@@ -66,6 +66,13 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 
 ## Type Declarations: Prefer `.ts` Over `.d.ts`
 
+# Generated Logs, Screenshots, and Temporary Files
+
+- Store agent-generated test/build logs, screenshots, recordings, performance traces, test reports, and scratch files under the current project root's `logs/` directory. Never write these artifacts directly into the project root or its parent workspace root.
+- Resolve the project root from the repository/worktree being worked on, not the shell's incidental working directory. Create `logs/` before writing; use task-specific subdirectories such as `logs/session-loading/`, with `screenshots/` and `tmp/` inside when useful.
+- Set output paths explicitly for command redirection, screenshot tools, and test/report runners so their generated evidence stays under `logs/`. Keep the whole `/logs/` directory ignored by Git.
+- Source files, product assets, required build outputs, and tool-owned runtime/state directories retain their prescribed locations. This rule applies to diagnostic evidence and disposable working files, not those files.
+
 # Verifying Changes
 
 - **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)

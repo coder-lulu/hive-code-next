@@ -143,6 +143,9 @@ validation-screenshots/
 /notes/
 /pr-evidence/
 
+# Agent-generated logs, screenshots, reports, and scratch files
+/logs/
+
 # Playwright
 test-results/
 playwright-report/
