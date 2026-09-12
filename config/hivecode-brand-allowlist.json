@@ -521,7 +521,6 @@
     "src/main/tray/system-tray.test.ts",
     "src/main/tray/system-tray.ts",
     "src/main/updater.ts",
-    "src/main/window/attach-main-window-services.test.ts",
     "src/main/window/clipboard-ipc-handlers.test.ts",
     "src/main/window/createMainWindow-tray-minimize-close.test.ts",
     "src/renderer/src/assets/main.css",

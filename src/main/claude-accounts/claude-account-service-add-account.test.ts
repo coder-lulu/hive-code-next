@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { WslResult, WslSpec } from '../wsl/wsl-runner'
 import type * as NodeChildProcess from 'node:child_process'
 import { deleteManagedClaudeKeychainCredentials } from './keychain'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
 import {
   resetClaudeKeychainMocks,
@@ -506,7 +507,7 @@ describe('ClaudeAccountService credential capture', () => {
     finishOwned({ ...wslResult(''), code: 35 })
     expect(await completed).toEqual(
       expect.objectContaining({
-        message: 'Managed WSL Claude auth storage is outside HiveCode account storage.'
+        message: `Managed WSL Claude auth storage is outside ${APP_DISPLAY_NAME} account storage.`
       })
     )
     expect(login).not.toHaveBeenCalled()
