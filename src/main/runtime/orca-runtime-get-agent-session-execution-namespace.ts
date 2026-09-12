@@ -140,6 +140,7 @@ export class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends OrcaRuntim
     })
     const startup = buildAgentResumeStartupPlan({
       agent: request.agent,
+      agentPermissionMode: request.agentPermissionMode,
       providerSession: identity.providerSession,
       cmdOverrides: settings.agentCmdOverrides ?? {},
       agentArgs: resolveAgentSessionResumeArgs({

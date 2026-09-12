@@ -22,6 +22,8 @@ import {
   resolveTuiAgentLaunchEnv
 } from '../../shared/tui-agent-launch-defaults'
 import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '../../shared/tui-agent-startup'
+import { resolveTuiAgentLaunchPermission } from '../../shared/tui-agent-permissions'
+import { resolveStartupShell } from '../../shared/tui-agent-startup-shell'
 import type { RuntimeTerminalCreate } from '../../shared/runtime-types'
 import type {
   AgentSessionCreateOperation,
@@ -66,7 +68,8 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
           request.presentation ?? null,
           request.placement?.tabId ?? null,
           request.placement?.leafId ?? null,
-          request.viewMode ?? null
+          request.viewMode ?? null,
+          ...(request.agentPermissionMode === undefined ? [] : [request.agentPermissionMode])
         ])
       )
       .digest('base64url')
@@ -142,7 +145,8 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
             request.presentation ?? null,
             request.placement?.tabId ?? null,
             request.placement?.leafId ?? null,
-            request.viewMode ?? null
+            request.viewMode ?? null,
+            ...(request.agentPermissionMode === undefined ? [] : [request.agentPermissionMode])
           ])
         )
         .digest('base64url')
@@ -159,14 +163,27 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
         isRemote,
         terminalWindowsShell: settings.terminalWindowsShell
       })
+      const agentArgs =
+        request.agentArgs !== undefined
+          ? request.agentArgs
+          : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs)
+      const agentEnv = resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv)
+      const permissionConfig =
+        request.agentPermissionMode === undefined
+          ? { agentArgs, agentEnv }
+          : resolveTuiAgentLaunchPermission({
+              agent: request.agent,
+              mode: request.agentPermissionMode,
+              agentArgs,
+              agentEnv,
+              shell: resolveStartupShell(platform, shell)
+            })
       const startupArgs = {
         agent: request.agent,
         cmdOverrides: settings.agentCmdOverrides ?? {},
-        agentArgs:
-          request.agentArgs !== undefined
-            ? request.agentArgs
-            : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
-        agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+        agentArgs: permissionConfig.agentArgs,
+        agentEnv: permissionConfig.agentEnv,
+        agentPermissionMode: request.agentPermissionMode,
         sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
         platform,
         shell,

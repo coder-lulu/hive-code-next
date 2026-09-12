@@ -4731,6 +4731,51 @@
         "src/renderer/src/components/tab-bar/TabBar.context-menu.test.ts"
       ],
       "reviewReason": "Original workflow/config hunks and production assignment callers reviewed; test coverage, deterministic tie breaks, isolated background launch and Hive workflow boundaries retained. Full exact-candidate gates remain required; no runtime gain is claimed from a timing projection."
+    },
+    {
+      "upstreamSha": "b17f60d744c05a58ee054260878af1dd8cdd3afb",
+      "type": "维护",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Retrospective review found retained toolchain/stability validation missing from the active Hive Linux release workflow; adapting foreign release workflows alone does not cover the active Hive workflow.",
+      "adaptation": "Replace the retained Hive Linux release pnpm 10.24.0 setup with packageManager-driven pnpm/setup@v2 (install: false), consistent with the existing pnpm 12 lock/workspace policy. Preserve existing triggers, signatures, HiveCloud destinations, secrets, artifact policy and harness budgets. Static candidate contract checks verify fail propagation and order; real Linux/macOS crash execution remains not tested and holds promotion.",
+      "regressionTests": [
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs: packageManager-driven setup before install",
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs: both native Linux matrix legs fail closed before packaging",
+        "node config/scripts/runtime-file-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)",
+        "ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)",
+        "node config/scripts/relay-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)"
+      ]
+    },
+    {
+      "upstreamSha": "433df4be3c4b2c5ed03589be48690b92693b51e5",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Retrospective review found retained toolchain/stability validation missing from the active Hive Linux release workflow; adapting foreign release workflows alone does not cover the active Hive workflow.",
+      "adaptation": "Apply the existing Node and exact Electron runtime file-watcher SIGSEGV recovery gates to both active Hive Linux architecture legs, after compilation and before packaging. Preserve existing triggers, signatures, HiveCloud destinations, secrets, artifact policy and harness budgets. Static candidate contract checks verify fail propagation and order; real Linux/macOS crash execution remains not tested and holds promotion.",
+      "regressionTests": [
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs: packageManager-driven setup before install",
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs: both native Linux matrix legs fail closed before packaging",
+        "node config/scripts/runtime-file-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)",
+        "ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)",
+        "node config/scripts/relay-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)"
+      ]
+    },
+    {
+      "upstreamSha": "e3c47eff1720c5ec925e46e381d94e2b4b10a653",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Retrospective review found retained toolchain/stability validation missing from the active Hive Linux release workflow; adapting foreign release workflows alone does not cover the active Hive workflow.",
+      "adaptation": "Apply the existing relay watcher-child SIGSEGV recovery oracle before both Hive Linux AppImage packaging legs; require PTY continuity and watch recovery. Preserve existing triggers, signatures, HiveCloud destinations, secrets, artifact policy and harness budgets. Static candidate contract checks verify fail propagation and order; real Linux/macOS crash execution remains not tested and holds promotion.",
+      "regressionTests": [
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs: packageManager-driven setup before install",
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs: both native Linux matrix legs fail closed before packaging",
+        "node config/scripts/runtime-file-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)",
+        "ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)",
+        "node config/scripts/relay-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)"
+      ]
     }
   ]
 }
