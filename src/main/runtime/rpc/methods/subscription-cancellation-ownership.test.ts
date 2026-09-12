@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { RuntimeSubscriptionRegistry } from '../../runtime-subscription-registry'
-import { isStreamingMethod } from '../core'
+import { eraseRpcMethods, isStreamingMethod } from '../core'
 import { ACCOUNT_METHODS } from './accounts'
 import { FILE_METHODS } from './files'
 import { BROWSER_SCREENCAST_METHODS } from './browser-screencast'
@@ -12,9 +12,11 @@ vi.mock('../../runtime-browser-commands-factory', () => ({
 it.each(['accounts.unsubscribe', 'files.unwatch', 'browser.screencast.unsubscribe'])(
   '%s cancels only its connection subscription and leaves local behavior intact',
   async (name) => {
-    const method = [...ACCOUNT_METHODS, ...FILE_METHODS, ...BROWSER_SCREENCAST_METHODS].find(
-      (item) => item.name === name
-    )!
+    const method = eraseRpcMethods([
+      ...ACCOUNT_METHODS,
+      ...FILE_METHODS,
+      ...BROWSER_SCREENCAST_METHODS
+    ]).find((item) => item.name === name)!
     if (isStreamingMethod(method)) {
       throw new Error('expected request')
     }

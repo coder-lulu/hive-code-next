@@ -18,17 +18,8 @@ type MockAgentOptions = {
   lastAssistantMessage?: string
   stateStartedAt?: number
   terminalHandle?: string
-  orchestration?: {
-    parentPaneKey?: string
-    parentTerminalHandle?: string
-    coordinatorHandle?: string
-  }
-  lineage?: {
-    depth: number
-    isFirstSibling: boolean
-    isLastSibling: boolean
-    childCount: number
-  }
+  orchestration?: Partial<NonNullable<DashboardAgentRowData['entry']['orchestration']>>
+  lineage?: DashboardAgentRowData['lineage']
 }
 
 function mockAgent({
@@ -78,29 +69,36 @@ let capturedRowActivations: {
 
 const activationMocks = vi.hoisted(() => ({
   activateAndRevealWorktree: vi.fn(),
-  activateTabAndFocusPane: vi.fn()
+  activateTabAndFocusPane: vi.fn(),
+  acknowledgeAgents: vi.fn(),
+  consumeAgentCompletionUnread: vi.fn()
 }))
 
-vi.mock('@/store', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      agentActivityDisplayMode: mockAgentActivityDisplayMode,
-      acknowledgedAgentsByPaneKey: {},
-      cacheTimerByKey: mockCacheTimerByKey,
-      dropAgentStatus: vi.fn(),
-      dismissRetainedAgent: vi.fn(),
-      acknowledgeAgents: vi.fn(),
-      agentSendPopoverTargetMode: null,
-      agentStatusByPaneKey: {},
-      tabsByWorktree: {},
-      terminalLayoutsByTabId: {},
-      sendPromptToSidebarAgentTarget: vi.fn(),
-      settings: {
-        promptCacheTimerEnabled: mockPromptCacheTimerEnabled,
-        promptCacheTtlMs: mockPromptCacheTtlMs
-      }
+vi.mock('@/store', () => {
+  const getState = () => ({
+    agentActivityDisplayMode: mockAgentActivityDisplayMode,
+    acknowledgedAgentsByPaneKey: {},
+    cacheTimerByKey: mockCacheTimerByKey,
+    dropAgentStatus: vi.fn(),
+    dismissRetainedAgent: vi.fn(),
+    acknowledgeAgents: activationMocks.acknowledgeAgents,
+    consumeAgentCompletionUnread: activationMocks.consumeAgentCompletionUnread,
+    agentSendPopoverTargetMode: null,
+    agentStatusByPaneKey: {},
+    tabsByWorktree: {},
+    terminalLayoutsByTabId: {},
+    sendPromptToSidebarAgentTarget: vi.fn(),
+    settings: {
+      promptCacheTimerEnabled: mockPromptCacheTimerEnabled,
+      promptCacheTtlMs: mockPromptCacheTtlMs
+    }
+  })
+  return {
+    useAppStore: Object.assign((selector: (state: unknown) => unknown) => selector(getState()), {
+      getState
     })
-}))
+  }
+})
 
 vi.mock('@/lib/worktree-activation', () => ({
   activateAndRevealWorktree: activationMocks.activateAndRevealWorktree
@@ -404,6 +402,8 @@ describe('WorktreeCardAgents', () => {
 
     expect(activationMocks.activateAndRevealWorktree).not.toHaveBeenCalled()
     expect(activationMocks.activateTabAndFocusPane).not.toHaveBeenCalled()
+    expect(activationMocks.acknowledgeAgents).toHaveBeenCalledWith(['tab-1:1'])
+    expect(activationMocks.consumeAgentCompletionUnread).toHaveBeenCalledWith('tab-1:1')
   })
 
   it('shows orchestration child agent rows under their parent by default', async () => {

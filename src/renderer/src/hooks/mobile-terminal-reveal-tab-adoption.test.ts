@@ -211,9 +211,7 @@ describe('mobile terminal reveal tab adoption', () => {
     })
   })
 
-  it('replies without an error when two recorded bindings both claim the pty', async () => {
-    // Ambiguity is unresolvable, so the reveal still creates a tab — but it must
-    // not reject, because the mobile focus path awaits it with no catch.
+  it('refuses to mint another tab when two recorded bindings both claim the pty', async () => {
     const storeState: HarnessStoreState = createHarnessStoreState({
       tabsByWorktree: {
         [WORKTREE_ID]: [
@@ -238,8 +236,9 @@ describe('mobile terminal reveal tab adoption', () => {
 
     expect(harness.replyTerminalCreate).toHaveBeenCalledWith({
       requestId: 'mobile-reveal',
-      tabId: 'tab-minted',
-      title: 'codex'
+      error: 'terminal_reveal_ambiguous_pty_owner'
     })
+    expect(storeState.createTab).not.toHaveBeenCalled()
+    expect(storeState.setTabLayout).not.toHaveBeenCalled()
   })
 })

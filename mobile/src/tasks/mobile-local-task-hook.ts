@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RpcClient } from '../transport/rpc-client'
-import type { ConnectionState, RpcResponse } from '../transport/types'
+import type { ConnectionState } from '../transport/types'
+import { runRpcOperation } from '../transport/rpc-operation'
+import { localSessionInventory, localWorktreeMetadata } from './mobile-local-task-operations'
 import {
   projectMobileLocalTaskGroups,
   type MobileLocalSessionSnapshot,
@@ -9,8 +11,7 @@ import {
 } from './mobile-local-task-model'
 import {
   parseMobileLocalSessionInventory,
-  parseMobileLocalSessionUpdate,
-  parseMobileLocalWorktreeMetadata
+  parseMobileLocalSessionUpdate
 } from './mobile-local-task-rpc'
 import {
   applyMobileLocalSessionUpdate,
@@ -67,25 +68,17 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
-function successfulResult(response: RpcResponse, label: string): unknown {
-  if (!response.ok) {
-    throw new Error(response.error.message || `${label} failed.`)
-  }
-  return response.result
-}
-
 function streamFailureMessage(value: unknown): string | null {
   if (!value || typeof value !== 'object') {
     return null
   }
-  const row = value as { type?: unknown; message?: unknown }
-  if (row.type !== 'error' && row.type !== 'end') {
+  if (!('type' in value) || (value.type !== 'error' && value.type !== 'end')) {
     return null
   }
-  if (typeof row.message === 'string' && row.message.trim()) {
-    return row.message.trim()
+  if ('message' in value && typeof value.message === 'string' && value.message.trim()) {
+    return value.message.trim()
   }
-  return row.type === 'end' ? '本地任务实时订阅已结束。' : '本地任务实时订阅失败。'
+  return value.type === 'end' ? '本地任务实时订阅已结束。' : '本地任务实时订阅失败。'
 }
 
 /**
@@ -164,9 +157,8 @@ export function useMobileLocalTasks(args: {
       if (!value || typeof value !== 'object') {
         return
       }
-      const row = value as { type?: unknown }
       try {
-        if (row.type === 'snapshots') {
+        if ('type' in value && value.type === 'snapshots') {
           const inventory = parseMobileLocalSessionInventory(value)
           streamEstablished = true
           commit((current) => ({
@@ -177,7 +169,7 @@ export function useMobileLocalTasks(args: {
           }))
           return
         }
-        if (row.type === 'updated') {
+        if ('type' in value && value.type === 'updated') {
           const update = parseMobileLocalSessionUpdate(value)
           if (!update) {
             throw new Error('Runtime returned an invalid session tab update.')
@@ -207,12 +199,8 @@ export function useMobileLocalTasks(args: {
       }))
     }
 
-    void client
-      .sendRequest('session.tabs.listAll')
-      .then((response) => {
-        const inventory = parseMobileLocalSessionInventory(
-          successfulResult(response, 'session.tabs.listAll')
-        )
+    void runRpcOperation(client, localSessionInventory, undefined)
+      .then((inventory) => {
         commit((current) => ({
           ...current,
           // subscribeAll begins with its own race-safe census. Once that has landed, a slower
@@ -233,12 +221,8 @@ export function useMobileLocalTasks(args: {
         }))
       })
 
-    void client
-      .sendRequest('worktree.ps', { limit: WORKTREE_PS_FULL_LIMIT })
-      .then((response) => {
-        const worktrees = parseMobileLocalWorktreeMetadata(
-          successfulResult(response, 'worktree.ps')
-        )
+    void runRpcOperation(client, localWorktreeMetadata, { limit: WORKTREE_PS_FULL_LIMIT })
+      .then((worktrees) => {
         commit((current) => ({
           ...current,
           worktrees,

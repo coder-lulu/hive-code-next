@@ -157,8 +157,7 @@ export function getDefaultOnboardingState(): OnboardingState {
  *  from a workspace directory the user actually chose. */
 export function getDefaultWorkspaceDir(homeDir: string): string {
   const separator = homeDir.includes('\\') ? '\\' : '/'
-  const trimmedHomeDir = homeDir.replace(/[\\/]+$/, '')
-  return [trimmedHomeDir, 'orca', 'workspaces'].join(separator)
+  return [homeDir.replace(/[\\/]+$/, ''), 'orca', 'workspaces'].join(separator)
 }
 
 export function getDefaultSettings(homedir: string): GlobalSettings {
@@ -298,6 +297,7 @@ export function getDefaultUIState(): PersistedUIState {
     usagePercentageDisplay: DEFAULT_USAGE_PERCENTAGE_DISPLAY,
     statusBarUsageMode: DEFAULT_STATUS_BAR_USAGE_MODE,
     dismissedUpdateVersion: null,
+    dismissedUnexpectedSignoutVersion: null,
     lastUpdateCheckAt: null,
     trustedOrcaHooks: {},
     setupScriptPromptDismissedRepoIds: [],

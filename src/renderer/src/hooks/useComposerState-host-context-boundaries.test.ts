@@ -36,6 +36,7 @@ const COMPOSER_SOURCE = {
   projectTarget: readComposerModule('project-target-actions.ts'),
   providerRuntime: readComposerModule('provider-runtime-sync.ts'),
   quickCreation: readComposerModule('quick-creation-execution.ts'),
+  quickCreationPrompt: readComposerModule('quick-creation-launch-prompt.ts'),
   quickSubmitAction: readComposerModule('quick-submit-action.ts'),
   quickSubmitPreparation: readComposerModule('quick-submit-preparation.ts'),
   quickSubmitSourcePreparation: readComposerModule('quick-submit-source-preparation.ts'),
@@ -567,8 +568,10 @@ describe('useComposerState host-context boundaries', () => {
     expect(section).toContain(
       'const submitLinkedWorkItem = smartGitHubMetadata?.linkedWorkItem ?? linkedWorkItem'
     )
-    expect(section).toContain('resolveFolderWorkspaceLaunchDraft(submitLinkedWorkItem, note)')
+    expect(section).toContain('const launchText = resolveFolderSubmitLaunchText(agentPrompt, note)')
+    expect(section).toContain('resolveFolderWorkspaceLaunchDraft(submitLinkedWorkItem, launchText)')
     expect(section).toContain('linkedWorkItem: submitLinkedWorkItem')
+    expect(section).toContain('note: launchText')
   })
 
   it('gates every submit path on the derived source intent', () => {
@@ -697,7 +700,10 @@ describe('useComposerState host-context boundaries', () => {
     expect(quickSubmit).toContain(
       'const promptLinkedWorkItem = agent === null ? null : submitLinkedWorkItem'
     )
-    expect(quickSubmit).toContain('resolveQuickCreateLinkedWorkItemPrompt(promptLinkedWorkItem')
+    expect(COMPOSER_SOURCE.quickCreation).toContain('resolveQuickCreationLaunchPrompt({')
+    expect(COMPOSER_SOURCE.quickCreation).toContain('linkedWorkItem: promptLinkedWorkItem')
+    expect(COMPOSER_SOURCE.quickCreationPrompt).toContain('resolveQuickCreateLinkedWorkItemPrompt(')
+    expect(COMPOSER_SOURCE.quickCreationPrompt).toContain('args.linkedWorkItem,')
     expect(quickSubmit).not.toContain('explicitAgentChoice')
     expect(quickSubmit).not.toContain('shouldPrepareQuickLinkedWorkItemAgentPrompt')
     expect(COMPOSER_SOURCE.quickCreation).not.toContain('resolveQuickWorkspaceSubmitAgent')

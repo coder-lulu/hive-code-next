@@ -4424,7 +4424,6 @@
           "a30e34eb5c": "ワークスペースボードを閉じる",
           "spaces": "スペース",
           "views": "サイドバービュー",
-          "createMenu": "作成",
           "addProject": "プロジェクトを追加"
         },
         "SidebarNav": {
@@ -10557,7 +10556,11 @@
           "emptyTitle": "デバイス間アクセスセッションはありません",
           "emptyDescription": "HiveCode Mobile、Web、または別のデスクトップがこの Runtime に接続すると、ここにセッションが表示されます。",
           "learnHowToConnect": "接続方法を見る",
-          "authorizedOnly": "現在のアカウントが承認した接続のみを表示します。"
+          "authorizedOnly": "現在のアカウントが承認した接続のみを表示します。",
+          "pageSummary": "{{page}} ページ · このページに {{count}} 件のセッション",
+          "previousPage": "前へ",
+          "nextPage": "次へ",
+          "statusPendingActivation": "有効化待ち"
         },
         "automations": {
           "showButton": "オートメーションボタンを表示",
@@ -15265,7 +15268,8 @@
       "securityTitle": "デバイスの認証情報は保護されています",
       "securityDescription": "ログイン後、認証情報はこのデバイスに安全に保存されます。",
       "contextSummary": "HiveCode Desktop · 現在のデバイス · 保護されたセッション",
-      "contextDetails": "暗号化された認証情報はこのデバイスに保存され、アカウント設定から取り消せます。"
+      "contextDetails": "暗号化された認証情報はこのデバイスに保存され、アカウント設定から取り消せます。",
+      "resendCode": "コードを再送信"
     },
     "sidebarAccount": {
       "connected": "HiveCloud に接続済み",
@@ -15347,7 +15351,9 @@
       "computerTransferPending": "移行保留中",
       "computerTransferPendingDescription": "デバイスの所有権を移行しています。",
       "retryComputerAnalysis": "状態不明・再試行",
-      "retryComputerAnalysisDescription": "デバイスの所有権を確認できませんでした。もう一度お試しください。"
+      "retryComputerAnalysisDescription": "デバイスの所有権を確認できませんでした。もう一度お試しください。",
+      "openWeb": "Web アプリを開く",
+      "openWebFailed": "Web アプリを開けませんでした。もう一度お試しください。"
     },
     "native-chat": {
       "composer": {
@@ -15764,6 +15770,14 @@
       "hide": "Agent を隠す",
       "action": "Agent を試す",
       "hiddenToast": "Agent タブを非表示にしました。設定 → 実験的機能で再度有効にできます。"
+    }
+  },
+  "notifications": {
+    "agentStatus": {
+      "needsInput": "入力待ち",
+      "working": "処理中",
+      "stopped": "停止",
+      "finished": "完了"
     }
   }
 }

@@ -8,7 +8,7 @@ function source(relativePath: string): string {
 
 describe('Terminal and Native Chat settings behavior', () => {
   it('keeps the default session view backed by the existing preference hook', () => {
-    const route = source('../../app/native-chat-settings.tsx')
+    const route = source('./native-chat-settings-screen.tsx')
 
     expect(route).toContain('useMobileDefaultSessionViewPreference()')
     expect(route).toContain("defaultView === 'chat'")

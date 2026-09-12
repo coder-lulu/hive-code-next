@@ -310,7 +310,8 @@ function readWindowsWorkflow() {
 const { windowsJobNames, laneFiles } = readWindowsWorkflow()
 const scannedTestFiles = scanSourceTree(projectDir, {
   includeTests: true,
-  extensions: TEST_FILE_PATTERN
+  extensions: TEST_FILE_PATTERN,
+  excludeRootDirectories: ['logs']
 }).filter(({ relativePath }) => !relativePath.startsWith(UNREACHABLE_BY_THE_WINDOWS_LANE))
 const gatedFiles = scannedTestFiles
   .filter(({ relativePath }) => !isScannerSelfPath(relativePath))

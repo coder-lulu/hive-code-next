@@ -16,6 +16,69 @@ function findStep(workflow, job, name) {
 }
 
 describe('HiveCloud release publishing contract', () => {
+  it('sets up the packageManager-pinned pnpm before caching and installing Linux dependencies', () => {
+    const linux = readWorkflow('hivecode-linux-release.yml')
+    const packageJson = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
+    const steps = linux.jobs.build.steps
+    const setup = steps.find((step) => step.uses === 'pnpm/setup@v2')
+    const nodeSetup = steps.find((step) => step.uses === 'actions/setup-node@v6')
+    const install = findStep(linux, 'build', 'Install locked dependencies')
+
+    expect(packageJson.packageManager).toMatch(/^pnpm@12\.0\.0\+/)
+    expect(setup).toBeDefined()
+    expect(setup.with).toEqual({ install: false })
+    expect(steps.some((step) => step.uses?.startsWith('pnpm/action-setup@'))).toBe(false)
+    expect(nodeSetup.with.cache).toBe('pnpm')
+    expect(steps.indexOf(setup)).toBeLessThan(steps.indexOf(nodeSetup))
+    expect(steps.indexOf(nodeSetup)).toBeLessThan(steps.indexOf(install))
+    expect(install.run).toBe('pnpm install --frozen-lockfile')
+  })
+
+  it.each(['x64', 'arm64'])(
+    'blocks %s Linux packaging on watcher fault recovery',
+    (architecture) => {
+      const linux = readWorkflow('hivecode-linux-release.yml')
+      const build = linux.jobs.build
+      const target = build.strategy.matrix.include.find(
+        (entry) => entry.architecture === architecture
+      )
+      const steps = build.steps
+      const compile = findStep(linux, 'build', 'Build application')
+      const runtime = findStep(linux, 'build', 'Gate runtime file-watcher process isolation')
+      const relay = findStep(linux, 'build', 'Gate SSH relay watcher process isolation')
+      const pack = findStep(linux, 'build', 'Package AppImage without external publishing')
+
+      expect(target.builder_arch).toBe(architecture)
+      expect(target.runner).toMatch(/^ubuntu-/)
+      expect(steps.indexOf(compile)).toBeLessThan(steps.indexOf(runtime))
+      expect(steps.indexOf(runtime)).toBeLessThan(steps.indexOf(relay))
+      expect(steps.indexOf(relay)).toBeLessThan(steps.indexOf(pack))
+      expect(linux.jobs.publish.needs).toContain('build')
+      expect(linux.jobs.publish.if).toBeUndefined()
+      expect(build['continue-on-error']).toBeUndefined()
+      for (const gate of [runtime, relay]) {
+        expect(gate.if).toBeUndefined()
+        expect(gate['continue-on-error']).toBeUndefined()
+        expect(gate.shell).toBe('bash')
+        expect(gate.env.ORCA_BACKGROUND_LAUNCH).toBe('1')
+        expect(gate.run).toMatch(/^set -euo pipefail\n/)
+        expect(gate.run).toContain('export TMPDIR="$GITHUB_WORKSPACE/logs/release-watcher-gates/')
+        expect(gate.run).toContain('${{ matrix.architecture }}')
+        expect(gate.run).toContain('mkdir -p "$TMPDIR"')
+        expect(gate.run).not.toMatch(/\|\|\s*true|set \+e|\btimeout\b/)
+      }
+      expect(runtime.run).toContain(
+        'node config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"'
+      )
+      expect(runtime.run).toContain(
+        'ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../electron.log"'
+      )
+      expect(relay.run).toContain(
+        'node config/scripts/relay-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"'
+      )
+    }
+  )
+
   it('embeds release identity before packaging and publishes desktop artifacts to object storage', () => {
     const linux = readWorkflow('hivecode-linux-release.yml')
     const windows = readWorkflow('hivecode-windows-hardware-sign.yml')

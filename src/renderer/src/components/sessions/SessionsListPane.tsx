@@ -57,7 +57,8 @@ export default function SessionsListPane({
     getItemKey: (index) => entries[index]?.key ?? 'archive-group',
     initialOffset: view.scrollTop
   })
-  const previousFilter = useRef(`${JSON.stringify(view.scope)}|${view.query}`)
+  const previousFilter = useRef<string>(undefined!)
+  previousFilter.current ??= `${JSON.stringify(view.scope)}|${view.query}`
   useLayoutEffect(() => {
     const filter = `${JSON.stringify(view.scope)}|${view.query}`
     if (previousFilter.current !== filter) {

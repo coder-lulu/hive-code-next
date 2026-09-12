@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import { routeWebRuntimeConnectionFrame } from './web-runtime-connection-frame-router'
 import { createWebRuntimeTestSession } from './web-runtime-e2ee-test-peer'
+import { webRuntimeAuthenticationFrame } from './web-runtime-client-protocol'
 
 describe('web runtime connection capability advertisement', () => {
   it('advertises GitHub PR suppression during E2EE authentication', async () => {
@@ -12,7 +13,16 @@ describe('web runtime connection capability advertisement', () => {
       getState: () => 'handshaking',
       getSession: () => session.client,
       getSocket: () => null,
-      pairingToken: 'token',
+      authenticationFrame: () =>
+        webRuntimeAuthenticationFrame(
+          {
+            kind: 'pairing',
+            endpoint: 'ws://127.0.0.1',
+            publicKeyB64: '',
+            deviceToken: 'token'
+          },
+          session.client.transcriptHashB64
+        ),
       pending: new Map(),
       subscriptions: new Map(),
       sendEncrypted,

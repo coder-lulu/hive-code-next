@@ -36,18 +36,21 @@ export async function runClaudeLoginSession(
 ): Promise<CapturedClaudeAuth> {
   const tempConfig = await createTemporaryClaudeConfigDir(location)
   const controller = new AbortController()
-  dependencies.setCancel(() => {
-    if (controller.signal.aborted) {
-      return false
-    }
-    controller.abort()
-    return true
-  })
-  const previousLegacyKeychain = await readActiveClaudeKeychainCredentials()
+  let previousLegacyKeychain: string | null = null
+  let acquiredLegacySnapshot = false
   let captured: CapturedClaudeAuth | null = null
-  let captureError: unknown = null
-  let cleanupError: unknown = null
+  let captureFailure: { error: unknown } | null = null
+  let cleanupFailure: { error: unknown } | null = null
   try {
+    dependencies.setCancel(() => {
+      if (controller.signal.aborted) {
+        return false
+      }
+      controller.abort()
+      return true
+    })
+    previousLegacyKeychain = await readActiveClaudeKeychainCredentials()
+    acquiredLegacySnapshot = true
     if (controller.signal.aborted) {
       throw new Error('Claude sign-in was cancelled.')
     }
@@ -64,9 +67,9 @@ export async function runClaudeLoginSession(
     )
     captured = await dependencies.capture(tempConfig.windowsPath, status, previousLegacyKeychain)
   } catch (error) {
-    captureError = error
+    captureFailure = { error }
   } finally {
-    if (process.platform === 'darwin') {
+    if (process.platform === 'darwin' && acquiredLegacySnapshot) {
       try {
         await deleteActiveClaudeKeychainCredentialsStrict(tempConfig.windowsPath)
       } catch (error) {
@@ -77,17 +80,22 @@ export async function runClaudeLoginSession(
           ? writeActiveClaudeKeychainCredentials(previousLegacyKeychain)
           : deleteActiveClaudeKeychainCredentialsStrict())
       } catch (error) {
-        cleanupError = error
+        cleanupFailure = { error }
       }
     }
-    await removeTemporaryClaudeConfigDir(tempConfig)
-    dependencies.setCancel(null)
+    try {
+      await removeTemporaryClaudeConfigDir(tempConfig)
+    } catch (error) {
+      cleanupFailure ??= { error }
+    } finally {
+      dependencies.setCancel(null)
+    }
   }
-  if (captureError) {
-    throw captureError
+  if (captureFailure) {
+    throw captureFailure.error
   }
-  if (cleanupError) {
-    throw cleanupError
+  if (cleanupFailure) {
+    throw cleanupFailure.error
   }
   return captured!
 }

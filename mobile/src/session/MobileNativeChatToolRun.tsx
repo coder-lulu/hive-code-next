@@ -191,7 +191,6 @@ export function ToolRun({
   defaultExpanded,
   expandChildren,
   activeCall,
-  trailing,
   onOpenFile
 }: {
   blocks: NativeChatBlock[]
@@ -200,7 +199,6 @@ export function ToolRun({
   expandChildren: boolean
   /** The still-running call, when the turn is live (desktop parity). */
   activeCall: ReturnType<typeof selectActiveToolCall>
-  trailing?: React.ReactNode
   onOpenFile?: (relativePath: string) => void
 }): React.JSX.Element {
   const theme = useMobileTheme()
@@ -264,7 +262,6 @@ export function ToolRun({
             </Text>
           </Pressable>
         )}
-        {trailing}
       </View>
       {open ? (
         <View style={styles.toolRunBody}>

@@ -1,5 +1,5 @@
-import { z } from 'zod'
-import { defineMethod, type RpcContext, type RpcMethod } from '../core'
+import { HiveRuntimeClaimPollParams, HiveRuntimeResetIdentityParams } from '../../../../shared/rpc-contract/hive-runtime-cloud-params'
+import { defineMethod, type RpcContext } from '../core'
 import type { HiveRuntimeCloudControl } from '../../../hive-runtime-cloud/hive-runtime-cloud-control'
 
 function requireLocalControl(context: RpcContext): HiveRuntimeCloudControl {
@@ -12,7 +12,7 @@ function requireLocalControl(context: RpcContext): HiveRuntimeCloudControl {
   return context.hiveRuntimeCloud
 }
 
-export const HIVE_RUNTIME_CLOUD_METHODS: RpcMethod[] = [
+export const HIVE_RUNTIME_CLOUD_METHODS = [
   defineMethod({
     name: 'cloudRuntime.status',
     params: null,
@@ -25,12 +25,12 @@ export const HIVE_RUNTIME_CLOUD_METHODS: RpcMethod[] = [
   }),
   defineMethod({
     name: 'cloudRuntime.claimPoll',
-    params: z.object({ challengeId: z.string().uuid() }).strict(),
+    params: HiveRuntimeClaimPollParams,
     handler: (params, context) => requireLocalControl(context).pollHeadlessClaim(params.challengeId)
   }),
   defineMethod({
     name: 'cloudRuntime.resetIdentity',
-    params: z.object({ confirm: z.literal(true) }).strict(),
+    params: HiveRuntimeResetIdentityParams,
     handler: (_params, context) => requireLocalControl(context).resetCloudIdentity()
   })
 ]

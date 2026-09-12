@@ -18,18 +18,23 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type { StructuredAgentSessionAdapter } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-adapter'
 import { attachFingerprintFields } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-attach'
 import type { AgentSessionAttachParams } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-attach'
-import { StructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-host'
+import type { StructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-host'
 import { setStructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-registry'
 import { AgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store'
 import { computeAgentSessionPayloadFingerprint } from '../../../src/shared/agent-session-mutation-envelope'
 import type { AgentSessionSubscribeEvent } from '../../../src/shared/agent-session-wire'
 import {
+  AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY,
   AGENT_SESSION_REWIND_RUNTIME_CAPABILITY,
   AGENT_SESSION_STATUS_FEED_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
 } from '../../../src/shared/protocol-version'
 import { resolveBaselineReleaseRef } from './release-checkout'
-import { structuredHostStub } from './structured-agent-session-host-fixture'
+import {
+  createStructuredHostFixture,
+  structuredHostStub,
+  turnItemSkew
+} from './structured-agent-session-host-fixture'
 import {
   loadAgentSessionWireBuild,
   WORKING_TREE,
@@ -443,9 +448,24 @@ describe('cross-version structured agent sessions', () => {
     })
   })
 
+  describe('a client that predates the turn item', () => {
+    beforeEach(() => turnItemSkew.install(SESSION, WORKSPACE))
+    afterEach(() => setStructuredAgentSessionHost(null))
+
+    it('is published the status carrier where a capable client gets the turn item', async () => {
+      const params = paramsFor('agentSession.history')
+      for (const [clientCapabilities, item] of turnItemSkew.clients(baseline, current)) {
+        const client = { clientKind: 'runtime' as const, clientCapabilities }
+        const replies = await callBuild(current, 'agentSession.history', params, client)
+        expect(replies[0]).toMatchObject({ ok: true, result: { page: { items: [item] } } })
+      }
+    })
+  })
+
   describe('a new client against an old host', () => {
     it('registers the whole surface on the new build', () => {
       expect(current.capabilities).toContain(STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY)
+      expect(current.capabilities).toContain(AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY)
       expect(current.methodNames.filter((name) => name.startsWith('agentSession.'))).toHaveLength(
         STRUCTURED_CALLS.length
       )
@@ -578,6 +598,7 @@ describe('cross-version structured agent sessions', () => {
   })
 
   describe('an old client against a structured-owned AI Vault row', () => {
+    const fixtureHosts = createStructuredHostFixture()
     let root: string
     let store: AgentSessionRecordStore
     let runtime: Record<string, unknown>
@@ -589,7 +610,7 @@ describe('cross-version structured agent sessions', () => {
         directory: join(root, 'store'),
         hostId: 'local'
       })
-      const host = new StructuredAgentSessionHost({
+      const host = fixtureHosts.createHost({
         store,
         adapter: {
           acquire: async ({ fence }) => ({
@@ -657,6 +678,7 @@ describe('cross-version structured agent sessions', () => {
     })
 
     afterEach(async () => {
+      await fixtureHosts.closeHosts()
       setStructuredAgentSessionHost(null)
       await rm(root, { recursive: true, force: true })
     })
@@ -765,6 +787,7 @@ describe('cross-version structured agent sessions', () => {
   })
 
   describe('a cursor across a host restart', () => {
+    const fixtureHosts = createStructuredHostFixture()
     let root: string
     let store: AgentSessionRecordStore
     let runtime: unknown
@@ -810,7 +833,7 @@ describe('cross-version structured agent sessions', () => {
         directory: join(root, 'store'),
         hostId: 'local'
       })
-      const host = new StructuredAgentSessionHost({
+      const host = fixtureHosts.createHost({
         store,
         adapter: adapter(),
         journalRoot: root,
@@ -879,6 +902,7 @@ describe('cross-version structured agent sessions', () => {
     })
 
     afterEach(async () => {
+      await fixtureHosts.closeHosts()
       setStructuredAgentSessionHost(null)
       await rm(root, { recursive: true, force: true })
     })

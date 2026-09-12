@@ -9,7 +9,7 @@ describe('createUISlice Activity navigation', () => {
     expect(store.getState().activityPageScope).toBe('all')
   })
 
-  it('keeps the existing experiment gate for the all scope', () => {
+  it('keeps the maintained Activity view available without the old experiment gate', () => {
     const store = createUIStore()
     store.setState({
       activeView: 'tasks',
@@ -18,8 +18,8 @@ describe('createUISlice Activity navigation', () => {
 
     store.getState().openActivityPage()
 
-    expect(store.getState().activeView).toBe('tasks')
-    expect(store.getState().previousViewBeforeActivity).toBe('terminal')
+    expect(store.getState().activeView).toBe('activity')
+    expect(store.getState().previousViewBeforeActivity).toBe('tasks')
     expect(store.getState().activityPageScope).toBe('all')
   })
 

@@ -3,6 +3,7 @@ import { writeFileSync, readFileSync, rmSync, mkdtempSync, mkdirSync } from 'nod
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { PersistedState } from '../shared/persisted-state-types'
+import { DEFAULT_SIDEBAR_WIDTH } from '../shared/constants'
 import { setSourceControlActionDefault } from '../shared/source-control-ai-actions'
 import {
   testState,
@@ -91,7 +92,7 @@ describe('Store', () => {
     const store = await createStore()
     // ui should have defaults
     const ui = store.getUI()
-    expect(ui.sidebarWidth).toBe(280)
+    expect(ui.sidebarWidth).toBe(DEFAULT_SIDEBAR_WIDTH)
     expect(ui.rightSidebarOpen).toBe(true)
     expect(ui.rightSidebarTab).toBe('explorer')
     // settings should preserve the overridden value

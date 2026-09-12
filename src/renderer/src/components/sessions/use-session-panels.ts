@@ -16,10 +16,8 @@ export function useSessionPanels(
   collectionKey?: string
 ) {
   const [panels, setPanels] = useState(EMPTY_SESSION_PANELS)
-  const collection = useRef<{ key: string | undefined; closed: Set<string> }>({
-    key: undefined,
-    closed: new Set()
-  })
+  const collection = useRef<{ key: string | undefined; closed: Set<string> }>(undefined!)
+  collection.current ??= { key: undefined, closed: new Set() }
   useLayoutEffect(() => {
     if (collectionKey === undefined) {
       collection.current.key = undefined

@@ -1,8 +1,11 @@
-import { BrowserWindow, ipcMain, Notification } from 'electron'
+import { BrowserWindow, ipcMain, Notification, powerMonitor } from 'electron'
+import { waitForTabRegistration } from '../ipc/browser-tab-registration-wait'
+import { readDesktopAwayState } from '../notifications/desktop-away-state'
 import type { RuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
 
 /** The desktop implementation of the runtime's optional desktop facilities. */
 export const electronRuntimeDesktopSurface: RuntimeDesktopSurface = {
+  isAwayForMobileNotifications: () => readDesktopAwayState(powerMonitor),
   showNotification: ({ title, body }) => {
     if (!Notification.isSupported()) {
       return false
@@ -11,6 +14,7 @@ export const electronRuntimeDesktopSurface: RuntimeDesktopSurface = {
     return true
   },
   findWindowById: (id) => BrowserWindow.fromId(id),
+  waitForBrowserTabRegistration: waitForTabRegistration,
   onIpc: (channel, listener) => {
     ipcMain.on(channel, listener as Parameters<typeof ipcMain.on>[1])
   },

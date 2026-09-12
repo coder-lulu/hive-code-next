@@ -1,3 +1,7 @@
+import type {
+  NativeChatLiveTurnIndicator,
+  NativeChatSettledTurns
+} from '../../../src/shared/native-chat-turn-status'
 import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import type { PendingNativeChatImage } from './mobile-native-chat-image-attachment'
@@ -16,6 +20,10 @@ export type MobileNativeChatViewProps = {
   error?: string
   agent?: string | null
   agentWorking?: boolean
+  canStop?: boolean
+  turnIndicator?: NativeChatLiveTurnIndicator | null
+  workingStartedAt?: number | null
+  settledTurns?: NativeChatSettledTurns | null
   /** Structured sessions expose live tool activity and per-turn disclosure. */
   structuredActivityUi?: boolean
   onStop?: () => void

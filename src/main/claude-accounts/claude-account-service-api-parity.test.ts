@@ -55,14 +55,10 @@ describe('ClaudeAccountService API parity', () => {
     const service = createService()
     const first = deferred()
     const calls: string[] = []
-    const registration = (
-      service as unknown as {
-        registration: {
-          add(target?: ClaudeAccountAddTarget): Promise<ClaudeRateLimitAccountsState>
-        }
-      }
-    ).registration
-    registration.add = vi.fn(async (target) => {
+    const mutation = service as unknown as {
+      doAddAccount(target?: ClaudeAccountAddTarget): Promise<ClaudeRateLimitAccountsState>
+    }
+    mutation.doAddAccount = vi.fn(async (target) => {
       calls.push(target?.wslDistro ?? 'host')
       if (calls.length === 1) {
         await first.promise
@@ -99,10 +95,8 @@ describe('ClaudeAccountService API parity', () => {
       activeAccountId: null,
       activeAccountIdsByRuntime: { host: null, wsl: {} }
     }))
-    ;(firstService as unknown as { registration: { add: typeof firstAdd } }).registration.add =
-      firstAdd
-    ;(secondService as unknown as { registration: { add: typeof secondAdd } }).registration.add =
-      secondAdd
+    ;(firstService as unknown as { doAddAccount: typeof firstAdd }).doAddAccount = firstAdd
+    ;(secondService as unknown as { doAddAccount: typeof secondAdd }).doAddAccount = secondAdd
     ;(
       firstService as unknown as { cancelPendingClaudeLogin: () => boolean }
     ).cancelPendingClaudeLogin = vi.fn(() => true)

@@ -3,7 +3,7 @@ import type { WebRuntimeTransportSubscription } from './web-runtime-subscription
 const REPLAYABLE_SUBSCRIPTION_METHODS = new Set(['files.watch'])
 
 type WebRuntimeSubscriptionRegistryOptions = {
-  deviceToken: string
+  credential: () => { deviceToken: string } | Record<string, never>
   nextId: () => string
   sendEncrypted: (message: unknown) => boolean
 }
@@ -50,7 +50,7 @@ export class WebRuntimeSubscriptionRegistry {
       if (
         this.options.sendEncrypted({
           id: subscription.id,
-          deviceToken: this.options.deviceToken,
+          ...this.options.credential(),
           method: subscription.method,
           params: subscription.params
         })

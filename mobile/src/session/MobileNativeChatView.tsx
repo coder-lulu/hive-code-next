@@ -18,6 +18,7 @@ import { createMobileNativeChatViewStyles } from './mobile-native-chat-view-styl
 import { buildMobileNativeChatTransientData } from './mobile-native-chat-render-data'
 import { useMobileNativeChatPinchGesture } from './use-mobile-native-chat-pinch-gesture'
 import { useMobileNativeChatTurnDisclosure } from './use-mobile-native-chat-turn-disclosure'
+import { useSettledMobileNativeChatInputLock } from './use-mobile-native-chat-input-lease'
 import { MobileNativeChatTurnStatus } from './MobileNativeChatTurnStatus'
 import { MobileAgentWorkingIndicator } from './MobileAgentWorkingIndicator'
 import { MobileNativeChatComposer } from './MobileNativeChatComposer'
@@ -25,7 +26,6 @@ import { MobileNativeChatMessage } from './MobileNativeChatMessage'
 import { MobileNativeChatPromptCard } from './MobileNativeChatPromptCard'
 import type { MobileNativeChatViewProps } from './mobile-native-chat-view-props'
 
-const INPUT_LOCK_SETTLE_MS = 600
 const EMPTY_ERROR = '无法读取对话记录。你可以切回终端继续工作。'
 const EMPTY_HINT = '让 Agent 检查代码、解释输出或进行修改。'
 
@@ -38,7 +38,11 @@ export function MobileNativeChatView({
   error,
   agent,
   agentWorking,
+  canStop = agentWorking,
   structuredActivityUi = false,
+  turnIndicator = null,
+  workingStartedAt,
+  settledTurns,
   onStop,
   streaming,
   hasMore,
@@ -164,19 +168,23 @@ export function MobileNativeChatView({
     [hasMore, loadingEarlier, onLoadEarlier]
   )
 
-  // Align a single message's top to the top of the viewport.
-  const onScrollToMessage = useCallback((index: number) => {
-    listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true })
-  }, [])
-
-  // Per-turn "Thinking / Working for N / Worked for N" rows. The structured lane
-  // owns them; the bridge lane keeps its three-dot indicator.
+  // Per-turn status rows: one live indicator while the turn runs, then a settled
+  // "Worked for N" row. The structured lane owns them; the bridge lane keeps its
+  // three-dot indicator.
   const turns = useMobileNativeChatTurnDisclosure({
     messages: data,
     enabled: structuredActivityUi,
     isWorking: agentWorking === true,
+    workingStartedAt,
+    settledTurns,
+    thinking: turnIndicator?.thinking === true,
+    activityText: turnIndicator?.activityText ?? null,
     scopeKey: sendSurfaceId
   })
+
+  const onScrollToMessage = useCallback((index: number) => {
+    listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true })
+  }, [])
 
   const renderItem = useCallback(
     ({ item, index }: { item: NativeChatMessage; index: number }) => (
@@ -200,16 +208,7 @@ export function MobileNativeChatView({
     status === 'error' ? '无法加载对话' : `开始与 ${formatAgentTypeLabel(agent)} 对话`
   const emptySubtitle = status === 'error' ? (error ?? EMPTY_ERROR) : EMPTY_HINT
 
-  // A dead PTY emits subscribed→end; settle both edges so its false lease cannot flash the composer enabled.
-  const [lockHeld, setLockHeld] = useState(false)
-  useEffect(() => {
-    if ((inputLockReason != null) === lockHeld) {
-      return
-    }
-    const timer = setTimeout(() => setLockHeld(inputLockReason != null), INPUT_LOCK_SETTLE_MS)
-    return () => clearTimeout(timer)
-  }, [inputLockReason, lockHeld])
-  const lockReason = lockHeld ? (inputLockReason ?? 'waiting') : null
+  const lockReason = useSettledMobileNativeChatInputLock(inputLockReason)
 
   return (
     <View style={[styles.root, { paddingBottom: bottomPad }]}>
@@ -261,11 +260,12 @@ export function MobileNativeChatView({
                 ) : null
               }
               ListFooterComponent={
-                turns.activeTurnIsUnanchored && turns.active ? (
+                structuredActivityUi && agentWorking && turns.active ? (
                   <MobileNativeChatTurnStatus
                     startedAt={turns.active.startedAt}
                     thinking={turns.active.thinking}
                     workedSeconds={turns.active.workedSeconds}
+                    activityText={turns.activeActivityText}
                   />
                 ) : null
               }
@@ -279,8 +279,7 @@ export function MobileNativeChatView({
               }
             />
           </GestureDetector>
-          {/* Jump-to-latest control. The scroll-to-top affordance now lives
-              per-message (the up-arrow in each agent message's controls). */}
+          {/* Jump-to-latest control. */}
           {!atBottom ? (
             <Pressable
               accessibilityLabel="滚动到最新消息"
@@ -303,8 +302,6 @@ export function MobileNativeChatView({
         question={question}
         onAnswerQuestion={onAnswerQuestion}
       />
-      {/* Chrome row above the composer: the working indicator and the global
-          tool-calls expand/collapse toggle on the left, Stop in the far corner. */}
       <View style={styles.chromeRow}>
         <View style={styles.chromeLeft}>
           {agentWorking && !structuredActivityUi ? <MobileAgentWorkingIndicator /> : null}
@@ -321,7 +318,7 @@ export function MobileNativeChatView({
             <Text style={styles.chromeToggleLabel}>{toolsExpanded ? '收起' : '工具'}</Text>
           </Pressable>
         </View>
-        {agentWorking ? (
+        {canStop ? (
           <Pressable
             style={({ pressed }) => [styles.stopButton, pressed && styles.pressed]}
             onPress={onStop}

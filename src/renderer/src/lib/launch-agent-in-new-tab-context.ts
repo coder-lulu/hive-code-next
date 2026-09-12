@@ -1,5 +1,6 @@
 import type { AppState } from '@/store/types'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
+import type { StructuredAgentLaunchSettlement } from '@/lib/structured-agent-launch-settlement'
 import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { LaunchSource } from '../../../shared/telemetry-events'
@@ -44,6 +45,8 @@ export type LaunchAgentInNewTabResult = {
   /** The host will publish and focus a structured tab asynchronously. */
   focusAfterMenuClose?: 'structured-session'
   promptDeliveryResult?: Promise<{ delivered: boolean; failureNotified: boolean }>
+  /** Final structured launch outcome, including definitive-refusal terminal fallback. */
+  structuredSettlement?: Promise<StructuredAgentLaunchSettlement>
 } | null
 
 export function resolveLaunchAgentExecutionContext(

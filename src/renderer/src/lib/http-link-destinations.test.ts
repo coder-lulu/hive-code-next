@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { describe, expect, it } from 'vitest'
 import { buildHttpLinkActions, httpLinkActionDestinationsFor } from './http-link-destinations'
 
@@ -41,7 +42,7 @@ describe('buildHttpLinkActions', () => {
       }
     )
 
-    expect(actions.primary.label).toBe('Orca Browser')
+    expect(actions.primary.label).toBe(`${APP_DISPLAY_NAME} Browser`)
     expect(actions.primary.external).toBe(false)
     expect(actions.alternate?.label).toBe('System Browser')
     expect(actions.alternate?.external).toBe(true)

@@ -1,6 +1,6 @@
 import { productNameText } from '@/product-brand'
 import type { LucideIcon } from 'lucide-react-native'
-import { WifiOff, Shield, Monitor, Clock, Globe } from 'lucide-react-native'
+import { WifiOff, Shield, Monitor, Clock, Globe, Bell } from 'lucide-react-native'
 
 export type TroubleshootSection = {
   id: string
@@ -10,6 +10,16 @@ export type TroubleshootSection = {
 }
 
 export const troubleshootCommonIssues: TroubleshootSection[] = [
+  {
+    id: 'notifications',
+    icon: Bell,
+    title: '通知',
+    steps: [
+      '检查系统是否允许 HiveCode 通知，并确认专注模式或勿扰模式已关闭。',
+      '尝试切换 Wi-Fi 网络。如果切换后收到通知，当前网络可能延迟了电脑连接。'
+    ]
+  },
+
   {
     id: 'wifi',
     icon: WifiOff,

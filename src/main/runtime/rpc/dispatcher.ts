@@ -1,7 +1,7 @@
 import {
   buildRegistry,
   isStreamingMethod,
-  type RpcAnyMethod,
+  type RpcAnyMethodDeclaration,
   type RpcEnvelopeMeta,
   type RpcRegistry,
   type RpcRequest,
@@ -27,7 +27,7 @@ import { invokeDispatcherUnaryMethod } from './dispatcher-unary-method-invocatio
 
 export type DispatcherOptions = {
   runtime: OrcaRuntimeService
-  methods?: readonly RpcAnyMethod[]
+  methods?: readonly RpcAnyMethodDeclaration[]
   hiveRuntimeCloud?: HiveRuntimeCloudControl
 }
 

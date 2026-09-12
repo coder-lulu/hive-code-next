@@ -19,6 +19,8 @@ import {
 
 export type SkillScanRoot = Omit<SkillDiscoverySource, 'exists' | 'skippedReason'>
 type SkillDiscoveryPathApi = Pick<typeof posix, 'basename' | 'join'>
+export const skillLabelCollator = new Intl.Collator(undefined, { sensitivity: 'base' })
+const skillPathCollator = new Intl.Collator()
 
 export function stablePathId(pathValue: string): string {
   return createHash('sha1').update(pathValue).digest('hex').slice(0, 16)
@@ -49,9 +51,9 @@ export function sourceLabelForSkill(root: SkillScanRoot, sourceKind: SkillSource
 
 export function compareSkills(a: DiscoveredSkill, b: DiscoveredSkill): number {
   return (
-    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
-    a.sourceLabel.localeCompare(b.sourceLabel, undefined, { sensitivity: 'base' }) ||
-    a.skillFilePath.localeCompare(b.skillFilePath)
+    skillLabelCollator.compare(a.name, b.name) ||
+    skillLabelCollator.compare(a.sourceLabel, b.sourceLabel) ||
+    skillPathCollator.compare(a.skillFilePath, b.skillFilePath)
   )
 }
 

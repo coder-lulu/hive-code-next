@@ -18,8 +18,10 @@ const TERMINAL_PANE_HOOK_SOURCE_PATTERN =
 // paused notice that read it (207 hooks, still 8 useMemo).
 // Then host-authoritative layout removal added two `useRef`s in reconciliation
 // (last host layout leaf set, retired leaf set) (209 hooks, still 8 useMemo).
+// Hive first-visible-render readiness adds useRef/useLayoutEffect in TerminalPane
+// (211 hooks, still 8 useMemo); frozen product and merged candidate have identical order.
 const PRE_REFACTOR_HOOK_ORDER_SHA256 =
-  'f6de13ab7d6d130444c50fec2cfe097851ee1b7ecf0f3a2cbdc082c2e8e8838b'
+  '6cac23b5aa23dd32f7b2892df91f3f7a8e3552c971114929fdfd392bc83aa5e1'
 
 const sourceFiles = readdirSync(__dirname)
   .filter((name) => TERMINAL_PANE_HOOK_SOURCE_PATTERN.test(name))
@@ -84,7 +86,7 @@ function readFlattenedHookOrder(): string[] {
 describe('TerminalPane refactor hook parity', () => {
   it('preserves the recursively flattened render hook order', () => {
     const hooks = readFlattenedHookOrder()
-    expect(hooks).toHaveLength(209)
+    expect(hooks).toHaveLength(211)
     expect(hooks.filter((hook) => hook === 'useMemo')).toHaveLength(8)
     expect(createHash('sha256').update(hooks.join('\n')).digest('hex')).toBe(
       PRE_REFACTOR_HOOK_ORDER_SHA256

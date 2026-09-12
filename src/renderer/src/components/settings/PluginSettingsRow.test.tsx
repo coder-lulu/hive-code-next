@@ -4,7 +4,6 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PluginHostListEntry } from '../../../../preload/api-types'
-import { applyProductBranding } from '@/product-brand'
 import { PluginSettingsRow } from './PluginSettingsRow'
 
 vi.mock('../ui/dropdown-menu', () => ({
@@ -79,9 +78,7 @@ describe('PluginSettingsRow', () => {
     expect(container.textContent).toContain('View advisory')
     expect(container.textContent).not.toContain('Remove')
     expect(
-      container.querySelector<HTMLButtonElement>(
-        `[aria-label="Enable ${applyProductBranding(plugin.name)}"]`
-      )?.disabled
+      container.querySelector<HTMLButtonElement>(`[aria-label="Enable ${plugin.name}"]`)?.disabled
     ).toBe(true)
     act(() => root.unmount())
   })

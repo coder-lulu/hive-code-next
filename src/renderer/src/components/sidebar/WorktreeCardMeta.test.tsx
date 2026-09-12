@@ -147,12 +147,14 @@ describe('WorktreeCardDetailsHover', () => {
     expect(markup).toContain('Copy link')
     expect(markup).toContain('Unlink PR from workspace')
     expect(markup).toContain(
-      'Orca will hide PR #456 details for this workspace. The PR and branch on GitHub won’t be changed.'
+      `${APP_DISPLAY_NAME} will hide PR #456 details for this workspace. The PR and branch on GitHub won’t be changed.`
     )
-    expect(markup).toContain('Open in Orca browser')
+    expect(markup).toContain(`Open in ${APP_DISPLAY_NAME} browser`)
     expect(moreActionsIndex).toBeLessThan(openInOrcaIndex)
     expect(openInOrcaIndex).toBeLessThan(viewOnGitHubIndex)
-    expect(markup.indexOf('Open in Orca browser')).toBeLessThan(markup.indexOf('Copy link'))
+    expect(markup.indexOf(`Open in ${APP_DISPLAY_NAME} browser`)).toBeLessThan(
+      markup.indexOf('Copy link')
+    )
     expect(markup.indexOf('Copy link')).toBeLessThan(markup.indexOf('Unlink PR from workspace'))
     expect(markup).not.toContain('aria-label="Unlink PR from workspace"')
   })
@@ -187,8 +189,8 @@ describe('WorktreeCardDetailsHover', () => {
 
     expect(moreActionsIndex).toBeGreaterThan(-1)
     expect(copyLinkIndex).toBeGreaterThan(-1)
-    expect(markup).toContain('Open in Orca browser')
-    expect(markup.indexOf('Open in Orca browser')).toBeLessThan(copyLinkIndex)
+    expect(markup).toContain(`Open in ${APP_DISPLAY_NAME} browser`)
+    expect(markup.indexOf(`Open in ${APP_DISPLAY_NAME} browser`)).toBeLessThan(copyLinkIndex)
     expect(editIssueIndex).toBeGreaterThan(-1)
     expect(moreActionsIndex).toBeLessThan(editIssueIndex)
     expect(copyLinkIndex).toBeLessThan(editIssueIndex)
@@ -222,10 +224,10 @@ describe('WorktreeCardDetailsHover', () => {
     expect(markup).toContain('aria-label="More MR actions"')
     expect(markup).toContain('Unlink MR from workspace')
     expect(markup).toContain(
-      'Orca will hide MR !77 details for this workspace. The MR and branch on GitLab won’t be changed.'
+      `${APP_DISPLAY_NAME} will hide MR !77 details for this workspace. The MR and branch on GitLab won’t be changed.`
     )
     expect(markup).toContain('View on GitLab')
-    expect(markup).toContain('Open in Orca browser')
+    expect(markup).toContain(`Open in ${APP_DISPLAY_NAME} browser`)
   })
 
   it('hides the embedded-browser action when a linked review has no URL', () => {
@@ -246,7 +248,7 @@ describe('WorktreeCardDetailsHover', () => {
       </WorktreeCardDetailsHover>
     )
 
-    expect(markup).not.toContain('Open in Orca browser')
+    expect(markup).not.toContain(`Open in ${APP_DISPLAY_NAME} browser`)
   })
 
   it('keeps the embedded-browser action provider-neutral for unsupported review URLs', () => {
@@ -271,7 +273,7 @@ describe('WorktreeCardDetailsHover', () => {
       </WorktreeCardDetailsHover>
     )
 
-    expect(markup).toContain('Open in Orca browser')
+    expect(markup).toContain(`Open in ${APP_DISPLAY_NAME} browser`)
   })
 
   it('displays Linear issue details with link', () => {

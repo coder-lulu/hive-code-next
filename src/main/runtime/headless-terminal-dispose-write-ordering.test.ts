@@ -98,9 +98,12 @@ describe('disposeHeadlessTerminal write ordering', () => {
     runtime.resetPtyModelAfterMigrationFailure(PTY_ID)
     runtime.onPtyData(PTY_ID, 'ISSUED-AFTER-DISPOSE\r\n', 2)
 
-    const snapshot = await runtime.serializeHiddenOutputRecoveryBuffer(PTY_ID)
+    const snapshot = await runtime.serializeMainTerminalBuffer(PTY_ID)
     const painted = `${snapshot?.scrollbackAnsi ?? ''}${snapshot?.data ?? ''}`
     expect(painted).toContain('ISSUED-AFTER-DISPOSE')
     expect(painted).not.toContain('QUEUED-BEFORE-DISPOSE')
+    // A failed migration's headless suffix cannot prove restored history. The
+    // direct model assertion above must not relax the provider recovery fence.
+    await expect(runtime.serializeHiddenOutputRecoveryBuffer(PTY_ID)).resolves.toBeNull()
   })
 })

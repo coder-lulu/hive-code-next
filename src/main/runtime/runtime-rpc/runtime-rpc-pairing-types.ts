@@ -1,7 +1,7 @@
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runtime-cloud-control'
 import type { OrcaRuntimeService } from '../orca-runtime'
-import type { RpcAnyMethod } from '../rpc/core'
+import type { RpcAnyMethodDeclaration } from '../rpc/core'
 import type { DeviceRegistry } from '../device-registry'
 import type { E2EEKeypair } from '../e2ee-keypair'
 export const DEFAULT_WS_PORT = 6768
@@ -47,7 +47,7 @@ export type OrcaRuntimeRpcServerOptions = {
   // Why: test-only override for the ownership reclaim cadence.
   metadataOwnershipPollMs?: number
   // Why: tests may inject inert protocol stages before production authorization registers them.
-  methods?: readonly RpcAnyMethod[]
+  methods?: readonly RpcAnyMethodDeclaration[]
 }
 
 export type PairingOfferUnavailableReason =

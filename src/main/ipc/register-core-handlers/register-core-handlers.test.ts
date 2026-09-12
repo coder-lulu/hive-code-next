@@ -142,7 +142,7 @@ vi.mock('electron', () => ({
   }
 }))
 
-vi.mock('./hive-account', () => ({
+vi.mock('../hive-account', () => ({
   registerHiveAccountHandlers: registerHiveAccountHandlersMock
 }))
 

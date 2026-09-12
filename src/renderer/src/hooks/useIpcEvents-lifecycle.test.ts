@@ -30,7 +30,7 @@ const EXPECTED_DIRECT_CALLBACK_METHODS = [
   'runtime.onNativeChatLaunchDraftResolved',
   'runtime.onTerminalDriverChanged',
   'runtime.onTerminalFitOverrideChanged',
-  'runtimeEnvironments.onSharedControlDiagnostics',
+  'runtimeEnvironments.onStatusChanged',
   'settings.onChanged',
   'ssh.onCredentialRequest',
   'ssh.onCredentialResolved',
@@ -58,6 +58,7 @@ const EXPECTED_DIRECT_CALLBACK_METHODS = [
   'ui.onOpenFeatureTour',
   'ui.onOpenFileFromMobile',
   'ui.onOpenMarkdownFiles',
+  'ui.onOpenNewTaskHome',
   'ui.onOpenNewWorkspace',
   'ui.onOpenQuickOpen',
   'ui.onOpenSettings',
@@ -106,7 +107,7 @@ const EXPECTED_DIRECT_CALLBACK_METHODS = [
 const EXPECTED_CALLBACK_REGISTRATION_SEQUENCE = [
   'ui.onMobileMarkdownRequest',
   'automations.onChanged',
-  'runtimeEnvironments.onSharedControlDiagnostics',
+  'runtimeEnvironments.onStatusChanged',
   'repos.onChanged',
   'worktrees.onChanged',
   'worktrees.onHeadIdentitiesChanged',
@@ -131,6 +132,7 @@ const EXPECTED_CALLBACK_REGISTRATION_SEQUENCE = [
   'ui.onOpenQuickOpen',
   'ui.onToggleQuickCommandsMenu',
   'ui.onOpenNewWorkspace',
+  'ui.onOpenNewTaskHome',
   'ui.onDeleteCurrentWorkspace',
   'ui.onOpenWorkspaceBoard',
   'ui.onToggleAgentDashboard',
@@ -382,7 +384,7 @@ describe('useIpcEvents App-lifetime lifecycle', () => {
     ).toEqual([
       'ui.onMobileMarkdownRequest',
       'automations.onChanged',
-      'runtimeEnvironments.onSharedControlDiagnostics',
+      'runtimeEnvironments.onStatusChanged',
       'runtimeEnvironments.subscribe',
       ...EXPECTED_CALLBACK_REGISTRATION_SEQUENCE.slice(3)
     ])

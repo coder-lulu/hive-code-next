@@ -62,16 +62,18 @@ const HOST_COMPONENT_NAMES = new Set([
   'View'
 ])
 
-// Hive route baseline; accepted-send takeover reports update callback/nested bodies only.
-const HEAD_MAIN_HOOK_SHA256 = 'e471d41748fc7da3dcf54087d6968c608d18b312ffa80877859ee152d5602f1c'
-const HEAD_HOOK_BINDING_SHA256 = 'e6281c2ba99ca485f7764540107df1dd620fcca88dc7e69f5bb67b7c8dbd5eae'
+// Hive route baseline at the reviewed upstream merge: notification-pane hook and terminal-create failure copy.
+// The string count and leaf JSX hash also repair drift already present in frozen product a697f3ba.
+// Immutable product/candidate fact comparisons are captured in logs/mobile-parity-fact-diff.txt.
+const HEAD_MAIN_HOOK_SHA256 = '2a44f37a7cc9e889219b18066ed810d35a106af6630e103f77a45aedf8eaaa66'
+const HEAD_HOOK_BINDING_SHA256 = 'bca4639b7af0a1a743f35052c9444b33e6d0d01622e6afc2cdd2db51633f98fa'
 const HEAD_CALLBACK_IDENTITY_SHA256 =
   'cad8b6e3c8ff4889e72272659a4b4b52730909c1e410107aab7606729f60b5d7'
 const HEAD_CALLBACK_BODY_SHA256 = '3bab990c09b8ebeca8763fe990985678596f0e24cc66deeee981684c1d73cacc'
 const HEAD_EFFECT_SHA256 = 'ec67f7c5cdd8926842f2bccbcccf4d3d922ec6086d5cd66c785071492fec2b3c'
 const HEAD_CONTENT_HOOK_SHA256 = 'f0c5809b641fc16a2ae59548785e3d0e6d318f311d568f9ad324382f02599177'
 const HEAD_NESTED_FUNCTION_SHA256 =
-  '04221c2e33c7d1cb56bdaaf82efb9e3eaab5241528b5a44119f0b3bc24c526b6'
+  '9cd442d7a2c73a88e9adf41f50c25c8f10df0672e74df36cd225d75ace0a416c'
 const HEAD_NATIVE_REGISTRATION_SHA256 =
   'cab85e4e4a3f43289ba93ddea9ccce57aea83e0bf14fd1620a965aad0c1cb49e'
 const HEAD_NATIVE_REMOVAL_SHA256 =
@@ -80,9 +82,9 @@ const HEAD_TIMER_CREATION_SHA256 =
   '7a06ea7e65ac48dfbd3d4350f9856e7aa8802abc70ccd0e2556f5b59975648de'
 const HEAD_TIMER_CLEANUP_SHA256 = 'd10925056f20b127981b551704406d7298e0e0bc1fd29e519cd11b7e7fea57dd'
 const HEAD_RUNTIME_STRING_SHA256 =
-  '3262abd35ed8a85c34be87c2d2b3041e313e887e3f62a26e678a860467b1798d'
+  'f93b92c081e583566de404e5d9e1750b911a1d6b1bfcd68f29692fce18f46abe'
 const HEAD_HOST_JSX_SHA256 = '6961e342d66c3b5ec9d78e75a5e79e3c69e7f4f79703203710d492928c93e131'
-const HEAD_LEAF_JSX_SHA256 = '576f82a4d8e1136e7cc0c4d13f27906d1206e1d803a792dee8ee9000ab42c669'
+const HEAD_LEAF_JSX_SHA256 = '4f988d2e13ca6944165416638891b4d16d8a2d6c4a07d2a7e2439fedf5f3b8c6'
 const HEAD_STYLE_REFERENCE_SHA256 =
   'd05089e4d4c85f52e6f5518196bac924adb89b7b2b3e70ed9c99de35f7d266b7'
 const HEAD_IDENTITY_FIELD_SHA256 =
@@ -473,7 +475,7 @@ describe('mobile session route extraction parity', () => {
     const contentBindings = CONTENT_COMPONENT_NAMES.flatMap(
       (name) => readHookFacts(name, definitions).bindings
     )
-    expect(main.hooks).toHaveLength(271)
+    expect(main.hooks).toHaveLength(272)
     expect(hash(main.hooks)).toBe(HEAD_MAIN_HOOK_SHA256)
     expect(hash(main.bindings)).toBe(HEAD_HOOK_BINDING_SHA256)
     expect(main.callbacks).toHaveLength(78)
@@ -519,7 +521,7 @@ describe('mobile session route extraction parity', () => {
   it('preserves runtime strings, styles, and the expanded JSX tree', () => {
     const strings = readRuntimeStrings()
     const jsx = readJsxFacts(readDefinitions())
-    expect(strings).toHaveLength(549)
+    expect(strings).toHaveLength(551)
     expect(hash(strings)).toBe(HEAD_RUNTIME_STRING_SHA256)
     expect(jsx.host).toHaveLength(125)
     expect(hash(jsx.host)).toBe(HEAD_HOST_JSX_SHA256)

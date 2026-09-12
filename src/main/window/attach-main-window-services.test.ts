@@ -74,7 +74,10 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../ipc/repos', () => ({
-  registerRepoHandlers: registerRepoHandlersMock,
+  registerRepoHandlers: registerRepoHandlersMock
+}))
+
+vi.mock('../ipc/repos/repos-changed-notification', () => ({
   setRepoRemoteClientNotifier: setRepoRemoteClientNotifierMock
 }))
 
@@ -332,14 +335,38 @@ describe('attachMainWindowServices', () => {
     expect(store.flushPendingAsync).toHaveBeenCalledTimes(1)
   })
 
-  it('does not initialize the online updater when HiveCode has no configured channel', async () => {
+  it('defers common updater initialization without a channel and skips destroyed owners', async () => {
     releaseUpdatesConfiguredMock.mockReturnValue(false)
     const mainWindow = createMainWindow()
+    const store = createStore()
 
-    attachMainWindowServices(mainWindow as never, createStore(), createRuntime() as never)
+    attachMainWindowServices(mainWindow as never, store, createRuntime() as never)
+    expect(mainWindow.once).toHaveBeenCalledWith('ready-to-show', expect.any(Function))
+    expect(setupAutoUpdaterMock).not.toHaveBeenCalled()
     await fireReadyToShow(mainWindow)
 
-    expect(setupAutoUpdaterMock).not.toHaveBeenCalled()
+    // Release/network refusal is proved by the paired updater.product-boundary.test.ts.
+    expect(setupAutoUpdaterMock).toHaveBeenCalledWith(mainWindow, {
+      getLastUpdateCheckAt: expect.any(Function),
+      onBeforeQuit: expect.any(Function),
+      setLastUpdateCheckAt: expect.any(Function),
+      getPendingUpdateNudgeId: expect.any(Function),
+      getDismissedUpdateNudgeId: expect.any(Function),
+      setPendingUpdateNudgeId: expect.any(Function),
+      setDismissedUpdateNudgeId: expect.any(Function),
+      getReleaseChannelOverride: expect.any(Function),
+      installMode: undefined
+    })
+    await setupAutoUpdaterMock.mock.calls[0][1].onBeforeQuit()
+    expect(store.flushPendingAsync).toHaveBeenCalledTimes(1)
+    await fireReadyToShow(mainWindow)
+    expect(setupAutoUpdaterMock).toHaveBeenCalledTimes(1)
+
+    const destroyedWindow = createMainWindow()
+    destroyedWindow.isDestroyed!.mockReturnValue(true)
+    attachMainWindowServices(destroyedWindow as never, createStore(), createRuntime() as never)
+    await fireReadyToShow(destroyedWindow)
+    expect(setupAutoUpdaterMock).toHaveBeenCalledTimes(1)
   })
 
   it('replaces the TCC handlers when the main window is reattached', () => {
@@ -544,14 +571,12 @@ describe('attachMainWindowServices', () => {
   })
 
   it('removes the app reload IPC handler when the owning window closes', () => {
-    const mainWindowOnMock = vi.fn()
     const mainWindow = createMainWindow()
-    mainWindow.on = mainWindowOnMock
 
     attachMainWindowServices(mainWindow as never, createStore(), createRuntime() as never)
 
     removeHandlerMock.mockClear()
-    const closedHandlers = getClosedHandlers(mainWindowOnMock)
+    const closedHandlers = getClosedHandlers(mainWindow.on)
     expect(closedHandlers.length).toBeGreaterThan(0)
     for (const handler of closedHandlers) {
       handler()
@@ -561,15 +586,11 @@ describe('attachMainWindowServices', () => {
   })
 
   it('keeps a newer app reload handler when an older window closes late', () => {
-    const oldWindowOnMock = vi.fn()
     const oldWindow = createMainWindow()
-    oldWindow.on = oldWindowOnMock
     attachMainWindowServices(oldWindow as never, createStore(), createRuntime() as never)
-    const oldClosedHandlers = getClosedHandlers(oldWindowOnMock)
+    const oldClosedHandlers = getClosedHandlers(oldWindow.on)
 
-    const newWindowOnMock = vi.fn()
     const newWindow = createMainWindow()
-    newWindow.on = newWindowOnMock
     attachMainWindowServices(newWindow as never, createStore(), createRuntime() as never)
 
     removeHandlerMock.mockClear()
@@ -579,7 +600,7 @@ describe('attachMainWindowServices', () => {
 
     expect(removeHandlerMock).not.toHaveBeenCalledWith('app:reload')
 
-    for (const handler of getClosedHandlers(newWindowOnMock)) {
+    for (const handler of getClosedHandlers(newWindow.on)) {
       handler()
     }
     expect(removeHandlerMock).toHaveBeenCalledWith('app:reload')
@@ -624,22 +645,18 @@ describe('attachMainWindowServices', () => {
   })
 
   it('clears browser guest registrations when the main window closes', () => {
-    const mainWindowOnMock = vi.fn()
     const mainWindow = createMainWindow()
-    mainWindow.on = mainWindowOnMock
 
     attachMainWindowServices(mainWindow as never, createStore(), createRuntime() as never)
 
-    const closedHandler = getClosedHandlers(mainWindowOnMock).at(-1)
+    const closedHandler = getClosedHandlers(mainWindow.on).at(-1)
     expect(closedHandler).toBeTypeOf('function')
     closedHandler?.()
     expect(browserManagerUnregisterAllMock).toHaveBeenCalledTimes(1)
   })
 
   it('removes the native file-drop relay when the main window closes', () => {
-    const mainWindowOnMock = vi.fn()
     const mainWindow = createMainWindow({ send: vi.fn() })
-    mainWindow.on = mainWindowOnMock
 
     attachMainWindowServices(mainWindow as never, createStore(), createRuntime() as never)
 
@@ -648,7 +665,7 @@ describe('attachMainWindowServices', () => {
     expect(relayHandler).toBeTypeOf('function')
     expect(removeAllListenersMock).toHaveBeenCalledWith(channel)
 
-    const closedHandlers = getClosedHandlers(mainWindowOnMock)
+    const closedHandlers = getClosedHandlers(mainWindow.on)
     for (const handler of closedHandlers) {
       handler()
     }
@@ -712,15 +729,13 @@ describe('attachMainWindowServices', () => {
   })
 
   it('clears the runtime notifier when the owning window closes', () => {
-    const mainWindowOnMock = vi.fn()
     const mainWindow = createMainWindow()
-    mainWindow.on = mainWindowOnMock
     const runtime = createRuntime()
 
     attachMainWindowServices(mainWindow as never, createStore(), runtime as never)
 
     runtime.setNotifier.mockClear()
-    for (const handler of getClosedHandlers(mainWindowOnMock)) {
+    for (const handler of getClosedHandlers(mainWindow.on)) {
       handler()
     }
 
@@ -730,15 +745,11 @@ describe('attachMainWindowServices', () => {
 
   it('keeps a newer runtime notifier when an older window closes late', () => {
     const runtime = createRuntime()
-    const oldWindowOnMock = vi.fn()
     const oldWindow = createMainWindow()
-    oldWindow.on = oldWindowOnMock
     attachMainWindowServices(oldWindow as never, createStore(), runtime as never)
-    const oldClosedHandlers = getClosedHandlers(oldWindowOnMock)
+    const oldClosedHandlers = getClosedHandlers(oldWindow.on)
 
-    const newWindowOnMock = vi.fn()
     const newWindow = createMainWindow()
-    newWindow.on = newWindowOnMock
     attachMainWindowServices(newWindow as never, createStore(), runtime as never)
 
     runtime.setNotifier.mockClear()
@@ -748,7 +759,7 @@ describe('attachMainWindowServices', () => {
 
     expect(runtime.setNotifier).not.toHaveBeenCalledWith(null)
 
-    for (const handler of getClosedHandlers(newWindowOnMock)) {
+    for (const handler of getClosedHandlers(newWindow.on)) {
       handler()
     }
     expect(runtime.setNotifier).toHaveBeenCalledWith(null)
@@ -757,10 +768,8 @@ describe('attachMainWindowServices', () => {
   it('forwards runtime notifier events to the renderer', () => {
     const sendMock = vi.fn()
     const webContentsOnMock = vi.fn()
-    const mainWindowOnMock = vi.fn()
     const mainWindow = createMainWindow({ on: webContentsOnMock, send: sendMock })
     mainWindow.isDestroyed = vi.fn(() => false)
-    mainWindow.on = mainWindowOnMock
     const runtime = createRuntime()
 
     attachMainWindowServices(mainWindow as never, createStore(), runtime as never)

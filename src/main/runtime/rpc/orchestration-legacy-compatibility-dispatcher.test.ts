@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type Database from '../../sqlite/sync-database'
 import { applyEscalationToDispatch } from '../orchestration/coordinator-escalation-triage'
@@ -356,7 +357,7 @@ describe('legacy compatibility through RpcDispatcher', () => {
       }
     })
     expect((coordinatorCheck as { result: { formatted: string } }).result.formatted).toContain(
-      `orca orchestration reply --id ${firstId}`
+      `${PRIMARY_CLI_COMMAND} orchestration reply --id ${firstId}`
     )
   })
 

@@ -13,7 +13,7 @@ import { createTerminalSettingsScreenStyles } from '../terminal/terminal-setting
 
 const sources = {
   chat: readFileSync(
-    fileURLToPath(new URL('../../app/native-chat-settings.tsx', import.meta.url)),
+    fileURLToPath(new URL('./native-chat-settings-screen.tsx', import.meta.url)),
     'utf8'
   ),
   terminal: readFileSync(

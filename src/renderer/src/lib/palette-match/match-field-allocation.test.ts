@@ -5,7 +5,31 @@ import {
   type PaletteFieldProfile
 } from './indexed-field'
 import { matchPaletteField } from './match-field'
-import { createPaletteQueryToken } from './palette-query'
+import { createPaletteQueryToken, preparePaletteQuery } from './palette-query'
+
+describe('palette atom equality preserves source ranges', () => {
+  it.each([
+    ['token0x token0 token0', 'token0', 8, 14],
+    ['prefix Café1 Café1', 'Café1', 7, 13],
+    ['prefix 🚀1 🚀1', '🚀1', 7, 10]
+  ] as const)('matches the first complete atom in %s', (text, query, start, end) => {
+    const field = indexPaletteField({
+      id: 'name',
+      profile: 'structured-label',
+      text,
+      role: 'primary',
+      destinationEligible: true
+    })!
+    const prepared = preparePaletteQuery(query)
+    if (prepared.state !== 'ready') {
+      throw new Error('Expected a ready query')
+    }
+    expect(matchPaletteField(field, prepared.tokens[0])).toEqual({
+      quality: 'word-exact',
+      ranges: [{ start, end }]
+    })
+  })
+})
 
 describe('palette field quality allocation', () => {
   it.each(['scan', 's', '123', 'scna', 'zzz'])(

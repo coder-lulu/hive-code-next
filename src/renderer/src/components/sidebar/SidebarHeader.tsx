@@ -54,7 +54,7 @@ const SidebarHeader = React.memo(function SidebarHeader({
     <div className="mt-2 flex h-8 min-w-0 items-center justify-between gap-1.5 px-2">
       <div className="flex min-w-0 items-center gap-1">
         <span
-          className="pl-2 pr-0.5 text-xs font-semibold text-muted-foreground/80 select-none"
+          className="min-w-0 truncate select-none pl-2 pr-0.5 text-xs font-semibold text-muted-foreground/80"
           data-sidebar-section-title={
             sectionTitle ? 'spaces' : groupBy === 'repo' ? 'projects' : 'workspaces'
           }

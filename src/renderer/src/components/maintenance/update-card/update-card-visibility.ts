@@ -34,7 +34,7 @@ export function isUpdateCardVisible({
   if (status.state === 'not-available' && (!isUserInitiated || autoDismissed)) {
     return false
   }
-  if (status.state === 'idle') {
+  if (status.state === 'idle' || status.state === 'disabled') {
     return false
   }
   if (status.state === 'error' && !shouldShowDetailedErrorCard && !isUserInitiated) {

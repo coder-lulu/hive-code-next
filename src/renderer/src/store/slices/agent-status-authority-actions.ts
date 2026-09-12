@@ -89,6 +89,10 @@ export function createAgentStatusAuthorityActions(
             s.unreadAgentCompletionPanes,
             retiredPaneKeySet
           ),
+          unreadAgentCompletionCountByPane: removePaneKeys(
+            s.unreadAgentCompletionCountByPane,
+            retiredPaneKeySet
+          ),
           lastTerminalInputAtByPaneKey: removePaneKeys(
             s.lastTerminalInputAtByPaneKey,
             retiredPaneKeySet
@@ -212,6 +216,12 @@ export function createAgentStatusAuthorityActions(
         paneForegroundAgentByPaneKey: movePaneKeyedRecord(s.paneForegroundAgentByPaneKey, from, to),
         unreadTerminalPanes: movePaneKeyedRecord(s.unreadTerminalPanes, from, to),
         unreadAgentCompletionPanes: movePaneKeyedRecord(s.unreadAgentCompletionPanes, from, to),
+        unreadAgentCompletionCountByPane: movePaneKeyedRecord(
+          s.unreadAgentCompletionCountByPane,
+          from,
+          to,
+          (count) => count + (s.unreadAgentCompletionCountByPane[to] ?? 0)
+        ),
         lastTerminalInputAtByPaneKey: movePaneKeyedRecord(s.lastTerminalInputAtByPaneKey, from, to),
         cacheTimerByKey: movePaneKeyedRecord(s.cacheTimerByKey, from, to),
         retentionSuppressedPaneKeys: movePaneKeyedRecord(s.retentionSuppressedPaneKeys, from, to)

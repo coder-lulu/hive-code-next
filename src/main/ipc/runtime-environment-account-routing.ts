@@ -71,7 +71,7 @@ export async function getEnvironmentStatusWithCloudFallback(
   userDataPath: string,
   environment: PublicKnownRuntimeEnvironment,
   timeoutMs?: number,
-  options?: { observeOnly?: true }
+  options?: { observeOnly?: true; signal?: AbortSignal; reconnect?: true }
 ): Promise<RuntimeRpcResponse<RuntimeStatus>> {
   let localResponse: RuntimeRpcResponse<RuntimeStatus> | null = null
   if (hasLocalPairing(environment)) {

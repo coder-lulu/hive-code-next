@@ -41,7 +41,6 @@ import { salvagedField, salvagedOptional, salvagingArray, salvagingRecord } from
 
 // ─── Terminal pane layout (recursive) ───────────────────────────────
 
-const terminalPaneSplitDirectionSchema = z.enum(['vertical', 'horizontal'])
 const workspaceKeySchema = z.custom<WorkspaceKey>(
   (value) => typeof value === 'string' && isWorkspaceKey(value)
 )
@@ -57,7 +56,7 @@ const terminalPaneLayoutNodeSchema: z.ZodType<TerminalPaneLayoutNode> = z.lazy((
     }),
     z.object({
       type: z.literal('split'),
-      direction: terminalPaneSplitDirectionSchema,
+      direction: z.enum(['vertical', 'horizontal']),
       first: terminalPaneLayoutNodeSchema,
       second: terminalPaneLayoutNodeSchema,
       ratio: z.number().optional()
@@ -111,6 +110,12 @@ const terminalTabSchema = z.object({
   customTitle: z.string().nullable(),
   color: z.string().nullable(),
   isPinned: z.boolean().optional(),
+  // Why: recovery asks the terminal row who owns the surface, so a row that
+  // loses viewMode on reload reads as "not chat-owned" and lets a hidden chat
+  // surface remount itself. Declared here so the row survives the parse, with
+  // the same `.catch('terminal')` degradation the unified tab uses below.
+  // Legacy rows that predate this stay undefined → 'terminal' in the renderer.
+  viewMode: z.enum(['terminal', 'chat']).catch('terminal').optional(),
   sortOrder: z.number(),
   createdAt: z.number(),
   generation: z.number().optional(),

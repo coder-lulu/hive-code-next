@@ -41,13 +41,14 @@ describe('isTransientSqliteContention', () => {
   it('recognizes a real SQLITE_BUSY thrown by a read-only open', () => {
     const contended = contendedDatabase()
     let thrown: unknown
+    let reader: SyncDatabase | null = null
     try {
-      new SyncDatabase(contended.path, { readonly: true, timeout: 0 })
-        .prepare('SELECT id FROM session')
-        .all()
+      reader = new SyncDatabase(contended.path, { readonly: true, timeout: 0 })
+      reader.prepare('SELECT id FROM session').all()
     } catch (error) {
       thrown = error
     } finally {
+      reader?.close()
       contended.release()
     }
 

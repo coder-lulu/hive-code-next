@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -82,7 +83,7 @@ describe('ClientHostedBrowserPagePane popup notices', () => {
     emitPopup()
 
     expect(toastMocks.message).toHaveBeenCalledWith(
-      'https://accounts.example.com tried to open a popup Orca does not support here.',
+      `https://accounts.example.com tried to open a popup ${APP_DISPLAY_NAME} does not support here.`,
       { id: 'browser-popup:page-a:blocked:https://accounts.example.com' }
     )
   })

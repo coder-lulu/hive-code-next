@@ -17,9 +17,12 @@ import type { BrowserWindow, IpcMainEvent } from 'electron'
 
 export type RuntimeDesktopSurface = {
   /** Show a native notification. Returns false when the host cannot, so callers can say so. */
+  isAwayForMobileNotifications?(): boolean | undefined
   showNotification(input: { title: string; body: string }): boolean
   /** The renderer window with this id, or null when there is no desktop. */
   findWindowById(id: number): BrowserWindow | null
+  /** Wait for the live renderer guest; absent desktops cannot confirm registration. */
+  waitForBrowserTabRegistration(browserPageId: string): Promise<void>
   onIpc(channel: string, listener: (event: IpcMainEvent, ...args: never[]) => void): void
   removeIpcListener(channel: string, listener: (...args: never[]) => void): void
 }
@@ -27,6 +30,9 @@ export type RuntimeDesktopSurface = {
 const inertDesktopSurface: RuntimeDesktopSurface = {
   showNotification: () => false,
   findWindowById: () => null,
+  waitForBrowserTabRegistration: async () => {
+    throw new Error('browser_restore_registration_unavailable')
+  },
   onIpc: () => {},
   removeIpcListener: () => {}
 }

@@ -59,6 +59,9 @@ export type FloatingTerminalPanelMocks = {
   pinFile: Mock<FloatingPanelStoreState['pinFile']>
   setFloatingFocus: Mock<(state: { panelFocused: boolean; terminalFocused: boolean }) => void>
   setActiveTab: Mock<FloatingPanelStoreState['setActiveTab']>
+  consumeFirstAgentCompletionUnreadForTab: Mock<
+    FloatingPanelStoreState['consumeFirstAgentCompletionUnreadForTab']
+  >
   setTabColor: Mock<FloatingPanelStoreState['setTabColor']>
   setTabCustomTitle: Mock<FloatingPanelStoreState['setTabCustomTitle']>
   setTabPaneExpanded: Mock<FloatingPanelStoreState['setTabPaneExpanded']>
@@ -105,6 +108,7 @@ export const mocks: FloatingTerminalPanelMocks = {
   pinFile: vi.fn(),
   setFloatingFocus: vi.fn(),
   setActiveTab: vi.fn(),
+  consumeFirstAgentCompletionUnreadForTab: vi.fn(),
   setTabColor: vi.fn(),
   setTabCustomTitle: vi.fn(),
   setTabPaneExpanded: vi.fn(),
@@ -143,6 +147,7 @@ function resetStore(tabs: TerminalTab[] = []): void {
     openFile: mocks.openFile,
     pinFile: mocks.pinFile,
     setActiveTab: mocks.setActiveTab,
+    consumeFirstAgentCompletionUnreadForTab: mocks.consumeFirstAgentCompletionUnreadForTab,
     setTabCustomTitle: mocks.setTabCustomTitle,
     setTabColor: mocks.setTabColor,
     setTabPaneExpanded: mocks.setTabPaneExpanded,

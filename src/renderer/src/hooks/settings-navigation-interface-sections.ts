@@ -27,7 +27,7 @@ export function buildInterfaceSettingsSections({
       ),
       icon: Palette,
       searchEntries: getAppearancePaneSearchEntries({
-        showWarpImport: showDesktopOnlySettings,
+        showDesktopThemeImports: showDesktopOnlySettings,
         showSystemTray: showDesktopOnlySettings && isWindows,
         showMenuBarIcon: showDesktopOnlySettings && isMac
       }),

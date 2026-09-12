@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Linking, Pressable, Text, View } from 'react-native'
 import { Check, ChevronRight, Moon } from 'lucide-react-native'
 import { buildWorktreeNavigationActions } from '../agent-history/worktree-navigation-actions'
 import { ActionSheetContent } from '../components/ActionSheetModal'
@@ -322,13 +322,14 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
         hostId={hostId}
         existingWorktreePaths={existingWorktreePaths}
         existingWorktrees={state.worktrees}
+        openExternalUrl={(url) => Linking.openURL(url)}
         onVisibleChange={(visible) => {
           state.newWorktreeModalVisibleRef.current = visible
         }}
-        onCreated={(worktreeId, worktreeName) => {
+        onCreated={(worktreeId, worktreeName, warning) => {
           void catalog.fetchWorktrees({ allowDuringModal: true })
           actions.navigateFromHostList(
-            hostNewWorktreeSessionRoute(hostId, worktreeId, worktreeName)
+            hostNewWorktreeSessionRoute(hostId, worktreeId, worktreeName, warning)
           )
         }}
         onRouteVisibleChange={actions.setShowNewWorktreeVisible}

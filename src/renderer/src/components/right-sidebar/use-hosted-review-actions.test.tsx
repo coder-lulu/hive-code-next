@@ -5,6 +5,10 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PRInfo } from '../../../../shared/github/pull-request-types'
 import type { Repo } from '../../../../shared/repo-types'
+import {
+  GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE,
+  GITLAB_READY_FOR_REVIEW_UPDATE_REQUIRED_MESSAGE
+} from '../../../../shared/protocol-version'
 import { useHostedReviewActions, type HostedReviewActionInfo } from './use-hosted-review-actions'
 
 const confirmationMocks = vi.hoisted(() => ({
@@ -167,7 +171,7 @@ describe('useHostedReviewActions', () => {
     expect(runtimeRpcMocks.assertRuntimeEnvironmentCapability).toHaveBeenCalledWith(
       'env-1',
       'github.markPRReadyForReview',
-      expect.stringContaining('newer Orca server')
+      GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE
     )
     expect(runtimeRpcMocks.callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },
@@ -223,7 +227,7 @@ describe('useHostedReviewActions', () => {
     expect(runtimeRpcMocks.assertRuntimeEnvironmentCapability).toHaveBeenCalledWith(
       'env-1',
       'gitlab.updateMR.readyForReview.v1',
-      expect.stringContaining('newer Orca server')
+      GITLAB_READY_FOR_REVIEW_UPDATE_REQUIRED_MESSAGE
     )
     expect(runtimeRpcMocks.callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },

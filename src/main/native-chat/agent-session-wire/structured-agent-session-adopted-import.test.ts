@@ -114,7 +114,7 @@ function adapter(): StructuredAgentSessionAdapter {
 async function attach(
   transcriptPath: string | undefined,
   sessionAdapter: StructuredAgentSessionAdapter,
-  onAttached: AttachFlowInput['onAttached'] = () => {}
+  onAttached: AttachFlowInput['onAttached'] = async ({ journal }) => journal.close()
 ) {
   store ??= await AgentSessionRecordStore.open({ directory: join(root!, 'store'), hostId: 'local' })
   return performAttach({

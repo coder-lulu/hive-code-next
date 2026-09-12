@@ -476,6 +476,7 @@ describe('FloatingTerminalPanel close behavior', () => {
     expect(stopImmediatePropagation).toHaveBeenCalledWith()
     expect(mocks.activateTab).toHaveBeenCalledWith('tab-3')
     expect(mocks.setActiveTab).toHaveBeenCalledWith('tab-3')
+    expect(mocks.consumeFirstAgentCompletionUnreadForTab).toHaveBeenCalledWith('tab-3')
     expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('tab-3')
   })
 

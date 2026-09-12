@@ -92,10 +92,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/setup@v2
         with:
-          version: 10.24.0
-          run_install: false
+          install: false
 
       - uses: actions/setup-node@v6
         with:
@@ -116,6 +115,27 @@ jobs:
         env:
           ORCA_BUILD_IDENTITY: ${{ needs.reserve.outputs.channel == 'stable' && 'stable' || 'rc' }}
         run: pnpm build:release
+
+      - name: Gate runtime file-watcher process isolation
+        shell: bash
+        env:
+          ORCA_BACKGROUND_LAUNCH: '1'
+        run: |
+          set -euo pipefail
+          export TMPDIR="$GITHUB_WORKSPACE/logs/release-watcher-gates/${{ matrix.architecture }}/runtime/tmp"
+          mkdir -p "$TMPDIR"
+          node config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"
+          ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../electron.log"
+
+      - name: Gate SSH relay watcher process isolation
+        shell: bash
+        env:
+          ORCA_BACKGROUND_LAUNCH: '1'
+        run: |
+          set -euo pipefail
+          export TMPDIR="$GITHUB_WORKSPACE/logs/release-watcher-gates/${{ matrix.architecture }}/relay/tmp"
+          mkdir -p "$TMPDIR"
+          node config/scripts/relay-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"
 
       - name: Package AppImage without external publishing
         shell: bash

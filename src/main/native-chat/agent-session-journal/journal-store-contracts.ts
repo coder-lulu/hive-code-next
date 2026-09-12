@@ -40,6 +40,7 @@ export type ResolveDispatchInput = {
   recovered?: true
 } & (
   | { state: 'accepted'; providerIdentity: AgentJournalItemIdentity }
+  | { state: 'pending' }
   | { state: 'rejected' | 'unknown'; reason?: string | null }
 )
 

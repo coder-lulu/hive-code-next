@@ -115,7 +115,12 @@ export function dispatchTerminalNotification(
       : undefined
   if (
     event.source === 'agent-task-complete' &&
-    isSupersededAgentCompletionSnapshot(storedAgentStatus, eventAgentStatusSnapshot)
+    isSupersededAgentCompletionSnapshot(
+      agentSnapshotMatchesExplicitTitle(storedAgentStatus, explicitTitleAgentType)
+        ? storedAgentStatus
+        : undefined,
+      eventAgentStatusSnapshot
+    )
   ) {
     return
   }

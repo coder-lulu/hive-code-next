@@ -11,6 +11,7 @@ import type {
 import {
   buildSkillDiscoverySources,
   compareSkills,
+  skillLabelCollator,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
@@ -309,9 +310,7 @@ export async function discoverSkills(args: {
   }
   return {
     skills,
-    sources: sources.sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
-    ),
+    sources: sources.sort((a, b) => skillLabelCollator.compare(a.label, b.label)),
     scannedAt: Date.now()
   }
 }

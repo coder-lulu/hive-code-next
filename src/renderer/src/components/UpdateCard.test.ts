@@ -5,6 +5,7 @@ import type { ChangelogData, UpdateStatus } from '../../../shared/update-status-
 import { createUISlice } from '../store/slices/ui'
 import type { AppState } from '../store/types'
 import { isHttp2ProtocolError } from './UpdateCard'
+import { isUpdateCardVisible } from './maintenance/update-card/update-card-visibility'
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -319,46 +320,13 @@ type VisibilityInput = {
 
 type VisibilityResult = 'hidden' | 'visible'
 
-/** Mirrors the visibility gates in UpdateCard's render path. */
 function computeVisibility(input: VisibilityInput): VisibilityResult {
-  const { status, dismissedVersion, cachedVersion, hasStartedDownload } = input
-  const isUserInitiated = 'userInitiated' in status && status.userInitiated
-  const isMandatoryUpdate = status.mandatory === true
-  const updateUserInitiatedCycle = input.updateUserInitiatedCycle ?? false
-  const shouldShowDetailedErrorCard =
-    status.state === 'error' && (hasStartedDownload || cachedVersion !== null)
-
-  if (status.state === 'checking' && !isUserInitiated) {
-    return 'hidden'
-  }
-  if (status.state === 'not-available' && !isUserInitiated) {
-    return 'hidden'
-  }
-  if (status.state === 'idle' || status.state === 'disabled') {
-    return 'hidden'
-  }
-  if (
-    status.state === 'error' &&
-    !isMandatoryUpdate &&
-    !shouldShowDetailedErrorCard &&
-    !isUserInitiated
-  ) {
-    return 'hidden'
-  }
-
-  const effectiveVersion = 'version' in status ? status.version : cachedVersion
-  if (
-    !isMandatoryUpdate &&
-    effectiveVersion &&
-    dismissedVersion === effectiveVersion &&
-    !updateUserInitiatedCycle
-  ) {
-    if (status.state !== 'downloading' && status.state !== 'error') {
-      return 'hidden'
-    }
-  }
-
-  return 'visible'
+  return isUpdateCardVisible({
+    ...input,
+    updateUserInitiatedCycle: input.updateUserInitiatedCycle ?? false
+  })
+    ? 'visible'
+    : 'hidden'
 }
 
 describe('UpdateCard visibility gates', () => {

@@ -635,5 +635,33 @@
     "dynamic": false,
     "reason": "Product UI copy pending localization catalog rollout",
     "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/sessions/SessionContent.tsx",
+    "kind": "object-property:error",
+    "text": "disconnected",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/sessions/SessionContent.tsx",
+    "kind": "object-property:error",
+    "text": "unavailable",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/lib/session-navigation.ts",
+    "kind": "object-property:error",
+    "text": "ambiguous",
+    "dynamic": false,
+    "count": 8
+  },
+  {
+    "filePath": "src/renderer/src/lib/session-navigation.ts",
+    "kind": "object-property:error",
+    "text": "unavailable",
+    "dynamic": false,
+    "count": 9
   }
 ]

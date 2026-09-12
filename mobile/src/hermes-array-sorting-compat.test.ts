@@ -55,7 +55,7 @@ describe('Hermes array sorting compatibility', () => {
 
   it('keeps production mobile bundle sources free of unsupported copied-array sorting', () => {
     const offenders = SOURCE_ROOTS.flatMap(({ label, path }) =>
-      findUnsupportedArraySorting(scanSourceTree(path, { includeTests: true })).map(
+      findUnsupportedArraySorting(scanSourceTree(path)).map(
         (relativePath) => `${label}/${relativePath}`
       )
     )

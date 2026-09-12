@@ -260,7 +260,11 @@ export function UpdateCard(): React.JSX.Element | null {
       )}
       <div
         ref={cardRootRef}
-        className="fixed bottom-10 right-4 z-50 w-[360px] max-w-[calc(100vw-32px)] flex flex-col gap-2 max-[480px]:left-4 max-[480px]:right-4 max-[480px]:w-auto"
+        className={
+          isMandatoryUpdate
+            ? 'fixed bottom-10 right-4 z-50 w-[360px] max-w-[calc(100vw-32px)] flex flex-col gap-2 max-[480px]:left-4 max-[480px]:right-4 max-[480px]:w-auto'
+            : 'flex flex-col gap-2'
+        }
       >
         {showReassurance && (
           <Card className={`py-0 gap-0 ${animationClass}`}>

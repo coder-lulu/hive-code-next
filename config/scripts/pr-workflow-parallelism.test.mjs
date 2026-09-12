@@ -15,6 +15,7 @@ const shellContractFiles = [
   'src/main/daemon/shell-ready.test.ts',
   'src/main/providers/local-pty-shell-ready-zsh-launch-environment.test.ts',
   'src/main/providers/__tests__/shell-ready-framework-example.test.ts',
+  'src/main/pty/omp-shell-wrapper.node-pty.test.ts',
   'src/main/shell-startup-feature-channel.test.ts',
   'src/main/zsh-scoped-histfile.live-shell.test.ts',
   'src/main/zsh-startup-hook-user-config-equivalence.live-shell.test.ts',
@@ -23,7 +24,6 @@ const shellContractFiles = [
 ]
 const patchedNodePtyContractFiles = [
   'src/main/daemon/node-pty-fd-leak.test.ts',
-  'src/main/pty/omp-shell-wrapper.node-pty.test.ts',
   'src/shared/fish-query-reply-child-stdin.node-pty.test.ts'
 ]
 const nativeShellContractFiles = [...shellContractFiles, ...patchedNodePtyContractFiles]
@@ -43,7 +43,7 @@ const realZshUsage =
 describe('PR workflow parallelism', () => {
   it('keeps Node 26 compatibility in a scheduled reusable lane', () => {
     expect(unitTestWorkflow.on.workflow_call.inputs.node_versions.required).toBe(true)
-    expect(unitTestWorkflow.jobs.test.strategy.matrix.shard).toHaveLength(16)
+    expect(unitTestWorkflow.jobs.test.strategy.matrix.shard).toHaveLength(8)
     expect(nodeNextWorkflow.jobs.test.uses).toBe('./.github/workflows/unit-tests.yml')
     expect(nodeNextWorkflow.jobs.test.with.node_versions).toBe('["26"]')
     expect(nodeNextWorkflow.on.schedule).toHaveLength(1)
@@ -60,13 +60,16 @@ describe('PR workflow parallelism', () => {
   })
 
   it('shards the general test suite on the pinned Node 24 runtime', () => {
-    expect(workflow.jobs.test.strategy.matrix.node).toEqual(['24.18.0'])
-    expect(workflow.jobs.test.strategy.matrix.shard).toEqual(
-      Array.from({ length: 16 }, (_, index) => index + 1)
+    const sharedTest = unitTestWorkflow.jobs.test
+    expect(workflow.jobs.test.uses).toBe('./.github/workflows/unit-tests.yml')
+    expect(JSON.parse(workflow.jobs.test.with.node_versions)).toEqual(['24.18.0'])
+    expect(sharedTest.strategy.matrix.node).toBe('${{ fromJSON(inputs.node_versions) }}')
+    expect(sharedTest.strategy.matrix.shard).toEqual(
+      Array.from({ length: 8 }, (_, index) => index + 1)
     )
-    expect(workflow.jobs.test.strategy.matrix.shard_total).toEqual([16])
-    const testStep = workflow.jobs.test.steps.find((step) => step.name === 'Test shard')
-    const installStep = workflow.jobs.test.steps.find(
+    expect(sharedTest.strategy.matrix.shard_total).toEqual([8])
+    const testStep = sharedTest.steps.find((step) => step.name === 'Test shard')
+    const installStep = sharedTest.steps.find(
       (step) => step.uses === './.github/actions/install-node-dependencies'
     )
     const primerInstall = workflow.jobs.test_native_cache.steps.find(
@@ -83,7 +86,7 @@ describe('PR workflow parallelism', () => {
       expect(testStep.run).toContain(`--exclude=${testFile}`)
     }
     expect(primerInstall.with['native-runtime']).toBe('node')
-    expect(primerInstall.with['node-version']).toBe('24')
+    expect(primerInstall.with['node-version']).toBe('24.18.0')
     expect(workflow.jobs.test.needs).toContain('test_native_cache')
     expect(nodeNextPrimerInstall.with['native-runtime']).toBe('node')
     expect(nodeNextPrimerInstall.with['node-version']).toBe('26')
@@ -295,17 +298,16 @@ describe('PR workflow parallelism', () => {
       workflow.jobs[jobName].steps.find(
         (step) => step.uses === './.github/actions/install-node-dependencies'
       )
+    const sharedTestInstall = unitTestWorkflow.jobs.test.steps.find(
+      (step) => step.uses === './.github/actions/install-node-dependencies'
+    )
 
-    for (const jobName of [
-      'static_analysis',
-      'typecheck',
-      'git_compatibility',
-      'xterm_patch_sync'
-    ]) {
+    for (const jobName of ['typecheck', 'git_compatibility', 'xterm_patch_sync']) {
       expect(installFor(jobName).with, jobName).toBeUndefined()
     }
+    expect(installFor('static_analysis').with['native-runtime']).toBe('node')
     expect(installFor('shell_contracts').with['native-runtime']).toBe('node')
-    expect(installFor('test').with['native-runtime']).toBe('node')
+    expect(sharedTestInstall.with['native-runtime']).toBe('node')
     expect(installFor('package').with['native-runtime']).toBe('electron')
     expect(installFor('package_windows').with['native-runtime']).toBe('node')
     expect(installFor('package_windows').with['persist-native-cache']).toBe('false')
@@ -464,6 +466,7 @@ describe('PR workflow parallelism', () => {
       'shell_contracts',
       'test',
       'orcad_browser',
+      'cross-version-wire',
       'managed_hook_node18',
       'package',
       'package_windows'
@@ -477,5 +480,7 @@ describe('PR workflow parallelism', () => {
     // ORCA_BROWSER_EXECUTABLE, so it only guards anything if verify actually reads it.
     expect(verifyStep.env.ORCAD_BROWSER).toBe('${{ needs.orcad_browser.result }}')
     expect(verifyStep.run).toContain('"$ORCAD_BROWSER"')
+    expect(verifyStep.env.CROSS_VERSION_WIRE).toBe('${{ needs.cross-version-wire.result }}')
+    expect(verifyStep.run).toContain('"$CROSS_VERSION_WIRE"')
   })
 })

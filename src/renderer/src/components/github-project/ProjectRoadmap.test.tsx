@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ProjectRoadmap from './ProjectRoadmap'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type {
   GitHubProjectField,
   GitHubProjectFieldValue,
@@ -255,7 +256,7 @@ describe('ProjectRoadmap', () => {
     expect(screen.getByText('list')).toBeTruthy()
     expect(
       screen.getByText(
-        'This roadmap view has no date or iteration field to place items on, so Orca is listing them instead.'
+        `This roadmap view has no date or iteration field to place items on, so ${APP_DISPLAY_NAME} is listing them instead.`
       )
     ).toBeTruthy()
   })

@@ -19,6 +19,18 @@ import { REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY } from '../../shared/protocol-
 const REMOTE_RUNTIME_TEST_TIMEOUT_MS = 15_000
 const REMOTE_RUNTIME_REQUEST_TIMEOUT_MS = 5_000
 
+function fixtureRuntimeStatus(runtimeId: string) {
+  return {
+    runtimeId,
+    startedAt: 1,
+    version: '1.0.0',
+    protocolVersion: 1,
+    minCompatibleDesktopVersion: '1.0.0',
+    minCompatibleMobileVersion: '1.0.0',
+    capabilities: []
+  }
+}
+
 // worktree.create routes through the runtime's clientMutationId idempotency
 // wrapper; these stubs run the create straight through (no dedupe).
 const passthroughDedupe = <T>(_repo: string, _id: string | undefined, run: () => Promise<T>) =>
@@ -44,7 +56,9 @@ describe('remote runtime request connection integration', () => {
         }
       ]
       const runtime = {
+        configureNotificationDismissalStore: () => {},
         getRuntimeId: () => 'fetch-runtime-test',
+        getStatus: () => fixtureRuntimeStatus('fetch-runtime-test'),
         getStartedAt: () => 1,
         cleanupSubscriptionsForConnection: () => {},
         cancelMobileDictationForConnection: () => {},
@@ -115,7 +129,9 @@ describe('remote runtime request connection integration', () => {
       const clientEventListeners = new Set<(event: RuntimeClientEvent) => void>()
       const subscriptionCleanups = new Map<string, () => void>()
       const runtime = {
+        configureNotificationDismissalStore: () => {},
         getRuntimeId: () => 'events-runtime-test',
+        getStatus: () => fixtureRuntimeStatus('events-runtime-test'),
         getStartedAt: () => 1,
         cleanupSubscriptionsForConnection: (connectionId: string) => {
           for (const [id, cleanup] of subscriptionCleanups) {
@@ -280,7 +296,9 @@ describe('remote runtime request connection integration', () => {
         }
       }
       const runtime = {
+        configureNotificationDismissalStore: () => {},
         getRuntimeId: () => 'remote-sleep-runtime-test',
+        getStatus: () => fixtureRuntimeStatus('remote-sleep-runtime-test'),
         getStartedAt: () => 1,
         cleanupSubscriptionsForConnection: (connectionId: string) => {
           for (const [id, cleanup] of subscriptionCleanups) {
@@ -506,6 +524,7 @@ describe('remote runtime request connection integration', () => {
         tabs: []
       }
       const runtime = {
+        configureNotificationDismissalStore: () => {},
         getRuntimeId: () => 'shared-runtime-test',
         getStartedAt: () => 1,
         getStatus: () => ({

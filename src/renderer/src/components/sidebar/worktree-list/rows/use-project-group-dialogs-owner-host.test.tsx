@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -114,8 +115,7 @@ describe('project group dialogs carry the owner host', () => {
     })
 
     expect(mocks.toastError).toHaveBeenCalledWith('Failed to rename group', {
-      description:
-        "Orca could not confirm the new name with the group's host. Recheck the group after reconnecting."
+      description: `${APP_DISPLAY_NAME} could not confirm the new name with the group's host. Recheck the group after reconnecting.`
     })
   })
 

@@ -1,65 +1,48 @@
-import type { RpcClient } from '../transport/rpc-client'
-import type { Worktree } from '../worktree/workspace-list-types'
+import {
+  interpretAtRpcBarrier,
+  startRpcOperation,
+  type RpcOperationClient
+} from '../transport/rpc-operation'
 import { RESUME_RPC_TIMEOUT_MS } from '../session/ai-vault-resume-preparation'
-import type { MobileAiVaultResumeSettings } from '../session/ai-vault-resume-launch'
-import type {
-  MobileAiVaultResumeFolderWorkspace,
-  MobileAiVaultResumeProjectGroup,
-  MobileAiVaultResumeRepo
-} from './agent-history-resume-target'
+import {
+  resumeRepos,
+  resumeFolders,
+  resumeGroups,
+  resumeSettings,
+  resumeWorktrees
+} from './mobile-ai-vault-resume-operations'
 
-export async function loadMobileResumeMetadata(client: Pick<RpcClient, 'sendRequest'>): Promise<{
-  repos: MobileAiVaultResumeRepo[]
-  folderWorkspaces: MobileAiVaultResumeFolderWorkspace[]
-  projectGroups: MobileAiVaultResumeProjectGroup[]
-  settings: MobileAiVaultResumeSettings | null
-  worktrees: Worktree[] | null
-}> {
-  const [
-    repoResponse,
-    folderWorkspaceResponse,
-    projectGroupResponse,
-    settingsResponse,
-    worktreeResponse
-  ] = await Promise.all([
-    client.sendRequest('repo.list', undefined, { timeoutMs: RESUME_RPC_TIMEOUT_MS }),
-    client
-      .sendRequest('folderWorkspace.list', undefined, { timeoutMs: RESUME_RPC_TIMEOUT_MS })
-      .catch(() => null),
-    client
-      .sendRequest('projectGroup.list', undefined, { timeoutMs: RESUME_RPC_TIMEOUT_MS })
-      .catch(() => null),
-    client
-      .sendRequest('settings.get', undefined, { timeoutMs: RESUME_RPC_TIMEOUT_MS })
-      .catch(() => null),
-    client
-      .sendRequest('worktree.ps', { limit: 10000 }, { timeoutMs: RESUME_RPC_TIMEOUT_MS })
-      .catch(() => null)
+export async function loadMobileResumeMetadata(client: RpcOperationClient) {
+  const options = { timeoutMs: RESUME_RPC_TIMEOUT_MS }
+  const repos = startRpcOperation(client, resumeRepos, undefined, options)
+  const folders = startRpcOperation(client, resumeFolders, undefined, options)
+  const groups = startRpcOperation(client, resumeGroups, undefined, options)
+  const settings = startRpcOperation(client, resumeSettings, undefined, options)
+  const worktrees = startRpcOperation(client, resumeWorktrees, { limit: 10000 }, options)
+  // Every optional request settles before the required repo reply is interpreted.
+  // Its transport rejection remains optional; a required rejection keeps its original identity.
+  await Promise.all([
+    repos.settlement.then((settled) => {
+      if (settled.status === 'rejected') {
+        throw settled.error
+      }
+    }),
+    folders.settlement,
+    groups.settlement,
+    settings.settlement,
+    worktrees.settlement
   ])
-  if (!repoResponse.ok) {
-    throw new Error(repoResponse.error?.message || 'Unable to load workspace metadata.')
-  }
-  const repoResult = repoResponse.result as { repos?: MobileAiVaultResumeRepo[] }
-  const folderWorkspaceResult =
-    folderWorkspaceResponse?.ok === true
-      ? (folderWorkspaceResponse.result as {
-          folderWorkspaces?: MobileAiVaultResumeFolderWorkspace[]
-        })
-      : null
-  const projectGroupResult =
-    projectGroupResponse?.ok === true
-      ? (projectGroupResponse.result as { groups?: MobileAiVaultResumeProjectGroup[] })
-      : null
-  const settingsResult =
-    settingsResponse?.ok === true
-      ? (settingsResponse.result as { settings?: MobileAiVaultResumeSettings })
-      : null
-  const worktreeResult =
-    worktreeResponse?.ok === true ? (worktreeResponse.result as { worktrees?: Worktree[] }) : null
+  const [repoResult] = await interpretAtRpcBarrier([repos])
+  const [[folderResult], [groupResult], [settingsResult], [worktreeResult]] = await Promise.all([
+    interpretAtRpcBarrier([folders]).catch(() => [null]),
+    interpretAtRpcBarrier([groups]).catch(() => [null]),
+    interpretAtRpcBarrier([settings]).catch(() => [null]),
+    interpretAtRpcBarrier([worktrees]).catch(() => [null])
+  ])
   return {
     repos: repoResult.repos ?? [],
-    folderWorkspaces: folderWorkspaceResult?.folderWorkspaces ?? [],
-    projectGroups: projectGroupResult?.groups ?? [],
+    folderWorkspaces: folderResult?.folderWorkspaces ?? [],
+    projectGroups: groupResult?.groups ?? [],
     settings: settingsResult?.settings ?? null,
     worktrees: worktreeResult?.worktrees ?? null
   }

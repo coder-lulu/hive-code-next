@@ -9,7 +9,8 @@ import {
 } from './release-checkout-tree.ts'
 
 export const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..')
-const DEFAULT_CACHE_ROOT = join(REPO_ROOT, 'tests', 'e2e', '.cross-version-checkouts')
+const DEFAULT_CACHE_ROOT = join(REPO_ROOT, 'logs', 'cross-version-checkouts')
+const EXISTING_CACHE_ROOT = join(REPO_ROOT, 'tests', 'e2e', '.cross-version-checkouts')
 
 // Bump when extraction or the alias rewrite changes so cached trees are rebuilt.
 const CHECKOUT_FORMAT = 3
@@ -230,6 +231,14 @@ export async function materializeReleaseCheckout(
   const root = join(cacheRoot, label, `${commit}-format-${CHECKOUT_FORMAT}`)
   if (await checkoutMatches(root, commit)) {
     return { ref, commit, label, root }
+  }
+  // Reuse a previously verified checkout without copying or modifying its old tree.
+  // Explicit cacheRoot callers remain isolated from both default locations.
+  if (options.cacheRoot === undefined) {
+    const existingRoot = join(EXISTING_CACHE_ROOT, label, `${commit}-format-${CHECKOUT_FORMAT}`)
+    if (await checkoutMatches(existingRoot, commit)) {
+      return { ref, commit, label, root: existingRoot }
+    }
   }
 
   const stagingPrefix = `.staging-${commit}-format-${CHECKOUT_FORMAT}-`

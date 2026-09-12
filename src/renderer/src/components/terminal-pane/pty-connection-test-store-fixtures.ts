@@ -100,7 +100,8 @@ export function createInitialStoreState(getState: () => StoreState): StoreState 
     }),
     markTerminalTabUnread: vi.fn(),
     markTerminalPaneUnread: vi.fn(),
-    markAgentCompletionPaneUnread: vi.fn()
+    markAgentCompletionPaneUnread: vi.fn(),
+    incrementAgentCompletionUnread: vi.fn()
   } as StoreState
 }
 

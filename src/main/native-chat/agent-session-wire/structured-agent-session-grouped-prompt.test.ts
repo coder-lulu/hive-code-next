@@ -104,6 +104,7 @@ async function seedGroupedQuestion(): Promise<{ itemId: string; revision: number
     },
     { fence: 1 }
   )
+  await journal.close()
   return { itemId: appended.itemId, revision: appended.revision }
 }
 
@@ -140,6 +141,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await host.flushAllStreamedEvents()
+  await host.close(SESSION)
   await rm(root, { recursive: true, force: true })
 })
 

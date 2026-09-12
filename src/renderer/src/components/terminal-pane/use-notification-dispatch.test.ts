@@ -31,6 +31,7 @@ type MockState = {
   settings: {
     experimentalTerminalAttention?: boolean
     notifications?: {
+      enabled?: boolean
       customSoundPath?: string | null
       customSoundId?: string | null
     }
@@ -363,18 +364,18 @@ describe('dispatchTerminalNotification', () => {
     expect(mockState.markAgentCompletionPaneUnread).toHaveBeenCalledWith(paneKey)
   })
 
-  it('can mark terminal attention without dispatching an OS notification', () => {
+  it('offers attention-only completion to main for independent mobile delivery', () => {
+    mockState.settings.notifications = { ...mockState.settings.notifications, enabled: false }
     dispatchTerminalNotification('wt-primary', {
       source: 'agent-task-complete',
       terminalTitle: 'codex',
-      paneKey,
-      suppressOsNotification: true
+      paneKey
     })
 
     expect(mockState.markWorktreeUnread).toHaveBeenCalledWith('wt-primary')
     expect(mockState.markTerminalTabUnread).toHaveBeenCalledWith('tab-1')
     expect(mockState.markTerminalPaneUnread).toHaveBeenCalledWith(paneKey)
-    expect(window.api.notifications.dispatch).not.toHaveBeenCalled()
+    expect(window.api.notifications.dispatch).toHaveBeenCalled()
   })
 
   it('does not mark the visible focused pane unread', () => {
@@ -398,7 +399,6 @@ describe('dispatchTerminalNotification', () => {
     const hiddenLeafId = '33333333-3333-4333-8333-333333333333'
     const hiddenPaneKey = `tab-2:${hiddenLeafId}`
     mockState.activeWorktreeId = 'wt-primary'
-    mockState.activeTabId = 'tab-1'
     mockState.tabsByWorktree['wt-primary'].push({ id: 'tab-2', ptyId: 'pty-2' })
     mockState.ptyIdsByTabId['tab-2'] = ['pty-2']
     mockState.terminalLayoutsByTabId['tab-2'] = {
@@ -425,7 +425,6 @@ describe('dispatchTerminalNotification', () => {
   it('marks a hidden split pane in the focused tab unread', () => {
     const siblingPaneKey = stalePaneKey
     mockState.activeWorktreeId = 'wt-primary'
-    mockState.activeTabId = 'tab-1'
     mockState.ptyIdsByTabId['tab-1'] = ['pty-1', 'pty-2']
     mockState.terminalLayoutsByTabId['tab-1'] = {
       root: {

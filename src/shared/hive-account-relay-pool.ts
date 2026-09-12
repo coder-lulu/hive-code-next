@@ -32,6 +32,7 @@ export class HiveAccountRelayPool {
     isClosed: () => this.state === 'closed'
   })
   private main: Promise<HiveAccountRelayChannel> | null = null
+  private statusReceiptChannel: HiveAccountRelayChannel | null = null
   private pending = 0
   private sequence = 0
   private activeRequests = 0
@@ -50,6 +51,7 @@ export class HiveAccountRelayPool {
       clientCapabilities?: readonly RuntimeCapability[]
       randomBytes?: (length: number) => Uint8Array
       onStateChange?: (state: HiveAccountRelayPoolState) => void
+      onStatusReceiptLost?: () => void
     }
   ) {}
 
@@ -57,6 +59,34 @@ export class HiveAccountRelayPool {
   getLastError = (): unknown => this.lastError
   async connect(): Promise<void> {
     await this.getMain()
+  }
+
+  async requestStatus(signal: AbortSignal): Promise<RuntimeRpcResponse<unknown>> {
+    if (signal.aborted) {
+      throw signal.reason
+    }
+    this.clearIdle()
+    try {
+      const channel =
+        [...this.channels].find((candidate) => candidate.isReady) ?? (await this.getMain())
+      if (signal.aborted) {
+        throw signal.reason
+      }
+      const response = await channel.request(
+        { id: this.nextId(), method: 'status.get' },
+        15_000,
+        signal
+      )
+      if (signal.aborted || channel.isClosed) {
+        throw unavailable()
+      }
+      if (response.ok) {
+        this.statusReceiptChannel = channel
+      }
+      return response
+    } finally {
+      this.scheduleIdle()
+    }
   }
 
   async request(
@@ -111,7 +141,7 @@ export class HiveAccountRelayPool {
     }
     this.clearIdle()
     if (!this.main) {
-      this.setState('connecting')
+      this.setState(this.hasReadyChannel() ? 'ready' : 'connecting')
       const flight = this.openChannel()
         .then((channel) => {
           if (this.getState() === 'closed' || channel.isClosed) {
@@ -126,7 +156,7 @@ export class HiveAccountRelayPool {
             this.main = null
           }
           if (this.state !== 'closed') {
-            this.setState('idle')
+            this.setState(this.hasReadyChannel() ? 'ready' : 'idle')
           }
           throw error
         })
@@ -204,6 +234,10 @@ export class HiveAccountRelayPool {
             .catch(() => undefined)
           if (this.state !== 'closed') {
             this.setState(this.hasReadyChannel() ? 'ready' : 'idle')
+          }
+          if (this.statusReceiptChannel === channel) {
+            this.statusReceiptChannel = null
+            this.options.onStatusReceiptLost?.()
           }
         }
       })

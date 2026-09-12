@@ -104,6 +104,10 @@ docs/**
 !docs/mobile-terminal-shortcut-bar.md
 !docs/reference/
 !docs/reference/build-toolchain.md
+!docs/reference/agent-pty-transcript-capture.md
+!docs/reference/agent-session-search-query-tuning.md
+!docs/reference/agent-status-store.md
+!docs/reference/antigravity-readiness-evidence.md
 !docs/reference/git-compatibility.md
 !docs/reference/upstream-sync-review.md
 !docs/reference/headless-linux-server.md
@@ -192,3 +196,5 @@ tests/e2e/.cross-version-checkouts/
 # Local client build configuration and workspace mutex.
 /.client-build.local.json
 /.client-build.lock
+
+!docs/relay-region-correction/ARCHITECTURE.md

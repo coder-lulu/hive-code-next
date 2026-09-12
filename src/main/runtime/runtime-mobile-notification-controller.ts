@@ -1,9 +1,15 @@
+import { reserveNotificationCooldown } from '../../shared/notification-burst-cooldown'
+import type { AgentStatusState } from '../../shared/agent-status-types'
 import { MobileNotificationReplayBuffer } from './mobile-notification-replay'
 import { notifyRuntimeListeners } from './runtime-async-boundaries'
 import { getRuntimeDesktopSurface } from './runtime-desktop-surface'
 
 export type MobileNotificationDispatchEvent = {
   type: 'notification'
+  legacySocketAllowed?: boolean
+  desktopAllowed?: boolean
+  desktopAway?: boolean
+  emittedAt?: number
   source: 'agent-task-complete' | 'terminal-bell' | 'test' | 'plugin'
   title: string
   body: string
@@ -11,6 +17,9 @@ export type MobileNotificationDispatchEvent = {
   notificationId?: string
   notificationSeq?: number
   notificationEpoch?: string
+  // Why: background push must tell "needs input" from "finished" without re-deriving
+  // it from the title. Optional and additive — old clients ignore it.
+  agentState?: AgentStatusState
 }
 
 export type MobileNotificationDismissEvent = {
@@ -26,8 +35,8 @@ export type MobileNotificationEvent =
 
 export class RuntimeMobileNotificationController {
   private readonly listeners = new Set<(event: MobileNotificationEvent) => void>()
+  private readonly legacyCooldown = new Map<string, number>()
   private readonly replay = new MobileNotificationReplayBuffer()
-
   onDispatched(listener: (event: MobileNotificationEvent) => void): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
@@ -38,6 +47,22 @@ export class RuntimeMobileNotificationController {
   }
 
   dispatch(event: MobileNotificationEvent): void {
+    if (event.type === 'notification') {
+      // Decide once before recording so reconnect and buffer eviction cannot reset cooldown.
+      const legacySocketAllowed =
+        event.desktopAllowed !== false &&
+        (event.emittedAt === undefined ||
+          reserveNotificationCooldown(
+            this.legacyCooldown,
+            event.worktreeId ?? 'global',
+            event.emittedAt
+          ))
+      event = {
+        ...event,
+        legacySocketAllowed,
+        desktopAway: getRuntimeDesktopSurface().isAwayForMobileNotifications?.()
+      }
+    }
     const seq = this.replay.record(event)
     notifyRuntimeListeners(
       this.listeners,

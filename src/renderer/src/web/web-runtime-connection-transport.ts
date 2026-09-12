@@ -7,7 +7,10 @@ import {
 } from './web-runtime-connection-frame-router'
 import { createWebRuntimeUnauthorizedError } from './web-runtime-client-error'
 import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
-import type { WebPairingOffer } from './web-pairing'
+import {
+  webRuntimeAuthenticationFrame,
+  type WebRuntimeConnection
+} from './web-runtime-client-protocol'
 import type { WebRuntimeTransportSubscription } from './web-runtime-subscription-contract'
 import { WebRuntimeSubscriptionRegistry } from './web-runtime-subscription-registry'
 import { WebRuntimeRequestRegistry } from './web-runtime-request-registry'
@@ -36,24 +39,28 @@ export class WebRuntimeConnectionTransport {
   private readonly connectionWaiters: WebRuntimeConnectionWaiters
 
   constructor(
-    private readonly pairing: WebPairingOffer,
-    clock: { now: () => number; isDocumentVisible: () => boolean }
+    private readonly connection: WebRuntimeConnection,
+    clock: { now: () => number; isDocumentVisible: () => boolean },
+    private readonly lifecycle: {
+      onStateChanged?: (state: WebRuntimeConnectionState) => void
+      reconnect?: boolean
+    } = {}
   ) {
     this.connectionWaiters = new WebRuntimeConnectionWaiters({
-      endpoint: pairing.endpoint,
+      endpoint: connection.endpoint,
       getState: () => this.state,
       isIntentionallyClosed: () => this.intentionallyClosed
     })
     this.subscriptionRegistry = new WebRuntimeSubscriptionRegistry({
-      deviceToken: pairing.deviceToken,
+      credential: () => this.rpcCredential(),
       nextId: () => this.nextId(),
       sendEncrypted: (message) => this.sendEncrypted(message)
     })
     this.subscriptions = this.subscriptionRegistry.subscriptions
     this.requestRegistry = new WebRuntimeRequestRegistry({
-      deviceToken: pairing.deviceToken,
+      credential: () => this.rpcCredential(),
       nextId: () => this.nextId(),
-      waitForConnected: (timeoutMs) => this.connectionWaiters.wait(timeoutMs),
+      waitForConnected: (timeoutMs, signal) => this.connectionWaiters.wait(timeoutMs, signal),
       sendEncrypted: (message) => this.sendEncrypted(message)
     })
     this.heartbeat = new WebRuntimeConnectionHeartbeat({
@@ -64,7 +71,7 @@ export class WebRuntimeConnectionTransport {
       sendProbe: () =>
         this.sendEncrypted({
           id: `web-heartbeat-${this.nextId()}`,
-          deviceToken: this.pairing.deviceToken,
+          ...this.rpcCredential(),
           method: 'status.get'
         }),
       handleDeadSocket: (socket) => this.handleSocketClosed(socket)
@@ -75,7 +82,7 @@ export class WebRuntimeConnectionTransport {
   async call(
     method: string,
     params?: unknown,
-    options?: { timeoutMs?: number }
+    options?: { timeoutMs?: number; signal?: AbortSignal }
   ): Promise<RuntimeRpcResponse<unknown>> {
     return this.requestRegistry.call(method, params, options)
   }
@@ -101,7 +108,8 @@ export class WebRuntimeConnectionTransport {
       getState: () => this.state,
       getSession: () => this.session,
       getSocket: () => this.ws,
-      pairingToken: this.pairing.deviceToken,
+      authenticationFrame: () =>
+        webRuntimeAuthenticationFrame(this.connection, this.session!.transcriptHashB64),
       pending: this.requestRegistry.pending,
       subscriptions: this.subscriptions,
       sendEncrypted: (message) => this.sendEncrypted(message),
@@ -148,6 +156,7 @@ export class WebRuntimeConnectionTransport {
     } else if (next === 'auth-failed') {
       this.connectionWaiters.rejectAll(createWebRuntimeUnauthorizedError())
     }
+    this.lifecycle.onStateChanged?.(next)
   }
 
   private openConnection(): void {
@@ -156,7 +165,7 @@ export class WebRuntimeConnectionTransport {
     }
     let socket: WebSocket
     try {
-      socket = new WebSocket(this.pairing.endpoint)
+      socket = new WebSocket(this.connection.endpoint)
     } catch (error) {
       this.requestRegistry.rejectAll(error instanceof Error ? error.message : String(error))
       this.scheduleReconnect()
@@ -179,7 +188,7 @@ export class WebRuntimeConnectionTransport {
       this.clearConnectTimer()
       this.setState('handshaking')
       this.session = RuntimeE2EEClientSession.create({
-        desktopPublicKeyB64: this.pairing.publicKeyB64,
+        desktopPublicKeyB64: this.connection.publicKeyB64,
         transport: 'direct'
       })
       socket.send(JSON.stringify(this.session.hello))
@@ -210,6 +219,10 @@ export class WebRuntimeConnectionTransport {
     }
   }
 
+  rpcCredential(): { deviceToken: string } | Record<string, never> {
+    return this.connection.kind === 'pairing' ? { deviceToken: this.connection.deviceToken } : {}
+  }
+
   sendEncrypted(message: unknown): boolean {
     const socket = this.ws
     if (!socket || socket.readyState !== WebSocket.OPEN || !this.session) {
@@ -233,7 +246,7 @@ export class WebRuntimeConnectionTransport {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectTimer || this.intentionallyClosed) {
+    if (this.reconnectTimer || this.intentionallyClosed || this.lifecycle.reconnect === false) {
       return
     }
     const delay = withReconnectJitter(

@@ -165,8 +165,9 @@ describe('WorktreeList lineage child card renderer', () => {
     const markup = await renderWorktreeListMarkup()
 
     expect(markup).toContain(
-      'aria-activedescendant="worktree-list-option-folder%3Afolder-workspace-1"'
+      'aria-activedescendant="worktree-list-option-local%7Cfolder%3Afolder-workspace-1"'
     )
+    expect(markup).toContain('id="worktree-list-option-local%7Cfolder%3Afolder-workspace-1"')
   })
 
   it('keeps folder workspace cards one compact step under their group header', async () => {
