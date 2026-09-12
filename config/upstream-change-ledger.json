@@ -769,9 +769,7 @@
       "upstreamSha": "b35791365427f097c134d7d856f31053f8aa399a",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "487d39e02ef647cc4144aca1163d5d3391124ccb"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -785,9 +783,7 @@
       "upstreamSha": "487d39e02ef647cc4144aca1163d5d3391124ccb",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "4aa9329e999df44ddcfc7feb957511eef00d91a1"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -802,9 +798,7 @@
       "upstreamSha": "4aa9329e999df44ddcfc7feb957511eef00d91a1",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "1b5092492fecf1b22cbfb7bcfff088076d56e649"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -822,9 +816,7 @@
       "upstreamSha": "1b5092492fecf1b22cbfb7bcfff088076d56e649",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "3bc631dad322ee9a208ebf41b7c8d587380fac5c"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance.",
       "regressionTests": [
@@ -840,9 +832,7 @@
       "upstreamSha": "3bc631dad322ee9a208ebf41b7c8d587380fac5c",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "cd8e98fdf9b1f3c58aa3037d2c7dd4efac528e56"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance.",
       "regressionTests": [
@@ -857,9 +847,7 @@
       "upstreamSha": "cd8e98fdf9b1f3c58aa3037d2c7dd4efac528e56",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "57b0355f72d01cbe7e776574b19c2d2b01c36091"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance.",
       "regressionTests": [
@@ -874,9 +862,7 @@
       "upstreamSha": "57b0355f72d01cbe7e776574b19c2d2b01c36091",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "de8e5421ff812c85f54f620b2802dd7fc281c6fe"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -896,9 +882,7 @@
       "upstreamSha": "de8e5421ff812c85f54f620b2802dd7fc281c6fe",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "7b53b5abd18df6b77840cc5dee0f7fb197f3dc0a"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -915,9 +899,7 @@
       "upstreamSha": "7b53b5abd18df6b77840cc5dee0f7fb197f3dc0a",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "923858e0981667216826788ab7156294dfc5c755"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -931,9 +913,7 @@
       "upstreamSha": "923858e0981667216826788ab7156294dfc5c755",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "719c4341a2de717945c217fe89d60bb35cb44630"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -949,9 +929,7 @@
       "upstreamSha": "719c4341a2de717945c217fe89d60bb35cb44630",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": [
-        "a05e2139d6529cc3aea3d1fd5f2fc5323d7fa3d9"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Orca download badges/Android publication links are not Hive product statistics or distribution links. Carry explicit display/publication product decision; no functional fix is deferred.",
       "regressionTests": [
@@ -967,9 +945,7 @@
       "upstreamSha": "a05e2139d6529cc3aea3d1fd5f2fc5323d7fa3d9",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "ef6eeab26e4a2ba817b19e8d68b37546f58d293e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -986,9 +962,7 @@
       "upstreamSha": "ef6eeab26e4a2ba817b19e8d68b37546f58d293e",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "eedd35645e585e9d257d702e5f8a90733953d600"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -1004,7 +978,9 @@
       "type": "新功能",
       "applied": "已移植",
       "dependencies": [
-        "fa3d29fa11e38fba80d77b45dcbe401edd3ec53f"
+        "58ff95becb408e7c01ab1f8a24be11cfa887b7c9",
+        "c84007c541d86c12616ea588c98ea0232fbf4406",
+        "2ecde717b4561cae1701a27615f704434232399a"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
@@ -1029,7 +1005,9 @@
       "type": "新功能",
       "applied": "已移植",
       "dependencies": [
-        "1a9a5f9bc720bebd06a5dd190a4ea0000e59ccb4"
+        "1fedda14caa29bf88b609c2035fd1fc04d6daea6",
+        "2c984bcdaa7950e628a18180aad9537243e1a92f",
+        "65631e449af36bba24b6a2d6c331a3c184e7a3e2"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain shared transcript reader and the final upstream index/query/indexer library. Windows identities use exact decimal uint64 dev/ino and schema6 TEXT, old cache rebuilt, unsafe numeric-only identity fails closed without extra per-file stat. Final upstream also has no application engine/indexer wiring; do not claim a live new search UI. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
@@ -1062,9 +1040,7 @@
       "upstreamSha": "1a9a5f9bc720bebd06a5dd190a4ea0000e59ccb4",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "341b13cf679892102d2db8bf74024ae963f1cdd1"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1082,9 +1058,7 @@
       "upstreamSha": "341b13cf679892102d2db8bf74024ae963f1cdd1",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "9f7fd9a27064335d0335dd9639f1c6d35768db7a"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Mixed restoration/cold-start fix reviewed as mandatory BUG: final Cloud archive fixes remain, while live Hive local notifications retain consent, exact preference key, catch-up and watermark retirement. The foreign remote service/native registrar is retired, so its dismissal module is not autolinked into Hive. Full mobile4633 assertions pass; this is not a deferral of an active cold-start fix.",
       "regressionTests": [
@@ -1152,9 +1126,7 @@
       "upstreamSha": "9f7fd9a27064335d0335dd9639f1c6d35768db7a",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "20ab99506541ad7bd47b317ba39aec8be263e0dc"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1172,9 +1144,7 @@
       "upstreamSha": "20ab99506541ad7bd47b317ba39aec8be263e0dc",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "438e0f4f5a8f1eda94007e5d31b0ee18da57d4be"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt non-installer Codex marketplace/plugin config-mirror reconciliation, retaining Hive account/runtime scope. This is a Codex configuration consistency fix, not upstream skill-installer material.",
       "regressionTests": [
@@ -1193,9 +1163,7 @@
       "upstreamSha": "438e0f4f5a8f1eda94007e5d31b0ee18da57d4be",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "f7238ce4693c450ee06976575f01f1f168876a51"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1213,9 +1181,7 @@
       "upstreamSha": "f7238ce4693c450ee06976575f01f1f168876a51",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "76c8e91d4a74137bba2e05974de2876fdad60ba4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced.",
       "regressionTests": [
@@ -1231,9 +1197,7 @@
       "upstreamSha": "76c8e91d4a74137bba2e05974de2876fdad60ba4",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "3b13ce09a51e8f292f34b96b796353618f681183"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1252,9 +1216,7 @@
       "upstreamSha": "3b13ce09a51e8f292f34b96b796353618f681183",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "556a7772ed7bdf67d5f811449d07f06dcd4285f4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -1270,9 +1232,7 @@
       "upstreamSha": "556a7772ed7bdf67d5f811449d07f06dcd4285f4",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "113e58f34e53d7496b0473346dbc209ff0a805be"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -1291,9 +1251,7 @@
       "upstreamSha": "113e58f34e53d7496b0473346dbc209ff0a805be",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "70a588c8bf06a135980ae7f7005d4cf7aa7419c6"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1312,9 +1270,7 @@
       "upstreamSha": "70a588c8bf06a135980ae7f7005d4cf7aa7419c6",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "353a1c8038ae70547a78c07eafa481f7f898be2b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1329,9 +1285,7 @@
       "upstreamSha": "353a1c8038ae70547a78c07eafa481f7f898be2b",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "6252f8149bc5b72985e830ff830a178f61997b8b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1347,9 +1301,7 @@
       "upstreamSha": "6252f8149bc5b72985e830ff830a178f61997b8b",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "9c918b93a664d28ae715d331bf5c696f8ec024a4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -1365,9 +1317,7 @@
       "upstreamSha": "9c918b93a664d28ae715d331bf5c696f8ec024a4",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "da5d555259fc63cb0e39b848e677987a98cbf493"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1387,7 +1337,7 @@
       "type": "重构",
       "applied": "已移植",
       "dependencies": [
-        "729491597f33031089148bc2fba41a99e0b95de7"
+        "ebb1acfa3772337c68676a17ad2c28433ba70c52"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
@@ -1438,7 +1388,7 @@
       "type": "新功能",
       "applied": "需要产品决定",
       "dependencies": [
-        "1d7bb47a11d04722753b62a68de668c765b95602"
+        "cd9aa43a2c76513d3c3ceca75356bd4c44ac305b"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "New foreign Orca remote Push/desktop Relay infrastructure crosses Hive account endpoints, pairing/wire authority and native registration. Preserve final archive safety fixes, but live Hive local notifications and account relay remain the maintained owners; require a separate product/wire decision before activation.",
@@ -1468,9 +1418,7 @@
       "upstreamSha": "1d7bb47a11d04722753b62a68de668c765b95602",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "cd9aa43a2c76513d3c3ceca75356bd4c44ac305b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced.",
       "regressionTests": [
@@ -1484,9 +1432,7 @@
       "upstreamSha": "cd9aa43a2c76513d3c3ceca75356bd4c44ac305b",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "9a567974868737698dfdb7deb5cb37b0352d6815"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1524,9 +1470,7 @@
       "upstreamSha": "9a567974868737698dfdb7deb5cb37b0352d6815",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "ec9c3e055010195a86bfc5cc659a0d216394caf0"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1547,9 +1491,7 @@
       "upstreamSha": "ec9c3e055010195a86bfc5cc659a0d216394caf0",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "fb19c969a6e45d2ca57f2d4727fffb4660a61c4f"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -1565,9 +1507,7 @@
       "upstreamSha": "fb19c969a6e45d2ca57f2d4727fffb4660a61c4f",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "08a24efaba619dc4d2a2da0abfc6efe687e8a72a"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -1589,9 +1529,7 @@
       "upstreamSha": "08a24efaba619dc4d2a2da0abfc6efe687e8a72a",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "9aa0f7e77d366c23a3cc8de2da32ae550d397dc0"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1613,9 +1551,7 @@
       "upstreamSha": "9aa0f7e77d366c23a3cc8de2da32ae550d397dc0",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": [
-        "a0799d8f1c0fe37ddcef17e63498069f34f25669"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Orca download badges/Android publication links are not Hive product statistics or distribution links. Carry explicit display/publication product decision; no functional fix is deferred.",
       "regressionTests": [
@@ -1632,7 +1568,7 @@
       "type": "BUG",
       "applied": "已移植",
       "dependencies": [
-        "94c2f96ea46e9f0a182eb2c7ad18068ab08a2b91"
+        "7d367b2aa4f1d7b6d4668927fe0c582e8ace3d62"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
@@ -1669,9 +1605,7 @@
       "upstreamSha": "94c2f96ea46e9f0a182eb2c7ad18068ab08a2b91",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "20c56249d51d4a58392e04b0de7d52fa4c24060f"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -1686,9 +1620,7 @@
       "upstreamSha": "20c56249d51d4a58392e04b0de7d52fa4c24060f",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "22d12388a5e619940cd898815dc707865f768555"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1705,9 +1637,7 @@
       "upstreamSha": "22d12388a5e619940cd898815dc707865f768555",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "78e985cd993082e27168f6587983724e4b5798ea"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1723,9 +1653,7 @@
       "upstreamSha": "78e985cd993082e27168f6587983724e4b5798ea",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "6bb2b0c6d7fb33e974dc534e807689d0f421708b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1741,9 +1669,7 @@
       "upstreamSha": "6bb2b0c6d7fb33e974dc534e807689d0f421708b",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "2167cd299465a380cdb1caaa720b416a1aeb9bab"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -1769,9 +1695,7 @@
       "upstreamSha": "2167cd299465a380cdb1caaa720b416a1aeb9bab",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "5fa62feda7c264c6eda99ba4788ffebab9aae26c"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -1792,9 +1716,7 @@
       "upstreamSha": "5fa62feda7c264c6eda99ba4788ffebab9aae26c",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "fab78c766952404a1296d519a1dd76df6ed8d12e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1810,9 +1732,7 @@
       "upstreamSha": "fab78c766952404a1296d519a1dd76df6ed8d12e",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "3b82d8de6422ed415e80dd2fdb75d73bcae610ea"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -1847,7 +1767,7 @@
       "type": "BUG",
       "applied": "已移植",
       "dependencies": [
-        "b6e44575520796cf9c560e5e6880a03705026d0c"
+        "da5d555259fc63cb0e39b848e677987a98cbf493"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
@@ -1901,9 +1821,7 @@
       "upstreamSha": "b6e44575520796cf9c560e5e6880a03705026d0c",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "b3e0a33fa4c5464cf77465daed254268fcea44f6"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -1928,9 +1846,7 @@
       "upstreamSha": "b3e0a33fa4c5464cf77465daed254268fcea44f6",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "26db90789577abf7870257e6bfa7774b1381b2f1"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1955,9 +1871,7 @@
       "upstreamSha": "26db90789577abf7870257e6bfa7774b1381b2f1",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "7d367b2aa4f1d7b6d4668927fe0c582e8ace3d62"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -1973,9 +1887,7 @@
       "upstreamSha": "7d367b2aa4f1d7b6d4668927fe0c582e8ace3d62",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "a93e0aea80cea1db15a4ddeb39e5289aecc8054c"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -1991,9 +1903,7 @@
       "upstreamSha": "a93e0aea80cea1db15a4ddeb39e5289aecc8054c",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "e187c82678a27a5283eca8b84b734fa627d7ad9b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -2009,9 +1919,7 @@
       "upstreamSha": "e187c82678a27a5283eca8b84b734fa627d7ad9b",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "1113df6b50ecde801ad5daf5681099cf831180cb"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced. Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -2076,9 +1984,7 @@
       "upstreamSha": "1113df6b50ecde801ad5daf5681099cf831180cb",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "2ecde717b4561cae1701a27615f704434232399a"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -2093,9 +1999,7 @@
       "upstreamSha": "2ecde717b4561cae1701a27615f704434232399a",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "1fedda14caa29bf88b609c2035fd1fc04d6daea6"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2139,7 +2043,7 @@
       "type": "新功能",
       "applied": "已移植",
       "dependencies": [
-        "f31bfa8fb79ac19386a2a3d6d1a3578e1e6c1f7d"
+        "2c984bcdaa7950e628a18180aad9537243e1a92f"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain shared transcript reader and the final upstream index/query/indexer library. Windows identities use exact decimal uint64 dev/ino and schema6 TEXT, old cache rebuilt, unsafe numeric-only identity fails closed without extra per-file stat. Final upstream also has no application engine/indexer wiring; do not claim a live new search UI. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
@@ -2171,9 +2075,7 @@
       "upstreamSha": "f31bfa8fb79ac19386a2a3d6d1a3578e1e6c1f7d",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "37603a6cf3d1a022c8e940b971680b92bc26e459"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain shared transcript reader and the final upstream index/query/indexer library. Windows identities use exact decimal uint64 dev/ino and schema6 TEXT, old cache rebuilt, unsafe numeric-only identity fails closed without extra per-file stat. Final upstream also has no application engine/indexer wiring; do not claim a live new search UI. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -2206,9 +2108,7 @@
       "upstreamSha": "37603a6cf3d1a022c8e940b971680b92bc26e459",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "cf7408a37fe63af4543ea6a4ece9474a993d783f"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -2223,9 +2123,7 @@
       "upstreamSha": "cf7408a37fe63af4543ea6a4ece9474a993d783f",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "8acce092ef40a2ade46f794e96fa6bf2936b0537"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain shared transcript reader and the final upstream index/query/indexer library. Windows identities use exact decimal uint64 dev/ino and schema6 TEXT, old cache rebuilt, unsafe numeric-only identity fails closed without extra per-file stat. Final upstream also has no application engine/indexer wiring; do not claim a live new search UI. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -2258,9 +2156,7 @@
       "upstreamSha": "8acce092ef40a2ade46f794e96fa6bf2936b0537",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "2ffac471bddf6b743512fcf39bbbbd1a437e2d37"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain desktop-style value-import fence for paired Web clients while keeping Hive-local settings and account capabilities. Extracted theme imports remain in allowed runtime ownership surfaces.",
       "regressionTests": [
@@ -2276,9 +2172,7 @@
       "upstreamSha": "2ffac471bddf6b743512fcf39bbbbd1a437e2d37",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "d33354cfd22bd3459c8dc75b399adf34cef0bea3"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -2307,7 +2201,7 @@
       "type": "新功能",
       "applied": "需要产品决定",
       "dependencies": [
-        "1798786d4e846e23582918aae645963a8ffed792"
+        "74cc9b50390b481009b34823a35eee01a5b90e40"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "New foreign Orca remote Push/desktop Relay infrastructure crosses Hive account endpoints, pairing/wire authority and native registration. Preserve final archive safety fixes, but live Hive local notifications and account relay remain the maintained owners; require a separate product/wire decision before activation.",
@@ -2374,9 +2268,7 @@
       "upstreamSha": "1798786d4e846e23582918aae645963a8ffed792",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "6c1580aebad6c0bf12637b5c8d45eb5d12fe7e16"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2409,9 +2301,7 @@
       "upstreamSha": "6c1580aebad6c0bf12637b5c8d45eb5d12fe7e16",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "3b99a59ea7606589e3af44ade61c07e151d83051"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -2425,9 +2315,7 @@
       "upstreamSha": "3b99a59ea7606589e3af44ade61c07e151d83051",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "9b83f976f95b00c907de61026a0544d14dcd4254"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -2442,9 +2330,7 @@
       "upstreamSha": "9b83f976f95b00c907de61026a0544d14dcd4254",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "c84007c541d86c12616ea588c98ea0232fbf4406"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2462,9 +2348,7 @@
       "upstreamSha": "c84007c541d86c12616ea588c98ea0232fbf4406",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "cdf41df37c6c16acae89b06795f0ee5267182632"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -2492,9 +2376,7 @@
       "upstreamSha": "cdf41df37c6c16acae89b06795f0ee5267182632",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "ecd7b19ad42ab78d190b37ca22cd57ab783103fb"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -2511,9 +2393,7 @@
       "upstreamSha": "ecd7b19ad42ab78d190b37ca22cd57ab783103fb",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "2c984bcdaa7950e628a18180aad9537243e1a92f"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2536,9 +2416,7 @@
       "upstreamSha": "2c984bcdaa7950e628a18180aad9537243e1a92f",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "47b6c756f0b5fb0c8110ca60250eb34c43a21741"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain shared transcript reader and the final upstream index/query/indexer library. Windows identities use exact decimal uint64 dev/ino and schema6 TEXT, old cache rebuilt, unsafe numeric-only identity fails closed without extra per-file stat. Final upstream also has no application engine/indexer wiring; do not claim a live new search UI. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -2568,9 +2446,7 @@
       "upstreamSha": "47b6c756f0b5fb0c8110ca60250eb34c43a21741",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "58ff95becb408e7c01ab1f8a24be11cfa887b7c9"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "The new card watches the retired OrcaCloud profile account and would incorrectly prompt HiveAccount users. Remove that cross-service card from the live app root; retain Hive signed-out/revoked runtime fences, normal notifications and independent mandatory-update overlay. Shared prompt code remains vendor reference; current service applicability is explicitly reviewed.",
       "regressionTests": [
@@ -2591,9 +2467,7 @@
       "upstreamSha": "58ff95becb408e7c01ab1f8a24be11cfa887b7c9",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "54216a7868a9aab8993ad7bc61909e9940bf2bec"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2614,9 +2488,7 @@
       "upstreamSha": "54216a7868a9aab8993ad7bc61909e9940bf2bec",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "ae729128b630eb45d391dfed19cf127cde6fc67e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -2632,9 +2504,7 @@
       "upstreamSha": "ae729128b630eb45d391dfed19cf127cde6fc67e",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "254a07bb0543c16ea4e03b14b147566f28dce78e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -2651,9 +2521,7 @@
       "upstreamSha": "254a07bb0543c16ea4e03b14b147566f28dce78e",
       "type": "BUG",
       "applied": "已等价实现",
-      "dependencies": [
-        "25b5fac68a7deee2c445dc6db6592d234be6703d"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain prune-before-glibc probe and minified telemetry preservation release fixes with native/release246 assertions. Frozen Hive bounded walker already prunes at maxDepth before child stat; its own exact path/depth regression passes after fixture order normalization. Do not copy upstream skill walker tests.",
       "regressionTests": [
@@ -2674,9 +2542,7 @@
       "upstreamSha": "25b5fac68a7deee2c445dc6db6592d234be6703d",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "fb9ba4b681512adc00052b97e1b36c05dc8c58bc"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2696,9 +2562,7 @@
       "upstreamSha": "fb9ba4b681512adc00052b97e1b36c05dc8c58bc",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "b0505f0418e5bb66fe2813c791278be4088806d4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -2719,9 +2583,7 @@
       "upstreamSha": "b0505f0418e5bb66fe2813c791278be4088806d4",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "74cc9b50390b481009b34823a35eee01a5b90e40"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -2741,7 +2603,7 @@
       "type": "新功能",
       "applied": "需要产品决定",
       "dependencies": [
-        "027acb4efa2e6b226d40df266b86367423946d62"
+        "eb2f2d52aee2ebbdc18cbb4244d8347440b3e17c"
       ],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "New foreign Orca remote Push/desktop Relay infrastructure crosses Hive account endpoints, pairing/wire authority and native registration. Preserve final archive safety fixes, but live Hive local notifications and account relay remain the maintained owners; require a separate product/wire decision before activation.",
@@ -2809,9 +2671,7 @@
       "upstreamSha": "027acb4efa2e6b226d40df266b86367423946d62",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "a9338438c437e1ba763a03f17b9d468988bd045b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2854,9 +2714,7 @@
       "upstreamSha": "a9338438c437e1ba763a03f17b9d468988bd045b",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "4e1681338c076f01d99f021fb12eec59199e4f08"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2873,9 +2731,7 @@
       "upstreamSha": "4e1681338c076f01d99f021fb12eec59199e4f08",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "fb85f88d645f3e886a9df7dd2bf41d065f7e7a4c"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -2897,9 +2753,7 @@
       "upstreamSha": "fb85f88d645f3e886a9df7dd2bf41d065f7e7a4c",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "eb2f2d52aee2ebbdc18cbb4244d8347440b3e17c"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -2921,9 +2775,7 @@
       "upstreamSha": "eb2f2d52aee2ebbdc18cbb4244d8347440b3e17c",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": [
-        "33436c30d89154948013c462b74419eb748980a1"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "New foreign Orca remote Push/desktop Relay infrastructure crosses Hive account endpoints, pairing/wire authority and native registration. Preserve final archive safety fixes, but live Hive local notifications and account relay remain the maintained owners; require a separate product/wire decision before activation.",
       "regressionTests": [
@@ -2979,9 +2831,7 @@
       "upstreamSha": "33436c30d89154948013c462b74419eb748980a1",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "2626e2eca4a3cdc6a966e729a66a9687a122250e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3030,9 +2880,7 @@
       "upstreamSha": "2626e2eca4a3cdc6a966e729a66a9687a122250e",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "721a2692893ab29f8daee3149965bf5e9adf99a0"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3099,9 +2947,7 @@
       "upstreamSha": "721a2692893ab29f8daee3149965bf5e9adf99a0",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "4f5a8275e87b05c96de1186f4c0f87901844513c"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3116,9 +2962,7 @@
       "upstreamSha": "4f5a8275e87b05c96de1186f4c0f87901844513c",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "68e207ca2fceddbbadb95abbbd10e64874671eff"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3133,9 +2977,7 @@
       "upstreamSha": "68e207ca2fceddbbadb95abbbd10e64874671eff",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "6e9de5fa58d2bacbb4d35bc754fbd4cdb8744c26"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3150,9 +2992,7 @@
       "upstreamSha": "6e9de5fa58d2bacbb4d35bc754fbd4cdb8744c26",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "a6e6de93c4d6d7d549068780bca8be789ef0f0a7"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -3172,9 +3012,7 @@
       "upstreamSha": "a6e6de93c4d6d7d549068780bca8be789ef0f0a7",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "5a96158849cf04f7659ea328f05f85f0d6cd84b9"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced.",
       "regressionTests": [
@@ -3190,9 +3028,7 @@
       "upstreamSha": "5a96158849cf04f7659ea328f05f85f0d6cd84b9",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "4408fe897a366005d1846e94cf2cd0a6ad65ee2b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3218,9 +3054,7 @@
       "upstreamSha": "4408fe897a366005d1846e94cf2cd0a6ad65ee2b",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "f2af92b2fa2e287dab639cecb9c3de5e6c6bb24d"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt native-chat subagent child-row projection using existing Hive project/group/worktree rows, exact owner and lineage contracts; keep current Project and Session middle panes and restored multi-tab workspace surface.",
       "regressionTests": [
@@ -3244,9 +3078,7 @@
       "upstreamSha": "f2af92b2fa2e287dab639cecb9c3de5e6c6bb24d",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "4b1b7178ad24d50ba655f4e3dc4dc580e5bcc812"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3273,9 +3105,7 @@
       "upstreamSha": "4b1b7178ad24d50ba655f4e3dc4dc580e5bcc812",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "26f9fd8ea152ad6126c005e5ae602c7d201f4a99"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3302,9 +3132,7 @@
       "upstreamSha": "26f9fd8ea152ad6126c005e5ae602c7d201f4a99",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": [
-        "ebb1acfa3772337c68676a17ad2c28433ba70c52"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Orca download badges/Android publication links are not Hive product statistics or distribution links. Carry explicit display/publication product decision; no functional fix is deferred.",
       "regressionTests": [
@@ -3320,9 +3148,7 @@
       "upstreamSha": "ebb1acfa3772337c68676a17ad2c28433ba70c52",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "f2d5711b2d32e9f11277cd63805c76b0b5f9ddf7"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3355,9 +3181,7 @@
       "upstreamSha": "f2d5711b2d32e9f11277cd63805c76b0b5f9ddf7",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "e74c22a0e770eb844995f32645b031f9a27b63e8"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3376,9 +3200,7 @@
       "upstreamSha": "e74c22a0e770eb844995f32645b031f9a27b63e8",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "2bf298d1dc1a41c03a270e89eca08834c36f13e0"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "",
       "regressionTests": [
@@ -3390,9 +3212,7 @@
       "upstreamSha": "2bf298d1dc1a41c03a270e89eca08834c36f13e0",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "4e0aa7a4735621f72f7bbb5b0ba46585eb3e4066"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3422,9 +3242,7 @@
       "upstreamSha": "4e0aa7a4735621f72f7bbb5b0ba46585eb3e4066",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": [
-        "dda103d2cf69dbdd730d0a7179bb3021b6467501"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Orca download badges/Android publication links are not Hive product statistics or distribution links. Carry explicit display/publication product decision; no functional fix is deferred.",
       "regressionTests": [
@@ -3440,9 +3258,7 @@
       "upstreamSha": "dda103d2cf69dbdd730d0a7179bb3021b6467501",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "34790ce0843affb73bb6340c9189b5b77e04a06b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3463,9 +3279,7 @@
       "upstreamSha": "34790ce0843affb73bb6340c9189b5b77e04a06b",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "0b60b0dcb1215b7005a7320e6fbe45304f3abbfd"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -3484,9 +3298,7 @@
       "upstreamSha": "0b60b0dcb1215b7005a7320e6fbe45304f3abbfd",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "a067cccd38e38487772741ebf9d0ea4a8fed8644"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3501,9 +3313,7 @@
       "upstreamSha": "a067cccd38e38487772741ebf9d0ea4a8fed8644",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "4b4acf26a4775cfdde4258566683e41a6c276f5b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -3518,9 +3328,7 @@
       "upstreamSha": "4b4acf26a4775cfdde4258566683e41a6c276f5b",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "2f828e44621071c1d2d12a28631bf5a4d97a9b7b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3545,9 +3353,7 @@
       "upstreamSha": "2f828e44621071c1d2d12a28631bf5a4d97a9b7b",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "aac38d698ff75ac4c8658addab48ef5a83617619"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt extracted mobile routes, typed operation acceptance/settlement fences and bounded markdown parsing; preserve Hive theme, safe-area headers, account pairing, local consent/watermarks and exact host/worktree ownership. Frozen Hive tasks raw RPC census remains96, not a new caller allowance. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3575,9 +3381,7 @@
       "upstreamSha": "aac38d698ff75ac4c8658addab48ef5a83617619",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "7dd183d82dafb768bb2506d161438a6d0894fd53"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Retain final upstream Cloud Push/Relay archive including sparse director error parsing, canary reuse, APNs/Android supersession, protocol3 compatibility and idle-source placement safety. No Hive endpoint, production activation, remote registration, signing or publication is introduced. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3595,9 +3399,7 @@
       "upstreamSha": "7dd183d82dafb768bb2506d161438a6d0894fd53",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "73d05214106542b9eeb07b819c716e8d6b59f108"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -3613,9 +3415,7 @@
       "upstreamSha": "73d05214106542b9eeb07b819c716e8d6b59f108",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "b94bcdc632a9af756f2c43e7e4b4c3b8930f75eb"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Place compatible direct workspace/create actions in the current middle Project header, where the retained Hive project/group/worktree tree lives. Keep contextual repo/host defaults and actual worktree creation; no duplicate Project-session navigation.",
       "regressionTests": [
@@ -3630,9 +3430,7 @@
       "upstreamSha": "b94bcdc632a9af756f2c43e7e4b4c3b8930f75eb",
       "type": "新功能",
       "applied": "需要产品决定",
-      "dependencies": [
-        "ed9d76178de14c7f220cf83f06af0d23c2717cfc"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Orca download badges/Android publication links are not Hive product statistics or distribution links. Carry explicit display/publication product decision; no functional fix is deferred.",
       "regressionTests": [
@@ -3648,9 +3446,7 @@
       "upstreamSha": "ed9d76178de14c7f220cf83f06af0d23c2717cfc",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "946b1fc07808ac3e996eb70452ac58555a92c693"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -3665,9 +3461,7 @@
       "upstreamSha": "946b1fc07808ac3e996eb70452ac58555a92c693",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "373a670aba853cb208fa3138f643f3afec8a1db7"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -3687,9 +3481,7 @@
       "upstreamSha": "373a670aba853cb208fa3138f643f3afec8a1db7",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "1e2ed20b3512a56d54320e9b2d5d88f74264a644"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3712,9 +3504,7 @@
       "upstreamSha": "1e2ed20b3512a56d54320e9b2d5d88f74264a644",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "042cc5266ca202de39cbde527d6785be736a1196"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3740,9 +3530,7 @@
       "upstreamSha": "042cc5266ca202de39cbde527d6785be736a1196",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "91f00b32efd6db53c3abb61e1fd85ab9d35ec151"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3761,9 +3549,7 @@
       "upstreamSha": "91f00b32efd6db53c3abb61e1fd85ab9d35ec151",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "8c18e42be2f45687254090b4935d84af93d2a3ce"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -3778,9 +3564,7 @@
       "upstreamSha": "8c18e42be2f45687254090b4935d84af93d2a3ce",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "069bdae283b6bb5ab4b151c9a42dfa091209b46a"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3798,9 +3582,7 @@
       "upstreamSha": "069bdae283b6bb5ab4b151c9a42dfa091209b46a",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "f1f2d61d0e38a60eda78400d967fb1b78bd62593"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -3815,9 +3597,7 @@
       "upstreamSha": "f1f2d61d0e38a60eda78400d967fb1b78bd62593",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "bf1e1b9004d38a37f2c1677802dc5a45904c19cf"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -3832,9 +3612,7 @@
       "upstreamSha": "bf1e1b9004d38a37f2c1677802dc5a45904c19cf",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "23f38ddf7f187c86e29b36d03615732d530753cb"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -3849,9 +3627,7 @@
       "upstreamSha": "23f38ddf7f187c86e29b36d03615732d530753cb",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "db66ab4ac83b60301f08bbfa206ac741a4ad56d4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3872,9 +3648,7 @@
       "upstreamSha": "db66ab4ac83b60301f08bbfa206ac741a4ad56d4",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "c875941d7ca4576c21d384a78256e74c14e61fd3"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -3891,9 +3665,7 @@
       "upstreamSha": "c875941d7ca4576c21d384a78256e74c14e61fd3",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "65631e449af36bba24b6a2d6c331a3c184e7a3e2"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -3908,9 +3680,7 @@
       "upstreamSha": "65631e449af36bba24b6a2d6c331a3c184e7a3e2",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "acd501486dd1b18cd551b1bcd6449bb16c4c9769"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -3932,9 +3702,7 @@
       "upstreamSha": "acd501486dd1b18cd551b1bcd6449bb16c4c9769",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "5868fdc9e3ad9efd27a265b3af51f59b6815c6a8"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -3950,9 +3718,7 @@
       "upstreamSha": "5868fdc9e3ad9efd27a265b3af51f59b6815c6a8",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "0fe132ea29bc38bd6f0e66c1a9f27e04cb6f729b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -3986,9 +3752,7 @@
       "upstreamSha": "0fe132ea29bc38bd6f0e66c1a9f27e04cb6f729b",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "2ee4053ae6b00a1e6c5241d52ee931da86d096ad"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4009,9 +3773,7 @@
       "upstreamSha": "2ee4053ae6b00a1e6c5241d52ee931da86d096ad",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "7197593e31a2e44ca536b6d1a75da47e6bf19851"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -4025,9 +3787,7 @@
       "upstreamSha": "7197593e31a2e44ca536b6d1a75da47e6bf19851",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "d15a6df22497ce7d444e669ea3cc015f77e73388"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -4042,9 +3802,7 @@
       "upstreamSha": "d15a6df22497ce7d444e669ea3cc015f77e73388",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "addd9f3da7de4ddeb72a4905405fce9bafdd369f"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -4066,9 +3824,7 @@
       "upstreamSha": "addd9f3da7de4ddeb72a4905405fce9bafdd369f",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "750e6ffada777192fe67ef30e444d4ca64b4ab8f"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent.",
       "regressionTests": [
@@ -4086,9 +3842,7 @@
       "upstreamSha": "750e6ffada777192fe67ef30e444d4ca64b4ab8f",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "3a801d213d708e0942f5cc5575588dd3ea260562"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent.",
       "regressionTests": [
@@ -4103,9 +3857,7 @@
       "upstreamSha": "3a801d213d708e0942f5cc5575588dd3ea260562",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "fe9d538b6f34f0634ced58ceae4449f538710e79"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -4132,9 +3884,7 @@
       "upstreamSha": "fe9d538b6f34f0634ced58ceae4449f538710e79",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "210ac1f77c1832c8ae20e9503110799cbbaf7e34"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -4148,9 +3898,7 @@
       "upstreamSha": "210ac1f77c1832c8ae20e9503110799cbbaf7e34",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "1c1cb7115ac571b19fed27ade99eb40d1d33dbca"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4166,9 +3914,7 @@
       "upstreamSha": "1c1cb7115ac571b19fed27ade99eb40d1d33dbca",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "72befaf360e7303b9948112d4e83167eec2cb34b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -4198,9 +3944,7 @@
       "upstreamSha": "72befaf360e7303b9948112d4e83167eec2cb34b",
       "type": "新功能",
       "applied": "已移植",
-      "dependencies": [
-        "852495d35cf002d8be1324a6935cfa6b8c3d7768"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance. Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -4233,9 +3977,7 @@
       "upstreamSha": "852495d35cf002d8be1324a6935cfa6b8c3d7768",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "98df62d8ff72cd51c3333751624efa3cf1a96041"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -4261,9 +4003,7 @@
       "upstreamSha": "98df62d8ff72cd51c3333751624efa3cf1a96041",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "eedaf2bdfc2e10ef1e4937cfd86a6233e49ecf07"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4278,9 +4018,7 @@
       "upstreamSha": "eedaf2bdfc2e10ef1e4937cfd86a6233e49ecf07",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "2558bf1b17a525b08edc2a17416cd26387f15fc8"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4295,9 +4033,7 @@
       "upstreamSha": "2558bf1b17a525b08edc2a17416cd26387f15fc8",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "6d2d63104a6d88035ddc79d75d247621d5e8adeb"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4312,9 +4048,7 @@
       "upstreamSha": "6d2d63104a6d88035ddc79d75d247621d5e8adeb",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "e373c89536ab3215e6bf311774187fc8768f7aee"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4329,9 +4063,7 @@
       "upstreamSha": "e373c89536ab3215e6bf311774187fc8768f7aee",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "5f63b850a5daa96e10a28209ba8bd3935f6c9773"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4346,9 +4078,7 @@
       "upstreamSha": "5f63b850a5daa96e10a28209ba8bd3935f6c9773",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "f74222d82c5b9a92c09cffed3e5cd451f058205b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4363,9 +4093,7 @@
       "upstreamSha": "f74222d82c5b9a92c09cffed3e5cd451f058205b",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "063c1caa6fbc8545e9c446e1ae32a684d1d92a95"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4380,9 +4108,7 @@
       "upstreamSha": "063c1caa6fbc8545e9c446e1ae32a684d1d92a95",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "0f4bca26d40588d713615b9c197e5c94ff94eff9"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4398,9 +4124,7 @@
       "upstreamSha": "0f4bca26d40588d713615b9c197e5c94ff94eff9",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "4a502d2e19d4c3c0906b35d530b3f36a91587b89"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4415,9 +4139,7 @@
       "upstreamSha": "4a502d2e19d4c3c0906b35d530b3f36a91587b89",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "8b7b670c406164c015b3c8fde854b9e10dcefcfc"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4432,9 +4154,7 @@
       "upstreamSha": "8b7b670c406164c015b3c8fde854b9e10dcefcfc",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "35bbc5ce5ca40a2137e6cab81f5eeb13b132636e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4453,9 +4173,7 @@
       "upstreamSha": "35bbc5ce5ca40a2137e6cab81f5eeb13b132636e",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "782c4618fd5479d83c9384d0b6708eb48e341f24"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4470,9 +4188,7 @@
       "upstreamSha": "782c4618fd5479d83c9384d0b6708eb48e341f24",
       "type": "性能",
       "applied": "已等价实现",
-      "dependencies": [
-        "8983e026f7ae5e2482a106a611c5986c5dca403e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Keep the frozen Hive installer, providers, registry, path tables and its own tests. Performance changes are independently derived from the Hive implementation and frozen requirements: first-wins ID/name indexing, shared collators, selected-ID set and locked-name placement index. No upstream installer material is copied.",
       "regressionTests": [
@@ -4487,9 +4203,7 @@
       "upstreamSha": "8983e026f7ae5e2482a106a611c5986c5dca403e",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "60456107e65fcf261feb6d9f6ce6adb99bc331f4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4504,9 +4218,7 @@
       "upstreamSha": "60456107e65fcf261feb6d9f6ce6adb99bc331f4",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "f242c99af48ca383becc1276e4f5f74c761374c0"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4521,9 +4233,7 @@
       "upstreamSha": "f242c99af48ca383becc1276e4f5f74c761374c0",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "44eb95fc6bb96fbb32bb2ebda59b8c1f908e1a71"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4544,9 +4254,7 @@
       "upstreamSha": "44eb95fc6bb96fbb32bb2ebda59b8c1f908e1a71",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "1dcd7926497604244eb8369725d5e10365ad16a6"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -4562,9 +4270,7 @@
       "upstreamSha": "1dcd7926497604244eb8369725d5e10365ad16a6",
       "type": "性能",
       "applied": "已等价实现",
-      "dependencies": [
-        "126a69367c3735b941fe2b440292cf02e429a765"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Keep the frozen Hive installer, providers, registry, path tables and its own tests. Performance changes are independently derived from the Hive implementation and frozen requirements: first-wins ID/name indexing, shared collators, selected-ID set and locked-name placement index. No upstream installer material is copied.",
       "regressionTests": [
@@ -4580,9 +4286,7 @@
       "upstreamSha": "126a69367c3735b941fe2b440292cf02e429a765",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "f0c210a906d34ab1f75504cda7708b4783fabf79"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4597,9 +4301,7 @@
       "upstreamSha": "f0c210a906d34ab1f75504cda7708b4783fabf79",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "ee2faa5a2df9054c2ea34cbd04d6f18973e79eb4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4614,9 +4316,7 @@
       "upstreamSha": "ee2faa5a2df9054c2ea34cbd04d6f18973e79eb4",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "db5df2f6f679871f76fbfb77477593b0598c6067"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4632,9 +4332,7 @@
       "upstreamSha": "db5df2f6f679871f76fbfb77477593b0598c6067",
       "type": "安全",
       "applied": "已移植",
-      "dependencies": [
-        "c3a415487b119891bddc600e5d73f1ad78ecdd35"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4649,9 +4347,7 @@
       "upstreamSha": "c3a415487b119891bddc600e5d73f1ad78ecdd35",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "d872a5a8b8ec726ddf7235fc274609d94e8e0336"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt compatible CI caching, shutdown oracle and Electron43.7 security floor. Preserve Hive identity, endpoints, signatures, manual retired publication workflows and compatibility aliases. Consolidate parallel upstream relay plans into one current architecture reference; product documentation does not become deployment authority.",
       "regressionTests": [
@@ -4668,9 +4364,7 @@
       "upstreamSha": "d872a5a8b8ec726ddf7235fc274609d94e8e0336",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "d7162ef570f0eef7f72718ed6dd42404ef83a604"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4686,9 +4380,7 @@
       "upstreamSha": "d7162ef570f0eef7f72718ed6dd42404ef83a604",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "a0ea66a13d487b4870885e8915f918f5d12485c7"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4705,9 +4397,7 @@
       "upstreamSha": "a0ea66a13d487b4870885e8915f918f5d12485c7",
       "type": "性能",
       "applied": "已等价实现",
-      "dependencies": [
-        "400f70b0061541605b56b6ab55a0e60d95d89fdb"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Keep the frozen Hive installer, providers, registry, path tables and its own tests. Performance changes are independently derived from the Hive implementation and frozen requirements: first-wins ID/name indexing, shared collators, selected-ID set and locked-name placement index. No upstream installer material is copied.",
       "regressionTests": [
@@ -4723,9 +4413,7 @@
       "upstreamSha": "400f70b0061541605b56b6ab55a0e60d95d89fdb",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "b68d2c46f69cc71344993f8f2ce25ec9e70e0aa4"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final runtime recovery, single hook/status ownership, stream receipt revocation, bounded transport and exact run/terminal custody fixes. Preserve Hive account-cloud E2EE principal, local control, provider accounts, close/reconnect and wire/persisted identities. Retired Orca desktop Relay/Push services remain absent. Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4744,9 +4432,7 @@
       "upstreamSha": "b68d2c46f69cc71344993f8f2ce25ec9e70e0aa4",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "b38c1313c4350a56bec53a45add2a3510cc66ef7"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4761,9 +4447,7 @@
       "upstreamSha": "b38c1313c4350a56bec53a45add2a3510cc66ef7",
       "type": "性能",
       "applied": "已等价实现",
-      "dependencies": [
-        "de771ae4af9606e64cdb3d387eff5986326c64e1"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Keep the frozen Hive installer, providers, registry, path tables and its own tests. Performance changes are independently derived from the Hive implementation and frozen requirements: first-wins ID/name indexing, shared collators, selected-ID set and locked-name placement index. No upstream installer material is copied.",
       "regressionTests": [
@@ -4778,9 +4462,7 @@
       "upstreamSha": "de771ae4af9606e64cdb3d387eff5986326c64e1",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "e0cac9677262f2d467d62030deba06afa214d0c5"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4795,9 +4477,7 @@
       "upstreamSha": "e0cac9677262f2d467d62030deba06afa214d0c5",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "5f2127ad122b5a08afed23ca934caa02a1ce887e"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4812,9 +4492,7 @@
       "upstreamSha": "5f2127ad122b5a08afed23ca934caa02a1ce887e",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "8413a5b33c68123ffa2d33c680cacdaaef7bc8a1"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -4830,9 +4508,7 @@
       "upstreamSha": "8413a5b33c68123ffa2d33c680cacdaaef7bc8a1",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "6a9c5d8ce3836865c8fba9461b699e03fb4639be"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4848,9 +4524,7 @@
       "upstreamSha": "6a9c5d8ce3836865c8fba9461b699e03fb4639be",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "96216601bc977bb9011dd7600cc7ac80bb3d736b"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -4865,9 +4539,7 @@
       "upstreamSha": "96216601bc977bb9011dd7600cc7ac80bb3d736b",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "814d3525d4cad1ccce82d3f2f806632e92b39638"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4882,9 +4554,7 @@
       "upstreamSha": "814d3525d4cad1ccce82d3f2f806632e92b39638",
       "type": "安全",
       "applied": "已移植",
-      "dependencies": [
-        "2c5cd845a2ec3512cf983f62f10bd88eea61ee25"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4899,9 +4569,7 @@
       "upstreamSha": "2c5cd845a2ec3512cf983f62f10bd88eea61ee25",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "96b33d7725396699bbe80139702e0a8b478545ee"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4916,9 +4584,7 @@
       "upstreamSha": "96b33d7725396699bbe80139702e0a8b478545ee",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "df8a43724f1c8dbb434ab1efc28f17f46a478606"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4933,9 +4599,7 @@
       "upstreamSha": "df8a43724f1c8dbb434ab1efc28f17f46a478606",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "86fe80da254cbae8e92786e222be4c74a2270270"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4950,9 +4614,7 @@
       "upstreamSha": "86fe80da254cbae8e92786e222be4c74a2270270",
       "type": "性能",
       "applied": "已移植",
-      "dependencies": [
-        "c69d4d4f8b52ec505a8025350c4189654502dff2"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
@@ -4967,9 +4629,7 @@
       "upstreamSha": "c69d4d4f8b52ec505a8025350c4189654502dff2",
       "type": "安全",
       "applied": "已移植",
-      "dependencies": [
-        "e80fae0c4d4d70424d52eebe383c57b2291b9daa"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt final upstream implementation and bounded performance/module extraction. Retain current Hive three-column navigation, resizable middle pane, workspace multi-tab/right-sidebar, drag/split, activity view and account Web link; update moved-source/brand fixtures without weakening behavior.",
       "regressionTests": [
@@ -4984,9 +4644,7 @@
       "upstreamSha": "e80fae0c4d4d70424d52eebe383c57b2291b9daa",
       "type": "重构",
       "applied": "已移植",
-      "dependencies": [
-        "d196942220ea6d2819c35a1d672f86b378f4b738"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -5005,9 +4663,7 @@
       "upstreamSha": "d196942220ea6d2819c35a1d672f86b378f4b738",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "94a64cf40fb9d187086645f9c9fbed9c5f6d1665"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate. Adopt durable turn timing, send-on-admission, unlisted-model refusal, bounded virtual transcript, background tasks/goals/checklists, grouped question receipts and current provider launch routing. Preserve Hive permission policy, composed prompt, retained pane focus/IME and localized appearance.",
       "regressionTests": [
@@ -5027,9 +4683,7 @@
       "upstreamSha": "94a64cf40fb9d187086645f9c9fbed9c5f6d1665",
       "type": "BUG",
       "applied": "已移植",
-      "dependencies": [
-        "12f2c6b991dc80973827464bee3f629ebc0fc753"
-      ],
+      "dependencies": [],
       "conflictReason": "Current Hive overlay and retained service/capability ownership; exact path dispositions in logs/per-commit-review.json. Ancestry proves inclusion only.",
       "adaptation": "Adopt recovery-on-tab-row, observed-outcome budget, deliberately asleep workspace fencing, deferred admission replay, retained pane isolation and Git/create/prune generation guards. Preserve multi-tab, split, sidebar and exact Hive workspace/session projection. POSIX mocked fixtures are explicit; actual Windows matrix remains separate.",
       "regressionTests": [
