@@ -11,7 +11,7 @@ vi.mock('node:fs', () => filesystem)
 
 describe('scanSourceTree', () => {
   it('skips root artifact logs before stat while retaining source and nested logs', () => {
-    const root = join(import.meta.dirname, 'scanner-fixture')
+    const root = join(process.cwd(), 'logs', 'scanner-fixture')
     const artifacts = join(root, 'logs')
     const source = join(root, 'src')
     const nestedLogs = join(source, 'logs')
@@ -56,7 +56,7 @@ describe('scanSourceTree', () => {
   })
 
   it('retains legitimate logs beneath a source root by default', () => {
-    const root = join(import.meta.dirname, 'source-root-fixture')
+    const root = join(process.cwd(), 'logs', 'source-root-fixture')
     const logs = join(root, 'logs')
     const path = join(logs, 'implementation.ts')
     const content = 'export const sourceLog = true'
