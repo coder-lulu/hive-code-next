@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
-import { waitForTabRegistration } from '../ipc/browser-tab-registration-wait'
+import { getRuntimeDesktopSurface } from './runtime-desktop-surface'
 
 const pendingByWindow = new WeakMap<BrowserWindow, Map<string, Promise<void>>>()
 const RESTORE_CONCURRENCY = 4
@@ -52,7 +52,9 @@ export function restoreRendererBrowserSessionTabs(args: {
             worktreeId: snapshot.worktree,
             browserPageId
           })
-          await (args.waitForRegistration ?? waitForTabRegistration)(browserPageId)
+          await (args.waitForRegistration
+            ? args.waitForRegistration(browserPageId)
+            : getRuntimeDesktopSurface().waitForBrowserTabRegistration(browserPageId))
         })
       )
       const failure = results.find((result) => result.status === 'rejected')

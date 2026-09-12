@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { getRuntimeDesktopSurface, setRuntimeDesktopSurface } from './runtime-desktop-surface'
 import type { BrowserWindow } from 'electron'
 import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
 
-vi.mock('../ipc/browser-tab-registration-wait', () => ({ waitForTabRegistration: vi.fn() }))
 import { restoreRendererBrowserSessionTabs } from './restore-renderer-browser-session-tabs'
 
 function setup(pageIds = ['page-1'], worktree = 'folder:folder-1') {
@@ -33,6 +33,63 @@ function setup(pageIds = ['page-1'], worktree = 'folder:folder-1') {
 }
 
 describe('requested browser workspace restoration', () => {
+  afterEach(() => setRuntimeDesktopSurface(null))
+
+  it('delegates default registration waiting to the desktop port and waits until ready', async () => {
+    const { args, send } = setup()
+    let ready!: () => void
+    const waitForBrowserTabRegistration = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          ready = resolve
+        })
+    )
+    setRuntimeDesktopSurface({ ...getRuntimeDesktopSurface(), waitForBrowserTabRegistration })
+    let restored = false
+    const pending = restoreRendererBrowserSessionTabs({
+      ...args,
+      waitForRegistration: undefined
+    }).then(() => {
+      restored = true
+    })
+
+    expect(send).toHaveBeenCalledWith('browser:activateView', {
+      worktreeId: 'folder:folder-1',
+      browserPageId: 'page-1'
+    })
+    expect(waitForBrowserTabRegistration).toHaveBeenCalledExactlyOnceWith('page-1')
+    await Promise.resolve()
+    expect(restored).toBe(false)
+    ready()
+    await pending
+    expect(restored).toBe(true)
+  })
+
+  it('preserves an explicit registration wait instead of calling the desktop port', async () => {
+    const { args } = setup()
+    const waitForBrowserTabRegistration = vi.fn().mockRejectedValue(new Error('wrong owner'))
+    setRuntimeDesktopSurface({ ...getRuntimeDesktopSurface(), waitForBrowserTabRegistration })
+    await restoreRendererBrowserSessionTabs(args)
+    expect(args.waitForRegistration).toHaveBeenCalledExactlyOnceWith('page-1')
+    expect(waitForBrowserTabRegistration).not.toHaveBeenCalled()
+  })
+
+  it('does not falsely confirm a renderer restore through the inert Node surface', async () => {
+    const { args } = setup()
+    await expect(
+      restoreRendererBrowserSessionTabs({
+        ...args,
+        waitForRegistration: undefined
+      })
+    ).rejects.toThrow('browser_restore_registration_unavailable')
+    await expect(
+      restoreRendererBrowserSessionTabs({
+        ...args,
+        window: null,
+        waitForRegistration: undefined
+      })
+    ).resolves.toBeUndefined()
+  })
   it.each(['folder:folder-1', 'repo::/worktree'])(
     'registers restored pages without selecting the host pane: %s',
     async (worktree) => {
