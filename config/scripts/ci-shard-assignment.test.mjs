@@ -3,20 +3,64 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BaseSequencer } from 'vitest/node'
-import { balanceFiles } from './ci-shard-assignment.mjs'
+import { balanceFiles, readTimingBaseline } from './ci-shard-assignment.mjs'
 import { discoverE2eFiles, planE2e } from './ci-e2e-shard-plan.mjs'
 import { parseTimingLog } from './ci-shard-timing-import.mjs'
 import TimingSequencer from './ci-unit-sequencer.mjs'
 
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync) }
+})
+
 const directories = []
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.mocked(readFileSync).mockReset()
   for (const directory of directories.splice(0)) {
     rmSync(directory, { recursive: true, force: true })
   }
 })
 
 describe('timing-weighted shard selection', () => {
+  it.each([Number.NaN, Infinity, -Infinity, -1, '526', null, true])(
+    'rejects invalid per-file overhead %s before assigning files',
+    (overheadMs) => {
+      expect(() => balanceFiles(['a', 'b'], 2, { a: 100, b: 80 }, overheadMs)).toThrow(
+        'Invalid timing overhead'
+      )
+    }
+  )
+
+  it.each([undefined, null, [], 526, 'timings', true].map((timings) => [timings]))(
+    'rejects malformed duration maps %s instead of estimating every file',
+    (timings) => {
+      expect(() => balanceFiles(['a'], 1, timings)).toThrow('Invalid timing map')
+    }
+  )
+
+  it.each(
+    [
+      null,
+      [],
+      {},
+      { unit: null },
+      { unit: [] },
+      { unit: 'invalid' },
+      { unit: { overheadMs: 0 } },
+      { unit: { timings: null, overheadMs: 0 } },
+      { unit: { timings: [], overheadMs: 0 } },
+      { unit: { timings: 'invalid', overheadMs: 0 } },
+      { unit: { timings: {} } },
+      { unit: { timings: {}, overheadMs: -1 } },
+      { unit: { timings: {}, overheadMs: '526' } },
+      { unit: { timings: {}, overheadMs: null } }
+    ].map((baseline) => [baseline])
+  )('rejects malformed suite timing baselines %j at load', (baseline) => {
+    vi.mocked(readFileSync).mockReturnValueOnce(JSON.stringify(baseline))
+    expect(() => readTimingBaseline('unit')).toThrow('Invalid timing')
+  })
+
   it('distributes long files, includes unknowns exactly once, and ignores discovery order', () => {
     const files = ['long', 'medium', 'short', 'unknown', 'new', 'zero', 'invalid']
     const timings = { long: 100, medium: 80, short: 20, zero: 0, invalid: -1, deleted: 20 }

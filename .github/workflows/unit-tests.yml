@@ -77,6 +77,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: unit-shard-node-${{ matrix.node }}-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
-          path: ci-shards/
+          path: logs/ci-shards/
           retention-days: 14
           if-no-files-found: warn

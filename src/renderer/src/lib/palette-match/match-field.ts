@@ -28,20 +28,31 @@ const PREFIX_QUALITIES: ReadonlySet<PaletteMatchQuality> = new Set<PaletteMatchQ
 
 const MIN_COMPACT_LENGTH = 2
 const SIGILS = new Set(['#', '!'])
+const IDENTIFIER_TOKEN_QUALITIES = new WeakMap<
+  readonly PaletteMatchQuality[],
+  readonly PaletteMatchQuality[]
+>()
 
 function allowedQualities(
   field: PaletteIndexedField,
   token: PaletteQueryToken
 ): readonly PaletteMatchQuality[] {
   let qualities = paletteProfileAllowedQualities(field.profile)
+  if (token.isIdentifierLike) {
+    const cached = IDENTIFIER_TOKEN_QUALITIES.get(qualities)
+    if (cached) {
+      qualities = cached
+    } else {
+      const filtered = qualities.filter((quality) => quality !== 'typo')
+      IDENTIFIER_TOKEN_QUALITIES.set(qualities, filtered)
+      qualities = filtered
+    }
+  }
   if (field.identifier && !identifierKindAllowsPrefix(field.identifier.kind)) {
     qualities = qualities.filter((quality) => !PREFIX_QUALITIES.has(quality))
   }
   if (token.isSingleLatinCharacter) {
     qualities = qualities.filter((quality) => SHORT_TOKEN_QUALITIES.has(quality))
-  }
-  if (token.isIdentifierLike) {
-    qualities = qualities.filter((quality) => quality !== 'typo')
   }
   return qualities
 }
@@ -87,6 +98,10 @@ function matchLiteral(
 ): PaletteFieldMatch | null {
   const normalized = field.text.normalized
   const text = token.text
+  const literalIndex = normalized.indexOf(text)
+  if (literalIndex === -1) {
+    return null
+  }
 
   if (qualities.includes('field-exact') && normalized === text) {
     return { quality: 'field-exact', ranges: toRanges(field, 0, normalized.length) }
@@ -113,10 +128,6 @@ function matchLiteral(
     }
   }
 
-  const literalIndex = normalized.indexOf(text)
-  if (literalIndex === -1) {
-    return null
-  }
   if (qualities.includes('boundary-substring') && isWordStart(field, literalIndex)) {
     return {
       quality: 'boundary-substring',

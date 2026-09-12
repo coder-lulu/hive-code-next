@@ -4,6 +4,15 @@ import { dirname } from 'node:path'
 
 export const compareIds = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
 
+function validateTimingInputs(timings, overheadMs) {
+  if (timings === null || typeof timings !== 'object' || Array.isArray(timings)) {
+    throw new Error('Invalid timing map')
+  }
+  if (!Number.isFinite(overheadMs) || overheadMs < 0) {
+    throw new Error('Invalid timing overhead')
+  }
+}
+
 export function balanceFiles(files, count, timings, overheadMs = 0) {
   if (!Number.isInteger(count) || count < 1) {
     throw new Error('Invalid shard count')
@@ -11,6 +20,7 @@ export function balanceFiles(files, count, timings, overheadMs = 0) {
   if (new Set(files).size !== files.length) {
     throw new Error('Duplicate discovered file')
   }
+  validateTimingInputs(timings, overheadMs)
   const known = Object.values(timings).filter((value) => Number.isFinite(value) && value > 0)
   known.sort((a, b) => a - b)
   const fallbackMs = known[Math.floor(known.length / 2)] ?? 1000
@@ -44,8 +54,9 @@ export function balanceFiles(files, count, timings, overheadMs = 0) {
 
 export function readTimingBaseline(suite) {
   const bytes = readFileSync(new URL('./ci-shard-timings.json', import.meta.url), 'utf8')
-  const baseline = JSON.parse(bytes)
-  return { ...baseline[suite], baselineSha256: createHash('sha256').update(bytes).digest('hex') }
+  const baseline = JSON.parse(bytes)?.[suite]
+  validateTimingInputs(baseline?.timings, baseline?.overheadMs)
+  return { ...baseline, baselineSha256: createHash('sha256').update(bytes).digest('hex') }
 }
 
 export function writeAssignment(path, assignment) {

@@ -8,7 +8,7 @@ export default class TimingSequencer extends BaseSequencer {
     const key = (spec) => relative(this.ctx.config.root, spec.moduleId).replaceAll('\\', '/')
     const baseline = readTimingBaseline('unit')
     const assignment = balanceFiles(specs.map(key), count, baseline.timings, baseline.overheadMs)
-    writeAssignment(process.env.ORCA_SHARD_MANIFEST ?? 'ci-shards/unit-assignment.json', {
+    writeAssignment(process.env.ORCA_SHARD_MANIFEST ?? 'logs/ci-shards/unit-assignment.json', {
       ...assignment,
       baselineSha256: baseline.baselineSha256,
       selectedShard: index

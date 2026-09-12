@@ -46,16 +46,18 @@ No retries, assertions, coverage exclusions, runner classes or shard counts chan
 
 ## Reproduction and refresh
 
-Every shard uploads an artifact named with its shard, Node version where relevant,
-and run attempt. `assignment.json` contains the checked-out source SHA, run ID,
-attempt, baseline SHA-256, algorithm, fallback, all shard files and chosen shard.
+Shard diagnostics are written under `logs/ci-shards/`; the default unit manifest is
+`logs/ci-shards/unit-assignment.json`. Every shard uploads an artifact named with
+its shard, Node version where relevant, and run attempt. `assignment.json` contains
+the checked-out source SHA, run ID, attempt, baseline SHA-256, algorithm, fallback,
+all shard files and chosen shard.
 E2E also retains both discovery reports and `selected.txt`. Artifacts live for
 14 days. A rerun of the same source uses the same checked-in baseline rather than
 mutable timing caches; a GitHub job rerun therefore keeps its assignment.
 
-For E2E reproduction, check out the recorded source and pass the saved list to the
-existing command: `pnpm run test:e2e --test-list=/path/to/selected.txt` with the same
-CI environment/build inputs. For unit reproduction, use the unchanged workflow
+For E2E reproduction, check out the recorded source, restore the saved list under
+`logs/ci-shards/`, and use `pnpm run test:e2e --test-list=logs/ci-shards/selected.txt`
+with the same CI environment/build inputs. For unit reproduction, use the unchanged workflow
 command and exclusions with `ORCA_BALANCE_UNIT_SHARDS=1` and the recorded
 `--shard=INDEX/8`. Direct test-file reruns remain supported.
 
