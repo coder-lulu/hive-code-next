@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 import { resolve } from 'node:path'
 
 const vitestOxcConfig = { tsconfig: false } as never
+const windowsTestWorkerOptions = process.platform === 'win32' ? { maxWorkers: 4 } : {}
 
 export default defineConfig({
   root: import.meta.dirname,
@@ -14,6 +15,8 @@ export default defineConfig({
   // otherwise fails before Vitest can run the test modules.
   oxc: vitestOxcConfig,
   test: {
+    // Why: match the root suite's Windows worker cap so large hosts do not overwhelm transforms.
+    ...windowsTestWorkerOptions,
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
     onConsoleLog: (log) => !log.includes('react-test-renderer is deprecated'),

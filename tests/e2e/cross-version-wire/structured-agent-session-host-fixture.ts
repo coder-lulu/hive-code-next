@@ -1,10 +1,35 @@
 import { vi } from 'vitest'
-import type { StructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-host'
+import {
+  StructuredAgentSessionHost,
+  type StructuredAgentSessionHostDeps
+} from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-host'
 import { setStructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-registry'
 import {
   AGENT_SESSION_TURN_ITEM_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
 } from '../../../src/shared/protocol-version'
+
+/** Each suite owns the real hosts it creates, including every restart generation. */
+export function createStructuredHostFixture() {
+  const hosts: StructuredAgentSessionHost[] = []
+  return {
+    createHost(deps: StructuredAgentSessionHostDeps): StructuredAgentSessionHost {
+      const host = new StructuredAgentSessionHost(deps)
+      hosts.push(host)
+      return host
+    },
+    async closeHosts(): Promise<void> {
+      const results = await Promise.allSettled(hosts.map((host) => host.flushAllStreamedEvents()))
+      const failures = results.flatMap((result) =>
+        result.status === 'rejected' ? [result.reason] : []
+      )
+      if (failures.length > 0) {
+        throw new AggregateError(failures, 'cross-version fixture host teardown failed')
+      }
+      hosts.length = 0
+    }
+  }
+}
 
 /** The host every skew installs to drive the surface: enough of the real host's
  *  shape for each handler to run, and a spy per method so "which call reached the
