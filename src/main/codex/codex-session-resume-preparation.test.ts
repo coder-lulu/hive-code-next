@@ -31,7 +31,7 @@ function prepare(args: {
 describe('prepareCodexSessionResume', () => {
   it('resumes an unmirrored Windows rollout from its C drive source while the selected account is on E', async () => {
     const systemHome = 'C:\\Users\\example\\.codex'
-    const selectedHome = 'E:\\HiveCode\\codex-accounts\\selected\\home'
+    const selectedHome = 'E:\\test-profile\\codex-accounts\\selected\\home'
     const transcriptPath = `${systemHome}\\sessions\\2026\\09\\13\\rollout-2026-09-13T00-00-00-${SESSION_ID}.jsonl`
     const resolveVerifiedResumeHome = vi.fn(async (source: { homePath: string }) => source.homePath)
     await expect(
