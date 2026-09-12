@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Archive, ChevronRight, Search, SearchX, X } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionListViewState } from '../../../../shared/session-list-scope'
@@ -9,6 +9,7 @@ import { useAppStore } from '@/store'
 import { partitionSessionList } from '../../../../shared/session-list-metadata'
 import SessionListRow from './SessionListRow'
 import { useNavigationPaneResize } from './useNavigationPaneResize'
+import NavigationPaneToggle from './NavigationPaneToggle'
 import type { SessionListItem, SessionProjectOption } from './session-list-types'
 import SessionScopePicker from './SessionScopePicker'
 import SessionCreationMenu from './SessionCreationMenu'
@@ -29,7 +30,8 @@ export default function SessionsListPane({
   updateView: (patch: Partial<SessionListViewState>) => void
   onArchive?: (key: string) => void
 }): React.JSX.Element {
-  const { containerRef, resizeHandle } = useNavigationPaneResize(
+  const contentId = useId()
+  const { containerRef, resizeHandle, collapsed, toggleCollapsed } = useNavigationPaneResize(
     'hive-sessions-pane-width',
     translate('components.sessions.resizeSessions', 'Resize sessions pane')
   )
@@ -98,132 +100,146 @@ export default function SessionsListPane({
     <aside
       ref={containerRef}
       className="sessions-list-pane"
+      data-collapsed={collapsed}
       aria-label={translate('components.sessions.current', 'Current restorable sessions')}
     >
       {resizeHandle}
       <div className="sessions-list-heading">
-        <SessionScopePicker
-          scope={view.scope}
-          items={allItems}
-          projects={projects}
-          onChange={(scope) => updateView({ scope })}
-        />
-        <span className="session-count">{active.length}</span>
-        <SessionCreationMenu scope={view.scope} />
-      </div>
-      <SessionWorkspaceFilter scope={view.scope} onChange={(scope) => updateView({ scope })} />
-      <div className="sessions-search">
-        <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <Input
-          aria-label={translate('components.sessions.search', 'Search sessions')}
-          placeholder={translate('components.sessions.searchPlaceholder', 'Search sessions…')}
-          value={view.query}
-          onChange={(event) => updateView({ query: event.target.value, scrollTop: 0 })}
-          className="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-        />
-        {view.query && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => updateView({ query: '', scrollTop: 0 })}
-            aria-label={translate('components.sessions.clearSearch', 'Clear search')}
-          >
-            <X className="size-3" aria-hidden />
-          </Button>
-        )}
-      </div>
-      {entries.length === 0 ? (
-        <div className="sessions-list-empty">
-          <SearchX className="size-6 text-muted-foreground" aria-hidden />
-          <p>{translate('components.sessions.noMatches', 'No sessions in this view')}</p>
-          <span>
-            {view.query
-              ? translate(
-                  'components.sessions.trySearch',
-                  'Try another title, project, workspace or host.'
-                )
-              : translate(
-                  'components.sessions.loadedOnly',
-                  'Only currently loaded, restorable sessions are shown.'
-                )}
-          </span>
-          <SessionCreationMenu scope={view.scope} showLabel />
+        <div className="navigation-pane-heading-content" hidden={collapsed}>
+          <SessionScopePicker
+            scope={view.scope}
+            items={allItems}
+            projects={projects}
+            onChange={(scope) => updateView({ scope })}
+          />
+          <span className="session-count">{active.length}</span>
+          <SessionCreationMenu scope={view.scope} />
         </div>
-      ) : (
-        <div
-          ref={scrollRef}
-          className="sessions-list-scroll"
-          role="listbox"
-          tabIndex={0}
-          aria-label={translate('components.sessions.title', 'Sessions')}
-          aria-activedescendant={
-            highlightedKey && visibleRows.some((row) => entries[row.index]?.key === highlightedKey)
-              ? optionId(highlightedKey)
-              : undefined
-          }
-          onKeyDown={handleKeys}
-          onScroll={(event) => updateView({ scrollTop: event.currentTarget.scrollTop })}
-          data-testid="sessions-list-scroll"
-        >
-          <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
-            {visibleRows.map((row) => {
-              const item = entries[row.index]
-              if (!item) {
-                return (
-                  <button
-                    key="archive-group"
-                    type="button"
-                    className="session-archive-group"
-                    ref={virtualizer.measureElement}
-                    data-index={row.index}
-                    style={{ transform: `translateY(${row.start}px)` }}
-                    aria-expanded={archiveExpanded}
-                    onClick={() => setArchiveExpanded((expanded) => !expanded)}
-                  >
-                    <Archive className="size-4" aria-hidden />
-                    <span>{translate('components.sessions.archived', 'Archived')}</span>
-                    <span className="session-count">{archived.length}</span>
-                    <ChevronRight className="size-4" aria-hidden />
-                  </button>
-                )
-              }
-              return (
-                <SessionListRow
-                  key={item.key}
-                  item={item}
-                  rowRef={virtualizer.measureElement}
-                  index={row.index}
-                  offset={row.start}
-                  optionId={optionId(item.key)}
-                  selected={item.key === view.selectedSessionKey}
-                  highlighted={item.key === highlightedKey}
-                  pinned={metadata[item.key]?.pinned === true}
-                  archived={metadata[item.key]?.archived === true}
-                  onSelect={() => {
-                    setHighlightedKey(item.key)
-                    updateView({ selectedSessionKey: item.key })
-                    scrollRef.current?.focus({ preventScroll: true })
-                  }}
-                  onPin={() => updateMetadata(item.key, { pinned: !metadata[item.key]?.pinned })}
-                  onArchive={() => {
-                    updateMetadata(item.key, { archived: !metadata[item.key]?.archived })
-                    if (!metadata[item.key]?.archived) {
-                      if (onArchive) {
-                        onArchive(item.key)
-                      } else if (item.key === view.selectedSessionKey) {
-                        updateView({ selectedSessionKey: null })
-                      }
-                    }
-                  }}
-                />
-              )
-            })}
+        <NavigationPaneToggle
+          collapsed={collapsed}
+          onToggle={toggleCollapsed}
+          controlsId={contentId}
+          kind="sessions"
+        />
+      </div>
+      <div id={contentId} className="navigation-pane-content" hidden={collapsed}>
+        <SessionWorkspaceFilter scope={view.scope} onChange={(scope) => updateView({ scope })} />
+        <div className="sessions-search">
+          <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <Input
+            aria-label={translate('components.sessions.search', 'Search sessions')}
+            placeholder={translate('components.sessions.searchPlaceholder', 'Search sessions…')}
+            value={view.query}
+            onChange={(event) => updateView({ query: event.target.value, scrollTop: 0 })}
+            className="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+          />
+          {view.query && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => updateView({ query: '', scrollTop: 0 })}
+              aria-label={translate('components.sessions.clearSearch', 'Clear search')}
+            >
+              <X className="size-3" aria-hidden />
+            </Button>
+          )}
+        </div>
+        {entries.length === 0 ? (
+          <div className="sessions-list-empty">
+            <SearchX className="size-6 text-muted-foreground" aria-hidden />
+            <p>{translate('components.sessions.noMatches', 'No sessions in this view')}</p>
+            <span>
+              {view.query
+                ? translate(
+                    'components.sessions.trySearch',
+                    'Try another title, project, workspace or host.'
+                  )
+                : translate(
+                    'components.sessions.loadedOnly',
+                    'Only currently loaded, restorable sessions are shown.'
+                  )}
+            </span>
+            <SessionCreationMenu scope={view.scope} showLabel />
           </div>
-        </div>
-      )}
-      <p className="sessions-list-footnote">
-        {translate('components.sessions.current', 'Current restorable sessions')}
-      </p>
+        ) : (
+          <div
+            ref={scrollRef}
+            className="sessions-list-scroll"
+            role="listbox"
+            tabIndex={0}
+            aria-label={translate('components.sessions.title', 'Sessions')}
+            aria-activedescendant={
+              highlightedKey &&
+              visibleRows.some((row) => entries[row.index]?.key === highlightedKey)
+                ? optionId(highlightedKey)
+                : undefined
+            }
+            onKeyDown={handleKeys}
+            onScroll={(event) => updateView({ scrollTop: event.currentTarget.scrollTop })}
+            data-testid="sessions-list-scroll"
+          >
+            <div
+              style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
+            >
+              {visibleRows.map((row) => {
+                const item = entries[row.index]
+                if (!item) {
+                  return (
+                    <button
+                      key="archive-group"
+                      type="button"
+                      className="session-archive-group"
+                      ref={virtualizer.measureElement}
+                      data-index={row.index}
+                      style={{ transform: `translateY(${row.start}px)` }}
+                      aria-expanded={archiveExpanded}
+                      onClick={() => setArchiveExpanded((expanded) => !expanded)}
+                    >
+                      <Archive className="size-4" aria-hidden />
+                      <span>{translate('components.sessions.archived', 'Archived')}</span>
+                      <span className="session-count">{archived.length}</span>
+                      <ChevronRight className="size-4" aria-hidden />
+                    </button>
+                  )
+                }
+                return (
+                  <SessionListRow
+                    key={item.key}
+                    item={item}
+                    rowRef={virtualizer.measureElement}
+                    index={row.index}
+                    offset={row.start}
+                    optionId={optionId(item.key)}
+                    selected={item.key === view.selectedSessionKey}
+                    highlighted={item.key === highlightedKey}
+                    pinned={metadata[item.key]?.pinned === true}
+                    archived={metadata[item.key]?.archived === true}
+                    onSelect={() => {
+                      setHighlightedKey(item.key)
+                      updateView({ selectedSessionKey: item.key })
+                      scrollRef.current?.focus({ preventScroll: true })
+                    }}
+                    onPin={() => updateMetadata(item.key, { pinned: !metadata[item.key]?.pinned })}
+                    onArchive={() => {
+                      updateMetadata(item.key, { archived: !metadata[item.key]?.archived })
+                      if (!metadata[item.key]?.archived) {
+                        if (onArchive) {
+                          onArchive(item.key)
+                        } else if (item.key === view.selectedSessionKey) {
+                          updateView({ selectedSessionKey: null })
+                        }
+                      }
+                    }}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )}
+        <p className="sessions-list-footnote">
+          {translate('components.sessions.current', 'Current restorable sessions')}
+        </p>
+      </div>
     </aside>
   )
 }
