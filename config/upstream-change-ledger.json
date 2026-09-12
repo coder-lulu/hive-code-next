@@ -4776,6 +4776,66 @@
         "ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)",
         "node config/scripts/relay-watcher-fault-harness.mjs (Linux/macOS runtime execution: not tested)"
       ]
+    },
+    {
+      "upstreamSha": "31562c5b27df6c6848a085edee18ca7a26fa4a22",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Pre-cursor retrospective behavioral review found Hive retained obsolete inline Claude account facade implementations after compatible upstream helper modules had been included. Git ancestry or helper presence did not activate these safety and responsiveness fixes.",
+      "adaptation": "Delegate native Windows auth login to the existing process owner so the interactive login console and relayed owned PID are used for cancellation.",
+      "regressionTests": [
+        "src/main/claude-accounts/claude-account-service-login-process.test.ts",
+        "src/main/claude-accounts/claude-account-service-add-account.test.ts",
+        "src/main/claude-accounts/claude-account-service-reauth-rollback.test.ts",
+        "src/main/claude-accounts/claude-account-service-api-parity.test.ts",
+        "Exact-candidate shared identity, owned-path and runtime-auth tests are required after committing the facade repair; platform/CI gaps continue to hold promotion."
+      ]
+    },
+    {
+      "upstreamSha": "48e63c015f3f699e56acb1266e9c0f4884584f00",
+      "type": "维护",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Pre-cursor retrospective behavioral review found Hive retained obsolete inline Claude account facade implementations after compatible upstream helper modules had been included. Git ancestry or helper presence did not activate these safety and responsiveness fixes.",
+      "adaptation": "Use the existing process, login-session and managed-storage owners instead of obsolete inline facade bodies; preserve Hive account selection, queues, local storage ownership and public API while adopting asynchronous WSL operations.",
+      "regressionTests": [
+        "src/main/claude-accounts/claude-account-service-login-process.test.ts",
+        "src/main/claude-accounts/claude-account-service-add-account.test.ts",
+        "src/main/claude-accounts/claude-account-service-reauth-rollback.test.ts",
+        "src/main/claude-accounts/claude-account-service-api-parity.test.ts",
+        "Exact-candidate shared identity, owned-path and runtime-auth tests are required after committing the facade repair; platform/CI gaps continue to hold promotion."
+      ]
+    },
+    {
+      "upstreamSha": "e48d217670600b0cd7691e1b9d55d5ffaaa8bd2a",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Pre-cursor retrospective behavioral review found Hive retained obsolete inline Claude account facade implementations after compatible upstream helper modules had been included. Git ancestry or helper presence did not activate these safety and responsiveness fixes.",
+      "adaptation": "Forward CLAUDE_SECURESTORAGE_CONFIG_DIR through the existing command owner on host and WSL, matching the selected managed config root without changing persisted compatibility paths.",
+      "regressionTests": [
+        "src/main/claude-accounts/claude-account-service-login-process.test.ts",
+        "src/main/claude-accounts/claude-account-service-add-account.test.ts",
+        "src/main/claude-accounts/claude-account-service-reauth-rollback.test.ts",
+        "src/main/claude-accounts/claude-account-service-api-parity.test.ts",
+        "Exact-candidate shared identity, owned-path and runtime-auth tests are required after committing the facade repair; platform/CI gaps continue to hold promotion."
+      ]
+    },
+    {
+      "upstreamSha": "7b530f1eb562736179e575b255fa60c6206f6879",
+      "type": "BUG",
+      "applied": "已移植",
+      "dependencies": [],
+      "conflictReason": "Pre-cursor retrospective behavioral review found Hive retained obsolete inline Claude account facade implementations after compatible upstream helper modules had been included. Git ancestry or helper presence did not activate these safety and responsiveness fixes.",
+      "adaptation": "Activate the existing guarded owned-tree termination and kill-observability path through the Claude command facade, retaining cancellation and timeout budgets.",
+      "regressionTests": [
+        "src/main/claude-accounts/claude-account-service-login-process.test.ts",
+        "src/main/claude-accounts/claude-account-service-add-account.test.ts",
+        "src/main/claude-accounts/claude-account-service-reauth-rollback.test.ts",
+        "src/main/claude-accounts/claude-account-service-api-parity.test.ts",
+        "Exact-candidate shared identity, owned-path and runtime-auth tests are required after committing the facade repair; platform/CI gaps continue to hold promotion."
+      ]
     }
   ]
 }

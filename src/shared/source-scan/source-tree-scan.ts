@@ -41,13 +41,22 @@ export type ScannedFile = { path: string; relativePath: string; source: string }
  */
 export function scanSourceTree(
   root: string,
-  options: { includeTests?: boolean; extensions?: RegExp } = {}
+  options: {
+    includeTests?: boolean
+    extensions?: RegExp
+    excludeRootDirectories?: readonly string[]
+  } = {}
 ): ScannedFile[] {
   const extensions = options.extensions ?? /\.tsx?$/
   const found: ScannedFile[] = []
   const visit = (directory: string): void => {
     for (const entry of readdirSync(directory)) {
-      if (IGNORED_DIRECTORIES.has(entry) || entry.startsWith('.') || entry === '__fixtures__') {
+      if (
+        (directory === root && options.excludeRootDirectories?.includes(entry)) ||
+        IGNORED_DIRECTORIES.has(entry) ||
+        entry.startsWith('.') ||
+        entry === '__fixtures__'
+      ) {
         continue
       }
       const path = join(directory, entry)

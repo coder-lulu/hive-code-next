@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 import { relayArtifactFilenames } from '../../src/shared/relay-artifacts.ts'
+import { APP_DISPLAY_NAME } from '../../src/shared/brand.ts'
 import { selectTargets, targets } from './client-build-contract.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
@@ -378,9 +379,16 @@ describe('Electron runtime package contract', () => {
         .split('|')
         .map((target) => target.trim())
     ).toEqual(
-      ['/opt/HiveCode', '/opt/hivecode', '/opt/Orca', '/opt/orca-ide', '/opt/orca'].flatMap(
-        (directory) =>
-          ['hive', 'hivecode', 'orca-ide'].map((command) => `${directory}/resources/bin/${command}`)
+      [
+        `/opt/${APP_DISPLAY_NAME}`,
+        `/opt/${packageJson.name}`,
+        '/opt/Orca',
+        '/opt/orca-ide',
+        '/opt/orca'
+      ].flatMap((directory) =>
+        ['hive', packageJson.name, 'orca-ide'].map(
+          (command) => `${directory}/resources/bin/${command}`
+        )
       )
     )
     expect(afterInstallScript).toMatch(
@@ -608,16 +616,6 @@ describe('Electron runtime package contract', () => {
       { os: 'macos-15', platform: 'mac' },
       { os: 'windows-2022', platform: 'windows' }
     ])
-    expect(goldenRunSteps.get('linux')?.run).toContain(
-      'pnpm run test:e2e:terminal-rendering-golden'
-    )
-    expect(goldenRunSteps.get('linux')?.run).toContain(
-      'pnpm run --if-present test:e2e:posix-profile-index-golden'
-    )
-    expect(goldenRunSteps.get('mac')?.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
-    expect(goldenRunSteps.get('mac')?.run).toContain(
-      'pnpm run --if-present test:e2e:posix-profile-index-golden'
-    )
     expect(goldenRunSteps.get('windows')).toMatchObject({
       if: "runner.os == 'Windows'",
       shell: 'pwsh'
@@ -634,20 +632,16 @@ describe('Electron runtime package contract', () => {
     expect(publishReleaseNeeds).not.toContain('terminal-rendering-release-evidence')
     expect(releaseGoldenJob['continue-on-error']).toBeUndefined()
     expect(releaseGoldenMatrix).toEqual(goldenMatrix)
-    const releaseLinuxRunStep = releaseGoldenJob.steps.find(
-      (step) => step.name === 'Run terminal rendering golden on Linux'
-    )
-    expect(releaseLinuxRunStep.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
-    expect(releaseLinuxRunStep.run).toContain(
-      'pnpm run --if-present test:e2e:posix-profile-index-golden'
-    )
-    const releaseMacRunStep = releaseGoldenJob.steps.find(
-      (step) => step.name === 'Run terminal rendering golden on macOS'
-    )
-    expect(releaseMacRunStep.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
-    expect(releaseMacRunStep.run).toContain(
-      'pnpm run --if-present test:e2e:posix-profile-index-golden'
-    )
+    for (const platform of ['linux', 'mac']) {
+      const releaseRunStep = releaseGoldenJob.steps.find(
+        (step) =>
+          step.name === `Run terminal rendering golden on ${goldenPlatformLabels.get(platform)}`
+      )
+      for (const runStep of [goldenRunSteps.get(platform), releaseRunStep]) {
+        expect(runStep.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
+        expect(runStep.run).toContain('pnpm run --if-present test:e2e:posix-profile-index-golden')
+      }
+    }
     const releaseWindowsRunStep = releaseGoldenJob.steps.find(
       (step) => step.name === 'Run fresh-startup golden on Windows'
     )

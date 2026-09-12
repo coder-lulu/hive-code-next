@@ -1,5 +1,81 @@
-import { describe, expect, it } from 'vitest'
-import { blankStringContents, stripComments } from './source-tree-scan'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { blankStringContents, scanSourceTree, stripComments } from './source-tree-scan'
+
+const filesystem = vi.hoisted(() => ({
+  readdirSync: vi.fn<(path: string) => string[]>(),
+  statSync: vi.fn<(path: string) => { isDirectory(): boolean }>(),
+  readFileSync: vi.fn<(path: string) => string>()
+}))
+vi.mock('node:fs', () => filesystem)
+
+describe('scanSourceTree', () => {
+  it('skips root artifact logs before stat while retaining source and nested logs', () => {
+    const root = join(import.meta.dirname, 'scanner-fixture')
+    const artifacts = join(root, 'logs')
+    const source = join(root, 'src')
+    const nestedLogs = join(source, 'logs')
+    const directories = new Map([
+      [root, ['logs', 'src']],
+      [source, ['live.test.ts', 'logs']],
+      [nestedLogs, ['retained.ts']]
+    ])
+    const files = new Map([
+      [join(source, 'live.test.ts'), 'describe("live", () => {})'],
+      [join(nestedLogs, 'retained.ts'), 'export const retained = true']
+    ])
+    filesystem.readdirSync.mockImplementation((path) => directories.get(path) ?? [])
+    filesystem.statSync.mockImplementation((path) => {
+      if (path === artifacts) {
+        throw new Error('Artifact entry disappeared during cleanup')
+      }
+      return { isDirectory: () => directories.has(path) }
+    })
+    filesystem.readFileSync.mockImplementation((path) => {
+      const content = files.get(path)
+      if (content === undefined) {
+        throw new Error(`Unexpected source read: ${path}`)
+      }
+      return content
+    })
+    try {
+      expect(
+        scanSourceTree(root, { includeTests: true, excludeRootDirectories: ['logs'] })
+      ).toEqual(
+        [...files].map(([path, content], index) => ({
+          path,
+          relativePath: ['src/live.test.ts', 'src/logs/retained.ts'][index],
+          source: content
+        }))
+      )
+      expect(filesystem.statSync).not.toHaveBeenCalledWith(artifacts)
+      expect(filesystem.readdirSync).not.toHaveBeenCalledWith(artifacts)
+    } finally {
+      vi.resetAllMocks()
+    }
+  })
+
+  it('retains legitimate logs beneath a source root by default', () => {
+    const root = join(import.meta.dirname, 'source-root-fixture')
+    const logs = join(root, 'logs')
+    const path = join(logs, 'implementation.ts')
+    const content = 'export const sourceLog = true'
+    filesystem.readdirSync.mockImplementation((directory) =>
+      directory === root ? ['logs'] : ['implementation.ts']
+    )
+    filesystem.statSync.mockImplementation((entry) => ({ isDirectory: () => entry === logs }))
+    filesystem.readFileSync.mockReturnValue(content)
+    try {
+      expect(scanSourceTree(root)).toEqual([
+        { path, relativePath: 'logs/implementation.ts', source: content }
+      ])
+      expect(filesystem.statSync).toHaveBeenCalledWith(logs)
+      expect(filesystem.readdirSync).toHaveBeenCalledWith(logs)
+    } finally {
+      vi.resetAllMocks()
+    }
+  })
+})
 
 /**
  * These guards are only worth having if they cannot under-report.

@@ -136,6 +136,7 @@ describe('attach', () => {
       mintSpawnToken: () => 'spawn-a',
       now: () => NOW
     })
+    replaceHostTestState({ store, host })
     const params = attachParams()
 
     await expect(host.attach(CALLER, params)).rejects.toThrow(
