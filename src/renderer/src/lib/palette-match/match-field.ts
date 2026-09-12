@@ -32,6 +32,10 @@ const IDENTIFIER_TOKEN_QUALITIES = new WeakMap<
   readonly PaletteMatchQuality[],
   readonly PaletteMatchQuality[]
 >()
+const QUALITIES_WITHOUT_PREFIX = new WeakMap<
+  readonly PaletteMatchQuality[],
+  readonly PaletteMatchQuality[]
+>()
 
 function allowedQualities(
   field: PaletteIndexedField,
@@ -49,7 +53,14 @@ function allowedQualities(
     }
   }
   if (field.identifier && !identifierKindAllowsPrefix(field.identifier.kind)) {
-    qualities = qualities.filter((quality) => !PREFIX_QUALITIES.has(quality))
+    const cached = QUALITIES_WITHOUT_PREFIX.get(qualities)
+    if (cached) {
+      qualities = cached
+    } else {
+      const filtered = qualities.filter((quality) => !PREFIX_QUALITIES.has(quality))
+      QUALITIES_WITHOUT_PREFIX.set(qualities, filtered)
+      qualities = filtered
+    }
   }
   if (token.isSingleLatinCharacter) {
     qualities = qualities.filter((quality) => SHORT_TOKEN_QUALITIES.has(quality))
