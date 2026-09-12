@@ -405,6 +405,50 @@ describe('evidence limits', () => {
   })
 })
 
+describe('visible and supporting proof ordering', () => {
+  it.each([
+    ['rollback atlas checkout', ['comment-field', 'name', 'name']],
+    ['atlas checkout rollback', ['name', 'name', 'comment-field']]
+  ] as const)('keeps visible proofs around the required hidden token in %s', (query, fieldIds) => {
+    const match = run(
+      {
+        ...labelOnly('atlas checkout'),
+        evidence: [
+          {
+            unit: {
+              id: 'comment',
+              kind: 'comment',
+              text: 'atlas rollback checkout',
+              accessibilityLabel: 'Comment'
+            },
+            fields: [
+              {
+                id: 'comment-field',
+                profile: 'prose',
+                text: 'atlas rollback checkout',
+                evidenceId: 'comment',
+                renderOffset: 0
+              }
+            ]
+          }
+        ]
+      },
+      query
+    )
+    expect(match?.assignments.map((assignment) => assignment.fieldId)).toEqual(fieldIds)
+    expect(match?.rank.coverage).toBe(3)
+    expect(match?.supportingEvidence).toEqual([
+      {
+        id: 'comment',
+        kind: 'comment',
+        text: 'atlas rollback checkout',
+        accessibilityLabel: 'Comment',
+        ranges: [{ start: 6, end: 14 }]
+      }
+    ])
+  })
+})
+
 describe('typo distance', () => {
   it.each([
     ['daily', 'dayly', true],

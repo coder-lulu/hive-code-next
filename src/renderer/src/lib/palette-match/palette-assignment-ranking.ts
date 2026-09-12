@@ -197,18 +197,26 @@ export function collectScopeAssignments(args: {
   evidenceId: string
   diagnostics?: PaletteMatchDiagnostics
 }): RankedAssignment[] {
-  let addsUsefulCandidate = false
-  const scopeCandidates = args.visibleSummaries.map((visible, index) => {
-    const evidence = (args.evidenceSummaries[index].get(args.evidenceId) ?? []).filter(
-      (candidate) => !visible.some((alternative) => isDominatedBy(candidate, alternative))
-    )
-    if (!evidence.length) {
-      return visible
+  let scopeCandidates: TokenCandidate[][] | null = null
+  for (let index = 0; index < args.visibleSummaries.length; index += 1) {
+    const entries = args.evidenceSummaries[index].get(args.evidenceId)
+    if (!entries?.length) {
+      continue
     }
-    addsUsefulCandidate = true
-    return summarizeCandidates([...visible, ...evidence], args.diagnostics)
-  })
-  if (!addsUsefulCandidate) {
+    const visible = args.visibleSummaries[index]
+    let evidence: TokenCandidate[] | null = null
+    for (const candidate of entries) {
+      if (!visible.some((alternative) => isDominatedBy(candidate, alternative))) {
+        evidence ??= []
+        evidence.push(candidate)
+      }
+    }
+    if (evidence) {
+      scopeCandidates ??= [...args.visibleSummaries]
+      scopeCandidates[index] = summarizeCandidates([...visible, ...evidence], args.diagnostics)
+    }
+  }
+  if (!scopeCandidates) {
     return []
   }
   const assignments: RankedAssignment[] = []
