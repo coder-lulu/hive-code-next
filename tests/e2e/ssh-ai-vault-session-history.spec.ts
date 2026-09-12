@@ -43,7 +43,7 @@ test.describe('SSH Agent Session History', () => {
       await waitForSessionReady(orcaPage)
       await waitForActiveWorktree(orcaPage)
       const remote = await connectDockerRemote(orcaPage, target)
-      const sshScope = `ssh:${encodeURIComponent(remote.targetId)}`
+      const sshScope = `ssh:${encodeURIComponent(remote.targetId)}` as const
 
       const scan = await orcaPage.evaluate(
         async ({ sshScope, defaultTitle, runtimeTitle, claudeTitle }) => {

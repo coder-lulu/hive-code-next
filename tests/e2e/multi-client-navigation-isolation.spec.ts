@@ -299,9 +299,9 @@ test('shows only provider-backed creation actions in paired web', async ({
             .find((candidate) => candidate.id === state.activeWorktreeId)
           const environmentId = worktree?.runtimeOwnerEnvironmentId
           return environmentId
-            ? state.runtimeStatusByEnvironmentId
+            ? state?.runtimeStatusByEnvironmentId
                 .get(environmentId)
-                ?.status.capabilities?.includes('browser.screencast.v1') === true
+                ?.status?.capabilities?.includes('browser.screencast.v1') === true
             : false
         })
       )

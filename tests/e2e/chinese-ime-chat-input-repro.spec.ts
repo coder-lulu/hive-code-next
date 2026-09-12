@@ -527,6 +527,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
     const scriptPath = path.join(testRepoPath, `.orca-chinese-ime-harness-${runId}.cjs`)
     writeFileSync(scriptPath, terminalImeHarnessScript(runId))
     const session = await orcaPage.context().newCDPSession(orcaPage)
+    const activeSession = session
 
     try {
       await sendToTerminal(orcaPage, ptyId, `node ${JSON.stringify(scriptPath)}\r`)
@@ -546,7 +547,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
         })
         .toBe('你好')
 
-      await commitImeText(session, '一二三四五六七八九十')
+      await commitImeText(activeSession, '一二三四五六七八九十')
       await waitForLivePrompt(orcaPage, '一二三四五六七八九十')
       for (let index = 0; index < 5; index += 1) {
         await orcaPage.keyboard.press('ArrowLeft')
@@ -560,7 +561,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
       await orcaPage.keyboard.press('Backspace')
       await waitForLivePrompt(orcaPage, '一二三四五中六七八九十')
       await setImeComposition(session, '')
-      await commitImeText(session, '')
+      await commitImeText(activeSession, '')
 
       await orcaPage.keyboard.press('Backspace')
       await waitForLivePrompt(orcaPage, '一二三四五六七八九十')
@@ -660,7 +661,8 @@ test.describe('Chinese IME terminal chat input repro', () => {
       // Why: create the session/harness inside the try so a mid-setup throw
       // still hits finally and removes the harness script.
       writeFileSync(scriptPath, terminalImeHarnessScript(runId))
-      session = await orcaPage.context().newCDPSession(orcaPage)
+      const activeSession = await orcaPage.context().newCDPSession(orcaPage)
+      session = activeSession
       await sendToTerminal(orcaPage, ptyId, `node ${JSON.stringify(scriptPath)}\r`)
       harnessStarted = true
       await waitForTerminalOutput(orcaPage, `IME_HARNESS_READY_${runId}`, 10_000, 20_000)
@@ -676,7 +678,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
       await orcaPage.waitForTimeout(80)
       await dispatchSogouEmptyCompositionUpdate(orcaPage)
       await dispatchCandidateSelectionKey(session, { key: ' ', code: 'Space', keyCode: 32 }, () =>
-        commitImeText(session, '你')
+        commitImeText(activeSession, '你')
       )
       await waitForLivePrompt(orcaPage, '你')
       await attachImeEvidence(orcaPage, testInfo, 'sogou-after-space-commit')
@@ -694,7 +696,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
       await orcaPage.waitForTimeout(80)
       await dispatchSogouEmptyCompositionUpdate(orcaPage)
       await dispatchCandidateSelectionKey(session, { key: '2', code: 'Digit2', keyCode: 50 }, () =>
-        commitImeText(session, '你好')
+        commitImeText(activeSession, '你好')
       )
       await waitForLivePrompt(orcaPage, '你好')
       await attachImeEvidence(orcaPage, testInfo, 'sogou-after-digit-commit')
@@ -714,7 +716,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
       await dispatchSogouEmptyCompositionUpdate(orcaPage)
       await dispatchSogouPostCompositionEnd(orcaPage, '再见')
       await dispatchCandidateSelectionKey(session, { key: '3', code: 'Digit3', keyCode: 51 }, () =>
-        commitImeText(session, '再见')
+        commitImeText(activeSession, '再见')
       )
       await waitForLivePrompt(orcaPage, '再见')
       const postCompositionLog = await readImeEventLog(orcaPage)
@@ -788,6 +790,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
 
     const ptyId = await waitForActivePanePtyId(orcaPage)
     const session = await orcaPage.context().newCDPSession(orcaPage)
+    const activeSession = session
 
     try {
       await launchCodexTui(orcaPage, ptyId)
@@ -817,7 +820,7 @@ test.describe('Chinese IME terminal chat input repro', () => {
         'Backspace during Codex composition removed committed Chinese text'
       )
       await setImeComposition(session, '')
-      await commitImeText(session, '')
+      await commitImeText(activeSession, '')
 
       await attachImeEvidence(orcaPage, testInfo, 'codex-after-composition-backspace', {
         cleanTerminal: stripTerminalControls(await getTerminalContent(orcaPage, 20_000))

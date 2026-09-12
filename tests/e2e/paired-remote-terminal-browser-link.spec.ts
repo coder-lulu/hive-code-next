@@ -1,5 +1,9 @@
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import type {
+  RuntimeMobileSessionTabsResult,
+  BrowserTabListResult
+} from '../../src/shared/runtime-types'
 import type { Page } from '@stablyai/playwright-test'
 import {
   readClientGuestState,
@@ -78,12 +82,13 @@ async function readTabInventory(
           (tab) => tab.contentType === 'browser'
         ).length,
         clientTerminalTabs: (state?.tabsByWorktree[worktreeId] ?? []).length,
-        hostAuthoritativeBrowserTabs: sessionResponse.result.tabs.filter(
-          (tab) => tab.type === 'browser'
-        ).length,
-        hostRegisteredBrowserPages: browserResponse.result.tabs.length,
-        hostTerminalTabs: sessionResponse.result.tabs.filter((tab) => tab.type === 'terminal')
-          .length
+        hostAuthoritativeBrowserTabs: (
+          sessionResponse.result as RuntimeMobileSessionTabsResult
+        ).tabs.filter((tab) => tab.type === 'browser').length,
+        hostRegisteredBrowserPages: (browserResponse.result as BrowserTabListResult).tabs.length,
+        hostTerminalTabs: (sessionResponse.result as RuntimeMobileSessionTabsResult).tabs.filter(
+          (tab) => tab.type === 'terminal'
+        ).length
       }
     },
     { environmentId, worktreeId }

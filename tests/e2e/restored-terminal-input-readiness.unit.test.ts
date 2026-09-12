@@ -57,7 +57,7 @@ describe('restored terminal input readiness', () => {
   it('retries after replay drops the first full input payload', async () => {
     let content = ''
     let attempts = 0
-    const input = vi.fn((data: string) => {
+    const input = vi.fn((data: string, _wasUserInput?: boolean) => {
       attempts += 1
       if (attempts >= 2) {
         content = data
@@ -76,7 +76,7 @@ describe('restored terminal input readiness', () => {
 
   it('accepts a healthy PTY echo that arrives after multiple poll intervals', async () => {
     let content = ''
-    const input = vi.fn((data: string) => {
+    const input = vi.fn((data: string, _wasUserInput?: boolean) => {
       setTimeout(() => {
         content = data
       }, 250)
@@ -106,7 +106,7 @@ describe('restored terminal input readiness', () => {
   it('does not accept a marker replayed into a replacement pane', async () => {
     let activePane: TestPane
     let replacementContent = ''
-    const replacementInput = vi.fn((data: string) => {
+    const replacementInput = vi.fn((data: string, _wasUserInput?: boolean) => {
       replacementContent = data
     })
     const replacementPane: TestPane = {
@@ -114,7 +114,7 @@ describe('restored terminal input readiness', () => {
       serializeAddon: { serialize: () => replacementContent },
       terminal: { input: replacementInput }
     }
-    const firstInput = vi.fn((data: string) => {
+    const firstInput = vi.fn((data: string, _wasUserInput?: boolean) => {
       replacementContent = data
       activePane = replacementPane
     })
@@ -146,7 +146,7 @@ describe('restored terminal input readiness', () => {
   it('discards stale attempts when document replacement rejects evaluation', async () => {
     let activePane: TestPane
     let replacementContent = ''
-    const replacementInput = vi.fn((data: string) => {
+    const replacementInput = vi.fn((data: string, _wasUserInput?: boolean) => {
       replacementContent = data
     })
     const replacementPane: TestPane = {
@@ -155,7 +155,7 @@ describe('restored terminal input readiness', () => {
       terminal: { input: replacementInput }
     }
     let originalInputCalls = 0
-    const firstInput = vi.fn((data: string) => {
+    const firstInput = vi.fn((data: string, _wasUserInput?: boolean) => {
       originalInputCalls += 1
       if (originalInputCalls === 2) {
         replacementContent = data

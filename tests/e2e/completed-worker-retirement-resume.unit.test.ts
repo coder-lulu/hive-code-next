@@ -7,7 +7,7 @@ import type { TerminalTab } from '../../src/shared/terminal-tab-types'
 import type { Worktree } from '../../src/shared/worktree/types'
 import { OrchestrationDb } from '../../src/main/runtime/orchestration/db'
 import { OrcaRuntimeService } from '../../src/main/runtime/orca-runtime'
-import type { RpcContext } from '../../src/main/runtime/rpc/core'
+import { eraseRpcMethods, type RpcContext } from '../../src/main/runtime/rpc/core'
 import { ORCHESTRATION_METHODS } from '../../src/main/runtime/rpc/methods/orchestration'
 import { closeTerminalTab } from '@/components/terminal/terminal-tab-actions'
 import {
@@ -227,7 +227,7 @@ function expectCanaryUnchanged(): void {
 }
 
 function orchestrationMethod(name: string) {
-  const method = ORCHESTRATION_METHODS.find((candidate) => candidate.name === name)
+  const method = eraseRpcMethods(ORCHESTRATION_METHODS).find((candidate) => candidate.name === name)
   if (!method) {
     throw new Error(`Missing orchestration method: ${name}`)
   }

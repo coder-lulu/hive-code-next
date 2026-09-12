@@ -175,6 +175,15 @@ export default function SessionsListPane({
                 : undefined
             }
             onKeyDown={handleKeys}
+            onFocus={(event) => {
+              if (event.target !== event.currentTarget) {
+                return
+              }
+              const index = entries.findIndex((entry) => entry?.key === highlightedKey)
+              if (index !== -1) {
+                virtualizer.scrollToIndex(index, { align: 'auto' })
+              }
+            }}
             onScroll={(event) => updateView({ scrollTop: event.currentTarget.scrollTop })}
             data-testid="sessions-list-scroll"
           >

@@ -91,6 +91,10 @@ export async function seedPRCommentsSidebarFixture(page: Page): Promise<PRCommen
     }
 
     const comments = fixtureComments
+    const sourceControlAi = store.getState().settings?.sourceControlAi
+    if (!sourceControlAi) {
+      throw new Error('Source control AI settings unavailable')
+    }
 
     store.setState((current) => ({
       prCache: {
@@ -117,12 +121,12 @@ export async function seedPRCommentsSidebarFixture(page: Page): Promise<PRCommen
         ? {
             ...current.settings,
             sourceControlAi: {
-              ...current.settings.sourceControlAi,
+              ...sourceControlAi,
               enabled: true
             }
           }
         : current.settings,
-      fetchPRForBranch: async (repoPath: string, targetBranch: string) => {
+      fetchPRForBranch: async (_repoPath: string, targetBranch: string) => {
         if (targetBranch !== branch) {
           return null
         }
@@ -137,7 +141,7 @@ export async function seedPRCommentsSidebarFixture(page: Page): Promise<PRCommen
       fetchPRChecks: async () => [],
       fetchPRComments: async () => comments,
       setPRCommentReaction: async () => true,
-      fetchUpstreamStatus: async () => undefined,
+      fetchUpstreamStatus: async () => null,
       setUpstreamStatus: () => undefined
     }))
 

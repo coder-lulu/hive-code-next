@@ -1,5 +1,8 @@
 import type { Page } from '@stablyai/playwright-test'
-import type { RuntimeMobileSessionTabsResult } from '../../src/shared/runtime-types'
+import type {
+  RuntimeMobileSessionTabsResult,
+  RuntimeMobileSessionTerminalClientTab
+} from '../../src/shared/runtime-types'
 import { toWebTerminalSurfaceTabId } from '../../src/shared/terminal-surface-id'
 import type { TerminalLayoutSnapshot } from '../../src/shared/terminal-tab-types'
 import {
@@ -77,8 +80,10 @@ async function readHostLayout(
     })
   ).result
   return (
-    snapshot.tabs.find((tab) => tab.type === 'terminal' && tab.parentTabId === hostTabId)
-      ?.parentLayout ?? null
+    snapshot.tabs.find(
+      (tab): tab is RuntimeMobileSessionTerminalClientTab =>
+        tab.type === 'terminal' && tab.parentTabId === hostTabId
+    )?.parentLayout ?? null
   )
 }
 
@@ -156,6 +161,7 @@ test('retries an identical remote pane layout after reconnect', async ({
       await window.api.runtimeEnvironments.disconnect({ selector })
     }, client.environmentId)
 
+    const connectedClient = client
     const failedPush = client.page.waitForEvent('console', {
       predicate: (message) =>
         message.type() === 'warning' &&
@@ -173,10 +179,10 @@ test('retries an identical remote pane layout after reconnect', async ({
     await expect
       .poll(
         () =>
-          client.page.evaluate(async (selector) => {
+          connectedClient.page.evaluate(async (selector) => {
             const response = await window.api.runtimeEnvironments.connect({ selector })
             return response.ok
-          }, client.environmentId),
+          }, connectedClient.environmentId),
         { timeout: 60_000, message: 'paired client never reconnected to the host runtime' }
       )
       .toBe(true)

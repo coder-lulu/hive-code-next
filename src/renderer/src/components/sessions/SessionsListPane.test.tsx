@@ -7,6 +7,7 @@ import type { SessionListMetadata } from '../../../../shared/session-list-metada
 const mocks = vi.hoisted(() => ({
   terminate: vi.fn(),
   error: vi.fn(),
+  scrollToIndex: vi.fn(),
   state: {
     sessionListMetadata: {} as SessionListMetadata,
     updateSessionListMetadata: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('@tanstack/react-virtual', () => ({
     getTotalSize: () => count * 56,
     measureElement: vi.fn(),
     scrollToOffset: vi.fn(),
-    scrollToIndex: vi.fn()
+    scrollToIndex: mocks.scrollToIndex
   })
 }))
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
@@ -55,6 +56,15 @@ function pane(filtered = items) {
   )
 }
 afterEach(cleanup)
+it('reveals the highlighted row when focus returns to the list after a resize', () => {
+  render(pane())
+  const list = screen.getByRole('listbox')
+  fireEvent.focus(list)
+  expect(mocks.scrollToIndex).toHaveBeenCalledWith(0, { align: 'auto' })
+  mocks.scrollToIndex.mockClear()
+  fireEvent.focus(screen.getAllByRole('button', { name: 'Pin session' })[0])
+  expect(mocks.scrollToIndex).not.toHaveBeenCalled()
+})
 beforeEach(() => {
   localStorage.clear()
   vi.clearAllMocks()

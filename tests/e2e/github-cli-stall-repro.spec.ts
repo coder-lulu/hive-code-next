@@ -56,7 +56,7 @@ const test = base.extend({
       PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ''}`,
       ORCA_GH_EXEC_TIMEOUT_MS: '1000'
     },
-    { option: true }
+    { scope: 'test' }
   ]
 })
 
@@ -103,10 +103,10 @@ test('GitHub Tasks drawer recovers when gh stalls on issue details', async ({
     }
     const item = {
       id: 'issue-5388',
-      type: 'issue',
+      type: 'issue' as const,
       number: 5388,
       title: 'Issue detail fetch that hangs in gh',
-      state: 'open',
+      state: 'open' as const,
       url: 'https://github.com/acme/repo/issues/5388',
       labels: [],
       updatedAt: '2026-06-15T20:00:00.000Z',

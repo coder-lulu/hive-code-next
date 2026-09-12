@@ -1,3 +1,5 @@
+import type { terminalOutputSchedulerDebugState } from '../../../src/renderer/src/lib/pane-manager/pane-terminal-output-scheduler-debug'
+import type { PaneManager } from '../../../src/renderer/src/lib/pane-manager/pane-manager'
 import type { AppState } from '../../../src/renderer/src/store/types'
 import type { OpenFile, RightSidebarTab } from '../../../src/renderer/src/store/slices/editor'
 import type {
@@ -22,11 +24,22 @@ export type AppStore = {
 
 // Why: PaneManager hands out one object carrying both halves, and the rendering specs read
 // the internal renderer state off it.
-export type ManagedPaneHandle = ManagedPane & ManagedPaneInternal
+export type ManagedPaneHandle = ManagedPane &
+  ManagedPaneInternal & {
+    terminal: ManagedPane['terminal'] & {
+      _core?: {
+        _renderService?: { dimensions?: { css?: { cell?: { width: number; height: number } } } }
+        _themeService?: { colors?: { ansi?: { rgba: number }[]; background?: { rgba: number } } }
+      }
+    }
+  }
 
 // Why not optional: window.__paneManagers only ever holds real PaneManager instances, and
 // marking the methods optional made every call site a possibly-undefined invocation.
-export type PaneManagerLike = {
+export type PaneManagerLike = Pick<
+  PaneManager,
+  'movePane' | 'scheduleRevealRepaint' | 'scheduleRevealPresent'
+> & {
   getActivePane(): ManagedPaneHandle | null
   getPanes(limit?: number): ManagedPaneHandle[]
   splitPane(paneId: number, direction: 'vertical' | 'horizontal'): ManagedPaneHandle | null
@@ -66,6 +79,9 @@ declare global {
     __store?: AppStore
     __dictationMeterE2E?: { publish(meter: DictationMeterState): void }
     __paneManagers?: Map<string, PaneManagerLike>
+    __terminalOutputSchedulerDebug?: {
+      snapshot(): typeof terminalOutputSchedulerDebugState
+    }
   }
 }
 

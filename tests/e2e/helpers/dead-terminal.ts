@@ -126,7 +126,12 @@ export async function createAndActivateWorktreeWithSetup(
 export async function removeWorktreeViaStore(page: TestPage, worktreeId: string): Promise<void> {
   await page.evaluate(async (id) => {
     try {
-      await window.__store?.getState().removeWorktree(id, true)
+      const state = window.__store?.getState()
+      const worktree = state?.allWorktrees().find((entry) => entry.id === id)
+      if (!state || !worktree) {
+        throw new Error(`Worktree unavailable: ${id}`)
+      }
+      await state.removeWorktree({ id, executionHostId: worktree.hostId ?? null }, true)
     } catch {
       /* best-effort */
     }

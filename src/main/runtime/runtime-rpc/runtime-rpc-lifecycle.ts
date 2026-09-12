@@ -20,7 +20,19 @@ import {
 } from './runtime-rpc-socket-metadata'
 
 export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
-  async start(): Promise<void> {
+  protected startupPromise: Promise<void> | null = null
+
+  start(): Promise<void> {
+    if (this.stopping) {
+      return Promise.resolve()
+    }
+    this.startupPromise ??= this.startRuntime().finally(() => {
+      this.startupPromise = null
+    })
+    return this.startupPromise
+  }
+
+  private async startRuntime(): Promise<void> {
     if (this.activeTransports.length > 0) {
       return
     }
@@ -74,7 +86,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
     if (this.enableWebSocket) {
       // Why: land any deferred lastSeen write before a replacement registry reads the same file.
       this.deviceRegistry?.flushPendingLastSeen()
-      const pairingIdentity = this.initializePairingIdentity()
+      const pairingIdentity = await this.initializePairingIdentity()
       if (!pairingIdentity.ok) {
         this.deviceRegistry = null
         this.e2eeKeypair = null
@@ -110,7 +122,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
     this.transports = transportsMeta
 
     try {
-      this.writeMetadata()
+      await this.writeMetadata()
     } catch (error) {
       // Why: a runtime that can't publish metadata is invisible to the CLI — close transports rather than run undiscoverable.
       this.activeTransports = []
@@ -119,17 +131,20 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
       throw error
     }
 
+    if (this.stopping) {
+      return
+    }
     this.metadataOwnershipWatch = watchRuntimeMetadataOwnership({
       userDataPath: this.userDataPath,
       ownedPid: this.pid,
       ownedRuntimeId: this.runtime.getRuntimeId(),
       pollIntervalMs: this.metadataOwnershipPollMs,
-      republish: () => {
+      republish: async () => {
         // Why: never advertise endpoints we already tore down.
         if (this.activeTransports.length === 0) {
           return
         }
-        this.writeMetadata()
+        await this.writeMetadata()
       },
       onReclaim: (previous) => {
         console.warn(

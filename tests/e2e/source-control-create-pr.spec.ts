@@ -37,7 +37,10 @@ async function openSourceControl(page: Page, expectedWorktreeId: string): Promis
           }
           state.setRightSidebarOpen(true)
           state.setRightSidebarTab('source-control')
-          const current = window.__store.getState()
+          const current = window.__store?.getState()
+          if (!current) {
+            throw new Error('Store unavailable')
+          }
           const activeWorktree = Object.values(current.worktreesByRepo)
             .flat()
             .some((entry) => entry.id === expectedWorktreeId)
@@ -134,6 +137,7 @@ async function seedCreatePREligibleBranch(
     }
     const eligibility = {
       provider: 'github' as const,
+      reviewLookupOutcome: 'not_found' as const,
       review: null,
       canCreate: true,
       blockedReason: null,
@@ -163,7 +167,7 @@ async function seedCreatePREligibleBranch(
       getHostedReviewCreationEligibility: async () => eligibility,
       fetchHostedReviewForBranch: async () => null,
       setUpstreamStatus: () => undefined,
-      fetchUpstreamStatus: async () => undefined,
+      fetchUpstreamStatus: async () => null,
       fetchPRForBranch: async (repoPath: string, targetBranch: string) => {
         store.setState((next) => ({
           prCache: {

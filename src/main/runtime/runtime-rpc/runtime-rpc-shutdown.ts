@@ -11,6 +11,8 @@ export class RuntimeRpcShutdown extends RuntimeRpcMobilePairing {
     // transport arrays before snapshotting them, so a racing rebind can't strand a wide 0.0.0.0 listener
     // by writing it back into a cleared array after shutdown (see widenWebSocketBind).
     this.stopping = true
+    // Startup owns local transports until publication; wait before collecting them for teardown.
+    await this.startupPromise?.catch(() => {})
     const pendingExposure = this.networkExposurePromise
     if (pendingExposure) {
       await pendingExposure.catch(() => {
@@ -22,6 +24,7 @@ export class RuntimeRpcShutdown extends RuntimeRpcMobilePairing {
     this.transports = []
     this.metadataOwnershipWatch?.stop()
     this.metadataOwnershipWatch = null
+    await this.pendingMetadataWrite.catch(() => {})
     this.clearCloudSessionExpiryTimers()
     this.mobileSocketWiring = null
     this.detachWebSocketWiring = null

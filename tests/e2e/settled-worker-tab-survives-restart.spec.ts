@@ -480,6 +480,9 @@ for (const daemonSessionGone of [false, true]) {
         const layout = window.__store?.getState().terminalLayoutsByTabId[tabId]
         const leaves: string[] = []
         const visit = (node: NonNullable<typeof layout>['root']) => {
+          if (!node) {
+            return
+          }
           if (node.type === 'leaf') {
             leaves.push(`${tabId}:${node.leafId}`)
           } else {

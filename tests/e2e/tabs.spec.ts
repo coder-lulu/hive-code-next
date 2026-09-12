@@ -266,6 +266,9 @@ test.describe('Tabs', () => {
     const orderedTabs = await getWorktreeTabs(orcaPage, worktreeId)
     const secondTabId = orderedTabs.find((tab) => tab.id !== firstTabId)?.id
     expect(secondTabId).toBeTruthy()
+    if (!firstTabId || !secondTabId) {
+      throw new Error('Two terminal tabs required')
+    }
 
     await orcaPage.evaluate((tabId) => {
       window.__store?.getState().setActiveTab(tabId)
@@ -326,7 +329,7 @@ test.describe('Tabs', () => {
         ? groups.find((group) => group.id === activeGroupId)
         : groups[0]
 
-      if (activeGroup?.tabOrder?.length >= 2) {
+      if (activeGroup && activeGroup.tabOrder.length >= 2) {
         const nextOrder = [
           activeGroup.tabOrder[1],
           activeGroup.tabOrder[0],
@@ -385,6 +388,9 @@ test.describe('Tabs', () => {
     const [firstTabId, secondTabId] = domOrderBefore
     expect(firstTabId).toBeTruthy()
     expect(secondTabId).toBeTruthy()
+    if (!firstTabId || !secondTabId) {
+      throw new Error('Two terminal tabs required')
+    }
 
     await tabLocator(orcaPage, firstTabId).click({ force: true })
     await expect.poll(() => getDomActiveTabId(orcaPage), { timeout: 3_000 }).toBe(firstTabId)

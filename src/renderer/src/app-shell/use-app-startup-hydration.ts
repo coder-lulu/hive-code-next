@@ -71,6 +71,10 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
         await timeRendererStartupStep('fetch-settings', () =>
           actions.fetchSettings({ deferOwnerWorktreeVisibilityDefaults: true })
         )
+        // Stop discarded mounts before they duplicate catalog scans and publish stale appearance.
+        if (cancelled) {
+          return
+        }
         // Why: hidden-at-launch PTYs can query OSC 10/11 before any pane mounts; publish view attributes as soon as settings exist so main's silent-until-push responder has data.
         publishTerminalViewAttributesAtAppStart(
           useAppStore.getState().settings,

@@ -373,6 +373,9 @@ async function pressShiftedRussianLayoutKey(page: Page): Promise<{
     // public input API exercises the same PTY data path without that browser
     // trust boundary, while the keydown assertion below still catches kitty
     // encoded sequences leaking from shifted layout keys.
+    if (!pane) {
+      throw new Error('Terminal pane unavailable')
+    }
     pane.terminal.input('Ф')
 
     return {
@@ -662,7 +665,8 @@ test.describe('Terminal Shortcuts', () => {
             const manager = tabId ? window.__paneManagers?.get(tabId) : null
             const pane = manager?.getActivePane?.() ?? manager?.getPanes?.()[0] ?? null
             const terminalText = pane?.terminal.buffer.active
-              .translateBufferLineToString(pane.terminal.buffer.active.cursorY, true)
+              .getLine(pane.terminal.buffer.active.baseY + pane.terminal.buffer.active.cursorY)
+              ?.translateToString(true)
               .trim()
             const visibleText = pane?.container.textContent ?? ''
             return {

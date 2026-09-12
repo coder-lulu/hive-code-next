@@ -159,7 +159,12 @@ function createRuntimeClosePath(
       pendingShutdowns.push(shutdown)
       return true
     },
-    listProcesses: (options) => router.listProcesses(options),
+    listProcesses: (connectionId) => {
+      if (connectionId) {
+        throw new Error('Local daemon fixture cannot enumerate a remote host')
+      }
+      return router.listProcesses()
+    },
     hasPty: (ptyId) => router.hasPty(ptyId),
     getForegroundProcess: (ptyId) => router.getForegroundProcess(ptyId)
   })
@@ -272,6 +277,9 @@ async function main(): Promise<void> {
       router = await connectThroughDesktopDiscovery(config, burst)
     }
     await connectParallelRuntimeClients(config)
+    if (!router) {
+      throw new Error('Reconnect fixture requires at least one connection burst')
+    }
     const { dispatcher, targets, pendingShutdowns } = await createRuntimeClosePath(config, router)
     await dispatchFixtureCloseBursts({ dispatcher, worktreeId: WORKTREE_ID, targets })
     const shutdownResults = await Promise.allSettled(pendingShutdowns)

@@ -300,7 +300,7 @@ test.describe('Reveal active workspace button', () => {
       if (!targetFolder) {
         throw new Error('Expected a target folder workspace')
       }
-      const folderWorktreeId = `folder:${targetFolder.id}`
+      const folderWorktreeId = `folder:${targetFolder.id}` as const
       store.setState({
         activeRepoId: null,
         activeWorktreeId: null,

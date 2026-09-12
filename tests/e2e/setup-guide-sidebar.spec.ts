@@ -1,3 +1,4 @@
+import type { Repo } from '../../src/shared/repo-types'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import type { SkillDiscoveryResult } from '../../src/shared/skills'
 import { test, expect } from './helpers/orca-app'
@@ -191,6 +192,9 @@ async function seedCompletedSetupExceptCapabilityReadiness(page: Page): Promise<
       throw new Error('window.__store is not available')
     }
     const state = store.getState()
+    if (!state.settings) {
+      throw new Error('Settings unavailable')
+    }
     const existingRepo = state.repos[0] ?? {
       id: 'setup-guide-repo-a',
       path: '/tmp/setup-guide-repo-a',
@@ -199,7 +203,7 @@ async function seedCompletedSetupExceptCapabilityReadiness(page: Page): Promise<
       addedAt: Date.now(),
       kind: 'git'
     }
-    const primaryRepo = {
+    const primaryRepo: Repo = {
       ...existingRepo,
       kind: 'git',
       hookSettings: {
@@ -304,10 +308,17 @@ async function seedCompletedSetupExceptCapabilityReadiness(page: Page): Promise<
         ]
       },
       tabsByWorktree: {
-        [secondaryWorktree.id]: [{ id: 'setup-guide-terminal-tab', title: 'Terminal' }]
+        [secondaryWorktree.id]: [
+          state.createTab(secondaryWorktree.id, undefined, undefined, {
+            id: 'setup-guide-terminal-tab',
+            activate: false
+          })
+        ]
       },
       terminalLayoutsByTabId: {
         'setup-guide-terminal-tab': {
+          activeLeafId: 'setup-guide-left',
+          expandedLeafId: null,
           root: {
             type: 'split',
             direction: 'horizontal',

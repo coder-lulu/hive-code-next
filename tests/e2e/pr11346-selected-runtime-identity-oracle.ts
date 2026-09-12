@@ -117,20 +117,22 @@ export async function installFinalActivationGate(page: Page, targetPath: string)
       waiting: false
     }
     store.setState({
-      fetchWorktrees: async (...args: Parameters<typeof originalFetchWorktrees>) => {
-        const result = await originalFetchWorktrees(...args)
-        const targetRepo = store
-          .getState()
-          .repos.find(
-            (repo) =>
-              repo.path === pathToGate && repo.executionHostId?.startsWith('runtime:') === true
-          )
-        if (targetRepo?.id === args[0]) {
-          gateWindow.__pr11346ActivationGate!.waiting = true
-          await released
+      fetchWorktrees: new Proxy(originalFetchWorktrees, {
+        async apply(target, receiver: unknown, args: unknown[]) {
+          const result: unknown = await Reflect.apply(target, receiver, args)
+          const targetRepo = store
+            .getState()
+            .repos.find(
+              (repo) =>
+                repo.path === pathToGate && repo.executionHostId?.startsWith('runtime:') === true
+            )
+          if (targetRepo?.id === args[0]) {
+            gateWindow.__pr11346ActivationGate!.waiting = true
+            await released
+          }
+          return result
         }
-        return result
-      }
+      })
     })
   }, targetPath)
 }
@@ -189,7 +191,7 @@ export async function injectSameIdLocalActivationCollision(
         repoId: localRepoId,
         path: localCollisionPath,
         hostId: 'local' as const,
-        runtimeOwnerEnvironmentId: null
+        runtimeOwnerEnvironmentId: undefined
       }
       store.setState({
         repos: [

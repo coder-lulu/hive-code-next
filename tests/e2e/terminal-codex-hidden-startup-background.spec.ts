@@ -319,16 +319,16 @@ test.describe('Codex hidden startup composer background', () => {
       })
       .toContain(marker)
 
-    let target: CodexStartupBackgroundTarget | null = null
+    const capture: { target: CodexStartupBackgroundTarget | null } = { target: null }
     await expect
       .poll(
         async () => {
           try {
             const nextTarget = await readCodexStartupBackgroundTarget(orcaPage, marker)
-            target = nextTarget
+            capture.target = nextTarget
             return nextTarget.modelBackgroundCells >= Math.min(40, nextTarget.cols)
           } catch {
-            target = null
+            capture.target = null
             return false
           }
         },
@@ -338,6 +338,7 @@ test.describe('Codex hidden startup composer background', () => {
         }
       )
       .toBe(true)
+    const target = capture.target
     if (!target) {
       throw new Error('Codex startup background target was not captured')
     }

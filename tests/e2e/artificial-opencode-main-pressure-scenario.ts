@@ -48,8 +48,8 @@ type MainPressureDeps<
   TMeasurement,
   TDebug,
   TScheduler extends MainPressureSchedulerSnapshot,
-  TMainPressure,
-  TAckGate
+  TMainPressure extends MainPressureSnapshot,
+  TAckGate extends { heldAckChars: number; heldAckCount: number; gatedPtyCount: number }
 > = {
   annotateTypingMeasurement: (
     testInfo: TestInfo,
@@ -85,7 +85,7 @@ type MainPressureDeps<
 export async function runMainPressureScenario<
   TMeasurement extends MainPressureMeasurement,
   TMainPressure extends MainPressureSnapshot,
-  TAckGate extends MainPressureAckGate,
+  TAckGate extends MainPressureAckGate & { heldAckCount: number; gatedPtyCount: number },
   TDebug,
   TScheduler extends MainPressureSchedulerSnapshot
 >({
@@ -214,8 +214,8 @@ async function measureAndAnnotateScroll<
   TMeasurement,
   TDebug,
   TScheduler extends MainPressureSchedulerSnapshot,
-  TMainPressure,
-  TAckGate
+  TMainPressure extends MainPressureSnapshot,
+  TAckGate extends { heldAckChars: number; heldAckCount: number; gatedPtyCount: number }
 >({
   annotationSuffix,
   deps,

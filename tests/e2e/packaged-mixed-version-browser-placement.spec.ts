@@ -196,7 +196,7 @@ async function launchPackagedPairedClient(args: {
       app,
       environmentId,
       page,
-      status,
+      status: { ...status, capabilities: status.capabilities ?? [] },
       version,
       dispose: async () => {
         const failures = await collectCleanupFailures([
@@ -211,7 +211,7 @@ async function launchPackagedPairedClient(args: {
     }
   } catch (error) {
     const cleanupErrors = await collectCleanupFailures([
-      ...(app ? [() => closeElectronAppForE2E(app)] : []),
+      ...(app ? [() => (app ? closeElectronAppForE2E(app) : Promise.resolve())] : []),
       () => cleanupE2EDaemons(userDataDir),
       () => removeProfile(userDataDir)
     ])
