@@ -56,6 +56,7 @@ function pane(filtered = items) {
 }
 afterEach(cleanup)
 beforeEach(() => {
+  localStorage.clear()
   vi.clearAllMocks()
   mocks.state.sessionListMetadata = {}
   mocks.state.updateSessionListMetadata.mockImplementation((key: string, patch: object) => {
@@ -152,4 +153,38 @@ it('resizes the sessions pane independently and restores its saved width', () =>
   expect(screen.getByRole('complementary').style.width).toBe('320px')
   localStorage.removeItem('hive-projects-pane-width')
   localStorage.removeItem('hive-sessions-pane-width')
+})
+
+it('collapses without losing rows, selection or archive state and restores its width', () => {
+  mocks.state.sessionListMetadata = { two: { archived: true } }
+  const result = render(pane())
+  const container = screen.getByRole('complementary')
+  fireEvent.keyDown(screen.getByRole('separator'), { key: 'ArrowRight' })
+  fireEvent.click(screen.getByRole('button', { name: /Archived/ }))
+  const row = screen.getByRole('option', { name: /First session/ })
+  const collapse = screen.getByRole('button', { name: 'Collapse sessions pane' })
+  collapse.focus()
+  fireEvent.click(collapse)
+  expect(screen.queryByRole('listbox')).toBeNull()
+  expect(screen.queryByRole('separator')).toBeNull()
+  expect(row.isConnected).toBe(true)
+  expect(row.getAttribute('aria-selected')).toBe('true')
+  const expand = screen.getByRole('button', { name: 'Expand sessions pane' })
+  expect(document.activeElement).toBe(expand)
+  expect(expand.getAttribute('aria-expanded')).toBe('false')
+  expect(document.getElementById(expand.getAttribute('aria-controls')!)?.hidden).toBe(true)
+  expect(localStorage.getItem('hive-sessions-pane-width')).toBe('336')
+  expect(updateView).not.toHaveBeenCalled()
+  fireEvent.click(expand)
+  expect(container.style.width).toBe('336px')
+  expect(screen.getByRole('option', { name: /First session/ })).toBe(row)
+  expect(screen.getByRole('option', { name: /Second session/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /Archived/ }).getAttribute('aria-expanded')).toBe(
+    'true'
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse sessions pane' }))
+  result.unmount()
+  render(pane())
+  expect(screen.getByRole('button', { name: 'Expand sessions pane' })).toBeTruthy()
+  expect(screen.queryByRole('listbox')).toBeNull()
 })

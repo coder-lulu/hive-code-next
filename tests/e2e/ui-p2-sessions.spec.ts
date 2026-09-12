@@ -88,6 +88,91 @@ test.beforeEach(async ({ orcaPage: page, electronApp }) => {
   ).toBe(true)
 })
 
+test('collapses navigation panes while preserving content and narrow-window access', async ({
+  orcaPage: page
+}) => {
+  const fixture = await seedSessions(page, 24)
+  await openSessions(page)
+  const pane = page.locator('.sessions-list-pane')
+  const list = page.getByTestId('sessions-list-scroll')
+  const search = page.getByRole('textbox', { name: 'Search sessions', exact: true })
+  await search.fill('P2 Temporary')
+  await page.getByTestId('session-center-row').first().click()
+  await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible()
+  const terminal = await page.locator('[data-session-terminal] .xterm').elementHandle()
+  const width = (await pane.boundingBox())!.width
+  await list.evaluate((element) => {
+    element.scrollTop = 240
+  })
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(240)
+  await capture(page, 'collapse-sessions-expanded-light')
+  const collapse = page.getByRole('button', { name: 'Collapse sessions pane', exact: true })
+  await collapse.focus()
+  await collapse.press('Enter')
+  const expand = page.getByRole('button', { name: 'Expand sessions pane', exact: true })
+  await expect(expand).toBeFocused()
+  await expect(expand).toHaveAttribute('aria-expanded', 'false')
+  await expect(list).not.toBeVisible()
+  await expect(pane.getByRole('separator')).toHaveCount(0)
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBe(48)
+  expect(await terminal!.evaluate((element) => element.isConnected)).toBe(true)
+  await capture(page, 'collapse-sessions-light')
+  await expand.press('Space')
+  await expect(list).toBeVisible()
+  await expect(search).toHaveValue('P2 Temporary')
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(240)
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBe(width)
+  await collapse.click()
+  await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
+  await capture(page, 'collapse-sessions-dark')
+  await page.setViewportSize({ width: 760, height: 960 })
+  const back = page.getByRole('button', { name: 'Back to session list', exact: true })
+  await back.click()
+  await expect(list).toBeVisible()
+  await expect(page.getByRole('listbox', { name: 'Sessions', exact: true })).toBeVisible()
+  await expect(search).toHaveValue('P2 Temporary')
+  await expect(expand).not.toBeVisible()
+  await capture(page, 'collapse-sessions-narrow')
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await expect(expand).toBeVisible()
+  await page.getByRole('button', { name: 'Projects', exact: true }).click()
+  const projects = page.getByTestId('projects-navigation-pane')
+  await projects.locator(`[data-worktree-id="${fixture.worktreeId}"]`).first().click()
+  await expect(page.locator('[data-terminal-workbench-container]')).toHaveAttribute(
+    'aria-hidden',
+    'false'
+  )
+  const tree = projects.locator('.sidebar-workspace-section')
+  const mountedTree = await tree.elementHandle()
+  const projectWidth = (await projects.boundingBox())!.width
+  await capture(page, 'collapse-projects-expanded-dark')
+  const projectCollapse = page.getByRole('button', { name: 'Collapse projects pane', exact: true })
+  await projectCollapse.click()
+  await expect(tree).not.toBeVisible()
+  await expect.poll(async () => (await projects.boundingBox())!.width).toBe(48)
+  expect(await mountedTree!.evaluate((element) => element.isConnected)).toBe(true)
+  await expect(page.locator('[data-terminal-workbench-container]')).toHaveAttribute(
+    'aria-hidden',
+    'false'
+  )
+  await capture(page, 'collapse-projects-dark')
+  await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'light' }))
+  await capture(page, 'collapse-projects-light')
+  await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
+  await page.getByRole('button', { name: 'Expand projects pane', exact: true }).click()
+  await expect(tree).toBeVisible()
+  await expect.poll(async () => (await projects.boundingBox())!.width).toBe(projectWidth)
+  await openSessions(page)
+  await expect(expand).toBeVisible()
+  await expand.click()
+  await expect(list).toBeVisible()
+  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'zh' }))
+  await expect(page.getByRole('button', { name: '折叠会话列表', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '折叠会话列表', exact: true }).click()
+  await expect(page.getByRole('button', { name: '展开会话列表', exact: true })).toBeVisible()
+  await capture(page, 'collapse-sessions-zh-dark')
+})
+
 test('reuses the full workbench from project management and creates in context', async ({
   orcaPage: page
 }) => {

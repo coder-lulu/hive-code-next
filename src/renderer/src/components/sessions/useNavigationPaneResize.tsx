@@ -2,6 +2,23 @@ import { useCallback, useRef, useState } from 'react'
 import { useSidebarResize } from '@/hooks/useSidebarResize'
 
 export function useNavigationPaneResize(storageKey: string, label: string) {
+  const collapsedStorageKey = storageKey.replace(/-width$/, '-collapsed')
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(collapsedStorageKey) === 'true'
+    } catch {
+      return false
+    }
+  })
+  const toggleCollapsed = (): void => {
+    const next = !collapsed
+    setCollapsed(next)
+    try {
+      localStorage.setItem(collapsedStorageKey, String(next))
+    } catch {
+      /* Storage can be unavailable. */
+    }
+  }
   const [width, setWidth] = useState(() => {
     try {
       const saved = Number(localStorage.getItem(storageKey))
@@ -23,7 +40,7 @@ export function useNavigationPaneResize(storageKey: string, label: string) {
     [storageKey]
   )
   const { containerRef, onResizeStart } = useSidebarResize<HTMLElement>({
-    isOpen: true,
+    isOpen: !collapsed,
     width,
     minWidth: 240,
     maxWidth: 520,
@@ -33,7 +50,9 @@ export function useNavigationPaneResize(storageKey: string, label: string) {
   const lastResizePress = useRef({ time: 0, x: 0 })
   return {
     containerRef,
-    resizeHandle: (
+    collapsed,
+    toggleCollapsed,
+    resizeHandle: collapsed ? null : (
       <div
         role="separator"
         aria-orientation="vertical"

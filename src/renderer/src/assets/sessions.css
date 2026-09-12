@@ -40,6 +40,26 @@
   font-size: 12px;
   color: var(--muted-foreground);
 }
+.navigation-pane-heading-content:not([hidden]) {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sessions-space-2);
+  min-width: 0;
+}
+.navigation-pane-content:not([hidden]) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.sessions-list-pane[data-collapsed='true'] {
+  min-width: calc(var(--sessions-space-6) * 2);
+}
+.sessions-list-pane[data-collapsed='true'] .sessions-list-heading {
+  justify-content: center;
+  padding-inline: 0;
+}
 .sessions-search {
   display: flex;
   align-items: center;
@@ -281,11 +301,40 @@ html[data-session-dragging='true'] * {
   cursor: grabbing !important;
 }
 @container sessions (max-width: 640px) {
+  .navigation-pane-toggle {
+    display: none;
+  }
+  .sessions-list-pane[data-collapsed='true'] {
+    min-width: 0;
+  }
+  .sessions-list-pane[data-collapsed='true'] .sessions-list-heading {
+    padding-inline: var(--sessions-space-3);
+  }
+  .navigation-pane-content[hidden] {
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .navigation-pane-heading-content[hidden] {
+    flex: 1;
+    align-items: center;
+    gap: var(--sessions-space-2);
+    min-width: 0;
+  }
   .navigation-pane-resize-handle {
     display: none;
   }
   .sessions-page[data-has-selection='false'] .session-panel-workspace {
     display: none;
+  }
+}
+/* Override Preflight's important hidden rule within its own cascade layer. */
+@layer base {
+  @container sessions (max-width: 640px) {
+    .navigation-pane-content[hidden],
+    .navigation-pane-heading-content[hidden] {
+      display: flex !important;
+    }
   }
 }
 .session-current-tab > [role='tab'] {
