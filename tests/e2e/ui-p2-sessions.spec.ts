@@ -98,8 +98,12 @@ test('collapses navigation panes while preserving content and narrow-window acce
   const search = page.getByRole('textbox', { name: 'Search sessions', exact: true })
   await search.fill('P2 Temporary')
   await page.getByTestId('session-center-row').first().click()
-  await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible()
-  const terminal = await page.locator('[data-session-terminal] .xterm').elementHandle()
+  await expect(
+    page.locator('[data-terminal-overlay-tab-id][aria-hidden="false"] .xterm')
+  ).toBeVisible()
+  const terminal = await page
+    .locator('[data-terminal-overlay-tab-id][aria-hidden="false"] .xterm')
+    .elementHandle()
   const width = (await pane.boundingBox())!.width
   await list.evaluate((element) => {
     element.scrollTop = 240
@@ -337,7 +341,9 @@ test('filters real session rows and preserves search through narrow list/detail 
   await expect(
     page.getByTestId('session-detail').getByRole('heading', { name: /P2 Temporary 01/ })
   ).toBeVisible()
-  await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible({ timeout: 30_000 })
+  await expect(
+    page.locator('[data-terminal-overlay-tab-id][aria-hidden="false"] .xterm')
+  ).toBeVisible({ timeout: 30_000 })
   await expect(page.getByTestId('session-content-loading')).toHaveCount(0)
   await expect(page.getByTestId('session-chat-anchor')).toHaveAttribute('aria-busy', 'false')
   await capture(page, 'p2-02-light-filtered-detail')
@@ -345,7 +351,7 @@ test('filters real session rows and preserves search through narrow list/detail 
   await page.evaluate(() => window.__store!.getState().updateSettings({ theme: 'dark' }))
   await expect(page.locator('html')).toHaveClass(/dark/)
   await capture(page, 'p2-03-dark-filtered-detail')
-  await page.setViewportSize({ width: 900, height: 760 })
+  await page.setViewportSize({ width: 760, height: 760 })
   const back = page.getByRole('button', { name: 'Back to session list', exact: true })
   await expect(back).toBeVisible()
   await back.click()
@@ -358,7 +364,7 @@ test('filters real session rows and preserves search through narrow list/detail 
     .poll(() =>
       page.evaluate(() =>
         Boolean(
-          document.activeElement?.closest('[data-session-terminal]') ||
+          document.activeElement?.closest('[data-terminal-overlay-tab-id]') ||
           document.activeElement?.getAttribute('aria-label') === 'Back to session list'
         )
       )
@@ -445,7 +451,9 @@ test('returns to the same terminal and browser guest without duplicate tabs or P
       .filter({ hasText: 'P2 Workspace continuity' })
       .click()
     await expect(page.getByTestId('sessions-page')).toBeVisible()
-    await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible()
+    await expect(
+      page.locator('[data-terminal-overlay-tab-id][aria-hidden="false"] .xterm')
+    ).toBeVisible()
     expect(await page.evaluate(() => window.__store!.getState().activeWorktreeId)).toBe(
       fixture.worktreeId
     )
@@ -456,12 +464,16 @@ test('returns to the same terminal and browser guest without duplicate tabs or P
     await search.fill('P2 Workspace continuity')
     await page.getByTestId('session-center-row').click()
     await expect(page.getByTestId('sessions-page')).toBeVisible()
-    await expect(page.locator('[data-session-terminal] .xterm')).toBeVisible()
+    await expect(
+      page.locator('[data-terminal-overlay-tab-id][aria-hidden="false"] .xterm')
+    ).toBeVisible()
     expect(await page.evaluate(() => window.__store!.getState().activeWorktreeId)).toBe(
       fixture.worktreeId
     )
     await expect(page.getByRole('button', { name: 'Open workspace', exact: true })).toHaveCount(0)
-    await page.locator('[data-session-terminal] .xterm-helper-textarea').focus()
+    await page
+      .locator('[data-terminal-overlay-tab-id][aria-hidden="false"] .xterm-helper-textarea')
+      .focus()
     await page.keyboard.type('echo P2_DIRECT_SESSION_INPUT')
     await page.keyboard.press('Enter')
     await expect
@@ -548,14 +560,14 @@ test('restores a virtual list position and selected row after leaving the sessio
   ).toHaveAttribute('data-session-key', selectedKey!)
   await expect(page.getByTestId('session-detail')).toBeVisible()
   await capture(page, 'p2-08-virtual-list-restored')
-  await page.setViewportSize({ width: 900, height: 760 })
+  await page.setViewportSize({ width: 760, height: 760 })
   await page.getByRole('button', { name: 'Back to session list', exact: true }).click()
   await expect(list).toBeVisible()
   await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(500)
   await expect(page.locator(`[data-session-key="${selectedKey}"]`).last()).toBeVisible()
   await capture(page, 'p2-review-narrow-list-return')
   await expect(page.getByTestId('session-navigation')).toHaveCount(0)
-  await expect(page.locator('.sidebar-workspace-section')).toHaveCount(0)
+  await expect(page.getByTestId('projects-navigation-pane')).not.toBeVisible()
   await expect(page.getByRole('button', { name: 'Projects', exact: true })).toBeVisible()
 })
 
@@ -596,7 +608,9 @@ test('terminates an archived session through its real terminal owner', async ({
   await openSessions(page)
   const row = page.getByTestId('session-center-row').filter({ hasText: 'P2 Temporary 00' })
   await row.click()
-  const terminal = page.locator('[data-session-terminal]:visible [data-pty-id]').first()
+  const terminal = page
+    .locator('[data-terminal-overlay-tab-id][aria-hidden="false"] [data-pty-id]')
+    .first()
   await expect(terminal).toHaveAttribute('data-pty-id', /\S+/, { timeout: 30_000 })
   const ptyId = (await terminal.getAttribute('data-pty-id'))!
   await row.hover()

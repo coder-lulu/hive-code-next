@@ -507,7 +507,11 @@ test.describe('Browser Tab', () => {
         webview.setZoomLevel(0.5)
         for (let reload = 0; reload < 3; reload += 1) {
           await new Promise<void>((resolve) => {
-            webview.addEventListener('dom-ready', () => resolve(), { once: true })
+            const onReady = (): void => {
+              webview.removeEventListener('dom-ready', onReady)
+              resolve()
+            }
+            webview.addEventListener('dom-ready', onReady)
             if (reload === 1) {
               webview.reloadIgnoringCache()
             } else {
@@ -558,7 +562,7 @@ test.describe('Browser Tab', () => {
         {
           browserTabId: browserTab!.id,
           browserPageId: browserTab!.pageId ?? browserTab!.id,
-          modifier: process.platform === 'darwin' ? 'meta' : 'control'
+          modifier: process.platform === 'darwin' ? ('meta' as const) : ('control' as const)
         }
       )
       await expect
@@ -617,7 +621,11 @@ test.describe('Browser Tab', () => {
           const untouchedA = webviewA.getZoomLevel()
 
           await new Promise<void>((resolve) => {
-            webviewA.addEventListener('dom-ready', () => resolve(), { once: true })
+            const onReady = (): void => {
+              webviewA.removeEventListener('dom-ready', onReady)
+              resolve()
+            }
+            webviewA.addEventListener('dom-ready', onReady)
             webviewA.reload()
           })
 

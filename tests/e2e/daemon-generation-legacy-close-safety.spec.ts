@@ -1,4 +1,4 @@
-import { fork, type ChildProcess } from 'node:child_process'
+import { fork, type ChildProcess, type ForkOptions } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test, type TestInfo } from '@playwright/test'
@@ -97,7 +97,7 @@ function launchLegacyCloseClient(options: {
     })}\n`
   )
   let output = ''
-  const child = fork(runtime.legacyCloseClientEntryPath, ['--config', configPath], {
+  const forkOptions: ForkOptions & { windowsHide: boolean } = {
     cwd: runtime.userDataDir,
     execPath: runtime.electronPath,
     windowsHide: true,
@@ -108,7 +108,8 @@ function launchLegacyCloseClient(options: {
       ORCA_USER_DATA_PATH: runtime.userDataDir
     },
     stdio: ['ignore', 'ignore', 'pipe', 'ipc']
-  })
+  }
+  const child = fork(runtime.legacyCloseClientEntryPath, ['--config', configPath], forkOptions)
   child.stderr?.on('data', (chunk: Buffer) => {
     output = `${output}${chunk.toString('utf8')}`.slice(-32_768)
   })

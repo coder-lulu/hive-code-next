@@ -94,11 +94,7 @@ test.describe('Automation hidden terminal first mount', () => {
           recordInteraction: false
         })
         state.queueTabStartupCommand(tab.id, {
-          command: `node -e "console.log('${marker}')"`,
-          telemetry: {
-            launch_source: 'automation_hidden_first_mount_e2e',
-            request_kind: 'new'
-          }
+          command: `node -e "console.log('${marker}')"`
         })
         state.setTabCustomTitle(tab.id, 'Automation hidden shell', {
           recordInteraction: false

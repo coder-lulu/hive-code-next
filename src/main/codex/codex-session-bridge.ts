@@ -13,7 +13,11 @@ import {
   listCodexSessionJsonlFiles,
   listCodexSessionJsonlFilesIncrementally
 } from './codex-session-file-listing'
-import { linkCodexSessionFile, tryHardlinkCodexSessionFile } from './codex-session-link'
+import {
+  canBridgeCodexSessionRoots,
+  linkCodexSessionFile,
+  tryHardlinkCodexSessionFile
+} from './codex-session-link'
 import type { CodexSessionBridgeIncrementalOptions } from './codex-session-file-listing'
 
 export type { CodexSessionBridgeIncrementalOptions } from './codex-session-file-listing'
@@ -35,6 +39,7 @@ export type LegacyCopiedCodexSessionBridgeScanPreference = {
 export type CodexSessionBridgeSummary = {
   scannedFiles: number
   linkedFiles: number
+  sourceOnlyHomes?: number
 }
 
 let backgroundSessionBridgeTask: Promise<void> | null = null
@@ -52,6 +57,9 @@ export function syncSystemCodexSessionsIntoManagedHome(sourceCodexHomePath?: str
   }
 
   const managedSessionsRoot = join(getOrcaManagedCodexHomePath(), 'sessions')
+  if (!canBridgeCodexSessionRoots(systemSessionsRoot, managedSessionsRoot)) {
+    return
+  }
   for (const systemSessionFilePath of listCodexSessionJsonlFiles(systemSessionsRoot)) {
     bridgeSystemCodexSessionFile(systemSessionsRoot, managedSessionsRoot, systemSessionFilePath)
   }
@@ -71,6 +79,13 @@ export function startSystemCodexSessionBridgeInBackground(
     return backgroundSessionBridgeTask
   }
   const task = syncSystemCodexSessionsIntoManagedHomeIncrementally(options, sourceCodexHomePath)
+    .then((summary) => {
+      if (summary.sourceOnlyHomes) {
+        console.info(
+          '[codex-session-bridge] Cross-device history retained at source; resume requires a trusted, verified home.'
+        )
+      }
+    })
     .catch((error: unknown) => {
       console.warn('[codex-session-bridge] Background session bridge failed:', error)
     })
@@ -100,6 +115,9 @@ export async function syncSystemCodexSessionsIntoManagedHomeIncrementally(
   }
 
   const managedSessionsRoot = join(getOrcaManagedCodexHomePath(), 'sessions')
+  if (!canBridgeCodexSessionRoots(systemSessionsRoot, managedSessionsRoot)) {
+    return { scannedFiles: 0, linkedFiles: 0, sourceOnlyHomes: 1 }
+  }
   const summary: CodexSessionBridgeSummary = { scannedFiles: 0, linkedFiles: 0 }
   for await (const systemSessionFilePath of listCodexSessionJsonlFilesIncrementally(
     systemSessionsRoot,

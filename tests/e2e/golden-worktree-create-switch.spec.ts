@@ -23,7 +23,12 @@ async function createWorkspace(page: Page, name: string): Promise<void> {
 
 async function removeCreatedWorktree(page: Page, worktreeId: string): Promise<void> {
   await page.evaluate(async (id) => {
-    await window.__store?.getState().removeWorktree(id, true)
+    const state = window.__store?.getState()
+    const worktree = state?.allWorktrees().find((entry) => entry.id === id)
+    if (!state || !worktree) {
+      throw new Error(`Worktree unavailable: ${id}`)
+    }
+    await state.removeWorktree({ id, executionHostId: worktree.hostId ?? null }, true)
   }, worktreeId)
 }
 

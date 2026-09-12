@@ -8,6 +8,16 @@ evidence; an unexplained skip is not an accepted outcome.
 
 ## One historical review, then increments
 
+After the September 2026 maintenance merge, the maintainer requested that only
+`hivecode/main-next` remain as a product repository branch. Remove the temporary
+`vendor-integration` ref only after its exact candidate is included in that
+branch and verified remotely. Preserve review checkpoints and evidence.
+The existing sync preflight deliberately fails when vendor is absent; a future
+maintainer-authorized sync must recreate its temporary integration ref from the
+reviewed product tip, never from upstream, before invoking the protected flow.
+Do not re-enable disabled Actions or change release publication settings as part
+of branch cleanup.
+
 `config/upstream-sync-state.json` starts with `initialAuditCompleted: false`.
 No previous fetch, vendor merge, or old report is automatically treated as a
 completed historical review. The first run accounts for the entire reachable

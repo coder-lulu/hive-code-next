@@ -137,6 +137,7 @@ test('recovers the same startup exec through an isolated headless orca serve', a
     releasePath = path.join(homePath, `.sta4067-${runId}.release`)
     removeProfile = installZshExecProfile(homePath, runId, { releasePath, startedPath })
     client = await launchPairedWebClient(host.app, host.offer, { waitForWorkspace: false })
+    const connectedPage = client.page
     await host.client.call('repo.add', { path: testRepoPath, kind: 'git' })
     await client.page.locator('[data-worktree-sidebar]').waitFor({
       state: 'visible',
@@ -144,7 +145,8 @@ test('recovers the same startup exec through an isolated headless orca serve', a
     })
     await expect
       .poll(
-        () => client.page.evaluate(() => window.__store?.getState().allWorktrees()[0]?.id ?? null),
+        () =>
+          connectedPage.evaluate(() => window.__store?.getState().allWorktrees()[0]?.id ?? null),
         { timeout: 30_000 }
       )
       .not.toBeNull()

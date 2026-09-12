@@ -172,7 +172,15 @@ test('runs hello-orca panel, command, and event behind visible consent', async (
     if (createdWorktreeId) {
       await orcaPage
         .evaluate(async (worktreeId) => {
-          await window.__store?.getState().removeWorktree(worktreeId, true)
+          const state = window.__store?.getState()
+          const worktree = state?.allWorktrees().find((entry) => entry.id === worktreeId)
+          if (!state || !worktree) {
+            throw new Error(`Worktree unavailable: ${worktreeId}`)
+          }
+          await state.removeWorktree(
+            { id: worktreeId, executionHostId: worktree.hostId ?? null },
+            true
+          )
         }, createdWorktreeId)
         .catch(() => undefined)
     }

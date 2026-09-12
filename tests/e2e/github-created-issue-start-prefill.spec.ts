@@ -99,7 +99,7 @@ const test = base.extend({
     {
       PATH: `${fakeCliDir}${path.delimiter}${process.env.PATH ?? ''}`
     },
-    { option: true }
+    { scope: 'test' }
   ]
 })
 

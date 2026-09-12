@@ -126,13 +126,18 @@ export async function launchHeadlessPairedRuntimeHost(
           '--serve-pairing-address',
           '127.0.0.1'
         ],
-        env: isolation.env
+        env: Object.fromEntries(
+          Object.entries(isolation.env).filter(
+            (entry): entry is [string, string] => typeof entry[1] === 'string'
+          )
+        )
       })
-    app = await launchServeProcess()
+    const launchedApp = await launchServeProcess()
+    app = launchedApp
     const [offer] = await Promise.all([
       readPairingOffer(app),
       retryTransientMainEvaluate(() =>
-        app.evaluate(({ app: electronApp }) => electronApp.getPath('home'))
+        launchedApp.evaluate(({ app: electronApp }) => electronApp.getPath('home'))
       ).then((home) => assertElectronResolvedIsolatedHome(home, isolation))
     ])
     let serveProcess = app
@@ -163,10 +168,16 @@ export async function launchHeadlessPairedRuntimeHost(
           ...(agentBrowserSocketDir
             ? [
                 () =>
-                  rmSync(agentBrowserSocketDir, {
-                    recursive: true,
-                    force: true
-                  })
+                  rmSync(
+                    agentBrowserSocketDir ??
+                      (() => {
+                        throw new Error('Socket directory unavailable')
+                      })(),
+                    {
+                      recursive: true,
+                      force: true
+                    }
+                  )
               ]
             : [])
         ])
@@ -175,11 +186,20 @@ export async function launchHeadlessPairedRuntimeHost(
   } catch (error) {
     try {
       await cleanupHeadlessHostResources([
-        ...(app ? [() => closeElectronAppForE2E(app)] : []),
+        ...(app ? [() => (app ? closeElectronAppForE2E(app) : Promise.resolve())] : []),
         () => cleanupE2EDaemons(userDataDir),
         () => rmSync(userDataDir, { recursive: true, force: true }),
         ...(agentBrowserSocketDir
-          ? [() => rmSync(agentBrowserSocketDir, { recursive: true, force: true })]
+          ? [
+              () =>
+                rmSync(
+                  agentBrowserSocketDir ??
+                    (() => {
+                      throw new Error('Socket directory unavailable')
+                    })(),
+                  { recursive: true, force: true }
+                )
+            ]
           : [])
       ])
     } catch (cleanupError) {

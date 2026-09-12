@@ -23,6 +23,7 @@ const { fsMockState } = vi.hoisted(() => ({
   fsMockState: {
     failLink: false,
     failSymlink: false,
+    crossDevice: false,
     fakeSymlinks: new Map<string, string>()
   }
 }))
@@ -39,6 +40,12 @@ vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof NodeFs>('node:fs')
   return {
     ...actual,
+    statSync: ((path: Parameters<typeof actual.statSync>[0]) => {
+      const stat = actual.statSync(path)
+      return fsMockState.crossDevice
+        ? { ...stat, dev: String(path).includes('codex-session-user-data-') ? 2 : 1 }
+        : stat
+    }) as typeof actual.statSync,
     linkSync: (...args: Parameters<typeof actual.linkSync>) => {
       if (fsMockState.failLink) {
         throw new Error('hardlink disabled for test')
@@ -107,6 +114,7 @@ import {
   syncSystemCodexSessionsIntoManagedHome,
   syncSystemCodexSessionsIntoManagedHomeIncrementally
 } from './codex-session-bridge'
+import { listCodexSessionJsonlFilesIncrementally } from './codex-session-file-listing'
 
 let fakeHomeDir: string
 let userDataDir: string
@@ -158,6 +166,7 @@ function writeLegacyCopyMarker(relativePath: string, sourcePath: string, targetP
 
 beforeEach(() => {
   fsMockState.failLink = false
+  fsMockState.crossDevice = false
   fsMockState.failSymlink = false
   fsMockState.fakeSymlinks.clear()
   fakeHomeDir = mkdtempSync(join(tmpdir(), 'orca-codex-session-home-'))
@@ -180,6 +189,31 @@ afterEach(() => {
 })
 
 describe('syncSystemCodexSessionsIntoManagedHome', () => {
+  it('leaves cross-device history discoverable in its source without scanning or mirroring', async () => {
+    fsMockState.crossDevice = true
+    const sourcePath = join(
+      getSystemCodexHomePath(),
+      'sessions',
+      '2026',
+      '09',
+      '13',
+      'rollout-source.jsonl'
+    )
+    mkdirSync(dirname(sourcePath), { recursive: true })
+    writeFileSync(sourcePath, '{"id":"source"}\n')
+    const summary = await syncSystemCodexSessionsIntoManagedHomeIncrementally()
+    expect(summary).toEqual({ scannedFiles: 0, linkedFiles: 0, sourceOnlyHomes: 1 })
+    expect(readFileSync(sourcePath, 'utf-8')).toBe('{"id":"source"}\n')
+    expect(existsSync(join(getRuntimeCodexHomePath(), 'sessions'))).toBe(false)
+    const discovered: string[] = []
+    for await (const filePath of listCodexSessionJsonlFilesIncrementally(
+      join(getSystemCodexHomePath(), 'sessions'),
+      {}
+    )) {
+      discovered.push(filePath)
+    }
+    expect(discovered).toEqual([sourcePath])
+  })
   it('bridges system Codex session jsonl files into the managed runtime home', () => {
     const systemSessionPath = join(
       getSystemCodexHomePath(),
@@ -260,7 +294,7 @@ describe('syncSystemCodexSessionsIntoManagedHome', () => {
     ).toBe(false)
   })
 
-  it('falls back to symlinks when hardlinks are unavailable', () => {
+  it('retains the source rollout when hardlinks are unavailable', () => {
     fsMockState.failLink = true
     const systemSessionPath = join(
       getSystemCodexHomePath(),
@@ -283,10 +317,8 @@ describe('syncSystemCodexSessionsIntoManagedHome', () => {
       '26',
       'rollout-symlink-fallback.jsonl'
     )
-    expect(lstatSync(runtimeSessionPath).isSymbolicLink()).toBe(true)
-    expect(normalizeLinkTarget(readlinkSync(runtimeSessionPath))).toBe(
-      normalizeLinkTarget(systemSessionPath)
-    )
+    expect(existsSync(runtimeSessionPath)).toBe(false)
+    expect(readFileSync(systemSessionPath, 'utf-8')).toBe('{"id":"system"}\n')
   })
 
   it('does not overwrite runtime-owned session files', () => {

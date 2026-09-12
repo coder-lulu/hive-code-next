@@ -55,8 +55,8 @@ async function readActiveTerminalRasterTarget(page: Page): Promise<TerminalRaste
       if (record?.isBgPalette?.()) {
         const index = record.getBgColor?.() ?? -1
         const rgba =
-          pane.terminal._core?._themeService?.colors?.ansi?.[index]?.rgba ??
-          pane.terminal._core?._themeService?.colors?.background?.rgba
+          pane?.terminal._core?._themeService?.colors?.ansi?.[index]?.rgba ??
+          pane?.terminal._core?._themeService?.colors?.background?.rgba
         if (typeof rgba !== 'number') {
           return false
         }

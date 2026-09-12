@@ -3,7 +3,7 @@ import { dirname, join, relative } from 'node:path'
 import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
 import { listCodexSessionRolloutFilesIncrementally } from './codex-session-file-listing'
 import type { CodexSessionBridgeIncrementalOptions } from './codex-session-file-listing'
-import { linkCodexSessionFile } from './codex-session-link'
+import { canBridgeCodexSessionRoots, linkCodexSessionFile } from './codex-session-link'
 
 /**
  * Bridges Codex history between Orca-managed Codex homes.
@@ -19,6 +19,7 @@ import { linkCodexSessionFile } from './codex-session-link'
 export type CodexAccountSessionBridgeSummary = {
   scannedFiles: number
   linkedFiles: number
+  sourceOnlyHomes?: number
 }
 
 const backgroundBridgeTasksByTargetHome = new Map<string, Promise<void>>()
@@ -37,6 +38,14 @@ export function startCodexAccountSessionBridgeInBackground(args: {
     return inFlight
   }
   const task = bridgeCodexSessionsIntoAccountHome(args)
+    .then((summary) => {
+      if (summary.sourceOnlyHomes) {
+        console.info(
+          '[codex-account-session-bridge] Cross-device history homes retained for verified source resume:',
+          summary.sourceOnlyHomes
+        )
+      }
+    })
     .catch((error: unknown) => {
       console.warn('[codex-account-session-bridge] Background session bridge failed:', error)
     })
@@ -66,6 +75,10 @@ export async function bridgeCodexSessionsIntoAccountHome(args: {
   )) {
     const sourceSessionsRoot = join(sourceHomePath, 'sessions')
     if (!existsSync(sourceSessionsRoot)) {
+      continue
+    }
+    if (!canBridgeCodexSessionRoots(sourceSessionsRoot, targetSessionsRoot)) {
+      summary.sourceOnlyHomes = (summary.sourceOnlyHomes ?? 0) + 1
       continue
     }
     for await (const sourceFilePath of listCodexSessionRolloutFilesIncrementally(

@@ -128,6 +128,8 @@ async function addRealOrcaRepo(page: Page, repoPath: string): Promise<string> {
     await store.getState().updateRepo(repo.id, {
       externalWorktreeVisibility: 'show',
       hookSettings: {
+        mode: 'auto',
+        scripts: { setup: '', archive: '' },
         ...repo.hookSettings,
         setupRunPolicy: 'run-by-default',
         setupAgentStartupPolicy: 'start-immediately'
@@ -555,6 +557,8 @@ async function captureClickEvidence(
 
   return {
     ...diff,
+    changedPixels: diff.diffPixels,
+    totalPixels: diff.width * diff.height,
     leftPane: pane,
     beforeContent,
     afterContent

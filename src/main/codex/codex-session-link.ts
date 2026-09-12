@@ -1,4 +1,30 @@
-import { linkSync, symlinkSync } from 'node:fs'
+import { linkSync, statSync } from 'node:fs'
+import { dirname } from 'node:path'
+
+/** Cross-device history stays at source; resume still requires a trusted, verified home. */
+export function canBridgeCodexSessionRoots(sourceRoot: string, targetRoot: string): boolean {
+  const sourceDevice = existingAncestorDevice(sourceRoot)
+  const targetDevice = existingAncestorDevice(targetRoot)
+  return sourceDevice === null || targetDevice === null || sourceDevice === targetDevice
+}
+
+function existingAncestorDevice(filePath: string): number | null {
+  let candidate = filePath
+  while (true) {
+    try {
+      return statSync(candidate).dev
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        return null
+      }
+      const parent = dirname(candidate)
+      if (parent === candidate) {
+        return null
+      }
+      candidate = parent
+    }
+  }
+}
 
 /**
  * Attempts a hardlink so resume sees one physical JSONL session log.
@@ -15,16 +41,12 @@ export function tryHardlinkCodexSessionFile(sourcePath: string, targetPath: stri
 }
 
 /**
- * Links a session file with hardlink first and symlink fallback.
+ * Links a session without introducing an independent writable transcript.
  */
 export function linkCodexSessionFile(sourcePath: string, targetPath: string): boolean {
-  if (tryHardlinkCodexSessionFile(sourcePath, targetPath)) {
-    return true
-  }
   try {
-    // Why fallback: hardlinks keep sessions visible to Codex resume, but can
-    // fail across volumes. A symlink is still better than a diverging copy.
-    symlinkSync(sourcePath, targetPath, process.platform === 'win32' ? 'file' : undefined)
+    // Codex ignores symlinked rollouts, even on hosts that permit creating them.
+    linkSync(sourcePath, targetPath)
     return true
   } catch (error) {
     console.warn('[codex-session-bridge] Failed to link Codex session:', sourcePath, error)

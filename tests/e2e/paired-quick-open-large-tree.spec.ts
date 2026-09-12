@@ -1,3 +1,7 @@
+import type {
+  RuntimeFileListResult,
+  RuntimeWorktreeListResult
+} from '../../src/shared/runtime-types'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { launchHeadlessPairedRuntimeHost } from './helpers/headless-paired-runtime-host'
@@ -73,10 +77,11 @@ async function expectQuickOpenAndRuntimeHealthy(
         if (!response.ok) {
           throw new Error(`files.searchPaths oracle failed: ${JSON.stringify(response)}`)
         }
+        const result = response.result as RuntimeFileListResult
         const oracle = {
-          files: response.result.files.map((file) => file.relativePath),
-          totalCount: response.result.totalCount,
-          truncated: response.result.truncated
+          files: result.files.map((file) => file.relativePath),
+          totalCount: result.totalCount,
+          truncated: result.truncated
         }
         const encodedOracle = new TextEncoder().encode(JSON.stringify(oracle))
         const digest = await crypto.subtle.digest('SHA-256', encodedOracle)
@@ -103,7 +108,7 @@ async function expectQuickOpenAndRuntimeHealthy(
         if (!response.ok) {
           throw new Error(`files.stat oracle failed: ${JSON.stringify(response)}`)
         }
-        return response.result
+        return response.result as { isDirectory: boolean; size: number; mtime: number }
       },
       { environmentId: client.environmentId, worktreeId, targetPath }
     )
@@ -160,7 +165,11 @@ async function expectQuickOpenAndRuntimeHealthy(
   )
   expect(response.ok).toBe(true)
   if (response.ok) {
-    expect(response.result.worktrees.some((worktree) => worktree.id === worktreeId)).toBe(true)
+    expect(
+      (response.result as RuntimeWorktreeListResult).worktrees.some(
+        (worktree) => worktree.id === worktreeId
+      )
+    ).toBe(true)
   }
 }
 

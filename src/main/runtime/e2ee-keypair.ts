@@ -2,13 +2,10 @@
 // and desktop over plain ws://. The public key is embedded in the QR pairing
 // offer so the mobile client can derive a shared secret via ECDH.
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import nacl from 'tweetnacl'
-import {
-  hardenExistingSecureFile,
-  isUnreadableError,
-  writeSecureJsonFile
-} from '../../shared/secure-file'
+import { hardenExistingSecureFile, isUnreadableError } from '../../shared/secure-file'
+import { writeSecureJsonFileAsync } from '../../shared/secure-file-async'
 import { E2EE_KEYPAIR_FILENAME } from './mobile-pairing-files'
 
 const KEYPAIR_FILENAME = E2EE_KEYPAIR_FILENAME
@@ -27,7 +24,21 @@ export type E2EEKeypair = {
   publicKeyB64: string
 }
 
-export function loadOrCreateE2EEKeypair(userDataPath: string): E2EEKeypair {
+const pendingKeypairs = new Map<string, Promise<E2EEKeypair>>()
+
+export function loadOrCreateE2EEKeypair(userDataPath: string): Promise<E2EEKeypair> {
+  const canonicalPath = resolve(userDataPath)
+  const key = process.platform === 'win32' ? canonicalPath.toLowerCase() : canonicalPath
+  const existing = pendingKeypairs.get(key)
+  if (existing) {
+    return existing
+  }
+  const pending = loadOrCreateKeypair(canonicalPath).finally(() => pendingKeypairs.delete(key))
+  pendingKeypairs.set(key, pending)
+  return pending
+}
+
+async function loadOrCreateKeypair(userDataPath: string): Promise<E2EEKeypair> {
   const filePath = join(userDataPath, KEYPAIR_FILENAME)
 
   if (existsSync(filePath)) {
@@ -66,7 +77,7 @@ export function loadOrCreateE2EEKeypair(userDataPath: string): E2EEKeypair {
   const secretKeyB64 = Buffer.from(keypair.secretKey).toString('base64')
 
   const data: KeypairFile = { v: KEYPAIR_VERSION, publicKeyB64, secretKeyB64 }
-  writeSecureJsonFile(filePath, data)
+  await writeSecureJsonFileAsync(filePath, data)
 
   return { publicKey: keypair.publicKey, secretKey: keypair.secretKey, publicKeyB64 }
 }

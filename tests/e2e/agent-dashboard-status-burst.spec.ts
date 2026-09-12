@@ -31,6 +31,9 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
         throw new Error('window.__store is unavailable')
       }
       const state = store.getState()
+      if (!state.settings) {
+        throw new Error('Settings unavailable')
+      }
       const tab =
         state.tabsByWorktree[worktreeId]?.[0] ??
         state.createTab(worktreeId, undefined, undefined, {
@@ -40,9 +43,9 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
       store.setState({
         agentDashboardDrawerOpen: false,
         settings: {
-          ...store.getState().settings,
+          ...state.settings,
           experimentalAgentDashboardPopout: true,
-          experimentalAgentDashboardMode: 'drawer',
+          experimentalAgentDashboardMode: 'in-window',
           experimentalAgentDashboardShowIdle: true,
           tabAutoGenerateTitle: false
         }

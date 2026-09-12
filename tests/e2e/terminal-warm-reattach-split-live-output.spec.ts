@@ -184,6 +184,7 @@ test('restored hidden split drains live alternate-screen output without a click 
     if (!streamingPane?.ptyId) {
       throw new Error('Split did not expose its active PTY')
     }
+    const streamingPtyId = streamingPane.ptyId
     expect(streamingPane.ptyId).toContain(PTY_SESSION_ID_SEPARATOR)
     await execInTerminal(
       first.page,
@@ -193,9 +194,7 @@ test('restored hidden split drains live alternate-screen output without a click 
     await expect
       .poll(
         async () =>
-          frameNumber(
-            (await probePane(first.page, split.tabId, streamingPane.ptyId))?.content ?? ''
-          ),
+          frameNumber((await probePane(first.page, split.tabId, streamingPtyId))?.content ?? ''),
         {
           timeout: 20_000,
           message: 'Streaming TUI did not start in the split pane'

@@ -330,11 +330,15 @@ test('a missing legacy worker cannot spawn a replacement during restart recovery
     await expect.poll(() => hasPersistedResumeRecord(session.userDataDir, workerPaneKey)).toBe(true)
     markDispatchLegacy(session.userDataDir, dispatch.result.dispatch!.id)
 
+    const workerPtyId = worker?.ptyId
+    if (!workerPtyId) {
+      throw new Error('Worker PTY missing')
+    }
     await session.close(firstApp)
     firstApp = null
-    await removeDetachedDaemonSession(session.userDataDir, worker!.ptyId)
+    await removeDetachedDaemonSession(session.userDataDir, workerPtyId)
     await expect
-      .poll(() => detachedDaemonSessionExists(session.userDataDir, worker!.ptyId))
+      .poll(() => detachedDaemonSessionExists(session.userDataDir, workerPtyId))
       .toBe(false)
     await expect.poll(() => isProcessAlive(initialSpawn.pid)).toBe(false)
     rmSync(interruptionLedgerPath, { force: true })

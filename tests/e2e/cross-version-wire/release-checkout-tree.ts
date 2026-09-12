@@ -7,6 +7,10 @@ const CHECKOUT_MAX_OUTPUT_BYTES = 1024 * 1024
 // Why: the wire endpoints only need the runtime RPC host, the renderer client, and
 // the shared codec. Skipping cli/relay keeps a cold CI extraction a few seconds.
 const ARCHIVE_PATHS = ['src/main', 'src/shared', 'src/preload', 'src/renderer', 'src/types']
+// The tree preparation removes these too; skip thousands of Windows writes before that walk.
+const TAR_TEST_EXCLUDES = ['test', 'bench', 'spec'].flatMap((kind) =>
+  ['ts', 'tsx'].map((extension) => `--exclude=*.${kind}.${extension}`)
+)
 
 const ALIAS_SPECIFIER =
   /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(['"])@(renderer)?\/([^'"]+)\2/g
@@ -118,7 +122,7 @@ export async function extractReleaseCheckoutTree(
     await runCheckoutProcess(
       repoRoot,
       checkoutTarProgram(),
-      ['-xf', archive, '-C', staging],
+      [...TAR_TEST_EXCLUDES, '-xf', archive, '-C', staging],
       deadline
     )
   } finally {

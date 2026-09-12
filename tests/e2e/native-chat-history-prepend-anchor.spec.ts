@@ -116,7 +116,9 @@ test.describe('Native chat history prepend anchoring', () => {
         .poll(() => transcriptWindow.locator(':scope > [data-index]').count())
         .toBeGreaterThan(3)
 
-      const initialTotalSize = await transcriptWindow.evaluate((element) => element.offsetHeight)
+      const initialTotalSize = await transcriptWindow.evaluate(
+        (element) => (element as HTMLElement).offsetHeight
+      )
       const anchor = await scroll.evaluate(async (element) => {
         element.scrollTop = element.scrollHeight * 0.55
         element.dispatchEvent(new Event('scroll', { bubbles: true }))
@@ -161,7 +163,7 @@ test.describe('Native chat history prepend anchoring', () => {
       // handler without Playwright first scrolling the reader to the transcript head.
       await loadEarlier.evaluate((button: HTMLButtonElement) => button.click())
       await expect
-        .poll(() => transcriptWindow.evaluate((element) => element.offsetHeight))
+        .poll(() => transcriptWindow.evaluate((element) => (element as HTMLElement).offsetHeight))
         .toBeGreaterThan(initialTotalSize)
       await expect(loadEarlier).toBeAttached({ timeout: 30_000 })
 

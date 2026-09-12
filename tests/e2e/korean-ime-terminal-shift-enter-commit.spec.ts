@@ -480,7 +480,10 @@ test.describe('Korean IME terminal committing Enter chords', () => {
         orcaPage,
         testRepoPath
       }, testInfo) => {
-        test.skip(chord.windowsOnly && process.platform !== 'win32', 'Windows IME ownership')
+        test.skip(
+          Boolean(chord.windowsOnly) && process.platform !== 'win32',
+          'Windows IME ownership'
+        )
         await waitForSessionReady(orcaPage)
         await waitForActiveWorktree(orcaPage)
         await ensureTerminalVisible(orcaPage)

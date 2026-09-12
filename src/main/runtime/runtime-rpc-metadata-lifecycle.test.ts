@@ -8,6 +8,7 @@ import { readRuntimeMetadata, writeRuntimeMetadata } from './runtime-metadata'
 import { createRuntimeTransportMetadata, OrcaRuntimeRpcServer } from './runtime-rpc'
 import type { DeviceRegistry } from './device-registry'
 import type { RuntimeMetadata } from '../../shared/runtime-bootstrap'
+import { UnixSocketTransport } from './rpc/unix-socket-transport'
 
 vi.mock('../git/worktree', () => {
   const worktrees = [
@@ -230,7 +231,7 @@ describe('OrcaRuntimeRpcServer', () => {
     const runtime = new OrcaRuntimeService()
     const server = new OrcaRuntimeRpcServer({ runtime, userDataPath })
     const writeMetadataSpy = vi
-      .spyOn(runtimeMetadataModule, 'writeRuntimeMetadata')
+      .spyOn(runtimeMetadataModule, 'writeRuntimeMetadataAsync')
       .mockImplementationOnce(() => {
         throw new Error('write failed')
       })
@@ -249,4 +250,54 @@ describe('OrcaRuntimeRpcServer', () => {
 
     writeMetadataSpy.mockRestore()
   })
+  it.each(['pairing', 'metadata'] as const)(
+    'waits for pending %s startup before stopping all transports',
+    async (stage) => {
+      const server = new OrcaRuntimeRpcServer({
+        runtime: new OrcaRuntimeService(),
+        userDataPath: mkdtempSync(join(tmpdir(), 'orca-runtime-start-stop-')),
+        enableWebSocket: stage === 'pairing'
+      })
+      let release!: () => void
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let entered = false
+      const spy =
+        stage === 'pairing'
+          ? vi
+              .spyOn(
+                server as unknown as { initializePairingIdentity: () => Promise<unknown> },
+                'initializePairingIdentity'
+              )
+              .mockImplementationOnce(async () => {
+                entered = true
+                await blocked
+                return { ok: false, failure: {} }
+              })
+          : vi
+              .spyOn(runtimeMetadataModule, 'writeRuntimeMetadataAsync')
+              .mockImplementationOnce(async () => {
+                entered = true
+                await blocked
+              })
+      const starting = server.start()
+      const socketStop = vi.spyOn(UnixSocketTransport.prototype, 'stop')
+      await vi.waitFor(() => expect(entered).toBe(true))
+      let stopped = false
+      const stopping = server.stop().then(() => {
+        stopped = true
+      })
+      await Promise.resolve()
+      expect(stopped).toBe(false)
+      release()
+      await Promise.all([starting, stopping])
+      expect(server['activeTransports']).toEqual([])
+      expect(server['transports']).toEqual([])
+      expect(server['metadataOwnershipWatch']).toBeNull()
+      expect(socketStop).toHaveBeenCalledTimes(1)
+      socketStop.mockRestore()
+      spy.mockRestore()
+    }
+  )
 })

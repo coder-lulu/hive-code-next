@@ -1,5 +1,5 @@
 import type { RuntimeMetadata } from '../../../shared/runtime-bootstrap'
-import { writeRuntimeMetadata } from '../runtime-metadata'
+import { writeRuntimeMetadataAsync } from '../runtime-metadata'
 import type { RpcMessageContext } from '../rpc/transport'
 import type { RpcRequest, RpcResponse } from '../rpc/core'
 import { errorResponse } from '../rpc/errors'
@@ -143,14 +143,20 @@ export class RuntimeRpcRequestAdmission extends RuntimeRpcBinaryRouting {
     return errorResponse(id, { runtimeId: this.runtime.getRuntimeId() }, code, message)
   }
 
-  protected writeMetadata(): void {
+  protected pendingMetadataWrite: Promise<void> = Promise.resolve()
+
+  protected writeMetadata(): Promise<void> {
     const metadata: RuntimeMetadata = {
       runtimeId: this.runtime.getRuntimeId(),
       pid: this.pid,
-      transports: this.transports,
+      transports: this.transports.map((transport) => ({ ...transport })),
       authToken: this.authToken,
       startedAt: this.runtime.getStartedAt()
     }
-    writeRuntimeMetadata(this.userDataPath, metadata)
+    const pending = this.pendingMetadataWrite
+      .catch(() => {})
+      .then(() => writeRuntimeMetadataAsync(this.userDataPath, metadata))
+    this.pendingMetadataWrite = pending
+    return pending
   }
 }

@@ -224,7 +224,9 @@ async function readPaneDiagnostics(
         bufferLength: pane?.serializeAddon?.serialize?.()?.length ?? null,
         paneLeafIds: manager?.getPanes?.().map((entry) => entry.leafId ?? null) ?? null,
         storeTabPtyId: tab?.ptyId ?? null,
-        storeTabLayout: tab?.paneLayout ? JSON.stringify(tab.paneLayout) : null,
+        storeTabLayout: state?.terminalLayoutsByTabId[webTabId]
+          ? JSON.stringify(state.terminalLayoutsByTabId[webTabId])
+          : null,
         storePtyIdsByTab: state?.ptyIdsByTabId?.[webTabId] ?? null
       }
     },

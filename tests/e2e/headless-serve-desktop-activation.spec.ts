@@ -140,7 +140,11 @@ test('promotes the headless owner without replacing its daemon terminal', async 
   try {
     serveApp = await electron.launch({
       args: [...getOrcaElectronLaunchArgs(mainPath, false), '--serve', '--serve-no-pairing'],
-      env
+      env: Object.fromEntries(
+        Object.entries(env).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string'
+        )
+      )
     })
     const resolvedHome = await serveApp.evaluate(({ app }) => app.getPath('home'))
     assertElectronResolvedIsolatedHome(resolvedHome, homeIsolation)

@@ -183,7 +183,7 @@ const test = base.extend({
       GROK_HOME: fakeGrokHome,
       OMP_CODING_AGENT_DIR: fakeOmpHome
     },
-    { option: true }
+    { scope: 'test' }
   ]
 })
 

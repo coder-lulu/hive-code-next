@@ -198,6 +198,9 @@ test('publishes, updates, revokes, and deletes without losing local state', asyn
       ).toMatchObject({ status: 'ok', value: { status: 'removed' } })
     }
 
+    if (!packageId) {
+      throw new Error('Published package ID missing')
+    }
     const removed = await orcaPage.evaluate(
       (name) => window.api.skills.removeInstall({ name, destination: { scope: 'global' } }),
       SKILL_NAME
@@ -420,10 +423,10 @@ function expectPhysicalInstall(
     expect(skill?.canonicalPath).toContain(`.agents\\skills\\${SKILL_NAME}`)
   } else if (target === 'wsl') {
     expect(skill?.canonicalPath).toMatch(/^\/home\/[^/]+\/\.agents\/skills\//)
-    expect(skill?.canonicalPath.endsWith(`/${SKILL_NAME}`)).toBe(true)
+    expect(skill?.canonicalPath?.endsWith(`/${SKILL_NAME}`)).toBe(true)
   } else {
     expect(skill?.canonicalPath).toMatch(/^\//)
-    expect(skill?.canonicalPath.endsWith(`/.agents/skills/${SKILL_NAME}`)).toBe(true)
+    expect(skill?.canonicalPath?.endsWith(`/.agents/skills/${SKILL_NAME}`)).toBe(true)
   }
 }
 
@@ -454,7 +457,9 @@ async function expectManagedRemoteVersion(
       candidate.destination.scope === 'global' &&
       candidate.destination.executionTarget?.kind === 'ssh' &&
       candidate.destination.executionTarget.connectionId ===
-        target.destination.executionTarget?.connectionId
+        (target.destination.scope === 'global' && target.destination.executionTarget?.kind === 'ssh'
+          ? target.destination.executionTarget.connectionId
+          : undefined)
     )
   })
   expect(install).toMatchObject({

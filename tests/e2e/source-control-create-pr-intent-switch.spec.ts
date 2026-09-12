@@ -105,6 +105,7 @@ test.describe('Source Control Create PR intent worktree switching', () => {
             if (!testWindow.__createPRIntentPushFinished) {
               return {
                 provider: 'github' as const,
+                reviewLookupOutcome: 'not_found' as const,
                 review: null,
                 canCreate: false,
                 blockedReason: 'needs_push' as const,
@@ -115,6 +116,7 @@ test.describe('Source Control Create PR intent worktree switching', () => {
             }
             return {
               provider: 'github' as const,
+              reviewLookupOutcome: 'not_found' as const,
               review: null,
               canCreate: true,
               blockedReason: null,

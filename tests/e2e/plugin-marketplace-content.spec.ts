@@ -274,7 +274,14 @@ async function runMarketplaceJourney(page: Page): Promise<void> {
 test('installs and applies official Phase 1 content from a fresh profile', async ({}, testInfo) => {
   test.setTimeout(180_000)
   const fixture = await createMarketplaceFixture()
-  const session = createRestartSession(testInfo as TestInfo, fixture.gitEnvironment)
+  const session = createRestartSession(
+    testInfo as TestInfo,
+    Object.fromEntries(
+      Object.entries(fixture.gitEnvironment).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    )
+  )
   let launched: Awaited<ReturnType<typeof session.launch>> | null = null
   try {
     launched = await session.launch()

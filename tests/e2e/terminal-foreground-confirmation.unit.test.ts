@@ -61,7 +61,9 @@ describe('daemon foreground confirmation composes with pane tracking', () => {
     }
   })
 
-  async function createComposedTracker(publish: ReturnType<typeof vi.fn>) {
+  async function createComposedTracker(
+    publish: Parameters<typeof createPaneForegroundAgentTracker>[0]['publish']
+  ) {
     const handle = await createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
     const tracker = createPaneForegroundAgentTracker({
       getPtyId: () => 'pty-1',

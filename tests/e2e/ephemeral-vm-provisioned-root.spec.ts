@@ -113,7 +113,11 @@ test('adopts a recipe-provisioned SSH root without creating a linked worktree', 
         { timeout: 30_000 }
       )
       .toBe(false)
-    expect(() => execDockerSshRelayTargetCommand(target, 'true')).toThrow()
+    const removedTarget = target
+    if (!removedTarget) {
+      throw new Error('Provisioned target missing')
+    }
+    expect(() => execDockerSshRelayTargetCommand(removedTarget, 'true')).toThrow()
   } finally {
     cleanupDockerSshRelayTarget(target)
     rmSync(sourceRepo, { recursive: true, force: true })
