@@ -59,10 +59,9 @@ await cp(join(source, 'packages/db/src/migrations'), join(output, 'migrations'),
   recursive: true
 })
 await canonicalizePaperclipMigrationFiles(join(output, 'migrations'))
-await copyFile(
-  join(root, 'integration/paperclip/service/task-tables.sql'),
-  join(output, 'task-tables.sql')
-)
+for (const tableFile of ['task-tables.sql', 'team-workbench-tables.sql']) {
+  await copyFile(join(root, 'integration/paperclip/service', tableFile), join(output, tableFile))
+}
 await copyFile(join(source, 'LICENSE'), join(output, 'PAPERCLIP-LICENSE'))
 await copyFile(join(root, 'LICENSE'), join(output, 'LICENSE'))
 await writeFile(

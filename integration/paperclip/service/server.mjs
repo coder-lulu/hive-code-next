@@ -9,6 +9,8 @@ import { applyPendingMigrations } from '@hive-paperclip-db'
 import { createTaskRepository } from './task-repository.mjs'
 import { createTaskDispatch } from './task-dispatch.mjs'
 import { reconcilePaperclipMigrationHashes } from './migration-history.mjs'
+import { createTeamWorkbenchRepository } from './team-workbench-repository.mjs'
+import { WORKBENCH_PATHS, handleTeamWorkbenchRequest } from './team-workbench-routes.mjs'
 import manifest from '../compatibility-manifest.json' with { type: 'json' }
 
 const Input = z.strictObject({
@@ -32,8 +34,10 @@ const sql = postgres(databaseUrl, { max: 4, onnotice: () => {} })
 await reconcilePaperclipMigrationHashes(sql, new URL('./migrations', import.meta.url))
 await applyPendingMigrations(databaseUrl)
 await sql.unsafe(await readFile(new URL('./task-tables.sql', import.meta.url), 'utf8'))
+await sql.unsafe(await readFile(new URL('./team-workbench-tables.sql', import.meta.url), 'utf8'))
 const repository = createTaskRepository(sql),
   dispatch = createTaskDispatch(repository)
+const workbenchRepository = createTeamWorkbenchRepository(sql)
 const secret = randomBytes(32).toString('base64url'),
   expected = Buffer.from(secret)
 let authority = '',
@@ -71,13 +75,14 @@ const server = createServer(async (request, response) => {
     const route = request.url?.match(
       /^\/hive\/tasks(?:\/([0-9a-f-]{36})(?:\/(binding|dispatch|cancel))?)?$/
     )
-    if (!route) {
+    const workbench = WORKBENCH_PATHS.includes(request.url)
+    if (!route && !workbench) {
       send(response, 403, { error: { code: 'FORBIDDEN' } })
       return
     }
-    const taskId = route[1],
-      action = route[2]
-    if (request.method === 'GET' && !action) {
+    const taskId = route?.[1],
+      action = route?.[2]
+    if (!workbench && request.method === 'GET' && !action) {
       send(
         response,
         200,
@@ -101,6 +106,17 @@ const server = createServer(async (request, response) => {
       chunks.push(chunk)
     }
     const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)))
+    if (workbench) {
+      const result = await handleTeamWorkbenchRequest(
+        workbenchRepository,
+        accountId,
+        request.url,
+        body
+      )
+      const createsObject = request.url.endsWith('/create')
+      send(response, createsObject ? 201 : 200, result)
+      return
+    }
     if (!taskId && !action) {
       send(response, 201, await repository.create(accountId, Input.parse(body)))
       return

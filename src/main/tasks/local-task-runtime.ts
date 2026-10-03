@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import { realpathSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HiveAccountService } from '../hive-account/hive-account-service'
@@ -77,21 +78,22 @@ export async function startLocalTaskRuntime(options: {
       accountId: account.accountId
     }
   }
+  const resolveWorkspaceSource = async (selector: string) => {
+    const proof = await resolveHiveAgentLocalProject(options.runtime, options.store, selector)
+    const scope = await options.runtime.showTerminalWorkspaceLaunchScope(selector)
+    if (scope.connectionId !== null) {
+      return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
+    }
+    proof.assertCurrent()
+    return { path: scope.path, assertCurrent: proof.assertCurrent }
+  }
   const issuer = new LocalTaskBindingIssuer({
     directory,
     operationCallerKey: 'trusted-local:runtime',
     currentRuntime,
     currentAccount: () => options.account.getRuntimeCloudAuthorization(),
     assertCurrent,
-    resolveSource: async (selector) => {
-      const proof = await resolveHiveAgentLocalProject(options.runtime, options.store, selector)
-      const scope = await options.runtime.showTerminalWorkspaceLaunchScope(selector)
-      if (scope.connectionId !== null) {
-        return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
-      }
-      proof.assertCurrent()
-      return { path: scope.path, assertCurrent: proof.assertCurrent }
-    },
+    resolveSource: resolveWorkspaceSource,
     registerWorkspace: async (path) => {
       assertCurrent()
       const workspace = await options.store.runDurableMutation(() => {
@@ -223,8 +225,13 @@ export async function startLocalTaskRuntime(options: {
       issuer,
       currentAccount: () => options.account.getRuntimeCloudAuthorization(),
       assertCurrent,
-      validateWorkspace: (selector) =>
-        resolveHiveAgentLocalProject(options.runtime, options.store, selector)
+      validateWorkspace: async (selector) => {
+        const source = await resolveWorkspaceSource(selector)
+        return {
+          workspaceRef: `workspace:${createHash('sha256').update(JSON.stringify(source.path)).digest('hex')}`,
+          assertCurrent: source.assertCurrent
+        }
+      }
     }),
     close() {
       closed = true

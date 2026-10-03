@@ -6,7 +6,6 @@ import { X, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { LinearScopeSelector } from '@/components/linear-scope-selector'
-import { HiveTaskDialog } from './hive/HiveTaskDialog'
 import {
   Select,
   SelectTrigger,
@@ -227,7 +226,6 @@ export function TaskPageSourceBar({
           ) : null}
         </div>
       ) : null}
-      <HiveTaskDialog />
     </div>
   )
 }

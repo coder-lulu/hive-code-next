@@ -1,8 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAppStore } from '@/store'
-import { useAllWorktrees } from '@/store/selectors'
-import { folderWorkspaceKey } from '../../../../../shared/workspace-scope'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,35 +20,17 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useHiveTasks } from './use-hive-tasks'
+import { useHiveWorkspaces } from './use-hive-workspaces'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 
-export function HiveTaskDialog() {
+export function HiveTaskDialog({ label }: { label?: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [input, setInput] = useState('')
   const [workspace, setWorkspace] = useState('')
   const request = useRef({ signature: '', id: '' })
-  const folders = useAppStore((state) => state.folderWorkspaces)
-  const worktrees = useAllWorktrees()
-  const choices = useMemo(
-    () => [
-      ...folders
-        .filter(
-          (folder) =>
-            !folder.isArchived &&
-            !folder.connectionId &&
-            (!folder.executionHostId || folder.executionHostId === 'local')
-        )
-        .map((folder) => ({ id: folderWorkspaceKey(folder.id), name: folder.name })),
-      ...worktrees
-        .filter(
-          (worktree) => !worktree.isArchived && (!worktree.hostId || worktree.hostId === 'local')
-        )
-        .map((worktree) => ({ id: worktree.id, name: worktree.branch || worktree.path }))
-    ],
-    [folders, worktrees]
-  )
+  const choices = useHiveWorkspaces()
   const tasks = useHiveTasks(open)
   const submit = async () => {
     const signature = JSON.stringify([title.trim(), input.trim(), workspace])
@@ -80,7 +59,7 @@ export function HiveTaskDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          {t('hiveTasks.open')}
+          {label ?? t('hiveTasks.open')}
         </Button>
       </DialogTrigger>
       <DialogContent className="flex max-h-full flex-col overflow-hidden sm:max-w-3xl">
