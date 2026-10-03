@@ -13,6 +13,7 @@ import {
   readTerminalPtyWriteEntries
 } from './helpers/terminal-pty-write-spy'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import { LIVE_BACKGROUND_TERMINAL_AGENT_SOURCE } from './live-background-terminal-mount-agent-fixture'
 import type {
   RuntimeStatus,
   RuntimeTerminalCreate,
@@ -41,26 +42,7 @@ const spawnLedgerPath = path.join(fakeCliDir, 'codex-spawn.jsonl')
 const setupLedgerPath = path.join(fakeCliDir, 'setup-spawn.jsonl')
 const canaryLedgerPath = path.join(fakeCliDir, 'canary-spawn.jsonl')
 const signalLedgerPath = path.join(fakeCliDir, 'terminal-signals.jsonl')
-const fakeCodexSource = `
-const { appendFileSync } = require('node:fs')
-const args = process.argv.slice(2)
-if (args.includes('app-server')) {
-  process.stderr.write("error: unrecognized subcommand 'app-server'\\n")
-  process.exit(2)
-}
-appendFileSync(process.env.ORCA_E2E_CODEX_SPAWN_LEDGER, JSON.stringify({ args, pid: process.pid }) + '\\n')
-process.stdout.write('LIVE_AGENT_READY:' + process.pid + '\\n')
-let inputBuffer = ''
-process.stdin.on('data', (chunk) => {
-  inputBuffer += chunk.toString()
-  const lines = inputBuffer.split(/[\\r\\n]+/)
-  inputBuffer = lines.pop() || ''
-  for (const line of lines) if (line) process.stdout.write('AGENT_INPUT:' + process.pid + ':' + line + '\\n')
-})
-for (const signal of ['SIGINT', 'SIGHUP', 'SIGTERM']) process.on(signal, () => appendFileSync(process.env.ORCA_E2E_SIGNAL_LEDGER, JSON.stringify({ kind: 'agent', pid: process.pid, signal }) + '\\n'))
-process.stdin.resume()
-setInterval(() => {}, 60_000)
-`
+const fakeCodexSource = LIVE_BACKGROUND_TERMINAL_AGENT_SOURCE
 
 if (process.platform === 'win32') {
   writeFileSync(path.join(fakeCliDir, 'fake-codex.js'), fakeCodexSource)

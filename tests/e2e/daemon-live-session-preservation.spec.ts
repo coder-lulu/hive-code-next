@@ -11,7 +11,12 @@ import {
   waitForPaneCount,
   waitForTerminalOutput
 } from './helpers/terminal'
-import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import {
+  ensureTerminalVisible,
+  switchToWorktree,
+  waitForActiveWorktree,
+  waitForSessionReady
+} from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
 import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
 import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
@@ -87,6 +92,8 @@ test('preserves a live daemon PTY when the daemon launch identity is stale', asy
     const secondLaunch = await session.launch()
     secondApp = secondLaunch.app
     await waitForSessionReady(secondLaunch.page)
+    await expect(secondLaunch.page.getByTestId('desktop-home')).toBeVisible()
+    await switchToWorktree(secondLaunch.page, worktreeId)
     await expect
       .poll(
         async () => secondLaunch.page.evaluate(() => window.__store?.getState().activeWorktreeId),

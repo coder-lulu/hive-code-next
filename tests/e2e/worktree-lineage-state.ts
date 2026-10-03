@@ -18,6 +18,7 @@ export async function seedLineageScenario(
     const state = store.getState()
     state.setActiveView('terminal')
     state.setSidebarOpen(true)
+    state.updateSessionsView({ navigation: 'projects' })
     state.setGroupBy('none')
     state.setSortBy('recent')
     // Why: these specs assert lineage structure, not the user's persisted

@@ -8,7 +8,10 @@ import type {
   AgentSessionStatusSummary,
   AgentSessionSubscribeEvent
 } from '../../src/shared/agent-session-wire'
-import type { AgentJournalCursor } from '../../src/shared/agent-session-journal-types'
+import {
+  AGENT_JOURNAL_THREAD_SCOPE,
+  type AgentJournalCursor
+} from '../../src/shared/agent-session-journal-types'
 import {
   EMPTY_STRUCTURED_AGENT_SESSION,
   reduceStructuredAgentSession
@@ -63,7 +66,7 @@ async function fixture() {
     await journal.appendItem(
       { provider: 'orca', clientMessageId: `output-${index}` },
       { kind: 'status', text: `Tool output ${index}` },
-      { fence: 1 }
+      { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
     )
   }
   for (let index = 1; index < 99; index += 1) {
@@ -230,7 +233,7 @@ describe('structured session cursor/body regression', () => {
       await journal.appendItem(
         { provider: 'orca', clientMessageId: 'completed-turn' },
         { kind: 'turn', turnId: 'turn-1', state: 'completed' },
-        { fence: 1 }
+        { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
       )
       subscribers.publish(SESSION, journal)
       await vi.waitFor(() => expect(owner.getSnapshot().state.cursor).toEqual(journal.cursor()))

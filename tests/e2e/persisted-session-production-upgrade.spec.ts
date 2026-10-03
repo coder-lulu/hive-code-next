@@ -18,7 +18,7 @@ import {
   assertElectronResolvedIsolatedHome,
   createElectronHomeIsolation
 } from './helpers/electron-home-isolation'
-import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
+import { ensureTerminalVisible, switchToWorktree, waitForSessionReady } from './helpers/store'
 import { openProfileStateDatabaseReadOnly } from '../../src/main/persistence/profile-state/profile-state-database'
 import { readProfileStateSnapshot } from '../../src/main/persistence/profile-state/profile-state-documents'
 import { ProfileStateSqliteAuthority } from '../../src/main/persistence/profile-state/profile-state-sqlite-authority'
@@ -217,6 +217,11 @@ async function expectProductionSessionRestored(
   expected: { marker: string; ptyId: string; repoId: string; worktreeId: string }
 ): Promise<void> {
   await waitForSessionReady(page)
+  await expect(page.getByTestId('desktop-home')).toBeVisible()
+  await page.evaluate((repoId) => {
+    window.__store!.getState().setActiveRepo(repoId)
+  }, expected.repoId)
+  await switchToWorktree(page, expected.worktreeId)
   await ensureTerminalVisible(page)
   await waitForActiveTerminalManager(page, 30_000)
   await waitForPaneCount(page, 1, 30_000)

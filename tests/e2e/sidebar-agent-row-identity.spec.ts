@@ -46,6 +46,7 @@ async function useFullAgentActivityRows(page: Page): Promise<void> {
       throw new Error('window.__store is not available')
     }
     const state = store.getState()
+    state.updateSessionsView({ navigation: 'projects' })
     // Why: 'full' renders every agent row with its label inline, so the proof
     // reads off the rendered sidebar instead of a collapsed summary pill.
     state.setAgentActivityDisplayMode('full')

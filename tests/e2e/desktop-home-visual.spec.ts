@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { mkdirSync } from 'node:fs'
 import { test, expect } from './helpers/orca-app'
 import { APP_DISPLAY_NAME } from '../../src/shared/brand'
 
@@ -21,12 +22,14 @@ test('desktop home renders the production shell and empty states', async ({ orca
   const home = orcaPage.getByTestId('desktop-home')
   await expect(home).toBeVisible()
   await expect(
-    home.getByRole('heading', { name: `${APP_DISPLAY_NAME}，开始今天的开发工作` })
+    home.getByRole('heading', { name: `${APP_DISPLAY_NAME} — start today's development` })
   ).toBeVisible()
   await expect(home.locator('.desktop-home-composer-context')).toBeVisible()
 
+  const evidenceDir = path.resolve('logs/e2e/desktop-home-visual')
+  mkdirSync(evidenceDir, { recursive: true })
   await orcaPage.screenshot({
-    path: path.resolve('.omx/state/desktop-home/iteration-2.png'),
+    path: path.join(evidenceDir, 'home-light.png'),
     animations: 'disabled'
   })
 
@@ -64,7 +67,7 @@ test('desktop home renders the production shell and empty states', async ({ orca
     })
 
   await orcaPage.screenshot({
-    path: path.resolve('.omx/state/desktop-dark-theme/iteration-3.png'),
+    path: path.join(evidenceDir, 'home-dark.png'),
     animations: 'disabled'
   })
 
@@ -95,7 +98,7 @@ test('desktop home renders the production shell and empty states', async ({ orca
     })
 
   await orcaPage.screenshot({
-    path: path.resolve('.omx/state/desktop-dark-theme/iteration-3-sign-in.png'),
+    path: path.join(evidenceDir, 'sign-in-dark.png'),
     animations: 'disabled'
   })
 })

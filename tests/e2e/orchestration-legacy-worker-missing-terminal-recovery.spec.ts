@@ -41,7 +41,16 @@ function appendLedger(envName, event) {
     appendFileSync(ledgerPath, JSON.stringify({ pid: process.pid, ...event }) + '\\n')
   } catch {}
 }
-if (process.argv.slice(2).includes('app-server')) {
+const args = process.argv.slice(2)
+if (args.length === 1 && args[0] === '--help') {
+  process.stdout.write('Usage: codex [OPTIONS]\\n  --no-daemon  Run without the background daemon\\n')
+  process.exit(0)
+}
+if (args.length === 1 && args[0] === '--version') {
+  process.stdout.write('codex 0.0.0-e2e\\n')
+  process.exit(0)
+}
+if (args.includes('app-server')) {
   process.stderr.write("error: unrecognized subcommand 'app-server'\\n")
   process.exit(2)
 }

@@ -23,6 +23,7 @@ import {
   ensureTerminalVisible,
   getActiveTabId,
   getActiveWorktreeId,
+  switchToWorktree,
   waitForSessionReady
 } from './helpers/store'
 import { TEST_REPO_PATH_FILE } from './global-setup'
@@ -92,6 +93,8 @@ function seedDuplicatePtyOwnership(userDataDir: string): void {
 
 async function waitForRestoredTerminal(page: Page, worktreeId: string): Promise<string> {
   await waitForSessionReady(page)
+  await expect(page.getByTestId('desktop-home')).toBeVisible()
+  await switchToWorktree(page, worktreeId)
   await expect.poll(() => getActiveWorktreeId(page), { timeout: 15_000 }).toBe(worktreeId)
   await ensureTerminalVisible(page)
   await waitForActiveTerminalManager(page, 30_000)
