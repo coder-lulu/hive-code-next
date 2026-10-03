@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-useless-spread */
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
-import { OrcaRuntimeWithAttachWindow } from './orca-runtime-attach-window'
+import { OrcaRuntimeWithRepairPublishedPtySurfaces } from './orca-runtime-repair-published-pty-surfaces'
 import type {
   RuntimeRendererSyncWindowGraph,
   RuntimeSyncWindowGraph,
@@ -10,13 +10,10 @@ import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-types'
 import type { RuntimeLeafRecord } from './runtime-terminal-state-records'
 import {
   assertUniqueRuntimeGraphTabIds,
-  collectRuntimeGraphSurfaceClaims,
-  collectRuntimeGraphSurfacePublications,
-  getPublishedRuntimeSurfacePtyId,
-  repairPublishedRuntimeSurfaceProjection
+  collectRuntimeGraphSurfacePublications
 } from './pty-recorded-surface-topology'
 
-export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow {
+export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithRepairPublishedPtySurfaces {
   shouldRelayTerminalBrowserOpens(): boolean {
     return this.authoritativeWindowId === HEADLESS_RUNTIME_WINDOW_ID
   }
@@ -100,36 +97,23 @@ export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow 
     // Why: renderer reloads can briefly republish the same leaf with no ptyId;
     // keep live CLI handles usable while the UI graph rebuilds.
     const preserveLivePtysDuringReload = this.graphStatus === 'reloading'
-    const incomingClaims = collectRuntimeGraphSurfaceClaims(lifecycleLeaves)
-    for (const incomingLeaf of lifecycleLeaves) {
-      let leaf = incomingLeaf
-      const priorLeaf = previousLeaves.get(this.getLeafKey(leaf.tabId, leaf.leafId))
-      const priorPtyId =
-        priorLeaf?.ptyId ??
-        getPublishedRuntimeSurfacePtyId(leaf, previousMobileSnapshots.get(leaf.worktreeId))
-      const priorPty = priorPtyId ? this.ptysById.get(priorPtyId) : undefined
-      const repairedSnapshot =
-        priorPty &&
-        incomingClaims.paneCounts.get(leaf.tabId)?.get(leaf.leafId) === 1 &&
-        !incomingClaims.ptyIds.has(priorPty.ptyId) &&
-        this.tabs.get(leaf.tabId)?.worktreeId === leaf.worktreeId &&
-        !this.isPtyStopRequested(priorPty.ptyId) &&
-        this.getPtyLivenessVerdict(priorPty.ptyId)?.status !== 'exited' &&
-        this.getPtyLivenessVerdict(priorPty.ptyId)?.status !== 'unverifiable'
-          ? repairPublishedRuntimeSurfaceProjection(
-              priorPty,
-              leaf,
-              previousMobileSnapshots.get(leaf.worktreeId),
-              incomingMobileSnapshots.get(leaf.worktreeId),
-              this.mobileSessionTabsByWorktree.get(leaf.worktreeId)
-            )
-          : undefined
-      if (repairedSnapshot) {
-        // Why: a renderer losing its binding cannot fork the same live host-owned process onto a new surface.
-        this.storeMobileSessionSnapshot(leaf.worktreeId, repairedSnapshot)
-        changedMobileWorktrees.add(leaf.worktreeId)
-        leaf = { ...leaf, ptyId: priorPty.ptyId }
+    const repairedSurfaces = this.repairPublishedPtySurfaces(
+      lifecycleLeaves,
+      previousLeaves,
+      previousMobileSnapshots,
+      incomingMobileSnapshots,
+      changedMobileWorktrees,
+      {
+        leafKey: (tabId, leafId) => this.getLeafKey(tabId, leafId),
+        allowsPty: (ptyId) => {
+          const liveness = this.getPtyLivenessVerdict(ptyId)?.status
+          return (
+            !this.isPtyStopRequested(ptyId) && liveness !== 'exited' && liveness !== 'unverifiable'
+          )
+        }
       }
+    )
+    for (const leaf of repairedSurfaces.leaves) {
       if (leaf.ptyId) {
         if (leaf.parked) {
           this.orchestrationMailboxPointerDelivery.markPtyColdParked(leaf.ptyId)
@@ -253,6 +237,8 @@ export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow 
           } else {
             this.invalidateLeafHandle(oldLeafKey)
           }
+        } else if (oldLeaf?.ptyId && repairedSurfaces.unmountedPtyIds.has(oldLeaf.ptyId)) {
+          this.retainUnmountedPublishedPtyHandle(oldLeafKey, oldLeaf.ptyId)
         } else {
           this.invalidateLeafHandle(oldLeafKey)
         }

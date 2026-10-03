@@ -164,6 +164,26 @@ export class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntimeWithBuil
     this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
   }
 
+  protected retainUnmountedPublishedPtyHandle(leafKey: string, ptyId: string): void {
+    const handle = this.handleByLeafKey.get(leafKey)
+    const record = handle ? this.handles.get(handle) : undefined
+    if (!handle || !record || record.ptyId !== ptyId) {
+      this.invalidateLeafHandle(leafKey)
+      return
+    }
+    // Why: the publication still owns this process while the renderer has no mounted leaf.
+    this.handleByLeafKey.delete(leafKey)
+    this.handleByPtyIncarnation.delete(ptyId)
+    this.handleByPtyId.set(ptyId, handle)
+    const syntheticId = `pty:${ptyId}`
+    this.handles.set(handle, {
+      ...record,
+      tabId: syntheticId,
+      leafId: syntheticId,
+      ptyGeneration: 0
+    })
+  }
+
   protected adoptFirstPtyForLeafHandle(
     leafKey: string,
     ptyId: string | null,

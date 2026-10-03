@@ -280,6 +280,13 @@ export function repairPublishedRuntimeSurfaceProjection(
   if (surface?.type !== 'terminal') {
     return undefined
   }
+  if (
+    surface.ptyId === pty.ptyId &&
+    surface.incarnationId === pty.incarnationId &&
+    surface.parentLayout?.ptyIdsByLeafId?.[leaf.leafId] === pty.ptyId
+  ) {
+    return current
+  }
   const parentLayout = buildMaterializedHeadlessParentLayout(
     leaf.leafId,
     pty.ptyId,

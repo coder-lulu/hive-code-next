@@ -87,18 +87,132 @@ class RuntimeFixture extends OrcaRuntimeService {
   }
 }
 
-function setup() {
+function setup(unmounted = false) {
   const runtime = new RuntimeFixture(null)
   const write = vi.fn(() => true)
   runtime.setPtyController({ write, kill: () => true, getForegroundProcess: async () => null })
   runtime.attachWindow(1)
   runtime.registerPty(PTY, WORKTREE, null, { tabId: TAB, leafId: LEAF, incarnationId: INCARNATION })
   runtime.setRuntimeOwned(true)
-  runtime.syncWindowGraph(1, graph(PTY, 1))
+  const initial = graph(PTY, 1)
+  runtime.syncWindowGraph(1, unmounted ? { ...initial, tabs: [], leaves: [] } : initial)
   return { runtime, write }
 }
 
 describe('runtime-owned PTY projection repair', () => {
+  it.each([false, true])(
+    'retains an unmounted bound publication handle (unchanged=%s)',
+    async (unchanged) => {
+      const { runtime, write } = setup()
+      const [before] = (await runtime.listTerminals()).terminals
+      const incoming: RuntimeRendererSyncWindowGraph = {
+        ...graph(PTY, 2),
+        tabs: [],
+        leaves: [],
+        rendererGeneration: 'renderer',
+        ...(unchanged ? { mobileSessionTabs: [], unchangedMobileSessionWorktrees: [WORKTREE] } : {})
+      }
+      runtime.syncWindowGraph(1, incoming)
+      expect(runtime.binding()).toBeUndefined()
+      expect((await runtime.listTerminals()).terminals).toMatchObject([
+        { handle: before.handle, tabId: TAB, leafId: LEAF, ptyId: PTY, orphaned: false }
+      ])
+      await runtime.sendTerminal(before.handle, { text: 'parked owner' }, { inputKind: 'driving' })
+      expect(write).toHaveBeenCalledWith(PTY, 'parked owner', 'driving')
+      runtime.syncWindowGraph(1, graph(PTY, 3))
+      expect((await runtime.listTerminals()).terminals).toMatchObject([{ handle: before.handle }])
+    }
+  )
+
+  it.each([false, true])(
+    'keeps a published owner through an empty graph (unmounted=%s)',
+    async (unmounted) => {
+      const { runtime, write } = setup(unmounted)
+      const [before] = (await runtime.listTerminals()).terminals
+      runtime.syncWindowGraph(1, { ...graph(null, 2), tabs: [], leaves: [] })
+      expect(runtime.binding()).toBeUndefined()
+      expect(runtime.snapshot()?.tabs).toMatchObject([
+        { parentTabId: TAB, leafId: LEAF, ptyId: PTY, incarnationId: INCARNATION }
+      ])
+      expect((await runtime.listTerminals()).terminals).toMatchObject([
+        { handle: before.handle, tabId: TAB, leafId: LEAF, ptyId: PTY, orphaned: false }
+      ])
+      runtime.syncWindowGraph(1, graph(null, 3))
+      expect(runtime.binding()).toBe(PTY)
+      expect((await runtime.listTerminals()).terminals).toHaveLength(1)
+      expect((await runtime.listTerminals()).terminals).toMatchObject([
+        { handle: before.handle, tabId: TAB, leafId: LEAF, ptyId: PTY, incarnationId: INCARNATION }
+      ])
+      await runtime.sendTerminal(
+        before.handle,
+        { text: 'unmounted owner' },
+        { inputKind: 'driving' }
+      )
+      expect(write).toHaveBeenCalledWith(PTY, 'unmounted owner', 'driving')
+    }
+  )
+
+  it.each([
+    'renderer-owned',
+    'unverifiable',
+    'stopping',
+    'replacement-incarnation',
+    'removed-publication',
+    'competing-layout',
+    'competing-graph',
+    'replacement-worktree'
+  ])('refuses an unmounted publication without retained host authority (%s)', async (reason) => {
+    const { runtime } = setup()
+    const [before] = (await runtime.listTerminals()).terminals
+    const incoming: RuntimeSyncWindowGraph = { ...graph(null, 2), tabs: [], leaves: [] }
+    if (reason === 'renderer-owned') {
+      runtime.setRuntimeOwned(false)
+    }
+    if (reason === 'unverifiable') {
+      runtime.markPtyLivenessUnverifiable(PTY, 'Host unavailable')
+    }
+    if (reason === 'stopping') {
+      runtime.markPtyStopRequested(PTY)
+    }
+    if (reason === 'replacement-incarnation') {
+      runtime.registerPty(PTY, WORKTREE, null, {
+        tabId: TAB,
+        leafId: LEAF,
+        incarnationId: 'replacement'
+      })
+    }
+    if (reason === 'removed-publication') {
+      incoming.mobileSessionTabs![0].tabs = []
+    }
+    if (reason === 'replacement-worktree') {
+      incoming.mobileSessionTabs![0].worktreeInstanceId = 'replacement'
+    }
+    if (reason === 'competing-layout') {
+      const surface = incoming.mobileSessionTabs![0].tabs[0]
+      if (surface.type !== 'terminal') {
+        throw new Error('Missing terminal fixture')
+      }
+      surface.parentLayout!.ptyIdsByLeafId = { [OTHER_LEAF]: PTY }
+    }
+    if (reason === 'competing-graph') {
+      incoming.leaves.push({
+        tabId: TAB,
+        worktreeId: WORKTREE,
+        leafId: OTHER_LEAF,
+        paneRuntimeId: 2,
+        ptyId: PTY
+      })
+    }
+    runtime.syncWindowGraph(1, incoming)
+    expect(runtime.binding()).toBeUndefined()
+    if (reason === 'removed-publication') {
+      await expect(runtime.readTerminal(before.handle)).rejects.toThrow('terminal_handle_stale')
+    } else {
+      const surface = runtime.snapshot()?.tabs.find((tab) => tab.id === `${TAB}::${LEAF}`)
+      expect(surface?.type === 'terminal' ? surface.ptyId : undefined).not.toBe(PTY)
+    }
+  })
+
   it('keeps the published host identity on the first renderer mount before any prior graph leaf', async () => {
     const runtime = new RuntimeFixture(null)
     const write = vi.fn(() => true)
