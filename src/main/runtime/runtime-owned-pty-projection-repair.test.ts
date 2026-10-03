@@ -14,7 +14,11 @@ const OTHER_LEAF = '22222222-2222-4222-8222-222222222222'
 const PTY = 'pty-runtime'
 const INCARNATION = 'incarnation-runtime'
 
-function graph(ptyId: string | null, version: number): RuntimeSyncWindowGraph {
+function graph(
+  ptyId: string | null,
+  version: number,
+  omitIncarnation = false
+): RuntimeSyncWindowGraph {
   return {
     tabs: [
       {
@@ -42,7 +46,7 @@ function graph(ptyId: string | null, version: number): RuntimeSyncWindowGraph {
             parentTabId: TAB,
             leafId: LEAF,
             ptyId,
-            incarnationId: ptyId ? INCARNATION : null,
+            ...(omitIncarnation ? {} : { incarnationId: ptyId ? INCARNATION : null }),
             parentLayout: {
               root: { type: 'leaf', leafId: LEAF },
               activeLeafId: LEAF,
@@ -87,19 +91,126 @@ class RuntimeFixture extends OrcaRuntimeService {
   }
 }
 
-function setup(unmounted = false) {
+function setup(unmounted = false, omitIncarnation = false) {
   const runtime = new RuntimeFixture(null)
   const write = vi.fn(() => true)
   runtime.setPtyController({ write, kill: () => true, getForegroundProcess: async () => null })
   runtime.attachWindow(1)
   runtime.registerPty(PTY, WORKTREE, null, { tabId: TAB, leafId: LEAF, incarnationId: INCARNATION })
   runtime.setRuntimeOwned(true)
-  const initial = graph(PTY, 1)
+  const initial = graph(PTY, 1, omitIncarnation)
   runtime.syncWindowGraph(1, unmounted ? { ...initial, tabs: [], leaves: [] } : initial)
   return { runtime, write }
 }
 
 describe('runtime-owned PTY projection repair', () => {
+  it.each([
+    'renderer-owned',
+    'unverifiable',
+    'stopping',
+    'declared-replacement',
+    'native-replacement',
+    'competing-graph',
+    'competing-layout',
+    'duplicate-publication',
+    'missing-layout',
+    'replacement-worktree',
+    'replacement-surface',
+    'prior-competing-layout',
+    'prior-replacement-pty'
+  ])('does not certify a renderer binding without native authority (%s)', (reason) => {
+    const { runtime } = setup()
+    if (reason === 'prior-competing-layout' || reason === 'prior-replacement-pty') {
+      const prior = graph(PTY, 2, true)
+      const priorSurface = prior.mobileSessionTabs![0].tabs[0]
+      if (priorSurface.type !== 'terminal') {
+        throw new Error('Missing prior terminal fixture')
+      }
+      if (reason === 'prior-competing-layout') {
+        priorSurface.parentLayout!.ptyIdsByLeafId = { [LEAF]: PTY, [OTHER_LEAF]: PTY }
+      } else {
+        priorSurface.ptyId = 'replacement-pty'
+      }
+      runtime.syncWindowGraph(1, prior)
+    }
+    const incoming = graph(PTY, 3, true)
+    const surface = incoming.mobileSessionTabs![0].tabs[0]
+    if (surface.type !== 'terminal') {
+      throw new Error('Missing terminal fixture')
+    }
+    if (reason === 'renderer-owned') {
+      runtime.setRuntimeOwned(false)
+    }
+    if (reason === 'unverifiable') {
+      runtime.markPtyLivenessUnverifiable(PTY, 'Host unavailable')
+    }
+    if (reason === 'stopping') {
+      runtime.markPtyStopRequested(PTY)
+    }
+    if (reason === 'declared-replacement') {
+      surface.incarnationId = 'replacement'
+    }
+    if (reason === 'native-replacement') {
+      runtime.registerPty(PTY, WORKTREE, null, {
+        tabId: TAB,
+        leafId: LEAF,
+        incarnationId: 'replacement'
+      })
+    }
+    if (reason === 'competing-graph') {
+      incoming.leaves.push({ ...incoming.leaves[0], leafId: OTHER_LEAF, paneRuntimeId: 2 })
+    }
+    if (reason === 'competing-layout') {
+      surface.parentLayout!.ptyIdsByLeafId = { [LEAF]: PTY, [OTHER_LEAF]: PTY }
+    }
+    if (reason === 'duplicate-publication') {
+      incoming.mobileSessionTabs![0].tabs.push({ ...surface, id: 'duplicate' })
+    }
+    if (reason === 'missing-layout') {
+      surface.parentLayout = undefined
+    }
+    if (reason === 'replacement-worktree') {
+      incoming.mobileSessionTabs![0].worktreeInstanceId = 'replacement'
+    }
+    if (reason === 'replacement-surface') {
+      surface.id = 'replacement-surface'
+    }
+    runtime.syncWindowGraph(1, incoming)
+    const accepted = runtime.snapshot()?.tabs.find((tab) => tab.id === surface.id)
+    expect(accepted?.type === 'terminal' ? accepted.incarnationId : undefined).not.toBe(INCARNATION)
+    runtime.syncWindowGraph(1, graph(null, 4, true))
+    expect(runtime.binding()).toBeNull()
+  })
+
+  it.each([false, true])(
+    'keeps the native owner when renderer publications omit incarnation (emptyGraph=%s)',
+    async (emptyGraph) => {
+      const { runtime, write } = setup(false, true)
+      const [before] = (await runtime.listTerminals()).terminals
+      const incoming = graph(null, 2, true)
+      runtime.syncWindowGraph(1, emptyGraph ? { ...incoming, tabs: [], leaves: [] } : incoming)
+      expect((await runtime.listTerminals()).terminals).toMatchObject([
+        {
+          handle: before.handle,
+          tabId: TAB,
+          leafId: LEAF,
+          ptyId: PTY,
+          incarnationId: INCARNATION,
+          orphaned: false
+        }
+      ])
+      await runtime.sendTerminal(
+        before.handle,
+        { text: 'original native owner' },
+        { inputKind: 'driving' }
+      )
+      expect(write).toHaveBeenCalledWith(PTY, 'original native owner', 'driving')
+      runtime.syncWindowGraph(1, graph(null, 3, true))
+      expect(runtime.binding()).toBe(PTY)
+      expect((await runtime.listTerminals()).terminals).toMatchObject([{ handle: before.handle }])
+    }
+  )
+
   it.each([false, true])(
     'retains an unmounted bound publication handle (unchanged=%s)',
     async (unchanged) => {

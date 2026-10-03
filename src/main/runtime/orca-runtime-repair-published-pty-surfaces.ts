@@ -4,6 +4,7 @@ import type {
   RuntimeSyncedLeaf
 } from '../../shared/runtime-types'
 import type { RuntimeLeafRecord } from './runtime-terminal-state-records'
+import { certifyBoundRuntimeSurfaceIncarnation } from './runtime-bound-surface-incarnation-certification'
 import {
   collectRuntimeGraphSurfaceClaims,
   getPublishedRuntimeSurfacePtyId,
@@ -23,6 +24,36 @@ export class OrcaRuntimeWithRepairPublishedPtySurfaces extends OrcaRuntimeWithAt
     }
   ): { leaves: RuntimeSyncedLeaf[]; unmountedPtyIds: Set<string> } {
     const claims = collectRuntimeGraphSurfaceClaims(leaves)
+    for (const leaf of leaves) {
+      const pty = leaf.ptyId ? this.ptysById.get(leaf.ptyId) : undefined
+      const incoming = incomingSnapshots.get(leaf.worktreeId)
+      const current = this.mobileSessionTabsByWorktree.get(leaf.worktreeId)
+      const accepted = this.acceptedRendererMobileSnapshotByWorktree.get(leaf.worktreeId)
+      if (
+        !pty ||
+        !incoming ||
+        !current ||
+        accepted?.publicationEpoch !== incoming.publicationEpoch ||
+        accepted.rendererVersion !== incoming.snapshotVersion ||
+        claims.ptyCounts.get(pty.ptyId) !== 1 ||
+        claims.paneCounts.get(leaf.tabId)?.get(leaf.leafId) !== 1 ||
+        this.tabs.get(leaf.tabId)?.worktreeId !== leaf.worktreeId ||
+        !admission.allowsPty(pty.ptyId)
+      ) {
+        continue
+      }
+      const certified = certifyBoundRuntimeSurfaceIncarnation(
+        pty,
+        leaf,
+        previousSnapshots.get(leaf.worktreeId),
+        incoming,
+        current
+      )
+      if (certified) {
+        this.storeMobileSessionSnapshot(leaf.worktreeId, certified)
+        changedWorktrees.add(leaf.worktreeId)
+      }
+    }
     const candidates = [...leaves]
     for (const snapshot of incomingSnapshots.values()) {
       for (const surface of snapshot.tabs) {

@@ -59,19 +59,22 @@ export function collectRuntimeGraphSurfacePublications(
 
 export function collectRuntimeGraphSurfaceClaims(leaves: readonly RuntimeSyncedLeaf[]): {
   ptyIds: Set<string>
+  ptyCounts: Map<string, number>
   paneCounts: Map<string, Map<string, number>>
 } {
   const ptyIds = new Set<string>()
+  const ptyCounts = new Map<string, number>()
   const paneCounts = new Map<string, Map<string, number>>()
   for (const leaf of leaves) {
     if (leaf.ptyId) {
       ptyIds.add(leaf.ptyId)
+      ptyCounts.set(leaf.ptyId, (ptyCounts.get(leaf.ptyId) ?? 0) + 1)
     }
     const counts = paneCounts.get(leaf.tabId) ?? new Map<string, number>()
     counts.set(leaf.leafId, (counts.get(leaf.leafId) ?? 0) + 1)
     paneCounts.set(leaf.tabId, counts)
   }
-  return { ptyIds, paneCounts }
+  return { ptyIds, ptyCounts, paneCounts }
 }
 
 export function getPublishedRuntimeSurfacePtyId(
