@@ -14,7 +14,9 @@ function xpathLiteral(value: string): string {
 }
 
 export function worktreeRow(page: Page, worktreeId: string) {
-  return page.locator(`xpath=//*[@data-worktree-id=${xpathLiteral(worktreeId)}]`).first()
+  return page
+    .locator(`xpath=//*[@role='option' and @data-worktree-id=${xpathLiteral(worktreeId)}]`)
+    .first()
 }
 
 export function worktreeRowSurface(page: Page, worktreeId: string) {

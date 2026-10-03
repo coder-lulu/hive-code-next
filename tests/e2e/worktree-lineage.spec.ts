@@ -58,7 +58,7 @@ test.describe('Worktree Lineage', () => {
     const positions = await orcaPage.evaluate(
       ({ parentId, childId }) => {
         const rowFor = (worktreeId: string) =>
-          [...document.querySelectorAll<HTMLElement>('[data-worktree-id]')].find(
+          [...document.querySelectorAll<HTMLElement>('[role="option"][data-worktree-id]')].find(
             (element) => element.dataset.worktreeId === worktreeId
           )
         const parent = rowFor(parentId)
@@ -173,7 +173,7 @@ test.describe('Worktree Lineage', () => {
     const positions = await orcaPage.evaluate(
       ({ parentId, childId }) => {
         const rowFor = (worktreeId: string) =>
-          [...document.querySelectorAll<HTMLElement>('[data-worktree-id]')].find(
+          [...document.querySelectorAll<HTMLElement>('[role="option"][data-worktree-id]')].find(
             (element) => element.dataset.worktreeId === worktreeId
           )
         const parent = rowFor(parentId)
