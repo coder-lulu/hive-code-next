@@ -176,7 +176,7 @@ describe('createUISlice settings navigation', () => {
       prefetchLinearIssues
     } as unknown as Partial<AppState>)
 
-    store.getState().openTaskPage()
+    store.getState().openTaskPage({ preselectedRepoId: 'repo-1' })
 
     expect(prefetchWorkItems).toHaveBeenCalledWith(
       'repo-1',
@@ -187,6 +187,38 @@ describe('createUISlice settings navigation', () => {
     )
     expect(prefetchLinearIssues).not.toHaveBeenCalled()
   })
+
+  it.each(['github', 'linear'] as const)(
+    'does not prefetch %s providers when opening the native workbench',
+    (source) => {
+      const store = createUIStore()
+      const prefetchWorkItems = vi.fn()
+      const prefetchLinearIssues = vi.fn()
+      store.setState({
+        repos: ['one', 'two'].map((id) => ({
+          id,
+          path: `/repo/${id}`,
+          displayName: id,
+          badgeColor: 'blue',
+          addedAt: 1,
+          kind: 'git' as const
+        })),
+        settings: {
+          ...getDefaultSettings('/task-test-home'),
+          defaultTaskSource: source,
+          visibleTaskProviders: [source]
+        },
+        linearStatus: { ...store.getState().linearStatus, connected: true },
+        prefetchWorkItems,
+        prefetchLinearIssues
+      })
+      store.getState().openTaskPage()
+      expect(store.getState().activeView).toBe('tasks')
+      expect(store.getState().taskPageData).toEqual({})
+      expect(prefetchWorkItems).not.toHaveBeenCalled()
+      expect(prefetchLinearIssues).not.toHaveBeenCalled()
+    }
+  )
 
   it('prefetches direct GitHub task opens with their source context', () => {
     const store = createUIStore()

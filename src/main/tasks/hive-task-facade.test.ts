@@ -62,7 +62,10 @@ async function fixture() {
     issuer: { issue },
     currentAccount: () => account,
     assertCurrent: () => undefined,
-    validateWorkspace: async () => ({ assertCurrent: () => undefined }),
+    validateWorkspace: async () => ({
+      workspaceRef: 'workspace:test',
+      assertCurrent: () => undefined
+    }),
     request: requestFactory
   })
   return {

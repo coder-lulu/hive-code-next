@@ -80,6 +80,12 @@ export function installWebPreloadApi(
 function createWebPreloadApi(): Partial<PreloadApi> {
   return {
     hiveTasks: {
+      listCompanies: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
+      createCompany: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
+      listProjects: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
+      createProject: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
+      getTeam: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
+      configureTeam: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       list: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       create: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       cancel: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),

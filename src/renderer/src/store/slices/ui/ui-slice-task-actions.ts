@@ -9,6 +9,7 @@ import {
 import { PER_REPO_FETCH_LIMIT } from '../../../../../shared/work-items'
 import { isGitRepoKind } from '../../../../../shared/repo-kind'
 import { presetToQuery } from './ui-slice-hydration-sanitizers'
+import { isExternalTaskPageRequest } from '../../../lib/task-page-request'
 
 const LINEAR_TASK_PREFETCH_LIMIT = 36
 
@@ -106,6 +107,9 @@ export function createUiTaskActions(set: UISliceSet, get: UISliceGet): Partial<U
           state.activeView === 'tasks' ? state.previousViewBeforeTasks : state.activeView,
         taskPageData: data
       }))
+      if (!isExternalTaskPageRequest(data)) {
+        return
+      }
       // Why: prefetch the work-item list during first render so the page's effect hits a warm/in-flight SWR cache (~300–800ms win).
       const state = get()
       const preferredVisibleTaskProviders = normalizeVisibleTaskProviders(

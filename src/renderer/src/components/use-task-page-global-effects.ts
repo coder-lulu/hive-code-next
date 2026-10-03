@@ -1,5 +1,6 @@
 import type { TaskPageJiraIssueCreationModel } from './use-task-page-jira-issue-creation'
 import { useEffect } from 'react'
+import { useTaskPageDismissal } from './use-task-page-dismissal'
 export function useTaskPageGlobalEffects(model: TaskPageJiraIssueCreationModel) {
   const {
     closeTaskPage,
@@ -27,68 +28,16 @@ export function useTaskPageGlobalEffects(model: TaskPageJiraIssueCreationModel) 
     newJiraIssueOpen
   } = model
   const githubTasksBusy = tasksLoading || tasksRefreshing || tasksFiltering
-  useEffect(() => {
-    // Why: when a modal is open, let it own Esc dismissal.
-    if (
-      dialogWorkItem ||
-      selectedJiraIssue ||
-      selectedLinearIssue ||
-      newIssueOpen ||
-      newLinearIssueOpen ||
-      newJiraIssueOpen ||
-      activeModal !== 'none'
-    ) {
-      return
-    }
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') {
-        return
-      }
-      const target = event.target
-      if (!(target instanceof HTMLElement)) {
-        return
-      }
-
-      // Why: open menus/popovers/selects own Esc; capture-phase leave would steal it from Radix.
-      if (
-        document.querySelector(
-          '[data-slot="dropdown-menu-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]'
-        )
-      ) {
-        return
-      }
-
-      // Why: Esc first blurs a focused input so it doesn't accidentally close the whole page; only closes once focus is outside an input.
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        target.isContentEditable
-      ) {
-        event.preventDefault()
-        target.blur()
-        return
-      }
-      event.preventDefault()
-      closeTaskPage()
-    }
-    window.addEventListener('keydown', onKeyDown, {
-      capture: true
-    })
-    return () =>
-      window.removeEventListener('keydown', onKeyDown, {
-        capture: true
-      })
-  }, [
-    activeModal,
+  useTaskPageDismissal(
     closeTaskPage,
-    dialogWorkItem,
-    newIssueOpen,
-    newLinearIssueOpen,
-    newJiraIssueOpen,
-    selectedLinearIssue,
-    selectedJiraIssue
-  ])
+    !dialogWorkItem &&
+      !selectedJiraIssue &&
+      !selectedLinearIssue &&
+      !newIssueOpen &&
+      !newLinearIssueOpen &&
+      !newJiraIssueOpen &&
+      activeModal === 'none'
+  )
   useEffect(() => {
     if (!preflightStatusCurrent || !preflightStatusChecked) {
       void refreshPreflightStatus()

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { dirname, basename } from 'node:path'
+import { createHash } from 'node:crypto'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
 import { HiveTaskCreateSchema, type HiveTasksApi, type HiveTaskView } from '../../shared/hive-tasks'
 import { TaskExecutionResultSchema } from '../../shared/task-execution/task-execution-receipts'
@@ -8,6 +9,10 @@ import type { TaskArtifactIndex } from './task-artifact-index'
 import { readTaskArtifactFile } from './task-artifact-index'
 import type { LocalTaskBindingIssuer } from './local-task-binding-issuer'
 import { refuseTaskExecution } from './task-execution-error'
+import {
+  createHiveTeamWorkbenchFacade,
+  type HiveTaskWorkspaceProof
+} from './hive-team-workbench-facade'
 
 const Task = z.object({
   id: z.string().uuid(),
@@ -59,7 +64,7 @@ export function createHiveTaskFacade(options: {
   artifacts: TaskArtifactIndex
   issuer: Pick<LocalTaskBindingIssuer, 'issue'>
   currentAccount: () => HiveRuntimeCloudAuthorization | null
-  validateWorkspace: (selector: string) => Promise<{ assertCurrent(): void }>
+  validateWorkspace: (selector: string) => Promise<HiveTaskWorkspaceProof>
   assertCurrent(): void
   request?: typeof createLocalTaskRequest
 }): HiveTasksApi {
@@ -102,6 +107,7 @@ export function createHiveTaskFacade(options: {
       maximumResponseBytes: 512 * 1024
     })
     return {
+      accountRef: `account:${createHash('sha256').update(JSON.stringify(account.accountId)).digest('hex')}`,
       assertCurrent,
       request: async (path: string, body?: unknown) => {
         assertCurrent()
@@ -113,6 +119,7 @@ export function createHiveTaskFacade(options: {
   }
   const taskPath = (id: string) => `/hive/tasks/${z.string().uuid().parse(id)}`
   return {
+    ...createHiveTeamWorkbenchFacade({ context, validateWorkspace: options.validateWorkspace }),
     async list() {
       const caller = await context()
       return z
