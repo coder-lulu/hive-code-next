@@ -14,6 +14,7 @@ import {
 } from './helpers/terminal-pty-write-spy'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import { LIVE_BACKGROUND_TERMINAL_AGENT_SOURCE } from './live-background-terminal-mount-agent-fixture'
+import { logTerminalInputDiagnostic } from './live-background-terminal-mount-diagnostics'
 import type {
   RuntimeStatus,
   RuntimeTerminalCreate,
@@ -668,9 +669,14 @@ test('adopts runtime-owned agent and Setup PTYs on first mount', async ({
   await clearTerminalPtyWriteLog(electronApp)
   await typeIntoTerminal(orcaPage, setup!.tabId, setupMarker)
   await assertExactPtyReceivedMarker(electronApp, setupPtyId, setupMarker)
-  await expect(terminalAccessibility(orcaPage, setup!.tabId)).toContainText(
-    `SETUP_INPUT:${setupPid}:${setupMarker}`
-  )
+  try {
+    await expect(terminalAccessibility(orcaPage, setup!.tabId)).toContainText(
+      `SETUP_INPUT:${setupPid}:${setupMarker}`
+    )
+  } catch (error) {
+    await logTerminalInputDiagnostic(electronApp, orcaPage, client, setup!, setupMarker)
+    throw error
+  }
   await expect(terminalAccessibility(orcaPage, setup!.tabId)).not.toContainText(
     'Conversation interrupted'
   )

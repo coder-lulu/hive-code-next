@@ -307,9 +307,32 @@ test.describe('Worktree Lineage', () => {
     const parentAgentPrompt = await seedWorkspaceAgentStatus(orcaPage, parentId, 'PARENT')
     const childAgentPrompt = await seedWorkspaceAgentStatus(orcaPage, childId, 'CHILD')
 
-    await expect(
-      parentRow.getByRole('treeitem').filter({ hasText: parentAgentPrompt })
-    ).toBeVisible()
-    await expect(childRow.getByRole('treeitem').filter({ hasText: childAgentPrompt })).toBeVisible()
+    for (const row of [parentRow, childRow]) {
+      const disclosure = row
+        .locator('[data-project-workspace-heading]')
+        .first()
+        .getByRole('button', { name: 'Toggle sessions', exact: true })
+      await expect(disclosure).toBeVisible()
+      if ((await disclosure.getAttribute('aria-expanded')) === 'false') {
+        await disclosure.click()
+      }
+      await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+    }
+    for (const [row, prompt] of [
+      [parentRow, parentAgentPrompt],
+      [childRow, childAgentPrompt]
+    ] as const) {
+      const session = row
+        .locator('.project-tree-sessions')
+        .first()
+        .locator('.project-tree-session-row[role="button"]')
+        .filter({ hasText: prompt })
+      await expect(session).toHaveCount(1)
+      await expect(session).toBeVisible()
+      await expect(session.getByText(prompt, { exact: true })).toBeVisible()
+    }
+    await expect(parentRow).toHaveAttribute('aria-current', 'page')
+    await expect(parentRow).toBeVisible()
+    await expect(childRow).toBeVisible()
   })
 })
