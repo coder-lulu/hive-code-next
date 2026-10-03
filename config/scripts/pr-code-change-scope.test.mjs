@@ -1,0 +1,524 @@
+import { spawn, spawnSync } from 'node:child_process'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import {
+  classifyPrJobs,
+  hasNativeCacheInput,
+  isDocsOnlyPath,
+  PR_CHECK_JOBS,
+  shouldRunPrChecks,
+  STATIC_ANALYSIS_SCAN_ROOTS
+} from './pr-code-change-scope.mjs'
+
+const projectDir = resolve(import.meta.dirname, '../..')
+
+const ALWAYS_ON = ['static_analysis', 'typecheck', 'test']
+
+function expectedJobs(overrides, { alwaysOn = true } = {}) {
+  return Object.fromEntries(
+    PR_CHECK_JOBS.map((job) => [
+      job,
+      (alwaysOn && ALWAYS_ON.includes(job)) || Boolean(overrides[job])
+    ])
+  )
+}
+
+function expectClassification(files, overrides) {
+  const result = classifyPrJobs(files)
+  const shouldRun = shouldRunPrChecks(files)
+  expect(result.should_run).toBe(shouldRun)
+  expect(result).toMatchObject({
+    should_run: shouldRun,
+    ...expectedJobs(overrides, { alwaysOn: shouldRun })
+  })
+}
+
+describe('docs-only path classification', () => {
+  it('treats the WeChat README PR files as docs-only', () => {
+    expect(
+      shouldRunPrChecks([
+        'README.md',
+        'docs/assets/wechat-qr-group8.jpg',
+        'docs/readme/README.zh-CN.md'
+      ])
+    ).toBe(false)
+  })
+
+  it('skips root instruction files and GitHub markdown templates', () => {
+    expect(isDocsOnlyPath('AGENTS.md')).toBe(true)
+    expect(isDocsOnlyPath('CLAUDE.md')).toBe(true)
+    expect(isDocsOnlyPath('LICENSE')).toBe(true)
+    expect(isDocsOnlyPath('.github/CONTRIBUTING.md')).toBe(true)
+    expect(isDocsOnlyPath('.github/pull_request_template.md')).toBe(true)
+    expect(isDocsOnlyPath('.github/ISSUE_TEMPLATE/bug_report.yml')).toBe(true)
+    expect(isDocsOnlyPath('.github/CODEOWNERS')).toBe(true)
+  })
+
+  it('still runs PR Checks for product markdown and CI', () => {
+    expect(isDocsOnlyPath('skills/computer-use/SKILL.md')).toBe(false)
+    expect(isDocsOnlyPath('skill-guides/orca-cli.md')).toBe(false)
+    expect(isDocsOnlyPath('.github/workflows/pr.yml')).toBe(false)
+    expect(isDocsOnlyPath('src/main/index.ts')).toBe(false)
+    expect(isDocsOnlyPath('config/scripts/pr-code-change-scope.mjs')).toBe(false)
+    expect(shouldRunPrChecks(['README.md', 'src/main/index.ts'])).toBe(true)
+  })
+
+  it('runs PR Checks when the diff is empty rather than skipping by accident', () => {
+    expect(shouldRunPrChecks([])).toBe(true)
+  })
+
+  it('keeps shared PR checks active for mobile-only diffs', () => {
+    expect(shouldRunPrChecks(['mobile/src/App.tsx', 'mobile/package.json'])).toBe(true)
+    expectClassification(['mobile/src/App.tsx'], { mobile_web_app: true })
+  })
+
+  it('exposes the native-cache predicate for local and compatibility callers', () => {
+    expect(hasNativeCacheInput([])).toBe(true)
+    expect(hasNativeCacheInput(['src/main/index.ts'])).toBe(false)
+    expect(hasNativeCacheInput(['config/patches/node-pty@1.1.0.patch'])).toBe(true)
+    expect(hasNativeCacheInput(['config/scripts/ensure-native-runtime.mjs'])).toBe(true)
+  })
+
+  it('does not start desktop PR Checks for cloud-only diffs', () => {
+    expect(
+      shouldRunPrChecks([
+        'cloud/apps/relay/src/index.ts',
+        'cloud/package.json',
+        'cloud/.gitleaks.toml',
+        '.github/workflows/cloud-verify.yml'
+      ])
+    ).toBe(false)
+  })
+})
+
+describe('per-job path classification', () => {
+  it('runs every expensive job on an empty diff rather than skipping by accident', () => {
+    const result = classifyPrJobs([])
+    expect(result.should_run).toBe(true)
+    for (const job of PR_CHECK_JOBS) {
+      expect(result[job], job).toBe(true)
+    }
+  })
+
+  it('skips every expensive job for docs-only diffs', () => {
+    expectClassification(['README.md', 'docs/readme/README.zh-CN.md'], {})
+  })
+
+  it('runs packaging and always-on jobs for product source, not git/xterm/shell lanes', () => {
+    expectClassification(['src/renderer/src/components/tab-bar/TabBar.tsx'], {
+      package: true,
+      package_windows: true
+    })
+  })
+
+  it('runs Git compatibility only when git capability inputs change', () => {
+    expectClassification(['src/shared/git-capability-cache.ts'], {
+      git_compatibility: true,
+      package: true,
+      package_windows: true
+    })
+    expectClassification(['src/shared/git-binary-compatibility.test.ts'], {
+      git_compatibility: true
+    })
+    expectClassification(['.github/actions/prepare-git-compatibility/action.yml'], {
+      git_compatibility: true
+    })
+  })
+
+  it('runs the Codex index-heal contract only when the heal or its transport changes', () => {
+    expectClassification(['src/main/codex/codex-session-index-heal.ts'], {
+      codex_index_heal_contract: true,
+      package: true,
+      package_windows: true
+    })
+    expectClassification(['src/main/sqlite/sync-database.ts'], {
+      codex_index_heal_contract: true,
+      package: true,
+      package_windows: true
+    })
+    expectClassification(['src/main/codex/codex-app-server-session.ts'], {
+      codex_index_heal_contract: true,
+      package: true,
+      package_windows: true
+    })
+    expectClassification(['src/main/codex/codex-index-heal-binary-contract.test.ts'], {
+      codex_index_heal_contract: true
+    })
+    for (const file of ['src/main/agent-trust-presets.ts', 'src/main/codex/config-toml-trust.ts']) {
+      expectClassification([file], {
+        codex_index_heal_contract: true,
+        package: true,
+        package_windows: true
+      })
+    }
+    // Keep the real-binary gate live when a transport or launch dependency changes.
+    for (const file of [
+      'src/main/codex/codex-app-server-capability-signal.ts',
+      'src/main/codex/codex-process-exit-deadline.ts',
+      'src/main/codex/codex-session-backfill.ts',
+      'src/main/codex/codex-session-index-heal-state.ts',
+      'src/main/codex-cli/command.ts',
+      'src/main/win32-utils.ts',
+      'src/shared/node-cli-command-resolution.ts',
+      'src/shared/windows-batch-spawn.ts'
+    ]) {
+      expectClassification([file], {
+        codex_index_heal_contract: true,
+        package: true,
+        package_windows: true
+      })
+    }
+    // A neighbouring Codex module must not drag the real-binary job in.
+    expectClassification(['src/main/codex/codex-home-paths.ts'], {
+      package: true,
+      package_windows: true
+    })
+  })
+
+  it('runs xterm patch sync only when xterm inputs change', () => {
+    expectClassification(['config/patches/xterm-upstream.json'], {
+      xterm_patch_sync: true
+    })
+    expectClassification(['config/patches/@xterm__xterm@6.1.0-beta.287.patch'], {
+      xterm_patch_sync: true
+    })
+  })
+
+  it('runs native package jobs only for the platform that ships the changed native', () => {
+    expectClassification(['native/windows-cli-launcher/src/main.rs'], {
+      package_windows: true
+    })
+    expectClassification(['native/computer-use-linux/runtime.py'], {
+      package: true
+    })
+    expectClassification(['native/computer-use-macos/Package.swift'], {})
+  })
+
+  it('runs Linux packaging when an artifact contract changes', () => {
+    for (const file of [
+      'config/scripts/package-linux-formats.mjs',
+      'config/scripts/script-child-process.mjs',
+      'config/scripts/space-sharing-copy.mjs',
+      '.github/actions/prepare-linux-package-fixture/action.yml',
+      'config/docker/cli-launch-contract/Dockerfile',
+      'config/docker/cli-launch-contract/run-cli-case.sh',
+      'config/docker/headless-pairing/Dockerfile',
+      'config/docker/headless-pairing/run-appimage-case.sh',
+      'config/docker/headless-serve-shutdown/Dockerfile',
+      'config/scripts/run-linux-cli-launch-contract-docker.mjs',
+      'config/scripts/run-headless-linux-pairing-docker.mjs',
+      'config/scripts/static-appimage-package-contract.cjs'
+    ]) {
+      expectClassification([file], {
+        package: true,
+        mobile_web_app: file === 'config/scripts/script-child-process.mjs'
+      })
+    }
+  })
+
+  it('runs Linux packaging for the daemon shutdown descendant oracle and its production paths', () => {
+    for (const file of [
+      'config/docker/daemon-shutdown-descendants/Dockerfile',
+      'config/docker/daemon-shutdown-descendants/bundle-entry.ts',
+      'config/docker/daemon-shutdown-descendants/fixture.cjs',
+      'config/docker/daemon-shutdown-descendants/run-case.sh',
+      'config/scripts/run-daemon-shutdown-descendants-docker.mjs'
+    ]) {
+      expectClassification([file], {
+        package: true,
+        mobile_web_app: file === 'config/scripts/script-child-process.mjs'
+      })
+    }
+    for (const file of [
+      'src/main/daemon/terminal-host.ts',
+      'src/main/daemon/terminal-session-teardown.ts',
+      'src/main/daemon/terminal-host-session-shutdown.ts',
+      'src/main/daemon/terminal-descendant-shutdown.ts',
+      'src/main/pty-descendant-termination.ts',
+      'src/main/pty-descendant-exit-verification.ts',
+      'src/main/pty-process-table-parser.ts'
+    ]) {
+      expectClassification([file], { package: true, package_windows: true })
+    }
+  })
+
+  it('runs both package jobs when the shared skills runtime verifier changes', () => {
+    expectClassification(['config/scripts/verify-skills-cli-runtime.cjs'], {
+      package: true,
+      package_windows: true
+    })
+  })
+
+  it('runs shell contracts when live-shell inputs change', () => {
+    expectClassification(['src/main/daemon/shell-ready.ts'], {
+      shell_contracts: true,
+      package: true,
+      package_windows: true
+    })
+  })
+
+  it('runs shell contracts when wrapper templates or live-shell fixtures change', () => {
+    expectClassification(['src/main/shell-templates.ts'], {
+      shell_contracts: true,
+      package: true,
+      package_windows: true
+    })
+    expectClassification(['src/main/shell-startup-launch-intent-fixtures.ts'], {
+      shell_contracts: true,
+      package: true,
+      package_windows: true
+    })
+  })
+
+  it('runs orcad browser when Chrome launch, session, or tab modules change', () => {
+    for (const file of [
+      'src/main/orcad/external-chromium-browser-session.ts',
+      'src/main/orcad/external-chromium-command-arguments.ts',
+      'src/main/orcad/external-chromium-tab-registry.ts',
+      'src/main/orcad/external-chromium-tab-projection.ts'
+    ]) {
+      expectClassification([file], {
+        orcad_browser: true,
+        package: true,
+        package_windows: true
+      })
+    }
+    expectClassification(['src/main/orcad/orcad-native-preflight.ts'], {
+      package: true,
+      package_windows: true
+    })
+  })
+
+  it('runs the mobile web app job for the builder, the page source and the shell policy', () => {
+    for (const file of [
+      'config/scripts/build-mobile-web-app-bundle.mjs',
+      'config/scripts/run-mobile-web-app-checks.mjs',
+      'config/scripts/script-child-process.mjs',
+      'src/shared/child-process/run-process.ts',
+      'config/scripts/mobile-web-app-route-manifest.mjs',
+      'mobile/web-entry/index.tsx',
+      'mobile/app/h/[hostId]/index.tsx',
+      'mobile/src/transport/client-context.web.tsx',
+      'mobile/modules/orca-mobile-web-shell/ios/MobileWebShellCsp.swift',
+      // The vendored Expo module the page resolves a .web.ts out of.
+      'mobile/packages/expo-two-way-audio/src/ExpoTwoWayAudioModule.web.ts'
+    ]) {
+      expect(classifyPrJobs([file]).mobile_web_app, file).toBe(true)
+    }
+  })
+
+  it('runs it alongside shared checks on a mobile-only diff', () => {
+    const classified = classifyPrJobs(['mobile/app/h/[hostId]/tasks.tsx'])
+    expect(classified.should_run).toBe(true)
+    expect(classified.mobile_web_app).toBe(true)
+  })
+
+  it('needs no package.json prefix, because package.json already forces every job', () => {
+    // build:mobile-web is defined there, so the job has to run on an edit to it. A prefix
+    // that broad is not how: GLOBAL_FORCE_FILES already covers the file.
+    expect(classifyPrJobs(['package.json']).mobile_web_app).toBe(true)
+  })
+
+  it('leaves it off for changes that cannot reach the page', () => {
+    for (const file of ['docs/reference/x.md', 'src/main/orcad/orcad-native-preflight.ts']) {
+      expect(classifyPrJobs([file]).mobile_web_app, file).toBe(false)
+    }
+  })
+
+  it('runs cross-version wire checks for every working-tree wire module', () => {
+    for (const file of [
+      'src/shared/protocol-version.ts',
+      'src/shared/terminal-stream-protocol.ts',
+      'src/shared/agent-session-wire.ts',
+      'src/shared/agent-session-mutation-envelope.ts',
+      'src/shared/agent-session-journal-item-key.ts',
+      'src/shared/agent-session-journal-types.ts',
+      'src/main/ai-vault/structured-session-ownership.ts',
+      'src/main/native-chat/agent-session-journal/journal-cursor.ts',
+      'src/main/native-chat/agent-session-journal/journal-reducer.ts',
+      'src/main/native-chat/agent-session-journal/journal-row-schema.ts',
+      'src/main/native-chat/agent-session-wire/structured-agent-session-host.ts',
+      'src/main/runtime/agent-session-record-store.ts',
+      'src/main/runtime/rpc/dispatcher.ts',
+      'src/main/runtime/rpc/methods/ai-vault.ts',
+      'src/main/runtime/rpc/methods/browser-tab-create-schema.ts',
+      'src/main/runtime/rpc/methods/session-tabs.ts',
+      'src/main/runtime/rpc/methods/structured-agent-session.ts',
+      'src/main/runtime/rpc/methods/structured-agent-session-gate.ts',
+      'src/main/runtime/rpc/methods/structured-agent-session-hold.ts',
+      'src/main/runtime/rpc/methods/structured-agent-session-schemas.ts',
+      'src/main/runtime/rpc/methods/terminal.ts',
+      'src/main/runtime/runtime-worktree-agent-rows.ts',
+      'src/main/runtime/runtime-worktree-pty-agent-sources.ts',
+      'src/shared/runtime-worktree-contracts.ts',
+      'src/renderer/src/runtime/remote-runtime-terminal-multiplexer.ts'
+    ]) {
+      expectClassification([file], {
+        'cross-version-wire': true,
+        package: true,
+        package_windows: true
+      })
+    }
+    expectClassification(
+      ['tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts'],
+      { 'cross-version-wire': true }
+    )
+  })
+
+  it.each([
+    'config/scripts/prepare-cross-version-baselines.mjs',
+    'config/scripts/prepare-cross-version-baselines.test.mjs'
+  ])('runs cross-version wire checks when its baseline preparer changes: %s', (file) => {
+    expectClassification([file], { 'cross-version-wire': true })
+  })
+
+  it('runs workflow-self-change and lockfile diffs as force-all', () => {
+    const result = classifyPrJobs(['.github/workflows/pr.yml'])
+    expect(result.should_run).toBe(true)
+    for (const job of PR_CHECK_JOBS) {
+      expect(result[job], job).toBe(true)
+    }
+    expect(classifyPrJobs(['pnpm-lock.yaml']).git_compatibility).toBe(true)
+  })
+
+  it('primes native caches only when their immutable inputs change', () => {
+    expect(classifyPrJobs([]).native_cache_changed).toBe(true)
+    expect(classifyPrJobs(['README.md']).native_cache_changed).toBe(false)
+    expect(classifyPrJobs(['src/main/index.ts']).native_cache_changed).toBe(false)
+    for (const file of [
+      'package.json',
+      'pnpm-lock.yaml',
+      '.github/actions/install-node-dependencies/action.yml',
+      'config/scripts/ensure-native-runtime.mjs',
+      'config/scripts/rebuild-native-deps.mjs',
+      'config/patches/node-pty@1.1.0.patch'
+    ]) {
+      expect(classifyPrJobs([file]).native_cache_changed, file).toBe(true)
+    }
+  })
+
+  // Why: static analysis lints changed mobile files with a type-aware pass, and
+  // mobile is a separate pnpm project. Without its node_modules every mobile type
+  // resolves to an `error` type and the changed-code gate fails on phantom
+  // findings, which is exactly how a react-test-renderer union broke a PR.
+  it('installs mobile dependencies exactly when mobile files change', () => {
+    expect(classifyPrJobs([]).mobile_dependencies).toBe(true)
+    expect(classifyPrJobs(['README.md']).mobile_dependencies).toBe(false)
+    expect(classifyPrJobs(['src/main/index.ts']).mobile_dependencies).toBe(false)
+    expect(
+      classifyPrJobs(['src/main/index.ts', 'mobile/src/session/a.test.ts']).mobile_dependencies
+    ).toBe(true)
+    // The product keeps shared contract checks active for mobile-only changes;
+    // their type-aware analysis needs the mobile dependency tree too.
+    expect(classifyPrJobs(['mobile/package.json']).mobile_dependencies).toBe(true)
+    expect(classifyPrJobs(['mobile/package.json']).should_run).toBe(true)
+    expect(classifyPrJobs(['README.md', 'mobile/src/a.ts']).mobile_dependencies).toBe(true)
+  })
+
+  it('runs static analysis alongside the shared suite for a mobile-only diff', () => {
+    const result = classifyPrJobs([
+      'mobile/src/test-support/rpc-recording/adapters/push-registration-mount-adapters.ts'
+    ])
+    expect(result.static_analysis).toBe(true)
+    expect(result.mobile_dependencies).toBe(true)
+    expect(result.should_run).toBe(true)
+    expect(result.typecheck).toBe(true)
+    expect(result.test).toBe(true)
+    for (const job of ['package', 'package_windows', 'git_compatibility']) {
+      expect(result[job], job).toBe(false)
+    }
+  })
+
+  // The ratchet: adding a tree to an audit command has to widen this trigger on its own.
+  it('runs static analysis for every tree the audit commands scan', () => {
+    expect(STATIC_ANALYSIS_SCAN_ROOTS).toEqual(
+      expect.arrayContaining(['src', 'config', 'tests', 'mobile'])
+    )
+    for (const root of STATIC_ANALYSIS_SCAN_ROOTS) {
+      expect(classifyPrJobs([`${root}/changed-file.ts`]).static_analysis, root).toBe(true)
+    }
+  })
+
+  it('leaves diffs the audits never read out of static analysis', () => {
+    expect(classifyPrJobs(['README.md']).static_analysis).toBe(false)
+    expect(classifyPrJobs(['cloud/apps/relay/src/index.ts']).static_analysis).toBe(false)
+  })
+
+  it('keeps unit-test-only diffs out of packaging', () => {
+    expectClassification(['src/main/git/git-status.test.ts'], {
+      git_compatibility: true
+    })
+  })
+
+  it('emits GitHub output pairs from the shipped CLI', () => {
+    const result = spawnSync(process.execPath, ['config/scripts/pr-code-change-scope.mjs'], {
+      cwd: projectDir,
+      encoding: 'utf8',
+      input: 'config/patches/xterm-upstream.json\n'
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('should_run=true\n')
+    expect(result.stdout).toContain('xterm_patch_sync=true\n')
+    expect(result.stdout).toContain('git_compatibility=false\n')
+    expect(result.stdout).toContain('package=false\n')
+    expect(result.stdout).toContain('test=true\n')
+  })
+
+  it('accepts CRLF-delimited paths from Windows callers', () => {
+    const result = spawnSync(process.execPath, ['config/scripts/pr-code-change-scope.mjs'], {
+      cwd: projectDir,
+      encoding: 'utf8',
+      input: 'README.md\r\n'
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('should_run=false\n')
+  })
+
+  // A long-lived PR whose base.sha has gone stale diffs thousands of files, so the writer
+  // outruns one pipe buffer. A single fd-0 read then returns early, breaks the writer's pipe,
+  // and still exits 0 -- emitting no pairs at all, which silently skips every lane.
+  it('classifies a path that arrives after the first pipe buffer', async () => {
+    const filler = Array.from(
+      { length: 12_000 },
+      (_, index) => `docs/reference/generated-placeholder-${index}.md`
+    )
+    const input = `${[...filler, 'config/patches/xterm-upstream.json'].join('\n')}\n`
+    expect(input.length).toBeGreaterThan(64 * 1024)
+
+    const child = spawn(process.execPath, ['config/scripts/pr-code-change-scope.mjs'], {
+      cwd: projectDir,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    let stdout = ''
+    let stderr = ''
+    let brokePipe = false
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => (stdout += chunk))
+    child.stderr.on('data', (chunk) => (stderr += chunk))
+    child.stdin.on('error', (error) => {
+      brokePipe ||= error.code === 'EPIPE'
+    })
+
+    const exitCode = await new Promise((resolvePromise) => {
+      child.on('close', resolvePromise)
+      let offset = 0
+      const step = () => {
+        if (offset >= input.length) {
+          child.stdin.end()
+          return
+        }
+        child.stdin.write(input.slice(offset, offset + 64 * 1024))
+        offset += 64 * 1024
+        setTimeout(step, 20)
+      }
+      step()
+    })
+
+    expect(stderr).not.toContain('EAGAIN')
+    expect(brokePipe).toBe(false)
+    expect(exitCode, stderr).toBe(0)
+    expect(stdout).toContain('should_run=true\n')
+    expect(stdout).toContain('xterm_patch_sync=true\n')
+  })
+})

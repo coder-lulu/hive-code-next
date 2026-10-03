@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.heartbeat-error.relay-matrix.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "heartbeat-error",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1788566400000,
+  "input": {
+    "mode": "relay-v2",
+    "responses": [
+      {"status": 400, "contentType": "application/json", "body": {"code": "INVALID_REQUEST"}},
+      {"status": 401, "contentType": "application/json", "body": {"code": "RUNTIME_PROOF_REJECTED"}},
+      {"status": 409, "contentType": "application/json", "body": {"code": "REPLAY_DETECTED"}},
+      {"status": 409, "contentType": "application/json", "body": {"code": "COMMAND_REPLAY_CONFLICT"}},
+      {"status": 409, "contentType": "application/json", "body": {"code": "SEQUENCE_GAP"}},
+      {"status": 410, "contentType": "application/json", "body": {"code": "STALE_BINDING"}},
+      {"status": 422, "contentType": "application/json", "body": {"code": "INVALID_REQUEST"}},
+      {"status": 426, "contentType": "application/json", "body": {"code": "UPGRADE_REQUIRED"}},
+      {"status": 503, "contentType": "application/json", "retryAfter": 1, "body": {"code": "RELAY_UNAVAILABLE"}}
+    ]
+  }
+}

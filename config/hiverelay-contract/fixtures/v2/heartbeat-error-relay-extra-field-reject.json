@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.heartbeat-error.relay-extra-field.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "heartbeat-error",
+  "applicableComponents": ["cloud", "hivecode"],
+  "validationTime": 1788566400000,
+  "input": {
+    "mode": "relay-v2",
+    "responses": [
+      {
+        "status": 409,
+        "contentType": "application/json",
+        "body": {"code": "REPLAY_DETECTED", "detail": "must-not-cross-boundary"}
+      }
+    ]
+  }
+}

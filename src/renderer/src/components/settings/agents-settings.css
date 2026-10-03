@@ -1,0 +1,133 @@
+.agents-settings {
+  container: agents-settings / inline-size;
+}
+
+.agents-settings-tabs {
+  width: 100%;
+  height: 44px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.agents-settings-tabs [data-slot='tabs-trigger'] {
+  flex: none;
+  height: 100%;
+  padding: 0 20px;
+  border-radius: 0;
+  transition-duration: 180ms;
+}
+
+.agents-settings-tabs [data-slot='tabs-trigger']::after {
+  bottom: -1px;
+}
+
+.agents-settings-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 0 32px;
+}
+
+.agents-installed-grid,
+.agents-available-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.agent-management-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  min-height: 216px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-settings-card);
+  background: var(--card);
+  color: var(--card-foreground);
+  transition: border-color 180ms;
+}
+
+.agent-management-card[data-installed='false'] {
+  min-height: 144px;
+  gap: 20px;
+}
+
+.agent-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.agents-preferences {
+  border-top: 1px solid var(--border);
+}
+
+.agents-preferences > section {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.agents-preferences label,
+.agents-preferences h3 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.agents-preferences p {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.agents-preferences [role='radiogroup'] {
+  align-self: center;
+}
+
+.agents-preferences [role='radio'] {
+  min-height: 28px;
+  font-size: 14px;
+}
+
+@container agents-settings (min-width: 800px) {
+  .agents-installed-grid,
+  .agents-available-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-management-card {
+    padding: 24px;
+  }
+}
+
+@container agents-settings (min-width: 1100px) {
+  .agents-available-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container agents-settings (max-width: 550px) {
+  .agents-settings-tabs {
+    gap: 0;
+  }
+
+  .agents-settings-tabs [data-slot='tabs-trigger'] {
+    flex: 1;
+    min-width: 0;
+    padding: 0 8px;
+    white-space: normal;
+  }
+
+  .agents-preferences [data-setting-row],
+  .agents-preferences #agent-cache-timer .justify-between {
+    flex-wrap: wrap;
+  }
+}

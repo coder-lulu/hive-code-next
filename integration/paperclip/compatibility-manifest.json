@@ -1,0 +1,124 @@
+{
+  "protocolVersion": 1,
+  "status": "p1_personal_local_static_accepted",
+  "paperclip": {
+    "repository": "https://github.com/paperclipai/paperclip",
+    "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+    "databaseSourceDigest": "6bd1aaf03a0236ede28106012b865281620616757b88bf52a94da90e6e8c6e5f",
+    "license": "MIT",
+    "historicalPageRevision": "0f14d261233c545aa6a8a38ec253c498a5130fff"
+  },
+  "adapterUtils": {
+    "package": "@paperclipai/adapter-utils",
+    "version": "0.3.1",
+    "sourceRevision": "a027f76a726e8a556674eded807c2de0e55f5cc0"
+  },
+  "hiveRuntimeAdapter": {
+    "proposedPackage": "@hivekernel/paperclip-adapter-hive-runtime",
+    "adapterType": "hive_runtime",
+    "implementationStatus": "codex_runtime_and_business_chain_real_static_acceptance_passed",
+    "packageVersion": "0.1.0",
+    "buildCommand": "pnpm run build:paperclip-adapter",
+    "factory": "createServerAdapter",
+    "launchMethod": "agent.launchReplay",
+    "requiredLaunchCapability": "agent.launch.replay-required.v1"
+  },
+  "nativePi": {
+    "package": "@earendil-works/pi-coding-agent",
+    "version": "0.85.1"
+  },
+  "executionAllowlist": ["hive_runtime"],
+  "upstreamPatchesApplied": false,
+  "containerImageBuilt": true,
+  "restrictedTaskService": {
+    "entry": "integration/paperclip/service/server.mjs",
+    "buildCommand": "pnpm run build:paperclip-service",
+    "environmentCheckCommand": "pnpm run check:paperclip-service",
+    "windowsDevelopmentTransport": "host_node_loopback",
+    "image": "hive-paperclip-p1:a027f76a",
+    "executor": "codex",
+    "profileRevision": "codex:1",
+    "databaseAuthority": "pinned_paperclip_tables",
+    "providerPackagesBundled": [],
+    "upstreamServerLoaded": false,
+    "resourceSnapshotsSupported": false,
+    "teamExecutionSupported": false,
+    "realCodexAcceptance": "passed_personal_local_static_tasks"
+  },
+  "teamai": {
+    "repository": "https://github.com/Tencent/teamai-cli",
+    "revision": "5fb316c7b8616f430f4d03f2fda86f9c44755adb",
+    "version": "0.22.0",
+    "license": "MIT",
+    "cliEnabled": false,
+    "auditScope": "package_and_license_only"
+  },
+  "auditedFiles": [
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "server/src/adapters/plugin-loader.ts",
+      "sha256": "a8c8b4a91bd6c56635e0cb5f89080d59525c5dfa6ed099567742294e028413b5"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "packages/adapter-utils/src/types.ts",
+      "sha256": "a74be82c5eb762b25e96279680a36a95d954c0e55e58f39222e3fee71766592d"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "packages/adapter-utils/package.json",
+      "sha256": "d80daf4ebf87ebea4ea2cba85f5b1665982452d1fa03e11c0264c21c2a671f6d"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "server/src/adapters/registry.ts",
+      "sha256": "4b8643c6234f3fec105f8a0f99e0817e01100570ab5cc4b729cfcd01f3ca9652"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "server/src/adapters/http/execute.ts",
+      "sha256": "cfb8167f53ce4bc897c4d6ca452bf6c96d666173cb624b1269ae66485f2751cb"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "server/src/services/heartbeat.ts",
+      "sha256": "d4e477c6f7abaf94a8325776230e87b0b5a452a56e4686f66ba16beb1f148e76"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "server/src/routes/company-skills.ts",
+      "sha256": "41ee932c1e2cd5d135cf2d84a116430c38a2324cd64098cf8bf6e637fb523068"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "LICENSE",
+      "sha256": "7f8a27f0979bded50e240caa8c8c29f3088ddf87032cb83e5a9732bff91d18b4"
+    },
+    {
+      "repository": "paperclipai/paperclip",
+      "revision": "a027f76a726e8a556674eded807c2de0e55f5cc0",
+      "path": "package.json",
+      "sha256": "9db03f47715d4cb433e9cde06b06404da516afd0a9f8c2a74c852e2bb4beec76"
+    },
+    {
+      "repository": "Tencent/teamai-cli",
+      "revision": "5fb316c7b8616f430f4d03f2fda86f9c44755adb",
+      "path": "LICENSE",
+      "sha256": "31154d9c1a8bd8d37b449bdbb8a04f9b4618e5d330b52b0fdb7c452414d75a41"
+    },
+    {
+      "repository": "Tencent/teamai-cli",
+      "revision": "5fb316c7b8616f430f4d03f2fda86f9c44755adb",
+      "path": "package.json",
+      "sha256": "5f9ecf80ea7e07f1aea677b78d6e68505cd618d14cd5ab45eeff4b49930407bc"
+    }
+  ]
+}

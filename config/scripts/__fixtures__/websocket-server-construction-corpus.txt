@@ -1,0 +1,21 @@
+# Reviewed HiveCode construction corpus after retiring the upstream relay stack.
+# Repeated paths represent separate constructions; retain each site in scanner coverage.
+mobile/scripts/mock-server.ts
+mobile/src/transport/cellular-handshake-stall-real-socket.test.ts
+mobile/src/transport/rpc-client-live-recovery.test.ts
+src/cli/runtime/websocket-transport.test.ts
+src/main/browser/browser-route-tcp-egress-fixture.ts
+src/main/browser/cdp-ws-proxy.ts
+src/main/emulator/emulator-gesture-sender.test.ts
+src/main/runtime/rpc/ws-transport.ts
+src/renderer/src/web/web-runtime-client.test.ts
+src/shared/remote-runtime-client.test.ts
+src/shared/remote-runtime-client.test.ts
+src/shared/remote-runtime-client.test.ts
+src/shared/remote-runtime-client.test.ts
+src/shared/remote-runtime-outbound-admission.test.ts
+src/shared/remote-runtime-request-connection.test.ts
+src/shared/remote-runtime-shared-control-test-server.ts
+src/shared/remote-runtime-subscription-request.test.ts
+tests/e2e/helpers/local-https-test-server.ts
+tests/e2e/hiverelay/hiverelay-mock-cell-server.ts

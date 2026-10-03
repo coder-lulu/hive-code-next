@@ -1,0 +1,321 @@
+import {
+  formatSubmodulePushFailureDetail,
+  stripCredentialsFromMessage
+} from '../../../shared/git-remote-error'
+import {
+  isPushHookFailure,
+  summarizePushFailure
+} from '../../../shared/source-control-push-failure'
+import * as remoteErrorCopy from './source-control-remote-error-copy'
+
+const REMOTE_OPERATION_DETAIL_MAX_LENGTH = 200
+const SYNC_PUSH_STAGE_ERROR = Symbol('source-control-sync-push-stage-error')
+type SyncPushStageMarkedError = Error & { [SYNC_PUSH_STAGE_ERROR]?: true }
+
+// Why: arbitrarily long git stderr lines (for instance, a multi-kilobyte
+// server-side pre-receive hook message) should not blow up the toast. Cap the
+// detail length so the toast stays readable; the underlying error is still
+// rethrown for console/logs if a caller needs the full payload.
+function truncateDetail(detail: string): string {
+  if (detail.length <= REMOTE_OPERATION_DETAIL_MAX_LENGTH) {
+    return detail
+  }
+  return `${detail.slice(0, REMOTE_OPERATION_DETAIL_MAX_LENGTH).trimEnd()}...`
+}
+
+function extractPublishFailureDetail(message: string): string | null {
+  let remoteDetail: string | null = null
+
+  for (const rawLine of iterateRemoteErrorLines(message)) {
+    const line = rawLine.trim()
+    if (!line) {
+      continue
+    }
+    if (line.startsWith('fatal:')) {
+      return truncateDetail(stripCredentialsFromMessage(line.slice('fatal:'.length).trim()))
+    }
+    if (remoteDetail === null && line.startsWith('remote:')) {
+      remoteDetail = truncateDetail(
+        stripCredentialsFromMessage(line.slice('remote:'.length).trim())
+      )
+    }
+  }
+
+  return remoteDetail
+}
+
+function* iterateRemoteErrorLines(message: string): Generator<string> {
+  let lineStart = 0
+
+  for (let index = 0; index < message.length; index++) {
+    const code = message.charCodeAt(index)
+    if (code !== 10 && code !== 13) {
+      continue
+    }
+
+    yield message.slice(lineStart, index)
+    if (code === 13 && message.charCodeAt(index + 1) === 10) {
+      index++
+    }
+    lineStart = index + 1
+  }
+
+  if (lineStart <= message.length) {
+    yield message.slice(lineStart)
+  }
+}
+
+function resolveSubmodulePushFailureMessage(
+  message: string,
+  operationLabel: string
+): string | null {
+  const detail = formatSubmodulePushFailureDetail(message)
+  return detail
+    ? remoteErrorCopy.formatOperationFailure(
+        operationLabel,
+        truncateDetail(remoteErrorCopy.translateSubmoduleFailureDetail(detail))
+      )
+    : null
+}
+
+function isNonFastForwardRemoteError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  return (
+    /non-fast-forward|fetch first|updates were rejected|stale info/i.test(error.message) ||
+    formatSubmodulePushFailureDetail(error.message)?.includes('has remote changes') === true
+  )
+}
+
+export type RemoteOperationErrorOptions = {
+  publish?: boolean
+  isPush?: boolean
+  isForcePush?: boolean
+  isSync?: boolean
+  isSyncPushStage?: boolean
+  isFetch?: boolean
+  isFastForward?: boolean
+  isRebase?: boolean
+}
+
+export function markSyncPushStageError<T>(error: T): T {
+  if (error instanceof Error) {
+    Object.defineProperty(error, SYNC_PUSH_STAGE_ERROR, {
+      configurable: true,
+      value: true
+    })
+  }
+  return error
+}
+
+export function isSyncPushStageError(error: unknown): boolean {
+  return (
+    error instanceof Error && (error as SyncPushStageMarkedError)[SYNC_PUSH_STAGE_ERROR] === true
+  )
+}
+
+// Why: shared patterns so unconcluded-merge vs fresh-conflict toast copy cannot
+// drift between the two branches below.
+const UNCONCLUDED_MERGE_ERROR_PATTERN =
+  /unmerged files|needs merge|you have not concluded your merge/i
+const FRESH_MERGE_CONFLICT_ERROR_PATTERN = /automatic merge failed|CONFLICT \(|fix conflicts/i
+
+export function resolveRemoteOperationErrorMessage(
+  error: unknown,
+  options?: RemoteOperationErrorOptions
+): string {
+  if (!(error instanceof Error)) {
+    return remoteErrorCopy.operationFailed()
+  }
+
+  if (UNCONCLUDED_MERGE_ERROR_PATTERN.test(error.message)) {
+    if (options?.isRebase) {
+      return remoteErrorCopy.rebaseExistingConflicts()
+    }
+    return options?.isSync
+      ? remoteErrorCopy.syncExistingConflicts()
+      : remoteErrorCopy.pullExistingConflicts()
+  }
+
+  if (FRESH_MERGE_CONFLICT_ERROR_PATTERN.test(error.message)) {
+    if (options?.isRebase) {
+      return remoteErrorCopy.rebaseFreshConflicts()
+    }
+    return options?.isSync
+      ? remoteErrorCopy.syncFreshConflicts()
+      : remoteErrorCopy.pullFreshConflicts()
+  }
+
+  if (options?.publish) {
+    const submoduleMessage = resolveSubmodulePushFailureMessage(error.message, 'Publish Branch')
+    if (submoduleMessage) {
+      return submoduleMessage
+    }
+  }
+
+  if (options?.isSync) {
+    const submoduleMessage = resolveSubmodulePushFailureMessage(error.message, 'Sync')
+    if (submoduleMessage) {
+      return submoduleMessage
+    }
+  }
+
+  if (options?.isForcePush) {
+    const submoduleMessage = resolveSubmodulePushFailureMessage(error.message, 'Force Push')
+    if (submoduleMessage) {
+      return submoduleMessage
+    }
+  }
+
+  if (options?.isPush) {
+    const submoduleMessage = resolveSubmodulePushFailureMessage(error.message, 'Push')
+    if (submoduleMessage) {
+      return submoduleMessage
+    }
+  }
+
+  const isPushLikeOperation =
+    options?.isPush || options?.isForcePush || options?.publish || options?.isSyncPushStage
+  if (isPushLikeOperation && isPushHookFailure(error.message)) {
+    const summary = summarizePushFailure(error.message)
+    const operationLabel = options?.publish
+      ? 'Publish Branch'
+      : options?.isSyncPushStage
+        ? 'Sync'
+        : options?.isForcePush
+          ? 'Force Push'
+          : 'Push'
+    return remoteErrorCopy.formatPushHookFailure(operationLabel, summary)
+  }
+
+  // Why: under sync, the inner push runs *after* a successful pull, so a
+  // non-fast-forward at that point means the remote raced ahead between
+  // fetch and push — not "user forgot to pull". Saying "Pull first" would
+  // be wrong (sync just did). Branch isSync above the shared NFF path so
+  // sync gets a sync-shaped message instead of inheriting the push wording.
+  if (
+    options?.isSync &&
+    /non-fast-forward|fetch first|updates were rejected/i.test(error.message)
+  ) {
+    return remoteErrorCopy.syncRemoteChanged()
+  }
+
+  // Why: force-with-lease rejection means the remote moved since our last
+  // snapshot; telling the user to pull would defeat the explicit force-push
+  // path and can reintroduce commits they meant to replace.
+  if (
+    options?.isForcePush &&
+    /non-fast-forward|fetch first|updates were rejected|stale info/i.test(error.message)
+  ) {
+    return remoteErrorCopy.forcePushRemoteChanged()
+  }
+
+  // Why: non-fast-forward/rejected detection is shared across publish and push so
+  // both paths surface the same actionable toast regardless of operation type.
+  if (/non-fast-forward|fetch first|updates were rejected/i.test(error.message)) {
+    return remoteErrorCopy.pushRemoteChanged()
+  }
+
+  // Why: `git pull` / merge refuses to run when the working tree has changes
+  // that would be overwritten; surface a single readable line instead of the
+  // multi-line git stderr (which lists every affected path).
+  if (
+    /local changes.*would be overwritten|Please commit your changes or stash them/i.test(
+      error.message
+    )
+  ) {
+    if (options?.isRebase) {
+      return remoteErrorCopy.rebaseLocalChanges()
+    }
+    if (options?.isFastForward) {
+      return remoteErrorCopy.fastForwardLocalChanges()
+    }
+    return remoteErrorCopy.pullLocalChanges()
+  }
+
+  if (/Pull would overwrite local changes/i.test(error.message)) {
+    if (options?.isRebase) {
+      return remoteErrorCopy.rebaseLocalChanges()
+    }
+    if (options?.isFastForward) {
+      return remoteErrorCopy.fastForwardLocalChanges()
+    }
+    return remoteErrorCopy.pullLocalChanges()
+  }
+
+  if (/Pull would overwrite untracked files/i.test(error.message)) {
+    if (options?.isRebase) {
+      return remoteErrorCopy.rebaseUntrackedFiles()
+    }
+    if (options?.isFastForward) {
+      return remoteErrorCopy.fastForwardUntrackedFiles()
+    }
+    return remoteErrorCopy.pullUntrackedFiles()
+  }
+
+  if (options?.publish) {
+    // Why: publish failures often bubble up as raw wrapped git/IPC payloads; this
+    // keeps the toast human-readable while preserving the actionable fatal reason.
+    const detail = extractPublishFailureDetail(error.message)
+    if (detail) {
+      return remoteErrorCopy.formatRemoteAccessFailure('Publish Branch', detail)
+    }
+
+    return remoteErrorCopy.publishFailed()
+  }
+
+  if (options?.isSync) {
+    // Why: the user invoked Sync — surface "Sync failed" rather than leaking
+    // the inner-step name ("Push failed"). Detail extraction matches push so
+    // auth / protected-branch reasons stay actionable.
+    const detail = extractPublishFailureDetail(error.message)
+    if (detail) {
+      return remoteErrorCopy.formatRemoteAccessFailure('Sync', detail)
+    }
+    return remoteErrorCopy.formatConnectionFailure('Sync')
+  }
+
+  if (options?.isForcePush) {
+    const detail = extractPublishFailureDetail(error.message)
+    if (detail) {
+      return remoteErrorCopy.formatRemoteAccessFailure('Force Push', detail)
+    }
+    return remoteErrorCopy.formatConnectionFailure('Force Push')
+  }
+
+  if (options?.isPush) {
+    // Why: surfacing fatal/remote lines from git is more actionable than a generic
+    // connection message for auth errors, protected branches, etc.
+    const detail = extractPublishFailureDetail(error.message)
+    if (detail) {
+      return remoteErrorCopy.formatRemoteAccessFailure('Push', detail)
+    }
+    return remoteErrorCopy.formatConnectionFailure('Push')
+  }
+
+  if (options?.isFetch) {
+    const detail =
+      extractPublishFailureDetail(error.message) ??
+      truncateDetail(stripCredentialsFromMessage(error.message))
+    return remoteErrorCopy.formatOperationFailure('Fetch', detail)
+  }
+
+  if (options?.isFastForward) {
+    const detail =
+      extractPublishFailureDetail(error.message) ??
+      truncateDetail(stripCredentialsFromMessage(error.message))
+    return remoteErrorCopy.formatOperationFailure('Fast-forward', detail)
+  }
+
+  if (options?.isRebase) {
+    const detail =
+      extractPublishFailureDetail(error.message) ??
+      truncateDetail(stripCredentialsFromMessage(error.message))
+    return remoteErrorCopy.formatOperationFailure('Rebase', detail)
+  }
+
+  return error.message
+}
+
+export { isNonFastForwardRemoteError }

@@ -1,0 +1,80 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { OrcaRuntimeRpcServer } from './runtime-rpc'
+import { DeviceRegistry } from './device-registry'
+import { createMobileRpcSurfaceRuntime } from './runtime-rpc-mobile-method-allowlist-fixtures'
+import { MOBILE_RPC_METHOD_ALLOWLIST } from './runtime-rpc/runtime-rpc-mobile-method-allowlist'
+
+/**
+ * What a phone is told when this desktop has never heard of the method it called.
+ *
+ * The mobile allowlist gate runs before the dispatcher, so for a mobile-scoped device
+ * `method_not_found` is reachable only for a method that IS allowlisted but unregistered.
+ * A method an older desktop predates is missing from both, and the phone is told `forbidden`.
+ *
+ * That distinction is the whole skew contract for a phone probing a method to decide whether the
+ * desktop can serve it (`pairing.provisionRelay`, `pairing.getEndpoints`). Keying the "too old,
+ * stay on LAN" fallback on `method_not_found` alone never fires against a genuinely old desktop.
+ * See docs/reference/remote-wire-compatibility.md — a scope refusal is not a missing method.
+ */
+/** The RPC error code a reply carries, or undefined when the reply names no error. */
+function errorCode(reply: Record<string, unknown>): string | undefined {
+  const error = reply.error
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return undefined
+  }
+  return typeof error.code === 'string' ? error.code : undefined
+}
+
+describe('an unknown method reaching a mobile-scoped device', () => {
+  const dispatchAs = async (
+    scope: 'mobile' | 'runtime',
+    method: string
+  ): Promise<Record<string, unknown>> => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-scope-'))
+    const { runtime } = createMobileRpcSurfaceRuntime()
+    const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false })
+    server['deviceRegistry'] = new DeviceRegistry(userDataPath)
+    const device = server['deviceRegistry']!.addDevice('peer', scope)
+    const dispatched = vi.spyOn(server['dispatcher'], 'dispatchStreaming')
+    const replies: Record<string, unknown>[] = []
+    await server['handleWebSocketMessage'](
+      JSON.stringify({ id: 'req_1', method, deviceToken: device.token, params: {} }),
+      (response) => {
+        const parsed: Record<string, unknown> = JSON.parse(response)
+        replies.push(parsed)
+      },
+      () => {}
+    )
+    if (scope === 'mobile') {
+      expect(dispatched).not.toHaveBeenCalled()
+    }
+    return replies[0] ?? {}
+  }
+
+  it('answers forbidden, not method_not_found, for a method this build does not register', async () => {
+    const reply = await dispatchAs('mobile', 'pairing.methodThisBuildHasNeverHeardOf')
+    expect(reply.ok).toBe(false)
+    expect(errorCode(reply)).toBe('forbidden')
+    expect(errorCode(reply)).not.toBe('method_not_found')
+  })
+
+  it('answers method_not_found to a non-mobile peer for the same unknown method', async () => {
+    const reply = await dispatchAs('runtime', 'pairing.methodThisBuildHasNeverHeardOf')
+    expect(reply.ok).toBe(false)
+    expect(errorCode(reply)).toBe('method_not_found')
+  })
+
+  // Hive account sessions do not grant a phone authority to discover or provision pairing.
+  // `forbidden` therefore does not by itself prove that the desktop is an older build.
+  it.each(['pairing.getEndpoints', 'pairing.provisionRelay'])(
+    'refuses %s before dispatch for a mobile-scoped device',
+    async (method) => {
+      expect(MOBILE_RPC_METHOD_ALLOWLIST.has(method)).toBe(false)
+      const reply = await dispatchAs('mobile', method)
+      expect(reply).toMatchObject({ ok: false, error: { code: 'forbidden' } })
+    }
+  )
+})

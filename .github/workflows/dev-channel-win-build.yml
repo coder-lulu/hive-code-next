@@ -1,0 +1,42 @@
+name: Retired dev-channel Windows build
+
+# This reusable workflow previously uploaded unsigned Windows installers to
+# per-channel GitHub repositories. It is intentionally retained as a stub so
+# stale callers fail closed; all new Desktop bytes must go through the
+# HiveCloud object-storage uploader in release-cut.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Ignored; GitHub dev channels are retired'
+        required: true
+        type: string
+      tag:
+        description: 'Ignored; GitHub dev channels are retired'
+        required: false
+        default: ''
+        type: string
+      ref:
+        description: 'Ignored; GitHub dev channels are retired'
+        required: false
+        default: ''
+        type: string
+      version:
+        description: 'Ignored; GitHub dev channels are retired'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  retired:
+    if: github.repository == 'stablyai/orca'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain retirement
+        run: |
+          echo "::error::GitHub dev-channel installer publishing is retired. Use release-cut.yml and HiveCloud OSS."
+          exit 1

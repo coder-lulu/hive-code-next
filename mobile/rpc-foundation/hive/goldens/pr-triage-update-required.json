@@ -1,0 +1,39 @@
+{
+  "goldenFormatVersion": 6,
+  "operation": "session.pr-triage-launch",
+  "family": "session.pr-triage",
+  "namedDeltas": [],
+  "values": {
+    "102af7b5d263": {
+      "launched": {
+        "kind": "not-started",
+        "message": "Update HiveCode on your computer to start an agent from your phone."
+      }
+    },
+    "eb79a9b3682a": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": {
+        "$rpc": "undefined"
+      }
+    }
+  },
+  "recording": {
+    "scenario": "pr-triage-update-required",
+    "checkpoints": [
+      {
+        "id": "update-required",
+        "observation": {
+          "sender": [],
+          "payloads": [],
+          "settlements": {
+            "launch": "eb79a9b3682a"
+          },
+          "state": "102af7b5d263",
+          "effects": []
+        }
+      }
+    ]
+  }
+}

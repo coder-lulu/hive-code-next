@@ -1,0 +1,35 @@
+# Files/globs currently allowed to exceed the oxlint `max-lines` budget.
+# This is a RATCHET: the list may only SHRINK. Do NOT add entries to get CI green —
+# split the oversized file instead (AGENTS.md → "Do Not Disable Max Lines").
+# Regenerate/prune: pnpm check:max-lines-ratchet --prune   (removes stale entries only)
+inline mobile/app/h/[hostId]/edit.tsx
+inline mobile/src/auth/mobile-sms-session.ts
+inline mobile/src/runtime-directory/account-runtime-display-name-pending.ts
+inline src/cli/help.ts
+inline src/main/claude-accounts/service.ts
+inline src/main/codex/codex-hook-trust-grant.ts
+inline src/main/hive-account/hive-account-client.ts
+inline src/main/hive-account/hive-account-service.ts
+inline src/main/hive-runtime-cloud/hive-runtime-display-name-coordinator.ts
+inline src/main/ipc/worktree-remote.ts
+inline src/main/ssh/ssh-channel-multiplexer.ts
+inline src/main/ssh/ssh-connection.ts
+inline src/main/ssh/ssh-relay-deploy.ts
+inline src/main/ssh/ssh-relay-session.ts
+inline src/main/updater.ts
+inline src/relay/pty-handler.ts
+inline src/renderer/src/components/Landing.tsx
+inline src/renderer/src/components/NewWorkspaceComposerCard.test.tsx
+inline src/renderer/src/components/landing/DesktopHomeProjectTree.tsx
+inline src/renderer/src/components/landing/desktop-home-model-entities.ts
+inline src/renderer/src/components/settings/HiveAccountSignInConfirmDialog.tsx
+inline src/renderer/src/components/sidebar/AddRepoDialog.tsx
+inline src/renderer/src/components/sidebar/SidebarFooter.test.tsx
+inline src/renderer/src/components/sidebar/SidebarFooter.tsx
+inline src/renderer/src/components/sidebar/WorktreeList.tsx
+inline src/renderer/src/components/sidebar/project-header-drag.ts
+inline src/renderer/src/components/sidebar/project-header-drop.ts
+inline src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx
+inline src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.ts
+inline src/renderer/src/store/slices/account-runtime-cloud.ts
+mobile-config app/h/*/tasks.tsx

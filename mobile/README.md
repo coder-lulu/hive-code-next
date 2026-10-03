@@ -1,0 +1,289 @@
+# HiveCode Mobile
+
+React Native companion app for HiveCode. Monitor worktrees, view terminal output, and send commands from your phone.
+
+Local development uses two processes:
+
+- HiveCode desktop/Electron from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
+- Expo Metro from `mobile/`. This serves the React Native app on port `8081`.
+
+Unless a command says otherwise, run mobile app commands from the `mobile/` directory.
+
+## Android emulator iteration
+
+With a development client installed and the emulator running, use:
+
+```bash
+pnpm dev:android
+```
+
+Keep Metro running. TypeScript and UI edits use Fast Refresh without rebuilding
+an APK. Android Studio can open `mobile/android` for Logcat and native debugging;
+it does not need to rebuild the application for every JavaScript change.
+Native dependency/configuration changes require another native build. Verify a
+release APK before distribution because debug timing and performance differ.
+
+Use the same product code, application ID and public account/Relay services.
+Account Runtime testing uses normal login and device claiming; local QR pairing
+below is a separate connection path, not a prerequisite for account connections.
+The shared test AVD is `hivecode-crash-check`. Preserve its login with an in-place
+update signed by the existing key; do not uninstall or clear data to resolve a
+debug/release signing mismatch. The initial signed development client was built
+locally using the existing protected signing configuration.
+
+## Prerequisites
+
+- Node.js 24+
+- pnpm
+- Xcode and/or Android Studio tooling for simulator or device builds
+- Expo Go on your phone, or a development client build when native modules are needed
+- Phone and desktop on the same LAN when testing a physical phone
+
+## Start HiveCode Desktop
+
+From the repository root:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Confirm the mobile RPC server is listening:
+
+```bash
+lsof -nP -iTCP:6768 -sTCP:LISTEN
+```
+
+Restart `pnpm dev` after changing Electron main-process code. Metro hot reload only applies to the mobile JavaScript bundle.
+
+## Start The Mobile App
+
+```bash
+cd mobile
+pnpm install
+pnpm start
+```
+
+Scan the Expo QR code with your phone's camera on iOS, or Expo Go on Android.
+
+For a native dev-client build:
+
+```bash
+pnpm exec expo run:android
+pnpm exec expo run:ios
+pnpm start --dev-client
+```
+
+## Pair With HiveCode Desktop
+
+1. Open HiveCode desktop.
+2. Go to Settings > Mobile.
+3. Scan the pairing QR code from the mobile app.
+4. Confirm the mobile host endpoint is `ws://<desktop-ip>:6768`.
+
+For the Android emulator, use `ws://10.0.2.2:6768`. For a physical phone, use the desktop LAN IP, for example `ws://192.168.0.179:6768`.
+
+If the phone has a stale host entry, remove it from the app and pair again.
+
+## Development Paths
+
+### Android Phone
+
+1. Install Expo Go from Google Play
+2. Run `pnpm start`, scan QR with Expo Go
+3. For native modules: `pnpm exec expo run:android`
+4. Run with `pnpm start --dev-client`
+
+### iOS Simulator
+
+1. Install Xcode from the App Store
+2. Run `pnpm start --ios` to open in iOS Simulator
+
+## Physical Phone Debugging
+
+The phone can be inspected through the connected device tooling:
+
+```bash
+hive snapshot --json
+hive click --element @e3 --json
+hive fill --element @e1 --value "ls" --json
+hive screenshot --json
+```
+
+Use `snapshot` first to find the current element refs, then click/fill those refs. After mobile file edits, Metro usually hot reloads automatically, but navigating out of and back into the session screen can be useful because it re-runs `terminal.subscribe`.
+
+## Terminal Streaming Repro Without A Phone
+
+Use this when terminal output does not render on device and you need to split server streaming bugs from WebView/UI bugs:
+
+```bash
+cd mobile
+ORCA_MOBILE_WS_URL=ws://127.0.0.1:6768 pnpm exec tsx scripts/test-subscribe.ts <deviceToken> <serverPublicKeyB64>
+```
+
+You can pass a worktree selector as the third argument:
+
+```bash
+pnpm exec tsx scripts/test-subscribe.ts <deviceToken> <serverPublicKeyB64> "id:<worktreeId>"
+pnpm exec tsx scripts/test-subscribe.ts <deviceToken> <serverPublicKeyB64> "path:/absolute/worktree/path"
+pnpm exec tsx scripts/test-subscribe.ts <deviceToken> <serverPublicKeyB64> "name:my-worktree"
+```
+
+The expected result includes:
+
+```text
+streamSawMarker: true
+readSawMarker: true
+```
+
+If this repro fails, debug the desktop runtime/PTY path before the mobile WebView. If it passes but the phone is blank, debug the session screen or `TerminalWebView` readiness/queueing path.
+
+### Stable Terminal And Recovery Behavior
+
+The authoritative cross-product behavior lives in [`docs/engineering/product-design.md`](../docs/engineering/product-design.md). Mobile changes must preserve these local contracts:
+
+- The first focus for a terminal handle uses direct input. Users can opt into buffered input, and switching sessions does not open the keyboard automatically.
+- Output received before the terminal WebView is ready is queued with a bound and replayed in order. Reconnect establishes a fresh PTY subscription.
+- Foreground and network handoffs probe liveness and replace a dead physical client. A disconnected socket is not proof that the remote session exited.
+- Expected relay migration keeps loaded content visible and presents a connecting/reconnecting state instead of an empty grey surface.
+
+## Terminal Color Repro Without A Phone
+
+Use this when terminal colors disappear after switching tabs. Open a Claude Code terminal and at least one other terminal in the target worktree, then run:
+
+```bash
+cd mobile
+ORCA_MOBILE_WS_URL=ws://127.0.0.1:6768 pnpm exec tsx scripts/repro-terminal-colors.ts \
+  <deviceToken> <serverPublicKeyB64> "id:<worktreeId>"
+```
+
+The script captures `terminal.subscribe` snapshots in an A → B → A sequence and writes raw snapshots to `mobile/terminal-color-repro/`. If the two A snapshots have different `sgrColor` counts, the desktop snapshot changed during the switch. If they match, the ANSI color data is still present and the bug is in mobile replay/rendering.
+
+## Validation
+
+Run these checks before committing mobile terminal changes:
+
+```bash
+cd mobile
+pnpm exec tsc --noEmit
+pnpm run check:tests-typecheck
+pnpm lint
+cd ..
+pnpm typecheck:node
+```
+
+`tsc --noEmit` reads `tsconfig.json`, which excludes test files so Metro never bundles them.
+`tsconfig.test.json` puts them back, and `pnpm run typecheck:tests` shows their errors in full.
+`check:tests-typecheck` is the gate over it: a ratchet against `tests-typecheck-baseline.txt`, the
+127 test files that do not typecheck yet. It fails when a file that checks today stops checking,
+and when a baseline entry starts checking (prune it with
+`node scripts/check-tests-typecheck-ratchet.mjs --prune`). The list may only shrink.
+
+The same gate censuses the program first: every `*.test.ts(x)` on disk must be in it, or named in
+the script's `TESTS_OUTSIDE_PROGRAM` with a reason. Without that, a test excluded from
+`tsconfig.test.json` — or a `Foo.test.tsx` shadowed by a `Foo.test.ts` beside it, which a wildcard
+`include` drops for the higher-priority extension — would leave the ratchet silently.
+
+## Protocol Version Compatibility
+
+Mobile and desktop talk over a versioned protocol. Because mobile updates lag desktop by 24-48h via the App Store, both sides exchange version numbers on `status.get` so a genuinely incompatible combo can hard-block instead of silently misbehaving.
+
+Constants live in two files (Metro can't resolve outside `mobile/`):
+
+- `src/shared/protocol-version.ts` — `DESKTOP_PROTOCOL_VERSION`, `MIN_COMPATIBLE_MOBILE_VERSION`
+- `mobile/src/transport/protocol-version.ts` — `MOBILE_PROTOCOL_VERSION`, `MIN_COMPATIBLE_DESKTOP_VERSION`
+
+Today all four are set so `evaluateCompat` always returns `{ kind: 'ok' }` — nothing blocks. The wire format is in place to flip a switch when needed.
+
+### When to bump
+
+Bump `DESKTOP_PROTOCOL_VERSION` (and the mobile mirror `MOBILE_PROTOCOL_VERSION` when relevant) for **breaking** changes:
+
+- Removed RPC method or required parameter that mobile uses
+- Changed meaning (units, nullability) of an existing field mobile reads
+- Changed encryption, framing, or auth handshake
+
+Do **not** bump for additive changes:
+
+- New RPC methods
+- New optional fields on existing methods
+- New event types in `terminal.subscribe`
+
+Set `MIN_COMPATIBLE_MOBILE_VERSION` (kill-switch) when desktop ships a change that requires a minimum mobile version to function safely. Same for `MIN_COMPATIBLE_DESKTOP_VERSION` from the mobile side.
+
+When a verdict is `blocked`, `mobile/src/components/ProtocolBlockScreen.tsx` renders a screen pointing the user at either the App Store (mobile too old) or the configured HiveCloud update/store link (desktop too old).
+
+To exercise the block screen locally: set `MIN_COMPATIBLE_DESKTOP_VERSION = 999` in `mobile/src/transport/protocol-version.ts`, rebuild, pair to any desktop. Revert before merging.
+
+## Mock Server
+
+Develop the mobile app without a running HiveCode desktop instance:
+
+```bash
+pnpm mock-server           # starts mock WebSocket server on port 6768
+```
+
+Connect from the app using endpoint `ws://localhost:6768` and token `mock-device-token`.
+
+### Environment variables
+
+- `MOCK_NATIVE_CHAT=1` — serve the native-chat scenario (one live agent tab, empty transcript, image upload) instead of the default terminal fixtures.
+- `MOCK_CHAT_AGENT=omp` — with `MOCK_NATIVE_CHAT=1`, present an OMP tab and four decoded transcript messages, including a tool call and result, instead of the default Claude scenario. It deliberately omits `transcriptPath` to exercise legacy-hook readability discovery; current OMP hooks may report a path.
+- `MOCK_SERVER_KEY_FILE` — persist the server keypair across restarts so a paired device keeps its public-key pin. A missing or invalid file is re-keyed with a warning, which forces a re-pair.
+
+### Scenario control files
+
+Read on every request, so behaviour can be flipped mid-session without a restart (a restart would re-key E2EE and force a re-pair). Write the mode into the file, or delete it for the default.
+
+- `MOCK_SEND_MODE_FILE` (default `orca-mock-send-mode` in the system temporary directory) — `accept` (default) accepts the send, `error` fails it with `mobile_input_floor_unavailable`, anything else reports the send as rejected.
+- `MOCK_TERMINAL_LIST_MODE_FILE` (default `orca-mock-terminal-list-mode` in the system temporary directory) — `omit` returns an empty terminal list, `other` returns a list that omits the chat handle, anything else lists it.
+- `MOCK_TERMINAL_STREAM_MODE_FILE` (default `orca-mock-terminal-stream-mode` in the system temporary directory) — `dead` answers a subscribe with `subscribed` then `end` (a gone PTY), which is what exercises the rearm bound and terminal prune; anything else streams normally.
+
+## Connect to HiveCode Desktop
+
+1. Start HiveCode desktop with WebSocket transport enabled
+2. In HiveCode, go to Settings > Mobile and scan the QR code with this app
+3. The QR encodes the connection endpoint, device token, and TLS fingerprint
+
+## Project Structure
+
+```
+mobile/
+├── app/                   # Expo Router screens (file-based routing)
+│   ├── _layout.tsx        # Root layout with navigation stack
+│   ├── index.tsx          # Home screen — paired hosts list
+│   └── pair-scan.tsx      # QR code scanning screen
+├── src/
+│   ├── terminal/          # Terminal WebView and xterm bridge
+│   └── transport/         # WebSocket RPC client
+├── scripts/
+│   ├── test-subscribe.ts  # Desktop streaming repro without a phone
+│   └── mock-server.ts     # Standalone mock WebSocket server
+└── assets/                # App icons and splash screen
+```
+
+## RPC recording provenance
+
+The original upstream goldens use format v6 and remain immutable. Hive records its supported scenario domain into scratch evidence, then publishes only individually reviewed trace differences as sparse overlays. The external Hive manifest pins the full upstream reference hash, the source/upstream commits and recorder/scenario/operation-adapter digests. Old v1 metadata remains intentionally invalid until the actual frozen source has been recorded and reviewed.
+
+Commit all mobile, shared protocol, recorder and lockfile changes before recording. Use a full source commit SHA and the frozen upstream SHA; the recorder checks actual Git source identity before and after the run. It uses only scripted RPC transports and native mounting substitutes, without contacting production services.
+
+```powershell
+$sourceCommit = git rev-parse HEAD
+$upstreamCommit = 'a781a602a8729439d7a3eebf0c3b9e5817362e77'
+$env:ORCA_BACKGROUND_LAUNCH = '1'
+$env:RPC_FOUNDATION_RECORD = '1'
+pnpm --dir mobile exec tsx scripts/rpc-recording.mts --record-hive $sourceCommit $upstreamCommit --evidence-only
+```
+
+Evidence is written to `logs/upstream-sync/hive-rpc-recording/<sourceCommit>/provenance.json` and `goldens/`. Optional golden IDs can follow the two SHAs for a targeted diagnostic run. A targeted run never publishes. A full run with `--evidence-only` records every supported golden without changing the actual Hive manifest or overlays.
+
+Review every measured trace difference against the immutable upstream originals. Update `mobile/rpc-foundation/hive/reviewed-deltas.json` with the current upstream aggregate hash, exact before/after trace hashes and a concrete product reason for each difference. This review data is publication input rather than recording source; the recorder, scenarios, product sources and lockfile must continue to match the frozen source commit.
+
+```powershell
+pnpm --dir mobile exec tsx scripts/rpc-recording.mts --publish-hive $sourceCommit $upstreamCommit
+```
+
+Publication verifies the recorded provenance against the same frozen source and rejects unknown scenarios, changed identities, missing adapter provenance, unreviewed trace changes and disappeared reviewed deltas. It writes the external v2 manifest and actual sparse overlays while keeping every upstream original unchanged. Run the golden/domain/bridge replay suites against the published references before committing the metadata candidate.
+
+`rpc:record <id>` from the older README no longer describes a valid invocation; the new workflow requires explicit `--record-hive` or `--publish-hive` and both commit SHAs.

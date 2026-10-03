@@ -1,0 +1,29 @@
+import { z } from 'zod'
+
+export const HiveTaskCreateSchema = z.strictObject({
+  requestId: z.string().uuid(),
+  title: z.string().trim().min(1).max(240),
+  input: z.string().trim().min(1).max(48_000),
+  workspaceSelector: z.string().min(1).max(512)
+})
+export type HiveTaskCreate = z.infer<typeof HiveTaskCreateSchema>
+export type HiveTaskView = {
+  id: string
+  title: string
+  status:
+    | 'pending'
+    | 'running'
+    | 'cancelRequested'
+    | 'unknown'
+    | 'succeeded'
+    | 'failed'
+    | 'cancelled'
+  artifactRefs: string[]
+}
+export type HiveTaskArtifact = { name: string; text: string }
+export type HiveTasksApi = {
+  list(): Promise<HiveTaskView[]>
+  create(input: HiveTaskCreate): Promise<HiveTaskView>
+  cancel(taskId: string): Promise<HiveTaskView>
+  artifact(taskId: string, artifactRef: string): Promise<HiveTaskArtifact>
+}

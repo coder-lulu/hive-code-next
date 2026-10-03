@@ -1,0 +1,3507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:task-execution:1",
+  "$defs": {
+    "TaskRef": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "spaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "taskRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        }
+      },
+      "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+      "additionalProperties": false
+    },
+    "ExecutionCommand": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "kind": {
+              "type": "string",
+              "const": "execution.start"
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "spaceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "runId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "taskRevision": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                }
+              },
+              "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+              "additionalProperties": false
+            },
+            "operationId": {
+              "type": "string",
+              "minLength": 46,
+              "maxLength": 46,
+              "pattern": "^[0-9]{13}-[0-9a-f]{32}(?![\\s\\S])"
+            },
+            "idempotencyKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "agent": {
+              "type": "string",
+              "const": "hivecode"
+            },
+            "profileId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "profileRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "policyRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownerScope": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "personalTenant"
+                    },
+                    "tenantRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["kind", "tenantRef"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "teamSpace"
+                    },
+                    "teamSpaceRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["kind", "teamSpaceRef"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "executionAccountRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "billingSubjectRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "workspaceRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "workspaceExecutionClaimRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "isolationPolicyRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "writeFence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionPolicy": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "trustMode": {
+                      "type": "string",
+                      "const": "trusted_personal_preview"
+                    },
+                    "executionPolicyRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "executionPolicyRevision": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["trustMode", "executionPolicyRef", "executionPolicyRevision"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "trustMode": {
+                      "type": "string",
+                      "const": "enforced_autonomous"
+                    },
+                    "executionPolicyRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "executionPolicyRevision": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "enforcementEvidenceRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": [
+                    "trustMode",
+                    "executionPolicyRef",
+                    "executionPolicyRevision",
+                    "enforcementEvidenceRef"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "inputRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "authorizationRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "authorizationRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "expiresAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "requiredCapabilities": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "kind",
+            "task",
+            "operationId",
+            "idempotencyKey",
+            "agent",
+            "profileId",
+            "profileRevision",
+            "policyRevision",
+            "ownerScope",
+            "executionAccountRef",
+            "billingSubjectRef",
+            "workspaceRef",
+            "workspaceExecutionClaimRef",
+            "isolationPolicyRef",
+            "writeFence",
+            "executionPolicy",
+            "inputRef",
+            "authorizationRef",
+            "authorizationRevision",
+            "expiresAt",
+            "requiredCapabilities"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "kind": {
+              "type": "string",
+              "const": "execution.start"
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "spaceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "runId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "taskRevision": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                }
+              },
+              "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+              "additionalProperties": false
+            },
+            "operationId": {
+              "type": "string",
+              "minLength": 46,
+              "maxLength": 46,
+              "pattern": "^[0-9]{13}-[0-9a-f]{32}(?![\\s\\S])"
+            },
+            "idempotencyKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "agent": {
+              "type": "string",
+              "const": "hivecode"
+            },
+            "profileId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "profileRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "policyRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownerScope": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "personalTenant"
+                    },
+                    "tenantRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["kind", "tenantRef"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "teamSpace"
+                    },
+                    "teamSpaceRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["kind", "teamSpaceRef"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "executionAccountRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "billingSubjectRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "workspaceRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "workspaceExecutionClaimRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "isolationPolicyRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "writeFence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionPolicy": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "trustMode": {
+                      "type": "string",
+                      "const": "trusted_personal_preview"
+                    },
+                    "executionPolicyRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "executionPolicyRevision": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["trustMode", "executionPolicyRef", "executionPolicyRevision"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "trustMode": {
+                      "type": "string",
+                      "const": "enforced_autonomous"
+                    },
+                    "executionPolicyRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "executionPolicyRevision": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "enforcementEvidenceRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": [
+                    "trustMode",
+                    "executionPolicyRef",
+                    "executionPolicyRevision",
+                    "enforcementEvidenceRef"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "inputRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "authorizationRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "authorizationRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "expiresAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "requiredCapabilities": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            },
+            "resourceSnapshotRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "resourceSnapshotDigest": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "manifestVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "resolverVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "requiredCoverage": {
+              "type": "string",
+              "enum": ["managed_only", "effective_set_verified"]
+            },
+            "resourceScopeRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "kind",
+            "task",
+            "operationId",
+            "idempotencyKey",
+            "agent",
+            "profileId",
+            "profileRevision",
+            "policyRevision",
+            "ownerScope",
+            "executionAccountRef",
+            "billingSubjectRef",
+            "workspaceRef",
+            "workspaceExecutionClaimRef",
+            "isolationPolicyRef",
+            "writeFence",
+            "executionPolicy",
+            "inputRef",
+            "authorizationRef",
+            "authorizationRevision",
+            "expiresAt",
+            "requiredCapabilities",
+            "resourceSnapshotRef",
+            "resourceSnapshotDigest",
+            "manifestVersion",
+            "resolverVersion",
+            "requiredCoverage",
+            "resourceScopeRef"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CancelCommand": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "type": "string",
+          "const": "execution.cancel"
+        },
+        "task": {
+          "type": "object",
+          "properties": {
+            "spaceId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "taskId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "runId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "attempt": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "taskRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            }
+          },
+          "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+          "additionalProperties": false
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "authorizationRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "authorizationRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "expiresAt": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "allOf": [
+            {
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+            },
+            {
+              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["user_requested", "authorization_revoked", "budget_policy", "shutdown"]
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "kind",
+        "task",
+        "idempotencyKey",
+        "commandFingerprint",
+        "authorizationRef",
+        "authorizationRevision",
+        "expiresAt",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "ObserveCommand": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "authorizationRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "authorizationRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "expiresAt": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "allOf": [
+            {
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+            },
+            {
+              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "const": "execution.observe"
+        },
+        "afterSequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "commandFingerprint",
+        "authorizationRef",
+        "authorizationRevision",
+        "expiresAt",
+        "kind",
+        "afterSequence",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "ReconcileCommand": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "authorizationRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "authorizationRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "expiresAt": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "allOf": [
+            {
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+            },
+            {
+              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "const": "execution.reconcile"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "commandFingerprint",
+        "authorizationRef",
+        "authorizationRevision",
+        "expiresAt",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ExecutionObservation": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "type": "string",
+          "const": "execution.observation"
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "running",
+            "waiting_input",
+            "cancel_requested",
+            "outcome_unknown",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "accepted": {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "execution.accepted"
+            },
+            "receiptId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "status": {
+              "type": "string",
+              "const": "accepted"
+            },
+            "operationId": {
+              "type": "string",
+              "minLength": 46,
+              "maxLength": 46,
+              "pattern": "^[0-9]{13}-[0-9a-f]{32}(?![\\s\\S])"
+            },
+            "workspaceExecutionClaimRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "writeFence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "receiptId",
+            "status",
+            "operationId",
+            "workspaceExecutionClaimRef",
+            "writeFence"
+          ],
+          "additionalProperties": false
+        },
+        "events": {
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "protocolVersion": {
+                "type": "number",
+                "const": 1
+              },
+              "runtimeRecordId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              },
+              "ownershipEpoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "executionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              },
+              "executionEpoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "commandFingerprint": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64,
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              },
+              "recordedAt": {
+                "type": "string",
+                "minLength": 24,
+                "maxLength": 24,
+                "allOf": [
+                  {
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                  },
+                  {
+                    "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "const": "execution.event"
+              },
+              "eventId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "running",
+                  "waiting_input",
+                  "cancel_requested",
+                  "outcome_unknown",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 4096,
+                "pattern": "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[^\\uD800-\\uDFFF]){0,2048}(?![\\s\\S])"
+              },
+              "artifactRefs": {
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                }
+              }
+            },
+            "required": [
+              "protocolVersion",
+              "runtimeRecordId",
+              "ownershipEpoch",
+              "executionId",
+              "executionEpoch",
+              "commandFingerprint",
+              "recordedAt",
+              "kind",
+              "eventId",
+              "sequence",
+              "status",
+              "artifactRefs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lastSequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionRef": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result": {
+          "anyOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "protocolVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "runtimeRecordId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "ownershipEpoch": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "executionEpoch": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "commandFingerprint": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "recordedAt": {
+                      "type": "string",
+                      "minLength": 24,
+                      "maxLength": 24,
+                      "allOf": [
+                        {
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                        },
+                        {
+                          "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "execution.result"
+                    },
+                    "receiptId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "outcomeRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "artifactRefs": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "usageFactRefs": {
+                      "maxItems": 256,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "succeeded"
+                    },
+                    "stopProof": {
+                      "type": "object",
+                      "properties": {
+                        "proofRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "evidenceKind": {
+                          "type": "string",
+                          "const": "stopped"
+                        },
+                        "managedToolsSettled": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "writersFenced": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "recordedAt": {
+                          "type": "string",
+                          "minLength": 24,
+                          "maxLength": 24,
+                          "allOf": [
+                            {
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                            },
+                            {
+                              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "proofRef",
+                        "evidenceKind",
+                        "managedToolsSettled",
+                        "writersFenced",
+                        "recordedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "protocolVersion",
+                    "runtimeRecordId",
+                    "ownershipEpoch",
+                    "executionId",
+                    "executionEpoch",
+                    "commandFingerprint",
+                    "recordedAt",
+                    "kind",
+                    "receiptId",
+                    "outcomeRef",
+                    "artifactRefs",
+                    "usageFactRefs",
+                    "status",
+                    "stopProof"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "protocolVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "runtimeRecordId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "ownershipEpoch": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "executionEpoch": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "commandFingerprint": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "recordedAt": {
+                      "type": "string",
+                      "minLength": 24,
+                      "maxLength": 24,
+                      "allOf": [
+                        {
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                        },
+                        {
+                          "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "execution.result"
+                    },
+                    "receiptId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "outcomeRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "artifactRefs": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "usageFactRefs": {
+                      "maxItems": 256,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "failed"
+                    },
+                    "stopProof": {
+                      "type": "object",
+                      "properties": {
+                        "proofRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "evidenceKind": {
+                          "type": "string",
+                          "enum": ["not_started", "stopped"]
+                        },
+                        "managedToolsSettled": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "writersFenced": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "recordedAt": {
+                          "type": "string",
+                          "minLength": 24,
+                          "maxLength": 24,
+                          "allOf": [
+                            {
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                            },
+                            {
+                              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "proofRef",
+                        "evidenceKind",
+                        "managedToolsSettled",
+                        "writersFenced",
+                        "recordedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "protocolVersion",
+                    "runtimeRecordId",
+                    "ownershipEpoch",
+                    "executionId",
+                    "executionEpoch",
+                    "commandFingerprint",
+                    "recordedAt",
+                    "kind",
+                    "receiptId",
+                    "outcomeRef",
+                    "artifactRefs",
+                    "usageFactRefs",
+                    "status",
+                    "stopProof"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "protocolVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "runtimeRecordId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "ownershipEpoch": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "executionEpoch": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "commandFingerprint": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "recordedAt": {
+                      "type": "string",
+                      "minLength": 24,
+                      "maxLength": 24,
+                      "allOf": [
+                        {
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                        },
+                        {
+                          "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "execution.result"
+                    },
+                    "receiptId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "outcomeRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "artifactRefs": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "usageFactRefs": {
+                      "maxItems": 256,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "cancelled"
+                    },
+                    "stopProof": {
+                      "type": "object",
+                      "properties": {
+                        "proofRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "evidenceKind": {
+                          "type": "string",
+                          "enum": ["not_started", "stopped"]
+                        },
+                        "managedToolsSettled": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "writersFenced": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "recordedAt": {
+                          "type": "string",
+                          "minLength": 24,
+                          "maxLength": 24,
+                          "allOf": [
+                            {
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                            },
+                            {
+                              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "proofRef",
+                        "evidenceKind",
+                        "managedToolsSettled",
+                        "writersFenced",
+                        "recordedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "protocolVersion",
+                    "runtimeRecordId",
+                    "ownershipEpoch",
+                    "executionId",
+                    "executionEpoch",
+                    "commandFingerprint",
+                    "recordedAt",
+                    "kind",
+                    "receiptId",
+                    "outcomeRef",
+                    "artifactRefs",
+                    "usageFactRefs",
+                    "status",
+                    "stopProof"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "kind",
+        "commandFingerprint",
+        "status",
+        "accepted",
+        "events",
+        "cursor",
+        "lastSequence",
+        "sessionRef",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "AcceptedReceipt": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "recordedAt": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "allOf": [
+            {
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+            },
+            {
+              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "const": "execution.accepted"
+        },
+        "receiptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "status": {
+          "type": "string",
+          "const": "accepted"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 46,
+          "maxLength": 46,
+          "pattern": "^[0-9]{13}-[0-9a-f]{32}(?![\\s\\S])"
+        },
+        "workspaceExecutionClaimRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "writeFence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "commandFingerprint",
+        "recordedAt",
+        "kind",
+        "receiptId",
+        "status",
+        "operationId",
+        "workspaceExecutionClaimRef",
+        "writeFence"
+      ],
+      "additionalProperties": false
+    },
+    "ExecutionEvent": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "recordedAt": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "allOf": [
+            {
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+            },
+            {
+              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "const": "execution.event"
+        },
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "running",
+            "waiting_input",
+            "cancel_requested",
+            "outcome_unknown",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[^\\uD800-\\uDFFF]){0,2048}(?![\\s\\S])"
+        },
+        "artifactRefs": {
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+          }
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "commandFingerprint",
+        "recordedAt",
+        "kind",
+        "eventId",
+        "sequence",
+        "status",
+        "artifactRefs"
+      ],
+      "additionalProperties": false
+    },
+    "ExecutionResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "execution.result"
+            },
+            "receiptId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "outcomeRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "artifactRefs": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            },
+            "usageFactRefs": {
+              "maxItems": 256,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            },
+            "status": {
+              "type": "string",
+              "const": "succeeded"
+            },
+            "stopProof": {
+              "type": "object",
+              "properties": {
+                "proofRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "evidenceKind": {
+                  "type": "string",
+                  "const": "stopped"
+                },
+                "managedToolsSettled": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "writersFenced": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "recordedAt": {
+                  "type": "string",
+                  "minLength": 24,
+                  "maxLength": 24,
+                  "allOf": [
+                    {
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                    },
+                    {
+                      "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "proofRef",
+                "evidenceKind",
+                "managedToolsSettled",
+                "writersFenced",
+                "recordedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "receiptId",
+            "outcomeRef",
+            "artifactRefs",
+            "usageFactRefs",
+            "status",
+            "stopProof"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "execution.result"
+            },
+            "receiptId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "outcomeRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "artifactRefs": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            },
+            "usageFactRefs": {
+              "maxItems": 256,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            },
+            "status": {
+              "type": "string",
+              "const": "failed"
+            },
+            "stopProof": {
+              "type": "object",
+              "properties": {
+                "proofRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "evidenceKind": {
+                  "type": "string",
+                  "enum": ["not_started", "stopped"]
+                },
+                "managedToolsSettled": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "writersFenced": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "recordedAt": {
+                  "type": "string",
+                  "minLength": 24,
+                  "maxLength": 24,
+                  "allOf": [
+                    {
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                    },
+                    {
+                      "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "proofRef",
+                "evidenceKind",
+                "managedToolsSettled",
+                "writersFenced",
+                "recordedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "receiptId",
+            "outcomeRef",
+            "artifactRefs",
+            "usageFactRefs",
+            "status",
+            "stopProof"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "execution.result"
+            },
+            "receiptId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "outcomeRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "artifactRefs": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            },
+            "usageFactRefs": {
+              "maxItems": 256,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+              }
+            },
+            "status": {
+              "type": "string",
+              "const": "cancelled"
+            },
+            "stopProof": {
+              "type": "object",
+              "properties": {
+                "proofRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "evidenceKind": {
+                  "type": "string",
+                  "enum": ["not_started", "stopped"]
+                },
+                "managedToolsSettled": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "writersFenced": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "recordedAt": {
+                  "type": "string",
+                  "minLength": 24,
+                  "maxLength": 24,
+                  "allOf": [
+                    {
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                    },
+                    {
+                      "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "proofRef",
+                "evidenceKind",
+                "managedToolsSettled",
+                "writersFenced",
+                "recordedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "receiptId",
+            "outcomeRef",
+            "artifactRefs",
+            "usageFactRefs",
+            "status",
+            "stopProof"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Capability": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "type": "string",
+          "const": "execution.capabilities"
+        },
+        "host": {
+          "type": "string",
+          "enum": ["native", "wsl", "ssh"]
+        },
+        "capabilities": {
+          "maxItems": 128,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+          }
+        },
+        "resourceCoverage": {
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["managed_only", "effective_set_verified"]
+          }
+        },
+        "manifestVersions": {
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+          }
+        },
+        "resolverVersions": {
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+          }
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "kind",
+        "host",
+        "capabilities",
+        "resourceCoverage",
+        "manifestVersions",
+        "resolverVersions"
+      ],
+      "additionalProperties": false
+    },
+    "ResourcePreparationReceipt": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "recordedAt": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "allOf": [
+            {
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+            },
+            {
+              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "const": "resource.preparation"
+        },
+        "receiptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "snapshotRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "snapshotDigest": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "resolverVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["waiting_resource", "preparing", "ready", "resource_preparation_failed"]
+        },
+        "existingSkillReceiptRefs": {
+          "maxItems": 256,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+          }
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "commandFingerprint",
+        "recordedAt",
+        "kind",
+        "receiptId",
+        "snapshotRef",
+        "snapshotDigest",
+        "resolverVersion",
+        "status",
+        "existingSkillReceiptRefs"
+      ],
+      "additionalProperties": false
+    },
+    "ResourceActivationReceipt": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "runtimeRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "ownershipEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "executionEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "commandFingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "recordedAt": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "allOf": [
+            {
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+            },
+            {
+              "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "const": "resource.activation"
+        },
+        "receiptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "sessionRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "snapshotRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "snapshotDigest": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "resolverVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "observedCoverage": {
+          "type": "string",
+          "enum": ["managed_only", "effective_set_verified"]
+        },
+        "effectiveSetDigest": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "loaderVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "loadedRefs": {
+          "maxItems": 256,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+          }
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runtimeRecordId",
+        "ownershipEpoch",
+        "executionId",
+        "executionEpoch",
+        "commandFingerprint",
+        "recordedAt",
+        "kind",
+        "receiptId",
+        "sessionRef",
+        "snapshotRef",
+        "snapshotDigest",
+        "resolverVersion",
+        "observedCoverage",
+        "effectiveSetDigest",
+        "loaderVersion",
+        "loadedRefs"
+      ],
+      "additionalProperties": false
+    },
+    "UsageFact": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "usage.fact"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceEventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sessionRef": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "usageBasis": {
+              "type": "string",
+              "enum": ["per_run", "unknown"]
+            },
+            "inputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cachedInputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "costSource": {
+              "type": "string",
+              "const": "unknown"
+            },
+            "costMicros": {
+              "type": "null"
+            },
+            "currency": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "eventId",
+            "sourceRef",
+            "sourceEventId",
+            "sourceRevision",
+            "requestId",
+            "sessionRef",
+            "usageBasis",
+            "inputTokens",
+            "outputTokens",
+            "cachedInputTokens",
+            "costSource",
+            "costMicros",
+            "currency"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "usage.fact"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceEventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sessionRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "usageBasis": {
+              "type": "string",
+              "const": "session_cumulative"
+            },
+            "inputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cachedInputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "costSource": {
+              "type": "string",
+              "const": "unknown"
+            },
+            "costMicros": {
+              "type": "null"
+            },
+            "currency": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "eventId",
+            "sourceRef",
+            "sourceEventId",
+            "sourceRevision",
+            "requestId",
+            "sessionRef",
+            "usageBasis",
+            "inputTokens",
+            "outputTokens",
+            "cachedInputTokens",
+            "costSource",
+            "costMicros",
+            "currency"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "usage.fact"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceEventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sessionRef": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "usageBasis": {
+              "type": "string",
+              "enum": ["per_run", "unknown"]
+            },
+            "inputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cachedInputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "costSource": {
+              "type": "string",
+              "const": "authoritative_billing"
+            },
+            "costMicros": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "currency": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "pattern": "^[A-Z]{3}(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "eventId",
+            "sourceRef",
+            "sourceEventId",
+            "sourceRevision",
+            "requestId",
+            "sessionRef",
+            "usageBasis",
+            "inputTokens",
+            "outputTokens",
+            "cachedInputTokens",
+            "costSource",
+            "costMicros",
+            "currency"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "protocolVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "recordedAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "usage.fact"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceEventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sessionRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "usageBasis": {
+              "type": "string",
+              "const": "session_cumulative"
+            },
+            "inputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cachedInputTokens": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "costSource": {
+              "type": "string",
+              "const": "authoritative_billing"
+            },
+            "costMicros": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "currency": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "pattern": "^[A-Z]{3}(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "protocolVersion",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "recordedAt",
+            "kind",
+            "eventId",
+            "sourceRef",
+            "sourceEventId",
+            "sourceRevision",
+            "requestId",
+            "sessionRef",
+            "usageBasis",
+            "inputTokens",
+            "outputTokens",
+            "cachedInputTokens",
+            "costSource",
+            "costMicros",
+            "currency"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ExecutionCommand"
+    },
+    {
+      "$ref": "#/$defs/CancelCommand"
+    },
+    {
+      "$ref": "#/$defs/ObserveCommand"
+    },
+    {
+      "$ref": "#/$defs/ReconcileCommand"
+    },
+    {
+      "$ref": "#/$defs/ExecutionObservation"
+    },
+    {
+      "$ref": "#/$defs/AcceptedReceipt"
+    },
+    {
+      "$ref": "#/$defs/ExecutionEvent"
+    },
+    {
+      "$ref": "#/$defs/ExecutionResult"
+    },
+    {
+      "$ref": "#/$defs/Capability"
+    },
+    {
+      "$ref": "#/$defs/ResourcePreparationReceipt"
+    },
+    {
+      "$ref": "#/$defs/ResourceActivationReceipt"
+    },
+    {
+      "$ref": "#/$defs/UsageFact"
+    }
+  ]
+}

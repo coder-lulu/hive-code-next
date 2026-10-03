@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.admission.binding-match.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "admission-replay",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {
+    "expected": {"cellId": "cell-01", "cellIncarnationId": "22222222-2222-4222-8222-222222222222", "relayHostId": "If4x36FUomFia_hU", "assignmentEpoch": 5, "clientKeyHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+    "actual": {"clientKeyHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "assignmentEpoch": 5, "relayHostId": "If4x36FUomFia_hU", "cellIncarnationId": "22222222-2222-4222-8222-222222222222", "cellId": "cell-01"},
+    "priorState": "UNUSED",
+    "attempts": 1
+  }
+}

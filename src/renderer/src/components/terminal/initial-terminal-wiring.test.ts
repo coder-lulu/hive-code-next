@@ -1,0 +1,39 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+// Why: the watcher owner is the passive half of the closed-last-terminal contract — it must keep
+// honouring the tombstone while explicit activation re-seeds. Assert the wiring as source text;
+// mounting the full terminal surface costs far more than it returns, and the e2e that covers it
+// only runs when an e2e spec changes.
+const TERMINAL_PATH = 'src/renderer/src/components/use-terminal-watcher-effects.ts'
+
+function readSource(relativePath: string): string {
+  return readFileSync(join(process.cwd(), relativePath), 'utf8').replace(/\r\n/g, '\n')
+}
+
+describe('Terminal auto-create wiring', () => {
+  const source = readSource(TERMINAL_PATH)
+
+  it('derives the tombstone from the active worktree row and its close records at decision time', () => {
+    // Why the live store: a render-captured row goes stale while the activation check runs.
+    expect(source).toMatch(
+      /isTerminalWorkspaceEmptiedOnPurpose\(\s*useAppStore\.getState\(\),\s*activeWorktreeId\s*\)/
+    )
+  })
+
+  it('passes that derivation into shouldAutoCreateInitialTerminal', () => {
+    // Why: the regression #14590 fixed is re-introduced by dropping this second argument, and a
+    // literal here would pin nothing — it has to be the identifier the effect actually derives.
+    // Both floating and project-workspace paths must honor the same closed-terminal tombstone.
+    expect(
+      source.split('shouldAutoCreateInitialTerminal(').length - 1,
+      'expected one guarded call in each floating and project-workspace path'
+    ).toBe(2)
+    expect(
+      source.match(
+        /shouldAutoCreateInitialTerminal\(renderableTabCount, activeWorktreeHasTerminalState\)/g
+      )
+    ).toHaveLength(2)
+  })
+})

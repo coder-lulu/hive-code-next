@@ -1,0 +1,3 @@
+# RPC recordings hash TypeScript source and anchor source mutations byte-for-byte.
+*.ts text eol=lf
+*.tsx text eol=lf

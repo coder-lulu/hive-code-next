@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "description": "Maintained path boundary for upstream/orca synchronization",
+  "productBoundary": {
+    "owner": "HiveCode maintainers",
+    "paths": [
+      "config/product/",
+      "config/hivecode-brand-allowlist.json",
+      "config/electron-builder.config.cjs",
+      "cloud/",
+      "src/main/product/",
+      "src/main/hive-account/",
+      "src/main/hive-runtime-cloud/",
+      "src/shared/generated/product-config.ts",
+      "mobile/src/generated/product-config.ts",
+      ".github/workflows/",
+      "resources/"
+    ]
+  },
+  "directAbsorb": {
+    "owner": "Upstream compatibility",
+    "paths": [
+      "src/shared/",
+      "src/relay/",
+      "src/main/providers/",
+      "src/main/daemon/",
+      "src/main/network/",
+      "tests/",
+      "config/scripts/"
+    ],
+    "rule": "Only absorb when no productBoundary or manualReview path is touched. Preserve wire and persistence compatibility."
+  },
+  "manualReview": {
+    "owner": "Joint HiveCode and upstream reviewers",
+    "paths": [
+      "src/main/runtime/rpc/",
+      "src/main/pty/",
+      "src/main/ipc/pty/",
+      "src/main/git/",
+      "src/main/source-control/",
+      "src/main/ssh/",
+      "mobile/src/worktree/",
+      "src/main/window/",
+      "src/main/updater/"
+    ],
+    "rule": "Review conflicts individually on the selected product main branch, preserve maintained boundaries, and publish only after exact-candidate gates."
+  },
+  "moduleSplitTargets": [
+    {
+      "path": "src/main/git/runner.ts",
+      "facade": "public git/gh command-runner entry point",
+      "boundaryPaths": ["src/main/git/runner.ts", "src/main/git/command-runner/"],
+      "expectedBoundary": "manualReview",
+      "contractTests": ["src/main/git/runner.test.ts", "src/main/git/runner-command-exec.test.ts"],
+      "sensitivity": "Git, WSL, GitHub CLI and environment compatibility"
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pty-connection.ts",
+      "facade": "connectPanePty and startup notice exports",
+      "boundaryPaths": [
+        "src/renderer/src/components/terminal-pane/pty-connection.ts",
+        "src/renderer/src/components/terminal-pane/pty-connection/"
+      ],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/renderer/src/components/terminal-pane/pty-connection-agent-session-resume.test.ts",
+        "src/renderer/src/components/terminal-pane/pty-connection-cold-restore-agent-resume.test.ts"
+      ],
+      "sensitivity": "PTY lifecycle, reattach, input routing and terminal recovery"
+    },
+    {
+      "path": "src/renderer/src/web/web-runtime-client.ts",
+      "facade": "WebRuntimeClient public RPC/subscription API",
+      "boundaryPaths": [
+        "src/renderer/src/web/web-runtime-client.ts",
+        "src/renderer/src/web/web-runtime-client-"
+      ],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/renderer/src/web/web-runtime-client.test.ts",
+        "src/renderer/src/web/web-runtime-client-protocol.test.ts",
+        "src/renderer/src/web/web-runtime-client-timeout-budget.test.ts"
+      ],
+      "sensitivity": "E2EE, Cloud session credentials, reconnect and file-watch replay"
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api.ts",
+      "facade": "window.api preload API",
+      "boundaryPaths": [
+        "src/renderer/src/web/web-preload-api.ts",
+        "src/renderer/src/web/web-preload-api-",
+        "src/renderer/src/web/preload-api/"
+      ],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/renderer/src/web/web-preload-api-test-harness.ts",
+        "src/renderer/src/web/web-preload-api-runtime-calls.test.ts",
+        "src/renderer/src/web/web-preload-api-workspace-catalog.test.ts"
+      ],
+      "sensitivity": "Renderer capability exposure and product API names"
+    },
+    {
+      "path": "src/main/window/createMainWindow.ts",
+      "facade": "loadMainWindow and createMainWindow",
+      "boundaryPaths": [
+        "src/main/window/createMainWindow.ts",
+        "src/main/window/createMainWindow-",
+        "src/main/window/main-window-"
+      ],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/main/window/createMainWindow.test.ts",
+        "src/main/window/createMainWindow-renderer-crash-recovery.test.ts",
+        "src/main/window/createMainWindow-close-confirmation.test.ts"
+      ],
+      "sensitivity": "Window lifecycle, quit/reload, renderer recovery and native chrome"
+    },
+    {
+      "path": "src/main/providers/ssh-git-provider.ts",
+      "facade": "SshGitProvider IGitProvider implementation",
+      "boundaryPaths": [
+        "src/main/providers/ssh-git-provider.ts",
+        "src/main/providers/ssh-git-provider-"
+      ],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/main/providers/ssh-git-provider-exec.test.ts",
+        "src/main/providers/ssh-git-provider-merge.test.ts",
+        "src/main/providers/ssh-git-provider-staging.test.ts",
+        "src/main/providers/ssh-git-provider-status.test.ts",
+        "src/main/providers/ssh-git-provider-worktree.test.ts"
+      ],
+      "sensitivity": "SSH transport, Git semantics, leases and remote worktrees"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime.ts",
+      "facade": "OrcaRuntime public API and product controllers",
+      "boundaryPaths": ["src/main/runtime/orca-runtime.ts", "src/main/runtime/orca-runtime-"],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/main/runtime/orca-runtime.test.ts",
+        "src/main/runtime/orca-runtime-cloud-status.test.ts"
+      ],
+      "sensitivity": "Runtime lifecycle, skill registry, host authority and cloud identity"
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc.ts",
+      "facade": "RuntimeRpcServer transport and authorization entry point",
+      "boundaryPaths": ["src/main/runtime/runtime-rpc.ts", "src/main/runtime/runtime-rpc/"],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/main/runtime/runtime-rpc-cloud-session.test.ts",
+        "src/main/runtime/runtime-rpc-cloud-transport-security.test.ts",
+        "src/main/runtime/runtime-rpc-request-authorization.test.ts"
+      ],
+      "sensitivity": "Cloud E2EE, expiry, pairing, local-only ownership and connection cleanup"
+    },
+    {
+      "path": "src/main/text-generation/commit-message-text-generation.ts",
+      "facade": "Source-control generation and cancellation API",
+      "boundaryPaths": ["src/main/text-generation/"],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/main/text-generation/commit-message-text-generation-remote-execution.test.ts",
+        "src/main/text-generation/commit-message-text-generation-failure-sanitization.test.ts"
+      ],
+      "sensitivity": "Remote outcome uncertainty, credentials, command permissions and cancellation"
+    },
+    {
+      "path": "src/renderer/src/store/slices/repos.ts",
+      "facade": "RepoSlice public actions and types",
+      "boundaryPaths": [
+        "src/renderer/src/store/slices/repos.ts",
+        "src/renderer/src/store/repos/",
+        "src/renderer/src/store/projects/",
+        "src/renderer/src/store/project-groups/",
+        "src/renderer/src/store/folder-workspaces/"
+      ],
+      "expectedBoundary": "manualReview",
+      "contractTests": [
+        "src/renderer/src/store/slices/repos-project-groups-delete.test.ts",
+        "src/renderer/src/store/slices/repos-host-identity-routing.test.ts"
+      ],
+      "sensitivity": "Host-scoped deletion, project grouping and runtime ownership"
+    },
+    {
+      "path": "src/renderer/src/components/github-project/ProjectViewWrapper.tsx",
+      "facade": "ProjectView composition and state rendering",
+      "boundaryPaths": ["src/renderer/src/components/github-project/"],
+      "expectedBoundary": "manualReview",
+      "contractTests": ["src/renderer/src/store/slices/repos-project-groups.test.ts"],
+      "sensitivity": "Project display, host authority, HiveCode support links and retained UI"
+    }
+  ],
+  "workflow": {
+    "upstream": "upstream/main",
+    "integrationMode": "direct-product",
+    "productBranches": ["hivecode/main-next", "main"],
+    "publication": "verified-fast-forward"
+  },
+  "absorptionPolicy": {
+    "historicalAndCurrent": true,
+    "requiredUpstreamBugFixes": true,
+    "requiredNonConflictingFeatures": true,
+    "rule": "Every upstream BUG or security fix, historical or current, must be absorbed or documented as already equivalent in the product tree. Every upstream feature that does not cross a product boundary must be absorbed. Product decision is required only when the change crosses a product-boundary path, changes a persisted or wire contract, or conflicts with a maintained HiveCode capability.",
+    "uiAdaptation": "When an upstream feature overlaps HiveCode UI, preserve HiveCode branding and existing UI capabilities while adopting upstream behavior and compatibility fixes.",
+    "historicalAudit": "Perform one complete review of reachable upstream history before accepting the initial checkpoint. Subsequent runs review every commit after the last reviewed upstream SHA read from the frozen product target, plus unresolved carried-over decisions. A fetch, local merge, failed gate, or unpublished candidate never advances that effective checkpoint.",
+    "checkpointFile": "config/upstream-sync-state.json",
+    "checkpointAuthority": "Only boundary review, exact-candidate validation and fast-forward publication to the product target make its proposed checkpoint effective. Missing initial history requires a full review; malformed state or rewritten upstream history stops for explicit repair, never silently skips commits.",
+    "equivalence": "Use reachable commits and nonempty patch IDs as inclusion evidence. Semantic equivalence or duplicate features require explicit product evidence and review. Ancestry alone is not proof that later product adaptations preserved upstream behavior.",
+    "pendingDecisions": "Carry unresolved boundary feature decisions into every subsequent run. Mandatory BUG, security, stability, and data-consistency fixes cannot be closed by deferral or an unexplained product decision.",
+    "lanes": {
+      "bugBackport": "BUG, security, stability, and data-consistency fixes are mandatory backports after dependency-closure and patch-id review.",
+      "productDecision": "New features and UI changes enter product decision only when they meet the explicit product-boundary/conflict criteria above; otherwise they are mandatory absorption candidates."
+    },
+    "moduleSplits": "Review the active import/export entry point together with every extracted module and its product delta. A conflict-free merge of helper modules is not absorption evidence when an older monolith bypasses them. Preserve public exports and port product behavior into the active modules; verify through the facade."
+  }
+}

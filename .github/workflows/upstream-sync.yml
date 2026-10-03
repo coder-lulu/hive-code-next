@@ -1,0 +1,512 @@
+name: Upstream Sync
+
+# Verify one immutable candidate before a fast-forward product update.
+# Existing repository-level Actions enablement remains an operator setting.
+on:
+  schedule:
+    - cron: '17 2 * * 1,4'
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Product main branch to synchronize after all gates pass
+        required: true
+        type: string
+        default: hivecode/main-next
+
+concurrency:
+  group: hivecode-upstream-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_REPOSITORY: stablyai/orca
+  UPSTREAM_BRANCH: main
+  TARGET_BRANCH: ${{ inputs.target_branch || 'hivecode/main-next' }}
+
+jobs:
+  sync:
+    name: prepare product candidate without publication credentials
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_sha: ${{ steps.sync.outputs.upstream_sha }}
+      target_sha: ${{ steps.sync.outputs.target_sha }}
+      candidate_sha: ${{ steps.bundle.outputs.candidate_sha }}
+      node_version: ${{ steps.sync.outputs.node_version }}
+      has_changes: ${{ steps.checkpoint.outputs.has_changes }}
+    steps:
+      - name: Checkout repository without publication credentials
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          fetch-tags: false
+          persist-credentials: false
+
+      - name: Freeze upstream and remote product tip
+        id: sync
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPSTREAM_URL: https://github.com/${{ env.UPSTREAM_REPOSITORY }}.git
+        run: |
+          set -euo pipefail
+          gh auth setup-git --hostname github.com
+          for branch in "$TARGET_BRANCH" "$UPSTREAM_BRANCH"; do
+            git check-ref-format --branch "$branch"
+          done
+          case "$TARGET_BRANCH" in
+            main|hivecode/main-next) ;;
+            *) echo '::error::Invalid product target branch.'; exit 1 ;;
+          esac
+          test -z "$(git status --porcelain)"
+          test -z "$(git ls-files -u)"
+          for state in MERGE_HEAD rebase-merge rebase-apply; do
+            test ! -e "$(git rev-parse --git-path "$state")"
+          done
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url upstream "$UPSTREAM_URL"
+          else
+            git remote add upstream "$UPSTREAM_URL"
+          fi
+          if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+            git fetch --no-tags --unshallow origin "$TARGET_BRANCH"
+          fi
+          git fetch --no-tags --prune upstream \
+            "+refs/heads/$UPSTREAM_BRANCH:refs/remotes/upstream/$UPSTREAM_BRANCH"
+          upstream_sha="$(git rev-parse "refs/remotes/upstream/$UPSTREAM_BRANCH")"
+          # The product ref must exist so its maintained overlay is retained.
+          git fetch --no-tags --prune origin \
+            "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+          target_sha="$(git rev-parse "refs/remotes/origin/$TARGET_BRANCH")"
+          {
+            echo "upstream_sha=$upstream_sha"
+            echo "target_sha=$target_sha"
+          } >> "$GITHUB_OUTPUT"
+          # Run privileged intake code from the reviewed product, not the incoming tree.
+          mkdir -p "$RUNNER_TEMP/upstream-sync-control"
+          git archive "$target_sha" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          node_version="$(jq -er '.engines.node | select(type == "string" and length > 0)' "$RUNNER_TEMP/upstream-sync-control/package.json")"
+          echo "node_version=$node_version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js for dependency-free intake
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ steps.sync.outputs.node_version }}
+
+      - name: Absorb upstream content without adding upstream commit ancestry
+        shell: bash
+        env:
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          TARGET_SHA: ${{ steps.sync.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p logs/upstream-sync
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch --force-create "$TARGET_BRANCH" "$TARGET_SHA"
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-tree-sync.mjs" prepare \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" \
+            --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/tree-sync-prepare.json"
+          if ! git diff --cached --quiet; then
+            git commit -m 'Absorb reviewed upstream changes into the product tree' \
+              -m 'A three-way content receipt binds the frozen product, upstream checkpoint and incoming tree without adding upstream parents.'
+          fi
+
+      - name: Close intake before proposing a checkpoint
+        id: checkpoint
+        shell: bash
+        env:
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          TARGET_SHA: ${{ steps.sync.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-intake.mjs" \
+            --cwd "$GITHUB_WORKSPACE" \
+            --upstream "$UPSTREAM_SHA" --head HEAD --state-ref "$TARGET_SHA" \
+            --target-branch "$TARGET_BRANCH" \
+            --report "$GITHUB_WORKSPACE/logs/upstream-sync/proposed-intake.md" \
+            --json-output "$GITHUB_WORKSPACE/logs/upstream-sync/proposed-intake.json" --require-boundary-review --write-checkpoint
+          git add -- config/upstream-sync-state.json
+          test "$(git diff --cached --name-only)" = 'config/upstream-sync-state.json' || git diff --cached --quiet
+          if ! git diff --cached --quiet; then
+            git commit -m 'Keep the next upstream review anchored to a reviewed product checkpoint' \
+              -m 'The checkpoint is proposed until this candidate passes gates and the exact candidate is published to the product branch.' \
+              -m 'Tested: Upstream intake inclusion and dependency closure' \
+              -m 'Not-tested: Candidate platform and product gates run before product publication'
+          fi
+          test -z "$(git status --porcelain)"
+          if [ "$(git rev-parse HEAD)" = "$TARGET_SHA" ]; then
+            echo 'has_changes=false' >> "$GITHUB_OUTPUT"
+            echo 'No product or checkpoint changes; skip publication and repeated gates.'
+          else
+            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bundle the final immutable candidate without publishing a branch
+        id: bundle
+        if: steps.checkpoint.outputs.has_changes == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_sha="$(git rev-parse HEAD)"
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+          mkdir -p logs/upstream-sync/candidate
+          git bundle create logs/upstream-sync/candidate/candidate.bundle "refs/heads/$TARGET_BRANCH"
+
+      - name: Upload the immutable candidate
+        if: steps.checkpoint.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync-candidate
+          path: logs/upstream-sync/candidate/candidate.bundle
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload preparation evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync-preparation
+          path: |
+            logs/upstream-sync/product-conflicts.txt
+            logs/upstream-sync/upstream-conflicts.txt
+            logs/upstream-sync/tree-sync-prepare.json
+            logs/upstream-sync/proposed-intake.md
+            logs/upstream-sync/proposed-intake.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  gates:
+    name: product, compatibility, and intake evidence
+    needs: sync
+    if: needs.sync.result == 'success' && needs.sync.outputs.has_changes == 'true'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+      TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
+      CANDIDATE_SHA: ${{ needs.sync.outputs.candidate_sha }}
+    steps:
+      - name: Checkout the frozen product base
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.sync.outputs.target_sha }}
+          fetch-depth: 1
+          fetch-tags: false
+          persist-credentials: false
+
+      - name: Download the immutable candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: upstream-sync-candidate
+          path: logs/upstream-sync/candidate
+
+      - name: Load the exact candidate from the bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git bundle verify logs/upstream-sync/candidate/candidate.bundle
+          git -c core.hooksPath=/dev/null fetch --no-tags logs/upstream-sync/candidate/candidate.bundle "refs/heads/$TARGET_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$CANDIDATE_SHA"
+          git -c core.hooksPath=/dev/null checkout --detach "$CANDIDATE_SHA"
+          git merge-base --is-ancestor "$TARGET_SHA" "$CANDIDATE_SHA"
+          git -c core.hooksPath=/dev/null fetch --no-tags "https://github.com/$UPSTREAM_REPOSITORY.git" "$UPSTREAM_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$UPSTREAM_SHA"
+
+      - name: Verify immutable commits and load reviewed audit code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          # Upstream objects are proof inputs, never parents of public product commits.
+          git merge-base --is-ancestor "$TARGET_SHA" "$CANDIDATE_SHA"
+          mkdir -p "$RUNNER_TEMP/upstream-sync-control" "$GITHUB_WORKSPACE/logs/upstream-sync/evidence"
+          git archive "$TARGET_SHA" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+
+      - name: Setup Node.js for reviewed audit code
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ needs.sync.outputs.node_version }}
+
+      - name: Recompute frozen three-way content absorption before candidate execution
+        shell: bash
+        run: |
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-tree-sync.mjs" verify \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/tree-sync-verify.json"
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Install separate mobile workspace dependencies
+        run: pnpm --dir mobile install --frozen-lockfile --ignore-scripts
+
+      - name: Run common product verification once
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            node "$RUNNER_TEMP/upstream-sync-control/config/scripts/run-upstream-sync-gates.mjs" --suite=common --cwd "$GITHUB_WORKSPACE"
+            pnpm run typecheck
+            pnpm run lint
+            pnpm run test
+            pnpm run build:desktop
+            pnpm run build:web
+            pnpm --dir mobile run typecheck
+            pnpm --dir mobile run lint
+            pnpm --dir mobile run test
+          } 2>&1 | tee "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/common-gates.log"
+
+      - name: Regenerate trusted fork and product evidence after candidate execution
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          mkdir -p "$RUNNER_TEMP/upstream-sync-control" "$GITHUB_WORKSPACE/logs/upstream-sync/evidence"
+          git --no-replace-objects archive "$TARGET_SHA" config | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          import { pathToFileURL } from 'node:url'
+          const root = process.env.RUNNER_TEMP
+          const { collectForkDelta, renderMarkdown } = await import(pathToFileURL(`${root}/upstream-sync-control/config/scripts/audit-fork-delta.mjs`))
+          for (const [name, base] of [['fork-delta', process.env.UPSTREAM_SHA], ['product-delta', process.env.TARGET_SHA]]) {
+            const report = collectForkDelta({ base, head: process.env.CANDIDATE_SHA })
+            writeFileSync(`${process.env.GITHUB_WORKSPACE}/logs/upstream-sync/evidence/${name}.json`, JSON.stringify(report, null, 2))
+            writeFileSync(`${process.env.GITHUB_WORKSPACE}/logs/upstream-sync/evidence/${name}.md`, renderMarkdown(report))
+          }
+          NODE
+
+      - name: Track priorities and reverify intake on the final candidate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-tree-sync.mjs" verify \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/tree-sync-verify.json"
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/track-upstream-changes.mjs" \
+            --cwd "$GITHUB_WORKSPACE" \
+            --head "$UPSTREAM_SHA" --state-ref "$TARGET_SHA" --target-branch "$TARGET_BRANCH" \
+            --output "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/upstream-change-intake.md"
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-intake.mjs" \
+            --cwd "$GITHUB_WORKSPACE" \
+            --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" --state-ref "$TARGET_SHA" \
+            --target-branch "$TARGET_BRANCH" \
+            --report "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/upstream-intake-report.md" \
+            --json-output "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/upstream-intake-report.json" --require-boundary-review
+
+      - name: Record common verification outcome
+        if: always()
+        shell: bash
+        env:
+          GATE_STATUS: ${{ job.status }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from 'node:fs'
+          const directory = `${process.env.GITHUB_WORKSPACE}/logs/upstream-sync/evidence`
+          mkdirSync(directory, { recursive: true })
+          writeFileSync(`${directory}/common-gates.json`, JSON.stringify({
+            suite: 'common-gates', status: process.env.GATE_STATUS,
+            upstreamSha: process.env.UPSTREAM_SHA, targetSha: process.env.TARGET_SHA, candidateSha: process.env.CANDIDATE_SHA,
+            commands: [
+              'node config/scripts/run-upstream-sync-gates.mjs --suite=common',
+              'pnpm run typecheck', 'pnpm run lint', 'pnpm run test',
+              'pnpm run build:desktop', 'pnpm run build:web',
+              'pnpm --dir mobile run typecheck', 'pnpm --dir mobile run lint', 'pnpm --dir mobile run test',
+            ],
+          }, null, 2))
+          NODE
+
+      - name: Upload the reports produced by this job
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync-compatibility-evidence
+          path: logs/upstream-sync/evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  platform-gates:
+    name: PTY / WSL / SSH (${{ matrix.os }})
+    needs: sync
+    if: needs.sync.result == 'success' && needs.sync.outputs.has_changes == 'true'
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win32
+          - os: macos-latest
+            platform: darwin
+    runs-on: ${{ matrix.os }}
+    env:
+      UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+      TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
+      CANDIDATE_SHA: ${{ needs.sync.outputs.candidate_sha }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - name: Checkout the frozen product base
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.sync.outputs.target_sha }}
+          fetch-depth: 1
+          fetch-tags: false
+          persist-credentials: false
+
+      - name: Download the immutable candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: upstream-sync-candidate
+          path: logs/upstream-sync/candidate
+
+      - name: Load the exact candidate from the bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git bundle verify logs/upstream-sync/candidate/candidate.bundle
+          git -c core.hooksPath=/dev/null fetch --no-tags logs/upstream-sync/candidate/candidate.bundle "refs/heads/$TARGET_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$CANDIDATE_SHA"
+          git -c core.hooksPath=/dev/null checkout --detach "$CANDIDATE_SHA"
+          git merge-base --is-ancestor "$TARGET_SHA" "$CANDIDATE_SHA"
+          git -c core.hooksPath=/dev/null fetch --no-tags "https://github.com/$UPSTREAM_REPOSITORY.git" "$UPSTREAM_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$UPSTREAM_SHA"
+
+      - name: Verify tested candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          mkdir -p "$RUNNER_TEMP/upstream-sync-control"
+          git archive "$TARGET_SHA" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+
+      - name: Setup Node.js for reviewed content verification
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ needs.sync.outputs.node_version }}
+
+      - name: Recompute frozen content absorption on this platform
+        shell: bash
+        run: |
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-tree-sync.mjs" verify \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/tree-sync-$PLATFORM.json"
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Execute the focused platform regression matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/run-upstream-sync-gates.mjs" --suite=regression --platform="$PLATFORM" --cwd "$GITHUB_WORKSPACE" \
+            2>&1 | tee "$GITHUB_WORKSPACE/logs/upstream-sync/regression-$PLATFORM.log"
+
+      - name: Record platform verification outcome
+        if: always()
+        shell: bash
+        env:
+          GATE_STATUS: ${{ job.status }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          const suite = `regression-${process.env.PLATFORM}`
+          writeFileSync(`${process.env.GITHUB_WORKSPACE}/logs/upstream-sync/${suite}.json`, JSON.stringify({
+            suite, status: process.env.GATE_STATUS,
+            upstreamSha: process.env.UPSTREAM_SHA, targetSha: process.env.TARGET_SHA, candidateSha: process.env.CANDIDATE_SHA,
+            commands: [`node config/scripts/run-upstream-sync-gates.mjs --suite=regression --platform=${process.env.PLATFORM}`],
+          }, null, 2))
+          NODE
+
+      - name: Upload platform evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync-platform-${{ matrix.platform }}
+          path: |
+            logs/upstream-sync/regression-${{ matrix.platform }}.json
+            logs/upstream-sync/regression-${{ matrix.platform }}.log
+            logs/upstream-sync/tree-sync-${{ matrix.platform }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: publish verified product update
+    needs: [sync, gates, platform-gates]
+    if: needs.sync.result == 'success' && needs.gates.result == 'success' && needs.platform-gates.result == 'success'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
+      TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
+      CANDIDATE_SHA: ${{ needs.sync.outputs.candidate_sha }}
+    steps:
+      - name: Checkout frozen product control code without stored credentials
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.sync.outputs.target_sha }}
+          fetch-depth: 1
+          fetch-tags: false
+          persist-credentials: false
+
+      - name: Download complete verification evidence and immutable bundle
+        uses: actions/download-artifact@v8
+        with:
+          pattern: upstream-sync-*
+          path: logs/upstream-sync/publication
+          merge-multiple: true
+
+      - name: Setup Node.js for trusted evidence validation
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ needs.sync.outputs.node_version }}
+
+      - name: Validate evidence and candidate without executing incoming code
+        shell: bash
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          for sha in "$UPSTREAM_SHA" "$TARGET_SHA" "$CANDIDATE_SHA"; do
+            [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
+          done
+          case "$TARGET_BRANCH" in main|hivecode/main-next) ;; *) exit 1 ;; esac
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          git bundle verify logs/upstream-sync/publication/candidate.bundle
+          git -c core.hooksPath=/dev/null fetch --no-tags logs/upstream-sync/publication/candidate.bundle "refs/heads/$TARGET_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$CANDIDATE_SHA"
+          git merge-base --is-ancestor "$TARGET_SHA" "$CANDIDATE_SHA"
+          git -c core.hooksPath=/dev/null fetch --no-tags "https://github.com/$UPSTREAM_REPOSITORY.git" "$UPSTREAM_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$UPSTREAM_SHA"
+          node config/scripts/upstream-tree-sync.mjs verify \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --report logs/upstream-sync/publication/tree-sync-verify.json
+          node config/scripts/upstream-intake.mjs \
+            --cwd "$GITHUB_WORKSPACE" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --state-ref "$TARGET_SHA" --target-branch "$TARGET_BRANCH" --require-boundary-review \
+            --report logs/upstream-sync/publication/upstream-intake-report.md \
+            --json-output logs/upstream-sync/publication/upstream-intake-report.json
+          node config/scripts/upstream-sync-publication.mjs \
+            --evidence logs/upstream-sync/publication \
+            --upstream "$UPSTREAM_SHA" --target "$TARGET_SHA" --candidate "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --run-url "$RUN_URL" \
+            --output logs/upstream-sync/publication/decision.md
+
+      - name: Fast-forward the unchanged remote product target
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git --hostname github.com
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$TARGET_SHA"
+          git -c core.hooksPath=/dev/null push origin "$CANDIDATE_SHA:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$CANDIDATE_SHA"
+          cat logs/upstream-sync/publication/decision.md >> "$GITHUB_STEP_SUMMARY"

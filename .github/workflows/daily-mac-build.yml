@@ -1,0 +1,28 @@
+name: Retired daily desktop build
+
+# Daily builds used timestamped `-daily.N` versions and uploaded installer
+# bytes to the stablyai/orca-daily GitHub repository. Those versions are not a
+# valid HiveCode release identity. This retained manual stub prevents an old
+# bookmark from silently publishing outside HiveCloud.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Ignored; daily GitHub releases are retired'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  retired:
+    if: github.repository == 'stablyai/orca'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain retirement
+        run: |
+          echo "::error::Daily GitHub installer publishing is retired. Use release-cut.yml and publish the signed artifact through HiveCloud OSS."
+          exit 1

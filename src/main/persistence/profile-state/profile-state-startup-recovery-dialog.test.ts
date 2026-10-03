@@ -1,0 +1,103 @@
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  chooseProfileStateCopy,
+  presentProfileStateStartupRecoveryDialog
+} from './profile-state-startup-recovery-dialog'
+
+describe('profile state startup recovery dialog', () => {
+  it('offers a copyable offline export command and does not mutate state', async () => {
+    const showMessageBox = vi.fn().mockResolvedValue({ response: 0 })
+    const copyToClipboard = vi.fn()
+
+    await presentProfileStateStartupRecoveryDialog({
+      message: 'SQLite state is unreadable.\nSQLite path: /tmp/profile-state.db',
+      recoveryCommand: 'orca profile state exports',
+      showMessageBox,
+      copyToClipboard
+    })
+
+    expect(showMessageBox).toHaveBeenCalledWith({
+      type: 'error',
+      buttons: ['Copy recovery command', 'Quit'],
+      defaultId: 1,
+      cancelId: 1,
+      title: `${APP_DISPLAY_NAME} profile state cannot be opened`,
+      message: `${APP_DISPLAY_NAME} cannot safely open this profile.`,
+      detail: `SQLite state is unreadable.
+SQLite path: /tmp/profile-state.db
+
+Copy the recovery command, then run it after ${APP_DISPLAY_NAME} closes.`
+    })
+    expect(copyToClipboard).toHaveBeenCalledWith('orca profile state exports')
+  })
+
+  it('leaves the clipboard untouched when the user quits', async () => {
+    const showMessageBox = vi.fn().mockResolvedValue({ response: 1 })
+    const copyToClipboard = vi.fn()
+
+    await presentProfileStateStartupRecoveryDialog({
+      message: 'ambiguous profile state',
+      recoveryCommand: 'orca profile state exports',
+      showMessageBox,
+      copyToClipboard
+    })
+
+    expect(copyToClipboard).not.toHaveBeenCalled()
+  })
+
+  it('does not offer rollback for an authority ambiguity', async () => {
+    const showMessageBox = vi.fn().mockResolvedValue({ response: 0 })
+    const copyToClipboard = vi.fn()
+
+    await presentProfileStateStartupRecoveryDialog({
+      message: 'both profile authorities are present',
+      showMessageBox,
+      copyToClipboard
+    })
+
+    expect(showMessageBox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        buttons: ['Quit'],
+        defaultId: 0,
+        cancelId: 0,
+        detail: `both profile authorities are present
+
+Quit ${APP_DISPLAY_NAME} and resolve the profile-state authority before retrying.`
+      })
+    )
+    expect(copyToClipboard).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [0, 'current-sqlite'],
+    [1, 'current-json'],
+    [2, undefined]
+  ] as const)('maps choice button %i to %s', async (response, expected) => {
+    const showMessageBox = vi.fn().mockResolvedValue({ response })
+    await expect(
+      chooseProfileStateCopy({
+        sqliteSavedAt: new Date(1),
+        jsonSavedAt: new Date(2),
+        formatTime: (time) => `t${time.getTime()}`,
+        showMessageBox
+      })
+    ).resolves.toBe(expected)
+    expect(showMessageBox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        buttons: ['Use SQLite (Recommended)', 'Use JSON', 'Quit'],
+        defaultId: 0,
+        cancelId: 2
+      })
+    )
+    const { detail } = showMessageBox.mock.calls[0][0]
+    expect(detail).toContain('Last saved t1.')
+    expect(detail).toContain('Last saved t2.')
+  })
+
+  it('omits save times it could not read', async () => {
+    const showMessageBox = vi.fn().mockResolvedValue({ response: 2 })
+    await chooseProfileStateCopy({ showMessageBox })
+    expect(showMessageBox.mock.calls[0][0].detail).not.toContain('Last saved')
+  })
+})

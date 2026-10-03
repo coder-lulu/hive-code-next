@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.jws.wrong-typ.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "jws",
+  "applicableComponents": [
+    "cloud",
+    "hivecode",
+    "cell"
+  ],
+  "validationTime": 1893456000,
+  "input": {
+    "verifierContext": {
+      "issuer": "https://cloud.hive.test/relay",
+      "acceptedVerifierKids": [
+        "relay-test-2026-01"
+      ],
+      "privateOriginsByCellId": {
+        "cell-01": "https://cell-01.private.hive.test:8443"
+      }
+    },
+    "tokenType": "controlLease",
+    "compactJws": "eyJhbGciOiJFZERTQSIsInR5cCI6InJlbGF5LXNlc3Npb24rand0Iiwia2lkIjoicmVsYXktdGVzdC0yMDI2LTAxIn0.eyJpc3MiOiJodHRwczovL2Nsb3VkLmhpdmUudGVzdC9yZWxheSIsInN1YiI6InJ1bnRpbWUtMDEiLCJqdGkiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJpYXQiOjE4OTM0NTU5NzAsIm5iZiI6MTg5MzQ1NTk3MCwiYXVkIjoiaGl2ZS1yZWxheS1jZWxsIiwic2NvcGUiOiJyZWxheTpjb250cm9sIiwiZXhwIjoxODkzNDU2MDkwLCJjZWxsSWQiOiJjZWxsLTAxIiwiY2VsbEluY2FybmF0aW9uSWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJhc3NpZ25tZW50SWQiOiIzMzMzMzMzMy0zMzMzLTQzMzMtODMzMy0zMzMzMzMzMzMzMzMiLCJyZWxheUhvc3RJZCI6IkFBQUFBQUFBQUFBQUFBQUEiLCJob3N0S2V5SGFzaCI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEiLCJydW50aW1lVHVwbGVIYXNoIjoiQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQSIsImF1dGhvcml0eUdlbmVyYXRpb24iOjcsImZlbmNpbmdFcG9jaCI6MywibGVhc2VFcG9jaCI6MTEsImFzc2lnbm1lbnRFcG9jaCI6NSwiY29udHJvbEdlbmVyYXRpb24iOjJ9.nahUrnZwrTegCWJ0sH0bOyhzhru1nMoHZfxrkKB91LE9753vTyUM_mpeLdWBEfa6Bi8NcnnIchOQWCM37VPoCw"
+  }
+}

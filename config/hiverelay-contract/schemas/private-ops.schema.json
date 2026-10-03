@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/private-ops.schema.json",
+  "title": "HiveRelay Cell private operations",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/statusResponse"
+    },
+    {
+      "$ref": "#/$defs/lifecycleCommand"
+    },
+    {
+      "$ref": "#/$defs/assignmentFence"
+    },
+    {
+      "$ref": "#/$defs/incarnationFence"
+    },
+    {
+      "$ref": "#/$defs/commandResult"
+    }
+  ],
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "epochMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "base64url16": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22}$"
+    },
+    "statusResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "observedAt must be within validationTime +/- 30000 ms. nonce must equal both the request header nonce and authenticated cellOpsToken nonce; cellId must equal the token Cell binding.",
+      "required": [
+        "type",
+        "v",
+        "nonce",
+        "cellId",
+        "cellIncarnationId",
+        "publicReady",
+        "lifecyclePermit",
+        "cryptographicReady",
+        "resourceReady",
+        "processReady",
+        "draining",
+        "preAuthSlotsUsed",
+        "authenticatedSlotsUsed",
+        "acceptedVerifierKids",
+        "keysetDigest",
+        "buildDigest",
+        "imageDigest",
+        "observedAt"
+      ],
+      "properties": {
+        "type": {
+          "const": "cell-status"
+        },
+        "v": {
+          "const": 2
+        },
+        "nonce": {
+          "$ref": "#/$defs/base64url16"
+        },
+        "cellId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "cellIncarnationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "publicReady": {
+          "type": "boolean"
+        },
+        "lifecyclePermit": {
+          "type": "boolean"
+        },
+        "cryptographicReady": {
+          "type": "boolean"
+        },
+        "resourceReady": {
+          "type": "boolean"
+        },
+        "processReady": {
+          "type": "boolean"
+        },
+        "draining": {
+          "type": "boolean"
+        },
+        "preAuthSlotsUsed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "authenticatedSlotsUsed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "acceptedVerifierKids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/opaqueId"
+          }
+        },
+        "keysetDigest": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "buildDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "imageDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "observedAt": {
+          "$ref": "#/$defs/epochMs"
+        }
+      }
+    },
+    "lifecycleCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "issuedAt must be within validationTime +/- 30000 ms; deadlineAt must equal issuedAt + 120000 ms and be greater than validationTime.",
+      "required": [
+        "type",
+        "v",
+        "commandType",
+        "commandId",
+        "cellId",
+        "targetIncarnationId",
+        "lifecycleGeneration",
+        "issuedAt",
+        "deadlineAt"
+      ],
+      "properties": {
+        "type": {
+          "const": "cell-lifecycle-command"
+        },
+        "v": {
+          "const": 2
+        },
+        "commandType": {
+          "enum": [
+            "INCARNATION_ACTIVATE",
+            "INCARNATION_DRAIN"
+          ]
+        },
+        "commandId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "cellId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "targetIncarnationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "lifecycleGeneration": {
+          "$ref": "#/$defs/generation"
+        },
+        "issuedAt": {
+          "$ref": "#/$defs/epochMs"
+        },
+        "deadlineAt": {
+          "$ref": "#/$defs/epochMs"
+        }
+      }
+    },
+    "assignmentFence": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "issuedAt must be within validationTime +/- 30000 ms.",
+      "required": [
+        "type",
+        "v",
+        "commandType",
+        "commandId",
+        "cellId",
+        "targetIncarnationId",
+        "assignmentId",
+        "rejectAssignmentEpochAtMost",
+        "rejectControlGenerationAtMost",
+        "issuedAt"
+      ],
+      "properties": {
+        "type": {
+          "const": "cell-assignment-fence"
+        },
+        "v": {
+          "const": 2
+        },
+        "commandType": {
+          "const": "ASSIGNMENT_FENCE"
+        },
+        "commandId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "cellId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "targetIncarnationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "assignmentId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "rejectAssignmentEpochAtMost": {
+          "$ref": "#/$defs/generation"
+        },
+        "rejectControlGenerationAtMost": {
+          "$ref": "#/$defs/generation"
+        },
+        "issuedAt": {
+          "$ref": "#/$defs/epochMs"
+        }
+      }
+    },
+    "incarnationFence": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "issuedAt must be within validationTime +/- 30000 ms.",
+      "required": [
+        "type",
+        "v",
+        "commandType",
+        "commandId",
+        "cellId",
+        "targetIncarnationId",
+        "lifecycleGeneration",
+        "issuedAt"
+      ],
+      "properties": {
+        "type": {
+          "const": "cell-incarnation-fence"
+        },
+        "v": {
+          "const": 2
+        },
+        "commandType": {
+          "const": "INCARNATION_FENCE"
+        },
+        "commandId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "cellId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "targetIncarnationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "lifecycleGeneration": {
+          "$ref": "#/$defs/generation"
+        },
+        "issuedAt": {
+          "$ref": "#/$defs/epochMs"
+        }
+      }
+    },
+    "commandResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "Exact command replay returns the original stored response; it does not replace result with a replay marker.",
+      "required": [
+        "type",
+        "v",
+        "commandId",
+        "commandType",
+        "cellId",
+        "targetIncarnationId",
+        "result",
+        "observedAt"
+      ],
+      "properties": {
+        "type": {
+          "const": "cell-command-result"
+        },
+        "v": {
+          "const": 2
+        },
+        "commandId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "commandType": {
+          "enum": [
+            "ASSIGNMENT_FENCE",
+            "INCARNATION_ACTIVATE",
+            "INCARNATION_DRAIN",
+            "INCARNATION_FENCE"
+          ]
+        },
+        "cellId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "targetIncarnationId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "result": {
+          "enum": [
+            "APPLIED",
+            "STALE_NOOP",
+            "COMMAND_REPLAY_CONFLICT",
+            "TARGET_MISMATCH"
+          ]
+        },
+        "observedAt": {
+          "$ref": "#/$defs/epochMs"
+        }
+      }
+    }
+  }
+}
