@@ -1,8 +1,12 @@
 import type { HiveRuntimeCloudIdentity } from '../../../src/main/hive-runtime-cloud/hive-runtime-cloud-identity-store'
+import type { HiveRuntimeCloudAuthorization } from '../../../src/main/hive-account/hive-account-service'
 
 export type RuntimeFixture = {
   identity: HiveRuntimeCloudIdentity
   resourceVersion: number
+  presenceSession: HiveRuntimeCloudAuthorization & {
+    cloudSessionId: string
+  }
   tuple: {
     runtimeRecordId: string
     runtimeInstanceId: string

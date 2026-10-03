@@ -50,7 +50,12 @@ paths:
   /hive/v1/runtime-heartbeats:
     post:
       operationId: recordRuntimeRelayControlHeartbeatV1
-      security: []
+      security: [{hiveSession: []}]
+      description: >-
+        Requires exactly one native Hive account Bearer access token and the
+        proof-protected cloudSessionId matching that token's current login session.
+        Runtime identity proof or mTLS remains mandatory. Revoked or expired target
+        login authority invalidates presence and all derived remote access.
       x-hiverelay-capability: runtime-session-control-v1
       x-hiverelay-legacy-response-shape: unchanged-when-capability-absent
       requestBody:

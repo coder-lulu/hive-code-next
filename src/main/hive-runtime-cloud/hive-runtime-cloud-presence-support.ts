@@ -38,6 +38,32 @@ export type RuntimeSource = {
   getReport: () => HiveRuntimeCloudReport
 }
 
+export class HiveRuntimeCloudPresencePublication {
+  private readonly listeners = new Set<(state: HiveRuntimeCloudPresenceState) => void>()
+
+  constructor(public value: HiveRuntimeCloudPresenceState) {}
+
+  subscribe(listener: (state: HiveRuntimeCloudPresenceState) => void): () => void {
+    this.listeners.add(listener)
+    listener(this.value)
+    return () => this.listeners.delete(listener)
+  }
+
+  set(state: HiveRuntimeCloudPresenceState): void {
+    if (this.value === state) {
+      return
+    }
+    this.value = state
+    for (const listener of this.listeners) {
+      try {
+        listener(state)
+      } catch {
+        // Observers cannot prevent Cloud access from being fenced.
+      }
+    }
+  }
+}
+
 export type PresenceDependencies = {
   createClient: (apiBaseUrl: string) => PresenceClient
   loadIdentity: (userDataPath: string) => ReturnType<typeof getOrCreateHiveRuntimeCloudIdentity>

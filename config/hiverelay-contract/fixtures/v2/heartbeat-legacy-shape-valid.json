@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.9",
+  "contractRevision": "hiverelay-v2-p0.10",
   "caseId": "v2.heartbeat.legacy-shape.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "heartbeat-control",
@@ -10,6 +10,8 @@
     "legacyRequest": {
       "runtimeInstanceId": "21000000-0000-4000-8000-000000000001",
       "bootId": "21000000-0000-4000-8000-000000000002",
+      "cloudSessionId": "21000000-0000-4000-8000-000000000005",
+      "clientAuthMode": "IDENTITY_PROOF",
       "leaseId": "21000000-0000-4000-8000-000000000003",
       "authorityGeneration": 7,
       "leaseEpoch": 11,

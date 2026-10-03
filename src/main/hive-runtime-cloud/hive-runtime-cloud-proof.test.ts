@@ -144,6 +144,7 @@ describe('Hive Runtime Cloud proofs', () => {
       identity,
       {
         bootId: '323e4567-e89b-42d3-a456-426614174000',
+        cloudSessionId: '923e4567-e89b-42d3-a456-426614174000',
         expectedAuthorityGeneration: 3,
         expectedLeaseEpoch: 4,
         expectedFencingEpoch: 5
@@ -172,6 +173,7 @@ describe('Hive Runtime Cloud proofs', () => {
       identity,
       {
         bootId: '323e4567-e89b-42d3-a456-426614174000',
+        cloudSessionId: '923e4567-e89b-42d3-a456-426614174000',
         leaseId: '423e4567-e89b-42d3-a456-426614174000',
         authorityGeneration: 1,
         leaseEpoch: 1,
@@ -277,6 +279,7 @@ describe('Hive Runtime Cloud proofs', () => {
       identity,
       {
         bootId: '323e4567-e89b-42d3-a456-426614174000',
+        cloudSessionId: '923e4567-e89b-42d3-a456-426614174000',
         leaseId: '423e4567-e89b-42d3-a456-426614174000',
         authorityGeneration: 1,
         leaseEpoch: 1,
@@ -297,6 +300,7 @@ describe('Hive Runtime Cloud proofs', () => {
       identity,
       {
         bootId: '323e4567-e89b-42d3-a456-426614174000',
+        cloudSessionId: '923e4567-e89b-42d3-a456-426614174000',
         leaseId: '423e4567-e89b-42d3-a456-426614174000',
         authorityGeneration: 1,
         leaseEpoch: 1,

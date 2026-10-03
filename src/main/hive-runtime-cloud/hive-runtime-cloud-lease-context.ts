@@ -73,7 +73,11 @@ export class HiveRuntimeCloudLeaseContextPublisher {
 
   publish(context: CurrentHiveRuntimeCloudLeaseContext | null): void {
     for (const listener of this.listeners) {
-      listener(context)
+      try {
+        listener(context)
+      } catch {
+        // One observer cannot prevent other connections from losing Cloud authority.
+      }
     }
   }
 }

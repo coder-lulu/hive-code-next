@@ -568,7 +568,7 @@ export class HiveAccountService extends HiveAccountPublication {
   }
 
   async signOut(): Promise<HiveAccountSignOutResult> {
-    this.mutationEpoch += 1
+    const expectedEpoch = ++this.mutationEpoch
     this.pendingSmsSignIn = null
     this.fenceRuntimeCloudAuthorization()
     const configured = this.dependencies.getConfig()
@@ -583,9 +583,15 @@ export class HiveAccountService extends HiveAccountPublication {
     const result = await completeHiveAccountSignOut({
       hasStoredSession: stored.status !== 'missing',
       revokeRemote,
-      clearLocal: () => this.clearCurrentSession()
+      clearLocal: () => {
+        this.clearCurrentSession()
+        this.publishState(signedOutState())
+      }
     })
-    return publishHiveAccountResult((state) => this.publishState(state), result)
+    if (this.mutationEpoch !== expectedEpoch) {
+      return { ...result, state: await this.getState() }
+    }
+    return result
   }
 
   readAiModelCandidates(): Promise<HiveAiModelCandidatesSnapshot> {
@@ -747,9 +753,10 @@ export class HiveAccountService extends HiveAccountPublication {
   private async revokeCurrent(client: HiveAccountClient, accessToken: string): Promise<void> {
     const sessions = await client.listCloudSessions(accessToken)
     const current = sessions.find((session) => session.currentSession)
-    if (current) {
-      await client.revokeSession(accessToken, current)
+    if (!current) {
+      throw new Error('hive_account_current_session_unavailable')
     }
+    await client.revokeSession(accessToken, current)
   }
 
   private async bestEffortRevokeCurrent(

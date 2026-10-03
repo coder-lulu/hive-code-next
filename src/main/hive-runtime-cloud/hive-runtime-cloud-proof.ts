@@ -135,6 +135,7 @@ export function createRuntimeLeaseAcquireRequest(
   identity: HiveRuntimeCloudIdentity,
   input: Readonly<{
     bootId: string
+    cloudSessionId: string
     expectedAuthorityGeneration: number
     expectedLeaseEpoch: number
     expectedFencingEpoch: number
@@ -144,6 +145,7 @@ export function createRuntimeLeaseAcquireRequest(
   const body = {
     runtimeInstanceId: identity.runtimeInstanceId,
     bootId: input.bootId,
+    cloudSessionId: input.cloudSessionId,
     expectedAuthorityGeneration: input.expectedAuthorityGeneration,
     expectedLeaseEpoch: input.expectedLeaseEpoch,
     expectedFencingEpoch: input.expectedFencingEpoch,
@@ -162,6 +164,7 @@ export function createRuntimeHeartbeatRequest(
   identity: HiveRuntimeCloudIdentity,
   input: Readonly<{
     bootId: string
+    cloudSessionId: string
     leaseId: string
     authorityGeneration: number
     leaseEpoch: number
@@ -180,6 +183,7 @@ export function createRuntimeHeartbeatRequest(
   const body = {
     runtimeInstanceId: identity.runtimeInstanceId,
     bootId: input.bootId,
+    cloudSessionId: input.cloudSessionId,
     leaseId: input.leaseId,
     authorityGeneration: input.authorityGeneration,
     leaseEpoch: input.leaseEpoch,

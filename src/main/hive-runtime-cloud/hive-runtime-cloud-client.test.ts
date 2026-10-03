@@ -17,6 +17,22 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe('Hive Runtime Cloud HTTP client', () => {
+  it('uses one Bearer header for lease and heartbeat without copying credentials into the body', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation(async () => jsonResponse({ code: 'unauthorized' }, 401))
+    const client = new HiveRuntimeCloudClient('https://api.hivekernel.com', fetchImpl)
+    const request = { cloudSessionId: '223e4567-e89b-42d3-a456-426614174000', proof: 'signed' }
+    await expect(client.acquireLease(request, 'native-token')).rejects.toMatchObject({
+      status: 401
+    })
+    await expect(client.heartbeat(request, 'native-token')).rejects.toMatchObject({ status: 401 })
+    for (const [, init] of fetchImpl.mock.calls) {
+      expect(new Headers(init.headers).get('authorization')).toBe('Bearer native-token')
+      expect(init.body).toBe(JSON.stringify(request))
+      expect(init.body).not.toContain('native-token')
+    }
+  })
   it('sends signed lookup with redirect and cache disabled and parses only the frozen shape', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       jsonResponse({

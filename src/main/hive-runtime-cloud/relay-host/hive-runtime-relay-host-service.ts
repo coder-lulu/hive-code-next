@@ -93,9 +93,12 @@ export class HiveRuntimeRelayHostService {
       onAssigned: (assignment) => this.assigned(assignment),
       onConnection: (assignment, connection) => this.connections.open(assignment, connection),
       onUnavailable: () => {
-        this.connections.close()
         this.authorityUntil = null
-        options.presence.requestHeartbeat()
+        try {
+          this.connections.close()
+        } finally {
+          options.presence.requestHeartbeat()
+        }
       }
     })
   }

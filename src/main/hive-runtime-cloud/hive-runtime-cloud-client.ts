@@ -167,19 +167,33 @@ export class HiveRuntimeCloudClient extends HiveRuntimeCloudAccountClient {
 
   async acquireLease(
     request: Record<string, unknown>,
+    accessToken: string,
     signal?: AbortSignal
   ): Promise<RuntimeLease> {
     return normalizeLease(
-      await this.request('/hive/v1/runtime-leases/acquire', request, {}, 201, signal)
+      await this.request(
+        '/hive/v1/runtime-leases/acquire',
+        request,
+        { authorization: `Bearer ${accessToken}` },
+        201,
+        signal
+      )
     )
   }
 
   async heartbeat(
     request: Record<string, unknown>,
+    accessToken: string,
     signal?: AbortSignal
   ): Promise<RuntimeHeartbeat> {
     return normalizeHeartbeat(
-      await this.request('/hive/v1/runtime-heartbeats', request, {}, 200, signal)
+      await this.request(
+        '/hive/v1/runtime-heartbeats',
+        request,
+        { authorization: `Bearer ${accessToken}` },
+        200,
+        signal
+      )
     )
   }
 

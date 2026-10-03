@@ -6,6 +6,7 @@ export async function completeHiveAccountSignOut(input: {
   revokeRemote: (() => Promise<void>) | null
   clearLocal: () => void
 }): Promise<HiveAccountSignOutResult> {
+  input.clearLocal()
   if (!input.hasStoredSession) {
     return { status: 'already-signed-out', state: signedOutState() }
   }
@@ -17,8 +18,6 @@ export async function completeHiveAccountSignOut(input: {
     }
   } catch {
     remoteRevoked = false
-  } finally {
-    input.clearLocal()
   }
   return {
     status: remoteRevoked ? 'remote-and-local' : 'local-only',

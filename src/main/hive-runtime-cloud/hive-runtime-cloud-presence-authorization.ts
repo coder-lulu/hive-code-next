@@ -7,10 +7,7 @@ type PresenceAuthorizationMigration = Readonly<{
   dependencies: PresenceDependencies
 }>
 
-/**
- * Migrates a claimed Runtime from its provisional authority to the signed-in
- * authority without coupling heartbeat lifetime to the account session.
- */
+/** Restores the authority on an owner-matched local registration. */
 export function migrateHiveRuntimeCloudPresenceAuthorization({
   authorization,
   userDataPath,
@@ -21,7 +18,7 @@ export function migrateHiveRuntimeCloudPresenceAuthorization({
     stored.status !== 'ok' ||
     stored.value.status !== 'CLAIMED' ||
     stored.value.ownerAccountId !== authorization.accountId ||
-    stored.value.authorityId === authorization.authorityId
+    stored.value.authorityId !== undefined
   ) {
     return false
   }

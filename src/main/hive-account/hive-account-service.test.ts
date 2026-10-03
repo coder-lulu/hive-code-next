@@ -249,6 +249,64 @@ describe('Hive account application service', () => {
     await expect(service.getState()).resolves.toMatchObject({ status: 'signed-out' })
   })
 
+  it('fences all independent consumers even if an earlier account observer throws', async () => {
+    const service = createService()
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    service.subscribeRuntimeCloudAuthorization(() => {
+      throw new Error('directory observer failed')
+    })
+    const presence = vi.fn()
+    service.subscribeRuntimeCloudAuthorization(presence)
+    await service.signOut()
+    expect(presence).toHaveBeenCalledWith(null)
+    expect(service.getRuntimeCloudAuthorization()).toBeNull()
+  })
+
+  it('reports local-only sign-out when Cloud did not return the current session for revocation', async () => {
+    const service = createService()
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    client.listCloudSessions.mockResolvedValueOnce([])
+    await expect(service.signOut()).resolves.toMatchObject({
+      status: 'local-only',
+      state: { status: 'signed-out' }
+    })
+    expect(client.revokeSession).not.toHaveBeenCalled()
+    expect(service.getRuntimeCloudAuthorization()).toBeNull()
+  })
+
+  it('preserves a new login completed while the old remote sign-out is pending', async () => {
+    const onStateChanged = vi.fn()
+    const service = createService(onStateChanged)
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    let finishRevocation: () => void = () => {}
+    client.revokeSession.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRevocation = resolve
+        })
+    )
+    const signOut = service.signOut()
+    expect(service.getRuntimeCloudAuthorization()).toBeNull()
+    await expect(service.getState()).resolves.toMatchObject({ status: 'signed-out' })
+    await vi.waitFor(() => expect(client.revokeSession).toHaveBeenCalledOnce())
+    await expect(service.refresh()).resolves.toMatchObject({ status: 'signed-out' })
+    expect(client.refreshSession).not.toHaveBeenCalled()
+    client.exchangeSession.mockResolvedValueOnce({
+      ...sessionResponse,
+      accessToken: 'new-login',
+      refreshToken: 'new-refresh'
+    })
+    await service.signIn({ sessionProfile: 'TRUSTED' })
+    expect(service.getRuntimeCloudAuthorization()?.accessToken).toBe('new-login')
+    finishRevocation()
+    await expect(signOut).resolves.toMatchObject({ state: { status: 'signed-in' } })
+    await expect(service.getState()).resolves.toMatchObject({ status: 'signed-in' })
+    expect(service.getRuntimeCloudAuthorization()?.accessToken).toBe('new-login')
+    expect(onStateChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: 'signed-in' })
+    )
+  })
+
   it('fails closed when operating-system encryption is unavailable', async () => {
     safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
     await expect(createService().getState()).resolves.toMatchObject({

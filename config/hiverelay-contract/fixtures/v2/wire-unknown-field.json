@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.9",
+  "contractRevision": "hiverelay-v2-p0.10",
   "caseId": "v2.wire.unknown-field.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "wire-message",

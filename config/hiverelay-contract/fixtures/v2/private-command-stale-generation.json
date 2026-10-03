@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.9",
+  "contractRevision": "hiverelay-v2-p0.10",
   "caseId": "v2.private-ops.stale-generation.valid",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-command",

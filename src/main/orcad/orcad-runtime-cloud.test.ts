@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({
   presenceOptions: null as unknown as ConstructorParameters<typeof HiveRuntimeCloudPresenceService>,
   hostOptions: null as unknown as ConstructorParameters<typeof HiveRuntimeRelayHostService>[0],
   ready: vi.fn(),
+  authorization: vi.fn(),
   stop: vi.fn(async () => {}),
   unsubscribe: vi.fn(),
   hostStart: vi.fn(),
@@ -30,7 +31,11 @@ vi.mock('../hive-runtime-cloud/hive-runtime-cloud-presence-service', () => ({
     getBootId() {
       return '10000000-0000-4000-8000-000000000001'
     }
+    getState() {
+      return 'SIGNED_OUT'
+    }
     notifyRegistrationChanged = vi.fn()
+    setAuthorization = mock.authorization
     setRuntimeReady = mock.ready
     stop = mock.stop
   }

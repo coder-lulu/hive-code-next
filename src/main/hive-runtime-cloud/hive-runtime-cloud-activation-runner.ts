@@ -9,9 +9,11 @@ import {
   type PresenceDependencies
 } from './hive-runtime-cloud-presence-support'
 import type { HiveRuntimeCloudRegistrationState } from './hive-runtime-cloud-state-store'
+import type { HiveRuntimeCloudPresenceSessionSource } from './hive-runtime-cloud-presence-session'
 
 type ActivationRunnerOptions = Readonly<{
   client: PresenceClient | null
+  authorization: HiveRuntimeCloudPresenceSessionSource
   userDataPath: string
   bootId: string
   dependencies: PresenceDependencies
@@ -22,9 +24,14 @@ type ActivationRunnerOptions = Readonly<{
 
 export async function runHiveRuntimeCloudActivation(
   options: ActivationRunnerOptions
-): Promise<ActivationResult> {
+): Promise<Extract<ActivationResult, { status: 'LEASED' }>> {
   if (!options.client) {
     throw new FatalPresenceError('client_unavailable')
+  }
+  options.assertCurrent()
+  const authorization = options.authorization()
+  if (!authorization) {
+    throw new FatalPresenceError('runtime_login_required')
   }
   const loadedIdentity = options.dependencies.loadIdentity(options.userDataPath)
   if (loadedIdentity.status !== 'ok') {
@@ -39,6 +46,8 @@ export async function runHiveRuntimeCloudActivation(
   }
   return activateClaimedHiveRuntimeCloudPresence({
     client: options.client,
+    authorization,
+    getAuthorization: options.authorization,
     identity: loadedIdentity.identity,
     stored: stored.value,
     bootId: options.bootId,

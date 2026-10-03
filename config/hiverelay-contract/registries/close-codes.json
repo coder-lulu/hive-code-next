@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.9",
+  "contractRevision": "hiverelay-v2-p0.10",
   "codes": [
     {"symbol": "NORMAL", "code": 1000, "retry": "NONE", "action": "CLOSE"},
     {"symbol": "PROTOCOL_ERROR", "code": 1002, "retry": "NONE", "action": "UPGRADE_OR_FIX_CLIENT"},

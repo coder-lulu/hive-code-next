@@ -49,6 +49,7 @@ const LegacyReportSchema = z
           'pairing-v3',
           'runtime-health-v1',
           'shared-control-v1',
+          'web-session-display-metadata-v1',
           'web-launch-grant-v1'
         ])
       )
@@ -97,6 +98,7 @@ const LegacyRequestSchema = z
   .object({
     runtimeInstanceId: UuidV4,
     bootId: UuidV4,
+    cloudSessionId: UuidV4,
     leaseId: UuidV4,
     authorityGeneration: PositiveInteger,
     leaseEpoch: PositiveInteger,

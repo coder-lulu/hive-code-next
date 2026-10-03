@@ -59,9 +59,12 @@ export class HiveRuntimeRelayConnections {
       }
       closed = true
       this.entries.delete(connection.connId)
-      channel?.destroy()
       try {
-        detach?.()
+        try {
+          channel?.destroy()
+        } finally {
+          detach?.()
+        }
       } finally {
         try {
           session.close('TRANSPORT_CLOSED')
@@ -139,8 +142,17 @@ export class HiveRuntimeRelayConnections {
   }
 
   close(): void {
-    for (const entry of this.entries.values()) {
-      entry.close()
+    let firstError: unknown
+    const entries = [...this.entries.values()]
+    for (const entry of entries) {
+      try {
+        entry.close()
+      } catch (error) {
+        firstError ??= error
+      }
+    }
+    if (firstError) {
+      throw firstError
     }
   }
 }

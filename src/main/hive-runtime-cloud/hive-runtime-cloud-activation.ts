@@ -1,4 +1,8 @@
-import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
+import {
+  withHiveRuntimeCloudPresenceSession,
+  type HiveRuntimeCloudPresenceSession,
+  type HiveRuntimeCloudPresenceSessionSource
+} from './hive-runtime-cloud-presence-session'
 import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import {
@@ -20,7 +24,8 @@ import type { HiveRuntimeCloudRegistrationState } from './hive-runtime-cloud-sta
 
 type ActivationOptions = {
   client: PresenceClient
-  authorization: HiveRuntimeCloudAuthorization
+  authorization: HiveRuntimeCloudPresenceSession
+  getAuthorization: HiveRuntimeCloudPresenceSessionSource
   identity: HiveRuntimeCloudIdentity
   stored: HiveRuntimeCloudRegistrationState | null
   bootId: string
@@ -45,6 +50,8 @@ export type ActivationResult =
 
 type ClaimedActivationOptions = Readonly<{
   client: PresenceClient
+  authorization: HiveRuntimeCloudPresenceSession
+  getAuthorization: HiveRuntimeCloudPresenceSessionSource
   identity: HiveRuntimeCloudIdentity
   stored: Extract<HiveRuntimeCloudRegistrationState, { status: 'CLAIMED' }>
   bootId: string
@@ -145,25 +152,34 @@ async function claimRuntime(
 }
 
 async function acquireRuntimeLease(
-  options: Pick<ActivationOptions, 'client' | 'identity' | 'signal' | 'assertCurrent'> & {
+  options: Pick<
+    ActivationOptions,
+    'client' | 'authorization' | 'getAuthorization' | 'identity' | 'signal' | 'assertCurrent'
+  > & {
     authorityId: string
   },
   registration: Extract<HiveRuntimeCloudRegistrationState, { status: 'CLAIMED' }>,
   bootId: string
 ): Promise<ActiveLease> {
   try {
-    const lease = await options.client.acquireLease(
+    const request = () =>
       createRuntimeLeaseAcquireRequest(
         options.identity,
         {
           bootId,
+          cloudSessionId: options.authorization.cloudSessionId,
           expectedAuthorityGeneration: registration.authorityGeneration,
           expectedLeaseEpoch: registration.latestLeaseEpoch,
           expectedFencingEpoch: registration.fencingEpoch
         },
         { authorityId: options.authorityId }
-      ),
-      options.signal
+      )
+    const lease = await withHiveRuntimeCloudPresenceSession(
+      options.authorization,
+      options.getAuthorization,
+      options.assertCurrent,
+      (authorization) =>
+        options.client.acquireLease(request(), authorization.accessToken, options.signal)
     )
     options.assertCurrent()
     return { ...lease, bootId, nextHeartbeatSeq: 1 }
@@ -234,6 +250,12 @@ export async function activateClaimedHiveRuntimeCloudPresence(
   const authorityId = options.stored.authorityId
   if (!authorityId) {
     throw new ClaimPendingPresenceError('runtime_authority_unavailable')
+  }
+  if (
+    options.stored.ownerAccountId !== options.authorization.accountId ||
+    authorityId !== options.authorization.authorityId
+  ) {
+    throw new FatalPresenceError('runtime_owner_mismatch')
   }
   const lookup = await options.client.lookup(
     createRuntimeRegistrationLookupRequest(options.identity, { authorityId }),

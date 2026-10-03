@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import type { HiveAccountPublication } from '../hive-account/hive-account-publication'
 import { getHiveRuntimeCloudConfig } from '../hive-runtime-cloud/hive-runtime-cloud-config'
 import { HiveRuntimeCloudClient } from '../hive-runtime-cloud/hive-runtime-cloud-client'
 import { HiveRuntimeCloudPresenceService } from '../hive-runtime-cloud/hive-runtime-cloud-presence-service'
@@ -31,6 +32,10 @@ export function createOrcadRuntimeCloud(options: {
   runtimeVersion: string
   runtime: Parameters<typeof createHiveRuntimeCloudReport>[0]
   env?: NodeJS.ProcessEnv
+  account?: Pick<
+    HiveAccountPublication,
+    'getRuntimeCloudAuthorization' | 'subscribeRuntimeCloudAuthorization'
+  >
 }) {
   const env = options.env ?? process.env
   const config = getHiveRuntimeCloudConfig(env)
@@ -69,10 +74,22 @@ export function createOrcadRuntimeCloud(options: {
     dependencies: { ...defaultLocalRuntimeOwnershipDependencies, ...storage, createClient }
   })
   const unsubscribe = presence.subscribeState((state) => ownership.setPresenceState(state))
+  const applyAuthorization = (
+    authorization: ReturnType<HiveAccountPublication['getRuntimeCloudAuthorization']>
+  ) => {
+    try {
+      presence.setAuthorization(authorization)
+    } finally {
+      ownership.setAuthorization(authorization)
+    }
+  }
+  const unsubscribeAccount = options.account?.subscribeRuntimeCloudAuthorization(applyAuthorization)
+  applyAuthorization(options.account?.getRuntimeCloudAuthorization() ?? null)
   let ready = false
   let shutdown: Promise<void> | null = null
   return {
     ownership,
+    getPresenceState: () => presence.getState(),
     rpcReady(rpc: OrcaRuntimeRpcServer): void {
       if (ready || shutdown) {
         return
@@ -96,6 +113,7 @@ export function createOrcadRuntimeCloud(options: {
         return shutdown
       }
       presence.setRuntimeReady(false)
+      unsubscribeAccount?.()
       unsubscribe()
       ownership.stop()
       shutdown = Promise.all([host?.stop() ?? Promise.resolve(), presence.stop()]).then(() => {})

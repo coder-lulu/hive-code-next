@@ -162,6 +162,15 @@ describe('Hive Runtime Relay signed heartbeat boundary', () => {
       .mockResolvedValueOnce(normalizeHeartbeat({ ...base, ...fixture.input.response }))
     let pending: PendingHeartbeat | null = null
     const options = {
+      authorization: () => ({
+        accessToken: 'session-token',
+        accountId: 'account',
+        authorityId: 'hive-primary',
+        sessionExpiresAt: fixture.validationTime + 60_000,
+        sessionGeneration: 1,
+        cloudSessionId: '923e4567-e89b-42d3-a456-426614174000',
+        accessExpiresAt: fixture.validationTime + 60_000
+      }),
       identity,
       authorityId: 'hive-primary',
       lease,
@@ -199,6 +208,15 @@ describe('Hive Runtime Relay signed heartbeat boundary', () => {
     const accept = vi.fn()
     await expect(
       sendHiveRuntimeCloudHeartbeat({
+        authorization: () => ({
+          accessToken: 'session-token',
+          accountId: 'account',
+          authorityId: 'hive-primary',
+          sessionExpiresAt: fixture.validationTime + 60_000,
+          sessionGeneration: 1,
+          cloudSessionId: '923e4567-e89b-42d3-a456-426614174000',
+          accessExpiresAt: fixture.validationTime + 60_000
+        }),
         identity,
         authorityId: 'hive-primary',
         lease,

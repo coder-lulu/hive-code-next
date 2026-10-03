@@ -374,6 +374,7 @@ it.skipIf(!origin)(
             saveState: saveHiveRuntimeCloudServiceRegistrationState
           }
         )
+        presence.setAuthorization(item.presenceSession)
         const runtime = {
           getRuntimeId: () => item.identity.runtimeInstanceId,
           cleanupSubscriptionsForConnection: () => {},

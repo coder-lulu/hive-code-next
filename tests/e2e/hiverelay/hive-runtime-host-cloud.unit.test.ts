@@ -116,6 +116,7 @@ it.skipIf(!origin)(
               context.identity,
               {
                 bootId: context.tuple.bootId,
+                cloudSessionId: fixture.presenceSession.cloudSessionId,
                 leaseId: context.tuple.heartbeatLeaseId,
                 authorityGeneration: context.tuple.authorityGeneration,
                 fencingEpoch: context.tuple.fencingEpoch,
@@ -134,7 +135,8 @@ it.skipIf(!origin)(
                 }
               },
               { authorityId: context.authorityId }
-            )
+            ),
+            fixture.presenceSession.accessToken
           )
           expect(result.responseVersion).toBe('runtime-session-control/v1')
           observations.push(
@@ -177,7 +179,11 @@ it.skipIf(!origin)(
               claims[key] ?? (mockBinding as unknown as Record<string, unknown>)[key]
           }
           cellOptions.controlLease = lease
-          cellNow = claims.exp * 1000 - 120000
+          const issuedAt: unknown = claims.iat
+          if (typeof issuedAt !== 'number' || !Number.isSafeInteger(issuedAt)) {
+            throw new Error('fixture_control_lease_issue_time_missing')
+          }
+          cellNow = issuedAt * 1000
         }
         return new WebSocket(cell.baseUrl.replace('http:', 'ws:') + new URL(url).pathname, {
           headers: lease ? { authorization: `Bearer ${lease}` } : {},

@@ -303,6 +303,11 @@ async function startOrcadRuntime(
   try {
     await rpc.start()
     runtimeCloud.rpcReady(rpc)
+    if (runtimeCloud.getPresenceState() === 'SIGNED_OUT') {
+      console.error(
+        '[orcad] Cloud remote access requires a native account session; this Node host has no secure account source. Local tasks and the Runtime claim remain available.'
+      )
+    }
   } catch (error) {
     await runtimeCloud.stop()
     await rpc.stop()

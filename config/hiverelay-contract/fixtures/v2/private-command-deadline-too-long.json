@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contractRevision": "hiverelay-v2-p0.9",
+  "contractRevision": "hiverelay-v2-p0.10",
   "caseId": "v2.private-ops.lifecycle-deadline-too-long.reject",
   "suite": "hiverelay-v2-conformance",
   "operation": "private-command",

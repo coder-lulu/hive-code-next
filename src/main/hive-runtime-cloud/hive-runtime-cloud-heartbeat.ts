@@ -1,6 +1,10 @@
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import type { RuntimeHeartbeat } from './hive-runtime-cloud-response'
 import {
+  withHiveRuntimeCloudPresenceSession,
+  type HiveRuntimeCloudPresenceSessionSource
+} from './hive-runtime-cloud-presence-session'
+import {
   createRuntimeHeartbeatRequest,
   type HiveRuntimeCloudReport
 } from './hive-runtime-cloud-proof'
@@ -14,6 +18,7 @@ export type PendingHeartbeat = Parameters<typeof createRuntimeHeartbeatRequest>[
 
 export type HeartbeatOptions = {
   client: PresenceClient
+  authorization: HiveRuntimeCloudPresenceSessionSource
   identity: HiveRuntimeCloudIdentity
   authorityId: string
   lease: ActiveLease
@@ -27,10 +32,16 @@ export type HeartbeatOptions = {
 }
 
 export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): Promise<number> {
+  options.assertCurrent()
+  const authorization = options.authorization()
+  if (!authorization) {
+    throw new FatalPresenceError('runtime_login_required')
+  }
   const pending =
     options.pending ??
     ({
       bootId: options.lease.bootId,
+      cloudSessionId: authorization.cloudSessionId,
       leaseId: options.lease.leaseId,
       authorityGeneration: options.lease.authorityGeneration,
       leaseEpoch: options.lease.leaseEpoch,
@@ -39,12 +50,23 @@ export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): 
       sourceReportedAt: new Date(options.now()).toISOString(),
       report: structuredClone(options.report)
     } satisfies PendingHeartbeat)
+  if (pending.cloudSessionId !== authorization.cloudSessionId) {
+    throw new FatalPresenceError('heartbeat_session_mismatch')
+  }
+  options.assertCurrent()
   options.onPrepared(pending)
-  const heartbeat = await options.client.heartbeat(
-    createRuntimeHeartbeatRequest(options.identity, pending, {
-      authorityId: options.authorityId
-    }),
-    options.signal
+  const heartbeat = await withHiveRuntimeCloudPresenceSession(
+    authorization,
+    options.authorization,
+    options.assertCurrent,
+    (current) =>
+      options.client.heartbeat(
+        createRuntimeHeartbeatRequest(options.identity, pending, {
+          authorityId: options.authorityId
+        }),
+        current.accessToken,
+        options.signal
+      )
   )
   options.assertCurrent()
   if (

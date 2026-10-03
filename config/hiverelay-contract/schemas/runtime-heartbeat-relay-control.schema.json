@@ -247,7 +247,8 @@
               "pairing-v3",
               "runtime-health-v1",
               "shared-control-v1",
-              "web-launch-grant-v1"
+              "web-launch-grant-v1",
+              "web-session-display-metadata-v1"
             ]
           }
         },
@@ -387,7 +388,8 @@
               "runtime-health-v1",
               "shared-control-v1",
               "web-launch-grant-v1",
-              "runtime-session-control-v1"
+              "runtime-session-control-v1",
+              "web-session-display-metadata-v1"
             ]
           }
         },
@@ -498,6 +500,8 @@
       "required": [
         "runtimeInstanceId",
         "bootId",
+        "cloudSessionId",
+        "clientAuthMode",
         "leaseId",
         "authorityGeneration",
         "leaseEpoch",
@@ -512,6 +516,9 @@
           "$ref": "#/$defs/uuidV4"
         },
         "bootId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "cloudSessionId": {
           "$ref": "#/$defs/uuidV4"
         },
         "leaseId": {
@@ -601,6 +608,8 @@
       "required": [
         "runtimeInstanceId",
         "bootId",
+        "cloudSessionId",
+        "clientAuthMode",
         "leaseId",
         "authorityGeneration",
         "leaseEpoch",
@@ -615,6 +624,9 @@
           "$ref": "#/$defs/uuidV4"
         },
         "bootId": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "cloudSessionId": {
           "$ref": "#/$defs/uuidV4"
         },
         "leaseId": {

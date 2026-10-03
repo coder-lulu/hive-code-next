@@ -50,10 +50,38 @@ function boundedRandom(random: () => number): number {
 }
 
 export class HiveRuntimeCloudPresenceScheduler {
+  epoch = 0
+  inFlight: Promise<void> | null = null
+  private abortController: AbortController | null = null
   private timer: NodeJS.Timeout | undefined
   private retryAttempt = 0
 
   constructor(private readonly random: () => number) {}
+
+  cancelOperation(): void {
+    this.epoch += 1
+    this.reset()
+    this.abortController?.abort()
+    this.abortController = null
+  }
+
+  run(
+    operation: (signal: AbortSignal) => Promise<void>,
+    onFailure: (error: unknown) => void,
+    onFinished: () => void
+  ): void {
+    const epoch = this.epoch
+    this.abortController = new AbortController()
+    this.inFlight = operation(this.abortController.signal)
+      .catch(onFailure)
+      .finally(() => {
+        if (epoch === this.epoch) {
+          this.abortController = null
+          this.inFlight = null
+          onFinished()
+        }
+      })
+  }
 
   reset(): void {
     this.retryAttempt = 0

@@ -19,7 +19,7 @@
       "const": 1
     },
     "contractRevision": {
-      "const": "hiverelay-v2-p0.9"
+      "const": "hiverelay-v2-p0.10"
     },
     "caseId": {
       "type": "string",

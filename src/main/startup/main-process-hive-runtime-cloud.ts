@@ -175,18 +175,24 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
     processLocalRuntimeOwnership.setPresenceState(state)
   )
   if (state.hiveAccountService) {
-    state.unsubscribeRuntimeCloudAuthorization =
-      state.hiveAccountService.subscribeRuntimeCloudAuthorization((authorization) => {
-        processRuntimeCloudDirectory.setAuthorization(authorization)
-        processRuntimeCloudSessions.setAuthorization(authorization)
-        processLocalRuntimeOwnership.setAuthorization(authorization)
-        processRuntimeCloudPresence.setAuthorization(authorization)
-      })
-    const authorization = state.hiveAccountService.getRuntimeCloudAuthorization()
-    processRuntimeCloudDirectory.setAuthorization(authorization)
-    processRuntimeCloudSessions.setAuthorization(authorization)
-    processLocalRuntimeOwnership.setAuthorization(authorization)
-    processRuntimeCloudPresence.setAuthorization(authorization)
+    const hiveAccountService = state.hiveAccountService
+    const consumers = [
+      processRuntimeCloudPresence,
+      processRuntimeCloudDirectory,
+      processRuntimeCloudSessions,
+      processLocalRuntimeOwnership
+    ]
+    const subscriptions = consumers.map((consumer) =>
+      hiveAccountService.subscribeRuntimeCloudAuthorization((authorization) =>
+        consumer.setAuthorization(authorization)
+      )
+    )
+    state.unsubscribeRuntimeCloudAuthorization = () =>
+      subscriptions.forEach((unsubscribe) => unsubscribe())
+    const authorization = hiveAccountService.getRuntimeCloudAuthorization()
+    for (const consumer of consumers) {
+      consumer.setAuthorization(authorization)
+    }
   }
   initializeLocalTasks()
 }

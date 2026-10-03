@@ -119,6 +119,7 @@ it.skipIf(!origin)(
               context.identity,
               {
                 bootId: context.tuple.bootId,
+                cloudSessionId: fixture.presenceSession.cloudSessionId,
                 leaseId: context.tuple.heartbeatLeaseId,
                 authorityGeneration: context.tuple.authorityGeneration,
                 fencingEpoch: context.tuple.fencingEpoch,
@@ -137,7 +138,8 @@ it.skipIf(!origin)(
                 }
               },
               { authorityId: context.authorityId }
-            )
+            ),
+            fixture.presenceSession.accessToken
           )
           expect(result.responseVersion).toBe('runtime-session-control/v1')
           observations.push(
@@ -367,12 +369,14 @@ it.skipIf(!origin)(
             context.identity,
             {
               bootId,
+              cloudSessionId: fixture.presenceSession.cloudSessionId,
               expectedAuthorityGeneration: context.tuple.authorityGeneration,
               expectedLeaseEpoch: context.tuple.leaseEpoch,
               expectedFencingEpoch: context.tuple.fencingEpoch
             },
             { authorityId: context.authorityId }
-          )
+          ),
+          fixture.presenceSession.accessToken
         )
         context = {
           ...context,
