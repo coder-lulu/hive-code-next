@@ -10,11 +10,52 @@
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import type {
   RuntimeMobileSessionTabsSnapshot,
-  RuntimeSyncedLeaf
+  RuntimeSyncedLeaf,
+  RuntimeSyncedTab,
+  RuntimeSyncWindowGraph
 } from '../../shared/runtime-types'
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
 import { terminalLayoutContainsLeaf } from './headless-terminal-split-layout'
 import { buildMaterializedHeadlessParentLayout } from './mobile-session-layout-projection'
+
+/** The runtime indexes graph tabs by bare id, so duplicate ids cannot be routed safely. */
+export function assertUniqueRuntimeGraphTabIds(tabs: readonly RuntimeSyncedTab[]): void {
+  const seen = new Set<string>()
+  for (const tab of tabs) {
+    if (seen.has(tab.tabId)) {
+      throw new Error('duplicate_runtime_tab_id')
+    }
+    seen.add(tab.tabId)
+  }
+}
+
+export function collectRuntimeGraphSurfacePublications(
+  graph: RuntimeSyncWindowGraph,
+  previous: ReadonlyMap<string, RuntimeMobileSessionTabsSnapshot>,
+  accepted: ReadonlyMap<string, { publicationEpoch: string }>,
+  resyncWorktrees: ReadonlySet<string>,
+  rendererGeneration: string | null | undefined
+): Map<string, RuntimeMobileSessionTabsSnapshot> {
+  const incoming = new Map(
+    (graph.mobileSessionTabs ?? []).map((snapshot) => [snapshot.worktree, snapshot])
+  )
+  if (graph.mobileSessionTabs === undefined) {
+    return incoming
+  }
+  for (const worktree of graph.unchangedMobileSessionWorktrees ?? []) {
+    const prior = previous.get(worktree)
+    if (
+      prior &&
+      !incoming.has(worktree) &&
+      !resyncWorktrees.has(worktree) &&
+      typeof rendererGeneration === 'string' &&
+      accepted.get(worktree)?.publicationEpoch === rendererGeneration
+    ) {
+      incoming.set(worktree, prior)
+    }
+  }
+  return incoming
+}
 
 export function collectRuntimeGraphSurfaceClaims(leaves: readonly RuntimeSyncedLeaf[]): {
   ptyIds: Set<string>
@@ -31,6 +72,20 @@ export function collectRuntimeGraphSurfaceClaims(leaves: readonly RuntimeSyncedL
     paneCounts.set(leaf.tabId, counts)
   }
   return { ptyIds, paneCounts }
+}
+
+export function getPublishedRuntimeSurfacePtyId(
+  leaf: RuntimeSyncedLeaf,
+  previous: RuntimeMobileSessionTabsSnapshot | undefined
+): string | null | undefined {
+  if (previous?.worktree !== leaf.worktreeId) {
+    return undefined
+  }
+  const surfaces = previous.tabs.filter(
+    (tab) => tab.type === 'terminal' && tab.parentTabId === leaf.tabId && tab.leafId === leaf.leafId
+  )
+  const surface = surfaces.length === 1 ? surfaces[0] : undefined
+  return surface?.type === 'terminal' ? surface.ptyId : undefined
 }
 
 export type RecordedPtySurface = {

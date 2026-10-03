@@ -3,27 +3,18 @@
 import { OrcaRuntimeWithAttachWindow } from './orca-runtime-attach-window'
 import type {
   RuntimeRendererSyncWindowGraph,
-  RuntimeSyncedTab,
   RuntimeSyncWindowGraph,
   RuntimeSyncWindowGraphResult
 } from '../../shared/runtime-types'
 import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-types'
 import type { RuntimeLeafRecord } from './runtime-terminal-state-records'
 import {
+  assertUniqueRuntimeGraphTabIds,
   collectRuntimeGraphSurfaceClaims,
+  collectRuntimeGraphSurfacePublications,
+  getPublishedRuntimeSurfacePtyId,
   repairPublishedRuntimeSurfaceProjection
 } from './pty-recorded-surface-topology'
-
-/** The runtime indexes graph tabs by bare id, so duplicate ids cannot be routed safely. */
-function assertUniqueRuntimeGraphTabIds(tabs: readonly RuntimeSyncedTab[]): void {
-  const seen = new Set<string>()
-  for (const tab of tabs) {
-    if (seen.has(tab.tabId)) {
-      throw new Error('duplicate_runtime_tab_id')
-    }
-    seen.add(tab.tabId)
-  }
-}
 
 export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow {
   shouldRelayTerminalBrowserOpens(): boolean {
@@ -79,13 +70,17 @@ export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow 
     this.tabs = new Map(graph.tabs.map((tab) => [tab.tabId, tab]))
     const lifecycleLeaves = this.reconcileMobileSessionRetirementFences(graph.leaves)
     const previousMobileSnapshots = new Map(this.mobileSessionTabsByWorktree)
-    const incomingMobileSnapshots = new Map(
-      (graph.mobileSessionTabs ?? []).map((snapshot) => [snapshot.worktree, snapshot])
-    )
     const mobileSessionResyncWorktrees = new Set<string>()
     const changedMobileWorktrees = this.syncMobileSessionTabs(
       graph.mobileSessionTabs,
       graph.unchangedMobileSessionWorktrees,
+      mobileSessionResyncWorktrees,
+      rendererGeneration
+    )
+    const incomingMobileSnapshots = collectRuntimeGraphSurfacePublications(
+      graph,
+      previousMobileSnapshots,
+      this.acceptedRendererMobileSnapshotByWorktree,
       mobileSessionResyncWorktrees,
       rendererGeneration
     )
@@ -109,7 +104,10 @@ export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow 
     for (const incomingLeaf of lifecycleLeaves) {
       let leaf = incomingLeaf
       const priorLeaf = previousLeaves.get(this.getLeafKey(leaf.tabId, leaf.leafId))
-      const priorPty = priorLeaf?.ptyId ? this.ptysById.get(priorLeaf.ptyId) : undefined
+      const priorPtyId =
+        priorLeaf?.ptyId ??
+        getPublishedRuntimeSurfacePtyId(leaf, previousMobileSnapshots.get(leaf.worktreeId))
+      const priorPty = priorPtyId ? this.ptysById.get(priorPtyId) : undefined
       const repairedSnapshot =
         priorPty &&
         incomingClaims.paneCounts.get(leaf.tabId)?.get(leaf.leafId) === 1 &&

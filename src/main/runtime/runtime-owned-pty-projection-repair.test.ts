@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import type {
   RuntimeMobileSessionTabsSnapshot,
+  RuntimeRendererSyncWindowGraph,
   RuntimeSyncWindowGraph
 } from '../../shared/runtime-types'
 import type { TerminalLayoutSnapshot } from '../../shared/terminal-tab-types'
@@ -80,6 +81,10 @@ class RuntimeFixture extends OrcaRuntimeService {
   binding(): string | null | undefined {
     return this.leaves.get(this.getLeafKey(TAB, LEAF))?.ptyId
   }
+
+  forgetRendererPublication(): void {
+    this.acceptedRendererMobileSnapshotByWorktree.delete(WORKTREE)
+  }
 }
 
 function setup() {
@@ -94,6 +99,70 @@ function setup() {
 }
 
 describe('runtime-owned PTY projection repair', () => {
+  it('keeps the published host identity on the first renderer mount before any prior graph leaf', async () => {
+    const runtime = new RuntimeFixture(null)
+    const write = vi.fn(() => true)
+    runtime.setPtyController({ write, kill: () => true, getForegroundProcess: async () => null })
+    runtime.attachWindow(1)
+    runtime.registerPty(PTY, WORKTREE, null, {
+      tabId: TAB,
+      leafId: LEAF,
+      incarnationId: INCARNATION
+    })
+    runtime.setRuntimeOwned(true)
+    runtime.syncWindowGraph(1, { ...graph(PTY, 1), tabs: [], leaves: [] })
+    const [before] = (await runtime.listTerminals()).terminals
+    runtime.syncWindowGraph(1, graph(null, 2))
+    expect(runtime.binding()).toBe(PTY)
+    const after = (await runtime.listTerminals()).terminals
+    expect(after).toHaveLength(1)
+    expect(after[0]).toMatchObject({
+      handle: before.handle,
+      tabId: TAB,
+      leafId: LEAF,
+      ptyId: PTY,
+      incarnationId: INCARNATION
+    })
+    await runtime.sendTerminal(before.handle, { text: 'first owner' }, { inputKind: 'driving' })
+    expect(write).toHaveBeenCalledWith(PTY, 'first owner', 'driving')
+  })
+
+  it('retains the original handle when a null pane uses an acknowledged unchanged publication', async () => {
+    const { runtime, write } = setup()
+    const [before] = (await runtime.listTerminals()).terminals
+    const incoming: RuntimeRendererSyncWindowGraph = {
+      ...graph(null, 2),
+      rendererGeneration: 'renderer',
+      mobileSessionTabs: [],
+      unchangedMobileSessionWorktrees: [WORKTREE]
+    }
+    runtime.syncWindowGraph(1, incoming)
+    expect(runtime.binding()).toBe(PTY)
+    expect((await runtime.listTerminals()).terminals).toMatchObject([
+      { handle: before.handle, tabId: TAB, leafId: LEAF, ptyId: PTY, incarnationId: INCARNATION }
+    ])
+    await runtime.sendTerminal(before.handle, { text: 'unchanged owner' }, { inputKind: 'driving' })
+    expect(write).toHaveBeenCalledWith(PTY, 'unchanged owner', 'driving')
+  })
+
+  it.each(['undeclared', 'unaccepted', 'different-generation', 'no-publication-partition'])(
+    'refuses missing mobile publication without current renderer acknowledgement (%s)',
+    (reason) => {
+      const { runtime } = setup()
+      if (reason === 'unaccepted') {
+        runtime.forgetRendererPublication()
+      }
+      const incoming: RuntimeRendererSyncWindowGraph = {
+        ...graph(null, 2),
+        rendererGeneration: reason === 'different-generation' ? 'other-renderer' : 'renderer',
+        mobileSessionTabs: reason === 'no-publication-partition' ? undefined : [],
+        unchangedMobileSessionWorktrees: reason === 'undeclared' ? [] : [WORKTREE]
+      }
+      runtime.syncWindowGraph(1, incoming)
+      expect(runtime.binding()).toBeNull()
+    }
+  )
+
   it('keeps one original surface and handle across a null graph and mobile projection', async () => {
     const { runtime, write } = setup()
     const [before] = (await runtime.listTerminals()).terminals
