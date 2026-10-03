@@ -710,6 +710,8 @@ test('adopts runtime-owned agent and Setup PTYs on first mount', async ({
 
   await orcaPage.reload()
   await waitForSessionReady(orcaPage)
+  // The default landing page has no PTY dispatcher until a terminal is mounted.
+  await activateTerminal(orcaPage, worktreeId, agent!.tabId)
   await expect
     .poll(
       async () => {
@@ -739,7 +741,6 @@ test('adopts runtime-owned agent and Setup PTYs on first mount', async ({
   await expect
     .poll(() => orcaPage.evaluate(() => window.api.pty.getRendererDeliveryDebugSnapshot()))
     .toMatchObject(postReloadDelivery)
-  await activateTerminal(orcaPage, worktreeId, agent!.tabId)
   const remountedAgentPtyId = await waitForActivePanePtyId(orcaPage)
   expect(remountedAgentPtyId).toBe(agentPtyId)
   await enableTerminalAccessibility(orcaPage, agent!.tabId)
