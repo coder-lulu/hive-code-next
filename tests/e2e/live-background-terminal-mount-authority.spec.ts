@@ -15,6 +15,10 @@ import {
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import { LIVE_BACKGROUND_TERMINAL_AGENT_SOURCE } from './live-background-terminal-mount-agent-fixture'
 import { logTerminalInputDiagnostic } from './live-background-terminal-mount-diagnostics'
+import {
+  installRuntimeSurfacePublicationSpy,
+  withRuntimeSurfacePublicationDiagnostic
+} from './live-background-terminal-mount-graph-diagnostics'
 import type {
   RuntimeStatus,
   RuntimeTerminalCreate,
@@ -509,6 +513,7 @@ test('adopts runtime-owned agent and Setup PTYs on first mount', async ({
   })
   await waitForSessionReady(orcaPage)
   await installTerminalPtyWriteSpy(electronApp)
+  await installRuntimeSurfacePublicationSpy(electronApp)
   const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
   const client = new RuntimeClient(userDataDir, 30_000, null, null)
   const added = await client.call<{ repo: { id: string } }>('repo.add', {
@@ -625,28 +630,32 @@ test('adopts runtime-owned agent and Setup PTYs on first mount', async ({
   await faultProjectionAndActivate(orcaPage, worktreeId, [agent!, setup!], agent!.tabId)
   const mountedAgentPtyId = await waitForActivePanePtyId(orcaPage)
   await enableTerminalAccessibility(orcaPage, agent!.tabId)
-  await expect
-    .poll(
-      async () => ({
-        mountedPtyId: mountedAgentPtyId,
-        liveInventory: (await readWorktreeTerminals(client, worktreeId)).map(liveTerminalIdentity),
-        visibleOriginalReady: (
-          await terminalAccessibility(orcaPage, agent!.tabId).innerText()
-        ).includes(`LIVE_AGENT_READY:${agentPid}`),
-        processPids: {
-          agent: readSpawnLedger().map(({ pid }) => pid),
-          setup: readJsonLines<{ pid: number }>(setupLedgerPath).map(({ pid }) => pid),
-          canary: readJsonLines<{ pid: number }>(canaryLedgerPath).map(({ pid }) => pid)
-        }
-      }),
-      { timeout: 10_000 }
-    )
-    .toEqual({
-      mountedPtyId: agentPtyId,
-      liveInventory: originals.map(liveTerminalIdentity),
-      visibleOriginalReady: true,
-      processPids: { agent: [agentPid], setup: [setupPid], canary: [canaryPid] }
-    })
+  await withRuntimeSurfacePublicationDiagnostic(electronApp, async () => {
+    await expect
+      .poll(
+        async () => ({
+          mountedPtyId: mountedAgentPtyId,
+          liveInventory: (await readWorktreeTerminals(client, worktreeId)).map(
+            liveTerminalIdentity
+          ),
+          visibleOriginalReady: (
+            await terminalAccessibility(orcaPage, agent!.tabId).innerText()
+          ).includes(`LIVE_AGENT_READY:${agentPid}`),
+          processPids: {
+            agent: readSpawnLedger().map(({ pid }) => pid),
+            setup: readJsonLines<{ pid: number }>(setupLedgerPath).map(({ pid }) => pid),
+            canary: readJsonLines<{ pid: number }>(canaryLedgerPath).map(({ pid }) => pid)
+          }
+        }),
+        { timeout: 10_000 }
+      )
+      .toEqual({
+        mountedPtyId: agentPtyId,
+        liveInventory: originals.map(liveTerminalIdentity),
+        visibleOriginalReady: true,
+        processPids: { agent: [agentPid], setup: [setupPid], canary: [canaryPid] }
+      })
+  })
   const agentMarker = `AGENT_KB_${randomUUID().slice(0, 8)}`
   await clearTerminalPtyWriteLog(electronApp)
   await typeIntoTerminal(orcaPage, agent!.tabId, agentMarker)
