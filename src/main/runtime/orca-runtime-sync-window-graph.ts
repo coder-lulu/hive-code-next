@@ -9,6 +9,10 @@ import type {
 } from '../../shared/runtime-types'
 import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-types'
 import type { RuntimeLeafRecord } from './runtime-terminal-state-records'
+import {
+  collectRuntimeGraphSurfaceClaims,
+  repairPublishedRuntimeSurfaceProjection
+} from './pty-recorded-surface-topology'
 
 /** The runtime indexes graph tabs by bare id, so duplicate ids cannot be routed safely. */
 function assertUniqueRuntimeGraphTabIds(tabs: readonly RuntimeSyncedTab[]): void {
@@ -71,10 +75,13 @@ export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow 
     }
 
     const graphWasReady = this.graphStatus === 'ready'
-    const previousTabs = this.tabs
-    const previousLeaves = this.leaves
+    const { tabs: previousTabs, leaves: previousLeaves } = this
     this.tabs = new Map(graph.tabs.map((tab) => [tab.tabId, tab]))
     const lifecycleLeaves = this.reconcileMobileSessionRetirementFences(graph.leaves)
+    const previousMobileSnapshots = new Map(this.mobileSessionTabsByWorktree)
+    const incomingMobileSnapshots = new Map(
+      (graph.mobileSessionTabs ?? []).map((snapshot) => [snapshot.worktree, snapshot])
+    )
     const mobileSessionResyncWorktrees = new Set<string>()
     const changedMobileWorktrees = this.syncMobileSessionTabs(
       graph.mobileSessionTabs,
@@ -98,7 +105,33 @@ export class OrcaRuntimeWithSyncWindowGraph extends OrcaRuntimeWithAttachWindow 
     // Why: renderer reloads can briefly republish the same leaf with no ptyId;
     // keep live CLI handles usable while the UI graph rebuilds.
     const preserveLivePtysDuringReload = this.graphStatus === 'reloading'
-    for (const leaf of lifecycleLeaves) {
+    const incomingClaims = collectRuntimeGraphSurfaceClaims(lifecycleLeaves)
+    for (const incomingLeaf of lifecycleLeaves) {
+      let leaf = incomingLeaf
+      const priorLeaf = previousLeaves.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+      const priorPty = priorLeaf?.ptyId ? this.ptysById.get(priorLeaf.ptyId) : undefined
+      const repairedSnapshot =
+        priorPty &&
+        incomingClaims.paneCounts.get(leaf.tabId)?.get(leaf.leafId) === 1 &&
+        !incomingClaims.ptyIds.has(priorPty.ptyId) &&
+        this.tabs.get(leaf.tabId)?.worktreeId === leaf.worktreeId &&
+        !this.isPtyStopRequested(priorPty.ptyId) &&
+        this.getPtyLivenessVerdict(priorPty.ptyId)?.status !== 'exited' &&
+        this.getPtyLivenessVerdict(priorPty.ptyId)?.status !== 'unverifiable'
+          ? repairPublishedRuntimeSurfaceProjection(
+              priorPty,
+              leaf,
+              previousMobileSnapshots.get(leaf.worktreeId),
+              incomingMobileSnapshots.get(leaf.worktreeId),
+              this.mobileSessionTabsByWorktree.get(leaf.worktreeId)
+            )
+          : undefined
+      if (repairedSnapshot) {
+        // Why: a renderer losing its binding cannot fork the same live host-owned process onto a new surface.
+        this.storeMobileSessionSnapshot(leaf.worktreeId, repairedSnapshot)
+        changedMobileWorktrees.add(leaf.worktreeId)
+        leaf = { ...leaf, ptyId: priorPty.ptyId }
+      }
       if (leaf.ptyId) {
         if (leaf.parked) {
           this.orchestrationMailboxPointerDelivery.markPtyColdParked(leaf.ptyId)

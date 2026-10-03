@@ -93,12 +93,20 @@ test.describe('Worktree lineage agent-list expansion independence', () => {
     await expect(sessions).toHaveCount(2)
     await sessionDisclosure(orcaPage, parentId).click()
     await expect(sessionDisclosure(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'false')
-    await expect(sessions.first()).toBeHidden()
+    const expansion = parentRow.locator('.project-tree-sessions > .compact-agent-expansion-grid')
+    await expect(expansion).toHaveAttribute('aria-hidden', 'true')
+    await expect(expansion).toHaveAttribute('inert', '')
+    // Collapsed rows stay mounted for the grid animation, but must occupy no visible space.
+    await expect
+      .poll(() => expansion.evaluate((element) => element.getBoundingClientRect().height))
+      .toBe(0)
     await expect(parentRow.locator('.project-tree-agent-summary')).toBeVisible()
     await captureSidebar(orcaPage, '1-before-both-collapsed.png')
 
     await sessionDisclosure(orcaPage, parentId).click()
     await expect(sessionDisclosure(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'true')
+    await expect(expansion).toHaveAttribute('aria-hidden', 'false')
+    await expect(expansion).not.toHaveAttribute('inert', '')
     await expect(sessions.nth(0)).toBeVisible()
     await expect(sessions.nth(1)).toBeVisible()
     await captureSidebar(orcaPage, '2-agents-expanded.png')

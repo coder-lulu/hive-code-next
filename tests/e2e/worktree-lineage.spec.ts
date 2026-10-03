@@ -19,7 +19,7 @@ async function captureEvidence(page: Page, name: string, locator?: Locator): Pro
   if (process.env.ORCA_CAPTURE_EVIDENCE !== '1') {
     return
   }
-  const outputDir = resolve(process.cwd(), 'pr-evidence')
+  const outputDir = resolve(process.cwd(), 'logs/e2e/worktree-lineage')
   mkdirSync(outputDir, { recursive: true })
   const path = resolve(outputDir, name)
   if (locator) {
@@ -194,6 +194,12 @@ test.describe('Worktree Lineage', () => {
 
   test('dims the nested child when its terminal sleeps', async ({ orcaPage }) => {
     const { parentId, childId } = await seedLineageScenario(orcaPage)
+    await orcaPage.evaluate(() => {
+      if (!window.__store) {
+        throw new Error('window.__store is not available')
+      }
+      window.__store.getState().updateSettings({ experimentalNewWorktreeCardStyle: true })
+    })
     const parentRow = worktreeOption(orcaPage, parentId)
     const childRow = worktreeOption(orcaPage, childId)
 

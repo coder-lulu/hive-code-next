@@ -8,8 +8,30 @@
  * graph (#7587) and a graph that went away (leaves cleared, sequence not bumped) do not.
  */
 import { parsePaneKey } from '../../shared/stable-pane-id'
-import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
+import type {
+  RuntimeMobileSessionTabsSnapshot,
+  RuntimeSyncedLeaf
+} from '../../shared/runtime-types'
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
+import { terminalLayoutContainsLeaf } from './headless-terminal-split-layout'
+import { buildMaterializedHeadlessParentLayout } from './mobile-session-layout-projection'
+
+export function collectRuntimeGraphSurfaceClaims(leaves: readonly RuntimeSyncedLeaf[]): {
+  ptyIds: Set<string>
+  paneCounts: Map<string, Map<string, number>>
+} {
+  const ptyIds = new Set<string>()
+  const paneCounts = new Map<string, Map<string, number>>()
+  for (const leaf of leaves) {
+    if (leaf.ptyId) {
+      ptyIds.add(leaf.ptyId)
+    }
+    const counts = paneCounts.get(leaf.tabId) ?? new Map<string, number>()
+    counts.set(leaf.leafId, (counts.get(leaf.leafId) ?? 0) + 1)
+    paneCounts.set(leaf.tabId, counts)
+  }
+  return { ptyIds, paneCounts }
+}
 
 export type RecordedPtySurface = {
   ptyId: string
@@ -123,4 +145,104 @@ export function ptyHoldsPublishedRuntimeSurface(
       tab.ptyId === pty.ptyId &&
       (tab.incarnationId ?? null) === pty.incarnationId
   )
+}
+
+/** A live host publication can repair a missing projection, but cannot recreate a retired pane. */
+function canRepairPublishedRuntimeSurface(
+  pty: Parameters<typeof ptyHoldsPublishedRuntimeSurface>[0],
+  leaf: RuntimeSyncedLeaf,
+  previous: RuntimeMobileSessionTabsSnapshot | undefined,
+  current: RuntimeMobileSessionTabsSnapshot | undefined
+): boolean {
+  const pane = parsePaneKey(pty.paneKey ?? '')
+  if (
+    !pty.incarnationId ||
+    !previous ||
+    leaf.ptyId !== null ||
+    !pane ||
+    leaf.worktreeId !== pty.worktreeId ||
+    leaf.tabId !== pty.tabId ||
+    leaf.tabId !== pane.tabId ||
+    leaf.leafId !== pane.leafId ||
+    current?.worktree !== pty.worktreeId ||
+    previous?.worktreeInstanceId !== current.worktreeInstanceId ||
+    !ptyHoldsPublishedRuntimeSurface(pty, previous, {
+      graphSequence: 0,
+      ptyIdHoldingPane: () => undefined
+    })
+  ) {
+    return false
+  }
+  const priorOwners = previous.tabs.filter(
+    (tab) => tab.type === 'terminal' && tab.ptyId === pty.ptyId
+  )
+  const currentSurfaces = current.tabs.filter(
+    (tab) => tab.type === 'terminal' && tab.parentTabId === pane.tabId && tab.leafId === pane.leafId
+  )
+  const surface = currentSurfaces[0]
+  return Boolean(
+    priorOwners.length === 1 &&
+    currentSurfaces.length === 1 &&
+    surface?.type === 'terminal' &&
+    surface.id === priorOwners[0]?.id &&
+    (surface.ptyId == null || surface.ptyId === pty.ptyId) &&
+    (surface.incarnationId == null || surface.incarnationId === pty.incarnationId) &&
+    terminalLayoutContainsLeaf(surface.parentLayout?.root, pane.leafId) &&
+    (!surface.parentLayout?.ptyIdsByLeafId?.[pane.leafId] ||
+      surface.parentLayout.ptyIdsByLeafId[pane.leafId] === pty.ptyId) &&
+    ![previous, current].some((snapshot) =>
+      snapshot.tabs.some(
+        (tab) =>
+          tab.type === 'terminal' &&
+          ((tab.ptyId === pty.ptyId &&
+            (tab.parentTabId !== pane.tabId || tab.leafId !== pane.leafId)) ||
+            Object.entries(tab.parentLayout?.ptyIdsByLeafId ?? {}).some(
+              ([leafId, ptyId]) =>
+                ptyId === pty.ptyId && (tab.parentTabId !== pane.tabId || leafId !== pane.leafId)
+            ))
+      )
+    )
+  )
+}
+
+export function repairPublishedRuntimeSurfaceProjection(
+  pty: Parameters<typeof ptyHoldsPublishedRuntimeSurface>[0],
+  leaf: RuntimeSyncedLeaf,
+  previous: RuntimeMobileSessionTabsSnapshot | undefined,
+  incoming: RuntimeMobileSessionTabsSnapshot | undefined,
+  current: RuntimeMobileSessionTabsSnapshot | undefined
+): RuntimeMobileSessionTabsSnapshot | undefined {
+  if (
+    !current ||
+    !canRepairPublishedRuntimeSurface(pty, leaf, previous, incoming) ||
+    !canRepairPublishedRuntimeSurface(pty, leaf, previous, current)
+  ) {
+    return undefined
+  }
+  const surface = current.tabs.find(
+    (tab) => tab.type === 'terminal' && tab.parentTabId === leaf.tabId && tab.leafId === leaf.leafId
+  )
+  if (surface?.type !== 'terminal') {
+    return undefined
+  }
+  const parentLayout = buildMaterializedHeadlessParentLayout(
+    leaf.leafId,
+    pty.ptyId,
+    surface.parentLayout
+  )
+  return {
+    ...current,
+    snapshotVersion: current.snapshotVersion + 1,
+    tabs: current.tabs.map((tab) =>
+      tab.type === 'terminal' && tab.parentTabId === leaf.tabId
+        ? {
+            ...tab,
+            parentLayout,
+            ...(tab.leafId === leaf.leafId
+              ? { ptyId: pty.ptyId, incarnationId: pty.incarnationId }
+              : {})
+          }
+        : tab
+    )
+  }
 }
