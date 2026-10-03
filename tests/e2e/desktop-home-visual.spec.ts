@@ -1,16 +1,39 @@
 import path from 'node:path'
 import { mkdirSync } from 'node:fs'
+import type { ElectronApplication } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { APP_DISPLAY_NAME } from '../../src/shared/brand'
+import type { HiveAccountState } from '../../src/shared/hive-account'
 
 test.use({ seedTestRepo: false, dismissOnboarding: true })
 
-test('desktop home renders the production shell and empty states', async ({ orcaPage }) => {
+async function publishAccountState(
+  electronApp: ElectronApplication,
+  state: HiveAccountState
+): Promise<void> {
+  await electronApp.evaluate(({ ipcMain, BrowserWindow }, state) => {
+    ipcMain.removeHandler('hiveAccount:getState')
+    ipcMain.handle('hiveAccount:getState', () => state)
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('hiveAccount:stateChanged', state)
+    }
+  }, state)
+}
+
+test('desktop home renders the production shell and empty states', async ({
+  electronApp,
+  orcaPage
+}) => {
   await orcaPage.waitForFunction(
     () => Boolean(window.__store?.getState().workspaceSessionReady),
     undefined,
     { timeout: 30_000 }
   )
+  await publishAccountState(electronApp, {
+    configured: true,
+    status: 'signed-out',
+    persistence: 'encrypted'
+  })
   await orcaPage.evaluate(() => {
     window.__store?.setState({
       activeView: 'terminal',
@@ -101,4 +124,30 @@ test('desktop home renders the production shell and empty states', async ({ orca
     path: path.join(evidenceDir, 'sign-in-dark.png'),
     animations: 'disabled'
   })
+})
+
+test('secure storage failure directs sign-in to the blocked account settings', async ({
+  electronApp,
+  orcaPage
+}) => {
+  await orcaPage.waitForFunction(() => Boolean(window.__store?.getState().workspaceSessionReady))
+  await publishAccountState(electronApp, {
+    configured: true,
+    status: 'error',
+    persistence: 'none',
+    errorCode: 'secure_storage_unavailable'
+  })
+  await orcaPage.locator('[data-sidebar-account-trigger]').click()
+  await orcaPage
+    .locator('[data-account-popover]')
+    .getByRole('button', { name: 'Sign in to HiveCloud', exact: true })
+    .click()
+  await expect(
+    orcaPage.getByRole('heading', { name: 'Account & cloud', exact: true })
+  ).toBeVisible()
+  await expect(orcaPage.getByRole('alert')).toContainText('System secure storage is unavailable')
+  await expect(
+    orcaPage.getByRole('button', { name: 'Sign in to HiveCloud', exact: true })
+  ).toBeDisabled()
+  await expect(orcaPage.locator('.hive-account-dialog')).toHaveCount(0)
 })

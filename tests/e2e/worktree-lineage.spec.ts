@@ -192,9 +192,7 @@ test.describe('Worktree Lineage', () => {
     expect(positions!.childTop).toBeGreaterThan(positions!.parentTop)
   })
 
-  test('updates nested child preview status when the child terminal sleeps', async ({
-    orcaPage
-  }) => {
+  test('dims the nested child when its terminal sleeps', async ({ orcaPage }) => {
     const { parentId, childId } = await seedLineageScenario(orcaPage)
     const parentRow = worktreeOption(orcaPage, parentId)
     const childRow = worktreeOption(orcaPage, childId)
@@ -203,10 +201,17 @@ test.describe('Worktree Lineage', () => {
     await expect(childRow).toBeVisible()
 
     const childTabId = await seedWorkspaceLiveTerminal(orcaPage, childId)
-    await expect(childRow).toContainText('Active')
+    const sleepingTint = childRow.locator('[data-worktree-sleeping-dim]')
+    const heading = childRow.locator('[data-project-workspace-heading]')
+    await expect(sleepingTint).toHaveCount(0)
+    const awakeColor = await heading.evaluate((element) => getComputedStyle(element).color)
 
     await markWorkspaceTerminalSlept(orcaPage, { worktreeId: childId, tabId: childTabId })
-    await expect(childRow).toContainText('Inactive')
+    await expect(childRow).toBeVisible()
+    await expect(sleepingTint).toBeVisible()
+    await expect
+      .poll(() => heading.evaluate((element) => getComputedStyle(element).color))
+      .not.toBe(awakeColor)
   })
 
   test('sleeps a workspace and every descendant from the parent context menu', async ({

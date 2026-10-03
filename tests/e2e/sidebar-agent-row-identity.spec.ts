@@ -109,7 +109,7 @@ function sidebarAgentRowIdentities(page: Page, agentListSelector: string): Promi
   return page.evaluate((selector) => {
     const list = document.querySelector(selector)
     return list
-      ? [...list.children]
+      ? [...list.querySelectorAll('.project-tree-session-row')]
           .map((row) => row.querySelector('span[title]')?.getAttribute('title') ?? '')
           .filter((identity) => identity.length > 0)
           .sort()
@@ -182,23 +182,45 @@ test('sidebar keeps a Cursor pane visible and an OpenCode pane out of Claude Cod
   // Settle gate: the emitter has run, so the literal has been offered to the title
   // pipeline — kept as Cursor identity on the fix, dropped on main.
   await waitForTerminalOutput(orcaPage, PANE_HOLD_MARKER, 15_000)
+  await expect
+    .poll(() => paneTitles(orcaPage, cursor.tabId), { timeout: 15_000 })
+    .toContain(CURSOR_NATIVE_OSC_TITLE)
 
-  // Only the active worktree's card has agents, so this resolves to one list.
-  const agentListSelector = `[data-worktree-sidebar] [aria-label="Agents"]`
-  const agentList = worktreeRow(orcaPage, worktreeId).locator('[aria-label="Agents"]')
-  await expect(agentList.locator('> div').first()).toBeVisible()
+  const agentListSelector = `[data-worktree-sidebar] [role="option"][data-worktree-id=${JSON.stringify(worktreeId)}] .project-tree-sessions`
+  const agentList = worktreeRow(orcaPage, worktreeId).locator('.project-tree-sessions')
+  const agentRows = agentList.locator('.project-tree-session-row')
+  try {
+    await expect(agentRows.first()).toBeVisible()
 
-  // #10258: the Cursor pane gets a row at all. #8940: the OpenCode pane stays OpenCode.
-  expect(await settledSidebarAgentRowIdentities(orcaPage, agentListSelector)).toEqual([
-    'Cursor',
-    'OpenCode'
-  ])
+    // #10258: Cursor remains visible; #8940: OpenCode keeps its own identity.
+    expect(await settledSidebarAgentRowIdentities(orcaPage, agentListSelector)).toEqual([
+      'Cursor',
+      'OpenCode'
+    ])
 
-  // Both panes are on the card: the Cursor row exists at all (#10258) next to the
-  // OpenCode row still labelled by its own task text (#8940).
-  await expect(agentList.locator('> div')).toHaveCount(2)
-  await expect(agentList).toContainText('Cursor')
-  await expect(agentList).toContainText('use Claude Sonnet')
+    await expect(agentRows).toHaveCount(2)
+    await expect(agentList).toContainText('Cursor')
+    await expect(agentList).toContainText('use Claude Sonnet')
+  } catch (error) {
+    const paneEvidence = await orcaPage.evaluate(
+      (tabIds) => {
+        const state = window.__store?.getState()
+        return tabIds.map((tabId) => ({
+          tab: Object.values(state?.tabsByWorktree ?? {})
+            .flat()
+            .find((tab) => tab.id === tabId),
+          titles: state?.runtimePaneTitlesByTabId[tabId],
+          ptyIds: state?.ptyIdsByTabId[tabId],
+          layout: state?.terminalLayoutsByTabId[tabId],
+          mounted: window.__paneManagers?.has(tabId)
+        }))
+      },
+      [openCode.tabId, cursor.tabId]
+    )
+    throw new Error(`Sidebar agent projection failed: ${JSON.stringify(paneEvidence)}`, {
+      cause: error
+    })
+  }
 
   openCodeScript.cleanup()
   cursorScript.cleanup()
