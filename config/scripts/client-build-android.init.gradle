@@ -1,0 +1,27 @@
+import org.gradle.api.artifacts.dsl.LockMode
+import org.gradle.api.artifacts.component.ModuleComponentSelector
+
+gradle.beforeProject { project ->
+    def lockRoot = System.getenv('HIVECODE_ANDROID_LOCK_ROOT')
+    if (!lockRoot) throw new GradleException('HiveCode Android lock directory is required')
+    def buildName = project.rootProject.name.replaceAll('[^A-Za-z0-9_.-]', '_')
+    def projectName = project.path.replaceAll('[^A-Za-z0-9_.-]', '_')
+    def directory = new File(lockRoot, buildName)
+    directory.mkdirs()
+    project.dependencyLocking {
+        lockAllConfigurations()
+        lockFile = new File(directory, "${projectName}.lockfile")
+        lockMode = gradle.startParameter.writeDependencyLocks ? LockMode.DEFAULT : LockMode.STRICT
+    }
+    if (project.rootProject.projectDir.canonicalPath == new File(System.getenv('HIVECODE_ANDROID_PROJECT_ROOT')).canonicalPath) {
+        // stdlib-common 2.1.20 only forwards to stdlib; avoid Gradle #34842's orphan lock entry.
+        project.configurations.configureEach { configuration ->
+            configuration.resolutionStrategy.dependencySubstitution.all { dependency ->
+                def requested = dependency.requested
+                if (requested instanceof ModuleComponentSelector && requested.group == 'org.jetbrains.kotlin' && requested.module == 'kotlin-stdlib-common') {
+                    dependency.useTarget("org.jetbrains.kotlin:kotlin-stdlib:${project.rootProject.ext.kotlinVersion}")
+                }
+            }
+        }
+    }
+}

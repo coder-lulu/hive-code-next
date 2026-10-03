@@ -1,0 +1,157 @@
+import { useCallback, useRef, useState } from 'react'
+import { toPng } from 'html-to-image'
+import { Check, Copy, Share2 } from 'lucide-react'
+import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
+import { ShareUsageCard, type ShareUsageCardProps } from './ShareUsageCard'
+import { translate } from '@/i18n/i18n'
+import { buildUsageShareText } from './share-card-utils'
+import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
+
+type ShareUsageButtonProps = ShareUsageCardProps
+
+function XIcon(): React.JSX.Element {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
+export function ShareUsageButton(props: ShareUsageButtonProps): React.JSX.Element {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
+  const [capturing, setCapturing] = useState(false)
+  const copiedResetTimerRef = useRef<number | null>(null)
+  // Why: image capture/clipboard IPC can resolve after dialog teardown; avoid
+  // state writes and reset timers after this control unmounts.
+  const isMountedRef = useRef(false)
+
+  const clearCopiedResetTimer = useCallback((): void => {
+    if (copiedResetTimerRef.current !== null) {
+      window.clearTimeout(copiedResetTimerRef.current)
+      copiedResetTimerRef.current = null
+    }
+  }, [])
+
+  const setShareButtonRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      isMountedRef.current = node !== null
+      if (node === null) {
+        clearCopiedResetTimer()
+      }
+    },
+    [clearCopiedResetTimer]
+  )
+
+  const captureToClipboard = useCallback(async () => {
+    if (!cardRef.current || capturing) {
+      return
+    }
+    setCapturing(true)
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 2,
+        backgroundColor: undefined
+      })
+      await window.api.ui.writeClipboardImage(dataUrl)
+      return true
+    } finally {
+      if (isMountedRef.current) {
+        setCapturing(false)
+      }
+    }
+  }, [capturing])
+
+  const handleCopy = useCallback(async () => {
+    const ok = await captureToClipboard()
+    if (ok && isMountedRef.current) {
+      clearCopiedResetTimer()
+      setCopied(true)
+      copiedResetTimerRef.current = window.setTimeout(() => {
+        copiedResetTimerRef.current = null
+        setCopied(false)
+      }, 2000)
+    }
+  }, [captureToClipboard, clearCopiedResetTimer])
+
+  const handleShareToX = useCallback(async () => {
+    const socialUrl = PRODUCT_PUBLIC_LINKS.social
+    if (!socialUrl) {
+      return
+    }
+    const socialHost = new URL(socialUrl).hostname.toLowerCase()
+    if (socialHost === 'x.com' || socialHost === 'www.x.com') {
+      const url = `https://x.com/intent/post?text=${encodeURIComponent(buildUsageShareText(props))}`
+      await window.api.shell.openUrl(url)
+      return
+    }
+    await window.api.shell.openUrl(socialUrl)
+  }, [props])
+
+  return (
+    <Dialog>
+      <TooltipProvider delayDuration={250}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <Button
+                ref={setShareButtonRef}
+                variant="ghost"
+                size="icon-xs"
+                aria-label={translate(
+                  'auto.components.stats.ShareUsageButton.bce08eccb9',
+                  'Share usage'
+                )}
+              >
+                <Share2 className="size-3.5" />
+              </Button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            {translate('auto.components.stats.ShareUsageButton.cecefa7c32', 'Share')}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <DialogContent className="max-w-fit" showCloseButton>
+        <DialogHeader>
+          <DialogTitle>
+            {translate('auto.components.stats.ShareUsageButton.bce08eccb9', 'Share usage')}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col items-center gap-3 py-2">
+          <ShareUsageCard ref={cardRef} {...props} />
+          <div className="flex w-full max-w-[480px] gap-2">
+            <Button onClick={() => void handleCopy()} disabled={capturing} className="flex-1">
+              {copied ? (
+                <>
+                  <Check className="mr-2 size-4" />
+                  {translate('auto.components.stats.ShareUsageButton.bd82c76a70', 'Copied')}
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 size-4" />
+                  {translate('auto.components.stats.ShareUsageButton.b295c1c75d', 'Copy image')}
+                </>
+              )}
+            </Button>
+            {PRODUCT_PUBLIC_LINKS.social ? (
+              <Button
+                variant="outline"
+                onClick={() => void handleShareToX()}
+                disabled={capturing}
+                className="flex-1"
+              >
+                <span className="mr-2">
+                  <XIcon />
+                </span>
+                {translate('auto.components.stats.ShareUsageButton.7d6b25323d', 'Share on X')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

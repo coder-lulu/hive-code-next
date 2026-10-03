@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.origin.explicit-default-port.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "origin",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {"origin": "https://client.hive.test:443", "allowedOrigins": ["https://client.hive.test"], "browser": true}
+}

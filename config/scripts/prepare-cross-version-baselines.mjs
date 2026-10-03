@@ -1,0 +1,84 @@
+import path from 'node:path'
+import { createGit } from './upstream-sync-checkpoint.mjs'
+
+export const BASELINE_RELEASE = 'v1.4.186'
+const UPSTREAM_URL = 'https://github.com/stablyai/orca.git'
+// Published release labels resolve to verified upstream objects without creating local tags.
+export const UPSTREAM_BASELINE_PINS = Object.freeze({
+  'v1.4.186': 'd802fdc7429f5f9d959b99a73656545bd760eace',
+  'v1.4.184': '2307f2ebbe1c1e737c0b12d920bb0a208332db2c',
+  '5534462b50c660888487a2108700d4cf284270db': '5534462b50c660888487a2108700d4cf284270db',
+  '28957d6004dd191b6f0baff493a9fd3d37405d9d': '28957d6004dd191b6f0baff493a9fd3d37405d9d',
+  '6e4f817101daa18d82824b69243d9079baa9c416': '6e4f817101daa18d82824b69243d9079baa9c416',
+  d937d22f498505c017634be9bf0540c9fa42e665: 'd937d22f498505c017634be9bf0540c9fa42e665',
+  '4cb013c0a9': '4cb013c0a9251275fa3d20ea33b45429e07aa6be',
+  '4bb337741c': '4bb337741c335cfcc428d3b4271023566e2dadb8',
+  fd9125ea8c: 'fd9125ea8c7b347cd8b675a4095e31cd3c865d25'
+})
+
+export function resolvePinnedUpstreamRef(ref) {
+  return Object.hasOwn(UPSTREAM_BASELINE_PINS, ref) ? UPSTREAM_BASELINE_PINS[ref] : ref
+}
+
+function createBaselineGit(cwd) {
+  const env = { ...process.env }
+  for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) {
+    delete env[name]
+  }
+  return createGit(cwd, { env, timeoutMs: 300_000, maxBuffer: 16 * 1024 * 1024 })
+}
+
+export function prepareCrossVersionBaselines({
+  cwd = process.cwd(),
+  git = createBaselineGit(cwd)
+} = {}) {
+  const commits = [...new Set(Object.values(UPSTREAM_BASELINE_PINS))]
+  const verify = (sha) => {
+    const resolved = git(['rev-parse', '--verify', '--end-of-options', `${sha}^{commit}`]).trim()
+    if (resolved !== sha) {
+      throw new Error(`Upstream baseline identity mismatch: ${sha}`)
+    }
+  }
+  const missing = commits.filter((sha) => {
+    try {
+      verify(sha)
+      return false
+    } catch (error) {
+      if (error.status !== 128) {
+        throw error
+      }
+      return true
+    }
+  })
+  if (missing.length) {
+    // Fetch full snapshot blobs so archives do not depend on an implicit promisor remote.
+    git([
+      'fetch',
+      '--quiet',
+      '--no-tags',
+      '--no-write-fetch-head',
+      '--depth=1',
+      UPSTREAM_URL,
+      ...missing
+    ])
+  }
+  for (const sha of commits) {
+    verify(sha)
+  }
+  return {
+    schemaVersion: 1,
+    upstream: 'stablyai/orca',
+    baselineRelease: BASELINE_RELEASE,
+    baselineCommit: UPSTREAM_BASELINE_PINS[BASELINE_RELEASE],
+    commits
+  }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  try {
+    console.log(JSON.stringify(prepareCrossVersionBaselines(), null, 2))
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  }
+}

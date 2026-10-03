@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.private-ops.exact-replay.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "private-command",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {
+    "previous": {
+      "commandId": "30303030-3030-4030-8030-303030303030",
+      "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "storedResponse": {"type": "cell-command-result", "v": 2, "commandId": "30303030-3030-4030-8030-303030303030", "commandType": "INCARNATION_DRAIN", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "result": "APPLIED", "observedAt": 1893456000000}
+    },
+    "current": {"commandId": "30303030-3030-4030-8030-303030303030", "bodySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "expectedResponse": {"type": "cell-command-result", "v": 2, "commandId": "30303030-3030-4030-8030-303030303030", "commandType": "INCARNATION_DRAIN", "cellId": "cell-01", "targetIncarnationId": "22222222-2222-4222-8222-222222222222", "result": "APPLIED", "observedAt": 1893456000000}
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.conn-ticket.replay.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "conn-ticket-replay",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {"connTicket": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "priorConsumed": true, "concurrentAttempts": 2}
+}

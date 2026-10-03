@@ -1,0 +1,291 @@
+import { createElement } from 'react'
+import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SessionOptionDescriptor } from '../../../src/shared/native-chat-session-options'
+import { MobileNativeChatSessionOptionPickers } from './MobileNativeChatSessionOptionPickers'
+import type { MobileNativeChatSessionOptionsController } from './use-mobile-native-chat-session-options'
+
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  Keyboard: { dismiss: vi.fn() },
+  Pressable: 'Pressable',
+  StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
+  Text: 'Text',
+  View: 'View'
+}))
+vi.mock('lucide-react-native', () => ({
+  Check: 'Check',
+  ChevronDown: 'ChevronDown',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  X: 'X'
+}))
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+vi.mock('../components/BottomDrawer', async () => {
+  const React = await import('react')
+  return {
+    BottomDrawer: ({ visible, children }: { visible: boolean; children?: unknown }) =>
+      visible ? React.createElement('BottomDrawer', { visible }, children) : null
+  }
+})
+
+const MODEL_DESCRIPTOR: SessionOptionDescriptor = {
+  id: 'model',
+  label: 'Model',
+  category: 'model',
+  kind: {
+    type: 'select',
+    currentValue: 'sonnet',
+    choices: [
+      { value: 'sonnet', label: 'Sonnet 5' },
+      { value: 'opus', label: 'Opus 4.8', description: 'Most capable' }
+    ]
+  },
+  valueSource: 'reported',
+  transport: 'catalog',
+  settable: true
+}
+
+const EFFORT_DESCRIPTOR: SessionOptionDescriptor = {
+  id: 'effort',
+  label: 'Effort',
+  category: 'thought_level',
+  kind: {
+    type: 'select',
+    currentValue: 'high',
+    choices: [
+      { value: 'low', label: 'Low' },
+      { value: 'high', label: 'High' }
+    ]
+  },
+  valueSource: 'dispatched',
+  transport: 'catalog',
+  settable: true
+}
+
+const FAST_MODE_DESCRIPTOR: SessionOptionDescriptor = {
+  id: 'fastMode',
+  label: 'Fast mode',
+  category: 'mode',
+  kind: { type: 'boolean', currentValue: false },
+  valueSource: 'reported',
+  transport: 'catalog',
+  settable: true
+}
+
+describe('MobileNativeChatSessionOptionPickers', () => {
+  let renderer: ReactTestRenderer | null = null
+  const setOption = vi.fn<MobileNativeChatSessionOptionsController['setOption']>()
+  const invokeAction = vi.fn<MobileNativeChatSessionOptionsController['invokeAction']>()
+
+  const mount = (snapshot: SessionOptionDescriptor[], isWorking = false): void => {
+    const controller: MobileNativeChatSessionOptionsController = {
+      snapshot,
+      pendingId: null,
+      setOption,
+      invokeAction,
+      recordCommand: vi.fn()
+    }
+    act(() => {
+      renderer = create(
+        createElement(MobileNativeChatSessionOptionPickers, { controller, isWorking })
+      )
+    })
+  }
+
+  const pill = (
+    name: string
+  ): {
+    props: {
+      onPress: () => void
+      accessibilityLabel?: string
+      disabled?: boolean
+      accessibilityRole?: string
+      accessibilityState?: { disabled?: boolean }
+    }
+  } =>
+    renderer!.root.find(
+      (node) =>
+        node.type === 'Pressable' &&
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.startsWith(name)
+    ) as {
+      props: {
+        onPress: () => void
+        accessibilityLabel?: string
+        disabled?: boolean
+        accessibilityRole?: string
+        accessibilityState?: { disabled?: boolean }
+      }
+    }
+
+  const rowByText = (
+    text: string
+  ): {
+    props: {
+      onPress: () => void
+      accessibilityRole?: string
+      accessibilityLabel?: string
+      accessibilityState?: { checked?: boolean; disabled?: boolean }
+    }
+  } => {
+    const label = renderer!.root
+      .findAll((node) => node.type === 'Text')
+      .find((node) => (node.props as { children?: unknown }).children === text)
+    if (!label) {
+      throw new Error(`No row labeled ${text}`)
+    }
+    let parent = label.parent
+    while (parent && parent.type !== 'Pressable') {
+      parent = parent.parent
+    }
+    if (!parent) {
+      throw new Error(`No pressable row for ${text}`)
+    }
+    return parent as unknown as {
+      props: {
+        onPress: () => void
+        accessibilityRole?: string
+        accessibilityLabel?: string
+        accessibilityState?: { checked?: boolean; disabled?: boolean }
+      }
+    }
+  }
+
+  beforeEach(() => {
+    setOption.mockReset()
+    setOption.mockResolvedValue(true)
+    invokeAction.mockReset()
+    invokeAction.mockResolvedValue(true)
+  })
+  afterEach(() => {
+    act(() => {
+      renderer?.unmount()
+    })
+    renderer = null
+  })
+
+  it('renders nothing without a model descriptor', () => {
+    mount([])
+    expect(renderer!.toJSON()).toBeNull()
+  })
+
+  it('shows the current model and effort in one pill', () => {
+    mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
+    expect(pill('模型').props).toMatchObject({
+      accessibilityLabel: '模型，Sonnet 5 High',
+      disabled: false
+    })
+    const labels = renderer!.root
+      .findAll((node) => node.type === 'Text')
+      .map((node) => (node.props as { children?: unknown }).children)
+    expect(labels).toContain('Sonnet 5 High')
+  })
+
+  it('opens the model sheet and applies a picked model', async () => {
+    mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
+    await act(async () => pill('模型').props.onPress())
+    expect(renderer!.root.findByType('BottomDrawer').props.visible).toBe(true)
+    await act(async () => rowByText('Opus 4.8').props.onPress())
+    expect(setOption).toHaveBeenCalledWith('model', 'opus')
+  })
+
+  it('opens an option picker from the model sheet summary', async () => {
+    mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
+    await act(async () => pill('模型').props.onPress())
+    await act(async () => rowByText('Effort').props.onPress())
+    await act(async () => rowByText('Low').props.onPress())
+    expect(setOption).toHaveBeenCalledWith('effort', 'low')
+  })
+
+  it('shows absolute boolean values in option summaries', async () => {
+    mount([MODEL_DESCRIPTOR, FAST_MODE_DESCRIPTOR])
+    await act(async () => pill('模型').props.onPress())
+    expect(rowByText('关闭').props.accessibilityLabel).toBe('Fast mode，关闭')
+  })
+
+  it('announces choice selection and disabled state', async () => {
+    mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
+    expect(pill('模型').props).toMatchObject({
+      accessibilityRole: 'button',
+      accessibilityState: { disabled: false }
+    })
+    await act(async () => pill('模型').props.onPress())
+    expect(rowByText('Sonnet 5').props).toMatchObject({
+      accessibilityRole: 'radio',
+      accessibilityState: { checked: true, disabled: false }
+    })
+    expect(rowByText('Opus 4.8').props.accessibilityState?.checked).toBe(false)
+  })
+
+  it('closes without dispatch when re-picking the tracked value', async () => {
+    mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR])
+    await act(async () => pill('模型').props.onPress())
+    await act(async () => rowByText('Sonnet 5').props.onPress())
+    expect(setOption).not.toHaveBeenCalled()
+  })
+
+  it('renders agent-picker descriptors as a single action row', async () => {
+    mount([
+      {
+        ...MODEL_DESCRIPTOR,
+        kind: { type: 'select', choices: [] },
+        valueSource: 'unknown',
+        transport: 'catalog',
+        action: { type: 'agent-picker' }
+      }
+    ])
+    await act(async () => pill('模型').props.onPress())
+    expect(rowByText('在 Agent 选择器中选择…').props.accessibilityRole).toBe('button')
+    await act(async () => rowByText('在 Agent 选择器中选择…').props.onPress())
+    expect(invokeAction).toHaveBeenCalledWith('model')
+  })
+
+  // The terminal transport can only learn the outcome by parsing the screen back,
+  // so the sheet admits the value is unconfirmed; the structured transport reports
+  // it every turn, which makes the same caption noise there.
+  it.each([
+    { transport: 'catalog' as const, caption: true },
+    { transport: 'agent-session' as const, caption: false }
+  ])('captions a dispatched value only on the terminal transport', async (scenario) => {
+    mount([
+      MODEL_DESCRIPTOR,
+      { ...EFFORT_DESCRIPTOR, valueSource: 'dispatched', transport: scenario.transport }
+    ])
+    await act(async () => pill('模型').props.onPress())
+    await act(async () => rowByText('Effort').props.onPress())
+    const captions = renderer!.root
+      .findAll((node) => node.type === 'Text')
+      .filter(
+        (node) => (node.props as { children?: unknown }).children === '已发送给 Agent，尚未确认'
+      )
+    expect(captions.length > 0).toBe(scenario.caption)
+  })
+
+  it.each(['catalog', 'agent-session'] as const)(
+    'does not caption a reported value on the %s transport',
+    async (transport) => {
+      mount([MODEL_DESCRIPTOR, { ...EFFORT_DESCRIPTOR, valueSource: 'reported', transport }])
+      await act(async () => pill('模型').props.onPress())
+      await act(async () => rowByText('Effort').props.onPress())
+      expect(
+        renderer!.root
+          .findAll((node) => node.type === 'Text')
+          .some(
+            (node) => (node.props as { children?: unknown }).children === '已发送给 Agent，尚未确认'
+          )
+      ).toBe(false)
+    }
+  )
+
+  it('locks the pills while the agent is working', () => {
+    mount([MODEL_DESCRIPTOR, EFFORT_DESCRIPTOR], true)
+    expect(pill('模型').props).toMatchObject({ disabled: true })
+  })
+})

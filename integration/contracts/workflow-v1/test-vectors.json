@@ -1,0 +1,434 @@
+{
+  "examples": {
+    "team": {
+      "contractVersion": 1,
+      "kind": "workflow.team-binding",
+      "company": {
+        "contractVersion": 1,
+        "kind": "workflow.company-binding",
+        "companyRef": "company:engineering",
+        "ownerScope": {
+          "kind": "personalTenant",
+          "tenantRef": "tenant:owner"
+        },
+        "ownerAccountRef": "account:owner",
+        "ownerActorRef": "actor:owner",
+        "bindingRevision": 1
+      },
+      "project": {
+        "contractVersion": 1,
+        "kind": "workflow.project-binding",
+        "scope": {
+          "companyRef": "company:engineering",
+          "projectRef": "project:demo"
+        },
+        "hiveWorkspaceRef": "workspace:project-source",
+        "bindingRevision": 1
+      },
+      "employees": [
+        {
+          "contractVersion": 1,
+          "kind": "workflow.employee-binding",
+          "scope": {
+            "companyRef": "company:engineering",
+            "projectRef": "project:demo"
+          },
+          "employeeRef": "employee:product",
+          "role": "product",
+          "adapterType": "hive_runtime",
+          "executor": "codex",
+          "profileRef": "codex",
+          "profileRevision": "codex:1",
+          "bindingRevision": 1
+        },
+        {
+          "contractVersion": 1,
+          "kind": "workflow.employee-binding",
+          "scope": {
+            "companyRef": "company:engineering",
+            "projectRef": "project:demo"
+          },
+          "employeeRef": "employee:developer",
+          "role": "developer",
+          "adapterType": "hive_runtime",
+          "executor": "codex",
+          "profileRef": "codex",
+          "profileRevision": "codex:1",
+          "bindingRevision": 1
+        },
+        {
+          "contractVersion": 1,
+          "kind": "workflow.employee-binding",
+          "scope": {
+            "companyRef": "company:engineering",
+            "projectRef": "project:demo"
+          },
+          "employeeRef": "employee:tester",
+          "role": "tester",
+          "adapterType": "hive_runtime",
+          "executor": "codex",
+          "profileRef": "codex",
+          "profileRevision": "codex:1",
+          "bindingRevision": 1
+        },
+        {
+          "contractVersion": 1,
+          "kind": "workflow.employee-binding",
+          "scope": {
+            "companyRef": "company:engineering",
+            "projectRef": "project:demo"
+          },
+          "employeeRef": "employee:ops",
+          "role": "ops",
+          "adapterType": "hive_runtime",
+          "executor": "codex",
+          "profileRef": "codex",
+          "profileRevision": "codex:1",
+          "bindingRevision": 1
+        }
+      ]
+    },
+    "definition": {
+      "contractVersion": 1,
+      "kind": "workflow.definition",
+      "scope": {
+        "companyRef": "company:engineering",
+        "projectRef": "project:demo"
+      },
+      "workflowRef": "workflow:feature",
+      "workflowRevision": 1,
+      "stages": [
+        {
+          "stageRef": "stage:product",
+          "role": "product",
+          "outputKind": "requirements",
+          "dependsOn": [],
+          "acceptanceCriteria": ["Produce the required versioned handoff."],
+          "maxAttempts": 2
+        },
+        {
+          "stageRef": "stage:developer",
+          "role": "developer",
+          "outputKind": "code",
+          "dependsOn": ["stage:product"],
+          "acceptanceCriteria": ["Produce the required versioned handoff."],
+          "maxAttempts": 2
+        },
+        {
+          "stageRef": "stage:tester",
+          "role": "tester",
+          "outputKind": "test_report",
+          "returnToStageRef": "stage:developer",
+          "dependsOn": ["stage:developer"],
+          "acceptanceCriteria": ["Run independent tests against the fixed code snapshot."],
+          "maxAttempts": 2
+        },
+        {
+          "stageRef": "stage:ops",
+          "role": "ops",
+          "outputKind": "release_plan",
+          "dependsOn": ["stage:tester"],
+          "acceptanceCriteria": ["Produce the required versioned handoff."],
+          "maxAttempts": 2
+        }
+      ],
+      "maxParallelism": 1,
+      "maxDurationMs": 3600000
+    },
+    "handoff": {
+      "contractVersion": 1,
+      "kind": "workflow.handoff",
+      "handoffRef": "handoff:code-v1",
+      "binding": {
+        "scope": {
+          "companyRef": "company:engineering",
+          "projectRef": "project:demo"
+        },
+        "workflowRef": "workflow:feature",
+        "workflowRevision": 1,
+        "workflowRunRef": "workflow-run:one"
+      },
+      "stageRef": "stage:developer",
+      "producer": {
+        "employeeRef": "employee:developer",
+        "role": "developer",
+        "task": {
+          "spaceId": "company:engineering",
+          "taskId": "task:developer",
+          "runId": "run:developer",
+          "attempt": 1,
+          "taskRevision": "1"
+        },
+        "runtimeRecordId": "runtime:local",
+        "ownershipEpoch": 1,
+        "executionId": "execution:developer",
+        "executionEpoch": 1,
+        "commandFingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "sessionRef": "session:developer",
+        "executionWorkspaceRef": "execution-workspace:developer",
+        "workspaceExecutionClaimRef": "claim:developer"
+      },
+      "consumer": {
+        "stageRef": "stage:tester",
+        "employeeRef": "employee:tester",
+        "role": "tester"
+      },
+      "artifact": {
+        "artifactRef": "artifact:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifactRevision": 1,
+        "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "codeVersion": {
+        "kind": "snapshot",
+        "snapshot": {
+          "artifactRef": "artifact:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "artifactRevision": 1,
+          "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "treeDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "dependencyVersions": [
+        {
+          "stageRef": "stage:product",
+          "handoffRef": "handoff:requirements-v1",
+          "artifact": {
+            "artifactRef": "artifact:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "artifactRevision": 1,
+            "digest": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
+      ],
+      "summary": "Implement the agreed feature; verify the fixed snapshot in a fresh tester workspace.",
+      "audienceScope": {
+        "scope": {
+          "companyRef": "company:engineering",
+          "projectRef": "project:demo"
+        },
+        "employeeRefs": ["employee:developer", "employee:tester"]
+      }
+    },
+    "review": {
+      "contractVersion": 1,
+      "kind": "workflow.review",
+      "reviewRef": "review:code-v1",
+      "stageRef": "stage:tester",
+      "binding": {
+        "scope": {
+          "companyRef": "company:engineering",
+          "projectRef": "project:demo"
+        },
+        "workflowRef": "workflow:feature",
+        "workflowRevision": 1,
+        "workflowRunRef": "workflow-run:one"
+      },
+      "subjectHandoffRef": "handoff:code-v1",
+      "artifact": {
+        "artifactRef": "artifact:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifactRevision": 1,
+        "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "codeVersion": {
+        "kind": "snapshot",
+        "snapshot": {
+          "artifactRef": "artifact:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "artifactRevision": 1,
+          "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "treeDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "reviewer": {
+        "employeeRef": "employee:tester",
+        "role": "tester",
+        "task": {
+          "spaceId": "company:engineering",
+          "taskId": "task:tester",
+          "runId": "run:tester",
+          "attempt": 1,
+          "taskRevision": "1"
+        },
+        "runtimeRecordId": "runtime:local",
+        "ownershipEpoch": 1,
+        "executionId": "execution:tester",
+        "executionEpoch": 1,
+        "commandFingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "sessionRef": "session:tester",
+        "executionWorkspaceRef": "execution-workspace:tester",
+        "workspaceExecutionClaimRef": "claim:tester"
+      },
+      "decision": "approved",
+      "testReport": {
+        "artifactRef": "artifact:1111111111111111111111111111111111111111111111111111111111111111",
+        "artifactRevision": 1,
+        "digest": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    },
+    "approval": {
+      "contractVersion": 1,
+      "kind": "workflow.deployment-approval",
+      "approvalRef": "approval:staging-v1",
+      "binding": {
+        "scope": {
+          "companyRef": "company:engineering",
+          "projectRef": "project:demo"
+        },
+        "workflowRef": "workflow:feature",
+        "workflowRevision": 1,
+        "workflowRunRef": "workflow-run:one"
+      },
+      "subjectHandoffRef": "handoff:code-v1",
+      "artifact": {
+        "artifactRef": "artifact:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifactRevision": 1,
+        "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "codeVersion": {
+        "kind": "snapshot",
+        "snapshot": {
+          "artifactRef": "artifact:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "artifactRevision": 1,
+          "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "treeDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "reviewRef": "review:code-v1",
+      "targetRef": "target:staging",
+      "action": "deploy",
+      "actorRef": "actor:owner",
+      "authorizationRevision": "1",
+      "expiresAt": "2026-10-03T12:00:00.000Z"
+    },
+    "sharedEvent": {
+      "contractVersion": 1,
+      "kind": "workflow.shared-event",
+      "sharedEventId": "event:handoff-v1",
+      "causationId": "event:code-finished-v1",
+      "binding": {
+        "scope": {
+          "companyRef": "company:engineering",
+          "projectRef": "project:demo"
+        },
+        "workflowRef": "workflow:feature",
+        "workflowRevision": 1,
+        "workflowRunRef": "workflow-run:one"
+      },
+      "actorRef": "employee:developer",
+      "eventType": "handoff",
+      "summary": "Implement the agreed feature; verify the fixed snapshot in a fresh tester workspace.",
+      "artifactRefs": ["artifact:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+      "audienceScope": {
+        "scope": {
+          "companyRef": "company:engineering",
+          "projectRef": "project:demo"
+        },
+        "employeeRefs": ["employee:developer", "employee:tester"]
+      }
+    }
+  },
+  "bindingCases": [
+    {
+      "name": "artifact revision changes invalidate old tests",
+      "target": "review",
+      "path": ["artifact", "artifactRevision"],
+      "value": 2,
+      "expected": "workflow_artifact_revision_mismatch"
+    },
+    {
+      "name": "artifact digest changes invalidate old tests",
+      "target": "review",
+      "path": ["artifact", "digest"],
+      "value": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected": "workflow_artifact_revision_mismatch"
+    },
+    {
+      "name": "code tree changes invalidate old tests",
+      "target": "review",
+      "path": ["codeVersion", "treeDigest"],
+      "value": "4444444444444444444444444444444444444444444444444444444444444444",
+      "expected": "workflow_artifact_revision_mismatch"
+    },
+    {
+      "name": "workflow revision cannot drift in flight",
+      "target": "review",
+      "path": ["binding", "workflowRevision"],
+      "value": 2,
+      "expected": "workflow_binding_mismatch"
+    },
+    {
+      "name": "project cannot be substituted",
+      "target": "review",
+      "path": ["binding", "scope", "projectRef"],
+      "value": "project:other",
+      "expected": "workflow_binding_mismatch"
+    },
+    {
+      "name": "producer session cannot perform independent tests",
+      "target": "review",
+      "path": ["reviewer", "sessionRef"],
+      "value": "session:developer",
+      "expected": "workflow_independent_test_required"
+    },
+    {
+      "name": "producer workspace cannot perform independent tests",
+      "target": "review",
+      "path": ["reviewer", "executionWorkspaceRef"],
+      "value": "execution-workspace:developer",
+      "expected": "workflow_independent_test_required"
+    },
+    {
+      "name": "producer execution cannot perform independent tests",
+      "target": "review",
+      "path": ["reviewer", "executionId"],
+      "value": "execution:developer",
+      "expected": "workflow_independent_test_required"
+    },
+    {
+      "name": "deployment approval must match artifact revision",
+      "target": "approval",
+      "path": ["artifact", "artifactRevision"],
+      "value": 2,
+      "expected": "workflow_artifact_revision_mismatch"
+    },
+    {
+      "name": "deployment approval cannot follow a new workflow revision",
+      "target": "approval",
+      "path": ["binding", "workflowRevision"],
+      "value": 2,
+      "expected": "workflow_binding_mismatch"
+    },
+    {
+      "name": "staging approval cannot authorize production",
+      "target": "approval",
+      "path": ["targetRef"],
+      "value": "target:production",
+      "expected": "workflow_deployment_authorization_mismatch"
+    },
+    {
+      "name": "deploy approval cannot authorize rollback",
+      "target": "approval",
+      "path": ["action"],
+      "value": "rollback",
+      "expected": "workflow_deployment_authorization_mismatch"
+    },
+    {
+      "name": "expired approval does not authorize a deployment",
+      "target": "approval",
+      "path": ["expiresAt"],
+      "value": "2026-10-03T10:00:00.000Z",
+      "expected": "workflow_deployment_authorization_mismatch"
+    },
+    {
+      "name": "revoked authorization revision cannot be reused",
+      "target": "approval",
+      "path": ["authorizationRevision"],
+      "value": "2",
+      "expected": "workflow_deployment_authorization_mismatch"
+    },
+    {
+      "name": "approval cannot be borrowed from another actor",
+      "target": "approval",
+      "path": ["actorRef"],
+      "value": "actor:other",
+      "expected": "workflow_deployment_authorization_mismatch"
+    }
+  ]
+}

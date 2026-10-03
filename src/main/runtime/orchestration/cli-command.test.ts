@@ -1,0 +1,86 @@
+import { describe, expect, it } from 'vitest'
+import {
+  localOrchestrationCliCommand,
+  resolveTerminalOrchestrationCliCommand,
+  runtimeOrchestrationCliCommand
+} from './cli-command'
+
+describe('resolveTerminalOrchestrationCliCommand', () => {
+  it('uses the installed Hive command for structured and local runtime callers', () => {
+    expect(runtimeOrchestrationCliCommand()).toBe('hive')
+    expect(localOrchestrationCliCommand()).toBe('hive')
+  })
+  it('uses the primary HiveCode command for a pane recorded as WSL', () => {
+    expect(
+      resolveTerminalOrchestrationCliCommand({
+        connectionId: null,
+        isWsl: true,
+        worktreeId: 'repo::C:\\repo'
+      })
+    ).toBe('hive')
+  })
+
+  it('uses project runtime and WSL paths when restored pane metadata is unavailable', () => {
+    expect(
+      resolveTerminalOrchestrationCliCommand({
+        connectionId: null,
+        isWsl: null,
+        worktreeId: 'repo::C:\\repo',
+        projectRuntime: {
+          status: 'resolved',
+          runtime: {
+            kind: 'wsl',
+            hostPlatform: 'wsl',
+            projectId: 'project',
+            distro: 'Ubuntu',
+            reason: 'project-override',
+            cacheKey: 'project:wsl:Ubuntu'
+          }
+        }
+      })
+    ).toBe('hive')
+    expect(
+      resolveTerminalOrchestrationCliCommand({
+        connectionId: null,
+        isWsl: null,
+        worktreeId: 'repo::\\\\wsl.localhost\\Ubuntu\\home\\alice\\repo'
+      })
+    ).toBe('hive')
+  })
+
+  it('uses the primary HiveCode command for native and SSH panes', () => {
+    expect(
+      resolveTerminalOrchestrationCliCommand({
+        connectionId: null,
+        isWsl: false,
+        worktreeId: 'repo::/home/alice/repo'
+      })
+    ).toBe('hive')
+    expect(
+      resolveTerminalOrchestrationCliCommand({
+        connectionId: 'ssh-1',
+        isWsl: null,
+        worktreeId: 'repo::\\\\wsl.localhost\\Ubuntu\\home\\alice\\repo'
+      })
+    ).toBe('hive')
+  })
+
+  it('uses the installed Hive command despite upstream runtime launcher hints', () => {
+    expect(
+      resolveTerminalOrchestrationCliCommand({
+        connectionId: null,
+        isWsl: true,
+        worktreeId: 'repo::C:\\repo',
+        runtimeCliCommand: 'orca-dev'
+      })
+    ).toBe('hive')
+    expect(
+      resolveTerminalOrchestrationCliCommand({
+        connectionId: 'ssh-1',
+        isWsl: true,
+        worktreeId: 'repo::C:\\repo',
+        runtimeCliCommand: 'orca-dev'
+      })
+    ).toBe('hive')
+  })
+})

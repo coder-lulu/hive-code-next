@@ -1,0 +1,67 @@
+.accounts-pane {
+  container: accounts-pane / inline-size;
+  min-width: 0;
+}
+
+.accounts-official-status {
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 1fr);
+}
+
+.accounts-official-identity {
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--border);
+}
+
+.accounts-official-model {
+  padding-left: 1.5rem;
+}
+
+.accounts-provider-row {
+  grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.25fr) minmax(8rem, 0.7fr) auto;
+}
+
+@container accounts-pane (max-width: 600px) {
+  .accounts-official-status {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .accounts-official-identity {
+    padding-right: 0;
+    padding-bottom: 0.875rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .accounts-official-model {
+    padding-top: 0.875rem;
+    padding-left: 0;
+  }
+
+  .accounts-cli-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .accounts-runtime-scope {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .accounts-provider-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .accounts-provider-detail {
+    display: none;
+  }
+
+  .accounts-provider-status {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .accounts-provider-row > :last-child {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}

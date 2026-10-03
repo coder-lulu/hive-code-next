@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.hive.dev/hiverelay/v2/control-lease-refresh.schema.json",
+  "title": "Current acknowledged Runtime Host control lease refresh",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "runtimeProof",
+    "assignmentId",
+    "assignmentEpoch",
+    "controlGeneration",
+    "expectedControlLeaseExpiresAt"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "const": 2
+    },
+    "runtimeProof": {
+      "$ref": "runtime-proof.schema.json"
+    },
+    "assignmentId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "assignmentEpoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "controlGeneration": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "expectedControlLeaseExpiresAt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "$comment": "Runtime-proof JSON body only. The active current tuple, binding, assignment, cell incarnation and acknowledged control generation must remain authoritative. A matching expiry CAS issues a fresh jti with monotonically increasing expiry, capped by the current heartbeat lease and 120 seconds, without changing controlGeneration. A lower expected expiry returns the current committed lease without extending it; a higher expiry or stale generation rejects. Each HTTP retry signs a new one-use Runtime proof. The existing /v1/assign keeps takeover semantics. The Cell accepts auth-refresh only on its current owner socket."
+}

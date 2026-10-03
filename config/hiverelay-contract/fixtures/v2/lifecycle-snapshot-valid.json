@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.lifecycle-snapshot.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "lifecycle-operator",
+  "applicableComponents": [
+    "cloud"
+  ],
+  "validationTime": 1788566401000,
+  "input": {
+    "snapshot": {
+      "protocolVersion": "hiverelay-cell-lifecycle-operator/v1",
+      "cellId": "cell-ap-east-1a",
+      "state": "ACTIVATING",
+      "resourceVersion": 9,
+      "lifecycleGeneration": 4,
+      "observedIncarnationId": "10000000-0000-4000-8000-000000000002",
+      "routingConfirmedIncarnationId": null,
+      "routingConfirmedAt": null,
+      "observedAt": "2026-09-05T00:00:01Z",
+      "updatedAt": "2026-09-05T00:00:01Z"
+    }
+  }
+}

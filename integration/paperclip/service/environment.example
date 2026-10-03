@@ -1,0 +1,3 @@
+HIVE_PAPERCLIP_DATABASE_URL=postgres://hive_tasks:CHANGE_ME@127.0.0.1:5432/hive_tasks
+HIVE_PAPERCLIP_SERVICE_DESCRIPTOR=/PRIVATE/HiveCode-user-data/hive-tasks/paperclip.json
+HIVE_TASK_TRANSPORT_DESCRIPTOR=/PRIVATE/HiveCode-user-data/hive-tasks/transport.json

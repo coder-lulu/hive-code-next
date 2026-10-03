@@ -1,0 +1,297 @@
+.project-tree-header-disclosure,
+.project-tree-header-count {
+  display: none;
+}
+
+.projects-navigation-pane {
+  container: project-tree / inline-size;
+  --worktree-sidebar-foreground: var(--foreground);
+  --worktree-sidebar-border: var(--border);
+}
+
+.projects-navigation-pane .sessions-list-heading {
+  height: var(--project-tree-toolbar-height);
+  min-height: var(--project-tree-toolbar-height);
+  padding-inline: var(--project-tree-inset);
+  font-size: var(--project-tree-project-font);
+  border-bottom: 0;
+}
+
+.projects-navigation-pane [data-worktree-sidebar] {
+  padding-inline: var(--project-tree-inset);
+}
+
+.projects-navigation-pane [data-project-tree-header] {
+  --project-tree-row-inset: calc(var(--project-tree-depth) * var(--project-tree-indent-step));
+  height: var(--project-tree-row-height);
+  padding-left: calc(var(--project-tree-depth) * var(--project-tree-indent-step));
+  gap: var(--project-tree-gap);
+  border-radius: var(--project-tree-radius);
+  color: var(--foreground);
+}
+
+.projects-navigation-pane [data-project-tree-header='repo'] {
+  height: var(--project-tree-project-height);
+}
+
+.projects-navigation-pane [data-project-tree-header='repo'] .font-semibold {
+  font-size: var(--project-tree-project-font);
+}
+
+.projects-navigation-pane [data-project-tree-header='group'] .font-semibold {
+  font-size: var(--project-tree-font);
+  font-weight: 600;
+}
+
+.projects-navigation-pane [data-project-tree-top-group] > [data-project-tree-header] {
+  background: var(--muted);
+}
+
+.projects-navigation-pane [data-project-tree-top-group].pt-1 {
+  padding-top: var(--project-tree-inset);
+}
+
+.projects-navigation-pane .project-tree-header-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--project-tree-indent-step);
+  flex-shrink: 0;
+}
+
+.projects-navigation-pane .project-tree-header-count {
+  display: block;
+  flex-shrink: 0;
+  font-size: var(--project-tree-meta-font);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.projects-navigation-pane
+  [data-project-tree-header='group']
+  > [data-project-tree-header-title]
+  > .size-4,
+.projects-navigation-pane [data-repo-header-collapse-affordance] {
+  display: none;
+}
+
+.projects-navigation-pane [data-worktree-id] {
+  --project-tree-row-inset: calc(var(--project-tree-depth, 0) * var(--project-tree-indent-step));
+  --project-tree-folder-inset: 0px;
+  padding-left: calc(var(--project-tree-depth, 0) * var(--project-tree-indent-step));
+}
+
+.projects-navigation-pane [data-worktree-id]::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--project-tree-row-inset) - var(--project-tree-indent-step) / 2);
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--border);
+  pointer-events: none;
+}
+
+.project-tree-workspace-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 30%;
+  flex-shrink: 2;
+  font-size: var(--project-tree-meta-font);
+  color: var(--muted-foreground);
+}
+
+.projects-navigation-pane [data-worktree-id] > .relative {
+  padding-left: 0;
+}
+
+.projects-navigation-pane [data-worktree-card-surface='true'] {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  border: 0;
+  border-radius: var(--project-tree-radius);
+  background: transparent;
+  box-shadow: none;
+}
+
+.projects-navigation-pane [data-worktree-card-surface='true']:hover,
+.projects-navigation-pane [data-worktree-card-surface='true'][data-worktree-card-active] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.projects-navigation-pane [data-worktree-card-parent-content],
+.projects-navigation-pane [data-worktree-card-parent-content] > div,
+.projects-navigation-pane [data-worktree-card-hover-trigger] {
+  gap: 0;
+  margin-left: 0;
+}
+
+.projects-navigation-pane [data-project-workspace-heading] {
+  position: relative;
+  container: project-workspace / inline-size;
+  height: var(--project-tree-row-height);
+  border-radius: var(--project-tree-radius);
+  font-size: var(--project-tree-font);
+  padding-right: var(--project-tree-gap);
+}
+
+.projects-navigation-pane [data-project-workspace-heading] > div:first-child {
+  gap: var(--project-tree-gap);
+}
+
+.projects-navigation-pane [data-project-workspace-heading]:hover,
+.projects-navigation-pane .project-tree-session-row:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, var(--background));
+}
+
+.projects-navigation-pane
+  [data-worktree-card-active]
+  > [data-worktree-card-parent-content]
+  [data-project-workspace-heading],
+.projects-navigation-pane
+  [data-worktree-card-active]
+  > [data-worktree-sleeping-dim]
+  [data-project-workspace-heading],
+.projects-navigation-pane .project-tree-session-row[data-focused-agent-pane='true'] {
+  background: color-mix(in srgb, var(--foreground) 9%, var(--background));
+  box-shadow: inset 2px 0 var(--foreground);
+}
+
+.projects-navigation-pane
+  [data-worktree-card-surface]:has(
+    .project-tree-sessions [data-focused-agent-pane='true']:not([inert] *)
+  )
+  [data-project-workspace-heading] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.project-tree-workspace-identity {
+  /* Keep the disclosure, folder icon and some title visible before session metadata. */
+  min-width: min(100%, 8rem);
+}
+
+.project-tree-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--project-tree-indent-step);
+  height: var(--project-tree-row-height);
+  border-radius: var(--project-tree-radius);
+}
+
+.project-tree-disclosure:focus-visible,
+.projects-navigation-pane .project-tree-session-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.project-tree-agent-summary,
+.project-tree-summary-logos,
+.project-tree-session-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--project-tree-gap);
+  flex-shrink: 0;
+  font-size: var(--project-tree-meta-font);
+  color: var(--muted-foreground);
+}
+
+.project-tree-agent-summary {
+  min-width: 0;
+  max-width: 40%;
+  flex-shrink: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@container project-workspace (max-width: 280px) {
+  .project-tree-workspace-host,
+  .project-tree-summary-logos {
+    display: none;
+  }
+}
+
+@container project-workspace (max-width: 200px) {
+  .project-tree-agent-summary {
+    display: none;
+  }
+}
+
+.project-tree-sessions {
+  margin-left: var(--project-tree-indent-step);
+}
+
+.project-tree-sessions .compact-agent-expansion-content {
+  padding-top: 0;
+  gap: 0;
+}
+
+.projects-navigation-pane .project-tree-session-row {
+  position: relative;
+  height: var(--project-tree-row-height);
+  gap: var(--project-tree-gap);
+  padding-inline: 0 var(--project-tree-gap);
+  border-radius: var(--project-tree-radius);
+  background: transparent;
+  border: 0;
+  font-size: var(--project-tree-font);
+}
+
+.project-tree-session-row::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--project-tree-gap) / 2);
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--border);
+}
+
+.project-tree-session-row::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--project-tree-gap) / 2);
+  top: 50%;
+  width: var(--project-tree-gap);
+  border-top: 1px solid var(--border);
+}
+
+.project-tree-session-row:last-child::before {
+  bottom: 50%;
+}
+
+.project-tree-sessions .worktree-agent-lineage-children {
+  margin-left: var(--project-tree-indent-step);
+  padding-left: 0;
+  border: 0;
+}
+
+.project-tree-search {
+  position: relative;
+  margin: var(--project-tree-gap) var(--project-tree-inset);
+}
+
+.project-tree-search input {
+  height: var(--project-tree-row-height);
+  padding-left: calc(var(--project-tree-gap) * 4);
+  font-size: var(--project-tree-font);
+}
+
+.project-tree-search > svg {
+  position: absolute;
+  left: var(--project-tree-gap);
+  top: var(--project-tree-gap);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+@container project-tree (max-width: 340px) {
+  .project-tree-workspace-host,
+  .project-tree-summary-logos,
+  .projects-navigation-pane .project-tree-header-count {
+    display: none;
+  }
+}

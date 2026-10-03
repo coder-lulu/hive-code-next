@@ -1,0 +1,314 @@
+{
+  "version": 2,
+  "baseline": "1cf2cb6659e6a50cc994de819790a90eccd94ac2",
+  "upstreamBaseline": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
+  "recorderSha256": "393e48c4995c6d84a3eeee5e15f2012b306211c6c4ebc5d03d66d9feda577df8",
+  "scenariosSha256": "333d474884f5caba18067219e9675f27f035dd7ea1aa6e26c391237b0f15f24f",
+  "adapterSha256ByOperation": {
+    "aiVault.history-scan": "60520b4701a43a1b227d4b0b03425c409b35bd25a5a3672ed0df286c9b06d1a6",
+    "aiVault.history-screen": "5428989876b0da5f4e0c950c15a8f96fd0afabfa8bac8b2ec131c837f3263034",
+    "aiVault.resume-launch": "2f43211e4084c0493bd02ec98868acf53a4c748f89a70cd9657c9c3ee87b12fb",
+    "aiVault.resume-preparation": "2f43211e4084c0493bd02ec98868acf53a4c748f89a70cd9657c9c3ee87b12fb",
+    "workspace.file-inventory": "262eaad263a45aa13ec5b27c12b59946b12c202474229fff7a5727dba6d702ca",
+    "project.update-metadata": "d3b7f33d810e1fa420ac41a628cde9fe4a9e65fd57f89fbca0a40fc7d74951ab",
+    "linear.issue-detail": "d3b7f33d810e1fa420ac41a628cde9fe4a9e65fd57f89fbca0a40fc7d74951ab",
+    "browser.page-commands": "55971752f963202d30160851197a301089b0f3ebd0c46725af1a461d8310d658",
+    "clipboard.image-terminal-attachment": "16779b663f4faec8cbccdb42efd7b568a2912845b161f8a4827754687eb4235c",
+    "clipboard.image-upload": "16779b663f4faec8cbccdb42efd7b568a2912845b161f8a4827754687eb4235c",
+    "accounts.codex-reset-credit": "76b53dea504a688493843e23e8e7d052fc196f559bb1e2579d0fd38bf3156d0e",
+    "components.codex-reset-capability": "5cfbce3c7d97d908fbd447646d611e41a8aa1f61f684b9b710c4b67d6ff023a7",
+    "components.setup-script": "5cfbce3c7d97d908fbd447646d611e41a8aa1f61f684b9b710c4b67d6ff023a7",
+    "components.execution-target-local": "5cfbce3c7d97d908fbd447646d611e41a8aa1f61f684b9b710c4b67d6ff023a7",
+    "components.execution-target": "5cfbce3c7d97d908fbd447646d611e41a8aa1f61f684b9b710c4b67d6ff023a7",
+    "session.diff-review-load": "b644a8322d4b9e3baabbf99d0e1310fbb6a8944b92f75c96b88cbf2ac3a95eeb",
+    "files.terminal-path-tap": "e20a76ecd5e820dc4797fb25307810af68b5ced996dba2b9599464a21b5cbe1b",
+    "files.explorer-screen": "020a15d7ec612226eb3dde2b5166081fb19f0b8fbf335a7c4f4d5e0951eac52c",
+    "files.mutation-ownership": "b93fc8b6f1ece041acaa8cc5699852085e67d7e2f39db13145e483f854ea3309",
+    "files.preview-load": "b93fc8b6f1ece041acaa8cc5699852085e67d7e2f39db13145e483f854ea3309",
+    "files.preview-save": "b93fc8b6f1ece041acaa8cc5699852085e67d7e2f39db13145e483f854ea3309",
+    "files.tab-doc": "b93fc8b6f1ece041acaa8cc5699852085e67d7e2f39db13145e483f854ea3309",
+    "home.host-accounts": "c632fdbc4b730777ecb09f08bec14cca0586042b01ed99d40d0228806c7def4a",
+    "home.host-stats": "a9e0780298a1443664e7ae02056168aa34d67556c9c056d51a82c7b4a73ad35b",
+    "host.view-settings": "a9e0780298a1443664e7ae02056168aa34d67556c9c056d51a82c7b4a73ad35b",
+    "host.worktree-actions": "a9bec2d4662f58633f56e980c148d14627e2ba5cc09a85b95b57ac88aeb6bf63",
+    "worktree.host-refresh": "8e41c8624b9b6185e447cee3590a851ab88b6b1ee1d632af90e3a771a90310be",
+    "settings.bot-overrides": "22309750dd6b25d1aab41cbb41a33e629743de6420501436d7d5bf40599ec445",
+    "settings.task-hydration": "22309750dd6b25d1aab41cbb41a33e629743de6420501436d7d5bf40599ec445",
+    "settings.workspace-context": "22309750dd6b25d1aab41cbb41a33e629743de6420501436d7d5bf40599ec445",
+    "linear.select-workspace-picker": "b65996c152b632d553a31e07e31ea5c76f998eada42cf0966923d730da21908f",
+    "session.live-worktree-name": "8e41c8624b9b6185e447cee3590a851ab88b6b1ee1d632af90e3a771a90310be",
+    "agentSession.structured-launch": "d340697a64a198066b1037a550afb9a0de7507246a545901d2fc0a23407f38d6",
+    "workspace.repositories": "64c1772f0f95a3c43fbb14398a8804b2b4784f7f18874e4fd79767ae634c7faa",
+    "source-control.branch-base-ref": "5e47c7960b9352753f0751d4ccf5e3ff7fb7b74a63cc4e4df3c3ffdcc6c1e66b",
+    "source-control.branch-diff-preview": "090af0b4af54f072694c30ed23a3ec05447cc50d2b6d54ec22afe53821563678",
+    "source-control.changes-load": "090af0b4af54f072694c30ed23a3ec05447cc50d2b6d54ec22afe53821563678",
+    "source-control.commit-message": "5e47c7960b9352753f0751d4ccf5e3ff7fb7b74a63cc4e4df3c3ffdcc6c1e66b",
+    "source-control.history-commit-files": "090af0b4af54f072694c30ed23a3ec05447cc50d2b6d54ec22afe53821563678",
+    "source-control.git-history": "5e47c7960b9352753f0751d4ccf5e3ff7fb7b74a63cc4e4df3c3ffdcc6c1e66b",
+    "source-control.remote-prerequisite": "c582ce355b0704b38d7e84cbce352630096c91231bf09aecd1f6dbb409fed17f",
+    "source-control.review-git-preparation": "c582ce355b0704b38d7e84cbce352630096c91231bf09aecd1f6dbb409fed17f",
+    "session.pr-mutations": "5f65c5b318f4764b0f58a5e7b593333759a9cfa799db45b11190ac26f4083335",
+    "session.pr-reads": "5f65c5b318f4764b0f58a5e7b593333759a9cfa799db45b11190ac26f4083335",
+    "source-control.hosted-review-create": "c582ce355b0704b38d7e84cbce352630096c91231bf09aecd1f6dbb409fed17f",
+    "source-control.create-intent": "c582ce355b0704b38d7e84cbce352630096c91231bf09aecd1f6dbb409fed17f",
+    "source-control.hosted-review-eligibility": "c582ce355b0704b38d7e84cbce352630096c91231bf09aecd1f6dbb409fed17f",
+    "mobileWeb.bundle-fetch": "af339fef2c684d5709c6d3f279e5f0d9c33d17b6d4e5c89e501963400901b564",
+    "mobileWeb.bundle-manifest": "af339fef2c684d5709c6d3f279e5f0d9c33d17b6d4e5c89e501963400901b564",
+    "nativeChat.image-paste": "16779b663f4faec8cbccdb42efd7b568a2912845b161f8a4827754687eb4235c",
+    "nativeChat.image-upload": "16779b663f4faec8cbccdb42efd7b568a2912845b161f8a4827754687eb4235c",
+    "nativeChat.session-option-pick": "b98a3ca3818678b88cf629bc4635300a103637126a136f025a1600dc16f08008",
+    "nativeChat.terminal-write": "b98a3ca3818678b88cf629bc4635300a103637126a136f025a1600dc16f08008",
+    "notifications.display-test-screen": "f55275c268e49679b37d72ce6cbe71186ce02c77fe3fd53f0f21e796502d62e8",
+    "session.content-create": "add86c717b77affaeae7da1a658cc7d10ec8aa69950b203a7120709981d0cd6c",
+    "session.create-terminal": "295ec6c9aa196b08052c0817c39ebbccf55acfe9596f269c8083294e487de3f3",
+    "session.diff-notes": "42334358b5e5966001639653b553f15033f6e201d785107871fe056536f0a5e2",
+    "session.diff-review-actions": "dc3a746274b4197b02b0b3060bbf8ab0f67eb54355c8b9888e1f061e37f777af",
+    "session.tab-documents": "a3daf9a05d05424959baf77feb45cb0c076d77d8c49e877941ed612cc1e5ce95",
+    "session.markdown-save": "42334358b5e5966001639653b553f15033f6e201d785107871fe056536f0a5e2",
+    "session.native-chat-page": "60ce67f66134d6385aa7fb47f2135436a7b3ce0221e3b2514bea65e06dba5518",
+    "session.native-chat-readability": "a3daf9a05d05424959baf77feb45cb0c076d77d8c49e877941ed612cc1e5ce95",
+    "session.native-chat-stop": "a3daf9a05d05424959baf77feb45cb0c076d77d8c49e877941ed612cc1e5ce95",
+    "session.pr-branch-context": "5f65c5b318f4764b0f58a5e7b593333759a9cfa799db45b11190ac26f4083335",
+    "session.pr-sidebar": "87ffa2daea415d2682f1112025b5bd9d52404c6fc7c239180a3ad2120678ff1f",
+    "session.pr-triage-launch": "5f65c5b318f4764b0f58a5e7b593333759a9cfa799db45b11190ac26f4083335",
+    "session.startup": "512f5fb83292d65762249ebbd5dca9f0402d6e0ceb0a14001cd5436770427cec",
+    "session.tab-activation": "4a1e81ab3229c8fd10b3ad435568efec11a944e0f02a183f94e4b1f44a7e5de0",
+    "session.tab-close": "add86c717b77affaeae7da1a658cc7d10ec8aa69950b203a7120709981d0cd6c",
+    "source-control.session-diff-reveal": "5e47c7960b9352753f0751d4ccf5e3ff7fb7b74a63cc4e4df3c3ffdcc6c1e66b",
+    "session.tabs-stream-health": "4a1e81ab3229c8fd10b3ad435568efec11a944e0f02a183f94e4b1f44a7e5de0",
+    "session.terminal-display-mode": "9e90ad39a8d4257adf30166757a6364c4710dc3ae9f06365f80a3dd8f1c94d89",
+    "session.terminal-gesture-input": "9d119d5ec320e2538105d6ff673b9f4b8e3decbe46527947489dffbcf2ac0472",
+    "session.terminal-input-send": "e7e3718f685e3713cf1b8209d59d618741f892bd286853b79bb456c59cec8d86",
+    "session.terminal-inventory": "a3daf9a05d05424959baf77feb45cb0c076d77d8c49e877941ed612cc1e5ce95",
+    "session.terminal-clipboard": "e7e3718f685e3713cf1b8209d59d618741f892bd286853b79bb456c59cec8d86",
+    "settings.new-tab-agents": "448cdbd12f4f6a14bb33947bfbbb1837aebeb28979db70c62f2ba2fbb4d89c8f",
+    "settings.task-preferences": "d3b7f33d810e1fa420ac41a628cde9fe4a9e65fd57f89fbca0a40fc7d74951ab",
+    "settings.home-providers": "22309750dd6b25d1aab41cbb41a33e629743de6420501436d7d5bf40599ec445",
+    "settings.quick-commands": "42334358b5e5966001639653b553f15033f6e201d785107871fe056536f0a5e2",
+    "settings.repo-metadata": "22309750dd6b25d1aab41cbb41a33e629743de6420501436d7d5bf40599ec445",
+    "settings.resume-metadata": "22309750dd6b25d1aab41cbb41a33e629743de6420501436d7d5bf40599ec445",
+    "settings.task-workspace-create": "c2eed306311a844cd6f2f84b6513c0a1182f86a5e3cace434385b8287c80d7c5",
+    "settings.task-workspace": "c2eed306311a844cd6f2f84b6513c0a1182f86a5e3cace434385b8287c80d7c5",
+    "settings.workspace-submit": "c2eed306311a844cd6f2f84b6513c0a1182f86a5e3cace434385b8287c80d7c5",
+    "speech.audio-chunk": "5d978690e3626892b83bdba64537f9b1e1bb66c2060a00517ceead042a6d2334",
+    "speech.dictation-session": "5d978690e3626892b83bdba64537f9b1e1bb66c2060a00517ceead042a6d2334",
+    "speech.desktop-start": "5d978690e3626892b83bdba64537f9b1e1bb66c2060a00517ceead042a6d2334",
+    "speech.setup-sheet": "5d978690e3626892b83bdba64537f9b1e1bb66c2060a00517ceead042a6d2334",
+    "tasks.item-checks-files-github": "7e39e3e2921bdbd4b39e48b86b2b9a61e680529d3adb824d869762d903ba41eb",
+    "tasks.item-comment-github": "fa02a96a68f31ae9daaf3e8a852c878f1ae835a3e0a95084c94635debf5848a3",
+    "tasks.item-comment-gitlab": "fa02a96a68f31ae9daaf3e8a852c878f1ae835a3e0a95084c94635debf5848a3",
+    "tasks.item-comment-gitlab-mr": "fa02a96a68f31ae9daaf3e8a852c878f1ae835a3e0a95084c94635debf5848a3",
+    "tasks.item-detail-github": "ee08154e9eb47e22692be975dc5c0e93e35ae4eacf9b910c882a7c1b3e6e43a3",
+    "tasks.item-detail-gitlab": "ee08154e9eb47e22692be975dc5c0e93e35ae4eacf9b910c882a7c1b3e6e43a3",
+    "tasks.item-detail-linear": "ee08154e9eb47e22692be975dc5c0e93e35ae4eacf9b910c882a7c1b3e6e43a3",
+    "tasks.item-detail-metadata": "ab405e9616eb9993c62bb96aff2c88880c6fd9c80b69cd8d569a14ed56e2c174",
+    "tasks.item-merge-gitlab": "fa02a96a68f31ae9daaf3e8a852c878f1ae835a3e0a95084c94635debf5848a3",
+    "tasks.item-metadata-github": "57676045a1f3e022096d630b94b73040af0835054e50bf6ce399ff45dfbfa5ca",
+    "tasks.item-metadata-gitlab": "57676045a1f3e022096d630b94b73040af0835054e50bf6ce399ff45dfbfa5ca",
+    "tasks.item-metadata-gitlab-mr": "57676045a1f3e022096d630b94b73040af0835054e50bf6ce399ff45dfbfa5ca",
+    "tasks.item-reply-merge-github": "fa02a96a68f31ae9daaf3e8a852c878f1ae835a3e0a95084c94635debf5848a3",
+    "tasks.item-review-github": "fa02a96a68f31ae9daaf3e8a852c878f1ae835a3e0a95084c94635debf5848a3",
+    "tasks.item-status-gitlab": "7e39e3e2921bdbd4b39e48b86b2b9a61e680529d3adb824d869762d903ba41eb",
+    "tasks.item-status-gitlab-mr": "7e39e3e2921bdbd4b39e48b86b2b9a61e680529d3adb824d869762d903ba41eb",
+    "tasks.linear-connect": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.linear-item-actions": "57676045a1f3e022096d630b94b73040af0835054e50bf6ce399ff45dfbfa5ca",
+    "tasks.linear-team-context": "ab405e9616eb9993c62bb96aff2c88880c6fd9c80b69cd8d569a14ed56e2c174",
+    "tasks.paste-lookup": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125",
+    "tasks.project-board-load": "0e5439d1f3c832144f87450be407978fee96c2581e8d36885f5dec5dd975a65c",
+    "tasks.project-repo-slugs": "0e5439d1f3c832144f87450be407978fee96c2581e8d36885f5dec5dd975a65c",
+    "tasks.project-row-comments-issue": "a93a5c18efb8ba9bb51f8223e1cc7aabd5a72daf6c3730e6195acff8fa2bf49a",
+    "tasks.project-row-comments-pr": "a93a5c18efb8ba9bb51f8223e1cc7aabd5a72daf6c3730e6195acff8fa2bf49a",
+    "tasks.project-row-detail": "e6630136e6a37fd652c4121b4ec27d0bfcbba268d146840dd9c9156373ff20d7",
+    "tasks.project-row-fields": "1746300e77e5b278b86258f82ebe7486ba7f6da3978cfb5622625eb9d010dbb2",
+    "tasks.project-row-files-merge": "dc1aaa1f40939b3bd8604991e0cddaeb4c07bf1870a9d3b165da6615a7a945f6",
+    "tasks.project-row-metadata-load": "e6630136e6a37fd652c4121b4ec27d0bfcbba268d146840dd9c9156373ff20d7",
+    "tasks.project-row-review-checks": "1746300e77e5b278b86258f82ebe7486ba7f6da3978cfb5622625eb9d010dbb2",
+    "tasks.project-row-threads": "a93a5c18efb8ba9bb51f8223e1cc7aabd5a72daf6c3730e6195acff8fa2bf49a",
+    "tasks.provider-load": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.route-repo-list": "23f974df8b57c723069605de1db80c339ead286b18aae38e67fce03ea50c5180",
+    "tasks.smart-source-search": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125",
+    "tasks.task-create-github": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.task-create-gitlab": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.task-create-linear": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.task-list-gitlab-items": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.task-list-gitlab-todos": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.task-list-linear": "c652711371cfb1e80ac2a16191c6918d56a0e0990dca6c6812c46e8a8a21c7a0",
+    "tasks.workspace-source": "4e567302ac8acffcfd602c9b323ecf8b5b7c0c4692bda1a4c881011a91d98979",
+    "tasks.workspace-sparse": "4e567302ac8acffcfd602c9b323ecf8b5b7c0c4692bda1a4c881011a91d98979",
+    "tasks.workspace-ssh-local": "4e567302ac8acffcfd602c9b323ecf8b5b7c0c4692bda1a4c881011a91d98979",
+    "tasks.workspace-ssh": "4e567302ac8acffcfd602c9b323ecf8b5b7c0c4692bda1a4c881011a91d98979",
+    "terminal.query-reply": "42e1fe434b591ab5a945b6b366bbb20b567085d58bade63413f2251e8202b255",
+    "terminal.accessory-raw-send": "42e1fe434b591ab5a945b6b366bbb20b567085d58bade63413f2251e8202b255",
+    "terminal.takeover-report": "42e1fe434b591ab5a945b6b366bbb20b567085d58bade63413f2251e8202b255",
+    "terminal.viewport-refit": "42e1fe434b591ab5a945b6b366bbb20b567085d58bade63413f2251e8202b255",
+    "transport.capability-probe": "373694e252e971a9fa62754a834ed6636568d2b767d78000b1d384f8d9b01f39",
+    "transport.host-status-gates": "373694e252e971a9fa62754a834ed6636568d2b767d78000b1d384f8d9b01f39",
+    "tasks.worktree-create-retry": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125",
+    "worktree.catalog-snapshot": "4e942ddfbaa0ba6bfc2993969276987f6528ac53765d125e99a830e261f93a8e",
+    "worktree.home-catalog": "4e942ddfbaa0ba6bfc2993969276987f6528ac53765d125e99a830e261f93a8e",
+    "tasks.composer-hosted-base": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125",
+    "worktree.retired-names": "4e942ddfbaa0ba6bfc2993969276987f6528ac53765d125e99a830e261f93a8e",
+    "source-control.pr-link": "5e47c7960b9352753f0751d4ccf5e3ff7fb7b74a63cc4e4df3c3ffdcc6c1e66b",
+    "tasks.worktree-capabilities": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125",
+    "tasks.setup-hook-trust": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125"
+  },
+  "upstreamGoldensSha256": "77f10254ffc9d7c912311b9fafcbd9f85fde90685e0a4eb64b75e6dccaa58033",
+  "overlays": {
+    "aivault-history-screen-listed": {
+      "sha256": "c49e0f4e5694878f8cc4142e90961dcbd409b5371d130525d96c7053eb29eb25",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "aivault-history-screen-worktrees": {
+      "sha256": "3c141d5e1fa68f4bf86eabe260f7defbe83695e31da7cfdb4ea7348775d74732",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "diff-review-status-unavailable": {
+      "sha256": "3aad8ad4cb924882119918aff0c70e837c63241e3f9fd973edd54a9adc9e31cf",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "files-explorer-legacy-fallback": {
+      "sha256": "c830d62544e6624c906fe59bbcda53bfd3f05004ea5bd7be382bbeed400f34ee",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "files-explorer-readdir": {
+      "sha256": "c25d1fa79d46e5be1a00075c98bcba2e249377a5114fe41f98376588e7d3084e",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "matrix-aivault.history-screen-platform-status": {
+      "sha256": "81d3516237b69610503252897726eef447b64a1f963cc217072f5bfda40002d7",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "matrix-aivault.history-screen-status.get-2": {
+      "sha256": "4a7da4378198bf69c41035dd179145c896acd3793951c80391beae022f0e818f",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "matrix-aivault.history-screen-worktree.ps-1": {
+      "sha256": "5947e256626c92a31550d56e52867ae407cab5aaa2db666f233c50bb16dea515",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "matrix-files.explorer-screen-files.list-1": {
+      "sha256": "bcb4795b97a7eea10e0ba763bf12bf8e3d11abfd37ff51ef9932805fab1069d0",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "matrix-files.explorer-screen-files.readdir-1": {
+      "sha256": "079fa910358d2fd6ba4f579098c529908fddf9a452b07de0b6da91a4235e1980",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "matrix-files.mutation-ownership-status.get-1": {
+      "sha256": "ffe9a14d1e7095190a2fa72366110068c4acd5e27536e96bd42b649302b4f9c8",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-git.changes-load-git.status-1": {
+      "sha256": "6b7ea65746013e4c1fed686025fa88a60ac8043ff1b34129f5168f68c2d2f3c6",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-git.history-commit-files-git.commitcompare-1": {
+      "sha256": "1b40331216d43f2bf57eb27dcfcc074f951649185c88a223302c89ae71c84b99",
+      "reason": "Hive mobile Source Control keeps the product Chinese retry and empty-state copy while retaining the upstream history and commit-file behavior."
+    },
+    "matrix-git.history-commit-files-git.history-1": {
+      "sha256": "d7ecbe1fdda5599498a5519bf990b5f14a8884552a21425f47336b3b524ccb92",
+      "reason": "Hive mobile Source Control keeps the product Chinese retry and empty-state copy while retaining the upstream history and commit-file behavior."
+    },
+    "matrix-hostedreview.create-intent-hostedreview.getcreationeligibility-1": {
+      "sha256": "9407cf9c5799bf4fd3b0bbb7cad64fabd721e5fd5214db67e6d39ba656dc98ba",
+      "reason": "Hive visible product name replaces Orca in existing hosted-review error and warning text."
+    },
+    "matrix-hostedreview.create-intent-hostedreview.getcreationeligibility-2": {
+      "sha256": "b7e5a5cea5cb24a2e46541c8d435869ea461cd005569d078e66c6f8ab3d80813",
+      "reason": "Hive visible product name replaces Orca in existing hosted-review error and warning text."
+    },
+    "matrix-hostedreview.create-intent-worktree.set-1": {
+      "sha256": "963d428e70528825e41642daed7c8e4865570fe248700dfc019e5437fe622a57",
+      "reason": "Hive visible product name replaces Orca in existing hosted-review error and warning text."
+    },
+    "matrix-notifications.display-test-screen-notifications.testpush-1": {
+      "sha256": "574738177630a274ea44260f54723a686d027a914b9cc910ca1055421d0c8ff2",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "matrix-session.content-create-status.get-1": {
+      "sha256": "fac662c595f8b4d2030cd225453b9c58d0b13ed7309e8c31130f928424d388ee",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.diff-review-git.status-1": {
+      "sha256": "91d4569c0bbd7e451844bd4692e96004db3b2a52d80755a9d7f41914dde91f3e",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.markdown-disk-fallback-files.read-1": {
+      "sha256": "4d45addb67ad588c31c7c8b4d58e973e740921d9336db674b4a2cd35a7c26d8a",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.pr-triage-agent.launchreplay-1": {
+      "sha256": "ceac66e29f10cacdf95f29fdda70b06263a152f6cad17ec93fabe3008827fdcb",
+      "reason": "Hive preserves the agent.launch update-required refusal and its RPC/state transitions while replacing the visible Orca product name with HiveCode."
+    },
+    "matrix-session.startup-worktree.activate-1": {
+      "sha256": "fff4abaa5b08bcac8e2e3e4501260f0451d9328126c2e4013729307eef2ea9b3",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.startup-worktree.activate-2": {
+      "sha256": "4b72c7af4778d478f9c8cd87426134f04cc2ca7d9a98a0f965454ec45b7cb2da",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-settings.resume-metadata-folderworkspace.list-1": {
+      "sha256": "97b7e64cfa344546e176431252f76b9b82e99814e70514731d2f5d75229b270d",
+      "reason": "Hive treats unreadable optional folder-workspace metadata as an empty list so session resume can continue from the required host metadata."
+    },
+    "matrix-settings.resume-metadata-projectgroup.list-1": {
+      "sha256": "62a8ca024b54ffd1360781e6cf10d0fb35cdc312724bef4db867dee8872a9453",
+      "reason": "Hive treats unreadable optional project-group metadata as an empty list so session resume can continue from the required host metadata."
+    },
+    "matrix-settings.resume-metadata-repo.list-1": {
+      "sha256": "e3cae6f6cdfe71542448bc4e8eac2e9093d4a982d75347e8e500ea0f886f9013",
+      "reason": "Hive extracted resume metadata loader preserves typed and coded repo diagnostics while treating unusable repo enrichment payloads as an empty list."
+    },
+    "matrix-settings.resume-metadata-worktree.ps-1": {
+      "sha256": "a9e858437edcca33e0050d7448cebbabe531b0661215aef5154e53b48d3ae10c",
+      "reason": "Hive treats unreadable optional worktree metadata as unavailable so session resume can continue without fabricating a workspace target."
+    },
+    "matrix-settings.task-hydration-status.get-1": {
+      "sha256": "7326acafd89f2a5caef1922c4f35600a4c695cac78578d36759dd67e49f6883b",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "notifications-display-test-accepted": {
+      "sha256": "a4053667fdc83b9ea33bf2b1f7640c04005c178581978174880136f05a7e88c4",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "notifications-display-test-not-registered": {
+      "sha256": "2d451c21b0b8ec5b390f9e99d0dc3afab7ab1760a8f00c1a5f74d0198ad90dfb",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "notifications-display-test-rate-limited": {
+      "sha256": "fb6c6c2002ca7321150ee62d0cfe158243f7d3d499720e95593a8c7d9f7e6571",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "notifications-display-test-unknown-reason": {
+      "sha256": "d3217d19a209881ec8c7708071cf9ca2842665e7dba923d110e980d840dbb535",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "pr-triage-update-required": {
+      "sha256": "475b3a50e4e150bef32b3267cbd786fee61146760d0f720b04c0cc783989e80e",
+      "reason": "Hive preserves the agent.launch update-required refusal and its RPC/state transitions while replacing the visible Orca product name with HiveCode."
+    },
+    "session-markdown-disk-read": {
+      "sha256": "a013819621687593774e1a3c9c1574c882aa13ae448d0157804c9c260fdf7159",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "session-markdown-tab-disk-fallback": {
+      "sha256": "846214bd7367771643c1c037fb4a7ad9887b026edd17970fd3277c0899053b41",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "session-startup-both-activation-sites": {
+      "sha256": "62df797410f4a44726332ad651fda900820dd973375eb0cfeaf3ec438bdb79c8",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "speech-setup-sheet-denied-to-mobile": {
+      "sha256": "3ddeb504fb36e9ca99102642b4b10cafa5e4478854d58ab33ee32cbd3ff26ab4",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "speech-setup-sheet-legacy-desktop": {
+      "sha256": "958bff36e95c4ac768fcf7ddf3512c353afa76dc95212fb52963ad1279f8d787",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    }
+  }
+}

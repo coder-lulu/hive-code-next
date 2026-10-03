@@ -1,0 +1,33 @@
+name: Retired adhoc desktop build
+
+# Adhoc builds used timestamped `-adhoc.N` versions and uploaded installer bytes
+# to the stablyai/orca-adhoc GitHub repository. Custom suffixes are no longer
+# accepted by the HiveCode release contract. Keep a manual stub so callers get
+# an explicit migration error instead of accidentally publishing to GitHub.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Ignored; adhoc GitHub releases are retired'
+        required: false
+        default: ''
+        type: string
+      label:
+        description: 'Ignored; adhoc GitHub releases are retired'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  retired:
+    if: github.repository == 'stablyai/orca'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain retirement
+        run: |
+          echo "::error::Adhoc GitHub installer publishing is retired. Use an authenticated HiveCloud internal draft with a unified SemVer version."
+          exit 1

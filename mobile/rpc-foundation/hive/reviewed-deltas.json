@@ -1,0 +1,200 @@
+{
+  "upstreamGoldensSha256": "77f10254ffc9d7c912311b9fafcbd9f85fde90685e0a4eb64b75e6dccaa58033",
+  "deltas": {
+    "aivault-history-screen-listed": {
+      "upstreamTraceSha256": "ebcaa9e4133a493b5f9118ff6eaf960af91be2659abb98f0fc1da3df0749a786",
+      "hiveTraceSha256": "d4720d6624e9f333f7b12cff762a7f1d4665c52a305b169a0a573eafbb4973a5",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "aivault-history-screen-worktrees": {
+      "upstreamTraceSha256": "710cec56a371425dd60cf8a3f5d272355b97cc2e8b46998a18d8a4def0f27ee1",
+      "hiveTraceSha256": "1218a8a9f176b04b6b15e40cbdf98ffe59391affeddc122e55749f7e3d30fc0e",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "diff-review-status-unavailable": {
+      "upstreamTraceSha256": "3116a0ca088ae3443abc9ffeaa55dcd7f33423d7373993b0825df34862fa4e2d",
+      "hiveTraceSha256": "bcc4c82a6b7581041e65d5b3d98d5d270c584925f1d3249da76c14f8254c31b1",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "files-explorer-legacy-fallback": {
+      "upstreamTraceSha256": "af730c3daf18db396a4050590668c1ecaa8cc776dce4de5ddc0265a6857c27b7",
+      "hiveTraceSha256": "0401ea1ca92677a8d8ce2a62d11e22451c0eb74c50d83d4ba0b94353f835f32c",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "files-explorer-readdir": {
+      "upstreamTraceSha256": "26b916a37cd41581decdca327cf9f665366bb8c114cc13f7da616743b9fb5fad",
+      "hiveTraceSha256": "8a95caea110dfe09f3ed621243261a207bf46afbc44b4123fa717583316e8f25",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "matrix-aivault.history-screen-platform-status": {
+      "upstreamTraceSha256": "e5c7573aa003fb258e37f854f15ad32b24d1bf7ba7e1efbacc326d6ee4cbc1a9",
+      "hiveTraceSha256": "f41e9056d8369869062a04b2b9a327d5a4a7503f79b522c7fe948349fa271051",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "matrix-aivault.history-screen-status.get-2": {
+      "upstreamTraceSha256": "a09c3ddeb1260b1260cd4c05c40ee4a5e6607db35d3782c5c4197f87609deab4",
+      "hiveTraceSha256": "61e2764ddd9938ddd1a7d87124cdb2e1276c8921c639da53f72d0ae92f68de6e",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "matrix-aivault.history-screen-worktree.ps-1": {
+      "upstreamTraceSha256": "dc473667dc8ebba4603bee3cebf143134bfbd1e4b30125a4b0b288a4ef4a7a9c",
+      "hiveTraceSha256": "c1fd15f1c05685196014c4bb9647537bbae93e662c7e1b429e7386842e3acf9e",
+      "reason": "Hive mobile Agent Session History keeps the product Chinese screen copy while retaining the upstream RPC requests, reply handling and state transitions."
+    },
+    "matrix-files.explorer-screen-files.list-1": {
+      "upstreamTraceSha256": "bbfda28230bbdf1f0322c53c3d75d5f2150e002ec02ac8fc0e8d0aed6452fdd2",
+      "hiveTraceSha256": "129c410632cbf4ad98162ea84ff5047c514a8c2846b4c1bb6c444013b782aa6f",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "matrix-files.explorer-screen-files.readdir-1": {
+      "upstreamTraceSha256": "96219ec49ffc22e7eb5e97cdcc82e32b847023e42c9f6a39139409e57e9c3b59",
+      "hiveTraceSha256": "a1251e987c65bbecda1a68b9ed692238b7ed0a8b52c8dbe85710656e974c30ae",
+      "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "matrix-files.mutation-ownership-status.get-1": {
+      "upstreamTraceSha256": "1f7a3481cd488fdf2b76074249a711effdcf2a83ade009d1066ae4cf6f888d7a",
+      "hiveTraceSha256": "80adcfd6f1df88722868b444f0521e057050ce0006e639b102c3cc734fa5d62e",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-git.changes-load-git.status-1": {
+      "upstreamTraceSha256": "d64bbbffa821b65d5f6be4de04635ab5464eaeb59ea93249bb521a900de40161",
+      "hiveTraceSha256": "7f1bd78126b5447721e7000e65fed552092ea175198b4bbec1413f1d1a65e545",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-git.history-commit-files-git.commitcompare-1": {
+      "upstreamTraceSha256": "ebdb4b469fe689a7fdd1ac59dbbf2950e7af16b263d0cefc5bea1cd4e977e4d7",
+      "hiveTraceSha256": "6e8c8595f554089d390b22f19147081fa2fcd33226fe0c9392d555c84a355dc6",
+      "reason": "Hive mobile Source Control keeps the product Chinese retry and empty-state copy while retaining the upstream history and commit-file behavior."
+    },
+    "matrix-git.history-commit-files-git.history-1": {
+      "upstreamTraceSha256": "e2ce3f9bc666c7ddd60657532580943242af284b13bfc5c78f3773b58bf573c5",
+      "hiveTraceSha256": "49c16e59e615146572f6583c7177c1f83a25ef9e7caa243f20735bec3243f0b3",
+      "reason": "Hive mobile Source Control keeps the product Chinese retry and empty-state copy while retaining the upstream history and commit-file behavior."
+    },
+    "matrix-hostedreview.create-intent-hostedreview.getcreationeligibility-1": {
+      "upstreamTraceSha256": "57ed3aab7847de5e17a6a8cd981e912e7aa9a37c1c89502d1304fe072f1878fa",
+      "hiveTraceSha256": "224ec7ffcc79fe10d7d9f6ad97f64517f17c7d528156096854d29058baf2ff1d",
+      "reason": "Hive visible product name replaces Orca in existing hosted-review error and warning text."
+    },
+    "matrix-hostedreview.create-intent-hostedreview.getcreationeligibility-2": {
+      "upstreamTraceSha256": "b3b411c36eaf0fba4cdc44e2e992083937cdd89351fa49fa05f7b3f7d0ea5c54",
+      "hiveTraceSha256": "159381f3488eb74ded8caba531444317aa44dfdc1931c27322f77e1465978666",
+      "reason": "Hive visible product name replaces Orca in existing hosted-review error and warning text."
+    },
+    "matrix-hostedreview.create-intent-worktree.set-1": {
+      "upstreamTraceSha256": "99977d94d91efa0e69c5fc8d9d6e875136da1493a1003923a44a55e20e6c9599",
+      "hiveTraceSha256": "47d5fe7b82c33e62a597a56b31b2ad5aa142c8b96d303e2b35d04a442bb564b1",
+      "reason": "Hive visible product name replaces Orca in existing hosted-review error and warning text."
+    },
+    "matrix-notifications.display-test-screen-notifications.testpush-1": {
+      "upstreamTraceSha256": "98c6d750418be4f44910e6c1f6442bf85e73c6d896aeffe31018a7cabe55390d",
+      "hiveTraceSha256": "6f04d92f7b74e57a7b8183816bf0b183337fd1f5dea090cf124c306471d91806",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "matrix-session.content-create-status.get-1": {
+      "upstreamTraceSha256": "b5115be709fe6ea3f511cfe01626ff370d6fcaa81230a067877f5179c8a55276",
+      "hiveTraceSha256": "d56a4cfe3557581ccf9eb3226f86923e3e52d018df28e24831d1c6129ab5eeb3",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.diff-review-git.status-1": {
+      "upstreamTraceSha256": "af3e2d2b04c80ec54d8c8ae99da855d7c0c257529c87e2b91ae48ce415177a57",
+      "hiveTraceSha256": "5ca442c51b1788d89ff78ae8aebc81913eee857c718b7a6fdda60d2374d2ade6",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.markdown-disk-fallback-files.read-1": {
+      "upstreamTraceSha256": "dba9113a3ec77d5078192bfa9ad5ebf006ecf95ab28f586102f916fb268f497c",
+      "hiveTraceSha256": "0093335094944bb7b7e551a7acb0945fe213d5c1435f47982d70b909ee8dcc5b",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.pr-triage-agent.launchreplay-1": {
+      "upstreamTraceSha256": "79f6f8b33b882ff88bdeda60d19ba24cab73524d0de0e386aedf8405474320dc",
+      "hiveTraceSha256": "38d30dcefc4aac17cdcd61bd9bd95c608bdee8db368e2a792d391c2550dbf0da",
+      "reason": "Hive preserves the agent.launch update-required refusal and its RPC/state transitions while replacing the visible Orca product name with HiveCode."
+    },
+    "matrix-session.startup-worktree.activate-1": {
+      "upstreamTraceSha256": "3605f23f3b614c6ef1c4f3428fb7f9f061bed6c2e79782f857fe8caf581358a7",
+      "hiveTraceSha256": "1f74d61d900c46b8f53a4ec59fc580ee69dff684ec9b8d0ded3507df6f1e8d7c",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-session.startup-worktree.activate-2": {
+      "upstreamTraceSha256": "658043800506f66fc2f2d5d6cfca7b0ad2efaeb6ef6378eae357cd60ba21d05f",
+      "hiveTraceSha256": "25c21efc7c59bb3567f8bf9718e8968ad44e5242d36842bb25230edc74761b6b",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "matrix-settings.resume-metadata-folderworkspace.list-1": {
+      "upstreamTraceSha256": "d93170d7595ca1f1b4211956989a71b2fa4afb93c3e40112456e6ef95df20434",
+      "hiveTraceSha256": "45d2c29fc068bf53fc335acac4c925c7d6d94c95bbf905d951002e6d720fb51a",
+      "reason": "Hive treats unreadable optional folder-workspace metadata as an empty list so session resume can continue from the required host metadata."
+    },
+    "matrix-settings.resume-metadata-projectgroup.list-1": {
+      "upstreamTraceSha256": "7b19a3ba499f382a9353c1d8e6b81b51350c8a17200a74532b733c2e01d62a6f",
+      "hiveTraceSha256": "2b8326044b0b5c87951b55d1db9b557099b308d575df57c57331e577fc0b2c7f",
+      "reason": "Hive treats unreadable optional project-group metadata as an empty list so session resume can continue from the required host metadata."
+    },
+    "matrix-settings.resume-metadata-repo.list-1": {
+      "upstreamTraceSha256": "1ee9829e88cabd68bdf2e7c9f8fc20af9dd2f6df1a65fc355ae791b69d312eee",
+      "hiveTraceSha256": "3d88dc37590f33a4f1ea246f21d6c4beb7782ba7eb20a45f70eec0c14f3866da",
+      "reason": "Hive extracted resume metadata loader preserves typed and coded repo diagnostics while treating unusable repo enrichment payloads as an empty list."
+    },
+    "matrix-settings.resume-metadata-worktree.ps-1": {
+      "upstreamTraceSha256": "c968ed9050fb3f1b34dfd3c92cb2093558de82cb2b68794b763859e281d19e60",
+      "hiveTraceSha256": "e274511c2215aea1a2fd8bc9492ababc168fb0eba7dbc94a37da4aee913f8650",
+      "reason": "Hive treats unreadable optional worktree metadata as unavailable so session resume can continue without fabricating a workspace target."
+    },
+    "matrix-settings.task-hydration-status.get-1": {
+      "upstreamTraceSha256": "212ffd263228449b6d3718f41bbe9f2310f6488f05de34e371707752b607a5b2",
+      "hiveTraceSha256": "123ccb8a224d1c70139682067f3089a2c93e4816108468af04cd107f98b21cf7",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "notifications-display-test-accepted": {
+      "upstreamTraceSha256": "2f667b0e729c758c200932573b838cd02ef41a904cc6afaeeb3eb12c8bee0f9d",
+      "hiveTraceSha256": "f83c3009cf36dd334b360e662c2ce587029847f768134a96a6153153e8816ccc",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "notifications-display-test-not-registered": {
+      "upstreamTraceSha256": "6e42ad22343b5c47c876c9ebda970f53dc83edbdba7a3307dee1bbd1472dc7c0",
+      "hiveTraceSha256": "6a9ee41d24233de6d45b76a23e2ff6fc74fc2fd2547f0e46a617e36fadcba17b",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "notifications-display-test-rate-limited": {
+      "upstreamTraceSha256": "648f1d93f83e8a9a9ca9414c8cf22c57c5f9fde7d936c3ffb3c3928be78f6d46",
+      "hiveTraceSha256": "e6c8c43ca996c0219fb381710b99c149f5e56a8497c13e381228a1625f42eec8",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "notifications-display-test-unknown-reason": {
+      "upstreamTraceSha256": "13d89eb6c0b172734447a609860630b29c38d56453a7bd722cbd5a84c29f2b21",
+      "hiveTraceSha256": "7f300ce65326ddb41f98ee488c7718a3c5453201447e603170fc3f6db5558db0",
+      "reason": "Hive removes Orca Push-service wording and describes the retained connected-desktop notification test path; no Orca push authority is introduced."
+    },
+    "pr-triage-update-required": {
+      "upstreamTraceSha256": "194abb8188a1a9b612881cf0f1089d5c67b53d65be2dc53c9ab6b2ee6314d485",
+      "hiveTraceSha256": "5b8d6b8e12d641500364d4fdcd1f879de5018ceadfabf1663262a0f0a3aade37",
+      "reason": "Hive preserves the agent.launch update-required refusal and its RPC/state transitions while replacing the visible Orca product name with HiveCode."
+    },
+    "session-markdown-disk-read": {
+      "upstreamTraceSha256": "d8e9ea7a8ab70e8514807c9c8b819815a02655ec2d428113331d9c2135f8f614",
+      "hiveTraceSha256": "06fbfbb9bed7d7f07424a4184cecd39eec9e265fad4732914cc0462743354568",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "session-markdown-tab-disk-fallback": {
+      "upstreamTraceSha256": "e91588b8ce5c78983e33eafcb0fbe657ae65c4f6585c71650551bd578ad8c304",
+      "hiveTraceSha256": "8de9bc1ce342736f870caabdbd6d7cddbe0b34c41b8430740a9f040a64eba088",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "session-startup-both-activation-sites": {
+      "upstreamTraceSha256": "3241b8676ffe10ea6ffe6f6db68d7fcdb58fd9a7c5bea7cce9b3c6b5acf0b25d",
+      "hiveTraceSha256": "0b6196ef227a860dba42a16ecbe53bb917a761aa82444f03eeffcfbf2f827cb8",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "speech-setup-sheet-denied-to-mobile": {
+      "upstreamTraceSha256": "176782dd75be33dcffee790f50d9ba905251bf740f043bbb7e39bb53fcb2309b",
+      "hiveTraceSha256": "f0bbf8ab6e959c6e5ee6849d69d3a7743692c7badb50e616ddcb9997feab6aa5",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    },
+    "speech-setup-sheet-legacy-desktop": {
+      "upstreamTraceSha256": "240899fc3a8dfe910e03872f43e72adc910ee34d3f1f6aea8c9b442536495f27",
+      "hiveTraceSha256": "000f4a4552f995a22a9548cabe4f7271e13f6c756c8141be8f0ac97d9885086e",
+      "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
+    }
+  }
+}

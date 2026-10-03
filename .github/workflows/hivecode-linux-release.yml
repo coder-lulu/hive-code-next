@@ -1,0 +1,208 @@
+name: HiveCode Linux AppImage release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Exact package version to publish, e.g. 1.5.0-beta.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hivecode-linux-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reserve:
+    if: github.repository == 'coder-lulu/hive-code-next'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      channel: ${{ steps.identity.outputs.channel }}
+      build_number: ${{ steps.reserve.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Validate release identity
+        id: identity
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ github.event.inputs.release_version }}
+        run: |
+          set -euo pipefail
+          version="${REQUESTED_VERSION:-${GITHUB_REF_NAME#v}}"
+          package_version="$(node -p "require('./package.json').version")"
+          test "$version" = "$package_version"
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
+            channel=beta
+          elif [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            channel=stable
+          else
+            echo "::error::Unsupported HiveCode release version: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Reserve Linux build number in HiveCloud
+        id: reserve
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECODE_RELEASE_PLATFORM: linux
+          HIVECODE_RELEASE_CHANNEL: ${{ steps.identity.outputs.channel }}
+          HIVECODE_BUILD_RESERVATION_KEY: hivecode:linux:${{ steps.identity.outputs.channel }}:${{ steps.identity.outputs.version }}
+        run: node config/scripts/reserve-hivecloud-build-number.mjs
+
+  build:
+    needs: reserve
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: ubuntu-22.04
+            builder_arch: x64
+            unpacked_dir: dist/linux-unpacked
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+            builder_arch: arm64
+            unpacked_dir: dist/linux-arm64-unpacked
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      HIVECODE_BUILD_NUMBER: ${{ needs.reserve.outputs.build_number }}
+      HIVECODE_COMMIT_SHA: ${{ github.sha }}
+      HIVECODE_EMBED_RELEASE_IDENTITY: '1'
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 python3-gi gir1.2-atspi-2.0 at-spi2-core xclip xdotool
+          npm install -g node-gyp@11.5.0
+          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: ./.github/actions/install-mobile-dependencies
+
+      - name: Build application
+        env:
+          ORCA_BUILD_IDENTITY: ${{ needs.reserve.outputs.channel == 'stable' && 'stable' || 'rc' }}
+        run: pnpm build:release
+
+      - name: Gate runtime file-watcher process isolation
+        shell: bash
+        env:
+          ORCA_BACKGROUND_LAUNCH: '1'
+        run: |
+          set -euo pipefail
+          export TMPDIR="$GITHUB_WORKSPACE/logs/release-watcher-gates/${{ matrix.architecture }}/runtime/tmp"
+          mkdir -p "$TMPDIR"
+          node config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"
+          ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../electron.log"
+
+      - name: Gate SSH relay watcher process isolation
+        shell: bash
+        env:
+          ORCA_BACKGROUND_LAUNCH: '1'
+        run: |
+          set -euo pipefail
+          export TMPDIR="$GITHUB_WORKSPACE/logs/release-watcher-gates/${{ matrix.architecture }}/relay/tmp"
+          mkdir -p "$TMPDIR"
+          node config/scripts/relay-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"
+
+      - name: Package AppImage without external publishing
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.builder_arch }}
+        run: |
+          set -euo pipefail
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          if [[ "$TARGET_ARCH" == arm64 ]]; then
+            ORCA_LINUX_ARM64_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage --arm64 --publish never
+          else
+            pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage --x64 --publish never
+          fi
+
+      - name: Smoke packaged native runtime
+        run: node config/scripts/run-linux-packaged-node-pty-floor-smoke.mjs --app-dir ${{ matrix.unpacked_dir }}
+
+      - name: Stage immutable AppImage
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          artifact="$(find dist -maxdepth 1 -type f -iname '*.AppImage' -print -quit)"
+          test -n "$artifact"
+          mkdir -p upload
+          cp "$artifact" "upload/hivecode-linux-${TARGET_ARCH}.AppImage"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hivecode-linux-${{ matrix.architecture }}-${{ github.sha }}
+          path: upload/*.AppImage
+          if-no-files-found: error
+          retention-days: 2
+
+  publish:
+    needs: [reserve, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: hivecode-linux-*-${{ github.sha }}
+          path: signed-artifacts
+          merge-multiple: true
+
+      - name: Publish AppImages to HiveCloud object storage
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECODE_VERSION: ${{ needs.reserve.outputs.version }}
+          HIVECODE_BUILD_NUMBER: ${{ needs.reserve.outputs.build_number }}
+          HIVECODE_RELEASE_CHANNEL: ${{ needs.reserve.outputs.channel }}
+          HIVECODE_DESKTOP_PLATFORM: linux
+          HIVECODE_DESKTOP_ARCHITECTURE: x64
+          HIVECODE_EXPECTED_ARTIFACTS: '2'
+          HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES: x64,arm64
+          HIVECODE_ARTIFACT_PATHS: x64=signed-artifacts/hivecode-linux-x64.AppImage,arm64=signed-artifacts/hivecode-linux-arm64.AppImage
+          HIVECODE_RELEASE_NOTES: ${{ github.ref_name }}
+        run: node config/scripts/publish-hivecloud-desktop-release.mjs

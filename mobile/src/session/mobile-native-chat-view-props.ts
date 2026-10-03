@@ -1,0 +1,72 @@
+import type {
+  NativeChatLiveTurnIndicator,
+  NativeChatSettledTurns
+} from '../../../src/shared/native-chat-turn-status'
+import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
+import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
+import type { NativeChatTurnJournal } from '../../../src/shared/native-chat-turn-membership'
+import type { MobileQueuedSlotProps } from './use-mobile-native-chat-queued-slot'
+import type { PendingNativeChatImage } from './mobile-native-chat-image-attachment'
+import type { MobileNativeChatSessionOptionPickersProps } from './MobileNativeChatSessionOptionPickers'
+import type { MobileChatPermission } from './mobile-native-chat-permission'
+import type { MobileChatQuestion } from './mobile-native-chat-question'
+import type { MobileNativeChatPendingItem } from './mobile-native-chat-render-data'
+import type { MobileNativeChatStatus } from './use-mobile-native-chat-session'
+
+export type MobileNativeChatInputLockReason = 'disconnected' | 'waiting'
+
+export type MobileNativeChatViewProps = MobileQueuedSlotProps & {
+  messages: NativeChatMessage[]
+  folded: NativeChatMessage[]
+  status: MobileNativeChatStatus
+  error?: string
+  agent?: string | null
+  agentWorking?: boolean
+  canStop?: boolean
+  turnIndicator?: NativeChatLiveTurnIndicator | null
+  workingStartedAt?: number | null
+  settledTurns?: NativeChatSettledTurns | null
+  turnJournal?: NativeChatTurnJournal | null
+  /** Structured sessions expose live tool activity and per-turn disclosure. */
+  structuredActivityUi?: boolean
+  onStop?: () => void
+  streaming: string | null
+  hasMore?: boolean
+  loadingEarlier?: boolean
+  onLoadEarlier?: () => void
+  onSend: (text: string) => Promise<boolean>
+  sendSurfaceId: string
+  getSendCompletionGeneration: () => number
+  getComposerEditGeneration: () => number
+  pending: MobileNativeChatPendingItem[]
+  imagePreviewsByMessageId?: Record<string, string[]>
+  composerText: string
+  onComposerTextChange: (text: string) => void
+  onAttachImage?: () => void
+  attachments?: PendingNativeChatImage[]
+  onRemoveAttachment?: (id: string) => void
+  isAttaching?: boolean
+  onMicPress?: () => void
+  micActive?: boolean
+  dictationMode?: 'toggle' | 'hold'
+  onMicPressIn?: () => void
+  onMicPressOut?: () => void
+  inputLockReason?: MobileNativeChatInputLockReason | null
+  sendErrorMessage?: string | null
+  onClearSendError?: () => void
+  filePaths?: string[]
+  onNeedFiles?: (query: string) => void
+  sessionOptions?: MobileNativeChatSessionOptionPickersProps | null
+  ask?: AskPrompt | null
+  askKey?: string | null
+  onDismissAsk?: () => void
+  onAnswerAsk?: (prompt: AskPrompt, selections: AskAnswerSelection[]) => Promise<boolean>
+  onCancelAsk?: () => Promise<boolean>
+  onCancelPrompt?: (prompt?: { itemId: string; expectedRevision: number }) => Promise<boolean>
+  question?: MobileChatQuestion | null
+  onAnswerQuestion?: (text: string) => Promise<boolean>
+  permission?: MobileChatPermission | null
+  onRespondPermission?: (send: string) => Promise<boolean>
+  onOpenFile?: (relativePath: string) => void
+  keyboardInset?: number
+}

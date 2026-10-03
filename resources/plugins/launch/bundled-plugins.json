@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "pluginKey": "stablyai.orca-navigation-shortcuts",
+      "path": "stablyai.orca-navigation-shortcuts",
+      "contentHash": "6f3c7ce2d00b694cb6ae616fc32bffa73c009bf03d45e09b9a96b56003e95ae5"
+    }
+  ]
+}

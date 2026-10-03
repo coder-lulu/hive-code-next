@@ -1,0 +1,623 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const asyncStorageMock = vi.hoisted(() => ({
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn()
+}))
+
+const secureStoreMock = vi.hoisted(() => ({
+  deleteItemAsync: vi.fn(),
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn()
+}))
+
+const scheduleCleanupMock = vi.hoisted(() => vi.fn())
+const cancelCleanupMock = vi.hoisted(() => vi.fn())
+const recordCleanupIntentMock = vi.hoisted(() => vi.fn())
+const platformMock = vi.hoisted(() => ({ OS: 'ios' }))
+
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: asyncStorageMock
+}))
+
+vi.mock('expo-secure-store', () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+  ...secureStoreMock
+}))
+
+vi.mock('react-native', () => ({
+  Platform: platformMock
+}))
+
+vi.mock('./host-credential-cleanup', () => ({
+  cancelPendingHostCredentialCleanup: (...args: unknown[]) => cancelCleanupMock(...args),
+  recordHostCredentialCleanupIntent: (...args: unknown[]) => recordCleanupIntentMock(...args),
+  scheduleHostCredentialCleanup: (...args: unknown[]) => scheduleCleanupMock(...args),
+  retryPendingHostCredentialCleanups: vi.fn()
+}))
+
+import {
+  loadHostCatalog,
+  loadHosts,
+  removeHost,
+  resolvePairingHostIdentity,
+  resetHostStoreForTests,
+  savePairedHost,
+  updateHostNameAndEndpoint,
+  updateLastConnected
+} from './host-store'
+import {
+  replaceAccountRuntimeProfiles,
+  resetAccountRuntimeProfileRegistryForTests
+} from '../runtime-directory/account-runtime-profile-registry'
+
+const HOSTS_STORAGE_KEY = 'orca:hosts'
+const HOST_ONE = {
+  id: 'host-1',
+  name: 'Host 1',
+  endpoint: 'ws://127.0.0.1:1',
+  publicKeyB64: 'key',
+  lastConnected: 0
+}
+const HOST_TWO = {
+  id: 'host-2',
+  name: 'Host 2',
+  endpoint: 'ws://127.0.0.1:2',
+  publicKeyB64: 'key-2',
+  lastConnected: 0
+}
+
+function scheduledCleanup(hostId: string): (id: string) => Promise<void> {
+  const cleanup = scheduleCleanupMock.mock.calls.find(([id]) => id === hostId)?.[1]
+  expect(cleanup).toBeTypeOf('function')
+  return cleanup as (id: string) => Promise<void>
+}
+
+describe('host-store list mutations', () => {
+  let storedHostsRaw: string
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetHostStoreForTests()
+    resetAccountRuntimeProfileRegistryForTests()
+    platformMock.OS = 'ios'
+    scheduleCleanupMock.mockReset()
+    scheduleCleanupMock.mockResolvedValue(undefined)
+    cancelCleanupMock.mockReset()
+    cancelCleanupMock.mockResolvedValue(undefined)
+    recordCleanupIntentMock.mockReset()
+    recordCleanupIntentMock.mockResolvedValue(undefined)
+    storedHostsRaw = JSON.stringify([HOST_ONE, HOST_TWO])
+    asyncStorageMock.getItem.mockImplementation(async (key: string) => {
+      if (key === HOSTS_STORAGE_KEY) {
+        return storedHostsRaw
+      }
+      return null
+    })
+    asyncStorageMock.setItem.mockImplementation(async (key: string, raw: string) => {
+      if (key === HOSTS_STORAGE_KEY) {
+        storedHostsRaw = raw
+      }
+    })
+    secureStoreMock.setItemAsync.mockResolvedValue(undefined)
+    secureStoreMock.getItemAsync.mockImplementation(async (key: string) =>
+      key.endsWith(HOST_ONE.id) || key.endsWith(HOST_TWO.id) ? `token-${key.at(-1)}` : null
+    )
+  })
+
+  it('resolves an existing host by pinned key with one durable read', async () => {
+    await expect(resolvePairingHostIdentity(HOST_TWO.publicKeyB64, 'host-new')).resolves.toEqual({
+      id: HOST_TWO.id,
+      name: HOST_TWO.name
+    })
+    expect(asyncStorageMock.getItem).toHaveBeenCalledOnce()
+  })
+
+  it('names a new host from the same durable read used for identity lookup', async () => {
+    await expect(resolvePairingHostIdentity('unpaired-key', 'host-new')).resolves.toEqual({
+      id: 'host-new',
+      name: 'Host 3'
+    })
+    expect(asyncStorageMock.getItem).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a host visible when its credential read temporarily fails', async () => {
+    secureStoreMock.getItemAsync.mockImplementation(async (key: string) => {
+      if (key.endsWith(HOST_ONE.id)) {
+        throw new Error('keychain locked')
+      }
+      return key.endsWith(HOST_TWO.id) ? 'token-2' : null
+    })
+
+    const catalog = await loadHostCatalog()
+    const profiles = await loadHosts()
+
+    expect(catalog.map(({ id }) => id)).toEqual([HOST_ONE.id, HOST_TWO.id])
+    expect(catalog.find(({ id }) => id === HOST_ONE.id)).toMatchObject({
+      credentialStatus: 'temporarily-unavailable',
+      profile: null
+    })
+    expect(profiles.map(({ id }) => id)).toEqual([HOST_TWO.id])
+  })
+
+  it('keeps orphaned metadata visible when its credential is missing', async () => {
+    secureStoreMock.getItemAsync.mockImplementation(async (key: string) =>
+      key.endsWith(HOST_TWO.id) ? 'token-2' : null
+    )
+
+    const catalog = await loadHostCatalog()
+
+    expect(catalog.find(({ id }) => id === HOST_ONE.id)).toMatchObject({
+      credentialStatus: 'missing',
+      profile: null
+    })
+  })
+
+  it('keeps account Runtime profiles out of the local pairing store API', async () => {
+    replaceAccountRuntimeProfiles([
+      {
+        id: 'account-runtime',
+        runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
+        name: 'Account Runtime',
+        endpoint: 'cloud://123e4567-e89b-42d3-a456-426614174000',
+        deviceToken: '',
+        publicKeyB64: '',
+        lastConnected: 0
+      }
+    ])
+
+    await expect(loadHosts()).resolves.toMatchObject([{ id: HOST_ONE.id }, { id: HOST_TWO.id }])
+  })
+
+  it('keeps existing metadata when pairing a distinct host', async () => {
+    await savePairedHost({
+      id: 'host-new',
+      name: 'Host 3',
+      endpoint: 'ws://127.0.0.1:3',
+      publicKeyB64: 'key-new',
+      deviceToken: 'token-new',
+      lastConnected: 0
+    })
+
+    expect(JSON.parse(storedHostsRaw).map(({ id }: { id: string }) => id)).toEqual([
+      HOST_ONE.id,
+      HOST_TWO.id,
+      'host-new'
+    ])
+  })
+
+  it('fails closed when durable host identity storage is unreadable', async () => {
+    asyncStorageMock.getItem.mockRejectedValueOnce(new Error('storage unavailable'))
+
+    await expect(resolvePairingHostIdentity('key-new', 'host-new')).rejects.toThrow(/unreadable/)
+    expect(asyncStorageMock.setItem).not.toHaveBeenCalled()
+  })
+
+  it('collapses already-persisted duplicates when the desktop is re-paired', async () => {
+    storedHostsRaw = JSON.stringify([
+      HOST_ONE,
+      { ...HOST_TWO, id: 'host-duplicate', publicKeyB64: HOST_ONE.publicKeyB64 }
+    ])
+
+    await savePairedHost({
+      ...HOST_ONE,
+      endpoint: 'ws://127.0.0.1:3',
+      deviceToken: 'replacement-token'
+    })
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([{ ...HOST_ONE, endpoint: 'ws://127.0.0.1:3' }])
+    expect(recordCleanupIntentMock.mock.invocationCallOrder[0]).toBeLessThan(
+      asyncStorageMock.setItem.mock.invocationCallOrder[0]!
+    )
+    expect(scheduleCleanupMock).toHaveBeenCalledWith('host-duplicate', expect.any(Function))
+  })
+
+  it('does not remove same-key metadata when the replacement credential write fails', async () => {
+    const duplicate = {
+      ...HOST_TWO,
+      id: 'host-duplicate',
+      publicKeyB64: HOST_ONE.publicKeyB64
+    }
+    storedHostsRaw = JSON.stringify([HOST_ONE, duplicate])
+    secureStoreMock.setItemAsync.mockRejectedValue(new Error('keychain write failed'))
+
+    await expect(
+      savePairedHost({
+        ...HOST_ONE,
+        endpoint: 'ws://127.0.0.1:3',
+        deviceToken: 'replacement-token'
+      })
+    ).rejects.toThrow('keychain write failed')
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_ONE, duplicate])
+    expect(cancelCleanupMock).toHaveBeenCalledWith(duplicate.id)
+    expect(scheduleCleanupMock).not.toHaveBeenCalled()
+  })
+
+  it('serves a committed replacement token when same-key metadata persistence fails', async () => {
+    const duplicate = {
+      ...HOST_TWO,
+      id: 'host-duplicate',
+      publicKeyB64: HOST_ONE.publicKeyB64
+    }
+    storedHostsRaw = JSON.stringify([HOST_ONE, duplicate])
+    await loadHosts()
+    asyncStorageMock.setItem.mockRejectedValueOnce(new Error('metadata write failed'))
+
+    await expect(
+      savePairedHost({
+        ...HOST_ONE,
+        endpoint: 'ws://127.0.0.1:3',
+        deviceToken: 'replacement-token'
+      })
+    ).rejects.toThrow('metadata write failed')
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_ONE, duplicate])
+    await expect(
+      loadHosts().then((hosts) => hosts.find(({ id }) => id === HOST_ONE.id)?.deviceToken)
+    ).resolves.toBe('replacement-token')
+  })
+
+  it('records cleanup when new same-key metadata fails after its credential commits', async () => {
+    const replacement = {
+      ...HOST_TWO,
+      id: 'host-replacement',
+      publicKeyB64: HOST_ONE.publicKeyB64,
+      deviceToken: 'replacement-token'
+    }
+    asyncStorageMock.setItem.mockRejectedValueOnce(new Error('metadata write failed'))
+
+    await expect(savePairedHost(replacement)).rejects.toThrow('metadata write failed')
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_ONE, HOST_TWO])
+    expect(recordCleanupIntentMock).toHaveBeenCalledWith(replacement.id)
+    expect(recordCleanupIntentMock.mock.invocationCallOrder[0]).toBeLessThan(
+      secureStoreMock.setItemAsync.mock.invocationCallOrder[0]!
+    )
+    expect(scheduleCleanupMock).toHaveBeenCalledWith(replacement.id, expect.any(Function))
+  })
+
+  it('does not clean a duplicate id that a later same-key save made authoritative', async () => {
+    const duplicate = {
+      ...HOST_TWO,
+      id: 'host-duplicate',
+      publicKeyB64: HOST_ONE.publicKeyB64
+    }
+    storedHostsRaw = JSON.stringify([HOST_ONE, duplicate])
+    await savePairedHost({ ...HOST_ONE, deviceToken: 'token-a' })
+    const staleCleanup = scheduledCleanup(duplicate.id)
+
+    await savePairedHost({ ...duplicate, deviceToken: 'token-b' })
+    await staleCleanup(duplicate.id)
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([duplicate])
+    expect(secureStoreMock.deleteItemAsync).not.toHaveBeenCalled()
+  })
+
+  it('keeps the normal iOS save on the existing default keychain service', async () => {
+    await savePairedHost({
+      id: 'host-new',
+      name: 'New Host',
+      endpoint: 'ws://127.0.0.1:3',
+      publicKeyB64: 'key-new',
+      deviceToken: 'new-token',
+      lastConnected: 0
+    })
+
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      'orca.host-token.host-new',
+      'new-token',
+      {
+        keychainAccessible: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY'
+      }
+    )
+  })
+
+  it('commits the removal when credential cleanup scheduling rejects', async () => {
+    scheduleCleanupMock.mockRejectedValue(new Error('intent storage unavailable'))
+
+    await expect(removeHost(HOST_ONE.id)).resolves.toBeUndefined()
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_TWO])
+    expect(scheduleCleanupMock).toHaveBeenCalledWith(HOST_ONE.id, expect.any(Function))
+  })
+
+  it('cancels write-ahead cleanup when host metadata removal fails', async () => {
+    asyncStorageMock.setItem.mockRejectedValueOnce(new Error('metadata write failed'))
+
+    await expect(removeHost(HOST_ONE.id)).rejects.toThrow('metadata write failed')
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_ONE, HOST_TWO])
+    expect(cancelCleanupMock).toHaveBeenCalledWith(HOST_ONE.id)
+  })
+
+  it('does not cancel cleanup from a removal committed during a stalled save', async () => {
+    let releaseTokenWrite: () => void = () => {}
+    secureStoreMock.setItemAsync.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        releaseTokenWrite = resolve
+      })
+    )
+
+    const save = savePairedHost({ ...HOST_ONE, deviceToken: 'replacement-token' })
+    await vi.waitFor(() => expect(secureStoreMock.setItemAsync).toHaveBeenCalledOnce())
+    await removeHost(HOST_ONE.id)
+    releaseTokenWrite()
+    await save
+    await loadHostCatalog()
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_TWO])
+    expect(scheduleCleanupMock).toHaveBeenCalledWith(HOST_ONE.id, expect.any(Function))
+    expect(cancelCleanupMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses an early same-key token write without durable cleanup intent', async () => {
+    const replacement = {
+      ...HOST_TWO,
+      id: 'host-replacement',
+      publicKeyB64: HOST_ONE.publicKeyB64,
+      deviceToken: 'replacement-token'
+    }
+    recordCleanupIntentMock.mockRejectedValueOnce(new Error('intent storage unavailable'))
+
+    await expect(savePairedHost(replacement)).rejects.toThrow('intent storage unavailable')
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_ONE, HOST_TWO])
+    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled()
+  })
+
+  it('deletes an unpaired credential when cleanup runs without a newer write', async () => {
+    await removeHost(HOST_ONE.id)
+    const cleanup = scheduledCleanup(HOST_ONE.id)
+
+    await cleanup(HOST_ONE.id)
+
+    expect(secureStoreMock.deleteItemAsync).toHaveBeenCalledWith(
+      'orca.host-token.host-1',
+      expect.anything()
+    )
+  })
+
+  it('awaits cleanup scheduling after metadata commit', async () => {
+    let resolveSchedule: (() => void) | null = null
+    scheduleCleanupMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSchedule = resolve
+      })
+    )
+
+    let settled = false
+    const removal = removeHost(HOST_ONE.id).then(() => {
+      settled = true
+    })
+    await vi.waitFor(() => {
+      expect(JSON.parse(storedHostsRaw)).toEqual([HOST_TWO])
+    })
+    expect(settled).toBe(false)
+    expect(recordCleanupIntentMock.mock.invocationCallOrder[0]).toBeLessThan(
+      asyncStorageMock.setItem.mock.invocationCallOrder[0]!
+    )
+
+    resolveSchedule?.()
+    await removal
+    expect(settled).toBe(true)
+  })
+
+  it('applies concurrent rename and remove without clobbering either', async () => {
+    let releaseReads: (() => void) | null = null
+    const readsReleased = new Promise<void>((resolve) => {
+      releaseReads = resolve
+    })
+    let pendingReads = 0
+    asyncStorageMock.getItem.mockImplementation(async (key: string) => {
+      if (key !== HOSTS_STORAGE_KEY) {
+        return null
+      }
+      pendingReads += 1
+      if (pendingReads <= 2) {
+        await readsReleased
+      }
+      return storedHostsRaw
+    })
+
+    const rename = updateHostNameAndEndpoint(HOST_ONE.id, { personalName: 'Renamed Host' })
+    const remove = removeHost(HOST_TWO.id)
+    // Both writers have started their RMW and are blocked on the shared read
+    // gate; without a mutation queue the second would clobber the first.
+    await vi.waitFor(() => {
+      expect(pendingReads).toBeGreaterThanOrEqual(1)
+    })
+    releaseReads?.()
+    await Promise.all([rename, remove])
+
+    expect(JSON.parse(storedHostsRaw)).toEqual([
+      { ...HOST_ONE, name: 'Renamed Host', personalName: 'Renamed Host' }
+    ])
+  })
+
+  it('preserves a rename when lastConnected updates race it', async () => {
+    const before = Date.now()
+    await Promise.all([
+      updateHostNameAndEndpoint(HOST_ONE.id, { personalName: 'Alpha' }),
+      updateLastConnected(HOST_ONE.id),
+      updateHostNameAndEndpoint(HOST_TWO.id, { personalName: 'Beta' })
+    ])
+
+    const stored = JSON.parse(storedHostsRaw) as Array<typeof HOST_ONE>
+    expect(stored).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: HOST_ONE.id, name: 'Alpha' }),
+        expect.objectContaining({ id: HOST_TWO.id, name: 'Beta' })
+      ])
+    )
+    const hostOne = stored.find((host) => host.id === HOST_ONE.id)
+    expect(hostOne?.lastConnected).toBeGreaterThanOrEqual(before)
+  })
+
+  it('does not wipe the host list when storage is unreadable during mutation', async () => {
+    storedHostsRaw = '{'
+    await expect(updateHostNameAndEndpoint(HOST_ONE.id, { personalName: 'Nope' })).rejects.toThrow(
+      /unreadable/
+    )
+    expect(asyncStorageMock.setItem).not.toHaveBeenCalled()
+    expect(storedHostsRaw).toBe('{')
+  })
+
+  // Why: gates the (slow, real-device 50-200ms) Keychain pass so a load can be
+  // parked mid-flight while a write commits underneath it.
+  function gateKeychainReads(): () => void {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    secureStoreMock.getItemAsync.mockImplementation(async (key: string) => {
+      await gate
+      return key.endsWith(HOST_ONE.id) || key.endsWith(HOST_TWO.id) ? `token-${key.at(-1)}` : null
+    })
+    return release
+  }
+
+  it('does not serve a pre-removal snapshot to a load issued after the removal (#8791)', async () => {
+    const releaseKeychain = gateKeychainReads()
+    const parkedLoad = loadHosts()
+    await vi.waitFor(() => {
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalled()
+    })
+
+    await removeHost(HOST_ONE.id)
+    const afterRemoval = loadHosts()
+    releaseKeychain()
+
+    await parkedLoad
+    await expect(afterRemoval.then((hosts) => hosts.map((host) => host.id))).resolves.toEqual([
+      HOST_TWO.id
+    ])
+  })
+
+  it('does not serve a pre-rename snapshot to a load issued after the rename (#8791)', async () => {
+    const releaseKeychain = gateKeychainReads()
+    const parkedLoad = loadHosts()
+    await vi.waitFor(() => {
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalled()
+    })
+
+    await updateHostNameAndEndpoint(HOST_ONE.id, { personalName: 'Living Room Mac' })
+    const afterRename = loadHosts()
+    releaseKeychain()
+
+    await parkedLoad
+    const hosts = await afterRename
+    expect(hosts.find((host) => host.id === HOST_ONE.id)?.name).toBe('Living Room Mac')
+  })
+
+  it('does not share a host-list pass started before savePairedHost commits its token', async () => {
+    const newHost = {
+      id: 'host-new',
+      name: 'New Host',
+      endpoint: 'ws://127.0.0.1:3',
+      publicKeyB64: 'key-new',
+      deviceToken: 'token-new',
+      lastConnected: 0
+    }
+    let releaseTokenWrite: () => void = () => {}
+    secureStoreMock.setItemAsync.mockReturnValue(
+      new Promise<void>((resolve) => {
+        releaseTokenWrite = resolve
+      })
+    )
+    let resolveParkedTokenRead: (token: string | null) => void = () => {}
+    const parkedTokenRead = new Promise<string | null>((resolve) => {
+      resolveParkedTokenRead = resolve
+    })
+    let shouldParkHostOneRead = true
+    secureStoreMock.getItemAsync.mockImplementation(async (key: string) => {
+      if (key.endsWith(HOST_ONE.id) && shouldParkHostOneRead) {
+        shouldParkHostOneRead = false
+        return parkedTokenRead
+      }
+      if (key.endsWith(newHost.id)) {
+        return newHost.deviceToken
+      }
+      return key.endsWith(HOST_ONE.id) || key.endsWith(HOST_TWO.id) ? `token-${key.at(-1)}` : null
+    })
+
+    const save = savePairedHost(newHost)
+    await vi.waitFor(() => {
+      expect(secureStoreMock.setItemAsync).toHaveBeenCalled()
+    })
+    const parkedLoad = loadHosts()
+    await vi.waitFor(() => {
+      expect(
+        asyncStorageMock.getItem.mock.calls.filter(([key]) => key === HOSTS_STORAGE_KEY)
+      ).toHaveLength(2)
+    })
+
+    releaseTokenWrite()
+    await save
+    await vi.waitFor(() => {
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith(
+        expect.stringContaining(HOST_ONE.id),
+        expect.anything()
+      )
+    })
+    const afterSave = loadHosts()
+    resolveParkedTokenRead(null)
+
+    const [parkedHosts, savedHosts] = await Promise.all([parkedLoad, afterSave])
+    expect(savedHosts.map((host) => host.id)).toContain(newHost.id)
+    expect(savedHosts).not.toBe(parkedHosts)
+  })
+
+  it('does not let a late pre-write token read poison the token cache', async () => {
+    const newHost = {
+      id: 'host-new',
+      name: 'New Host',
+      endpoint: 'ws://127.0.0.1:3',
+      publicKeyB64: 'key-new',
+      deviceToken: 'token-new',
+      lastConnected: 0
+    }
+    storedHostsRaw = JSON.stringify([{ ...newHost, deviceToken: undefined }])
+    let resolvePrewriteTokenRead: (token: string) => void = () => {}
+    secureStoreMock.getItemAsync.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolvePrewriteTokenRead = resolve
+      })
+    )
+
+    const parkedLoad = loadHosts()
+    await vi.waitFor(() => {
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalled()
+    })
+    await savePairedHost(newHost)
+    resolvePrewriteTokenRead('token-old')
+    await parkedLoad
+
+    const hosts = await loadHosts()
+    expect(hosts.find((host) => host.id === newHost.id)?.deviceToken).toBe(newHost.deviceToken)
+  })
+
+  it('still shares one Keychain pass across loads with no write between them', async () => {
+    const releaseKeychain = gateKeychainReads()
+    const first = loadHosts()
+    await vi.waitFor(() => {
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalled()
+    })
+    const second = loadHosts()
+    releaseKeychain()
+
+    const [firstHosts, secondHosts] = await Promise.all([first, second])
+    expect(firstHosts).toBe(secondHosts)
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2)
+  })
+
+  it('resolves instead of rejecting when updateLastConnected hits unreadable storage', async () => {
+    // Why: callers fire updateLastConnected with `void`; a rejection here would
+    // surface as an unhandled promise rejection rather than a caught error.
+    storedHostsRaw = '{'
+    await expect(updateLastConnected(HOST_ONE.id)).resolves.toBeUndefined()
+    expect(asyncStorageMock.setItem).not.toHaveBeenCalled()
+    expect(storedHostsRaw).toBe('{')
+  })
+})

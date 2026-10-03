@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "admissionCommitEvent": "ATTACH_COMMIT",
+  "machines": {
+    "admission": [
+      {"source": "UNUSED", "event": "ADMISSION_VERIFIED", "guard": "current-binding-and-capacity", "target": "RESERVED", "failureReason": "ADMISSION_REJECTED", "release": "none", "duplicate": "REPLAY_DETECTED"},
+      {"source": "RESERVED", "event": "PRECOMMIT_DISCONNECT", "guard": "attach-not-committed", "target": "UNUSED", "failureReason": "ILLEGAL_STATE", "release": "client-slot,reservation,conn-ticket", "duplicate": "IDEMPOTENT"},
+      {"source": "RESERVED", "event": "ATTACH_COMMIT", "guard": "host-data-authenticated-and-both-sockets-open", "target": "CONSUMED", "failureReason": "ATTACH_REJECTED", "release": "reservation-to-active-owner", "duplicate": "REPLAY_DETECTED"}
+    ],
+    "host": [
+      {"source": "UNBOUND", "event": "CONTROL_AUTHENTICATED", "guard": "current-control-lease", "target": "PROVING", "failureReason": "AUTH_REQUIRED", "release": "control-slot", "duplicate": "REPLAY_DETECTED"},
+      {"source": "PROVING", "event": "HOST_PROOF_ACCEPTED", "guard": "current-binding-and-proof", "target": "ACTIVE", "failureReason": "HOST_PROOF_REJECTED", "release": "none", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "CONTROL_TAKEOVER", "guard": "higher-control-generation-same-assignment", "target": "REBINDING", "failureReason": "STALE_BINDING", "release": "old-control", "duplicate": "IDEMPOTENT"},
+      {"source": "REBINDING", "event": "HOST_PROOF_ACCEPTED", "guard": "new-control-current", "target": "ACTIVE", "failureReason": "HOST_PROOF_REJECTED", "release": "none", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "INCARNATION_DRAIN", "guard": "matching-incarnation-generation", "target": "DRAINING", "failureReason": "STALE_BINDING", "release": "new-admission-permit", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "ASSIGNMENT_FENCE", "guard": "matching-assignment-upper-bounds", "target": "FENCED", "failureReason": "STALE_BINDING", "release": "owner-and-associated-sockets", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "CONTROL_LEASE_EXPIRED", "guard": "lease-deadline-reached", "target": "FENCED", "failureReason": "ILLEGAL_STATE", "release": "owner-and-associated-sockets", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "INCARNATION_FENCE", "guard": "matching-incarnation-generation", "target": "FENCED", "failureReason": "STALE_BINDING", "release": "all-incarnation-owners-and-sockets", "duplicate": "IDEMPOTENT"},
+      {"source": "DRAINING", "event": "DRAIN_DEADLINE", "guard": "deadline-reached", "target": "CLOSED", "failureReason": "ILLEGAL_STATE", "release": "owner-and-associated-sockets", "duplicate": "IDEMPOTENT"},
+      {"source": "FENCED", "event": "CLOSE_COMPLETE", "guard": "resources-released", "target": "CLOSED", "failureReason": "ILLEGAL_STATE", "release": "none", "duplicate": "IDEMPOTENT"}
+    ],
+    "client": [
+      {"source": "PREAUTH", "event": "ADMISSION_VERIFIED", "guard": "origin-token-binding-current", "target": "ADMITTED", "failureReason": "AUTH_REQUIRED", "release": "preauth-slot-on-failure", "duplicate": "REPLAY_DETECTED"},
+      {"source": "ADMITTED", "event": "CONN_OPEN_SENT", "guard": "active-owner", "target": "WAIT_HOST_ATTACH", "failureReason": "HOST_UNAVAILABLE", "release": "reservation-on-failure", "duplicate": "IDEMPOTENT"},
+      {"source": "WAIT_HOST_ATTACH", "event": "ATTACH_COMMIT", "guard": "host-data-authenticated", "target": "E2EE_FORWARDING", "failureReason": "ATTACH_REJECTED", "release": "both-sockets-on-failure", "duplicate": "REPLAY_DETECTED"},
+      {"source": "E2EE_FORWARDING", "event": "INNER_AUTH_ACCEPTED", "guard": "opaque-to-cell", "target": "ACTIVE", "failureReason": "INNER_AUTH_REJECTED", "release": "both-sockets-on-failure", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "CLOSE", "guard": "any-terminal-condition", "target": "CLOSED", "failureReason": "ILLEGAL_STATE", "release": "both-sockets-and-owner-reference", "duplicate": "IDEMPOTENT"}
+    ],
+    "managedSession": [
+      {"source": "PENDING_ACTIVATION", "event": "ACTIVATE", "guard": "binding-version-authority-and-deadlines-current", "target": "ACTIVE", "failureReason": "REJECTED_DEADLINE", "release": "none", "duplicate": "RETURN_STORED_ADJUDICATION"},
+      {"source": "PENDING_ACTIVATION", "event": "ABANDON", "guard": "binding-version-authority-current", "target": "CLOSED", "terminalReason": "ABANDONED_BEFORE_ACTIVATION", "failureReason": "REJECTED_BINDING", "release": "managed-session", "duplicate": "RETURN_STORED_ADJUDICATION"},
+      {"source": "ACTIVE", "event": "CLOSE", "guard": "allowed-close-reason-and-current-binding", "target": "CLOSED", "terminalReason": "EVENT_REASON", "failureReason": "REJECTED_ILLEGAL_STATE", "release": "managed-session", "duplicate": "RETURN_STORED_ADJUDICATION"},
+      {"source": "ACTIVE", "event": "IDLE_EXPIRE", "guard": "idle-deadline-reached", "target": "EXPIRED", "terminalReason": "IDLE_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "RETURN_STORED_ADJUDICATION"},
+      {"source": "ACTIVE", "event": "AUTHORITY_EXPIRE", "guard": "authority-deadline-reached", "target": "UNVERIFIABLE", "terminalReason": "SESSION_AUTHORITY_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "RETURN_STORED_ADJUDICATION"},
+      {"source": "REVOKE_PENDING", "event": "AUTHORITY_EXPIRE", "guard": "authority-deadline-reached", "target": "UNVERIFIABLE", "terminalReason": "SESSION_AUTHORITY_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "RETURN_STORED_ADJUDICATION"},
+      {"source": "PENDING_ACTIVATION", "event": "CLOUD_REVOKE_REQUEST", "guard": "current-resource-version", "target": "REVOKED", "terminalReason": "REVOKED_BEFORE_ACTIVATION", "failureReason": "REJECTED_STALE_VERSION", "release": "managed-session", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "CLOUD_REVOKE_REQUEST", "guard": "current-resource-version", "target": "REVOKE_PENDING", "failureReason": "REJECTED_STALE_VERSION", "release": "none", "duplicate": "IDEMPOTENT"},
+      {"source": "REVOKE_PENDING", "event": "CONTROL_COMMAND_ACK", "guard": "matching-command-sequence-and-resource-version", "target": "REVOKED", "terminalReason": "REVOKED", "failureReason": "REJECTED_STALE_VERSION", "release": "managed-session", "duplicate": "IDEMPOTENT"},
+      {"source": "PENDING_ACTIVATION", "event": "ACTIVATION_DEADLINE", "guard": "activation-deadline-reached", "target": "UNVERIFIABLE", "terminalReason": "ACTIVATION_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "IDEMPOTENT"},
+      {"source": "PENDING_ACTIVATION", "event": "ABSOLUTE_DEADLINE", "guard": "absolute-deadline-reached", "target": "EXPIRED", "terminalReason": "ABSOLUTE_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "IDEMPOTENT"},
+      {"source": "ACTIVE", "event": "ABSOLUTE_DEADLINE", "guard": "absolute-deadline-reached", "target": "EXPIRED", "terminalReason": "ABSOLUTE_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "IDEMPOTENT"},
+      {"source": "REVOKE_PENDING", "event": "ABSOLUTE_DEADLINE", "guard": "absolute-deadline-reached", "target": "EXPIRED", "terminalReason": "ABSOLUTE_TIMEOUT", "failureReason": "REJECTED_DEADLINE", "release": "managed-session", "duplicate": "IDEMPOTENT"}
+    ]
+  },
+  "transitionVerdicts": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY", "TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"],
+  "managedSessionBatch": {
+    "method": "POST",
+    "pathTemplate": "/hive/v1/runtimes/{runtimeRecordId}/session-transitions",
+    "preferredTransport": "/hive/v1/runtime-heartbeats#report.relayControl.sessionTransitions",
+    "capability": "runtime-session-control-v1",
+    "legacyStandaloneRouteStatus": "FROZEN_COMPATIBILITY_NOT_ADVERTISED",
+    "maximumEntries": 128,
+    "processInRequestOrder": true,
+    "storedVerdicts": ["APPLIED", "REJECTED_NOT_FOUND", "REJECTED_BINDING", "REJECTED_STALE_VERSION", "REJECTED_ILLEGAL_STATE", "REJECTED_DEADLINE", "REJECTED_AUTHORITY"],
+    "unstoredStopVerdicts": ["TRANSITION_REPLAY_CONFLICT", "SEQUENCE_GAP"],
+    "stopResponseRule": "emit stored=false stop verdict for offending and every later request entry without state evaluation",
+    "ackRule": "highest-contiguous-stored-sequence",
+    "controlVersionRule": "APPLIED increments by one; every rejected adjudication preserves the current value",
+    "exactReplayRule": "return-original-stored-adjudication",
+    "outboxDeleteRule": "matching-adjudication-and-covering-ack-required",
+    "reasonByTransitionType": {
+      "ACTIVATE": ["ACTIVATED"],
+      "ABANDON": ["ABANDONED_BEFORE_ACTIVATION"],
+      "CLOSE": ["CLIENT_CLOSED", "RUNTIME_SHUTDOWN", "TRANSPORT_CLOSED", "LOCAL_ERROR"],
+      "IDLE_EXPIRE": ["IDLE_TIMEOUT"],
+      "AUTHORITY_EXPIRE": ["SESSION_AUTHORITY_TIMEOUT"]
+    }
+  }
+}

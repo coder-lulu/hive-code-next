@@ -1,0 +1,207 @@
+name: HiveCode client packages
+
+on:
+  push:
+    branches: [hivecode/main-next]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Package target to verify
+        type: choice
+        default: all
+        options:
+          - all
+          - windows-x64
+          - macos-x64
+          - macos-arm64
+          - linux-x64
+          - linux-arm64
+          - android
+          - ios
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-packages-${{ github.ref }}-${{ github.sha }}-${{ inputs.target || 'all' }}
+  cancel-in-progress: true
+
+env:
+  ORCA_BACKGROUND_LAUNCH: '1'
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+jobs:
+  plan:
+    if: github.repository == 'coder-lulu/hive-code-next'
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify private documentation separation
+        run: node config/scripts/verify-documentation-governance.mjs
+      - id: plan
+        env:
+          BUILD_TARGET: ${{ inputs.target || 'all' }}
+        run: echo "matrix=$(node config/scripts/client-build-ci-plan.mjs)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve pinned tools and output directories
+        id: tools
+        run: |
+          mkdir -p logs/client-build-ci
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          const pins = JSON.parse(readFileSync('config/client-build.json'))
+          const pkg = JSON.parse(readFileSync('package.json'))
+          appendFileSync(process.env.GITHUB_OUTPUT, `java=${pins.android.java}\nversion=${pkg.version}\nxcode=${pins.ios.xcode}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `HIVECODE_BUILD_HOME=${join(process.env.RUNNER_TEMP, 'hivecode-build')}\n`)
+          NODE
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          cache-electron-package: 'true'
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            runtime/managed-pi/pnpm-lock.yaml
+            runtime/native-pi/pnpm-lock.yaml
+            mobile/pnpm-lock.yaml
+      - uses: ./.github/actions/install-mobile-dependencies
+        with:
+          node-linker: ${{ (matrix.target == 'android' || matrix.target == 'ios') && 'hoisted' || 'isolated' }}
+      - name: Install Linux packaging and native tools
+        if: startsWith(matrix.target, 'linux-')
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends rpm fakeroot binutils build-essential libgtk-3-0 libnss3 libgbm1 libasound2
+          npm install -g node-gyp@11.5.0
+          printf 'npm_config_node_gyp=%s/node-gyp/bin/node-gyp.js\n' "$(npm root -g)" >> "$GITHUB_ENV"
+      - name: Select pinned iOS Xcode
+        if: matrix.target == 'ios'
+        env:
+          XCODE_VERSION: ${{ steps.tools.outputs.xcode }}
+        run: |
+          developer_dir="/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          test -d "$developer_dir"
+          printf 'DEVELOPER_DIR=%s\n' "$developer_dir" >> "$GITHUB_ENV"
+      - name: Verify iOS executable signature validation
+        if: matrix.target == 'ios'
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run --config config/vitest.config.ts config/scripts/client-build-ios-signature.darwin.test.mjs 2>&1 | tee logs/client-build-ci/ios-signature-test.log
+      - name: Setup Android Java
+        if: matrix.target == 'android'
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: ${{ steps.tools.outputs.java }}
+      - name: Setup Android command-line tools
+        if: matrix.target == 'android'
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          cmdline-tools-version: '12266719'
+      - name: Install pinned Android SDK packages
+        if: matrix.target == 'android'
+        run: |
+          mapfile -t sdk_packages < <(node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const { android: a } = JSON.parse(readFileSync('config/client-build.json'))
+          console.log(`platforms;android-${a.compileSdk}\nbuild-tools;${a.buildTools}\nndk;${a.ndk}\ncmake;${a.cmake}`)
+          NODE
+          )
+          sdkmanager "${sdk_packages[@]}" | tee logs/client-build-ci/android-sdk.log
+      - name: Materialize Android release key
+        if: matrix.target == 'android'
+        env:
+          RELEASE_KEY_BASE64: ${{ secrets.HIVECODE_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync, appendFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          if (!process.env.RELEASE_KEY_BASE64) throw new Error('Android release keystore secret is missing')
+          const path = join(process.env.RUNNER_TEMP, 'hivecode-release.keystore')
+          writeFileSync(path, Buffer.from(process.env.RELEASE_KEY_BASE64, 'base64'), { mode: 0o600 })
+          appendFileSync(process.env.GITHUB_ENV, `HIVECODE_ANDROID_KEYSTORE_PATH=${path}\n`)
+          NODE
+      - name: Verify and build packages
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          HIVECODE_ANDROID_KEYSTORE_PASSWORD: ${{ matrix.target == 'android' && secrets.HIVECODE_ANDROID_KEYSTORE_PASSWORD || '' }}
+          HIVECODE_ANDROID_KEY_ALIAS: ${{ matrix.target == 'android' && secrets.HIVECODE_ANDROID_KEY_ALIAS || '' }}
+          HIVECODE_ANDROID_KEY_PASSWORD: ${{ matrix.target == 'android' && secrets.HIVECODE_ANDROID_KEY_PASSWORD || '' }}
+          HIVECODE_ANDROID_SIGNING_FINGERPRINT: ${{ matrix.target == 'android' && secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT || '' }}
+        run: |
+          set -euo pipefail
+          pnpm run clients:doctor -- --target "$BUILD_TARGET" 2>&1 | tee logs/client-build-ci/doctor.log
+          pnpm run clients:prepare -- --target "$BUILD_TARGET" 2>&1 | tee logs/client-build-ci/prepare.log
+          git diff --exit-code HEAD
+      - name: Verify published artifact manifest
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          BUILD_VERSION: ${{ steps.tools.outputs.version }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          import { createHash } from 'node:crypto'
+          const root = join('dist', process.env.BUILD_VERSION, process.env.BUILD_TARGET)
+          const { directory } = JSON.parse(readFileSync(join(root, 'latest.json')))
+          const path = join(root, directory)
+          const manifest = JSON.parse(readFileSync(join(path, 'build-manifest.json')))
+          if (manifest.source.commit !== process.env.GITHUB_SHA || manifest.source.dirty || !manifest.artifacts.length) throw new Error('Package source identity is not the clean CI commit')
+          for (const artifact of manifest.artifacts) {
+            const sha = createHash('sha256').update(readFileSync(join(path, artifact.file))).digest('hex')
+            if (sha !== artifact.sha256) throw new Error(`Artifact checksum differs: ${artifact.file}`)
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ${manifest.target}\nSource: ${manifest.source.commit}\nVersion: ${manifest.version}\nSignature: ${JSON.stringify(manifest.signature)}\n\n${manifest.artifacts.map(a => `- ${a.file}: ${a.sha256}`).join('\n')}\n`)
+          if (manifest.target === 'ios') appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nUnsigned xcarchive and simulator app only. No installable IPA is produced.\n')
+          NODE
+      - name: Upload verified packages
+        uses: actions/upload-artifact@v6
+        with:
+          name: client-packages-${{ matrix.target }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist/${{ steps.tools.outputs.version }}/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0
+      - name: Remove temporary Android key
+        if: always() && matrix.target == 'android'
+        run: |
+          node --input-type=module <<'NODE'
+          import { unlinkSync, existsSync } from 'node:fs'
+          import { join } from 'node:path'
+          const path = join(process.env.RUNNER_TEMP, 'hivecode-release.keystore')
+          if (existsSync(path)) unlinkSync(path)
+          NODE
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: client-build-evidence-${{ matrix.target }}-${{ github.run_attempt }}
+          path: |
+            logs/client-build-ci/
+            logs/client-build/
+          if-no-files-found: warn
+          retention-days: 7
+
+  verify:
+    name: All selected packages verified
+    needs: [plan, build]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-22.04
+    env:
+      BUILD_RESULT: ${{ needs.build.result }}
+    steps:
+      - run: test "$BUILD_RESULT" = success

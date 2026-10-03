@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.origin.ipv6-literal.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "origin",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000000,
+  "input": {"origin": "https://[2001:db8::1]:8443", "allowedOrigins": ["https://[2001:db8::1]:8443"], "browser": true}
+}

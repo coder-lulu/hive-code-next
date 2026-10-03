@@ -1,0 +1,7 @@
+{
+  "buildHome": "E:/hive-build",
+  "androidSdk": "C:/Users/YOUR_USER/AppData/Local/Android/Sdk",
+  "javaHome": "C:/YOUR_JDK_DIRECTORY",
+  "androidKeystore": "C:/YOUR_PRIVATE_DIRECTORY/release.jks",
+  "androidSigningCredentials": "C:/YOUR_PRIVATE_DIRECTORY/release.credentials.txt"
+}

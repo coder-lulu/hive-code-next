@@ -1,0 +1,161 @@
+.integration-settings-page {
+  max-width: var(--desktop-settings-content-max);
+  display: flex;
+  flex-direction: column;
+  gap: var(--desktop-settings-section-gap);
+  font-size: var(--desktop-settings-body-font);
+  line-height: var(--desktop-settings-body-leading);
+}
+.integration-location-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 4);
+  min-height: var(--desktop-settings-location-height);
+  padding: calc(var(--spacing) * 4) var(--desktop-settings-content-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--desktop-settings-section-radius);
+  background: var(--card);
+}
+.integration-settings-group {
+  border: 1px solid var(--border);
+  border-radius: var(--desktop-settings-section-radius);
+  background: var(--card);
+  padding-inline: var(--desktop-settings-content-inset);
+}
+.integration-settings-group > h3 {
+  font-size: var(--text-base);
+  line-height: calc(var(--spacing) * 6);
+  font-weight: 600;
+  padding-block: calc(var(--spacing) * 4);
+}
+.integration-settings-row {
+  display: grid;
+  grid-template-columns: calc(var(--spacing) * 6) minmax(0, 1fr) minmax(
+      calc(var(--spacing) * 25),
+      auto
+    ) calc(var(--spacing) * 24);
+  align-items: center;
+  gap: calc(var(--spacing) * 4);
+  min-height: var(--desktop-settings-row-height);
+  padding-block: calc(var(--spacing) * 4);
+  border-top: 1px solid var(--border);
+}
+.integration-brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: calc(var(--spacing) * 6);
+  height: calc(var(--spacing) * 6);
+}
+.integration-brand-icon > svg {
+  width: 100%;
+  height: 100%;
+}
+.integration-row-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.integration-row-copy > p {
+  font-size: var(--text-sm);
+  line-height: calc(var(--spacing) * 5);
+  font-weight: 500;
+}
+.integration-row-copy > div {
+  color: var(--muted-foreground);
+  margin-top: calc(var(--spacing) * 1);
+}
+.integration-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+  font-size: var(--desktop-settings-body-font);
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.integration-row-status[data-tone='connected'] {
+  color: var(--status-success);
+}
+.integration-row-status[data-tone='attention'] {
+  color: var(--destructive);
+}
+.integration-status-dot {
+  width: calc(var(--spacing) * 2);
+  height: calc(var(--spacing) * 2);
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.integration-management-header {
+  padding: var(--desktop-settings-content-inset);
+  padding-right: calc(var(--spacing) * 12);
+  border-bottom: 1px solid var(--border);
+}
+.integration-management-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--desktop-settings-content-inset);
+  font-size: var(--desktop-settings-body-font);
+  line-height: var(--desktop-settings-body-leading);
+}
+.integration-management-body > div > .mt-4 {
+  margin-top: 0;
+}
+.integration-management-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: calc(var(--spacing) * 4) var(--desktop-settings-content-inset);
+  border-top: 1px solid var(--border);
+}
+.integration-workspace-list {
+  border: 1px solid var(--border);
+  border-radius: var(--desktop-settings-control-radius);
+}
+.integration-workspace-row {
+  padding: calc(var(--spacing) * 4);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 3);
+}
+.integration-workspace-row + .integration-workspace-row {
+  border-top: 1px solid var(--border);
+}
+.integration-workspace-row .integration-workspace-identity {
+  flex: 1 1 calc(var(--spacing) * 40);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.integration-workspace-row > [role='alert'] {
+  min-width: 0;
+}
+.integration-workspace-row p {
+  white-space: normal;
+}
+.integration-connection-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 4);
+  border-top: 1px solid var(--border);
+  padding-block: calc(var(--spacing) * 3);
+}
+.integration-connection-info dd {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .integration-settings-row {
+    grid-template-columns: calc(var(--spacing) * 6) minmax(0, 1fr) auto;
+  }
+  .integration-row-copy {
+    grid-column: 2 / -1;
+  }
+  .integration-row-status {
+    grid-column: 2;
+  }
+  [data-integration-row-action] {
+    grid-column: 3;
+  }
+}

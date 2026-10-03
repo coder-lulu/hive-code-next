@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.jws.cell-ops-fence-binding.reject",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "jws",
+  "applicableComponents": ["cloud", "hivecode", "cell"],
+  "validationTime": 1893456000,
+  "input": {
+    "verifierContext": {"issuer": "https://cloud.hive.test/relay", "acceptedVerifierKids": ["relay-test-2026-01"], "privateOriginsByCellId": {"cell-01": "https://cell-01.private.hive.test:8443"}},
+    "tokenType": "cellOpsToken",
+    "compactJws": "eyJhbGciOiJFZERTQSIsInR5cCI6InJlbGF5LWNlbGwtb3BzK2p3dCIsImtpZCI6InJlbGF5LXRlc3QtMjAyNi0wMSJ9.eyJpc3MiOiJodHRwczovL2Nsb3VkLmhpdmUudGVzdC9yZWxheSIsInN1YiI6ImhpdmUtY2xvdWQtcmVsYXktb3BzIiwianRpIjoiMjYyNjI2MjYtMjYyNi00NjI2LTg2MjYtMjYyNjI2MjYyNjI2IiwiaWF0IjoxODkzNDU1OTgwLCJuYmYiOjE4OTM0NTU5ODAsImF1ZCI6ImhpdmUtcmVsYXktY2VsbC1vcHMiLCJzY29wZSI6InJlbGF5OmNlbGw6ZmVuY2UiLCJleHAiOjE4OTM0NTYwMTAsIm1ldGhvZCI6IkdFVCIsInBhdGgiOiIvaW50ZXJuYWwvc3RhdHVzIiwicHJpdmF0ZU9yaWdpbiI6Imh0dHBzOi8vY2VsbC0wMS5wcml2YXRlLmhpdmUudGVzdDo4NDQzIiwiY2VsbElkIjoiY2VsbC0wMSIsIm5vbmNlIjoiQlFVRkJRVUZCUVVGQlFVRkJRVUZCUSJ9.84T6IrwREIdHVr6sk8PFsjDeCxyPECQTNs2rSYgaqqAf2NDGY3rYKbcKTbp4pewM2pfN_4IBUJ1RBvfMhnuBAw"
+  }
+}

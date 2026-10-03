@@ -1,0 +1,35 @@
+[Unit]
+Description=HiveCode headless Runtime
+Documentation=https://updates.hivekernel.com/
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=hivecode-runtime
+Group=hivecode-runtime
+WorkingDirectory=/var/lib/hivecode-runtime
+Environment=HOME=/var/lib/hivecode-runtime
+Environment=LIBGL_ALWAYS_SOFTWARE=1
+Environment=HIVECODE_RUNTIME_ARGS=
+EnvironmentFile=-/etc/hivecode/runtime.env
+ExecStart=/usr/bin/hive serve --port 6768 --json $HIVECODE_RUNTIME_ARGS
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hivecode-runtime
+KillMode=mixed
+TimeoutStopSec=30
+Restart=on-failure
+RestartPreventExitStatus=3
+RestartSec=5
+# Chromium's setuid sandbox must be allowed to elevate inside its helper.
+# PrivateTmp hides the shared X11 socket directory from the managed Xvfb.
+NoNewPrivileges=false
+PrivateTmp=false
+ProtectSystem=full
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

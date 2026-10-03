@@ -1,0 +1,54 @@
+.agent-capabilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 24px 16px;
+  max-width: 1040px;
+  padding-top: 4px;
+}
+
+.agent-capabilities-grid > * {
+  min-width: 0;
+}
+
+.agent-capabilities-orchestration-card {
+  order: 1;
+}
+
+.agent-capabilities-computer-card {
+  order: 2;
+}
+
+.agent-capabilities-settings {
+  grid-column: 1 / -1;
+  order: 3;
+}
+
+.agent-capabilities-permissions {
+  grid-column: 1 / -1;
+  order: 4;
+}
+
+.agent-capabilities-permissions:empty {
+  display: none;
+}
+
+.agent-capabilities-examples {
+  grid-column: 1 / -1;
+  order: 5;
+}
+
+.agent-capabilities-explanation {
+  grid-column: 1 / -1;
+  order: 6;
+}
+
+.agent-capabilities-orchestration-card:has([data-terminal-open='true']),
+.agent-capabilities-computer-card:has([data-terminal-open='true']) {
+  grid-column: 1 / -1;
+}
+
+.agent-capabilities-orchestration-card > [data-terminal-open],
+.agent-capabilities-computer-card > [data-terminal-open] {
+  height: 100%;
+  background: var(--card);
+}

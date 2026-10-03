@@ -1,0 +1,29 @@
+name: Retired hourly desktop build
+
+# Hourly builds used timestamped `-hourly.N` versions and uploaded installer
+# bytes to the stablyai/orca-hourly GitHub repository. That bypassed the
+# HiveCloud release control plane and the unified SemVer contract. Keep the
+# workflow name and a manual entry point for discoverability, but never build or
+# publish from this legacy path.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Ignored; hourly GitHub releases are retired'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  retired:
+    if: github.repository == 'stablyai/orca'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain retirement
+        run: |
+          echo "::error::Hourly GitHub installer publishing is retired. Use release-cut.yml and publish the signed artifact through HiveCloud OSS."
+          exit 1

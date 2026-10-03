@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "kind": "public-tree-baseline",
+  "archiveRepository": "https://github.com/coder-lulu/hive-code-next-history",
+  "sourceCommit": "e39b0ed8aeb8aedf52e833e54c04445c4845653a",
+  "sourceTree": "40164e99cd0b2c953ef6941c857a8b35cd8458af",
+  "additionalSourceCommits": ["39ff1728504fa082c37f21f82a05d30b797b9cd2"],
+  "ledgerBlob": "16d8d3de8adc1ee96ad9706cd454b1b5f68561de",
+  "reviewedUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
+  "pendingShas": ["90801e2deb5debc51e2018ec178255ab2fe1748a"],
+  "preservedProductCommits": [
+    "77103f25718b7f9c646657e96fa49e707b09cfa0",
+    "99aea1c2f71cccda4ebed311bd65767af588ab2b",
+    "be687b0bd54a3f7176c6d1de0286bb765fefb8db",
+    "c88b03c8b9a5aceeb124621a4ee06074aa1f9d40",
+    "e6e9d9eeb5f7ec83e27e659c8b13a9c5d25e2c9e",
+    "feeada0630bf66c7f607f250e2bb350348a91387"
+  ],
+  "historicalEvidence": "Original reviewed ledger entries are preserved in this public root tree; their product commits and complete source history are retained in the private archive."
+}

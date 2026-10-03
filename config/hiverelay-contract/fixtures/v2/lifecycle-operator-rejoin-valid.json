@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "contractRevision": "hiverelay-v2-p0.9",
+  "caseId": "v2.lifecycle-operator.rejoin.valid",
+  "suite": "hiverelay-v2-conformance",
+  "operation": "lifecycle-operator",
+  "applicableComponents": [
+    "cloud"
+  ],
+  "validationTime": 1788566400000,
+  "input": {
+    "request": {
+      "protocolVersion": "hiverelay-cell-lifecycle-operator/v1",
+      "operationId": "10000000-0000-4000-8000-000000000001",
+      "action": "REJOIN",
+      "expectedResourceVersion": 7,
+      "expectedLifecycleGeneration": 3,
+      "targetIncarnationId": "10000000-0000-4000-8000-000000000002"
+    },
+    "response": {
+      "protocolVersion": "hiverelay-cell-lifecycle-operator/v1",
+      "operationId": "10000000-0000-4000-8000-000000000001",
+      "action": "REJOIN",
+      "cellId": "cell-ap-east-1a",
+      "state": "UNHEALTHY",
+      "resourceVersion": 8,
+      "lifecycleGeneration": 4,
+      "observedIncarnationId": "10000000-0000-4000-8000-000000000002",
+      "routingConfirmedIncarnationId": null,
+      "routingConfirmedAt": null,
+      "updatedAt": "2026-09-05T00:00:00Z",
+      "duplicate": false,
+      "delivery": null
+    }
+  }
+}

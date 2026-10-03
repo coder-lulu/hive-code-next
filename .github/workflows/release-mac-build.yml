@@ -1,0 +1,232 @@
+name: Release macOS Build
+
+run-name: Mac release build ${{ inputs.tag }} (${{ inputs.release_run_id }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose draft should receive macOS artifacts
+        required: true
+        type: string
+      release_run_id:
+        description: release-cut workflow run that requested this build
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-mac-build-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build-mac:
+    if: github.repository == 'coder-lulu/hive-code-next'
+    # Why: this workflow is outside the SignPath signing run, so Blacksmith
+    # cannot enter Windows artifact provenance while mac notarization gets the
+    # faster runner.
+    runs-on: blacksmith-6vcpu-macos-15
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      HIVECODE_COMMIT_SHA: ${{ github.sha }}
+      # Packaging runs after the Vite build; keep identity embedding enabled
+      # for electron-builder so the shipped app carries its release metadata.
+      HIVECODE_EMBED_RELEASE_IDENTITY: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Stamp checked-out commit in release identity
+        shell: bash
+        run: echo "HIVECODE_COMMIT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            mobile/pnpm-lock.yaml
+
+      - name: Reserve macOS build number in HiveCloud
+        shell: bash
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          if [[ "$version" == *-beta.* || "$version" == *-rc.* ]]; then
+            channel=beta
+          else
+            channel=stable
+          fi
+          export HIVECODE_RELEASE_PLATFORM=macos
+          export HIVECODE_RELEASE_CHANNEL="$channel"
+          export HIVECODE_BUILD_RESERVATION_KEY="hivecode:macos:${channel}:${version}"
+          node config/scripts/reserve-hivecloud-build-number.mjs
+
+      # Cache the Electron binary + electron-builder tool downloads (notarytool,
+      # winCodeSign, nsis, squirrel, AppImage). Saves ~30-90s per job, incl. mac.
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-builder-mac-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-mac-
+
+      # Why: pnpm install triggers electron's postinstall, which downloads the
+      # Electron binary from GitHub release assets. GitHub's download CDN
+      # occasionally returns 504s that fail the whole release. Retry on
+      # failure so transient network errors don't require a manual re-run.
+      # Why both CPUs: the mac config packages x64 and arm64 from this arm64
+      # runner, so the install must carry both variants of the native optional deps.
+      - name: Install dependencies
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pnpm install --frozen-lockfile --cpu=current,x64,arm64
+
+      # Why here: electron-builder's beforePack requires out/mobile-web, and the bundle
+      # build resolves React Native and Expo from mobile/node_modules.
+      - uses: ./.github/actions/install-mobile-dependencies
+
+      - name: Verify macOS signing environment
+        run: node config/scripts/verify-macos-release-env.mjs
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTS }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # Why: `plutil -lint` accepts duplicate plist keys, but `codesign`
+      # rejects duplicate entitlements after the expensive app build.
+      - name: Verify macOS entitlements
+        run: pnpm verify:macos-entitlements
+
+      # Why: telemetry's transport gate (`src/main/telemetry/client.ts:IS_OFFICIAL_BUILD`)
+      # requires the build identity to be the literal string `stable` or `rc`,
+      # substituted by electron-vite's `define` block at build time.
+      - name: Classify release tag for telemetry build identity
+        id: tag-classify
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # Why the optional trailing identifier: suffixed side-branch RCs
+          # (vX.Y.Z-rc.N.perf) are rc-channel prerelease builds — same telemetry
+          # identity as plain RCs.
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(beta|rc)\.[0-9]+(\.[0-9A-Za-z]+)?$ ]]; then
+            identity=rc
+          elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            identity=stable
+          else
+            echo "::error::Tag $TAG does not match stable, beta, or rc pattern; refusing to build official artifact"
+            exit 1
+          fi
+          echo "identity=$identity" >>"$GITHUB_OUTPUT"
+          echo "Classified $TAG as $identity"
+
+      - name: Build app
+        run: pnpm build:release
+        env:
+          # Why: Vite's web build crossed Node's default old-space ceiling on
+          # the macOS release runner, leaving v1.4.2-rc.8 as an incomplete draft.
+          NODE_OPTIONS: --max-old-space-size=4096
+          ORCA_BUILD_IDENTITY: ${{ steps.tag-classify.outputs.identity }}
+          ORCA_DIAGNOSTICS_TOKEN_URL: https://www.onorca.dev/diagnostics/token
+          ORCA_POSTHOG_WRITE_KEY: ${{ secrets.ORCA_POSTHOG_WRITE_KEY }}
+
+      - name: Gate runtime file-watcher process isolation
+        run: |
+          # Why: #8212 is a native-process crash contract. Prove both the Node
+          # host and the exact Electron runtime survive SIGSEGV before packaging.
+          node config/scripts/runtime-file-watcher-fault-harness.mjs
+          ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs
+
+      - name: Gate SSH relay watcher process isolation
+        run: |
+          # Why: the remote native watcher shares a daemon with live PTYs.
+          # Kill only its child and require both PTY and watch recovery before packaging.
+          node config/scripts/relay-watcher-fault-harness.mjs
+
+      - name: Build release artifacts (macOS)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish never
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTS }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # Verify the packaged app before publishing immutable artifacts.
+      - name: Verify telemetry constants present in app.asar
+        run: node config/scripts/verify-telemetry-constants.mjs
+
+      - name: Verify macOS application signatures and certificates
+        shell: bash
+        env:
+          HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT: ${{ secrets.HIVECODE_MAC_SIGNING_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          expected="$(printf '%s' "$HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT" | tr '[:upper:]' '[:lower:]' | tr -d ':')"
+          [[ "$expected" =~ ^[0-9a-f]{64}$ ]]
+          apps="$(find dist -maxdepth 2 -type d -name 'HiveCode.app' -print | sort)"
+          test "$(printf '%s\n' "$apps" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 2
+          index=0
+          while IFS= read -r app; do
+            test -n "$app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            certificate_prefix="$RUNNER_TEMP/hivecode-certificate-$index-"
+            codesign --display --extract-certificates "$certificate_prefix" "$app"
+            actual="$(openssl x509 -inform der -in "${certificate_prefix}0" -noout -fingerprint -sha256 | cut -d= -f2 | tr '[:upper:]' '[:lower:]' | tr -d ':')"
+            test "$actual" = "$expected"
+            index=$((index + 1))
+          done <<< "$apps"
+
+      - name: Publish macOS ZIP artifacts to HiveCloud object storage
+        shell: bash
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECODE_VERSION: ${{ inputs.tag }}
+          HIVECODE_RELEASE_CHANNEL: ${{ contains(inputs.tag, '-beta.') && 'beta' || contains(inputs.tag, '-rc.') && 'beta' || 'stable' }}
+          HIVECODE_DESKTOP_PLATFORM: macos
+          HIVECODE_DESKTOP_ARCHITECTURE: x64
+          HIVECODE_EXPECTED_ARTIFACTS: '2'
+          HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES: x64,arm64
+          HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT: ${{ secrets.HIVECODE_MAC_SIGNING_FINGERPRINT }}
+          HIVECODE_RELEASE_NOTES: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          export HIVECODE_VERSION="${HIVECODE_VERSION#v}"
+          x64="$(find dist -maxdepth 1 -type f -name 'hivecode-macos-x64.zip' -print -quit)"
+          arm64="$(find dist -maxdepth 1 -type f -name 'hivecode-macos-arm64.zip' -print -quit)"
+          test -n "$x64" && test -n "$arm64"
+          export HIVECODE_ARTIFACT_PATHS="x64=$x64,arm64=$arm64"
+          node config/scripts/publish-hivecloud-desktop-release.mjs
