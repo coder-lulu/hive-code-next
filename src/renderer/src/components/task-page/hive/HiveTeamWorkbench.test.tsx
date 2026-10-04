@@ -2,10 +2,12 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HiveAccountState } from '../../../../../shared/hive-account'
 import type { HiveWorkbenchCompanyPage } from '../../../../../shared/hive-team-workbench'
 import { HiveTeamWorkbench } from './HiveTeamWorkbench'
 import {
   deferredWorkbenchValue,
+  workbenchAccountState,
   workbenchCompany,
   workbenchProject,
   workbenchTeam
@@ -117,6 +119,8 @@ const api = {
 let root: Root
 let container: HTMLDivElement
 let accountChanged: () => void
+let accountStateChanged: (state: HiveAccountState) => void
+const firstAccount = workbenchAccountState()
 beforeEach(() => {
   Object.values(api).forEach((mock) => mock.mockReset())
   workspaces.openSpacePage.mockClear()
@@ -131,8 +135,10 @@ beforeEach(() => {
     value: {
       hiveTasks: api,
       hiveAccount: {
-        onStateChanged: (listener: () => void) => {
-          accountChanged = listener
+        getState: vi.fn().mockResolvedValue(firstAccount),
+        onStateChanged: (listener: (state: HiveAccountState) => void) => {
+          accountStateChanged = listener
+          accountChanged = () => listener(workbenchAccountState('other-owner', 'other-authority'))
           return () => undefined
         }
       }
@@ -170,6 +176,38 @@ function setInput(id: string, value: string) {
 }
 
 describe('team-workbench forms and availability', () => {
+  it('keeps company, project and employee drafts mounted during token refresh failures and recovery', async () => {
+    await mount()
+    act(() => button('hiveWorkbench.newCompany').click())
+    act(() => button('hiveWorkbench.newProject').click())
+    act(() => {
+      setInput('hive-company-name', 'Company draft')
+      setInput('hive-project-name', 'Project draft')
+      setInput('hive-employee-product', 'Employee draft')
+    })
+    const companyInput = container.querySelector('#hive-company-name')
+    const projectInput = container.querySelector('#hive-project-name')
+    const employeeInput = container.querySelector('#hive-employee-product')
+    for (const account of [
+      { ...firstAccount, expiresAt: firstAccount.expiresAt! + 10_000 },
+      { ...firstAccount, expiresAt: Date.now() - 1000, errorCode: 'network_unavailable' as const },
+      { ...firstAccount, expiresAt: Date.now() + 60_000 }
+    ]) {
+      await act(async () => accountStateChanged(account))
+      expect(container.querySelector('#hive-company-name')).toBe(companyInput)
+      expect(container.querySelector('#hive-project-name')).toBe(projectInput)
+      expect(container.querySelector('#hive-employee-product')).toBe(employeeInput)
+      expect(container.querySelector<HTMLInputElement>('#hive-company-name')?.value).toBe(
+        'Company draft'
+      )
+      expect(container.querySelector<HTMLInputElement>('#hive-project-name')?.value).toBe(
+        'Project draft'
+      )
+      expect(container.querySelector<HTMLInputElement>('#hive-employee-product')?.value).toBe(
+        'Employee draft'
+      )
+    }
+  })
   it('renders the four real employees, personal task entry and unavailable execution state', async () => {
     await mount()
     expect(button('hiveWorkbench.personalTasks')).not.toBeNull()

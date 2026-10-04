@@ -1,10 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { HiveAccountState } from '../../../../../shared/hive-account'
 import {
   appendWorkbenchRows,
   emptyHiveWorkbenchState,
   type PendingOperation
 } from './hive-workbench-state'
 import { createHiveWorkbenchMutations } from './hive-workbench-mutations'
+
+function workbenchAccountIdentity(state: HiveAccountState): string {
+  return JSON.stringify([
+    state.configured,
+    state.status,
+    state.account?.accountId,
+    state.authorityId,
+    state.sessionProfile,
+    state.errorCode === 'session_expired' ||
+      state.errorCode === 'session_rejected' ||
+      (state.sessionExpiresAt !== undefined && state.sessionExpiresAt <= Date.now())
+  ])
+}
 
 export function useHiveWorkbench() {
   const [state, setState] = useState(emptyHiveWorkbenchState)
@@ -83,16 +97,41 @@ export function useHiveWorkbench() {
   )
   useEffect(() => {
     const requestCache = requests.current
+    let active = true
+    let accountEvents = 0
+    let accountIdentity: string | undefined
     mounted.current = true
     void loadCompanies()
-    const unsubscribe = window.api.hiveAccount.onStateChanged(() => {
+    const unsubscribe = window.api.hiveAccount.onStateChanged((account) => {
+      if (!active) {
+        return
+      }
+      accountEvents += 1
+      const nextIdentity = workbenchAccountIdentity(account)
+      // Token refresh does not change the owner of drafts or idempotent requests.
+      if (nextIdentity === accountIdentity) {
+        return
+      }
+      accountIdentity = nextIdentity
       generation.current += 1
       flight.current = null
       requestCache.clear()
       setState((previous) => emptyHiveWorkbenchState(previous.accountRevision + 1))
       void loadCompanies()
     })
+    const readRevision = accountEvents
+    void Promise.resolve()
+      .then(() => window.api.hiveAccount.getState())
+      .then((account) => {
+        if (active && accountEvents === readRevision) {
+          accountIdentity = workbenchAccountIdentity(account)
+        }
+      })
+      .catch(() => {
+        // Task APIs authenticate independently; an unknown identity invalidates the next event.
+      })
     return () => {
+      active = false
       unsubscribe()
       mounted.current = false
       generation.current += 1

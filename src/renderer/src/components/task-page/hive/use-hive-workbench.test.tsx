@@ -2,6 +2,7 @@
 import { act, type ReactElement, StrictMode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HiveAccountState } from '../../../../../shared/hive-account'
 import type {
   HiveWorkbenchCompanyPage,
   HiveWorkbenchProjectPage,
@@ -10,6 +11,7 @@ import type {
 import { useHiveWorkbench } from './use-hive-workbench'
 import {
   deferredWorkbenchValue,
+  workbenchAccountState,
   workbenchCompany,
   workbenchId,
   workbenchProject,
@@ -21,6 +23,9 @@ let container: HTMLDivElement
 let root: Root
 let current: ReturnType<typeof useHiveWorkbench>
 let accountChanged: () => void
+let accountStateChanged: (state: HiveAccountState) => void
+const firstAccount = workbenchAccountState()
+const secondAccount = workbenchAccountState('other-owner', 'other-authority')
 const unsubscribe = vi.fn()
 const api = {
   listCompanies: vi.fn(),
@@ -81,8 +86,10 @@ beforeEach(() => {
     value: {
       hiveTasks: api,
       hiveAccount: {
-        onStateChanged: (listener: () => void) => {
-          accountChanged = listener
+        getState: vi.fn().mockResolvedValue(firstAccount),
+        onStateChanged: (listener: (state: HiveAccountState) => void) => {
+          accountStateChanged = listener
+          accountChanged = () => listener(secondAccount)
           return unsubscribe
         }
       }
@@ -98,6 +105,121 @@ afterEach(() => {
 })
 
 describe('Hive workbench request and account boundaries', () => {
+  it('preserves selected records when the same account refreshes its token or reports a transient error', async () => {
+    await mount()
+    const revision = current.accountRevision
+    await act(async () => {
+      accountStateChanged({
+        ...firstAccount,
+        account: { ...firstAccount.account!, displayName: 'Renamed owner' },
+        expiresAt: firstAccount.expiresAt! + 10_000,
+        sessionExpiresAt: firstAccount.sessionExpiresAt! + 10_000,
+        errorCode: 'network_unavailable'
+      })
+    })
+    expect(current.accountRevision).toBe(revision)
+    expect(current.team).toEqual(firstTeam)
+    expect(api.listCompanies).toHaveBeenCalledOnce()
+    expect(api.getTeam).toHaveBeenCalledOnce()
+  })
+  it('preserves selected records when an expired access token refresh fails and then recovers', async () => {
+    await mount()
+    const revision = current.accountRevision
+    for (const account of [
+      { ...firstAccount, expiresAt: Date.now() - 1000, errorCode: 'network_unavailable' as const },
+      { ...firstAccount, expiresAt: Date.now() + 60_000 }
+    ]) {
+      await act(async () => accountStateChanged(account))
+      expect(current.accountRevision).toBe(revision)
+      expect(current.team).toEqual(firstTeam)
+      expect(api.listCompanies).toHaveBeenCalledOnce()
+    }
+  })
+  it('preserves single flight and the retry id across failed and recovered same-account refreshes', async () => {
+    const pending = deferredWorkbenchValue<typeof secondCompany>()
+    api.createCompany.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(secondCompany)
+    await mount()
+    let mutation!: Promise<boolean>
+    await act(async () => {
+      mutation = current.createCompany({ name: 'Draft' })
+    })
+    const originalId = api.createCompany.mock.calls[0][0].requestId
+    for (const account of [
+      { ...firstAccount, expiresAt: Date.now() - 1000, errorCode: 'network_unavailable' as const },
+      { ...firstAccount, expiresAt: Date.now() + 60_000 }
+    ]) {
+      await act(async () => accountStateChanged(account))
+      expect(current.pending).toBe('createCompany')
+    }
+    await act(async () => {
+      expect(await current.createCompany({ name: 'Draft' })).toBe(false)
+    })
+    expect(api.createCompany).toHaveBeenCalledOnce()
+    await act(async () => {
+      pending.reject(new Error('SERVICE_UNAVAILABLE'))
+      await mutation
+    })
+    await act(async () => {
+      await current.createCompany({ name: 'Draft' })
+    })
+    expect(api.createCompany.mock.calls[1][0].requestId).toBe(originalId)
+  })
+  it.each([
+    'authority',
+    'profile',
+    'signed-out',
+    'expired',
+    'session-expired',
+    'rejected'
+  ] as const)('clears private records for a changed %s boundary', async (boundary) => {
+    await mount()
+    const fresh = deferredWorkbenchValue<HiveWorkbenchCompanyPage>()
+    api.listCompanies.mockReturnValueOnce(fresh.promise)
+    const next: HiveAccountState = { ...firstAccount }
+    if (boundary === 'authority') {
+      next.authorityId = 'replacement-authority'
+    }
+    if (boundary === 'profile') {
+      next.sessionProfile = 'TEMPORARY'
+    }
+    if (boundary === 'signed-out') {
+      next.status = 'signed-out'
+      delete next.account
+      delete next.authorityId
+    }
+    if (boundary === 'expired') {
+      next.errorCode = 'session_expired'
+    }
+    if (boundary === 'session-expired') {
+      next.sessionExpiresAt = Date.now() - 1000
+    }
+    if (boundary === 'rejected') {
+      next.errorCode = 'session_rejected'
+    }
+    act(() => accountStateChanged(next))
+    expect(current.team).toBeNull()
+    expect(current.companies.items).toEqual([])
+    await act(async () => {
+      fresh.resolve({ items: [], nextCursor: null })
+    })
+  })
+  it('does not let a late initial account read replace a newer account notification', async () => {
+    const initial = deferredWorkbenchValue<HiveAccountState>()
+    vi.mocked(window.api.hiveAccount.getState).mockReturnValueOnce(initial.promise)
+    await mount()
+    await act(async () => {
+      accountChanged()
+    })
+    const revision = current.accountRevision
+    await act(async () => {
+      initial.resolve(firstAccount)
+    })
+    await act(async () => {
+      accountStateChanged({ ...secondAccount, expiresAt: secondAccount.expiresAt! + 1000 })
+    })
+    expect(current.accountRevision).toBe(revision)
+    expect(api.listCompanies).toHaveBeenCalledTimes(2)
+  })
   it('loads the real selected company, its projects and its employees without launching a task', async () => {
     await mount()
     expect(current.team).toEqual(firstTeam)

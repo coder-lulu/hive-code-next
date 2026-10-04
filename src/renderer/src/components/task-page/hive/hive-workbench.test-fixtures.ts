@@ -1,8 +1,25 @@
+import type { HiveAccountState } from '../../../../../shared/hive-account'
 import type {
   HiveWorkbenchCompany,
   HiveWorkbenchProject,
   HiveWorkbenchTeam
 } from '../../../../../shared/hive-team-workbench'
+
+export function workbenchAccountState(
+  accountId = 'workbench-owner',
+  authorityId = 'workbench-authority'
+): HiveAccountState {
+  return {
+    configured: true,
+    status: 'signed-in',
+    persistence: 'encrypted',
+    account: { accountId, displayName: 'Workbench owner' },
+    authorityId,
+    sessionProfile: 'TRUSTED',
+    expiresAt: Date.now() + 3_600_000,
+    sessionExpiresAt: Date.now() + 86_400_000
+  }
+}
 
 export function workbenchId(value: number): string {
   return `00000000-0000-4000-8000-${String(value).padStart(12, '0')}`
