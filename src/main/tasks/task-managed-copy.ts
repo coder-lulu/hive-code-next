@@ -5,6 +5,7 @@ import { readNodeFileHandleWithinLimit } from '../../shared/node-bounded-file-re
 import { isWslUncPath } from '../../shared/wsl-paths'
 import { refuseTaskExecution } from './task-execution-error'
 import { taskLaunchPathKey } from './task-launch-workspace'
+import type { TaskWorkspaceDirectoryIdentity } from './task-execution-record'
 
 const OMITTED_DIRECTORIES = new Set(['.git', 'node_modules', 'logs'])
 const MAX_FILE_BYTES = 8 * 1024 * 1024
@@ -13,6 +14,44 @@ const MAX_ENTRIES = 20_000
 const within = (root: string, path: string) => {
   const suffix = relative(root, path)
   return suffix !== '' && !isAbsolute(suffix) && suffix !== '..' && !suffix.startsWith(`..${sep}`)
+}
+
+function readTaskDirectoryIdentity(path: string): TaskWorkspaceDirectoryIdentity {
+  try {
+    const stat = lstatSync(path, { bigint: true })
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      stat.ino <= 0n ||
+      taskLaunchPathKey(realpathSync(path)) !== taskLaunchPathKey(path)
+    ) {
+      return refuseTaskExecution('FORBIDDEN')
+    }
+    return Object.freeze({
+      dev: stat.dev.toString(),
+      ino: stat.ino.toString(),
+      birthtimeNs: stat.birthtimeNs.toString()
+    })
+  } catch {
+    return refuseTaskExecution('FORBIDDEN')
+  }
+}
+
+export function assertTaskDirectoryIdentity(
+  path: string,
+  expected: TaskWorkspaceDirectoryIdentity | undefined
+): void {
+  if (!expected) {
+    return refuseTaskExecution('OUTCOME_UNKNOWN')
+  }
+  const current = readTaskDirectoryIdentity(path)
+  if (
+    current.dev !== expected.dev ||
+    current.ino !== expected.ino ||
+    current.birthtimeNs !== expected.birthtimeNs
+  ) {
+    return refuseTaskExecution('FORBIDDEN')
+  }
 }
 
 /** Copy source files, including dirty/untracked files, without Git mutations or shared inodes. */
@@ -29,24 +68,20 @@ export async function createTaskManagedCopy(options: {
     return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
   }
   const source = await realpath(options.source)
+  const sourceIdentity = readTaskDirectoryIdentity(source)
   await mkdir(options.directory, { recursive: true, mode: 0o700 })
   const directory = await realpath(options.directory)
   if (!lstatSync(source).isDirectory() || within(source, directory) || source === directory) {
     return refuseTaskExecution('FORBIDDEN')
   }
   const target = await mkdtemp(join(directory, 'execution-'))
+  const directoryIdentity = readTaskDirectoryIdentity(target)
   let count = 0
   let bytes = 0
   const assertCurrent = () => {
     options.assertCurrent()
-    for (const path of [source, target]) {
-      if (
-        lstatSync(path).isSymbolicLink() ||
-        taskLaunchPathKey(realpathSync(path)) !== taskLaunchPathKey(path)
-      ) {
-        return refuseTaskExecution('FORBIDDEN')
-      }
-    }
+    assertTaskDirectoryIdentity(source, sourceIdentity)
+    assertTaskDirectoryIdentity(target, directoryIdentity)
   }
   const copyDirectory = async (from: string, to: string, depth: number): Promise<void> => {
     if (depth > 64) {
@@ -105,10 +140,21 @@ export async function createTaskManagedCopy(options: {
   try {
     await copyDirectory(source, target, 0)
     assertCurrent()
-    return Object.freeze({ canonicalPath: source, executionPath: target, assertCurrent })
+    return Object.freeze({
+      canonicalPath: source,
+      executionPath: target,
+      directoryIdentity,
+      assertCurrent
+    })
   } catch (error) {
-    // Only an unlaunched directory minted by this call may be discarded.
-    if (within(directory, target) && !lstatSync(target).isSymbolicLink()) {
+    let owned = false
+    try {
+      assertTaskDirectoryIdentity(target, directoryIdentity)
+      owned = within(directory, target)
+    } catch {
+      /* A replacement or missing directory is not ours to discard. */
+    }
+    if (owned) {
       await rm(target, { recursive: true, force: true })
     }
     throw error

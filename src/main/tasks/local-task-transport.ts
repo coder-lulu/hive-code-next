@@ -3,6 +3,11 @@ import { once } from 'node:events'
 import type { TaskExecutionCaller, TaskExecutionHost } from './task-execution-host'
 import { TaskExecutionError } from './task-execution-error'
 import { TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
+import type { HiveRuntimeBindingPurpose } from './paperclip-adapter-contract'
+import {
+  LocalTaskRuntimeOwnerSchema,
+  TaskDeliveryTokenSchema
+} from '../../shared/task-execution/task-command-delivery'
 
 export const TASK_TRANSPORT_MAX_BYTES = 64 * 1024
 const errorStatus = (code: TaskExecutionError['code']) =>
@@ -48,9 +53,11 @@ export async function startLocalTaskTransport(options: {
   host: Pick<TaskExecutionHost, 'start' | 'observe' | 'cancel' | 'reconcile'>
   authenticate: (bearer: string) => TaskExecutionCaller | null
   capabilities: (caller: TaskExecutionCaller) => unknown
+  currentOwner?: (caller: TaskExecutionCaller) => unknown
   resolveBinding?: (
     companyId: string,
     runId: string,
+    purpose: HiveRuntimeBindingPurpose,
     caller: TaskExecutionCaller
   ) => Promise<unknown>
 }) {
@@ -88,8 +95,30 @@ export async function startLocalTaskTransport(options: {
         send(response, 401, { error: { code: 'FORBIDDEN' } })
         return
       }
+      const deliveryHeaders = [
+        'x-hive-delivery-owner',
+        'x-hive-delivery-lease',
+        'x-hive-delivery-generation'
+      ]
+      let delivery
+      if (deliveryHeaders.some((name) => request.headers[name] !== undefined)) {
+        const generation = request.headers['x-hive-delivery-generation']
+        if (typeof generation !== 'string' || !/^[1-9][0-9]{0,15}$/.test(generation)) {
+          throw new TaskExecutionError('FORBIDDEN')
+        }
+        const parsed = TaskDeliveryTokenSchema.safeParse({
+          ownerId: request.headers['x-hive-delivery-owner'],
+          leaseRef: request.headers['x-hive-delivery-lease'],
+          generation: Number(generation)
+        })
+        if (!parsed.success) {
+          throw new TaskExecutionError('FORBIDDEN')
+        }
+        delivery = parsed.data
+      }
       const caller: TaskExecutionCaller = {
         operationCallerKey: authenticated.operationCallerKey,
+        ...(delivery ? { delivery } : {}),
         assertCurrent: () => {
           if (closed) {
             throw new TaskExecutionError('SERVICE_UNAVAILABLE')
@@ -102,7 +131,18 @@ export async function startLocalTaskTransport(options: {
         send(response, 200, options.capabilities(caller))
         return
       }
-      const bindingPath = request.url?.match(/^\/execution\/binding\/([^/]+)\/([^/]+)$/)
+      if (request.url === '/execution/owner' && request.method === 'GET' && options.currentOwner) {
+        caller.assertCurrent?.()
+        const owner = LocalTaskRuntimeOwnerSchema.safeParse(options.currentOwner(caller))
+        if (!owner.success) {
+          throw new TaskExecutionError('FORBIDDEN')
+        }
+        send(response, 200, owner.data)
+        return
+      }
+      const bindingPath = request.url?.match(
+        /^\/execution\/binding\/([^/?]+)\/([^/?]+)\?purpose=(execute|recover)$/
+      )
       if (bindingPath && request.method === 'GET' && options.resolveBinding) {
         const decode = (value: string) => {
           try {
@@ -117,7 +157,8 @@ export async function startLocalTaskTransport(options: {
           throw new TaskExecutionError('INVALID_REQUEST')
         }
         caller.assertCurrent?.()
-        const binding = await options.resolveBinding(companyId.data, runId.data, caller)
+        const purpose = bindingPath[3] === 'execute' ? 'execute' : 'recover'
+        const binding = await options.resolveBinding(companyId.data, runId.data, purpose, caller)
         caller.assertCurrent?.()
         send(response, 200, binding)
         return

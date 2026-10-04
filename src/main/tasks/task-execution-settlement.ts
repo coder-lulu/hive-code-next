@@ -41,7 +41,8 @@ export async function collectTaskExecutionSettlement(
   deps: TaskExecutionHostDependencies,
   initial: TaskExecutionRecord,
   pendingLaunch: Promise<void> | undefined,
-  now: () => number
+  now: () => number,
+  validate: () => void = () => undefined
 ) {
   const deadline = Date.now() + (deps.evidenceTimeoutMs ?? 5000)
   if (pendingLaunch) {
@@ -51,6 +52,7 @@ export async function collectTaskExecutionSettlement(
   if (!record || record.result) {
     return
   }
+  validate()
   let rawCandidate: unknown = null
   let readFailed = false
   if (!record.cancellationKey) {
@@ -72,16 +74,17 @@ export async function collectTaskExecutionSettlement(
   }
   const candidate = Candidate.safeParse(rawCandidate)
   if (!record.cancellationKey && (readFailed || (rawCandidate !== null && !candidate.success))) {
-    await deps.store.markUnknown(record.command, now())
+    await deps.store.markUnknown(record.command, now(), validate)
     return
   }
   if (!record.cancellationKey && !candidate.success) {
     return
   }
   const stopping = record
+  validate()
   const proof = await settleBeforeDeadline(() => deps.stop(stopping), null, deadline)
   if (!proof || !proofMatches(record, proof)) {
-    await deps.store.markUnknown(record.command, now())
+    await deps.store.markUnknown(record.command, now(), validate)
     return
   }
   const current = deps.store.get(record.command)
@@ -89,13 +92,14 @@ export async function collectTaskExecutionSettlement(
     return
   }
   if (!current.cancellationKey && proof.evidenceKind !== 'stopped') {
-    await deps.store.markUnknown(record.command, now())
+    await deps.store.markUnknown(record.command, now(), validate)
     return
   }
   const succeeded = candidate.success ? candidate.data : null
   await deps.store.settle(
     record.command,
     (latest) => {
+      validate()
       if (!latest.cancellationKey && !succeeded) {
         throw new TaskExecutionError('OUTCOME_UNKNOWN')
       }

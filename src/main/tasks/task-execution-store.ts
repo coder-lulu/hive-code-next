@@ -1,5 +1,7 @@
 import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import type { AgentLaunchResult } from '../../shared/agent-launch-intent'
+import { isAgentLaunchResult } from '../../shared/agent-launch-intent'
+import { agentSessionOperationKey } from '../../shared/agent-session-operation-ledger'
 import {
   TaskExecutionResultSchema,
   type TaskExecutionResult
@@ -22,6 +24,21 @@ export class TaskExecutionPersistence {
 
   get(identity: Identity): TaskExecutionRecord | null {
     return this.transactions.readTaskExecution(taskExecutionRecordKey(identity))
+  }
+
+  listActive(): TaskExecutionRecord[] {
+    return this.transactions.readActiveTaskExecutions()
+  }
+
+  readActive(validate: () => void): Promise<TaskExecutionRecord[]> {
+    return this.transactions.transact(() => {
+      validate()
+      return structuredClone(
+        [...(this.transactions.state.taskExecutions?.values() ?? [])].filter(
+          (record) => !record.result
+        )
+      )
+    })
   }
 
   admit(input: TaskExecutionAdmission) {
@@ -51,31 +68,32 @@ export class TaskExecutionPersistence {
   }
 
   bindLaunch(identity: Identity, launch: AgentLaunchResult, now: number) {
+    return this.update(identity, (record) => bindTaskLaunch(record, launch), now)
+  }
+
+  recoverLaunch(identity: Identity, fingerprint: string, now: number, validate: () => void) {
     return this.update(
       identity,
       (record) => {
-        if (record.dispatch === 'bound') {
-          if (!record.launch) {
-            return refuseTaskExecution('OUTCOME_UNKNOWN')
-          }
-          if (canonicalAgentSessionDigest(record.launch) !== canonicalAgentSessionDigest(launch)) {
-            return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
-          }
+        validate()
+        if (record.dispatch !== 'dispatching' || record.result) {
           return null
         }
+        const row = this.transactions.state.operations.get(
+          agentSessionOperationKey(record.operationCallerKey, record.command.operationId)
+        )
         if (
-          record.dispatch !== 'dispatching' ||
-          record.result ||
-          launch.worktreeId !== record.workspace.workspaceId
+          row &&
+          (row.callerKey !== record.operationCallerKey ||
+            row.operationId !== record.command.operationId ||
+            row.fingerprint !== fingerprint)
         ) {
-          return refuseTaskExecution('OUTCOME_UNKNOWN')
+          return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
         }
-        return {
-          ...record,
-          dispatch: 'bound',
-          launch,
-          status: record.cancellationKey ? 'cancel_requested' : 'running'
+        if (row?.outcome.status !== 'succeeded' || !isAgentLaunchResult(row.outcome.launch)) {
+          return null
         }
+        return bindTaskLaunch(record, row.outcome.launch)
       },
       now
     )
@@ -100,13 +118,15 @@ export class TaskExecutionPersistence {
     )
   }
 
-  markUnknown(identity: Identity, now: number) {
+  markUnknown(identity: Identity, now: number, validate: () => void = () => undefined) {
     return this.update(
       identity,
-      (record) =>
-        record.result || record.status === 'outcome_unknown'
+      (record) => {
+        validate()
+        return record.result || record.status === 'outcome_unknown'
           ? null
-          : { ...record, status: 'outcome_unknown' },
+          : { ...record, status: 'outcome_unknown' }
+      },
       now
     )
   }
@@ -186,5 +206,33 @@ export class TaskExecutionPersistence {
       this.transactions.state.taskExecutions!.set(key, record)
       return { changed: true, record: structuredClone(record) }
     })
+  }
+}
+
+function bindTaskLaunch(
+  record: TaskExecutionRecord,
+  launch: AgentLaunchResult
+): TaskExecutionRecord | null {
+  if (record.dispatch === 'bound') {
+    if (!record.launch) {
+      return refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    if (canonicalAgentSessionDigest(record.launch) !== canonicalAgentSessionDigest(launch)) {
+      return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
+    }
+    return null
+  }
+  if (
+    record.dispatch !== 'dispatching' ||
+    record.result ||
+    launch.worktreeId !== record.workspace.workspaceId
+  ) {
+    return refuseTaskExecution('OUTCOME_UNKNOWN')
+  }
+  return {
+    ...record,
+    dispatch: 'bound',
+    launch,
+    status: record.cancellationKey ? 'cancel_requested' : 'running'
   }
 }

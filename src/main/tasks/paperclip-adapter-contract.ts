@@ -6,6 +6,7 @@ import {
   TaskOpaqueRef
 } from '../../shared/task-execution/task-execution-primitives'
 import type { LocalTaskClient } from './local-task-client'
+import type { TaskExecutionObservation } from '../../shared/task-execution/task-execution-observation'
 
 export const HiveRuntimeAdapterConfig = z.strictObject({
   workspaceRef: TaskOpaqueRef,
@@ -29,6 +30,8 @@ const Session = z.strictObject({
   sessionRef: TaskOpaqueRef.nullable()
 })
 export type HiveRuntimeBinding = z.infer<typeof HiveRuntimeAdapterBinding>
+export const HiveRuntimeBindingPurposeSchema = z.enum(['execute', 'recover'])
+export type HiveRuntimeBindingPurpose = z.infer<typeof HiveRuntimeBindingPurposeSchema>
 
 /** The adapter-facing subset of the pinned adapter-utils 0.3.1 contract. */
 export type PaperclipTaskExecutionContext = {
@@ -38,7 +41,7 @@ export type PaperclipTaskExecutionContext = {
   config: Record<string, unknown>
   signal?: AbortSignal
   onCancellationReady?: () => Promise<void>
-  onDispatch?: () => void
+  onDispatch?: () => void | Promise<void>
   onLog: (stream: 'stdout' | 'stderr', chunk: string) => Promise<void>
   runtimeCommandSpec?: unknown
   executionTarget?: unknown
@@ -62,9 +65,16 @@ export type PaperclipTaskExecutionResult = {
 }
 export type HiveRuntimeAdapterPorts = {
   client: LocalTaskClient
-  resolveBinding: (companyId: string, runId: string) => Promise<unknown>
+  resolveBinding: (
+    companyId: string,
+    runId: string,
+    purpose: HiveRuntimeBindingPurpose
+  ) => Promise<unknown>
   pollIntervalMs?: number
   waitTimeoutMs?: number
+  observationCursor?: number
+  onObservation?: (observation: TaskExecutionObservation) => Promise<void>
+  assertCurrent?: () => void
 }
 export type PaperclipEnvironmentTestResult = {
   adapterType: string

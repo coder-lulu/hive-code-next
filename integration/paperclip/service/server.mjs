@@ -5,12 +5,19 @@ import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
 import postgres from '@hive-paperclip-postgres'
+import { HIVE_WORKFLOW_CASE_MAX_REQUEST_BYTES } from '../../../src/shared/hive-workflow-cases.ts'
 import { applyPendingMigrations } from '@hive-paperclip-db'
 import { createTaskRepository } from './task-repository.mjs'
 import { createTaskDispatch } from './task-dispatch.mjs'
 import { reconcilePaperclipMigrationHashes } from './migration-history.mjs'
 import { createTeamWorkbenchRepository } from './team-workbench-repository.mjs'
+import { createWorkflowDefinitionRepository } from './workflow-definition-repository.mjs'
+import { createWorkflowCaseRepository } from './workflow-case-repository.mjs'
 import { WORKBENCH_PATHS, handleTeamWorkbenchRequest } from './team-workbench-routes.mjs'
+import {
+  EXTERNAL_EXECUTION_PATH,
+  handleExternalExecutionControl
+} from './external-execution-control.mjs'
 import manifest from '../compatibility-manifest.json' with { type: 'json' }
 
 const Input = z.strictObject({
@@ -35,9 +42,17 @@ await reconcilePaperclipMigrationHashes(sql, new URL('./migrations', import.meta
 await applyPendingMigrations(databaseUrl)
 await sql.unsafe(await readFile(new URL('./task-tables.sql', import.meta.url), 'utf8'))
 await sql.unsafe(await readFile(new URL('./team-workbench-tables.sql', import.meta.url), 'utf8'))
+await sql.unsafe(
+  await readFile(new URL('./workflow-definition-tables.sql', import.meta.url), 'utf8')
+)
+await sql.unsafe(await readFile(new URL('./workflow-case-tables.sql', import.meta.url), 'utf8'))
 const repository = createTaskRepository(sql),
   dispatch = createTaskDispatch(repository)
-const workbenchRepository = createTeamWorkbenchRepository(sql)
+const workbenchRepository = {
+  ...createTeamWorkbenchRepository(sql),
+  ...createWorkflowDefinitionRepository(sql),
+  ...createWorkflowCaseRepository(sql)
+}
 const secret = randomBytes(32).toString('base64url'),
   expected = Buffer.from(secret)
 let authority = '',
@@ -68,21 +83,35 @@ const server = createServer(async (request, response) => {
       return
     }
     const accountId = request.headers['x-hive-account-id']
-    if (typeof accountId !== 'string' || !accountId || accountId.length > 512) {
+    const control = request.url?.match(EXTERNAL_EXECUTION_PATH)
+    if (
+      control
+        ? accountId !== undefined
+        : typeof accountId !== 'string' || !accountId || accountId.length > 512
+    ) {
       send(response, 403, { error: { code: 'FORBIDDEN' } })
+      return
+    }
+    const delivery = request.url?.match(
+      /^\/hive\/execution-delivery\/([0-9a-f-]{36})\/([0-9a-f-]{36})$/
+    )
+    if (delivery && request.method === 'GET') {
+      const companyId = z.string().uuid().parse(delivery[1])
+      const runId = z.string().uuid().parse(delivery[2])
+      send(response, 200, await repository.getCurrentDelivery(accountId, companyId, runId))
       return
     }
     const route = request.url?.match(
       /^\/hive\/tasks(?:\/([0-9a-f-]{36})(?:\/(binding|dispatch|cancel))?)?$/
     )
     const workbench = WORKBENCH_PATHS.includes(request.url)
-    if (!route && !workbench) {
+    if (!route && !workbench && !control) {
       send(response, 403, { error: { code: 'FORBIDDEN' } })
       return
     }
     const taskId = route?.[1],
       action = route?.[2]
-    if (!workbench && request.method === 'GET' && !action) {
+    if (!workbench && !control && request.method === 'GET' && !action) {
       send(
         response,
         200,
@@ -95,10 +124,15 @@ const server = createServer(async (request, response) => {
       return
     }
     const chunks = []
+    // 48,000 JSON-escaped requirement characters plus bounded case metadata fit in 320 KiB.
+    const maximumBodyBytes =
+      request.url === '/hive/workbench/cases/create'
+        ? HIVE_WORKFLOW_CASE_MAX_REQUEST_BYTES
+        : 64 * 1024
     let length = 0
     for await (const chunk of request.iterator({ destroyOnReturn: false })) {
       length += chunk.length
-      if (length > 64 * 1024) {
+      if (length > maximumBodyBytes) {
         request.resume()
         send(response, 413, { error: { code: 'INVALID_REQUEST' } })
         return
@@ -106,6 +140,14 @@ const server = createServer(async (request, response) => {
       chunks.push(chunk)
     }
     const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)))
+    if (control) {
+      send(
+        response,
+        202,
+        await handleExternalExecutionControl(repository, dispatch, control[1], control[2], body)
+      )
+      return
+    }
     if (workbench) {
       const result = await handleTeamWorkbenchRequest(
         workbenchRepository,
@@ -134,7 +176,7 @@ const server = createServer(async (request, response) => {
     if (taskId && action === 'cancel') {
       Empty.parse(body)
       const result = await repository.cancel(accountId, taskId)
-      dispatch.cancel(accountId, taskId)
+      void dispatch.cancel(accountId, taskId).catch(() => {})
       send(response, 202, result)
       return
     }
@@ -143,9 +185,14 @@ const server = createServer(async (request, response) => {
     const code =
       error instanceof z.ZodError || error instanceof SyntaxError || error instanceof TypeError
         ? 'INVALID_REQUEST'
-        : ['FORBIDDEN', 'IDEMPOTENCY_CONFLICT', 'REVISION_CONFLICT', 'OUTCOME_UNKNOWN'].includes(
-              error.code
-            )
+        : [
+              'FORBIDDEN',
+              'INVALID_REQUEST',
+              'IDEMPOTENCY_CONFLICT',
+              'REVISION_CONFLICT',
+              'OUTCOME_UNKNOWN',
+              'SEQUENCE_GAP'
+            ].includes(error.code)
           ? error.code
           : 'SERVICE_UNAVAILABLE'
     send(
@@ -172,6 +219,7 @@ await writeFile(descriptor, JSON.stringify({ baseUrl: `http://${authority}`, sec
   mode: 0o600
 })
 console.log('Restricted Paperclip task service ready; adapter allowlist: hive_runtime')
+dispatch.startRecovery()
 let shutdown
 const close = () =>
   (shutdown ??= (async () => {

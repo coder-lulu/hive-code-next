@@ -12,7 +12,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@renderer': resolve('src/renderer/src'),
-      '@': resolve('src/renderer/src')
+      '@': resolve('src/renderer/src'),
+      '@hive-paperclip-external-execution': resolve(
+        process.env.HIVE_PAPERCLIP_SOURCE
+          ? resolve(process.env.HIVE_PAPERCLIP_SOURCE, 'server/src/services/external-execution.ts')
+          : 'integration/paperclip/core/external-execution.ts'
+      )
     }
   },
   test: {

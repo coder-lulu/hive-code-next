@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS hive_workbench_employee_bindings (
 CREATE TABLE IF NOT EXISTS hive_workbench_request_receipts (
   account_id text NOT NULL CHECK (char_length(account_id) BETWEEN 1 AND 512),
   request_id uuid NOT NULL,
-  operation text NOT NULL CHECK (operation IN ('companies.create', 'projects.create', 'team.configure')),
+  operation text NOT NULL CHECK (operation IN ('companies.create', 'projects.create', 'team.configure', 'workflows.save')),
   payload_fingerprint text NOT NULL CHECK (payload_fingerprint ~ '^[a-f0-9]{64}$'),
   company_id uuid NOT NULL REFERENCES hive_workbench_company_bindings(company_id),
   response_json jsonb NOT NULL,

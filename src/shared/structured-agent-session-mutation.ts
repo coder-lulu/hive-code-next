@@ -13,17 +13,21 @@ function canonicalize(value: unknown): string {
   return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalize(entry)}`).join(',')}}`
 }
 
+export function structuredAgentSessionDigest(value: Record<string, unknown>): string {
+  const bytes = sha256(new TextEncoder().encode(canonicalize(value)))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 export function structuredAgentSessionPayloadFingerprint(input: {
   method: string
   sessionId: string
   fields: Record<string, unknown>
 }): string {
-  const bytes = sha256(
-    new TextEncoder().encode(
-      canonicalize({ method: input.method, sessionId: input.sessionId, fields: input.fields })
-    )
-  )
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return structuredAgentSessionDigest({
+    method: input.method,
+    sessionId: input.sessionId,
+    fields: input.fields
+  })
 }
 
 export function structuredAgentSessionDomainFingerprint(input: {

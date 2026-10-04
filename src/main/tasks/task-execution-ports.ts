@@ -1,4 +1,5 @@
 import type { AgentLaunchResult } from '../../shared/agent-launch-intent'
+import type { TaskDeliveryToken } from '../../shared/task-execution/task-command-delivery'
 import type {
   TaskExecutionCancel,
   TaskExecutionStart
@@ -8,6 +9,7 @@ import type { TaskExecutionPersistence } from './task-execution-store'
 
 export type TaskExecutionCaller = Readonly<{
   operationCallerKey: string
+  delivery?: TaskDeliveryToken
   // Private host lifetime guard; transport JSON cannot provide it.
   assertCurrent?: () => void
 }>

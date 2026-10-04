@@ -11,12 +11,22 @@ import {
   WorkflowScopeSchema
 } from './workflow-bindings'
 
+export const WORKFLOW_STAGE_LIMITS = {
+  stages: 32,
+  dependencies: 32,
+  acceptanceCriteria: 16
+} as const
+
 export const WorkflowStageSchema = z.strictObject({
   stageRef: TaskOpaqueRef,
   role: WorkflowRoleSchema,
   outputKind: z.enum(['requirements', 'code', 'test_report', 'release_plan']),
-  dependsOn: boundedTaskCollection(TaskOpaqueRef, 32),
-  acceptanceCriteria: boundedTaskCollection(TaskProgressSummary, 16, 1),
+  dependsOn: boundedTaskCollection(TaskOpaqueRef, WORKFLOW_STAGE_LIMITS.dependencies),
+  acceptanceCriteria: boundedTaskCollection(
+    TaskProgressSummary,
+    WORKFLOW_STAGE_LIMITS.acceptanceCriteria,
+    1
+  ),
   returnToStageRef: TaskOpaqueRef.optional(),
   maxAttempts: z.number().int().min(1).max(3)
 })
@@ -25,7 +35,7 @@ const WorkflowDefinitionInputSchema = z.strictObject({
   kind: z.literal('workflow.definition'),
   scope: WorkflowScopeSchema,
   ...WorkflowReferenceFields,
-  stages: boundedTaskCollection(WorkflowStageSchema, 32, 4),
+  stages: boundedTaskCollection(WorkflowStageSchema, WORKFLOW_STAGE_LIMITS.stages, 4),
   maxParallelism: z.number().int().min(1).max(4),
   maxDurationMs: z.number().int().min(1000).max(86_400_000)
 })
@@ -40,6 +50,9 @@ function graphRefusal(definition: Definition) {
     return 'workflow_roles_incomplete'
   }
   for (const stage of definition.stages) {
+    if (stage.acceptanceCriteria.some((criterion) => !criterion.trim())) {
+      return 'workflow_definition_invalid'
+    }
     if (new Set(stage.dependsOn).size !== stage.dependsOn.length) {
       return 'workflow_duplicate_dependency'
     }

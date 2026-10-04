@@ -25,6 +25,7 @@ function fixture() {
     accountId: account.accountId,
     authorityId: account.authorityId,
     sessionGeneration: account.sessionGeneration,
+    runtimeOwnershipEpoch: command.ownershipEpoch,
     validUntil: TASK_TEST_NOW + 120_000,
     actions: ['start', 'observe', 'cancel', 'reconcile'],
     assertCurrent: vi.fn()

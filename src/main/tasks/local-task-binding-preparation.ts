@@ -1,0 +1,171 @@
+import { randomUUID, createHash } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { TaskExecutionStartSchema } from '../../shared/task-execution/task-execution-command'
+import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
+import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
+import type { LocalTaskGrant } from './local-task-authority'
+import { HiveRuntimeAdapterBinding } from './paperclip-adapter-contract'
+import { assertTaskDirectoryIdentity, createTaskManagedCopy } from './task-managed-copy'
+import { refuseTaskExecution } from './task-execution-error'
+import { taskCodexResultInstructions } from './task-codex-evidence'
+import type { TaskExecutionWorkspace } from './task-execution-record'
+import type { LocalTaskBindingInput } from './local-task-binding-file'
+import type { LocalTaskBindingIssuer, LocalTaskRuntimeOwner } from './local-task-binding-issuer'
+
+type BindingPreparationOptions = ConstructorParameters<typeof LocalTaskBindingIssuer>[0] & {
+  requireOwner(): { account: HiveRuntimeCloudAuthorization; runtime: LocalTaskRuntimeOwner }
+  now(): number
+}
+const reference = (kind: string) => `${kind}:${randomUUID()}`
+const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+
+export async function prepareLocalTaskBinding(
+  options: BindingPreparationOptions,
+  input: LocalTaskBindingInput,
+  key: string,
+  fingerprint: string
+) {
+  const owner = options.requireOwner()
+  const assertOwner = () => {
+    const current = options.requireOwner()
+    if (
+      current.account.accountId !== owner.account.accountId ||
+      current.account.authorityId !== owner.account.authorityId ||
+      current.account.sessionGeneration !== owner.account.sessionGeneration ||
+      current.runtime.runtimeRecordId !== owner.runtime.runtimeRecordId ||
+      current.runtime.ownershipEpoch !== owner.runtime.ownershipEpoch
+    ) {
+      return refuseTaskExecution('FORBIDDEN')
+    }
+  }
+  await mkdir(join(options.directory, 'bindings'), { recursive: true, mode: 0o700 })
+  assertOwner()
+  // An unfinished/restarted preparation is never silently reminted as another execution.
+  try {
+    await writeFile(
+      join(options.directory, 'bindings', `${key}.intent.json`),
+      JSON.stringify({ fingerprint, input }),
+      { flag: 'wx', mode: 0o600 }
+    )
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+      return refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    throw error
+  }
+  const source = await options.resolveSource(input.workspaceSelector)
+  const copy = await createTaskManagedCopy({
+    source: source.path,
+    directory: join(options.directory, 'workspaces'),
+    assertCurrent: () => {
+      assertOwner()
+      source.assertCurrent()
+    }
+  })
+  assertOwner()
+  const registered = await options.registerWorkspace(copy.executionPath)
+  const assertCurrent = () => {
+    assertOwner()
+    source.assertCurrent()
+    copy.assertCurrent()
+    registered.assertCurrent()
+  }
+  assertCurrent()
+  const workspace: TaskExecutionWorkspace = {
+    hostId: 'local',
+    workspaceId: registered.workspaceId,
+    canonicalPath: copy.canonicalPath,
+    executionPath: copy.executionPath,
+    isolation: 'managed_copy',
+    directoryIdentity: copy.directoryIdentity
+  }
+  const command = TaskExecutionStartSchema.parse({
+    protocolVersion: 1,
+    kind: 'execution.start',
+    runtimeRecordId: owner.runtime.runtimeRecordId,
+    ownershipEpoch: owner.runtime.ownershipEpoch,
+    executionId: reference('execution'),
+    executionEpoch: 1,
+    task: input.task,
+    operationId: `${options.now()}-${randomUUID().replaceAll('-', '')}`,
+    idempotencyKey: reference('start'),
+    agent: 'hivecode',
+    profileId: 'codex',
+    profileRevision: 'codex:1',
+    policyRevision: 'personal-preview:1',
+    ownerScope: {
+      kind: 'personalTenant',
+      tenantRef: `account:${digest(owner.account.accountId)}`
+    },
+    executionAccountRef: `account:${digest(owner.account.accountId)}`,
+    billingSubjectRef: 'billing:external-codex',
+    workspaceRef: `workspace:${digest(source.path)}`,
+    workspaceExecutionClaimRef: reference('claim'),
+    isolationPolicyRef: 'managed-copy:1',
+    writeFence: 1,
+    executionPolicy: {
+      trustMode: 'trusted_personal_preview',
+      executionPolicyRef: 'personal-preview',
+      executionPolicyRevision: '1'
+    },
+    inputRef: `input:${digest(input.input)}`,
+    authorizationRef: reference('authorization'),
+    authorizationRevision: '1',
+    expiresAt: new Date(
+      Math.min(owner.account.sessionExpiresAt, options.now() + 60_000)
+    ).toISOString(),
+    requiredCapabilities: []
+  })
+  const commandFingerprint = computeTaskExecutionFingerprint(command, options.operationCallerKey)
+  const binding = HiveRuntimeAdapterBinding.parse({
+    bindingRef: reference('binding'),
+    paperclipCompanyId: input.paperclipCompanyId,
+    paperclipAgentId: input.paperclipAgentId,
+    command,
+    commandFingerprint
+  })
+  const grant: LocalTaskGrant = {
+    command,
+    operationCallerKey: options.operationCallerKey,
+    accountId: owner.account.accountId,
+    authorityId: owner.account.authorityId,
+    sessionGeneration: owner.account.sessionGeneration,
+    runtimeOwnershipEpoch: owner.runtime.ownershipEpoch,
+    validUntil: Date.parse(command.expiresAt),
+    actions: ['start', 'observe', 'reconcile', 'cancel'],
+    workspace,
+    input: input.input + taskCodexResultInstructions({ command, commandFingerprint }),
+    assertCurrent
+  }
+  const recoveryProof = await options.restoreWorkspace(workspace)
+  assertCurrent()
+  await writeFile(
+    join(options.directory, 'bindings', `${key}.json`),
+    JSON.stringify({
+      binding,
+      workspace,
+      accountId: grant.accountId,
+      authorityId: grant.authorityId,
+      sessionGeneration: grant.sessionGeneration,
+      fingerprint
+    }),
+    { flag: 'wx', mode: 0o600 }
+  )
+  assertCurrent()
+  const entry = {
+    binding,
+    grant,
+    fingerprint,
+    assertExecutionCurrent: assertCurrent,
+    assertWorkspaceCurrent: () => {
+      options.assertCurrent?.()
+      assertTaskDirectoryIdentity(workspace.executionPath, workspace.directoryIdentity)
+      recoveryProof.assertCurrent()
+    },
+    accountId: owner.account.accountId,
+    input: grant.input,
+    workspace
+  }
+  return entry
+}

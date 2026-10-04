@@ -9,6 +9,16 @@ import type {
   HiveWorkbenchProjectsQuery,
   HiveWorkbenchTeamConfigure
 } from '../../shared/hive-team-workbench'
+import type {
+  HiveWorkflowListQuery,
+  HiveWorkflowReadQuery,
+  HiveWorkflowSave
+} from '../../shared/hive-task-workflows'
+import type {
+  HiveWorkflowCaseCreate,
+  HiveWorkflowCaseListQuery,
+  HiveWorkflowCaseReadQuery
+} from '../../shared/hive-workflow-cases'
 
 export function registerHiveTaskHandlers() {
   const bind = <Args extends unknown[]>(
@@ -43,4 +53,16 @@ export function registerHiveTaskHandlers() {
   bind('createProject', (facade, input: HiveWorkbenchProjectCreate) => facade.createProject(input))
   bind('getTeam', (facade, projectId: string) => facade.getTeam(projectId))
   bind('configureTeam', (facade, input: HiveWorkbenchTeamConfigure) => facade.configureTeam(input))
+  bind('listWorkflows', (facade, query: HiveWorkflowListQuery) => facade.listWorkflows(query))
+  bind('getWorkflow', (facade, query: HiveWorkflowReadQuery) => facade.getWorkflow(query))
+  bind('saveWorkflow', (facade, input: HiveWorkflowSave) => facade.saveWorkflow(input))
+  bind('createWorkflowCase', (facade, input: HiveWorkflowCaseCreate) =>
+    facade.createWorkflowCase(input)
+  )
+  bind('listWorkflowCases', (facade, query: HiveWorkflowCaseListQuery) =>
+    facade.listWorkflowCases(query)
+  )
+  bind('getWorkflowCase', (facade, query: HiveWorkflowCaseReadQuery) =>
+    facade.getWorkflowCase(query)
+  )
 }

@@ -1,18 +1,18 @@
 import { z } from 'zod'
-import { dirname, basename } from 'node:path'
-import { createHash } from 'node:crypto'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
 import { HiveTaskCreateSchema, type HiveTasksApi, type HiveTaskView } from '../../shared/hive-tasks'
 import { TaskExecutionResultSchema } from '../../shared/task-execution/task-execution-receipts'
-import { createLocalTaskRequest } from './local-task-http-client'
+import type { createLocalTaskRequest } from './local-task-http-client'
+import { createHiveTaskServiceContext } from './hive-task-service-context'
 import type { TaskArtifactIndex } from './task-artifact-index'
-import { readTaskArtifactFile } from './task-artifact-index'
 import type { LocalTaskBindingIssuer } from './local-task-binding-issuer'
 import { refuseTaskExecution } from './task-execution-error'
 import {
   createHiveTeamWorkbenchFacade,
   type HiveTaskWorkspaceProof
 } from './hive-team-workbench-facade'
+import { createHiveTaskWorkflowFacade } from './hive-task-workflow-facade'
+import { createHiveWorkflowCaseFacade } from './hive-workflow-case-facade'
 
 const Task = z.object({
   id: z.string().uuid(),
@@ -68,58 +68,26 @@ export function createHiveTaskFacade(options: {
   assertCurrent(): void
   request?: typeof createLocalTaskRequest
 }): HiveTasksApi {
-  const context = async () => {
-    options.assertCurrent()
-    const account = options.currentAccount()
-    if (!account || account.sessionExpiresAt <= Date.now()) {
-      return refuseTaskExecution('FORBIDDEN')
-    }
-    const assertCurrent = () => {
-      options.assertCurrent()
-      const current = options.currentAccount()
-      if (
-        !current ||
-        current.accountId !== account.accountId ||
-        current.authorityId !== account.authorityId ||
-        current.sessionGeneration !== account.sessionGeneration ||
-        current.sessionExpiresAt <= Date.now()
-      ) {
-        return refuseTaskExecution('FORBIDDEN')
-      }
-    }
-    let descriptor: { baseUrl: string; secret: string }
-    try {
-      const data = await readTaskArtifactFile(
-        dirname(options.descriptorPath),
-        basename(options.descriptorPath),
-        2048
-      )
-      descriptor = z
-        .strictObject({ baseUrl: z.string(), secret: z.string() })
-        .parse(JSON.parse(data.toString('utf8')))
-    } catch {
-      return refuseTaskExecution('SERVICE_UNAVAILABLE')
-    }
-    assertCurrent()
-    const request = (options.request ?? createLocalTaskRequest)({
-      ...descriptor,
-      headers: { 'X-Hive-Account-Id': account.accountId },
-      maximumResponseBytes: 512 * 1024
-    })
-    return {
-      accountRef: `account:${createHash('sha256').update(JSON.stringify(account.accountId)).digest('hex')}`,
-      assertCurrent,
-      request: async (path: string, body?: unknown) => {
-        assertCurrent()
-        const value = await request(path, body)
-        assertCurrent()
-        return value
-      }
-    }
-  }
+  const context = createHiveTaskServiceContext(options)
+  const workbench = createHiveTeamWorkbenchFacade({
+    context,
+    validateWorkspace: options.validateWorkspace
+  })
+  const workflows = createHiveTaskWorkflowFacade({
+    context,
+    getTeam: workbench.getTeam,
+    validateWorkspace: options.validateWorkspace
+  })
   const taskPath = (id: string) => `/hive/tasks/${z.string().uuid().parse(id)}`
   return {
-    ...createHiveTeamWorkbenchFacade({ context, validateWorkspace: options.validateWorkspace }),
+    ...workbench,
+    ...workflows,
+    ...createHiveWorkflowCaseFacade({
+      context,
+      getTeam: workbench.getTeam,
+      getWorkflow: workflows.getWorkflow,
+      validateWorkspace: options.validateWorkspace
+    }),
     async list() {
       const caller = await context()
       return z

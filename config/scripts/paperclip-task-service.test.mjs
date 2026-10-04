@@ -11,16 +11,16 @@ import { computeTaskExecutionFingerprint } from '../../src/shared/task-execution
 describe('Paperclip dispatch concurrency', () => {
   it('reserves a flight before awaiting the transactional dispatch claim', async () => {
     let release
-    const claimDispatch = vi.fn(
+    const read = vi.fn(
       () =>
         new Promise((done) => {
           release = done
         })
     )
-    const dispatch = createTaskDispatch({ claimDispatch })
+    const dispatch = createTaskDispatch({ read })
     const first = dispatch.start('account', 'task'),
       second = dispatch.start('account', 'task')
-    expect(claimDispatch).toHaveBeenCalledTimes(1)
+    expect(read).toHaveBeenCalledTimes(1)
     release({ result_receipt: { status: 'cancelled' } })
     await Promise.all([first, second])
     await dispatch.close()

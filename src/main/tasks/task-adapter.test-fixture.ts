@@ -6,6 +6,7 @@ import { TaskExecutionHost, type TaskExecutionHostDependencies } from './task-ex
 import { startLocalTaskTransport } from './local-task-transport'
 import { createLocalTaskServiceCredential } from './local-task-service-credential'
 import { LocalTaskClient } from './local-task-client'
+import type { TaskExecutionStart } from '../../shared/task-execution/task-execution-command'
 import type {
   HiveRuntimeAdapterPorts,
   PaperclipTaskExecutionContext
@@ -22,9 +23,15 @@ import {
 } from './task-execution.test-fixture'
 
 /** A protocol fixture with real HTTP and disk commits; provider/stop ports are explicit test doubles. */
-export async function taskAdapterFixture() {
+export async function taskAdapterFixture(
+  options: {
+    command?: TaskExecutionStart
+    companyId?: string
+    agentId?: string
+  } = {}
+) {
   const directory = await taskTestDirectory()
-  const command = taskCommand()
+  const command = options.command ?? taskCommand()
   const store = await openTestAgentSessionRecordStore(directory)
   const deps: TaskExecutionHostDependencies = {
     store: store.tasks,
@@ -50,8 +57,8 @@ export async function taskAdapterFixture() {
   const client = new LocalTaskClient({ baseUrl: transport.baseUrl, secret: credential.secret })
   const binding = {
     bindingRef: 'binding:test',
-    paperclipCompanyId: 'company:test',
-    paperclipAgentId: 'agent:test',
+    paperclipCompanyId: options.companyId ?? 'company:test',
+    paperclipAgentId: options.agentId ?? 'agent:test',
     command,
     commandFingerprint: computeTaskExecutionFingerprint(
       command,

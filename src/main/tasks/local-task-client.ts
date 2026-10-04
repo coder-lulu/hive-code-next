@@ -13,6 +13,11 @@ import { TaskDigest, TaskOpaqueRef } from '../../shared/task-execution/task-exec
 import { TaskExecutionAcceptedSchema } from '../../shared/task-execution/task-execution-receipts'
 import { createLocalTaskRequest, type LocalTaskClientOptions } from './local-task-http-client'
 import { TaskExecutionError } from './task-execution-error'
+import { LocalTaskRuntimeOwnerSchema } from '../../shared/task-execution/task-command-delivery'
+import {
+  HiveRuntimeBindingPurposeSchema,
+  type HiveRuntimeBindingPurpose
+} from './paperclip-adapter-contract'
 
 type Identity = Pick<
   TaskExecutionStart,
@@ -42,12 +47,28 @@ export class LocalTaskClient {
     return parsed.data
   }
 
-  async binding(companyId: string, runId: string): Promise<unknown> {
-    if (!TaskOpaqueRef.safeParse(companyId).success || !TaskOpaqueRef.safeParse(runId).success) {
+  async owner() {
+    const parsed = LocalTaskRuntimeOwnerSchema.safeParse(await this.request('/execution/owner'))
+    if (!parsed.success) {
+      throw new TaskExecutionError('FORBIDDEN')
+    }
+    return parsed.data
+  }
+
+  async binding(
+    companyId: string,
+    runId: string,
+    purpose: HiveRuntimeBindingPurpose
+  ): Promise<unknown> {
+    if (
+      !TaskOpaqueRef.safeParse(companyId).success ||
+      !TaskOpaqueRef.safeParse(runId).success ||
+      !HiveRuntimeBindingPurposeSchema.safeParse(purpose).success
+    ) {
       throw new TaskExecutionError('INVALID_REQUEST')
     }
     return this.request(
-      `/execution/binding/${encodeURIComponent(companyId)}/${encodeURIComponent(runId)}`
+      `/execution/binding/${encodeURIComponent(companyId)}/${encodeURIComponent(runId)}?purpose=${purpose}`
     )
   }
 
@@ -81,7 +102,11 @@ export class LocalTaskClient {
     if (
       observation.cursor < query.data.afterSequence ||
       observation.events.length > query.data.limit ||
-      observation.events.some((event) => event.sequence <= query.data.afterSequence)
+      (observation.events.length > 0 &&
+        observation.events[0].sequence !== query.data.afterSequence + 1) ||
+      (observation.events.length === 0 &&
+        (observation.cursor !== query.data.afterSequence ||
+          observation.lastSequence > query.data.afterSequence))
     ) {
       throw new TaskExecutionError('OUTCOME_UNKNOWN')
     }

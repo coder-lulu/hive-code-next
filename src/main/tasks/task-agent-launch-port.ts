@@ -1,5 +1,4 @@
 import { AGENT_LAUNCH_METHODS } from '../runtime/rpc/methods/agent-launch'
-import { AgentLaunchReplay } from '../runtime/rpc/methods/agent-launch-schemas'
 import { agentLaunchOperationCallerKey } from '../runtime/rpc/methods/agent-launch-replay'
 import type { RpcContext } from '../runtime/rpc/core'
 import {
@@ -11,6 +10,7 @@ import type { TaskExecutionRecord } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
 import { hasExplicitTuiLaunchCommand } from '../../shared/tui-agent-launch-command-override'
 import { requireTaskLaunchWorkspace, taskLaunchPathKey } from './task-launch-workspace'
+import { taskAgentLaunchParams } from './task-agent-launch-params'
 
 /** Uses the existing replay handler and ledger, including its unknown-outcome refusal. */
 export function createTaskAgentLaunchPort(options: {
@@ -38,15 +38,11 @@ export function createTaskAgentLaunchPort(options: {
     }
     const workspace = await requireTaskLaunchWorkspace(context, record.workspace)
     authorization.assertCurrent()
-    const params = AgentLaunchReplay.parse({
-      agent: executor,
-      operationId: record.command.operationId,
-      target: { kind: 'existing', worktree: `id:${record.workspace.workspaceId}` },
-      prompt: { text: authorization.input, delivery: 'submit' },
-      agentArgs: null,
-      cwd: workspace.executionPath,
-      presentation: 'background'
-    })
+    const params = taskAgentLaunchParams(
+      { ...record, workspace: { ...record.workspace, executionPath: workspace.executionPath } },
+      authorization.input,
+      executor
+    )
     return method.handler(params, {
       ...context,
       ...(executor === 'codex' ? { requiredAgentLaunchMode: 'structured' as const } : {}),

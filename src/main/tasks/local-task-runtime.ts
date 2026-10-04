@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
-import { realpathSync } from 'node:fs'
+import { lstatSync, realpathSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -18,6 +18,8 @@ import {
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { TaskExecutionHost } from './task-execution-host'
 import { createLocalTaskAuthorizer } from './local-task-authority'
+import { createTaskDeliveryAuthorizer } from './task-delivery-authority'
+import { createHiveTaskServiceContext } from './hive-task-service-context'
 import { LocalTaskBindingIssuer } from './local-task-binding-issuer'
 import { createLocalTaskServiceCredential } from './local-task-service-credential'
 import { startLocalTaskTransport } from './local-task-transport'
@@ -27,6 +29,8 @@ import { refuseTaskExecution } from './task-execution-error'
 import { createHiveTaskFacade } from './hive-task-facade'
 import { TaskArtifactIndex } from './task-artifact-index'
 import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
+import { taskLaunchPathKey } from './task-launch-workspace'
+import { assertTaskDirectoryIdentity } from './task-managed-copy'
 
 /** One task service assembled from the existing account, Runtime, record store and Codex host. */
 export async function startLocalTaskRuntime(options: {
@@ -94,6 +98,31 @@ export async function startLocalTaskRuntime(options: {
     currentAccount: () => options.account.getRuntimeCloudAuthorization(),
     assertCurrent,
     resolveSource: resolveWorkspaceSource,
+    readExecution: (command) => resources.store.tasks.get(command),
+    restoreWorkspace: async (workspace) => {
+      if (!workspace.workspaceId.startsWith('folder:')) {
+        return refuseTaskExecution('FORBIDDEN')
+      }
+      const id = workspace.workspaceId.slice('folder:'.length)
+      const expected = realpathSync(workspace.executionPath)
+      const guard = () => {
+        assertCurrent()
+        assertTaskDirectoryIdentity(workspace.executionPath, workspace.directoryIdentity)
+        const current = options.store.getFolderWorkspace(id)
+        if (
+          !current ||
+          current.isArchived ||
+          current.connectionId ||
+          lstatSync(workspace.executionPath).isSymbolicLink() ||
+          taskLaunchPathKey(realpathSync(current.folderPath)) !== taskLaunchPathKey(expected) ||
+          taskLaunchPathKey(expected) !== taskLaunchPathKey(workspace.executionPath)
+        ) {
+          return refuseTaskExecution('FORBIDDEN')
+        }
+      }
+      guard()
+      return { assertCurrent: guard }
+    },
     registerWorkspace: async (path) => {
       assertCurrent()
       const workspace = await options.store.runDurableMutation(() => {
@@ -164,10 +193,17 @@ export async function startLocalTaskRuntime(options: {
     store: resources.store.tasks,
     capabilities,
     resolveStart: (query) => issuer.resolveGrant(query.authorizationRef)?.command ?? null,
-    authorize: createLocalTaskAuthorizer({
-      currentRuntime,
-      currentAccount: () => options.account.getRuntimeCloudAuthorization(),
-      resolveGrant: issuer.resolveGrant
+    authorize: createTaskDeliveryAuthorizer({
+      authorize: createLocalTaskAuthorizer({
+        currentRuntime,
+        currentAccount: () => options.account.getRuntimeCloudAuthorization(),
+        resolveGrant: issuer.resolveGrant
+      }),
+      context: createHiveTaskServiceContext({
+        descriptorPath: join(directory, 'paperclip.json'),
+        currentAccount: () => options.account.getRuntimeCloudAuthorization(),
+        assertCurrent
+      })
     }),
     launch: createTaskAgentLaunchPort({
       executor: 'codex',
@@ -177,12 +213,14 @@ export async function startLocalTaskRuntime(options: {
     ...evidence
   })
   const credential = createLocalTaskServiceCredential('trusted-local:runtime')
+  await issuer.restoreBindings(await resources.store.tasks.readActive(assertCurrent))
   const transport = await startLocalTaskTransport({
     host,
     capabilities,
+    currentOwner: currentRuntime,
     authenticate: credential.authenticate,
-    resolveBinding: (companyId, runId, caller) =>
-      issuer.resolveBinding(companyId, runId, caller.operationCallerKey)
+    resolveBinding: (companyId, runId, purpose, caller) =>
+      issuer.resolveBinding(companyId, runId, caller.operationCallerKey, purpose)
   })
   try {
     await mkdir(directory, { recursive: true, mode: 0o700 })
@@ -203,6 +241,7 @@ export async function startLocalTaskRuntime(options: {
     store: resources.store.tasks,
     host,
     assertCurrent,
+    operationCallerKey: 'trusted-local:runtime',
     subscribe(listener) {
       const account = options.account.subscribeRuntimeCloudAuthorization(listener)
       const ownership = options.ownership.subscribe(listener)

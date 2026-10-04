@@ -3,7 +3,10 @@ import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
 import { copyFile, cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { paperclipDatabaseSourceDigest } from './paperclip-source-proof.mjs'
+import {
+  paperclipDatabaseSourceDigest,
+  paperclipExternalExecutionSourceDigest
+} from './paperclip-source-proof.mjs'
 import { paperclipServiceNotices } from './paperclip-service-notices.mjs'
 import { canonicalizePaperclipMigrationFiles } from '../../integration/paperclip/service/migration-history.mjs'
 
@@ -26,6 +29,18 @@ const sourceDigest = await paperclipDatabaseSourceDigest(source)
 if (sourceDigest !== manifest.paperclip.databaseSourceDigest) {
   throw new Error('Paperclip DB/shared sources differ from the audited revision')
 }
+const externalExecutionModule = process.env.HIVE_PAPERCLIP_SOURCE
+  ? join(source, manifest.externalExecutionCore.module)
+  : join(root, manifest.externalExecutionCore.vendoredModule)
+const externalExecutionSourceDigest = await paperclipExternalExecutionSourceDigest(
+  process.env.HIVE_PAPERCLIP_SOURCE ? source : root,
+  process.env.HIVE_PAPERCLIP_SOURCE
+    ? manifest.externalExecutionCore.module
+    : manifest.externalExecutionCore.vendoredModule
+)
+if (externalExecutionSourceDigest !== manifest.externalExecutionCore.moduleSha256) {
+  throw new Error('Paperclip external execution source differs from the reviewed module')
+}
 const requireDb = createRequire(join(source, 'packages/db/package.json'))
 await mkdir(output, { recursive: true })
 const compiled = await build({
@@ -41,16 +56,18 @@ const compiled = await build({
     js: "import { createRequire as createBundleRequire } from 'node:module'; const require = createBundleRequire(import.meta.url);"
   },
   alias: {
+    '@hive-paperclip-external-execution': externalExecutionModule,
     '@hive-paperclip-db': join(source, 'packages/db/src/client.ts'),
     '@hive-paperclip-postgres': requireDb.resolve('postgres')
   },
   logLevel: 'silent',
   legalComments: 'eof'
 })
-const forbidden = Object.keys(compiled.metafile.inputs).filter((file) =>
-  /(?:\/server\/src\/|adapter-(?:claude|codex|cursor|gemini|grok)|(?:native|managed)-pi|pi-coding-agent)/.test(
-    file
-  )
+const forbidden = Object.keys(compiled.metafile.inputs).filter(
+  (file) =>
+    /(?:\/server\/src\/|adapter-(?:claude|codex|cursor|gemini|grok)|(?:native|managed)-pi|pi-coding-agent)/.test(
+      file
+    ) && resolve(root, file) !== externalExecutionModule
 )
 if (forbidden.length) {
   throw new Error('Provider or upstream execution code entered the restricted Paperclip service')
@@ -59,7 +76,12 @@ await cp(join(source, 'packages/db/src/migrations'), join(output, 'migrations'),
   recursive: true
 })
 await canonicalizePaperclipMigrationFiles(join(output, 'migrations'))
-for (const tableFile of ['task-tables.sql', 'team-workbench-tables.sql']) {
+for (const tableFile of [
+  'task-tables.sql',
+  'team-workbench-tables.sql',
+  'workflow-definition-tables.sql',
+  'workflow-case-tables.sql'
+]) {
   await copyFile(join(root, 'integration/paperclip/service', tableFile), join(output, tableFile))
 }
 await copyFile(join(source, 'LICENSE'), join(output, 'PAPERCLIP-LICENSE'))
@@ -85,6 +107,7 @@ await writeFile(
     {
       paperclipRevision: revision,
       sourceDigest,
+      externalExecutionSourceDigest,
       bundledDependencies: notices.packages,
       adapterAllowlist: ['hive_runtime'],
       providerPackagesBundled: [],

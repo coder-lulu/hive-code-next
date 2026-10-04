@@ -97,6 +97,11 @@ export class AgentSessionStoreTransactionQueue {
     return structuredClone(records?.get(key) ?? null)
   }
 
+  readActiveTaskExecutions(): TaskExecutionRecord[] {
+    const records = this.taskReadSnapshot ?? this.state.taskExecutions
+    return structuredClone([...(records?.values() ?? [])].filter((record) => !record.result))
+  }
+
   transact<T>(apply: () => T): Promise<T> {
     const run = this.queue.then(() =>
       withFileTransactionLock(this.filePath, async () => {

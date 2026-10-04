@@ -14,6 +14,7 @@ export type LocalTaskGrant = TaskExecutionAuthorization & {
   accountId: string
   authorityId: string
   sessionGeneration: number
+  runtimeOwnershipEpoch: number
   validUntil: number
   actions: readonly TaskExecutionAction[]
 }
@@ -58,7 +59,8 @@ export function createLocalTaskAuthorizer(deps: LocalTaskAuthorityDependencies) 
         account.sessionGeneration !== grant.sessionGeneration ||
         runtime.accountId !== account.accountId ||
         runtime.runtimeRecordId !== command.runtimeRecordId ||
-        runtime.ownershipEpoch !== command.ownershipEpoch ||
+        runtime.ownershipEpoch !== grant.runtimeOwnershipEpoch ||
+        (action === 'start' && runtime.ownershipEpoch !== command.ownershipEpoch) ||
         caller.operationCallerKey !== grant.operationCallerKey ||
         !grant.actions.includes(action) ||
         computeTaskExecutionFingerprint(command, caller.operationCallerKey) !==

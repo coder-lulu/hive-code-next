@@ -120,5 +120,14 @@
       "path": "package.json",
       "sha256": "5f9ecf80ea7e07f1aea677b78d6e68505cd618d14cd5ab45eeff4b49930407bc"
     }
-  ]
+  ],
+  "externalExecutionCore": {
+    "repository": "https://github.com/coder-lulu/hive-paperclip",
+    "branch": "hive/external-execution-20261004",
+    "status": "development_unpublished",
+    "module": "server/src/services/external-execution.ts",
+    "moduleSha256": "96d083b04f1e139657d1c8c8f664340d683eb2d5e1351d983ed54321c0fdc684",
+    "vendoredModule": "integration/paperclip/core/external-execution.ts",
+    "license": "MIT"
+  }
 }

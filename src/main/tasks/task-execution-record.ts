@@ -14,12 +14,27 @@ import {
   TaskExecutionResultSchema
 } from '../../shared/task-execution/task-execution-receipts'
 
+export const TaskWorkspaceDirectoryIdentitySchema = z.strictObject({
+  dev: z.string().max(40).regex(/^\d+$/),
+  ino: z
+    .string()
+    .max(40)
+    .regex(/^[1-9]\d*$/),
+  birthtimeNs: z
+    .string()
+    .max(40)
+    .regex(/^-?\d+$/)
+})
+export type TaskWorkspaceDirectoryIdentity = z.infer<typeof TaskWorkspaceDirectoryIdentitySchema>
+
 export const TaskExecutionWorkspaceSchema = z.strictObject({
   hostId: z.literal('local'),
   workspaceId: z.string().min(1).max(512),
   canonicalPath: z.string().min(1).max(4096),
   executionPath: z.string().min(1).max(4096),
-  isolation: z.enum(['managed_worktree', 'managed_copy'])
+  isolation: z.enum(['managed_worktree', 'managed_copy']),
+  // Missing original evidence remains readable but cannot authorize workspace recovery.
+  directoryIdentity: TaskWorkspaceDirectoryIdentitySchema.optional()
 })
 
 export const TaskExecutionRecordSchema = z

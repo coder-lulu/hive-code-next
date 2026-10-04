@@ -73,10 +73,15 @@ describe('long-running Paperclip task authorization', () => {
     expect(current.ports.resolveBinding).toHaveBeenCalledTimes(2)
     expect(current.deps.launch).toHaveBeenCalledTimes(1)
     expect(result.sessionParams?.executionId).toBe(current.binding.command.executionId)
-    expect(current.deps.authorize).toHaveBeenLastCalledWith(
+    expect(current.deps.authorize).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ authorizationRef: 'grant:renewed' }),
       'reconcile'
+    )
+    expect(current.deps.authorize).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ authorizationRef: 'grant:renewed' }),
+      'observe'
     )
   })
   it('renews expired authorization before forwarding operator cancellation', async () => {

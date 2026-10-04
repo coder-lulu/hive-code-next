@@ -7,13 +7,14 @@ import {
 } from '../../shared/task-execution/task-execution-command'
 import {
   TaskExecutionObserveSchema,
-  TaskExecutionObservationSchema,
   TaskExecutionReconcileSchema
 } from '../../shared/task-execution/task-execution-observation'
 import { TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
 import { refuseTaskExecution } from './task-execution-error'
-import { taskExecutionIdentity, type TaskExecutionRecord } from './task-execution-record'
+import type { TaskExecutionRecord } from './task-execution-record'
+import { taskRecordObservation } from './task-record-observation'
 import { collectTaskExecutionSettlement } from './task-execution-settlement'
+import { recoverPersistedTaskExecution } from './task-execution-recovery'
 import type {
   TaskExecutionCaller,
   TaskExecutionAction,
@@ -47,8 +48,31 @@ export class TaskExecutionHost {
     }
   }
 
-  /** Private Runtime cleanup; a revoked caller cannot authorize another transport operation. */
-  async cancelRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
+  async recoverPersistedExecution(
+    record: TaskExecutionRecord,
+    caller: TaskExecutionCaller,
+    launchFingerprint: string | null,
+    assertAuthorized: () => void
+  ): Promise<void> {
+    return recoverPersistedTaskExecution({
+      store: this.deps.store,
+      read: () =>
+        this.requireRecord(
+          { ...record.command, commandFingerprint: record.commandFingerprint },
+          caller
+        ),
+      isLaunching: (fingerprint) => this.launches.has(fingerprint),
+      now: this.now,
+      validate: () => caller.assertCurrent?.(),
+      assertAuthorized,
+      launchFingerprint,
+      settle: (current, validate) => this.settle(current, validate),
+      cancelRevoked: (current) => this.cancelRevokedExecution(current, caller)
+    })
+  }
+
+  /** Persist revocation before slow collection; this never proves that the writer stopped. */
+  async fenceRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
     caller.assertCurrent?.()
     const current = this.requireRecord(
       { ...record.command, commandFingerprint: record.commandFingerprint },
@@ -57,13 +81,22 @@ export class TaskExecutionHost {
     if (current.result) {
       return
     }
-    const cancellation = await this.deps.store.requestCancellation(
+    await this.deps.store.requestCancellation(
       current.command,
       `revoked:${current.commandFingerprint}`,
       this.now(),
       () => caller.assertCurrent?.()
     )
-    await this.settle(cancellation.record)
+  }
+
+  /** Private Runtime cleanup; a revoked caller cannot authorize another transport operation. */
+  async cancelRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
+    await this.fenceRevokedExecution(record, caller)
+    const current = this.requireRecord(
+      { ...record.command, commandFingerprint: record.commandFingerprint },
+      caller
+    )
+    await this.settle(current, () => caller.assertCurrent?.())
   }
 
   async start(value: unknown, caller: TaskExecutionCaller) {
@@ -111,7 +144,7 @@ export class TaskExecutionHost {
       },
       'observe'
     )
-    return this.observation(record, query.afterSequence, query.limit)
+    return taskRecordObservation(record, query.afterSequence, query.limit)
   }
 
   async reconcile(value: unknown, caller: TaskExecutionCaller) {
@@ -131,9 +164,9 @@ export class TaskExecutionHost {
       },
       'reconcile'
     )
-    await this.settle(record)
+    await this.settle(record, authorization.assertCurrent)
     authorization.assertCurrent()
-    return this.observation(this.requireRecord(query, caller), 0, 32)
+    return taskRecordObservation(this.requireRecord(query, caller), 0, 32)
   }
 
   async cancel(value: unknown, caller: TaskExecutionCaller) {
@@ -169,9 +202,9 @@ export class TaskExecutionHost {
       this.now(),
       authorization.assertCurrent
     )
-    await this.settle(cancellation.record)
+    await this.settle(cancellation.record, authorization.assertCurrent)
     authorization.assertCurrent()
-    return this.observation(this.requireRecord(command, caller), 0, 32)
+    return taskRecordObservation(this.requireRecord(command, caller), 0, 32)
   }
 
   private async authorize(
@@ -252,7 +285,7 @@ export class TaskExecutionHost {
     }
   }
 
-  private async settle(record: TaskExecutionRecord) {
+  private async settle(record: TaskExecutionRecord, validate: () => void) {
     if (record.result) {
       return
     }
@@ -265,31 +298,10 @@ export class TaskExecutionHost {
       this.deps,
       record,
       this.launches.get(key),
-      this.now
+      this.now,
+      validate
     ).finally(() => this.settlements.delete(key))
     this.settlements.set(key, settlement)
     return settlement
-  }
-
-  private observation(record: TaskExecutionRecord, after: number, limit: number) {
-    if (after > record.events.length) {
-      return refuseTaskExecution('INVALID_REQUEST')
-    }
-    const events = record.events.filter((event) => event.sequence > after).slice(0, limit)
-    return TaskExecutionObservationSchema.parse({
-      ...taskExecutionIdentity(record.command),
-      kind: 'execution.observation',
-      commandFingerprint: record.commandFingerprint,
-      status: record.status,
-      accepted: record.accepted,
-      events,
-      cursor: events.at(-1)?.sequence ?? after,
-      lastSequence: record.events.length,
-      result: record.result,
-      sessionRef:
-        record.launch?.outcome.kind === 'structured'
-          ? record.launch.outcome.sessionId
-          : (record.launch?.outcome.handle ?? null)
-    })
   }
 }

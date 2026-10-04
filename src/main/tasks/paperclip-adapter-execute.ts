@@ -6,6 +6,7 @@ import { createPaperclipTaskAuthorization } from './paperclip-adapter-authorizat
 import type {
   HiveRuntimeAdapterPorts,
   HiveRuntimeBinding,
+  HiveRuntimeBindingPurpose,
   PaperclipTaskExecutionContext,
   PaperclipTaskExecutionResult
 } from './paperclip-adapter-contract'
@@ -15,17 +16,21 @@ import { TaskExecutionError } from './task-execution-error'
 /** Acceptance does not end a Paperclip run. Cancellation also waits for the host's terminal proof. */
 export async function executePaperclipTask(
   context: PaperclipTaskExecutionContext,
-  ports: HiveRuntimeAdapterPorts
+  ports: HiveRuntimeAdapterPorts,
+  purpose: HiveRuntimeBindingPurpose
 ): Promise<PaperclipTaskExecutionResult> {
   let binding: HiveRuntimeBinding | null = null
-  let dispatched = false
-  let startSettled = false
+  let dispatched = purpose === 'recover'
+  let startSettled = purpose === 'recover'
   const cancellation: { flight: Promise<TaskExecutionObservation | null> | null } = { flight: null }
   let cancelFailed = false
   let query: Record<string, unknown> | null = null
   let currentAuthorization: (() => Promise<HiveRuntimeBinding>) | null = null
+  let cursor = ports.observationCursor ?? 0
   const refreshQuery = async () => {
+    ports.assertCurrent?.()
     binding = await currentAuthorization!()
+    ports.assertCurrent?.()
     query = {
       protocolVersion: binding.command.protocolVersion,
       runtimeRecordId: binding.command.runtimeRecordId,
@@ -38,6 +43,27 @@ export async function executePaperclipTask(
       expiresAt: binding.command.expiresAt,
       kind: 'execution.reconcile'
     }
+  }
+  const readObservation = async () => {
+    await refreshQuery()
+    // Runtime owns collection; a recovered dispatcher only reads the committed event stream.
+    if (purpose === 'execute') {
+      await ports.client.reconcile(query)
+    }
+    let observation: TaskExecutionObservation
+    do {
+      await refreshQuery()
+      observation = await ports.client.observe({
+        ...query,
+        kind: 'execution.observe',
+        afterSequence: cursor,
+        limit: 32
+      })
+      ports.assertCurrent?.()
+      await ports.onObservation?.(observation)
+      cursor = observation.cursor
+    } while (observation.result && cursor < observation.lastSequence)
+    return observation
   }
   const requestCancellation = (reason: 'user_requested' | 'shutdown' = 'user_requested') => {
     if (!cancellation.flight && binding && query) {
@@ -63,17 +89,22 @@ export async function executePaperclipTask(
     }
   }
   try {
-    binding = await requirePaperclipTaskBinding(context, ports)
-    currentAuthorization = createPaperclipTaskAuthorization(context, ports, binding)
+    ports.assertCurrent?.()
+    binding = await requirePaperclipTaskBinding(context, ports, purpose)
+    currentAuthorization = createPaperclipTaskAuthorization(context, ports, binding, purpose)
     await refreshQuery()
     context.signal!.addEventListener('abort', onAbort)
     await context.onCancellationReady!()
-    if (taskExecutionCapabilityRefusal(binding.command, await ports.client.capabilities())) {
+    if (
+      purpose === 'execute' &&
+      taskExecutionCapabilityRefusal(binding.command, await ports.client.capabilities())
+    ) {
       throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
     }
     await refreshQuery()
-    if (!context.signal!.aborted) {
-      context.onDispatch!()
+    if (purpose === 'execute' && !context.signal!.aborted) {
+      await context.onDispatch!()
+      ports.assertCurrent?.()
       dispatched = true
       try {
         if (!context.signal!.aborted) {
@@ -92,16 +123,12 @@ export async function executePaperclipTask(
     let lastStatus = ''
     while (Date.now() < deadline) {
       if (context.signal!.aborted) {
-        const cancelled = await requestCancellation()
-        if (cancelled?.result) {
-          return paperclipTaskTerminalResult(binding, cancelled)
-        }
+        await requestCancellation()
         if (cancelFailed) {
           return paperclipTaskErrorResult('OUTCOME_UNKNOWN', binding, true)
         }
       }
-      await refreshQuery()
-      const observation = await ports.client.reconcile(query)
+      const observation = await readObservation()
       if (observation.result) {
         return paperclipTaskTerminalResult(binding, observation)
       }
@@ -122,18 +149,20 @@ export async function executePaperclipTask(
         }
       })
     }
+    if (purpose === 'recover') {
+      return paperclipTaskErrorResult('OUTCOME_UNKNOWN', binding, true, true)
+    }
     const cancelled = await requestCancellation('shutdown')
-    return cancelled?.result
+    const observation = cancelled?.result ? await readObservation() : null
+    return observation?.result
       ? {
-          ...paperclipTaskTerminalResult(binding, cancelled),
-          timedOut: cancelled.result.status === 'cancelled'
+          ...paperclipTaskTerminalResult(binding, observation),
+          timedOut: observation.result.status === 'cancelled'
         }
       : paperclipTaskErrorResult('OUTCOME_UNKNOWN', binding, true, true)
   } catch (error) {
     if (dispatched && binding && query) {
-      const observation = await refreshQuery()
-        .then(() => ports.client.reconcile(query))
-        .catch(() => null)
+      const observation = await readObservation().catch(() => null)
       if (observation?.result) {
         return paperclipTaskTerminalResult(binding, observation)
       }
