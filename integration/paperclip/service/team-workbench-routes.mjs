@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   HiveWorkbenchCompanyCreateSchema,
+  HiveWorkbenchObjectIdInputSchema,
   HiveWorkbenchPageQuerySchema,
   HiveWorkbenchProjectsQuerySchema,
   HiveWorkbenchTeamConfigureSchema
@@ -16,7 +17,7 @@ export const WORKBENCH_PATHS = Object.freeze([
   '/hive/workbench/team/read',
   '/hive/workbench/team/configure'
 ])
-const TeamRead = z.strictObject({ projectId: z.string().uuid() })
+const TeamRead = z.strictObject({ projectId: HiveWorkbenchObjectIdInputSchema })
 
 /** The authenticated Hive facade supplies account identity and the validated workspace binding. */
 export function handleTeamWorkbenchRequest(repository, accountId, path, body) {

@@ -16,7 +16,7 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 
-async function fixture() {
+async function fixture(companyId = randomUUID(), projectId = randomUUID()) {
   let account: HiveRuntimeCloudAuthorization | null = {
     accountId: 'workbench-owner',
     authorityId: 'authority:workbench',
@@ -25,8 +25,6 @@ async function fixture() {
     sessionExpiresAt: Date.now() + 60_000
   }
   const digest = createHash('sha256').update(JSON.stringify(account.accountId)).digest('hex')
-  const companyId = randomUUID()
-  const projectId = randomUUID()
   const team: HiveWorkbenchTeam = {
     company: {
       id: companyId,
@@ -140,6 +138,49 @@ async function fixture() {
 }
 
 describe('authenticated team workbench facade', () => {
+  it.each(['listProjects', 'createProject', 'getTeam', 'configureTeam'] as const)(
+    'accepts case-equivalent UUID input for %s and sends canonical request identities',
+    async (operation) => {
+      const f = await fixture(
+        'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb'
+      )
+      const requestId = 'cccccccc-3333-4333-8333-cccccccccccc'
+      const operations = {
+        listProjects: () => f.facade.listProjects({ companyId: f.team.company.id.toUpperCase() }),
+        createProject: () =>
+          f.facade.createProject({
+            ...f.projectInput,
+            requestId: requestId.toUpperCase(),
+            companyId: f.team.company.id.toUpperCase()
+          }),
+        getTeam: () => f.facade.getTeam(f.team.project.id.toUpperCase()),
+        configureTeam: () =>
+          f.facade.configureTeam({
+            ...f.configureInput,
+            requestId: requestId.toUpperCase(),
+            projectId: f.team.project.id.toUpperCase()
+          })
+      }
+      const result = await operations[operation]()
+      expect(result).toEqual(
+        operation === 'listProjects'
+          ? { items: [f.team.project], nextCursor: null }
+          : operation === 'createProject'
+            ? f.team.project
+            : f.team
+      )
+      const body = f.request.mock.calls.at(-1)?.[1]
+      expect(body).toMatchObject(
+        operation === 'listProjects' || operation === 'createProject'
+          ? { companyId: f.team.company.id }
+          : { projectId: f.team.project.id }
+      )
+      if (operation === 'createProject' || operation === 'configureTeam') {
+        expect(body).toMatchObject({ requestId })
+      }
+    }
+  )
   it('routes all six operations through the scoped service and adds only the host workspace reference', async () => {
     const f = await fixture()
     await f.facade.listCompanies({ limit: 10 })

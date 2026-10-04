@@ -59,6 +59,30 @@ describe('restricted team workbench request routing', () => {
   })
 
   it.each([
+    [
+      '/hive/workbench/projects/list',
+      'listProjects',
+      { companyId: companyId.toUpperCase(), after: projectId.toUpperCase() },
+      { companyId, after: projectId, limit: 25 }
+    ],
+    ['/hive/workbench/team/read', 'getTeam', { projectId: projectId.toUpperCase() }, projectId],
+    [
+      '/hive/workbench/team/configure',
+      'configureTeam',
+      {
+        ...teamInput,
+        requestId: teamInput.requestId.toUpperCase(),
+        projectId: projectId.toUpperCase()
+      },
+      teamInput
+    ]
+  ])('uses canonical UUID identity at the %s service boundary', (path, method, body, parsed) => {
+    const repository = fixture()
+    handleTeamWorkbenchRequest(repository, 'authenticated-account', path, body)
+    expect(repository[method]).toHaveBeenCalledWith('authenticated-account', parsed)
+  })
+
+  it.each([
     '/hive/workbench/team/dispatch',
     '/hive/workbench/team/configure?dispatch=true',
     '/api/agents',

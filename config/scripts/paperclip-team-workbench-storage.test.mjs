@@ -101,6 +101,61 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
       expect(project.binding.hiveWorkspaceRef).toBe('workspace:isolated-contract')
     })
 
+    it('preserves committed UUID identity and immutable receipts across input case changes', async () => {
+      const companyInput = { requestId: randomUUID(), name: 'Case-independent company' }
+      const created = await request('companies/create', {
+        ...companyInput,
+        requestId: companyInput.requestId.toUpperCase()
+      })
+      expect(created.status).toBe(201)
+      createdCompanies.push(created.body.id)
+      const companyReplay = await request('companies/create', companyInput)
+      expect(companyReplay.status).toBe(201)
+      expect(companyReplay.body).toEqual(created.body)
+      const projectInput = {
+        requestId: randomUUID(),
+        companyId: company.id,
+        name: 'Case-independent project',
+        workspaceSelector: 'folder:uuid-case',
+        hiveWorkspaceRef: 'workspace:uuid-case'
+      }
+      const createdProject = await request('projects/create', {
+        ...projectInput,
+        requestId: projectInput.requestId.toUpperCase(),
+        companyId: company.id.toUpperCase()
+      })
+      expect(createdProject.status).toBe(201)
+      createdProjects.push(createdProject.body.id)
+      const projectReplay = await request('projects/create', projectInput)
+      expect(projectReplay.status).toBe(201)
+      expect(projectReplay.body).toEqual(createdProject.body)
+      const teamInput = {
+        requestId: randomUUID(),
+        projectId: createdProject.body.id,
+        expectedRevision: 1,
+        employees
+      }
+      const updated = await request('team/configure', {
+        ...teamInput,
+        requestId: teamInput.requestId.toUpperCase(),
+        projectId: teamInput.projectId.toUpperCase()
+      })
+      expect(updated.status).toBe(200)
+      const teamReplay = await request('team/configure', teamInput)
+      expect(teamReplay.status).toBe(200)
+      expect(teamReplay.body).toEqual(updated.body)
+      const read = await request('team/read', { projectId: teamInput.projectId.toUpperCase() })
+      expect(read.status).toBe(200)
+      expect(read.body).toEqual(updated.body)
+      expect(read.body.project.binding.bindingRevision).toBe(2)
+      const [counts] = await sql`SELECT
+        (SELECT count(*)::int FROM agents WHERE company_id=${company.id} AND id IN
+          (SELECT employee_id FROM hive_workbench_employee_bindings WHERE project_id=${teamInput.projectId})) AS employees,
+        (SELECT count(*)::int FROM hive_workbench_request_receipts WHERE account_id=${account}
+          AND request_id IN (${companyInput.requestId},${projectInput.requestId},${teamInput.requestId})) AS receipts`
+      expect(counts).toEqual({ employees: 4, receipts: 3 })
+    })
+
     it('coalesces concurrent company creation and rejects changed/cross-operation request keys', async () => {
       const input = { requestId: randomUUID(), name: 'Concurrent company' }
       const responses = await Promise.all(

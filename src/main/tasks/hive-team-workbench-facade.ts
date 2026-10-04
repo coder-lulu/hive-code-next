@@ -1,8 +1,8 @@
-import { z } from 'zod'
 import {
   HiveWorkbenchCompanyCreateSchema,
   HiveWorkbenchCompanyPageSchema,
   HiveWorkbenchCompanySchema,
+  HiveWorkbenchObjectIdInputSchema,
   HiveWorkbenchPageQuerySchema,
   HiveWorkbenchProjectCreateSchema,
   HiveWorkbenchProjectPageSchema,
@@ -96,7 +96,7 @@ export function createHiveTeamWorkbenchFacade(options: {
       return result
     },
     async getTeam(rawProjectId) {
-      const projectId = z.string().uuid().parse(rawProjectId)
+      const projectId = HiveWorkbenchObjectIdInputSchema.parse(rawProjectId)
       const caller = await options.context()
       const result = HiveWorkbenchTeamSchema.parse(
         await caller.request('/hive/workbench/team/read', { projectId })

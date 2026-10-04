@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { z } from 'zod'
 import {
   HiveWorkbenchCompanyCreateSchema,
   HiveWorkbenchCompanyPageSchema,
   HiveWorkbenchCompanySchema,
+  HiveWorkbenchObjectIdInputSchema,
   HiveWorkbenchPageQuerySchema,
   HiveWorkbenchProjectCreateSchema,
   HiveWorkbenchProjectPageSchema,
@@ -28,7 +28,6 @@ import {
 export const WorkbenchProjectBindingCreateSchema = HiveWorkbenchProjectCreateSchema.extend({
   hiveWorkspaceRef: TaskOpaqueRef
 })
-const ObjectId = z.string().uuid()
 
 async function replayWorkbenchRequest(db, accountId, input, operation, responseSchema) {
   const [receipt] = await db`SELECT operation,payload_fingerprint,company_id,response_json
@@ -168,7 +167,7 @@ export function createTeamWorkbenchRepository(sql) {
       })
     },
     async getTeam(accountId, rawProjectId) {
-      const projectId = ObjectId.parse(rawProjectId)
+      const projectId = HiveWorkbenchObjectIdInputSchema.parse(rawProjectId)
       workbenchOwnerReferences(accountId)
       return sql.begin((db) => readWorkbenchTeam(db, accountId, projectId))
     },

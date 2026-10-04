@@ -420,6 +420,22 @@ describe('four-role team configuration and execution availability', () => {
     expect(f.writes()).toHaveLength(0)
   })
 
+  it('replays the same team request across UUID case changes without another write', async () => {
+    const source = sqlFixture([[projectRow(2)], employeeRows()])
+    const original = await source.repository.getTeam(accountId, projectId)
+    const input = { ...teamInput(), requestId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa' }
+    const f = sqlFixture([[], [receipt('team.configure', input, original)], [companyRow()]])
+    expect(
+      await f.repository.configureTeam(accountId, {
+        ...input,
+        requestId: input.requestId.toUpperCase(),
+        projectId: input.projectId.toUpperCase()
+      })
+    ).toEqual(original)
+    expect(f.writes()).toHaveLength(0)
+    expect(f.calls[1].values).toEqual([accountId, input.requestId])
+  })
+
   it('aborts a conflicting project revision update instead of emitting a successful receipt', async () => {
     const input = teamInput()
     const replies = [[], [], [projectRow()], []]

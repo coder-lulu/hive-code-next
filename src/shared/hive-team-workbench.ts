@@ -9,21 +9,22 @@ import {
 } from './task-workflow/workflow-bindings'
 
 const ObjectId = z.string().uuid()
+export const HiveWorkbenchObjectIdInputSchema = ObjectId.transform((id) => id.toLowerCase())
 const Name = z.string().trim().min(1).max(160)
 export const HiveWorkbenchPageQuerySchema = z.strictObject({
-  after: ObjectId.optional(),
+  after: HiveWorkbenchObjectIdInputSchema.optional(),
   limit: z.number().int().min(1).max(50).default(25)
 })
 export const HiveWorkbenchProjectsQuerySchema = HiveWorkbenchPageQuerySchema.extend({
-  companyId: ObjectId
+  companyId: HiveWorkbenchObjectIdInputSchema
 })
 export const HiveWorkbenchCompanyCreateSchema = z.strictObject({
-  requestId: ObjectId,
+  requestId: HiveWorkbenchObjectIdInputSchema,
   name: Name
 })
 export const HiveWorkbenchProjectCreateSchema = z.strictObject({
-  requestId: ObjectId,
-  companyId: ObjectId,
+  requestId: HiveWorkbenchObjectIdInputSchema,
+  companyId: HiveWorkbenchObjectIdInputSchema,
   name: Name,
   workspaceSelector: z.string().min(1).max(512)
 })
@@ -35,8 +36,8 @@ export const HiveWorkbenchEmployeeInputSchema = z.strictObject({
 })
 export const HiveWorkbenchTeamConfigureSchema = z
   .strictObject({
-    requestId: ObjectId,
-    projectId: ObjectId,
+    requestId: HiveWorkbenchObjectIdInputSchema,
+    projectId: HiveWorkbenchObjectIdInputSchema,
     expectedRevision: TaskEpoch,
     employees: boundedTaskCollection(HiveWorkbenchEmployeeInputSchema, 4, 4)
   })
