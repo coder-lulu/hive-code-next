@@ -20,7 +20,7 @@ import type { TabBarProps } from './tab-bar-props'
 import type { TabBarRuntimeModel } from './use-tab-bar-runtime-model'
 import type { TabBarCreateMenuController } from './use-tab-bar-create-menu-controller'
 import type { TabBarItemProjection } from './use-tab-bar-item-projection'
-import type { TabBarItem } from './tab-bar-item-model'
+import type { TabBarItemActions } from './use-tab-bar-item-actions'
 import { renderTabBarItems } from './tab-bar-item-surface'
 import { TabBarStaticCreateMenu } from './tab-bar-static-create-menu'
 import ClientHostedBrowserTabRows from './ClientHostedBrowserTabRows'
@@ -36,7 +36,7 @@ export function renderTabBarSurface({
   tabStripNavigation,
   tabStripDragScroll,
   activeClientHostedBrowserRowId,
-  togglePinned
+  itemActions
 }: {
   props: TabBarProps
   runtime: TabBarRuntimeModel
@@ -45,7 +45,7 @@ export function renderTabBarSurface({
   tabStripNavigation: ReturnType<typeof useTabStripOverflowNavigation>
   tabStripDragScroll: ReturnType<typeof useTabStripDragScrollHandlers>
   activeClientHostedBrowserRowId: string | null
-  togglePinned: (item: TabBarItem) => void
+  itemActions: TabBarItemActions
 }): React.JSX.Element {
   const {
     worktreeId,
@@ -90,13 +90,15 @@ export function renderTabBarSurface({
   const clientHostedBrowserRows = props.clientHostedBrowserRows ?? EMPTY_CLIENT_HOSTED_ROWS
   const { tabStripRef, tabStripOverflowState, activeTabDockSide, scrollTabStrip } =
     tabStripNavigation
+  const includeTopTabBorder = tabStripChrome !== 'floating-panel'
   const renderedItems = renderTabBarItems({
     items: orderedItems,
     props,
     runtime,
+    actions: itemActions,
     dropIndicatorByVisibleId,
-    activeClientHostedBrowserRowId,
-    togglePinned
+    includeTopTabBorder,
+    activeClientHostedBrowserRowId
   })
 
   return (

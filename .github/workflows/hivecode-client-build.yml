@@ -36,6 +36,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      desktop: ${{ steps.plan.outputs.desktop }}
     steps:
       - uses: actions/checkout@v6
       - name: Verify private documentation separation
@@ -43,10 +44,38 @@ jobs:
       - id: plan
         env:
           BUILD_TARGET: ${{ inputs.target || 'all' }}
-        run: echo "matrix=$(node config/scripts/client-build-ci-plan.mjs)" >> "$GITHUB_OUTPUT"
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs'
+          import { buildMatrix } from './config/scripts/client-build-ci-plan.mjs'
+          const matrix = buildMatrix(process.env.BUILD_TARGET || 'all')
+          const desktop = matrix.include.some(({ target }) => /^(windows|macos|linux)-/.test(target))
+          appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(matrix)}\ndesktop=${desktop}\n`)
+          NODE
+
+  desktop-runtime:
+    needs: plan
+    if: needs.plan.outputs.desktop == 'true'
+    uses: ./.github/workflows/node-server-tests.yml
+    with:
+      ref: ${{ github.sha }}
+      build_template: true
+
+  relay-native-addons:
+    needs: plan
+    if: needs.plan.outputs.desktop == 'true'
+    uses: ./.github/workflows/relay-windows-process-tree.yml
+    with:
+      ref: ${{ github.sha }}
 
   build:
-    needs: plan
+    needs: [plan, desktop-runtime, relay-native-addons]
+    if: >-
+      !cancelled() && needs.plan.result == 'success' &&
+      ((needs.plan.outputs.desktop == 'true' &&
+        needs.desktop-runtime.result == 'success' && needs.relay-native-addons.result == 'success') ||
+       (needs.plan.outputs.desktop == 'false' &&
+        needs.desktop-runtime.result == 'skipped' && needs.relay-native-addons.result == 'skipped'))
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
@@ -81,6 +110,22 @@ jobs:
       - uses: ./.github/actions/install-mobile-dependencies
         with:
           node-linker: ${{ (matrix.target == 'android' || matrix.target == 'ios') && 'hoisted' || 'isolated' }}
+      - name: Stage the qualified headless runtime template
+        if: startsWith(matrix.target, 'windows-') || startsWith(matrix.target, 'macos-') || startsWith(matrix.target, 'linux-')
+        uses: actions/download-artifact@v8
+        with:
+          name: orcad-template
+          path: out/orcad-template
+      - name: Stage the qualified Windows SSH process-tree addons
+        if: startsWith(matrix.target, 'windows-') || startsWith(matrix.target, 'macos-') || startsWith(matrix.target, 'linux-')
+        uses: actions/download-artifact@v8
+        with:
+          name: relay-windows-process-tree
+          path: .build/windows-process-tree
+      - name: Require runtime resources in desktop packages
+        if: startsWith(matrix.target, 'windows-') || startsWith(matrix.target, 'macos-') || startsWith(matrix.target, 'linux-')
+        run: |
+          printf 'ORCA_REQUIRE_ORCAD_TEMPLATE=1\nORCA_REQUIRE_RELAY_NATIVE_ADDONS=x64,arm64\n' >> "$GITHUB_ENV"
       - name: Install Linux packaging and native tools
         if: startsWith(matrix.target, 'linux-')
         run: |

@@ -1,3 +1,5 @@
+import { RuntimeMobileNotificationController } from '../runtime/runtime-mobile-notification-controller'
+import { HiveMobilePushClient } from '../hive-runtime-cloud/hive-mobile-push-client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserWindow } from 'electron'
 import { createNotificationDeliveryService } from './notification-delivery-service'
@@ -16,6 +18,7 @@ function makeSettings(overrides: Partial<NotificationSettings> = {}): Notificati
     customSoundId: 'system',
     customSoundPath: null,
     customSoundVolume: 1,
+    mutedNotificationSourceIds: [],
     ...overrides
   }
 }
@@ -120,6 +123,41 @@ describe('createNotificationDeliveryService', () => {
     })
   })
 
+  it('skips the desktop banner for a muted machine but still reaches the phone', () => {
+    const harness = makeHarness(makeSettings({ mutedNotificationSourceIds: ['runtime:m4air'] }))
+    const service = createNotificationDeliveryService(harness.deps)
+
+    expect(service.dispatch(makeRequest({ notificationSourceId: 'runtime:m4air' }))).toEqual({
+      delivered: false,
+      reason: 'host-muted'
+    })
+    expect(harness.dispatchMobileNotification).toHaveBeenCalledWith(
+      expect.not.objectContaining({ desktopAllowed: false })
+    )
+    expect(harness.deliverNative).not.toHaveBeenCalled()
+
+    // Other machines, and requests whose machine is unknown, still notify.
+    expect(
+      service.dispatch(
+        makeRequest({ notificationSourceId: 'local', worktreeId: 'wt-2', worktreeLabel: 'wt-2' })
+      )
+    ).toEqual({ delivered: true })
+    expect(service.dispatch(makeRequest({ worktreeId: 'wt-3', worktreeLabel: 'wt-3' }))).toEqual({
+      delivered: true
+    })
+  })
+
+  it('reports the master switch over a muted machine', () => {
+    const harness = makeHarness(
+      makeSettings({ enabled: false, mutedNotificationSourceIds: ['runtime:m4air'] })
+    )
+    expect(
+      createNotificationDeliveryService(harness.deps).dispatch(
+        makeRequest({ notificationSourceId: 'runtime:m4air' })
+      )
+    ).toEqual({ delivered: false, reason: 'disabled' })
+  })
+
   it('suppresses a focused active workspace without touching mobile delivery', () => {
     const harness = makeHarness(makeSettings({ suppressWhenFocused: true }))
     const focusedWindow = makeFocusedWindowStub()
@@ -160,4 +198,84 @@ describe('createNotificationDeliveryService', () => {
     ).resolves.toEqual({ delivered: false, reason: 'blocked-by-system' })
     expect(harness.deliverNative).not.toHaveBeenCalled()
   })
+})
+
+it.each<Partial<NotificationSettings>>([{}, { enabled: false }, { agentTaskComplete: false }])(
+  'preserves mobile content and Hive account push authority when a machine is muted (%j)',
+  async (overrides) => {
+    const events: Parameters<
+      NonNullable<NotificationDeliveryDependencies['dispatchMobileNotification']>
+    >[0][] = []
+    for (const muted of [false, true]) {
+      const fetchImpl = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ accepted: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+      )
+      const controller = new RuntimeMobileNotificationController()
+      const push = new HiveMobilePushClient({
+        apiBaseUrl: 'https://owned-hive.test',
+        getRuntimeId: () => '11111111-1111-4111-8111-111111111111',
+        getAuthorization: () => ({
+          accessToken: 'test-account-access',
+          accountId: 'fixture-account',
+          authorityId: 'fixture-authority',
+          sessionExpiresAt: now + 60000,
+          sessionGeneration: 1
+        }),
+        fetchImpl
+      })
+      controller.setRemotePushSink(push)
+      const harness = makeHarness(
+        makeSettings({ ...overrides, mutedNotificationSourceIds: muted ? ['runtime:qa'] : [] })
+      )
+      harness.deps.dispatchMobileNotification = (event) => {
+        events.push(event)
+        controller.dispatch(event)
+      }
+      createNotificationDeliveryService(harness.deps).dispatch(
+        makeRequest({ notificationSourceId: 'runtime:qa', agentState: 'done' })
+      )
+      // Desktop preferences do not authorize or suppress the account-owned phone push.
+      await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1))
+      controller.setRemotePushSink(
+        new HiveMobilePushClient({
+          apiBaseUrl: 'https://owned-hive.test',
+          getAuthorization: () => null,
+          getRuntimeId: () => '11111111-1111-4111-8111-111111111111',
+          fetchImpl
+        })
+      )
+      await expect(controller.testRemotePush()).resolves.toEqual({
+        accepted: false,
+        reason: 'unavailable'
+      })
+      expect(fetchImpl).toHaveBeenCalledTimes(1)
+    }
+    expect(events[1]).toEqual(events[0])
+  }
+)
+
+it('changing a machine mute preserves mobile cooldown and does not reserve desktop cooldown', () => {
+  const settings = makeSettings({ mutedNotificationSourceIds: ['runtime:qa'] })
+  const harness = makeHarness(settings)
+  const service = createNotificationDeliveryService(harness.deps)
+  const request = makeRequest({ notificationSourceId: 'runtime:qa' })
+  expect(service.dispatch(request)).toEqual({ delivered: false, reason: 'host-muted' })
+  settings.mutedNotificationSourceIds = []
+  expect(service.dispatch(request)).toEqual({ delivered: true })
+  expect(harness.dispatchMobileNotification).toHaveBeenCalledTimes(1)
+})
+
+it('reports a muted host before a disabled source', () => {
+  const harness = makeHarness(
+    makeSettings({ agentTaskComplete: false, mutedNotificationSourceIds: ['runtime:qa'] })
+  )
+  expect(
+    createNotificationDeliveryService(harness.deps).dispatch(
+      makeRequest({ notificationSourceId: 'runtime:qa' })
+    )
+  ).toEqual({ delivered: false, reason: 'host-muted' })
 })

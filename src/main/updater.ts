@@ -1,3 +1,4 @@
+import { getMacUpdateRunningInstances } from './macos-update-running-instances'
 /* eslint-disable max-lines */
 import { app, BrowserWindow, powerMonitor, shell } from 'electron'
 import { is } from '@electron-toolkit/utils'
@@ -38,6 +39,8 @@ import { writeMainThreadDiagnosticMarker } from './diagnostics/main-thread-churn
 import { runWithLaunchPath } from './startup/hydrate-shell-path'
 import {
   beginMacUpdateDownload,
+  isMacInstallRequested,
+  setMacInstallPreflightInProgress,
   deferMacQuitUntilInstallerReady,
   hasMacInstallAuthority,
   isMacInstallerReady,
@@ -986,14 +989,52 @@ async function performQuitAndInstall(): Promise<void> {
   if (deferHeadlessServeInstall('install', pendingVersion)) {
     return
   }
+  finishActiveUpdateCheckAttempt()
+  clearBackgroundCheckLaunchPending()
   quitAndInstallInProgress = true
-
-  markMacQuitAndInstallInFlight()
 
   // Set BEFORE anything else so the `activate` handler doesn't reopen the old version while ShipIt replaces the .app bundle.
   quittingForUpdate = true
 
   try {
+    if (process.platform === 'darwin') {
+      setMacInstallPreflightInProgress(true)
+      let blockers: number[]
+      try {
+        blockers = await getMacUpdateRunningInstances()
+      } catch {
+        resetQuitForUpdateState()
+        mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
+        sendInstallFailureStatus({
+          state: 'error',
+          version: pendingVersion,
+          retryAction: 'install',
+          message: applyProductCliBranding(
+            'Could not check for other running Orca instances. Orca remains open. Try again. If the check keeps failing, close the other Orca instances and background orca serve servers, then quit Orca to let the update install on exit. Reopen Orca afterwards.'
+          )
+        })
+        recordUpdaterLifecycle('macos_running_instances_check_failed')
+        return
+      }
+      if (blockers.length > 0) {
+        resetQuitForUpdateState()
+        mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
+        sendInstallFailureStatus({
+          state: 'error',
+          version: pendingVersion,
+          retryAction: 'install',
+          message: applyProductCliBranding(
+            `Close the other Orca instances (process IDs: ${blockers.slice(0, 10).join(', ')}) before installing this update. Background orca serve instances also need to stop. Orca remains open; retry the update after closing them.`
+          )
+        })
+        recordUpdaterLifecycle('macos_install_blocked_by_running_instances', {
+          pids: blockers.slice(0, 10).join(', '),
+          count: blockers.length
+        })
+        return
+      }
+    }
+    markMacQuitAndInstallInFlight()
     await withUpdaterSpan({ stage: 'install' }, async (span) => {
       span.setAttribute('updater.version', pendingVersion || 'unknown')
       span.setAttribute('updater.platform', process.platform)
@@ -1041,6 +1082,7 @@ async function performQuitAndInstall(): Promise<void> {
         return
       }
       // Why: mark before the call so a sync 'error' during quitAndInstall can recover; pre-native errors must not look like install failure.
+      setMacInstallPreflightInProgress(false)
       quitAndInstallNativeInvoked = true
       // Why: invoke before killAllPty/removing close listeners so a sync 'error' (the "no filepath" path) can recover while windows and PTYs are intact.
       const supervisorOwnsRelaunch = updateInstallMode === 'supervised-headless-serve'
@@ -1126,6 +1168,7 @@ async function performQuitAndInstall(): Promise<void> {
 }
 
 function resetQuitForUpdateState(): void {
+  setMacInstallPreflightInProgress(false)
   quitAndInstallInProgress = false
   quittingForUpdate = false
   updateInstallCommitted = false
@@ -2035,6 +2078,10 @@ function retryPrereleaseFallbackAfterMissingManifest(
 function runBackgroundUpdateCheck(
   nudgeId: string | null = getPersistedPendingUpdateNudgeId()
 ): boolean {
+  if (pendingQuitAndInstallTimer || quitAndInstallInProgress || isMacInstallRequested()) {
+    return false
+  }
+
   if (!releaseUpdaterServicesInitialized || !hasConfiguredProductUpdateChannel()) {
     return false
   }
@@ -2066,6 +2113,10 @@ function runBackgroundUpdateCheck(
   // Don't send 'checking' here — the 'checking-for-update' handler does; sending from both dupes notifications (issue #35).
   const autoUpdater = getAutoUpdater()
   const launch = (): Promise<unknown> | undefined => {
+    if (pendingQuitAndInstallTimer || quitAndInstallInProgress || isMacInstallRequested()) {
+      return undefined
+    }
+
     if (!isActiveUpdateCheckAttempt(attemptId)) {
       return undefined
     }
@@ -2118,6 +2169,10 @@ function applyUpdateCheckVariant(variant: UpdateCheckVariant): void {
 
 /** Menu-triggered check — delegates feedback to renderer toasts via userInitiated flag */
 export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
+  if (pendingQuitAndInstallTimer || quitAndInstallInProgress || isMacInstallRequested()) {
+    return
+  }
+
   if (!app.isPackaged) {
     sendSettledCheckStatus({ state: 'not-available', userInitiated: true })
     return
@@ -2172,6 +2227,10 @@ export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
   const attemptId = beginUpdateCheckAttempt()
   const autoUpdater = getAutoUpdater()
   const launch = (): Promise<unknown> | undefined => {
+    if (pendingQuitAndInstallTimer || quitAndInstallInProgress || isMacInstallRequested()) {
+      return undefined
+    }
+
     if (!isActiveUpdateCheckAttempt(attemptId)) {
       return undefined
     }
@@ -2612,7 +2671,8 @@ export function quitAndInstall(): boolean {
     localBuildSelectionInProgress ||
     pinnedBuildSelectionInProgress ||
     pendingQuitAndInstallTimer ||
-    quitAndInstallInProgress
+    quitAndInstallInProgress ||
+    isMacInstallRequested()
   ) {
     return false
   }
@@ -2631,6 +2691,8 @@ export function quitAndInstall(): boolean {
     return false
   }
 
+  finishActiveUpdateCheckAttempt()
+  clearBackgroundCheckLaunchPending()
   if (
     deferMacQuitUntilInstallerReady(
       currentStatus,
@@ -2644,6 +2706,9 @@ export function quitAndInstall(): boolean {
     return true
   }
 
+  if (process.platform === 'darwin') {
+    setMacInstallPreflightInProgress(true)
+  }
   // Why: defer the quit a tick so the renderer can flush dismissals/state before windows start closing.
   pendingQuitAndInstallTimer = setTimeout(() => {
     void performQuitAndInstall()

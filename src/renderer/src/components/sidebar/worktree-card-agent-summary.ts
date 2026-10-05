@@ -16,6 +16,8 @@ const SUMMARY_STATE_ORDER: AgentDotState[] = [
   'failed',
   'working',
   'monitoring',
+  'unconfirmed',
+  // Why: a user's Stop is not news, but it is not a finish either.
   'interrupted',
   'done',
   // Why: below every reporting state, above true idle — the pane is still held.
@@ -35,6 +37,8 @@ export function formatSummaryStateLabel(state: AgentDotState): string {
       return translate('components.agentStatus.summaryMonitoring', 'monitoring')
     case 'unverifiable':
       return translate('components.agentStatus.notReporting', 'not reporting')
+    case 'unconfirmed':
+      return translate('components.agentStatus.unconfirmed', 'unconfirmed')
     case 'blocked':
     case 'interrupted':
     case 'failed':

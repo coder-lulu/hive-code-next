@@ -79,7 +79,6 @@ export function publishNewEpoch(input: {
   input.database.transaction((db) => {
     if (input.purgeQueuedContent) {
       db.prepare('DELETE FROM queued_messages WHERE session_id = ?').run(sessionId)
-      db.prepare('DELETE FROM queued_message_pauses WHERE session_id = ?').run(sessionId)
     }
     const retired = readJournalSessionEpoch(db, sessionId)
     if (retired !== null) {

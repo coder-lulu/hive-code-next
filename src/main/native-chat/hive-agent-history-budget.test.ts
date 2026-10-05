@@ -6,12 +6,13 @@ import { performance } from 'node:perf_hooks'
 import { expect, it } from 'vitest'
 import { openAgentSessionJournal } from './agent-session-journal/journal-store-factory'
 import { JournalHostDatabase } from './agent-session-journal/journal-host-database'
+import { NO_LEGACY_JOURNAL_RECORDS } from './agent-session-journal/journal-database'
 import { createAgentSessionCatchUpReader } from './agent-session-wire/agent-session-history-page'
 import { AgentSessionSubscribers } from './agent-session-wire/structured-agent-session-subscribers'
 
 it('reads/projects 1000 events within 200ms and drops a failed consumer without a queue', async () => {
   const root = await mkdtemp(join(tmpdir(), 'hive-p2-budget-'))
-  const database = JournalHostDatabase.open(root)
+  const database = await JournalHostDatabase.open(root, async () => NO_LEGACY_JOURNAL_RECORDS)
   const journal = await openAgentSessionJournal({
     database,
     identity: {

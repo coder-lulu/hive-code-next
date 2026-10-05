@@ -58,11 +58,7 @@ export function MobileBrowserAddressField({
       />
       {fileLabel ? (
         <View pointerEvents="none" style={styles.fileLabelHost}>
-          <Text
-            style={styles.fileLabel}
-            numberOfLines={1}
-            ellipsizeMode="middle"
-          >
+          <Text style={styles.fileLabel} numberOfLines={1} ellipsizeMode="middle">
             {fileLabel}
           </Text>
         </View>

@@ -22,6 +22,7 @@ import {
 import { isRemoteRuntimePtyId } from './paired-parked-terminal-restore'
 import { TRANSPORT_CONNECT_SETTLE_GRACE_MS } from './pty-connect-limits'
 import { shouldRetainDisposedPaneSpawn } from './disposed-spawn-retention'
+import { buffersInputOnlyForSshReattach } from './ssh-reattach-input-buffering'
 
 import type { ConnectPanePtySession } from './connect-pane-pty-session'
 import { resolveTerminalInlineImagesEnabled } from '../../../../../shared/terminal-inline-images-settings'
@@ -37,11 +38,14 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
     ? { foreground: session.terminalTheme.foreground, background: session.terminalTheme.background }
     : undefined
   session.agentLaunchPreferences = toAgentLaunchPreferences(session.paneStartup?.sessionOptions)
+  session.buffersInputOnlyForReattach = buffersInputOnlyForSshReattach(session)
   session.transportOptions = {
     terminalKittyKeyboardProtocol:
       session.pane.terminal.options.vtExtensions?.kittyKeyboard === true,
     cwd: session.deps.cwd,
-    ...(session.deps.cwdPromise || session.deps.preconnectInput?.length
+    ...(session.deps.cwdPromise ||
+    session.deps.preconnectInput?.length ||
+    session.buffersInputOnlyForReattach
       ? { bufferInputUntilConnect: true }
       : {}),
     ...(session.deps.preconnectInput?.length
@@ -164,16 +168,19 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
   // desktop silent while the elected mobile xterm owns query replies.
   session.sendDesktopQueryReplyImmediate = (data: string): boolean =>
     session.canSendDesktopQueryReply() && session.transport.sendInputImmediate(data)
+  const acceptsHiddenMode2031Fact = (): boolean => {
+    const ptyId = session.transport.getPtyId()
+    return (
+      !session.disposed &&
+      (session.isHiddenDeliveryGateManagedPty(ptyId) || session.remoteOutputGatedPtyId === ptyId)
+    )
+  }
   // Why (gate mode only): gate-managed PTYs never see the subscribe bytes, so this fact is
   // their only cue to record the subscription — without the registry entry a later theme
   // flip never pushes the CSI 997 update and the TUI keeps a stale theme after reveal.
   // Record-only: a subscribe is not a query (see session.observeLiveMode2031Chunk, #9993).
   session.handleHiddenMode2031SubscribeFact = (): void => {
-    const ptyId = session.transport.getPtyId()
-    if (
-      session.disposed ||
-      (!session.isHiddenDeliveryGateManagedPty(ptyId) && session.remoteOutputGatedPtyId !== ptyId)
-    ) {
+    if (!acceptsHiddenMode2031Fact()) {
       return
     }
     const mode = resolveTerminalColorSchemeMode(
@@ -189,11 +196,7 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
   // set, and the next theme flip pushes CSI 997 into the shell that replaced it
   // (#9993 via maybePushMode2031Flip).
   session.handleHiddenMode2031UnsubscribeFact = (): void => {
-    const ptyId = session.transport.getPtyId()
-    if (
-      session.disposed ||
-      (!session.isHiddenDeliveryGateManagedPty(ptyId) && session.remoteOutputGatedPtyId !== ptyId)
-    ) {
+    if (!acceptsHiddenMode2031Fact()) {
       return
     }
     session.deps.paneMode2031Ref.current.delete(session.pane.id)
@@ -214,6 +217,7 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
     sixelSupported: () =>
       resolveTerminalInlineImagesEnabled(useAppStore.getState().settings?.terminalInlineImages) &&
       terminalRendersInlineImages(session.pane.terminal),
+    skipOscColorQueryReplies: () => !session.shouldAnswerPaneOscColorQueries(),
     ...(session.isNativeWindowsConpty ? { da1Response: CONPTY_DA1_RESPONSE } : {})
   })
   session.respondToTerminalPixelSizeQueries = createTerminalPixelSizeQueryResponder(
@@ -230,7 +234,7 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
     try {
       proposed = session.pane.fitAddon.proposeDimensions()
     } catch {
-      proposed = undefined
+      // A failed fit probe keeps the terminal's existing dimensions.
     }
     const cols = proposed?.cols ?? session.pane.terminal.cols
     const rows = proposed?.rows ?? session.pane.terminal.rows

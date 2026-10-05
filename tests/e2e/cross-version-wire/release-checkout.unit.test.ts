@@ -26,6 +26,7 @@ import {
 } from './release-checkout'
 import { extractReleaseCheckoutTree } from './release-checkout-tree'
 const temporaryRoots: string[] = []
+const temporaryRefs: { ref: string; commit: string }[] = []
 
 const COMPRESSED_LOCK_OPTIONS: CheckoutLockOptions = {
   realpath: false,
@@ -279,6 +280,9 @@ async function runContentionPhase(
 }
 
 afterEach(() => {
+  for (const { ref, commit } of temporaryRefs.splice(0)) {
+    git(['update-ref', '-d', ref, commit])
+  }
   for (const root of temporaryRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true })
   }

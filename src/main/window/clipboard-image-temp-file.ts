@@ -9,7 +9,6 @@ import {
   assertClipboardImageByteLengthWithinLimit,
   CLIPBOARD_IMAGE_TEMP_FILE_PREFIX
 } from '../../shared/clipboard-image'
-import { authorizeExternalPath } from '../ipc/filesystem-auth'
 
 export type SaveClipboardImageAsTempFileArgs = {
   connectionId?: string | null
@@ -45,8 +44,5 @@ export async function saveClipboardImageBufferAsTempFile(
 
   const tempPath = path.join(getAppEnvironment().getPath('temp'), fileName)
   await fs.writeFile(tempPath, buffer)
-  // Why: the OS temp dir is outside every allowed root, so without this the
-  // composer's own thumbnail/preview read of the file it just wrote is denied.
-  authorizeExternalPath(tempPath)
   return tempPath
 }

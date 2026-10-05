@@ -4,7 +4,10 @@ import {
   type LaunchAgentInNewTabArgs as ContextLaunchAgentInNewTabArgs,
   type LaunchAgentInNewTabResult
 } from './launch-agent-in-new-tab-context'
-export type { LaunchAgentInNewTabResult } from './launch-agent-in-new-tab-context'
+export type {
+  AgentLaunchSurface,
+  LaunchAgentInNewTabResult
+} from './launch-agent-in-new-tab-context'
 export type LaunchAgentInNewTabArgs = ContextLaunchAgentInNewTabArgs & {
   onPromptDeliveryUnconfirmed?: () => void
 }
@@ -37,7 +40,7 @@ import { resolveTuiAgentLaunchPermission } from '../../../shared/tui-agent-permi
 import { seedCommandCodeSubmittedPromptStatus } from '@/lib/command-code-prompt-status-seed'
 import { resolveInitialNativeChatSessionOptions } from '@/components/native-chat/native-chat-launch-session-options'
 import { seedNativeChatAppliedSessionOptions } from '@/components/native-chat/native-chat-session-option-cache'
-import { launchAgentInStructuredNewTab } from '@/lib/launch-agent-in-new-tab-structured'
+import { launchStructuredAgentFromNewTab } from '@/lib/launch-agent-in-new-tab-structured-route'
 import { workspaceKindForWorktreeId } from '@/lib/agent-launch-route-input'
 import { planAgentSessionLaunch } from '@/lib/agent-session-launch-plan'
 
@@ -67,7 +70,6 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
     launchPlatform,
     onPromptDelivered,
     onPromptDeliveryUnconfirmed,
-    agentSessionLaunchPlan,
     pendingActivationSpawn,
     beforeSurfaceOpen
   } = args
@@ -147,6 +149,48 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
     startupPlan.agentPermissionMode = agentPermissionMode
   }
 
+  // Why first: a structured chat is created on whichever runtime owns the workspace, a paired
+  // server included, so only a non-structured route falls through to the host-published terminal.
+  const plan =
+    args.requestId === undefined
+      ? args.agentSessionLaunchPlan
+      : planAgentSessionLaunch(store, {
+          requestId: args.requestId,
+          agent,
+          workspace: { kind: workspaceKind, worktreeId, executionHostId: resolvedExecutionHostId },
+          prompt: trimmedPrompt,
+          promptDelivery: viewModePromptDelivery,
+          tuiCustomization: { cwd: initialCwd, agentArgs, agentPermissionMode },
+          initialSessionOptions: startupPlan.sessionOptions,
+          onPromptDelivered
+        })
+  if (plan?.route === 'structured-native-chat') {
+    const structured = launchStructuredAgentFromNewTab({
+      plan,
+      worktreeId,
+      ...(groupId ? { groupId } : {}),
+      ...(beforeSurfaceOpen ? { beforeSurfaceOpen } : {}),
+      // A paired server's "no" opens this same launch as a terminal, with the caller's arguments.
+      openTerminal: (terminalPlan) =>
+        launchAgentInNewTabInternal({
+          ...args,
+          beforeSurfaceOpen: undefined,
+          requestId: undefined,
+          agentSessionLaunchPlan: terminalPlan
+        })
+    })
+    return (
+      structured && {
+        ...structured,
+        tabId: null,
+        startupPlan,
+        ...(structured.surface.kind === 'local-agent-session'
+          ? { focusAfterMenuClose: 'structured-session' as const }
+          : {})
+      }
+    )
+  }
+
   const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(store, worktreeId)
   if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
     if (beforeSurfaceOpen?.({ kind: 'host-published' }) === false) {
@@ -184,53 +228,6 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
   if (isWebClientLocation()) {
     throw new Error('Select a connected Host workspace before starting a task.')
   }
-
-  const plan =
-    agentSessionLaunchPlan ??
-    planAgentSessionLaunch(store, {
-      agent,
-      workspace: {
-        kind: workspaceKind,
-        worktreeId,
-        executionHostId: resolvedExecutionHostId
-      },
-      prompt: trimmedPrompt,
-      promptDelivery: viewModePromptDelivery,
-      tuiCustomization: { cwd: initialCwd, agentArgs, agentPermissionMode },
-      initialSessionOptions: startupPlan.sessionOptions,
-      onPromptDelivered
-    })
-  if (plan?.route === 'structured-native-chat') {
-    const structured = launchAgentInStructuredNewTab({
-      plan,
-      ...(beforeSurfaceOpen
-        ? {
-            beforeOpen: (sessionId: string) =>
-              beforeSurfaceOpen({ kind: 'local-agent-session', sessionId })
-          }
-        : {}),
-      ...(groupId ? { targetGroupId: groupId } : {})
-    })
-    if (!structured) {
-      return null
-    }
-    return {
-      surface: {
-        kind: 'local-agent-session',
-        tabId: structured.tabId,
-        sessionId: structured.sessionId
-      },
-      tabId: null,
-      startupPlan,
-      pasteDraftAfterLaunch: false,
-      focusAfterMenuClose: 'structured-session',
-      structuredSettlement: structured.structuredSettlement,
-      ...(structured.promptDeliveryResult
-        ? { promptDeliveryResult: structured.promptDeliveryResult }
-        : {})
-    }
-  }
-
   if (beforeSurfaceOpen?.({ kind: 'local-terminal' }) === false) {
     return null
   }

@@ -594,8 +594,8 @@ test('adopts runtime-owned agent and Setup PTYs on first mount', async ({
   expect(agent).toBeTruthy()
   expect(setup).toBeTruthy()
   expect(canary).toBeTruthy()
-  if (!agent?.ptyId || !setup?.ptyId) {
-    throw new Error('Agent and setup PTYs required')
+  if (!agent?.ptyId || !setup?.ptyId || !canary?.ptyId) {
+    throw new Error('Agent, setup, and canary PTYs required')
   }
   const agentPtyId = agent.ptyId
   const setupPtyId = setup.ptyId

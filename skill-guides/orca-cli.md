@@ -74,6 +74,7 @@ Common commands:
 hive repo list --json
 hive repo show --repo id:<repoId> --json
 hive repo add --path /abs/repo --json
+hive repo set --repo id:<repoId> --external-worktree-visibility show --json
 hive repo set-base-ref --repo id:<repoId> --ref origin/main --json
 hive repo search-refs --repo id:<repoId> --query main --limit 10 --json
 hive worktree list --repo id:<repoId> --json
@@ -88,8 +89,16 @@ hive worktree create --name independent-task --no-parent --json
 hive worktree set --worktree id:<repoId>::<worktreePath> --display-name "My Task" --json
 hive worktree set --worktree active --comment "reproduced bug; testing fix" --json
 hive worktree set --worktree active --workspace-status in-review --json
+hive worktree set --worktree active --unread --json
+hive worktree create --repo id:<repoId> --name review-task --pr 123 --json
+hive worktree set --worktree active --gitlab-issue '#42' --gitlab-mr '!77' --json
+hive worktree set --worktree active --pr null --gitlab-mr null --json
 hive worktree rm --worktree id:<repoId>::<worktreePath> --force --json
 ```
+
+Use `repo set --external-worktree-visibility show` to show a repo's non-Orca worktrees.
+`hide` hides them; `inherit` clears the repo override and follows the global default.
+Per-worktree visibility rules still apply.
 
 Selectors:
 
@@ -136,7 +145,17 @@ hive worktree set --worktree active --comment "fix implemented; running integrat
 
 Update after a repro, fix, validation, handoff, or blocker. Keep it short and current. A failed comment update is not an error to surface unless the user asked for HiveCode state.
 
-Card status uses `--workspace-status <id>`; defaults are `todo`, `in-progress`, `in-review`, `completed`.
+Card status uses `--workspace-status <id>`; defaults are `todo`, `in-progress`, `in-review`, `completed`. `--unread` puts the workspace's unread dot in the sidebar to ask for a person's attention; `--read` clears it.
+
+Issue/review links: `--pr` writes the GitHub pull request number; `--gitlab-issue` and
+`--gitlab-mr` write separate GitLab numbers and accept `#42` / `!77` respectively.
+All numbers must be positive safe integers. The GitLab flags also accept HTTP(S) URLs
+whose host/project match the workspace's stored GitLab source context or the repo's
+stored remote. They never select a foreign project or fetch a review branch. Absent
+flags leave links unchanged; literal `null` clears only the named link on `set` and
+is refused on `create`. Folder-based repos can store numeric links, but missing
+source/remote identity prevents URL validation and may leave provider links unavailable.
+Old runtimes that predate these existing fields may ignore them; verify with `worktree show --json`.
 
 ## Terminals
 
@@ -213,9 +232,9 @@ The commands, snapshot and ref rules, page affinity, and `browser_*` recoveries 
 
 This guide covers worktrees, terminals, and handoffs on its own. At a gate below, run `hive skills get orca-cli --reference references/<file>.md` and read only that document; `--references` lists the names. If the CLI rejects `--reference`, run `hive skills get orca-cli --full` once instead: it returns this guide plus every reference from the same CLI build, so read only the named one. If `--full` is rejected too, the CLI predates bundled references: use `hive <command> --help`, keep the rules above, and do not guess flags.
 
-| Action gate                                                                                                     | Reference                        |
-| --------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Action gate                                                                                                         | Reference                        |
+| ------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
 | Driving HiveCode's embedded browser: navigation, snapshots, refs, tabs, concurrent pages, or `browser_*` recoveries | `references/browser.md`          |
-| Creating, editing, running, or inspecting scheduled automations                                                 | `references/automations.md`      |
-| Publishing or revoking an artifact link, or publishing installed skills                                         | `references/publishing.md`       |
-| Mobile emulator taps, gestures, typing, buttons, camera, or permissions                                         | invoke the `orca-emulator` skill |
+| Creating, editing, running, or inspecting scheduled automations                                                     | `references/automations.md`      |
+| Publishing or revoking an artifact link, or publishing installed skills                                             | `references/publishing.md`       |
+| Mobile emulator taps, gestures, typing, buttons, camera, or permissions                                             | invoke the `orca-emulator` skill |

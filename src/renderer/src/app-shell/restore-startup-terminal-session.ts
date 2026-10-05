@@ -1,5 +1,5 @@
 import { toRuntimeExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
-import { restoreLocalStructuredSessionTabsOnce } from '../runtime/local-structured-session-tabs-sync'
+import { restoreLocalStructuredChatsAtStartup } from '../runtime/local-structured-chats'
 import {
   collectTerminalProviderSnapshotPtyIds,
   refreshTerminalProviderSnapshotCapabilities
@@ -29,11 +29,9 @@ export async function restoreStartupTerminalSession(
   await timeRendererStartupStep('recover-legacy-worker-terminals-post-reconnect', () =>
     window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
   )
-  if (useAppStore.getState().settings?.experimentalStructuredNativeChat === true) {
-    await timeRendererStartupStep('project-structured-session-tabs', () =>
-      restoreLocalStructuredSessionTabsOnce()
-    )
-  }
+  await restoreLocalStructuredChatsAtStartup(useAppStore.getState().settings, (restore) =>
+    timeRendererStartupStep('project-structured-session-tabs', restore)
+  )
 }
 
 export async function listRuntimeSessionHostIdsForStartup(): Promise<ExecutionHostId[]> {

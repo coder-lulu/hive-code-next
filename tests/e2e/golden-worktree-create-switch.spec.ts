@@ -1,3 +1,4 @@
+import { removeWorktreeViaStore } from './helpers/dead-terminal'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import {
@@ -32,17 +33,6 @@ async function createWorkspace(page: Page, name: string): Promise<void> {
   await dialog.getByPlaceholder(/Type a name/i).fill(name)
   await dialog.getByRole('button', { name: /Create (Workspace|Worktree)/i }).click()
   await expect(dialog).toBeHidden({ timeout: 20_000 })
-}
-
-async function removeCreatedWorktree(page: Page, worktreeId: string): Promise<void> {
-  await page.evaluate(async (id) => {
-    const state = window.__store?.getState()
-    const worktree = state?.allWorktrees().find((entry) => entry.id === id)
-    if (!state || !worktree) {
-      throw new Error(`Worktree unavailable: ${id}`)
-    }
-    await state.removeWorktree({ id, executionHostId: worktree.hostId ?? null }, true)
-  }, worktreeId)
 }
 
 test('creates a worktree, keeps its terminal isolated, and switches back @golden', async ({
@@ -99,7 +89,7 @@ test('creates a worktree, keeps its terminal isolated, and switches back @golden
           .click()
           .catch(() => undefined)
       }
-      await removeCreatedWorktree(orcaPage, childWorktreeId).catch(() => undefined)
+      await removeWorktreeViaStore(orcaPage, childWorktreeId)
     }
   }
 })

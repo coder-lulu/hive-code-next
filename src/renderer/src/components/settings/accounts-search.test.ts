@@ -3,6 +3,7 @@ import { i18n } from '../../i18n/i18n'
 import {
   getAccountsCodexSearchEntries,
   getAccountsMiniMaxSearchEntries,
+  getAccountsPaneSearchEntries,
   getAccountsOpencodeSearchEntries
 } from './accounts-search'
 import { resolveAccountsPaneNavigation } from './accounts-pane-navigation'
@@ -22,6 +23,24 @@ describe('provider account settings search', () => {
       accountSheet: 'codex',
       credentialSheet: null
     })
+  })
+})
+
+describe('getAccountsPaneSearchEntries', () => {
+  it('keeps Antigravity and GLM plan settings discoverable in pane order', () => {
+    const entries = getAccountsPaneSearchEntries()
+    const titles = entries.map((entry) => entry.title)
+    expect(
+      titles.filter((title) =>
+        ['Antigravity Accounts', 'Cursor Usage', 'GLM Coding Plan'].includes(title)
+      )
+    ).toEqual(['Antigravity Accounts', 'Cursor Usage', 'GLM Coding Plan'])
+    expect(entries.find((entry) => entry.title === 'Antigravity Accounts')?.keywords).toEqual(
+      expect.arrayContaining(['antigravity', 'agy', 'google', 'accounts'])
+    )
+    expect(entries.find((entry) => entry.title === 'GLM Coding Plan')?.keywords).toEqual(
+      expect.arrayContaining(['glm', 'zai', 'zhipu', 'bigmodel', 'coding plan'])
+    )
   })
 })
 

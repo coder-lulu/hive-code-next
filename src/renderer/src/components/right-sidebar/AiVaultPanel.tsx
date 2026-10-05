@@ -70,6 +70,8 @@ export default function AiVaultPanel(): React.JSX.Element {
   const projectHostSetupProjection = useProjectHostSetupProjection()
   const resumeTargetState = useAppStore(
     useShallow((state) => ({
+      projects: state.projects,
+      settings: state.settings,
       folderWorkspaces: state.folderWorkspaces,
       projectGroups: state.projectGroups,
       repos: state.repos,
@@ -128,7 +130,7 @@ export default function AiVaultPanel(): React.JSX.Element {
     () => deriveAiVaultWorkspaceScopePaths(activeWorktree ?? null, allWorktrees),
     [activeWorktree, allWorktrees]
   )
-  const projectScopeContext = useMemo(
+  const { activeProjectKey, projectLabelByKey } = useMemo(
     () =>
       buildAiVaultProjectContext({
         repos,
@@ -140,12 +142,10 @@ export default function AiVaultPanel(): React.JSX.Element {
       }),
     [activeRepo, activeWorktree, allWorktrees, projectHostSetupProjection, repos]
   )
-  const activeProjectKey = projectScopeContext.activeProjectKey
   const { scope, handleScopeChange } = useAiVaultPanelScope({
     activeProjectKey,
     activeWorktreePath
   })
-  const projectLabelByKey = projectScopeContext.projectLabelByKey
   // Sent to the scanner so scoped views surface sessions older than the global cap.
   const scopePaths = useMemo(
     () =>

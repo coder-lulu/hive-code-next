@@ -71,7 +71,7 @@ export async function readTerminalPtyWriteEntries(
 }
 
 export async function setTerminalPtyWriteDelay(
-  app: ElectronApplication,
+  app: Pick<ElectronApplication, 'evaluate'>,
   delayMs: number
 ): Promise<void> {
   await app.evaluate((_, nextDelayMs) => {

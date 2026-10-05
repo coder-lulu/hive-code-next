@@ -10,7 +10,7 @@ import type {
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { RuntimeEnvironmentAccountClaim } from '../../shared/runtime-environments'
 import type { HiveAccountRuntimeDirectoryService } from './hive-account-runtime-directory-service'
-import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/protocol-version'
+import { NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/protocol-version'
 import { toHiveAccountRelayClientError } from '../../shared/hive-account-relay-errors'
 
 const unavailable = () =>
@@ -150,7 +150,7 @@ export class HiveAccountRuntimeTransport {
       throw unavailable()
     }
     const pool = new HiveAccountRelayPool({
-      clientCapabilities: ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES,
+      clientCapabilities: NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES,
       createMaterial: () =>
         this.directory.createConnection(claim.runtimeRecordId, claim.resourceVersion),
       createSocket: this.socketFactory

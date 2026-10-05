@@ -16,7 +16,7 @@ import { installMainProcessQuitHandlers } from './startup/main-process-quit'
 import { shouldActivateDesktopForSecondInstance } from './startup/single-instance-lock'
 import { capturePairingProtocolUrl } from './startup/main-process-pairing-protocol'
 import { isPairingProtocolUrl } from './startup/protocol-handler'
-import { resolveOpenedMarkdownDocuments } from './startup/os-opened-markdown-files'
+import { resolveOsOpenedDocuments } from './startup/os-opened-documents'
 import {
   formatProfileStateStartupFailure,
   isDivergedProfileStateFailure,
@@ -44,7 +44,7 @@ function requestDesktopActivation(argv: readonly string[] = []): void {
   state.skillShareDeepLinks.capture(argv, (shareId) => {
     state.mainWindow?.webContents.send('ui:openSkillShare', shareId)
   })
-  state.osOpenedMarkdownFiles.capture(argv, publishOsOpenedMarkdownFiles)
+  state.osOpenedDocuments.capture(argv, publishOsOpenedDocuments)
   // Why: a duplicate `orca serve` must not drag a headless server into opening a desktop window (#11935).
   if (!shouldActivateDesktopForSecondInstance(argv)) {
     return
@@ -56,26 +56,26 @@ function requestDesktopActivation(argv: readonly string[] = []): void {
 }
 
 /**
- * Hands buffered OS-opened markdown paths to a renderer that has proven it is listening.
+ * Hands buffered OS-opened document paths to a renderer that has proven it is listening.
  *
  * Until that proof arrives the paths stay buffered, because `webContents.send` to a renderer
  * with no listener attached is dropped silently and the queue would be gone.
  */
-function publishOsOpenedMarkdownFiles(): void {
+function publishOsOpenedDocuments(): void {
   const targetWindow = state.mainWindow
-  if (!state.markdownFileOpenListenerReady || !targetWindow || targetWindow.isDestroyed()) {
+  if (!state.osDocumentOpenListenerReady || !targetWindow || targetWindow.isDestroyed()) {
     return
   }
   // Why consumed before the await: a renderer pull racing this resolve must not take the same
   // batch again. The restore() calls hand it back if delivery turns out to be impossible.
-  const filePaths = state.osOpenedMarkdownFiles.consume()
+  const filePaths = state.osOpenedDocuments.consume()
   if (filePaths.length === 0) {
     return
   }
-  void resolveOpenedMarkdownDocuments(filePaths)
+  void resolveOsOpenedDocuments(filePaths)
     .then((documents) => {
       if (targetWindow.isDestroyed() || targetWindow.webContents.isDestroyed()) {
-        state.osOpenedMarkdownFiles.restore(filePaths)
+        state.osOpenedDocuments.restore(filePaths)
         return
       }
       if (documents.length > 0) {
@@ -83,8 +83,8 @@ function publishOsOpenedMarkdownFiles(): void {
       }
     })
     .catch((error) => {
-      state.osOpenedMarkdownFiles.restore(filePaths)
-      console.warn('[os-open] Failed to resolve OS-opened markdown files:', error)
+      state.osOpenedDocuments.restore(filePaths)
+      console.warn('[os-open] Failed to resolve OS-opened documents:', error)
     })
 }
 
@@ -108,9 +108,9 @@ if (preflightReady) {
     requestDesktopActivation([url])
   })
   // Why: macOS delivers "Open With" as open-file, often before `ready`, and only to a handler
-  // that claims the event. Non-markdown paths stay unclaimed so the OS default handler wins.
+  // that claims the event. Unsupported paths stay unclaimed.
   app.on('open-file', (event, filePath) => {
-    if (!state.osOpenedMarkdownFiles.captureFilePaths([filePath], publishOsOpenedMarkdownFiles)) {
+    if (!state.osOpenedDocuments.captureFilePaths([filePath], publishOsOpenedDocuments)) {
       return
     }
     event.preventDefault()
@@ -123,7 +123,7 @@ if (preflightReady) {
   state.skillShareDeepLinks.capture(process.argv)
   capturePairingProtocolUrl(process.argv)
   // Why no publish: nothing is listening this early, so the first renderer pulls these on mount.
-  state.osOpenedMarkdownFiles.capture(process.argv)
+  state.osOpenedDocuments.capture(process.argv)
   registerMainProcessIpcHandlers()
   installMainProcessQuitHandlers()
   void app.whenReady().then(async () => {

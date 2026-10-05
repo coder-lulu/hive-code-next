@@ -17,7 +17,7 @@ import {
   resolveTabAgentFromSignals
 } from './tab-agent-from-signals'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
-import type { TuiAgent } from '../../../shared/tui-agent'
+import type { TerminalAgent } from '../../../shared/terminal-agent'
 
 /**
  * Resolve which coding-harness agent a terminal tab is running, for its tab-bar
@@ -33,7 +33,7 @@ import type { TuiAgent } from '../../../shared/tui-agent'
  * 6. launchAgent — bootstrap before any hook/process signal; cleared once exit evidence shows it left.
  * 7. Sibling-pane identity (live, then completed/retained) — split-tab fallback.
  */
-export function useTabAgent(tab: TerminalTab): TuiAgent | null {
+export function useTabAgent(tab: TerminalTab): TerminalAgent | null {
   const focusedHookAgent = useAppStore((s) =>
     resolveFocusedTabAgent(s.agentStatusByPaneKey, s.terminalLayoutsByTabId[tab.id], tab.id)
   )

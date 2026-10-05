@@ -55,6 +55,7 @@ describe('MobileNativeChatTurnStatus', () => {
   function render(props: {
     startedAt: number | null
     workedSeconds?: number | null
+    verdict?: 'interruption' | 'cancellation' | 'failure' | 'superseded'
     expanded?: boolean
     onToggleExpanded?: () => void
   }): ReactTestRenderer {
@@ -83,6 +84,35 @@ describe('MobileNativeChatTurnStatus', () => {
     expect(button.props.accessibilityState).toEqual({ expanded: false })
     act(() => button.props.onPress())
     expect(onToggleExpanded).toHaveBeenCalledOnce()
+  })
+
+  // The crash's notice row explains the cut; the turn bar reads like any finished turn.
+  it('heads a turn a crash cut off as worked, and a turn the user stopped as interrupted', () => {
+    const crashed = render({
+      startedAt: Date.now(),
+      workedSeconds: 12,
+      verdict: 'interruption',
+      onToggleExpanded: vi.fn()
+    })
+    expect(labels(crashed.root)).toEqual(['处理完成 · 12s'])
+    act(() => crashed.unmount())
+    const stopped = render({
+      startedAt: Date.now(),
+      workedSeconds: 12,
+      verdict: 'cancellation',
+      onToggleExpanded: vi.fn()
+    })
+    expect(labels(stopped.root)).toEqual(['已中断 · 12s'])
+  })
+
+  it.each([
+    ['failure', '处理失败'],
+    ['superseded', '已中断']
+  ] as const)('shows the host verdict %s without retaining a live timer', (verdict, caption) => {
+    const tree = render({ startedAt: Date.now(), workedSeconds: 12, verdict })
+    expect(labels(tree.root)).toEqual([`${caption} · 12s`])
+    expect(vi.getTimerCount()).toBe(0)
+    expect(spinners(tree.root)).toHaveLength(0)
   })
 
   it('stays a plain row when the settled turn has nothing to disclose', () => {

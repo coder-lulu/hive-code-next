@@ -53,6 +53,7 @@ function targetState(state: AgentStatusState, split = false): NotesSendAgentTarg
       }
     },
     tabsByWorktree: { wt: [tab] },
+    unifiedTabsByWorktree: {},
     terminalLayoutsByTabId: { tab: layout },
     ptyIdsByTabId: { tab: split ? ['pty-a', 'pty-b'] : ['pty-a'] },
     runtimePaneTitlesByTabId: { tab: { [split ? 2 : 1]: 'Codex ready' } }

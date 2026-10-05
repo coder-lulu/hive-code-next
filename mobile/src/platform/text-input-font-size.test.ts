@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from 'vitest'
 // The stylesheets are the subject, so react-native is stubbed down to what they touch rather than
 // parsed: its entry point is Flow, which this runner does not read.
 vi.mock('react-native', () => ({
-  Platform: { select: (choices: { default?: string; ios?: string }) => choices.ios ?? choices.default },
+  Platform: {
+    select: (choices: { default?: string; ios?: string }) => choices.ios ?? choices.default
+  },
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     hairlineWidth: 1

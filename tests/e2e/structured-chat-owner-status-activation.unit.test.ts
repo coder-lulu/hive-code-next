@@ -28,6 +28,7 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
+import { createStructuredAgentSessionLogger } from '../../src/main/native-chat/agent-session-wire/structured-agent-session-logger'
 
 const WORKTREE = 'repo-1::/workspace/repo'
 
@@ -39,6 +40,7 @@ let closeSession: Mock<NonNullable<StructuredAgentSessionAdapter['closeSession']
 
 function openHost(): void {
   host = new StructuredAgentSessionHost({
+    logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
       acquire: async ({ fence, spawnToken }) => ({

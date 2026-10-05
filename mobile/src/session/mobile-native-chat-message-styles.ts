@@ -46,6 +46,10 @@ export function createMobileNativeChatMessageStyles(theme: MobileTheme) {
       backgroundColor: theme.color.brand.subtle,
       borderRadius: theme.radii.card
     },
+    hostNotice: {
+      ...theme.typography.body,
+      color: theme.color.text.secondary
+    },
     reasoning: {
       opacity: 0.72
     },

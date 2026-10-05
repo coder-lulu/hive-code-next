@@ -1,4 +1,4 @@
-import { applyProductBranding, APP_DISPLAY_NAME } from '../../../shared/brand'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 /**
  * Resolves an orchestration caller that names itself by the Orca agent session id in its injected
  * environment. Both dispatchers call this once, before params parse and the unary/streaming split,
@@ -13,12 +13,17 @@ import { applyProductBranding, APP_DISPLAY_NAME } from '../../../shared/brand'
  * - A live lease: released, mid owner change or unreconciled sessions cannot act.
  * - The session wins over any declared caller: a declared handle must name this same session, and
  *   a structured worker's session id maps to the handle and pane it was minted.
- * - A request with no session id that declares a `session:` caller gets the party it names: a
+ * - A request with no session id that declares an `orca_session_id:` caller gets the party it names: a
  *   worker's handle, or a refusal for a chat, whose address alone identifies nobody.
  */
 import { agentSessionLeaseAdmitsWriter } from '../../../shared/agent-session-lease-adjudication'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
-import { isOrcaSessionId, parseOrcaSessionAddress } from '../../../shared/orca-session-address'
+import { ORCA_AGENT_SESSION_ID_ENV } from '../../../shared/agent-session-caller-env'
+import {
+  ORCA_SESSION_ADDRESS_PREFIX,
+  isOrcaSessionId,
+  parseOrcaSessionAddress
+} from '../../../shared/orca-session-address'
 import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as CODES } from '../../../shared/orchestration-session-caller-codes'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { OrchestrationSessionCaller } from '../orchestration/orchestration-caller-identity'
@@ -75,7 +80,7 @@ export type ResolvedOrchestrationRequest = {
 const NO_EFFECTS = { effectsApplied: false } as const
 
 /**
- * Whether this request names its caller by a session id, or declares a `session:` address as its
+ * Whether this request names its caller by a session id, or declares an `orca_session_id:` address as its
  * caller. Synchronous, so every other request, terminal callers included, takes no extra async hop.
  */
 export function needsOrchestrationCallerResolution(request: RpcRequest): boolean {
@@ -112,22 +117,18 @@ export async function resolveOrchestrationSessionCaller(
   const claimed: unknown = evidence?.agentSessionId
   if (route?.pairedDeviceId !== undefined) {
     throw hostBoundary(
-      applyProductBranding(
-        'This request reached Orca from a paired client, and an agent session id identifies a caller only on the host that runs that session.'
-      )
+      `This request reached ${APP_DISPLAY_NAME} from a paired client, and a ${APP_DISPLAY_NAME} session ID identifies a caller only on the host that runs that session.`
     )
   }
   if (evidence?.host) {
     throw hostBoundary(
-      `This command ran in ${evidence.host.kind === 'ssh' ? 'an SSH' : 'a WSL'} environment, and an agent session id identifies a caller only on the host that runs that session.`
+      `This command ran in ${evidence.host.kind === 'ssh' ? 'an SSH' : 'a WSL'} environment, and a ${APP_DISPLAY_NAME} session ID identifies a caller only on the host that runs that session.`
     )
   }
   if (typeof claimed !== 'string' || !isOrcaSessionId(claimed)) {
     throw new OrchestrationError(
       CODES.unknown,
-      applyProductBranding(
-        'The caller named an agent session id that is not an Orca session id. No effects were applied.'
-      ),
+      `The caller named an ID that is not a ${APP_DISPLAY_NAME} session ID. No effects were applied.`,
       NO_EFFECTS
     )
   }
@@ -176,7 +177,7 @@ async function readSessionRecord(
   if (found.kind === 'provider-id') {
     throw new OrchestrationError(
       CODES.providerId,
-      `${sessionId} is the provider's own session id, which changes on /clear. This session's ${APP_DISPLAY_NAME} id is ${found.orcaSessionId}; use that instead. No effects were applied.`,
+      `${sessionId} is the provider's own session id, which changes on /clear. This session's ${APP_DISPLAY_NAME} session ID is ${ORCA_SESSION_ADDRESS_PREFIX}${found.orcaSessionId}; set ${ORCA_AGENT_SESSION_ID_ENV}=${found.orcaSessionId} instead. No effects were applied.`,
       { ...NO_EFFECTS, orcaSessionId: found.orcaSessionId }
     )
   }
@@ -190,7 +191,7 @@ async function readSessionRecord(
 function assertSessionCanAct(sessionId: string, record: AgentSessionRecord): void {
   if (!structuredWorkerHostScope(record.location)) {
     throw hostBoundary(
-      `Agent session ${sessionId} runs on another host, and an agent session id identifies a caller only on the host that runs that session.`
+      `Agent session ${sessionId} runs on another host, and a ${APP_DISPLAY_NAME} session ID identifies a caller only on the host that runs that session.`
     )
   }
   if (agentSessionLeaseAdmitsWriter(record.lease)) {
@@ -211,7 +212,7 @@ function assertSessionCanAct(sessionId: string, record: AgentSessionRecord): voi
   )
 }
 
-/** A request with no session id that declares a `session:` caller: a worker's is its handle. */
+/** A request with no session id that declares an `orca_session_id:` caller: a worker's is its handle. */
 function bindDeclaredSessionAddress(db: OrchestrationDb, request: RpcRequest): RpcRequest {
   const name = ORCHESTRATION_CALLER_PARAM[request.method]
   const declared = declaredSessionAddress(request)

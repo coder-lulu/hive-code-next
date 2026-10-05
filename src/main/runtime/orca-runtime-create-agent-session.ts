@@ -17,9 +17,9 @@ import {
 } from './orca-runtime-core'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
 import { resolveAgentStartupPlanInputs } from '../../shared/agent-startup-plan-inputs'
-import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '../../shared/tui-agent-startup'
 import { resolveTuiAgentLaunchPermission } from '../../shared/tui-agent-permissions'
 import { resolveStartupShell } from '../../shared/tui-agent-startup-shell'
+import { buildExecutionHostAgentStartupPlan } from '../opencode/opencode-model-startup-plan'
 import type { RuntimeTerminalCreate } from '../../shared/runtime-types'
 import type {
   AgentSessionCreateOperation,
@@ -178,14 +178,14 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
         ...permissionConfig,
         agentPermissionMode: request.agentPermissionMode
       }
-      const startup =
-        request.promptDelivery === 'draft'
-          ? buildAgentDraftLaunchPlan({ ...startupArgs, draft: request.prompt ?? '' })
-          : buildAgentStartupPlan({
-              ...startupArgs,
-              prompt: request.prompt ?? '',
-              allowEmptyPromptLaunch: true
-            })
+      const startup = await buildExecutionHostAgentStartupPlan({
+        inputs: startupArgs,
+        cwd: startupCwd ?? workspace.path,
+        prompt: request.prompt ?? '',
+        promptDelivery: request.promptDelivery,
+        hostIdentity: this.runtimeId,
+        signal: caller.signal
+      })
       if (!startup) {
         throw new Error('agent_session_identity_required')
       }

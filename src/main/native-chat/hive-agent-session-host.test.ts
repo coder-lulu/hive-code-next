@@ -1,3 +1,9 @@
+import {
+  openTestAgentSessionRecordStore,
+  importTestLegacyAgentSessionRecordStore,
+  readPersistedTestAgentSessionStoreText,
+  editPersistedTestAgentSessionStore
+} from '../runtime/agent-session-record-store-test-harness'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../shared/agent-session-journal-types'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -7,13 +13,15 @@ import {
   HIVE_AGENT_METHODS,
   type AuthenticatedRuntimePrincipal
 } from '../../shared/hive-agent-session-methods'
-import { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
-import { agentSessionStorePath } from '../runtime/agent-session-record-store-file'
-import { AGENT_SESSION_STORE_SCHEMA_VERSION as VER } from '../runtime/agent-session-store-contract'
+import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
+import { legacyAgentSessionStorePath } from '../runtime/agent-session-record-store-file'
 import { HiveAgentSessionHost } from './hive-agent-session-host'
 import type { HiveAgentHostDependencies } from './hive-agent-session-dependencies'
 import { HiveAgentFakeAdapter } from './hive-agent-fake-adapter'
-import { createTrackedJournalOpener } from './agent-session-journal/journal-host-database-test-support'
+import {
+  createTrackedJournalOpener,
+  openTestJournalHostDatabase
+} from './agent-session-journal/journal-host-database-test-support'
 import { journalDatabasePath } from './agent-session-journal/journal-host-database'
 import type { AgentSessionJournal } from './agent-session-journal/journal-store'
 import { recoverHiveAgentSessions } from './hive-agent-session-recovery'
@@ -51,11 +59,21 @@ async function create(id = sessionId()) {
   return id
 }
 
+function waitForAbort(signal: AbortSignal): Promise<void> {
+  return new Promise((resolveWait) => {
+    if (signal.aborted) {
+      resolveWait()
+    } else {
+      signal.addEventListener('abort', () => resolveWait(), { once: true })
+    }
+  })
+}
+
 beforeEach(async () => {
   const artifactRoot = join(process.cwd(), 'logs/hive-agent-session-tests')
   await mkdir(artifactRoot, { recursive: true })
   root = await mkdtemp(join(artifactRoot, 'store-'))
-  store = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+  store = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
   opened = new Map()
   principal = {
     kind: 'local',
@@ -393,7 +411,7 @@ describe('HiveAgent durable text facade', () => {
     expect(await call('delete', { sessionId: id, operationId: operationId() })).toMatchObject({
       ok: false
     })
-    const restartedStore = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+    const restartedStore = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
     const restarted = await HiveAgentSessionHost.open({ ...deps, store: restartedStore })
     expect(restartedStore.hive.get(id)?.deletionComplete).toBe(true)
     expect(journal.snapshot().items).toEqual([])
@@ -488,7 +506,9 @@ describe('HiveAgent durable text facade', () => {
     const read = JSON.stringify(await call('read', { sessionId: id }))
     expect(read).not.toContain('vault-ref-1')
     expect(read).not.toContain('fake-secret-value')
-    expect(await readFile(agentSessionStorePath(root), 'utf8')).not.toContain('fake-secret-value')
+    expect(await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })).not.toContain(
+      'fake-secret-value'
+    )
     expect(JSON.stringify(opened.get(id)!.snapshot())).not.toContain('fake-secret-value')
   })
 
@@ -532,14 +552,7 @@ describe('HiveAgent durable text facade', () => {
 
   it('limits active generations to five and reclaims cancelled work', async () => {
     deps.adapter = new HiveAgentFakeAdapter({
-      wait: (signal) =>
-        new Promise((resolveWait) => {
-          if (signal.aborted) {
-            resolveWait()
-          } else {
-            signal.addEventListener('abort', () => resolveWait(), { once: true })
-          }
-        })
+      wait: waitForAbort
     })
     const ids = await Promise.all(Array.from({ length: 6 }, () => create()))
     for (const id of ids.slice(0, 5)) {
@@ -562,29 +575,34 @@ describe('HiveAgent durable text facade', () => {
 
   it('leaves memory and disk unchanged when atomic publication fails', async () => {
     const id = await create()
-    const before = await readFile(agentSessionStorePath(root), 'utf8')
-    const writes = await import('../durable-file-write')
-    vi.spyOn(writes, 'renameDurable').mockRejectedValueOnce(new Error('injected before rename'))
+    const before = await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })
+    vi.spyOn(openTestJournalHostDatabase(root), 'transaction').mockImplementationOnce(() => {
+      throw new Error('injected before commit')
+    })
     expect(
       await call('submit', { sessionId: id, operationId: operationId(), text: 'never-dispatch' })
     ).toMatchObject({ ok: false })
     expect(store.hive.get(id)?.aggregate.generation).toBeUndefined()
-    expect(await readFile(agentSessionStorePath(root), 'utf8')).toBe(before)
+    expect(await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })).toBe(before)
     expect((deps.adapter as HiveAgentFakeAdapter).dispatches).toBe(0)
   })
 
   it('recovers backup without allowing a lost operation to dispatch again', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(NOW)
     const id = await create()
-    const path = agentSessionStorePath(root)
-    const beforeIntent = await readFile(path, 'utf8')
+    const migrationRoot = join(root, 'legacy-recovery')
+    const path = legacyAgentSessionStorePath(migrationRoot)
+    await mkdir(join(migrationRoot, 'agent-sessions'), { recursive: true })
+    const beforeIntent = await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })
     const params = { sessionId: id, operationId: operationId(), text: 'once' }
     await call('submit', params)
     await host.drain()
     await writeFile(`${path}.bak`, beforeIntent)
     await writeFile(path, '{broken')
-    const recovered = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
-    expect(recovered.recoveredFromBackup).toBe(true)
+    const recovered = await importTestLegacyAgentSessionRecordStore(migrationRoot, {
+      hostId: 'host-1'
+    })
+    expect(await readFile(`${path}.bak`, 'utf8')).toBe(beforeIntent)
     expect(recovered.hive.get(id)).toMatchObject({
       accountId: 'account-1',
       deviceId: 'device-1',
@@ -624,7 +642,7 @@ describe('HiveAgent durable text facade', () => {
     expect((deps.adapter as HiveAgentFakeAdapter).dispatches).toBe(1)
     expect(events.length).toBeGreaterThan(1)
     dispose()
-    const reopened = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+    const reopened = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
     expect(reopened.hive.get(id)?.aggregate.generation?.state).toBe('COMPLETED')
     expect(await call('history', { sessionId: id })).toMatchObject({
       ok: true,
@@ -678,14 +696,7 @@ describe('HiveAgent durable text facade', () => {
 
   it('cancels a waiting generation and rejects late or stale generation work', async () => {
     deps.adapter = new HiveAgentFakeAdapter({
-      wait: (signal) =>
-        new Promise((resolveWait) => {
-          if (signal.aborted) {
-            resolveWait()
-          } else {
-            signal.addEventListener('abort', () => resolveWait(), { once: true })
-          }
-        })
+      wait: waitForAbort
     })
     const id = await create()
     await call('submit', { sessionId: id, operationId: operationId(), text: 'wait' })
@@ -743,22 +754,6 @@ describe('HiveAgent durable text facade', () => {
     )
   })
 
-  it('migrates v2 atomically, preserving its backup and rejecting corrupted metadata', async () => {
-    const path = agentSessionStorePath(root)
-    const v2 = JSON.stringify({
-      schemaVersion: 2,
-      hostId: 'host-1',
-      records: {},
-      operations: {},
-      retiredClaimKeys: [],
-      unusableRecords: {}
-    })
-    await writeFile(path, v2)
-    await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
-    expect(JSON.parse(await readFile(path, 'utf8')).schemaVersion).toBe(VER)
-    expect(await readFile(`${path}.bak`, 'utf8')).toBe(v2)
-  })
-
   it.each([
     ['recorded', 'COMPLETED'],
     ['kept-ledger', 'COMPLETED'],
@@ -805,18 +800,21 @@ describe('HiveAgent durable text facade', () => {
       }
       await journal.close()
       opened.delete(id)
-      const path = agentSessionStorePath(root)
-      const raw = JSON.parse(await readFile(path, 'utf8'))
-      const entry = raw.hiveSessions[id]
-      entry.aggregate.generation.state = 'RUNNING'
-      delete entry.aggregate.generation.finalReceiptRef
-      entry.aggregate.turn.state = 'RUNNING'
-      delete entry.aggregate.turn.finalizedAt
-      if (scenario !== 'kept-ledger') {
-        raw.operations = {}
-      }
-      await writeFile(path, JSON.stringify(raw))
-      const restarted = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+      await editPersistedTestAgentSessionStore(
+        root,
+        (raw) => {
+          const entry = raw.hiveSessions[id]
+          entry.aggregate.generation!.state = 'RUNNING'
+          delete entry.aggregate.generation!.finalReceiptRef
+          entry.aggregate.turn!.state = 'RUNNING'
+          delete entry.aggregate.turn!.finalizedAt
+          if (scenario !== 'kept-ledger') {
+            raw.operations = {}
+          }
+        },
+        { hostId: 'host-1' }
+      )
+      const restarted = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
       await recoverHiveAgentSessions({ ...deps, store: restarted })
       expect(restarted.hive.get(id)?.aggregate.generation?.state).toBe(expected)
       expect((deps.adapter as HiveAgentFakeAdapter).dispatches).toBe(1)

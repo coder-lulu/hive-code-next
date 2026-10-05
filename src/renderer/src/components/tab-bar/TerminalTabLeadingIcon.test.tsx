@@ -8,7 +8,12 @@ import type { TerminalTabActivityStatus } from './terminal-tab-activity-status'
 function renderStatus(status: TerminalTabActivityStatus): string {
   return renderToStaticMarkup(
     <TooltipProvider>
-      <TerminalTabLeadingIcon agent="codex" shell={undefined} isActive={false} />
+      <TerminalTabLeadingIcon
+        agent="codex"
+        activityStatus={status}
+        shell={undefined}
+        isActive={false}
+      />
       <TerminalTabActivityIndicator activityStatus={status} showUnreadActivity={false} />
     </TooltipProvider>
   )
@@ -52,7 +57,12 @@ describe('TerminalTabLeadingIcon', () => {
 
   it('falls back to the shell icon when a plain tab is inactive', () => {
     const markup = renderToStaticMarkup(
-      <TerminalTabLeadingIcon agent={null} shell={undefined} isActive={false} />
+      <TerminalTabLeadingIcon
+        agent={null}
+        activityStatus="inactive"
+        shell={undefined}
+        isActive={false}
+      />
     )
 
     expect(markup).toContain('data-shell-icon="generic"')
@@ -62,7 +72,12 @@ describe('TerminalTabLeadingIcon', () => {
   it('keeps the unread bell and identity after an unvisited completion', () => {
     const markup = renderToStaticMarkup(
       <>
-        <TerminalTabLeadingIcon agent="codex" shell={undefined} isActive={false} />
+        <TerminalTabLeadingIcon
+          agent="codex"
+          activityStatus="done"
+          shell={undefined}
+          isActive={false}
+        />
         <TerminalTabActivityIndicator activityStatus="done" showUnreadActivity />
       </>
     )

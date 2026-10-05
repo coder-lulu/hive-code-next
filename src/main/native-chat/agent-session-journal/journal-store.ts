@@ -27,7 +27,7 @@ import {
 import type { JournalReplacementItem } from './journal-epoch-replacement'
 import { readJournalSince } from './journal-cursor'
 import type { JournalHostDatabase } from './journal-host-database'
-import { readJournalRowsAfterCursor, type JournalLoad } from './journal-open'
+import { journalRowsAfterReader } from './journal-open'
 import {
   markJournalPendingSubmissionsUnknown,
   rejectJournalPendingSubmissions,
@@ -59,22 +59,25 @@ import type {
   ResolveDispatchInput
 } from './journal-store-contracts'
 import { queuedMessageConsumeHook, type JournalQueuedMessages } from './journal-queued-messages'
-import type { AgentJournalEpochReason } from './journal-row-schema'
-import type { JournalRowWriter } from './journal-row-writer'
+import {
+  journalQueueResumeRowBuilder,
+  journalStopEventRowBuilder
+} from './journal-stop-and-resume-rows'
+import type { AgentJournalEpochReason, JournalStopEvent } from './journal-row-schema'
+import type { JournalOperationReceipt, JournalRowWriter } from './journal-row-writer'
 import type { JournalEpochController } from './journal-epoch-controller'
 import { JournalWriteQueue } from './journal-write-queue'
 import { createJournalStoreCollaborators } from './journal-store-collaborators'
 import { journalStoreLoadedFields } from './journal-store-open'
-import type { JournalItemAppender } from './journal-item-appender'
+import type { JournalItemAppender, JournalResolvedItem } from './journal-item-appender'
 import type { JournalLifecycleBatchAppender } from './journal-lifecycle-batch-appender'
+import type { JournalStopMarks } from './journal-stop-marks'
 
 export { AgentSessionJournalError } from './journal-write-guards'
 
 export class AgentSessionJournal implements AgentSessionJournalReader {
   private readonly identity: AgentSessionJournalIdentity
   private readonly database: JournalHostDatabase
-  private readonly now: () => number
-  private readonly mintEpoch: () => string
 
   private state: JournalReducerState
   private readOnly = false
@@ -90,20 +93,19 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
   private readonly restore: () => Promise<void>
   /** Draft rows queued while the agent works; never reducer input or owed work. */
   readonly queuedMessages: JournalQueuedMessages
+  readonly stopMarks: JournalStopMarks
 
   constructor(options: AgentSessionJournalOptions) {
     this.identity = options.identity
     this.database = options.database
-    this.now = options.now ?? (() => Date.now())
-    this.mintEpoch = options.mintEpoch ?? randomUUID
     this.state = createJournalReducerState(options.identity.sessionId, '')
     // Serializes sequence assignment with the durable write behind it.
     this.queue = new JournalWriteQueue(options.identity.sessionId)
     const collaborators = createJournalStoreCollaborators({
       identity: this.identity,
       legacyDirectory: this.database.legacyDirectoryFor(this.identity),
-      now: this.now,
-      mintEpoch: this.mintEpoch,
+      now: options.now ?? (() => Date.now()),
+      mintEpoch: options.mintEpoch ?? randomUUID,
       serialize: (run) => this.queue.serialize(run),
       deferPerSessionImport: options.deferPerSessionImport === true,
       owe: (work) => this.queue.owe(work),
@@ -115,7 +117,7 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
       },
       cursor: this.cursor,
       adopt: (loaded) => {
-        this.adoptLoadedJournal(loaded)
+        Object.assign(this, journalStoreLoadedFields(loaded))
         this.onCommitted?.()
       },
       commit: (row) => {
@@ -138,6 +140,7 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
     this.itemAppender = collaborators.itemAppender
     this.lifecycleBatchAppender = collaborators.lifecycleBatchAppender
     this.queuedMessages = collaborators.queuedMessages
+    this.stopMarks = collaborators.stopMarks
     this.restore = collaborators.restore
   }
 
@@ -167,7 +170,7 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
   /** Explicit retention deletion, serialized with this chat's writer. */
   purgeContent(fence: number): Promise<void> {
     return this.epochController.purge(fence, (loaded) => {
-      this.adoptLoadedJournal(loaded)
+      Object.assign(this, journalStoreLoadedFields(loaded))
       this.queuedMessages.invalidate()
       this.onCommitted?.()
     })
@@ -198,11 +201,12 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
 
   /**
    * Resolves once the chat's rows are in the host's database. A restore's open serves a chat still
-   * in its per-chat file from a read-only fold of it; the copy runs before the chat's first write,
-   * and a reader that needs rows (forward pages, catch-up) awaits it here.
+   * in its per-chat file from a read-only fold of it; the copy runs before the chat's first write.
+   * A reader that needs rows (forward pages, catch-up) and every mutation's open await it here, so
+   * each reads the fold after every earlier write.
    */
   whenImported(): Promise<void> {
-    return this.queue.serialize(async () => undefined)
+    return this.queue.serialize(() => undefined)
   }
 
   get importPending(): boolean {
@@ -278,23 +282,17 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
 
   canonicalItemId = (itemId: string): string => resolveJournalItemId(this.state, itemId)
 
+  /** Reads the fold with every write issued before this call committed, and none issued after: at
+   *  once unless writes still wait behind an owed import or a running write. */
+  readInOrder<T>(read: () => T): Promise<T> {
+    return this.queue.readInOrder(read)
+  }
+
   readSince(cursor: AgentJournalCursor, limit?: number): JournalReadSince {
-    return readJournalSince(
-      {
-        state: this.state,
-        rowsAfter: (afterSequence) =>
-          readJournalRowsAfterCursor(
-            this.database.db,
-            this.identity.sessionId,
-            this.state.epoch,
-            afterSequence,
-            limit
-          ),
-        readOnly: this.readOnly
-      },
-      cursor,
-      () => this.cursor()
-    )
+    const { sessionId } = this.identity
+    const rowsAfter = journalRowsAfterReader(this.database.db, sessionId, this.state.epoch, limit)
+    const source = { state: this.state, rowsAfter, readOnly: this.readOnly }
+    return readJournalSince(source, cursor, () => this.cursor())
   }
 
   /** Upsert by stable identity. The revision is assigned here so a caller
@@ -307,6 +305,14 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
     return this.itemAppender.append(identity, body, options)
   }
 
+  /** An upsert whose row is chosen from the fold at its own turn in the queue; null writes nothing. */
+  appendResolvedItem(
+    resolve: () => JournalResolvedItem | null,
+    options: JournalItemAppendOptions
+  ): Promise<JournalAppendResult | null> {
+    return this.itemAppender.appendResolved(resolve, options)
+  }
+
   appendTombstone(
     identity: AgentJournalItemIdentity,
     options: JournalTombstoneInput
@@ -315,6 +321,16 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
     return this.rowWriter.append(
       journalTombstoneRowBuilder(() => this.state, itemId, options.fence)
     )
+  }
+
+  /** A Stop that took effect, timed by its row (`JournalStopEvent`). */
+  appendStopEvent(event: Omit<JournalStopEvent, 'at'>, fence: number): Promise<AgentJournalCursor> {
+    return this.rowWriter.append(journalStopEventRowBuilder(() => this.state, event, fence))
+  }
+
+  /** A person's Resume of the queue. */
+  appendQueueResume(fence: number): Promise<AgentJournalCursor> {
+    return this.rowWriter.append(journalQueueResumeRowBuilder(() => this.state, fence))
   }
 
   appendLifecycleBatch(input: JournalLifecycleBatchInput): Promise<AgentJournalCursor> {
@@ -330,11 +346,14 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
     input: JournalSubmissionInput,
     /** Present: this submission is a queued draft's conversion, and the draft's
      *  state transition commits in the SAME transaction — exactly-once consume. */
-    consume?: JournalSubmissionConsume
+    consume?: JournalSubmissionConsume,
+    /** The send's ledger answer, committed with this row. */
+    receipt?: JournalOperationReceipt
   ): Promise<AgentJournalCursor> {
     return this.rowWriter.append(
       journalSubmissionRowBuilder(() => this.state, this.identity.providerHandle, input, consume),
-      consume && queuedMessageConsumeHook(this.queuedMessages, input.clientMessageId, consume)
+      consume && queuedMessageConsumeHook(this.queuedMessages, input.clientMessageId, consume),
+      receipt
     )
   }
 
@@ -383,9 +402,5 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
     items: readonly JournalReplacementItem[]
   ): Promise<AgentJournalCursor> {
     return this.epochController.replace(reason, fence, items)
-  }
-
-  private adoptLoadedJournal(loaded: JournalLoad): void {
-    Object.assign(this, journalStoreLoadedFields(loaded))
   }
 }

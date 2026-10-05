@@ -12,6 +12,7 @@ import {
 } from './provider-account-visibility'
 import type { AccountsPaneSectionModel, ProviderRosterLoadState } from './accounts-pane-types'
 import { AccountsOfficialService } from './accounts-pane-official-service'
+import { AccountsHostOwnedSections } from './accounts-host-owned-sections'
 import {
   AccountsProviderSheet,
   type ProviderAccountSheetKind
@@ -325,6 +326,7 @@ export function AccountsPaneOverview({
           />
         </div>
       </section>
+      <AccountsHostOwnedSections model={model} />
       <AccountsCredentialsOverview
         model={model}
         sheet={credentialSheet}

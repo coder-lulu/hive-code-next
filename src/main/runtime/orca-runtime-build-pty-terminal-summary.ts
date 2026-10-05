@@ -29,7 +29,7 @@ export class OrcaRuntimeWithBuildPtyTerminalSummary extends OrcaRuntimeWithGetPt
   ): RuntimeTerminalSummary {
     const worktree = worktreesById.get(pty.worktreeId)
 
-    const title = getLatestPtyTitle(pty)
+    const title = getLatestPtyTitle(this.getPtyDisplayRecord(pty))
     const pane = parsePaneKey(pty.paneKey ?? '')
     const topology = this.ptySurfaceTopology()
     const orphaned =
@@ -52,6 +52,9 @@ export class OrcaRuntimeWithBuildPtyTerminalSummary extends OrcaRuntimeWithGetPt
       ptyId: pty.ptyId,
       incarnationId: pty.incarnationId,
       orphaned,
+      ...(orphaned && pane && pane.tabId === pty.tabId && pty.paneKey
+        ? { recordedPaneKey: pty.paneKey }
+        : {}),
       worktreeId: pty.worktreeId,
       worktreePath: worktree?.path ?? '',
       branch: worktree?.branch ?? '',

@@ -262,7 +262,7 @@ describe('mobile structured send operation journal', () => {
   it.each([
     { dispatchState: 'unknown', recovered: true, retained: true },
     { dispatchState: 'pending', recovered: true, retained: true },
-    { dispatchState: 'rejected', recovered: true, retained: true },
+    { dispatchState: 'rejected', recovered: true, retained: false },
     { dispatchState: 'accepted', recovered: true, retained: false },
     { dispatchState: 'accepted', recovered: false, retained: false },
     { dispatchState: 'rejected', recovered: false, retained: false }

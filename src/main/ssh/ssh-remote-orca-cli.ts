@@ -26,7 +26,7 @@ import {
   requiredRemoteCliString,
   resolveRemoteCliHandle
 } from './ssh-remote-cli-args'
-import { buildRemoteCliError } from './ssh-remote-cli-error-response'
+import { formatRemoteCliError } from './ssh-remote-cli-error-response'
 import { getRemoteLinearHelp, tryDispatchRemoteLinearCli } from './ssh-remote-linear-cli'
 import {
   getRemoteOrchestrationPayload,
@@ -63,17 +63,17 @@ export async function runRemoteOrcaCli(
   const json = parsed.flags.has('json')
   const command = parsed.commandPath.join(' ')
 
+  // An authenticated relay proves an SSH caller, never authority over this host's desktop.
+  // Refuse the whole namespace before a local CLI child can acquire a sidecar or input lease.
+  if (parsed.commandPath[0] === 'computer') {
+    const message = 'computer_control_remote_origin_forbidden'
+    return formatRemoteCliError(message, message, json)
+  }
+
   const interactiveMessage =
     HOST_INTERACTIVE_COMMANDS[command] ?? HOST_INTERACTIVE_COMMANDS[parsed.commandPath[0] ?? '']
   if (interactiveMessage && !parsed.flags.has('help')) {
-    if (json) {
-      return {
-        stdout: `${JSON.stringify(buildRemoteCliError(interactiveMessage, 'unsupported_over_ssh'), null, 2)}\n`,
-        stderr: '',
-        exitCode: 1
-      }
-    }
-    return { stdout: '', stderr: `${interactiveMessage}\n`, exitCode: 1 }
+    return formatRemoteCliError(interactiveMessage, 'unsupported_over_ssh', json)
   }
 
   if (command === 'orchestration check' || command === 'orchestration ask') {
@@ -135,14 +135,7 @@ async function runLegacyRemoteOrcaCli(
             typeof (err as { code: unknown }).code === 'string'
           ? (err as { code: string }).code
           : 'runtime_error'
-    if (json) {
-      return {
-        stdout: `${JSON.stringify(buildRemoteCliError(message, code), null, 2)}\n`,
-        stderr: '',
-        exitCode: 1
-      }
-    }
-    return { stdout: '', stderr: `${message}\n`, exitCode: 1 }
+    return formatRemoteCliError(message, code, json)
   }
 }
 
@@ -225,10 +218,7 @@ async function dispatchRemoteCli(
           // authority as the full host CLI passthrough.
           senderPaneKey: env.ORCA_PANE_KEY || undefined
         },
-        {
-          ...compatibilityEnvelope,
-          orchestrationCapability: optionalRemoteCliString(parsed.flags, 'dispatch-capability')
-        }
+        compatibilityEnvelope
       )
     }
     case 'orchestration check':
@@ -268,10 +258,7 @@ async function dispatchRemoteCli(
           run: optionalRemoteCliString(parsed.flags, 'run'),
           compatibilityCliCommand: 'orca'
         },
-        {
-          ...compatibilityEnvelope,
-          orchestrationCapability: optionalRemoteCliString(parsed.flags, 'dispatch-capability')
-        }
+        compatibilityEnvelope
       )
     case 'orchestration reply':
       return await call(
@@ -315,7 +302,6 @@ async function call(
     authToken: 'remote-cli',
     method,
     params,
-    orchestrationCapability: envelope?.orchestrationCapability,
     orchestrationContractVersion: method.startsWith('orchestration.')
       ? ORCHESTRATION_CONTRACT_VERSION
       : undefined,

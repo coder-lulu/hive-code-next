@@ -454,3 +454,30 @@ describe('syncSystemCodexResourcesIntoManagedHome', () => {
     }
   )
 })
+
+describe('Codex global rules in managed launch homes', () => {
+  it.each(['native', 'wsl-copy'] as const)(
+    'preserves rules on the %s lane without importing auth/history',
+    (lane) => {
+      const systemHomePath = getSystemCodexHomePath()
+      const managedHomePath = join(userDataDir, 'rules-home')
+      mkdirSync(join(systemHomePath, 'rules'), { recursive: true })
+      writeFileSync(
+        join(systemHomePath, 'rules', 'default.rules'),
+        'allow-prefix ["git", "status"]\n'
+      )
+      writeFileSync(join(systemHomePath, 'auth.json'), '{"secret":"system"}')
+      if (lane === 'native') {
+        syncSystemCodexResourcesIntoManagedHome(managedHomePath)
+      } else {
+        syncCodexGlobalInstructionsIntoManagedHome({ systemHomePath, managedHomePath })
+      }
+      expect(readFileSync(join(managedHomePath, 'rules', 'default.rules'), 'utf8')).toContain('git')
+      expect(existsSync(join(managedHomePath, 'auth.json'))).toBe(false)
+      expect(existsSync(join(managedHomePath, 'sessions'))).toBe(false)
+      if (lane === 'wsl-copy') {
+        expect(lstatSync(join(managedHomePath, 'rules')).isSymbolicLink()).toBe(false)
+      }
+    }
+  )
+})

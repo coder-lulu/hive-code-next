@@ -1,4 +1,9 @@
 import {
+  formatComputerFollowUpCommand,
+  type ComputerActionFollowUpTarget
+} from './computer-action-follow-up'
+export type { ComputerActionFollowUpTarget } from './computer-action-follow-up'
+import {
   chmodSync,
   lstatSync,
   mkdirSync,
@@ -9,9 +14,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PRIMARY_CLI_COMMAND } from '../shared/brand'
 import { formatBase64PayloadByteCount } from './base64-payload-byte-count'
-import { quoteCliCommandArgument } from './shell-command-quote'
 import type {
   ComputerActionMetadata,
   ComputerActionResult,
@@ -64,7 +67,11 @@ export function prepareComputerCliJsonResult<TResult>(
       screenshotStatus?: unknown
     }
   }
-  if (!record.result || !('screenshotStatus' in record.result)) {
+  if (
+    !record.result ||
+    typeof record.result !== 'object' ||
+    !('screenshotStatus' in record.result)
+  ) {
     return response
   }
   const screenshot = record.result?.screenshot
@@ -192,14 +199,6 @@ export function formatListWindows(result: ComputerListWindowsResult): string {
     .join('\n')
 }
 
-export type ComputerActionFollowUpTarget = {
-  session?: string
-  worktree?: string
-  windowId?: number
-  windowIndex?: number
-  restoreWindow?: boolean
-}
-
 export function formatComputerAction(
   verb: string,
   result: ComputerActionResult,
@@ -215,44 +214,6 @@ export function formatComputerAction(
     ? 'Inspect with the command above or use the --json result before assuming it worked.'
     : 'Use the --json result or rerun state before choosing the next element index.'
   return `${formatActionVerb(verb)} ${outcome}${path}${verification}; ${result.snapshot.elementCount} visible elements in current window.${screenshotFailure} Use \`${followUpCommand}\` to inspect. ${inspectTail}`
-}
-
-function formatComputerFollowUpCommand(
-  result: ComputerActionResult,
-  target: ComputerActionFollowUpTarget
-): string {
-  const args = [
-    PRIMARY_CLI_COMMAND,
-    'computer',
-    'get-app-state',
-    '--app',
-    quoteCliCommandArgument(result.snapshot.app.bundleId ?? result.snapshot.app.name)
-  ]
-  if (target.session) {
-    args.push('--session', quoteCliCommandArgument(target.session))
-  } else if (target.worktree) {
-    args.push('--worktree', quoteCliCommandArgument(target.worktree))
-  }
-  const windowChanged =
-    result.action?.verification?.state === 'unverified' &&
-    result.action.verification.reason === 'window_changed'
-  if (!windowChanged && target.windowId !== undefined) {
-    args.push('--window-id', String(target.windowId))
-  } else if (!windowChanged && target.windowIndex !== undefined) {
-    args.push('--window-index', String(target.windowIndex))
-  } else {
-    const windowId = result.action?.targetWindowId ?? result.snapshot.window.id
-    const windowIndex = result.action?.targetWindowIndex ?? result.snapshot.window.index
-    if (windowId !== null && windowId !== undefined) {
-      args.push('--window-id', String(windowId))
-    } else if (windowIndex !== null && windowIndex !== undefined) {
-      args.push('--window-index', String(windowIndex))
-    }
-  }
-  if (target.restoreWindow) {
-    args.push('--restore-window')
-  }
-  return args.join(' ')
 }
 
 const UNVERIFIED_ACTION_REASONS: Record<ComputerActionMetadata['path'], string> = {

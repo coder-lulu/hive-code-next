@@ -84,6 +84,17 @@ export function hostTestDrawnRowIds(
     state: 'dispatching' as const
   }))
   return projectNativeChatTranscriptMessages(
-    projectStructuredAgentSessionMessages(snapshot.items, outbox, snapshot.submissions)
+    projectStructuredAgentSessionMessages(snapshot.items, outbox, snapshot.submissions, {
+      rejectedInPlace: true
+    })
   ).map(({ id }) => id)
+}
+
+export function hostTestProviderIdentity(itemId: string) {
+  return {
+    provider: 'codex' as const,
+    threadId: HOST_TEST_THREAD,
+    turnId: `turn-${itemId}`,
+    ordinal: 0
+  }
 }

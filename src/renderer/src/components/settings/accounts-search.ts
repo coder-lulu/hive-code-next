@@ -3,6 +3,9 @@ import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 
+const getRateLimitSearchKeywords = (): string[] =>
+  translateSearchKeyword('auto.components.settings.accounts.search.e949b08ffb', 'rate limit')
+
 export const getAccountsLocationSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.accounts.search.d09fb5ca92', 'Account Location'),
@@ -58,10 +61,7 @@ export const getAccountsCodexSearchEntries = createLocalizedCatalog(() => [
       'Codex Accounts',
       ...translateSearchKeyword('auto.components.settings.accounts.search.70d1b8def5', 'codex'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.06662af91e', 'account'),
-      ...translateSearchKeyword(
-        'auto.components.settings.accounts.search.e949b08ffb',
-        'rate limit'
-      ),
+      ...getRateLimitSearchKeywords(),
       ...translateSearchKeyword(
         'auto.components.settings.accounts.search.86edc96bc9',
         'status bar'
@@ -124,10 +124,7 @@ export const getAccountsGeminiSearchEntries = createLocalizedCatalog(() => [
         'auto.components.settings.accounts.search.b7c2cee442',
         'experimental'
       ),
-      ...translateSearchKeyword(
-        'auto.components.settings.accounts.search.e949b08ffb',
-        'rate limit'
-      ),
+      ...getRateLimitSearchKeywords(),
       ...translateSearchKeyword('auto.components.settings.accounts.search.86edc96bc9', 'status bar')
     ]
   }
@@ -149,10 +146,7 @@ export const getAccountsOpencodeSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.accounts.search.61f7d1fcbe', 'cookie'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.9c4e40cf6b', 'session'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.37020a02c2', 'console'),
-      ...translateSearchKeyword(
-        'auto.components.settings.accounts.search.e949b08ffb',
-        'rate limit'
-      ),
+      ...getRateLimitSearchKeywords(),
       ...translateSearchKeyword('auto.components.settings.accounts.search.86edc96bc9', 'status bar')
     ]
   },
@@ -171,10 +165,7 @@ export const getAccountsOpencodeSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.accounts.search.be8b621bdc', 'workspace'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.421c6be25e', 'id'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.7e67d7d1b6', 'wrk'),
-      ...translateSearchKeyword(
-        'auto.components.settings.accounts.search.e949b08ffb',
-        'rate limit'
-      ),
+      ...getRateLimitSearchKeywords(),
       ...translateSearchKeyword('auto.components.settings.accounts.search.86edc96bc9', 'status bar')
     ]
   }
@@ -196,10 +187,7 @@ export const getAccountsMiniMaxSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.accounts.search.3a9b6d2c4e', 'api key'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.5d8f1a3b7c', 'china'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.7e2a4b8c1d', 'overseas'),
-      ...translateSearchKeyword(
-        'auto.components.settings.accounts.search.e949b08ffb',
-        'rate limit'
-      ),
+      ...getRateLimitSearchKeywords(),
       ...translateSearchKeyword('auto.components.settings.accounts.search.86edc96bc9', 'status bar')
     ]
   }
@@ -218,11 +206,26 @@ export const getAccountsGrokSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.accounts.search.c1b5f9d7e0', 'xai'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.b0a4e8c6d9', 'oauth'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.a9f3d7b5c8', 'login'),
-      ...translateSearchKeyword(
-        'auto.components.settings.accounts.search.e949b08ffb',
-        'rate limit'
-      ),
+      ...getRateLimitSearchKeywords(),
       ...translateSearchKeyword('auto.components.settings.accounts.search.86edc96bc9', 'status bar')
+    ]
+  }
+])
+
+export const getAccountsAntigravitySearchEntries = createLocalizedCatalog(() => [
+  {
+    title: translate('accounts.antigravity.searchTitle', 'Antigravity Accounts'),
+    description: translate(
+      'accounts.antigravity.searchDescription',
+      'Save and select native agy Google accounts on the execution host.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('accounts.antigravity.keyword.antigravity', 'antigravity'),
+      ...translateSearchKeyword('accounts.antigravity.keyword.agy', 'agy'),
+      ...translateSearchKeyword('accounts.antigravity.keyword.google', 'google'),
+      ...translateSearchKeyword('accounts.antigravity.keyword.accounts', 'accounts'),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.a9f3d7b5c8', 'login'),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.cursor.kw.usage', 'usage')
     ]
   }
 ])
@@ -259,6 +262,36 @@ export const getAccountsCursorSearchEntries = createLocalizedCatalog(() => [
   }
 ])
 
+export const getAccountsZcodePlanSearchEntries = createLocalizedCatalog(() => [
+  {
+    title: translate('auto.components.settings.accounts.search.zcodePlan.title', 'GLM Coding Plan'),
+    description: translate(
+      'auto.components.settings.accounts.search.zcodePlan.description',
+      'Track Z.AI or Zhipu (BigModel) GLM Coding Plan usage. Pick the site and save the plan API key.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('auto.components.settings.accounts.search.zcodePlan.kw.glm', 'glm'),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.zcodePlan.kw.zai', 'zai'),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.zcodePlan.kw.zhipu',
+        'zhipu'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.zcodePlan.kw.bigmodel',
+        'bigmodel'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.zcodePlan.kw.codingPlan',
+        'coding plan'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.zcodePlan.kw.rateLimit',
+        'rate limit'
+      )
+    ]
+  }
+])
+
 export const getAccountsPaneSearchEntries = createLocalizedCatalog((): SettingsSearchEntry[] => [
   ...getAccountsLocationSearchEntries(),
   ...getAccountsClaudeSearchEntries(),
@@ -267,5 +300,7 @@ export const getAccountsPaneSearchEntries = createLocalizedCatalog((): SettingsS
   ...getAccountsOpencodeSearchEntries(),
   ...getAccountsMiniMaxSearchEntries(),
   ...getAccountsGrokSearchEntries(),
-  ...getAccountsCursorSearchEntries()
+  ...getAccountsAntigravitySearchEntries(),
+  ...getAccountsCursorSearchEntries(),
+  ...getAccountsZcodePlanSearchEntries()
 ])

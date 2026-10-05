@@ -1,6 +1,3 @@
-import type { AgentJournalMessageItem } from './agent-session-journal-types'
-import type { AgentSessionMutationEnvelope } from './agent-session-wire'
-import { structuredAgentSessionPayloadFingerprint } from './structured-agent-session-mutation'
 // Whether an outbox send asks the host to hold it as a draft (`delivery: 'queue-if-active'`).
 //
 // The one stored fact is `sentDelivery`, what the first attempt put on the wire. An attempted id
@@ -65,41 +62,4 @@ export function parseStructuredAgentSessionOutboxQueueFields(entry: {
       : {}),
     ...(entry.outlivedStop === true ? { outlivedStop: true as const } : {})
   }
-}
-
-export type StructuredAgentSessionSendMutation = {
-  envelope: AgentSessionMutationEnvelope
-  body: AgentJournalMessageItem
-  delivery?: 'queue-if-active'
-}
-
-/** The `agentSession.send` arguments an entry stands for. Typed rather than wire-shaped so a host
- *  calling its own send path builds the same envelope a client would, fingerprint included. */
-export function structuredAgentSessionSendMutation(
-  entry: StructuredAgentSessionOutboxEntry,
-  expectedRuntimeFence: number
-): StructuredAgentSessionSendMutation {
-  // `delivery` joins the OPERATION fingerprint exactly as the host digests it; never the body's.
-  const delivery = entry.sentDelivery ?? undefined
-  const fields = { body: entry.body, ...(delivery ? { delivery } : {}) }
-  return {
-    envelope: {
-      sessionId: entry.sessionId,
-      clientOperationId: entry.clientMessageId,
-      expectedRuntimeFence,
-      payloadFingerprint: structuredAgentSessionPayloadFingerprint({
-        method: 'agentSession.send',
-        sessionId: entry.sessionId,
-        fields
-      })
-    },
-    ...fields
-  }
-}
-
-export function structuredAgentSessionSendRequest(
-  entry: StructuredAgentSessionOutboxEntry,
-  expectedRuntimeFence: number
-): Record<string, unknown> {
-  return structuredAgentSessionSendMutation(entry, expectedRuntimeFence)
 }

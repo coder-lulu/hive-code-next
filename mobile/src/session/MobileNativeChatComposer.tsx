@@ -5,14 +5,12 @@ import {
   Keyboard,
   Pressable,
   ScrollView,
-  StyleSheet,
   TextInput,
   View
 } from 'react-native'
 import { ArrowUp, ImagePlus, Mic, Square, X } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
+import { createMobileNativeChatComposerStyles } from './mobile-native-chat-composer-styles'
 import { getVerifiedNativeChatCommands } from '../../../src/shared/native-chat-agent-profiles'
 import { structuredSlashCommands } from '../../../src/shared/structured-agent-session-composer'
 import type { AgentSessionConversationCommand } from '../../../src/shared/agent-session-conversation-command'
@@ -32,6 +30,7 @@ import {
   type MobileNativeChatSessionOptionPickersProps
 } from './MobileNativeChatSessionOptionPickers'
 import type { PendingNativeChatImage } from './mobile-native-chat-image-attachment'
+import { keepHeldPressThroughLongPress } from './held-press-long-press'
 
 const NO_FILE_PATHS: string[] = []
 const NO_ATTACHMENTS: PendingNativeChatImage[] = []
@@ -99,7 +98,7 @@ export function MobileNativeChatComposer({
   onNeedFiles
 }: Props): React.JSX.Element {
   const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  const styles = useMobileThemeStyles(createMobileNativeChatComposerStyles)
   const [cursor, setCursor] = useState(0)
   // Transiently drives the native caret after a mid-text autocomplete insert,
   // then released on the next selection change so manual caret placement still
@@ -300,17 +299,26 @@ export function MobileNativeChatComposer({
                 onPress={dictationMode === 'hold' ? undefined : onMicPress}
                 onPressIn={dictationMode === 'hold' ? onMicPressIn : undefined}
                 onPressOut={dictationMode === 'hold' ? onMicPressOut : undefined}
+                onLongPress={dictationMode === 'hold' ? keepHeldPressThroughLongPress : undefined}
                 disabled={disabled}
               >
+                {/* The icon swaps on press; as the page's touch target, its removal would send
+                    touchend to a detached node and lose the release. */}
                 {micActive ? (
                   <Square
+                    pointerEvents="none"
                     size={18}
                     color={theme.color.status.danger}
                     strokeWidth={2.4}
                     fill={theme.color.status.danger}
                   />
                 ) : (
-                  <Mic size={20} color={theme.color.text.secondary} strokeWidth={2} />
+                  <Mic
+                    pointerEvents="none"
+                    size={20}
+                    color={theme.color.text.secondary}
+                    strokeWidth={2}
+                  />
                 )}
               </Pressable>
             ) : null}
@@ -335,105 +343,4 @@ export function MobileNativeChatComposer({
       </View>
     </View>
   )
-}
-
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    attachmentStrip: {
-      maxHeight: 76,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.color.border.subtle,
-      backgroundColor: theme.color.bg.surface
-    },
-    attachmentStripContent: {
-      gap: theme.spacing.space8,
-      paddingHorizontal: theme.spacing.space12,
-      paddingVertical: theme.spacing.space8
-    },
-    attachmentThumb: {
-      width: 60,
-      height: 60,
-      borderRadius: theme.radii.control,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.subtle,
-      backgroundColor: theme.color.bg.subtle
-    },
-    attachmentImage: {
-      width: '100%',
-      height: '100%',
-      borderRadius: theme.radii.control
-    },
-    attachmentRemove: {
-      // Inset inside the thumb: Android drops touches outside the parent's bounds,
-      // so an overhanging badge would lose part of its tap target.
-      position: 'absolute',
-      top: 2,
-      right: 2,
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.circle,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.color.bg.elevated,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default
-    },
-    composerInset: {
-      paddingHorizontal: theme.spacing.space12,
-      paddingTop: theme.spacing.space8,
-      paddingBottom: theme.spacing.space12
-    },
-    bar: {
-      gap: theme.spacing.space4,
-      paddingHorizontal: theme.spacing.space12,
-      paddingVertical: theme.spacing.space8,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.card,
-      backgroundColor: theme.color.bg.surface,
-      overflow: 'hidden'
-    },
-    actionRow: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space8
-    },
-    actionSpacer: {
-      flex: 1
-    },
-    input: {
-      ...theme.typography.body,
-      fontSize: TEXT_INPUT_FONT_SIZE,
-      width: '100%',
-      maxHeight: 140,
-      minHeight: theme.size.minimumTouchTarget,
-      color: theme.color.text.primary,
-      backgroundColor: theme.color.bg.subtle,
-      borderRadius: theme.radii.control,
-      paddingHorizontal: theme.spacing.space12,
-      paddingTop: theme.spacing.space8,
-      paddingBottom: theme.spacing.space8
-    },
-    iconButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    sendButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.circle,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.color.bg.selected
-    },
-    sendButtonDisabled: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    pressed: {
-      opacity: 0.7
-    }
-  })
 }

@@ -1,9 +1,15 @@
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import * as durableWrite from '../durable-file-write'
+import { join } from 'node:path'
+import {
+  openTestJournalHostDatabase,
+  closeTestJournalHostDatabases
+} from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import { legacyAgentSessionStorePath } from '../runtime/agent-session-record-store-file'
 import {
   openTestAgentSessionRecordStore,
-  testAgentSessionStoreFilePath
+  importTestLegacyAgentSessionRecordStore,
+  readPersistedTestAgentSessionStoreText
 } from '../runtime/agent-session-record-store-test-harness'
 import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
 import { taskExecutionIdentity } from './task-execution-record'
@@ -24,6 +30,7 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   vi.restoreAllMocks()
+  closeTestJournalHostDatabases()
   await rm(directory, { recursive: true, force: true })
 })
 function admission(command = taskCommand()) {
@@ -47,24 +54,6 @@ function anotherCommand() {
   }
 }
 
-function delayedWrite() {
-  const write = durableWrite.writeTempFileDurable
-  let release!: () => void
-  let notifyStarted!: () => void
-  const started = new Promise<void>((resolve) => {
-    notifyStarted = resolve
-  })
-  const gate = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  vi.spyOn(durableWrite, 'writeTempFileDurable').mockImplementationOnce(async (...args) => {
-    notifyStarted()
-    await gate
-    await write(...args)
-  })
-  return { started, release }
-}
-
 describe('task execution transactions in the runtime record store', () => {
   it('atomically accepts concurrent starts once and persists the same receipt', async () => {
     const starts = await Promise.all(
@@ -76,8 +65,8 @@ describe('task execution transactions in the runtime record store', () => {
     expect(reopened.tasks.get(taskCommand())).toEqual(starts[0].record)
     expect(reopened.listOperationRows()).toEqual([])
   })
-  it('serializes two store instances on the existing file lock', async () => {
-    const other = await openTestAgentSessionRecordStore(directory)
+  it('serializes concurrent callers through the host single-writer queue', async () => {
+    const other = store
     const starts = await Promise.all([
       store.tasks.admit(admission()),
       other.tasks.admit(admission())
@@ -175,25 +164,35 @@ describe('task execution transactions in the runtime record store', () => {
     )
   })
   it('does not expose an admission whose durable commit failed', async () => {
-    vi.spyOn(durableWrite, 'writeTempFileDurable').mockRejectedValueOnce(new Error('disk failure'))
+    vi.spyOn(openTestJournalHostDatabase(directory), 'transaction').mockImplementationOnce(() => {
+      throw new Error('disk failure')
+    })
     await expect(store.tasks.admit(admission())).rejects.toThrow('disk failure')
     expect(store.tasks.get(taskCommand())).toBeNull()
     expect((await openTestAgentSessionRecordStore(directory)).tasks.get(taskCommand())).toBeNull()
   })
-  it('does not expose admission state while the durable write is pending', async () => {
-    const write = delayedWrite()
-    const admissionResult = store.tasks.admit(admission())
-    await write.started
-    try {
+  it('does not expose admission state inside the durable transaction', async () => {
+    const database = openTestJournalHostDatabase(directory)
+    const transaction = database.transaction.bind(database)
+    vi.spyOn(database, 'transaction').mockImplementationOnce((run) => {
       expect(store.tasks.get(taskCommand())).toBeNull()
-    } finally {
-      write.release()
-      await admissionResult
-    }
+      const result = transaction(run)
+      expect(store.tasks.get(taskCommand())).toBeNull()
+      return result
+    })
+    await store.tasks.admit(admission())
+    expect(store.tasks.get(taskCommand())?.status).toBe('accepted')
   })
-  it('does not publish a terminal result before its durable write completes', async () => {
+  it('does not publish a terminal result before its durable transaction commits', async () => {
     const { record } = await store.tasks.admit(admission())
-    const write = delayedWrite()
+    const database = openTestJournalHostDatabase(directory)
+    const transaction = database.transaction.bind(database)
+    vi.spyOn(database, 'transaction').mockImplementationOnce((run) => {
+      const result = transaction(run)
+      expect(store.tasks.get(taskCommand())?.status).toBe('accepted')
+      expect(store.tasks.get(taskCommand())?.result).toBeNull()
+      return result
+    })
     const settlement = store.tasks.settle(
       taskCommand(),
       {
@@ -216,17 +215,10 @@ describe('task execution transactions in the runtime record store', () => {
       },
       TASK_TEST_NOW
     )
-    await write.started
-    try {
-      expect(store.tasks.get(taskCommand())?.status).toBe('accepted')
-      expect(store.tasks.get(taskCommand())?.result).toBeNull()
-    } finally {
-      write.release()
-      await settlement
-    }
+    await settlement
     expect(store.tasks.get(taskCommand())?.status).toBe('failed')
   })
-  it('rechecks authorization under the file transaction lock', async () => {
+  it('rechecks authorization inside the host journal transaction queue', async () => {
     await expect(
       store.tasks.admit({
         ...admission(),
@@ -249,15 +241,19 @@ describe('task execution transactions in the runtime record store', () => {
   it('retains unknown writers when the primary is recovered from an older backup', async () => {
     await store.tasks.admit(admission())
     await store.tasks.beginDispatch(taskCommand(), TASK_TEST_NOW, () => undefined)
-    const path = testAgentSessionStoreFilePath(directory)
+    const migrationRoot = join(directory, 'legacy-task-recovery')
+    const path = legacyAgentSessionStorePath(migrationRoot)
+    await mkdir(join(migrationRoot, 'agent-sessions'), { recursive: true })
+    const backup = await readPersistedTestAgentSessionStoreText(directory)
+    await writeFile(`${path}.bak`, backup)
     await writeFile(path, 'corrupt-primary')
-    const recovered = await openTestAgentSessionRecordStore(directory)
+    const recovered = await importTestLegacyAgentSessionRecordStore(migrationRoot)
     await expect(recovered.tasks.admit(admission(anotherCommand()))).rejects.toThrow(
       'OUTCOME_UNKNOWN'
     )
     expect(recovered.tasks.get(taskCommand())).not.toBeNull()
     // Recovery rejection keeps the backup intact for the next reader.
-    expect(JSON.parse(await readFile(`${path}.bak`, 'utf8')).taskExecutions).toBeTruthy()
+    expect(await readFile(`${path}.bak`, 'utf8')).toBe(backup)
   })
   it('rejects cross-execution terminal receipts without changing state', async () => {
     const { record } = await store.tasks.admit(admission())

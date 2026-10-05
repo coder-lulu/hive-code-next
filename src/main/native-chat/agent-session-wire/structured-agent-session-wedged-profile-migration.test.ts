@@ -53,6 +53,7 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
+import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 
 const CALLER = { callerKey: 'client-1' }
 const DEAD_OWNER: AgentSessionProcessIdentity = {
@@ -124,6 +125,7 @@ async function seedStore(record: PersistedAgentSessionRecord): Promise<void> {
 /** Every recorded owner in these fixtures is long gone; that is the present-time evidence. */
 function openHost(overrides: Partial<StructuredAgentSessionHostDeps> = {}): void {
   host = new StructuredAgentSessionHost({
+    logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
       acquire,
@@ -357,10 +359,10 @@ describe('already-wedged profiles become usable on load', () => {
       // What the sidebar reads: every status this restart published says the chat is not working.
       expect(published.filter((summary) => summary.sessionId === SESSION)).not.toEqual([])
       expect(published.map((summary) => summary.status)).not.toContain('working')
-      // A crash is not something the user did: no outcome is claimed, so no reader files it as a
-      // cancellation the user already knows about.
+      // A crash is not something the user did: a proven one reads as an interruption and an
+      // unprovable one as unconfirmed, so no reader files it as a cancellation the user knows about.
       expect(published.map((summary) => summary.turnOutcome)).toEqual(
-        published.map(() => undefined)
+        published.map(() => (verdict.state === 'interrupted' ? 'interruption' : 'unconfirmed'))
       )
     }
   )

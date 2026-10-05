@@ -171,19 +171,14 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     settings.activeCodexManagedAccountId = null
     settings.activeCodexManagedAccountIdsByRuntime = { host: null, wsl: {} }
 
-    // Windows cannot probe shell startup files, so its system-default route
-    // intentionally remains on the shared managed home.
-    const systemDefaultLaunchHome = process.platform === 'win32' ? sharedHome() : null
-    const systemDefaultRateLimitHome = process.platform === 'win32' ? sharedHome() : systemHome()
-    expect(service.prepareForCodexLaunch()).toBe(systemDefaultLaunchHome)
+    // System default uses the real home on every host, without importing shared account auth.
+    expect(service.prepareForCodexLaunch()).toBeNull()
     expect(service.prepareForRateLimitFetch()).toEqual({
       kind: 'ready',
-      codexHomePath: systemDefaultRateLimitHome
+      codexHomePath: systemHome()
     })
     expect(readFileSync(join(account.managedHomePath, 'auth.json'), 'utf-8')).toBe(fresh)
-    expect(readFileSync(sharedAuthPath(), 'utf-8')).toBe(
-      process.platform === 'win32' ? 'system auth sentinel\n' : mismatch
-    )
+    expect(readFileSync(sharedAuthPath(), 'utf-8')).toBe(mismatch)
     expect(readFileSync(systemAuthPath(), 'utf-8')).toBe('system auth sentinel\n')
   })
 
@@ -214,7 +209,7 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     expect(readFileSync(systemAuthPath(), 'utf-8')).toBe('system auth sentinel\n')
   })
 
-  it('bridges real-home and sibling-account history into the launched account home', async () => {
+  it('keeps real-home and sibling-account history outside the selected account home', async () => {
     const accountOne = createManagedAccount(
       'account-1',
       'acct-1',
@@ -235,24 +230,24 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     const { settings, store } = createStore([accountOne, accountTwo], accountOne.id)
     const { CodexRuntimeHomeService } = await import('./runtime-home-service')
     const bridge = await import('../codex/codex-account-session-bridge')
+    const startBridge = vi
+      .spyOn(bridge, 'startCodexAccountSessionBridgeInBackground')
+      .mockResolvedValue()
     const service = new CodexRuntimeHomeService(store as never)
 
     selectManagedAccount(settings, accountTwo.id)
     service.syncForCurrentSelection()
     expect(service.prepareForCodexLaunch()).toBe(accountTwo.managedHomePath)
-    await bridge.startCodexAccountSessionBridgeInBackground({
-      targetCodexHomePath: accountTwo.managedHomePath,
-      sourceCodexHomePaths: [systemHome(), accountOne.managedHomePath]
-    })
-
-    // Why: /resume reads only the launch CODEX_HOME, so both histories must be
-    // present under account two or the switch looks like data loss.
-    expect(readFileSync(join(accountTwo.managedHomePath, 'sessions', systemRollout), 'utf-8')).toBe(
-      '{"session":"real-home"}\n'
+    expect(startBridge).not.toHaveBeenCalled()
+    expect(existsSync(join(accountTwo.managedHomePath, 'sessions', systemRollout))).toBe(false)
+    expect(existsSync(join(accountTwo.managedHomePath, 'sessions', siblingRollout))).toBe(false)
+    expect(readFileSync(join(systemHome(), 'sessions', systemRollout), 'utf8')).toContain(
+      'real-home'
     )
     expect(
-      readFileSync(join(accountTwo.managedHomePath, 'sessions', siblingRollout), 'utf-8')
-    ).toBe('{"session":"account-one"}\n')
+      readFileSync(join(accountOne.managedHomePath, 'sessions', siblingRollout), 'utf8')
+    ).toContain('account-one')
+    startBridge.mockRestore()
     expect(existsSync(join(systemHome(), 'sessions', siblingRollout))).toBe(false)
   })
 

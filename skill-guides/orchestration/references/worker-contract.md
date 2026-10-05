@@ -2,7 +2,8 @@
 
 The injected preamble is authoritative. Copy its command rather than
 reconstructing flags. In particular, preserve the exact executable, worker
-handle, Dispatch capability, Task ID, and Dispatch ID.
+handle, Task ID, and Dispatch ID, and keep any other flag it carries (the current
+HiveCode host requires `--dispatch-capability`).
 
 ## Heartbeat
 
@@ -49,6 +50,8 @@ If `check` returns `consumer_fenced`, this process no longer owns its Dispatch:
 the Attempt was re-attached to another worker or settled without you. Stop, do
 not send `worker_done`, and do not retry the check. An empty `check` never means
 you were replaced; `consumer_fenced` is the only way you learn that.
+If `send` or `ask` returns `consumer_fenced`, the command ran from another
+party's terminal (a coordinator or another worker); run it from your own terminal.
 
 ## Escalation
 

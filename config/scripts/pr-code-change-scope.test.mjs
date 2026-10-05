@@ -11,7 +11,6 @@ import {
 } from './pr-code-change-scope.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
-
 const ALWAYS_ON = ['static_analysis', 'typecheck', 'test']
 
 function expectedJobs(overrides, { alwaysOn = true } = {}) {
@@ -123,6 +122,12 @@ describe('per-job path classification', () => {
     expectClassification(['.github/actions/prepare-git-compatibility/action.yml'], {
       git_compatibility: true
     })
+    // The contract pins the local-main fast-forward's exact arguments.
+    expectClassification(['src/shared/worktree/local-base-branch-fast-forward.ts'], {
+      git_compatibility: true,
+      package: true,
+      package_windows: true
+    })
   })
 
   it('runs the Codex index-heal contract only when the heal or its transport changes', () => {
@@ -197,6 +202,7 @@ describe('per-job path classification', () => {
   it('runs Linux packaging when an artifact contract changes', () => {
     for (const file of [
       'config/scripts/package-linux-formats.mjs',
+      'config/scripts/package-linux-formats-appimage.mjs',
       'config/scripts/script-child-process.mjs',
       'config/scripts/space-sharing-copy.mjs',
       '.github/actions/prepare-linux-package-fixture/action.yml',
@@ -268,6 +274,23 @@ describe('per-job path classification', () => {
       package: true,
       package_windows: true
     })
+  })
+
+  it('runs shell contracts for the structured-session login-shell test, its harness and its subject', () => {
+    expectClassification(
+      ['src/main/runtime/structured-session-cli-login-shell.live-shell.test.ts'],
+      { shell_contracts: true }
+    )
+    for (const file of [
+      'src/main/runtime/structured-session-login-shell-test-harness.ts',
+      'src/main/runtime/structured-session-child-identity-env.ts'
+    ]) {
+      expectClassification([file], {
+        shell_contracts: true,
+        package: true,
+        package_windows: true
+      })
+    }
   })
 
   it('runs orcad browser when Chrome launch, session, or tab modules change', () => {
@@ -351,7 +374,11 @@ describe('per-job path classification', () => {
       'src/main/runtime/runtime-worktree-agent-rows.ts',
       'src/main/runtime/runtime-worktree-pty-agent-sources.ts',
       'src/shared/runtime-worktree-contracts.ts',
-      'src/renderer/src/runtime/remote-runtime-terminal-multiplexer.ts'
+      'src/renderer/src/runtime/remote-runtime-terminal-multiplexer.ts',
+      'src/shared/structured-agent-session-projection.ts',
+      'src/shared/agent-turn-outcome.ts',
+      'src/main/runtime/orchestration/db.ts',
+      'src/main/runtime/orchestration/orchestration-schema-version-skew.ts'
     ]) {
       expectClassification([file], {
         'cross-version-wire': true,
@@ -389,6 +416,7 @@ describe('per-job path classification', () => {
       'package.json',
       'pnpm-lock.yaml',
       '.github/actions/install-node-dependencies/action.yml',
+      '.github/actions/prepare-native-runtime/action.yml',
       'config/scripts/ensure-native-runtime.mjs',
       'config/scripts/rebuild-native-deps.mjs',
       'config/patches/node-pty@1.1.0.patch'

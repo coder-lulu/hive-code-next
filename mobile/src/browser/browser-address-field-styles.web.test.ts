@@ -36,9 +36,7 @@ describe('the browser pane text inputs on the web', () => {
   it('raises the key row input to the same seam', () => {
     const styles = createMobileBrowserPaneStyles(lightTheme)
     expect(styles.keyboardInput.fontSize).toBe(TEXT_INPUT_FONT_SIZE)
-    expect(styles.keyboardInput.fontSize).toBeGreaterThanOrEqual(
-      IOS_FOCUS_ZOOM_FLOOR
-    )
+    expect(styles.keyboardInput.fontSize).toBeGreaterThanOrEqual(IOS_FOCUS_ZOOM_FLOOR)
   })
 
   it('keeps the overlaid label on the input size, so focus does not resize the address', () => {

@@ -6,6 +6,7 @@ import type {
   CodexAppServerConnectionHandlers,
   openCodexAppServerConnection
 } from '../codex/codex-app-server-connection'
+import { refuseUnroutedSteer } from '../codex/codex-structured-dispatch-test-support'
 import { computeAgentSessionPayloadFingerprint } from '../../shared/agent-session-mutation-envelope'
 import { attachFingerprintFields } from '../native-chat/agent-session-wire/structured-agent-session-attach'
 import { isRecord } from './rpc/orchestration-session-caller-test-fixture'
@@ -16,6 +17,8 @@ export type FakeConnection = Omit<CodexAppServerConnection, 'closed'> & {
   closed: boolean
   handlers: CodexAppServerConnectionHandlers
   threadId: string | null
+  /** Every JSON-RPC method the adapter called, in order. */
+  methods: string[]
   turns: { clientUserMessageId: string; text: string }[]
 }
 
@@ -56,10 +59,12 @@ export function fakeCodex() {
     const connection: FakeConnection = {
       handlers,
       threadId: null,
+      methods: [],
       turns: [],
       pid: 4321,
       closed: false,
       request: async (method, params) => {
+        connection.methods.push(method)
         const input = isRecord(params) ? params : {}
         if (method === 'thread/start') {
           connection.threadId = `thread-${connections.length}`
@@ -107,6 +112,9 @@ export function fakeCodex() {
             ],
             nextCursor: null
           }
+        }
+        if (method === 'turn/steer') {
+          return refuseUnroutedSteer(undefined)
         }
         return {}
       },
@@ -172,4 +180,30 @@ export function resetProviderFaults(): void {
   providerFaults.crashOnTurnStart = 'off'
   providerFaults.starts = 0
   providerFaults.turnStarts = 0
+}
+
+/** Emits the provider's start, echo and completion for one recorded turn. */
+export function completeFakeCodexTurn(connection: FakeConnection, turnIndex: number): void {
+  const turn = connection.turns[turnIndex]!
+  const turnId = `turn-${turnIndex + 1}`
+  const notify = (method: string, params: unknown) =>
+    connection.handlers.onNotification?.(method, params)
+  notify('turn/started', { turn: { id: turnId } })
+  notify('item/completed', {
+    item: {
+      type: 'userMessage',
+      id: `echo-${turn.clientUserMessageId}`,
+      clientId: turn.clientUserMessageId,
+      content: [{ type: 'text', text: 'pointer' }]
+    }
+  })
+  notify('turn/completed', { turn: { id: turnId } })
+}
+
+/** The text of a turn the fake provider received. */
+export function turnText(turn: { text: string }): string {
+  const input: unknown = JSON.parse(turn.text)
+  return Array.isArray(input)
+    ? input.map((item: unknown) => (isRecord(item) ? String(item.text) : '')).join('')
+    : ''
 }

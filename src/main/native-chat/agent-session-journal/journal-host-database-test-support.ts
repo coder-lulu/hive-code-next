@@ -3,6 +3,7 @@
 // same directory reads the same database the way a restarted host would.
 
 import { resolve } from 'node:path'
+import { NO_LEGACY_JOURNAL_RECORDS, type JournalLegacyRecordImport } from './journal-database'
 import { JournalHostDatabase } from './journal-host-database'
 import { replayJournal, type JournalLoad } from './journal-open'
 import { serializeJournalRow, type JournalRow } from './journal-row-schema'
@@ -19,15 +20,25 @@ import { openAgentSessionJournal } from './journal-store-factory'
 
 const opened = new Map<string, JournalHostDatabase>()
 
-export function openTestJournalHostDatabase(stateDirectory: string): JournalHostDatabase {
+export function openTestJournalHostDatabase(
+  stateDirectory: string,
+  legacyRecords: JournalLegacyRecordImport = NO_LEGACY_JOURNAL_RECORDS
+): JournalHostDatabase {
   const directory = resolve(stateDirectory)
   const existing = opened.get(directory)
   if (existing && !existing.isClosed) {
     return existing
   }
-  const database = JournalHostDatabase.open(directory)
+  const database = JournalHostDatabase.openWith(directory, legacyRecords)
   opened.set(directory, database)
   return database
+}
+
+/** Closes this directory's database, so the next open reads the file as a fresh process would. */
+export function closeTestJournalHostDatabase(stateDirectory: string): void {
+  const directory = resolve(stateDirectory)
+  opened.get(directory)?.close()
+  opened.delete(directory)
 }
 
 /** Closes every database this process opened for tests. */

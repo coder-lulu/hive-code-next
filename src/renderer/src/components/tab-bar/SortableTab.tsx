@@ -224,7 +224,12 @@ export default function SortableTab({
       }}
     >
       {isActive && <span className={ACTIVE_TAB_SURFACE_CLASSES} aria-hidden />}
-      <TerminalTabLeadingIcon agent={tabAgent} shell={shellForIcon} isActive={isActive} />
+      <TerminalTabLeadingIcon
+        agent={tabAgent}
+        activityStatus={activityStatus}
+        shell={shellForIcon}
+        isActive={isActive}
+      />
       {isEditing ? (
         <Input
           ref={setRenameInputElement}

@@ -28,6 +28,7 @@ import {
   stageWindowsProcessTreeNodeAddonApiHeaders,
   windowsProcessTreeAddonPath
 } from './windows-process-tree-gyp-rebuild.mjs'
+import { disableMsbuildFileTrackingOnWindows } from './msbuild-file-tracking.mjs'
 import {
   copyFileSync,
   existsSync,
@@ -135,6 +136,7 @@ try {
     }
     prepareWindowsProcessTreeBuild()
   }
+  disableMsbuildFileTrackingOnWindows()
   await rebuild({
     buildPath: projectDir,
     electronVersion,

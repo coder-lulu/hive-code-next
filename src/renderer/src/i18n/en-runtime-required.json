@@ -1,4 +1,15 @@
 {
+  "accounts": {
+    "managedData": {
+      "description": "Add accounts by running this command in a terminal on the HiveCode host. Selection applies to new explicit agent launches on that host; direct SSH relay and Windows-hosted WSL launches use their own credentials.",
+      "upgrade": "If accounts do not appear, update or restart the HiveCode host."
+    }
+  },
+  "agents": {
+    "hivecode": {
+      "name": "HiveCode AI"
+    }
+  },
   "agentsSettings": {
     "checkUpdates": "Check for updates",
     "checkingUpdates": "Checking…",
@@ -1135,6 +1146,13 @@
           }
         }
       },
+      "native": {
+        "chat": {
+          "NativeChatStructuredSessionStatus": {
+            "starting": "{{value0}} is still starting. Messages wait until it is ready; close this chat to give up on it."
+          }
+        }
+      },
       "new": {
         "workspace": {
           "SmartWorkspaceNameField": {
@@ -1392,6 +1410,9 @@
               }
             }
           },
+          "aiVaultSessionLogOpen": {
+            "notAuthorized": "Couldn't open log — path not authorized."
+          },
           "checks": {
             "panel": {
               "content": {
@@ -1596,6 +1617,10 @@
                 }
               },
               "discard": {
+                "confirmation": {
+                  "1426c2efff": "This will revert all changes to this file. This cannot be undone.",
+                  "40e9357b2a": "This will restore the file from HEAD and discard the deletion. This cannot be undone."
+                },
                 "dialog": {
                   "48c5ef95d9": "area",
                   "6de99d162b": "entry"
@@ -1927,7 +1952,7 @@
           "nativeChat": {
             "copy": "Adds a Chat UI view you can switch to from supported agent terminal panes. Experimental while we tune transcript fidelity, streaming, and terminal parity.",
             "resumeCopy": "When HiveCode quits or installs an update, chats that were working are automatically resumed when HiveCode is reopened.",
-            "structuredScope": "Local sessions only for now. WSL and remote execution hosts (including SSH) continue to use terminal chat, and Windows falls back to it unless HiveCode can read process start times."
+            "structuredScope": "Runs on this machine and on paired HiveCode servers running a version that supports it; older servers keep terminal chat. WSL and SSH hosts continue to use terminal chat, and Windows falls back to it unless HiveCode can read process start times."
           },
           "newWorktreeCardStyle": {
             "copy": "Preview updated worktree-card layout, metadata placement, card-display menu options, and status presentation."
@@ -2167,6 +2192,7 @@
         "MobilePane": {
           "35100bca5d": "While you're using a terminal on your phone, HiveCode shrinks it to fit your phone screen. When you close the app or switch away, this controls whether it stays at phone size (so interactive CLI tools don't reflow) or resizes back to your desktop. You can always use Restore this terminal or Restore all terminals on the banner to resize manually.",
           "3939fd062c": "Revoking a device disconnects it immediately.",
+          "5e2c7a1f84": "While you're using a terminal on your phone, HiveCode shrinks it to fit your phone screen. When you close the app or switch away, this controls whether it stays at phone size (so interactive CLI tools don't reflow) or resizes back to your desktop. You can always use Restore or Restore all on the banner to resize manually.",
           "d7ce676270": "Paired Devices",
           "diagnosticsCopied": "Diagnostics copied",
           "diagnosticsCopyFailed": "Failed to copy diagnostics",
@@ -2326,6 +2352,8 @@
           "hostSetupMissingCapability": "Update HiveCode on this host to set up projects",
           "hostWorkspaceWindowClosedHelp": "The server is reachable but its HiveCode window is closed. Open HiveCode on {{value0}} to use this setup.",
           "removeProjectAllHosts": "Remove this project from HiveCode on all configured hosts.",
+          "removeProjectCheckout": "Remove this checkout from HiveCode. Other checkouts of this project stay.",
+          "removeProjectKeepCheckouts": "Remove this project from HiveCode. Checkouts that have their own settings stay.",
           "settingUpHost": "Importing...",
           "setupExistingFolder": "Import existing folder",
           "setupExistingFolderHelp": "Make this project available on another host by linking a checkout that already exists there.",
@@ -2480,7 +2508,9 @@
           "4a342f44c1": "Advanced Connection",
           "92f80edbfd": "Remote Terminal Persistence",
           "e9609ddca6": "Proxy, jump host, and connection reuse",
-          "f2331ce599": "Edit SSH Target"
+          "f2331ce599": "Edit SSH Target",
+          "remoteRuntimeHelp": "Which Node.js runs HiveCode on this host. HiveCode-managed Node uploads its own and needs no npm; Host Node uses the Node.js already installed there.",
+          "remoteRuntimePinnedNode": "HiveCode-managed Node"
         },
         "TaskSourceLinearSetup": {
           "connectDescription": "Add a Personal API key so HiveCode can browse issues and open workspaces with ticket context."
@@ -2509,7 +2539,9 @@
           "29154326bb": "on",
           "348246b06f": "false",
           "5936387ddd": "auto",
+          "59573d0b33": "Enter a shell name on PATH or an executable path. HiveCode starts it as a login shell.",
           "5fe79a5e56": "Choose which WSL distribution new WSL terminals and local agent scans use.",
+          "69724e8f0c": "Choose what HiveCode opens for new local terminal panes.",
           "ab20575a8a": "off",
           "ab3a1f9068": "wsl.exe",
           "adbafefe56": "custom",
@@ -2556,6 +2588,12 @@
           "d8216eb22e": "This removes the WSL shell command. HiveCode itself remains installed on Windows.",
           "e2b0ee267f": "stale"
         },
+        "ZcodePlanAccountsSection": {
+          "detailsUnavailable": "Plan credential details are only readable on the computer running HiveCode.",
+          "hostOnly": "Change the plan site and API key in the desktop app on the computer running HiveCode.",
+          "keyRequired": "GLM Coding Plan API key is required.",
+          "usingCliHelp": "HiveCode reads the Coding Plan key from ~/.zcode/cli/config.json. Save an API key below to link the plan here instead."
+        },
         "accounts": {
           "search": {
             "d1d2ae383c": "Paste your opencode.ai session cookie for rate limit fetching."
@@ -2565,7 +2603,9 @@
           "95d3031db2": "Keeps this computer and display awake while agents are working. Lid-close behavior follows this device's power settings.",
           "a42f6fbdd8": "Keeps this computer and display awake while agents are working. HiveCode also asks this device to stay awake when the lid is closed, subject to its power policy.",
           "e5995ce268": "Keep computer awake while agents are working",
+          "lidNoteDefault": "HiveCode also asks this device to stay awake when the lid is closed, subject to its power policy.",
           "modeDescriptionDefault": "Choose On, Agent, or Off. Agent mode stays awake while agents are working. HiveCode also asks this device to stay awake when the lid is closed, subject to its power policy.",
+          "modeDescriptionMac": "Choose On, Agent, or Off. Agent mode prevents idle sleep while agents work, so long runs finish with the lid open. Closing the lid still puts this Mac to sleep.",
           "modeDescriptionWindows": "Choose On, Agent, or Off. Agent mode stays awake while agents are working; lid-close behavior follows this device's power settings.",
           "modeTitle": "Keep computer awake"
         },
@@ -3094,6 +3134,9 @@
         "CacheTimer": {
           "07729cc155": "expired"
         },
+        "DeleteWorktreeDirtyChangeHint": {
+          "8e2994ce28": "Deleting this workspace permanently removes these changes from disk."
+        },
         "FolderWorkspaceComposerDialog": {
           "chooseSourceProject": "Choose task source",
           "connectFailed": "Failed to connect to project.",
@@ -3280,8 +3323,7 @@
           "645fa4a0fd": "GH Issue",
           "65770ad0f0": "Edit GitHub links and notes for this workspace.",
           "741279e7b7": "Issue # or GitHub URL",
-          "7c454be4c5": "Paste an issue URL, or enter a number. Leave blank to remove the link.",
-          "gitlabDescription": "Edit issue links, merge request links, and notes for this workspace."
+          "7c454be4c5": "Paste an issue URL, or enter a number. Leave blank to remove the link."
         },
         "WorktreeOpenInMenu": {
           "0bed8727db": "It may have been moved or deleted. Refresh workspaces or remove it from HiveCode.",
@@ -3979,7 +4021,16 @@
             "stop_agent_confirm": "Stop Agent"
           },
           "MobileDriverOverlay": {
-            "3eed73394f": "Your keyboard is paused"
+            "3eed73394f": "Your keyboard is paused",
+            "54f7d6f69d": "Take back all terminals",
+            "7cffad954c": "Collapse",
+            "a6b1d8f3e2": "Your phone session ended. Restore to desktop size for this terminal, or for all terminals your phone left at phone size.",
+            "b3d8e1f42a": "Restore this terminal",
+            "c8f2e1a4b9": "Take back this terminal",
+            "d9f3c6e2a4": "Desktop keyboard is paused. Take back this terminal to type here, take back all terminals your phone controls, or collapse to keep watching.",
+            "e8c4f2a91b": "Restore all terminals",
+            "f2a8b9c1d3": "From your phone",
+            "faa367dc74": "Your phone left this at phone size"
           },
           "TerminalErrorToast": {
             "42b283ecfc": "HiveCode couldn't safely reconnect this terminal because the host couldn't verify its saved session. HiveCode left the saved session unchanged. Click Retry to try reconnecting now. If it still cannot reconnect, open a new terminal.",
@@ -4120,6 +4171,17 @@
         "events": {
           "browserStateIpcBridge": {
             "docPreviewLinkFailed": "Could not open this link in HiveCode Browser."
+          },
+          "os": {
+            "markdown": {
+              "file": {
+                "open": {
+                  "bridge": {
+                    "1e9a1a63c4": "Failed to open the Markdown file."
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -4132,6 +4194,9 @@
         "dropPartiallyAttached_other": "{{failureCount}} of {{count}} items could not be attached."
       },
       "useGlobalFileDrop": {
+        "nativeDropTempCopyFailed": "HiveCode couldn't copy {{count}} dropped files.",
+        "nativeDropTempCopyFailed_one": "HiveCode couldn't copy {{count}} dropped file.",
+        "nativeDropTempCopyFailed_other": "HiveCode couldn't copy {{count}} dropped files.",
         "nativeDropUnresolvedPaths": "HiveCode couldn't read a path for the dropped files."
       },
       "useIpcEvents": {
@@ -4220,6 +4285,13 @@
         "permissionDenied": "Permission denied.",
         "symlink": "Symbolic links cannot be attached.",
         "unsupported": "Unsupported file type."
+      },
+      "dropTempCopyFailure": {
+        "changed": "The file changed while HiveCode was copying it. Try the drop again.",
+        "storageFull": "HiveCode's storage for dropped files is full, so HiveCode couldn't hand it to the agent.",
+        "storageNotPrivate": "HiveCode's storage for dropped files can be read by other users, so nothing was copied.",
+        "storageUnavailable": "HiveCode couldn't create storage for dropped files.",
+        "tooLarge": "Too large to copy, so HiveCode couldn't hand it to the agent."
       },
       "folderWorkspacePathStatus": {
         "createError": {
@@ -4508,9 +4580,84 @@
         "awaitingUnnamed": "Awaiting user input",
         "questionCount": "{{value0}} questions"
       },
+      "backgroundTasks": {
+        "reasonUnverifiable": "no contact"
+      },
       "composer": {
         "effort": "Effort",
-        "imageUnsupported": "Image paste is not supported for this agent."
+        "imageUnsupported": "Image paste is not supported for this agent.",
+        "skillsUnavailableHost": "Skills are unavailable for this host",
+        "valueIsDefault": "Default",
+        "valueNotReported": "Not reported"
+      },
+      "contextMenu": {
+        "copyOrcaSessionId": "Copy HiveCode Session ID",
+        "orcaSessionIdCopied": "HiveCode session ID copied",
+        "orcaSessionIdCopyFailed": "Unable to copy HiveCode session ID",
+        "orcaSessionIdTooltip": "HiveCode's ID for this chat, separate from the agent CLI's own session ID. Agents use it to refer to each other through HiveCode."
+      },
+      "conversationCommand": {
+        "unconfirmed": "Conversation operation was not confirmed."
+      },
+      "failureWords": {
+        "accountSwitchInProgress": "A Claude account switch is in progress. Try again after it finishes.",
+        "answerUnconfirmed": "Your answer was recorded but the agent did not confirm it.",
+        "attachmentAtMost": "{{agent}} accepts at most {{limit}} images in one message, so this message was not sent.",
+        "attachmentEmpty": "An image on this message is empty, so the message was not sent.",
+        "attachmentInvalid": "An attachment on this message can't be sent to the agent.",
+        "attachmentLargerThan": "An image on this message is larger than {{size}} MB, so the message was not sent.",
+        "attachmentNoSource": "An image on this message has no file to send, so the message was not sent.",
+        "attachmentNotAFile": "An image on this message isn't a file, so the message was not sent.",
+        "attachmentTooLarge": "An image on this message is too large, so the message was not sent.",
+        "attachmentTooMany": "This message has too many images, so it was not sent.",
+        "attachmentTotalMoreThan": "The images on this message add up to more than {{size}} MB, so the message was not sent.",
+        "attachmentTotalTooLarge": "The images on this message are too large together, so the message was not sent.",
+        "attachmentUnreadable": "An attachment on this message couldn't be read, so the message was not sent.",
+        "attachmentUnsupportedType": "{{agent}} accepts only PNG, JPEG, GIF, and WebP images, so this message was not sent.",
+        "cancelUnconfirmed": "Cancellation was not confirmed.",
+        "cancelled": "This message was withdrawn before the agent started it.",
+        "chatClosed": "The chat closed before this message was sent.",
+        "chooseClaudeAccount": "Choose or add one in Claude Accounts settings.",
+        "chooseClaudeAccountThenRunCommand": "Choose or add one in Claude Accounts settings, then run /{{command}} again.",
+        "chooseClaudeAccountThenSend": "Choose or add one in Claude Accounts settings, then send your message again.",
+        "commandRefused": "This command didn't run.",
+        "commandRefusedTryAgain": "This command didn't run. Try it again.",
+        "compactionFailed": "Compaction failed.",
+        "compactionFailedQuoted": "Compaction failed: {{detail}}.",
+        "compactionUnconfirmed": "Compaction completion is unconfirmed.",
+        "couldNotRestart": "{{agent}} couldn't restart.",
+        "couldNotStart": "{{agent}} couldn't start.",
+        "emptyMessage": "This message is empty, so it was not sent.",
+        "historyTooLarge": "This conversation's history is too large to restore here.",
+        "hostFault": "HiveCode ran into a problem, so this didn't go through.",
+        "hostFaultTryAgain": "HiveCode ran into a problem, so this didn't go through. Try again.",
+        "hostRestarted": "HiveCode restarted before this message was sent.",
+        "hostStopped": "{{agent}} never finished starting, so HiveCode stopped it.",
+        "managedAccountEnvOverride": "This Claude launch sets its own Anthropic sign-in variables. Remove them to use a managed Claude account.",
+        "managedAccountUnsupported": "While a Claude account is added in WSL, Claude chats need a Windows Claude account.",
+        "noTurnToStop": "{{agent}} had no turn running to stop.",
+        "notDelivered": "This message was not delivered.",
+        "notDeliveredSendAgain": "This message was not delivered. Send it again to continue.",
+        "notSignedIn": "{{agent}} is not signed in for the selected account.",
+        "previousExitUnverifiable": "{{agent}} from before may still be running. Your messages will send once it stops.",
+        "providerExitedRejection": "{{agent}} stopped before this message was sent.",
+        "providerExitedRow": "{{agent}} stopped while this response was in progress. You can continue in this conversation.",
+        "providerRateLimited": "{{agent}} is rate-limited and retrying.",
+        "providerRejected": "The provider did not accept this message.",
+        "providerRejectedQuoted": "The provider did not accept this message: {{detail}}.",
+        "providerRetrying": "{{agent}} hit a temporary problem and is retrying.",
+        "providerRetryingQuoted": "{{agent}} is retrying: {{detail}}.",
+        "providerStartFailed": "{{agent}} stopped before it finished starting.",
+        "queueFull": "Too many messages were waiting for the agent, so this one was not sent.",
+        "runCommandAgain": "Run /{{command}} again.",
+        "sendToTryAgain": "Send your message to try again.",
+        "signInFirst": "Sign in first.",
+        "signInThenRunCommand": "Sign in, then run /{{command}} again.",
+        "signInThenSend": "Sign in, then send your message again.",
+        "stopRefused": "{{agent}} didn't stop.",
+        "stopRefusedQuoted": "{{agent}} didn't stop: {{detail}}.",
+        "theAgent": "The agent",
+        "writeFailed": "HiveCode couldn't hand this message to the agent, so it was not sent."
       },
       "handoff": {
         "agentOpen": "Agent is open in terminal.",
@@ -4544,6 +4691,10 @@
         "switchingAfterTurn": "Switching after this turn",
         "switchingOwner": "Switching session owner…"
       },
+      "notices": {
+        "historyItemTooLarge": "This part of the chat was too large to show.",
+        "historyRepaired": "Part of this chat's history couldn't be loaded."
+      },
       "question": {
         "other": "Other…"
       },
@@ -4570,6 +4721,8 @@
         }
       },
       "status": {
+        "failedAfter": "Failed after {{value0}}",
+        "interruptedAfter": "Interrupted after {{value0}}",
         "responding": "Agent is responding",
         "toggleDetails": "Toggle turn details",
         "workedFor": "Worked for {{value0}}",
@@ -4577,6 +4730,8 @@
       },
       "structuredSessionCloseFailed": "Could not close this chat session",
       "structuredSessionCloseFailedDescription": "The terminal stayed open so the provider remains recoverable.",
+      "structuredSessionHostUnreachableDescription": "HiveCode did not open a {{value0}} chat. Check the connection to the server and try again.",
+      "structuredSessionLaunchFailed": "Could not open {{value0}} chat",
       "structuredSessionLaunchFailedDescription": "HiveCode could not open a structured {{value0}} chat. See the logs for details.",
       "subagents": {
         "writtenBy": "Written by subagent {{value0}}"
@@ -4605,7 +4760,7 @@
         "answerFirst": "Answer the question or approval first.",
         "backgroundTasksRunning": "Background tasks are still running.",
         "capacity": "HiveCode has received too many requests in the last day.",
-        "chatNotFound": "The HiveCode running this chat has no record of it.",
+        "chatNotFound": "HiveCode can't find this chat.",
         "clearUnfinished": "The last /clear didn't finish.",
         "commandRunning": "A /compact or /clear is still running.",
         "conversationCleared": "This conversation has been cleared.",
@@ -4614,7 +4769,9 @@
         "historyUnreadable": "HiveCode couldn't read this chat's saved history.",
         "historyUnusable": "Unable to load this chat.",
         "hostReconciling": "HiveCode is still checking on this chat after restarting.",
-        "messagesUnsettled": "A message you sent earlier hasn't been confirmed yet.",
+        "messageNotSaved": "Couldn't save your message.",
+        "messagesUnsettled": "A message you sent earlier isn't confirmed yet.",
+        "notAvailable": "This isn't available in this chat.",
         "notDoneAnswer": "Your answer was not sent.",
         "notDoneCommand": "The command didn't run.",
         "notDoneGoal": "The goal wasn't changed.",
@@ -4627,15 +4784,16 @@
         "openCurrentConversation": "Open the current conversation to continue.",
         "optionRejected": "The agent didn't accept this setting.",
         "outcomeUnknown": "HiveCode couldn't confirm what happened. Check the chat.",
-        "ownerUnproven": "HiveCode hasn't confirmed that this chat's previous agent stopped.",
+        "ownerUnproven": "The previous agent in this chat may still be running.",
         "promptPending": "The agent is waiting for an answer to a question or approval.",
         "questionChanged": "This question was already answered or has changed.",
         "quitTerminalAgent": "Quit that agent to continue the chat here.",
-        "recordFailed": "HiveCode couldn't record it in this chat's history.",
+        "recordFailed": "HiveCode couldn't save this to the chat's history.",
         "recordUnreadable": "HiveCode couldn't read this chat's saved state.",
         "reopenChat": "Reopen the chat to check again.",
         "restartFailed": "The agent couldn't restart.",
         "savedByNewerOrca": "Chats were saved by a newer HiveCode.",
+        "sendOutcomeLost": "HiveCode couldn't confirm your message reached the agent. Check the chat, then send it again if needed.",
         "settleEarlierMessage": "Wait for your earlier message to go through, or retry it.",
         "startNewChat": "Start a new chat to continue.",
         "terminalAgentHoldsChat": "This chat is still open in a terminal agent.",
@@ -4643,7 +4801,7 @@
         "tryAgainComposerSend": "Send it again.",
         "turnActive": "The agent is still responding.",
         "unreachable": "HiveCode couldn't reach the agent.",
-        "unsupported": "The HiveCode running this chat doesn't support this. Update HiveCode, then try again.",
+        "unsupported": "This needs a newer HiveCode on the computer running this chat. Update HiveCode there, then try again.",
         "updateOrcaToKeepUsing": "Update HiveCode to keep using them.",
         "waitForBackgroundTasks": "Wait for the background tasks to finish.",
         "waitForCommand": "Wait for the /compact or /clear to finish.",
@@ -5061,6 +5219,10 @@
   "rendererRecovery": {
     "crashLoopDetail": "HiveCode tried to recover {{recoveryCount}} times in a row without success.",
     "genericDetail": "This is often a graphics-driver or installation problem. Reload to try again, or quit and relaunch HiveCode.",
+    "launchFailedDetail": "HiveCode retried {{recoveryCount}} times without success.",
+    "launchFailedGenericDetail": "The system refused to start it. Free up memory or close other apps, then click Try Again. If this keeps happening, reinstall HiveCode.",
+    "launchFailedMessage": "HiveCode couldn't start the process that draws its window.",
+    "lowCommitAdvice": "Free memory by closing unused apps or HiveCode workspaces, or increase the Windows page file size, then click Reload.",
     "stalledDetail": "HiveCode reloaded the window after a crash, but it never finished loading.",
     "title": "HiveCode keeps failing to load"
   },
@@ -5091,7 +5253,8 @@
     "panel": {
       "consent": "Enable full-text search? HiveCode builds an index on this computer from local agent transcripts, including full conversations and up to 3,072 characters per tool output. Content is not redacted. Authorized remote clients can search it and receive matching text.",
       "noService": "Search is unavailable on this computer. It may need an HiveCode update or a runtime with search support.",
-      "rankedResults": "Best matches"
+      "rankedResults": "Best matches",
+      "unsupportedAgent": "This computer does not support history search for the selected agent. Update HiveCode on that computer or select another agent."
     }
   },
   "settings": {
@@ -5134,6 +5297,18 @@
     "pathHelp": "One repository-relative directory per line. Spaces within a path are preserved."
   },
   "terminal": {
+    "codexSharedServerBanner": {
+      "confirmStopDescription": "This closes any open Codex sessions that share it, including ones outside HiveCode.",
+      "dialogDescription": "Codex sessions started directly in a terminal share one background server. HiveCode keeps the Codex sessions it starts separate. When sessions share a server, closing one can end the others, and agent status can be wrong.",
+      "openedBeforeUpdateBody": "This terminal was opened before HiveCode started giving each Codex its own server.",
+      "step1Note": "This changes your Codex settings, so it also applies outside HiveCode.",
+      "stopFailed": "HiveCode couldn't stop the server.",
+      "turnOffFailed": "HiveCode couldn't turn this off."
+    },
+    "codexSharedSettingsNotice": {
+      "description": "Codex may ask again to trust folders or approve commands. Re-add any MCP servers you added only in HiveCode.",
+      "title": "Codex in HiveCode now uses ~/.codex"
+    },
     "codexTerminalServerIsolationNotice": {
       "title": "HiveCode now runs Codex without its shared server"
     },

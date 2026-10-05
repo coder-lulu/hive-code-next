@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it } from 'vitest'
-import type { RuntimeMobileSessionTabsResult } from '../../../shared/runtime-types'
+import type {
+  RuntimeMobileSessionTabsRemovedResult,
+  RuntimeMobileSessionTabsResult
+} from '../../../shared/runtime-types'
 import type { Tab } from '../../../shared/tab-types'
 import {
   applyLocalStructuredSessionTabSnapshots,
-  removeLocalStructuredSessionTabs,
   resetLocalStructuredSessionVersionForTests
 } from './local-structured-session-tabs-sync'
 import {
@@ -117,7 +119,17 @@ it('keeps Hive tabs through CLI inventory updates and retirement without retaini
   expect(next.unifiedTabsByWorktree[WORKTREE_ID].some((tab) => tab.entityId === 'codex-1')).toBe(
     false
   )
-  const retired = removeLocalStructuredSessionTabs(next)
+  const retraction: RuntimeMobileSessionTabsRemovedResult = {
+    worktree: WORKTREE_ID,
+    publicationEpoch: 'epoch-hive',
+    snapshotVersion: 2,
+    removed: true,
+    activeGroupId: null,
+    activeTabId: null,
+    activeTabType: null,
+    tabs: []
+  }
+  const retired = applyLocalStructuredSessionTabSnapshots(next, [retraction])
   expect(retired.unifiedTabsByWorktree[WORKTREE_ID]).toContainEqual(hiveTab)
   expect(
     retired.unifiedTabsByWorktree[WORKTREE_ID].some((tab) => tab.agentSessionAgent === 'codex')

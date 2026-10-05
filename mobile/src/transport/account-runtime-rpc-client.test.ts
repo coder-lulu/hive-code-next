@@ -1,15 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HiveAccountRelayCallbacks } from '../../../src/shared/hive-account-relay-pool-contract'
+import { READY_STREAM_RELEASE_METHODS } from './rpc-client-server-subscription'
 
 const fixture = vi.hoisted(() => ({
   connectError: null as unknown,
+  subscriptionGate: null as Promise<void> | null,
   appStateListener: null as ((state: string) => void) | null,
   probe: vi.fn(),
   pools: [] as Array<{
     close: ReturnType<typeof vi.fn>
     lose: (error?: unknown) => void
     idle: () => void
-    subscriptions: Array<{ method: string; callbacks: HiveAccountRelayCallbacks }>
+    subscriptions: Array<{
+      method: string
+      callbacks: HiveAccountRelayCallbacks
+      close: ReturnType<typeof vi.fn>
+    }>
   }>
 }))
 
@@ -25,7 +31,11 @@ vi.mock('react-native', () => ({
 vi.mock('./runtime-random', () => ({ mobileRuntimeRandomBytes: vi.fn() }))
 vi.mock('../../../src/shared/hive-account-relay-pool', () => ({
   HiveAccountRelayPool: class {
-    subscriptions: Array<{ method: string; callbacks: HiveAccountRelayCallbacks }> = []
+    subscriptions: Array<{
+      method: string
+      callbacks: HiveAccountRelayCallbacks
+      close: ReturnType<typeof vi.fn>
+    }> = []
     state = 'ready'
     error: unknown = null
     close = vi.fn()
@@ -62,8 +72,12 @@ vi.mock('../../../src/shared/hive-account-relay-pool', () => ({
       return this.error
     }
     async subscribe(method: string, _params: unknown, callbacks: HiveAccountRelayCallbacks) {
-      this.subscriptions.push({ method, callbacks })
-      return { close: vi.fn(), sendRequest: fixture.probe }
+      const close = vi.fn()
+      this.subscriptions.push({ method, callbacks, close })
+      if (fixture.subscriptionGate) {
+        await fixture.subscriptionGate
+      }
+      return { close, sendRequest: fixture.probe }
     }
     async request() {
       return { id: 'request', ok: true, result: {}, _meta: { runtimeId: 'host' } }
@@ -80,6 +94,7 @@ describe('account Runtime independent stream recovery', () => {
     vi.useFakeTimers()
     fixture.pools.length = 0
     fixture.connectError = null
+    fixture.subscriptionGate = null
     fixture.probe.mockReset().mockResolvedValue({ id: 'health', ok: true, result: {} })
     AppState.currentState = 'active'
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
@@ -317,4 +332,78 @@ describe('account Runtime independent stream recovery', () => {
     release()
     expect(vi.getTimerCount()).toBe(0)
   })
+  it.each([...READY_STREAM_RELEASE_METHODS.keys()])(
+    'closes only the account-owned %s channel once',
+    async (method) => {
+      const listener = vi.fn()
+      const release = client.subscribe(method, {}, listener)
+      await Promise.resolve()
+      const pool = fixture.pools[0]!
+      const stream = pool.subscriptions[0]!
+      stream.callbacks.onResponse({
+        id: 'ready',
+        ok: true,
+        result: { type: 'ready', subscriptionId: 'owned' }
+      })
+      release()
+      release()
+      stream.callbacks.onClose?.()
+      expect(stream.close).toHaveBeenCalledTimes(1)
+      expect(pool.close).not.toHaveBeenCalled()
+      expect(fixture.probe).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
+    }
+  )
+
+  it('closes a late-opened account channel and never delivers after disposal', async () => {
+    let open!: () => void
+    fixture.subscriptionGate = new Promise<void>((resolve) => {
+      open = resolve
+    })
+    const listener = vi.fn()
+    const release = client.subscribe('notifications.subscribe', {}, listener)
+    const stream = fixture.pools[0]!.subscriptions[0]!
+    release()
+    stream.callbacks.onResponse({
+      id: 'late',
+      ok: true,
+      result: { type: 'ready', subscriptionId: 'late' }
+    })
+    open()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(stream.close).toHaveBeenCalledTimes(1)
+    expect(listener).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it.each(['end', 'refusal'])(
+    'retires an account stream on %s without stale callbacks or retries',
+    async (kind) => {
+      const listener = vi.fn()
+      const release = client.subscribe('nativeChat.subscribe', {}, listener)
+      await Promise.resolve()
+      const pool = fixture.pools[0]!
+      const stream = pool.subscriptions[0]!
+      stream.callbacks.onResponse(
+        kind === 'end'
+          ? { id: 'done', ok: true, result: { type: 'end' } }
+          : { id: 'done', ok: false, error: { code: 'FORBIDDEN', message: 'Access denied' } }
+      )
+      stream.callbacks.onResponse({ id: 'late', ok: true, result: 'stale' })
+      stream.callbacks.onClose?.()
+      release()
+      await vi.runOnlyPendingTimersAsync()
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener).toHaveBeenCalledWith(
+        kind === 'end'
+          ? { type: 'end' }
+          : expect.objectContaining({ type: 'error', message: 'Access denied' })
+      )
+      expect(stream.close).toHaveBeenCalledTimes(1)
+      expect(pool.close).not.toHaveBeenCalled()
+      expect(pool.subscriptions).toHaveLength(1)
+      expect(vi.getTimerCount()).toBe(0)
+    }
+  )
 })

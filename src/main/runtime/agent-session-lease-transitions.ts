@@ -18,7 +18,6 @@ import {
 } from '../../shared/agent-session-provider-handle'
 import type {
   AgentSessionDeathEvidence,
-  AgentSessionJournalCheckpoint,
   AgentSessionLease,
   AgentSessionProcessIdentity,
   AgentSessionRecord
@@ -248,28 +247,5 @@ function releasedAgentSessionLease(
     lastRenewedAt: now,
     handoffOperationId: null,
     deathEvidence
-  })
-}
-
-export function setAgentSessionJournalCheckpoint(args: {
-  record: AgentSessionRecord
-  fence: number
-  checkpoint: AgentSessionJournalCheckpoint
-  now: number
-}): AgentSessionRecord {
-  const { record } = args
-  assertFence(record.lease, args.fence)
-  const current = record.lease.journalCheckpoint
-  if (
-    current &&
-    (current.epoch > args.checkpoint.epoch ||
-      (current.epoch === args.checkpoint.epoch && current.sequence > args.checkpoint.sequence))
-  ) {
-    throw new Error('agent_session_checkpoint_stale')
-  }
-  return withLease(record, {
-    ...record.lease,
-    journalCheckpoint: args.checkpoint,
-    lastRenewedAt: args.now
   })
 }

@@ -6,12 +6,12 @@ import { useRouteHandoff } from '../navigation/route-handoff'
 import { ChevronLeft, RefreshCw } from 'lucide-react-native'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useHostClient } from '../transport/client-context'
-import { readMobileRuntimeHostPlatform } from '../transport/mobile-runtime-host-platform'
 import { worktreeCatalogRead } from '../worktree/worktree-catalog-operations'
 import { getWorktreeLabel } from '../session/worktree-label'
 import {
   buildMobileAiVaultResumeLaunch,
   createMobileAiVaultResumeMutationRegistry,
+  readMobileAiVaultResumeHost,
   readMobileRuntimeTerminalWindowsShell,
   resolveMobileAiVaultResumePlatform,
   resumeAiVaultSessionInTerminal
@@ -32,6 +32,7 @@ import {
   createMobileAiVaultResumeMutationId,
   loadMobileResumeMetadata
 } from './mobile-ai-vault-resume-metadata'
+import { useMobileResumeOperationOwnership } from './use-mobile-resume-operation-ownership'
 
 export type MobileAgentSessionHistoryPanelProps = {
   hostId: string
@@ -55,6 +56,12 @@ export function MobileAgentSessionHistoryPanel({
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createAgentHistoryStyles)
   const { client, state: connState } = useHostClient(hostId)
+  const claimResumeOwnership = useMobileResumeOperationOwnership(
+    hostId,
+    worktreeId,
+    client,
+    connState
+  )
   const [worktrees, setWorktrees] = useState<Worktree[]>([])
   const [worktreesLoaded, setWorktreesLoaded] = useState(false)
   const [query, setQuery] = useState('')
@@ -133,8 +140,8 @@ export function MobileAgentSessionHistoryPanel({
     [sessions, query, scope, scopeFilterPaths, activeWorktreePath, now]
   )
 
-  const hostPlatform = useMemo(
-    () => readMobileRuntimeHostPlatform(hostStatusResult),
+  const resumeHost = useMemo(
+    () => readMobileAiVaultResumeHost(hostStatusResult),
     [hostStatusResult]
   )
   const hostTerminalWindowsShell = useMemo(
@@ -163,6 +170,7 @@ export function MobileAgentSessionHistoryPanel({
         return
       }
 
+      const assertCurrentOwner = claimResumeOwnership()
       resumeLaunchInFlightRef.current = true
       setResumingSessionId(session.id)
       setResumeMessage(null)
@@ -174,6 +182,7 @@ export function MobileAgentSessionHistoryPanel({
           settings,
           worktrees: freshWorktrees
         } = await loadMobileResumeMetadata(client)
+        assertCurrentOwner()
         const target = resolveMobileAiVaultSessionResumeTarget({
           session,
           activeWorktreeId: worktreeId,
@@ -193,7 +202,7 @@ export function MobileAgentSessionHistoryPanel({
 
         const platform = resolveMobileAiVaultResumePlatform(
           target.targetStatus,
-          hostPlatform,
+          resumeHost.platform,
           target.workspacePath,
           target.terminalPlatform
         )
@@ -204,18 +213,31 @@ export function MobileAgentSessionHistoryPanel({
         }
 
         const preparedSession = await prepareMobileAiVaultSessionResume(client, session)
+        assertCurrentOwner()
         const launch = buildMobileAiVaultResumeLaunch({
           session: preparedSession,
           hostPlatform: platform,
           hostTerminalWindowsShell,
           settings
         })
-        await resumeAiVaultSessionInTerminal(client, target.worktreeId, {
-          ...launch,
-          clientMutationId: resumeMutationRegistryRef.current.claim(session.id)
-        })
+        await resumeAiVaultSessionInTerminal(
+          client,
+          target.worktreeId,
+          {
+            ...launch,
+            hostCapabilities: resumeHost.capabilities,
+            clientMutationId: resumeMutationRegistryRef.current.claim(session.id)
+          },
+          assertCurrentOwner
+        )
         resumeMutationRegistryRef.current.releaseOnSuccess(session.id)
         triggerSuccess()
+        // The host accepted the resume; a cutover now only stops navigation.
+        try {
+          assertCurrentOwner()
+        } catch {
+          return
+        }
         setResumeMessage('Agent session queued.')
         router.push(
           `/h/${encodeURIComponent(hostId)}/session/${encodeURIComponent(target.worktreeId)}` as Parameters<
@@ -234,11 +256,12 @@ export function MobileAgentSessionHistoryPanel({
       client,
       connState,
       hostId,
-      hostPlatform,
+      resumeHost,
       hostTerminalWindowsShell,
       router,
       worktreeId,
-      worktrees
+      worktrees,
+      claimResumeOwnership
     ]
   )
 

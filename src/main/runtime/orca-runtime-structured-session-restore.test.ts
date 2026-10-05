@@ -338,7 +338,8 @@ describe('structured session cold restoration', () => {
     })
 
     expect(closeSessionTab).toHaveBeenCalledWith('agent-session:restored-session', 'workspace-1')
-    expect(closeStructuredSession).toHaveBeenCalledWith('restored-session')
+    // The user closed this chat, so a turn the close cuts short is their cancellation.
+    expect(closeStructuredSession).toHaveBeenCalledWith('restored-session', 'user-close')
     expect(setSessionTabVisibility).toHaveBeenCalledWith('restored-session', false)
     expect(setSessionTabVisibility.mock.invocationCallOrder[0]).toBeLessThan(
       closeStructuredSession.mock.invocationCallOrder[0]!
@@ -354,7 +355,7 @@ describe('structured session cold restoration', () => {
 
   it('publishes restored Claude tabs with the Claude title', async () => {
     const runtime = new OrcaRuntimeService()
-    const publish = vi.spyOn(runtime, 'publishStructuredAgentSessionTab')
+    const project = vi.spyOn(runtime, 'projectStructuredAgentSessionTab')
     const internal = runtime as unknown as {
       hasPersistedStructuredAgentSessionStore(): boolean
       getKnownWorkspaceSessionWorktreeIds(): Set<string>
@@ -381,7 +382,7 @@ describe('structured session cold restoration', () => {
 
     await runtime.restoreStructuredAgentSessionTabs()
 
-    expect(publish).toHaveBeenCalledWith({
+    expect(project).toHaveBeenCalledWith({
       workspaceId: 'workspace-1',
       sessionId: 'restored-claude',
       agent: 'claude',
@@ -400,6 +401,30 @@ describe('structured session cold restoration', () => {
         })
       ])
     )
+  })
+
+  // The /clear commit moved the tab in the store already, so replacing it only projects.
+  it('replaces a cleared conversation tab without a store write', async () => {
+    const runtime = new OrcaRuntimeService()
+    const setSessionTabVisibility = vi.fn(async () => undefined)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: replacing a tab reaches the host only through setSessionTabVisibility, which must stay uncalled.
+    setStructuredAgentSessionHost({ setSessionTabVisibility } as never)
+
+    runtime.replaceStructuredAgentSessionTab({
+      sourceSessionId: 'cleared-session',
+      sessionId: 'replacement-session',
+      workspaceId: 'workspace-1',
+      agent: 'codex'
+    })
+
+    const snapshot = await runtime.listMobileSessionTabs('id:workspace-1')
+    expect(snapshot.tabs).toEqual([
+      expect.objectContaining({
+        id: 'agent-session:replacement-session',
+        replacesSessionId: 'cleared-session'
+      })
+    ])
+    expect(setSessionTabVisibility).not.toHaveBeenCalled()
   })
 
   it('commits the host close when the renderer already removed the structured tab', async () => {

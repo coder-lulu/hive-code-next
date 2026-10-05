@@ -26,6 +26,7 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
+import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 
 const CALLER = { callerKey: 'client-1' }
 const INIT_DELAY_MS = 40
@@ -78,6 +79,7 @@ beforeEach(async () => {
   })
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
+    logger: createStructuredAgentSessionLogger(),
     store,
     // The production router is what declares create support; the bare adapter only knows locations.
     adapter: Object.assign(adapter, { supportsCreate: () => true }),
@@ -144,7 +146,7 @@ describe('a publish-first Claude create whose init is slow', () => {
     await host.attach(CALLER, { ...params, options: { model: 'opus' } })
     await adapter.awaitStarted(SESSION)
     await Promise.all(lifecycle)
-    await host.close(SESSION)
+    await host.close(SESSION, 'evict')
     const releasedFence = store.getRecord(SESSION)?.lease.runtimeFence ?? 0
 
     // Starting the chat again resumes the session under a new fence.

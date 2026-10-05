@@ -172,7 +172,7 @@ describe('installProductUpdaterNetworkBoundary', () => {
       readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')
     ) as { dependencies?: Record<string, string> }
 
-    expect(packageJson.dependencies?.['electron-updater']).toBe('6.8.9')
+    expect(packageJson.dependencies?.['electron-updater']).toBe('6.8.10')
   })
 
   it('matches the partition currently used by electron-updater', () => {
@@ -423,7 +423,7 @@ describe('installProductUpdaterHttpExecutorBoundary', () => {
         handler: (options: RequestOptions) => void
       ): void {
         request.on('redirect', (_statusCode, _method, redirectUrl) => {
-          // Mirrors electron-updater@6.8.9 exactly: it calls the imported base class,
+          // Mirrors electron-updater@6.8.10 exactly: it calls the imported base class,
           // not this.constructor.prepareRedirectUrlOptions.
           handler(HttpExecutor.prepareRedirectUrlOptions(String(redirectUrl), options))
         })

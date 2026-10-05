@@ -60,6 +60,7 @@ vi.mock('./cdp-bridge', () => ({
 
 import { AgentBrowserBridge } from './agent-browser-bridge'
 import {
+  createFakeAgentBrowserChild,
   createSucceedWith,
   mockBrowserManager,
   mockWebContents,
@@ -130,11 +131,11 @@ describe('AgentBrowserBridge', () => {
       execFileMock.mockImplementation(
         (_bin: string, args: string[], _opts: unknown, cb: ExecFileCallback) => {
           if (args.includes('close')) {
-            return { kill: closeKill }
+            return createFakeAgentBrowserChild({ kill: closeKill })
           }
           if (args.includes('snapshot')) {
             cb(null, JSON.stringify({ success: true, data: { snapshot: 'ready' } }), '')
-            return { kill: vi.fn() }
+            return createFakeAgentBrowserChild({ kill: vi.fn() })
           }
           throw new Error(`unexpected agent-browser args ${args.join(' ')}`)
         }
@@ -258,10 +259,10 @@ describe('AgentBrowserBridge', () => {
           releaseStaleClose = () => {
             cb(null, JSON.stringify({ success: true, data: null }), '')
           }
-          return { kill: vi.fn() }
+          return createFakeAgentBrowserChild({ kill: vi.fn() })
         }
         cb(null, JSON.stringify({ success: true, data: null }), '')
-        return { kill: vi.fn() }
+        return createFakeAgentBrowserChild({ kill: vi.fn() })
       }
     )
 
@@ -303,11 +304,11 @@ describe('AgentBrowserBridge', () => {
 
     const killedError = Object.assign(new Error('killed'), { killed: true })
     let resolveRunningCommand: (() => void) | null = null
-    const activeChild = {
+    const activeChild = createFakeAgentBrowserChild({
       kill: vi.fn(() => {
         resolveRunningCommand?.()
       })
-    }
+    })
 
     execFileMock.mockImplementation(
       (_bin: string, args: string[], _opts: unknown, cb: ExecFileCallback) => {
@@ -317,10 +318,10 @@ describe('AgentBrowserBridge', () => {
         }
         if (args.includes('close')) {
           cb(null, JSON.stringify({ success: true, data: null }), '')
-          return { kill: vi.fn() }
+          return createFakeAgentBrowserChild({ kill: vi.fn() })
         }
         cb(null, JSON.stringify({ success: true, data: { ok: true } }), '')
-        return { kill: vi.fn() }
+        return createFakeAgentBrowserChild({ kill: vi.fn() })
       }
     )
 
@@ -392,10 +393,10 @@ describe('AgentBrowserBridge', () => {
         if (args.includes('snapshot')) {
           finishSnapshot = () =>
             cb(null, JSON.stringify({ success: true, data: { snapshot: 'x' } }), '')
-          return { kill: vi.fn(() => finishSnapshot?.()) }
+          return createFakeAgentBrowserChild({ kill: vi.fn(() => finishSnapshot?.()) })
         }
         cb(null, JSON.stringify({ success: true, data: null }), '')
-        return { kill: vi.fn() }
+        return createFakeAgentBrowserChild({ kill: vi.fn() })
       }
     )
 
@@ -623,7 +624,7 @@ describe('AgentBrowserBridge', () => {
           activeRetirements--
           cb(null, JSON.stringify({ success: true, data: null }), '')
         })
-        return { kill: vi.fn() }
+        return createFakeAgentBrowserChild({ kill: vi.fn() })
       }
     )
 

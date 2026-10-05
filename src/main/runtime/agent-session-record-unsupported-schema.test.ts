@@ -3,11 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
-import { AgentSessionRecordStore } from './agent-session-record-store'
 import {
-  AGENT_SESSION_STORE_SCHEMA_VERSION,
-  agentSessionStorePath
-} from './agent-session-record-store-file'
+  openTestAgentSessionRecordStore,
+  editPersistedTestAgentSessionStore,
+  readPersistedTestAgentSessionStore
+} from './agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabases } from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import { agentSessionStorePath, loadAgentSessionStore } from './agent-session-record-store-file'
 import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
 
 const NOW = 1_800_000_000_000
@@ -44,38 +46,26 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  closeTestJournalHostDatabases()
   await rm(directory, { recursive: true, force: true })
 })
 
 describe('unsupported agent session record schema', () => {
   it('quarantines without upgrading and keeps the session fail-closed', async () => {
-    const filePath = agentSessionStorePath(directory)
     const unsupported = { ...agentSessionRecordFixture(), schemaVersion: 1 }
-    const payload = JSON.stringify({
-      schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION,
-      hiveSessions: {},
-      taskExecutions: {},
-      hostId: 'local',
-      records: { [SESSION_ID]: unsupported },
-      operations: {},
-      retiredClaimKeys: [],
-      unusableRecords: {}
+    await editPersistedTestAgentSessionStore(directory, (state) => {
+      state.unusableRecords[SESSION_ID] = { reason: 'unsupported_schema', raw: unsupported }
     })
-    await Promise.all([writeFile(filePath, payload), writeFile(`${filePath}.bak`, payload)])
-
-    const store = await AgentSessionRecordStore.open({ directory, hostId: 'local' })
+    const store = await openTestAgentSessionRecordStore(directory)
 
     expect(store.getRecord(SESSION_ID)).toBeNull()
     expect(store.isSessionUnreadable(SESSION_ID)).toBe(true)
     await expect(store.reserveOwner(reserveRequest())).rejects.toThrow(
       'execution_owner_reconciling'
     )
-    const persisted = JSON.parse(await readFile(filePath, 'utf-8'))
-    expect(persisted.records).not.toHaveProperty(SESSION_ID)
-    expect(persisted.unusableRecords[SESSION_ID]).toMatchObject({
-      reason: 'unsupported_schema',
-      raw: { schemaVersion: 1 }
-    })
+    const persisted = await readPersistedTestAgentSessionStore(directory)
+    expect(persisted.records[SESSION_ID]).toEqual(unsupported)
+    expect(store.getRecord(SESSION_ID)).toBeNull()
   })
 
   it('rejects an ad-hoc store schema without rewriting it', async () => {
@@ -90,7 +80,7 @@ describe('unsupported agent session record schema', () => {
     })
     await writeFile(filePath, payload)
 
-    await expect(AgentSessionRecordStore.open({ directory, hostId: 'local' })).rejects.toThrow(
+    await expect(loadAgentSessionStore(filePath, 'local')).rejects.toThrow(
       'agent_session_store_corrupt'
     )
     await expect(readFile(filePath, 'utf-8')).resolves.toBe(payload)

@@ -190,7 +190,7 @@ describe('CodexRuntimeHomeService', () => {
     }
   })
 
-  it('starts WSL session bridging for the selected direct account home', async () => {
+  it('refuses WSL system-history bridging for the selected managed account home', async () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
     const startWslCodexSessionBridgeInBackground = vi.fn(() => Promise.resolve())
@@ -240,7 +240,8 @@ describe('CodexRuntimeHomeService', () => {
           }
         ],
         activeCodexManagedAccountId: null,
-        activeCodexManagedAccountIdsByRuntime: { host: null, wsl: { Debian: 'debian-account' } }
+        activeCodexManagedAccountIdsByRuntime: { host: null, wsl: { Debian: 'debian-account' } },
+        codexSessionSourceHome: { wsl: { Debian: '/home/alice/other-account-history' } }
       })
     )
 
@@ -251,11 +252,10 @@ describe('CodexRuntimeHomeService', () => {
       expect(service.prepareForCodexLaunch({ runtime: 'wsl', wslDistro: null })).toBe(
         managedHomePath
       )
-      expect(startWslCodexSessionBridgeInBackground).toHaveBeenCalledWith({
-        distro: 'Debian',
-        systemCodexHomePath: join(wslHome, '.codex'),
-        managedCodexHomePath: managedHomePath
-      })
+      expect(startWslCodexSessionBridgeInBackground).not.toHaveBeenCalled()
+      expect(readFileSync(join(managedHomePath, 'auth.json'), 'utf8')).toBe(
+        '{"account":"debian"}\n'
+      )
     } finally {
       vi.doUnmock('../codex/wsl-codex-session-bridge')
       vi.doUnmock('../wsl')
@@ -265,6 +265,46 @@ describe('CodexRuntimeHomeService', () => {
       }
     }
   })
+
+  it.each(['missing-account', ' '])(
+    'refuses WSL history bridging for an unproven selected account %j',
+    async (selectedId) => {
+      const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+      const startWslCodexSessionBridgeInBackground = vi.fn(async () => undefined)
+      vi.doMock('../codex/wsl-codex-session-bridge', () => ({
+        startWslCodexSessionBridgeInBackground
+      }))
+      const wslHome = join(testState.userDataDir, 'unproven-wsl-home')
+      vi.doMock('../wsl', () => ({
+        getDefaultWslDistro: () => 'Ubuntu',
+        getWslHome: () => wslHome
+      }))
+      const store = createStore(
+        createSettings({
+          activeCodexManagedAccountIdsByRuntime: { host: null, wsl: { Ubuntu: selectedId } },
+          codexSessionSourceHome: { wsl: { Ubuntu: '/home/me/other-codex-history' } }
+        })
+      )
+      try {
+        const { CodexRuntimeHomeService } = await import('./runtime-home-service')
+        const service = new CodexRuntimeHomeService(store as never)
+        expect(service.prepareForCodexLaunch({ runtime: 'wsl', wslDistro: 'Ubuntu' })).toBe(
+          join(wslHome, '.codex')
+        )
+        expect(startWslCodexSessionBridgeInBackground).not.toHaveBeenCalled()
+        expect(store.getSettings().activeCodexManagedAccountIdsByRuntime?.wsl.Ubuntu).toBe(
+          selectedId
+        )
+      } finally {
+        vi.doUnmock('../codex/wsl-codex-session-bridge')
+        vi.doUnmock('../wsl')
+        if (originalPlatform) {
+          Object.defineProperty(process, 'platform', originalPlatform)
+        }
+      }
+    }
+  )
 
   it('does not rescan retired sessions after the launch drain bridges them', async () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
@@ -326,11 +366,7 @@ describe('CodexRuntimeHomeService', () => {
       await service.prepareForCodexLaunchAsync({ runtime: 'wsl', wslDistro: 'Ubuntu' })
 
       expect(retiredBridgeRuns).toHaveBeenCalledTimes(1)
-      expect(startWslCodexSessionBridgeInBackground).toHaveBeenCalledExactlyOnceWith({
-        distro: 'Ubuntu',
-        systemCodexHomePath: join(wslHome, '.codex'),
-        managedCodexHomePath: managedHomePath
-      })
+      expect(startWslCodexSessionBridgeInBackground).not.toHaveBeenCalled()
     } finally {
       vi.doUnmock('./legacy-wsl-runtime-auth-drain')
       vi.doUnmock('../codex/wsl-codex-session-bridge')

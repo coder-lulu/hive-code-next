@@ -47,7 +47,8 @@ describe('PickerModal accessibility', () => {
       renderer = create(
         createElement(PickerModal, {
           visible: true,
-          title: 'Create Workspace On',
+          title: '排序方式',
+          subtitle: '在你的设备间同步',
           options: [
             { value: 'desk', label: 'Desk' },
             { value: 'laptop', label: 'Laptop', disabled: true }
@@ -59,6 +60,14 @@ describe('PickerModal accessibility', () => {
       )
     })
 
+    const note = renderer!.root
+      .findAllByType('Text')
+      .find((node) => node.children.includes('在你的设备间同步'))
+    expect(note).toBeDefined()
+    expect(note!.props.style).toMatchObject({
+      color: lightTheme.color.text.secondary,
+      ...lightTheme.typography.caption
+    })
     const rows = renderer!.root.findAllByType('Pressable')
     expect(rows.map((row) => row.props.accessible)).toEqual([true, true])
     expect(rows.map((row) => row.props.accessibilityRole)).toEqual(['button', 'button'])

@@ -134,7 +134,8 @@ export async function seedCreatePrComposer(page: Page): Promise<{
       // Ignore provider work queued before this generation-only fixture was installed.
       getEffectiveGitHubPRRefreshState: () => undefined,
       prRefreshStates: {},
-      fetchUpstreamStatus: async () => null,
+      fetchUpstreamStatus: async (worktreeId) =>
+        store.getState().remoteStatusesByWorktree[worktreeId] ?? null,
       setUpstreamStatus: () => undefined
     }))
 

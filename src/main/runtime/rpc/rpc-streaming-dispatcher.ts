@@ -163,7 +163,6 @@ export class RpcStreamingDispatcher {
             clientKind: options?.clientKind,
             clientCapabilities: options?.clientCapabilities,
             updateClientCapabilities: options?.updateClientCapabilities,
-            orchestrationCapability: request.orchestrationCapability,
             authenticatedCallerFingerprint:
               mutation?.identity.callerFingerprint ??
               legacyCoordinator?.mutationCallerFingerprint ??
@@ -222,7 +221,6 @@ export class RpcStreamingDispatcher {
           clientKind: options?.clientKind,
           clientCapabilities: options?.clientCapabilities,
           updateClientCapabilities: options?.updateClientCapabilities,
-          orchestrationCapability: request.orchestrationCapability,
           sendBinary: options?.sendBinary,
           registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
           registerBinaryMessageHandler: options?.registerBinaryMessageHandler,

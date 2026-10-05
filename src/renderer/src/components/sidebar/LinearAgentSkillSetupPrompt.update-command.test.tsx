@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '@/product-brand'
 import { act, type ComponentProps, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { CliInstallStatus } from '../../../../shared/cli-install-types'
@@ -55,11 +56,11 @@ let container: HTMLDivElement | null = null
 function cliStatus(): CliInstallStatus {
   return {
     platform: 'darwin',
-    commandName: 'orca',
+    commandName: PRIMARY_CLI_COMMAND,
     commandPath: null,
     pathDirectory: null,
     pathConfigured: false,
-    launcherPath: '/Applications/Orca.app/Contents/MacOS/Orca',
+    launcherPath: `/Applications/${APP_DISPLAY_NAME}.app/Contents/MacOS/${APP_DISPLAY_NAME}`,
     installMethod: null,
     supported: true,
     state: 'not_installed',

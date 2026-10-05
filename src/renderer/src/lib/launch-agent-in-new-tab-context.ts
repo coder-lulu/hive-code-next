@@ -1,3 +1,4 @@
+import type { AgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import type { AppState } from '@/store/types'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { AgentSessionLaunchPlan } from '@/lib/agent-session-launch-plan'
@@ -13,7 +14,11 @@ import {
   type ExecutionHostId
 } from '../../../shared/execution-host'
 
-export type LaunchAgentInNewTabArgs = {
+type LaunchAgentRequest =
+  | { requestId: AgentLaunchRequestId; agentSessionLaunchPlan?: undefined }
+  | { agentSessionLaunchPlan: AgentSessionLaunchPlan; requestId?: undefined }
+
+export type LaunchAgentInNewTabArgs = LaunchAgentRequest & {
   agent: TuiAgent
   worktreeId: string
   /** Host owner for colliding worktree IDs and FolderWorkspace scopes. */
@@ -37,8 +42,6 @@ export type LaunchAgentInNewTabArgs = {
   launchPlatform?: NodeJS.Platform
   /** Called after the prompt is actually delivered to the agent input path. */
   onPromptDelivered?: () => void
-  /** Keeps a preflighted route authoritative across workspace creation. */
-  agentSessionLaunchPlan?: AgentSessionLaunchPlan
   /** Keeps an activation-triggered empty-workspace launch pending until its surface opens. */
   pendingActivationSpawn?: boolean
   /** Lets a workspace reveal itself before the selected surface opens. */

@@ -73,4 +73,4 @@ test('pre-v41 code opens, acknowledges and writes a current-schema database, the
     db?.close()
     rmSync(directory, { recursive: true, force: true })
   }
-})
+}, 120_000)

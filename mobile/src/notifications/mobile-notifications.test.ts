@@ -91,19 +91,26 @@ describe('subscribeToDesktopNotifications', () => {
     return { promise, resolve }
   }
 
-  it('drops the local stream when disposed before the desktop returns ready', () => {
-    const unsubscribeStream = vi.fn()
+  it('ignores late ready and notification traffic after screen disposal', async () => {
+    let receive: (data: unknown) => void = () => {}
+    const drop = vi.fn()
+    const sendRequest = vi.fn()
     const client = {
-      subscribe: vi.fn(() => unsubscribeStream),
-      getState: vi.fn(() => 'connected'),
-      sendRequest: vi.fn()
+      subscribe: vi.fn((_method: string, _params: unknown, listener: typeof receive) => {
+        receive = listener
+        return drop
+      }),
+      getState: () => 'connected',
+      sendRequest
     } as unknown as RpcClient
-
-    const unsubscribe = subscribeToDesktopNotifications(client, 'host-1')
-    unsubscribe()
-
-    expect(unsubscribeStream).toHaveBeenCalledTimes(1)
-    expect(client.sendRequest).not.toHaveBeenCalled()
+    const dispose = subscribeToDesktopNotifications(client, 'host-1')
+    dispose()
+    receive({ type: 'ready', subscriptionId: 'late', epoch: 'late-epoch' })
+    receive({ type: 'notification', notificationId: 'late-event', title: 'Late', body: 'Late' })
+    await flushAsync()
+    expect(drop).toHaveBeenCalledTimes(1)
+    expect(sendRequest).not.toHaveBeenCalled()
+    expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled()
   })
 
   it('stores scheduled notification identifiers, replaces duplicates, and dismisses by id', async () => {

@@ -401,7 +401,7 @@ describe('CodexRuntimeHomeService', () => {
 
       finishDrain?.()
       await expect(launch).resolves.toBe(managedHomePath)
-      expect(startWslCodexSessionBridgeInBackground).toHaveBeenCalledTimes(1)
+      expect(startWslCodexSessionBridgeInBackground).not.toHaveBeenCalled()
     } finally {
       vi.doUnmock('../codex/codex-config-mirror')
       vi.doUnmock('../codex/codex-home-paths')
@@ -619,12 +619,7 @@ describe('CodexRuntimeHomeService', () => {
 
       expect(drainGuestHome).toBe('/mnt/c/Users/alice')
       expect(drainDestination).toEqual({ authContents: managedAuth, linuxHomePath })
-      expect(startWslCodexSessionBridgeInBackground).toHaveBeenCalledWith({
-        distro: 'Ubuntu',
-        systemCodexHomePath: '\\\\wsl.localhost\\Ubuntu\\mnt\\c\\Users\\alice\\.codex',
-        managedCodexHomePath:
-          '\\\\wsl.localhost\\Ubuntu\\mnt\\c\\Users\\alice\\orca\\codex-accounts\\drive-account\\home'
-      })
+      expect(startWslCodexSessionBridgeInBackground).not.toHaveBeenCalled()
     } finally {
       vi.doUnmock('../codex/codex-config-mirror')
       vi.doUnmock('../codex/codex-home-paths')

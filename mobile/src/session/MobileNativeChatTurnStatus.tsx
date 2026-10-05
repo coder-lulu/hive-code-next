@@ -8,6 +8,7 @@ import {
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
+import type { AgentTurnOutcome } from '../../../src/shared/agent-turn-outcome'
 
 /** Seconds tick only while a turn is actually counting, so a settled transcript
  *  holds no timers. */
@@ -27,16 +28,20 @@ function useElapsedSeconds(startedAt: number | null, counting: boolean): number 
 }
 
 /** The turn bar under the user's message: "Working for 12s" while the turn runs,
- *  settling in place to a tappable "Worked for 3m 4s" that discloses the turn's
- *  tool activity. Desktop parity: `NativeChatWorkingStatus`. */
+ *  settling in place to a tappable "Worked for 3m 4s" ("Interrupted after" for a Stop,
+ *  "Failed after" for a fault) that discloses the turn's tool activity. Desktop parity:
+ *  `NativeChatWorkingStatus`. */
 export function MobileNativeChatTurnStatus({
   startedAt,
   workedSeconds,
+  verdict,
   expanded = false,
   onToggleExpanded
 }: {
   startedAt: number | null
   workedSeconds?: number | null
+  /** How a settled turn ended; it picks the settled label. */
+  verdict?: AgentTurnOutcome
   expanded?: boolean
   onToggleExpanded?: () => void
 }): React.JSX.Element {
@@ -44,8 +49,14 @@ export function MobileNativeChatTurnStatus({
   const styles = useMobileThemeStyles(createStyles)
   const settled = workedSeconds != null
   const elapsedSeconds = useElapsedSeconds(startedAt, !settled)
-  const status = describeNativeChatTurnStatus({ workedSeconds, elapsedSeconds })
-  const label = `${status.key === 'workingFor' ? '正在处理' : '处理完成'} · ${status.duration}`
+  const status = describeNativeChatTurnStatus({ workedSeconds, elapsedSeconds, verdict })
+  const captions = {
+    workingFor: '正在处理',
+    workedFor: '处理完成',
+    interruptedAfter: '已中断',
+    failedAfter: '处理失败'
+  }
+  const label = `${captions[status.key]} · ${status.duration}`
 
   if (settled && onToggleExpanded) {
     return (

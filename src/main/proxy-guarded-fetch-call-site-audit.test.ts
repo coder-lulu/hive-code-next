@@ -33,7 +33,9 @@ const AUDITED_NON_NET_FETCH_CALLS = new Map<string, number>([
   // The existing electron-updater partition gap described above also applies to Hive metadata.
   // Product request/redirect allowlists still fence this partition independently of proxy state.
   ['main/product/product-updater-metadata-request.ts', 1],
-  ['main/product/product-updater-session.ts', 1]
+  ['main/product/product-updater-session.ts', 1],
+  // The same injected HttpClient, and the updater's deps.fetch that it is passed as.
+  ['main/runtime/agent-state-rules/agent-state-rules-live-update.ts', 2]
 ])
 
 // `globalThis.fetch` / `global.fetch` belong to global-fetch-call-site-audit.test.ts.

@@ -31,6 +31,7 @@ import {
 export { parseArgs, type OrcadOptions } from './orcad-options'
 
 let runOrcadQuitHandlers = (): void => {}
+let closeOrcadObservability = (): void => {}
 
 function createNodeAppEnvironment(): AppEnvironment {
   const quitHandlers: (() => void)[] = []
@@ -101,7 +102,12 @@ export async function startOrcad(options: OrcadOptions = {}): Promise<OrcadHandl
   return startOrcadWithHost(
     resolveUserDataPath(),
     (registerCleanup) => startOrcadRuntime(options, registerCleanup),
-    () => runOrcadQuitHandlers()
+    () => {
+      runOrcadQuitHandlers()
+      // Last, after every quit handler, so the spans they end still reach the file.
+      closeOrcadObservability()
+      closeOrcadObservability = () => {}
+    }
   )
 }
 
@@ -114,6 +120,8 @@ async function startOrcadRuntime(
   const { registerHeadlessPtyRuntime, getLocalPtyProvider, getSshPtyProvider } =
     await import('../ipc/pty')
   const { getAppEnvironment } = await import('../../shared/app-environment')
+  const { installOrcadObservability } = await import('./orcad-observability')
+  closeOrcadObservability = installOrcadObservability()
   const { resolveAdvertisedPairingEndpoint } = await import('../runtime/pairing-endpoint')
   const { ServeReadinessPublisher } = await import('../server/serve-readiness')
   const { createOrcadProfileStateStartup } = await import('./orcad-profile-state-startup')
@@ -137,6 +145,7 @@ async function startOrcadRuntime(
     | undefined
   let uninstallHookStatusRepublish = (): void => {}
   let uninstallObservedStatusIdentity = (): void => {}
+  let removeStatusHookSettingsListener = (): void => {}
   registerCleanup(async () => {
     try {
       await Promise.all([runtimeCloud?.stop(), rpc?.stop()])
@@ -153,6 +162,7 @@ async function startOrcadRuntime(
           // orcad restart goes back to killing every running terminal.
           await stopOrcadDaemon()
         } finally {
+          removeStatusHookSettingsListener()
           uninstallObservedStatusIdentity()
           uninstallHookStatusRepublish()
           agentHookServer.stop()
@@ -178,9 +188,17 @@ async function startOrcadRuntime(
   uninstallObservedStatusIdentity = agentHookServer.subscribeEnrichedStatus((enriched) =>
     observedStatusCapture.observe(enriched)
   )
-  if (isAgentStatusHooksEnabled(profileStore.getSettings())) {
-    await agentHookServer.start({ env: 'production', userDataPath: runtimeUserDataPath })
-  }
+  await agentHookServer.start({
+    env: 'production',
+    userDataPath: runtimeUserDataPath,
+    statusHooksEnabled: isAgentStatusHooksEnabled(profileStore.getSettings())
+  })
+
+  removeStatusHookSettingsListener = profileStore.onSettingsChanged((updates, settings) => {
+    if ('agentStatusHooksEnabled' in updates) {
+      agentHookServer.setStatusHooksEnabled(isAgentStatusHooksEnabled(settings))
+    }
+  })
 
   // Why before the runtime and the PTY handlers: `setLocalPtyProvider` installs the daemon
   // adapter as THE local provider, and the registry's contract is that it lands before
@@ -226,8 +244,10 @@ async function startOrcadRuntime(
       publish: (summary, subject) => agentHookServer.ingestStructuredStatus(summary, subject),
       forget: (subject) => agentHookServer.dropStructuredStatus(subject),
       publishChildWork: (subject, evidence, provider) =>
-        agentHookServer.ingestStructuredChildWork(subject, evidence, provider)
+        agentHookServer.ingestStructuredChildWork(subject, evidence, provider),
+      readChildWork: (subject) => agentHookServer.getStructuredChildWorkViews(subject)
     },
+    checkHookAgentPresence: (paneKey) => agentHookServer.checkAgentPresence(paneKey),
     reconcileAgentStatusForEndedProcess: (paneKeys) =>
       agentHookServer.reconcileEndedProcessForPaneKeys(paneKeys),
     buildAgentHookPtyEnv: () =>
@@ -248,6 +268,13 @@ async function startOrcadRuntime(
     getSettings: () => profileStore.getSettings()
   })
   getAppEnvironment().onWillQuit(() => sessionSearch?.dispose())
+
+  // Why: this host evaluates its own panes, so it keeps its own rules current.
+  const { startAgentStateRulesLiveUpdates } =
+    await import('../runtime/agent-state-rules/agent-state-rules-live-update')
+  startAgentStateRulesLiveUpdates(profileStore, (rules) =>
+    console.info(`[orcad] agent state rules ${rules.version} (${rules.source})`)
+  )
 
   // Why here too and not only on the desktop: nothing else republishes `session.tabs` when a
   // pane's status row changes, and orcad's whole job is serving paired clients.

@@ -18,6 +18,7 @@ import type {
   ConflictReviewEntry,
   ConflictReviewState,
   EditorOpenTargetOptions,
+  EditorTabSelection,
   OpenFile
 } from './open-file'
 import type { OpenFilePathRekey, RekeyOpenFilesResult } from './open-file-path-rekey'
@@ -25,6 +26,7 @@ import type {
   RestoredEditorOwnerMigration,
   RestoredEditorOwnerResult
 } from './restored-editor-owner'
+import type { UntitledFileCleanupResult } from '../tabs/untitled-file-cleanup'
 
 export type EditorFilesSlice = {
   // Open files / editor tabs
@@ -44,6 +46,7 @@ export type EditorFilesSlice = {
       forceContentReload?: boolean
       focusEditor?: boolean
       reopenId?: string
+      selection?: EditorTabSelection
     }
   ) => string
   openNewMarkdownInActiveWorkspace: (groupId: string) => Promise<void>
@@ -72,8 +75,8 @@ export type EditorFilesSlice = {
   ) => void
   makePreviewFilePermanent: (fileId: string, tabId?: string) => void
   pinFile: (fileId: string, tabId?: string) => void
-  closeFile: (fileId: string) => void
-  closeAllFiles: () => void
+  closeFile: (fileId: string) => UntitledFileCleanupResult | undefined
+  closeAllFiles: () => UntitledFileCleanupResult[]
   /** Most recently closed editor tabs per worktree (for Cmd/Ctrl+Shift+T). */
   recentlyClosedEditorTabsByWorktree: Record<string, ClosedEditorTabSnapshot[]>
   reopenClosedEditorTab: (worktreeId: string) => boolean
@@ -101,7 +104,7 @@ export type EditorFilesSlice = {
     relativePath: string,
     language: string,
     staged: boolean,
-    options?: EditorOpenTargetOptions
+    options?: EditorOpenTargetOptions & { selection?: EditorTabSelection }
   ) => void
   openBranchDiff: (
     worktreeId: string,

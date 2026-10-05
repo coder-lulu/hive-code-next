@@ -77,7 +77,62 @@ describe('live terminal surface owners', () => {
       WORKTREE_ID
     )
 
-    expect(owners.get(ptyId)).toBe('unowned')
+    expect(owners.get(ptyId)).toEqual({ unowned: true, recorded: null })
+  })
+
+  it('carries the pane the host last recorded for a live orphan', () => {
+    const ptyId = `${WORKTREE_ID}@@orphan`
+    const owners = indexLiveTerminalSurfaceOwners(
+      [
+        summary({
+          ptyId,
+          orphaned: true,
+          tabId: `pty:${ptyId}`,
+          leafId: `pty:${ptyId}`,
+          recordedPaneKey: `tab-live:${LEAF_ID}`
+        })
+      ],
+      WORKTREE_ID
+    )
+
+    expect(owners.get(ptyId)).toEqual({
+      unowned: true,
+      recorded: { paneKey: `tab-live:${LEAF_ID}`, ptyId, tabId: 'tab-live' }
+    })
+  })
+
+  it('ignores a recorded pane that is not a terminal pane key', () => {
+    const ptyId = `${WORKTREE_ID}@@orphan`
+    const owners = indexLiveTerminalSurfaceOwners(
+      [summary({ ptyId, orphaned: true, recordedPaneKey: 'tab-live:not-a-leaf' })],
+      WORKTREE_ID
+    )
+
+    expect(owners.get(ptyId)).toEqual({ unowned: true, recorded: null })
+  })
+
+  it('preserves explicit launch identity on the recorded orphan surface', () => {
+    const owners = indexLiveTerminalSurfaceOwners(
+      [
+        summary({ orphaned: true, recordedPaneKey: `tab-live:${LEAF_ID}`, launchAgent: 'hivecode' })
+      ],
+      WORKTREE_ID
+    )
+    expect(owners.get(`${WORKTREE_ID}@@live-agent`)).toMatchObject({
+      unowned: true,
+      recorded: { launchAgent: 'hivecode' }
+    })
+  })
+
+  it('does not adopt conflicting recorded orphan panes from one census', () => {
+    const owners = indexLiveTerminalSurfaceOwners(
+      [
+        summary({ orphaned: true, recordedPaneKey: `tab-live:${LEAF_ID}` }),
+        summary({ orphaned: true, recordedPaneKey: `tab-live:${OTHER_LEAF_ID}` })
+      ],
+      WORKTREE_ID
+    )
+    expect(owners.get(`${WORKTREE_ID}@@live-agent`)).toBeNull()
   })
 
   it('does not authorize adoption of a disconnected orphan', () => {

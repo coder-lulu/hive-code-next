@@ -1,11 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
-import {
-  View,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  Keyboard
-} from 'react-native'
+import { View, Pressable, StyleSheet, useWindowDimensions, Keyboard } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {

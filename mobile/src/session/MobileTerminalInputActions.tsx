@@ -8,6 +8,7 @@ import {
 import { ImagePlus, Mic } from 'lucide-react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { keepHeldPressThroughLongPress } from './held-press-long-press'
 
 type DictationState = {
   readonly isStarting: boolean
@@ -106,7 +107,7 @@ export function MobileTerminalInputActions({
                   onDictationCancel()
                 }
               }
-            : undefined
+            : keepHeldPressThroughLongPress
         }
         accessibilityRole="button"
         accessibilityLabel={

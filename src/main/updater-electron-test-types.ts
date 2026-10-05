@@ -34,6 +34,7 @@ export type AppMock = {
   isPackaged: boolean
   getVersion: Mock<() => string>
   on: Mock<(event: string, handler: (...args: unknown[]) => void) => AppMock>
+  prependListener: Mock<(event: string, handler: (...args: unknown[]) => void) => AppMock>
   emit: (event: string, ...args: unknown[]) => void
   quit: UpdaterSpy
 }

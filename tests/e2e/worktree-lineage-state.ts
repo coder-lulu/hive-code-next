@@ -7,9 +7,9 @@ export type LineageScenario = {
 
 export async function seedLineageScenario(
   page: Page,
-  options: { inlineOnly?: boolean } = {}
+  options: { inlineOnly?: boolean; preserveGrouping?: boolean } = {}
 ): Promise<LineageScenario> {
-  return page.evaluate(({ inlineOnly }) => {
+  return page.evaluate(({ inlineOnly, preserveGrouping }) => {
     const store = window.__store
     if (!store) {
       throw new Error('window.__store is not available')
@@ -19,7 +19,9 @@ export async function seedLineageScenario(
     state.setActiveView('terminal')
     state.setSidebarOpen(true)
     state.updateSessionsView({ navigation: 'projects' })
-    state.setGroupBy('none')
+    if (!preserveGrouping) {
+      state.setGroupBy('none')
+    }
     state.setSortBy('recent')
     // Why: these specs assert lineage structure, not the user's persisted
     // sidebar filters. Make the seeded child render even when it has no live PTY.

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { installSessionTabsInventoryEnvironment } from './session-tabs-inventory.test-fixture'
 import { SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import type { RuntimeMobileSessionTabsSnapshot } from '../../../../shared/runtime-session-contracts'
 import type { RuntimeMobileSessionTabsResult } from '../../../../shared/runtime-types'
@@ -7,23 +8,16 @@ import { subscribeSessionTabsInventory } from './session-tabs-inventory'
 
 const runningBaselineOracle = process.env.ORCA_TEST_BASELINE_SESSION_TABS_CENSUS_ORACLE === '1'
 
+installSessionTabsInventoryEnvironment()
+
 type Inventory = {
   snapshots: RuntimeMobileSessionTabsResult[]
   authoritative: true
   changeSequence: number
 }
 
-function deferredInventory(): {
-  promise: Promise<Inventory>
-  resolve: (inventory: Inventory) => void
-} {
-  let resolve!: (inventory: Inventory) => void
-  return {
-    promise: new Promise<Inventory>((settle) => {
-      resolve = settle
-    }),
-    resolve
-  }
+function deferredInventory() {
+  return Promise.withResolvers<Inventory>()
 }
 
 function snapshot(
@@ -101,17 +95,8 @@ function runtimeSnapshot(
   }
 }
 
-function deferredPtyInventory(): {
-  promise: Promise<PtyInventory>
-  resolve: (inventory: PtyInventory) => void
-} {
-  let resolve!: (inventory: PtyInventory) => void
-  return {
-    promise: new Promise<PtyInventory>((settle) => {
-      resolve = settle
-    }),
-    resolve
-  }
+function deferredPtyInventory() {
+  return Promise.withResolvers<PtyInventory>()
 }
 
 function createRuntimeHarness(initialSnapshots: RuntimeMobileSessionTabsSnapshot[] = []) {
@@ -127,6 +112,8 @@ function createRuntimeHarness(initialSnapshots: RuntimeMobileSessionTabsSnapshot
       connectionId: 'conn-runtime-census-race',
       requestId: 'req-runtime-census-race',
       pairedDeviceId: 'paired-runtime-census-race',
+      // A client without structured-session access has no restore before this ordered census.
+      clientKind: 'runtime',
       clientCapabilities: [SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY]
     },
     emit
@@ -401,6 +388,7 @@ describe.skipIf(runningBaselineOracle)('real runtime session tabs census boundar
 
   it('preserves caller-only follow intent when a later shared snapshot is buffered', async () => {
     const runtime = new OrcaRuntimeService()
+    await runtime.restoreStructuredAgentSessionTabs()
     runtime.syncWindowGraph(0, { tabs: [], leaves: [], mobileSessionTabs: [] })
     const census = deferredInventory()
     vi.spyOn(runtime, 'listAllMobileSessionTabsInventoryWithChangeSequence').mockImplementation(
@@ -466,6 +454,7 @@ describe.skipIf(runningBaselineOracle)('real runtime session tabs census boundar
 
   it('subsumes pre-boundary follow intent into the census selection', async () => {
     const runtime = new OrcaRuntimeService()
+    await runtime.restoreStructuredAgentSessionTabs()
     runtime.syncWindowGraph(0, { tabs: [], leaves: [], mobileSessionTabs: [] })
     const census = deferredInventory()
     vi.spyOn(runtime, 'listAllMobileSessionTabsInventoryWithChangeSequence').mockImplementation(
@@ -526,6 +515,7 @@ describe.skipIf(runningBaselineOracle)('real runtime session tabs census boundar
         runtime,
         connectionId: 'conn-abort',
         requestId: 'req-abort',
+        clientKind: 'runtime',
         signal: controller.signal
       },
       vi.fn()

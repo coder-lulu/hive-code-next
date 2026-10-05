@@ -67,7 +67,7 @@ export function prepareProfileStateStore(
   if (authority === undefined) {
     throw new ProfileStateStoreFactoryError(
       applyProductBranding(
-        'Writable profiles require SQLite database and backup support. Use Orca or its bundled Bun runtime.'
+        'Writable profiles require SQLite database and backup support. Use Orca or its pinned Node runtime.'
       )
     )
   }

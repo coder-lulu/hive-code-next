@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Store } from '../persistence'
-import type { RuntimeNotifier } from '../runtime/runtime-notifier-contract'
+import type { registerSshHandlers } from '../ipc/ssh'
+import type { registerRemoteWorkspaceHandlers } from '../ipc/remote-workspace'
+import type { registerDaemonManagementHandlers } from '../ipc/pty-management'
+import type { registerWorkspaceCleanupHandlers } from '../ipc/workspace-cleanup'
+import type { startFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade'
+import {
+  createMainWindowServiceStub,
+  createRuntime,
+  deferred,
+  type MainWindowStub
+} from './main-window-service-stubs.test-fixture'
 
 const {
   onMock,
@@ -14,8 +24,14 @@ const {
   systemPreferencesGetMediaAccessStatusMock,
   registerRepoHandlersMock,
   setRepoRemoteClientNotifierMock,
+  setWorktreeCatalogRemoteClientNotifierMock,
   registerWorktreeHandlersMock,
   registerPtyHandlersMock,
+  registerSshHandlersMock,
+  registerRemoteWorkspaceHandlersMock,
+  registerDaemonManagementHandlersMock,
+  registerWorkspaceCleanupHandlersMock,
+  startFolderRepoGitUpgradeWatchMock,
   hydrateLocalPtyRegistryAtBootMock,
   setupAutoUpdaterMock,
   releaseUpdatesConfiguredMock,
@@ -39,8 +55,15 @@ const {
   systemPreferencesGetMediaAccessStatusMock: vi.fn(),
   registerRepoHandlersMock: vi.fn(),
   setRepoRemoteClientNotifierMock: vi.fn(),
+  setWorktreeCatalogRemoteClientNotifierMock: vi.fn(),
   registerWorktreeHandlersMock: vi.fn(),
   registerPtyHandlersMock: vi.fn(),
+  registerSshHandlersMock: vi.fn<(...args: Parameters<typeof registerSshHandlers>) => void>(),
+  registerRemoteWorkspaceHandlersMock:
+    vi.fn<(...args: Parameters<typeof registerRemoteWorkspaceHandlers>) => void>(),
+  registerDaemonManagementHandlersMock: vi.fn<typeof registerDaemonManagementHandlers>(),
+  registerWorkspaceCleanupHandlersMock: vi.fn<typeof registerWorkspaceCleanupHandlers>(),
+  startFolderRepoGitUpgradeWatchMock: vi.fn<typeof startFolderRepoGitUpgradeWatch>(),
   hydrateLocalPtyRegistryAtBootMock: vi.fn(),
   setupAutoUpdaterMock: vi.fn(),
   releaseUpdatesConfiguredMock: vi.fn(),
@@ -82,6 +105,10 @@ vi.mock('../ipc/repos/repos-changed-notification', () => ({
   setRepoRemoteClientNotifier: setRepoRemoteClientNotifierMock
 }))
 
+vi.mock('../ipc/watched-worktree-catalog-notification', () => ({
+  setWorktreeCatalogRemoteClientNotifier: setWorktreeCatalogRemoteClientNotifierMock
+}))
+
 vi.mock('../ipc/worktrees', () => ({
   registerWorktreeHandlers: registerWorktreeHandlersMock
 }))
@@ -98,6 +125,20 @@ vi.mock('../ipc/worktree-change-invalidators', () => ({
 vi.mock('../ipc/pty', () => ({
   getLocalPtyProvider: vi.fn(),
   registerPtyHandlers: registerPtyHandlersMock
+}))
+
+vi.mock('../ipc/ssh', () => ({ registerSshHandlers: registerSshHandlersMock }))
+vi.mock('../ipc/remote-workspace', () => ({
+  registerRemoteWorkspaceHandlers: registerRemoteWorkspaceHandlersMock
+}))
+vi.mock('../ipc/pty-management', () => ({
+  registerDaemonManagementHandlers: registerDaemonManagementHandlersMock
+}))
+vi.mock('../ipc/workspace-cleanup', () => ({
+  registerWorkspaceCleanupHandlers: registerWorkspaceCleanupHandlersMock
+}))
+vi.mock('../ipc/folder-repo-git-upgrade', () => ({
+  startFolderRepoGitUpgradeWatch: startFolderRepoGitUpgradeWatchMock
 }))
 
 vi.mock('../memory/hydrate-local-pty-registry', () => ({
@@ -133,57 +174,16 @@ import { attachMainWindowServices } from './attach-main-window-services'
 
 type MockFn = ReturnType<typeof vi.fn>
 
-type MainWindowStub = {
-  id?: number
-  isDestroyed?: MockFn
-  on: MockFn
-  once: MockFn
-  webContents: {
-    id?: number
-    getURL: MockFn
-    isDestroyed?: MockFn
-    isLoadingMainFrame: MockFn
-    on: MockFn
-    send?: MockFn
-    reload?: MockFn
-    session: {
-      setPermissionRequestHandler: MockFn
-      setPermissionCheckHandler: MockFn
-    }
-  }
-}
-
-type RuntimeStub = {
-  attachWindow: MockFn
-  setNotifier: ReturnType<typeof vi.fn<(notifier: RuntimeNotifier | null) => void>>
-  markRendererReloading: MockFn
-  markRendererReloadCancelled: MockFn
-  markGraphReloadFailed: MockFn
-  markGraphUnavailable: MockFn
-}
-
 function createMainWindow(
   extraWebContents: { isLoadingMainFrame?: MockFn; on?: MockFn; send?: MockFn } = {}
 ): MainWindowStub {
-  return {
-    id: 1,
-    isDestroyed: vi.fn(() => false),
-    on: vi.fn(),
-    once: vi.fn(),
-    webContents: {
-      id: 1,
-      getURL: vi.fn(() => 'file:///opt/orca/renderer/index.html'),
-      isDestroyed: vi.fn(() => false),
-      isLoadingMainFrame: vi.fn(() => true),
-      on: vi.fn(),
-      reload: vi.fn(),
-      session: {
-        setPermissionRequestHandler: setPermissionRequestHandlerMock,
-        setPermissionCheckHandler: setPermissionCheckHandlerMock
-      },
-      ...extraWebContents
-    }
-  }
+  return createMainWindowServiceStub(
+    {
+      setPermissionRequestHandler: setPermissionRequestHandlerMock,
+      setPermissionCheckHandler: setPermissionCheckHandlerMock
+    },
+    extraWebContents
+  )
 }
 
 function createStore(): Store & { flushPendingAsync: MockFn } {
@@ -191,25 +191,6 @@ function createStore(): Store & { flushPendingAsync: MockFn } {
     getProfileStorageDirectory: vi.fn(() => '/profile-a'),
     flushPendingAsync: vi.fn(() => Promise.resolve())
   } as unknown as Store & { flushPendingAsync: MockFn }
-}
-
-function createRuntime(): RuntimeStub {
-  return {
-    attachWindow: vi.fn(),
-    setNotifier: vi.fn<(notifier: RuntimeNotifier | null) => void>(),
-    markRendererReloading: vi.fn(),
-    markRendererReloadCancelled: vi.fn(),
-    markGraphReloadFailed: vi.fn(),
-    markGraphUnavailable: vi.fn()
-  }
-}
-
-function deferred(): { promise: Promise<void>; resolve: () => void } {
-  let resolve!: () => void
-  const promise = new Promise<void>((next) => {
-    resolve = next
-  })
-  return { promise, resolve }
 }
 
 function getClosedHandlers(mainWindowOnMock: MockFn): (() => void)[] {
@@ -241,10 +222,30 @@ describe('attachMainWindowServices', () => {
   // #11994: without this wiring, host-local repo IPC mutations never reach paired clients.
   it('gives the repo IPC handlers the runtime so repo changes reach paired clients', () => {
     const runtime = createRuntime()
+    const mainWindow = createMainWindow()
+    const store = createStore()
 
-    attachMainWindowServices(createMainWindow() as never, createStore(), runtime as never)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Stubs provide the window/runtime methods exercised by attachment.
+    attachMainWindowServices(mainWindow as never, store, runtime as never)
 
     expect(setRepoRemoteClientNotifierMock).toHaveBeenCalledWith(runtime)
+    expect(setWorktreeCatalogRemoteClientNotifierMock).toHaveBeenCalledWith(runtime)
+    expect(registerSshHandlersMock).toHaveBeenCalledExactlyOnceWith(
+      store,
+      expect.any(Function),
+      runtime
+    )
+    expect(registerSshHandlersMock.mock.calls[0]?.[1]()).toBe(mainWindow)
+    expect(registerRemoteWorkspaceHandlersMock).toHaveBeenCalledExactlyOnceWith(
+      store,
+      expect.any(Function),
+      runtime
+    )
+    expect(registerRemoteWorkspaceHandlersMock.mock.calls[0]?.[1]()).toBe(mainWindow)
+    expect(registerDaemonManagementHandlersMock).toHaveBeenCalledExactlyOnceWith()
+    expect(registerDaemonManagementHandlersMock).toHaveBeenCalledAfter(registerPtyHandlersMock)
+    expect(registerWorkspaceCleanupHandlersMock).toHaveBeenCalledExactlyOnceWith(store)
+    expect(startFolderRepoGitUpgradeWatchMock).toHaveBeenCalledExactlyOnceWith(store, mainWindow)
   })
 
   it('reloads the app renderer through main and marks expected renderer teardown', async () => {

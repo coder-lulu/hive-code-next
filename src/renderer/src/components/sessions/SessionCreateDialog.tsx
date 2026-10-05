@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useDetectedAgents } from '@/hooks/useDetectedAgents'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import {
   DEFAULT_DISABLED_TUI_AGENTS,
   filterEnabledTuiAgents
@@ -116,9 +117,11 @@ export default function SessionCreateDialog({
     cleanup.current = tracker.stop
     try {
       const result = launchAgentInNewTab({
+        requestId: newAgentLaunchRequestId(),
         agent: selectedAgent,
         ...owner,
-        prompt: prompt.trim() || undefined
+        prompt: prompt.trim() || undefined,
+        launchSource: 'session_create'
       })
       if (!result) {
         throw new Error(

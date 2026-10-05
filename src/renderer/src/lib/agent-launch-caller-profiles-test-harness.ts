@@ -4,7 +4,7 @@ import type { LaunchAgentInNewTabArgs } from '@/lib/launch-agent-in-new-tab'
 // Exercise production caller argument shapes through the shared launch funnel.
 export type CallerLaunchArgs = Omit<
   LaunchAgentInNewTabArgs,
-  'beforeSurfaceOpen' | 'agentSessionLaunchPlan' | 'onPromptDelivered'
+  'beforeSurfaceOpen' | 'agentSessionLaunchPlan' | 'onPromptDelivered' | 'requestId'
 >
 
 export type AgentLaunchCallerProfile = {
@@ -32,18 +32,23 @@ export const AGENT_LAUNCH_CALLER_PROFILES: readonly AgentLaunchCallerProfile[] =
       worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
       prompt: PROMPT,
       promptDelivery: 'auto-submit',
-      launchSource: 'unknown'
+      launchSource: 'desktop_home'
     }
   },
   {
     id: 'home-workspace-session',
     caller: 'src/renderer/src/components/Landing.tsx',
-    args: { ...WORKSPACE_PROMPT, executionHostId: 'local', promptDelivery: 'auto-submit' }
+    args: {
+      ...WORKSPACE_PROMPT,
+      executionHostId: 'local',
+      promptDelivery: 'auto-submit',
+      launchSource: 'desktop_home'
+    }
   },
   {
     id: 'session-create-dialog',
     caller: 'src/renderer/src/components/sessions/SessionCreateDialog.tsx',
-    args: { ...WORKSPACE_PROMPT, executionHostId: 'local' }
+    args: { ...WORKSPACE_PROMPT, executionHostId: 'local', launchSource: 'session_create' }
   },
   {
     id: 'dashboard-spawn',

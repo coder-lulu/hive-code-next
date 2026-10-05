@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const mocks = vi.hoisted(() => {
@@ -203,6 +203,11 @@ vi.mock('../browser/browser-identity-mode-store', () => ({
     }
   }
 }))
+
+beforeAll(async () => {
+  // Load the production graph within setup; admission tests keep their original runtime budget.
+  await import('./main-process-preflight')
+})
 
 describe('browser process user-agent startup ordering', () => {
   it('explains admission refusal before a desktop launch exits', async () => {

@@ -1,6 +1,6 @@
 import type { TuiAgent } from './tui-agent'
 
-export type NativeChatTranscriptAgent = 'claude' | 'codex' | 'grok' | 'omp'
+export type NativeChatTranscriptAgent = 'claude' | 'codex' | 'grok' | 'omp' | 'opencode'
 
 /** Agents whose transcripts the native chat view can parse and render, in the
  *  order the settings pane advertises them. */
@@ -10,7 +10,9 @@ export const NATIVE_CHAT_SUPPORTED_AGENT_LIST: readonly TuiAgent[] = [
   'codex',
   'grok',
   'omp',
-  'hivecode'
+  'hivecode',
+  'opencode',
+  'opencode2'
 ]
 
 export const NATIVE_CHAT_SUPPORTED_AGENTS: ReadonlySet<string> = new Set(
@@ -29,17 +31,15 @@ export function nativeChatRequiresLocalTranscript(agent: string | null | undefin
     return false
   }
   const transcriptAgent = resolveNativeChatTranscriptAgent(agent)
-  return transcriptAgent === 'grok' || transcriptAgent === 'omp'
+  return transcriptAgent === 'grok' || transcriptAgent === 'omp' || transcriptAgent === 'opencode'
 }
 
-/** True when the agent renders a digit-commit question selector that ignores
- *  typed label text (pasting "Blue" + Enter commits the highlighted FIRST
- *  option — STA-1860): Claude's AskUserQuestion and Codex 0.145's
- *  request_user_input card both behave this way, so answers must be delivered
- *  as per-option keystrokes. Other agents commit a pasted answer. */
+/** Selector TUIs require key steps rather than pasted option labels. */
 export function shouldStepNativeChatAskAnswer(agent: string | null | undefined): boolean {
   const transcriptAgent = resolveNativeChatTranscriptAgent(agent)
-  return transcriptAgent === 'claude' || transcriptAgent === 'codex'
+  return (
+    transcriptAgent === 'claude' || transcriptAgent === 'codex' || transcriptAgent === 'opencode'
+  )
 }
 
 export function resolveNativeChatTranscriptAgent(
@@ -53,8 +53,15 @@ export function resolveNativeChatTranscriptAgent(
   if (agent === 'hivecode') {
     return 'omp'
   }
+  if (agent === 'opencode' || agent === 'opencode2') {
+    return 'opencode'
+  }
   if (agent === 'codex' || agent === 'grok' || agent === 'omp') {
     return agent
   }
   return null
+}
+
+export function nativeChatApprovalAcceptKey(agent: string | null | undefined): string {
+  return resolveNativeChatTranscriptAgent(agent) === 'opencode' ? '\r' : '1'
 }

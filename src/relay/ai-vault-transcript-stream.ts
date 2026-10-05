@@ -18,10 +18,24 @@ export async function readRelayTranscriptFile(path: string) {
 /** The same open handle supplies the probe and stream, including across renames. */
 export async function* readRelayTranscriptBytes(
   path: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { regularFileOnly: true; maxBytes: number }
 ): AsyncGenerator<Buffer> {
   throwIfAiVaultScanCancelled(signal)
   const handle = await openRegularTranscriptFile(path)
+  if (options?.regularFileOnly) {
+    try {
+      const read = await readNodeFileHandleWithinLimit(handle, options.maxBytes)
+      if (isBinaryBuffer(read.buffer.subarray(0, BINARY_PROBE_BYTES))) {
+        throw new BinarySessionTranscriptError()
+      }
+      throwIfAiVaultScanCancelled(signal)
+      yield read.buffer
+      return
+    } finally {
+      await handle.close()
+    }
+  }
   try {
     const probe = Buffer.alloc(BINARY_PROBE_BYTES)
     const { bytesRead } = await handle.read(probe, 0, probe.length, 0)

@@ -37,6 +37,8 @@ vi.mock('node:path', () => ({
 
 vi.mock('../../shared/secure-file', () => ({
   hardenExistingSecureFile: hardenExistingSecureFileMock,
+  isUnreadableError: (error: unknown) =>
+    error instanceof Error && 'code' in error && error.code === 'EBUSY',
   writeSecureFile: writeSecureFileMock
 }))
 
@@ -106,7 +108,8 @@ describe('minimax-api-key-store', () => {
     expect(safeStorageMock.encryptString).toHaveBeenCalledWith('sk-test-1234567890')
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
-      envelope('encrypted', 'sk-test-1234567890')
+      envelope('encrypted', 'sk-test-1234567890'),
+      { durable: true }
     )
   })
 
@@ -215,7 +218,11 @@ describe('minimax-api-key-store', () => {
   it('reads decrypted key from disk and caches it', async () => {
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockReturnValue('sk-cached-key')
+    let decryptedInput: Buffer | null = null
+    safeStorageMock.decryptString.mockImplementation((value: Buffer) => {
+      decryptedInput = Buffer.from(value)
+      return 'sk-cached-key'
+    })
     const store = await loadStore()
     const first = store.readMiniMaxApiKey()
     const second = store.readMiniMaxApiKey()
@@ -224,7 +231,10 @@ describe('minimax-api-key-store', () => {
     expect(hardenExistingSecureFileMock).toHaveBeenCalledTimes(1)
     expect(hardenExistingSecureFileMock).toHaveBeenCalledWith(storePath)
     expect(safeStorageMock.decryptString).toHaveBeenCalledTimes(1)
-    expect(safeStorageMock.decryptString).toHaveBeenCalledWith(Buffer.from('encrypted-payload'))
+    expect(decryptedInput).toEqual(Buffer.from('encrypted-payload'))
+    expect(safeStorageMock.decryptString.mock.calls[0]?.[0]).toEqual(
+      Buffer.alloc('encrypted-payload'.length)
+    )
   })
 
   it('returns null when no file exists', async () => {
@@ -256,6 +266,23 @@ describe('minimax-api-key-store', () => {
     readFileSyncMock.mockReturnValue(Buffer.from('raw-bytes-without-envelope'))
     const store = await loadStore()
     expect(() => store.readMiniMaxApiKey()).toThrow(/could not be decrypted/)
+  })
+
+  it('reports a transient read failure as unreadable, not undecryptable, and retries next read', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    existsSyncMock.mockReturnValue(true)
+    readFileSyncMock.mockImplementationOnce(() => {
+      throw Object.assign(new Error('resource busy'), { code: 'EBUSY' })
+    })
+    readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))
+    safeStorageMock.decryptString.mockReturnValueOnce('sk-after-retry')
+    const store = await loadStore()
+    expect(() => store.readMiniMaxApiKey()).toThrow('MiniMax API key file could not be read')
+    expect(error).not.toHaveBeenCalled()
+    expect(store.readMiniMaxApiKey()).toBe('sk-after-retry')
+    warn.mockRestore()
+    error.mockRestore()
   })
 
   it('clears the cached key and removes the file', async () => {

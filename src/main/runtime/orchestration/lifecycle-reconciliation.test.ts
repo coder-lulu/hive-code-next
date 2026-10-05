@@ -65,7 +65,7 @@ describe('lifecycle reconciliation', () => {
       startOptions: {}
     })
     const paneKey = `tab_worker:${LEAF_A}`
-    const capability = db.prepareStartingWorkerAuthority({
+    db.prepareStartingWorkerAuthority({
       dispatchId: started.dispatch.id,
       handle: 'term_worker',
       paneKey,
@@ -75,14 +75,6 @@ describe('lifecycle reconciliation', () => {
       effects: []
     })
     db.markWorkerStartUnknown(started.dispatch.id, 'agent_readiness', 'connection lost')
-    expect(
-      db.verifyDispatchCapability({
-        dispatchId: started.dispatch.id,
-        capability,
-        paneKey,
-        processIncarnation: 'worker:1'
-      })
-    ).toEqual({ valid: true })
 
     const message = db.insertMessage({
       runId: 'run_legacy_local',

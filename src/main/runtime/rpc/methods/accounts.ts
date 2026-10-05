@@ -1,6 +1,9 @@
 import { applyProductBranding } from '../../../../shared/brand'
 import { defineMethod, defineStreamingMethod } from '../core'
 import {
+  AddDataAccountParams,
+  SelectDataAccountParams,
+  RemoveDataAccountParams,
   AccountsUnsubscribeParams,
   AddClaudeFromConfigDirParams,
   AddCodexFromHomeParams,
@@ -26,6 +29,35 @@ let accountsSubscriptionSeq = 0
 // `orca account add` CLI can register accounts on a headless host; it is gated
 // to the local runtime connection, never a mobile device token. See #1438.
 export const ACCOUNT_METHODS = [
+  defineMethod({
+    name: 'accounts.listData',
+    params: null,
+    handler: async (_, { runtime }) => runtime.getDataAccountsSnapshot()
+  }),
+  defineMethod({
+    name: 'accounts.addDataFromHome',
+    params: AddDataAccountParams,
+    handler: async (params, { runtime, clientKind }) => {
+      if (clientKind !== undefined) {
+        throw new Error(
+          applyProductBranding('Adding accounts is only available on the Orca host runtime.')
+        )
+      }
+      return runtime.addDataAccountFromHome(params.provider, params.sourceDataHome, params.label)
+    }
+  }),
+  defineMethod({
+    name: 'accounts.selectData',
+    params: SelectDataAccountParams,
+    handler: async (params, { runtime }) =>
+      runtime.selectDataAccount(params.provider, params.accountId)
+  }),
+  defineMethod({
+    name: 'accounts.removeData',
+    params: RemoveDataAccountParams,
+    handler: async (params, { runtime }) =>
+      runtime.removeDataAccount(params.provider, params.accountId)
+  }),
   defineMethod({
     name: 'accounts.list',
     params: ListAccountsParams,

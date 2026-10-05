@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 const pr = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
 const mobile = parse(readFileSync('.github/workflows/mobile.yml', 'utf8'))
 const cloud = parse(readFileSync('.github/workflows/cloud-verify.yml', 'utf8'))
+const headless = parse(readFileSync('.github/workflows/node-server-tests.yml', 'utf8'))
 
 function assertJoinedBefore(steps, id, consumer) {
   const start = steps.findIndex((step) => step.id === id)
@@ -19,12 +20,13 @@ function assertJoinedBefore(steps, id, consumer) {
 describe('CI background step barriers', () => {
   it('joins every background check without suppressing failures', () => {
     for (const job of [
-      pr.jobs.static_analysis,
+      pr.jobs.preflight,
       pr.jobs.mobile_web_app,
       pr.jobs.package,
       pr.jobs.shell_contracts,
       mobile.jobs.verify,
-      cloud.jobs.security
+      cloud.jobs.security,
+      headless.jobs.persistence
     ]) {
       const pending = new Set()
       for (const step of job.steps) {
@@ -47,8 +49,34 @@ describe('CI background step barriers', () => {
     }
   })
 
+  it('joins planning before publishing the unit artifact', () => {
+    assertJoinedBefore(
+      pr.jobs.preflight.steps,
+      'unit-plan',
+      (step) => step.uses === 'actions/upload-artifact@v7'
+    )
+  })
+
+  it('builds the current Node artifact before qualifying it without a retired runtime checkout', () => {
+    const steps = headless.jobs.persistence.steps
+    const install = steps.findIndex((step) => step.uses?.endsWith('/install-node-dependencies'))
+    const native = steps.findIndex((step) => step.uses?.endsWith('/prepare-orcad-prebuilds'))
+    const build = steps.findIndex((step) => step.run === 'pnpm build:orcad')
+    const test = steps.findIndex((step) => step.run === 'pnpm test:node-server --artifact')
+    expect(install).toBeGreaterThanOrEqual(0)
+    expect(native).toBeGreaterThan(install)
+    expect(build).toBeGreaterThan(native)
+    expect(test).toBeGreaterThan(build)
+    expect(steps[test].if).toBeUndefined()
+    expect(steps[test]['continue-on-error']).toBeUndefined()
+    expect(steps[test].env).toBeUndefined()
+    expect(steps.some((step) => step.id === 'bun-orcad' || step.wait === 'bun-orcad')).toBe(false)
+    expect(steps.some((step) => String(step.uses).startsWith('oven-sh/setup-bun@'))).toBe(false)
+    expect(steps.map((step) => step.run ?? '').join('\n')).not.toContain('git worktree add')
+  })
+
   it('finishes native import-cycle analysis before mobile installation changes resolution', () => {
-    const steps = pr.jobs.static_analysis.steps
+    const steps = pr.jobs.preflight.steps
     assertJoinedBefore(steps, 'native-code-quality', (step) =>
       step.uses?.endsWith('/install-mobile-dependencies')
     )
@@ -57,7 +85,7 @@ describe('CI background step barriers', () => {
     expect(steps.findIndex((step) => step.id === 'changed-code-quality')).toBeGreaterThan(install)
   })
 
-  it('finishes both mobile typechecks before allocating test workers', () => {
+  it('joins independent mobile typechecks before allocating test workers', () => {
     const steps = mobile.jobs.verify.steps
     assertJoinedBefore(steps, 'production-types', (step) => step.name === 'Test')
     const ratchet = steps.findIndex((step) => step.name === 'Typecheck tests (ratchet)')

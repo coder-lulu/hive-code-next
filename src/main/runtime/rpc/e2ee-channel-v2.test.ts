@@ -18,6 +18,10 @@ import type {
   E2EEAccountBinding
 } from './e2ee-channel-account-authentication'
 import { deriveMobileE2EEV2KeySchedule } from './mobile-e2ee-v2-key-schedule'
+import {
+  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+  type RuntimeCapability
+} from '../../../shared/protocol-version'
 
 const server = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(1))
 const client = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(2))
@@ -120,7 +124,8 @@ function openServerFrame(
 
 function authenticate(
   ctx: ReturnType<typeof setup>,
-  schedule: ReturnType<typeof startV2>['schedule']
+  schedule: ReturnType<typeof startV2>['schedule'],
+  clientCapabilities: readonly RuntimeCapability[] = []
 ) {
   const transcriptHashB64 = Buffer.from(schedule.transcriptHash).toString('base64')
   ctx.channel.handleRawMessage(
@@ -129,7 +134,8 @@ function authenticate(
         type: 'e2ee_auth',
         v: 2,
         transcriptHashB64,
-        deviceToken: 'valid-token'
+        deviceToken: 'valid-token',
+        clientCapabilities
       }),
       schedule,
       0n
@@ -191,6 +197,17 @@ describe('E2EEChannel v2', () => {
     expect(ctx.channel.clientCapabilities).toEqual([])
     expect(onMessage).toHaveBeenCalledOnce()
     expect(onMessage.mock.calls[0]?.[0]).toBe(capabilityFrame)
+  })
+
+  it('binds runtime capabilities to the authenticated strict-v2 transcript', () => {
+    const ctx = setup()
+    const { schedule } = startV2(ctx)
+    expect(ctx.channel.clientCapabilities).toEqual([])
+    expect(ctx.onReady).not.toHaveBeenCalled()
+    authenticate(ctx, schedule, [SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY])
+    expect(ctx.onReady).toHaveBeenCalledOnce()
+    expect(ctx.channel.clientCapabilities).toEqual([SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY])
+    ctx.channel.destroy()
   })
 
   it('rejects an obsolete handshake and unknown authentication fields', () => {
@@ -374,6 +391,25 @@ describe('Account asynchronous authentication boundary', () => {
     )
     expect(resolver).not.toHaveBeenCalled()
     expect(ctx.resolveAuthenticatedDevice).not.toHaveBeenCalled()
+    expect(ctx.onError).toHaveBeenCalledWith(4001, 'Unauthorized', 'account_runtime_session')
+    ctx.channel.destroy()
+  })
+
+  it.each([
+    { deviceId: 'caller-device' },
+    { accountId: 'caller-account' },
+    { authorization: { mode: 'relay-basis', basisConnId: 'caller-connection' } },
+    { acceptedCredentialVersion: 99 },
+    { relayDeviceId: 'caller-relay-device' }
+  ])('rejects caller-selected account/phone authority before its resolver: %j', (injected) => {
+    const resolver = vi.fn()
+    const ready = vi.fn()
+    const ctx = setup({ resolveAccountSession: resolver, onAccountReady: ready })
+    const { schedule } = startV2(ctx)
+    ctx.channel.handleRawMessage(clientText(JSON.stringify({ ...auth, ...injected }), schedule, 0n))
+    expect(resolver).not.toHaveBeenCalled()
+    expect(ctx.resolveAuthenticatedDevice).not.toHaveBeenCalled()
+    expect(ready).not.toHaveBeenCalled()
     expect(ctx.onError).toHaveBeenCalledWith(4001, 'Unauthorized', 'account_runtime_session')
     ctx.channel.destroy()
   })

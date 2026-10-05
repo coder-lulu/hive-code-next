@@ -1,4 +1,6 @@
+import '../unused-default-rpc-methods.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
+import { installSessionTabsInventoryEnvironment } from './session-tabs-inventory.test-fixture'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import { OrcaRuntimeService } from '../../orca-runtime'
@@ -6,6 +8,8 @@ import { SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY } from '../../.
 import type { RuntimeMobileSessionTabsResult } from '../../../../shared/runtime-types'
 import { SESSION_TAB_METHODS } from './session-tabs'
 import { listSessionTabsInventory } from './session-tabs-inventory'
+
+installSessionTabsInventoryEnvironment()
 
 function makeRequest(method: string, params?: unknown): RpcRequest {
   return { id: 'req-1', authToken: 'tok', method, params }
@@ -430,6 +434,7 @@ describe('session tabs inventory RPC methods', () => {
 
   it('aborts and removes a publication waiter when the stream is cleaned up', async () => {
     const runtime = new OrcaRuntimeService()
+    await runtime.restoreStructuredAgentSessionTabs()
     runtime.attachWindow(1)
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
     const messages: string[] = []

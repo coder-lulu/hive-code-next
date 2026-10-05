@@ -12,19 +12,18 @@ import {
 } from './agent-session-operation-admission'
 import type { AgentSessionStoreState } from './agent-session-record-store-file'
 import { parseAgentSessionOperationTimestamp } from '../../shared/agent-session-host-authority'
-import type { AgentSessionStoreTransactionQueue } from './agent-session-store-transaction-queue'
+import type { AgentSessionStoreTransactions } from './agent-session-store-transactions'
 
 /** Scoped access to the SAME transaction queue, state and ledger as runtime records. */
 export class HiveAgentSessionPersistence {
-  constructor(private readonly transactions: AgentSessionStoreTransactionQueue) {}
+  constructor(private readonly transactions: AgentSessionStoreTransactions) {}
   settleCancellation(
     sessionId: string,
     generationId: string,
     operation: AgentSessionOperationAdmission,
     status: 'succeeded' | 'unknown'
   ) {
-    return this.transactions.transact(() => {
-      const state = this.transactions.state
+    return this.transactions.transact((state) => {
       const entry = state.hiveSessions?.get(sessionId)
       const row = [...state.operations.values()].find(
         (value) =>
@@ -48,8 +47,7 @@ export class HiveAgentSessionPersistence {
     })
   }
   completeDeletion(sessionId: string, operationId: string): Promise<void> {
-    return this.transactions.transact(() => {
-      const state = this.transactions.state
+    return this.transactions.transact((state) => {
       const entry = state.hiveSessions?.get(sessionId)
       if (!entry || entry.deletedAt === undefined || entry.deleteOperationId !== operationId) {
         throw new Error('hive_agent_operation_conflict')
@@ -73,9 +71,9 @@ export class HiveAgentSessionPersistence {
     structuredClone(this.transactions.state.hiveSessions?.get(sessionId) ?? null)
   list = () => structuredClone([...(this.transactions.state.hiveSessions?.values() ?? [])])
   commit = (input: HiveSessionCommit) =>
-    this.transactions.transact(() => commitHiveSession(this.transactions.state, input))
+    this.transactions.transact((draft) => commitHiveSession(draft, input))
   settle = (input: Parameters<typeof settleHiveSession>[1]) =>
-    this.transactions.transact(() => settleHiveSession(this.transactions.state, input))
+    this.transactions.transact((draft) => settleHiveSession(draft, input))
 }
 
 export type HiveSessionCommit = {

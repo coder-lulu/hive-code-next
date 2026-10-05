@@ -4,7 +4,7 @@ import {
   TaskExecutionResultSchema,
   type TaskExecutionResult
 } from '../../shared/task-execution/task-execution-receipts'
-import type { AgentSessionStoreTransactionQueue } from '../runtime/agent-session-store-transaction-queue'
+import type { AgentSessionStoreTransactions } from '../runtime/agent-session-store-transactions'
 import { admitTaskExecution, type TaskExecutionAdmission } from './task-execution-admission'
 import { refuseTaskExecution } from './task-execution-error'
 import {
@@ -18,14 +18,16 @@ type Identity = Parameters<typeof taskExecutionRecordKey>[0]
 
 /** Business bindings share the runtime's single writer; launch deduplication stays in its ledger. */
 export class TaskExecutionPersistence {
-  constructor(private readonly transactions: AgentSessionStoreTransactionQueue) {}
+  constructor(private readonly transactions: AgentSessionStoreTransactions) {}
 
   get(identity: Identity): TaskExecutionRecord | null {
-    return this.transactions.readTaskExecution(taskExecutionRecordKey(identity))
+    return structuredClone(
+      this.transactions.state.taskExecutions?.get(taskExecutionRecordKey(identity)) ?? null
+    )
   }
 
   admit(input: TaskExecutionAdmission) {
-    return this.transactions.transact(() => admitTaskExecution(this.transactions.state, input))
+    return this.transactions.transact((draft) => admitTaskExecution(draft, input))
   }
 
   async beginDispatch(identity: Identity, now: number, validate: () => void) {
@@ -152,9 +154,9 @@ export class TaskExecutionPersistence {
     apply: (record: TaskExecutionRecord) => TaskExecutionRecord | null,
     now: number
   ) {
-    return this.transactions.transact(() => {
+    return this.transactions.transact((draft) => {
       const key = taskExecutionRecordKey(identity)
-      const current = this.transactions.state.taskExecutions?.get(key)
+      const current = draft.taskExecutions?.get(key)
       if (!current) {
         return refuseTaskExecution('EXECUTION_NOT_FOUND')
       }
@@ -183,7 +185,7 @@ export class TaskExecutionPersistence {
         revision: current.revision + 1,
         events
       })
-      this.transactions.state.taskExecutions!.set(key, record)
+      draft.taskExecutions!.set(key, record)
       return { changed: true, record: structuredClone(record) }
     })
   }

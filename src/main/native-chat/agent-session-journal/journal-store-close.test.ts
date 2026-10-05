@@ -203,8 +203,7 @@ describe('closed-state admission happens at enqueue', () => {
         blocks: [{ type: 'text', text: 'owned-queued-secret' }]
       },
       fingerprint: 'own-fp',
-      hostInstance: 'host-1',
-      pausedBy: 'cleared'
+      hostInstance: 'host-1'
     })
     await other.queuedMessages.insert({
       messageId: 'other-draft',
@@ -212,6 +211,8 @@ describe('closed-state admission happens at enqueue', () => {
       fingerprint: 'other-fp',
       hostInstance: 'host-1'
     })
+    await journal.appendStopEvent({ reason: 'user-stop', caller: 'client-1' }, 1)
+    expect(journal.queuedMessages.pauses('host-1')).toHaveLength(1)
     expect(journal.queuedMessages.list()).toHaveLength(1)
     const oldEpoch = journal.epoch
     await journal.purgeContent(1)
@@ -219,12 +220,8 @@ describe('closed-state admission happens at enqueue', () => {
     expect(journal.snapshot().items).toEqual([])
     expect(journal.queuedMessages.list()).toEqual([])
     expect(other.queuedMessages.list()).toHaveLength(1)
-    const database = openTestJournalHostDatabase(root)
-    expect(
-      database.db
-        .prepare('SELECT * FROM queued_message_pauses WHERE session_id = ?')
-        .all(IDENTITY.sessionId)
-    ).toEqual([])
+    // Stop/Resume are now folded journal facts; the replacement must retain no owned pause.
+    expect(journal.queuedMessages.pauses('host-1')).toEqual([])
     const persisted = await readFile(journalDatabasePath(root))
     expect(persisted.includes(Buffer.from('owned-purge-secret'))).toBe(false)
     expect(persisted.includes(Buffer.from('owned-queued-secret'))).toBe(false)

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   activate: vi.fn(),
   launch: vi.fn(),
+  requestId: vi.fn(() => 'session-create-request'),
   close: vi.fn(),
   update: vi.fn(),
   open: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('@/lib/sidebar-worktree-activation', () => ({
   activateWorktreeFromSidebar: mocks.activate
 }))
 vi.mock('@/lib/launch-agent-in-new-tab', () => ({ launchAgentInNewTab: mocks.launch }))
+vi.mock('@/lib/agent-launch-request-id', () => ({ newAgentLaunchRequestId: mocks.requestId }))
 vi.mock('@/lib/agent-catalog', () => ({
   getAgentCatalog: () => [{ id: 'claude', label: 'Claude' }]
 }))
@@ -89,6 +91,7 @@ it('only detects agents on mount; launching explicitly carries the workspace own
   show()
   expect(mocks.detection).toHaveBeenCalledWith({ kind: 'ssh', connectionId: 'server' })
   expect(mocks.launch).not.toHaveBeenCalled()
+  expect(mocks.requestId).not.toHaveBeenCalled()
   mocks.launch.mockImplementation(() => {
     mocks.items = [
       {
@@ -104,10 +107,13 @@ it('only detects agents on mount; launching explicitly carries the workspace own
   fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
   expect(mocks.launch).toHaveBeenCalledWith({
     agent: 'claude',
+    requestId: 'session-create-request',
     worktreeId: 'main',
     executionHostId: 'ssh:server',
-    prompt: undefined
+    prompt: undefined,
+    launchSource: 'session_create'
   })
+  expect(mocks.requestId).toHaveBeenCalledOnce()
   expect(mocks.update).toHaveBeenCalledWith({ selectedSessionKey: 'created' })
   expect(mocks.close).toHaveBeenCalledOnce()
 })
@@ -145,6 +151,8 @@ it('does not relaunch after an uncertain async timeout', () => {
     (screen.getByRole('button', { name: 'Start session' }) as HTMLButtonElement).disabled
   ).toBe(true)
   expect(mocks.launch).toHaveBeenCalledOnce()
+  fireEvent.click(screen.getByRole('button', { name: 'Start session' }))
+  expect(mocks.requestId).toHaveBeenCalledOnce()
 })
 
 it('keeps a project-created session in the original workbench', () => {

@@ -4,10 +4,8 @@ import { getRecentlyClosedTabPosition, pushRecentlyClosedTabKind } from '../../r
 import { notifyHostOfMirroredEditorClose } from '@/runtime/close-mirrored-editor-tab'
 import { type ClosedEditorTabSnapshot, MAX_RECENT_CLOSED_EDITOR_TABS } from '../types/open-file'
 import { removeMarkdownVisibilityKeys } from '../tabs/workspace-editor-item'
-import {
-  deleteUntouchedUntitledFile,
-  shouldDeleteUntouchedUntitledFile
-} from '../tabs/untitled-file-cleanup'
+import { getUntitledFileCleanupResult } from '../tabs/untitled-file-cleanup'
+import { unifiedTabsKeepWorktreeSelected } from './unified-tabs-keep-worktree-selected'
 
 export function createCloseFileAction(
   set: EditorSet,
@@ -15,18 +13,16 @@ export function createCloseFileAction(
 ): Pick<EditorSlice, 'closeFile'> {
   return {
     closeFile: (fileId) => {
-      // Why: capture untitled+dirty state before set() mutates the store, so cleanup of throwaway untitled files can decide after removal.
       const preClose = get().openFiles.find((f) => f.id === fileId)
       // Why: also check editorDrafts — isDirty is set by a debounced callback, so a draft can exist before isDirty flushes; a draft means the user typed something.
       const hasDraft = !!get().editorDrafts[fileId]
-      const shouldDeleteFromDisk = shouldDeleteUntouchedUntitledFile(preClose, hasDraft)
+      const cleanupResult = getUntitledFileCleanupResult(preClose, hasDraft)
 
       // Why: mirrored tabs are host-owned, so the host must close its copy or its next snapshot re-mirrors the file and the tab reopens.
       notifyHostOfMirroredEditorClose(get(), preClose?.worktreeId, fileId)
 
       set((s) => {
         const closedFile = s.openFiles.find((f) => f.id === fileId)
-        const idx = s.openFiles.findIndex((f) => f.id === fileId)
         const newFiles = s.openFiles.filter((f) => f.id !== fileId)
         const newEditorDrafts = { ...s.editorDrafts }
         delete newEditorDrafts[fileId]
@@ -59,24 +55,20 @@ export function createCloseFileAction(
         const newActiveFileIdByWorktree = { ...s.activeFileIdByWorktree }
 
         if (s.activeFileId === fileId) {
-          // Find next file within the same worktree
-          const worktreeId = closedFile?.worktreeId
+          // Why: a stale activeFileId (e.g. an orphan editor tab promoted by closeUnifiedTab) is not in openFiles; scope the fallback to the active worktree.
+          const worktreeId = closedFile?.worktreeId ?? s.activeWorktreeId
           const worktreeFiles = worktreeId
             ? newFiles.filter((f) => f.worktreeId === worktreeId)
-            : newFiles
+            : []
           if (worktreeFiles.length === 0) {
             newActiveId = null
           } else {
-            // Pick adjacent file from same worktree
-            const closedWorktreeIdx = worktreeId
-              ? s.openFiles
-                  .filter((f) => f.worktreeId === worktreeId)
-                  .findIndex((f) => f.id === fileId)
-              : idx
+            // Pick adjacent file from same worktree; -1 (closed file not open) clamps to the first.
+            const closedWorktreeIdx = (
+              worktreeId ? s.openFiles.filter((f) => f.worktreeId === worktreeId) : s.openFiles
+            ).findIndex((f) => f.id === fileId)
             newActiveId =
-              closedWorktreeIdx >= worktreeFiles.length
-                ? worktreeFiles.at(-1)!.id
-                : worktreeFiles[closedWorktreeIdx].id
+              worktreeFiles[Math.min(Math.max(closedWorktreeIdx, 0), worktreeFiles.length - 1)].id
           }
           if (worktreeId) {
             newActiveFileIdByWorktree[worktreeId] = newActiveId
@@ -111,11 +103,19 @@ export function createCloseFileAction(
           newActiveTabTypeByWorktree[activeWorktreeId] =
             browserTabsForWorktree.length > 0 ? 'browser' : 'terminal'
         }
+        // Structured chats have no legacy terminal row to keep their workspace selected.
+        const hasRemainingUnifiedTabs =
+          activeWorktreeId !== null &&
+          unifiedTabsKeepWorktreeSelected(
+            s.unifiedTabsByWorktree?.[activeWorktreeId],
+            new Set([fileId])
+          )
         const shouldDeactivateWorktree =
           activeWorktreeId !== null &&
           remainingForWorktree.length === 0 &&
           browserTabsForWorktree.length === 0 &&
-          terminalTabsForWorktree.length === 0
+          terminalTabsForWorktree.length === 0 &&
+          !hasRemainingUnifiedTabs
 
         // Why: prune the closed id from tabBarOrderByWorktree so stale ids don't shift positions on the next reconcile.
         const worktreeId = closedFile?.worktreeId ?? activeWorktreeId
@@ -132,13 +132,8 @@ export function createCloseFileAction(
         let nextRecentlyClosed = s.recentlyClosedEditorTabsByWorktree
         let nextRecentlyClosedKinds = s.recentlyClosedTabKindsByWorktree
         const wtRecent = closedFile?.worktreeId
-        // Why: exclude untitled unedited files (deleted from disk after close, so Cmd+Shift+T can't reopen a gone path) and ephemeral preview tabs from the reopen stack.
-        if (
-          closedFile &&
-          wtRecent &&
-          !shouldDeleteFromDisk &&
-          closedFile.mode !== 'markdown-preview'
-        ) {
+        // Preserved untitled files remain reopenable; markdown previews are ephemeral.
+        if (closedFile && wtRecent && closedFile.mode !== 'markdown-preview') {
           const {
             id: _id,
             isDirty: _dirty,
@@ -194,11 +189,6 @@ export function createCloseFileAction(
         }
       })
 
-      // Why: untitled unedited files exist on disk only because createUntitledMarkdownFile() eagerly writes a bindable path; delete the clutter (fire-and-forget).
-      if (shouldDeleteFromDisk && preClose && typeof window !== 'undefined') {
-        deleteUntouchedUntitledFile(get(), preClose)
-      }
-
       // Why: route editor/diff closes through the unified close path (MRU + visual-neighbor fallback) so they match terminal/browser tab-close behavior.
       for (const tabs of Object.values(get().unifiedTabsByWorktree ?? {})) {
         const unifiedTab = tabs.find(
@@ -214,6 +204,7 @@ export function createCloseFileAction(
           break
         }
       }
+      return cleanupResult
     }
   }
 }

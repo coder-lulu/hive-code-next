@@ -11,6 +11,7 @@ import {
   writeSecureJsonFile
 } from '../../shared/secure-file'
 import type { DeviceScope } from '../../shared/runtime-types'
+import { removeStaleDurableWriteTempFiles } from '../durable-file-write'
 import { DEVICE_REGISTRY_FILENAME } from './mobile-pairing-files'
 import type { RuntimePairingReach } from '../../shared/runtime-pairing-reach'
 
@@ -31,6 +32,7 @@ export type DeviceEntry = {
 // Why: a lastSeen refresh is pure bookkeeping, so coalesce reconnect bursts into one write instead of
 // paying a secure-file rewrite (two synchronous PowerShell ACL spawns on Windows) per connection.
 const LAST_SEEN_FLUSH_DELAY_MS = 250
+const STALE_WRITE_TEMP_AGE_MS = 24 * 60 * 60 * 1000
 
 export class DeviceRegistry {
   private readonly registryPath: string
@@ -41,6 +43,10 @@ export class DeviceRegistry {
 
   constructor(userDataPath: string) {
     this.registryPath = join(userDataPath, DEVICE_REGISTRY_FILENAME)
+    // Why: a write killed between writeFile and rename (e.g. a hung icacls, #20497) orphans its temp forever.
+    void removeStaleDurableWriteTempFiles(this.registryPath, {
+      minimumAgeMs: STALE_WRITE_TEMP_AGE_MS
+    })
     this.load()
   }
 

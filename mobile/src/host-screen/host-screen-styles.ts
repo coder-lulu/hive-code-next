@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { createHostScreenRecoveryStyles } from './host-screen-recovery-styles'
+import { createHostScreenViewPickerStyles } from './host-screen-view-picker-styles'
 
 /**
  * Shared chrome styles for the host workspace list.
@@ -236,46 +237,6 @@ export function createHostScreenStyles(theme: MobileTheme) {
     },
     sectionCount: { ...typography.caption, color: color.text.tertiary },
     separator: { height: 1, backgroundColor: color.border.subtle },
-    filterModalHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.space16
-    },
-    filterModalTitle: { ...typography.sectionTitle, color: color.text.primary },
-    clearFiltersText: { ...typography.meta, color: color.brand.primary, fontWeight: '600' },
-    filterSectionLabel: {
-      marginBottom: spacing.space8,
-      color: color.text.tertiary,
-      ...typography.caption,
-      fontWeight: '600',
-      textTransform: 'uppercase'
-    },
-    filterGroup: {
-      marginBottom: spacing.space16,
-      overflow: 'hidden',
-      borderRadius: radii.control,
-      backgroundColor: color.bg.elevated
-    },
-    filterRow: {
-      minHeight: size.groupedListRowMinHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.space12,
-      gap: spacing.space8
-    },
-    filterRowText: { ...typography.label, flex: 1, color: color.text.primary },
-    filterRowValue: { ...typography.meta, color: color.text.secondary },
-    filterSeparator: {
-      height: 1,
-      marginLeft: spacing.space12,
-      backgroundColor: color.border.subtle
-    },
-    filterRepoDot: {
-      width: spacing.space8,
-      height: spacing.space8,
-      borderRadius: radii.circle
-    },
     confirmContent: { paddingHorizontal: spacing.space12, paddingTop: spacing.space12 },
     confirmTitle: {
       ...typography.sectionTitle,
@@ -301,5 +262,9 @@ export function createHostScreenStyles(theme: MobileTheme) {
     },
     confirmBtnPressed: { opacity: 0.75 }
   })
-  return { ...createHostScreenRecoveryStyles(theme), ...styles }
+  return {
+    ...createHostScreenRecoveryStyles(theme),
+    ...createHostScreenViewPickerStyles(theme),
+    ...styles
+  }
 }

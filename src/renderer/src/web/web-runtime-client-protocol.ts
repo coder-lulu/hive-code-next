@@ -1,14 +1,4 @@
-import {
-  AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY,
-  AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY,
-  AGENT_SESSION_TURN_ITEM_CAPABILITY,
-  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-  SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY,
-  WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-} from '../../../shared/protocol-version'
+import { WEB_RUNTIME_CLIENT_CAPABILITIES } from './web-runtime-client-capabilities'
 import type { RuntimeRpcResponse, RuntimeRpcSuccess } from '../../../shared/runtime-rpc-envelope'
 import type { WebPairingOffer } from './web-pairing'
 import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'
@@ -140,22 +130,11 @@ export function webRuntimeAuthenticationFrame(
   connection: WebRuntimeConnection,
   transcriptHashB64: string
 ): Record<string, unknown> {
-  const clientCapabilities = [
-    AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY,
-    AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY,
-    AGENT_SESSION_TURN_ITEM_CAPABILITY,
-    AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-    SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-    SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY,
-    WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
-    WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-    WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-  ]
   return {
     type: 'e2ee_auth',
     v: 2,
     transcriptHashB64,
-    clientCapabilities,
+    clientCapabilities: WEB_RUNTIME_CLIENT_CAPABILITIES,
     ...(connection.kind === 'pairing'
       ? { deviceToken: connection.deviceToken }
       : {

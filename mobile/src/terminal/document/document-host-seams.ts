@@ -173,7 +173,10 @@ export function createEngineWebglAddon() {
  * painting the application's roots would recolour every screen the shell can show, and leave them
  * recoloured after the terminal is gone.
  */
-export function paintTerminalThemeVariables(style: CSSStyleDeclaration, theme: TerminalDocumentTheme) {
+export function paintTerminalThemeVariables(
+  style: CSSStyleDeclaration,
+  theme: TerminalDocumentTheme
+) {
   style.setProperty('--terminal-scroll-thumb', theme.brightBlack || theme.foreground)
   style.setProperty('--terminal-accent', theme.blue || theme.foreground)
   style.setProperty('--terminal-foreground', theme.foreground)

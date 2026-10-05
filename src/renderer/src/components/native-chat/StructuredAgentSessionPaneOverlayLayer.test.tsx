@@ -56,7 +56,8 @@ vi.mock('@/store', async () => {
 })
 
 vi.mock('@/lib/worktree-runtime-owner', () => ({
-  getRuntimeEnvironmentIdForWorktree: (state: MockAppState) => state.runtimeEnvironmentId
+  getExecutionHostIdForWorktree: (state: MockAppState) =>
+    state.runtimeEnvironmentId ? `runtime:${state.runtimeEnvironmentId}` : 'local'
 }))
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
@@ -157,6 +158,7 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
     mocks.unmountsByTabId.clear()
     mocks.targetByTabId.clear()
     mocks.groupIdByTabId.clear()
+    mocks.targetByTabId.clear()
     mocks.store?.setState(createState(FIRST_TAB_ID))
   })
 
@@ -215,6 +217,25 @@ describe('StructuredAgentSessionPaneOverlayLayer', () => {
       )
     }
   )
+
+  it('routes same-workspace chat tabs to their recorded execution hosts', () => {
+    const state = createState(FIRST_TAB_ID)
+    const [first, second] = state.unifiedTabsByWorktree[WORKTREE_ID]!
+    mocks.store?.setState({
+      unifiedTabsByWorktree: {
+        [WORKTREE_ID]: [
+          { ...first!, executionHostId: 'runtime:server-1' },
+          { ...second!, executionHostId: 'local' }
+        ]
+      }
+    })
+    render(<StructuredAgentSessionPaneOverlayLayer worktreeId={WORKTREE_ID} isWorktreeActive />)
+    expect(mocks.targetByTabId.get(FIRST_TAB_ID)).toEqual({
+      kind: 'environment',
+      environmentId: 'server-1'
+    })
+    expect(mocks.targetByTabId.get(SECOND_TAB_ID)).toEqual({ kind: 'local' })
+  })
 
   it('routes overlay interaction back to the owning split group', () => {
     const view = render(

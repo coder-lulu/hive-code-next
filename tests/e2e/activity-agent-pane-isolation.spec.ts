@@ -272,6 +272,7 @@ test.describe('Activity Agent Pane Isolation', () => {
     const snapshot = await waitForPaneIdentitySnapshot(orcaPage, 2)
     const [first, second] = await seedActivityThreadsForSplitPanes(orcaPage, snapshot)
 
+    await orcaPage.evaluate(() => window.__store?.getState().setWorktreeCardProperties([]))
     await enableInlineAgentCards(orcaPage)
 
     await clickWorkspaceCardAgentRow(orcaPage, first.prompt)

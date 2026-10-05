@@ -10,6 +10,7 @@ import {
 } from './agent-failure-output'
 import type { InternalTextGenerationResult } from './source-control-text-generation-types'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { parseOpenCodeGenerationOutput } from '../../shared/opencode-generation-output'
 
 export function formatAgentCliFailureMessage(
   label: string,
@@ -46,17 +47,35 @@ export function finalizeFromAgentOutput(args: {
   emptyResultName: string
   includeLocalMacDnsHint?: boolean
   includeStdoutDetail?: boolean
+  outputFormat?: 'opencode-json'
 }): InternalTextGenerationResult {
   const { code, stdout, stderr, label, emptyResultName } = args
+  const parsed =
+    args.outputFormat === 'opencode-json' ? parseOpenCodeGenerationOutput(stdout) : null
   if (code !== 0) {
     console.error('[commit-message] Generator failed:', { label, exitCode: code, stdout, stderr })
     return {
       success: false,
-      error: formatAgentCliFailureMessage(label, stdout, stderr, code, args),
+      error: formatAgentCliFailureMessage(
+        label,
+        stdout,
+        parsed && !parsed.ok && parsed.error !== 'OpenCode returned invalid JSON events.'
+          ? parsed.error
+          : stderr,
+        code,
+        args
+      ),
       failureOutput: captureFailureOutput(label, code, stdout, stderr)
     }
   }
-  const cleaned = cleanGeneratedCommitMessage(stdout)
+  if (parsed && !parsed.ok) {
+    return {
+      success: false,
+      error: sanitizeAgentFailureDetail(parsed.error) ?? 'OpenCode reported an error.',
+      failureOutput: captureFailureOutput(label, code, stdout, stderr)
+    }
+  }
+  const cleaned = cleanGeneratedCommitMessage(parsed?.ok ? parsed.text : stdout)
   if (cleaned) {
     return { success: true, rawOutput: cleaned, agentLabel: label }
   }

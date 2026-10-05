@@ -20,6 +20,7 @@ import {
 import { observe, observeResolvedPathEntry } from './codex-path-observation'
 
 const CODEX_GLOBAL_INSTRUCTIONS_ENTRY = 'AGENTS.md'
+const CODEX_GLOBAL_RULES_ENTRY = 'rules'
 
 const CODEX_SYSTEM_RESOURCE_ENTRIES = [
   'skills',
@@ -29,6 +30,7 @@ const CODEX_SYSTEM_RESOURCE_ENTRIES = [
   'profile-v2',
   'themes',
   'prompts',
+  CODEX_GLOBAL_RULES_ENTRY,
   CODEX_GLOBAL_INSTRUCTIONS_ENTRY
 ] as const
 
@@ -98,9 +100,9 @@ export function syncCodexGlobalInstructionsIntoManagedHome({
   // both \\wsl.localhost UNC paths. A host-side symlink there stores a Windows
   // UNC target the distro cannot resolve, so copy the file like the config
   // mirror does across the same boundary.
-  linkSystemCodexResource(systemHomePath, managedHomePath, CODEX_GLOBAL_INSTRUCTIONS_ENTRY, {
-    preferCopy: true
-  })
+  for (const entry of [CODEX_GLOBAL_INSTRUCTIONS_ENTRY, CODEX_GLOBAL_RULES_ENTRY]) {
+    linkSystemCodexResource(systemHomePath, managedHomePath, entry, { preferCopy: true })
+  }
 }
 
 function linkSystemCodexResource(

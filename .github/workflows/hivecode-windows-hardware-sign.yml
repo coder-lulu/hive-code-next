@@ -24,13 +24,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  desktop-runtime:
+    if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)
+    uses: ./.github/workflows/node-server-tests.yml
+    with:
+      ref: ${{ github.sha }}
+      build_template: true
+
+  relay-native-addons:
+    if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)
+    uses: ./.github/workflows/relay-windows-process-tree.yml
+    with:
+      ref: ${{ github.sha }}
+
   build-and-sign:
+    needs: [desktop-runtime, relay-native-addons]
     name: Build and hardware-sign HiveCode Windows x64
     if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)
     runs-on: [self-hosted, windows, x64]
     environment: hivecode-windows-signing
     timeout-minutes: 120
     env:
+      ORCA_REQUIRE_ORCAD_TEMPLATE: '1'
+      ORCA_REQUIRE_RELAY_NATIVE_ADDONS: x64,arm64
       HIVECODE_WINDOWS_SIGNING_EXECUTABLE: ${{ vars.HIVECODE_WINDOWS_SIGNING_EXECUTABLE }}
       HIVECODE_WINDOWS_SIGNING_ARGUMENTS: ${{ vars.HIVECODE_WINDOWS_SIGNING_ARGUMENTS }}
       HIVECODE_WINDOWS_SIGNING_TIMEOUT_MS: ${{ vars.HIVECODE_WINDOWS_SIGNING_TIMEOUT_MS }}
@@ -42,6 +58,18 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: Stage the qualified headless runtime template
+        uses: actions/download-artifact@v8
+        with:
+          name: orcad-template
+          path: out/orcad-template
+
+      - name: Stage the qualified Windows relay addons
+        uses: actions/download-artifact@v8
+        with:
+          name: relay-windows-process-tree
+          path: .build/windows-process-tree
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6

@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events'
 import { afterAll, vi } from 'vitest'
 import { applyProductBranding } from '../shared/brand'
 import { createProductUpdaterTestMocks } from './updater-product-test-harness'
@@ -30,8 +31,6 @@ export function createUpdaterMocks(): UpdaterMocks {
     vi.useRealTimers()
     clearTrackedRealTimers()
   })
-  const appEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
-  const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
 
   const createHttpExecutorMock = () => ({
     request: vi.fn(),
@@ -59,30 +58,25 @@ export function createUpdaterMocks(): UpdaterMocks {
   }
   const productUpdaterSessionFetchMock = vi.fn(respondToProductUpdaterRequest)
 
+  const appEvents = new EventEmitter()
+  const updaterEvents = new EventEmitter()
   const appOn = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-    const handlers = appEventHandlers.get(event) ?? []
-    handlers.push(handler)
-    appEventHandlers.set(event, handlers)
+    appEvents.on(event, handler)
     return appMock
   })
-
-  const appEmit = (event: string, ...args: unknown[]) => {
-    for (const handler of appEventHandlers.get(event) ?? []) {
-      handler(...args)
-    }
+  const appPrependListener = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    appEvents.prependListener(event, handler)
+    return appMock
+  })
+  const appEmit = (event: string, ...args: unknown[]): void => {
+    appEvents.emit(event, ...args)
   }
-
   const on = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-    const handlers = eventHandlers.get(event) ?? []
-    handlers.push(handler)
-    eventHandlers.set(event, handlers)
+    updaterEvents.on(event, handler)
     return autoUpdaterMock
   })
-
-  const emit = (event: string, ...args: unknown[]) => {
-    for (const handler of eventHandlers.get(event) ?? []) {
-      handler(...args)
-    }
+  const emit = (event: string, ...args: unknown[]): void => {
+    updaterEvents.emit(event, ...args)
   }
 
   // Why: `vi.resetModules()` abandons the previous test's `updater` module instance but cannot cancel
@@ -114,9 +108,11 @@ export function createUpdaterMocks(): UpdaterMocks {
   }
 
   const reset = () => {
-    appEventHandlers.clear()
+    currentGeneration += 1
+    appEvents.removeAllListeners()
     appOn.mockClear()
-    eventHandlers.clear()
+    appPrependListener.mockClear()
+    updaterEvents.removeAllListeners()
     on.mockClear()
     autoUpdaterMock.checkForUpdates.mockReset().mockResolvedValue(null)
     autoUpdaterMock.downloadUpdate.mockReset()
@@ -159,6 +155,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     isPackaged: true,
     getVersion: vi.fn(() => '1.0.51'),
     on: appOn,
+    prependListener: appPrependListener,
     emit: appEmit,
     quit: vi.fn()
   }

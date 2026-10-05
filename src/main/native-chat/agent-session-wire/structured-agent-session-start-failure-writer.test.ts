@@ -30,6 +30,7 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
+import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 
 const CALLER = { callerKey: 'client-1' }
 const EXIT_REASON = 'Claude Code is not signed in. Sign in with the Claude CLI'
@@ -123,6 +124,7 @@ beforeEach(async () => {
   )
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
+    logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
       acquire: vi.fn(async ({ fence, spawnToken }) => ({
@@ -171,6 +173,7 @@ describe('a queued message whose start fails and whose child then exits', () => 
     await eventually(async () =>
       expect(await submission(queued)).toMatchObject({
         dispatchState: 'rejected',
+        recovered: true,
         reason: ADAPTER_FAILURE_TEXT,
         rejection: ADAPTER_FAILURE
       })
@@ -189,7 +192,7 @@ describe('a queued message whose start fails and whose child then exits', () => 
     expect(await submission(queued)).toMatchObject({ dispatchState: 'pending' })
     settleStart(undefined)
     await eventually(async () =>
-      expect(await submission(queued)).toMatchObject({ dispatchState: 'rejected' })
+      expect(await submission(queued)).toMatchObject({ dispatchState: 'rejected', recovered: true })
     )
     await host.flushStreamedEvents(SESSION)
 

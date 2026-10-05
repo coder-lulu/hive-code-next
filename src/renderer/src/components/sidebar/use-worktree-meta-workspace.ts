@@ -1,6 +1,12 @@
 import { useMemo } from 'react'
 import { useAppStore } from '@/store'
-import { findIndexedWorktreeOwner } from '@/lib/worktree-runtime-owner-index'
+import {
+  findIndexedFolderWorkspaceOwner,
+  findIndexedWorktreeOwner,
+  findIndexedWorktreeOwnerForHost
+} from '@/lib/worktree-runtime-owner-index'
+import { worktreeMatchesHost } from '@/store/slices/worktrees/listing/worktree-host-ownership'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
@@ -28,23 +34,33 @@ export function useWorktreeMetaWorkspace(args: {
   liveLinks: WorktreeMetaLiveLinks
 } {
   const { worktreeId, ownerRepoId, executionHostId } = args
+  const requestedHost = parseExecutionHostId(executionHostId)?.id
   const workspaceScope = useMemo(() => parseWorkspaceKey(worktreeId), [worktreeId])
   const indexedWorktree = useAppStore((s) => {
+    if (executionHostId && !requestedHost) {
+      return undefined
+    }
     // Why: the same workspace ID can exist under two hosts, which the owner index
     // reports as ambiguous rather than guessing. The row that opened the dialog
     // knows which one it is; the index stays the fallback for callers that cannot.
     const scoped = ownerRepoId
       ? s.worktreesByRepo[ownerRepoId]?.find(
-          (item) => item.id === worktreeId && (!executionHostId || item.hostId === executionHostId)
+          (item) =>
+            item.id === worktreeId &&
+            (!requestedHost ||
+              worktreeMatchesHost(item, requestedHost, {
+                unhostedWorktreesMatchHost: requestedHost === 'local'
+              }))
         )
       : undefined
     if (scoped) {
       return scoped
     }
-    const owner = findIndexedWorktreeOwner(s.worktreesByRepo, worktreeId)
-    return owner
-      ? s.worktreesByRepo[owner.repoId]?.find((item) => item.id === worktreeId)
-      : undefined
+    // A known host must never fall back to a same-id row owned by another host.
+    const owner = requestedHost
+      ? findIndexedWorktreeOwnerForHost(s.worktreesByRepo, worktreeId, requestedHost)
+      : findIndexedWorktreeOwner(s.worktreesByRepo, worktreeId)
+    return (owner as Worktree | null) ?? undefined
   })
   // Why: folder workspaces are absent from worktreesByRepo, so the lookup above
   // returns undefined and the row renders blank for them. The selector returns
@@ -52,8 +68,12 @@ export function useWorktreeMetaWorkspace(args: {
   // it, because a selector that built the object would return a fresh identity
   // on every store write and re-render the dialog continuously.
   const folderWorkspace = useAppStore((s) =>
-    workspaceScope?.type === 'folder'
-      ? (s.folderWorkspaces.find((item) => item.id === workspaceScope.folderWorkspaceId) ?? null)
+    workspaceScope?.type === 'folder' && (!executionHostId || requestedHost)
+      ? findIndexedFolderWorkspaceOwner(
+          s.folderWorkspaces,
+          workspaceScope.folderWorkspaceId,
+          requestedHost
+        )
       : null
   )
   const worktree = useMemo(

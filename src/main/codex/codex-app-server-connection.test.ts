@@ -488,6 +488,7 @@ describe('openCodexAppServerConnection', () => {
   })
 
   it('reports unproven close when forced termination did not produce an exit event', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const { child, spawnImpl } = stubChild({ exitOnStdinEnd: false })
     answerInitialize(child)
     const connection = await openCodexAppServerConnection(
@@ -496,7 +497,22 @@ describe('openCodexAppServerConnection', () => {
       spawnImpl
     )
 
-    await expect(connection.close()).resolves.toBe(false)
+    const forcedKill = new Promise<void>((resolve) => {
+      child.kill.mockImplementation((signal) => {
+        if (signal === 'SIGKILL') {
+          resolve()
+        }
+      })
+    })
+    const closing = connection.close()
+    await flushStreams()
+    await vi.advanceTimersByTimeAsync(GRACEFUL_EXIT_MS)
+    await forcedKill
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    await expect(closing).resolves.toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
   }, 10_000)
 
   it('shares one eventual exit proof across concurrent close callers', async () => {
@@ -830,6 +846,7 @@ describe('openCodexAppServerConnection', () => {
   })
 
   it('keeps a graceful close quiet when stdin breaks during the reap', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const { child, spawnImpl } = stubChild({ exitOnStdinEnd: false })
     answerInitialize(child)
     const exits: string[] = []
@@ -839,15 +856,26 @@ describe('openCodexAppServerConnection', () => {
       spawnImpl
     )
     child.stdin.on('finish', () => child.stdin.emit('error', new Error('write EPIPE')))
-    child.kill.mockImplementation(() => {
-      child.emit('exit', null, 'SIGKILL')
-      return true
+    const forcedKill = new Promise<void>((resolve) => {
+      child.kill.mockImplementation((signal) => {
+        child.emit('exit', null, 'SIGKILL')
+        if (signal === 'SIGKILL') {
+          resolve()
+        }
+        return true
+      })
     })
 
     const inFlight = rejection(connection.request('turn/start'))
-    await connection.close()
+    const closing = connection.close()
+    await flushStreams()
+    await vi.advanceTimersByTimeAsync(GRACEFUL_EXIT_MS)
+    await forcedKill
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(closing).resolves.toBe(true)
 
     expect((await inFlight).message).toContain('EPIPE')
     expect(exits).toHaveLength(0)
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

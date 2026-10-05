@@ -135,7 +135,8 @@ export function runRebuildScript(projectDir, extraEnv = {}, args = []) {
   for (const key of Object.keys(env)) {
     if (
       key.toLowerCase() === 'orca_strict_electron_install' ||
-      key.toLowerCase() === 'npm_lifecycle_event'
+      key.toLowerCase() === 'npm_lifecycle_event' ||
+      key.toLowerCase() === 'trackfileaccess'
     ) {
       delete env[key]
     }
@@ -291,6 +292,7 @@ export async function rebuild(options) {${emitAddon}
       force: options.force,
       headerURL: options.headerURL,
       ignoreModules: options.ignoreModules,
+      trackFileAccess: process.env.TrackFileAccess ?? null,
       onlyModules: options.onlyModules,
       platform: options.platform${
         captureNodePtyBindingGyp

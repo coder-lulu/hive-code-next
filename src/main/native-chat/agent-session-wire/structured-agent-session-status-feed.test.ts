@@ -1,4 +1,5 @@
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
+import { APP_DISPLAY_NAME, PRODUCT_CONFIG } from '../../../shared/brand'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,20 +7,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 import { agentSessionRecordFixture } from '../../../shared/agent-session-record.test-fixture'
 import type {
-  AgentSessionBackgroundTask,
   AgentSessionStatusEvent,
   AgentSessionStatusSummary
 } from '../../../shared/agent-session-wire'
+import type { AgentChildWorkView } from '../../../shared/agent-status-child-work-view'
 import { createClaudeJournalTranslator } from '../../claude/claude-structured-journal-translation'
 import { publishCodexTurnLifecycle } from '../../codex/codex-structured-journal-translation-turns'
 import { createDeferredStructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
 import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
-import { indexedStatusFeedSession as indexed } from './structured-agent-session-status-feed-test-session'
+import {
+  indexedStatusFeedSession as indexed,
+  statusFeedChildView
+} from './structured-agent-session-status-feed-test-session'
 import {
   StructuredAgentSessionStatusFeed,
   type StructuredAgentSessionStatusFeedDeps,
   type StructuredAgentSessionStatusSink
 } from './structured-agent-session-status-feed'
+import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { testEventSinkLogging } from './structured-agent-session-logger-test-support'
 
 const SESSION = 'status-session'
 const TURN_IDENTITY = {
@@ -67,14 +73,18 @@ function feedFor(
   sessions: Map<string, Parameters<typeof indexed>[0]>,
   record: Partial<AgentSessionRecord> | null = null,
   onStatusChanged?: StructuredAgentSessionStatusFeedDeps['onStatusChanged'],
-  readBackgroundTasks?: StructuredAgentSessionStatusFeedDeps['readBackgroundTasks'],
+  readChildWork?: () => AgentChildWorkView[],
   statusSink?: StructuredAgentSessionStatusSink
 ) {
   let now = 1_000
+  // The summary reads child records where the host keeps them: the sink its row landed in.
+  const sink =
+    statusSink ??
+    (readChildWork ? { publish: () => {}, forget: () => {}, readChildWork } : undefined)
   const feed = new StructuredAgentSessionStatusFeed({
+    logger: createStructuredAgentSessionLogger(),
     ...(onStatusChanged ? { onStatusChanged } : {}),
-    ...(statusSink ? { statusSink: () => statusSink } : {}),
-    ...(readBackgroundTasks ? { readBackgroundTasks } : {}),
+    ...(sink ? { statusSink: () => sink } : {}),
     sessions: {
       get: (sessionId: string) => {
         const session = sessions.get(sessionId)
@@ -96,6 +106,36 @@ function feedFor(
 }
 
 describe('StructuredAgentSessionStatusFeed', () => {
+  it(`publishes ${APP_DISPLAY_NAME} Managed Pi child views through the current host feed without Codex ID rewriting`, async () => {
+    const journal = await journals.open({
+      identity: {
+        sessionId: SESSION,
+        workspaceId: 'workspace-1',
+        hostId: 'local',
+        agent: PRODUCT_CONFIG.slug,
+        providerHandle: { kind: 'opaque', agent: PRODUCT_CONFIG.slug, value: SESSION }
+      },
+      stateDirectory: join(root, SESSION)
+    })
+    const child = statusFeedChildView({ providerId: 'pi-child' })
+    const { feed, events, dispose } = feedFor(
+      new Map([[SESSION, { journal, provider: 'managed-pi' }]]),
+      null,
+      undefined,
+      () => [child]
+    )
+    feed.publish(SESSION, journal)
+    expect(events.at(-1)).toMatchObject({
+      type: 'status',
+      session: {
+        agent: 'managed-pi',
+        children: [expect.objectContaining({ providerId: 'pi-child' })],
+        backgroundTasks: [expect.objectContaining({ id: 'pi-child' })]
+      }
+    })
+    dispose()
+  })
+
   it('publishes provider ownership transitions without changing journal time', async () => {
     const journal = await openJournal()
     const sessions = new Map<string, Indexed>([
@@ -540,7 +580,7 @@ describe('StructuredAgentSessionStatusFeed', () => {
       const { feed } = feedFor(new Map([[SESSION, { journal }]]), null, (summary) =>
         seen.push(summary.status)
       )
-      const deferred = createDeferredStructuredAgentSessionEventSink()
+      const deferred = createDeferredStructuredAgentSessionEventSink(testEventSinkLogging())
       if (agent === 'claude') {
         const translator = createClaudeJournalTranslator({ sink: deferred.sink })
         translator.handle({
@@ -638,10 +678,9 @@ describe('StructuredAgentSessionStatusFeed', () => {
     )
     const snapshot = vi.spyOn(journal, 'snapshot')
     let taskState: 'working' | 'waiting' = 'working'
-    const { feed, events } = feedFor(new Map([[SESSION, { journal }]]), null, undefined, () => ({
-      state: 'monitoring',
-      tasks: [{ id: 'child', kind: 'agent', state: taskState }]
-    }))
+    const { feed, events } = feedFor(new Map([[SESSION, { journal }]]), null, undefined, () => [
+      statusFeedChildView({ state: taskState })
+    ])
     for (let tick = 1; tick <= 100; tick++) {
       taskState = tick % 2 === 1 ? 'waiting' : 'working'
       feed.publish(SESSION)
@@ -679,90 +718,6 @@ describe('StructuredAgentSessionStatusFeed', () => {
     readOnly.mockRestore()
     feed.publish(SESSION)
     expect(events.at(-1)).toMatchObject({ type: 'status', session: { status: 'idle' } })
-  })
-
-  it('projects live background tasks and republishes a task-only state change', async () => {
-    const journal = await openJournal()
-    let tasks = [
-      { id: 'task-1', kind: 'agent' as const, name: 'deep_review', state: 'working' as const }
-    ]
-    const { feed, events } = feedFor(new Map([[SESSION, { journal }]]), null, undefined, () => ({
-      state: 'monitoring',
-      tasks
-    }))
-    await journal.appendItem(
-      USER_IDENTITY,
-      { kind: 'message', role: 'user', blocks: [{ type: 'text', text: 'fan out' }] },
-      { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
-    )
-    feed.publish(SESSION, journal)
-    expect(events.at(-1)).toEqual({
-      type: 'status',
-      session: expect.objectContaining({
-        backgroundTasks: [{ id: 'task-1', kind: 'agent', name: 'deep_review', state: 'working' }]
-      })
-    })
-
-    // No journal change: only the task state moved.
-    tasks = [{ id: 'task-1', kind: 'agent', name: 'deep_review', state: 'waiting' as never }]
-    const before = events.length
-    feed.publish(SESSION, journal)
-    expect(events).toHaveLength(before + 1)
-    expect(events.at(-1)).toEqual({
-      type: 'status',
-      session: expect.objectContaining({
-        backgroundTasks: [expect.objectContaining({ state: 'waiting' })]
-      })
-    })
-
-    // An identical projection is suppressed.
-    feed.publish(SESSION, journal)
-    expect(events).toHaveLength(before + 1)
-  })
-
-  it('omits task usage so a progress tick never re-broadcasts the summary', async () => {
-    const journal = await openJournal()
-    let tasks: AgentSessionBackgroundTask[] = [
-      { id: 'task-1', kind: 'agent', name: 'deep_review', state: 'working', totalTokens: 10 }
-    ]
-    const { feed, events } = feedFor(new Map([[SESSION, { journal }]]), null, undefined, () => ({
-      state: 'monitoring',
-      tasks
-    }))
-    await journal.appendItem(
-      USER_IDENTITY,
-      { kind: 'message', role: 'user', blocks: [{ type: 'text', text: 'fan out' }] },
-      { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
-    )
-    feed.publish(SESSION, journal)
-    const before = events.length
-
-    // A `task_progress` frame moves only usage, which no status-summary reader renders;
-    // re-broadcasting the whole summary per frame would cost every remote subscriber.
-    tasks = [
-      { id: 'task-1', kind: 'agent', name: 'deep_review', state: 'working', totalTokens: 4_200 }
-    ]
-    feed.publish(SESSION, journal)
-    expect(events).toHaveLength(before)
-    expect(events.at(-1)).toEqual({
-      type: 'status',
-      session: expect.objectContaining({
-        backgroundTasks: [{ id: 'task-1', kind: 'agent', name: 'deep_review', state: 'working' }]
-      })
-    })
-
-    // A state change on the same task still reaches subscribers.
-    tasks = [
-      { id: 'task-1', kind: 'agent', name: 'deep_review', state: 'waiting', totalTokens: 4_200 }
-    ]
-    feed.publish(SESSION, journal)
-    expect(events).toHaveLength(before + 1)
-    expect(events.at(-1)).toEqual({
-      type: 'status',
-      session: expect.objectContaining({
-        backgroundTasks: [expect.objectContaining({ state: 'waiting' })]
-      })
-    })
   })
 })
 
@@ -810,7 +765,6 @@ describe('the status sink sees the roster the broadcast cache deliberately lacks
     expect(published.at(-1)).toMatchObject({ sessionId: SESSION, status: 'idle' })
     expect(published.at(-1)?.hostExecutionOwned).toBeUndefined()
     expect(published.at(-1)?.hostExecutionPhase).toBeUndefined()
-    expect(published.at(-1)?.hostExecutionChild).toBeUndefined()
 
     // Exactly what `close` does after eviction: the cache keeps the projection, the sink does not.
     sessions.delete(SESSION)

@@ -6,7 +6,6 @@ import {
   agentJournalSubmissionKey,
   boundJournalKeyComponent
 } from '../../../shared/agent-session-journal-item-key'
-import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type {
   AgentJournalItemBody,
   AgentJournalItemIdentity,
@@ -320,12 +319,12 @@ describe('history page byte ceiling', () => {
       readAgentSessionHistory(journal, { sessionId: 'session-1', direction: 'tail', limit: 40 })
     )
     expect(tail.items).toHaveLength(1)
-    const bodyOnPage = tail.items[0]?.body
-    expect(bodyOnPage?.kind).toBe('status')
-    expect(bodyOnPage?.kind === 'status' ? bodyOnPage.presentation : null).toBe('history-truncated')
-    expect(bodyOnPage?.kind === 'status' ? bodyOnPage.text : '').toContain(
-      `[${APP_DISPLAY_NAME}: item truncated`
-    )
+    // Named for the client to word, with English for a client that can't.
+    expect(tail.items[0]?.body).toEqual({
+      kind: 'status',
+      text: 'This part of the chat was too large to show.',
+      presentation: 'history-item-too-large'
+    })
   })
 })
 

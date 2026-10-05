@@ -321,7 +321,7 @@ describe('owned orchestration references', () => {
     expect(squash(reference)).toContain('An empty `check` never means you were replaced')
   })
 
-  it('keeps heartbeat and worker_done recipes bound to the injected capability', () => {
+  it('keeps heartbeat and worker_done recipes bound to the injected Dispatch', () => {
     const reference = readReference('worker-contract.md')
     const recipes = [...reference.matchAll(/```text\n([\s\S]*?)```/gu)].map((match) => match[1])
     const heartbeat = recipes.find((recipe) => recipe.includes('--type heartbeat'))
@@ -329,7 +329,7 @@ describe('owned orchestration references', () => {
 
     for (const recipe of [heartbeat, workerDone]) {
       expect(recipe).toContain('--from <worker_handle>')
-      expect(recipe).toContain('--dispatch-capability <capability>')
+      expect(recipe).not.toContain('--dispatch-capability')
       expect(recipe).toContain('--task-id <task_id> --dispatch-id <dispatch_id>')
     }
     expect(workerDone).not.toContain('--files-modified')

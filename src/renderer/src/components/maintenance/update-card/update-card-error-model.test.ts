@@ -3,11 +3,15 @@ import type { UpdateStatus } from '../../../../../shared/update-status-types'
 import { buildUpdateCardErrorModel } from './update-card-error-model'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 
-function build(status: UpdateStatus, isLocalBuild = false) {
+function build(
+  status: UpdateStatus,
+  isLocalBuild = false,
+  cachedVersion: string | null = '1.4.200'
+) {
   return buildUpdateCardErrorModel({
     status,
     isLocalBuild,
-    cachedVersion: '1.4.200',
+    cachedVersion,
     installError: null,
     compatibilityRelaunching: false,
     compatibilitySetupError: null,
@@ -20,6 +24,16 @@ function build(status: UpdateStatus, isLocalBuild = false) {
 }
 
 describe('update card error model precedence', () => {
+  it('retains install retry when no release version is available', () => {
+    const model = build(
+      { state: 'error', message: 'Install failed', retryAction: 'install' },
+      false,
+      null
+    )
+    expect(model?.summary).toBe('Install failed')
+    expect(model?.releaseUrl).toBeUndefined()
+    expect(model?.primaryAction?.label).toBe('Try Again')
+  })
   it('keeps a local build failure out of platform download recovery', () => {
     const model = build(
       {

@@ -9,7 +9,6 @@ import { AgentIcon } from '@/lib/agent-catalog'
 import { agentTypeToIconAgent, formatAgentTypeLabel } from '@/lib/agent-status'
 import { cn } from '@/lib/utils'
 import { getAgentDotState } from './worktree-card-agent-summary'
-import { translate } from '@/i18n/i18n'
 import { getChildAgentDisclosureLabel } from '@/lib/child-agent-disclosure-copy'
 import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { formatAgentToolPreview } from '@/lib/agent-row-tool-preview'
@@ -18,7 +17,7 @@ import { useAgentRowConversationName } from '@/components/dashboard/use-agent-ro
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { formatShortTimeAgo } from '@/lib/short-time-ago'
-import { agentVerdictDisplayMark } from '../../../../shared/agent-main-agent-verdict'
+import { agentVerdictStatusLine } from '@/lib/agent-verdict-status-line'
 
 function getCompactAgentPrimary(
   agent: DashboardAgentRowData,
@@ -33,15 +32,9 @@ export function getCompactAgentSecondary(
   now: number,
   lastAssistantMessageOverride?: string
 ): string {
-  const verdictMark = agentVerdictDisplayMark(agent.entry)
-  if (verdictMark === 'interrupted') {
-    return translate(
-      'auto.components.dashboard.DashboardAgentRowMessage.1ec01cef03',
-      'Interrupted by user'
-    )
-  }
-  if (verdictMark === 'failed') {
-    return agentStateLabel('failed')
+  const verdictLine = agentVerdictStatusLine(agent.entry)
+  if (verdictLine) {
+    return verdictLine
   }
   // Why: the only honest thing to say about a pane Orca still holds but no longer hears
   // from is how long the silence has run; the user supplies the meaning.

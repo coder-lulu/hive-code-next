@@ -82,6 +82,9 @@ export function buildRequestStreamUnsubscribe(
   params: unknown,
   requestId: string
 ): { method: string; params: Record<string, unknown> } | null {
+  if (method === 'session.tabs.subscribeAll') {
+    return { method: 'session.tabs.unsubscribeAll', params: { subscriptionId: requestId } }
+  }
   if (method !== 'terminal.subscribe') {
     return buildStreamUnsubscribe(method, params, requestId)
   }

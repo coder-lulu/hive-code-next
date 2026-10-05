@@ -16,6 +16,7 @@ import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTar
 import { useDetectedAgents } from '@/hooks/useDetectedAgents'
 import { activateAndRevealWorkspace } from '@/lib/worktree-activation'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import {
   filterQuickWorkspaceAgents,
   pickQuickWorkspaceAgent,
@@ -292,12 +293,13 @@ export default function Landing(): React.JSX.Element {
       let launched: ReturnType<typeof launchAgentInNewTab> = null
       try {
         launched = launchAgentInNewTab({
+          requestId: newAgentLaunchRequestId(),
           agent,
           worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
           prompt,
           agentPermissionMode: resolvedPermissionMode,
           promptDelivery: 'auto-submit',
-          launchSource: 'unknown'
+          launchSource: 'desktop_home'
         })
       } catch (error) {
         tracker.stop()
@@ -329,13 +331,15 @@ export default function Landing(): React.JSX.Element {
       return
     }
     const launched = launchAgentInNewTab({
+      requestId: newAgentLaunchRequestId(),
       agent,
       worktreeId:
         selectedWorkspace.kind === 'folder' ? selectedWorkspace.workspaceKey : selectedWorkspace.id,
       executionHostId: selectedWorkspace.executionHostId,
       prompt,
       agentPermissionMode: resolvedPermissionMode,
-      promptDelivery: 'auto-submit'
+      promptDelivery: 'auto-submit',
+      launchSource: 'desktop_home'
     })
     if (!launched) {
       return

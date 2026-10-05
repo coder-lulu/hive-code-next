@@ -1,3 +1,4 @@
+import { encodeBase64Bytes, decodeBase64Bytes } from './base64-byte-codec'
 import nacl from 'tweetnacl'
 import type { RuntimeCapability } from './protocol-version'
 import {
@@ -176,11 +177,7 @@ function encodeBase64(bytes: Uint8Array): string {
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(bytes).toString('base64')
   }
-  let binary = ''
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
-  }
-  return btoa(binary)
+  return encodeBase64Bytes(bytes)
 }
 
 function decodeCanonicalBase64(value: string): Uint8Array | null {
@@ -189,8 +186,7 @@ function decodeCanonicalBase64(value: string): Uint8Array | null {
       const bytes = Buffer.from(value, 'base64')
       return bytes.toString('base64') === value ? new Uint8Array(bytes) : null
     }
-    const binary = atob(value)
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+    const bytes = decodeBase64Bytes(value)
     return encodeBase64(bytes) === value ? bytes : null
   } catch {
     return null

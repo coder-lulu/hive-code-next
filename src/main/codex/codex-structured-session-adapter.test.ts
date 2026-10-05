@@ -43,6 +43,9 @@ describe('CodexStructuredSessionAdapter.acquire', () => {
           ? /^(?:[a-z]:)?[^:;]*[\\/]cli[\\/]bin[\\/]orca-dev\.cmd$/i
           : /^[^:;]*[\\/]cli[\\/]bin[\\/]orca-dev$/
       ),
+      ...(process.platform !== 'win32'
+        ? { ORCA_CLI_BIN_DIR: expect.stringMatching(/^[^:;]*[\\/]cli[\\/]bin$/) }
+        : {}),
       ORCA_USER_DATA_PATH: expect.any(String),
       // The test host is unpackaged, so this app's CLI is the dev launcher dir, first on PATH.
       PATH: expect.stringMatching(

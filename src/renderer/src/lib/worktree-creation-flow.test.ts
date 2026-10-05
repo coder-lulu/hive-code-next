@@ -76,7 +76,8 @@ vi.mock('@/lib/new-workspace', () => ({
 
 vi.mock('sonner', () => ({
   toast: {
-    error: vi.fn()
+    error: vi.fn(),
+    success: vi.fn()
   }
 }))
 

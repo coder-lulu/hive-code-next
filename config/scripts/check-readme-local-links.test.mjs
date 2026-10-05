@@ -142,7 +142,26 @@ describe('public README local link check', () => {
       { readme: 'README.md', target: 'resources/missing.gif', resolved: 'resources/missing.gif' }
     ])
   })
-  it('runs on every PR through the ungated detector and in lint', () => {
+
+  // Why: a single-quoted attribute is valid HTML and GitHub renders it, so a parser
+  // that only reads double quotes would pass a README with a broken image.
+  it('reports a missing target in a single-quoted attribute', () => {
+    const files = {
+      ...validReadmes,
+      'README.md': `${validReadmes['README.md']}\n<img src='docs/assets/missing.gif' />`
+    }
+
+    expect(findBrokenReadmeLinks(makeFixture(files))).toEqual([
+      {
+        readme: 'README.md',
+        target: 'docs/assets/missing.gif',
+        resolved: 'docs/assets/missing.gif'
+      }
+    ])
+  })
+
+  // Docs-only diffs skip preflight, so the detector must check README links.
+  it('runs on every PR through the ungated detector and in the lint script', () => {
     const { scripts } = JSON.parse(readFileSync(path.join(projectDir, 'package.json'), 'utf8'))
     const workflow = parse(readFileSync(path.join(projectDir, '.github/workflows/pr.yml'), 'utf8'))
     const job = workflow.jobs.code_paths

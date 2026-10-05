@@ -49,7 +49,11 @@ export function applyRuntimeHostStatusSnapshot(
     state.setRuntimeEnvironmentStatus(snapshot.environmentId, entry)
     if (previous?.status == null) {
       void ensureBrowserClientHostsForRestoredPages(state)
-      void replayClientHostedBrowserCloseIntents(snapshot.environmentId, state)
+      void replayClientHostedBrowserCloseIntents(snapshot.environmentId, {
+        clientHostedBrowserCloseIntentsByEnvironment:
+          state.clientHostedBrowserCloseIntentsByEnvironment,
+        clearClientHostedBrowserCloseIntents: state.clearClientHostedBrowserCloseIntents
+      })
     }
   } else {
     // Lost local contact observes no runtime session ending. For a dual-route host this also

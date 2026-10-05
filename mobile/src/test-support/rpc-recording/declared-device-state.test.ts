@@ -140,5 +140,4 @@ describe('a scenario that declares its device', () => {
     expect(write.key).toMatch(/^orca:codex-reset-credit-attempt:v1:[0-9a-f]{64}$/)
     expect(JSON.parse(write.value)).toMatchObject({ idempotencyKey: params.params.idempotencyKey })
   })
-
 })

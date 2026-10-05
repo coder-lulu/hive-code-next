@@ -47,20 +47,20 @@ export function MobileTaskRuntimeGate(props: {
           : '任务状态不可验证。Runtime 恢复在线后即可继续。'}
       </Text>
       {props.onRetry ? (
-      <Pressable
-        accessibilityLabel="重试连接 Runtime"
-        accessibilityRole="button"
-        onPress={props.onRetry}
-        style={({ pressed }) => [
-          styles.emptyPrimaryButton,
-          pressed && styles.emptyPrimaryButtonPressed
-        ]}
-      >
-        <RefreshCw color={theme.color.text.inverse} size={20} strokeWidth={2} />
-        <Text maxFontSizeMultiplier={1.3} style={styles.emptyPrimaryButtonText}>
-          重试连接
-        </Text>
-      </Pressable>
+        <Pressable
+          accessibilityLabel="重试连接 Runtime"
+          accessibilityRole="button"
+          onPress={props.onRetry}
+          style={({ pressed }) => [
+            styles.emptyPrimaryButton,
+            pressed && styles.emptyPrimaryButtonPressed
+          ]}
+        >
+          <RefreshCw color={theme.color.text.inverse} size={20} strokeWidth={2} />
+          <Text maxFontSizeMultiplier={1.3} style={styles.emptyPrimaryButtonText}>
+            重试连接
+          </Text>
+        </Pressable>
       ) : null}
       <Pressable
         accessibilityRole="button"

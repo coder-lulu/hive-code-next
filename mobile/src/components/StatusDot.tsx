@@ -42,7 +42,9 @@ export function StatusDot({
       ? theme.color.status.danger
       : verdict?.kind === 'warning' || (verdict?.kind === 'normal' && verdict.label.endsWith('…'))
         ? theme.color.status.warning
-        : theme.color.status[state === 'connected' ? 'success' : state === 'auth-failed' ? 'danger' : 'warning']
+        : theme.color.status[
+            state === 'connected' ? 'success' : state === 'auth-failed' ? 'danger' : 'warning'
+          ]
     : statusDotColor(state, verdict)
   return <View style={[styles.dot, { backgroundColor: color }]} />
 }

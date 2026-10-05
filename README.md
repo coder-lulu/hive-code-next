@@ -31,13 +31,13 @@ Hive 账户登录、模型服务和账户中继需要可用的 Hive 后端及有
 
 ## 从源码开发
 
-需要 Git、Node.js **24.18.0**、pnpm **12.0.0**，以及当前平台的原生编译工具。精确版本与平台约束见 [工具链配置](config/toolchain.json)。
+需要 Git、Node.js **24.18.0**、pnpm **12.8.1**，以及当前平台的原生编译工具。精确版本与平台约束见 [工具链配置](config/toolchain.json)。
 
 获取源码后，在仓库根目录执行：
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm --dir mobile install --frozen-lockfile
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm --dir mobile install --frozen-lockfile --ignore-scripts
 pnpm dev
 ```
 

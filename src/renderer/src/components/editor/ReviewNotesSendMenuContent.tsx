@@ -13,9 +13,9 @@ import {
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import {
   activeAgentNotesSendFailureMessage,
-  sendNotesToActiveAgentSession,
   type ActiveAgentNotesSendResult
 } from '@/lib/active-agent-note-send'
+import { sendMessageToAgent } from '@/lib/agent-message-send'
 import {
   deriveNotesSendAgentTargets,
   type NotesSendAgentTarget
@@ -31,9 +31,8 @@ import type { DashboardAgentRow as DashboardAgentRowData } from '@/components/da
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import { useWorktreeAgentRows } from '@/components/sidebar/useWorktreeAgentRows'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
-import { agentRowDotState } from '@/lib/agent-row-dot-state'
 import { formatCompactDuration } from '@/lib/agent-row-decay-state'
-import { getAgentSendDisabledReason } from '@/lib/running-agent-targets'
+import { agentRowDisplayDotState } from '@/lib/agent-row-dot-state'
 import { translate } from '@/i18n/i18n'
 
 type OrderedSendTarget = {
@@ -47,7 +46,8 @@ export function ReviewNotesSendMenuContent({
   prompt,
   promptDelivery = 'submit-after-ready',
   launchSource = 'notes_send',
-  onPromptDelivered
+  onPromptDelivered,
+  onPromptHandedOff
 }: {
   worktreeId: string
   groupId: string
@@ -55,6 +55,8 @@ export function ReviewNotesSendMenuContent({
   promptDelivery?: 'auto-submit' | 'draft' | 'submit-after-ready'
   launchSource?: LaunchSource
   onPromptDelivered?: () => void
+  /** Given each send's own result the moment its prompt is handed to an agent. */
+  onPromptHandedOff?: (delivered: Promise<unknown>) => void
 }): React.JSX.Element {
   const { i18n } = useTranslation()
   const language = i18n.language
@@ -65,6 +67,7 @@ export function ReviewNotesSendMenuContent({
   // to avoid the new-array identity churn of selecting the function result.
   const agentStatusByPaneKey = useAppStore((s) => s.agentStatusByPaneKey)
   const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
+  const unifiedTabsByWorktree = useAppStore((s) => s.unifiedTabsByWorktree)
   const terminalLayoutsByTabId = useAppStore((s) => s.terminalLayoutsByTabId)
   const ptyIdsByTabId = useAppStore((s) => s.ptyIdsByTabId)
   const runtimePaneTitlesByTabId = useAppStore((s) => s.runtimePaneTitlesByTabId)
@@ -79,6 +82,7 @@ export function ReviewNotesSendMenuContent({
       {
         agentStatusByPaneKey,
         tabsByWorktree,
+        unifiedTabsByWorktree,
         terminalLayoutsByTabId,
         ptyIdsByTabId,
         runtimePaneTitlesByTabId
@@ -92,6 +96,7 @@ export function ReviewNotesSendMenuContent({
     language,
     agentStatusByPaneKey,
     tabsByWorktree,
+    unifiedTabsByWorktree,
     terminalLayoutsByTabId,
     runtimePaneTitlesByTabId,
     ptyIdsByTabId,
@@ -108,6 +113,8 @@ export function ReviewNotesSendMenuContent({
       onSent: () => void,
       options: { explicitTarget?: boolean } = {}
     ) => {
+      // Why: settle the loading toast in place; a separate dismiss can land before sonner mounts
+      // the loading toast when the send resolves at once (a chat send), leaving it stuck.
       const pending = toast.loading(
         translate(
           'auto.components.editor.ReviewNotesSendMenuContent.50f7e753ea',
@@ -115,7 +122,7 @@ export function ReviewNotesSendMenuContent({
         )
       )
 
-      void send()
+      const sending = send()
         .then((result) => {
           if (result.status === 'sent') {
             onSent()
@@ -123,16 +130,19 @@ export function ReviewNotesSendMenuContent({
               translate(
                 'auto.components.editor.ReviewNotesSendMenuContent.bb9c69a0c9',
                 'Notes sent.'
-              )
+              ),
+              { id: pending }
             )
             return
           }
 
-          toast.message(
+          // Why: a typed call is required; toast.message on the loading id keeps its spinner forever.
+          toast.info(
             activeAgentNotesSendFailureMessage(result.status, {
               explicitTarget: options.explicitTarget,
               code: result.code
-            })
+            }),
+            { id: pending }
           )
         })
         .catch(() => {
@@ -141,14 +151,13 @@ export function ReviewNotesSendMenuContent({
             activeAgentNotesSendFailureMessage('status-unavailable', {
               explicitTarget: options.explicitTarget,
               code: 'runtime-unverifiable'
-            })
+            }),
+            { id: pending }
           )
         })
-        .finally(() => {
-          toast.dismiss(pending)
-        })
+      onPromptHandedOff?.(sending)
     },
-    []
+    [onPromptHandedOff]
   )
 
   const sendToAgentTarget = useCallback(
@@ -164,12 +173,7 @@ export function ReviewNotesSendMenuContent({
       }
 
       runNotesSend(
-        () =>
-          sendNotesToActiveAgentSession({
-            worktreeId,
-            prompt,
-            noteTarget: { tabId: target.tabId, leafId: target.leafId }
-          }),
+        () => sendMessageToAgent({ worktreeId, prompt, target: target.messageTarget }),
         () => {
           onPromptDelivered?.()
           // Why: mirror the sidebar send-target telemetry so dropdown-routed
@@ -213,6 +217,8 @@ export function ReviewNotesSendMenuContent({
         promptDelivery={promptDelivery}
         launchSource={launchSource}
         onPromptDelivered={onPromptDelivered}
+        onPromptHandedOff={onPromptHandedOff}
+        disabled={!hasPrompt}
       />
     </>
   )
@@ -222,6 +228,10 @@ function resolveCurrentSendTargetEligibility(
   target: NotesSendAgentTarget,
   worktreeId: string
 ): { status: 'eligible' } | { status: 'disabled'; disabledReason: string } {
+  const goneReason =
+    target.messageTarget.kind === 'terminal'
+      ? 'Terminal is no longer available'
+      : 'Chat is no longer open'
   const state = useAppStore.getState()
   const currentTarget = deriveNotesSendAgentTargets(state, worktreeId).find(
     (candidate) => candidate.paneKey === target.paneKey
@@ -231,12 +241,11 @@ function resolveCurrentSendTargetEligibility(
       ? { status: 'eligible' }
       : {
           status: 'disabled',
-          disabledReason:
-            currentTarget.disabledReason ?? getAgentSendDisabledReason('terminal-unavailable')
+          disabledReason: currentTarget.disabledReason ?? goneReason
         }
   }
 
-  return { status: 'disabled', disabledReason: getAgentSendDisabledReason('terminal-unavailable') }
+  return { status: 'disabled', disabledReason: goneReason }
 }
 
 function AgentTargetMenuItem({
@@ -253,7 +262,8 @@ function AgentTargetMenuItem({
   onSend: (target: NotesSendAgentTarget) => void
 }): React.JSX.Element {
   const tabTitle = target.tabTitle.trim()
-  const state = agentRowDotState(agent?.state ?? 'idle', agent?.entry.workingMode)
+  // Why: the sidebar row's own state, so a failed or stopped agent reads the same in both places.
+  const state = agent ? agentRowDisplayDotState(agent) : 'idle'
   const timeAgo = agent ? formatAgentRelativeTime(agent, now) : null
   const disabledReason = target.status === 'disabled' ? target.disabledReason : undefined
   const secondaryParts = [

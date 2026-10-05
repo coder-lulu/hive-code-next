@@ -76,4 +76,26 @@ describe('Hive product release authority', () => {
       expect.objectContaining({ ref: 'tags/v1.5.0' })
     )
   })
+
+  it.each(['github-actions[bot]', 'someone'])(
+    'does not grant %s a foreign agent-rules release channel',
+    async (author) => {
+      const tag = 'agent-state-rules-engine-1-next'
+      const { github } = await enforce({ action: 'published', tag, author })
+      expect(github.rest.repos.updateRelease).toHaveBeenCalledWith(
+        expect.objectContaining({
+          release_id: 8,
+          draft: true,
+          prerelease: true,
+          make_latest: 'false'
+        })
+      )
+      expect(github.rest.repos.deleteRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ release_id: 8 })
+      )
+      expect(github.rest.git.deleteRef).toHaveBeenCalledWith(
+        expect.objectContaining({ ref: `tags/${tag}` })
+      )
+    }
+  )
 })

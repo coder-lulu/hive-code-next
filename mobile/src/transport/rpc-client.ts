@@ -49,7 +49,7 @@ export type RpcClient = UnvalidatedRpcRequestPort & {
    * Requests that did reach the wire must reject with a delivery-unknown error
    * (`markRpcDeliveryUnknown`), since the host may already have executed them. Pinned
    * against the real clients in `rpc-client-delivery-ambiguity.test.ts` (direct) and
-   * `mobile-relay-rpc-session.test.ts` (relay) — a new implementation needs its own case.
+   * `account-runtime-rpc-requests.test.ts` (account relay) — a new implementation needs its own case.
    */
   close: () => void
 }

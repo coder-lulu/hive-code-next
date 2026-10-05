@@ -291,7 +291,7 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.groupDescription}>
             在手机上使用终端时，{APP_DISPLAY_NAME}
-            会将终端缩小以适应屏幕。离开应用后，你可以让终端保持手机尺寸，避免交互式命令行工具重新排版；也可以在稍后恢复为电脑尺寸。终端横幅仍可随时手动恢复单个或全部终端。
+            会将终端缩小以适应屏幕。离开应用后，你可以让终端保持手机尺寸，避免交互式命令行工具重新排版；也可以在稍后恢复为电脑尺寸。电脑端终端横幅仍可随时手动恢复尺寸。
           </Text>
           <MobileGroupedList>
             {hosts.length === 0 ? (

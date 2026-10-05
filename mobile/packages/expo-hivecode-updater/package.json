@@ -5,9 +5,9 @@
   "description": "Minimal native bridge for handing verified HiveCode APKs to Android Package Installer",
   "keywords": [
     "ExpoHiveCodeUpdater",
-    "expo",
     "android",
-    "apk"
+    "apk",
+    "expo"
   ],
   "license": "MIT",
   "author": "HiveCode contributors",

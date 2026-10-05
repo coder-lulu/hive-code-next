@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
+import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import {
   ensureStructuredAgentSessionHost,
   getStructuredAgentSessionResources,
@@ -22,6 +23,7 @@ async function install() {
     directory = await mkdtemp(join(root, 'store-'))
   }
   return ensureStructuredAgentSessionHost({
+    logger: createStructuredAgentSessionLogger(),
     stateDirectory: directory,
     hostId: 'local',
     claimKeyId: 'key',

@@ -8,6 +8,9 @@ import {
   extractReleaseCheckoutTree,
   scavengeReleaseCheckoutStaging
 } from './release-checkout-tree.ts'
+import { selectLatestStableReleaseTag } from '../../../config/scripts/stable-release-tags.mjs'
+
+export { selectLatestStableReleaseTag }
 
 export const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..')
 const DEFAULT_CACHE_ROOT = join(REPO_ROOT, 'logs', 'cross-version-checkouts')
@@ -17,7 +20,6 @@ const EXISTING_CACHE_ROOT = join(REPO_ROOT, 'tests', 'e2e', '.cross-version-chec
 const CHECKOUT_FORMAT = 4
 
 const BASELINE_REF_ENV = 'ORCA_CROSS_VERSION_BASELINE_REF'
-const STABLE_DESKTOP_RELEASE_TAG = /^v\d+\.\d+\.\d+$/
 
 export type ReleaseCheckout = {
   /** The ref as requested, e.g. `v1.4.169`. */
@@ -88,24 +90,6 @@ function git(args: string[]): string {
   }).trim()
 }
 
-function compareReleaseTags(a: string, b: string): number {
-  const parts = (tag: string): number[] =>
-    tag
-      .replace(/^v/, '')
-      .split('.')
-      .map((part) => Number.parseInt(part, 10))
-      .map((value) => (Number.isFinite(value) ? value : 0))
-  const left = parts(a)
-  const right = parts(b)
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const diff = (left[index] ?? 0) - (right[index] ?? 0)
-    if (diff !== 0) {
-      return diff
-    }
-  }
-  return 0
-}
-
 /**
  * The version point the harness pairs current code against. An explicit
  * {@link BASELINE_REF_ENV} wins; otherwise the newest stable desktop release tag.
@@ -136,15 +120,6 @@ export function resolveBaselineReleaseRef(): string {
     )
   }
   return latest
-}
-
-export function selectLatestStableReleaseTag(tags: string[]): string | null {
-  return (
-    tags
-      .filter((tag) => STABLE_DESKTOP_RELEASE_TAG.test(tag))
-      .sort(compareReleaseTags)
-      .at(-1) ?? null
-  )
 }
 
 export function resolveReleaseCheckoutCommit(ref: string, readGit = git): string {

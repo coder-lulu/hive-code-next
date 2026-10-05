@@ -1,3 +1,4 @@
+import type * as ResumeMetadata from '../../../agent-history/mobile-ai-vault-resume-metadata'
 import type { OperationExposure } from '../operation-module-loader'
 import type { MountAdapter } from '../recording-scenario'
 import { hookMount } from '../hook-mount'
@@ -105,7 +106,7 @@ export function settingsMountAdapters(
       }
     },
     'settings.resume-metadata': ({ client }) => {
-      const load = modules.load(
+      const load = modules.load<typeof ResumeMetadata>(
         'mobile/src/agent-history/mobile-ai-vault-resume-metadata.ts'
       ).loadMobileResumeMetadata
       return { action: () => load(client), state: () => ({}), dispose: () => {} }

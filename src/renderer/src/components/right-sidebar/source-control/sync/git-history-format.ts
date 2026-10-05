@@ -4,8 +4,8 @@ import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 const getGitHistoryTimestampFormatter = createLocalizedCatalog(
   () =>
     new Intl.DateTimeFormat(getIntlLocale(), {
-      month: 'short',
-      day: 'numeric'
+      dateStyle: 'medium',
+      timeStyle: 'long'
     })
 )
 

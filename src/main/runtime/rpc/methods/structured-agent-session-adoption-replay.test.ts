@@ -1,3 +1,4 @@
+import '../unused-default-rpc-methods.test-fixture'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -16,6 +17,7 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../../../native-chat/agent-session-journal/journal-host-database-test-support'
+import { createStructuredAgentSessionLogger } from '../../../native-chat/agent-session-wire/structured-agent-session-logger'
 
 const SESSION = 'session-adoption-replay'
 const THREAD = 'thread-adoption-replay'
@@ -106,7 +108,7 @@ beforeEach(async () => {
 afterEach(async () => {
   setStructuredAgentSessionHost(null)
   await host?.flushAllStreamedEvents()
-  await host?.close(SESSION)
+  await host?.close(SESSION, 'evict')
   closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
   vi.restoreAllMocks()
@@ -188,6 +190,7 @@ describe('committed adopting create RPC replay', () => {
     const store = await openTestAgentSessionRecordStore(root)
     const sessionAdapter = adapter()
     host = new StructuredAgentSessionHost({
+      logger: createStructuredAgentSessionLogger(),
       store,
       adapter: sessionAdapter,
       journalDatabase: openTestJournalHostDatabase(root),

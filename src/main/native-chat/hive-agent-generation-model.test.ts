@@ -1,4 +1,8 @@
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import {
+  openTestAgentSessionRecordStore,
+  readPersistedTestAgentSessionStoreText
+} from '../runtime/agent-session-record-store-test-harness'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
@@ -12,8 +16,6 @@ import {
 } from '../../shared/hive-ai-model-catalog.test-fixture'
 import { HiveAiModelReader } from '../hive-runtime-cloud/hive-ai-model-reader'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
-import { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
-import { agentSessionStorePath } from '../runtime/agent-session-record-store-file'
 import { HiveAgentSessionHost } from './hive-agent-session-host'
 import type { HiveAgentHostDependencies } from './hive-agent-session-dependencies'
 import type { HiveAiCatalogClient } from '../hive-runtime-cloud/hive-ai-catalog-client'
@@ -101,7 +103,7 @@ beforeEach(async () => {
     }),
     () => client
   )
-  const store = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+  const store = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
   const opened = new Map<string, Awaited<ReturnType<typeof journals.open>>>()
   deps = {
     store,
@@ -215,7 +217,7 @@ describe('P2 Pack admission and durable execution binding', () => {
     'refuses %s Pack sources before model lookup or mutation',
     async (failure) => {
       const id = await create()
-      const before = await readFile(agentSessionStorePath(root), 'utf8')
+      const before = await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })
       if (failure === 'missing') {
         deps.readPack = undefined
       }
@@ -238,7 +240,7 @@ describe('P2 Pack admission and durable execution binding', () => {
       expect(client.catalog).not.toHaveBeenCalled()
       expect((deps.adapter as HiveAgentFakeAdapter).dispatches).toBe(0)
       expect(deps.store.listOperationRows()).toHaveLength(1)
-      expect(await readFile(agentSessionStorePath(root), 'utf8')).toBe(before)
+      expect(await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })).toBe(before)
     }
   )
 
@@ -262,7 +264,7 @@ describe('P2 Pack admission and durable execution binding', () => {
     expect(original.executionBinding).toEqual(supplied)
     expect(Object.isFrozen(supplied)).toBe(true)
     expect(Reflect.set(supplied, 'maxOutputTokens', 9999)).toBe(false)
-    const reloaded = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+    const reloaded = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
     expect(reloaded.hive.get(id)?.aggregate.generation?.executionBinding).toEqual(supplied)
     packManifest = { ...packManifest, packRevision: 'c'.repeat(64) }
     packManifest.profiles[0]!.maxInputTokens = 500
@@ -285,7 +287,7 @@ describe('P2 Pack admission and durable execution binding', () => {
     'rechecks %s changes after delayed lookup before commit',
     async (change) => {
       const id = await create()
-      const before = await readFile(agentSessionStorePath(root), 'utf8')
+      const before = await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })
       let finish!: () => void
       const waiting = new Promise<void>((release) => {
         finish = release
@@ -317,7 +319,9 @@ describe('P2 Pack admission and durable execution binding', () => {
         expect(deps.store.hive.get(id)?.aggregate.generation).toBeUndefined()
         expect((deps.adapter as HiveAgentFakeAdapter).dispatches).toBe(0)
         expect(deps.store.listOperationRows()).toHaveLength(1)
-        expect(await readFile(agentSessionStorePath(root), 'utf8')).toBe(before)
+        expect(await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })).toBe(
+          before
+        )
       } finally {
         finish()
         await pending
@@ -327,7 +331,7 @@ describe('P2 Pack admission and durable execution binding', () => {
 
   it('checks Pack scope inside the existing transaction before writing', async () => {
     const id = await create()
-    const before = await readFile(agentSessionStorePath(root), 'utf8')
+    const before = await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })
     const commit = deps.store.hive.commit
     vi.spyOn(deps.store.hive, 'commit').mockImplementation(async (input) => {
       packCurrent = false
@@ -336,7 +340,7 @@ describe('P2 Pack admission and durable execution binding', () => {
     expect(await submit(id)).toEqual({ ok: false, error: { code: 'hive_agent_pack_unavailable' } })
     expect(deps.store.listOperationRows()).toHaveLength(1)
     expect((deps.adapter as HiveAgentFakeAdapter).dispatches).toBe(0)
-    expect(await readFile(agentSessionStorePath(root), 'utf8')).toBe(before)
+    expect(await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })).toBe(before)
   })
 
   it('keeps durable metadata and UNKNOWN if Pack scope is lost after commit before dispatch', async () => {
@@ -480,7 +484,7 @@ describe('P2 durable explicit model binding', () => {
       expect(deps.store.hive.get(id)?.aggregate.generation?.modelSelection).toEqual(selection)
       finish()
       await host.drain()
-      const reloaded = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+      const reloaded = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
       expect(reloaded.hive.get(id)?.aggregate.generation?.modelSelection).toEqual(selection)
       await submit(id, { modelSelection: modelB })
       await host.drain()
@@ -560,14 +564,14 @@ describe('P2 durable explicit model binding', () => {
   })
   it('rechecks model authority inside the existing transaction before writing', async () => {
     const id = await create()
-    const before = await readFile(agentSessionStorePath(root), 'utf8')
+    const before = await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })
     const commit = deps.store.hive.commit
     vi.spyOn(deps.store.hive, 'commit').mockImplementationOnce((input) => {
       auth = null
       return commit(input)
     })
     expect(await submit(id)).toEqual({ ok: false, error: { code: 'hive_agent_model_unavailable' } })
-    expect(await readFile(agentSessionStorePath(root), 'utf8')).toBe(before)
+    expect(await readPersistedTestAgentSessionStoreText(root, { hostId: 'host-1' })).toBe(before)
     expect(deps.store.hive.get(id)?.aggregate.generation).toBeUndefined()
     expect((deps.adapter as HiveAgentFakeAdapter).dispatches).toBe(0)
   })

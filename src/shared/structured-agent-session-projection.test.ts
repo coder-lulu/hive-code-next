@@ -124,6 +124,23 @@ describe('structured agent session status projection', () => {
     })
   })
 
+  it('names the call a tool row output answers, so a run pairs it by id', () => {
+    const projected = projectStructuredItemToNativeChat(
+      item('wait', 1, {
+        kind: 'tool-call',
+        name: 'wait_agent',
+        callId: 'call-wait',
+        input: null,
+        state: 'completed',
+        output: { head: 'CHILD_REPLY', digest: 'd', byteLength: 11, truncated: false }
+      })
+    )
+    expect(projected?.blocks).toEqual([
+      expect.objectContaining({ type: 'tool-call', callId: 'call-wait' }),
+      { type: 'tool-result', output: 'CHILD_REPLY', isError: false, callId: 'call-wait' }
+    ])
+  })
+
   it('projects running, attention, and completed lifecycle states', () => {
     const running = item('running', 1, {
       kind: 'status',
@@ -808,45 +825,5 @@ describe("producer linkage — a subagent's output never speaks for the parent",
         childProse
       ])
     ).toBe('legacy child line')
-  })
-})
-
-describe('the turn verdict on the status summary', () => {
-  const user = item('u1', 1, {
-    kind: 'message',
-    role: 'user',
-    blocks: [{ type: 'text', text: 'go' }]
-  })
-
-  it('carries the newest settled turn verdict only while the session is idle', () => {
-    const running = item('turn-running', 2, {
-      kind: 'turn',
-      turnId: 'turn-1',
-      state: 'running'
-    })
-    expect(projectStructuredAgentSessionStatusSummary([user, running])).not.toHaveProperty(
-      'turnOutcome'
-    )
-    const cancelled = item('turn-cancelled', 3, {
-      kind: 'turn',
-      turnId: 'turn-1',
-      state: 'interrupted',
-      outcome: 'cancellation'
-    })
-    expect(projectStructuredAgentSessionStatusSummary([user, cancelled])).toMatchObject({
-      status: 'idle',
-      turnOutcome: 'cancellation'
-    })
-  })
-
-  it('reports no verdict for a settled turn the provider never judged', () => {
-    const completed = item('turn-completed', 2, {
-      kind: 'turn',
-      turnId: 'turn-1',
-      state: 'completed'
-    })
-    expect(projectStructuredAgentSessionStatusSummary([user, completed])).not.toHaveProperty(
-      'turnOutcome'
-    )
   })
 })

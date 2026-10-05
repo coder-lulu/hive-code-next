@@ -12,6 +12,7 @@
     ".anti-slop-plugin/**",
     "runtime/managed-pi/legal/node-LICENSE",
     "runtime/managed-pi/legal/pi-LICENSE",
-    "src/main/runtime/__fixtures__/*.timing.json"
+    "src/main/runtime/__fixtures__/*.timing.json",
+    "docs/**"
   ]
 }

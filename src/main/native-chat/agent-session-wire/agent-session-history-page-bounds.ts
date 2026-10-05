@@ -6,8 +6,8 @@ import type {
   AgentJournalRenderItem,
   AgentJournalSubmission
 } from '../../../shared/agent-session-journal-types'
-import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from '../../../shared/remote-runtime-memory-limits'
+import { agentSessionHostStatusBody } from '../../../shared/agent-session-host-status-rows'
 
 export const AGENT_SESSION_HISTORY_MAX_PAGE_BYTES = REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES / 2
 
@@ -47,18 +47,11 @@ export function submissionBytesByItemId(
   return bytes
 }
 
-export function oversizedHistoryItem(
-  item: AgentJournalRenderItem,
-  byteLength: number
-): AgentJournalRenderItem {
+export function oversizedHistoryItem(item: AgentJournalRenderItem): AgentJournalRenderItem {
   return {
     ...item,
     itemId: boundJournalKeyComponent(item.itemId),
-    body: {
-      kind: 'status',
-      presentation: 'history-truncated',
-      text: `[${APP_DISPLAY_NAME}: item truncated — ${byteLength} bytes exceeds the history page budget]`
-    }
+    body: agentSessionHostStatusBody('history-item-too-large')
   }
 }
 
@@ -74,7 +67,7 @@ export function boundHistoryItemsByBytes(
   for (const group of ordered) {
     const bytes = group.reduce((sum, item) => sum + historyEntryBytes(item, submissionBytes), 0)
     if (kept.length === 0 && bytes > maxBytes) {
-      kept.push(group.map((item) => oversizedHistoryItem(item, bytes)))
+      kept.push(group.map((item) => oversizedHistoryItem(item)))
       break
     }
     if (total + bytes > maxBytes) {

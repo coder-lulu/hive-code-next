@@ -82,10 +82,7 @@ export function MobileBrowserPaneView(props: MobileBrowserPaneViewProps) {
   const styles = useMobileThemeStyles(createMobileBrowserPaneStyles)
   // The pacer changes opacity imperatively after mount. Keep style props stable across stream renders.
   const frameLayerStyles = useMemo<[StyleProp<ViewStyle>, StyleProp<ViewStyle>]>(
-    () => [
-      styles.browserImageLayer,
-      [styles.browserImageLayer, styles.browserImageLayerHidden]
-    ],
+    () => [styles.browserImageLayer, [styles.browserImageLayer, styles.browserImageLayerHidden]],
     [styles]
   )
   const [keyboardFocused, setKeyboardFocused] = useState(false)

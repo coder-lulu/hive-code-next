@@ -29,7 +29,7 @@ describe('release E2E dispatch contract', () => {
     expect(releaseWorkflow.jobs.e2e).toBeUndefined()
     expect(dispatchJob.needs).toEqual(['cut', 'publish-release'])
     expect(dispatchJob.if).toBe(
-      "${{ github.repository == 'stablyai/orca' && needs.cut.outputs.tag != '' }}"
+      "${{ github.repository == 'stablyai/orca' && !cancelled() && needs.publish-release.result == 'success' && needs.cut.outputs.tag != '' }}"
     )
     expect(dispatchJob.permissions.actions).toBe('write')
     expect(dispatchStep.env.TAG).toBe('${{ needs.cut.outputs.tag }}')

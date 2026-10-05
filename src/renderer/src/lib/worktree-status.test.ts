@@ -5,6 +5,9 @@ import { getWorktreeStatus, getWorktreeStatusLabel, resolveWorktreeStatus } from
 it('labels a failed worktree instead of returning an empty status', () => {
   expect(getWorktreeStatusLabel('failed')).toBe('Failed')
 })
+it('labels an unconfirmed worktree without claiming completion', () => {
+  expect(getWorktreeStatusLabel('unconfirmed')).toBe('Couldn’t confirm')
+})
 
 const LEAF_ID_1 = '11111111-1111-4111-8111-111111111111'
 const LEAF_ID_2 = '22222222-2222-4222-8222-222222222222'

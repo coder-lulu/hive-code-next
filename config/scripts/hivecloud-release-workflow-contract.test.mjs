@@ -24,7 +24,8 @@ describe('HiveCloud release publishing contract', () => {
     const nodeSetup = steps.find((step) => step.uses === 'actions/setup-node@v6')
     const install = findStep(linux, 'build', 'Install locked dependencies')
 
-    expect(packageJson.packageManager).toMatch(/^pnpm@12\.0\.0\+/)
+    const toolchain = JSON.parse(readFileSync(join(projectDir, 'config/toolchain.json'), 'utf8'))
+    expect(packageJson.packageManager.split('+')[0]).toBe(`pnpm@${toolchain.pnpm}`)
     expect(setup).toBeDefined()
     expect(setup.with).toEqual({ install: false })
     expect(steps.some((step) => step.uses?.startsWith('pnpm/action-setup@'))).toBe(false)

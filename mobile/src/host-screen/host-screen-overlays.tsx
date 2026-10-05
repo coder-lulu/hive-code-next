@@ -18,7 +18,8 @@ import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelecto
 import { getWorktreeRowIdentity } from '../worktree/worktree-host-row-identity'
 import {
   WORKSPACE_GROUP_OPTIONS as GROUP_OPTIONS,
-  WORKSPACE_SORT_OPTIONS as SORT_OPTIONS
+  WORKSPACE_SORT_OPTIONS as SORT_OPTIONS,
+  WORKSPACE_VIEW_SHARED_NOTE
 } from '../worktree/workspace-list-picker-options'
 import { isWorktreePinned } from '../worktree/workspace-list-sections'
 import { createHostScreenStyles } from './host-screen-styles'
@@ -63,6 +64,7 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
       <PickerModal
         visible={state.showSortPicker}
         title="排序方式"
+        subtitle={WORKSPACE_VIEW_SHARED_NOTE}
         options={SORT_OPTIONS}
         selected={state.sortMode}
         onSelect={settings.handleSortChange}
@@ -72,6 +74,7 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
       <PickerModal
         visible={state.showGroupPicker}
         title="分组方式"
+        subtitle={WORKSPACE_VIEW_SHARED_NOTE}
         options={GROUP_OPTIONS}
         selected={state.groupMode}
         onSelect={settings.handleGroupChange}
@@ -92,9 +95,14 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
         onClose={() => state.setShowFilterModal(false)}
       >
         <View style={styles.filterModalHeader}>
-          <Text maxFontSizeMultiplier={1.3} style={styles.filterModalTitle}>
-            筛选与视图
-          </Text>
+          <View style={styles.filterModalHeading}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterModalTitle}>
+              筛选与视图
+            </Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.filterModalSubtitle}>
+              {WORKSPACE_VIEW_SHARED_NOTE}
+            </Text>
+          </View>
           {settings.activeFilterCount > 0 && (
             <Pressable onPress={settings.clearFilters}>
               <Text maxFontSizeMultiplier={1.3} style={styles.clearFiltersText}>

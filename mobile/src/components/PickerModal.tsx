@@ -16,6 +16,7 @@ export type PickerOption<T extends string = string> = {
 type Props<T extends string = string> = {
   visible: boolean
   title: string
+  subtitle?: string
   options: PickerOption<T>[]
   selected: T
   onSelect: (value: T) => void
@@ -36,6 +37,7 @@ type PickerModalContentProps<T extends string = string> = Pick<
 export function PickerModal<T extends string = string>({
   visible,
   title,
+  subtitle,
   options,
   selected,
   onSelect,
@@ -51,6 +53,7 @@ export function PickerModal<T extends string = string>({
     <BottomDrawer visible={visible} onClose={onClose} onAfterClose={onAfterClose} zIndex={zIndex}>
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
 
       <PickerModalContent
@@ -141,6 +144,11 @@ export function createPickerModalStyles(theme: MobileTheme) {
       ...theme.typography.meta,
       fontWeight: '500',
       color: theme.color.text.secondary
+    },
+    subtitle: {
+      ...theme.typography.caption,
+      color: theme.color.text.secondary,
+      marginTop: theme.spacing.space4
     },
     group: {
       overflow: 'hidden',

@@ -8,9 +8,13 @@ import { basename, dirname, resolve } from 'node:path'
 import {
   ensureWindowsProcessTreeCommandLinePatch,
   inspectWindowsProcessTreeAddon,
+  nodeGypRebuildInvocation,
+  nodeGypRebuildTimeoutMs,
   stageWindowsProcessTreeNodeAddonApiHeaders,
   windowsProcessTreeAddonPath
 } from './windows-process-tree-gyp-rebuild.mjs'
+import { describeProcessFailure, runProcessSync } from './script-child-process.mjs'
+import { disableMsbuildFileTrackingOnWindows } from './msbuild-file-tracking.mjs'
 
 const require = createRequire(import.meta.url)
 const { assertNodePtyJobOwnership, nodePtyAddonPath } = require('./node-pty-job-ownership.cjs')
@@ -91,22 +95,6 @@ function ensureNodeRuntime() {
   printCheckError(initial)
   rebuildNodeRuntimeModules(failedModules)
   verifyNodeRuntimeAfterRebuild()
-}
-
-function rebuildNodeRuntimeModules(moduleNames) {
-  for (const moduleName of moduleNames) {
-    let moduleDir = dirname(require.resolve(`${moduleName}/package.json`))
-    if (moduleName === '@vscode/windows-process-tree') {
-      ensureWindowsProcessTreeCommandLinePatch(moduleDir)
-      stageWindowsProcessTreeNodeAddonApiHeaders(moduleDir)
-      moduleDir = realpathSync(moduleDir)
-    }
-    console.warn(`[native-runtime] Rebuilding ${moduleName} with node-gyp.`)
-    runPnpm(['exec', 'node-gyp', 'rebuild'], { cwd: moduleDir })
-    if (moduleName === 'node-pty' && process.platform === 'win32') {
-      runNodeScript([resolve(moduleDir, 'scripts', 'post-install.js')])
-    }
-  }
 }
 
 function verifyNodeRuntimeAfterRebuild() {
@@ -400,26 +388,55 @@ function getWindowsBuildNumber() {
   return match && match.length === 4 ? Number.parseInt(match[3], 10) : 0
 }
 
-function runPnpm(args, { cwd = projectDir } = {}) {
-  // cmd.exe resolves both Corepack's pnpm.cmd and pnpm 12's native pnpm.exe.
-  const command = 'pnpm'
-  const env =
-    process.platform === 'linux' && args.includes('node-gyp')
-      ? { ...process.env, CXXFLAGS: `${process.env.CXXFLAGS ?? ''} -std=gnu++2a`.trim() }
-      : process.env
-  const result = spawnSync(command, args, {
-    cwd,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-    env
-  })
-
-  if (result.error || result.status !== 0) {
-    console.error(`[native-runtime] ${command} ${args.join(' ')} failed in ${cwd}.`)
-    if (result.error) {
-      console.error(formatError(result.error))
+function rebuildNodeRuntimeModules(moduleNames) {
+  for (const moduleName of moduleNames) {
+    let moduleDir = dirname(require.resolve(`${moduleName}/package.json`))
+    if (moduleName === '@vscode/windows-process-tree') {
+      // Why before node-gyp: this module is rebuilt precisely because the
+      // binary was the unpatched one, and pnpm materializes it unpatched often
+      // enough that compiling the source as-is would just rebuild the same
+      // reader and fail the verify pass. The patched binding.gyp then includes
+      // deps/node-addon-api, which the tarball does not ship, and node-gyp must
+      // run from the physical dir -- both reasons live in
+      // windows-process-tree-gyp-rebuild.mjs.
+      ensureWindowsProcessTreeCommandLinePatch(moduleDir)
+      stageWindowsProcessTreeNodeAddonApiHeaders(moduleDir)
+      moduleDir = realpathSync(moduleDir)
     }
-    process.exit(result.status ?? 1)
+    console.warn(`[native-runtime] Rebuilding ${moduleName} with node-gyp.`)
+    // pnpm exec inside an installed addon cannot discover the root build tool.
+    runNodeGyp(
+      moduleName,
+      nodeGypRebuildInvocation(
+        process.arch,
+        moduleDir,
+        process.env.npm_config_node_gyp || undefined
+      )
+    )
+    if (moduleName === 'node-pty' && process.platform === 'win32') {
+      runNodeScript([resolve(moduleDir, 'scripts', 'post-install.js')])
+    }
+  }
+}
+
+function runNodeGyp(moduleName, { args, cwd }) {
+  const env =
+    process.platform === 'linux'
+      ? { ...process.env, CXXFLAGS: `${process.env.CXXFLAGS ?? ''} -std=gnu++2a`.trim() }
+      : disableMsbuildFileTrackingOnWindows({ ...process.env })
+  const result = runProcessSync({
+    program: process.execPath,
+    args,
+    cwd,
+    env,
+    stdio: 'inherit',
+    timeoutMs: nodeGypRebuildTimeoutMs(moduleName)
+  })
+  if (result.code !== 0) {
+    console.error(
+      `[native-runtime] node-gyp rebuild failed in ${cwd}: ${describeProcessFailure(result)}`
+    )
+    process.exit(result.code ?? 1)
   }
 }
 

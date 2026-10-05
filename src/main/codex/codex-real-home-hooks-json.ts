@@ -1,17 +1,17 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
+import { resolveHooksJsonWritePath } from '../agent-hooks/hook-config-write-path'
 import {
   buildManagedCommandHook,
   removeManagedCommands,
   type HookDefinition
 } from '../agent-hooks/installer-utils'
-import { resolveHooksJsonWritePath } from '../agent-hooks/hook-config-write-path'
 import { getSystemCodexHomePath } from './codex-home-paths'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 
-/** The user's real `~/.codex` hook files, plus the guards and rollback the
- *  real-home lane needs before it is allowed to mutate them. */
+/** The user's real `~/.codex` hook files, plus the guard and pristine backup
+ *  the real-home lane needs before it is allowed to mutate them. */
 export function getRealHomeHooksJsonPath(): string {
   return join(getSystemCodexHomePath(), 'hooks.json')
 }

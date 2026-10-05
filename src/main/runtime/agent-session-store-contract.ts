@@ -17,6 +17,7 @@ export type AgentSessionStoreState = {
   /** Rows this build cannot validate, kept with a durable refusal reason. */
   unreadableRecords: Map<string, { reason: string; raw: unknown }>
   sessionTabs: AgentSessionTabTable | null
+  unrecordedSessionTabs?: AgentSessionTabTable
   hiveSessions?: Map<string, HiveAgentSessionEntry>
   hiveRecoveryFenceAt?: number
   taskExecutions?: Map<string, TaskExecutionRecord>

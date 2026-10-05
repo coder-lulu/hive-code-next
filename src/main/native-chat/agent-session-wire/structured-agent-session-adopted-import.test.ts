@@ -22,6 +22,7 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
+import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 
 const NOW = 1_800_000_000_000
 const SESSION = 'codex_adopting_session'
@@ -126,6 +127,7 @@ async function attach(
 ) {
   store ??= await openTestAgentSessionRecordStore(root!)
   return performAttach({
+    logger: createStructuredAgentSessionLogger(),
     store,
     adapter: sessionAdapter,
     openConversation: openTestAttachConversation(openTestJournalHostDatabase(root!)),
@@ -237,6 +239,7 @@ describe('adopting a provider conversation on create', () => {
     await writeCodexRollout(transcriptPath, 'valid source')
     store = await openTestAgentSessionRecordStore(root)
     const host = new StructuredAgentSessionHost({
+      logger: createStructuredAgentSessionLogger(),
       store,
       adapter: adapter(),
       journalDatabase: openTestJournalHostDatabase(root),

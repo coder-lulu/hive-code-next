@@ -17,6 +17,7 @@ import {
 } from '../terminal/terminal-keyboard-type'
 import { MobileTerminalLiveInputStatus } from './MobileTerminalLiveInputStatus'
 import { MobileTerminalInputActions } from './MobileTerminalInputActions'
+import { keepHeldPressThroughLongPress } from './held-press-long-press'
 import { isTerminalPhoneDisplayMode } from './mobile-session-route-helpers'
 import { useMobileSessionThemeStyles } from './mobile-session-styles'
 import { useKeyboardPersistingTaps } from '../platform/keyboard-persisting-taps'
@@ -216,6 +217,7 @@ export function MobileSessionCommandDock({ controller }: { controller: MobileSes
                   }
                   void handleAccessoryKey(createTerminalLiveAccessoryInput(key))
                 }}
+                onLongPress={key.repeatable ? keepHeldPressThroughLongPress : undefined}
                 accessibilityLabel={key.accessibilityLabel ?? `Send ${key.label}`}
               >
                 <Text

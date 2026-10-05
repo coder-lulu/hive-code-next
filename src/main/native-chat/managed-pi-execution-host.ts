@@ -8,6 +8,7 @@ import {
 import type { ManagedPiSessionScope } from '../runtime/managed-pi-execution-lease'
 import type { VerifiedManagedPiPack } from '../runtime/managed-pi-runtime-identity'
 import { StructuredAgentSessionLeaseRenewer } from './agent-session-wire/structured-agent-session-lease-renewer'
+import { createManagedPiExecutionLeaseLogger } from './managed-pi-execution-lease-logger'
 import { createManagedPiTextDriver } from './managed-pi-text-driver'
 import { createManagedPiTextAdapter } from './managed-pi-text-adapter'
 import type { ManagedPiTextInference } from './managed-pi-inference-pump'
@@ -96,7 +97,7 @@ export async function createManagedPiExecutionHost(options: {
         ownership: {
           ...lease.ownership,
           async onExit(receipt) {
-            renewer?.stop()
+            await renewer?.stop()
             await lease.ownership.onExit(receipt)
           },
           assertCurrent() {
@@ -115,8 +116,10 @@ export async function createManagedPiExecutionHost(options: {
     }
     let disposal: Promise<void> | undefined
     const dispose = () => {
-      renewer?.stop()
-      disposal ??= driver.dispose()
+      disposal ??= (async () => {
+        await renewer?.stop()
+        await driver.dispose()
+      })()
       return disposal
     }
     renewer = new StructuredAgentSessionLeaseRenewer({
@@ -130,9 +133,11 @@ export async function createManagedPiExecutionHost(options: {
         lease.assertLive()
         return { outcome: 'identity-matched', matchedOn: ['spawn-token'] }
       },
-      onError: () => {
-        void dispose().catch(() => {})
-      }
+      logger: createManagedPiExecutionLeaseLogger({
+        now: options.now,
+        recordId: lease.recordId,
+        dispose
+      })
     })
     try {
       lease.assertLive()

@@ -1,3 +1,4 @@
+import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -6,7 +7,7 @@ import {
   HIVE_AGENT_METHODS,
   type AuthenticatedRuntimePrincipal
 } from '../../shared/hive-agent-session-methods'
-import { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
+import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
 import { HiveAgentSessionHost } from './hive-agent-session-host'
 import type { HiveAgentHostDependencies } from './hive-agent-session-dependencies'
 import { HiveAgentFakeAdapter } from './hive-agent-fake-adapter'
@@ -45,7 +46,7 @@ beforeEach(async () => {
   const artifactRoot = join(process.cwd(), 'logs/hive-agent-session-tests')
   await mkdir(artifactRoot, { recursive: true })
   root = await mkdtemp(join(artifactRoot, 'store-'))
-  store = await AgentSessionRecordStore.open({ directory: root, hostId: 'host-1' })
+  store = await openTestAgentSessionRecordStore(root, { hostId: 'host-1' })
   opened = new Map()
   principal = {
     kind: 'local',

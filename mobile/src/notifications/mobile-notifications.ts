@@ -1,10 +1,6 @@
 import type { RpcClient } from '../transport/rpc-client'
 import { runRpcOperation } from '../transport/rpc-operation'
-import {
-  missedNotifications,
-  unsubscribeNotifications,
-  parseNotificationStreamEvent
-} from './mobile-notification-operations'
+import { missedNotifications, parseNotificationStreamEvent } from './mobile-notification-operations'
 // Re-exported so the existing importers (and their vi.mock paths) keep working.
 export {
   ensureNotificationPermissions,
@@ -37,7 +33,6 @@ import {
 export function subscribeToDesktopNotifications(client: RpcClient, hostId: string): () => void {
   configureNotificationChannel()
 
-  let subscriptionId: string | null = null
   let disposed = false
   // Why (#8591): survives the unsubscribe/resubscribe the app performs on every
   // socket drop, so a reconnect still knows its watermark and that it reconnected.
@@ -198,26 +193,17 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
 
   seedWatermarkFromStorage(session, hostId)
 
-  function unsubscribeServer(id: string) {
-    if (client.getState() === 'connected') {
-      runRpcOperation(client, unsubscribeNotifications, { subscriptionId: id }).catch(() => {})
-    }
-  }
-
   const unsubscribeStream = client.subscribe('notifications.subscribe', {}, (data: unknown) => {
     const event = parseNotificationStreamEvent(data)
     if (!event) {
       return
     }
+    if (disposed) {
+      return
+    }
     if (event.type === 'ready') {
-      subscriptionId = event.subscriptionId
       const isReconnect = session.connectedBefore
       session.connectedBefore = true
-      if (disposed) {
-        unsubscribeServer(subscriptionId)
-        unsubscribeStream()
-        return
-      }
       const readyEpoch = event.epoch
       // Why (#8591) the await: on a cold app open the persisted read is still in
       // flight, so deciding here would see watermarkLoaded false and skip catch-up —
@@ -242,9 +228,6 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
       return
     }
     if (event.type === 'end') {
-      if (disposed) {
-        unsubscribeStream()
-      }
       return
     }
     if (disposed) {
@@ -274,8 +257,5 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
     disposed = true
     // Why: drop the local stream first — readiness can race unmount; don't hold the callback while a subscription id is pending.
     unsubscribeStream()
-    if (subscriptionId) {
-      unsubscribeServer(subscriptionId)
-    }
   }
 }

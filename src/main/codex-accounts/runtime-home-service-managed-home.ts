@@ -1,18 +1,19 @@
 import { join } from 'node:path'
 import {
   syncSystemCodexResourcesIntoManagedHome,
-  getSystemCodexHomePath,
-  resolveOrcaManagedCodexHomePath
+  getSystemCodexHomePath
 } from '../codex/codex-home-paths'
 import { syncSystemConfigIntoManagedCodexHome } from '../codex/codex-config-mirror'
-import { startCodexAccountSessionBridgeInBackground } from '../codex/codex-account-session-bridge'
 import {
   resolveHostCodexSessionSourceHome,
   resolveWslCodexSessionSourceHome
 } from '../codex/codex-session-source-home'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
-import { normalizeCodexRuntimeSelection } from './runtime-selection'
+import {
+  getSelectedCodexAccountIdForTarget,
+  normalizeCodexRuntimeSelection
+} from './runtime-selection'
 import {
   resolveHostCodexManagedHomeVerdict,
   ManagedCodexHomeTemporarilyUnavailableError
@@ -117,32 +118,11 @@ export abstract class CodexRuntimeHomeManagedHome extends CodexRuntimeHomeSync {
       runtimeHomePath: perAccountHome,
       systemHomePath: getSystemCodexHomePath()
     })
-    this.startSelfContainedSessionBridgeForLaunch(perAccountHome)
     return perAccountHome
   }
 
-  // Why: Codex's own `/resume` picker only lists rollouts under the launch
-  // CODEX_HOME, so a self-contained account home starts out with no history at
-  // all. Hardlink every other Orca-visible home's rollouts in — after launch,
-  // since history trees can be large — so switching accounts no longer hides
-  // the user's conversations.
-  protected startSelfContainedSessionBridgeForLaunch(perAccountHome: string): void {
-    void startCodexAccountSessionBridgeInBackground({
-      targetCodexHomePath: perAccountHome,
-      sourceCodexHomePaths: this.getSelfContainedSessionBridgeSourceHomes()
-    })
-  }
-
-  protected getSelfContainedSessionBridgeSourceHomes(): string[] {
-    return [
-      // Why: history-only override lets custom-CODEX_HOME users bridge from the
-      // home they actually record sessions in; falls back to the real ~/.codex.
-      resolveHostCodexSessionSourceHome(this.store.getSettings()) ?? getSystemCodexHomePath(),
-      // Why: path only — a per-account install must not materialize the mirror.
-      resolveOrcaManagedCodexHomePath(),
-      ...this.getManagedHostAccountHomesForSessionDiscovery()
-    ]
-  }
+  // A managed account's CODEX_HOME owns its own history. Selection and launch never
+  // hardlink another account's transcripts into it: credential ownership is not history consent.
 
   // Why: the per-account home is both the launch CODEX_HOME and the credential
   // store, so codex reads/refreshes auth.json in place — there is no shared-home
@@ -161,9 +141,6 @@ export abstract class CodexRuntimeHomeManagedHome extends CodexRuntimeHomeSync {
       this.lastHostAccountUsedSelfContainedHome = true
       this.sharedAuthRefreshBlockedByManagedTransition = true
       this.markSharedRuntimeAuthManaged(account.id)
-      // Why: selection runs well before the user restarts a pane, so history is
-      // already linked in by the time the newly launched Codex opens /resume.
-      this.startSelfContainedSessionBridgeForLaunch(perAccountHome)
       return
     }
     this.clearSelfContainedManagedSelection(account)
@@ -257,6 +234,10 @@ export abstract class CodexRuntimeHomeManagedHome extends CodexRuntimeHomeSync {
     if (process.platform !== 'win32' || !runtimeHomePath) {
       return
     }
+    const settings = this.store.getSettings()
+    if (getSelectedCodexAccountIdForTarget(settings, target) !== null) {
+      return
+    }
     const runtimeHomeWsl = parseWslUncPath(runtimeHomePath)
     const distro = target.wslDistro?.trim() || runtimeHomeWsl?.distro || getDefaultWslDistro()
     if (!distro) {
@@ -264,7 +245,7 @@ export abstract class CodexRuntimeHomeManagedHome extends CodexRuntimeHomeSync {
     }
     // Why: history-only override lets custom-CODEX_HOME users bridge from their real home; falls back to <wslHome>/.codex.
     const systemCodexHomePath =
-      resolveWslCodexSessionSourceHome(this.store.getSettings(), distro) ??
+      resolveWslCodexSessionSourceHome(settings, distro) ??
       this.getWslSystemCodexHomePath({ runtime: 'wsl', wslDistro: distro })
     if (systemCodexHomePath && systemCodexHomePath !== runtimeHomePath) {
       // Why: WSL history must be hardlinked inside the distro; host-side links can't bridge Windows and WSL filesystems in a resume-visible way.

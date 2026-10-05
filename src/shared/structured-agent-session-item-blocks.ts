@@ -35,7 +35,8 @@ export function itemBlocks(item: AgentJournalRenderItem): {
               {
                 type: 'tool-result' as const,
                 output: boundedText(body.output),
-                isError: body.state === 'failed'
+                isError: body.state === 'failed',
+                ...(body.callId !== undefined ? { callId: body.callId } : {})
               }
             ]
           : [])

@@ -5,6 +5,10 @@ import { Image, Pressable, View } from 'react-native'
 import { splitNativeChatBlocks } from '../../../src/shared/native-chat-tool-fold'
 import { selectActiveToolCall } from '../../../src/shared/native-chat-tool-activity'
 import { isImageRefBlock, isTextBlock } from '../../../src/shared/native-chat-types'
+import {
+  AGENT_SESSION_HOST_STATUS_COPY,
+  isAgentSessionHostStatusPresentation
+} from '../../../src/shared/agent-session-host-status-rows'
 import type { NativeChatBlock, NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { MobileMarkdown } from '../components/MobileMarkdown'
 import { useClipboardWriter } from '../platform/clipboard'
@@ -30,6 +34,22 @@ function Prose({
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   if (isTextBlock(block)) {
+    if (isAgentSessionHostStatusPresentation(block.presentation)) {
+      return (
+        <Text
+          selectable
+          style={[
+            styles.hostNotice,
+            {
+              fontSize: theme.typography.body.fontSize * fontScale,
+              lineHeight: theme.typography.body.lineHeight * fontScale
+            }
+          ]}
+        >
+          {AGENT_SESSION_HOST_STATUS_COPY[block.presentation]}
+        </Text>
+      )
+    }
     // Inverted (user) bubbles use a fixed dark-on-light text rather than the
     // markdown renderer's light-on-dark palette.
     if (invert) {
@@ -192,6 +212,7 @@ function MobileNativeChatMessageImpl({
     <MobileNativeChatTurnStatus
       startedAt={turnStatus.startedAt}
       workedSeconds={turnStatus.workedSeconds}
+      verdict={turnStatus.verdict}
       expanded={turnExpanded ?? false}
       onToggleExpanded={turnKey && onToggleTurn ? () => onToggleTurn(turnKey) : undefined}
     />

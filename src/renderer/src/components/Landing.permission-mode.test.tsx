@@ -2,6 +2,7 @@
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
 
 const mocks = vi.hoisted(() => {
   const state = {
@@ -47,6 +48,8 @@ const mocks = vi.hoisted(() => {
     isWebClient: false,
     useAppStore,
     launchAgentInNewTab: vi.fn(),
+    newAgentLaunchRequestId: vi.fn(() => 'home-request'),
+    activateAndRevealWorkspace: vi.fn(() => true),
     activateTemporarySessionInMain: vi.fn(),
     createSessionLaunchTracker: vi.fn(() => ({
       markLaunched: vi.fn(() => false),
@@ -67,16 +70,21 @@ vi.mock('@/hooks/useDetectedAgents', () => ({
 vi.mock('@/lib/launch-agent-in-new-tab', () => ({
   launchAgentInNewTab: mocks.launchAgentInNewTab
 }))
+vi.mock('@/lib/agent-launch-request-id', () => ({
+  newAgentLaunchRequestId: mocks.newAgentLaunchRequestId
+}))
 vi.mock('@/lib/temporary-session-navigation', () => ({
   activateTemporarySessionInMain: mocks.activateTemporarySessionInMain
 }))
 vi.mock('./sessions/session-launch-tracker', () => ({
   createSessionLaunchTracker: mocks.createSessionLaunchTracker
 }))
-vi.mock('@/lib/worktree-activation', () => ({ activateAndRevealWorkspace: vi.fn(() => true) }))
+vi.mock('@/lib/worktree-activation', () => ({
+  activateAndRevealWorkspace: mocks.activateAndRevealWorkspace
+}))
 vi.mock('./landing/DesktopHomeComposerFooter', () => ({
   DesktopHomeComposerFooter: (props: {
-    model: { projects: { identityKey: string }[] }
+    model: { projects: { identityKey: string }[]; workspaces: { identityKey: string }[] }
     onWorkspaceChange: (value: string) => void
     onPermissionChange: (value: 'manual' | 'yolo') => void
     onSubmit: () => void
@@ -96,6 +104,14 @@ vi.mock('./landing/DesktopHomeComposerFooter', () => ({
           }
         >
           select project
+        </button>
+      ) : null}
+      {props.model.workspaces[0] ? (
+        <button
+          type="button"
+          onClick={() => props.onWorkspaceChange(props.model.workspaces[0].identityKey)}
+        >
+          select workspace
         </button>
       ) : null}
       <button type="button" onClick={props.onSubmit}>
@@ -118,6 +134,7 @@ describe('Landing permission mode wiring', () => {
     mocks.state.homeTaskDraft = 'implement the permission flow'
     mocks.launchAgentInNewTab.mockReturnValue({ tabId: 'floating-agent-tab' })
     mocks.activateTemporarySessionInMain.mockReturnValue(true)
+    mocks.activateAndRevealWorkspace.mockReturnValue(true)
   })
 
   afterEach(cleanup)
@@ -129,6 +146,7 @@ describe('Landing permission mode wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: 'submit' }))
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', ctrlKey: true })
     expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
+    expect(mocks.newAgentLaunchRequestId).not.toHaveBeenCalled()
     expect(mocks.createSessionLaunchTracker).not.toHaveBeenCalled()
     expect(mocks.state.setHomeTaskDraft).not.toHaveBeenCalled()
   })
@@ -166,9 +184,44 @@ describe('Landing permission mode wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: 'submit' }))
 
     expect(mocks.launchAgentInNewTab).toHaveBeenCalledWith(
-      expect.objectContaining({ agent: 'codex', agentPermissionMode: 'manual' })
+      expect.objectContaining({
+        agent: 'codex',
+        agentPermissionMode: 'manual',
+        requestId: 'home-request',
+        launchSource: 'desktop_home'
+      })
     )
+    expect(mocks.newAgentLaunchRequestId).toHaveBeenCalledOnce()
   })
+  it.each([true, false])(
+    'mints a workspace launch request only after activation succeeds: %s',
+    (activated) => {
+      mocks.state.repos = [{ id: 'repo-1', displayName: 'Project', path: '/project' }]
+      mocks.state.worktreesByRepo = { 'repo-1': [makeWorktree({ id: 'wt-1', repoId: 'repo-1' })] }
+      mocks.activateAndRevealWorkspace.mockReturnValue(activated)
+      render(<Landing />)
+      fireEvent.click(screen.getByRole('button', { name: 'select workspace' }))
+      fireEvent.click(screen.getByRole('button', { name: 'submit' }))
+      expect(mocks.activateAndRevealWorkspace).toHaveBeenCalledWith('wt-1', {
+        providesInitialSurface: true,
+        executionHostId: 'local'
+      })
+      if (activated) {
+        expect(mocks.newAgentLaunchRequestId).toHaveBeenCalledOnce()
+        expect(mocks.launchAgentInNewTab).toHaveBeenCalledWith(
+          expect.objectContaining({
+            requestId: 'home-request',
+            worktreeId: 'wt-1',
+            executionHostId: 'local',
+            launchSource: 'desktop_home'
+          })
+        )
+      } else {
+        expect(mocks.newAgentLaunchRequestId).not.toHaveBeenCalled()
+        expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
+      }
+    }
+  )
 
   it('opens the sessions page after a temporary session receives its inventory key', () => {
     render(<Landing />)
