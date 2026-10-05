@@ -1,7 +1,5 @@
 // @vitest-environment happy-dom
 
-import type { StateCreator } from 'zustand'
-import { createStore, type StoreApi } from 'zustand/vanilla'
 import { describe, expect, it, vi } from 'vitest'
 import {
   EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY,
@@ -12,13 +10,11 @@ import {
   type HiveLocalRuntimeOwnershipState
 } from '../../../../shared/hive-runtime-cloud'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
-import type { RuntimeStatusSlice } from './runtime-status-types'
 import {
   AccountRuntimeClaimError,
-  createAccountRuntimeCloudSlice,
-  projectAccountRuntimeDirectoryOntoCatalog,
-  type AccountRuntimeCloudSlice
+  projectAccountRuntimeDirectoryOntoCatalog
 } from './account-runtime-cloud'
+import { createSliceStore } from './account-runtime-cloud-test-store'
 
 function deferred<T>(): {
   promise: Promise<T>
@@ -34,25 +30,6 @@ function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
-type TestAccountRuntimeCloudState = AccountRuntimeCloudSlice &
-  Pick<RuntimeStatusSlice, 'runtimeStatusByEnvironmentId' | 'refreshRuntimeEnvironmentStatus'> & {
-    runtimeEnvironments: readonly PublicKnownRuntimeEnvironment[]
-    setRuntimeEnvironments: (environments: readonly PublicKnownRuntimeEnvironment[]) => void
-  }
-
-function createSliceStore(): StoreApi<TestAccountRuntimeCloudState> {
-  const store = createStore<TestAccountRuntimeCloudState>()(
-    createAccountRuntimeCloudSlice as unknown as StateCreator<TestAccountRuntimeCloudState>
-  )
-  store.setState({
-    runtimeEnvironments: [],
-    runtimeStatusByEnvironmentId: new Map(),
-    refreshRuntimeEnvironmentStatus: vi.fn().mockResolvedValue(true),
-    setRuntimeEnvironments: (runtimeEnvironments) => store.setState({ runtimeEnvironments })
-  })
-  return store
-}
-
 function directoryEntry(
   runtimeRecordId: string,
   overrides: Partial<HiveAccountRuntimeDirectoryEntry> = {}
@@ -64,6 +41,9 @@ function directoryEntry(
     runtimeProtocolVersion: 3,
     capabilities: [],
     resourceVersion: 1,
+    ownershipEpoch: 1,
+    cloudDisplayName: null,
+    cloudDisplayNameVersion: 1,
     createdAt: 1,
     updatedAt: 1,
     claimedAt: 1,
@@ -141,7 +121,8 @@ describe('account Runtime Cloud store sync', () => {
     )
 
     expect(projected).toMatchObject({
-      name: 'Home computer',
+      name: 'Runtime runtime-',
+      localPairedName: 'Home computer',
       updatedAt: 20,
       pairingRevision: 7,
       lastUsedAt: 30,
@@ -373,6 +354,7 @@ describe('account Runtime Cloud store sync', () => {
       stateRevision: 3,
       relation: 'CLAIMED_BY_CURRENT',
       runtimeRecordId: '423e4567-e89b-42d3-a456-426614174000',
+      ownershipEpoch: 1,
       checkedAt: 2
     }
     Object.defineProperty(window, 'api', {
@@ -738,7 +720,14 @@ describe('account Runtime Cloud store sync', () => {
           runtimeRecordId: 'runtime-1',
           desiredName: 'Pending desk',
           revision: 1,
-          confirmed: false
+          status: 'QUEUED',
+          expectedOwnershipEpoch: 1,
+          expectedCloudDisplayNameVersion: 1,
+          errorCode: null,
+          latestCloudDisplayName: null,
+          latestCloudDisplayNameVersion: null,
+          confirmedCloudDisplayNameVersion: null,
+          retryNotBefore: null
         }
       ]
     })
@@ -749,44 +738,6 @@ describe('account Runtime Cloud store sync', () => {
     )
     await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(5))
     stop()
-  })
-
-  it('applies a display-name IPC result and reloads the projected catalog', async () => {
-    const updated = {
-      ...readyDirectory('account-1', 1, [directoryEntry('runtime-1')]),
-      pendingDisplayNames: [
-        {
-          runtimeRecordId: 'runtime-1',
-          desiredName: 'Queued name',
-          revision: 1,
-          confirmed: false
-        }
-      ]
-    }
-    const updateDisplayName = vi.fn().mockResolvedValue(updated)
-    const list = vi.fn().mockResolvedValue([])
-    Object.defineProperty(window, 'api', {
-      configurable: true,
-      value: {
-        runtimeEnvironments: { list },
-        hiveRuntimeCloud: { updateDisplayName }
-      }
-    })
-    const store = createSliceStore()
-
-    await store.getState().updateAccountRuntimeDisplayName({
-      runtimeRecordId: 'runtime-1',
-      cloudDisplayName: 'Queued name',
-      expectedCloudDisplayNameVersion: 1
-    })
-
-    expect(store.getState().accountRuntimeDirectory).toBe(updated)
-    expect(updateDisplayName).toHaveBeenCalledWith({
-      runtimeRecordId: 'runtime-1',
-      cloudDisplayName: 'Queued name',
-      expectedCloudDisplayNameVersion: 1
-    })
-    await vi.waitFor(() => expect(list).toHaveBeenCalledOnce())
   })
 
   it('does not let old catalog lists overwrite an account switch or sign-out', async () => {

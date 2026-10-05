@@ -15,6 +15,14 @@ const TICKET_ID = '123e4567-e89b-42d3-a456-426614174000'
 const MANAGED_SESSION_ID = '223e4567-e89b-42d3-a456-426614174000'
 const RUNTIME_SESSION_ID = '323e4567-e89b-42d3-a456-426614174000'
 const SECRET = 'A'.repeat(43)
+const runtimeDisplayMetadata = {
+  runtimeRecordId: '523e4567-e89b-42d3-a456-426614174000',
+  resourceVersion: 7,
+  ownershipEpoch: 8,
+  cloudDisplayName: '<备用> 🐝',
+  cloudDisplayNameVersion: 2,
+  deviceName: '设备'
+}
 const { privateKey, publicKey } = generateKeyPairSync('ed25519')
 const identity: HiveRuntimeCloudIdentity = {
   schemaVersion: 1,
@@ -82,7 +90,8 @@ describe('Hive Runtime Cloud Web Launch service', () => {
       runtimeSessionId: RUNTIME_SESSION_ID,
       status: 'ACTIVE',
       expiresAt: NOW + 60_000,
-      controlVersion: 1
+      controlVersion: 1,
+      runtimeDisplayMetadata
     })
     terminateSessionConnections = vi.fn()
     service = new HiveRuntimeCloudWebLaunchService({
@@ -95,7 +104,7 @@ describe('Hive Runtime Cloud Web Launch service', () => {
       presence,
       getServerPublicKey: () => 'server-public-key',
       terminateSessionConnections,
-      client: { consumeConnectionTicket },
+      client: { consumeConnectionTicket, readWebSessionDisplayMetadata: vi.fn() },
       now: () => NOW
     })
     server = createServer((request, response) => {
@@ -132,7 +141,8 @@ describe('Hive Runtime Cloud Web Launch service', () => {
       runtimeSessionId: RUNTIME_SESSION_ID,
       websocketUrl: 'wss://code.hivekernel.com/_hive/runtime-rpc',
       serverPublicKeyB64: 'server-public-key',
-      expiresAt: '2026-08-25T08:01:00.000Z'
+      expiresAt: '2026-08-25T08:01:00.000Z',
+      runtimeDisplayMetadata
     })
     expect(body.sessionToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
     expect(consumeConnectionTicket).toHaveBeenCalledWith(
@@ -308,7 +318,8 @@ describe('Hive Runtime Cloud Web Launch service', () => {
         runtimeSessionId: RUNTIME_SESSION_ID,
         status: 'ACTIVE' as const,
         expiresAt: NOW,
-        controlVersion: 1
+        controlVersion: 1,
+        runtimeDisplayMetadata
       }
     ]
   ])('does not mint a local socket credential for an %s', async (_case, result) => {
@@ -336,7 +347,8 @@ describe('Hive Runtime Cloud Web Launch service', () => {
         runtimeSessionId: RUNTIME_SESSION_ID,
         status: 'ACTIVE',
         expiresAt: NOW + 60_000,
-        controlVersion: 1
+        controlVersion: 1,
+        runtimeDisplayMetadata
       }
     })
 

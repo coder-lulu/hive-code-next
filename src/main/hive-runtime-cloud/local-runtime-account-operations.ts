@@ -11,7 +11,7 @@ import type { ClaimedRegistration, LocalRuntimeRegistration } from './local-runt
 export type OwnershipAnalysis = Readonly<{
   result: Pick<
     HiveLocalRuntimeOwnershipState,
-    'relation' | 'runtimeRecordId' | 'claimCapabilityAvailable' | 'errorCode'
+    'relation' | 'runtimeRecordId' | 'ownershipEpoch' | 'claimCapabilityAvailable' | 'errorCode'
   >
   registrationChanged: boolean
 }>
@@ -61,8 +61,13 @@ export async function analyzeLocalRuntimeOwnership({
       registrationChanged: false
     }
   }
+  let ownershipEpoch: number
   try {
-    await registration.requireCurrentAccountOwnership(lookup.runtimeRecordId, authorization, signal)
+    ownershipEpoch = await registration.requireCurrentAccountOwnership(
+      lookup.runtimeRecordId,
+      authorization,
+      signal
+    )
   } catch (error) {
     if (error instanceof HiveRuntimeCloudRequestError && error.status === 404) {
       return {
@@ -82,7 +87,7 @@ export async function analyzeLocalRuntimeOwnership({
     registration.persist(claimed)
   }
   return {
-    result: ownershipResult('CLAIMED_BY_CURRENT', lookup.runtimeRecordId),
+    result: ownershipResult('CLAIMED_BY_CURRENT', lookup.runtimeRecordId, ownershipEpoch),
     registrationChanged
   }
 }
@@ -203,11 +208,13 @@ export async function claimLocalRuntimeForAccount({
 
 function ownershipResult(
   relation: HiveLocalRuntimeOwnershipState['relation'],
-  runtimeRecordId: string | null
+  runtimeRecordId: string | null,
+  ownershipEpoch: number | null = null
 ): OwnershipAnalysis['result'] {
   return {
     relation,
     runtimeRecordId,
+    ownershipEpoch,
     claimCapabilityAvailable: false,
     errorCode: null
   }

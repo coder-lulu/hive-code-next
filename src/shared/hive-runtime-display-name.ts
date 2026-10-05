@@ -1,3 +1,8 @@
+import type {
+  HiveAccountRuntimeDirectoryEntry,
+  HiveRuntimePendingDisplayName
+} from './hive-runtime-cloud'
+
 export const HIVE_RUNTIME_DISPLAY_NAME_MAX_CODE_POINTS = 128
 
 export class HiveRuntimeDisplayNameError extends Error {
@@ -70,24 +75,35 @@ export function isNormalizedHiveRuntimeDisplayName(value: unknown): value is str
 }
 
 type RuntimeDisplayNameSources = Readonly<{
-  pendingDesiredName?: string | null
   cloudDisplayName?: string | null
-  localPairedName?: string | null
   reportedDeviceName?: string | null
   runtimeRecordId: string
 }>
 
 export function resolveHiveRuntimeDisplayName(sources: RuntimeDisplayNameSources): string {
-  if (sources.pendingDesiredName !== undefined) {
-    if (sources.pendingDesiredName) {
-      return sources.pendingDesiredName
-    }
-  } else if (sources.cloudDisplayName) {
-    return sources.cloudDisplayName
-  }
   return (
-    sources.localPairedName?.trim() ||
+    sources.cloudDisplayName ||
     sources.reportedDeviceName?.trim() ||
     `Runtime ${sources.runtimeRecordId.slice(0, 8)}`
   )
+}
+
+export function applyConfirmedRuntimeDisplayName(
+  runtime: HiveAccountRuntimeDirectoryEntry,
+  pending?: HiveRuntimePendingDisplayName
+): HiveAccountRuntimeDirectoryEntry {
+  if (
+    pending?.status !== 'CONFIRMED' ||
+    pending.runtimeRecordId !== runtime.runtimeRecordId ||
+    pending.expectedOwnershipEpoch !== runtime.ownershipEpoch ||
+    pending.confirmedCloudDisplayNameVersion == null ||
+    pending.confirmedCloudDisplayNameVersion <= runtime.cloudDisplayNameVersion
+  ) {
+    return runtime
+  }
+  return {
+    ...runtime,
+    cloudDisplayName: pending.desiredName,
+    cloudDisplayNameVersion: pending.confirmedCloudDisplayNameVersion
+  }
 }

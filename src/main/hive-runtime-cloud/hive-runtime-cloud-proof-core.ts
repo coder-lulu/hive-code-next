@@ -23,6 +23,7 @@ export type HiveRuntimeCloudCapability =
   | 'runtime-health-v1'
   | 'shared-control-v1'
   | 'web-launch-grant-v1'
+  | 'web-session-display-metadata-v1'
   | 'runtime-session-control-v1'
 
 export type HiveRuntimeCloudReadinessReason =

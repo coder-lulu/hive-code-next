@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { isAccountClaimedExecutionHost } from '@/lib/execution-host-display-label'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { applyHostRename, getHostDisplayLabelOverride } from './host-rename-remove'
 
@@ -31,6 +32,7 @@ export function HostRenameDialog({
 }: HostRenameDialogProps): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const isCloudRuntime = useAppStore((state) => isAccountClaimedExecutionHost(state, hostId))
   const currentOverride = getHostDisplayLabelOverride(settings, hostId)
   const [value, setValue] = useState(currentOverride ?? '')
 
@@ -58,18 +60,27 @@ export function HostRenameDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {translate('auto.components.sidebar.HostRenameDialog.1a2b3c4d5e', 'Rename host')}
+            {isCloudRuntime
+              ? translate('runtimeCloudAlias.editLocalNote', 'Edit local note')
+              : translate('auto.components.sidebar.HostRenameDialog.1a2b3c4d5e', 'Rename host')}
           </DialogTitle>
           <DialogDescription>
-            {translate(
-              'auto.components.sidebar.HostRenameDialog.2b3c4d5e6f',
-              'This label is shown only on this computer. Leave it blank to use the default name.'
-            )}
+            {isCloudRuntime
+              ? translate(
+                  'runtimeCloudAlias.localNoteDescription',
+                  'This note is kept only on this computer. The shared cloud name is changed in Runtime settings.'
+                )
+              : translate(
+                  'auto.components.sidebar.HostRenameDialog.2b3c4d5e6f',
+                  'This label is shown only on this computer. Leave it blank to use the default name.'
+                )}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <Label htmlFor="host-rename-input">
-            {translate('auto.components.sidebar.HostRenameDialog.3c4d5e6f7a', 'Display name')}
+            {isCloudRuntime
+              ? translate('runtimeCloudAlias.localNoteLabel', 'Local note')
+              : translate('auto.components.sidebar.HostRenameDialog.3c4d5e6f7a', 'Display name')}
           </Label>
           <Input
             id="host-rename-input"

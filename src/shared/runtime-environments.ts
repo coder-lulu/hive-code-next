@@ -49,6 +49,7 @@ export type RuntimeEnvironmentAccessSource = 'local-pairing' | 'account-claimed'
 export type RuntimeEnvironmentAccountClaim = Readonly<{
   runtimeRecordId: string
   resourceVersion: number
+  ownershipEpoch: number
   presence: 'ONLINE' | 'DEGRADED' | 'OFFLINE'
   readiness: 'STARTING' | 'READY' | 'DEGRADED' | 'RECOVERING' | 'STOPPED' | 'ERROR' | null
   readinessReasonCode: string | null
@@ -66,8 +67,8 @@ export type RuntimeEnvironmentAccountClaim = Readonly<{
     | 'UNAVAILABLE'
   connectionCapabilities: readonly string[]
   cloudConnectable: boolean
-  cloudDisplayName?: string | null
-  cloudDisplayNameVersion?: number | null
+  cloudDisplayName: string | null
+  cloudDisplayNameVersion: number
   reportedDeviceName?: string | null
 }>
 
@@ -75,6 +76,7 @@ export type PublicKnownRuntimeEnvironment = Omit<KnownRuntimeEnvironment, 'endpo
   endpoints: PublicRuntimeAccessEndpoint[]
   accessSources?: readonly RuntimeEnvironmentAccessSource[]
   accountClaim?: RuntimeEnvironmentAccountClaim
+  localPairedName?: string
 }
 
 export function redactRuntimeEnvironment(

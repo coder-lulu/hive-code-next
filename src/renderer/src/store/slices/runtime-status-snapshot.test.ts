@@ -37,6 +37,9 @@ const environment = {
 const accountClaim: NonNullable<PublicKnownRuntimeEnvironment['accountClaim']> = {
   runtimeRecordId: 'runtime-record-a',
   resourceVersion: 1,
+  ownershipEpoch: 1,
+  cloudDisplayName: null,
+  cloudDisplayNameVersion: 1,
   presence: 'ONLINE',
   readiness: 'READY',
   readinessReasonCode: null,

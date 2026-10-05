@@ -15,7 +15,7 @@ export type OwnershipOperation = Readonly<{
 
 type OwnershipResult = Pick<
   HiveLocalRuntimeOwnershipState,
-  'relation' | 'runtimeRecordId' | 'claimCapabilityAvailable' | 'errorCode'
+  'relation' | 'runtimeRecordId' | 'ownershipEpoch' | 'claimCapabilityAvailable' | 'errorCode'
 >
 
 export class LocalRuntimeOwnershipSession {
@@ -147,10 +147,15 @@ export class LocalRuntimeOwnershipSession {
     }
   }
 
-  publishClaimed(authorization: HiveRuntimeCloudAuthorization, runtimeRecordId: string): void {
+  publishClaimed(
+    authorization: HiveRuntimeCloudAuthorization,
+    runtimeRecordId: string,
+    ownershipEpoch: number | null = null
+  ): void {
     this.publishAnalysis(authorization, {
       relation: 'CLAIMED_BY_CURRENT',
       runtimeRecordId,
+      ownershipEpoch,
       claimCapabilityAvailable: false,
       errorCode: null
     })
@@ -164,6 +169,16 @@ export class LocalRuntimeOwnershipSession {
       sessionGeneration: authorization.sessionGeneration,
       presence: this.publicPresence(),
       checkedAt: this.registration.now()
+    })
+  }
+
+  publishUnverifiable(authorization: HiveRuntimeCloudAuthorization, error: unknown): void {
+    this.publishAnalysis(authorization, {
+      relation: 'UNVERIFIABLE',
+      runtimeRecordId: this.state.runtimeRecordId,
+      ownershipEpoch: null,
+      claimCapabilityAvailable: false,
+      errorCode: ownershipErrorCode(error)
     })
   }
 
@@ -214,6 +229,7 @@ export class LocalRuntimeOwnershipSession {
       accountId: null,
       sessionGeneration: null,
       runtimeRecordId,
+      ownershipEpoch: null,
       claimCapabilityAvailable,
       presence: this.publicPresence(),
       checkedAt: this.registration.now(),

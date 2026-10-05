@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { normalizeConnectionTicketConsume } from './hive-runtime-cloud-response'
 import { normalizeWebSessionControlPull } from './hive-runtime-cloud-web-session-control-response'
 
+const runtimeDisplayMetadata = {
+  runtimeRecordId: '323e4567-e89b-42d3-a456-426614174000',
+  resourceVersion: 7,
+  ownershipEpoch: 8,
+  cloudDisplayName: null,
+  cloudDisplayNameVersion: 1,
+  deviceName: null
+}
+
 describe('Hive Runtime Cloud response normalization', () => {
   it('normalizes only the frozen Connection Ticket consume response', () => {
     expect(
@@ -10,14 +19,16 @@ describe('Hive Runtime Cloud response normalization', () => {
         runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
         status: 'ACTIVE',
         expiresAt: '2026-08-25T09:00:00.000Z',
-        controlVersion: 1
+        controlVersion: 1,
+        runtimeDisplayMetadata
       })
     ).toEqual({
       managedWebSessionId: '123e4567-e89b-42d3-a456-426614174000',
       runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
       status: 'ACTIVE',
       expiresAt: Date.parse('2026-08-25T09:00:00.000Z'),
-      controlVersion: 1
+      controlVersion: 1,
+      runtimeDisplayMetadata
     })
   })
 
@@ -32,6 +43,7 @@ describe('Hive Runtime Cloud response normalization', () => {
       status: 'ACTIVE',
       expiresAt: '2026-08-25T09:00:00.000Z',
       controlVersion: 1,
+      runtimeDisplayMetadata,
       ...change
     }
 

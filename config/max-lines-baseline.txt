@@ -10,7 +10,6 @@ inline src/main/claude-accounts/service.ts
 inline src/main/codex/codex-hook-trust-grant.ts
 inline src/main/hive-account/hive-account-client.ts
 inline src/main/hive-account/hive-account-service.ts
-inline src/main/hive-runtime-cloud/hive-runtime-display-name-coordinator.ts
 inline src/main/ipc/worktree-remote.ts
 inline src/main/ssh/ssh-channel-multiplexer.ts
 inline src/main/ssh/ssh-connection.ts

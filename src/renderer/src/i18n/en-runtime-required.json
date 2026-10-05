@@ -2347,6 +2347,12 @@
           "ccb07dd027": "Saved",
           "e57dde9d93": "Unsaved changes"
         },
+        "RuntimeCloudDisplayNameDialog": {
+          "cancel": "Cancel",
+          "clearSuccess": "Cloud Runtime name clear queued. It will sync with HiveCloud when available.",
+          "renameSuccess": "Runtime name change queued. It will sync with HiveCloud when available.",
+          "saveFailed": "Could not save the Runtime name. Refresh the Runtime list and try again."
+        },
         "RuntimeEnvironmentsPane": {
           "163671f7b5": "Run",
           "1826bd0608": "Saved Servers",
@@ -4170,6 +4176,9 @@
         "hostCannotOpen": "This chat can't be reopened until HiveCode is updated."
       },
       "agent": {
+        "catalog": {
+          "760bc6883d": "Codex"
+        },
         "skill": {
           "cli": {
             "prerequisite": {
@@ -5054,36 +5063,6 @@
     "genericDetail": "This is often a graphics-driver or installation problem. Reload to try again, or quit and relaunch HiveCode.",
     "stalledDetail": "HiveCode reloaded the window after a crash, but it never finished loading.",
     "title": "HiveCode keeps failing to load"
-  },
-  "runtimeCloudAlias": {
-    "adoptCloud": "Discard draft and use cloud name",
-    "blocked": "Cloud name cannot be verified; your draft is kept.",
-    "checkAgain": "Check cloud again",
-    "clearedName": "Use device name",
-    "close": "Close",
-    "cloudName": "Cloud name: {{name}}",
-    "confirmDraft": "Confirm submitting my draft",
-    "confirmed": "Cloud name confirmed",
-    "conflict": "The cloud name changed; your draft is kept.",
-    "currentComputer": "Current computer · local execution",
-    "discardDraft": "Discard retained draft",
-    "draft": "Draft: {{name}}",
-    "editLocalNote": "Edit local note",
-    "latestCloudName": "Last verified cloud name: {{name}}",
-    "localNote": "Local note: {{name}}",
-    "localNoteDescription": "This note is kept only on this computer. The shared cloud name is changed in Runtime settings.",
-    "localNoteLabel": "Local note",
-    "localNotes": "Local notes: {{names}}",
-    "orphanedDraft": "Retained draft for Runtime {{id}}: {{name}}",
-    "ownershipBlocked": "Original ownership cannot be confirmed; your draft is kept.",
-    "queued": "Name change queued",
-    "rateLimited": "Name change queued; wait before retrying.",
-    "renameCurrentComputer": "Rename current computer in HiveCloud",
-    "reviewDraft": "Review the current cloud name before submitting your draft as a new change.",
-    "saveFailed": "Could not save the Runtime name. Refresh the cloud list and review your draft.",
-    "storageUnavailable": "Name changes are unavailable because the local draft store could not be read or saved. Existing drafts are retained.",
-    "submitting": "Updating cloud name",
-    "unconfirmed": "Name change result is not confirmed"
   },
   "runtimeRpc": {
     "startupFailure": {

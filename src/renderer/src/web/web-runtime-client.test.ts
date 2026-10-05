@@ -113,7 +113,15 @@ describe('WebRuntimeClient', () => {
       websocketUrl: 'wss://runtime.example/_hive/runtime-rpc',
       serverPublicKeyB64: publicKeyToBase64(serverKeys.publicKey),
       sessionToken: 'A'.repeat(43),
-      expiresAt: '2026-08-25T09:00:00.000Z'
+      expiresAt: '2026-08-25T09:00:00.000Z',
+      runtimeDisplayMetadata: {
+        runtimeRecordId: '423e4567-e89b-42d3-a456-426614174000',
+        resourceVersion: 7,
+        ownershipEpoch: 8,
+        cloudDisplayName: null,
+        cloudDisplayNameVersion: 1,
+        deviceName: null
+      }
     })
     const call = client.call('status.get', {})
     const socket = fakeSockets[0]!

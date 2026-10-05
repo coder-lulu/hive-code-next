@@ -3,6 +3,10 @@ import {
   normalizeHiveRuntimeRelayHeartbeatResponse
 } from './relay-host/hive-runtime-relay-heartbeat-validation'
 import type { HiveRuntimeRelayHeartbeatResponseControl } from './relay-host/hive-runtime-relay-heartbeat-types'
+import {
+  parseRuntimeDisplayMetadata,
+  type RuntimeDisplayMetadata
+} from '../../shared/runtime-display-metadata'
 
 export type RuntimeRegistrationLookup =
   | { exists: false }
@@ -62,6 +66,7 @@ export type RuntimeConnectionTicketConsume = Readonly<{
   status: 'ACTIVE'
   expiresAt: number
   controlVersion: number
+  runtimeDisplayMetadata: RuntimeDisplayMetadata
 }>
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -292,7 +297,8 @@ export function normalizeConnectionTicketConsume(value: unknown): RuntimeConnect
     'runtimeSessionId',
     'status',
     'expiresAt',
-    'controlVersion'
+    'controlVersion',
+    'runtimeDisplayMetadata'
   ])
   if (value.status !== 'ACTIVE') {
     throw new Error('invalid_hive_runtime_cloud_response')
@@ -302,6 +308,7 @@ export function normalizeConnectionTicketConsume(value: unknown): RuntimeConnect
     runtimeSessionId: uuid(value.runtimeSessionId),
     status: 'ACTIVE',
     expiresAt: instant(value.expiresAt),
-    controlVersion: positiveInteger(value.controlVersion)
+    controlVersion: positiveInteger(value.controlVersion),
+    runtimeDisplayMetadata: parseRuntimeDisplayMetadata(value.runtimeDisplayMetadata)
   }
 }

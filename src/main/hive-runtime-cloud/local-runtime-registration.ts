@@ -251,7 +251,7 @@ export class LocalRuntimeRegistration {
     runtimeRecordId: string,
     authorization: HiveRuntimeCloudAuthorization,
     signal: AbortSignal
-  ): Promise<void> {
+  ): Promise<number> {
     const owned = await this.requireClient().getOwnedRuntime(
       runtimeRecordId,
       authorization.accessToken,
@@ -260,6 +260,7 @@ export class LocalRuntimeRegistration {
     if (owned.runtimeRecordId !== runtimeRecordId) {
       throw new Error('hive_runtime_cloud_directory_identity_mismatch')
     }
+    return owned.ownershipEpoch
   }
 }
 

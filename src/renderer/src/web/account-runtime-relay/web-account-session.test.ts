@@ -9,7 +9,14 @@ import {
 const uuid = '11111111-1111-4111-8111-111111111111'
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
-const runtime = { runtimeRecordId: uuid, resourceVersion: 3, status: 'CLAIMED' }
+const runtime = {
+  runtimeRecordId: uuid,
+  resourceVersion: 3,
+  status: 'CLAIMED',
+  ownershipEpoch: 8,
+  cloudDisplayName: null,
+  cloudDisplayNameVersion: 1
+}
 
 describe('browser account session', () => {
   it('accepts only one UUID navigation target and requires the current Relay capabilities', () => {

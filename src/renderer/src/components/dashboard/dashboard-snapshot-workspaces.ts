@@ -15,7 +15,7 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { selectExecutionHostDisplayLabels } from '@/lib/execution-host-display-label'
 import { isFolderRepo } from '../../../../shared/repo-kind'
 import { parseAppSshPtyId } from '../../../../shared/ssh-pty-id'
 
@@ -39,7 +39,13 @@ export type DashboardWorkspaceState = Pick<AppState, 'repos' | 'worktreesByRepo'
   Partial<
     Pick<
       AppState,
-      'folderWorkspaces' | 'projectGroups' | 'runtimeEnvironments' | 'settings' | 'sshTargetLabels'
+      | 'folderWorkspaces'
+      | 'projectGroups'
+      | 'runtimeEnvironments'
+      | 'settings'
+      | 'sshTargetLabels'
+      | 'accountRuntimeDirectory'
+      | 'localRuntimeOwnership'
     >
   >
 
@@ -53,7 +59,11 @@ function buildHostLabelLookup(
   for (const environment of state.runtimeEnvironments ?? []) {
     labels.set(toRuntimeExecutionHostId(environment.id), environment.name)
   }
-  for (const [hostId, label] of getHostDisplayLabelOverrides(state.settings)) {
+  for (const [hostId, label] of selectExecutionHostDisplayLabels({
+    ...state,
+    settings: state.settings ?? null,
+    runtimeEnvironments: state.runtimeEnvironments ?? []
+  })) {
     labels.set(hostId, label)
   }
   return labels

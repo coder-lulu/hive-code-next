@@ -5,6 +5,7 @@ export type HiveRuntimeDisplayNamePatchResponse = Readonly<{
   runtimeRecordId: string
   cloudDisplayName: string | null
   cloudDisplayNameVersion: number
+  ownershipEpoch: number
   updatedAt: number
 }>
 
@@ -15,11 +16,15 @@ export function normalizeRuntimeDisplayNamePatchResponse(
     !isRecord(value) ||
     Object.keys(value).some(
       (key) =>
-        !['runtimeRecordId', 'cloudDisplayName', 'cloudDisplayNameVersion', 'updatedAt'].includes(
-          key
-        )
+        ![
+          'runtimeRecordId',
+          'cloudDisplayName',
+          'cloudDisplayNameVersion',
+          'ownershipEpoch',
+          'updatedAt'
+        ].includes(key)
     ) ||
-    Object.keys(value).length !== 4 ||
+    Object.keys(value).length !== 5 ||
     (value.cloudDisplayName !== null &&
       !isNormalizedHiveRuntimeDisplayName(value.cloudDisplayName)) ||
     typeof value.updatedAt !== 'string'
@@ -34,6 +39,7 @@ export function normalizeRuntimeDisplayNamePatchResponse(
     runtimeRecordId: uuid(value.runtimeRecordId),
     cloudDisplayName: value.cloudDisplayName,
     cloudDisplayNameVersion: positiveInteger(value.cloudDisplayNameVersion),
+    ownershipEpoch: positiveInteger(value.ownershipEpoch),
     updatedAt
   }
 }

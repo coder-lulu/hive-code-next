@@ -13,6 +13,7 @@ import { translate } from '@/i18n/i18n'
 import { unwrapRuntimeRpcResult } from '@/runtime/runtime-rpc-client'
 import { extractRuntimeTransportDiagnostics } from '@/runtime/runtime-status-probe-diagnostics'
 import { useAppStore } from '@/store'
+import { accountRuntimeCatalogAccessFingerprint } from '@/store/slices/account-runtime-cloud'
 import {
   isUserManagedRuntimeEnvironment,
   type PublicKnownRuntimeEnvironment
@@ -49,12 +50,24 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
   const loadEnvironments = useCallback(
     async (verified?: { environmentId: string; runtimeStatus: RuntimeStatus }): Promise<void> => {
       const loadGeneration = ++loadGenerationRef.current
+      const accessKey = (): string => {
+        const state = useAppStore.getState()
+        return accountRuntimeCatalogAccessFingerprint(
+          state.accountRuntimeDirectory,
+          state.localRuntimeOwnership.runtimeRecordId
+        )
+      }
+      const initialAccessKey = accessKey()
+      const isCurrent = (): boolean =>
+        mountedRef.current &&
+        loadGeneration === loadGenerationRef.current &&
+        accessKey() === initialAccessKey
       if (mountedRef.current) {
         setIsLoading(true)
       }
       try {
         const nextEnvironments = await window.api.runtimeEnvironments.list()
-        if (!mountedRef.current || loadGeneration !== loadGenerationRef.current) {
+        if (!isCurrent()) {
           return
         }
         const visibleEnvironments = nextEnvironments.filter(isUserManagedRuntimeEnvironment)
@@ -64,7 +77,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
         if (verified) {
           await useAppStore.getState().readRuntimeHostStatusSnapshots()
         }
-        if (mountedRef.current) {
+        if (isCurrent()) {
           setEnvironments(visibleEnvironments)
           setDetailsByEnvironmentId((current) => {
             const next: Record<string, RuntimeHostDetails> = {}
@@ -95,7 +108,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
                 // Why: feed the live status into the store so sidebar host pickers
                 // reflect manual refreshes, not just the settings pane.
                 await useAppStore.getState().readRuntimeHostStatusSnapshots()
-                if (!mountedRef.current || loadGeneration !== loadGenerationRef.current) {
+                if (!isCurrent()) {
                   return
                 }
                 setDetailsByEnvironmentId((current) => ({
@@ -113,7 +126,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
                 // distinguish unreachable from never-checked.
                 const remoteControl = extractRuntimeTransportDiagnostics(error)
                 await useAppStore.getState().readRuntimeHostStatusSnapshots()
-                if (!mountedRef.current || loadGeneration !== loadGenerationRef.current) {
+                if (!isCurrent()) {
                   return
                 }
                 setDetailsByEnvironmentId((current) => ({
@@ -130,7 +143,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
             })
         )
       } catch (error) {
-        if (mountedRef.current && loadGeneration === loadGenerationRef.current) {
+        if (isCurrent()) {
           toast.error(
             error instanceof Error
               ? error.message
@@ -160,7 +173,10 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
     setDetailsByEnvironmentId((current) => {
       const next: Record<string, RuntimeHostDetails> = {}
       for (const environment of visibleEnvironments) {
-        next[environment.id] = getRuntimeEnvironmentInitialDetails(environment, current[environment.id])
+        next[environment.id] = getRuntimeEnvironmentInitialDetails(
+          environment,
+          current[environment.id]
+        )
       }
       return next
     })

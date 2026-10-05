@@ -6,7 +6,7 @@ import {
   parseExecutionHostId,
   toRuntimeExecutionHostId
 } from '../../../../shared/execution-host'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import { getWorkspacePortsByWorktreeId } from '@/lib/workspace-port-groups'
 import { getExplicitRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { hydrateRuntimeEnvironmentSshState } from '@/runtime/runtime-environment-ssh-state'
@@ -178,8 +178,9 @@ export function useWorktreeCardFoundation({
           ?.name ?? null)
       : null
   )
+  const hostLabels = useExecutionHostDisplayLabels()
   const runtimeHostLabel = runtimeHostId
-    ? (getHostDisplayLabelOverrides(settings).get(runtimeHostId) ?? runtimeEnvironmentName)
+    ? (hostLabels.get(runtimeHostId) ?? runtimeEnvironmentName)
     : null
   // Why the shared derivation, not raw truthiness: an absent entry means "not probed yet",
   // which is not the same verdict as a probe that came back unreachable.

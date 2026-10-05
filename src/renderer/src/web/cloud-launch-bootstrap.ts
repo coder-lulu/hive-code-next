@@ -1,4 +1,8 @@
 import type { CloudLaunchCredential } from './cloud-launch-fragment'
+import {
+  parseRuntimeDisplayMetadata,
+  type RuntimeDisplayMetadata
+} from '../../../shared/runtime-display-metadata'
 
 const CLOUD_LAUNCH_PROTOCOL_VERSION = 'cloud-launch/v1' as const
 const CLOUD_LAUNCH_EXCHANGE_PATH = '/_hive/web-launch/exchange'
@@ -13,7 +17,8 @@ const RESPONSE_FIELDS = new Set([
   'websocketUrl',
   'serverPublicKeyB64',
   'sessionToken',
-  'expiresAt'
+  'expiresAt',
+  'runtimeDisplayMetadata'
 ])
 
 export type CloudLaunchBootstrap = {
@@ -24,6 +29,7 @@ export type CloudLaunchBootstrap = {
   serverPublicKeyB64: string
   sessionToken: string
   expiresAt: string
+  runtimeDisplayMetadata: RuntimeDisplayMetadata
 }
 
 type CloudLaunchFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -88,7 +94,16 @@ function parseCloudLaunchBootstrap(value: unknown, browserOrigin: string): Cloud
     throw new Error('Cloud launch exchange returned invalid bootstrap data')
   }
 
-  return value as CloudLaunchBootstrap
+  return {
+    protocolVersion: value.protocolVersion,
+    managedWebSessionId: value.managedWebSessionId,
+    runtimeSessionId: value.runtimeSessionId,
+    websocketUrl: value.websocketUrl,
+    serverPublicKeyB64: value.serverPublicKeyB64,
+    sessionToken: value.sessionToken,
+    expiresAt: value.expiresAt,
+    runtimeDisplayMetadata: parseRuntimeDisplayMetadata(value.runtimeDisplayMetadata)
+  }
 }
 
 function isExactResponseObject(value: unknown): value is Record<string, unknown> {

@@ -7,9 +7,13 @@ import {
   projectHiveRuntimeAccountClaim,
   type HiveAccountRuntimeDirectoryState,
   type HiveLocalRuntimeOwnershipState,
-  type HiveRuntimeDisplayNameUpdateRequest
+  type HiveRuntimeDisplayNameUpdateRequest,
+  type HiveRuntimeDisplayNameDiscardRequest
 } from '../../../../shared/hive-runtime-cloud'
-import { resolveHiveRuntimeDisplayName } from '../../../../shared/hive-runtime-display-name'
+import {
+  applyConfirmedRuntimeDisplayName,
+  resolveHiveRuntimeDisplayName
+} from '../../../../shared/hive-runtime-display-name'
 import type {
   PublicKnownRuntimeEnvironment,
   RuntimeEnvironmentAccountClaim
@@ -22,6 +26,7 @@ export type AccountRuntimeCloudSlice = {
   startAccountRuntimeCloudSync: () => () => void
   refreshAccountRuntimeCloud: () => Promise<void>
   updateAccountRuntimeDisplayName: (request: HiveRuntimeDisplayNameUpdateRequest) => Promise<void>
+  discardAccountRuntimeDisplayName: (request: HiveRuntimeDisplayNameDiscardRequest) => Promise<void>
   refreshLocalRuntimeOwnership: () => Promise<HiveLocalRuntimeOwnershipState>
   claimLocalRuntimeForAccount: (
     expectedAccountId: string
@@ -45,6 +50,7 @@ export function accountRuntimeCatalogAccessFingerprint(
         [
           runtime.runtimeRecordId,
           runtime.resourceVersion,
+          runtime.ownershipEpoch,
           runtime.cloudDisplayNameVersion ?? null,
           runtime.cloudDisplayName ?? null
         ] as const
@@ -53,7 +59,17 @@ export function accountRuntimeCatalogAccessFingerprint(
   const pending = (directory.pendingDisplayNames ?? [])
     .map(
       (entry) =>
-        [entry.runtimeRecordId, entry.revision, entry.desiredName, entry.confirmed] as const
+        [
+          entry.runtimeRecordId,
+          entry.revision,
+          entry.desiredName,
+          entry.status,
+          entry.expectedOwnershipEpoch,
+          entry.confirmedCloudDisplayNameVersion,
+          entry.errorCode,
+          entry.latestCloudDisplayName,
+          entry.latestCloudDisplayNameVersion
+        ] as const
     )
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
   return JSON.stringify([
@@ -74,15 +90,15 @@ export function projectAccountRuntimeDirectoryOntoCatalog(
   }
   const runtimeById = new Map(directory.items.map((runtime) => [runtime.runtimeRecordId, runtime]))
   const pendingById = new Map(
-    (directory.pendingDisplayNames ?? []).map((pending) => [
-      pending.runtimeRecordId,
-      pending.desiredName
-    ])
+    (directory.pendingDisplayNames ?? []).map((pending) => [pending.runtimeRecordId, pending])
   )
   let changed = false
   const projected = environments.flatMap((environment): PublicKnownRuntimeEnvironment[] => {
     const runtimeRecordId = environment.accountClaim?.runtimeRecordId
-    const runtime = runtimeRecordId ? runtimeById.get(runtimeRecordId) : undefined
+    const snapshot = runtimeRecordId ? runtimeById.get(runtimeRecordId) : undefined
+    const runtime = snapshot
+      ? applyConfirmedRuntimeDisplayName(snapshot, pendingById.get(snapshot.runtimeRecordId))
+      : undefined
     if (!runtime) {
       if (!environment.accountClaim) {
         return [environment]
@@ -91,21 +107,22 @@ export function projectAccountRuntimeDirectoryOntoCatalog(
       if (environment.accessSources?.includes('local-pairing') !== true) {
         return []
       }
-      const { accountClaim: _accountClaim, ...localEnvironment } = environment
-      return [{ ...localEnvironment, accessSources: ['local-pairing'] }]
+      const { accountClaim: _accountClaim, localPairedName, ...localEnvironment } = environment
+      return [
+        {
+          ...localEnvironment,
+          name: localPairedName ?? environment.name,
+          accessSources: ['local-pairing']
+        }
+      ]
     }
     const accountClaim = projectHiveRuntimeAccountClaim(runtime)
     const accountOnly = environment.accessSources?.includes('local-pairing') !== true
-    const name = accountOnly
-      ? resolveHiveRuntimeDisplayName({
-          ...(pendingById.has(runtime.runtimeRecordId)
-            ? { pendingDesiredName: pendingById.get(runtime.runtimeRecordId)! }
-            : {}),
-          cloudDisplayName: runtime.cloudDisplayName,
-          reportedDeviceName: runtime.deviceName,
-          runtimeRecordId: runtime.runtimeRecordId
-        })
-      : environment.name
+    const name = resolveHiveRuntimeDisplayName({
+      cloudDisplayName: runtime.cloudDisplayName,
+      reportedDeviceName: runtime.deviceName,
+      runtimeRecordId: runtime.runtimeRecordId
+    })
     const updatedAt = accountOnly ? runtime.updatedAt : environment.updatedAt
     const lastUsedAt = accountOnly ? runtime.lastHeartbeatAt : environment.lastUsedAt
     const pairingRevision = accountOnly ? runtime.resourceVersion : environment.pairingRevision
@@ -126,7 +143,10 @@ export function projectAccountRuntimeDirectoryOntoCatalog(
         updatedAt,
         lastUsedAt,
         pairingRevision,
-        accountClaim
+        accountClaim,
+        ...(!accountOnly
+          ? { localPairedName: environment.localPairedName ?? environment.name }
+          : {})
       }
     ]
   })
@@ -141,6 +161,7 @@ function runtimeAccountClaimsEqual(
     left &&
     left.runtimeRecordId === right.runtimeRecordId &&
     left.resourceVersion === right.resourceVersion &&
+    left.ownershipEpoch === right.ownershipEpoch &&
     left.presence === right.presence &&
     left.readiness === right.readiness &&
     left.readinessReasonCode === right.readinessReasonCode &&
@@ -232,13 +253,19 @@ export const createAccountRuntimeCloudSlice: StateCreator<
   }
 
   const publishAccountRuntimeDirectory = (directory: HiveAccountRuntimeDirectoryState): void => {
-    set((state) => ({
-      accountRuntimeDirectory: directory,
-      runtimeEnvironments: projectAccountRuntimeDirectoryOntoCatalog(
-        state.runtimeEnvironments,
-        directory
+    const previousEnvironments = get().runtimeEnvironments
+    const runtimeEnvironments = projectAccountRuntimeDirectoryOntoCatalog(
+      previousEnvironments,
+      directory
+    )
+    if (runtimeEnvironments.length < previousEnvironments.length) {
+      const survivingIds = new Set(runtimeEnvironments.map((environment) => environment.id))
+      // Retire removed hosts before projection; heartbeat revisions must not retire surviving hosts.
+      get().setRuntimeEnvironments(
+        previousEnvironments.filter((environment) => survivingIds.has(environment.id))
       )
-    }))
+    }
+    set({ accountRuntimeDirectory: directory, runtimeEnvironments })
   }
 
   const publishLocalRuntimeOwnership = (
@@ -325,6 +352,15 @@ export const createAccountRuntimeCloudSlice: StateCreator<
       if (directoryGeneration === initialDirectoryGeneration) {
         publishAccountRuntimeDirectory(accountRuntimeDirectory)
         reloadRuntimeEnvironmentCatalog(accountRuntimeDirectory)
+      }
+    },
+
+    discardAccountRuntimeDisplayName: async (request) => {
+      const initialDirectoryGeneration = directoryGeneration
+      const directory = await window.api.hiveRuntimeCloud.discardDisplayName(request)
+      if (directoryGeneration === initialDirectoryGeneration) {
+        publishAccountRuntimeDirectory(directory)
+        reloadRuntimeEnvironmentCatalog(directory)
       }
     },
 

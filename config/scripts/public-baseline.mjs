@@ -1,33 +1,32 @@
 import {
+  PRODUCT_TARGET_BRANCHES,
   readCommitJson,
   resolveCommit,
   SHA_PATTERN,
-  STATE_PATH
+  STATE_PATH,
+  UPSTREAM_REPOSITORY
 } from './upstream-sync-checkpoint.mjs'
 
 const RECEIPT_PATH = 'config/open-source-baseline.json'
 const LEDGER_PATH = 'config/upstream-change-ledger.json'
 const ARCHIVE = 'https://github.com/coder-lulu/hive-code-next-history'
 
-export function collectImportedAdaptations({ git, head }) {
+export function readPublicBaseline({ git, head }) {
   const headSha = resolveCommit(git, head)
   const current = readCommitJson(git, headSha, RECEIPT_PATH, true)
   const roots = git(['rev-list', '--max-parents=0', headSha, '--']).trim().split(/\s+/)
-  if (roots.length !== 1) {
-    if (current || roots.some((root) => readCommitJson(git, root, RECEIPT_PATH, true))) {
-      throw new Error('Public baseline requires exactly one product root')
-    }
-    return new Map()
-  }
-  const root = roots[0]
-  const receipt = readCommitJson(git, root, RECEIPT_PATH, true)
+  const receipts = roots.map((root) => readCommitJson(git, root, RECEIPT_PATH, true))
   // The receipt is introduced only by the new root, never by an old-history preparation commit.
-  if (!receipt) {
-    return new Map()
+  if (!receipts.some(Boolean)) {
+    return null
   }
-  if (!current || JSON.stringify(current) !== JSON.stringify(receipt)) {
+  if (!current) {
     throw new Error('Public baseline receipt must remain immutable')
   }
+  if (receipts.some((receipt) => !receipt || JSON.stringify(receipt) !== JSON.stringify(current))) {
+    throw new Error('Every public root must carry the same immutable reviewed provenance')
+  }
+  const receipt = current
   if (
     receipt.schemaVersion !== 1 ||
     receipt.kind !== 'public-tree-baseline' ||
@@ -48,18 +47,24 @@ export function collectImportedAdaptations({ git, head }) {
   ) {
     throw new Error('Invalid public baseline provenance')
   }
-  const ledgerBlob = git(['rev-parse', `${root}:${LEDGER_PATH}`]).trim()
-  if (ledgerBlob !== receipt.ledgerBlob) {
-    throw new Error('Public baseline ledger blob is invalid')
+  for (const root of roots) {
+    const ledgerBlob = git(['rev-parse', `${root}:${LEDGER_PATH}`]).trim()
+    if (ledgerBlob !== receipt.ledgerBlob) {
+      throw new Error('Public baseline ledger blob is invalid')
+    }
+    const state = readCommitJson(git, root, STATE_PATH)
+    if (
+      state.schemaVersion !== 1 ||
+      state.upstream !== UPSTREAM_REPOSITORY ||
+      !PRODUCT_TARGET_BRANCHES.includes(state.targetBranch) ||
+      state.initialAuditCompleted !== true ||
+      state.lastReviewedUpstreamSha !== receipt.reviewedUpstreamSha ||
+      JSON.stringify(state.pendingShas) !== JSON.stringify(receipt.pendingShas)
+    ) {
+      throw new Error('Public baseline must preserve the reviewed cursor and pending decisions')
+    }
   }
-  const state = readCommitJson(git, root, STATE_PATH)
-  if (
-    state.lastReviewedUpstreamSha !== receipt.reviewedUpstreamSha ||
-    JSON.stringify(state.pendingShas) !== JSON.stringify(receipt.pendingShas)
-  ) {
-    throw new Error('Public baseline must preserve the reviewed cursor and pending decisions')
-  }
-  const initialLedger = readCommitJson(git, root, LEDGER_PATH)
+  const initialLedger = readCommitJson(git, roots[0], LEDGER_PATH)
   const currentLedger = readCommitJson(git, headSha, LEDGER_PATH)
   if (
     initialLedger.schemaVersion !== 1 ||
@@ -69,6 +74,15 @@ export function collectImportedAdaptations({ git, head }) {
   ) {
     throw new Error('Invalid public baseline change ledger')
   }
+  return { receipt, initialLedger, currentLedger }
+}
+
+export function collectImportedAdaptations({ git, head }) {
+  const baseline = readPublicBaseline({ git, head })
+  if (!baseline) {
+    return new Map()
+  }
+  const { receipt, initialLedger, currentLedger } = baseline
   const original = new Map(initialLedger.entries.map((entry) => [entry.upstreamSha, entry]))
   const imported = new Map()
   for (const entry of currentLedger.entries) {

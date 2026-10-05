@@ -2,10 +2,8 @@ import type {
   RuntimeHostStatusSnapshot,
   RuntimeHostStatusResponse
 } from '../../../../shared/runtime-host-status'
-import type { WorktreeVisibilityDefaults } from '../../../../shared/global-settings-types'
 import { RuntimeRpcCallQueuePool } from '../../../../shared/runtime-rpc-call-queue'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
-import type { Worktree } from '../../../../shared/worktree/types'
 import { WebRuntimeClient } from '../web-runtime-client'
 import {
   clearStoredWebRuntimeEnvironment,
@@ -23,43 +21,66 @@ import {
   createWebAccountRelayClient,
   type WebAccountRuntimeClient
 } from '../account-runtime-relay/web-account-relay-client'
-import { translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME } from '@/product-brand'
-
-export const webRuntimeState: {
-  activeEnvironment: StoredWebRuntimeEnvironment | null
-  activeCloudBootstrap: CloudLaunchBootstrap | null
-  activeAccountBootstrap: WebAccountBootstrap | null
-  worktreeVisibilityDefaultsRuntimeEnvironmentId: string | null
-  worktreeVisibilityDefaultsRuntimeValue: WorktreeVisibilityDefaults | null
-  activeClient: WebAccountRuntimeClient | null
-  activeClientEnvironmentId: string | null
-  cachedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null
-  cachedDetectedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null
-} = {
-  activeEnvironment: readStoredWebRuntimeEnvironment(),
-  activeCloudBootstrap: null,
-  activeAccountBootstrap: null,
-  worktreeVisibilityDefaultsRuntimeEnvironmentId: null,
-  worktreeVisibilityDefaultsRuntimeValue: null,
-  activeClient: null,
-  activeClientEnvironmentId: null,
-  cachedWorktrees: null,
-  cachedDetectedWorktrees: null
-}
+import {
+  cloudEnvironmentId,
+  createVolatileCloudEnvironment,
+  manuallyDisconnectedResponse
+} from './web-runtime-session-presentation'
+export { manuallyDisconnectedResponse } from './web-runtime-session-presentation'
+import { webRuntimeState } from './web-runtime-state'
+export { webRuntimeState } from './web-runtime-state'
+import {
+  WebRuntimeDisplayProjection,
+  type WebRuntimeDisplayOwner
+} from './web-runtime-display-projection'
+export {
+  WebRuntimeDisplayMetadataError,
+  type WebRuntimeDisplayOwner
+} from './web-runtime-display-projection'
 
 const statusListeners = new Set<(snapshot: RuntimeHostStatusSnapshot) => void>()
+const displayProjection = new WebRuntimeDisplayProjection(
+  webRuntimeState,
+  removeActiveRuntimeEnvironment
+)
+
+export const captureWebRuntimeDisplayOwner = (): WebRuntimeDisplayOwner | null =>
+  displayProjection.capture()
+
+export function isCurrentWebRuntimeDisplayOwner(owner: WebRuntimeDisplayOwner): boolean {
+  return displayProjection.current(owner)
+}
+
+export async function mergeWebRuntimeDisplayMetadata(
+  owner: WebRuntimeDisplayOwner,
+  value: unknown
+): Promise<boolean> {
+  return displayProjection.merge(owner, value)
+}
+
+export function clearWebRuntimeDisplayProjection(owner: WebRuntimeDisplayOwner): void {
+  displayProjection.clear(owner)
+}
 
 function webRuntimeStatusOptions(environment: StoredWebRuntimeEnvironment) {
+  const generation = displayProjection.generation
   return {
     environmentId: environment.id,
     pairingRevision: environment.pairingRevision ?? environment.createdAt,
     publish: (snapshot: RuntimeHostStatusSnapshot) => {
+      if (generation !== displayProjection.generation) {
+        return
+      }
       for (const listener of statusListeners) {
         listener(snapshot)
       }
     },
-    verified: (response: RuntimeHostStatusResponse) => updateEnvironmentFromResponse(environment, response)
+    verified: (response: RuntimeHostStatusResponse) => {
+      if (generation === displayProjection.generation) {
+        updateEnvironmentFromResponse(environment, response)
+      }
+    }
   }
 }
 
@@ -68,17 +89,33 @@ export function configureWebRuntimeBootstrap(
   accountBootstrap?: WebAccountBootstrap
 ): void {
   const nextAccount = accountBootstrap ?? null
-  if (nextAccount !== webRuntimeState.activeAccountBootstrap) {
+  const nextCloud = cloudBootstrap ?? null
+  if (
+    nextAccount === webRuntimeState.activeAccountBootstrap &&
+    nextCloud === webRuntimeState.activeCloudBootstrap &&
+    (nextAccount || nextCloud) &&
+    webRuntimeState.activeEnvironment
+  ) {
+    return
+  }
+  displayProjection.reset(nextAccount, nextCloud)
+  if (
+    nextAccount !== webRuntimeState.activeAccountBootstrap ||
+    nextCloud !== webRuntimeState.activeCloudBootstrap
+  ) {
     closeActiveRuntimeClients()
     webRuntimeState.activeAccountBootstrap?.session.close()
   }
   webRuntimeState.activeAccountBootstrap = nextAccount
-  webRuntimeState.activeCloudBootstrap = cloudBootstrap ?? null
+  webRuntimeState.activeCloudBootstrap = nextCloud
   webRuntimeState.activeEnvironment = nextAccount
     ? accountRuntimeEnvironment(nextAccount.runtime)
     : cloudBootstrap
       ? createVolatileCloudEnvironment(cloudBootstrap)
       : readStoredWebRuntimeEnvironment()
+  if (webRuntimeState.activeEnvironment) {
+    displayProjection.track(webRuntimeState.activeEnvironment)
+  }
   if (nextAccount && webRuntimeState.activeEnvironment) {
     webRuntimeState.activeClient = nextAccount.client
     webRuntimeState.activeClientEnvironmentId = webRuntimeState.activeEnvironment.id
@@ -122,7 +159,7 @@ export async function observeWebRuntimeStatus(
       ? webRuntimeState.activeCloudBootstrap
       : getPreferredWebPairingOffer(environment),
     {
-    reconnect: false
+      reconnect: false
     }
   )
   try {
@@ -183,6 +220,7 @@ export function disconnectActiveRuntimeEnvironment(): void {
 }
 
 export function removeActiveRuntimeEnvironment(): void {
+  displayProjection.reset(null, null)
   disconnectActiveRuntimeEnvironment()
   if (webRuntimeState.activeAccountBootstrap) {
     webRuntimeState.activeAccountBootstrap.session.close()
@@ -193,23 +231,6 @@ export function removeActiveRuntimeEnvironment(): void {
     clearStoredWebRuntimeEnvironment()
   }
   webRuntimeState.activeEnvironment = null
-}
-
-export function manuallyDisconnectedResponse(
-  environment: StoredWebRuntimeEnvironment
-): RuntimeRpcResponse<never> {
-  return {
-    id: 'runtime.manualDisconnect',
-    ok: false,
-    error: {
-      code: 'runtime_manually_disconnected',
-      message: translate(
-        'auto.web.webPreloadApi.runtimeEnvironmentManuallyDisconnected',
-        'Runtime environment is manually disconnected.'
-      )
-    },
-    _meta: { runtimeId: environment.runtimeId }
-  }
 }
 
 export function resolveEnvironment(selector: string): StoredWebRuntimeEnvironment {
@@ -250,7 +271,8 @@ export function updateEnvironmentFromResponse(
   environment: StoredWebRuntimeEnvironment,
   response: RuntimeRpcResponse<unknown>
 ): void {
-  if (webRuntimeState.activeEnvironment?.id !== environment.id) {
+  const current = webRuntimeState.activeEnvironment
+  if (!current || !displayProjection.currentEnvironment(environment)) {
     return
   }
   const runtimeId = response.ok ? response._meta.runtimeId : (response._meta?.runtimeId ?? null)
@@ -268,47 +290,22 @@ export function updateEnvironmentFromResponse(
       environment.id ===
         `account-${webRuntimeState.activeAccountBootstrap.runtime.runtimeRecordId}`)
   ) {
+    if (runtimeId === current.runtimeId) {
+      return
+    }
     webRuntimeState.activeEnvironment = {
-      ...environment,
+      ...current,
       runtimeId,
       updatedAt: Date.now(),
       lastUsedAt: Date.now()
     }
+    displayProjection.track(webRuntimeState.activeEnvironment)
+    void displayProjection.publish(webRuntimeState.activeEnvironment).catch(() => undefined)
     return
   }
   webRuntimeState.activeEnvironment = updateStoredEnvironmentRuntimeId(
-    environment,
+    current,
     runtimeId,
     pairedDeviceId
   )
-}
-
-function cloudEnvironmentId(bootstrap: CloudLaunchBootstrap): string {
-  return `cloud-${bootstrap.managedWebSessionId}`
-}
-
-function createVolatileCloudEnvironment(
-  bootstrap: CloudLaunchBootstrap
-): StoredWebRuntimeEnvironment {
-  const now = Date.now()
-  const id = cloudEnvironmentId(bootstrap)
-  return {
-    id,
-    name: 'Hive Runtime',
-    createdAt: now,
-    updatedAt: now,
-    lastUsedAt: null,
-    runtimeId: null,
-    preferredEndpointId: `wss-${id}`,
-    endpoints: [
-      {
-        id: `wss-${id}`,
-        kind: 'websocket',
-        label: translate('web.runtime.cloudWebSocket', 'Cloud WSS'),
-        endpoint: bootstrap.websocketUrl,
-        deviceToken: '',
-        publicKeyB64: bootstrap.serverPublicKeyB64
-      }
-    ]
-  }
 }

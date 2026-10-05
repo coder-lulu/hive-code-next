@@ -11,6 +11,9 @@ import {
 } from '@/runtime/runtime-host-connection-state'
 import { useAppStore } from '@/store'
 import { Button } from '../ui/button'
+import { RuntimeCloudDisplayNameStatus } from './runtime-cloud-display-name-status'
+import { getHostSettingOverride } from '../../../../shared/host-setting-overrides'
+import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
 import {
   getHostDetailsDescription,
   getHostDetailsSummary,
@@ -68,6 +71,9 @@ export function RuntimeServerRow({
 }: RuntimeServerRowProps): React.JSX.Element {
   const runtimeStatusEntry = useAppStore((state) =>
     state.runtimeStatusByEnvironmentId.get(environment.id)
+  )
+  const localNote = useAppStore((state) =>
+    getHostSettingOverride(state.settings, toRuntimeExecutionHostId(environment.id), 'displayLabel')
   )
   // Why the shared verdict and not `entry.status`: an unverifiable probe nulls it while the
   // transport is still up, and this row then read "error" and offered Connect for a host that
@@ -137,6 +143,20 @@ export function RuntimeServerRow({
         </div>
         {hostDescriptorText ? (
           <p className="truncate text-xs text-muted-foreground">{hostDescriptorText}</p>
+        ) : null}
+        {environment.accountClaim ? (
+          <>
+            {localNote || environment.localPairedName ? (
+              <p className="break-words text-xs text-muted-foreground">
+                {translate('runtimeCloudAlias.localNotes', 'Local notes: {{names}}', {
+                  names: [localNote, environment.localPairedName].filter(Boolean).join(' · ')
+                })}
+              </p>
+            ) : null}
+            <RuntimeCloudDisplayNameStatus
+              runtimeRecordId={environment.accountClaim.runtimeRecordId}
+            />
+          </>
         ) : null}
         <p className="truncate text-xs text-muted-foreground">
           {environment.connectionDependency === 'ssh-tunnel'
@@ -250,17 +270,19 @@ export function RuntimeServerRow({
             {translate('auto.components.settings.RuntimeEnvironmentsPane.connect', 'Connect')}
           </Button>
         )}
-        {removalPresentation ? <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => onRemove(environment)}
-          className="size-7 text-muted-foreground hover:text-red-400"
-          disabled={isBusy}
-          aria-label={removalPresentation.actionAriaLabel}
-        >
-          {removing ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-        </Button> : null}
+        {removalPresentation ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => onRemove(environment)}
+            className="size-7 text-muted-foreground hover:text-red-400"
+            disabled={isBusy}
+            aria-label={removalPresentation.actionAriaLabel}
+          >
+            {removing ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+          </Button>
+        ) : null}
       </div>
     </div>
   )

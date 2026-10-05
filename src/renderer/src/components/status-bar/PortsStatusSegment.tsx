@@ -21,6 +21,8 @@ import { STATUS_BAR_CONTEXT_MENU_EXEMPT_PROPS } from './status-bar-context-menu-
 import { PortRow, WorkspaceGroupRows } from './ports-status-popover-rows'
 import { translate } from '@/i18n/i18n'
 import type { WorkspacePortScanResult } from '../../../../shared/workspace-ports'
+import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 
 type PortsStatusSegmentProps = {
   compact?: boolean
@@ -36,6 +38,7 @@ export function PortsStatusSegment({ iconOnly }: PortsStatusSegmentProps): React
   const replaceWorkspacePortScans = useAppStore((s) => s.replaceWorkspacePortScans)
   const scansByKey = useAppStore((s) => s.workspacePortScansByKey)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
+  const hostLabels = useExecutionHostDisplayLabels()
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
   const [open, setOpen] = useState(false)
   const [externalOpen, setExternalOpen] = useState(false)
@@ -47,6 +50,15 @@ export function PortsStatusSegment({ iconOnly }: PortsStatusSegmentProps): React
   const unavailableHosts = useMemo(() => getUnavailableWorkspacePortHosts(scansByKey), [scansByKey])
   const hostLabel = useCallback(
     (host: WorkspacePortHostRef, hostScanKey: string, platform: NodeJS.Platform | null) => {
+      const confirmedName =
+        host.kind === 'local'
+          ? hostLabels.get('local')
+          : host.kind === 'environment'
+            ? hostLabels.get(toRuntimeExecutionHostId(host.environmentId))
+            : undefined
+      if (confirmedName) {
+        return confirmedName
+      }
       if (host.kind === 'local') {
         // Why: a paired web client's own userAgent is not the Orca host's
         // platform, so name the machine the scan actually ran on.
@@ -60,7 +72,7 @@ export function PortsStatusSegment({ iconOnly }: PortsStatusSegmentProps): React
         host.environmentId
       )
     },
-    [i18n.resolvedLanguage, runtimeEnvironments]
+    [hostLabels, i18n.resolvedLanguage, runtimeEnvironments]
   )
   const workspacePortCount = workspaceGroups.reduce((count, group) => count + group.ports.length, 0)
   const totalCount = workspacePortCount + externalPorts.length

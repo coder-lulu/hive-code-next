@@ -19,33 +19,49 @@ import type { HiveAccountRelayMaterial } from '../../../src/shared/hive-account-
 import { AccountRuntimeDirectoryStore } from './account-runtime-directory-store'
 import { useAccountRuntimeCloudProfile } from './use-account-runtime-cloud-profile'
 
-async function setup() {
-  const session = {
+async function setup(pendingDisplayNames: ReadonlyMap<string, string | null> = new Map()) {
+  const session: MobileSession = {
     authorityId: 'cloud',
     account: { accountId: 'account-a' },
-    sessionExpiresAt: 1_000
-  } as MobileSession
+    accessToken: 'fixture-token',
+    refreshToken: 'fixture-refresh',
+    expiresAt: 1_000,
+    sessionExpiresAt: 1_000,
+    sessionProfile: 'TRUSTED'
+  }
   const sessionRef: { current: MobileSession | null } = { current: session }
   const directoryStore = new AccountRuntimeDirectoryStore()
   directoryStore.activate({ authorityId: 'cloud', accountId: 'account-a' })
   let profile!: HostProfile
   function Harness() {
     const createProfile = useAccountRuntimeCloudProfile({
-      pendingDisplayNames: new Map(),
+      pendingDisplayNames,
       directoryStore,
       sessionRef,
       withCurrentSession: (operation) => operation(sessionRef.current!)
     })
-    const entry = {
+    const entry: AccountRuntimeDirectoryEntry = {
       runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      cloudDisplayName: 'Cloud name',
+      cloudDisplayNameVersion: 3,
+      deviceName: 'Reported name',
+      status: 'CLAIMED',
+      runtimeVersion: '1.0.0',
+      runtimeProtocolVersion: 3,
+      capabilities: [],
       resourceVersion: 1,
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-01T00:00:00Z',
+      lastHeartbeatAt: null,
       presence: 'ONLINE',
       readiness: 'READY',
+      readinessReasonCode: null,
+      freeDiskBytes: null,
       clientAuthMode: 'IDENTITY_PROOF',
       credentialState: 'ACTIVE',
       connectionCapabilities: ['hive-relay'],
       claimedAt: '2026-09-01T00:00:00Z'
-    } as AccountRuntimeDirectoryEntry
+    }
     directoryStore.complete(directoryStore.getSnapshot().generation, [entry], 0)
     profile = createProfile(entry)!
     return null
@@ -61,6 +77,15 @@ beforeEach(() => vi.clearAllMocks())
 afterEach(async () => {
   await act(async () => renderer?.unmount())
 })
+
+it.each(['Pending name', null])(
+  'projects pending alias %s into cloud connection names',
+  async (name) => {
+    const { profile } = await setup(new Map([['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name]]))
+    expect(profile.name).toBe(name ?? 'Reported name')
+    expect(createConnection).not.toHaveBeenCalled()
+  }
+)
 
 it('fences a late material response and rejects a stale profile after account replacement', async () => {
   const { session, sessionRef, profile } = await setup()

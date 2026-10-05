@@ -4,6 +4,7 @@ import {
   disposeHiveAccountRelayMaterial
 } from '../../../../shared/hive-account-relay-material'
 import { parseHiveRelayJson } from '../../../../shared/hive-relay-json'
+import { isNormalizedHiveRuntimeDisplayName } from '../../../../shared/hive-runtime-display-name'
 
 class WebAccountRequestError extends Error {
   constructor(
@@ -27,10 +28,20 @@ export function isTransientWebAccountSessionError(error: unknown): boolean {
   )
 }
 
+export function isWebAccountRuntimeBindingError(error: unknown): boolean {
+  return error instanceof WebAccountRequestError && [401, 403, 404].includes(error.status)
+}
+
+export function webAccountRetryAfterMs(error: unknown): number | undefined {
+  return error instanceof WebAccountRequestError ? error.retryAfterMs : undefined
+}
+
 const Runtime = z.object({
   runtimeRecordId: z.string().uuid(),
-  resourceVersion: z.number().int().positive(),
-  cloudDisplayName: z.string().nullable().optional(),
+  resourceVersion: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  ownershipEpoch: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  cloudDisplayNameVersion: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  cloudDisplayName: z.string().refine(isNormalizedHiveRuntimeDisplayName).nullable(),
   deviceName: z.string().nullable().optional(),
   status: z.string(),
   connectionCapabilities: z.array(z.string()).optional(),
@@ -78,9 +89,17 @@ export class WebAccountSession {
     }
   }
 
-  async restore(): Promise<boolean> {
+  get identityGeneration(): number {
+    return this.generation
+  }
+
+  isCurrentIdentity(generation: number): boolean {
+    return this.generation === generation && !this.controller.signal.aborted && !!this.csrf
+  }
+
+  async restore(signal?: AbortSignal): Promise<boolean> {
     const generation = this.generation
-    const { value } = await this.request('/auth/session')
+    const { value } = await this.request('/auth/session', undefined, signal)
     const session = z
       .object({ authenticated: z.boolean(), csrfToken: z.string().min(1).max(4096).optional() })
       .parse(value)
@@ -140,9 +159,9 @@ export class WebAccountSession {
     return material
   }
 
-  async runtime(runtimeRecordId: string): Promise<WebAccountRuntime> {
+  async runtime(runtimeRecordId: string, signal?: AbortSignal): Promise<WebAccountRuntime> {
     const id = z.string().uuid().parse(runtimeRecordId)
-    const { value } = await this.request(`/runtimes/${encodeURIComponent(id)}`)
+    const { value } = await this.request(`/runtimes/${encodeURIComponent(id)}`, undefined, signal)
     const runtime = Runtime.parse(value)
     if (runtime.runtimeRecordId !== id) {
       throw new Error('Unexpected Runtime identity')
@@ -180,16 +199,18 @@ export class WebAccountSession {
 
   private async request(
     path: string,
-    body?: unknown
+    body?: unknown,
+    signal?: AbortSignal
   ): Promise<{ value: unknown; headers: Headers }> {
     const timeout = AbortSignal.timeout(15_000)
+    const generation = this.generation
     const response = await this.fetchImpl(`${this.origin}/bff/user${path}`, {
       method: body === undefined ? 'GET' : 'POST',
       credentials: 'same-origin',
       redirect: 'error',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
-      signal: AbortSignal.any([this.controller.signal, timeout]),
+      signal: AbortSignal.any([this.controller.signal, timeout, ...(signal ? [signal] : [])]),
       headers: {
         Accept: 'application/json',
         ...(body === undefined
@@ -201,6 +222,10 @@ export class WebAccountSession {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     })
+    if (generation !== this.generation || this.controller.signal.aborted || signal?.aborted) {
+      await response.body?.cancel()
+      throw new Error('Account session changed')
+    }
     if (response.status === 204 && !response.redirected) {
       return { value: undefined, headers: response.headers }
     }
@@ -212,7 +237,7 @@ export class WebAccountSession {
       await response.body?.cancel()
       throw new WebAccountRequestError(
         response.status,
-        Math.min(60_000, Math.max(0, Number(response.headers.get('Retry-After') ?? 0) * 1000))
+        retryAfter(response.headers.get('Retry-After'))
       )
     }
     if (!response.body) {
@@ -235,6 +260,9 @@ export class WebAccountSession {
         text += decoder.decode(part.value, { stream: true })
       }
       text += decoder.decode()
+      if (generation !== this.generation || this.controller.signal.aborted || signal?.aborted) {
+        throw new Error('Account session changed')
+      }
       return { value: parseHiveRelayJson(text, 1024 * 1024), headers: response.headers }
     } catch (error) {
       await reader.cancel().catch(() => undefined)
@@ -243,4 +271,16 @@ export class WebAccountSession {
       reader.releaseLock()
     }
   }
+}
+
+function retryAfter(value: string | null): number {
+  if (!value) {
+    return 0
+  }
+  const seconds = Number(value)
+  const delay =
+    /^\d+$/.test(value) && Number.isFinite(seconds)
+      ? seconds * 1000
+      : Date.parse(value) - Date.now()
+  return Number.isFinite(delay) ? Math.min(2_147_483_647, Math.max(0, delay)) : 0
 }

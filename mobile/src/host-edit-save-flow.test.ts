@@ -375,7 +375,25 @@ describe('edit host handleSave', () => {
     act(() => renderer.unmount())
   })
 
-  it('clears only the cloud alias and immediately falls back to the local paired name', async () => {
+  it.each(['', 'A'.repeat(129), 'Unsafe\u0000name'])(
+    'shows invalid alias validation and prevents queuing for %j',
+    async (invalidName) => {
+      dependencies.hostId = CLOUD_RUNTIME_FIXTURE.runtimeRecordId
+      dependencies.loadHosts.mockResolvedValue([])
+      dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
+      const renderer = await renderEditHostRoute()
+      setFieldValue(renderer, 'Name', invalidName)
+      expect(findText(renderer, '名称需为 1–128 个字符')).toBe(true)
+      const save = renderer.root
+        .findAllByType('Pressable')
+        .find((node) => node.props.accessibilityLabel === 'Save host')!
+      expect(save.props.disabled).toBe(true)
+      expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
+      act(() => renderer.unmount())
+    }
+  )
+
+  it('clears only the cloud alias and falls back to the reported name across clients', async () => {
     dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
     dependencies.loadHosts.mockResolvedValue([
       { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
@@ -403,7 +421,7 @@ describe('edit host handleSave', () => {
     const nameInput = renderer.root
       .findAllByType('TextInput')
       .find((node) => node.props.accessibilityLabel === 'Name')
-    expect(nameInput?.props.value).toBe('Desk')
+    expect(nameInput?.props.value).toBe('Reported Desk')
     expect(dependencies.back).toHaveBeenCalledOnce()
     act(() => renderer.unmount())
   })

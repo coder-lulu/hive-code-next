@@ -91,7 +91,8 @@ describe('Hive account and runtime cloud preload bridges', () => {
     const update = {
       runtimeRecordId: 'runtime-1',
       cloudDisplayName: 'Development PC',
-      expectedCloudDisplayNameVersion: 3
+      expectedCloudDisplayNameVersion: 3,
+      expectedOwnershipEpoch: 1
     }
     const claim = { expectedAccountId: 'account-1' }
     const revoke = { managedSessionId: 'session-1', expectedResourceVersion: 4 }

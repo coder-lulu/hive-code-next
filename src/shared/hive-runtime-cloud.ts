@@ -40,6 +40,7 @@ export type HiveAccountRuntimeDirectoryEntry = Readonly<{
   runtimeProtocolVersion: 2 | 3
   capabilities: readonly string[]
   resourceVersion: number
+  ownershipEpoch: number
   createdAt: number
   updatedAt: number
   claimedAt: number | null
@@ -52,8 +53,8 @@ export type HiveAccountRuntimeDirectoryEntry = Readonly<{
   clientAuthMode: 'MTLS' | 'IDENTITY_PROOF' | null
   credentialState: HiveRuntimeCredentialState
   connectionCapabilities: readonly string[]
-  cloudDisplayName?: string | null
-  cloudDisplayNameVersion?: number | null
+  cloudDisplayName: string | null
+  cloudDisplayNameVersion: number
   deviceName?: string | null
   osName?: string | null
   osVersion?: string | null
@@ -70,6 +71,7 @@ export function projectHiveRuntimeAccountClaim(
   return {
     runtimeRecordId: runtime.runtimeRecordId,
     resourceVersion: runtime.resourceVersion,
+    ownershipEpoch: runtime.ownershipEpoch,
     presence: runtime.presence,
     readiness: runtime.readiness,
     readinessReasonCode: runtime.readinessReasonCode,
@@ -93,19 +95,58 @@ export type HiveAccountRuntimeDirectoryState = Readonly<{
   lastSyncedAt: number | null
   errorCode: string | null
   pendingDisplayNames?: readonly HiveRuntimePendingDisplayName[]
+  displayNameSyncError?: string | null
 }>
 
 export type HiveRuntimePendingDisplayName = Readonly<{
   runtimeRecordId: string
   desiredName: string | null
   revision: number
-  confirmed: boolean
+  expectedOwnershipEpoch: number | null
+  expectedCloudDisplayNameVersion: number
+  status: HiveRuntimeDisplayNameTaskStatus
+  errorCode: HiveRuntimeDisplayNameTaskError | null
+  latestCloudDisplayName: string | null
+  latestCloudDisplayNameVersion: number | null
+  confirmedCloudDisplayNameVersion: number | null
+  retryNotBefore: number | null
 }>
+
+export const HIVE_RUNTIME_DISPLAY_NAME_TASK_STATUSES = [
+  'QUEUED',
+  'SUBMITTING',
+  'UNCONFIRMED',
+  'CONFLICT',
+  'CONFIRMED',
+  'BLOCKED'
+] as const
+export type HiveRuntimeDisplayNameTaskStatus =
+  (typeof HIVE_RUNTIME_DISPLAY_NAME_TASK_STATUSES)[number]
+
+export const HIVE_RUNTIME_DISPLAY_NAME_TASK_ERRORS = [
+  'OWNERSHIP_UNVERIFIED',
+  'OWNERSHIP_CHANGED',
+  'TARGET_UNAVAILABLE',
+  'READ_UNAVAILABLE',
+  'AUTH_UNVERIFIED',
+  'REQUEST_REJECTED',
+  'RESULT_UNKNOWN',
+  'VERSION_CONFLICT',
+  'RATE_LIMITED'
+] as const
+export type HiveRuntimeDisplayNameTaskError = (typeof HIVE_RUNTIME_DISPLAY_NAME_TASK_ERRORS)[number]
 
 export type HiveRuntimeDisplayNameUpdateRequest = Readonly<{
   runtimeRecordId: string
   cloudDisplayName: string | null
   expectedCloudDisplayNameVersion: number
+  expectedOwnershipEpoch: number
+  pendingRevision?: number
+}>
+
+export type HiveRuntimeDisplayNameDiscardRequest = Readonly<{
+  runtimeRecordId: string
+  revision: number
 }>
 
 export type HiveLocalRuntimeOwnershipState = Readonly<{
@@ -115,6 +156,7 @@ export type HiveLocalRuntimeOwnershipState = Readonly<{
   accountId: string | null
   sessionGeneration: number | null
   runtimeRecordId: string | null
+  ownershipEpoch: number | null
   claimCapabilityAvailable: boolean
   presence:
     | 'DISABLED'
@@ -239,6 +281,7 @@ export const EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP: HiveLocalRuntimeOwnershipState 
   accountId: null,
   sessionGeneration: null,
   runtimeRecordId: null,
+  ownershipEpoch: null,
   claimCapabilityAvailable: false,
   presence: 'WAITING_RUNTIME',
   checkedAt: null,

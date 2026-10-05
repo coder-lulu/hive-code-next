@@ -7,6 +7,7 @@ import {
   type HiveLocalRuntimeClaimRequest,
   type HiveLocalRuntimeOwnershipState,
   type HiveRuntimeDisplayNameUpdateRequest,
+  type HiveRuntimeDisplayNameDiscardRequest,
   type HiveRuntimeSessionRevokeRequest
 } from '../../shared/hive-runtime-cloud'
 import { normalizeHiveRuntimeDisplayName } from '../../shared/hive-runtime-display-name'
@@ -16,7 +17,7 @@ import type { LocalRuntimeOwnershipService } from '../hive-runtime-cloud/local-r
 
 type DirectoryService = Pick<
   HiveAccountRuntimeDirectoryService,
-  'getState' | 'refresh' | 'subscribe' | 'updateDisplayName'
+  'getState' | 'refresh' | 'subscribe' | 'updateDisplayName' | 'discardDisplayName'
 >
 
 type OwnershipService = Pick<
@@ -83,7 +84,17 @@ export function requireHiveRuntimeDisplayNameUpdateRequest(
   }
   const request = value as Record<string, unknown>
   if (
-    Object.keys(request).length !== 3 ||
+    Object.keys(request).some(
+      (key) =>
+        ![
+          'runtimeRecordId',
+          'cloudDisplayName',
+          'expectedCloudDisplayNameVersion',
+          'expectedOwnershipEpoch',
+          'pendingRevision'
+        ].includes(key)
+    ) ||
+    !Object.hasOwn(request, 'expectedOwnershipEpoch') ||
     !Object.hasOwn(request, 'runtimeRecordId') ||
     !Object.hasOwn(request, 'cloudDisplayName') ||
     !Object.hasOwn(request, 'expectedCloudDisplayNameVersion') ||
@@ -92,7 +103,14 @@ export function requireHiveRuntimeDisplayNameUpdateRequest(
     (request.cloudDisplayName !== null && typeof request.cloudDisplayName !== 'string') ||
     typeof request.expectedCloudDisplayNameVersion !== 'number' ||
     !Number.isSafeInteger(request.expectedCloudDisplayNameVersion) ||
-    request.expectedCloudDisplayNameVersion < 1
+    request.expectedCloudDisplayNameVersion < 1 ||
+    typeof request.expectedOwnershipEpoch !== 'number' ||
+    !Number.isSafeInteger(request.expectedOwnershipEpoch) ||
+    request.expectedOwnershipEpoch < 1 ||
+    (Object.hasOwn(request, 'pendingRevision') &&
+      (typeof request.pendingRevision !== 'number' ||
+        !Number.isSafeInteger(request.pendingRevision) ||
+        request.pendingRevision < 1))
   ) {
     throw new Error('Invalid Runtime display-name request')
   }
@@ -108,8 +126,32 @@ export function requireHiveRuntimeDisplayNameUpdateRequest(
   return {
     runtimeRecordId: request.runtimeRecordId,
     cloudDisplayName,
-    expectedCloudDisplayNameVersion: request.expectedCloudDisplayNameVersion
+    expectedCloudDisplayNameVersion: request.expectedCloudDisplayNameVersion,
+    expectedOwnershipEpoch: request.expectedOwnershipEpoch,
+    ...(typeof request.pendingRevision === 'number'
+      ? { pendingRevision: request.pendingRevision }
+      : {})
   }
+}
+
+export function requireHiveRuntimeDisplayNameDiscardRequest(
+  value: unknown
+): HiveRuntimeDisplayNameDiscardRequest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('Invalid Runtime draft request')
+  }
+  const request = value as Record<string, unknown>
+  if (
+    Object.keys(request).length !== 2 ||
+    typeof request.runtimeRecordId !== 'string' ||
+    !UUID_PATTERN.test(request.runtimeRecordId) ||
+    typeof request.revision !== 'number' ||
+    !Number.isSafeInteger(request.revision) ||
+    request.revision < 1
+  ) {
+    throw new Error('Invalid Runtime draft request')
+  }
+  return { runtimeRecordId: request.runtimeRecordId, revision: request.revision }
 }
 
 function broadcast(channel: string, state: unknown): void {
@@ -130,6 +172,9 @@ export function registerHiveRuntimeCloudHandlers(services: HiveRuntimeCloudHandl
   ipcMain.handle('hiveRuntimeCloud:refreshDirectory', () => services.directory.refresh())
   ipcMain.handle('hiveRuntimeCloud:updateDisplayName', (_event, value: unknown) =>
     services.directory.updateDisplayName(requireHiveRuntimeDisplayNameUpdateRequest(value))
+  )
+  ipcMain.handle('hiveRuntimeCloud:discardDisplayName', (_event, value: unknown) =>
+    services.directory.discardDisplayName(requireHiveRuntimeDisplayNameDiscardRequest(value))
   )
   ipcMain.handle('hiveRuntimeCloud:getLocalOwnership', () => services.ownership.getState())
   ipcMain.handle('hiveRuntimeCloud:refreshLocalOwnership', () => services.ownership.refresh(true))

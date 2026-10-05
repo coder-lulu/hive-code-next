@@ -1,13 +1,10 @@
-/* eslint-disable max-lines -- Why: authorization fencing, retry serialization, and
-   conflict reconciliation form one coordinator state machine. */
 import { normalizeHiveRuntimeDisplayName } from '../../shared/hive-runtime-display-name'
 import type {
   HiveAccountRuntimeDirectoryEntry,
-  HiveRuntimePendingDisplayName
+  HiveRuntimePendingDisplayName,
+  HiveRuntimeDisplayNameDiscardRequest
 } from '../../shared/hive-runtime-cloud'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-service'
-import type { HiveRuntimeCloudAccountClient } from './hive-runtime-cloud-account-client'
-import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-http-client'
 import {
   desktopPendingTaskMatchesAuthorization,
   MAXIMUM_DESKTOP_PENDING_DISPLAY_NAMES,
@@ -16,21 +13,21 @@ import {
   type HiveRuntimeDisplayNamePendingStore
 } from './hive-runtime-display-name-pending-store'
 import { reconcileDesktopRuntimeDisplayNames } from './hive-runtime-display-name-reconcile'
-
-type DisplayNameClient = Pick<
-  HiveRuntimeCloudAccountClient,
-  'getOwnedRuntime' | 'updateOwnedRuntimeDisplayName'
->
+import {
+  submitRuntimeDisplayNameTask,
+  type RuntimeDisplayNameClient
+} from './hive-runtime-display-name-submission'
 
 export class HiveRuntimeDisplayNameCoordinator {
   private authorization: HiveRuntimeCloudAuthorization | null = null
   private state: DesktopPendingDisplayNameState
   private retryFlight: Promise<void> | null = null
   private retryTrailing = false
+  private storageError: string | null = null
 
   constructor(
     private readonly store: Pick<HiveRuntimeDisplayNamePendingStore, 'load' | 'save'>,
-    private readonly client: DisplayNameClient,
+    private readonly client: RuntimeDisplayNameClient,
     private readonly now: () => number,
     private readonly onChanged: () => void,
     private readonly requestDirectoryRefresh: () => void
@@ -49,6 +46,10 @@ export class HiveRuntimeDisplayNameCoordinator {
     }
   }
 
+  getStorageError(): string | null {
+    return this.storageError
+  }
+
   getPending(): readonly HiveRuntimePendingDisplayName[] {
     const authorization = this.authorization
     if (!authorization) {
@@ -56,58 +57,90 @@ export class HiveRuntimeDisplayNameCoordinator {
     }
     return this.state.tasks
       .filter((task) => desktopPendingTaskMatchesAuthorization(task, authorization))
-      .map((task) => ({
-        runtimeRecordId: task.runtimeRecordId,
-        desiredName: task.desiredName,
-        revision: task.revision,
-        confirmed: task.confirmed
-      }))
+      .map(
+        ({
+          authorityId: _authority,
+          accountId: _account,
+          expectedResourceVersion: _resource,
+          resumeStatus: _resume,
+          ...task
+        }) => task
+      )
   }
 
   enqueue(args: {
     runtimeRecordId: string
     desiredName: string | null
+    expectedOwnershipEpoch: number
     expectedCloudDisplayNameVersion: number
     expectedResourceVersion: number
+    pendingRevision?: number
   }): void {
     const authorization = this.requireAuthorization()
     const desiredName =
       args.desiredName === null ? null : normalizeHiveRuntimeDisplayName(args.desiredName)
+    assertPositiveInteger(args.expectedOwnershipEpoch)
     assertPositiveInteger(args.expectedCloudDisplayNameVersion)
     assertPositiveInteger(args.expectedResourceVersion)
+    assertPositiveInteger(this.state.nextRevision + 1)
+    const existing = this.state.tasks.find(
+      (task) =>
+        task.runtimeRecordId === args.runtimeRecordId &&
+        desktopPendingTaskMatchesAuthorization(task, authorization)
+    )
+    if (
+      existing?.status === 'SUBMITTING' ||
+      (existing && existing.status !== 'QUEUED' && args.pendingRevision !== existing.revision) ||
+      (args.pendingRevision != null && args.pendingRevision !== existing?.revision)
+    ) {
+      throw new Error('hive_runtime_display_name_draft_stale')
+    }
+    const scopeCount = this.state.tasks.filter((task) =>
+      desktopPendingTaskMatchesAuthorization(task, authorization)
+    ).length
+    if (!existing && scopeCount >= MAXIMUM_DESKTOP_PENDING_DISPLAY_NAMES) {
+      throw new Error('hive_runtime_display_name_pending_capacity')
+    }
     const task: DesktopPendingRuntimeDisplayName = {
       authorityId: authorization.authorityId,
       accountId: authorization.accountId,
       runtimeRecordId: args.runtimeRecordId,
       desiredName,
+      expectedOwnershipEpoch: args.expectedOwnershipEpoch,
       expectedCloudDisplayNameVersion: args.expectedCloudDisplayNameVersion,
       expectedResourceVersion: args.expectedResourceVersion,
       revision: this.state.nextRevision,
-      dormant: false,
-      confirmed: false,
-      confirmedCloudDisplayNameVersion: null
+      status: 'QUEUED',
+      errorCode:
+        existing?.retryNotBefore != null && existing.retryNotBefore > this.now()
+          ? 'RATE_LIMITED'
+          : null,
+      resumeStatus: null,
+      latestCloudDisplayName: null,
+      latestCloudDisplayNameVersion: null,
+      confirmedCloudDisplayNameVersion: null,
+      retryNotBefore: existing?.retryNotBefore ?? null
     }
-    const replacesExisting = this.state.tasks.some(
+    this.commit({
+      schemaVersion: 2,
+      nextRevision: this.state.nextRevision + 1,
+      tasks: [...this.state.tasks.filter((candidate) => candidate !== existing), task]
+    })
+    void this.retry().catch(() => undefined)
+  }
+
+  discard(request: HiveRuntimeDisplayNameDiscardRequest): void {
+    const authorization = this.requireAuthorization()
+    const task = this.state.tasks.find(
       (candidate) =>
-        candidate.runtimeRecordId === task.runtimeRecordId &&
+        candidate.runtimeRecordId === request.runtimeRecordId &&
+        candidate.revision === request.revision &&
         desktopPendingTaskMatchesAuthorization(candidate, authorization)
     )
-    const scopeTaskCount = this.state.tasks.filter((candidate) =>
-      desktopPendingTaskMatchesAuthorization(candidate, authorization)
-    ).length
-    if (!replacesExisting && scopeTaskCount >= MAXIMUM_DESKTOP_PENDING_DISPLAY_NAMES) {
-      throw new Error('hive_runtime_display_name_pending_capacity')
+    if (!task || task.status === 'SUBMITTING') {
+      throw new Error('hive_runtime_display_name_draft_stale')
     }
-    const tasks = this.state.tasks.filter(
-      (candidate) =>
-        !(
-          candidate.runtimeRecordId === task.runtimeRecordId &&
-          desktopPendingTaskMatchesAuthorization(candidate, authorization)
-        )
-    )
-    tasks.push(task)
-    this.commit({ schemaVersion: 1, nextRevision: this.state.nextRevision + 1, tasks })
-    void this.retry().catch(() => undefined)
+    this.replace(task, null)
   }
 
   reconcileDirectory(entries: readonly HiveAccountRuntimeDirectoryEntry[]): void {
@@ -116,7 +149,7 @@ export class HiveRuntimeDisplayNameCoordinator {
       return
     }
     const tasks = reconcileDesktopRuntimeDisplayNames(this.state.tasks, authorization, entries)
-    if (!sameTasks(tasks, this.state.tasks)) {
+    if (JSON.stringify(tasks) !== JSON.stringify(this.state.tasks)) {
       this.commit({ ...this.state, tasks })
     }
     void this.retry().catch(() => undefined)
@@ -137,102 +170,47 @@ export class HiveRuntimeDisplayNameCoordinator {
     do {
       this.retryTrailing = false
       await this.runRetryPass()
-    } while (this.retryTrailing && this.authorization)
+    } while (this.retryTrailing && this.authorization && !this.storageError)
   }
 
   private async runRetryPass(): Promise<void> {
     const authorization = this.authorization
-    if (!authorization || authorization.sessionExpiresAt <= this.now()) {
+    if (!authorization || authorization.sessionExpiresAt <= this.now() || this.storageError) {
       return
     }
     const tasks = this.state.tasks.filter(
-      (task) => !task.dormant && desktopPendingTaskMatchesAuthorization(task, authorization)
-    )
-    let directoryRefreshRequired = false
-    for (const snapshot of tasks) {
-      const task = this.currentTask(snapshot)
-      if (!task || !this.authorizationMatches(authorization)) {
-        continue
-      }
-      try {
-        const response = await this.client.updateOwnedRuntimeDisplayName(
-          task.runtimeRecordId,
-          task.desiredName,
-          task.expectedCloudDisplayNameVersion,
-          authorization.accessToken
+      (task) =>
+        desktopPendingTaskMatchesAuthorization(task, authorization) &&
+        ['QUEUED', 'SUBMITTING', 'UNCONFIRMED', 'BLOCKED'].includes(task.status) &&
+        task.expectedOwnershipEpoch != null &&
+        !['OWNERSHIP_CHANGED', 'OWNERSHIP_UNVERIFIED', 'REQUEST_REJECTED'].includes(
+          task.errorCode ?? ''
         )
-        if (this.authorizationMatches(authorization)) {
-          this.markConfirmed(task, response.cloudDisplayNameVersion)
-          directoryRefreshRequired = true
-        }
+    )
+    let refresh = false
+    for (const task of tasks) {
+      const current = (): DesktopPendingRuntimeDisplayName | null =>
+        this.authorizationMatches(authorization) ? this.currentTask(task) : null
+      if (!current()) {
         continue
-      } catch (failure) {
-        if (!(failure instanceof HiveRuntimeCloudRequestError) || failure.status !== 409) {
-          if (failure instanceof HiveRuntimeCloudRequestError && failure.status === 404) {
-            this.markDormant(task)
-            directoryRefreshRequired = true
-          }
-          continue
-        }
       }
-      directoryRefreshRequired =
-        (await this.resolveConflict(task, authorization)) || directoryRefreshRequired
+      await submitRuntimeDisplayNameTask({
+        client: this.client,
+        authorization,
+        now: this.now,
+        current,
+        replace: (replacement) => {
+          if (current()) {
+            this.replace(task, replacement)
+          }
+        }
+      })
+      const latest = current()
+      refresh ||= latest?.status === 'CONFIRMED' || latest?.errorCode === 'OWNERSHIP_CHANGED'
     }
-    if (directoryRefreshRequired && this.authorizationMatches(authorization)) {
+    if (refresh && this.authorizationMatches(authorization)) {
       this.requestDirectoryRefresh()
     }
-  }
-
-  private async resolveConflict(
-    task: DesktopPendingRuntimeDisplayName,
-    authorization: HiveRuntimeCloudAuthorization
-  ): Promise<boolean> {
-    if (!this.authorizationMatches(authorization) || !this.currentTask(task)) {
-      return false
-    }
-    try {
-      const entry = await this.client.getOwnedRuntime(
-        task.runtimeRecordId,
-        authorization.accessToken
-      )
-      const currentTask = this.currentTask(task)
-      if (!this.authorizationMatches(authorization) || !currentTask) {
-        return false
-      }
-      if (entry.resourceVersion !== currentTask.expectedResourceVersion) {
-        this.remove(currentTask)
-        return true
-      }
-      if (entry.cloudDisplayNameVersion == null) {
-        this.markDormant(currentTask)
-        return true
-      }
-      const confirmedVersion =
-        (entry.cloudDisplayName ?? null) === currentTask.desiredName
-          ? entry.cloudDisplayNameVersion
-          : (
-              await this.client.updateOwnedRuntimeDisplayName(
-                currentTask.runtimeRecordId,
-                currentTask.desiredName,
-                entry.cloudDisplayNameVersion,
-                authorization.accessToken
-              )
-            ).cloudDisplayNameVersion
-      if (this.authorizationMatches(authorization)) {
-        this.markConfirmed(currentTask, confirmedVersion)
-        return true
-      }
-    } catch (failure) {
-      if (
-        failure instanceof HiveRuntimeCloudRequestError &&
-        failure.status === 404 &&
-        this.authorizationMatches(authorization)
-      ) {
-        this.markDormant(task)
-        return true
-      }
-    }
-    return false
   }
 
   private currentTask(
@@ -249,52 +227,35 @@ export class HiveRuntimeDisplayNameCoordinator {
     )
   }
 
-  private markDormant(task: DesktopPendingRuntimeDisplayName): void {
-    this.replace(task, { ...task, dormant: true, confirmed: false })
-  }
-
-  private markConfirmed(task: DesktopPendingRuntimeDisplayName, version: number): void {
-    assertPositiveInteger(version)
-    this.replace(task, {
-      ...task,
-      dormant: true,
-      confirmed: true,
-      confirmedCloudDisplayNameVersion: version
-    })
-  }
-
-  private remove(task: DesktopPendingRuntimeDisplayName): void {
-    this.replace(task, null)
-  }
-
   private replace(
     task: DesktopPendingRuntimeDisplayName,
     replacement: DesktopPendingRuntimeDisplayName | null
   ): void {
-    if (!this.currentTask(task)) {
+    const current = this.currentTask(task)
+    if (!current) {
       return
     }
-    const tasks = this.state.tasks.flatMap((candidate) =>
-      this.currentTaskMatches(candidate, task) ? (replacement ? [replacement] : []) : [candidate]
-    )
-    this.commit({ ...this.state, tasks })
-  }
-
-  private currentTaskMatches(
-    left: DesktopPendingRuntimeDisplayName,
-    right: DesktopPendingRuntimeDisplayName
-  ): boolean {
-    return (
-      left.revision === right.revision &&
-      left.runtimeRecordId === right.runtimeRecordId &&
-      left.accountId === right.accountId &&
-      left.authorityId === right.authorityId
-    )
+    if (replacement && JSON.stringify(replacement) === JSON.stringify(current)) {
+      return
+    }
+    this.commit({
+      ...this.state,
+      tasks: this.state.tasks.flatMap((candidate) =>
+        candidate === current ? (replacement ? [replacement] : []) : [candidate]
+      )
+    })
   }
 
   private commit(state: DesktopPendingDisplayNameState): void {
-    this.store.save(state)
+    try {
+      this.store.save(state)
+    } catch {
+      this.storageError = 'PENDING_STORE_UNAVAILABLE'
+      this.onChanged()
+      throw new Error('hive_runtime_display_name_pending_persist_failed')
+    }
     this.state = state
+    this.storageError = null
     this.onChanged()
   }
 
@@ -302,6 +263,9 @@ export class HiveRuntimeDisplayNameCoordinator {
     const authorization = this.authorization
     if (!authorization || authorization.sessionExpiresAt <= this.now()) {
       throw new Error('hive_runtime_display_name_signed_out')
+    }
+    if (this.storageError) {
+      throw new Error('hive_runtime_display_name_pending_persist_failed')
     }
     return authorization
   }
@@ -321,11 +285,4 @@ function assertPositiveInteger(value: number): void {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new Error('hive_runtime_display_name_version_invalid')
   }
-}
-
-function sameTasks(
-  left: readonly DesktopPendingRuntimeDisplayName[],
-  right: readonly DesktopPendingRuntimeDisplayName[]
-): boolean {
-  return left.length === right.length && left.every((task, index) => task === right[index])
 }

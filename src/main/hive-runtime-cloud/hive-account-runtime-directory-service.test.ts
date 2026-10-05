@@ -31,6 +31,9 @@ const entry = (runtimeRecordId: string): HiveAccountRuntimeDirectoryEntry => ({
   runtimeProtocolVersion: 3,
   capabilities: ['pairing-v3'],
   resourceVersion: 1,
+  ownershipEpoch: 1,
+  cloudDisplayName: null,
+  cloudDisplayNameVersion: 1,
   createdAt: 1,
   updatedAt: 2,
   claimedAt: 1,
@@ -62,7 +65,7 @@ describe('HiveAccountRuntimeDirectoryService', () => {
           listOwnedRuntimes: vi
             .fn()
             .mockResolvedValue({ items: [directoryEntry], nextCursor: null }),
-          getOwnedRuntime: vi.fn(),
+          getOwnedRuntime: vi.fn().mockResolvedValue(directoryEntry),
           updateOwnedRuntimeDisplayName
         }),
         now: () => 1_000
@@ -78,14 +81,23 @@ describe('HiveAccountRuntimeDirectoryService', () => {
       const result = await service.updateDisplayName({
         runtimeRecordId,
         cloudDisplayName: 'New name',
-        expectedCloudDisplayNameVersion: 2
+        expectedCloudDisplayNameVersion: 2,
+        expectedOwnershipEpoch: 1
       })
 
       expect(result.pendingDisplayNames).toEqual([
         expect.objectContaining({ runtimeRecordId, desiredName: 'New name' })
       ])
       expect(publications.at(-1)).toBe(service.getState())
-      expect(publications.at(-1)?.pendingDisplayNames).toEqual(result.pendingDisplayNames)
+      expect(publications).toContain(result)
+      expect(publications.at(-1)?.pendingDisplayNames).toEqual([
+        expect.objectContaining({
+          runtimeRecordId,
+          desiredName: 'New name',
+          expectedOwnershipEpoch: 1,
+          expectedCloudDisplayNameVersion: 2
+        })
+      ])
     } finally {
       service.stop()
       rmSync(root, { recursive: true, force: true })

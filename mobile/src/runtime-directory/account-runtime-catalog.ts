@@ -30,20 +30,23 @@ export function mergeAccountRuntimeCatalog(
   })
 
   for (const runtime of accountRuntimes) {
-    const profile = cloudProfile(runtime)
+    const cloud = cloudProfile(runtime)
+    const name = effectiveRuntimeName(runtime, pendingDisplayNames)
+    const profile = cloud && cloud.name !== name ? { ...cloud, name } : cloud
     const localIndex = localByRuntimeId.get(runtime.runtimeRecordId)
     if (localIndex !== undefined) {
       const local = merged[localIndex]!
       const compositeProfile = mergeLocalProfileWithAccountRoute(local.profile, profile, local)
       merged[localIndex] = {
         ...local,
-        name: effectiveRuntimeName(runtime, local.name, pendingDisplayNames),
+        name,
         ...(compositeProfile
           ? {
               endpoint: compositeProfile.endpoint,
               publicKeyB64: compositeProfile.publicKeyB64,
               credentialStatus: 'ready' as const,
-              profile: compositeProfile
+              profile:
+                compositeProfile.name === name ? compositeProfile : { ...compositeProfile, name }
             }
           : {}),
         accessSources: ['manual-pairing', 'account-claimed'],
@@ -53,7 +56,7 @@ export function mergeAccountRuntimeCatalog(
       }
       continue
     }
-    merged.push(accountOnlyCatalogEntry(runtime, profile, pendingDisplayNames))
+    merged.push(accountOnlyCatalogEntry(runtime, profile, name))
   }
   return merged
 }
@@ -80,12 +83,12 @@ function mergeLocalProfileWithAccountRoute(
 function accountOnlyCatalogEntry(
   runtime: AccountRuntimeDirectoryEntry,
   profile: HostProfile | null,
-  pendingDisplayNames: ReadonlyMap<string, string | null>
+  name: string
 ): HostCatalogEntry {
   return {
     id: runtime.runtimeRecordId,
     runtimeRecordId: runtime.runtimeRecordId,
-    name: effectiveRuntimeName(runtime, null, pendingDisplayNames),
+    name,
     endpoint: profile?.endpoint ?? `cloud://${runtime.runtimeRecordId}`,
     publicKeyB64: profile?.publicKeyB64 ?? '',
     lastConnected: profile?.lastConnected ?? 0,
@@ -104,15 +107,12 @@ function accountOnlyCatalogEntry(
 
 function effectiveRuntimeName(
   runtime: AccountRuntimeDirectoryEntry,
-  localPairedName: string | null,
   pendingDisplayNames: ReadonlyMap<string, string | null>
 ): string {
   return resolveHiveRuntimeDisplayName({
-    ...(pendingDisplayNames.has(runtime.runtimeRecordId)
-      ? { pendingDesiredName: pendingDisplayNames.get(runtime.runtimeRecordId)! }
-      : {}),
-    cloudDisplayName: runtime.cloudDisplayName,
-    localPairedName,
+    cloudDisplayName: pendingDisplayNames.has(runtime.runtimeRecordId)
+      ? pendingDisplayNames.get(runtime.runtimeRecordId)
+      : runtime.cloudDisplayName,
     reportedDeviceName: runtime.deviceName,
     runtimeRecordId: runtime.runtimeRecordId
   })

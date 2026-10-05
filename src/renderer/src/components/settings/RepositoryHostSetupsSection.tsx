@@ -10,7 +10,7 @@ import {
   localizeExecutionHostRegistry
 } from '@/lib/localized-execution-host-label'
 import { buildExecutionHostRegistry } from '../../../../shared/execution-host-registry'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import type { ProjectHostSetup } from '../../../../shared/project-types'
 import type { Repo } from '../../../../shared/repo-types'
 import { useAppStore } from '../../store'
@@ -85,7 +85,7 @@ export function RepositoryHostSetupsSection({
   const sshStateByEnvironment = useAppStore((state) => state.sshStateByEnvironment)
   const removedSshTargetLabels = useAppStore((state) => state.removedSshTargetLabels)
   const sshTargetsHydrated = useAppStore((state) => state.sshTargetsHydrated)
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const hostOptions = useMemo(
     () =>
       localizeExecutionHostRegistry(

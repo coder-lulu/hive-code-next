@@ -81,9 +81,9 @@ describe('account Runtime catalog merge', () => {
     })
   })
 
-  it('uses account-scoped pending, cloud, local, reported, then short-id display names', () => {
+  it('uses account-scoped pending and cloud aliases, then the reported name or short id', () => {
     const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-    const claimed = runtime(id, 'Cloud name')
+    const claimed = { ...runtime(id, 'Cloud name'), deviceName: 'Reported name' }
     const localEntry = local(id)
     localEntry.name = 'Local name'
     localEntry.profile = { ...localEntry.profile!, name: 'Local name' }
@@ -102,7 +102,7 @@ describe('account Runtime catalog merge', () => {
     expect(
       mergeAccountRuntimeCatalog([localEntry], [claimed], () => null, new Map([[id, null]]))[0]
         ?.name
-    ).toBe('Local name')
+    ).toBe('Reported name')
     expect(mergeAccountRuntimeCatalog([localEntry], [], () => null)[0]?.name).toBe('Local name')
 
     const reported = { ...runtime(id, undefined), cloudDisplayName: undefined, deviceName: 'Desk' }
@@ -122,6 +122,49 @@ describe('account Runtime catalog merge', () => {
       ['account-claimed']
     ])
   })
+
+  it.each([false, true])(
+    'keeps pending alias names consistent with connection profiles when locally paired=%s',
+    (locallyPaired) => {
+      const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      const claimed = { ...runtime(id, 'Cloud name'), deviceName: 'Reported name' }
+      const localEntry = local(id)
+      const cloudProfile: HostProfile = {
+        ...localEntry.profile!,
+        id,
+        name: 'Cloud name',
+        endpoint: `cloud://${id}`,
+        deviceToken: '',
+        publicKeyB64: '',
+        accountRuntime: {
+          runtimeRecordId: id,
+          resourceVersion: claimed.resourceVersion,
+          createConnection: async () => {
+            throw new Error('not used')
+          }
+        }
+      }
+      for (const desiredName of ['Pending name', null]) {
+        const [entry] = mergeAccountRuntimeCatalog(
+          locallyPaired ? [localEntry] : [],
+          [claimed],
+          () => cloudProfile,
+          new Map([[id, desiredName]])
+        )
+        const expectedName = desiredName ?? 'Reported name'
+        expect(entry.name).toBe(expectedName)
+        expect(entry.profile?.name).toBe(expectedName)
+        expect(entry.cloudProfile?.name).toBe(expectedName)
+        expect(entry.profile?.deviceToken).toBe(locallyPaired ? 'local-secret' : '')
+        expect(entry.profile?.endpoint).toBe(locallyPaired ? localEntry.endpoint : `cloud://${id}`)
+        expect(entry.profile?.accountRuntime).toEqual(
+          locallyPaired ? undefined : cloudProfile.accountRuntime
+        )
+        expect(localEntry.profile?.name).toBe('Workstation')
+        expect(cloudProfile.name).toBe('Cloud name')
+      }
+    }
+  )
 })
 
 describe('hostCatalogEntryHasLocalPairing', () => {

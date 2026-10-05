@@ -68,6 +68,7 @@ describe('account Runtime directory client', () => {
           runtimeRecordId,
           cloudDisplayName: 'Mobile Runtime',
           cloudDisplayNameVersion: 2,
+          ownershipEpoch: 1,
           updatedAt: '2026-09-01T00:00:00Z'
         }),
         { status: 200, headers: { 'content-type': 'application/json' } }

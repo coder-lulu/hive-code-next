@@ -58,7 +58,9 @@ export function HiveWorkbenchTeamSection({
                 <Label htmlFor={`hive-employee-${employee.role}`}>
                   {t(`hiveWorkbench.roles.${employee.role}`)}
                 </Label>
-                <span className="text-xs text-muted-foreground">Codex</span>
+                <span className="text-xs text-muted-foreground">
+                  {t('auto.lib.agent.catalog.760bc6883d')}
+                </span>
               </div>
               <Input
                 id={`hive-employee-${employee.role}`}

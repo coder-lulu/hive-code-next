@@ -78,7 +78,97 @@ function fixture(applied = '已移植') {
   return { cwd, git, entry, root, receipt, write, commit }
 }
 
+function mergePublicRoot(f, alter = () => {}) {
+  alter(f)
+  f.git(['add', '.'])
+  const other = f
+    .git(['commit-tree', f.git(['write-tree']).trim(), '-m', 'Independent public fixture'])
+    .trim()
+  f.git(['checkout', f.root, '--', 'config'])
+  const head = f
+    .git([
+      'commit-tree',
+      f.git(['rev-parse', `${f.root}^{tree}`]).trim(),
+      '-p',
+      f.root,
+      '-p',
+      other,
+      '-m',
+      'Merge independently published product work'
+    ])
+    .trim()
+  f.git(['update-ref', 'refs/heads/hivecode/main-next', head])
+  return head
+}
+
 describe('immutable public root provenance', () => {
+  it('retains archived evidence after joining roots with identical reviewed provenance', () => {
+    const f = fixture()
+    const head = mergePublicRoot(f)
+    expect(f.git(['rev-list', '--max-parents=0', head]).trim().split(/\s+/)).toHaveLength(2)
+    expect(collectImportedAdaptations({ git: f.git, head }).get(f.entry.upstreamSha)).toEqual(
+      f.entry
+    )
+  }, 60000)
+
+  it.each([
+    'receipt-missing',
+    'receipt-changed',
+    'ledger-changed',
+    'cursor-changed',
+    'pending-changed'
+  ])('refuses a second root with %s', (change) => {
+    const f = fixture()
+    const head = mergePublicRoot(f, (other) => {
+      if (change === 'receipt-missing') {
+        other.git(['rm', 'config/open-source-baseline.json'])
+      }
+      if (change === 'receipt-changed') {
+        other.write('config/open-source-baseline.json', {
+          ...other.receipt,
+          sourceCommit: 'f'.repeat(40)
+        })
+      }
+      if (change === 'ledger-changed') {
+        other.write('config/upstream-change-ledger.json', { schemaVersion: 1, entries: [] })
+      }
+      if (change === 'cursor-changed' || change === 'pending-changed') {
+        const state = JSON.parse(
+          readFileSync(path.join(other.cwd, 'config/upstream-sync-state.json'))
+        )
+        other.write('config/upstream-sync-state.json', {
+          ...state,
+          ...(change === 'cursor-changed'
+            ? { lastReviewedUpstreamSha: 'f'.repeat(40) }
+            : { pendingShas: [] })
+        })
+      }
+    })
+    expect(() => collectImportedAdaptations({ git: f.git, head })).toThrow()
+  })
+
+  it('verifies real new tree absorption after a reviewed multi-root merge and rejects tampering', async () => {
+    const f = fixture()
+    const target = mergePublicRoot(f)
+    f.git(['checkout', '--detach', f.entry.upstreamSha])
+    f.write('multi-root-fix.json', { fixed: true })
+    const upstream = f.commit()
+    f.git(['checkout', 'hivecode/main-next'])
+    mkdirSync(path.join(f.cwd, 'docs'), { recursive: true })
+    prepareUpstreamTreeSync({ cwd: f.cwd, target, upstream })
+    const head = f.commit()
+    const options = { cwd: f.cwd, stateRef: target, upstream, head }
+    const report = await collectIntakeReport(options)
+    expect(report.passed).toBe(true)
+    expect(report.commits.find((row) => row.sha === upstream).evidence.kind).toBe(
+      'verified-tree-absorption'
+    )
+    f.write('multi-root-fix.json', { fixed: false })
+    await expect(collectIntakeReport({ ...options, head: f.commit() })).rejects.toThrow(
+      'checkpoint'
+    )
+  }, 90000)
+
   it('retains actual historical adaptation identities without requiring old ancestry', () => {
     const f = fixture()
     const imported = collectImportedAdaptations({ git: f.git, head: f.root })
@@ -86,16 +176,22 @@ describe('immutable public root provenance', () => {
     expect(f.git(['rev-list', '--count', f.root]).trim()).toBe('1')
   })
 
-  it('does not grant evidence to modified historical entries or future entries', () => {
-    const f = fixture()
-    const future = { ...f.entry, upstreamSha: 'f'.repeat(40) }
-    f.write('config/upstream-change-ledger.json', {
-      schemaVersion: 1,
-      entries: [{ ...f.entry, reviewReason: 'Changed claim' }, future]
-    })
-    const head = f.commit()
-    expect(collectImportedAdaptations({ git: f.git, head }).size).toBe(0)
-  })
+  it.each([false, true])(
+    'does not grant evidence to modified or future entries with multiple roots: %s',
+    (multipleRoots) => {
+      const f = fixture()
+      if (multipleRoots) {
+        mergePublicRoot(f)
+      }
+      const future = { ...f.entry, upstreamSha: 'f'.repeat(40) }
+      f.write('config/upstream-change-ledger.json', {
+        schemaVersion: 1,
+        entries: [{ ...f.entry, reviewReason: 'Changed claim' }, future]
+      })
+      const head = f.commit()
+      expect(collectImportedAdaptations({ git: f.git, head }).size).toBe(0)
+    }
+  )
 
   it('rejects a rewritten import receipt and a mismatched original ledger blob', () => {
     const f = fixture()
@@ -146,7 +242,7 @@ describe('immutable public root provenance', () => {
       ])
       .trim()
     expect(f.git(['rev-list', '--max-parents=0', head]).trim().split(/\s+/)).toHaveLength(2)
-    expect(() => collectImportedAdaptations({ git: f.git, head })).toThrow('exactly one')
+    expect(() => collectImportedAdaptations({ git: f.git, head })).toThrow('immutable')
     const ordinary = f
       .git([
         'commit-tree',

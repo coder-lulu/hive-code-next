@@ -11,13 +11,18 @@ import {
 } from './hive-runtime-cloud-managed-session-registry'
 import type { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud-presence-service'
 import { createRuntimeConnectionTicketConsumeRequest } from './hive-runtime-cloud-proof'
+import { readManagedRuntimeDisplayMetadata } from './hive-runtime-cloud-display-metadata-service'
+import { hiveRuntimeCloudTuplesEqual as sameTuple } from './hive-runtime-cloud-lease-context'
 
 const EXCHANGE_PATH = '/_hive/web-launch/exchange'
 const MAXIMUM_REQUEST_BYTES = 4096
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const SECRET_PATTERN = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/
 
-type TicketClient = Pick<HiveRuntimeCloudClient, 'consumeConnectionTicket'>
+type TicketClient = Pick<
+  HiveRuntimeCloudClient,
+  'consumeConnectionTicket' | 'readWebSessionDisplayMetadata'
+>
 type PresenceSource = Pick<
   HiveRuntimeCloudPresenceService,
   'getCurrentLeaseContext' | 'subscribeLeaseContext'
@@ -109,7 +114,11 @@ export class HiveRuntimeCloudWebLaunchService {
         return true
       }
       const current = this.presence.getCurrentLeaseContext()
-      if (!current || !sameTuple(context.tuple, current.tuple)) {
+      if (
+        !current ||
+        !sameTuple(context.tuple, current.tuple) ||
+        consumed.runtimeDisplayMetadata.runtimeRecordId !== current.tuple.runtimeRecordId
+      ) {
         this.writeProblem(response, 503, 'cloud_launch_unavailable')
         return true
       }
@@ -118,7 +127,8 @@ export class HiveRuntimeCloudWebLaunchService {
         runtimeSessionId: consumed.runtimeSessionId,
         currentTuple: current.tuple,
         expiresAt: consumed.expiresAt,
-        controlVersion: consumed.controlVersion
+        controlVersion: consumed.controlVersion,
+        ownershipEpoch: consumed.runtimeDisplayMetadata.ownershipEpoch
       })
       response.statusCode = 201
       response.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -130,7 +140,8 @@ export class HiveRuntimeCloudWebLaunchService {
           websocketUrl: websocketUrl(this.config),
           serverPublicKeyB64,
           sessionToken: bootstrap.sessionToken,
-          expiresAt: new Date(consumed.expiresAt).toISOString()
+          expiresAt: new Date(consumed.expiresAt).toISOString(),
+          runtimeDisplayMetadata: consumed.runtimeDisplayMetadata
         })
       )
     } catch (error) {
@@ -166,6 +177,17 @@ export class HiveRuntimeCloudWebLaunchService {
   revalidateSession(principal: E2EEAuthenticatedCloudSession): boolean {
     const context = this.presence.getCurrentLeaseContext()
     return context ? this.registry.revalidate(principal, context.tuple, this.now()) : false
+  }
+
+  readDisplayMetadata(principal: E2EEAuthenticatedCloudSession, signal?: AbortSignal) {
+    return readManagedRuntimeDisplayMetadata({
+      principal,
+      registry: this.registry,
+      getContext: () => this.presence.getCurrentLeaseContext(),
+      client: this.client,
+      now: this.now,
+      signal
+    })
   }
 
   revokeManagedSession(
@@ -272,19 +294,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function websocketUrl(config: HiveRuntimeCloudWebLaunchConfig): string {
   return `wss://${new URL(config.publicOrigin).host}${config.websocketPath}`
-}
-
-function sameTuple(
-  left: Parameters<HiveRuntimeCloudManagedSessionRegistry['fenceTuple']>[0],
-  right: Parameters<HiveRuntimeCloudManagedSessionRegistry['fenceTuple']>[0]
-): boolean {
-  return (
-    left.authorityGeneration === right.authorityGeneration &&
-    left.runtimeRecordId === right.runtimeRecordId &&
-    left.runtimeInstanceId === right.runtimeInstanceId &&
-    left.bootId === right.bootId &&
-    left.heartbeatLeaseId === right.heartbeatLeaseId &&
-    left.leaseEpoch === right.leaseEpoch &&
-    left.fencingEpoch === right.fencingEpoch
-  )
 }

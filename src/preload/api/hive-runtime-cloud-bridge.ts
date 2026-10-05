@@ -11,6 +11,8 @@ export const hiveRuntimeCloudApi = {
   getDirectory: () => ipcRenderer.invoke('hiveRuntimeCloud:getDirectory'),
   refreshDirectory: () => ipcRenderer.invoke('hiveRuntimeCloud:refreshDirectory'),
   updateDisplayName: (request) => ipcRenderer.invoke('hiveRuntimeCloud:updateDisplayName', request),
+  discardDisplayName: (request) =>
+    ipcRenderer.invoke('hiveRuntimeCloud:discardDisplayName', request),
   getLocalOwnership: () => ipcRenderer.invoke('hiveRuntimeCloud:getLocalOwnership'),
   refreshLocalOwnership: () => ipcRenderer.invoke('hiveRuntimeCloud:refreshLocalOwnership'),
   claimLocalRuntime: (request) => ipcRenderer.invoke('hiveRuntimeCloud:claimLocalRuntime', request),

@@ -11,7 +11,7 @@ import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shar
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
-import { getHostDisplayLabelOverrides } from '../../../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import type { buildRows } from '../grouping/build-rows'
 import {
   buildRuntimeOfflineRows,
@@ -122,10 +122,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
       }),
     [pendingCreationKeys]
   )
-  const hostLabelOverrides = useMemo(
-    () => getHostDisplayLabelOverrides(args.settings),
-    [args.settings]
-  )
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const hostOptions = useMemo(
     () =>
       buildSidebarHostOptions({

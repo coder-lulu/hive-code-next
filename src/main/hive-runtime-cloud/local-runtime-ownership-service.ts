@@ -21,7 +21,7 @@ import {
   type HeadlessClaim,
   type LocalRuntimeOwnershipServiceOptions
 } from './local-runtime-ownership-contracts'
-import { LocalRuntimeOwnershipSession, ownershipErrorCode } from './local-runtime-ownership-session'
+import { LocalRuntimeOwnershipSession } from './local-runtime-ownership-session'
 import { LocalRuntimeRegistration } from './local-runtime-registration'
 
 export {
@@ -140,7 +140,13 @@ export class LocalRuntimeOwnershipService {
       })
       registrationNotificationPending = true
       this.session.assertAccountCurrent(operation, authorization)
-      this.session.publishClaimed(authorization, claimed.runtimeRecordId)
+      const ownershipEpoch = await this.registration.requireCurrentAccountOwnership(
+        claimed.runtimeRecordId,
+        authorization,
+        operation.controller.signal
+      )
+      this.session.assertAccountCurrent(operation, authorization)
+      this.session.publishClaimed(authorization, claimed.runtimeRecordId, ownershipEpoch)
       registrationNotificationPending = false
       this.session.notifyRegistrationChanged()
       return this.session.getState()
@@ -298,12 +304,7 @@ export class LocalRuntimeOwnershipService {
       if (this.session.isOperationStale(operation)) {
         return
       }
-      this.session.publishAnalysis(authorization, {
-        relation: 'UNVERIFIABLE',
-        runtimeRecordId: this.session.getState().runtimeRecordId,
-        claimCapabilityAvailable: false,
-        errorCode: ownershipErrorCode(error)
-      })
+      this.session.publishUnverifiable(authorization, error)
     } finally {
       this.session.finishOperation(operation)
     }

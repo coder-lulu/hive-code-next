@@ -82,10 +82,16 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
   function resolveActionTarget(target: HostActionTarget | null) {
     const host =
       target?.scopeRevision === scopeRevision ? resolveCurrentHost(target.host) : undefined
-    return host && hostCatalogEntryHasLocalPairing(host) ? host : undefined
+    return host &&
+      (hostCatalogEntryHasLocalPairing(host) ||
+        (sessionScope && host.accessSources?.includes('account-claimed')))
+      ? host
+      : undefined
   }
   const validActionTarget = resolveActionTarget(actionTarget)
-  const validRemoveTarget = resolveActionTarget(confirmRemove)
+  const removeTarget = resolveActionTarget(confirmRemove)
+  const validRemoveTarget =
+    removeTarget && hostCatalogEntryHasLocalPairing(removeTarget) ? removeTarget : undefined
   useEffect(() => {
     if (actionTarget && !validActionTarget) {
       setActionTarget(null)
@@ -217,16 +223,9 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
     if (!host) {
       return
     }
-    if (!hostCatalogEntryHasLocalPairing(host)) {
-      Alert.alert(
-        'Account Runtime',
-        'Manage this Runtime and its sessions from your HiveCloud account.'
-      )
-      return
-    }
-    if (host.profile) {
+    if (host.profile || (sessionScope && host.accessSources?.includes('account-claimed'))) {
       setActionTarget({ host, scopeRevision })
-    } else {
+    } else if (hostCatalogEntryHasLocalPairing(host)) {
       setConfirmRemove({ host, scopeRevision })
     }
   }
@@ -345,9 +344,15 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
       <ActionSheetModal
         visible={validActionTarget != null}
         title={validActionTarget?.name}
-        message={validActionTarget ? hostEndpointLabel(validActionTarget.endpoint) : undefined}
+        message={
+          validActionTarget?.accessSources?.includes('account-claimed')
+            ? '管理账号运行环境与云端别名'
+            : validActionTarget
+              ? hostEndpointLabel(validActionTarget.endpoint)
+              : undefined
+        }
         actions={getHostListActionSheetActions({
-          host: validActionTarget?.profile ?? null,
+          host: validActionTarget ?? null,
           state: actionTarget
             ? resolveHomeHostConnectionState(
                 actionTarget.host.id,
@@ -372,9 +377,16 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
               data.router.push({ pathname: '/connection-log', params: { hostId: id } })
             ),
           onEdit: (hostId) => performHostAction(hostId, openMobileHostEdit),
+          onSessions: (hostId) =>
+            performHostAction(hostId, () => {
+              const runtimeRecordId = actionTarget?.host.runtimeRecordId
+              if (runtimeRecordId) {
+                data.router.push({ pathname: '/runtime-sessions', params: { runtimeRecordId } })
+              }
+            }),
           onRemove: () => {
             const host = resolveActionTarget(actionTarget)
-            if (host) {
+            if (host && hostCatalogEntryHasLocalPairing(host)) {
               setConfirmRemove({ host, scopeRevision })
             }
           }
@@ -383,9 +395,9 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
       />
       <ConfirmModal
         visible={validRemoveTarget != null}
-        title="Remove Host"
-        message={`Remove "${validRemoveTarget?.name}"? You can re-pair later.`}
-        confirmLabel="Remove"
+        title="移除本地配对"
+        message={`从这台手机移除“${validRemoveTarget?.name}”的本地配对？此操作不会解除云端认领。`}
+        confirmLabel="移除"
         destructive
         onConfirm={() => void handleRemove()}
         onCancel={() => setConfirmRemove(null)}

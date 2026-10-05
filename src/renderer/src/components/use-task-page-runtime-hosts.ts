@@ -8,7 +8,7 @@ import { resolveVisibleTaskProvider } from '../../../shared/task-providers'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import type { RuntimeProviderPreflightStatus } from '@/components/task-source-provider-availability'
 import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
-import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import { TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
@@ -56,6 +56,7 @@ export function useTaskPageRuntimeHosts(model: TaskPageRepoSelectionModel) {
         : [],
     [selectedRepos, taskSource]
   )
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const hostRegistryById = useMemo(
     () =>
       new Map(
@@ -67,14 +68,15 @@ export function useTaskPageRuntimeHosts(model: TaskPageRepoSelectionModel) {
             sshConnectionStates,
             runtimeEnvironments,
             runtimeStatusByEnvironmentId,
-            hostLabelOverrides: getHostDisplayLabelOverrides(settings)
+            hostLabelOverrides: hostLabelOverrides
           }),
-          getHostDisplayLabelOverrides(settings),
+          hostLabelOverrides,
           i18n.resolvedLanguage
         ).map((host) => [host.id, host])
       ),
     [
       i18n.resolvedLanguage,
+      hostLabelOverrides,
       repos,
       settings,
       sshConnectionStates,

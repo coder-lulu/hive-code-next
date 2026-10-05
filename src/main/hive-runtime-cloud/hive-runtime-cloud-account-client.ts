@@ -109,7 +109,11 @@ export class HiveRuntimeCloudAccountClient extends HiveRuntimeCloudHttpClient {
       signal
     )
     const parsed = normalizeRuntimeDisplayNamePatchResponse(response)
-    if (parsed.runtimeRecordId !== runtimeRecordId) {
+    if (
+      parsed.runtimeRecordId !== runtimeRecordId ||
+      parsed.cloudDisplayName !== normalizedName ||
+      parsed.cloudDisplayNameVersion < expectedCloudDisplayNameVersion
+    ) {
       throw new Error('invalid_hive_runtime_cloud_display_name_response')
     }
     return parsed

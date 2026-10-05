@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { Alert } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useMobileAuthSession } from '../src/auth/mobile-auth-session'
 import {
   FutureFeatureAction,
@@ -43,10 +43,16 @@ type RevokeOperation = {
 }
 
 export default function RuntimeSessionsScreen() {
+  const params = useLocalSearchParams<{ runtimeRecordId?: string }>()
+  const runtimeRecordId = typeof params.runtimeRecordId === 'string' ? params.runtimeRecordId : null
   const { hydrated, session: accountSession } = useMobileAuthSession()
   const { listSessions, revokeSession } = useAccountRuntimeDirectory()
   const scopeKey = accountSession
-    ? JSON.stringify([accountSession.authorityId, accountSession.account.accountId])
+    ? JSON.stringify([
+        accountSession.authorityId,
+        accountSession.account.accountId,
+        runtimeRecordId
+      ])
     : null
   const scopeRef = useRef(scopeKey)
   scopeRef.current = scopeKey
@@ -56,7 +62,10 @@ export default function RuntimeSessionsScreen() {
   const [loadingScope, setLoadingScope] = useState<string | null>(null)
   const [scopedError, setScopedError] = useState<ScopedError | null>(null)
   const [revokeOperation, setRevokeOperation] = useState<RevokeOperation | null>(null)
-  const sessions = loaded?.scopeKey === scopeKey ? loaded.items : []
+  const sessions =
+    loaded?.scopeKey === scopeKey
+      ? loaded.items.filter((item) => !runtimeRecordId || item.runtimeRecordId === runtimeRecordId)
+      : []
   const loading = loadingScope === scopeKey
   const error = scopedError?.scopeKey === scopeKey ? scopedError.message : null
   const revokingId = revokeOperation?.scopeKey === scopeKey ? revokeOperation.id : null
@@ -165,7 +174,11 @@ export default function RuntimeSessionsScreen() {
     <FutureFeatureScreen
       capabilityId="account"
       title="Runtime 会话"
-      description="查看当前账号在 Web、电脑和手机上的 Runtime 访问会话，并强制撤销不再使用的会话。"
+      description={
+        runtimeRecordId
+          ? '查看此运行环境在 Web、电脑和手机上的访问会话，并撤销不再使用的会话。'
+          : '查看当前账号在 Web、电脑和手机上的 Runtime 访问会话，并强制撤销不再使用的会话。'
+      }
     >
       <FutureFeatureNotice title={signedIn ? '账号会话' : '请先登录'}>
         {signedIn
@@ -181,7 +194,10 @@ export default function RuntimeSessionsScreen() {
         ) : loading && sessions.length === 0 ? (
           <FutureFeatureRow label="Runtime 会话" value="读取中" />
         ) : sessions.length === 0 ? (
-          <FutureFeatureRow label="Runtime 会话" value="暂无会话" />
+          <FutureFeatureRow
+            label="Runtime 会话"
+            value={runtimeRecordId ? '本页暂无此运行环境的会话' : '暂无会话'}
+          />
         ) : (
           sessions.map((item) => {
             const canRevoke =
@@ -212,6 +228,7 @@ export default function RuntimeSessionsScreen() {
         <>
           <FutureFeatureNotice title={`第 ${page.cursors.length} 页 · 本页 ${sessions.length} 条`}>
             每页最多 25 条。重连会产生独立的访问记录，已结束的记录仍可查看。
+            {runtimeRecordId ? '按当前运行环境筛选本页的账号会话，可继续翻页查看更多。' : null}
           </FutureFeatureNotice>
           <FutureFeatureAction
             disabled={loading || revokingId !== null || page.cursors.length <= 1}

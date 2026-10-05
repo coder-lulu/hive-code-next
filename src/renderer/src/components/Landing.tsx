@@ -31,6 +31,7 @@ import mascotUrl from '../../../../resources/desktop-home-mascot-float.png'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { getDesktopHomeWebLaunchIssue } from './landing/desktop-home-web-launch'
 import { translate } from '@/i18n/i18n'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 
 type HomeScene = 'code' | 'automation'
 const SCENES: { id: HomeScene; icon: typeof Code2; labelKey: string; placeholderKey: string }[] = [
@@ -88,6 +89,7 @@ export default function Landing(): React.JSX.Element {
   const openSettingsPage = useAppStore((state) => state.openSettingsPage)
   const openSettingsTarget = useAppStore((state) => state.openSettingsTarget)
   const openModal = useAppStore((state) => state.openModal)
+  const hostLabelById = useExecutionHostDisplayLabels()
   const model = useMemo(
     () =>
       buildDesktopHomeModel({
@@ -104,7 +106,8 @@ export default function Landing(): React.JSX.Element {
         activeWorktreeId,
         activeRepoId,
         activeWorkspaceExecutionHostId,
-        collapsedGroups
+        collapsedGroups,
+        hostLabelById
       }),
     [
       activeRepoId,
@@ -120,7 +123,8 @@ export default function Landing(): React.JSX.Element {
       repos,
       tabsByWorktree,
       unifiedTabsByWorktree,
-      worktreesByRepo
+      worktreesByRepo,
+      hostLabelById
     ]
   )
   // Keep the development surface as the default so the hero copy, composer

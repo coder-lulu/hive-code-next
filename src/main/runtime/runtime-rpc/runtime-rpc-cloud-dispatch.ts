@@ -4,6 +4,7 @@ import type { AuthenticatedCloudManagedSocket } from '../rpc/mobile-socket-wirin
 import { fingerprintAuthenticatedPairingCredential } from '../rpc/orchestration-mutation-executor'
 import { RuntimeRpcRequestAdmission } from './runtime-rpc-request-admission'
 import { classifyRuntimeLongPoll } from './runtime-rpc-long-poll'
+import { HiveRuntimeDisplayMetadataError } from '../../hive-runtime-cloud/hive-runtime-cloud-display-metadata-service'
 
 // Cloud ownership changes are available only through the local authenticated metadata transport.
 export const LOCAL_ONLY_RPC_METHODS = new Set([
@@ -111,7 +112,13 @@ export class RuntimeRpcCloudDispatch extends RuntimeRpcRequestAdmission {
     if (!this.revalidateCloudSession(socket)) {
       reply(
         JSON.stringify(
-          this.buildError(request.id, 'unauthorized', 'Cloud-managed session is expired or revoked')
+          this.buildError(
+            request.id,
+            request.method === 'cloudRuntime.displayMetadata'
+              ? 'runtime_display_metadata_binding_invalid'
+              : 'unauthorized',
+            'Cloud-managed session is expired or revoked'
+          )
         )
       )
       return
@@ -126,6 +133,11 @@ export class RuntimeRpcCloudDispatch extends RuntimeRpcRequestAdmission {
           )
         )
       )
+      return
+    }
+
+    if (request.method === 'cloudRuntime.displayMetadata') {
+      await this.handleDisplayMetadata(request, reply, socket, ws)
       return
     }
 
@@ -156,6 +168,68 @@ export class RuntimeRpcCloudDispatch extends RuntimeRpcRequestAdmission {
     } finally {
       abortRegistration?.dispose()
       this.releaseLongPoll(longPoll, clientId)
+    }
+  }
+
+  private async handleDisplayMetadata(
+    request: RpcRequest,
+    reply: (response: string) => void,
+    socket: AuthenticatedCloudManagedSocket,
+    ws: WebSocket | undefined
+  ): Promise<void> {
+    if (
+      !request.params ||
+      typeof request.params !== 'object' ||
+      Array.isArray(request.params) ||
+      Object.keys(request.params).length !== 0
+    ) {
+      reply(
+        JSON.stringify(
+          this.buildError(
+            request.id,
+            'runtime_display_metadata_request_invalid',
+            'Expected empty metadata params'
+          )
+        )
+      )
+      return
+    }
+    const abort = ws ? this.registerWebSocketDispatchAbort(ws) : null
+    try {
+      if (!this.cloudWebLaunchService) {
+        throw new HiveRuntimeDisplayMetadataError('runtime_display_metadata_unverifiable')
+      }
+      const result = await this.cloudWebLaunchService.readDisplayMetadata(
+        socket.principal,
+        abort?.signal
+      )
+      if (!this.revalidateCloudSession(socket)) {
+        throw new HiveRuntimeDisplayMetadataError('runtime_display_metadata_binding_invalid')
+      }
+      reply(
+        JSON.stringify({
+          id: request.id,
+          ok: true,
+          result,
+          _meta: { runtimeId: this.runtime.getRuntimeId() }
+        })
+      )
+    } catch (error) {
+      const code =
+        error instanceof HiveRuntimeDisplayMetadataError
+          ? error.code
+          : 'runtime_display_metadata_unverifiable'
+      const response = this.buildError(request.id, code, 'Runtime display metadata unavailable')
+      if (
+        !response.ok &&
+        error instanceof HiveRuntimeDisplayMetadataError &&
+        error.retryAfterMs != null
+      ) {
+        response.error.data = { retryAfterMs: error.retryAfterMs }
+      }
+      reply(JSON.stringify(response))
+    } finally {
+      abort?.dispose()
     }
   }
 }

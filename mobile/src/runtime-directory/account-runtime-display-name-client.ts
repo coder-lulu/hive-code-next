@@ -17,6 +17,7 @@ const RuntimeDisplayNamePatchResponseSchema = z
     runtimeRecordId: CanonicalUuidSchema,
     cloudDisplayName: z.string().refine(isNormalizedHiveRuntimeDisplayName).nullable(),
     cloudDisplayNameVersion: z.number().int().positive(),
+    ownershipEpoch: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     updatedAt: InstantSchema
   })
   .strict()

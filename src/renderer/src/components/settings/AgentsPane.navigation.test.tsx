@@ -5,9 +5,12 @@ import userEvent from '@testing-library/user-event'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { useAppStore } from '@/store'
+import { i18n, translate } from '@/i18n/i18n'
+import { CODEX_TERMINAL_SERVER_ISOLATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import { TooltipProvider } from '../ui/tooltip'
 import { AgentsPane } from './AgentsPane'
 import { AGENT_DEFAULT_ENV_DRAFT_MAX_BYTES } from './agent-default-env-draft'
+import { getCodexTerminalServerIsolationTitle } from './codex-terminal-server-isolation-copy'
 
 vi.mock('@/hooks/useDetectedAgents', () => ({
   useDetectedAgents: () => ({
@@ -42,10 +45,16 @@ function mountPane(settings = getDefaultSettings('/tmp')) {
 }
 
 describe('Agents settings navigation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    Reflect.deleteProperty(globalThis, '__ORCA_WEB_CLIENT__')
+    await i18n.changeLanguage('en')
   })
-  afterEach(cleanup)
+  afterEach(async () => {
+    cleanup()
+    Reflect.deleteProperty(globalThis, '__ORCA_WEB_CLIENT__')
+    await i18n.changeLanguage('en')
+  })
 
   it('can repair an existing undetected command override without exposing other launch fields', () => {
     const updateSettings = mountPane({
@@ -201,6 +210,69 @@ describe('Agents settings navigation', () => {
       'true'
     )
     expect(screen.getByRole('radiogroup', { name: 'Agent Permissions' })).toBeTruthy()
+  })
+
+  it('opens the Codex isolation switch from the notice target and saves both switch states', () => {
+    const updateSettings = mountPane()
+    act(() =>
+      useAppStore.getState().openSettingsTarget({
+        pane: 'agents',
+        repoId: null,
+        sectionId: CODEX_TERMINAL_SERVER_ISOLATION_SETTINGS_TARGET_ID
+      })
+    )
+    expect(screen.getByRole('tab', { name: 'Run preferences' }).getAttribute('aria-selected')).toBe(
+      'true'
+    )
+    const control = screen.getByRole('switch', { name: getCodexTerminalServerIsolationTitle() })
+    expect(control.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(control)
+    expect(updateSettings).toHaveBeenNthCalledWith(1, { codexTerminalServerIsolation: false })
+    expect(control.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(control)
+    expect(updateSettings).toHaveBeenNthCalledWith(2, { codexTerminalServerIsolation: true })
+    expect(updateSettings).toHaveBeenCalledTimes(2)
+    expect(control.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it.each(['shared server', 'daemon', 'isolate'])(
+    'opens the visible Codex isolation switch when searching for %s',
+    (query) => {
+      mountPane()
+      act(() => useAppStore.setState({ settingsSearchQuery: query }))
+      expect(
+        screen.getByRole('tab', { name: 'Run preferences' }).getAttribute('aria-selected')
+      ).toBe('true')
+      expect(
+        screen.getByRole('switch', { name: getCodexTerminalServerIsolationTitle() })
+      ).toBeTruthy()
+    }
+  )
+
+  it('keeps a desktop-only Codex search result from selecting a hidden row in paired web clients', () => {
+    Reflect.set(globalThis, '__ORCA_WEB_CLIENT__', true)
+    mountPane()
+    act(() => useAppStore.setState({ settingsSearchQuery: 'shared server' }))
+    expect(
+      screen.getByRole('tab', { name: 'Agent management' }).getAttribute('aria-selected')
+    ).toBe('true')
+    expect(
+      screen.queryByRole('switch', { name: getCodexTerminalServerIsolationTitle() })
+    ).toBeNull()
+  })
+
+  it('finds the localized Codex isolation control by its Chinese description', async () => {
+    await i18n.changeLanguage('zh')
+    mountPane()
+    act(() => useAppStore.setState({ settingsSearchQuery: '共享后台服务' }))
+    expect(screen.getByRole('tab', { name: '运行偏好' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('switch', { name: '让每个 Codex 终端独立运行' })).toBeTruthy()
+    expect(
+      translate('terminal.codexTerminalServerIsolationNotice.description', 'Missing notice')
+    ).toContain('运行偏好')
+    expect(
+      translate('terminal.codexTerminalServerIsolationNotice.openSettings', 'Open Settings')
+    ).toBe('打开设置')
   })
 
   it('opens and focuses the matching agent configuration from its installed card', () => {

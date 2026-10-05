@@ -4,11 +4,29 @@ import { MIN_COMPATIBLE_RUNTIME_SERVER_VERSION } from '../../../shared/protocol-
 import { APP_DISPLAY_NAME } from '../product-brand'
 import {
   encodePairingCode,
+  installApi,
   installBrowserGlobals,
   writeStoredRuntimeEnvironment
 } from './web-preload-api-test-harness'
 
 describe('web runtime environment identity', () => {
+  it('rejects unsupported cloud alias writes and draft discard instead of reporting a saved result', async () => {
+    const { api } = await installApi('Linux')
+    await expect(
+      api.hiveRuntimeCloud.updateDisplayName({
+        runtimeRecordId: '11111111-1111-4111-8111-111111111111',
+        cloudDisplayName: '名称',
+        expectedCloudDisplayNameVersion: 1,
+        expectedOwnershipEpoch: 8
+      })
+    ).rejects.toThrow('CAPABILITY_UNAVAILABLE')
+    await expect(
+      api.hiveRuntimeCloud.discardDisplayName({
+        runtimeRecordId: '11111111-1111-4111-8111-111111111111',
+        revision: 1
+      })
+    ).rejects.toThrow('CAPABILITY_UNAVAILABLE')
+  })
   it('enters the existing app with the account Relay client without persisting connection material', async () => {
     const globals = installBrowserGlobals('Linux')
     const { WebAccountSession } = await import('./account-runtime-relay/web-account-session')
@@ -26,6 +44,9 @@ describe('web runtime environment identity', () => {
         runtimeRecordId: '11111111-1111-4111-8111-111111111111',
         status: 'CLAIMED',
         resourceVersion: 1,
+        ownershipEpoch: 8,
+        cloudDisplayName: null,
+        cloudDisplayNameVersion: 1,
         deviceName: 'My computer'
       },
       session,
@@ -75,7 +96,15 @@ describe('web runtime environment identity', () => {
       websocketUrl: 'wss://runtime.example/_hive/runtime-rpc',
       serverPublicKeyB64: 'server-public-key',
       sessionToken: 'A'.repeat(43),
-      expiresAt: '2026-08-25T09:00:00.000Z'
+      expiresAt: '2026-08-25T09:00:00.000Z',
+      runtimeDisplayMetadata: {
+        runtimeRecordId: '423e4567-e89b-42d3-a456-426614174000',
+        resourceVersion: 7,
+        ownershipEpoch: 8,
+        cloudDisplayName: null,
+        cloudDisplayNameVersion: 1,
+        deviceName: '设备'
+      }
     }
     const { installWebPreloadApi } = await import('./web-preload-api')
     installWebPreloadApi(bootstrap)

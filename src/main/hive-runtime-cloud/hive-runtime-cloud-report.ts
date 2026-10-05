@@ -69,7 +69,13 @@ export function createHiveRuntimeCloudReport(
     runtimeVersion,
     runtimeProtocolVersion: 3,
     capabilities: webLaunch
-      ? ['pairing-v3', 'runtime-health-v1', 'connection-ticket-v1', 'web-launch-grant-v1']
+      ? [
+          'pairing-v3',
+          'runtime-health-v1',
+          'connection-ticket-v1',
+          'web-launch-grant-v1',
+          'web-session-display-metadata-v1'
+        ]
       : ['pairing-v3', 'runtime-health-v1'],
     ...readiness(status),
     startedAt: new Date(runtime.getStartedAt()).toISOString(),

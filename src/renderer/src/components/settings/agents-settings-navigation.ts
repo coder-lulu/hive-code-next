@@ -1,5 +1,6 @@
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
+import { CODEX_TERMINAL_SERVER_ISOLATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import { rankSettingsSearchItems } from './settings-search'
 import { getAgentsPaneSearchEntries } from './agents-search'
 
@@ -25,7 +26,8 @@ export function resolveAgentsSettingsTarget(
       'agent-tab-titles',
       'agent-awake',
       'agent-cache-timer',
-      'agent-permissions'
+      'agent-permissions',
+      CODEX_TERMINAL_SERVER_ISOLATION_SETTINGS_TARGET_ID
     ].includes(targetId)
   ) {
     return { tab: 'preferences', targetId }

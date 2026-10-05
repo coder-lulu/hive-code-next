@@ -35,6 +35,7 @@ function register(
     currentTuple: currentTuple(),
     expiresAt: NOW + 60_000,
     controlVersion: 1,
+    ownershipEpoch: 8,
     sessionToken: SESSION_TOKEN,
     ...overrides
   })
@@ -48,7 +49,8 @@ describe('Hive Runtime Cloud managed session registry', () => {
       runtimeSessionId: RUNTIME_SESSION_ID,
       currentTuple: currentTuple(),
       expiresAt: NOW + 60_000,
-      controlVersion: 1
+      controlVersion: 1,
+      ownershipEpoch: 8
     })
 
     expect(created.sessionToken).toMatch(/^[A-Za-z0-9_-]{43}$/)

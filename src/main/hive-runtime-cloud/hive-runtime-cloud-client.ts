@@ -28,6 +28,11 @@ import {
 } from './hive-runtime-cloud-claim-response'
 import { normalizeHiveRuntimeCloudAuthorityId } from './hive-runtime-cloud-capabilities-response'
 import { HiveRuntimeCloudAccountClient } from './hive-runtime-cloud-account-client'
+import {
+  parseRuntimeWebSessionDisplayMetadata,
+  RUNTIME_DISPLAY_METADATA_PATH,
+  type RuntimeWebSessionDisplayMetadata
+} from '../../shared/runtime-display-metadata'
 
 export type {
   RuntimeClaim,
@@ -212,6 +217,15 @@ export class HiveRuntimeCloudClient extends HiveRuntimeCloudAccountClient {
   ): Promise<RuntimeWebSessionControlPull> {
     return normalizeWebSessionControlPull(
       await this.request('/hive/v1/runtime-web-sessions/control-pull', request, {}, 200, signal)
+    )
+  }
+
+  async readWebSessionDisplayMetadata(
+    request: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<RuntimeWebSessionDisplayMetadata> {
+    return parseRuntimeWebSessionDisplayMetadata(
+      await this.request(RUNTIME_DISPLAY_METADATA_PATH, request, {}, 200, signal)
     )
   }
 

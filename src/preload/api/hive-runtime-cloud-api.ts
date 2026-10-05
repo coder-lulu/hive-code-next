@@ -3,6 +3,7 @@ import type {
   HiveLocalRuntimeClaimRequest,
   HiveLocalRuntimeOwnershipState,
   HiveRuntimeDisplayNameUpdateRequest,
+  HiveRuntimeDisplayNameDiscardRequest,
   HiveRuntimeSessionPage,
   HiveRuntimeSessionRevocation,
   HiveRuntimeSessionRevokeRequest
@@ -13,6 +14,9 @@ export type HiveRuntimeCloudApi = {
   refreshDirectory: () => Promise<HiveAccountRuntimeDirectoryState>
   updateDisplayName: (
     request: HiveRuntimeDisplayNameUpdateRequest
+  ) => Promise<HiveAccountRuntimeDirectoryState>
+  discardDisplayName: (
+    request: HiveRuntimeDisplayNameDiscardRequest
   ) => Promise<HiveAccountRuntimeDirectoryState>
   getLocalOwnership: () => Promise<HiveLocalRuntimeOwnershipState>
   refreshLocalOwnership: () => Promise<HiveLocalRuntimeOwnershipState>

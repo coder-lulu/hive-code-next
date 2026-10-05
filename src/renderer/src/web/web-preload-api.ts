@@ -78,6 +78,8 @@ export function installWebPreloadApi(
 }
 
 function createWebPreloadApi(): Partial<PreloadApi> {
+  const unavailableCloudCapability = (): Promise<never> =>
+    Promise.reject(new Error('CAPABILITY_UNAVAILABLE'))
   return {
     hiveTasks: {
       listCompanies: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
@@ -100,6 +102,19 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       () => webRuntimeState.activeAccountBootstrap,
       closeActiveRuntimeClients
     ),
+    hiveRuntimeCloud: {
+      getDirectory: unavailableCloudCapability,
+      refreshDirectory: unavailableCloudCapability,
+      getLocalOwnership: unavailableCloudCapability,
+      refreshLocalOwnership: unavailableCloudCapability,
+      updateDisplayName: unavailableCloudCapability,
+      discardDisplayName: unavailableCloudCapability,
+      claimLocalRuntime: unavailableCloudCapability,
+      listSessions: unavailableCloudCapability,
+      revokeSession: unavailableCloudCapability,
+      onDirectoryChanged: () => () => undefined,
+      onOwnershipChanged: () => () => undefined
+    },
     ...createWebE2EApi(),
     ...createWebSettingsApi(),
     keybindings: createWebKeybindingsApi(),

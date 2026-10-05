@@ -23,7 +23,9 @@ const switchedAuthorization: HiveRuntimeCloudAuthorization = {
 describe('HiveRuntimeDisplayNameCoordinator', () => {
   it('does not issue conflict refetches with an authorization that was replaced in flight', async () => {
     const firstPatch = deferred<{ cloudDisplayNameVersion: number }>()
-    const getOwnedRuntime = vi.fn()
+    const getOwnedRuntime = vi
+      .fn()
+      .mockResolvedValue(directoryEntry({ cloudDisplayName: 'Previous name' }))
     const fixture = createCoordinator({
       getOwnedRuntime,
       updateOwnedRuntimeDisplayName: vi.fn().mockReturnValue(firstPatch.promise)
@@ -38,7 +40,7 @@ describe('HiveRuntimeDisplayNameCoordinator', () => {
       expect(fixture.client.updateOwnedRuntimeDisplayName).toHaveBeenCalledOnce()
     )
 
-    expect(getOwnedRuntime).not.toHaveBeenCalled()
+    expect(getOwnedRuntime).toHaveBeenCalledOnce()
   })
 
   it('never sends an old desired name after a newer revision is queued during conflict refetch', async () => {
@@ -46,7 +48,7 @@ describe('HiveRuntimeDisplayNameCoordinator', () => {
     const updateOwnedRuntimeDisplayName = vi
       .fn()
       .mockRejectedValueOnce(new HiveRuntimeCloudRequestError(409, null))
-      .mockResolvedValueOnce({ cloudDisplayNameVersion: 2 })
+      .mockResolvedValueOnce({ ownershipEpoch: 1, cloudDisplayNameVersion: 2 })
     const fixture = createCoordinator({
       getOwnedRuntime: vi.fn().mockReturnValue(directoryRead.promise),
       updateOwnedRuntimeDisplayName
@@ -57,33 +59,37 @@ describe('HiveRuntimeDisplayNameCoordinator', () => {
 
     fixture.enqueue('New name')
     directoryRead.resolve(directoryEntry())
-    await vi.waitFor(() => expect(updateOwnedRuntimeDisplayName).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(updateOwnedRuntimeDisplayName).toHaveBeenCalledOnce())
 
-    expect(updateOwnedRuntimeDisplayName.mock.calls.map((call) => call[1])).toEqual([
-      'Old name',
-      'New name'
-    ])
+    expect(updateOwnedRuntimeDisplayName.mock.calls.map((call) => call[1])).toEqual(['New name'])
   })
 
-  it('clears a conflicted task when refetch proves the ownership resource epoch changed', async () => {
+  it('blocks and retains a task when a read proves the ownership epoch changed', async () => {
     const updateOwnedRuntimeDisplayName = vi
       .fn()
       .mockRejectedValueOnce(new HiveRuntimeCloudRequestError(409, null))
     const fixture = createCoordinator({
       getOwnedRuntime: vi
         .fn()
-        .mockResolvedValue(directoryEntry({ resourceVersion: 2, cloudDisplayNameVersion: 9 })),
+        .mockResolvedValue(
+          directoryEntry({ resourceVersion: 2, ownershipEpoch: 2, cloudDisplayNameVersion: 9 })
+        ),
       updateOwnedRuntimeDisplayName
     })
     fixture.coordinator.setAuthorization(firstAuthorization)
     fixture.enqueue('Offline rename')
 
-    await vi.waitFor(() => expect(fixture.coordinator.getPending()).toEqual([]))
-    expect(updateOwnedRuntimeDisplayName).toHaveBeenCalledOnce()
+    await vi.waitFor(() =>
+      expect(fixture.coordinator.getPending()[0]).toMatchObject({
+        status: 'BLOCKED',
+        errorCode: 'OWNERSHIP_CHANGED'
+      })
+    )
+    expect(updateOwnedRuntimeDisplayName).not.toHaveBeenCalled()
     expect(fixture.requestDirectoryRefresh).toHaveBeenCalledOnce()
   })
 
-  it('preserves the old alias fence when an ordinary directory refresh sees a new resource epoch', async () => {
+  it('preserves the old alias fence when the resource snapshot and ownership epoch change', async () => {
     const updateOwnedRuntimeDisplayName = vi.fn().mockRejectedValue(new Error('offline'))
     const fixture = createCoordinator({
       getOwnedRuntime: vi.fn(),
@@ -99,6 +105,7 @@ describe('HiveRuntimeDisplayNameCoordinator', () => {
 
     expect(fixture.state().tasks[0]).toMatchObject({
       expectedResourceVersion: 1,
+      expectedOwnershipEpoch: 1,
       expectedCloudDisplayNameVersion: 1
     })
   })
@@ -106,13 +113,15 @@ describe('HiveRuntimeDisplayNameCoordinator', () => {
   it('keeps a confirmed overlay through stale directory reads and clears it after a competing write', async () => {
     const fixture = createCoordinator({
       getOwnedRuntime: vi.fn(),
-      updateOwnedRuntimeDisplayName: vi.fn().mockResolvedValue({ cloudDisplayNameVersion: 4 })
+      updateOwnedRuntimeDisplayName: vi
+        .fn()
+        .mockResolvedValue({ ownershipEpoch: 1, cloudDisplayNameVersion: 4 })
     })
     fixture.coordinator.setAuthorization(firstAuthorization)
     fixture.enqueue('Accepted name')
     await vi.waitFor(() =>
       expect(fixture.coordinator.getPending()).toEqual([
-        expect.objectContaining({ desiredName: 'Accepted name', confirmed: true })
+        expect.objectContaining({ desiredName: 'Accepted name', status: 'CONFIRMED' })
       ])
     )
 
@@ -127,31 +136,39 @@ describe('HiveRuntimeDisplayNameCoordinator', () => {
     expect(fixture.coordinator.getPending()).toEqual([])
   })
 
-  it('clears a confirmed overlay when the directory proves a new ownership epoch', async () => {
+  it('blocks a confirmed overlay and retains its draft when ownership changes', async () => {
     const fixture = createCoordinator({
       getOwnedRuntime: vi.fn(),
-      updateOwnedRuntimeDisplayName: vi.fn().mockResolvedValue({ cloudDisplayNameVersion: 4 })
+      updateOwnedRuntimeDisplayName: vi
+        .fn()
+        .mockResolvedValue({ ownershipEpoch: 1, cloudDisplayNameVersion: 4 })
     })
     fixture.coordinator.setAuthorization(firstAuthorization)
     fixture.enqueue('Accepted name')
-    await vi.waitFor(() => expect(fixture.coordinator.getPending()[0]?.confirmed).toBe(true))
+    await vi.waitFor(() => expect(fixture.coordinator.getPending()[0]?.status).toBe('CONFIRMED'))
 
     fixture.coordinator.reconcileDirectory([
       directoryEntry({
         resourceVersion: 2,
+        ownershipEpoch: 2,
         cloudDisplayName: 'Reclaimed Runtime',
         cloudDisplayNameVersion: 3
       })
     ])
 
-    expect(fixture.coordinator.getPending()).toEqual([])
+    expect(fixture.coordinator.getPending()[0]).toMatchObject({
+      status: 'BLOCKED',
+      desiredName: 'Accepted name'
+    })
   })
 
   it('requests one directory refresh for a successful multi-task retry pass', async () => {
     const fixture = createCoordinator(
       {
         getOwnedRuntime: vi.fn(),
-        updateOwnedRuntimeDisplayName: vi.fn().mockResolvedValue({ cloudDisplayNameVersion: 2 })
+        updateOwnedRuntimeDisplayName: vi
+          .fn()
+          .mockResolvedValue({ ownershipEpoch: 1, cloudDisplayNameVersion: 2 })
       },
       [
         pendingTask('123e4567-e89b-42d3-a456-426614174001', 'First', 1),
@@ -162,7 +179,9 @@ describe('HiveRuntimeDisplayNameCoordinator', () => {
 
     fixture.coordinator.setAuthorization(firstAuthorization)
     await vi.waitFor(() =>
-      expect(fixture.coordinator.getPending().every((task) => task.confirmed)).toBe(true)
+      expect(fixture.coordinator.getPending().every((task) => task.status === 'CONFIRMED')).toBe(
+        true
+      )
     )
 
     expect(fixture.client.updateOwnedRuntimeDisplayName).toHaveBeenCalledTimes(3)
@@ -178,9 +197,14 @@ function createCoordinator(
   initialTasks: DesktopPendingDisplayNameState['tasks'] = []
 ) {
   let state: DesktopPendingDisplayNameState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     nextRevision: initialTasks.length + 1,
     tasks: initialTasks
+  }
+  if (!client.getOwnedRuntime.getMockImplementation()) {
+    client.getOwnedRuntime.mockImplementation(async (id: string) =>
+      directoryEntry({ runtimeRecordId: id })
+    )
   }
   const requestDirectoryRefresh = vi.fn()
   const coordinator = new HiveRuntimeDisplayNameCoordinator(
@@ -205,7 +229,8 @@ function createCoordinator(
         runtimeRecordId,
         desiredName,
         expectedCloudDisplayNameVersion: 1,
-        expectedResourceVersion: 1
+        expectedResourceVersion: 1,
+        expectedOwnershipEpoch: 1
       })
   }
 }
@@ -222,9 +247,14 @@ function pendingTask(
     desiredName,
     expectedCloudDisplayNameVersion: 1,
     expectedResourceVersion: 1,
+    expectedOwnershipEpoch: 1,
     revision,
-    dormant: false,
-    confirmed: false,
+    status: 'QUEUED',
+    errorCode: null,
+    resumeStatus: null,
+    latestCloudDisplayName: null,
+    latestCloudDisplayNameVersion: null,
+    retryNotBefore: null,
     confirmedCloudDisplayNameVersion: null
   }
 }
@@ -239,6 +269,7 @@ function directoryEntry(
     runtimeProtocolVersion: 3,
     capabilities: [],
     resourceVersion: 1,
+    ownershipEpoch: 1,
     createdAt: 1,
     updatedAt: 1,
     claimedAt: 1,

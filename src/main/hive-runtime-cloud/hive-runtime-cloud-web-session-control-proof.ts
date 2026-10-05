@@ -1,5 +1,10 @@
 import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-store'
 import {
+  RUNTIME_DISPLAY_METADATA_PATH,
+  RUNTIME_DISPLAY_METADATA_PROTOCOL,
+  RUNTIME_DISPLAY_METADATA_PROOF_PROTOCOL
+} from '../../shared/runtime-display-metadata'
+import {
   attachSignature,
   baseProof,
   canonicalRuntimeHeartbeatBody,
@@ -60,6 +65,37 @@ export function createRuntimeWebSessionControlPullRequest(
     body,
     'hive-runtime-web-session-control-pull/v1',
     '/hive/v1/runtime-web-sessions/control-pull',
+    context
+  )
+}
+
+export function createRuntimeWebSessionDisplayMetadataRequest(
+  identity: HiveRuntimeCloudIdentity,
+  input: RuntimeControlTuple &
+    Readonly<{
+      managedWebSessionId: string
+      runtimeSessionId: string
+      expectedOwnershipEpoch: number
+    }>,
+  context: ProofContext
+) {
+  return createControlRequest(
+    identity,
+    {
+      protocolVersion: RUNTIME_DISPLAY_METADATA_PROTOCOL,
+      managedWebSessionId: input.managedWebSessionId,
+      runtimeSessionId: input.runtimeSessionId,
+      authorityGeneration: input.authorityGeneration,
+      runtimeRecordId: input.runtimeRecordId,
+      runtimeInstanceId: identity.runtimeInstanceId,
+      bootId: input.bootId,
+      heartbeatLeaseId: input.heartbeatLeaseId,
+      leaseEpoch: input.leaseEpoch,
+      fencingEpoch: input.fencingEpoch,
+      expectedOwnershipEpoch: input.expectedOwnershipEpoch
+    },
+    RUNTIME_DISPLAY_METADATA_PROOF_PROTOCOL,
+    RUNTIME_DISPLAY_METADATA_PATH,
     context
   )
 }

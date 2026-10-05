@@ -159,6 +159,7 @@ export type DesktopHomeWorkspace = {
   branch: string
   badgeColor: string | null
   hostLabel: 'local' | 'ssh' | 'cloud'
+  hostDisplayName?: string
   executionHostId: ExecutionHostId
   runtimeLabel?: string
   sessionCount: number
@@ -176,6 +177,7 @@ export type DesktopHomeProject = {
   identityKey: string
   name: string
   /** All repository sources that belong to this logical project on this host. */
+  hostDisplayName?: string
   repoIds: string[]
   repoId: string | null
   projectGroupId: string | null
@@ -254,4 +256,5 @@ export type BuildDesktopHomeModelInput = {
   activeWorkspaceExecutionHostId?: ExecutionHostId | null
   /** Resolved Sidebar state; persisted group.isCollapsed is not read by home. */
   collapsedGroups?: ReadonlySet<string>
+  hostLabelById?: ReadonlyMap<ExecutionHostId, string>
 }

@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { getWorktreeExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
 import { getLocalizedExecutionHostLabel } from '@/lib/localized-execution-host-label'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import CommentMarkdown from '../sidebar/CommentMarkdown'
 import { DetailHeader, MetadataActionIcon } from '../sidebar/WorktreeCardMetadataControls'
 import {
@@ -27,7 +27,6 @@ import type { AgentPaneThread } from './activity-thread-types'
 
 export function ActivityThreadHoverCardSummary({
   thread,
-  settings,
   onJumpToWorkspace,
   canJumpToWorkspace
 }: {
@@ -42,7 +41,7 @@ export function ActivityThreadHoverCardSummary({
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const executionHostId = getWorktreeExecutionHostId(worktree, repo ?? undefined)
   const parsedHost = parseExecutionHostId(executionHostId)
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const hostDisplayLabel = useMemo(() => {
     const override = hostLabelOverrides.get(executionHostId)
     if (override) {

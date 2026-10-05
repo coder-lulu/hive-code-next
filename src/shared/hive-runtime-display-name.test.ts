@@ -41,28 +41,19 @@ describe('Hive Runtime display names', () => {
     expect(isNormalizedHiveRuntimeDisplayName('Cafe\u0301')).toBe(false)
   })
 
-  it('resolves pending, cloud, local, reported, and short-id names in order', () => {
+  it('resolves confirmed cloud, reported device, and short-id names in order', () => {
     const base = {
       runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       cloudDisplayName: 'Cloud',
-      localPairedName: 'Local',
       reportedDeviceName: 'Reported'
     }
 
-    expect(resolveHiveRuntimeDisplayName({ ...base, pendingDesiredName: 'Pending' })).toBe(
-      'Pending'
-    )
     expect(resolveHiveRuntimeDisplayName(base)).toBe('Cloud')
-    expect(resolveHiveRuntimeDisplayName({ ...base, pendingDesiredName: null })).toBe('Local')
-    expect(resolveHiveRuntimeDisplayName({ ...base, cloudDisplayName: null })).toBe('Local')
-    expect(
-      resolveHiveRuntimeDisplayName({ ...base, cloudDisplayName: null, localPairedName: null })
-    ).toBe('Reported')
+    expect(resolveHiveRuntimeDisplayName({ ...base, cloudDisplayName: null })).toBe('Reported')
     expect(
       resolveHiveRuntimeDisplayName({
         ...base,
         cloudDisplayName: null,
-        localPairedName: null,
         reportedDeviceName: null
       })
     ).toBe('Runtime aaaaaaaa')

@@ -1,10 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
-import { normalizeHiveRuntimeDisplayName } from '../../../../shared/hive-runtime-display-name'
+import { useRef } from 'react'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 import { translate } from '@/i18n/i18n'
-import { useAppStore } from '@/store'
 import { Button } from '../ui/button'
 import {
   Dialog,
@@ -16,94 +12,63 @@ import {
 } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { getRuntimeDisplayNameTaskLabel } from './runtime-cloud-display-name-status'
+import { useRuntimeCloudDisplayNameDraft } from './use-runtime-cloud-display-name-draft'
 
 type RuntimeCloudDisplayNameDialogProps = Readonly<{
   environment: PublicKnownRuntimeEnvironment | null
   onClose: () => void
 }>
 
-export function RuntimeCloudDisplayNameDialog({
+export function RuntimeCloudDisplayNameDialog(
+  props: RuntimeCloudDisplayNameDialogProps
+): React.JSX.Element {
+  return (
+    <RuntimeCloudDisplayNameDialogContent
+      key={props.environment?.accountClaim?.runtimeRecordId ?? 'closed'}
+      {...props}
+    />
+  )
+}
+
+function RuntimeCloudDisplayNameDialogContent({
   environment,
   onClose
 }: RuntimeCloudDisplayNameDialogProps): React.JSX.Element {
-  const updateDisplayName = useAppStore((state) => state.updateAccountRuntimeDisplayName)
-  const [name, setName] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const initializedRuntimeRecordIdRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (!environment?.accountClaim) {
-      initializedRuntimeRecordIdRef.current = null
-      return
-    }
-    const runtimeRecordId = environment.accountClaim.runtimeRecordId
-    if (initializedRuntimeRecordIdRef.current !== runtimeRecordId) {
-      initializedRuntimeRecordIdRef.current = runtimeRecordId
-      setName(environment.name)
-      setError(null)
-    }
-  }, [environment])
-
-  const submit = async (desiredName: string | null): Promise<void> => {
-    const claim = environment?.accountClaim
-    if (!claim || claim.cloudDisplayNameVersion == null || saving) {
-      return
-    }
-    let cloudDisplayName: string | null = null
-    try {
-      cloudDisplayName = desiredName === null ? null : normalizeHiveRuntimeDisplayName(desiredName)
-    } catch {
-      setError(
-        translate(
-          'auto.components.settings.RuntimeCloudDisplayNameDialog.invalidName',
-          'Enter 1–128 characters without control or bidirectional formatting characters.'
-        )
-      )
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      await updateDisplayName({
-        runtimeRecordId: claim.runtimeRecordId,
-        cloudDisplayName,
-        expectedCloudDisplayNameVersion: claim.cloudDisplayNameVersion
-      })
-      toast.success(
-        cloudDisplayName === null
-          ? translate(
-              'auto.components.settings.RuntimeCloudDisplayNameDialog.clearSuccess',
-              'Cloud Runtime name clear queued. It will sync with HiveCloud when available.'
-            )
-          : translate(
-              'auto.components.settings.RuntimeCloudDisplayNameDialog.renameSuccess',
-              'Runtime name change queued. It will sync with HiveCloud when available.'
-            )
-      )
-      onClose()
-    } catch {
-      setError(
-        translate(
-          'auto.components.settings.RuntimeCloudDisplayNameDialog.saveFailed',
-          'Could not save the Runtime name. Refresh the Runtime list and try again.'
-        )
-      )
-    } finally {
-      setSaving(false)
-    }
-  }
-
+  const openerRef = useRef<HTMLElement | null>(null)
+  const draft = useRuntimeCloudDisplayNameDraft(environment)
+  const cloudName =
+    environment?.accountClaim?.cloudDisplayName ??
+    environment?.accountClaim?.reportedDeviceName ??
+    translate('runtimeCloudAlias.clearedName', 'Use device name')
   return (
     <Dialog
       open={environment !== null}
       onOpenChange={(open) => {
-        if (!open && !saving) {
+        if (!open) {
           onClose()
         }
       }}
     >
-      <DialogContent className="max-w-sm sm:max-w-sm" showCloseButton={false}>
+      <DialogContent
+        className="max-w-sm sm:max-w-sm"
+        showCloseButton={false}
+        onOpenAutoFocus={() => {
+          const opener = document.activeElement
+          openerRef.current =
+            opener instanceof HTMLElement && opener !== document.body && opener.isConnected
+              ? opener
+              : null
+        }}
+        onCloseAutoFocus={(event) => {
+          const opener = openerRef.current
+          openerRef.current = null
+          if (opener?.isConnected) {
+            event.preventDefault()
+            opener.focus({ preventScroll: true })
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {translate(
@@ -118,44 +83,117 @@ export function RuntimeCloudDisplayNameDialog({
             )}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="runtime-cloud-display-name">
-            {translate(
-              'auto.components.settings.RuntimeCloudDisplayNameDialog.label',
-              'Runtime name'
-            )}
-          </Label>
-          <Input
-            id="runtime-cloud-display-name"
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value)
-              setError(null)
-            }}
-            disabled={saving}
-            autoFocus
-          />
-          {error ? (
-            <p className="text-sm text-destructive" role="alert" aria-live="assertive">
-              {error}
+        <div className="space-y-3">
+          <p className="break-words text-sm text-muted-foreground">
+            {translate('runtimeCloudAlias.cloudName', 'Cloud name: {{name}}', { name: cloudName })}
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="runtime-cloud-display-name">
+              {translate(
+                'auto.components.settings.RuntimeCloudDisplayNameDialog.label',
+                'Runtime name'
+              )}
+            </Label>
+            <Input
+              id="runtime-cloud-display-name"
+              value={draft.name}
+              disabled={draft.busy}
+              aria-invalid={Boolean(draft.error)}
+              aria-describedby={draft.error ? 'runtime-cloud-display-name-error' : undefined}
+              onChange={(event) => {
+                draft.setName(event.target.value)
+                draft.clearError()
+              }}
+            />
+            {draft.error ? (
+              <p
+                id="runtime-cloud-display-name-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-sm text-destructive"
+              >
+                {draft.error}
+              </p>
+            ) : null}
+          </div>
+          {draft.task ? (
+            <p className="break-words text-sm text-muted-foreground" role="status">
+              {getRuntimeDisplayNameTaskLabel(draft.task)}
             </p>
+          ) : draft.queued ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {translate('runtimeCloudAlias.queued', 'Name change queued')}
+            </p>
+          ) : null}
+          {draft.needsConfirmation ? (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <p className="break-words text-sm">
+                {translate(
+                  'runtimeCloudAlias.reviewDraft',
+                  'Review the current cloud name before submitting your draft as a new change.'
+                )}
+              </p>
+              {draft.task?.latestCloudDisplayNameVersion ? (
+                <p className="break-words text-xs text-muted-foreground">
+                  {translate(
+                    'runtimeCloudAlias.latestCloudName',
+                    'Last verified cloud name: {{name}}',
+                    {
+                      name:
+                        draft.task.latestCloudDisplayName ??
+                        translate('runtimeCloudAlias.clearedName', 'Use device name')
+                    }
+                  )}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={draft.busy}
+                  onClick={() => void draft.checkAgain()}
+                >
+                  {translate('runtimeCloudAlias.checkAgain', 'Check cloud again')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={draft.busy}
+                  onClick={() => void draft.adoptCloudName()}
+                >
+                  {translate('runtimeCloudAlias.adoptCloud', 'Discard draft and use cloud name')}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={draft.busy}
+                  onClick={() => void draft.submit(draft.name, true)}
+                >
+                  {translate('runtimeCloudAlias.confirmDraft', 'Confirm submitting my draft')}
+                </Button>
+              </div>
+            </div>
           ) : null}
         </div>
         <DialogFooter className="sm:justify-between">
-          <Button variant="outline" onClick={() => void submit(null)} disabled={saving}>
+          <Button
+            variant="outline"
+            onClick={() => void draft.submit(null)}
+            disabled={draft.busy || draft.needsConfirmation}
+          >
             {translate(
               'auto.components.settings.RuntimeCloudDisplayNameDialog.clear',
               'Clear cloud name'
             )}
           </Button>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={saving}>
-              {translate('auto.components.settings.RuntimeCloudDisplayNameDialog.cancel', 'Cancel')}
+            <Button variant="outline" onClick={onClose}>
+              {translate('runtimeCloudAlias.close', 'Close')}
             </Button>
-            <Button onClick={() => void submit(name)} disabled={saving}>
-              {saving ? <Loader2 className="animate-spin" /> : null}
-              {translate('auto.components.settings.RuntimeCloudDisplayNameDialog.save', 'Save')}
-            </Button>
+            {!draft.needsConfirmation ? (
+              <Button onClick={() => void draft.submit(draft.name)} disabled={draft.busy}>
+                {translate('auto.components.settings.RuntimeCloudDisplayNameDialog.save', 'Save')}
+              </Button>
+            ) : null}
           </div>
         </DialogFooter>
       </DialogContent>

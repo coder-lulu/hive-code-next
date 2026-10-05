@@ -13,7 +13,15 @@ const bootstrap = {
   websocketUrl: 'wss://runtime.example/_hive/runtime',
   serverPublicKeyB64: 'c2VydmVyLXB1YmxpYy1rZXk=',
   sessionToken: 'A'.repeat(43),
-  expiresAt: '2026-08-25T12:34:56Z'
+  expiresAt: '2026-08-25T12:34:56Z',
+  runtimeDisplayMetadata: {
+    runtimeRecordId: '423e4567-e89b-42d3-a456-426614174000',
+    resourceVersion: 7,
+    ownershipEpoch: 8,
+    cloudDisplayName: '<备用> 🐝',
+    cloudDisplayNameVersion: 2,
+    deviceName: '设备'
+  }
 }
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
@@ -60,6 +68,31 @@ describe('cloud launch bootstrap exchange', () => {
       })
     ],
     ['an extra response field', jsonResponse({ ...bootstrap, deviceToken: 'must-not-cross' })],
+    ['missing runtime metadata', jsonResponse({ ...bootstrap, runtimeDisplayMetadata: undefined })],
+    [
+      'metadata without an explicit nullable alias',
+      jsonResponse({
+        ...bootstrap,
+        runtimeDisplayMetadata: { ...bootstrap.runtimeDisplayMetadata, cloudDisplayName: undefined }
+      })
+    ],
+    [
+      'metadata leaking an account field',
+      jsonResponse({
+        ...bootstrap,
+        runtimeDisplayMetadata: { ...bootstrap.runtimeDisplayMetadata, accountId: 'must-not-cross' }
+      })
+    ],
+    [
+      'unsafe metadata version',
+      jsonResponse({
+        ...bootstrap,
+        runtimeDisplayMetadata: {
+          ...bootstrap.runtimeDisplayMetadata,
+          ownershipEpoch: Number.MAX_SAFE_INTEGER + 1
+        }
+      })
+    ],
     [
       'a non-canonical session UUID',
       jsonResponse({ ...bootstrap, runtimeSessionId: 'not-a-uuid' })

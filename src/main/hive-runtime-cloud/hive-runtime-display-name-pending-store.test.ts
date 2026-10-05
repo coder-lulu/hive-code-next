@@ -35,7 +35,7 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
     temporaryDirectories.push(root)
     const store = new HiveRuntimeDisplayNamePendingStore(root)
     const state: DesktopPendingDisplayNameState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       nextRevision: Number.MAX_SAFE_INTEGER,
       tasks: Array.from(
         {
@@ -58,7 +58,7 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
 
   it('rejects a new target at capacity without discarding old tasks', () => {
     let state: DesktopPendingDisplayNameState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       nextRevision: 1,
       tasks: []
     }
@@ -84,7 +84,8 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
         runtimeRecordId: runtimeId(index),
         desiredName: `Desk ${index}`,
         expectedCloudDisplayNameVersion: 1,
-        expectedResourceVersion: 1
+        expectedResourceVersion: 1,
+        expectedOwnershipEpoch: 1
       })
     }
 
@@ -93,7 +94,8 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
         runtimeRecordId: runtimeId(MAXIMUM_DESKTOP_PENDING_DISPLAY_NAMES),
         desiredName: 'Overflow',
         expectedCloudDisplayNameVersion: 1,
-        expectedResourceVersion: 1
+        expectedResourceVersion: 1,
+        expectedOwnershipEpoch: 1
       })
     ).toThrow('hive_runtime_display_name_pending_capacity')
 
@@ -107,7 +109,8 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
         runtimeRecordId: runtimeId(0),
         desiredName: 'Latest first target',
         expectedCloudDisplayNameVersion: 2,
-        expectedResourceVersion: 1
+        expectedResourceVersion: 1,
+        expectedOwnershipEpoch: 1
       })
     ).not.toThrow()
     expect(state.tasks).toHaveLength(MAXIMUM_DESKTOP_PENDING_DISPLAY_NAMES)
@@ -119,7 +122,7 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
 
   it('gives each authority and account scope an independent capacity quota', () => {
     let state: DesktopPendingDisplayNameState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       nextRevision: 1,
       tasks: []
     }
@@ -144,7 +147,8 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
         runtimeRecordId: runtimeId(index),
         desiredName: `Account A ${index}`,
         expectedCloudDisplayNameVersion: 1,
-        expectedResourceVersion: 1
+        expectedResourceVersion: 1,
+        expectedOwnershipEpoch: 1
       })
     }
 
@@ -160,7 +164,8 @@ describe('HiveRuntimeDisplayNamePendingStore', () => {
         runtimeRecordId: runtimeId(MAXIMUM_DESKTOP_PENDING_DISPLAY_NAMES),
         desiredName: 'Account B desk',
         expectedCloudDisplayNameVersion: 1,
-        expectedResourceVersion: 1
+        expectedResourceVersion: 1,
+        expectedOwnershipEpoch: 1
       })
     ).not.toThrow()
     expect(state.tasks).toHaveLength(MAXIMUM_DESKTOP_PENDING_DISPLAY_NAMES + 1)
@@ -202,9 +207,14 @@ function maximumSizeTask(index: number, scopeIndex: number): DesktopPendingRunti
     desiredName: '😀'.repeat(128),
     expectedCloudDisplayNameVersion: Number.MAX_SAFE_INTEGER,
     expectedResourceVersion: Number.MAX_SAFE_INTEGER,
+    expectedOwnershipEpoch: Number.MAX_SAFE_INTEGER,
     revision: Number.MAX_SAFE_INTEGER - index,
-    dormant: false,
-    confirmed: true,
+    status: 'CONFIRMED',
+    errorCode: null,
+    resumeStatus: null,
+    latestCloudDisplayName: null,
+    latestCloudDisplayNameVersion: null,
+    retryNotBefore: null,
     confirmedCloudDisplayNameVersion: Number.MAX_SAFE_INTEGER
   }
 }

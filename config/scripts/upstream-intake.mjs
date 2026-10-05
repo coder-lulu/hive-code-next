@@ -3,7 +3,7 @@ import path from 'node:path'
 import { classifySyncBoundaryPath } from './audit-fork-delta.mjs'
 import { classifyUpstreamChange, loadPriorityManifest } from './track-upstream-changes.mjs'
 import { collectCommitHistory, collectPatchIds } from './upstream-intake-history.mjs'
-import { collectImportedAdaptations } from './public-baseline.mjs'
+import { collectImportedAdaptations, readPublicBaseline } from './public-baseline.mjs'
 import { verifyUpstreamTreeSync } from './upstream-tree-sync.mjs'
 import {
   commitSet,
@@ -231,9 +231,7 @@ export async function collectIntakeReport({
     throw new Error('Candidate does not contain the frozen product state commit')
   }
   const importedAdaptations = collectImportedAdaptations({ git, head: headSha })
-  const root = git(['rev-list', '--max-parents=0', range.stateRef, '--']).trim().split(/\s+/)
-  const publicBaseline =
-    root.length === 1 && readCommitJson(git, root[0], 'config/open-source-baseline.json', true)
+  const publicBaseline = readPublicBaseline({ git, head: range.stateRef })
   const treeProof = publicBaseline
     ? verifyUpstreamTreeSync({
         cwd,

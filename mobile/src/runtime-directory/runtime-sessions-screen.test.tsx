@@ -6,6 +6,7 @@ import type { MobileSession } from '../auth/mobile-sms-auth'
 import type { RuntimeSession, RuntimeSessionPage } from './account-runtime-directory-types'
 
 const dependencies = vi.hoisted(() => ({
+  params: { runtimeRecordId: '' },
   accountSession: null as MobileSession | null,
   alert: vi.fn(),
   listSessions: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('react-native', () => ({ Alert: { alert: dependencies.alert } }))
 vi.mock('expo-router', async () => {
   const React = await import('react')
   return {
+    useLocalSearchParams: () => dependencies.params,
     useFocusEffect(effect: () => void | (() => void)): void {
       React.useEffect(effect, [effect])
     }
@@ -103,6 +105,7 @@ describe('Runtime sessions account isolation', () => {
   let renderer: ReactTestRenderer | null = null
 
   beforeEach(() => {
+    dependencies.params = { runtimeRecordId: '' }
     dependencies.accountSession = account('account-a')
     dependencies.alert.mockReset()
     dependencies.listSessions.mockReset()
@@ -112,6 +115,48 @@ describe('Runtime sessions account isolation', () => {
   afterEach(() => {
     act(() => renderer?.unmount())
     renderer = null
+  })
+
+  it('shows only the selected Runtime while keeping other Runtime sessions untouched', async () => {
+    const first = runtimeSession('Selected', '11111111-1111-4111-8111-111111111111')
+    const other = {
+      ...runtimeSession('Other', '44444444-4444-4444-8444-444444444444'),
+      runtimeRecordId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    }
+    dependencies.params.runtimeRecordId = first.runtimeRecordId
+    dependencies.listSessions.mockResolvedValueOnce({ items: [first, other], nextCursor: null })
+    renderer = await renderScreen()
+    expect(row(renderer, '手机 · Selected')).toBeDefined()
+    expect(row(renderer, '手机 · Other')).toBeUndefined()
+    expect(dependencies.revokeSession).not.toHaveBeenCalled()
+  })
+
+  it('allows paging past a page without sessions for the selected Runtime', async () => {
+    dependencies.params.runtimeRecordId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    dependencies.listSessions.mockResolvedValueOnce({
+      items: [runtimeSession('Other', '11111111-1111-4111-8111-111111111111')],
+      nextCursor: 'next'
+    })
+    renderer = await renderScreen()
+    expect(row(renderer, '手机 · Other')).toBeUndefined()
+    expect(row(renderer, 'Runtime 会话')?.props.value).toBe('本页暂无此运行环境的会话')
+    const next = renderer.root
+      .findAllByType('FutureFeatureAction')
+      .find((action) => action.props.label === '下一页')!
+    expect(next.props.disabled).toBe(false)
+  })
+
+  it('invalidates a revoke confirmation after the selected Runtime changes', async () => {
+    const first = runtimeSession('First', '11111111-1111-4111-8111-111111111111')
+    dependencies.params.runtimeRecordId = first.runtimeRecordId
+    dependencies.listSessions.mockResolvedValue({ items: [first], nextCursor: null })
+    renderer = await renderScreen()
+    act(() => row(renderer!, '手机 · First')!.props.onPress())
+    const confirm = dependencies.alert.mock.calls[0][2][1].onPress
+    dependencies.params.runtimeRecordId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    await act(async () => renderer!.update(createElement(RuntimeSessionsScreen)))
+    await act(async () => confirm())
+    expect(dependencies.revokeSession).not.toHaveBeenCalled()
   })
 
   it('hides already-loaded account A rows immediately after switching to B', async () => {

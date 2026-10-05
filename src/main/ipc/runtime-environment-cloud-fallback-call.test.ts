@@ -35,6 +35,9 @@ function environment(local = true): PublicKnownRuntimeEnvironment {
     accountClaim: {
       runtimeRecordId: 'record-1',
       resourceVersion: 7,
+      ownershipEpoch: 1,
+      cloudDisplayName: null,
+      cloudDisplayNameVersion: 1,
       presence: 'ONLINE',
       readiness: 'READY',
       readinessReasonCode: null,

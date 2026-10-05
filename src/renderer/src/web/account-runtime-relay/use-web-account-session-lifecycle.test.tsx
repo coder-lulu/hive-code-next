@@ -105,6 +105,9 @@ describe('connected browser account revalidation', () => {
       session.material({
         runtimeRecordId: '11111111-1111-4111-8111-111111111111',
         resourceVersion: 1,
+        ownershipEpoch: 8,
+        cloudDisplayName: null,
+        cloudDisplayNameVersion: 1,
         status: 'CLAIMED'
       })
     ).rejects.toMatchObject({ status: 403 })

@@ -1,9 +1,27 @@
 import type { HiveAccountRuntimeDirectoryEntry } from '../../shared/hive-runtime-cloud'
 import {
   HiveRuntimeCloudRequestError,
-  type HiveRuntimeCloudClient,
+  HiveRuntimeCloudClient,
   type HiveRuntimeCloudTransportError
 } from './hive-runtime-cloud-client'
+
+export type HiveAccountRuntimeDirectoryClient = {
+  listOwnedRuntimes: HiveRuntimeCloudClient['listOwnedRuntimes']
+  createConnectionIntent?: HiveRuntimeCloudClient['createConnectionIntent']
+  getOwnedRuntime?: HiveRuntimeCloudClient['getOwnedRuntime']
+  updateOwnedRuntimeDisplayName?: HiveRuntimeCloudClient['updateOwnedRuntimeDisplayName']
+}
+
+export type HiveAccountRuntimeDirectoryDependencies = Readonly<{
+  createClient: (apiBaseUrl: string) => HiveAccountRuntimeDirectoryClient
+  now: () => number
+}>
+
+export const defaultHiveAccountRuntimeDirectoryDependencies: HiveAccountRuntimeDirectoryDependencies =
+  {
+    createClient: (apiBaseUrl) => new HiveRuntimeCloudClient(apiBaseUrl),
+    now: Date.now
+  }
 
 const PAGE_SIZE = 100
 const MAXIMUM_DIRECTORY_ITEMS = 10_000

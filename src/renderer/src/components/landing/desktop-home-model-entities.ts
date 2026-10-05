@@ -99,6 +99,7 @@ function makeWorktreeWorkspace(
     branch: branchLabel(worktree.branch, worktree.isMainWorktree),
     badgeColor: repo.badgeColor ?? null,
     hostLabel: hostLabel(executionHostId),
+    hostDisplayName: input.hostLabelById?.get(executionHostId),
     executionHostId,
     sessionCount: legacySessionCount ? tabs.length : sessions.length,
     sessions,
@@ -152,6 +153,7 @@ function makeFolderWorkspace(
     branch: 'folder',
     badgeColor: null,
     hostLabel: hostLabel(executionHostId),
+    hostDisplayName: input.hostLabelById?.get(executionHostId),
     executionHostId,
     sessionCount: sessions.length,
     sessions,
@@ -230,6 +232,7 @@ export function buildHomeEntities(
       setupIndex.byProjectId,
       repos
     )
+    source.hostDisplayName = input.hostLabelById?.get(host)
     const existing = projectsByIdentity.get(source.identityKey)
     if (existing) {
       // Multiple repos can point at one Project catalog row. Merge the source

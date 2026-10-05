@@ -1,5 +1,8 @@
 import { listEnvironments } from '../../shared/runtime-environment-store'
-import type { HiveAccountRuntimeDirectoryState } from '../../shared/hive-runtime-cloud'
+import type {
+  HiveAccountRuntimeDirectoryState,
+  HiveRuntimePendingDisplayName
+} from '../../shared/hive-runtime-cloud'
 import {
   redactRuntimeEnvironment,
   type PublicKnownRuntimeEnvironment
@@ -59,12 +62,9 @@ export function resolveRuntimeEnvironmentCatalogEntry(
 
 function pendingDisplayNameMap(
   state: HiveAccountRuntimeDirectoryState | undefined
-): ReadonlyMap<string, string | null> {
+): ReadonlyMap<string, HiveRuntimePendingDisplayName> {
   return new Map(
-    (state?.pendingDisplayNames ?? []).map((pending) => [
-      pending.runtimeRecordId,
-      pending.desiredName
-    ])
+    (state?.pendingDisplayNames ?? []).map((pending) => [pending.runtimeRecordId, pending])
   )
 }
 

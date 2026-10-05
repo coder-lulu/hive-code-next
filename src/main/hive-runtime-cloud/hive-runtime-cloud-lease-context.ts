@@ -14,6 +14,21 @@ export type HiveRuntimeCloudTuple = Readonly<{
   fencingEpoch: number
 }>
 
+export function hiveRuntimeCloudTuplesEqual(
+  left: HiveRuntimeCloudTuple,
+  right: HiveRuntimeCloudTuple
+): boolean {
+  return (
+    left.authorityGeneration === right.authorityGeneration &&
+    left.runtimeRecordId === right.runtimeRecordId &&
+    left.runtimeInstanceId === right.runtimeInstanceId &&
+    left.bootId === right.bootId &&
+    left.heartbeatLeaseId === right.heartbeatLeaseId &&
+    left.leaseEpoch === right.leaseEpoch &&
+    left.fencingEpoch === right.fencingEpoch
+  )
+}
+
 export type CurrentHiveRuntimeCloudLeaseContext = Readonly<{
   authorityId: string
   identity: HiveRuntimeCloudIdentity

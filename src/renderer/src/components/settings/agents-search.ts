@@ -1,4 +1,5 @@
 import { getAgentCatalog } from '@/lib/agent-catalog'
+import { CODEX_TERMINAL_SERVER_ISOLATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import {
   getAgentAwakeDescription,
   getAgentAwakeSearchKeywords,
@@ -147,6 +148,7 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
   {
     title: getCodexTerminalServerIsolationTitle(),
     id: CODEX_TERMINAL_SERVER_ISOLATION_SEARCH_ENTRY_ID,
+    targetSectionId: CODEX_TERMINAL_SERVER_ISOLATION_SETTINGS_TARGET_ID,
     description: getCodexTerminalServerIsolationDescription(),
     keywords: getCodexTerminalServerIsolationSearchKeywords()
   },

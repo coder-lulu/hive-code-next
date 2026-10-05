@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { HiveAccountRuntimeDirectoryEntry } from '../../shared/hive-runtime-cloud'
+import type {
+  HiveAccountRuntimeDirectoryEntry,
+  HiveRuntimePendingDisplayName
+} from '../../shared/hive-runtime-cloud'
 import type { PublicKnownRuntimeEnvironment } from '../../shared/runtime-environments'
 import {
   accountRuntimeEnvironmentId,
@@ -36,6 +39,9 @@ function account(
     runtimeProtocolVersion: 3,
     capabilities: [],
     resourceVersion: 7,
+    ownershipEpoch: 1,
+    cloudDisplayName: null,
+    cloudDisplayNameVersion: 1,
     createdAt: 10,
     updatedAt: 20,
     claimedAt: 12,
@@ -65,22 +71,42 @@ describe('mergeHiveAccountRuntimeCatalog', () => {
     })
   })
 
-  it('projects account-scoped pending and cloud names without changing the local pairing', () => {
+  it('projects only confirmed account-scoped names and preserves the local pairing label as a note', () => {
     const localEntry = local({ runtimeRecordId, name: 'Local name' })
     const claimed = account({ cloudDisplayName: 'Cloud name', deviceName: 'Reported device' })
 
     expect(mergeHiveAccountRuntimeCatalog([localEntry], [claimed])[0]?.name).toBe('Cloud name')
+    const task: HiveRuntimePendingDisplayName = {
+      runtimeRecordId,
+      desiredName: 'Pending name',
+      revision: 1,
+      expectedOwnershipEpoch: 1,
+      expectedCloudDisplayNameVersion: 1,
+      status: 'QUEUED',
+      errorCode: null,
+      latestCloudDisplayName: null,
+      latestCloudDisplayNameVersion: null,
+      confirmedCloudDisplayNameVersion: null,
+      retryNotBefore: null
+    }
+    expect(
+      mergeHiveAccountRuntimeCatalog([localEntry], [claimed], new Map([[runtimeRecordId, task]]))[0]
+    ).toMatchObject({ name: 'Cloud name', localPairedName: 'Local name' })
+    const confirmed = { ...task, status: 'CONFIRMED' as const, confirmedCloudDisplayNameVersion: 2 }
     expect(
       mergeHiveAccountRuntimeCatalog(
         [localEntry],
         [claimed],
-        new Map([[runtimeRecordId, 'Pending name']])
+        new Map([[runtimeRecordId, confirmed]])
       )[0]?.name
     ).toBe('Pending name')
     expect(
-      mergeHiveAccountRuntimeCatalog([localEntry], [claimed], new Map([[runtimeRecordId, null]]))[0]
-        ?.name
-    ).toBe('Local name')
+      mergeHiveAccountRuntimeCatalog(
+        [localEntry],
+        [claimed],
+        new Map([[runtimeRecordId, { ...confirmed, desiredName: null }]])
+      )[0]?.name
+    ).toBe('Reported device')
     expect(mergeHiveAccountRuntimeCatalog([localEntry], [])[0]?.name).toBe('Local name')
   })
 

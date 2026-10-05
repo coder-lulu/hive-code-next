@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback } from 'react'
 import { AlertTriangle, Loader2, MonitorSmartphone, Server, ServerOff } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -11,7 +11,7 @@ import {
 import { useAppStore } from '../../store'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 import { translate } from '@/i18n/i18n'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import {
   isRuntimeOwnedSshTargetId,
   toRuntimeExecutionHostId
@@ -83,7 +83,7 @@ export function SshStatusSegment({
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
 
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const targets = Array.from(sshTargetLabels.entries())
     // Why: runtime-owned (per-workspace-env) SSH targets are hidden — never list them
     // as a user-facing SSH host in the status bar.

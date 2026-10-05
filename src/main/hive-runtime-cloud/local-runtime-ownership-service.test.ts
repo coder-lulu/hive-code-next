@@ -84,9 +84,10 @@ function fixture(
       credentialActivationToken: 'secret'.repeat(8),
       credentialActivationExpiresAt: 1_900
     }),
-    getOwnedRuntime: vi
-      .fn()
-      .mockResolvedValue({ runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000' }),
+    getOwnedRuntime: vi.fn().mockResolvedValue({
+      runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
+      ownershipEpoch: 1
+    }),
     reissueClaimCapability: vi.fn().mockResolvedValue({
       runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
       claimCapability: 'r'.repeat(64),

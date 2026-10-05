@@ -24,6 +24,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import {
+  isAccountClaimedExecutionHost,
+  selectLocalAccountRuntime
+} from '@/lib/execution-host-display-label'
 import { sshConnectVerb } from '@/ssh/ssh-connect-verb'
 import { parseExecutionHostId } from '../../../../shared/execution-host'
 import { describeRuntimeCompatBlock } from '../../../../shared/protocol-compat'
@@ -64,7 +68,11 @@ function openManageHost(row: HostHeaderRow): void {
   } else if (row.kind === 'ssh') {
     state.openSettingsTarget({ pane: 'servers', repoId: null, sectionId: 'devices-ssh' })
   } else {
-    state.openSettingsTarget({ pane: 'general', repoId: null })
+    state.openSettingsTarget(
+      selectLocalAccountRuntime(state)
+        ? { pane: 'servers', repoId: null, sectionId: 'current-computer' }
+        : { pane: 'general', repoId: null }
+    )
   }
   state.openSettingsPage()
 }
@@ -75,6 +83,7 @@ export function HostSectionHeaderMenu({ row }: { row: HostHeaderRow }): React.JS
   const [renameOpen, setRenameOpen] = useState(false)
   const [removeOpen, setRemoveOpen] = useState(false)
   const mountedRef = useMountedRef()
+  const isCloudRuntime = useAppStore((state) => isAccountClaimedExecutionHost(state, row.hostId))
   const sshStatus = useAppStore((s) => {
     const parsed = parseExecutionHostId(row.hostId)
     if (parsed?.kind !== 'ssh') {
@@ -231,7 +240,9 @@ export function HostSectionHeaderMenu({ row }: { row: HostHeaderRow }): React.JS
         {model.actions.includes('rename') && (
           <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
             <Pencil className="size-3.5" />
-            {translate('auto.components.sidebar.HostSectionHeaderMenu.8d1e2f3a4b', 'Rename…')}
+            {isCloudRuntime
+              ? translate('runtimeCloudAlias.editLocalNote', 'Edit local note')
+              : translate('auto.components.sidebar.HostSectionHeaderMenu.8d1e2f3a4b', 'Rename…')}
           </DropdownMenuItem>
         )}
         {model.actions.includes('ssh-reconnect') && (

@@ -7,7 +7,7 @@ import {
   resolveComposerActiveRepoId
 } from '@/lib/new-workspace-composer-repo'
 import { buildExecutionHostRegistry } from '../../../../shared/execution-host-registry'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { WorkspaceStatus } from '../../../../shared/worktree/types'
@@ -138,6 +138,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
 
   const eligibleRepos = useMemo(() => getComposerEligibleRepos(repos), [repos])
 
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const hostOptions = useMemo(
     () =>
       localizeExecutionHostRegistry(
@@ -149,13 +150,14 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
           sshConnectionStates,
           runtimeEnvironments,
           runtimeStatusByEnvironmentId,
-          hostLabelOverrides: getHostDisplayLabelOverrides(settings)
+          hostLabelOverrides: hostLabelOverrides
         }),
-        getHostDisplayLabelOverrides(settings),
+        hostLabelOverrides,
         i18n.resolvedLanguage
       ),
     [
       i18n.resolvedLanguage,
+      hostLabelOverrides,
       repos,
       settings,
       sshConnectionStates,

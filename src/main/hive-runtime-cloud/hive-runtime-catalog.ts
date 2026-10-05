@@ -1,8 +1,12 @@
 import {
   projectHiveRuntimeAccountClaim,
-  type HiveAccountRuntimeDirectoryEntry
+  type HiveAccountRuntimeDirectoryEntry,
+  type HiveRuntimePendingDisplayName
 } from '../../shared/hive-runtime-cloud'
-import { resolveHiveRuntimeDisplayName } from '../../shared/hive-runtime-display-name'
+import {
+  applyConfirmedRuntimeDisplayName,
+  resolveHiveRuntimeDisplayName
+} from '../../shared/hive-runtime-display-name'
 import {
   hasHiveRuntimeRelayCapability,
   isHiveRuntimeCrossDeviceConnectable
@@ -30,7 +34,7 @@ export function runtimeRecordIdFromAccountEnvironmentId(environmentId: string): 
 export function mergeHiveAccountRuntimeCatalog(
   localEnvironments: readonly PublicKnownRuntimeEnvironment[],
   accountRuntimes: readonly HiveAccountRuntimeDirectoryEntry[],
-  pendingDisplayNames: ReadonlyMap<string, string | null> = new Map()
+  pendingDisplayNames: ReadonlyMap<string, HiveRuntimePendingDisplayName> = new Map()
 ): PublicKnownRuntimeEnvironment[] {
   const merged = localEnvironments.map<PublicKnownRuntimeEnvironment>((environment) => ({
     ...environment,
@@ -44,7 +48,11 @@ export function mergeHiveAccountRuntimeCatalog(
     }
   }
 
-  for (const runtime of accountRuntimes) {
+  for (const snapshot of accountRuntimes) {
+    const runtime = applyConfirmedRuntimeDisplayName(
+      snapshot,
+      pendingDisplayNames.get(snapshot.runtimeRecordId)
+    )
     const accountClaim = projectHiveRuntimeAccountClaim(runtime)
     const localIndex = localByRuntimeRecordId.get(runtime.runtimeRecordId)
     if (localIndex !== undefined) {
@@ -52,21 +60,18 @@ export function mergeHiveAccountRuntimeCatalog(
       merged[localIndex] = {
         ...local,
         name: resolveHiveRuntimeDisplayName({
-          ...(pendingDisplayNames.has(runtime.runtimeRecordId)
-            ? { pendingDesiredName: pendingDisplayNames.get(runtime.runtimeRecordId)! }
-            : {}),
           cloudDisplayName: runtime.cloudDisplayName,
-          localPairedName: local.name,
           reportedDeviceName: runtime.deviceName,
           runtimeRecordId: runtime.runtimeRecordId
         }),
         runtimeRecordId: runtime.runtimeRecordId,
+        localPairedName: local.localPairedName ?? local.name,
         accessSources: ['local-pairing', 'account-claimed'],
         accountClaim
       }
       continue
     }
-    merged.push(accountOnlyEnvironment(runtime, accountClaim, pendingDisplayNames))
+    merged.push(accountOnlyEnvironment(runtime, accountClaim))
   }
   return merged
 }
@@ -74,7 +79,7 @@ export function mergeHiveAccountRuntimeCatalog(
 export function resolveHiveRuntimeCatalogEntry(
   localEnvironments: readonly PublicKnownRuntimeEnvironment[],
   accountRuntimes: readonly HiveAccountRuntimeDirectoryEntry[],
-  pendingDisplayNames: ReadonlyMap<string, string | null>,
+  pendingDisplayNames: ReadonlyMap<string, HiveRuntimePendingDisplayName>,
   selector: string
 ): PublicKnownRuntimeEnvironment {
   const localById = localEnvironments.find((entry) => entry.id === selector)
@@ -111,7 +116,7 @@ export function resolveHiveRuntimeCatalogEntry(
 function resolveLocalCatalogEntry(
   local: PublicKnownRuntimeEnvironment,
   accountRuntimes: readonly HiveAccountRuntimeDirectoryEntry[],
-  pendingDisplayNames: ReadonlyMap<string, string | null>
+  pendingDisplayNames: ReadonlyMap<string, HiveRuntimePendingDisplayName>
 ): PublicKnownRuntimeEnvironment {
   const accountRuntime = local.runtimeRecordId
     ? accountRuntimes.find((runtime) => runtime.runtimeRecordId === local.runtimeRecordId)
@@ -125,17 +130,13 @@ function resolveLocalCatalogEntry(
 
 function accountOnlyEnvironment(
   runtime: HiveAccountRuntimeDirectoryEntry,
-  accountClaim: ReturnType<typeof projectHiveRuntimeAccountClaim>,
-  pendingDisplayNames: ReadonlyMap<string, string | null>
+  accountClaim: ReturnType<typeof projectHiveRuntimeAccountClaim>
 ): PublicKnownRuntimeEnvironment {
   const id = accountRuntimeEnvironmentId(runtime.runtimeRecordId)
   const endpointId = `cloud-${runtime.runtimeRecordId}`
   return {
     id,
     name: resolveHiveRuntimeDisplayName({
-      ...(pendingDisplayNames.has(runtime.runtimeRecordId)
-        ? { pendingDesiredName: pendingDisplayNames.get(runtime.runtimeRecordId)! }
-        : {}),
       cloudDisplayName: runtime.cloudDisplayName,
       reportedDeviceName: runtime.deviceName,
       runtimeRecordId: runtime.runtimeRecordId

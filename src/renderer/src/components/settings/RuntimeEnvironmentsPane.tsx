@@ -9,8 +9,7 @@ import {
 } from './runtime-environments-search'
 import {
   getRuntimeEnvironmentRemovalPresentation,
-  isRuntimeEnvironmentRemovalBlocked,
-  resolveRuntimeCloudRenameEnvironment
+  isRuntimeEnvironmentRemovalBlocked
 } from './runtime-environment-host-details'
 import { RuntimeServersConnectSection } from './runtime-servers-connect-section'
 import { RuntimeActiveServerSection } from './runtime-active-server-section'
@@ -20,6 +19,8 @@ import {
 } from './runtime-environment-dialogs'
 import { RuntimeConnectionTroubleshooting } from './runtime-connection-troubleshooting'
 import { RuntimeCloudDisplayNameDialog } from './RuntimeCloudDisplayNameDialog'
+import { useRuntimeCloudAliasSettings } from './use-runtime-cloud-alias-settings'
+import { RuntimeCloudAliasesSection } from './runtime-cloud-aliases-section'
 import { useRuntimeEnvironmentCatalog } from './use-runtime-environment-catalog'
 import { useRuntimeEnvironmentConnectionActions } from './use-runtime-environment-connection-actions'
 import { useRuntimeEnvironmentMutationActions } from './use-runtime-environment-mutation-actions'
@@ -62,8 +63,6 @@ export function RuntimeEnvironmentsPane({
 }: RuntimeEnvironmentsPaneProps): React.JSX.Element {
   const [pendingSwitchValue, setPendingSwitchValue] = useState<string | null>(null)
   const [pendingRemove, setPendingRemove] = useState<PublicKnownRuntimeEnvironment | null>(null)
-  const [pendingCloudRenameId, setPendingCloudRenameId] = useState<string | null>(null)
-  const [pendingCloudRenameScopeKey, setPendingCloudRenameScopeKey] = useState<string | null>(null)
   const [addServerFormOpen, setAddServerFormOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const remoteServerUpdates = useAppStore((state) => state.remoteServerUpdates)
@@ -73,11 +72,7 @@ export function RuntimeEnvironmentsPane({
   const setRemoteServerUpdateDialogOpen = useAppStore(
     (state) => state.setRemoteServerUpdateDialogOpen
   )
-  const accountRuntimeDirectory = useAppStore((state) => state.accountRuntimeDirectory)
-  const currentCloudRenameScopeKey =
-    accountRuntimeDirectory.accountId && accountRuntimeDirectory.sessionGeneration != null
-      ? `${accountRuntimeDirectory.accountId}\u0000${accountRuntimeDirectory.sessionGeneration}`
-      : null
+  const refreshAccountRuntimeCloud = useAppStore((state) => state.refreshAccountRuntimeCloud)
   const consumedAddServerIntentSignalRef = useRef(0)
   const {
     environments,
@@ -87,16 +82,11 @@ export function RuntimeEnvironmentsPane({
     mountedRef,
     loadEnvironments
   } = useRuntimeEnvironmentCatalog()
-  const pendingCloudRename = resolveRuntimeCloudRenameEnvironment(
-    environments,
-    pendingCloudRenameId,
-    pendingCloudRenameScopeKey,
-    currentCloudRenameScopeKey
-  )
+  const cloudAlias = useRuntimeCloudAliasSettings(settings, environments)
 
   const getEnvironmentLabel = (value: string): string => {
     if (value === LOCAL_RUNTIME_VALUE) {
-      return 'Local desktop'
+      return cloudAlias.localEnvironment?.name ?? 'Local desktop'
     }
     if (value === NO_RUNTIME_VALUE) {
       return 'No Runtime connected'
@@ -157,12 +147,6 @@ export function RuntimeEnvironmentsPane({
     consumedAddServerIntentSignalRef.current = addServerIntentSignal
     setAddServerFormOpen(true)
   }, [addServerIntentSignal])
-  useEffect(() => {
-    if (pendingCloudRenameId !== null && pendingCloudRename === null) {
-      setPendingCloudRenameId(null)
-      setPendingCloudRenameScopeKey(null)
-    }
-  }, [pendingCloudRename, pendingCloudRenameId])
 
   const activeValue =
     settings.activeRuntimeEnvironmentId ??
@@ -214,14 +198,6 @@ export function RuntimeEnvironmentsPane({
       }
     })
   }
-  const openCloudRenameDialog = (environment: PublicKnownRuntimeEnvironment): void => {
-    if (!currentCloudRenameScopeKey || environment.accountClaim?.cloudDisplayNameVersion == null) {
-      return
-    }
-    setPendingCloudRenameScopeKey(currentCloudRenameScopeKey)
-    setPendingCloudRenameId(environment.id)
-  }
-
   return (
     <SearchableSetting
       forceVisible
@@ -230,6 +206,14 @@ export function RuntimeEnvironmentsPane({
       keywords={searchEntry.keywords}
       className="space-y-4 py-2"
     >
+      {allowLocalRuntime ? (
+        <RuntimeCloudAliasesSection
+          settings={settings}
+          localEnvironment={cloudAlias.localEnvironment}
+          environments={environments}
+          onRename={cloudAlias.open}
+        />
+      ) : null}
       <RuntimeServersConnectSection
         visible
         environments={environments}
@@ -260,8 +244,8 @@ export function RuntimeEnvironmentsPane({
         onConnect={(environment) => void connectEnvironment(environment)}
         onDisconnect={(environment) => void disconnectEnvironment(environment)}
         onRemove={openRemoveDialog}
-        canRenameCloud={currentCloudRenameScopeKey !== null}
-        onRenameCloud={openCloudRenameDialog}
+        canRenameCloud={cloudAlias.canRename}
+        onRenameCloud={cloudAlias.open}
       />
 
       <RuntimeActiveServerSection
@@ -269,6 +253,7 @@ export function RuntimeEnvironmentsPane({
         advancedOpen={advancedOpen}
         allowLocalRuntime={allowLocalRuntime}
         localRuntimeValue={LOCAL_RUNTIME_VALUE}
+        localDisplayName={cloudAlias.localEnvironment?.name}
         noRuntimeValue={NO_RUNTIME_VALUE}
         activeValue={activeValue}
         environments={environments}
@@ -280,7 +265,7 @@ export function RuntimeEnvironmentsPane({
           setSwitchError(null)
           setPendingSwitchValue(value)
         }}
-        onRefresh={() => void loadEnvironments()}
+        onRefresh={() => void refreshAccountRuntimeCloud().then(() => loadEnvironments())}
       />
 
       <RuntimeConnectionTroubleshooting />
@@ -322,11 +307,8 @@ export function RuntimeEnvironmentsPane({
       />
 
       <RuntimeCloudDisplayNameDialog
-        environment={pendingCloudRename}
-        onClose={() => {
-          setPendingCloudRenameId(null)
-          setPendingCloudRenameScopeKey(null)
-        }}
+        environment={cloudAlias.environment}
+        onClose={cloudAlias.close}
       />
     </SearchableSetting>
   )

@@ -7,7 +7,7 @@ import {
   isPaletteFilterActive
 } from '@/components/cmd-j/palette-filter'
 import { getRepoHostIdentity } from '@/store/slices/repo-host-identity'
-import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import { getSettingsFocusedExecutionHostId } from '../../../shared/execution-host'
 import type { WorktreeJumpPaletteLocalState } from './use-worktree-jump-palette-local-state'
 import type { WorktreeJumpPaletteStoreState } from './use-worktree-jump-palette-store-state'
@@ -45,7 +45,7 @@ export function useWorktreeJumpPaletteFilter({
     () => new Map(repos.map((repo) => [getRepoHostIdentity(repo), repo])),
     [repos]
   )
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const hostOptions = useMemo(
     () =>
       buildSidebarHostOptions({

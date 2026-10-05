@@ -112,13 +112,9 @@ export default function EditHostScreen() {
       }
       const displayName = runtime
         ? resolveHiveRuntimeDisplayName({
-            ...(directory.pendingDisplayNames.has(runtime.runtimeRecordId)
-              ? {
-                  pendingDesiredName: directory.pendingDisplayNames.get(runtime.runtimeRecordId)!
-                }
-              : {}),
-            cloudDisplayName: runtime.cloudDisplayName,
-            localPairedName: found?.name,
+            cloudDisplayName: directory.pendingDisplayNames.has(runtime.runtimeRecordId)
+              ? directory.pendingDisplayNames.get(runtime.runtimeRecordId)
+              : runtime.cloudDisplayName,
             reportedDeviceName: runtime.deviceName,
             runtimeRecordId: runtime.runtimeRecordId
           })
@@ -305,8 +301,7 @@ export default function EditHostScreen() {
         expectedCloudDisplayNameVersion: cloudRuntime.cloudDisplayNameVersion
       })
       const fallbackName = resolveHiveRuntimeDisplayName({
-        pendingDesiredName: null,
-        localPairedName: host?.name,
+        cloudDisplayName: null,
         reportedDeviceName: cloudRuntime.deviceName,
         runtimeRecordId: cloudRuntime.runtimeRecordId
       })
@@ -334,7 +329,9 @@ export default function EditHostScreen() {
         >
           <ChevronLeft size={22} color={theme.color.text.primary} />
         </Pressable>
-        <Text style={styles.heading}>编辑电脑</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.heading}>
+          {cloudRuntime ? '修改云端别名' : '编辑电脑'}
+        </Text>
         <Pressable
           style={({ pressed }) => [
             styles.saveButton,
@@ -388,9 +385,12 @@ export default function EditHostScreen() {
                     : '此 Runtime 来自当前 HiveCloud 账号。修改名称不会在这台手机上创建本地配对。'}
             </Text>
 
-            <Text style={styles.label}>名称</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.label}>
+              {cloudRuntime ? '云端别名' : '名称'}
+            </Text>
             <TextInput
               style={styles.input}
+              maxFontSizeMultiplier={1.3}
               accessibilityLabel="Name"
               value={name}
               onChangeText={(value) => {
@@ -405,6 +405,17 @@ export default function EditHostScreen() {
               returnKeyType="next"
             />
 
+            {nameEditedRef.current && normalizedName.error ? (
+              <Text
+                maxFontSizeMultiplier={1.3}
+                style={styles.errorText}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {normalizedName.error}
+              </Text>
+            ) : null}
+
             {cloudRuntime?.cloudDisplayNameVersion != null ? (
               <Pressable
                 style={({ pressed }) => [
@@ -416,7 +427,9 @@ export default function EditHostScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Clear HiveCloud name"
               >
-                <Text style={styles.secondaryButtonText}>清除云端名称</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.secondaryButtonText}>
+                  清除云端别名
+                </Text>
               </Pressable>
             ) : null}
 

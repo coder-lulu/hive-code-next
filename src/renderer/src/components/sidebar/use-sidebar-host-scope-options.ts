@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import {
   buildSidebarHostOptions,
   buildSidebarHostScopeOptions,
@@ -24,7 +24,7 @@ export function useSidebarHostScopeOptions(): {
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
 
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const hostOptions = useMemo(
     () =>
       buildSidebarHostOptions({

@@ -13,6 +13,7 @@ import {
   type WebAccountRuntimeClient
 } from './web-account-relay-client'
 import type { StoredWebRuntimeEnvironment } from '../web-runtime-environment'
+import { resolveHiveRuntimeDisplayName } from '../../../../shared/hive-runtime-display-name'
 
 export type WebAccountBootstrap = {
   runtime: WebAccountRuntime
@@ -24,10 +25,7 @@ export function accountRuntimeEnvironment(runtime: WebAccountRuntime): StoredWeb
   const now = Date.now()
   return {
     id: `account-${runtime.runtimeRecordId}`,
-    name:
-      runtime.cloudDisplayName ||
-      runtime.deviceName ||
-      translate('auto.web.WebAccountConnect.runtimeName', 'Hive Runtime'),
+    name: resolveHiveRuntimeDisplayName({ ...runtime, reportedDeviceName: runtime.deviceName }),
     runtimeId: null,
     runtimeRecordId: runtime.runtimeRecordId,
     preferredEndpointId: `account-${runtime.runtimeRecordId}`,

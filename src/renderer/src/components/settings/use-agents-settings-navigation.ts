@@ -16,6 +16,7 @@ export function useAgentsSettingsNavigation(
 ) {
   const searchQuery = useAppStore((state) => state.settingsSearchQuery)
   const requestedTarget = useAppStore((state) => state.settingsNavigationTarget)
+  const isWebClient = isPairedWebClientWindow()
   const [navigation, setNavigation] = useState({
     tab: 'manage' as AgentsSettingsTab,
     agent: defaultAgent && defaultAgent !== 'blank' ? defaultAgent : catalog[0].id,
@@ -32,8 +33,10 @@ export function useAgentsSettingsNavigation(
         ? resolveAgentsSettingsTarget(requestedTarget.sectionId, catalog)
         : navigation.query !== searchQuery
           ? resolveAgentsSettingsSearch(searchQuery, catalog, {
-              includeAgentAwake: !isPairedWebClientWindow(),
-              includeAgentRuntime: wslSupportedPlatform
+              includeAgentAwake: !isWebClient,
+              includeAgentRuntime: wslSupportedPlatform,
+              includeAgentWorkspaceTrust: !isWebClient,
+              includeCodexTerminalServerIsolation: !isWebClient
             })
           : null
     setNavigation({

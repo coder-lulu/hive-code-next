@@ -34,7 +34,15 @@ describe('web runtime client protocol boundary', () => {
         websocketUrl: 'wss://runtime.example/rpc',
         serverPublicKeyB64: 'cloud-key',
         sessionToken: 'session-token',
-        expiresAt: '2026-08-25T09:00:00.000Z'
+        expiresAt: '2026-08-25T09:00:00.000Z',
+        runtimeDisplayMetadata: {
+          runtimeRecordId: '423e4567-e89b-42d3-a456-426614174000',
+          resourceVersion: 7,
+          ownershipEpoch: 8,
+          cloudDisplayName: null,
+          cloudDisplayNameVersion: 1,
+          deviceName: null
+        }
       })
     ).toEqual({
       kind: 'cloud-managed',

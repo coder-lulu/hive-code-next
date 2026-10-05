@@ -117,6 +117,8 @@ pnpm run clients:build -- --target desktop
 
 内部设计、运维和审计资料通过 `docs` 私有子模块维护，需要单独授权。公开源码的普通开发、测试和客户端构建使用公开仓库中的代码与配置。
 
+维护者通过 [Upstream Sync](.github/workflows/upstream-sync.yml) 跟随 Orca 更新。同步以 `config/upstream-sync-state.json` 中已审核的上游提交为基准，并保留 `config/upstream-change-ledger.json` 中的吸收与延期记录；源码采用三方内容合并，经过产品边界复核和测试后推送主分支，审核游标才会生效。冲突、私有文档变更或未完成的必要修复会阻止发布。操作约束见 [上游同步说明](.github/CONTRIBUTING.md#upstream-synchronization)。
+
 ## 开源许可与致谢
 
 HiveCode 基于 Stably AI 的开源项目 [Orca](https://github.com/stablyai/orca) 开发，遵循 [MIT License](LICENSE)。原始版权声明与许可条件保留在许可证文件中。感谢 Orca、Stably AI 及相关开源项目的贡献者。

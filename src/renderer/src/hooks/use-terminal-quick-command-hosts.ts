@@ -8,7 +8,8 @@ import {
   parseExecutionHostId,
   type ExecutionHostId
 } from '../../../shared/execution-host'
-import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
+import { selectExecutionHostDisplayLabels } from '@/lib/execution-host-display-label'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/runtime-environments'
 import { useAppStore } from '@/store'
@@ -89,10 +90,16 @@ export function flattenTerminalQuickCommandHosts(
 
 export function getTerminalQuickCommandHostOptions(
   settings: GlobalSettings | null | undefined,
-  runtimeEnvironments: readonly Pick<PublicKnownRuntimeEnvironment, 'id' | 'name'>[],
-  language?: string
+  runtimeEnvironments: readonly Pick<
+    PublicKnownRuntimeEnvironment,
+    'id' | 'name' | 'accountClaim'
+  >[],
+  language?: string,
+  hostLabels?: ReadonlyMap<ExecutionHostId, string>
 ): { id: ExecutionHostId; label: string }[] {
-  const overrides = getHostDisplayLabelOverrides(settings)
+  const overrides =
+    hostLabels ??
+    selectExecutionHostDisplayLabels({ settings: settings ?? null, runtimeEnvironments })
   return localizeExecutionHostRegistry(
     buildExecutionHostRegistry({
       repos: [],
@@ -178,6 +185,7 @@ export function useTerminalQuickCommandHosts(
     remoteState.error
   )
 
+  const hostLabels = useExecutionHostDisplayLabels()
   const hosts = useMemo(() => {
     if (!enabled) {
       return DISABLED_TERMINAL_QUICK_COMMAND_HOSTS
@@ -185,7 +193,8 @@ export function useTerminalQuickCommandHosts(
     const hostOptions = getTerminalQuickCommandHostOptions(
       settings,
       runtimeEnvironments,
-      i18n.resolvedLanguage
+      i18n.resolvedLanguage,
+      hostLabels
     )
     const result: TerminalQuickCommandHost[] = [
       {
@@ -217,7 +226,8 @@ export function useTerminalQuickCommandHosts(
     remoteHostId,
     remoteState,
     runtimeEnvironments,
-    settings
+    settings,
+    hostLabels
   ])
 
   return {

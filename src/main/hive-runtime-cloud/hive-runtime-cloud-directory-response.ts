@@ -142,8 +142,8 @@ function normalizeEntry(value: unknown): HiveAccountRuntimeDirectoryEntry {
   const topLevelConnections = value.connectionCapabilities
   const projectedConnections = projected.connectionCapabilities
   const cloudDisplayName = optionalDisplayName(value.cloudDisplayName)
-  const cloudDisplayNameVersion = positiveIntegerOrNull(value.cloudDisplayNameVersion)
-  if (cloudDisplayName !== null && cloudDisplayNameVersion === null) {
+  const cloudDisplayNameVersion = positiveInteger(value.cloudDisplayNameVersion)
+  if (!Object.hasOwn(value, 'cloudDisplayName')) {
     throw new Error('invalid_hive_runtime_cloud_directory_response')
   }
   return {
@@ -153,6 +153,7 @@ function normalizeEntry(value: unknown): HiveAccountRuntimeDirectoryEntry {
     runtimeProtocolVersion: value.runtimeProtocolVersion,
     capabilities: strings(value.capabilities),
     resourceVersion: positiveInteger(value.resourceVersion),
+    ownershipEpoch: positiveInteger(value.ownershipEpoch),
     createdAt,
     updatedAt,
     claimedAt: optionalInstant(value.claimedAt),

@@ -1,6 +1,20 @@
-import { parseExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
+import {
+  parseExecutionHostId,
+  toRuntimeExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host'
 import { getLocalizedExecutionHostLabel } from '@/lib/localized-execution-host-label'
-import { getHostSettingOverride } from '../../../shared/host-setting-overrides'
+import {
+  getHostSettingOverride,
+  getHostDisplayLabelOverrides
+} from '../../../shared/host-setting-overrides'
+import {
+  applyConfirmedRuntimeDisplayName,
+  resolveHiveRuntimeDisplayName
+} from '../../../shared/hive-runtime-display-name'
+import type { HiveAccountRuntimeDirectoryEntry } from '../../../shared/hive-runtime-cloud'
+import type { PublicKnownRuntimeEnvironment } from '../../../shared/runtime-environments'
+import type { GlobalSettings } from '../../../shared/global-settings-types'
 import {
   getExecutionHostIdForWorktree,
   getExplicitRuntimeEnvironmentIdForWorktree
@@ -8,25 +22,117 @@ import {
 import { selectRuntimeAwareSshTargetLabel } from '@/store/slices/runtime-environment-ssh-selectors'
 import type { AppState } from '@/store/types'
 
-/**
- * What to call an execution host in front of a user: their own rename first, then the machine's
- * published name (paired runtime) or the SSH target's label, and the raw id only as a last resort.
- */
+type HostDisplayState = {
+  settings: Pick<GlobalSettings, 'hostSettingOverrides'> | null
+  runtimeEnvironments: readonly Pick<PublicKnownRuntimeEnvironment, 'id' | 'accountClaim'>[]
+} & Partial<Pick<AppState, 'accountRuntimeDirectory' | 'localRuntimeOwnership'>>
+
+export function selectLocalAccountRuntime(
+  state: HostDisplayState
+): HiveAccountRuntimeDirectoryEntry | null {
+  const directory = state.accountRuntimeDirectory
+  const ownership = state.localRuntimeOwnership
+  if (
+    !directory ||
+    !ownership ||
+    ownership.relation !== 'CLAIMED_BY_CURRENT' ||
+    ownership.accountId !== directory.accountId ||
+    ownership.sessionGeneration !== directory.sessionGeneration ||
+    !ownership.runtimeRecordId
+  ) {
+    return null
+  }
+  const runtime = directory.items.find(
+    (entry) => entry.runtimeRecordId === ownership.runtimeRecordId
+  )
+  return runtime && runtime.ownershipEpoch === ownership.ownershipEpoch
+    ? applyConfirmedRuntimeDisplayName(
+        runtime,
+        directory.pendingDisplayNames?.find(
+          (pending) => pending.runtimeRecordId === runtime.runtimeRecordId
+        )
+      )
+    : null
+}
+
+export function selectExecutionHostDisplayLabels(
+  state: HostDisplayState
+): Map<ExecutionHostId, string> {
+  const labels = new Map(getHostDisplayLabelOverrides(state.settings))
+  for (const environment of state.runtimeEnvironments ?? []) {
+    if (!environment.accountClaim) {
+      continue
+    }
+    labels.set(
+      toRuntimeExecutionHostId(environment.id),
+      resolveHiveRuntimeDisplayName({
+        runtimeRecordId: environment.accountClaim.runtimeRecordId,
+        cloudDisplayName: environment.accountClaim.cloudDisplayName,
+        reportedDeviceName: environment.accountClaim.reportedDeviceName
+      })
+    )
+  }
+  const local = selectLocalAccountRuntime(state)
+  if (local) {
+    labels.set(
+      'local',
+      resolveHiveRuntimeDisplayName({
+        runtimeRecordId: local.runtimeRecordId,
+        cloudDisplayName: local.cloudDisplayName,
+        reportedDeviceName: local.deviceName
+      })
+    )
+  }
+  return labels
+}
+
+export function isAccountClaimedExecutionHost(
+  state: HostDisplayState,
+  hostId: ExecutionHostId
+): boolean {
+  const parsed = parseExecutionHostId(hostId)
+  return parsed?.kind === 'local'
+    ? selectLocalAccountRuntime(state) !== null
+    : parsed?.kind === 'runtime' &&
+        (state.runtimeEnvironments ?? []).some(
+          (environment) =>
+            environment.id === parsed.environmentId && environment.accountClaim != null
+        )
+}
+
+// Claimed cloud names are shared; personal host labels remain local notes.
 export function selectExecutionHostDisplayLabel(
   state: AppState,
   hostId: ExecutionHostId,
   // SSH labels are published per runtime environment when the target is reached through one.
   options: { sshEnvironmentId?: string | null } = {}
 ): string {
+  const parsed = parseExecutionHostId(hostId)
+  const local = parsed?.kind === 'local' ? selectLocalAccountRuntime(state) : null
+  if (local) {
+    return resolveHiveRuntimeDisplayName({
+      runtimeRecordId: local.runtimeRecordId,
+      cloudDisplayName: local.cloudDisplayName,
+      reportedDeviceName: local.deviceName
+    })
+  }
+  const environment =
+    parsed?.kind === 'runtime'
+      ? state.runtimeEnvironments?.find((entry) => entry.id === parsed.environmentId)
+      : null
+  if (environment?.accountClaim) {
+    return resolveHiveRuntimeDisplayName({
+      runtimeRecordId: environment.accountClaim.runtimeRecordId,
+      cloudDisplayName: environment.accountClaim.cloudDisplayName,
+      reportedDeviceName: environment.accountClaim.reportedDeviceName
+    })
+  }
   const override = getHostSettingOverride(state.settings, hostId, 'displayLabel')
   if (override) {
     return override
   }
-  const parsed = parseExecutionHostId(hostId)
   if (parsed?.kind === 'runtime') {
-    const name = state.runtimeEnvironments
-      ?.find((environment) => environment.id === parsed.environmentId)
-      ?.name.trim()
+    const name = environment?.name.trim()
     if (name) {
       return name
     }

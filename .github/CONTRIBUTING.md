@@ -78,6 +78,14 @@ receipt; any following checkpoint commit may change only the synchronization
 state. A merge conflict requires individual review and cannot be resolved by
 automatically choosing either side.
 
+When independently published product branches have different public roots,
+every root must carry the same immutable baseline provenance, original ledger
+blob, reviewed upstream cursor and pending decisions. The frozen product state
+must pass that verification before tree absorption can supply inclusion evidence.
+An unreviewed root cannot inherit another root's provenance. Preserve the original
+historical product SHAs; import reviewed code changes without adding private
+pre-open-source history to the public branch.
+
 Keep `docs/` pinned to the private documentation gitlink. Any upstream change to
 `docs/` or `.gitmodules`, including a change later reverted in the same interval,
 blocks automatic synchronization until authenticated private absorption and its

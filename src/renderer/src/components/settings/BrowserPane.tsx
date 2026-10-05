@@ -25,7 +25,7 @@ import {
   resolveBrowserHomePageDraftState
 } from './browser-home-page-draft-state'
 import { buildSidebarHostOptions } from '../sidebar/sidebar-host-options'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import {
   getSettingsFocusedExecutionHostId,
   type ExecutionHostId
@@ -120,7 +120,7 @@ export function BrowserPane({
     { isMac },
     settings.openLinksInAppModifierInverts === true
   )
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const browserSessionHostOptions = useMemo(
     () =>
       buildSidebarHostOptions({

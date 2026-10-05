@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
 import { getLocalizedLocalExecutionHostLabel } from '@/lib/localized-execution-host-label'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import type { Repo } from '../../../../shared/repo-types'
 import { getAutomationTargetAvailability } from './automation-target-availability'
 import type { AutomationSourceAvailability } from './use-automation-source-availability'
@@ -35,7 +35,6 @@ export function useAutomationsPagePresentationState({
     runtimeStatusByEnvironmentId,
     sshTargetLabels,
     runtimeEnvironments,
-    settings,
     repoForRow,
     worktreeForRow
   } = store
@@ -66,9 +65,14 @@ export function useAutomationsPagePresentationState({
     JSON.stringify(draft) !== JSON.stringify(draftAtOpen) ||
     (editingAutomationId !== null &&
       local.editingHostStableKey !== destination.rowRecoveryHost(local.editingRowKey)?.stableKey)
+  const hostLabelOverrides = useExecutionHostDisplayLabels()
   const getAutomationRepoHostLabel = useCallback(
     (repo: Repo): string => {
       const hostId = getRepoExecutionHostId(repo)
+      const cloudLabel = hostLabelOverrides.get(hostId)
+      if (cloudLabel) {
+        return cloudLabel
+      }
       const parsed = parseExecutionHostId(hostId)
       if (parsed?.kind === 'ssh') {
         return sshTargetLabels.get(parsed.targetId) ?? parsed.targetId
@@ -81,9 +85,8 @@ export function useAutomationsPagePresentationState({
       }
       return getLocalizedLocalExecutionHostLabel(null, i18n.resolvedLanguage)
     },
-    [i18n.resolvedLanguage, runtimeEnvironments, sshTargetLabels]
+    [hostLabelOverrides, i18n.resolvedLanguage, runtimeEnvironments, sshTargetLabels]
   )
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
   const hostLabelById = useMemo(() => {
     const labels = new Map<string, string>([
       ['local', getLocalizedLocalExecutionHostLabel(null, i18n.resolvedLanguage)]

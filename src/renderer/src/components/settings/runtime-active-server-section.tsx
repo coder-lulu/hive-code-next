@@ -17,6 +17,7 @@ type RuntimeActiveServerSectionProps = {
   advancedOpen: boolean
   allowLocalRuntime: boolean
   localRuntimeValue: string
+  localDisplayName?: string
   noRuntimeValue: string
   activeValue: string
   environments: PublicKnownRuntimeEnvironment[]
@@ -33,6 +34,7 @@ export function RuntimeActiveServerSection({
   advancedOpen,
   allowLocalRuntime,
   localRuntimeValue,
+  localDisplayName,
   noRuntimeValue,
   activeValue,
   environments,
@@ -107,10 +109,11 @@ export function RuntimeActiveServerSection({
                 <SelectContent>
                   {allowLocalRuntime ? (
                     <SelectItem value={localRuntimeValue}>
-                      {translate(
-                        'auto.components.settings.RuntimeEnvironmentsPane.78692becbd',
-                        'Local desktop'
-                      )}
+                      {localDisplayName ??
+                        translate(
+                          'auto.components.settings.RuntimeEnvironmentsPane.78692becbd',
+                          'Local desktop'
+                        )}
                     </SelectItem>
                   ) : environments.length === 0 ? (
                     <SelectItem value={noRuntimeValue} disabled>

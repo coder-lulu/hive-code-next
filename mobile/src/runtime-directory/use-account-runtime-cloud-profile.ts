@@ -32,10 +32,9 @@ export function useAccountRuntimeCloudProfile(args: {
         id: entry.runtimeRecordId,
         runtimeRecordId: entry.runtimeRecordId,
         name: resolveHiveRuntimeDisplayName({
-          ...(args.pendingDisplayNames.has(entry.runtimeRecordId)
-            ? { pendingDesiredName: args.pendingDisplayNames.get(entry.runtimeRecordId)! }
-            : {}),
-          cloudDisplayName: entry.cloudDisplayName,
+          cloudDisplayName: args.pendingDisplayNames.has(entry.runtimeRecordId)
+            ? args.pendingDisplayNames.get(entry.runtimeRecordId)
+            : entry.cloudDisplayName,
           reportedDeviceName: entry.deviceName,
           runtimeRecordId: entry.runtimeRecordId
         }),

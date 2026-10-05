@@ -1,17 +1,13 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import {
+  hiveRuntimeCloudTuplesEqual as tuplesEqual,
+  type HiveRuntimeCloudTuple
+} from './hive-runtime-cloud-lease-context'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 
-export type HiveRuntimeCloudCurrentTuple = Readonly<{
-  authorityGeneration: number
-  runtimeRecordId: string
-  runtimeInstanceId: string
-  bootId: string
-  heartbeatLeaseId: string
-  leaseEpoch: number
-  fencingEpoch: number
-}>
+export type HiveRuntimeCloudCurrentTuple = HiveRuntimeCloudTuple
 
 export type HiveRuntimeCloudManagedWebSessionPrincipal = Readonly<{
   principalKind: 'cloud_managed_web_session'
@@ -40,6 +36,7 @@ export type HiveRuntimeCloudManagedSessionRegistration = Readonly<{
   currentTuple: HiveRuntimeCloudCurrentTuple
   expiresAt: number
   controlVersion: number
+  ownershipEpoch: number
   sessionToken?: string
 }>
 
@@ -65,6 +62,7 @@ type RegistryEntry = Readonly<{
   principal: HiveRuntimeCloudManagedWebSessionPrincipal
   tokenDigest: Buffer
   controlVersion: number
+  ownershipEpoch: number
 }>
 
 export type HiveRuntimeCloudControlledRevocationResult = 'REVOKED' | 'ABSENT' | 'MISMATCH' | 'STALE'
@@ -118,21 +116,6 @@ function tokenDigest(value: string): Buffer {
   return createHash('sha256').update(value, 'utf8').digest()
 }
 
-function tuplesEqual(
-  left: HiveRuntimeCloudCurrentTuple,
-  right: HiveRuntimeCloudCurrentTuple
-): boolean {
-  return (
-    left.authorityGeneration === right.authorityGeneration &&
-    left.runtimeRecordId === right.runtimeRecordId &&
-    left.runtimeInstanceId === right.runtimeInstanceId &&
-    left.bootId === right.bootId &&
-    left.heartbeatLeaseId === right.heartbeatLeaseId &&
-    left.leaseEpoch === right.leaseEpoch &&
-    left.fencingEpoch === right.fencingEpoch
-  )
-}
-
 export class HiveRuntimeCloudManagedSessionRegistry {
   private readonly entries = new Map<string, RegistryEntry>()
   private readonly onInvalidate: HiveRuntimeCloudManagedSessionRegistryOptions['onInvalidate']
@@ -153,6 +136,7 @@ export class HiveRuntimeCloudManagedSessionRegistry {
     const currentTuple = validatedTuple(input.currentTuple)
     const expiresAt = requirePositiveInteger(input.expiresAt, 'managed_session_expires_at')
     const controlVersion = requirePositiveInteger(input.controlVersion, 'control_version')
+    const ownershipEpoch = requirePositiveInteger(input.ownershipEpoch, 'ownership_epoch')
     const sessionToken = requireSessionToken(
       input.sessionToken ?? randomBytes(32).toString('base64url')
     )
@@ -171,7 +155,8 @@ export class HiveRuntimeCloudManagedSessionRegistry {
     this.entries.set(managedWebSessionId, {
       principal,
       tokenDigest: tokenDigest(sessionToken),
-      controlVersion
+      controlVersion,
+      ownershipEpoch
     })
     return { sessionToken, principal }
   }
@@ -224,6 +209,28 @@ export class HiveRuntimeCloudManagedSessionRegistry {
 
   revoke(identifiers: HiveRuntimeCloudManagedSessionIdentifiers): boolean {
     return this.invalidateMatching(identifiers, 'REVOKED')
+  }
+
+  displayMetadataBinding(
+    principal: HiveRuntimeCloudManagedSessionIdentifiers & Readonly<{ expiresAt: number }>,
+    currentTuple: HiveRuntimeCloudCurrentTuple,
+    now: number
+  ): Readonly<{
+    principal: HiveRuntimeCloudManagedWebSessionPrincipal
+    ownershipEpoch: number
+    controlVersion: number
+  }> | null {
+    if (!this.revalidate(principal, currentTuple, now)) {
+      return null
+    }
+    const entry = this.entries.get(principal.managedWebSessionId)
+    return entry
+      ? {
+          principal: entry.principal,
+          ownershipEpoch: entry.ownershipEpoch,
+          controlVersion: entry.controlVersion
+        }
+      : null
   }
 
   revokeControlled(

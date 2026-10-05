@@ -221,8 +221,13 @@ function WorkspaceRow({
           <span className="desktop-home-tree-branch">{workspace.branch}</span>
           <span aria-hidden>·</span>
           <HostIcon workspace={workspace} />
-          <span>
-            {translate(`components.desktopHome.host.${workspace.hostLabel}`, workspace.hostLabel)}
+          <span className="truncate" title={workspace.hostDisplayName}>
+            {[
+              workspace.hostDisplayName,
+              translate(`components.desktopHome.host.${workspace.hostLabel}`, workspace.hostLabel)
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
           {workspace.sessions.length > 0 ? (
             <>
@@ -336,7 +341,12 @@ function ProjectRow({
           >
             {project.name.slice(0, 1).toUpperCase()}
           </span>
-          <span className="desktop-home-tree-project-name">{project.name}</span>
+          <span className="desktop-home-tree-project-name" title={project.hostDisplayName}>
+            {project.name}
+            {project.hostDisplayName ? (
+              <span className="text-xs text-muted-foreground"> · {project.hostDisplayName}</span>
+            ) : null}
+          </span>
           <span className="desktop-home-tree-count">{project.workspaceCount}</span>
         </button>
         {!pendingSession ? (

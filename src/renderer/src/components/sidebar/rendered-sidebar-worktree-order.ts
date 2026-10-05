@@ -1,6 +1,6 @@
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { AppState } from '@/store/types'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { selectExecutionHostDisplayLabels } from '@/lib/execution-host-display-label'
 import {
   ALL_EXECUTION_HOSTS_SCOPE,
   getSettingsFocusedExecutionHostId
@@ -100,7 +100,7 @@ export function computeRenderedSidebarWorktrees(
             settings: state.settings,
             runtimeEnvironments: state.runtimeEnvironments,
             runtimeStatusByEnvironmentId: state.runtimeStatusByEnvironmentId,
-            hostLabelOverrides: getHostDisplayLabelOverrides(state.settings)
+            hostLabelOverrides: selectExecutionHostDisplayLabels(state)
           }),
           state.workspaceHostOrder
         ),

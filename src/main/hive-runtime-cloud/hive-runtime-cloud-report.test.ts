@@ -64,7 +64,8 @@ describe('Hive Runtime Cloud report', () => {
       'pairing-v3',
       'runtime-health-v1',
       'connection-ticket-v1',
-      'web-launch-grant-v1'
+      'web-launch-grant-v1',
+      'web-session-display-metadata-v1'
     ])
     expect(report).toMatchObject({
       webHttpsOrigin: 'https://code.hivekernel.com',

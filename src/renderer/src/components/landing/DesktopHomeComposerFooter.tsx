@@ -189,7 +189,7 @@ export function DesktopHomeComposerFooter({
         (project.projectGroupId
           ? groupLabels.get(`${project.executionHostId}|project-group:${project.projectGroupId}`)
           : undefined) ?? translate('components.desktopHome.ungrouped', 'Ungrouped')
-      } · ${translate('components.desktopHome.composer.projectOptionDescription', 'Project · {{count}} workspaces', { count: project.workspaceCount })}`
+      } · ${translate('components.desktopHome.composer.projectOptionDescription', 'Project · {{count}} workspaces', { count: project.workspaceCount })}${project.hostDisplayName ? ` · ${project.hostDisplayName}` : ''}`
     })),
     ...model.recentWorkspaces.map((workspace) => ({
       // The same raw worktree/folder id can exist on more than one host;
@@ -197,10 +197,12 @@ export function DesktopHomeComposerFooter({
       // silently activate the wrong runtime.
       value: workspace.identityKey,
       label: `${workspace.repoName} / ${workspace.name}`,
-      description: `${workspace.branch} · ${translate(
-        `components.desktopHome.host.${workspace.hostLabel}`,
-        workspace.hostLabel
-      )}`
+      description: `${workspace.branch} · ${[
+        workspace.hostDisplayName,
+        translate(`components.desktopHome.host.${workspace.hostLabel}`, workspace.hostLabel)
+      ]
+        .filter(Boolean)
+        .join(' · ')}`
     }))
   ]
   const permissionSupported = agent !== null && supportsTuiAgentLaunchPermission(agent)

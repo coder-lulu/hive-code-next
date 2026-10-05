@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import { getLocalizedLocalExecutionHostLabel } from '@/lib/localized-execution-host-label'
 import type { AutomationHostFilter } from '../../../../shared/automation-host-filter'
 import type { StableAutomationAuthorityRef } from '../../../../shared/automation-owner-ref'
@@ -85,7 +85,7 @@ export function useAutomationHostCatalog(
   options: AutomationHostCatalogOptions = {}
 ): AutomationHostCatalogView {
   const { i18n } = useTranslation()
-  const settings = useAppStore((s) => s.settings)
+  const hostLabels = useExecutionHostDisplayLabels()
   const repos = useAppStore((s) => s.repos)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const automationHostFilter = useAppStore((s) => s.automationHostFilter)
@@ -96,9 +96,8 @@ export function useAutomationHostCatalog(
 
   const desktopLabel = useMemo(
     () =>
-      getHostDisplayLabelOverrides(settings).get('local') ??
-      getLocalizedLocalExecutionHostLabel(null, i18n.resolvedLanguage),
-    [i18n.resolvedLanguage, settings]
+      hostLabels.get('local') ?? getLocalizedLocalExecutionHostLabel(null, i18n.resolvedLanguage),
+    [hostLabels, i18n.resolvedLanguage]
   )
   // Why a ref: the controller outlives every render, so its legacy-partition
   // callback must read the latest repo tables, not the ones it was created with.

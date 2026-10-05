@@ -30,7 +30,8 @@ vi.mock('lucide-react-native', () => ({
   Activity: 'Icon',
   Edit3: 'Icon',
   PowerOff: 'Icon',
-  RefreshCw: 'Icon'
+  RefreshCw: 'Icon',
+  Users: 'Icon'
 }))
 vi.mock('react-native', () => ({
   Text: 'Text',
@@ -197,6 +198,77 @@ describe('Orca home in the Stack', () => {
     renderer = null
   })
 
+  it.each([true, false])(
+    'opens the account Runtime menu with alias editing when connected=%s',
+    (connected) => {
+      const hosts = addRuntimes()
+      const runtimeRecordId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      Object.assign(hosts[0], {
+        id: runtimeRecordId,
+        runtimeRecordId,
+        accessSources: ['account-claimed'],
+        ...(connected ? {} : { profile: null, credentialStatus: 'cloud-offline' })
+      })
+      fixture.session = { authorityId: 'cloud', account: { accountId: 'account-a' } }
+      fixture.data.hostStates = { [runtimeRecordId]: connected ? 'connected' : 'disconnected' }
+      renderer = mount()
+      act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+      const menu = renderer.root.findByType('ActionSheet')
+      expect(menu.props.visible).toBe(true)
+      const labels = menu.props.actions.map((action: { label: string }) => action.label)
+      expect(labels).toContain('修改云端别名')
+      expect(labels).toContain('会话管理')
+      expect(labels).not.toContain('移除本地配对')
+      act(() =>
+        menu.props.actions
+          .find((action: { label: string }) => action.label === '修改云端别名')
+          .onPress()
+      )
+      expect(fixture.edit).toHaveBeenCalledExactlyOnceWith(runtimeRecordId)
+    }
+  )
+
+  it('routes account session management to the selected Runtime', () => {
+    const hosts = addRuntimes()
+    const runtimeRecordId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    Object.assign(hosts[0], { runtimeRecordId, accessSources: ['account-claimed'] })
+    fixture.session = { authorityId: 'cloud', account: { accountId: 'account-a' } }
+    renderer = mount()
+    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+    act(() =>
+      renderer!.root
+        .findByType('ActionSheet')
+        .props.actions.find((action: { label: string }) => action.label === '会话管理')
+        .onPress()
+    )
+    expect(fixture.router.push).toHaveBeenCalledWith({
+      pathname: '/runtime-sessions',
+      params: { runtimeRecordId }
+    })
+  })
+
+  it('invalidates deferred account Runtime actions after switching accounts', () => {
+    const hosts = addRuntimes()
+    Object.assign(hosts[0], {
+      runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      accessSources: ['account-claimed']
+    })
+    fixture.session = { authorityId: 'cloud', account: { accountId: 'account-a' } }
+    renderer = mount()
+    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+    const actions = renderer.root.findByType('ActionSheet').props.actions
+    expect(actions.length).toBeGreaterThan(0)
+    fixture.session = { authorityId: 'cloud', account: { accountId: 'account-b' } }
+    act(() => renderer!.update(createElement(MainShell)))
+    expect(renderer.root.findByType('ActionSheet').props.visible).toBe(false)
+    act(() => actions.forEach((action: { onPress: () => void }) => action.onPress()))
+    expect(fixture.edit).not.toHaveBeenCalled()
+    expect(fixture.reconnect).not.toHaveBeenCalled()
+    expect(fixture.disconnect).not.toHaveBeenCalled()
+    expect(fixture.router.push).not.toHaveBeenCalled()
+    expect(fixture.remove).not.toHaveBeenCalled()
+  })
+
   it('shows original pairing onboarding when no computers are paired', () => {
     renderer = mount()
     expect(renderer.root.findAllByType('Navigation')).toHaveLength(0)
@@ -340,7 +412,7 @@ describe('Orca home in the Stack', () => {
     act(() =>
       renderer!.root
         .findByType('ActionSheet')
-        .props.actions.find((action: { label: string }) => action.label === 'Remove')
+        .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
         .onPress()
     )
     const confirm = renderer.root.findByType('Confirm').props.onConfirm
@@ -376,7 +448,7 @@ describe('Orca home in the Stack', () => {
     act(() =>
       renderer!.root
         .findByType('ActionSheet')
-        .props.actions.find((action: { label: string }) => action.label === 'Remove')
+        .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
         .onPress()
     )
     act(() => renderer!.root.findByType('Confirm').props.onConfirm())
@@ -395,7 +467,7 @@ describe('Orca home in the Stack', () => {
     act(() =>
       renderer!.root
         .findByType('ActionSheet')
-        .props.actions.find((action: { label: string }) => action.label === 'Remove')
+        .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
         .onPress()
     )
     await act(async () => renderer!.root.findByType('Confirm').props.onConfirm())
@@ -409,7 +481,7 @@ describe('Orca home in the Stack', () => {
     act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
     const edit = renderer.root
       .findByType('ActionSheet')
-      .props.actions.find((action: { label: string }) => action.label === 'Edit host')
+      .props.actions.find((action: { label: string }) => action.label === '修改别名与连接地址')
     act(() => renderer!.root.findByType('ActionSheet').props.onClose())
     expect(renderer.root.findByType('ActionSheet').props.visible).toBe(false)
     act(() => edit.onPress())
@@ -431,7 +503,7 @@ describe('Orca home in the Stack', () => {
       act(() =>
         renderer!.root
           .findByType('ActionSheet')
-          .props.actions.find((action: { label: string }) => action.label === 'Remove')
+          .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
           .onPress()
       )
       act(() => renderer!.root.findByType('Confirm').props.onConfirm())

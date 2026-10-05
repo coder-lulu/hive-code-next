@@ -4,6 +4,7 @@ import path from 'node:path'
 
 export const STATE_PATH = 'config/upstream-sync-state.json'
 export const UPSTREAM_REPOSITORY = 'stablyai/orca'
+export const PRODUCT_TARGET_BRANCHES = Object.freeze(['hivecode/main-next', 'main'])
 export const SHA_PATTERN = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/
 
 export function requireBoundaryReview(report) {
@@ -78,7 +79,7 @@ export function resolveAuditRange({
   stateRef,
   targetBranch = 'hivecode/main-next'
 }) {
-  if (!['hivecode/main-next', 'main'].includes(targetBranch)) {
+  if (!PRODUCT_TARGET_BRANCHES.includes(targetBranch)) {
     throw new Error('Unsupported product target')
   }
   if (!stateRef) {

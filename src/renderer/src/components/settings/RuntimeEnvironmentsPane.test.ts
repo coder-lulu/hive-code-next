@@ -439,6 +439,9 @@ describe('RuntimeEnvironmentsPane host details', () => {
       accountClaim: {
         runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         resourceVersion: 1,
+        ownershipEpoch: 1,
+        cloudDisplayName: null,
+        cloudDisplayNameVersion: 1,
         presence: 'ONLINE' as const,
         readiness: 'READY' as const,
         readinessReasonCode: null,
@@ -511,6 +514,7 @@ function accountClaim(cloudDisplayNameVersion: number) {
   return {
     runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
     resourceVersion: 1,
+    ownershipEpoch: 1,
     presence: 'ONLINE' as const,
     readiness: 'READY' as const,
     readinessReasonCode: null,

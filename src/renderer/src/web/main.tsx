@@ -30,7 +30,11 @@ import WebAccountConnect, {
   type WebAccountBootstrap
 } from './account-runtime-relay/WebAccountConnect'
 
-import { useWebAccountSessionLifecycle } from './account-runtime-relay/use-web-account-session-lifecycle'
+import { useWebRuntimeDisplayMetadata } from './use-web-runtime-display-metadata'
+import {
+  captureWebRuntimeDisplayOwner,
+  clearWebRuntimeDisplayProjection
+} from './preload-api/web-runtime-session'
 
 const reloadAccountPage = (): void => window.location.reload()
 
@@ -57,6 +61,10 @@ function AccountRuntimeRoot(): React.JSX.Element {
     const channel = new BroadcastChannel('hivecloud:user-auth')
     channel.onmessage = (event) => {
       if (event.data?.type === 'signed-out' || event.data?.type === 'session-expired') {
+        const owner = captureWebRuntimeDisplayOwner()
+        if (owner) {
+          clearWebRuntimeDisplayProjection(owner)
+        }
         closeActiveRuntimeClients()
         bootstrap.session.close()
         window.location.reload()
@@ -67,7 +75,12 @@ function AccountRuntimeRoot(): React.JSX.Element {
       channel.close()
     }
   }, [bootstrap])
-  useWebAccountSessionLifecycle(bootstrap?.session, closeActiveRuntimeClients, reloadAccountPage)
+  const metadataState = useWebRuntimeDisplayMetadata(
+    bootstrap,
+    null,
+    closeActiveRuntimeClients,
+    reloadAccountPage
+  )
   if (!bootstrap) {
     return (
       <WebAccountConnect
@@ -80,6 +93,7 @@ function AccountRuntimeRoot(): React.JSX.Element {
   }
   return (
     <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+      <RuntimeMetadataSyncNotice state={metadataState} />
       <App />
     </Suspense>
   )
@@ -145,6 +159,12 @@ function PairedWebRoot(): React.JSX.Element {
 function CloudLaunchRoot({ credential }: { credential: CloudLaunchCredential }): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<CloudLaunchBootstrap | null>(null)
   const [failed, setFailed] = useState(false)
+  const metadataState = useWebRuntimeDisplayMetadata(
+    null,
+    bootstrap,
+    closeActiveRuntimeClients,
+    reloadAccountPage
+  )
 
   useEffect(() => {
     let active = true
@@ -166,7 +186,7 @@ function CloudLaunchRoot({ credential }: { credential: CloudLaunchCredential }):
     }
   }, [credential])
 
-  if (failed) {
+  if (failed || metadataState === 'expired') {
     return <CloudLaunchFailure />
   }
   if (!bootstrap) {
@@ -174,8 +194,24 @@ function CloudLaunchRoot({ credential }: { credential: CloudLaunchCredential }):
   }
   return (
     <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+      <RuntimeMetadataSyncNotice state={metadataState} />
       <App />
     </Suspense>
+  )
+}
+
+function RuntimeMetadataSyncNotice({ state }: { state: string }): React.JSX.Element | null {
+  const { t } = useTranslation()
+  if (state !== 'unverifiable') {
+    return null
+  }
+  return (
+    <div
+      role="status"
+      className="fixed inset-x-2 bottom-2 z-50 rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-sm sm:inset-x-auto sm:left-3 sm:max-w-lg"
+    >
+      {t('web.runtime.nameSyncUnverified', '名称同步暂不可验证，显示上次已确认名称。')}
+    </div>
   )
 }
 

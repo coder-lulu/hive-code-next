@@ -2,9 +2,10 @@ import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account
 import {
   EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY,
   type HiveAccountRuntimeDirectoryState,
-  type HiveRuntimeDisplayNameUpdateRequest
+  type HiveRuntimeDisplayNameUpdateRequest,
+  type HiveRuntimeDisplayNameDiscardRequest
 } from '../../shared/hive-runtime-cloud'
-import { HiveRuntimeCloudClient, HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
+import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudConfig } from './hive-runtime-cloud-config'
 import {
   createHiveAccountRuntimeConnectionMaterial,
@@ -15,31 +16,21 @@ import type { HiveRuntimeDisplayNameCoordinator } from './hive-runtime-display-n
 import { createHiveRuntimeDisplayNameCoordinator } from './hive-runtime-display-name-coordinator-factory'
 import {
   hiveAccountRuntimeDirectoryErrorCode,
-  loadHiveAccountRuntimeDirectory
+  loadHiveAccountRuntimeDirectory,
+  defaultHiveAccountRuntimeDirectoryDependencies,
+  type HiveAccountRuntimeDirectoryClient,
+  type HiveAccountRuntimeDirectoryDependencies
 } from './hive-account-runtime-directory-refresh'
 import { publishHiveAccountRuntimeDirectory } from './hive-account-runtime-directory-publication'
+import {
+  enqueueAccountRuntimeDisplayName,
+  projectAccountRuntimeDisplayNameState
+} from './hive-account-runtime-display-name-actions'
 
 const DIRECTORY_REFRESH_INTERVAL_MS = 30_000
 
-type DirectoryClient = {
-  listOwnedRuntimes: HiveRuntimeCloudClient['listOwnedRuntimes']
-  createConnectionIntent?: HiveRuntimeCloudClient['createConnectionIntent']
-  getOwnedRuntime?: HiveRuntimeCloudClient['getOwnedRuntime']
-  updateOwnedRuntimeDisplayName?: HiveRuntimeCloudClient['updateOwnedRuntimeDisplayName']
-}
-
-type DirectoryDependencies = Readonly<{
-  createClient: (apiBaseUrl: string) => DirectoryClient
-  now: () => number
-}>
-
-const defaultDependencies: DirectoryDependencies = {
-  createClient: (apiBaseUrl) => new HiveRuntimeCloudClient(apiBaseUrl),
-  now: Date.now
-}
-
 export class HiveAccountRuntimeDirectoryService {
-  private readonly client: DirectoryClient | null
+  private readonly client: HiveAccountRuntimeDirectoryClient | null
   private readonly listeners = new Set<(state: HiveAccountRuntimeDirectoryState) => void>()
   private authorization: HiveRuntimeCloudAuthorization | null = null
   private state: HiveAccountRuntimeDirectoryState
@@ -47,11 +38,12 @@ export class HiveAccountRuntimeDirectoryService {
   private refreshTimer: ReturnType<typeof setTimeout> | null = null
   private epoch = 0
   private stopped = false
+  private refreshFlight: Promise<void> | null = null
   private readonly displayNames: HiveRuntimeDisplayNameCoordinator | null
 
   constructor(
     config: HiveRuntimeCloudConfig,
-    private readonly dependencies: DirectoryDependencies = defaultDependencies,
+    private readonly dependencies: HiveAccountRuntimeDirectoryDependencies = defaultHiveAccountRuntimeDirectoryDependencies,
     userDataPath?: string
   ) {
     this.client = config.enabled ? dependencies.createClient(config.apiBaseUrl) : null
@@ -109,31 +101,23 @@ export class HiveAccountRuntimeDirectoryService {
       lastSyncedAt: retainItems ? this.state.lastSyncedAt : null,
       errorCode: null
     })
-    void this.runRefresh(authorization)
+    void this.startRefresh(authorization)
   }
 
   async updateDisplayName(
     request: HiveRuntimeDisplayNameUpdateRequest
   ): Promise<HiveAccountRuntimeDirectoryState> {
-    if (!this.displayNames || !this.authorization) {
+    enqueueAccountRuntimeDisplayName(this.displayNames, this.authorization, this.state, request)
+    return this.state
+  }
+
+  discardDisplayName(
+    request: HiveRuntimeDisplayNameDiscardRequest
+  ): HiveAccountRuntimeDirectoryState {
+    if (!this.displayNames) {
       throw new Error('hive_runtime_display_name_unavailable')
     }
-    const entry = this.state.items.find(
-      (candidate) => candidate.runtimeRecordId === request.runtimeRecordId
-    )
-    if (
-      !entry ||
-      entry.cloudDisplayNameVersion == null ||
-      entry.cloudDisplayNameVersion !== request.expectedCloudDisplayNameVersion
-    ) {
-      throw new Error('hive_runtime_display_name_stale')
-    }
-    this.displayNames.enqueue({
-      runtimeRecordId: entry.runtimeRecordId,
-      desiredName: request.cloudDisplayName,
-      expectedCloudDisplayNameVersion: entry.cloudDisplayNameVersion,
-      expectedResourceVersion: entry.resourceVersion
-    })
+    this.displayNames.discard(request)
     return this.state
   }
 
@@ -149,13 +133,17 @@ export class HiveAccountRuntimeDirectoryService {
       this.setState(EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY)
       return this.state
     }
+    if (this.refreshFlight && this.controller && !this.controller.signal.aborted) {
+      await this.refreshFlight
+      return this.state
+    }
     this.cancelRequest()
     this.setState({
       ...this.state,
       status: this.state.items.length > 0 ? 'STALE' : 'LOADING',
       errorCode: null
     })
-    await this.runRefresh(authorization)
+    await this.startRefresh(authorization)
     return this.state
   }
 
@@ -185,6 +173,17 @@ export class HiveAccountRuntimeDirectoryService {
     this.displayNames?.setAuthorization(null, false)
     this.cancelRequest()
     this.listeners.clear()
+  }
+
+  private startRefresh(authorization: HiveRuntimeCloudAuthorization): Promise<void> {
+    const flight = this.runRefresh(authorization)
+    this.refreshFlight = flight
+    void flight.finally(() => {
+      if (this.refreshFlight === flight) {
+        this.refreshFlight = null
+      }
+    })
+    return flight
   }
 
   private async runRefresh(authorization: HiveRuntimeCloudAuthorization): Promise<void> {
@@ -311,10 +310,11 @@ export class HiveAccountRuntimeDirectoryService {
   }
 
   private setState(state: HiveAccountRuntimeDirectoryState): void {
-    this.state = {
-      ...state,
-      pendingDisplayNames: this.displayNames?.getPending() ?? []
-    }
+    this.state = projectAccountRuntimeDisplayNameState(
+      state,
+      this.displayNames,
+      Boolean(this.client?.updateOwnedRuntimeDisplayName)
+    )
     publishHiveAccountRuntimeDirectory(this.listeners, this.state)
   }
 }

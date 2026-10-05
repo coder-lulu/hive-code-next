@@ -48,6 +48,9 @@ function makeAccountClaim(): NonNullable<PublicKnownRuntimeEnvironment['accountC
   return {
     runtimeRecordId: 'runtime-record-a',
     resourceVersion: 1,
+    ownershipEpoch: 1,
+    cloudDisplayName: null,
+    cloudDisplayNameVersion: 1,
     presence: 'ONLINE',
     readiness: 'READY',
     readinessReasonCode: null,

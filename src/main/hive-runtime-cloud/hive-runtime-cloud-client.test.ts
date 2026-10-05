@@ -149,6 +149,7 @@ describe('Hive Runtime Cloud HTTP client', () => {
           runtimeProtocolVersion: 3,
           capabilities: ['pairing-v3'],
           resourceVersion: 2,
+          ownershipEpoch: 1,
           createdAt: '2026-08-31T00:00:00.000Z',
           updatedAt: '2026-08-31T00:01:00.000Z',
           claimedAt: '2026-08-31T00:00:30.000Z',
@@ -227,6 +228,7 @@ describe('Hive Runtime Cloud HTTP client', () => {
         runtimeRecordId,
         cloudDisplayName: 'Build Runtime',
         cloudDisplayNameVersion: 5,
+        ownershipEpoch: 1,
         updatedAt: '2026-09-01T00:00:00.000Z'
       })
     )
@@ -266,6 +268,7 @@ describe('Hive Runtime Cloud HTTP client', () => {
               runtimeProtocolVersion: 3,
               capabilities: [],
               resourceVersion: 2,
+              ownershipEpoch: 1,
               createdAt: '2026-08-31T00:00:00.000Z',
               updatedAt: '2026-08-31T00:01:00.000Z',
               presence: 'OFFLINE',
@@ -277,11 +280,11 @@ describe('Hive Runtime Cloud HTTP client', () => {
     )
 
     await expect(client.listOwnedRuntimes('token', null, 50)).rejects.toThrow(
-      'invalid_hive_runtime_cloud_directory_response'
+      'invalid_hive_runtime_cloud_response'
     )
   })
 
-  it('accepts a cleared directory alias represented by a version without a value', async () => {
+  it('accepts a cleared directory alias represented by explicit null and a version', async () => {
     const client = new HiveRuntimeCloudClient(
       'https://api.hivekernel.com',
       vi.fn().mockResolvedValue(
@@ -294,9 +297,11 @@ describe('Hive Runtime Cloud HTTP client', () => {
               runtimeProtocolVersion: 3,
               capabilities: [],
               resourceVersion: 2,
+              ownershipEpoch: 1,
               createdAt: '2026-08-31T00:00:00.000Z',
               updatedAt: '2026-08-31T00:01:00.000Z',
               presence: 'OFFLINE',
+              cloudDisplayName: null,
               cloudDisplayNameVersion: 3
             }
           ]
@@ -471,7 +476,15 @@ describe('Hive Runtime Cloud HTTP client', () => {
         runtimeSessionId: '223e4567-e89b-42d3-a456-426614174000',
         status: 'ACTIVE',
         expiresAt: '2026-08-25T09:00:00.000Z',
-        controlVersion: 1
+        controlVersion: 1,
+        runtimeDisplayMetadata: {
+          runtimeRecordId: '323e4567-e89b-42d3-a456-426614174000',
+          resourceVersion: 7,
+          ownershipEpoch: 8,
+          cloudDisplayName: null,
+          cloudDisplayNameVersion: 1,
+          deviceName: null
+        }
       })
     )
     const client = new HiveRuntimeCloudClient('https://api.hivekernel.com', fetchImpl)
