@@ -14,9 +14,26 @@
     "../src/preload/**/*",
     "../src/shared/**/*",
     "../src/relay/**/*",
-    "../src/types/**/*"
+    "../src/types/**/*",
+    "../mobile/scripts/rpc-recording-pin-guard.mts",
+    "../mobile/scripts/rpc-recording-pin-reachability.mts",
+    "../mobile/src/test-support/rpc-recording/recording-drivers.ts",
+    "../mobile/src/transport/browser-screencast-protocol.ts",
+    "../mobile/src/transport/mobile-runtime-host-platform.ts",
+    "../mobile/src/transport/rpc-acceptance-policies.ts",
+    "../mobile/src/transport/rpc-client-server-subscription.ts",
+    "../mobile/src/transport/rpc-client-session-tabs-stream.ts",
+    "../mobile/src/transport/rpc-client-stream-registry.ts",
+    "../mobile/src/transport/rpc-client-terminal-binary-frame.ts",
+    "../mobile/src/transport/rpc-client-terminal-stream-router.ts",
+    "../mobile/src/transport/rpc-client-terminal-subscription.ts",
+    "../mobile/src/transport/rpc-subscription-result-shapes.ts",
+    "../mobile/src/transport/terminal-stream-protocol.ts",
+    "../mobile/src/transport/types.ts"
   ],
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "composite": true,
     "types": ["electron-vite/node"]
   }

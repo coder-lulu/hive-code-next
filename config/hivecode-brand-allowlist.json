@@ -219,6 +219,8 @@
     "config/upstream-change-priority.json",
     "config/upstream-sync-boundary.json",
     "config/upstream-sync-state.json",
+    "config/upstream-tree-review.json",
+    "config/upstream-tree-sync-receipt.json",
     "DESIGN.md",
     "HiveCode-APP-UI-AI-Coding-Constraints.md",
     "integration/contracts/v1/README.md",
@@ -842,6 +844,6 @@
   ],
   "protectedFileHashes": {
     ".gitignore": "21ace0b31019b4c5b43751ccb65f4721b73d8a9c3ffe507813a77cc75cd4ad7b",
-    ".gitattributes": "0c884d7097c388e12f031b67b50200c9360c31ab183db3cf86ade3d6a1e1c93a"
+    ".gitattributes": "366e8770b2ca85a601935ef252f8901423581a67c1ff8eb6772773357225bd7b"
   }
 }

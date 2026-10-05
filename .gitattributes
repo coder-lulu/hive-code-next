@@ -71,6 +71,7 @@ config/scripts/reclaim-dev-electron-bundles.mjs text eol=lf
 # Mobile RPC recording goldens: replay requires the file text to equal what rpc:record writes
 # (LF), so a CRLF checkout would fail every golden.
 /mobile/rpc-foundation/goldens/*.json text eol=lf
+/mobile/rpc-foundation/hive/goldens/*.json text eol=lf
 # Mobile web page source. Every text byte here is hashed into an asset digest and from
 # there into buildId, so a CRLF Windows checkout would ship a different bundle id for
 # identical source (91af2897 vs 9d78435e, measured on the bundle this replaced).
