@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "46dec38e746e4a83f8bbc357d80a79ab167eb19e",
+  "sourceProductSha": "a7dff01e374c4c5c129819ffa9b3284755ed73e5",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -2795,7 +2795,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "7f3c21d39bb7d5c69edda511dcee61a50d9b14db"
+        "sha": "4c7531c44418ab1ffa59cfafdf7857efd44c7ad6"
       },
       "upstream": {
         "mode": "100644",
@@ -2889,7 +2889,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "495d444708fe2a39c2a69fad6ba349e48bedaeab"
+        "sha": "d079a06bd2d13aebb04c172e6d5443181039face"
       },
       "upstream": {
         "mode": "100644",
@@ -2982,7 +2982,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "3ea2b798a89f30e9f23dac611ce426598748f2ae"
+        "sha": "c65bfdf38c1183b88e08d69a20de10b5fe054344"
       },
       "upstream": null
     },
@@ -3001,7 +3001,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "91be3669c17c11e6b0ea909707ad53e5c4accf96"
+        "sha": "58a8f3065a08a9d007a497ef44383c09695d07f8"
       },
       "upstream": null
     },
@@ -3037,7 +3037,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "235aa4f0cbfb1ea2da5ac0f86e0e5ca9d5532506"
+        "sha": "78ab170973deeb0b8fb17ec221d14f4b56273953"
       },
       "upstream": {
         "mode": "100644",
@@ -3167,7 +3167,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "a9f4801222bae6c64d964e56ecf9ad06283f7c63"
+        "sha": "4716f821b466612c3f1be55e53a57840a0435839"
       },
       "upstream": null
     },
@@ -3182,7 +3182,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "279378f70637bb4314f1dc8162e91b7dab3ac55b"
+        "sha": "19c22dbc6a1bfe7e032b3bd9cf707c3225a8193b"
       },
       "upstream": {
         "mode": "100644",
@@ -3434,7 +3434,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "5750cd9f3a981a443ea40c7239441d2eb42f77e0"
+        "sha": "a18a1818363b3d19d8f467bfd81b1de6b641d01a"
       },
       "upstream": {
         "mode": "100644",
@@ -3452,7 +3452,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "106147f9cf5c769f48f2c6a357f36e2bc788d406"
+        "sha": "4e4e5967f73ad9ef59833747cf573efe6fbcd6cd"
       },
       "upstream": {
         "mode": "100644",
@@ -3470,7 +3470,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "07477965d43add3b99994f68c567f65f436fcb3b"
+        "sha": "1717060e6d43d7420b4982f21b703a7aa54cbee6"
       },
       "upstream": {
         "mode": "100644",
@@ -3569,7 +3569,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "769cd8854349b53cf53eb2d56957469e87aad103"
+        "sha": "4bf5f05a37108f50dba157c74def650aa9c76b23"
       },
       "upstream": {
         "mode": "100644",
@@ -3590,7 +3590,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "8bfbf17d7138b3cd626ac15d1f39a244e350b43a"
+        "sha": "5f70a243a458a213e6e5de7d1538eedf1e00af2d"
       },
       "upstream": {
         "mode": "100644",
@@ -3616,7 +3616,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "f782334628d0d0ded75ffe24bf200ecc062f1995"
+        "sha": "fed0396836d8c55faa4fba381ad1e209ec1d0737"
       },
       "upstream": {
         "mode": "100644",
@@ -4133,7 +4133,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "d4adb3e24fd3c3ab76d35a36b909a14858fbbb8f"
+        "sha": "8784dc311689a91a5724b7a8835b8cae7ed8c51d"
       },
       "upstream": {
         "mode": "100644",
@@ -4159,7 +4159,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "d553a7a040bacf27cf610af9adc63f36ab06cab0"
+        "sha": "d7f4875f6544138977130075160696986d71f2f5"
       },
       "upstream": {
         "mode": "100644",
@@ -4185,7 +4185,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "d89f0c6c7971c6be75c3c9ef242837551d056925"
+        "sha": "0f0359a606531d7641eaee684506776b14701841"
       },
       "upstream": {
         "mode": "100644",
@@ -4211,7 +4211,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "95d85cdcb9dd2b25e06db8089103ce3796be1c17"
+        "sha": "a80ea44fca1bfa2a4b6954e3db7746fa0e5938ef"
       },
       "upstream": {
         "mode": "100644",
@@ -4235,7 +4235,10 @@
         "mode": "100644",
         "sha": "2731a3a4e8212988e94e60ee8a655710f657beda"
       },
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "2731a3a4e8212988e94e60ee8a655710f657beda"
+      },
       "upstream": null
     },
     {
@@ -4257,7 +4260,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "dfb250d7b3009aadf68ecac231df966e90b7d575"
+        "sha": "9d24f772569b87e616fc0d2e7c8f33516cf72240"
       },
       "upstream": {
         "mode": "100644",
@@ -4283,7 +4286,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "3afd0bf21b52f315f258f61a8108c93bfc965b60"
+        "sha": "3aafec42f01b66243923abd2bc49e6d6e39e6bdf"
       },
       "upstream": {
         "mode": "100644",
@@ -4309,7 +4312,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "591a0c1926bf7a192615f14e25730ae19d701fa0"
+        "sha": "6f844c31935a652645355154d939171fedcfdd55"
       },
       "upstream": {
         "mode": "100644",
@@ -4440,10 +4443,7 @@
       "regressionTests": ["src/main/runtime/rpc/rpc-recording-pin-guard.test.ts"],
       "result": null,
       "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "de0ea1066ed2c25bc41c7445f57c38d500420da0"
-      },
+      "product": null,
       "upstream": null
     },
     {
@@ -4873,7 +4873,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "aedc3d509d927778634bf6719abd2c75804270ab"
+        "sha": "dfe8907ec43a845d3ce35453a27981bc33dcbfaf"
       },
       "upstream": null
     },
@@ -5021,7 +5021,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "3cecdb9ac0accd4ebb3d721749389b6dd6a3eef1"
+        "sha": "fa5a7c59c5d8bf5aeca576fd8f139a6176e8d6f6"
       },
       "upstream": {
         "mode": "100644",
@@ -5078,7 +5078,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "3ba4220962b1cd3bc83e46b7adc96b182c21cfb0"
+        "sha": "271d3eb489941e67772bc37d8e3d5fdeddd959e4"
       },
       "upstream": {
         "mode": "100644",
@@ -5141,7 +5141,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "163b7b46e0e35a8709a8a8bcbc64f1861ac4cb38"
+        "sha": "a8b5432f955620fbea5a60ecc9aa062e1cee1852"
       },
       "upstream": {
         "mode": "100644",
@@ -5210,7 +5210,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "e7c87d694ac65f9511276e2ed831aa82427f5a96"
+        "sha": "f5141a2c2a93157cfb144b1fe943a69b8bfe70f6"
       },
       "upstream": {
         "mode": "100644",
@@ -5246,7 +5246,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "c68fb4ff7c175a93294a2e817c11cf2fa9beb65e"
+        "sha": "5bdeac168ed14c9d16dc1aaab5da5b5f0478cec6"
       },
       "upstream": {
         "mode": "100644",
@@ -5267,7 +5267,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "3fc2ce2a4ca26ea036590fa29bb7bb62038a888b"
+        "sha": "e33e9dd4090ff3e76015a448abc46eddcf2f8b85"
       },
       "upstream": {
         "mode": "100644",
@@ -5306,7 +5306,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "4fc7014ba47e2c082d52bbd38d995ba92f631936"
+        "sha": "18212d2656853326aba5f53b1583292be6768d04"
       },
       "upstream": null
     },
@@ -5529,7 +5529,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "1680bf769a58e43d173576625b9d3d8415a83ff3"
+        "sha": "e5b1e9b9890677521d79ab3169663ff4fe2e7401"
       },
       "upstream": {
         "mode": "100644",
@@ -5550,7 +5550,10 @@
         "sha": "229fc0fa728e4f1031d28e4b8afb44b3d0051e8e"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "229fc0fa728e4f1031d28e4b8afb44b3d0051e8e"
+      },
       "upstream": null
     },
     {
@@ -5567,7 +5570,10 @@
         "sha": "10599cb3de3484efcedfe23a47e286c94caeedb9"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "10599cb3de3484efcedfe23a47e286c94caeedb9"
+      },
       "upstream": null
     },
     {
@@ -5578,7 +5584,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "424fb00d030be308b24bbe5176e75a14dc5bf2fe"
+        "sha": "9e4d6e189418006e7308447d7f6737077d2418c1"
       },
       "upstream": {
         "mode": "100644",
@@ -5842,10 +5848,7 @@
     {
       "path": "mobile/src/transport/rpc-client-inventory-release.test.ts",
       "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "7831d7cdb221abbde3988b22e0e88b9f2179a406"
-      },
+      "product": null,
       "upstream": null,
       "result": null,
       "reason": "Exercise real Mobile direct registry, host RpcDispatcher/session-tab methods and production RuntimeSubscriptionRegistry. Before/after census disposal releases once, spares the newer same-connection listener and rejects late frames.\nUnpublished-candidate validation repair: Migrate original real host/client two-case integration out of React Native static ambient and into current Node test/static owners.",
@@ -6059,6 +6062,30 @@
       "regressionTests": ["node node_modules/oxfmt/bin/oxfmt --check ."]
     },
     {
+      "path": "mobile/web-entry/web-overrides.json",
+      "base": {
+        "mode": "100644",
+        "sha": "62ad176c57d285419aa1d3accd32e51ffa02fde7"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "e9a5218010d786b66875e6bd963325808179f016"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "c0c3bcb437571ed297dd9bef796410c56b0a7de8"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "fd3e03e83acf0c38131932e6d6877a313e5f6662"
+      },
+      "reason": "The held candidate had already absorbed the upstream host-stack web override. Reapplying the original reviewed interval duplicated its identical inventory entry. Retain the exact shipped one-entry-per-physical-sibling inventory, all existing reasons/native siblings, Hive updater ownership and the upstream slide animation. The unchanged actual owner rejects the duplicate (4 pass/1 fail) and validates this exact result (5 pass); no case, budget or runtime behavior is removed.",
+      "regressionTests": [
+        "config/scripts/mobile-web-app-web-overrides.test.mjs",
+        "pnpm run build:mobile-web:app"
+      ]
+    },
+    {
       "path": "package.json",
       "base": {
         "mode": "100644",
@@ -6092,7 +6119,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "00f13003968390a6d08036c11413a1b391898805"
+        "sha": "fd681b1bcc2d6b3fc7357f8cfabeb29dc7db4ed0"
       },
       "upstream": {
         "mode": "100644",
@@ -6691,7 +6718,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "883bf8efd6accafb88608aea4427af072878f79a"
+        "sha": "4663ede81129b23154aaeb382c92e3e0176d03bc"
       },
       "upstream": {
         "mode": "100644",
@@ -6757,7 +6784,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "bba2991957890b481c873c40ecfab841c57ee816"
+        "sha": "6b71576ef6a29f960d8696650a741de15de276aa"
       },
       "upstream": {
         "mode": "100644",
@@ -6776,7 +6803,10 @@
         "sha": "6da60f93793e1e8652cf776f3ae74afe5dde6f21"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "6da60f93793e1e8652cf776f3ae74afe5dde6f21"
+      },
       "upstream": null
     },
     {
@@ -6856,7 +6886,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "5ce21d83f170271057f2a3a982ea35d88a8ac201"
+        "sha": "7a3fa5e0728153d9e4b9292649916c5095d32342"
       },
       "upstream": {
         "mode": "100644",
@@ -6877,7 +6907,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "af6719938bee29d3fbb76adcdfef22b2ff7aa19e"
+        "sha": "e45edd31b295def43139f4d6793f844897af01f7"
       },
       "upstream": {
         "mode": "100644",
@@ -6893,7 +6923,10 @@
         "sha": "c2bc40ba0b4c3724d06afe5ea9c81f59caf9263e"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c2bc40ba0b4c3724d06afe5ea9c81f59caf9263e"
+      },
       "upstream": null
     },
     {
@@ -7273,7 +7306,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "c9a2a5cdf03c4f5647829c4607ec9d64c122d5c8"
+        "sha": "d6bf3dcfa54351771abbbf494bd9a540ac6a71ad"
       },
       "upstream": {
         "mode": "100644",
@@ -7297,7 +7330,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "d684bd874ef38415cfdd5f1834875ce4a52ecc42"
+        "sha": "97a146277b278869a3430a4e8c1509d8e09ac415"
       },
       "upstream": {
         "mode": "100644",
@@ -7359,7 +7392,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "7c3041e6dfee778e66a254da7d7649a15a5131c9"
+        "sha": "694329ae94fc2e4e9a1e114a99973ac991e4fc7a"
       },
       "upstream": {
         "mode": "100644",
@@ -7968,7 +8001,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "9c920b45eb3993a8fc0d0f4579f4f3bd2a325fbb"
+        "sha": "91acda230e05a6b4c8f332cd78bdb6e5b4f4d995"
       },
       "upstream": {
         "mode": "100644",
@@ -9137,7 +9170,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "5bfad8156314232a77b30fd43581a3eb6d6acf52"
+        "sha": "3910ea72b0b53799b243c8f398578b60843f1f06"
       },
       "upstream": {
         "mode": "100644",
@@ -9161,7 +9194,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "24b6a4b73277bfaefbd3db9c27dfd79abaf8cf57"
+        "sha": "1008714812dd9380351a6723bd334dc7ffa8102c"
       },
       "upstream": {
         "mode": "100644",
@@ -9184,7 +9217,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "3c0096b1849c98ea2432dad16e67f55141c39b4b"
+        "sha": "0576091ca69b177f39b6ae2868c005cccbaaf0a0"
       },
       "upstream": {
         "mode": "100644",
@@ -9207,7 +9240,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "857e4f1c7ef12e7851e6fe57e526f922b9a4d1bf"
+        "sha": "c8418c15134b43cb03a3672e0b7c8cde62163004"
       },
       "upstream": {
         "mode": "100644",
@@ -9937,7 +9970,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "2e99f580125488c667ed2cdfc4fb2fffb54203f7"
+        "sha": "665bf3db4029caea38318d728d22b38066832ff5"
       },
       "upstream": {
         "mode": "100644",
@@ -9958,7 +9991,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "3cc0806f680c77380eac7b3a5d720be6ab591a68"
+        "sha": "f24fbfee841c0551710f74a1785a49c1d3bfabe0"
       },
       "upstream": {
         "mode": "100644",
@@ -9979,7 +10012,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "b017c9130a8ee9c8a5f0b3770823141c772bea5a"
+        "sha": "673eadd02153a1f8ba758e5db2722f897d1406e1"
       },
       "upstream": {
         "mode": "100644",
@@ -10005,7 +10038,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "365c843c1ef5447272e13a710716f2822b5e5845"
+        "sha": "29ae5b8d94b433dc34190e767b9e80181502af91"
       },
       "upstream": {
         "mode": "100644",
@@ -10232,7 +10265,10 @@
         "sha": "2aa5e2a07c9008b12b8876af8e453c7941bee7aa"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "2aa5e2a07c9008b12b8876af8e453c7941bee7aa"
+      },
       "upstream": null
     },
     {
@@ -10286,7 +10322,10 @@
         "sha": "006bf13264a4a364669c54029f8a2e195c7e6ed4"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "006bf13264a4a364669c54029f8a2e195c7e6ed4"
+      },
       "upstream": null
     },
     {
@@ -10718,7 +10757,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "ea10e8bd1d1bd4e70ef3d7b7ef95e1302441733a"
+        "sha": "2da0f3a36bba6ad89fb21389fbc9aabd0bc55a3f"
       },
       "upstream": {
         "mode": "100644",
@@ -11114,7 +11153,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "d1944f5ef862545b16f42a92b630816a84700197"
+        "sha": "869dcb46f75cbd5748b586e602c097d2a80eb691"
       },
       "upstream": {
         "mode": "100644",
@@ -11139,7 +11178,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "5e365a57e5a3a35f794e0a0d619f81e2c5cfc805"
+        "sha": "116b47001f7640613096628ff240fe10b9dfc775"
       },
       "upstream": {
         "mode": "100644",
@@ -11165,7 +11204,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "20f1ca000c244fbcf15627d1452858e05d2c86d5"
+        "sha": "eceb3c3d3f2104ae9a6ad55cfb7df6d7271542a0"
       },
       "upstream": {
         "mode": "100644",
@@ -11181,7 +11220,10 @@
         "sha": "f07b90ad333bf09f0d2efed96f6e50326f49d1b0"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "f07b90ad333bf09f0d2efed96f6e50326f49d1b0"
+      },
       "upstream": null
     },
     {
@@ -11197,7 +11239,10 @@
         "sha": "4136666f29aa613438d44629e4b16d714e7ed034"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "4136666f29aa613438d44629e4b16d714e7ed034"
+      },
       "upstream": null
     },
     {
@@ -11209,7 +11254,10 @@
         "sha": "b6867f3c10e013b5202ecc72060d6dff41c63246"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b6867f3c10e013b5202ecc72060d6dff41c63246"
+      },
       "upstream": null
     },
     {
@@ -11226,7 +11274,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "051ca85786e2d3681d3079dab8e4a7e6e42d7a32"
+        "sha": "ea0bc693e4399d761474eb50d784a764a6744094"
       },
       "upstream": {
         "mode": "100644",
@@ -11247,7 +11295,10 @@
         "sha": "f47ab3c272ad2d5c4de018547122d7a152ffa299"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "f47ab3c272ad2d5c4de018547122d7a152ffa299"
+      },
       "upstream": null
     },
     {
@@ -11312,7 +11363,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "4f7adfd549994424c551c2c929a7b2a063a7fb54"
+        "sha": "760a1ffd0a111945064c477aa8bf60db2a8857c6"
       },
       "upstream": {
         "mode": "100644",
@@ -11336,7 +11387,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "bec4311911eb2f55744a315da2836c0c3b5eda71"
+        "sha": "7743fff9a81a3a25556964b5703e1c82bf424b90"
       },
       "upstream": {
         "mode": "100644",
@@ -11357,7 +11408,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "c9f87e5c9fcf8ab25c92f39589f60d8862075069"
+        "sha": "72350b672dca342116a88a62b38db1813ce2de48"
       },
       "upstream": {
         "mode": "100644",
@@ -11817,7 +11868,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "d5493654e8e058ae22206da9abd30a1c7fad8017"
+        "sha": "838ed6c036c05a7f61d86d49c0a2101a87eb1fdc"
       },
       "upstream": {
         "mode": "100644",
@@ -12842,7 +12893,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "1855062a1dffa2f42270ccdfbebf9d487da291cc"
+        "sha": "35a747536a3871b7f0ce8f09694a00d9b0adc4a2"
       },
       "upstream": {
         "mode": "100644",
@@ -12862,7 +12913,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "a9de1beb870605786c63fc2a0e6ea6a06280154a"
+        "sha": "8eb0b57f84969e3bf39dc72585af242fd19a3912"
       },
       "upstream": {
         "mode": "100644",
@@ -13555,7 +13606,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "42de44a2b95429a0132ffaefeee3c51cded6fcba"
+        "sha": "3aa712a305497063246858625a819bc8f7069430"
       },
       "upstream": {
         "mode": "100644",
@@ -13575,7 +13626,10 @@
         "sha": "d407993d31b9b568c4f56f9a6be706e4434f9a92"
       },
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d407993d31b9b568c4f56f9a6be706e4434f9a92"
+      },
       "upstream": null
     },
     {
@@ -14389,7 +14443,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "420fbfeda9ba70dfdbc3ee42eb4c56bd95bbd5d9"
+        "sha": "3ee6df1f0c2be1e9d605b7438feff8673bd894b7"
       },
       "upstream": {
         "mode": "100644",
@@ -15040,7 +15094,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "9052173169a1212e07e171bf9cc871c6ece8acd4"
+        "sha": "a8fdeb8caa821a8e400dcec8fe8b38fe96ddec9b"
       },
       "upstream": {
         "mode": "100644",
