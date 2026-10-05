@@ -3,6 +3,10 @@ import { assertSynchronousAuthorization } from '../../../shared/synchronous-auth
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 import { reserveRequestFor } from './structured-agent-session-attach'
 import type { AttachFlowInput } from './structured-agent-session-attach-flow'
+import {
+  prepareTaskDispatch,
+  requireTaskDispatchAuthorization
+} from '../../tasks/task-dispatch-authorization'
 
 export async function assertTaskAttachCurrent(
   input: AttachFlowInput,
@@ -11,6 +15,10 @@ export async function assertTaskAttachCurrent(
   if (!Object.hasOwn(input.params, 'taskOrigin') && !Object.hasOwn(record, 'taskSource')) {
     return
   }
+  await prepareTaskDispatch(
+    requireTaskDispatchAuthorization(input.params.taskOrigin?.dispatch),
+    () => assertTaskAttachAuthorityCurrent(input, record)
+  )
   await input.store.assertTaskAcquisition(
     reserveRequestFor({
       sessionId: record.sessionId,
@@ -24,6 +32,14 @@ export async function assertTaskAttachCurrent(
   )
   // The file transaction awaited; check current authority again at the effect boundary.
   assertTaskAttachAuthorityCurrent(input, record)
+  assertSynchronousAuthorization(
+    () => requireTaskDispatchAuthorization(input.params.taskOrigin?.dispatch).assertCurrent(),
+    () => {
+      throw agentSessionRefusalError('agent_session_operation_invalid', {
+        reason: 'requestMalformed'
+      })
+    }
+  )
 }
 
 export function assertTaskAttachAuthorityCurrent(

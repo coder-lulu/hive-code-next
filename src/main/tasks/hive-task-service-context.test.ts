@@ -1,13 +1,14 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
 import { createHiveTaskServiceContext } from './hive-task-service-context'
 
 let directory: string
 beforeEach(async () => {
-  directory = await mkdtemp(join(tmpdir(), 'task-service-context-'))
+  const logs = resolve('logs/paperclip-development/p3/controlled-runtime/service-context/tmp')
+  await mkdir(logs, { recursive: true })
+  directory = await realpath(await mkdtemp(join(logs, 'task-service-context-')))
   await writeFile(
     join(directory, 'descriptor.json'),
     JSON.stringify({ baseUrl: 'http://127.0.0.1:1', secret: 'test-only-descriptor' })

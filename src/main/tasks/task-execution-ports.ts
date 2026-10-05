@@ -14,10 +14,15 @@ export type TaskExecutionCaller = Readonly<{
   assertCurrent?: () => void
 }>
 export type TaskExecutionAction = 'start' | 'observe' | 'cancel' | 'reconcile'
+export type TaskExecutionDispatchAuthorization = {
+  prepare: () => Promise<void>
+  assertCurrent: () => void
+}
 export type TaskExecutionAuthorization = {
   workspace: TaskExecutionWorkspace
   input: string
   assertCurrent: () => void
+  dispatch?: TaskExecutionDispatchAuthorization
 }
 export type TaskExecutionStopEvidence = {
   runtimeRecordId: string

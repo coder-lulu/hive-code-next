@@ -26,52 +26,68 @@ export function createTaskDeliveryAuthorizer(options: {
       return refuseTaskExecution('FORBIDDEN')
     }
     const context = await options.context()
-    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
-    assertTaskAuthorizationCurrent(() => context.assertCurrent())
-    const startedAt = now()
-    const parsed = TaskDeliveryProofSchema.safeParse(
-      await context.request(
-        `/hive/execution-delivery/${encodeURIComponent(command.task.spaceId)}/${encodeURIComponent(command.task.runId)}`
-      )
-    )
-    if (!parsed.success) {
-      return refuseTaskExecution('OUTCOME_UNKNOWN')
-    }
-    const proof = parsed.data
-    const remaining = Date.parse(proof.expiresAt) - Date.parse(proof.serverNow)
-    if (
-      proof.accountId !== context.accountId ||
-      proof.companyId !== command.task.spaceId ||
-      proof.taskId !== command.task.taskId ||
-      proof.runId !== command.task.runId ||
-      proof.protocolVersion !== command.protocolVersion ||
-      proof.runtimeRecordId !== command.runtimeRecordId ||
-      proof.ownershipEpoch !== command.ownershipEpoch ||
-      proof.executionId !== command.executionId ||
-      proof.executionEpoch !== command.executionEpoch ||
-      proof.operationId !== command.operationId ||
-      proof.workspaceExecutionClaimRef !== command.workspaceExecutionClaimRef ||
-      proof.writeFence !== command.writeFence ||
-      proof.commandFingerprint !==
-        computeTaskExecutionFingerprint(command, caller.operationCallerKey) ||
-      proof.ownerId !== token.data.ownerId ||
-      proof.leaseRef !== token.data.leaseRef ||
-      proof.generation !== token.data.generation ||
-      remaining <= 0 ||
-      remaining > 60_000
-    ) {
-      return refuseTaskExecution('FORBIDDEN')
-    }
-    // Counting from request start conservatively includes transport and scheduling delays.
-    const deadline = startedAt + remaining
     const assertCurrent = () => {
       assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
       assertTaskAuthorizationCurrent(() => context.assertCurrent())
+    }
+    assertCurrent()
+    const expected = {
+      accountId: context.accountId,
+      companyId: command.task.spaceId,
+      taskId: command.task.taskId,
+      runId: command.task.runId,
+      protocolVersion: command.protocolVersion,
+      runtimeRecordId: command.runtimeRecordId,
+      ownershipEpoch: command.ownershipEpoch,
+      executionId: command.executionId,
+      executionEpoch: command.executionEpoch,
+      operationId: command.operationId,
+      workspaceExecutionClaimRef: command.workspaceExecutionClaimRef,
+      writeFence: command.writeFence,
+      commandFingerprint: computeTaskExecutionFingerprint(command, caller.operationCallerKey),
+      ...token.data
+    }
+    const path = `/hive/execution-delivery/${encodeURIComponent(command.task.spaceId)}/${encodeURIComponent(command.task.runId)}`
+    let deadline = 0
+    let flight: Promise<void> | null = null
+    const assertDispatchCurrent = () => {
+      assertCurrent()
       if (now() >= deadline) {
         return refuseTaskExecution('FORBIDDEN')
       }
     }
-    assertCurrent()
-    return { ...authorization, assertCurrent }
+    const refresh = async () => {
+      deadline = 0
+      assertCurrent()
+      const startedAt = now()
+      const response = await context.request(path)
+      assertCurrent()
+      const parsed = TaskDeliveryProofSchema.safeParse(response)
+      if (!parsed.success) {
+        return refuseTaskExecution('OUTCOME_UNKNOWN')
+      }
+      const proof = parsed.data
+      const remaining = Date.parse(proof.expiresAt) - Date.parse(proof.serverNow)
+      if (
+        Object.entries(expected).some(([key, value]) => Reflect.get(proof, key) !== value) ||
+        remaining <= 0 ||
+        remaining > 60_000
+      ) {
+        return refuseTaskExecution('FORBIDDEN')
+      }
+      // Counting from request start conservatively includes transport and scheduling delays.
+      deadline = startedAt + remaining
+      assertDispatchCurrent()
+    }
+    const prepare = () => {
+      flight ??= refresh().finally(() => {
+        flight = null
+      })
+      return flight
+    }
+    const dispatch = { prepare, assertCurrent: assertDispatchCurrent }
+    await dispatch.prepare()
+    dispatch.assertCurrent()
+    return { ...authorization, assertCurrent, dispatch }
   }
 }

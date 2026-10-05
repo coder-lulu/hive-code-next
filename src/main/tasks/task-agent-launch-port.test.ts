@@ -63,7 +63,11 @@ async function fixture() {
   const authorization = {
     workspace: taskWorkspace(directory),
     input: 'Create report.md.',
-    assertCurrent: vi.fn()
+    assertCurrent: vi.fn(),
+    dispatch: {
+      prepare: vi.fn(async () => undefined),
+      assertCurrent: vi.fn(() => undefined)
+    }
   }
   replay.mockResolvedValue(TASK_TEST_LAUNCH)
   return { record, options, authorization, runtime }

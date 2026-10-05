@@ -48,6 +48,7 @@ function contextFor(session: StructuredAgentSessionUnexpectedExitSession) {
   )
   const context: StructuredAgentSessionUnexpectedExitContext<typeof session> = {
     store: {
+      tasks: { hasSessionBinding: () => false },
       getRecord: () => record,
       transitionHandoff: async (
         _sessionId: string,

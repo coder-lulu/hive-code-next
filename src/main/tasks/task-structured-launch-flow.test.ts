@@ -111,20 +111,22 @@ async function fixture() {
     attach,
     send: vi.fn(async () => ({ ok: true, value: { clientMessageId: 'test-launch-message' } }))
   })
+  const assertCurrent = () => {
+    const current = store.tasks.get(command)
+    if (
+      !current ||
+      current.dispatch !== 'dispatching' ||
+      current.cancellationKey ||
+      current.result
+    ) {
+      throw new TaskExecutionError('FORBIDDEN')
+    }
+  }
   const authorization = {
     workspace,
     input: 'Create report.md.',
-    assertCurrent: () => {
-      const current = store.tasks.get(command)
-      if (
-        !current ||
-        current.dispatch !== 'dispatching' ||
-        current.cancellationKey ||
-        current.result
-      ) {
-        throw new TaskExecutionError('FORBIDDEN')
-      }
-    }
+    assertCurrent,
+    dispatch: { prepare: async () => undefined, assertCurrent }
   }
   const launch = createTaskAgentLaunchPort({
     context: () => rpcContext(runtime, {}),

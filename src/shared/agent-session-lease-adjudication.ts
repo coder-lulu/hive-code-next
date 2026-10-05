@@ -10,10 +10,15 @@
  */
 
 import { nextAgentSessionFence } from './agent-session-next-fence'
+import {
+  agentSessionExecutionHostProbeMatchesRecord,
+  type AgentSessionExecutionHostProbe
+} from './agent-session-execution-host-proof'
 import type {
   AgentSessionDeathEvidence,
   AgentSessionHandoffStage,
-  AgentSessionLease
+  AgentSessionLease,
+  AgentSessionRecord
 } from './agent-session-record'
 import type {
   AgentSessionOwnerVerdict,
@@ -23,6 +28,7 @@ import type {
 export type AgentSessionIdentityMatchField = 'process-start-time' | 'spawn-token'
 
 export type AgentSessionOwnerProbe =
+  | AgentSessionExecutionHostProbe
   /** Orca watched this exact process exit. */
   | { outcome: 'exit-observed' }
   /** The recorded pid is not present on the host. */
@@ -66,7 +72,8 @@ export function isProvenDeadProbe(probe: AgentSessionOwnerProbe): boolean {
   return (
     probe.outcome === 'exit-observed' ||
     probe.outcome === 'pid-absent' ||
-    probe.outcome === 'identity-mismatch'
+    probe.outcome === 'identity-mismatch' ||
+    probe.outcome === 'execution-host-exited'
   )
 }
 
@@ -75,7 +82,10 @@ export function isProvenDeadProbe(probe: AgentSessionOwnerProbe): boolean {
  * match on a host that can produce neither a start time nor a token echo is indeterminate.
  */
 export function isProvenAliveProbe(probe: AgentSessionOwnerProbe): boolean {
-  return probe.outcome === 'identity-matched' && probe.matchedOn.length > 0
+  return (
+    (probe.outcome === 'identity-matched' && probe.matchedOn.length > 0) ||
+    probe.outcome === 'execution-host-live'
+  )
 }
 
 function deathEvidenceFor(
@@ -91,6 +101,14 @@ function deathEvidenceFor(
   }
   if (probe.outcome === 'exit-observed') {
     return { kind: 'exit-observed', detail: 'observed process exit', ...interval }
+  }
+  if (probe.outcome === 'execution-host-exited') {
+    return {
+      kind: 'execution-host-exit-observed',
+      detail: 'exact original container exited',
+      ...interval,
+      witness: probe.witness
+    }
   }
   if (probe.outcome === 'pid-absent') {
     return { kind: 'pid-absent', detail: 'recorded pid absent on host', ...interval }
@@ -140,6 +158,7 @@ export function isAgentSessionFenceCurrent(lease: AgentSessionLease, fence: numb
  * owner; it is only consulted when a recorded owner or an unused reservation stands in the way.
  */
 export function evaluateAgentSessionAcquisition(args: {
+  record?: AgentSessionRecord
   lease: AgentSessionLease
   expectedFence: number
   handoffOperationId: string | null
@@ -170,6 +189,16 @@ export function evaluateAgentSessionAcquisition(args: {
   }
   if (lease.handoffStage === 'recovering') {
     // Why: no stage expires into an owner; recovery resolution concludes about it first.
+    return {
+      decision: 'refused',
+      code: 'agent_session_ownership_unknown',
+      details: { reason: 'ownerUnproven' }
+    }
+  }
+  if (
+    Object.hasOwn(args.record ?? {}, 'taskSource') ||
+    probe.outcome.startsWith('execution-host-')
+  ) {
     return {
       decision: 'refused',
       code: 'agent_session_ownership_unknown',
@@ -225,11 +254,38 @@ export function evaluateAgentSessionAcquisition(args: {
  * grants no writer until this returns.
  */
 export function adjudicateAgentSessionRestart(args: {
+  record?: AgentSessionRecord
   lease: AgentSessionLease
   probe: AgentSessionOwnerProbe
   observedAt: number
 }): AgentSessionRestartAdjudication {
   const { lease, probe, observedAt } = args
+  if (
+    Object.hasOwn(args.record ?? {}, 'taskSource') ||
+    probe.outcome.startsWith('execution-host-')
+  ) {
+    const valid = args.record && agentSessionExecutionHostProbeMatchesRecord(probe, args.record)
+    if (valid && probe.outcome === 'execution-host-exited') {
+      if (
+        lease.claimStatus === 'released' &&
+        lease.ownerProcess === null &&
+        lease.reservedSpawnToken === null &&
+        lease.deathEvidence?.kind === 'execution-host-exit-observed'
+      ) {
+        return { disposition: 'free', reason: 'original container remains exited' }
+      }
+      return {
+        disposition: 'evicted',
+        nextFence: nextAgentSessionFence(lease),
+        evidence: deathEvidenceFor(probe, observedAt, lease)
+      }
+    }
+    return {
+      disposition: 'recovering',
+      stage: 'recovering',
+      reason: 'execution host needs original CID exit proof'
+    }
+  }
   if (lease.ownerProcess === null) {
     if (lease.reservedSpawnToken === null && lease.claimStatus === 'released') {
       // Why: the spawn token is minted before the child and is the only thing a child could be
@@ -242,13 +298,16 @@ export function adjudicateAgentSessionRestart(args: {
         disposition: 'evicted',
         nextFence: nextAgentSessionFence(lease),
         evidence: {
-          kind: 'pid-absent', detail: 'reservation never spawned', observedAt,
+          kind: 'pid-absent',
+          detail: 'reservation never spawned',
+          observedAt,
           ownerFence: lease.runtimeFence
         }
       }
     }
     return {
-      disposition: 'recovering', stage: 'recovering',
+      disposition: 'recovering',
+      stage: 'recovering',
       reason: 'reservation has no proof that its provider never started'
     }
   }

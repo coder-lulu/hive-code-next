@@ -27,7 +27,6 @@ import {
   isAgentSessionClaimKeyVerifiable,
   retireAgentSessionClaimKey
 } from './agent-session-claim-key-retention'
-import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-adjudication'
 import type { AgentSessionProviderHandleLink } from '../../shared/agent-session-provider-handle'
 import {
   agentSessionScopeKey,
@@ -41,6 +40,7 @@ import {
   evictAgentSessionOwner,
   proveAgentSessionOwner,
   setAgentSessionJournalCheckpoint,
+  type AgentSessionOwnerEviction,
   type AgentSessionProcessIdentityCommit
 } from './agent-session-lease-transitions'
 import {
@@ -71,6 +71,7 @@ import {
 } from './agent-session-record-store-file'
 import { setAgentSessionTabVisibility } from './agent-session-tab-table'
 import { loadProtectedAgentSessionStore } from './agent-session-record-store-security'
+import type { AgentSessionRecordTransition } from './agent-session-store-contract'
 import {
   AgentSessionStoreTransactionQueue,
   markAgentSessionStoreLeasesUnreconciled
@@ -245,20 +246,17 @@ export class AgentSessionRecordStore {
     )
   }
 
-  async evictProvenDeadOwner(args: {
-    sessionId: string
-    expectedFence: number
-    probe: AgentSessionOwnerProbe
-    now: number
-  }): Promise<AgentSessionRecord> {
-    return this.mutate(args.sessionId, (record) => evictAgentSessionOwner({ ...args, record }))
+  async evictProvenDeadOwner(args: AgentSessionOwnerEviction): Promise<AgentSessionRecord> {
+    return this.mutate(args.sessionId, (record) =>
+      evictAgentSessionOwner({ ...args, record }, this.state.taskExecutions)
+    )
   }
 
   async transitionHandoff(
     sessionId: string,
-    transition: (record: AgentSessionRecord) => AgentSessionRecord
+    transition: AgentSessionRecordTransition
   ): Promise<AgentSessionRecord> {
-    return this.mutate(sessionId, transition)
+    return this.mutate(sessionId, (record) => transition(record, this.state.taskExecutions))
   }
 
   async setJournalCheckpoint(args: {

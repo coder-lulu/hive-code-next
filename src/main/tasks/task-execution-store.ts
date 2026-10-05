@@ -1,7 +1,7 @@
-import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import type { AgentLaunchResult } from '../../shared/agent-launch-intent'
 import { isAgentLaunchResult } from '../../shared/agent-launch-intent'
 import { agentSessionOperationKey } from '../../shared/agent-session-operation-ledger'
+import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import {
   TaskStructuredBindingSchema,
   type TaskStructuredBinding
@@ -15,8 +15,14 @@ import { admitTaskExecution, type TaskExecutionAdmission } from './task-executio
 import { admitTaskDockerIdentity } from './task-docker-identity-admission'
 import type { TaskDockerIdentity } from './task-docker-identity'
 import { refuseTaskExecution } from './task-execution-error'
-import { reserveTaskModelDispatch } from './task-model-dispatch-reservation'
+import {
+  assertTaskModelDispatchCurrent,
+  reserveTaskModelDispatch
+} from './task-model-dispatch-reservation'
+import { bindTaskLaunch } from './task-launch-binding'
+import { assertTaskCodexSessionBinding } from './task-codex-session-binding'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import { hasTaskSessionBinding } from './task-session-association'
 import {
   TaskExecutionRecordSchema,
   taskExecutionIdentity,
@@ -32,6 +38,10 @@ export class TaskExecutionPersistence {
 
   get(identity: Identity): TaskExecutionRecord | null {
     return this.transactions.readTaskExecution(taskExecutionRecordKey(identity))
+  }
+
+  hasSessionBinding(sessionId: string): boolean {
+    return hasTaskSessionBinding(this.transactions.readState.taskExecutions, sessionId)
   }
 
   listActive(): TaskExecutionRecord[] {
@@ -97,6 +107,37 @@ export class TaskExecutionPersistence {
     )
   }
 
+  async runModelEffect<T>(binding: TaskStructuredBinding, validate: () => void, start: () => T) {
+    const snapshot = TaskStructuredBindingSchema.safeParse(binding)
+    if (!snapshot.success || typeof validate !== 'function' || typeof start !== 'function') {
+      return refuseTaskExecution('INVALID_REQUEST')
+    }
+    return this.transactions.transact(() => {
+      assertTaskAuthorizationCurrent(() => validate())
+      const task = this.transactions.state.taskExecutions?.get(
+        taskExecutionRecordKey(snapshot.data.source)
+      )
+      if (!task) {
+        return refuseTaskExecution('EXECUTION_NOT_FOUND')
+      }
+      assertTaskModelDispatchCurrent(this.transactions.state, task, snapshot.data)
+      if (!task.modelDispatchAttempts) {
+        return refuseTaskExecution('OUTCOME_UNKNOWN')
+      }
+      // The envelope keeps the file transaction independent of a network promise.
+      return { value: start() }
+    })
+  }
+
+  assertStructuredBindingCurrent(binding: TaskStructuredBinding): void {
+    const state = this.transactions.readState
+    const task = state.taskExecutions?.get(taskExecutionRecordKey(binding.source))
+    if (!task) {
+      return refuseTaskExecution('EXECUTION_NOT_FOUND')
+    }
+    assertTaskCodexSessionBinding(state, task, binding, true)
+  }
+
   persistDockerIdentity(
     identity: Identity & Pick<TaskExecutionRecord['command'], 'ownershipEpoch'>,
     dockerIdentity: TaskDockerIdentity,
@@ -125,7 +166,7 @@ export class TaskExecutionPersistence {
         if (typeof validate !== 'function') {
           return refuseTaskExecution('INVALID_REQUEST')
         }
-        validate()
+        assertTaskAuthorizationCurrent(() => validate())
       }
     )
   }
@@ -267,33 +308,5 @@ export class TaskExecutionPersistence {
       this.transactions.state.taskExecutions!.set(key, record)
       return { changed: true, record: structuredClone(record) }
     })
-  }
-}
-
-function bindTaskLaunch(
-  record: TaskExecutionRecord,
-  launch: AgentLaunchResult
-): TaskExecutionRecord | null {
-  if (record.dispatch === 'bound') {
-    if (!record.launch) {
-      return refuseTaskExecution('OUTCOME_UNKNOWN')
-    }
-    if (canonicalAgentSessionDigest(record.launch) !== canonicalAgentSessionDigest(launch)) {
-      return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
-    }
-    return null
-  }
-  if (
-    record.dispatch !== 'dispatching' ||
-    record.result ||
-    launch.worktreeId !== record.workspace.workspaceId
-  ) {
-    return refuseTaskExecution('OUTCOME_UNKNOWN')
-  }
-  return {
-    ...record,
-    dispatch: 'bound',
-    launch,
-    status: record.cancellationKey ? 'cancel_requested' : 'running'
   }
 }

@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
 import { TaskDigest, TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
 import type { TaskDockerConfiguration, TaskDockerRecord } from './task-docker-configuration'
+import { refuseTaskExecution } from './task-execution-error'
 
 export const TaskDockerDaemonSchema = z.strictObject({
   ID: z.string().min(1).max(160),
@@ -96,4 +97,25 @@ export function taskDockerIdentityFor(
     daemon,
     containerId
   })
+}
+
+export function taskDockerRecoveryIdentity(
+  config: TaskDockerConfiguration,
+  recoveryIdentity: TaskDockerIdentity | undefined,
+  persistIdentity: unknown
+): TaskDockerIdentity | null {
+  const recovery =
+    recoveryIdentity === undefined ? null : TaskDockerIdentitySchema.parse(recoveryIdentity)
+  if (
+    (!recovery && typeof persistIdentity !== 'function') ||
+    (recovery &&
+      (persistIdentity !== undefined ||
+        !isDeepStrictEqual(
+          recovery,
+          taskDockerIdentityFor(config, recovery.daemon, recovery.containerId)
+        )))
+  ) {
+    return refuseTaskExecution('INVALID_REQUEST')
+  }
+  return recovery
 }

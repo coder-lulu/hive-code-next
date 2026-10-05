@@ -4,6 +4,7 @@ import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { AgentSessionStoreState } from './agent-session-record-store-file'
 import { agentSessionReconciliationTargetMatches } from './agent-session-reconciliation-target'
 import { applyAgentSessionRestartAdjudication } from './agent-session-restart-lease-transitions'
+import { taskDockerSessionProbeForRecord } from '../tasks/task-docker-session-owner'
 
 export type AgentSessionRestartProbeArgs = {
   owns?: (record: AgentSessionRecord) => boolean
@@ -49,7 +50,11 @@ export function applyAgentSessionRestartProbes(
     ) {
       continue
     }
-    const next = applyAgentSessionRestartAdjudication({ record, probe: probed.probe, now })
+    const next = applyAgentSessionRestartAdjudication({
+      record,
+      probe: taskDockerSessionProbeForRecord(record, probed.probe, state.taskExecutions),
+      now
+    })
     state.records.set(sessionId, next)
     reconciled.set(sessionId, next)
   }

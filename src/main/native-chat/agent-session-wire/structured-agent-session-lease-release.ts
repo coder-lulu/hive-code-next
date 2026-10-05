@@ -15,7 +15,7 @@ import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 export type StructuredAgentSessionLeaseStore = Pick<
   AgentSessionRecordStore,
   'getRecord' | 'transitionHandoff'
->
+> & { tasks: Pick<AgentSessionRecordStore['tasks'], 'hasSessionBinding'> }
 
 export async function releaseStoredStructuredAgentSessionOwner(input: {
   store: StructuredAgentSessionLeaseStore

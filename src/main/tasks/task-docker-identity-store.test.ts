@@ -108,6 +108,15 @@ function heldWrite(fail = false) {
 }
 
 describe('Docker identity checkpoints in the original Task transaction', () => {
+  it('refuses an asynchronous authorization result before committing a Docker generation', async () => {
+    const original = await admission()
+    const before = await readPersistedTestAgentSessionStoreText(directory)
+    await expect(
+      persist(dockerIdentity(original), store, () => Promise.resolve())
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    expect(await readPersistedTestAgentSessionStoreText(directory)).toBe(before)
+    expect(store.tasks.get(taskCommand())).toEqual(original)
+  })
   it('keeps records without a Docker field readable after cold reload', async () => {
     const { record } = await store.tasks.admit({
       command: taskCommand(),

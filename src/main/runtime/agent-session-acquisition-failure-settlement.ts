@@ -10,6 +10,7 @@ import type {
 } from '../../shared/agent-session-record'
 import { assertFence, withLease } from './agent-session-lease-transitions'
 import type { AgentSessionStoreState } from './agent-session-record-store-file'
+import { hasTaskSessionBinding } from '../tasks/task-session-association'
 
 /**
  * How the failed attempt's provider process was accounted for.
@@ -55,7 +56,11 @@ export function settleFailedAgentSessionAcquisition(
   if (!record) {
     throw new Error('agent_session_identity_required')
   }
-  const next = settleFailedLease(record, args)
+  const next = settleFailedLease(
+    record,
+    args,
+    hasTaskSessionBinding(state.taskExecutions, record.sessionId)
+  )
   state.records.set(args.sessionId, next)
   state.operations = settleAgentSessionOperation(state.operations, args)
   return next
@@ -85,7 +90,9 @@ export function settleFailedAgentSessionPostAcquisitionAttachment(
     throw new Error('agent_session_ownership_unknown')
   }
   const next =
-    args.exitProof === 'unproven'
+    args.exitProof === 'unproven' ||
+    Object.hasOwn(record, 'taskSource') ||
+    hasTaskSessionBinding(state.taskExecutions, record.sessionId)
       ? {
           ...withLease(record, {
             ...record.lease,
@@ -120,7 +127,8 @@ export function settleFailedAgentSessionPostAcquisitionAttachment(
 
 function settleFailedLease(
   record: AgentSessionRecord,
-  args: AgentSessionFailedAcquisitionSettlement
+  args: AgentSessionFailedAcquisitionSettlement,
+  taskBound: boolean
 ): AgentSessionRecord {
   assertFence(record.lease, args.fence)
   if (
@@ -131,7 +139,11 @@ function settleFailedLease(
   ) {
     throw new Error('agent_session_ownership_unknown')
   }
-  if (args.exitProof === 'unproven' && record.lease.ownerProcess) {
+  if (
+    Object.hasOwn(record, 'taskSource') ||
+    taskBound ||
+    (args.exitProof === 'unproven' && record.lease.ownerProcess)
+  ) {
     // Parking in recovery proves nothing alive, so `lastRenewedAt` keeps the spawn's proof.
     return {
       ...withLease(record, {

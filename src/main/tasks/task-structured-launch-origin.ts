@@ -1,6 +1,7 @@
 import type { TaskSessionSourceReference } from '../../shared/task-execution/task-structured-binding'
 import { assertSynchronousAuthorization } from '../../shared/synchronous-authorization-guard'
 import { refuseTaskExecution } from './task-execution-error'
+import type { TaskExecutionDispatchAuthorization } from './task-execution-ports'
 
 export function assertTaskAuthorizationCurrent(check: () => void): void {
   assertSynchronousAuthorization(check, () => refuseTaskExecution('FORBIDDEN'))
@@ -13,4 +14,5 @@ export type TaskStructuredLaunchOrigin = {
   operationId: string
   launchFingerprint: string
   validate: () => void
+  dispatch?: TaskExecutionDispatchAuthorization
 }

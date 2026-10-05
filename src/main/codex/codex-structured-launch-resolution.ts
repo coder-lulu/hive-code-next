@@ -6,12 +6,13 @@
 // must name the thread this session actually proved — never one a caller asks
 // for, which is how a resume becomes a fork wearing a resume's name.
 
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { agentSessionProviderHandleChainHead } from '../../shared/agent-session-provider-handle'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { resolveCodexCommand } from '../codex-cli/command'
 import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
 import type { CodexStructuredLaunch } from './codex-structured-session-adapter'
+import type { CodexStructuredLaunchInput } from './codex-structured-session-state'
 import type { CodexStructuredPermissionPolicy } from './codex-structured-permission-policy'
 import { resolvePinnedCodexRolloutProof } from './codex-pinned-rollout-proof'
 import { isWindowsProcessStartTimeAvailable } from '../windows/windows-process-table'
@@ -31,6 +32,10 @@ export type CodexStructuredLaunchResolverDeps = {
   /** The user's Agent Permissions setting as thread policy, re-read per acquisition.
    *  States both postures outright — a resume inherits the last one for any field left absent. */
   resolvePermissionPolicy?: () => CodexStructuredPermissionPolicy
+  resolveTaskLaunch?: (
+    input: CodexStructuredLaunchInput,
+    record: AgentSessionRecord
+  ) => Promise<CodexStructuredLaunch>
 }
 
 export type CodexStructuredInvocation = {
@@ -60,11 +65,26 @@ export async function resolveCodexStructuredInvocation(
 
 export function createCodexStructuredLaunchResolver(
   deps: CodexStructuredLaunchResolverDeps
-): (input: { identity: AgentSessionJournalIdentity }) => Promise<CodexStructuredLaunch> {
-  return async ({ identity }) => {
+): (input: CodexStructuredLaunchInput) => Promise<CodexStructuredLaunch> {
+  return async (input) => {
+    const { identity } = input
     const record = deps.store.getRecord(identity.sessionId)
     if (!record) {
       throw new Error(`no durable agent-session record for ${identity.sessionId}`)
+    }
+    if (
+      Object.hasOwn(record, 'taskSource') ||
+      Object.hasOwn(input, 'taskOrigin') ||
+      deps.store.tasks?.hasSessionBinding(identity.sessionId)
+    ) {
+      if (!deps.resolveTaskLaunch) {
+        throw new Error('TASK_DOCKER_RUNTIME_UNAVAILABLE')
+      }
+      const launch = await deps.resolveTaskLaunch(input, record)
+      if (typeof launch.openTaskConnection !== 'function') {
+        throw new Error('TASK_DOCKER_RUNTIME_UNAVAILABLE')
+      }
+      return launch
     }
     const { location, accountHome } = record
     if (record.provider !== 'codex') {

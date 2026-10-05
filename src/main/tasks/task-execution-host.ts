@@ -16,6 +16,10 @@ import type { TaskExecutionRecord } from './task-execution-record'
 import { taskRecordObservation } from './task-record-observation'
 import { collectTaskExecutionSettlement } from './task-execution-settlement'
 import { recoverPersistedTaskExecution } from './task-execution-recovery'
+import {
+  assertTaskExecutionDispatchCurrent,
+  prepareTaskExecutionLaunchAuthorization
+} from './task-execution-launch-authorization'
 import type {
   TaskExecutionCaller,
   TaskExecutionAction,
@@ -115,7 +119,7 @@ export class TaskExecutionHost {
       operationCallerKey: caller.operationCallerKey,
       workspace: authorization.workspace,
       now: this.now(),
-      validate: authorization.assertCurrent
+      validate: () => assertTaskExecutionDispatchCurrent(authorization)
     })
     if (admitted.created) {
       const key = admitted.record.commandFingerprint
@@ -232,6 +236,9 @@ export class TaskExecutionHost {
       assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     }
     assertCurrent()
+    if (action === 'start') {
+      assertTaskExecutionDispatchCurrent(authorization)
+    }
     return { ...authorization, assertCurrent }
   }
 
@@ -257,30 +264,15 @@ export class TaskExecutionHost {
 
   private async dispatch(record: TaskExecutionRecord, authorization: TaskExecutionAuthorization) {
     try {
-      const dispatch = await this.deps.store.beginDispatch(
-        record.command,
-        this.now(),
-        authorization.assertCurrent
+      const dispatch = await prepareTaskExecutionLaunchAuthorization(
+        { store: this.deps.store, now: this.now },
+        record,
+        authorization
       )
-      if (!dispatch.changed) {
-        return
+      if (dispatch) {
+        const launch = await this.deps.launch(dispatch.record, dispatch.authorization)
+        await this.deps.store.bindLaunch(record.command, launch, this.now())
       }
-      // Cancellation can commit while the launch port awaits replay or terminal preparation.
-      const assertCurrent = () => {
-        assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
-        const current = this.deps.store.get(record.command)
-        if (
-          !current ||
-          current.cancellationKey ||
-          current.result ||
-          current.dispatch !== 'dispatching'
-        ) {
-          return refuseTaskExecution('OUTCOME_UNKNOWN')
-        }
-      }
-      assertCurrent()
-      const launch = await this.deps.launch(dispatch.record, { ...authorization, assertCurrent })
-      await this.deps.store.bindLaunch(record.command, launch, this.now())
     } catch {
       await this.deps.store.markUnknown(record.command, this.now()).catch(() => undefined)
     }

@@ -19,6 +19,7 @@ import type {
   AgentSessionJournalIdentity
 } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionProviderHandleLink } from '../../../shared/agent-session-provider-handle'
+import type { TaskStructuredLaunchOrigin } from '../../tasks/task-structured-launch-origin'
 import type {
   AgentSessionAccountHome,
   AgentSessionExecutionLocation,
@@ -229,6 +230,7 @@ export type StructuredAgentSessionAcquireInput = {
   onSpawned?: (process: AgentSessionProcessIdentity) => Promise<void>
   /** Host-only source guard after launch preparation and again in the synchronous spawn frame. */
   spawnGuard?: { prepare: () => Promise<void>; assertCurrent: () => void }
+  taskOrigin?: TaskStructuredLaunchOrigin
 }
 
 export type StructuredAgentSessionSetOptionInput = {

@@ -10,6 +10,7 @@ import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account
 
 function fixture() {
   const command = taskCommand()
+  let now = TASK_TEST_NOW
   let account: HiveRuntimeCloudAuthorization | null = {
     accountId: 'account:one',
     authorityId: 'authority:one',
@@ -39,12 +40,23 @@ function fixture() {
       accountId: 'account:one'
     }),
     resolveGrant: (ref) => (ref === command.authorizationRef ? currentGrant : null),
-    now: () => TASK_TEST_NOW
+    now: () => now
   })
   return {
     command,
     grant,
     authorize,
+    advanceTime: (milliseconds: number) => {
+      now += milliseconds
+    },
+    renewGrant: (milliseconds = 60_000) => {
+      grant.validUntil = now + milliseconds
+    },
+    expireAccount: () => {
+      if (account) {
+        account = { ...account, sessionExpiresAt: now }
+      }
+    },
     revokeGrant: () => {
       currentGrant = null
     },
@@ -55,12 +67,74 @@ function fixture() {
       account = null
     },
     changeAccount: () => {
-      account = { ...account!, accountId: 'account:another' }
+      if (account) {
+        account = { ...account, accountId: 'account:another' }
+      }
     }
   }
 }
 
 describe('local service grants and account ownership', () => {
+  it('keeps an admitted guard live only through renewal of the same canonical grant', async () => {
+    const current = fixture()
+    current.grant.validUntil = Date.parse(current.command.expiresAt)
+    const authorization = await current.authorize(TASK_TEST_CALLER, current.command, 'start')
+    current.advanceTime(50_000)
+    current.renewGrant()
+    current.advanceTime(11_000)
+    expect(authorization.assertCurrent()).toBeUndefined()
+    await expect(current.authorize(TASK_TEST_CALLER, current.command, 'start')).rejects.toThrow(
+      'FORBIDDEN'
+    )
+    current.advanceTime(49_000)
+    expect(authorization.assertCurrent).toThrow('FORBIDDEN')
+  })
+  it.each(['malformed', 'past', 'now', 'beyond-live-grant'])(
+    'refuses a new RPC with %s expiry before returning a grant',
+    async (expiry) => {
+      const current = fixture()
+      const expiresAt =
+        expiry === 'malformed'
+          ? 'not-a-timestamp'
+          : new Date(
+              expiry === 'past'
+                ? TASK_TEST_NOW - 1
+                : expiry === 'now'
+                  ? TASK_TEST_NOW
+                  : current.grant.validUntil + 1
+            ).toISOString()
+      await expect(
+        current.authorize(TASK_TEST_CALLER, { ...current.command, expiresAt }, 'start')
+      ).rejects.toThrow('FORBIDDEN')
+    }
+  )
+  it.each(['revokeGrant', 'replaceGrant', 'signOut', 'changeAccount', 'expireAccount'] as const)(
+    'still refuses %s after the same grant was renewed past the original command expiry',
+    async (change) => {
+      const current = fixture()
+      const authorization = await current.authorize(TASK_TEST_CALLER, current.command, 'start')
+      current.advanceTime(61_000)
+      current.renewGrant()
+      current[change]()
+      expect(authorization.assertCurrent).toThrow('FORBIDDEN')
+    }
+  )
+  it('does not let a renewed grant bypass its original source/action/fingerprint checks', async () => {
+    const current = fixture()
+    const authorization = await current.authorize(TASK_TEST_CALLER, current.command, 'start')
+    current.advanceTime(61_000)
+    current.renewGrant()
+    current.grant.assertCurrent = () => {
+      throw new Error('Source revoked')
+    }
+    expect(authorization.assertCurrent).toThrow('Source revoked')
+    current.grant.assertCurrent = vi.fn()
+    current.grant.actions = ['observe']
+    expect(authorization.assertCurrent).toThrow('FORBIDDEN')
+    current.grant.actions = ['start']
+    current.grant.command = { ...current.command, inputRef: 'input:changed' }
+    expect(authorization.assertCurrent).toThrow('FORBIDDEN')
+  })
   it('refuses an asynchronous original grant before authorizing start', async () => {
     const current = fixture()
     current.grant.assertCurrent = () => Promise.resolve()

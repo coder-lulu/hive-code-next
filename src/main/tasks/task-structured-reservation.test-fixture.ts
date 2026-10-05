@@ -19,15 +19,20 @@ import {
 } from './task-execution-record'
 import type { TaskStructuredLaunchOrigin } from './task-structured-launch-origin'
 import { taskCommand, taskWorkspace, TASK_TEST_NOW } from './task-execution.test-fixture'
+import type { TaskExecutionStart } from '../../shared/task-execution/task-execution-command'
 
 export const TASK_STRUCTURED_LOGS = 'logs/paperclip-development/p3/task-session-binding/writer'
 
 export function taskStructuredFixture(
-  workspace: TaskExecutionWorkspace = taskWorkspace('isolated-test')
+  workspace: TaskExecutionWorkspace = taskWorkspace('isolated-test'),
+  taskReference?: TaskExecutionStart['task']
 ) {
   const state = emptyState('local')
   const validate = vi.fn(() => undefined)
-  const command = taskCommand({ operationId: `${TASK_TEST_NOW}-${'b'.repeat(32)}` })
+  const command = taskCommand({
+    operationId: `${TASK_TEST_NOW}-${'b'.repeat(32)}`,
+    ...(taskReference ? { task: taskReference } : {})
+  })
   const admission = {
     command,
     workspace,
@@ -51,7 +56,11 @@ export function taskStructuredFixture(
       agent: 'codex',
       target: { kind: 'existing', worktree: workspace.workspaceId }
     }),
-    validate
+    validate,
+    dispatch: {
+      prepare: vi.fn(async () => undefined),
+      assertCurrent: vi.fn(() => undefined)
+    }
   }
   const outer = {
     ...pendingAgentSessionOperationRow({

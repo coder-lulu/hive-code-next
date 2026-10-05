@@ -14,9 +14,12 @@ import {
 } from './task-docker-inspection'
 import { refuseTaskExecution } from './task-execution-error'
 import { assertTaskDirectoryIdentity } from './task-managed-copy'
+import type { TaskExecutionDispatchAuthorization } from './task-execution-ports'
+import { prepareTaskDispatch } from './task-dispatch-authorization'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import {
-  TaskDockerIdentitySchema,
   taskDockerIdentityFor,
+  taskDockerRecoveryIdentity,
   type TaskDockerIdentity
 } from './task-docker-identity'
 
@@ -39,26 +42,18 @@ export function createTaskDockerBoundary(options: {
   record: TaskDockerRecord
   assertCurrent: () => void
   persistIdentity?: (identity: TaskDockerIdentity) => Promise<void>
+  dispatch?: TaskExecutionDispatchAuthorization
   recoveryIdentity?: TaskDockerIdentity
   run?: typeof runProcess
 }) {
   const config = taskDockerConfiguration(options)
-  const recovery =
-    options.recoveryIdentity === undefined
-      ? null
-      : TaskDockerIdentitySchema.parse(options.recoveryIdentity)
-  if (
-    (!recovery && typeof options.persistIdentity !== 'function') ||
-    (recovery &&
-      (options.persistIdentity !== undefined ||
-        !isDeepStrictEqual(
-          recovery,
-          taskDockerIdentityFor(config, recovery.daemon, recovery.containerId)
-        )))
-  ) {
-    refuseTaskExecution('INVALID_REQUEST')
-  }
+  const recovery = taskDockerRecoveryIdentity(
+    config,
+    options.recoveryIdentity,
+    options.persistIdentity
+  )
   const run = options.run ?? runProcess
+  const dispatch = options.dispatch
   const exitProof = new RetryableProcessExitProof()
   let containerId = recovery?.containerId ?? null
   let imageEnv: Record<string, string> | null = null
@@ -99,6 +94,10 @@ export function createTaskDockerBoundary(options: {
       }
     }
     assertInvocation()
+    if (current && args[0] === 'create' && dispatch) {
+      await prepareTaskDispatch(dispatch, assertCurrent)
+      assertTaskAuthorizationCurrent(() => dispatch.assertCurrent())
+    }
     try {
       return await run({
         program: config.dockerPath,

@@ -1,5 +1,6 @@
 import type { AgentSessionOwnerProbe } from '../../../shared/agent-session-lease-adjudication'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import { agentSessionExecutionHostProbeMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
 import {
   createDeferredStructuredAgentSessionEventSink,
   type DeferredStructuredAgentSessionEventSink,
@@ -7,7 +8,10 @@ import {
 } from './structured-agent-session-event-sink'
 import type { StructuredAgentSessionHostDeps } from './structured-agent-session-host'
 import { StructuredAgentSessionLeaseRenewer } from './structured-agent-session-lease-renewer'
-import { resolveStructuredSessionRecovery } from './structured-agent-session-recovery-resolution'
+import {
+  resolveStructuredSessionRecovery,
+  commitStructuredSessionExecutionHostExit
+} from './structured-agent-session-recovery-resolution'
 
 export class StructuredAgentSessionHostRuntimeState {
   private readonly eventSinks = new Map<string, DeferredStructuredAgentSessionEventSink>()
@@ -124,7 +128,10 @@ export class StructuredAgentSessionHostRuntimeState {
         store: this.deps.store,
         probeRecord: (record) => this.probeRecord(record),
         now: () => this.deps.now?.() ?? Date.now(),
-        ...(this.deps.stopOwnerProcess ? { stopOwnerProcess: this.deps.stopOwnerProcess } : {})
+        ...(this.deps.stopOwnerProcess ? { stopOwnerProcess: this.deps.stopOwnerProcess } : {}),
+        ...(this.deps.stopExecutionOwner
+          ? { stopExecutionOwner: this.deps.stopExecutionOwner }
+          : {})
       },
       sessionId
     )
@@ -132,6 +139,12 @@ export class StructuredAgentSessionHostRuntimeState {
 
   probeOwner(sessionId: string): Promise<AgentSessionOwnerProbe> {
     const record = this.deps.store.getRecord(sessionId)
+    if (
+      record &&
+      (Object.hasOwn(record, 'taskSource') || this.deps.store.tasks.hasSessionBinding(sessionId))
+    ) {
+      return this.probeRecord(record)
+    }
     if (
       !record ||
       (record.lease.ownerProcess === null && record.lease.claimStatus !== 'reserved')
@@ -144,13 +157,44 @@ export class StructuredAgentSessionHostRuntimeState {
     return this.probeRecord(record)
   }
 
+  async commitExecutionOwnerStop(
+    sessionId: string,
+    expectedFence: number
+  ): Promise<'resolved' | 'unresolved'> {
+    const record = this.deps.store.getRecord(sessionId)
+    if (!record || !this.deps.stopExecutionOwner) {
+      return 'unresolved'
+    }
+    const probe = await this.deps.stopExecutionOwner(record)
+    if (
+      !probe ||
+      probe.outcome !== 'execution-host-exited' ||
+      probe.witness.ownerFence !== expectedFence ||
+      !agentSessionExecutionHostProbeMatchesRecord(probe, record)
+    ) {
+      return 'unresolved'
+    }
+    const barrier = await this.lifecycleBarrier(sessionId)
+    if (!barrier.ok) {
+      throw barrier.error
+    }
+    return commitStructuredSessionExecutionHostExit(
+      { store: this.deps.store, now: () => this.deps.now?.() ?? Date.now() },
+      record,
+      probe
+    )
+  }
+
   probeRecord(record: AgentSessionRecord): Promise<AgentSessionOwnerProbe> {
     return (
       this.deps.probeOwner?.(record) ??
-      Promise.resolve({
-        outcome: 'indeterminate',
-        reason: 'This host cannot probe structured session owners.'
-      })
+      (Object.hasOwn(record, 'taskSource') ||
+      this.deps.store.tasks.hasSessionBinding(record.sessionId)
+        ? Promise.resolve({ outcome: 'execution-host-unverifiable' })
+        : Promise.resolve({
+            outcome: 'indeterminate',
+            reason: 'This host cannot probe structured session owners.'
+          }))
     )
   }
 }

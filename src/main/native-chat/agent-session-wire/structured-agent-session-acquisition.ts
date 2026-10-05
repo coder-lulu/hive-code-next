@@ -51,7 +51,8 @@ export async function acquireOwner(
             spawnGuard: {
               prepare: () => assertTaskAttachCurrent(input, record),
               assertCurrent: () => assertTaskAttachAuthorityCurrent(input, record)
-            }
+            },
+            taskOrigin: input.params.taskOrigin
           }
         : {}),
       onSpawned: async (process) => {

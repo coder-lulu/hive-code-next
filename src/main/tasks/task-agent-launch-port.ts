@@ -14,6 +14,10 @@ import { taskAgentLaunchParams } from './task-agent-launch-params'
 import { computeAgentLaunchFingerprint } from '../../shared/agent-launch-operation'
 import { taskSessionSourceReference } from '../../shared/task-execution/task-structured-binding'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import {
+  prepareTaskDispatch,
+  requireTaskDispatchAuthorization
+} from './task-dispatch-authorization'
 
 /** Uses the existing replay handler and ledger, including its unknown-outcome refusal. */
 export function createTaskAgentLaunchPort(options: {
@@ -25,6 +29,11 @@ export function createTaskAgentLaunchPort(options: {
   const method = AGENT_LAUNCH_METHODS.find((entry) => entry.name === 'agent.launchReplay')!
   return async (record: TaskExecutionRecord, authorization: TaskExecutionAuthorization) => {
     assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+    const dispatch =
+      executor === 'codex' ? requireTaskDispatchAuthorization(authorization.dispatch) : undefined
+    if (dispatch) {
+      await prepareTaskDispatch(dispatch, () => authorization.assertCurrent())
+    }
     const capabilities = options.capabilities()
     if (
       !capabilities.includes(AGENT_LAUNCH_RUNTIME_CAPABILITY) ||
@@ -53,6 +62,7 @@ export function createTaskAgentLaunchPort(options: {
             operationCallerKey: record.operationCallerKey,
             operationId: record.command.operationId,
             launchFingerprint: computeAgentLaunchFingerprint(params),
+            dispatch,
             validate: () => {
               assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
               if (hasExplicitTuiLaunchCommand(context.runtime.getClientSettings(), executor)) {

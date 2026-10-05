@@ -9,6 +9,7 @@
 // reentrant, so every public entry point takes it once and calls these.
 
 import { isQueuedAgentJournalSubmission } from '../../../shared/agent-session-queued-submission'
+import { agentSessionExecutionHostWitnessMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
 import { agentSessionFailureFact } from '../../../shared/agent-session-failure'
 import { agentSessionFailureWords } from '../../../shared/agent-session-failure-words'
 import {
@@ -100,6 +101,15 @@ export async function stopStructuredAgentSessionAgentUnderSerialize(
   const owed = owedProviderChildWindDown(session)
   session.owesProviderChildWindDown = owed
   const stopping = session.child
+  const record = context.deps.store.getRecord(sessionId)
+  const taskExecution =
+    (record && Object.hasOwn(record, 'taskSource')) ||
+    context.deps.store.tasks.hasSessionBinding(sessionId)
+  const taskFence =
+    owed?.fence ??
+    (record?.lease.deathEvidence?.kind === 'execution-host-exit-observed'
+      ? record.lease.deathEvidence.ownerFence
+      : record?.lease.runtimeFence)
   let settlementError: unknown
   const eviction: StructuredAgentSessionEvictionContext = {
     sessionId,
@@ -108,6 +118,19 @@ export async function stopStructuredAgentSessionAgentUnderSerialize(
     owesProviderChildWindDown: owed !== undefined,
     eventSink: context.runtimeState.eventSinkFor(sessionId),
     adapter: context.deps.adapter,
+    ...(taskExecution
+      ? {
+          stopExecutionOwner: async () => {
+            if (
+              taskFence === undefined ||
+              (await context.runtimeState.commitExecutionOwnerStop(sessionId, taskFence)) !==
+                'resolved'
+            ) {
+              throw new Error('exact execution host exit was not committed')
+            }
+          }
+        }
+      : {}),
     ...(context.restartWitness
       ? { beforeProviderChildStop: () => context.restartWitness?.beforeStop(sessionId) }
       : {}),
@@ -149,7 +172,19 @@ export async function stopStructuredAgentSessionAgentUnderSerialize(
       }
     },
     releaseLease: async () => {
-      if (owed) {
+      if (taskExecution) {
+        const current = context.deps.store.getRecord(sessionId)
+        const death = current?.lease.deathEvidence
+        if (
+          !current ||
+          death?.kind !== 'execution-host-exit-observed' ||
+          death.ownerFence !== taskFence ||
+          current.lease.unreconciled ||
+          !agentSessionExecutionHostWitnessMatchesRecord(death.witness, current)
+        ) {
+          throw new Error('execution host lease exit was not committed')
+        }
+      } else if (owed) {
         await releaseStoredStructuredAgentSessionOwner({
           store: context.deps.store,
           sessionId,

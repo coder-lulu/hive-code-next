@@ -26,6 +26,7 @@ import {
   resolveRuntimeEnvironmentCatalogEntry
 } from '../ipc/runtime-environment-account-routing'
 import { mainProcessState as state } from './main-process-state'
+import { createMainProcessTaskCodexAccountPorts } from './main-process-task-codex-accounts'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
 import { ArtifactCloudService } from '../artifacts/artifact-cloud-service'
@@ -151,6 +152,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
       }),
     prepareCodexStructuredLaunch: ({ launchEnv }) =>
       prepareCodexRuntimeHomeForLaunch(undefined, launchEnv),
+    taskCodexAccounts: createMainProcessTaskCodexAccountPorts(store),
     // Why throw like prepare does: a null from an uninitialized service would
     // map to the system home and key a catalog read to the wrong account.
     resolveCodexStructuredLaunchHome: ({ launchEnv }) => {

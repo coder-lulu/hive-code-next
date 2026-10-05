@@ -6,6 +6,7 @@ import {
   type AgentSessionOwnerProbe
 } from '../../../shared/agent-session-lease-adjudication'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import { agentSessionExecutionHostProbeMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
 import { PROVIDER_SUPERVISOR_MAX_STOP_MS } from '../../codex/codex-app-server-posix-supervisor'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 
@@ -16,6 +17,7 @@ export type StructuredSessionRecoveryResolutionDeps = {
   probeRecord: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe>
   now: () => number
   stopOwnerProcess?: (pid: number, signal: StructuredSessionRecoveryStopSignal) => void
+  stopExecutionOwner?: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe | null>
   delay?: (ms: number) => Promise<void>
 }
 
@@ -43,6 +45,13 @@ export async function resolveStructuredSessionRecovery(
     return 'not-applicable'
   }
   let probe = await deps.probeRecord(record)
+  if (
+    Object.hasOwn(record, 'taskSource') ||
+    deps.store.tasks.hasSessionBinding(record.sessionId) ||
+    probe.outcome.startsWith('execution-host-')
+  ) {
+    return resolveExecutionHostRecovery(deps, record, probe)
+  }
   const owner = record.lease.ownerProcess
   if (owner && record.lease.claimStatus === 'conflicted' && !isProvenDeadProbe(probe)) {
     // A conflicting claimant may still execute independently; require proof of its exit.
@@ -66,6 +75,70 @@ export async function resolveStructuredSessionRecovery(
     const code = error instanceof Error ? error.message : String(error)
     if (UNRESOLVED_REFUSALS.has(code)) {
       // The record moved under this resolution; the next attempt re-asks against what it is now.
+      return 'unresolved'
+    }
+    throw error
+  }
+}
+
+async function resolveExecutionHostRecovery(
+  deps: StructuredSessionRecoveryResolutionDeps,
+  record: AgentSessionRecord,
+  initial: AgentSessionOwnerProbe
+): Promise<'resolved' | 'unresolved'> {
+  let probe = initial
+  if (probe.outcome !== 'execution-host-exited') {
+    if (record.lease.claimStatus === 'conflicted') {
+      return 'unresolved'
+    }
+    probe = (await deps.stopExecutionOwner?.(record)) ?? { outcome: 'execution-host-unverifiable' }
+  }
+  if (
+    probe.outcome !== 'execution-host-exited' ||
+    !agentSessionExecutionHostProbeMatchesRecord(probe, record)
+  ) {
+    return 'unresolved'
+  }
+  return commitStructuredSessionExecutionHostExit(deps, record, probe)
+}
+
+export async function commitStructuredSessionExecutionHostExit(
+  deps: Pick<StructuredSessionRecoveryResolutionDeps, 'store' | 'now'>,
+  record: AgentSessionRecord,
+  probe: AgentSessionOwnerProbe
+): Promise<'resolved' | 'unresolved'> {
+  if (
+    probe.outcome !== 'execution-host-exited' ||
+    !agentSessionExecutionHostProbeMatchesRecord(probe, record)
+  ) {
+    return 'unresolved'
+  }
+  try {
+    if (record.lease.unreconciled) {
+      const reconciled = await deps.store.reconcileOnRestart({
+        owns: (current) =>
+          current.sessionId === record.sessionId &&
+          current.lease.runtimeFence === record.lease.runtimeFence,
+        probe: async () => probe,
+        now: deps.now()
+      })
+      const next = reconciled.get(record.sessionId)
+      return next &&
+        !next.lease.unreconciled &&
+        next.lease.claimStatus === 'released' &&
+        next.lease.deathEvidence?.kind === 'execution-host-exit-observed'
+        ? 'resolved'
+        : 'unresolved'
+    }
+    await deps.store.evictProvenDeadOwner({
+      sessionId: record.sessionId,
+      expectedFence: record.lease.runtimeFence,
+      probe,
+      now: deps.now()
+    })
+    return 'resolved'
+  } catch (error) {
+    if (error instanceof Error && UNRESOLVED_REFUSALS.has(error.message)) {
       return 'unresolved'
     }
     throw error

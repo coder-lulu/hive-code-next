@@ -14,6 +14,9 @@ import { guardTaskDockerCodexFrame, taskDockerCodexFrameParams } from './task-do
 import type { createTaskDockerBoundary } from './task-docker-boundary'
 import { createTaskDockerModelChannelPort, isTaskDockerModelId } from './task-docker-model-channel'
 import type { TaskModelChannel } from './task-model-channel-protocol'
+import type { TaskExecutionDispatchAuthorization } from './task-execution-ports'
+import { prepareTaskDispatch } from './task-dispatch-authorization'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 const admittedBoundaries = new WeakSet<ReturnType<typeof createTaskDockerBoundary>>()
 
@@ -23,6 +26,7 @@ export async function openTaskDockerCodexConnection(options: {
   handlers?: CodexAppServerConnectionHandlers
   open?: typeof openCodexAppServerConnection
   modelChannel?: TaskModelChannel
+  dispatch?: TaskExecutionDispatchAuthorization
 }): Promise<CodexAppServerConnection> {
   if (admittedBoundaries.has(options.boundary)) {
     throw new Error('TASK_DOCKER_ATTACH_ALREADY_ADMITTED')
@@ -37,6 +41,7 @@ export async function openTaskDockerCodexConnection(options: {
     throw error
   }
   const handlers = options.handlers ?? {}
+  const dispatch = options.dispatch
   const exitProof = new RetryableProcessExitProof()
   let raw: CodexAppServerConnection | undefined
   let pid: number | undefined
@@ -126,6 +131,9 @@ export async function openTaskDockerCodexConnection(options: {
   }
   try {
     assertUsable()
+    if (dispatch) {
+      await prepareTaskDispatch(dispatch, assertUsable)
+    }
     raw = await (options.open ?? openCodexAppServerConnection)(
       { ...prepared.launch, maxFrameBytes: NDJSON_MAX_LINE_BYTES },
       {
@@ -165,6 +173,9 @@ export async function openTaskDockerCodexConnection(options: {
       },
       (spec) => {
         assertUsable()
+        if (dispatch) {
+          assertTaskAuthorizationCurrent(() => dispatch.assertCurrent())
+        }
         return spawnProcess(spec)
       }
     )
