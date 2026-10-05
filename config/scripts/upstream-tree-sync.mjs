@@ -8,6 +8,12 @@ import {
   SHA_PATTERN,
   STATE_PATH
 } from './upstream-sync-checkpoint.mjs'
+import {
+  applyFrozenTreeReview,
+  loadFrozenTreeReview,
+  validatePrivateDocumentationReview,
+  TREE_REVIEW_PATH
+} from './upstream-tree-review.mjs'
 
 export const TREE_SYNC_RECEIPT_PATH = 'config/upstream-tree-sync-receipt.json'
 const receiptName = TREE_SYNC_RECEIPT_PATH.split('/').at(-1)
@@ -45,6 +51,7 @@ function context(options) {
     throw new Error('Git replacement refs are not allowed during frozen tree verification')
   }
   return {
+    cwd,
     git,
     range,
     target: options.target,
@@ -71,9 +78,10 @@ function tree(git, rows) {
   ).trim()
 }
 
-function normalize(git, ref, docs, receiptBlob) {
-  const rows = entries(git, ref).filter((row) => row.name !== 'docs')
+function normalize(git, ref, docs, receiptBlob, gitmodules) {
+  const rows = entries(git, ref).filter((row) => !['docs', '.gitmodules'].includes(row.name))
   rows.push(docs)
+  rows.push(gitmodules)
   const config = rows.find((row) => row.name === 'config')
   if (config && config.type !== 'tree') {
     throw new Error('The config path is not a tree')
@@ -119,9 +127,14 @@ function snapshot(git, treeSha, parent) {
 export function computeUpstreamTreeSync(options) {
   const ctx = context(options)
   const { git, base, target, upstream } = ctx
+  const review = loadFrozenTreeReview(ctx)
   const docs = entries(git, target).find((row) => row.name === 'docs')
   if (docs?.mode !== '160000' || docs.type !== 'commit') {
     throw new Error('Frozen product docs must remain a private documentation gitlink')
+  }
+  const gitmodules = entries(git, target).find((row) => row.name === '.gitmodules')
+  if (gitmodules?.type !== 'blob' || gitmodules.mode !== '100644') {
+    throw new Error('Frozen private documentation mount configuration is missing')
   }
   const changed = paths(git, base, upstream)
   const documentationPaths = changed.filter(
@@ -139,14 +152,25 @@ export function computeUpstreamTreeSync(options) {
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-  if (documentationPaths.length || documentationShas.length) {
+  let privateReview
+  try {
+    privateReview = validatePrivateDocumentationReview(
+      ctx,
+      docs,
+      documentationPaths,
+      documentationShas,
+      review
+    )
+  } catch {
     const error = new Error(
       'Upstream docs changes require authenticated private documentation absorption before content synchronization'
     )
     error.details = { documentationPaths, documentationShas, base, upstream, target }
     throw error
   }
-  if (changed.some((file) => [TREE_SYNC_RECEIPT_PATH, STATE_PATH].includes(file))) {
+  if (
+    changed.some((file) => [TREE_SYNC_RECEIPT_PATH, STATE_PATH, TREE_REVIEW_PATH].includes(file))
+  ) {
     throw new Error('Upstream changes cannot overwrite product-owned synchronization metadata')
   }
   const absorbedUpstreamShas = git(['rev-list', '--reverse', `${base}..${upstream}`, '--'])
@@ -156,40 +180,70 @@ export function computeUpstreamTreeSync(options) {
   const baseTreeSha = git(['rev-parse', `${base}^{tree}`]).trim()
   const targetTreeSha = git(['rev-parse', `${target}^{tree}`]).trim()
   const upstreamTreeSha = git(['rev-parse', `${upstream}^{tree}`]).trim()
-  const normalizedBase = normalize(git, base, docs)
-  const normalizedTarget = normalize(git, target, docs)
-  const normalizedUpstream = normalize(git, upstream, docs)
+  const normalizedBase = normalize(git, base, docs, null, gitmodules)
+  const normalizedTarget = normalize(git, target, docs, null, gitmodules)
+  const normalizedUpstream = normalize(git, upstream, docs, null, gitmodules)
   const ancestor = snapshot(git, normalizedBase)
   let mergedTreeSha
+  let conflictPaths = []
   try {
-    mergedTreeSha = git([
+    const output = git([
       '-c',
       'merge.renames=true',
       '-c',
       'merge.conflictStyle=merge',
       'merge-tree',
       '--write-tree',
+      '--name-only',
+      '-z',
       snapshot(git, normalizedTarget, ancestor),
       snapshot(git, normalizedUpstream, ancestor)
-    ]).trim()
+    ])
+    mergedTreeSha = output.split('\0')[0]
   } catch (cause) {
-    const error = new Error(
-      cause.status === 1
-        ? 'Three-way content conflicts require individual product-boundary review'
-        : 'Content synchronization requires Git merge-tree --write-tree (Git 2.38+)'
-    )
-    error.details = {
-      base,
-      upstream,
-      target,
-      output: String(cause.stdout ?? ''),
-      error: String(cause.stderr ?? '')
+    const records = String(cause.stdout ?? '').split('\0')
+    if (cause.status === 1 && SHA_PATTERN.test(records[0])) {
+      mergedTreeSha = records[0]
+      for (const file of records.slice(1)) {
+        if (!file) {
+          break
+        }
+        conflictPaths.push(file)
+      }
+      if (!review) {
+        const error = new Error(
+          'Three-way content conflicts require individual product-boundary review'
+        )
+        error.details = {
+          base,
+          upstream,
+          target,
+          conflictPaths,
+          output: String(cause.stdout ?? '')
+        }
+        throw error
+      }
+    } else {
+      const error = new Error(
+        cause.status === 1
+          ? 'Three-way content conflicts require individual product-boundary review'
+          : 'Content synchronization requires Git merge-tree --write-tree (Git 2.38+)'
+      )
+      error.details = {
+        base,
+        upstream,
+        target,
+        output: String(cause.stdout ?? ''),
+        error: String(cause.stderr ?? '')
+      }
+      throw error
     }
-    throw error
   }
   if (!SHA_PATTERN.test(mergedTreeSha)) {
     throw new Error('Git did not produce one clean merged tree')
   }
+  const reviewed = applyFrozenTreeReview(ctx, mergedTreeSha, conflictPaths, review)
+  mergedTreeSha = reviewed.mergedTreeSha
   const receipt = {
     schemaVersion: 1,
     kind: 'three-way-content',
@@ -201,19 +255,26 @@ export function computeUpstreamTreeSync(options) {
     upstreamTreeSha,
     targetTreeSha,
     mergedTreeSha,
-    docs: { path: 'docs', mode: '160000', sha: docs.sha, upstreamChanged: false },
+    docs: {
+      path: 'docs',
+      mode: '160000',
+      sha: docs.sha,
+      upstreamChanged: Boolean(privateReview),
+      ...(privateReview ? { privateReview } : {})
+    },
+    ...(reviewed.summary ? { review: reviewed.summary } : {}),
     absorbedUpstreamShas
   }
-  return { ...ctx, docs, receipt, absorbedUpstreamShas, mergedTreeSha }
+  return { ...ctx, docs, gitmodules, receipt, absorbedUpstreamShas, mergedTreeSha }
 }
 
 function receiptText(receipt) {
   return `${JSON.stringify(receipt, null, 2)}\n`
 }
 
-function receiptedTree({ git, docs, receipt, mergedTreeSha }) {
+function receiptedTree({ git, docs, gitmodules, receipt, mergedTreeSha }) {
   const blob = git(['hash-object', '-w', '--stdin'], receiptText(receipt)).trim()
-  return normalize(git, mergedTreeSha, docs, blob)
+  return normalize(git, mergedTreeSha, docs, blob, gitmodules)
 }
 
 function cleanFrozenCheckout({ git, target, range }) {

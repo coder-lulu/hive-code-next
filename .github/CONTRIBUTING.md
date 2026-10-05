@@ -78,6 +78,23 @@ receipt; any following checkpoint commit may change only the synchronization
 state. A merge conflict requires individual review and cannot be resolved by
 automatically choosing either side.
 
+For a conflicting interval, review base/product/upstream file versions and run
+the relevant behavior checks in an isolated working tree. Record the exact
+input and reviewed result blob identities, reasons and regression obligations
+in `config/upstream-tree-review.json`. Commit this maintenance metadata and any
+required control changes before freezing the product target for content
+preparation. The verifier reads the review from that frozen target; a candidate
+cannot grant itself permission to replace files. Missing conflict decisions,
+different inputs, changed results or control-file overrides fail verification.
+The ledger may be part of the content commit, but its original ownership and
+nonpending historical evidence must remain unchanged.
+
+Reviewed result objects must be available from the local review or its Git
+bundle. An automatic preparation job that has only metadata and cannot obtain
+those objects fails explicitly. It never invents resolutions or treats a hash
+as proof that a missing file was reviewed. Candidate execution remains in
+read-only jobs; publication uses the frozen control code.
+
 When independently published product branches have different public roots,
 every root must carry the same immutable baseline provenance, original ledger
 blob, reviewed upstream cursor and pending decisions. The frozen product state
@@ -91,6 +108,12 @@ Keep `docs/` pinned to the private documentation gitlink. Any upstream change to
 blocks automatic synchronization until authenticated private absorption and its
 reviewed checkpoint are recorded. Never copy upstream or private documentation
 bodies into the public tree to bypass this boundary.
+
+Publish the reviewed documentation changes to the authorized private repository
+first. `upstream-private-docs-review.mjs` checks its authenticated private status,
+write access, published commit and exact source/private blob coverage. Freeze
+that proof with the updated gitlink in the maintenance metadata. Public records
+contain identities and review decisions, while documentation bodies stay private.
 
 The synchronization boundary is mandatory for both historical and current
 upstream changes: all upstream BUG, security, stability, and data-consistency

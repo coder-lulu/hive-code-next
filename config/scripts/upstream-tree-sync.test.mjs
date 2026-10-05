@@ -8,6 +8,8 @@ import {
   verifyUpstreamTreeSync,
   TREE_SYNC_RECEIPT_PATH
 } from './upstream-tree-sync.mjs'
+import { TREE_REVIEW_PATH } from './upstream-tree-review.mjs'
+import { createPrivateDocumentationProof } from './upstream-private-docs-review.mjs'
 
 const fixtureRoot = resolve(
   import.meta.dirname,
@@ -91,6 +93,49 @@ function checkpoint(f) {
   state.lastReviewedUpstreamSha = f.upstream
   f.write(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`)
   return f.commit('Activate reviewed checkpoint', [STATE_PATH])
+}
+
+function frozenReview(f, resolutions, documentation = null) {
+  f.write(
+    TREE_REVIEW_PATH,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        kind: 'frozen-upstream-review',
+        baseUpstreamSha: f.base,
+        upstreamSha: f.upstream,
+        sourceProductSha: f.target,
+        documentation,
+        resolutions
+      },
+      null,
+      2
+    )}\n`
+  )
+  const target = f.commit('Freeze individually reviewed resolutions', [TREE_REVIEW_PATH])
+  f.options.target = target
+  return target
+}
+
+function fileEntry(f, ref, file) {
+  const record = f.git(['ls-tree', ref, '--', file])
+  if (!record) {
+    return null
+  }
+  const [mode, , sha] = record.split(/\s+/)
+  return { mode, sha }
+}
+
+function resolution(f, file, contents) {
+  return {
+    path: file,
+    base: fileEntry(f, f.base, file),
+    product: fileEntry(f, f.target, file),
+    upstream: fileEntry(f, f.upstream, file),
+    result: { mode: '100644', sha: f.git(['hash-object', '-w', '--stdin'], contents) },
+    reason: 'Preserve the reviewed product change and adopt the upstream behavior.',
+    regressionTests: ['engine.test.ts']
+  }
 }
 
 afterEach(() => {
@@ -206,6 +251,226 @@ describe(
           'authenticated private documentation absorption'
         )
         expect(f.git(['status', '--porcelain'])).toBe('')
+      }
+    )
+
+    it('recomputes individually resolved conflicts only from review frozen before absorption', () => {
+      const f = fixture((repo) => repo.write('engine.txt', 'upstream first\nmiddle\nlast\n'))
+      const contents = 'reviewed first\nmiddle\nlast\n'
+      const row = resolution(f, 'engine.txt', contents)
+      const target = frozenReview(f, [row])
+      const { head, receipt } = contentCommit(f)
+      expect(f.git(['show', `${head}:engine.txt`])).toBe(contents.trim())
+      expect(receipt.review.conflictPaths).toEqual(['engine.txt'])
+      expect(receipt.review.frozenReviewBlobSha).toBe(
+        f.git(['rev-parse', `${target}:${TREE_REVIEW_PATH}`])
+      )
+      expect(verifyUpstreamTreeSync(f.options).contentCommitSha).toBe(head)
+      f.write('engine.txt', 'unreviewed replacement\n')
+      f.commit('Alter the reviewed result', ['engine.txt'])
+      expect(() => verifyUpstreamTreeSync(f.options)).toThrow('Only the checkpoint state')
+    })
+
+    it.each(['missing-conflict', 'wrong-product', 'wrong-upstream', 'protected-path'])(
+      'rejects an incomplete or invalid frozen review: %s',
+      (kind) => {
+        const f = fixture((repo) => repo.write('engine.txt', 'upstream first\nmiddle\nlast\n'))
+        const row = resolution(f, 'engine.txt', 'reviewed\n')
+        if (kind === 'wrong-product') {
+          row.product.sha = 'a'.repeat(40)
+        }
+        if (kind === 'wrong-upstream') {
+          row.upstream.sha = 'a'.repeat(40)
+        }
+        if (kind === 'protected-path') {
+          row.path = STATE_PATH
+        }
+        frozenReview(f, kind === 'missing-conflict' ? [] : [row])
+        const before = f.git(['write-tree'])
+        expect(() => prepareUpstreamTreeSync(f.options)).toThrow()
+        expect(f.git(['write-tree'])).toBe(before)
+        expect(f.git(['status', '--porcelain'])).toBe('')
+      }
+    )
+
+    it('cannot authorize candidate-only resolution metadata or arbitrary clean-path changes', () => {
+      const f = fixture()
+      const { head } = contentCommit(f)
+      const row = resolution(f, 'identity.txt', 'fabricated\n')
+      f.write(TREE_REVIEW_PATH, `${JSON.stringify({ resolutions: [row] })}\n`)
+      f.commit('Candidate claims permission', [TREE_REVIEW_PATH])
+      expect(() =>
+        verifyUpstreamTreeSync({ ...f.options, head: f.git(['rev-parse', 'HEAD']) })
+      ).toThrow('Only the checkpoint state')
+      expect(verifyUpstreamTreeSync({ ...f.options, head }).contentCommitSha).toBe(head)
+    })
+
+    it.each([
+      'config/private-document-fingerprints.json',
+      'config/scripts/verify-documentation-governance.mjs'
+    ])('cannot replace frozen privacy controls through a reviewed result: %s', (file) => {
+      const f = fixture()
+      const row = resolution(f, file, 'candidate attempts to disable privacy checks\n')
+      frozenReview(f, [row])
+      const before = f.git(['write-tree'])
+      expect(() => prepareUpstreamTreeSync(f.options)).toThrow('protected frozen resolution')
+      expect(f.git(['write-tree'])).toBe(before)
+      expect(f.git(['status', '--porcelain'])).toBe('')
+    })
+
+    it.each(['preserved', 'rewritten'])(
+      'requires original ledger evidence to remain unchanged in a reviewed ledger: %s',
+      (kind) => {
+        const f = fixture()
+        const ledgerPath = 'config/upstream-change-ledger.json'
+        const historical = {
+          upstreamSha: f.base,
+          productSha: f.target,
+          status: 'absorbed',
+          dependencies: [],
+          reason: 'Original reviewed product evidence.'
+        }
+        const ledger = {
+          schemaVersion: 1,
+          upstream: 'stablyai/orca',
+          targetBranch: branch,
+          entries: [historical]
+        }
+        f.write(ledgerPath, `${JSON.stringify(ledger)}\n`)
+        f.target = f.commit('Record immutable historical ledger', [ledgerPath])
+        f.options.target = f.target
+        const after = {
+          ...ledger,
+          entries: [
+            { ...historical, ...(kind === 'rewritten' ? { productSha: f.target } : {}) },
+            {
+              upstreamSha: f.upstream,
+              productSha: null,
+              status: 'absorbed',
+              dependencies: [],
+              reason: 'Reviewed interval; content receipt proves tree inclusion.'
+            }
+          ]
+        }
+        frozenReview(f, [resolution(f, ledgerPath, `${JSON.stringify(after)}\n`)])
+        if (kind === 'rewritten') {
+          expect(() => prepareUpstreamTreeSync(f.options)).toThrow(
+            'cannot rewrite historical evidence'
+          )
+          expect(f.git(['status', '--porcelain'])).toBe('')
+        } else {
+          const { head } = contentCommit(f)
+          expect(verifyUpstreamTreeSync(f.options).contentCommitSha).toBe(head)
+          expect(JSON.parse(f.git(['show', `${head}:${ledgerPath}`])).entries[0]).toEqual(
+            historical
+          )
+        }
+      }
+    )
+
+    it('accepts exact private-document coverage frozen in the product without exposing its bodies', () => {
+      const f = fixture((repo) => repo.write('docs/reference.md', 'Changed private guidance\n'))
+      const documentation = {
+        privateRepository: 'coder-lulu/hive-code-docs',
+        privateCommitSha: docsSha,
+        receiptBlobSha: 'c'.repeat(40),
+        authentication: 'authenticated-private-github-repository',
+        documentationShas: [f.upstream],
+        paths: [
+          {
+            path: 'docs/reference.md',
+            upstreamBlobSha: f.git(['rev-parse', `${f.upstream}:docs/reference.md`]),
+            privatePath: 'reference.md',
+            privateBlobSha: 'd'.repeat(40),
+            reason: 'Reviewed and adapted privately.'
+          }
+        ]
+      }
+      frozenReview(f, [], documentation)
+      const { head, receipt } = contentCommit(f)
+      expect(receipt.docs.upstreamChanged).toBe(true)
+      expect(f.git(['ls-tree', head, '--', 'docs'])).toBe(`160000 commit ${docsSha}\tdocs`)
+      expect(() => f.git(['show', `${head}:docs/reference.md`])).toThrow()
+      expect(verifyUpstreamTreeSync(f.options).contentCommitSha).toBe(head)
+    })
+
+    it.each(['missing-commit', 'wrong-pointer', 'wrong-source-blob'])(
+      'retains the private documentation gate for incomplete frozen proof: %s',
+      (kind) => {
+        const f = fixture((repo) => repo.write('docs/reference.md', 'Changed private guidance\n'))
+        const documentation = {
+          privateRepository: 'coder-lulu/hive-code-docs',
+          privateCommitSha: docsSha,
+          receiptBlobSha: 'c'.repeat(40),
+          authentication: 'authenticated-private-github-repository',
+          documentationShas: kind === 'missing-commit' ? [] : [f.upstream],
+          paths: [
+            {
+              path: 'docs/reference.md',
+              upstreamBlobSha:
+                kind === 'wrong-source-blob'
+                  ? 'a'.repeat(40)
+                  : f.git(['rev-parse', `${f.upstream}:docs/reference.md`]),
+              privatePath: 'reference.md',
+              privateBlobSha: 'd'.repeat(40),
+              reason: 'Reviewed privately.'
+            }
+          ]
+        }
+        if (kind === 'wrong-pointer') {
+          documentation.privateCommitSha = 'a'.repeat(40)
+        }
+        frozenReview(f, [], documentation)
+        expect(() => prepareUpstreamTreeSync(f.options)).toThrow()
+        expect(f.git(['status', '--porcelain'])).toBe('')
+      }
+    )
+
+    it('keeps the owned private mount when upstream changes its module configuration', () => {
+      const f = fixture((repo) =>
+        repo.write(
+          '.gitmodules',
+          '[submodule "foreign"]\n\tpath = foreign\n\turl = https://example.test/foreign.git\n'
+        )
+      )
+      const documentation = {
+        privateRepository: 'coder-lulu/hive-code-docs',
+        privateCommitSha: docsSha,
+        receiptBlobSha: 'c'.repeat(40),
+        authentication: 'authenticated-private-github-repository',
+        documentationShas: [f.upstream],
+        paths: [
+          {
+            path: '.gitmodules',
+            upstreamBlobSha: f.git(['rev-parse', `${f.upstream}:.gitmodules`]),
+            privatePath: 'config/mount-review.json',
+            privateBlobSha: 'd'.repeat(40),
+            reason: 'Retain the owned private mount; no foreign module is admitted.'
+          }
+        ]
+      }
+      const target = frozenReview(f, [], documentation)
+      const { head } = contentCommit(f)
+      expect(f.git(['show', `${head}:.gitmodules`])).toBe(f.git(['show', `${target}:.gitmodules`]))
+      expect(verifyUpstreamTreeSync(f.options).contentCommitSha).toBe(head)
+    })
+
+    it.each(['public-repository', 'read-only-access'])(
+      'cannot record private handling without authenticated ownership: %s',
+      (kind) => {
+        const f = fixture()
+        expect(() =>
+          createPrivateDocumentationProof({
+            ...f.options,
+            privateCwd: f.cwd,
+            github: () => ({
+              full_name: 'coder-lulu/hive-code-docs',
+              private: kind !== 'public-repository',
+              permissions: { push: kind !== 'read-only-access' },
+              default_branch: 'main'
+            })
+          })
+        ).toThrow('Authenticated private documentation repository and write access')
       }
     )
 

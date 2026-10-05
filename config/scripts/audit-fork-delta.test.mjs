@@ -152,6 +152,51 @@ describe('explicit tree comparison for public root imports', () => {
       expect(() => collectForkDelta({ base, head, git })).toThrow()
     })
   })
+  it('regenerates both trusted CI deltas from actual public and upstream trees', () => {
+    const workflow = parse(
+      readFileSync(new URL('../../.github/workflows/upstream-sync.yml', import.meta.url), 'utf8')
+    )
+    const step = Object.values(workflow.jobs)
+      .flatMap((job) => job.steps ?? [])
+      .find(
+        (item) =>
+          item.name === 'Regenerate trusted fork and product evidence after candidate execution'
+      )
+    const loop = step.run.slice(
+      step.run.indexOf('for (const [name, base]'),
+      step.run.lastIndexOf('\nNODE')
+    )
+    withUnrelatedRoots(({ base, head, git }) => {
+      const outputs = new Map()
+      runInNewContext(loop, {
+        process: {
+          env: {
+            UPSTREAM_SHA: base,
+            TARGET_SHA: head,
+            CANDIDATE_SHA: head,
+            GITHUB_WORKSPACE: '/fixture'
+          }
+        },
+        collectForkDelta: (options) => collectForkDelta({ ...options, git }),
+        renderMarkdown,
+        writeFileSync: (file, contents) => outputs.set(file, contents)
+      })
+      const fork = JSON.parse(outputs.get('/fixture/logs/upstream-sync/evidence/fork-delta.json'))
+      const product = JSON.parse(
+        outputs.get('/fixture/logs/upstream-sync/evidence/product-delta.json')
+      )
+      expect(fork).toMatchObject({
+        comparison: 'trees',
+        baseSha: base,
+        headSha: head,
+        mergeBase: null
+      })
+      expect(fork.changedFiles).toHaveLength(5)
+      expect(product).toMatchObject({ comparison: 'trees', baseSha: head, headSha: head })
+      expect(product.changedFiles).toEqual([])
+      expect(outputs.size).toBe(4)
+    })
+  })
   it('rejects unknown modes and missing refs instead of reporting an empty comparison', () => {
     withUnrelatedRoots(({ base, head, git }) => {
       expect(() => collectForkDelta({ base, head, comparison: 'guess', git })).toThrow(

@@ -274,7 +274,7 @@ jobs:
           const root = process.env.RUNNER_TEMP
           const { collectForkDelta, renderMarkdown } = await import(pathToFileURL(`${root}/upstream-sync-control/config/scripts/audit-fork-delta.mjs`))
           for (const [name, base] of [['fork-delta', process.env.UPSTREAM_SHA], ['product-delta', process.env.TARGET_SHA]]) {
-            const report = collectForkDelta({ base, head: process.env.CANDIDATE_SHA })
+            const report = collectForkDelta({ base, head: process.env.CANDIDATE_SHA, comparison: 'trees' })
             writeFileSync(`${process.env.GITHUB_WORKSPACE}/logs/upstream-sync/evidence/${name}.json`, JSON.stringify(report, null, 2))
             writeFileSync(`${process.env.GITHUB_WORKSPACE}/logs/upstream-sync/evidence/${name}.md`, renderMarkdown(report))
           }
