@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../../agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../../../native-chat/agent-session-journal/journal-host-database-test-support'
 import { setStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-registry'
 import type { StructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-host'
 import type { RpcContext } from '../core'
@@ -160,6 +161,7 @@ describe('a replayed launch', () => {
 
   afterEach(async () => {
     setStructuredAgentSessionHost(null)
+    closeTestJournalHostDatabase(directory)
     await rm(directory, { recursive: true, force: true })
   })
 

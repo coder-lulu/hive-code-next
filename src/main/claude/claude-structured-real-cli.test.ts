@@ -1,8 +1,12 @@
-import { randomUUID } from 'node:crypto'
+import {
+  registerWindowsCloseRoot,
+  takeWindowsCloseProofRows
+} from './claude-real-cli-windows-close-diagnostics.test-fixture'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, relative } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildClaudeChildProcessEnv } from './claude-child-process-environment'
 import * as claudeConnection from './claude-stream-json-connection'
 import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
@@ -21,9 +25,103 @@ import {
   type ClaudeStructuredSessionEvent
 } from './claude-structured-session-adapter'
 import type { ClaudeStructuredSessionAdapterDeps } from './claude-structured-session-state'
+import { listedModels } from './claude-structured-model-catalog'
+import { readWindowsProcessCreationTime } from '../windows/windows-process-table'
 
 const command = realClaudeCommand
 const suiteTitle = `Claude structured real CLI handshake${realClaudeCliGate.skipReason ? ` (skipped: ${realClaudeCliGate.skipReason})` : ''}`
+
+const diagnostics: { timeline: Record<string, unknown>[]; startedAt: number }[] = []
+const ownedAdapters = new Set<ClaudeStructuredSessionAdapter>()
+const ownedDirectories = new Set<string>()
+const sentMessageIds = new WeakMap<ClaudeStructuredSessionAdapter, string[]>()
+const diagnosticRunId = `${Date.now()}-${process.pid}`
+let diagnosticIndex = 0
+
+afterEach(async () => {
+  const failures: unknown[] = []
+  for (const adapter of ownedAdapters) {
+    try {
+      await adapter.closeAll()
+    } catch (error) {
+      failures.push(error)
+    }
+  }
+  if (failures.length === 0) {
+    for (const directory of ownedDirectories) {
+      const cleanupStartedAt = Date.now()
+      let removed = false
+      try {
+        await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+        ownedDirectories.delete(directory)
+        removed = true
+      } catch (error) {
+        failures.push(error)
+      } finally {
+        diagnostics.at(-1)?.timeline.push({
+          type: 'owned-directory-cleanup',
+          kind: basename(directory).startsWith('orca-command-init-') ? 'premint' : 'queued',
+          elapsedMs: Date.now() - cleanupStartedAt,
+          removed
+        })
+      }
+    }
+  }
+  try {
+    if (diagnostics.length > 0) {
+      diagnostics.push({ startedAt: Date.now(), timeline: takeWindowsCloseProofRows() })
+      const directory = join(
+        process.cwd(),
+        'logs/upstream-sync/20261005/repairs/real-claude-reaper-diagnostics',
+        diagnosticRunId
+      )
+      await mkdir(directory, { recursive: true })
+      await writeFile(
+        join(directory, `${++diagnosticIndex}.json`),
+        JSON.stringify(diagnostics.splice(0), null, 2)
+      )
+    }
+  } catch (error) {
+    failures.push(error)
+  }
+  if (failures.length > 0) {
+    throw failures[0]
+  }
+})
+
+function commandLifecycleIndex(
+  events: ClaudeStructuredSessionEvent[],
+  uuid: string | undefined,
+  state: 'queued' | 'started'
+): number {
+  return events.findIndex(
+    (event) =>
+      typeof uuid === 'string' &&
+      event.type === 'message' &&
+      event.message.type === 'command_lifecycle' &&
+      event.message.command_uuid === uuid &&
+      event.message.state === state
+  )
+}
+
+function observedFailure(error: unknown): Record<string, unknown> {
+  const message = error instanceof Error ? error.message : ''
+  return {
+    errorClass: error instanceof Error ? error.name : typeof error,
+    httpStatuses: [...message.matchAll(/\b(?:401|403|408|429|5\d\d)\b/g)].map(([code]) => code),
+    timeout: /timed? ?out|timeout/i.test(message)
+  }
+}
+
+function streamObjectType(value: unknown, key?: 'delta' | 'content_block'): string | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined
+  }
+  const nested: unknown = key ? Reflect.get(value, key) : value
+  const kind: unknown =
+    typeof nested === 'object' && nested !== null ? Reflect.get(nested, 'type') : undefined
+  return typeof kind === 'string' ? kind : undefined
+}
 
 function realAdapter(
   providerSessionId: string,
@@ -33,6 +131,15 @@ function realAdapter(
   onDispatchSettledLate?: ClaudeStructuredSessionAdapterDeps['onDispatchSettledLate'],
   env = realClaudeLaunchHome().env
 ): ClaudeStructuredSessionAdapter {
+  const startedAt = Date.now()
+  const timeline: Record<string, unknown>[] = []
+  const sent: string[] = []
+  diagnostics.push({ startedAt, timeline })
+  const record = (row: Record<string, unknown>): void => {
+    if (timeline.length < 1024) {
+      timeline.push({ atMs: Date.now() - startedAt, ...row })
+    }
+  }
   const adapter = new ClaudeStructuredSessionAdapter({
     resolveLaunch: async () => ({
       pathToClaudeCodeExecutable: command,
@@ -45,7 +152,96 @@ function realAdapter(
       resumesTranscript: false,
       continuesChain: false
     }),
-    onEvent: (event) => events.push(event),
+    onEvent: (event) => {
+      events.push(event)
+      if (event.type === 'message') {
+        const frame = event.message
+        const stream = frame.event
+        record({
+          type: event.type,
+          frameType: frame.type,
+          subtype: frame.subtype,
+          state: frame.state,
+          commandUuidHash:
+            typeof frame.command_uuid === 'string'
+              ? createHash('sha256').update(frame.command_uuid).digest('hex')
+              : undefined,
+          sameProviderSession: frame.session_id === providerSessionId,
+          model: frame.type === 'system' && frame.subtype === 'init' ? frame.model : undefined,
+          capabilities: frame.capabilities,
+          hookEvent: frame.hook_event,
+          hookOutcome: frame.outcome,
+          isError: frame.is_error,
+          streamType: streamObjectType(stream),
+          deltaType: streamObjectType(stream, 'delta'),
+          blockType: streamObjectType(stream, 'content_block')
+        })
+      } else {
+        record({
+          type: event.type,
+          ...(event.type === 'prompt'
+            ? { promptKind: event.prompt.kind, toolName: event.prompt.toolName }
+            : {}),
+          ...(event.type === 'ended' ? observedFailure(new Error(event.reason)) : {})
+        })
+      }
+    },
+    openConnection: async (launch, handlers) => {
+      record({ type: 'open-connection' })
+      const connection = await claudeConnection.openClaudeStreamJsonConnection(launch, handlers)
+      const rootPid = connection.pid
+      const rootBirth =
+        process.platform === 'win32' && rootPid !== undefined
+          ? readWindowsProcessCreationTime(rootPid)
+          : undefined
+      registerWindowsCloseRoot(rootPid, rootBirth)
+      record({ type: 'owned-root', rootPid, rootBirth })
+      const recordClose = (type: string, detail: Record<string, unknown> = {}) =>
+        record({ type, rootPid, rootBirth, ...connection.exitVerdict, ...detail })
+      const close = connection.close.bind(connection)
+      connection.close = async () => {
+        recordClose('connection-close-before')
+        try {
+          const closed = await close()
+          recordClose('connection-close-after', { closed })
+          return closed
+        } catch (error) {
+          recordClose('connection-close-error', observedFailure(error))
+          throw error
+        }
+      }
+      const send = connection.send.bind(connection)
+      connection.send = async (message, beforeDispatch) => {
+        if (message.type === 'user' && typeof message.uuid === 'string') {
+          sent.push(message.uuid)
+          record({
+            type: 'send-user',
+            uuidHash: createHash('sha256').update(message.uuid).digest('hex')
+          })
+        }
+        await send(message, beforeDispatch)
+      }
+      const interrupt = connection.interrupt.bind(connection)
+      connection.interrupt = async (options) => {
+        record({ type: 'interrupt-request', cancelQueued: options?.cancelQueued === true })
+        try {
+          const receipt = await interrupt(options)
+          const ids = (values: readonly string[] | undefined) =>
+            values?.map((value) => createHash('sha256').update(value).digest('hex'))
+          record({
+            type: 'interrupt-response',
+            receiptPresent: receipt !== undefined,
+            cancelled: ids(receipt?.cancelled),
+            stillQueued: ids(receipt?.still_queued)
+          })
+          return receipt
+        } catch (error) {
+          record({ type: 'interrupt-error', ...observedFailure(error) })
+          throw error
+        }
+      }
+      return connection
+    },
     ...(onDispatchSettledLate ? { onDispatchSettledLate } : {}),
     readProcessStartTime: async () => 1,
     now: () => 2
@@ -57,6 +253,20 @@ function realAdapter(
     await adapter.awaitStarted(input.identity.sessionId)
     return acquisition
   }
+  const closeAll = adapter.closeAll.bind(adapter)
+  adapter.closeAll = async () => {
+    record({ type: 'close-start' })
+    try {
+      await closeAll()
+      ownedAdapters.delete(adapter)
+      record({ type: 'close-end' })
+    } catch (error) {
+      record({ type: 'close-error', ...observedFailure(error) })
+      throw error
+    }
+  }
+  ownedAdapters.add(adapter)
+  sentMessageIds.set(adapter, sent)
   return adapter
 }
 
@@ -141,6 +351,7 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
       const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')
       const events: ClaudeStructuredSessionEvent[] = []
       const cwd = await mkdtemp(join(tmpdir(), 'orca-command-init-'))
+      ownedDirectories.add(cwd)
       await mkdir(join(cwd, '.claude', 'commands'), { recursive: true })
       await writeFile(
         join(cwd, '.claude', 'commands', 'orca-init-catalog-proof.md'),
@@ -148,38 +359,33 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
       )
       const adapter = realAdapter(providerSessionId, claudeConfigDir, events, cwd)
 
-      try {
-        const acquisition = await adapter.acquire({
-          identity: identity(providerSessionId),
-          fence: 1,
-          spawnToken: 'real-cli'
-        })
-        const observedSubtypes = events.flatMap((event) =>
-          event.type === 'message' ? [event.message.subtype] : []
-        )
+      const acquisition = await adapter.acquire({
+        identity: identity(providerSessionId),
+        fence: 1,
+        spawnToken: 'real-cli'
+      })
+      const observedSubtypes = events.flatMap((event) =>
+        event.type === 'message' ? [event.message.subtype] : []
+      )
 
-        expect(acquisition.link.handle).toMatchObject({
-          provider: 'claude',
-          sessionId: providerSessionId,
-          // Init/SessionStart UUIDs are protocol frames, not resumable
-          // main-transcript leaves; no cursor exists before the first user turn.
-          leafUuid: null
+      expect(acquisition.link.handle).toMatchObject({
+        provider: 'claude',
+        sessionId: providerSessionId,
+        // Init/SessionStart UUIDs are protocol frames, not resumable
+        // main-transcript leaves; no cursor exists before the first user turn.
+        leafUuid: null
+      })
+      expect(observedSubtypes).toContain('hook_started')
+      expect(adapter.readCommands('real-cli-handshake')).toContainEqual(
+        expect.objectContaining({
+          name: 'orca-init-catalog-proof',
+          kind: 'command',
+          kindUnspecified: true
         })
-        expect(observedSubtypes).toContain('hook_started')
-        expect(adapter.readCommands('real-cli-handshake')).toContainEqual(
-          expect.objectContaining({
-            name: 'orca-init-catalog-proof',
-            kind: 'command',
-            kindUnspecified: true
-          })
-        )
-        expect(
-          adapter.readCommands('real-cli-handshake')?.some(({ name }) => name === 'help')
-        ).toBe(false)
-      } finally {
-        await adapter.closeAll()
-        await rm(cwd, { recursive: true, force: true })
-      }
+      )
+      expect(adapter.readCommands('real-cli-handshake')?.some(({ name }) => name === 'help')).toBe(
+        false
+      )
     },
     10_000
   )
@@ -196,29 +402,23 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
       const events: ClaudeStructuredSessionEvent[] = []
       const adapter = realAdapter(providerSessionId, claudeConfigDir, events)
 
-      try {
-        await adapter.acquire({
-          identity: identity(providerSessionId),
-          fence: 1,
-          spawnToken: 'real-cli-effort'
-        })
-        const published = events.flatMap((event) =>
-          event.type === 'message' ? [event.message] : []
-        )
-        const options = await adapter.readOptions({ sessionId: 'real-cli-handshake', fence: 1 })
+      await adapter.acquire({
+        identity: identity(providerSessionId),
+        fence: 1,
+        spawnToken: 'real-cli-effort'
+      })
+      const published = events.flatMap((event) => (event.type === 'message' ? [event.message] : []))
+      const options = await adapter.readOptions({ sessionId: 'real-cli-handshake', fence: 1 })
 
-        expect(published.length).toBeGreaterThan(0)
-        // Not just the init frame: no frame the CLI publishes carries an effort
-        // at all. Goes red the day one does, which is when the simpler fix
-        // becomes available. Which frame proves the session varies by host, so
-        // this asserts over all of them rather than picking one.
-        expect(published.filter((frame) => 'effortLevel' in frame)).toEqual([])
-        // Goes red if `effective.effortLevel` is renamed or dropped, which no
-        // fixture-backed test can see.
-        expect(options.current.effort).toEqual(expect.any(String))
-      } finally {
-        await adapter.closeAll()
-      }
+      expect(published.length).toBeGreaterThan(0)
+      // Not just the init frame: no frame the CLI publishes carries an effort
+      // at all. Goes red the day one does, which is when the simpler fix
+      // becomes available. Which frame proves the session varies by host, so
+      // this asserts over all of them rather than picking one.
+      expect(published.filter((frame) => 'effortLevel' in frame)).toEqual([])
+      // Goes red if `effective.effortLevel` is renamed or dropped, which no
+      // fixture-backed test can see.
+      expect(options.current.effort).toEqual(expect.any(String))
     },
     15_000
   )
@@ -289,6 +489,11 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
           fence: 1,
           spawnToken: 'real-cli-model'
         })
+        const catalog = events.find((event) => event.type === 'options')
+        const models = listedModels({ models: catalog?.models })
+        const selected = models.find((model) => model.id === 'haiku')
+        expect(selected?.resolvedModel).toEqual(expect.any(String))
+        expect(selected?.resolvedModel).not.toBe('')
         await adapter.setOption({
           sessionId: 'real-cli-handshake',
           key: 'model',
@@ -324,10 +529,12 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
         // Both halves: the field exists, and it names the model the picker asked
         // for in the catalog's resolved shape rather than the id Orca sent.
         expect(frames[0]?.model).toEqual(expect.any(String))
-        expect(frames[0]?.model).toBe('claude-haiku-4-5-20251001')
-        await expect(
-          adapter.readOptions({ sessionId: 'real-cli-handshake', fence: 1 })
-        ).resolves.toMatchObject({ current: { model: 'haiku' } })
+        expect(frames[0]?.model).toBe(selected?.resolvedModel)
+        const readback = await adapter.readOptions({ sessionId: 'real-cli-handshake', fence: 1 })
+        expect(readback.current.confirmed).toContain('model')
+        expect(models.find((model) => model.id === readback.current.model)?.resolvedModel).toBe(
+          selected?.resolvedModel
+        )
       } finally {
         await adapter.closeAll()
       }
@@ -383,7 +590,18 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
         await expect(
           send('real-cli-stop-1', 'Count from 1 to 300, one number per line, and nothing else.')
         ).resolves.toEqual({ state: 'admitted' })
+        const sentUuid = sentMessageIds.get(adapter)?.[0]
+        expect(sentUuid).toEqual(expect.any(String))
+        const startedDeadline = Date.now() + 60_000
+        while (
+          commandLifecycleIndex(events, sentUuid, 'started') < 0 &&
+          Date.now() < startedDeadline
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+        expect(commandLifecycleIndex(events, sentUuid, 'started')).toBeGreaterThanOrEqual(first)
         const startedBeforeStop = replyStarted(first)
+        expect(startedBeforeStop).toBe(false)
 
         await expect(
           adapter.cancelTurn({ sessionId: 'real-cli-handshake', fence: 1 })
@@ -417,6 +635,7 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
       const providerSessionId = randomUUID()
       const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')
       const cwd = await mkdtemp(join(tmpdir(), 'orca-queued-stop-'))
+      ownedDirectories.add(cwd)
       await mkdir(join(cwd, '.claude'), { recursive: true })
       await writeFile(
         join(cwd, '.claude', 'settings.json'),
@@ -450,7 +669,15 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
           fence: 1,
           spawnToken: 'real-cli-queued-stop'
         })
-        await send('real-cli-queued-stop-a', 'Count from 1 to 400, one number per line.')
+        await send(
+          'real-cli-queued-stop-a',
+          'Use text only. Do not use tools. Count from 1 to 400, one number per line.'
+        )
+        const firstUuid = sentMessageIds.get(adapter)?.[0]
+        expect(firstUuid).toEqual(expect.any(String))
+        await expect(
+          waitFor(() => commandLifecycleIndex(events, firstUuid, 'started') >= 0)
+        ).resolves.toBe(true)
         // A's reply is streaming, so the next send queues behind its turn.
         await expect(
           waitFor(() =>
@@ -463,6 +690,12 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
           )
         ).resolves.toBe(true)
         await send('real-cli-queued-stop-b', 'Say the word banana.')
+        const queuedUuid = sentMessageIds.get(adapter)?.[1]
+        expect(queuedUuid).toEqual(expect.any(String))
+        await expect(
+          waitFor(() => commandLifecycleIndex(events, queuedUuid, 'queued') >= 0)
+        ).resolves.toBe(true)
+        expect(commandLifecycleIndex(events, queuedUuid, 'started')).toBe(-1)
 
         await expect(
           adapter.cancelTurn({
@@ -482,9 +715,39 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
           reason: 'provider_cancelled_before_start',
           rejection: { kind: 'cancelled' }
         })
+        await expect(
+          send(
+            'real-cli-queued-stop-c',
+            'Use text only. Do not use tools. Reply with the single word ok.'
+          )
+        ).resolves.toEqual({ state: 'admitted' })
+        const nextUuid = sentMessageIds.get(adapter)?.[2]
+        expect(nextUuid).toEqual(expect.any(String))
+        await expect(
+          waitFor(() => commandLifecycleIndex(events, nextUuid, 'started') >= 0)
+        ).resolves.toBe(true)
+        const nextFrames = () => events.slice(commandLifecycleIndex(events, nextUuid, 'started'))
+        await expect(
+          waitFor(() =>
+            nextFrames().some(
+              (event) =>
+                event.type === 'message' &&
+                event.message.type === 'result' &&
+                event.message.subtype === 'success'
+            )
+          )
+        ).resolves.toBe(true)
+        expect(
+          nextFrames().some(
+            (event) =>
+              event.type === 'message' &&
+              event.message.type === 'stream_event' &&
+              JSON.stringify(event.message).includes('text_delta')
+          )
+        ).toBe(true)
+        expect(commandLifecycleIndex(events, queuedUuid, 'started')).toBe(-1)
       } finally {
         await adapter.closeAll()
-        await rm(cwd, { recursive: true, force: true })
       }
     },
     150_000

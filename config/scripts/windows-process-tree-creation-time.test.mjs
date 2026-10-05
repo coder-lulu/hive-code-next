@@ -18,7 +18,11 @@ it('accepts the compiled capability only when both readers are available', () =>
   expect(() =>
     assertWindowsProcessTreeCreationTime({
       platform: 'win32',
-      module: { supportedProcessDataFlags: 7, getProcessCreationTime: () => undefined }
+      module: {
+        supportedProcessDataFlags: 7,
+        getProcessCreationTime: () => undefined,
+        terminateProcessIfCreationTimeMatches: () => false
+      }
     })
   ).not.toThrow()
 })
@@ -30,6 +34,15 @@ it('still rejects a binary without table creation-time support', () => {
       module: { getProcessCreationTime: () => undefined }
     })
   ).toThrow('CreationTime support')
+})
+
+it('rejects a creation-time binary that cannot identity-check native termination', () => {
+  expect(() =>
+    assertWindowsProcessTreeCreationTime({
+      platform: 'win32',
+      module: { supportedProcessDataFlags: 7, getProcessCreationTime: () => undefined }
+    })
+  ).toThrow('identified process termination')
 })
 
 it('does not require Windows native capabilities on another platform', () => {

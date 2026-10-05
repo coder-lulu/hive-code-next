@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from '../../src/shared/child-process/run-process'
+import { runProcess } from '../../../shared/child-process/run-process'
 import {
   assertReproductionSuitesExist,
   assertPinnedProductSupport,
@@ -10,18 +10,18 @@ import {
   readPinnedBaseline,
   removeScratchWorktree,
   REPRODUCTION_SUITES
-} from './rpc-recording-pin-guard.mts'
+} from '../../../../mobile/scripts/rpc-recording-pin-guard.mts'
 import {
   checkPinReachable,
   gitHubRepositoryFromRemote,
   PIN_MANIFEST,
   pullRequestsWithCommit,
   repinInstruction
-} from './rpc-recording-pin-reachability.mts'
+} from '../../../../mobile/scripts/rpc-recording-pin-reachability.mts'
 
 const logs = resolve(
   import.meta.dirname,
-  '../../logs/upstream-sync/review-20260930/mobile/pin-tests'
+  '../../../../logs/upstream-sync/review-20260930/mobile/pin-tests'
 )
 mkdirSync(logs, { recursive: true })
 
@@ -549,7 +549,9 @@ describe('the suites a reproduction runs', () => {
   const overlay = 'mobile/src/test-support/rpc-recording'
 
   it('every name resolves to a file in this repository', () => {
-    expect(() => assertReproductionSuitesExist(resolve(import.meta.dirname, '../..'))).not.toThrow()
+    expect(() =>
+      assertReproductionSuitesExist(resolve(import.meta.dirname, '../../../..'))
+    ).not.toThrow()
   })
 
   it('throws for the one that drifted, rather than letting vitest pass over it', async () => {

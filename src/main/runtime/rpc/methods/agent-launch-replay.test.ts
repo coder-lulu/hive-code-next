@@ -31,6 +31,7 @@ import {
   openTestAgentSessionRecordStore,
   readPersistedTestAgentSessionStore
 } from '../../agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../../../native-chat/agent-session-journal/journal-host-database-test-support'
 import { setStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-registry'
 import type { StructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-host'
 import type { RpcContext } from '../core'
@@ -134,6 +135,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   setStructuredAgentSessionHost(null)
+  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 

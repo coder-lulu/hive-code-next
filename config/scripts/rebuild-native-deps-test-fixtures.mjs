@@ -457,7 +457,7 @@ export function writeFakeWindowsProcessTree(projectDir) {
   mkdirSync(processTreeDir, { recursive: true })
   writeFileSync(
     join(processTreeDir, 'index.js'),
-    `module.exports = { supportedProcessDataFlags: ${CREATION_TIME_FLAG}, getProcessCreationTime: () => undefined }\n`
+    `module.exports = { supportedProcessDataFlags: ${CREATION_TIME_FLAG}, getProcessCreationTime: () => undefined, terminateProcessIfCreationTimeMatches: () => false }\n`
   )
 }
 
@@ -491,7 +491,7 @@ export function writeFakeWindowsProcessTreeWithNodeAddonApi(
   writeFileSync(
     join(processTreeDir, 'src', 'process.cc'),
     creationTimePatchApplied
-      ? 'GetProcessCreationTime(pinfo);\nGetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime);\n'
+      ? 'GetProcessCreationTime(pinfo);\nGetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime);\nTerminateProcessIfCreationTimeMatches(pid, birth);\n'
       : 'GetProcessMemoryUsage(pinfo);\n'
   )
   writeFileSync(
@@ -500,26 +500,28 @@ export function writeFakeWindowsProcessTreeWithNodeAddonApi(
   )
   writeFileSync(
     join(processTreeDir, 'src', 'addon.cc'),
-    creationTimePatchApplied ? 'exports.Set("getProcessCreationTime", getter);\n' : '\n'
+    creationTimePatchApplied
+      ? 'exports.Set("getProcessCreationTime", getter);\nexports.Set("terminateProcessIfCreationTimeMatches", terminate);\n'
+      : '\n'
   )
   mkdirSync(join(processTreeDir, 'lib'), { recursive: true })
   writeFileSync(
     join(processTreeDir, 'lib', 'index.js'),
     creationTimePatchApplied
-      ? 'exports.ProcessDataFlag["CreationTime"] = 4;\nexports.getProcessCreationTime = getter;\n'
+      ? 'exports.ProcessDataFlag["CreationTime"] = 4;\nexports.getProcessCreationTime = getter;\nexports.terminateProcessIfCreationTimeMatches = terminate;\n'
       : '\n'
   )
   writeFileSync(
     join(processTreeDir, 'lib', 'index.ts'),
     creationTimePatchApplied
-      ? 'export enum ProcessDataFlag { CreationTime = 4 }\nexport const getProcessCreationTime = getter;\n'
+      ? 'export enum ProcessDataFlag { CreationTime = 4 }\nexport const getProcessCreationTime = getter;\nexport const terminateProcessIfCreationTimeMatches = terminate;\n'
       : '\n'
   )
   mkdirSync(join(processTreeDir, 'typings'), { recursive: true })
   writeFileSync(
     join(processTreeDir, 'typings', 'windows-process-tree.d.ts'),
     creationTimePatchApplied
-      ? 'creationTimeMs?: number\nexport const getProcessCreationTime: Function;\n'
+      ? 'creationTimeMs?: number\nexport const getProcessCreationTime: Function;\nexport const terminateProcessIfCreationTimeMatches: Function;\n'
       : '\n'
   )
   writeFileSync(join(nodeAddonApiDir, 'package.json'), '{"name":"node-addon-api"}\n')

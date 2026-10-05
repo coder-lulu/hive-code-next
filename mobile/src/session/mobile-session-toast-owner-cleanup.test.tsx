@@ -47,7 +47,15 @@ vi.mock('../platform/haptics', () => ({
 vi.mock('../terminal/terminal-copy-gutter-preference', () => ({
   useTerminalCopyTrimsGutter: () => ({ current: false })
 }))
-vi.mock('./mobile-session-styles', () => ({ styles: { container: {}, kavInner: {} } }))
+vi.mock('./mobile-session-styles', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileSessionThemeStyles: () => ({
+      styles: { container: {}, kavInner: {} },
+      theme: lightTheme
+    })
+  }
+})
 vi.mock('./MobileSessionHeader', () => ({ MobileSessionHeader: () => null }))
 vi.mock('./MobileSessionContentRow', () => ({ MobileSessionContentRow: () => null }))
 vi.mock('./MobileSessionSheets', () => ({ MobileSessionSheets: () => null }))

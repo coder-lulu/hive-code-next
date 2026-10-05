@@ -17,7 +17,7 @@ import { importProfileStateJson, readProfileStateSnapshot } from './profile-stat
 import { profileStateJsonExportPath } from './legacy-json/profile-state-export-path'
 import { buildRecoveryCrashProcess, killRecoveryAt } from './profile-state-recovery-crash-process'
 
-const suite = mkdtempSync(join(tmpdir(), 'orca-large-recovery-crash-'))
+const suite = mkdtempSync(join(tmpdir(), 'profile-large-'))
 const roots: string[] = []
 const profileId = 'large-recovery'
 const oldJson = JSON.stringify({ opaque: 'x'.repeat(8 * 1024 * 1024), revision: 'old' })

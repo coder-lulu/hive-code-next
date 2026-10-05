@@ -20,7 +20,7 @@ const relayFixture = vi.hoisted(() => ({
       string,
       {
         callbacks: HiveAccountRelayCallbacks
-        close: ReturnType<typeof vi.fn>
+        close: ReturnType<typeof vi.fn<() => void>>
       }
     >
   }>
@@ -39,7 +39,7 @@ vi.mock('../../../src/shared/hive-account-relay-pool', () => ({
       string,
       {
         callbacks: HiveAccountRelayCallbacks
-        close: ReturnType<typeof vi.fn>
+        close: ReturnType<typeof vi.fn<() => void>>
       }
     >()
     constructor(private options: { onStateChange(state: string): void }) {
@@ -237,7 +237,17 @@ function relayRig(): TransportRig {
   return {
     client,
     sent: pool.sent,
-    reply: (response) => pool.subscriptions.get(response.id)?.callbacks.onResponse(response),
+    reply: (response) => {
+      const callbacks = pool.subscriptions.get(response.id)?.callbacks
+      if (response.ok) {
+        if (!response._meta) {
+          throw new Error('expected runtime metadata on a host success')
+        }
+        callbacks?.onResponse({ ...response, _meta: response._meta })
+      } else {
+        callbacks?.onResponse(response)
+      }
+    },
     assertReleased: (request) =>
       expect(pool.subscriptions.get(request.id)!.close).toHaveBeenCalledOnce(),
     assertLive: (request) =>

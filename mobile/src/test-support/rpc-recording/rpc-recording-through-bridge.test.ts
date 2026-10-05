@@ -41,6 +41,10 @@ import {
 } from '../bridged-parity/divergence-evidence'
 import { familyGoldens, pilotGoldens } from './derived-goldens'
 import { compareGolden, readGolden } from './golden-recording'
+import {
+  INVENTORY_UNMOUNT_REFERENCE_ID,
+  inventoryUnmountExpectedReference
+} from './inventory-unmount-reference-delta'
 import { readHiveGoldenDomain } from '../hive-golden-domain'
 import { pilotMountAdapters } from './pilot-mount-adapters'
 import type { Recording, RecordingScenario } from './recording-scenario'
@@ -74,7 +78,8 @@ import { vitestRecordingScheduler } from './vitest-recording-scheduler'
  * `BRIDGED_PARITY_MEMBERS` pins which goldens are in it — a count alone cannot see one golden
  * leaving a class as another arrives.
  *
- * 382 of the 755 Hive-supported references replay byte for byte. The other 373 fall in five
+ * 381 frozen traces and one explicitly witnessed current-source reference replay byte for byte.
+ * The other 373 of the 755 supported references fall in five
  * classes, 325 / 1 / 6 / 33 / 8, and none of them is a reason to re-record anything.
  * `c1-page-closure.ts` then pins, golden by golden, the 94 recorded at a call site the C1 page
  * owns, because a count over 755 cannot tell a domain's regression from another domain's
@@ -159,6 +164,7 @@ const members = new Map<BridgedParityClass, string[]>()
 const samples = new Map<BridgedParityClass, string>()
 /** Every golden's own verdict, which is what the C1 closure is pinned against golden by golden. */
 const observed = new Map<string, PageClosureObservation>()
+const sourceDeltas = new Set<string>()
 
 /**
  * The page's client over the shared port pair, holding the recorder's scripted client shell-side.
@@ -267,11 +273,16 @@ async function verdict(
   const record = (name: BridgedParityVerdict): void => {
     observed.set(id, { family, verdict: name })
   }
-  const expected = readGolden(directory, id)
+  const frozen = readGolden(directory, id)
+  const expected =
+    id === INVENTORY_UNMOUNT_REFERENCE_ID ? inventoryUnmountExpectedReference(frozen) : frozen
   const fields = run.recording === null ? [] : divergingFields(expected.recording, run.recording)
   if (run.recording !== null && fields.length === 0) {
     // Not redundant with the field walk: this one also pins the encoding.
     compareGolden(expected, { ...expected, recording: run.recording })
+    if (id === INVENTORY_UNMOUNT_REFERENCE_ID) {
+      sourceDeltas.add(id)
+    }
     identical += 1
     record('identical')
     return
@@ -344,7 +355,11 @@ describe.skipIf(process.env[BRIDGED_PARITY_FLAG] === BRIDGED_PARITY_OFF)(
         ([name]) => BRIDGED_PARITY_EXCLUSIONS[asClass(name)] !== undefined
       )
       const excludedCount = total(Object.fromEntries(excluded))
-      process.stdout.write(`\nbridged parity over ${corpus} goldens\n${table}\n`)
+      process.stdout.write(`\nbridged parity over ${corpus} product references\n${table}\n`)
+      process.stdout.write(
+        `\napproved current-source deltas ${sourceDeltas.size}: ${[...sourceDeltas].join(', ')}\n`
+      )
+      expect([...sourceDeltas]).toEqual([INVENTORY_UNMOUNT_REFERENCE_ID])
       process.stdout.write(`\nexcluded ${excludedCount} of ${corpus}, each with the reason it is\n`)
       for (const [name, count] of excluded) {
         process.stdout.write(`  ${name} ${count}: ${BRIDGED_PARITY_EXCLUSIONS[asClass(name)]}\n`)

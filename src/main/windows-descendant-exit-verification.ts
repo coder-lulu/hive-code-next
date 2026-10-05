@@ -1,8 +1,10 @@
 import { getProcessTableIndex } from '../shared/process-table-index'
 import type { DescendantTreeVerdict } from './pty-descendant-exit-verification'
 import { windowsDescendantsFromRows } from './providers/windows-foreground-process-rows'
-import { readWindowsProcessTableFresh } from './windows/windows-process-table'
-import { terminateWindowsProcessTree } from './windows-process-tree-kill'
+import {
+  readWindowsProcessTableFresh,
+  requestWindowsProcessTermination
+} from './windows/windows-process-table'
 
 export const WINDOWS_DESCENDANT_KILL_VERIFY_MS = 3_500
 const WINDOWS_DESCENDANT_POLL_MS = 100
@@ -39,7 +41,14 @@ export async function verifyWindowsProcessIdentity(
   target: WindowsProcessIdentity,
   deps: Pick<WindowsDescendantVerificationDeps, 'readTable'> = {}
 ): Promise<boolean> {
-  if (!Number.isInteger(target.pid) || target.pid <= 0 || !Number.isFinite(target.creationTimeMs)) {
+  if (
+    !Number.isSafeInteger(target.pid) ||
+    target.pid <= 0 ||
+    target.pid > 0xffffffff ||
+    target.pid === process.pid ||
+    !Number.isSafeInteger(target.creationTimeMs) ||
+    target.creationTimeMs <= 0
+  ) {
     return false
   }
   const table = await (deps.readTable ?? readWindowsProcessTableFresh)().catch(() => null)
@@ -118,16 +127,16 @@ export async function captureWindowsDescendantSnapshot(
   }
 }
 
-export type IdentifiedWindowsTreeTerminationDeps = {
+export type IdentifiedWindowsProcessTerminationDeps = {
   readTable?: WindowsDescendantVerificationDeps['readTable']
-  terminateTree?: (target: WindowsProcessIdentity) => Promise<void>
+  requestTermination?: (target: WindowsProcessIdentity) => Promise<'requested' | 'unavailable'>
   ownsRoot?: () => boolean
 }
 
-/** Revalidate the captured root at the last async boundary before taskkill. */
-export async function terminateIdentifiedWindowsProcessTree(
+/** The fresh table admits a captured identity; the native owner rechecks its birth on the signal HANDLE. */
+export async function requestIdentifiedWindowsProcessTermination(
   target: WindowsProcessIdentity,
-  deps: IdentifiedWindowsTreeTerminationDeps = {}
+  deps: IdentifiedWindowsProcessTerminationDeps = {}
 ): Promise<boolean> {
   if (!(await verifyWindowsProcessIdentity(target, { readTable: deps.readTable }))) {
     return false
@@ -135,20 +144,42 @@ export async function terminateIdentifiedWindowsProcessTree(
   if (deps.ownsRoot?.() === false) {
     return false
   }
-  await (
-    deps.terminateTree ??
-    ((identified: WindowsProcessIdentity) => terminateWindowsProcessTree(identified.pid))
-  )(target)
-  return true
+  const outcome = deps.requestTermination
+    ? await deps.requestTermination(target)
+    : requestWindowsProcessTermination(target.pid, target.creationTimeMs)
+  return outcome === 'requested'
+}
+
+/** Stop only children retained from a live owned root; root exit never authorizes a new walk. */
+export async function terminateWindowsDescendantSnapshot(
+  snapshot: WindowsDescendantSnapshot,
+  deps: WindowsDescendantVerificationDeps & {
+    requestTermination?: IdentifiedWindowsProcessTerminationDeps['requestTermination']
+  } = {}
+): Promise<DescendantTreeVerdict> {
+  await Promise.all(
+    snapshot.descendants
+      .filter(
+        (target) =>
+          target.pid !== snapshot.root.pid &&
+          Number.isFinite(target.creationTimeMs) &&
+          target.creationTimeMs >= snapshot.root.creationTimeMs
+      )
+      .map((target) =>
+        requestIdentifiedWindowsProcessTermination(target, {
+          readTable: deps.readTable,
+          requestTermination: deps.requestTermination
+        })
+      )
+  )
+  return verifyWindowsDescendantSnapshotExit(snapshot, deps)
 }
 
 /**
  * Whether a snapshotted Windows tree is gone, polled to a bounded deadline.
  *
- * Why a verification pass at all: `taskkill /T /F` resolves the same way on a
- * timeout, an access denial and a recycled root as it does on a successful
- * kill, so its completion is never evidence. Only a table read that no longer
- * shows an identity-matched row is.
+ * A native termination request does not prove exit. Only a fresh table read
+ * that no longer shows an identity-matched row does.
  */
 export async function verifyWindowsDescendantSnapshotExit(
   snapshot: WindowsDescendantSnapshot,
@@ -169,10 +200,18 @@ export async function verifyWindowsDescendantSnapshotExit(
     if (!table) {
       verdict = 'unverifiable'
     } else {
-      const live = new Map(table.map((row) => [row.pid, row.creationTimeMs]))
+      const live = new Map<number, number | undefined | null>()
+      for (const row of table) {
+        live.set(row.pid, live.has(row.pid) ? null : row.creationTimeMs)
+      }
+      const unidentified = snapshot.descendants.some(
+        (row) => live.has(row.pid) && !Number.isFinite(live.get(row.pid))
+      )
       verdict = snapshot.descendants.some((row) => live.get(row.pid) === row.creationTimeMs)
         ? 'live'
-        : proven
+        : unidentified
+          ? 'unverifiable'
+          : proven
       if (verdict === proven) {
         return verdict
       }

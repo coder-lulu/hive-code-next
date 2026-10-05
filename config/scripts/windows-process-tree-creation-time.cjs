@@ -26,13 +26,14 @@ function assertWindowsProcessTreeCreationTime({ module, platform = process.platf
   if (
     typeof supported === 'number' &&
     (supported & CREATION_TIME_FLAG) !== 0 &&
-    typeof module?.getProcessCreationTime === 'function'
+    typeof module?.getProcessCreationTime === 'function' &&
+    typeof module?.terminateProcessIfCreationTimeMatches === 'function'
   ) {
     return
   }
   throw new Error(
     [
-      '@vscode/windows-process-tree does not report CreationTime support with a synchronous identity getter',
+      '@vscode/windows-process-tree does not report CreationTime support with a synchronous identity getter and identified process termination',
       `(supportedProcessDataFlags=${String(supported)}).`,
       'This is an unpatched or older binary, so process identities or synchronous',
       'profile-owner recovery are unavailable.',

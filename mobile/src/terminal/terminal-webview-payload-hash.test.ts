@@ -6,10 +6,10 @@ import { XTERM_HTML } from './terminal-webview-html'
 // uncovered region ships silently. A diff here means the emitted WebView source changed —
 // update these values only when that change is deliberate, and only after checking the
 // document still runs. Refactors that merely move slice boundaries must leave them alone.
-// Rebuilt after the upstream modular document merge and Hive terminal theme CSS integration.
+// Rebuilt with esbuild 0.28.2 and syntax folding disabled to retain xterm's DECRQM enum.
 // The document-style, engine and theme suites verify the changed seams.
-const EXPECTED_SHA256 = '8b5557afb7dc3e31d86c021ba272705ffe6db3040f987a41431a0c8f8ce5500a'
-const EXPECTED_LENGTH = 747244
+const EXPECTED_SHA256 = '832d1ee36b4ceed749f061af98f0358c7d06e36d432b020f92e9765cd7123c14'
+const EXPECTED_LENGTH = 751481
 
 describe('terminal WebView payload', () => {
   it('composes the expected document', () => {

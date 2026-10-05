@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 import { produceManagedPiTextPack } from '../build-plugins/managed-pi-pack-producer'
 import { loadManagedPiTextPack } from '../../src/main/runtime/managed-pi-pack-loader'
+import { AGENT_SESSION_LEASE_TTL_MS } from '../../src/main/runtime/agent-session-record-store'
 import {
-  AgentSessionRecordStore,
-  AGENT_SESSION_LEASE_TTL_MS
-} from '../../src/main/runtime/agent-session-record-store'
+  openTestAgentSessionRecordStore,
+  readPersistedTestAgentSessionStore
+} from '../../src/main/runtime/agent-session-record-store-test-harness'
 import { openManagedPiProcessSupervisor } from '../../src/main/runtime/managed-pi-process-supervisor'
-import { agentSessionStorePath } from '../../src/main/runtime/agent-session-record-store-file'
 import { createManagedPiExecutionHost } from '../../src/main/native-chat/managed-pi-execution-host'
 import {
   reserveManagedPiExecutionLease,
@@ -59,7 +59,7 @@ async function fixture(
   identity?: { accountId: string; deviceId: string; assertAuthorized?: () => void }
 ) {
   const directory = await mkdtemp(join(root, 'session-'))
-  const store = await AgentSessionRecordStore.open({ directory, hostId: 'local' })
+  const store = await openTestAgentSessionRecordStore(directory)
   let authorized = true
   let clock = Date.now()
   const now = () => clock
@@ -481,7 +481,7 @@ it.each(['CHAT_COMPLETIONS', 'RESPONSES'] as const)(
     expect(f.record(sessionId).lease.ownerProcess!.pid).toBe(pid)
     expect(f.record(sessionId).providerHandleChain).toHaveLength(1)
     expect(f.run).toHaveBeenCalledTimes(2)
-    const persisted = JSON.parse(await readFile(agentSessionStorePath(f.directory), 'utf8'))
+    const persisted = await readPersistedTestAgentSessionStore(f.directory)
     expect(JSON.stringify(persisted)).toContain('managed-pi')
     await f.host.close()
     expect(f.record(sessionId).lease).toMatchObject({
@@ -714,7 +714,7 @@ it('reconciles a released Pi lease on restart without touching external-provider
     now: Date.now()
   })
   await f.host.close()
-  const restarted = await AgentSessionRecordStore.open({ directory: f.directory, hostId: 'local' })
+  const restarted = await openTestAgentSessionRecordStore(f.directory)
   expect(restarted.getRecord(managedPiExecutionRecordId(id))?.lease.unreconciled).toBe(true)
   const external = structuredClone(restarted.getRecord('external_session_1'))
   const execution = await createManagedPiExecutionHost({

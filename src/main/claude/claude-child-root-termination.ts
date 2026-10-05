@@ -37,9 +37,8 @@ type WindowsRootTerminationInput = {
 }
 
 /**
- * `taskkill /T /F` addresses a bare pid, so a dead root's pid may already belong
- * to a stranger whose whole tree it would take down: that one is identity-gated.
- * The direct root kill after it runs however the probe decided.
+ * Captured identity gates the root request; the native owner checks birth on its signal HANDLE.
+ * The original Node-owned handle fallback runs regardless of the probe result.
  */
 export async function terminateClaudeWindowsRoot(
   input: WindowsRootTerminationInput

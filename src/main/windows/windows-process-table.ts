@@ -3,6 +3,12 @@ import { createRequire } from 'node:module'
 import { createProcessTableSnapshotReader } from '../../shared/process-table-snapshot-reader'
 import { reportWindowsCommandLineRecoveryHealth } from './windows-command-line-recovery-health'
 import { readWindowsProcessRowsWithCim } from './windows-process-table-cim-scan'
+import { requestNativeWindowsProcessTermination } from './windows-process-termination'
+import type {
+  NativeProcessInfo,
+  WindowsProcessTreeModule,
+  WindowsProcessTreeAddon
+} from './windows-process-tree-native-contract'
 
 /**
  * The only place Orca reads the Windows process table.
@@ -61,34 +67,6 @@ export type WindowsProcessRow = WindowsProcessIdentityRow & {
   command: string
 }
 
-type NativeProcessInfo = {
-  pid: number
-  ppid: number
-  name: string
-  commandLine?: string
-  creationTimeMs?: number
-}
-
-type WindowsProcessTreeModule = {
-  ProcessDataFlag: {
-    None: number
-    CommandLine: number
-    CreationTime?: number
-  }
-  /**
-   * Flag bits the COMPILED addon reports, straight from `addon.cc`. Absent on a
-   * build that predates the patch — which is not the same question as the enum
-   * above, because pnpm patches the source tree and leaves the tarball's
-   * prebuilt `.node` in place.
-   */
-  supportedProcessDataFlags?: number
-  getProcessCreationTime?: (pid: number) => number | undefined
-  getAllProcesses: (
-    callback: (processes: NativeProcessInfo[] | undefined) => void,
-    flags?: number
-  ) => void
-}
-
 const requireFromMain = createRequire(__filename)
 
 /** `resolve` is optional so a test can inject a bare function for the require alone. */
@@ -100,26 +78,6 @@ type NativeRequire = ((specifier: string) => unknown) & {
 // resolution steps below are the exact thing #15749 shipped untested -- the
 // relay suites replaced the loader wholesale, so nothing exercised the require.
 let requireNative: NativeRequire = requireFromMain
-
-/**
- * The bare addon a relay host receives, with no npm package around it.
- *
- * The published package's `lib/index.js` adds only a queue over this call, and
- * that queue is the wedge this module already defends against: it latches a
- * module-global `requestInProgress` with no try/catch. `nativeReadGate` holds
- * the mutual exclusion instead -- and must, because this addon has no queue of
- * its own and two simultaneous `CreateToolhelp32Snapshot` calls are the crash
- * the vendor's queue exists to prevent. With one native call ever outstanding,
- * binding straight to the addon drops a duplicate rather than losing a guard.
- */
-type WindowsProcessTreeAddon = {
-  getProcessCreationTime?: (pid: number) => number | undefined
-  getProcessList: (
-    callback: (processes: NativeProcessInfo[] | undefined) => void,
-    flags: number
-  ) => void
-  supportedProcessDataFlags?: number
-}
 
 /**
  * Mirrors the package's enum; the addon takes the raw bit field. `Memory` (1)
@@ -187,6 +145,7 @@ function adaptAddon(addon: WindowsProcessTreeAddon): WindowsProcessTreeModule {
     ProcessDataFlag: PROCESS_DATA_FLAG,
     supportedProcessDataFlags: addon.supportedProcessDataFlags,
     getProcessCreationTime: addon.getProcessCreationTime,
+    terminateProcessIfCreationTimeMatches: addon.terminateProcessIfCreationTimeMatches,
     getAllProcesses: (callback, flags) => addon.getProcessList(callback, flags ?? 0)
   }
 }
@@ -556,6 +515,14 @@ export function readWindowsProcessCreationTime(pid: number): number | null {
   } catch {
     return null
   }
+}
+
+/** A native request is never an observed exit; unavailable capabilities never fall back to PID kills. */
+export function requestWindowsProcessTermination(
+  pid: number,
+  creationTimeMs: number
+): 'requested' | 'unavailable' {
+  return requestNativeWindowsProcessTermination(pid, creationTimeMs, moduleLoader)
 }
 
 function resetSnapshotReaders(): void {

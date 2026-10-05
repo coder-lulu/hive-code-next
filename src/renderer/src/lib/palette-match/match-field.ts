@@ -27,6 +27,7 @@ const PREFIX_QUALITIES: ReadonlySet<PaletteMatchQuality> = new Set<PaletteMatchQ
 ])
 
 const MIN_COMPACT_LENGTH = 2
+const NUMBER_WORD = /^\p{N}+$/u
 const SIGILS = new Set(['#', '!'])
 const IDENTIFIER_TOKEN_QUALITIES = new WeakMap<
   readonly PaletteMatchQuality[],
@@ -117,8 +118,10 @@ function matchLiteral(
   if (qualities.includes('field-exact') && normalized === text) {
     return { quality: 'field-exact', ranges: toRanges(field, 0, normalized.length) }
   }
+  // Indexed words split at every letter/number boundary and exclude punctuation.
+  const canMatchWord = token.isLetterOnly || NUMBER_WORD.test(text)
   if (qualities.includes('word-exact')) {
-    const word = field.words.find((entry) => entry.text === text)
+    const word = canMatchWord ? field.words.find((entry) => entry.text === text) : undefined
     if (word) {
       return { quality: 'word-exact', ranges: toRanges(field, word.start, word.end) }
     }
@@ -133,7 +136,7 @@ function matchLiteral(
     return { quality: 'field-prefix', ranges: toRanges(field, 0, text.length) }
   }
   if (qualities.includes('word-prefix')) {
-    const word = field.words.find((entry) => entry.text.startsWith(text))
+    const word = canMatchWord ? field.words.find((entry) => entry.text.startsWith(text)) : undefined
     const atom = field.atoms.find((entry) => normalized.startsWith(text, entry.start))
     const start = word && atom ? Math.min(word.start, atom.start) : (word?.start ?? atom?.start)
     if (start !== undefined) {

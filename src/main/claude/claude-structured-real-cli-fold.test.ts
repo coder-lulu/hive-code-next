@@ -5,6 +5,7 @@
 // from a SessionStart hook frame BEFORE system/init arrives, which is exactly
 // the path the fixture harness cannot fake end to end.
 
+import './claude-real-cli-windows-close-diagnostics.test-fixture'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

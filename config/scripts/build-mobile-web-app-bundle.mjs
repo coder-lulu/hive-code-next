@@ -77,6 +77,13 @@ export const MOBILE_WEB_APP_SHIMS = [
     appliesTo: (options) => options.alias?.zod === MOBILE_ZOD_PACKAGE
   },
   {
+    // Scratch routes and shared imports must use the renderer's same React instance.
+    name: 'one-react',
+    appliesTo: (options) =>
+      options.alias?.react === MOBILE_REACT_PACKAGE &&
+      options.alias?.['react-dom'] === MOBILE_REACT_DOM_PACKAGE
+  },
+  {
     // Older lucide-react-native barrels re-export LucideProvider from a context.mjs that does not
     // export it. Metro's loose CJS interop tolerates it; esbuild's strict ESM does not. Newer
     // versions provide the real export, which this shim preserves.
@@ -177,6 +184,8 @@ const PAGE_ASYNC_STORAGE_MODULE = join(
  * the `module` field here, which is the same ESM entry the package's `import` condition names.
  */
 const MOBILE_ZOD_PACKAGE = join(mobileDir, 'node_modules', 'zod')
+const MOBILE_REACT_PACKAGE = join(mobileDir, 'node_modules', 'react')
+const MOBILE_REACT_DOM_PACKAGE = join(mobileDir, 'node_modules', 'react-dom')
 
 /**
  * Zod's compiled path, off before any module runs.
@@ -307,11 +316,11 @@ export function mobileWebAppBuildOptions(routes) {
     metafile: true,
     logLevel: 'silent',
     jsx: 'automatic',
-    // One React: resolve everything from mobile/node_modules, which is where the entry lives.
-    // A fallback only, so it settles nothing for a module that resolves on its own — see
-    // MOBILE_ZOD_PACKAGE, which is a repo-root import this never reached.
+    // Fallback for Expo dependencies; aliases bind shared imports to the mobile instances.
     nodePaths: [join(mobileDir, 'node_modules')],
     alias: {
+      react: MOBILE_REACT_PACKAGE,
+      'react-dom': MOBILE_REACT_DOM_PACKAGE,
       'react-native': 'react-native-web',
       '@react-native-async-storage/async-storage': PAGE_ASYNC_STORAGE_MODULE,
       zod: MOBILE_ZOD_PACKAGE

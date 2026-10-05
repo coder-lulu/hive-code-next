@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   captureWindowsDescendantSnapshot,
-  terminateIdentifiedWindowsProcessTree,
+  requestIdentifiedWindowsProcessTermination,
   verifyWindowsDescendantSnapshotExit,
   type WindowsDescendantSnapshot
 } from './windows-descendant-exit-verification'
@@ -236,35 +236,35 @@ describe('verifyWindowsDescendantSnapshotExit', () => {
   })
 })
 
-describe('terminateIdentifiedWindowsProcessTree', () => {
-  it('never taskkills a replacement that reused the captured root pid', async () => {
-    const terminateTree = vi.fn(async () => {})
+describe('requestIdentifiedWindowsProcessTermination', () => {
+  it('never signals a replacement that reused the captured root pid', async () => {
+    const requestTermination = vi.fn(async () => 'requested' as const)
 
     await expect(
-      terminateIdentifiedWindowsProcessTree(
+      requestIdentifiedWindowsProcessTermination(
         { pid: 100, creationTimeMs: 5 },
         {
           readTable: vi.fn(async () => [{ pid: 100, ppid: 1, creationTimeMs: 99 }]),
-          terminateTree
+          requestTermination
         }
       )
     ).resolves.toBe(false)
-    expect(terminateTree).not.toHaveBeenCalled()
+    expect(requestTermination).not.toHaveBeenCalled()
   })
 
   it('rechecks retained-child ownership after the identity read settles', async () => {
-    const terminateTree = vi.fn(async () => {})
+    const requestTermination = vi.fn(async () => 'requested' as const)
 
     await expect(
-      terminateIdentifiedWindowsProcessTree(
+      requestIdentifiedWindowsProcessTermination(
         { pid: 100, creationTimeMs: 5 },
         {
           readTable: vi.fn(async () => [{ pid: 100, ppid: 1, creationTimeMs: 5 }]),
           ownsRoot: () => false,
-          terminateTree
+          requestTermination
         }
       )
     ).resolves.toBe(false)
-    expect(terminateTree).not.toHaveBeenCalled()
+    expect(requestTermination).not.toHaveBeenCalled()
   })
 })

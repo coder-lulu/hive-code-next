@@ -281,17 +281,19 @@ describe('cross-version structured agent sessions', () => {
         settingOff()
       )
 
-    beforeEach(async () => {
+    async function installLaunchModeHosts(host: unknown): Promise<void> {
       for (const build of [current, baseline]) {
-        await build.installStructuredHost(installableHost(structuredHostStub(SESSION, WORKSPACE)))
+        if (build === baseline && !build.methodNames.includes('agentSession.createSupport')) {
+          continue
+        }
+        await build.installStructuredHost(host)
       }
-    })
+    }
 
-    afterEach(async () => {
-      for (const build of [current, baseline]) {
-        await build.installStructuredHost(null)
-      }
-    })
+    beforeEach(() =>
+      installLaunchModeHosts(installableHost(structuredHostStub(SESSION, WORKSPACE)))
+    )
+    afterEach(() => installLaunchModeHosts(null))
 
     it('is refused by a host whose setting is off, exactly as the release refused it', async () => {
       const replies = await createSupport(current, released())

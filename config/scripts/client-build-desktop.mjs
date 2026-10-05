@@ -236,6 +236,8 @@ export async function buildDesktop(context, name, online) {
       outputDirectory: output,
       arch: target.arch,
       configFile,
+      // Formal packages retain release toolsets; the PR compression overlay is CI-only.
+      prepareAppImageTools: async () => ({}),
       runBuilder: (args) =>
         nodeStep(
           context,

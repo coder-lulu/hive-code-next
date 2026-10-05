@@ -194,6 +194,10 @@ describe('Subprocess: Relay entry point', () => {
     tmpDir = mkdtempSync(path.join(tmpdir(), 'relay-native-repair-'))
     const repairedRelayEntry = path.join(tmpDir, 'relay.js')
     copyFileSync(relayEntry, repairedRelayEntry)
+    // An incomplete local package prevents an ancestor install from satisfying the fixture.
+    const localPtyDirectory = path.join(tmpDir, 'node_modules', 'node-pty')
+    mkdirSync(localPtyDirectory, { recursive: true })
+    writeFileSync(path.join(localPtyDirectory, 'package.json'), '{"main":"lib/index.js"}\n')
 
     relay = spawnRelayEntry(repairedRelayEntry)
     await relay.sentinelReceived

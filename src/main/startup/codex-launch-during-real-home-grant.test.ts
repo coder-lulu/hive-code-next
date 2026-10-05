@@ -101,6 +101,7 @@ const { prepareCodexSessionResumeForLaunch } = await import('./codex-session-res
 const {
   computeTrustedHash,
   normalizeHookTrustKeyForLookup,
+  parseCodexProjectHeaderPath,
   parseTrustKey,
   readHookTrustEntries,
   upsertHookTrustEntries
@@ -286,8 +287,9 @@ describe('a Codex launch while the real-home approval hangs', () => {
       const managedHooks = readFileSync(join(getOrcaManagedCodexHomePath(), 'hooks.json'), 'utf-8')
       expect(managedHooks).toContain('codex-hook')
       const systemConfig = readFileSync(join(homes.tmpHome, '.codex', 'config.toml'), 'utf-8')
+      const trustedProjectPaths = systemConfig.split(/\r?\n/).map(parseCodexProjectHeaderPath)
       for (const workspace of workspaces) {
-        expect(systemConfig).toContain(workspace)
+        expect(trustedProjectPaths).toContain(workspace)
       }
       expect(systemConfig.match(/trust_level = "trusted"/g)).toHaveLength(2)
     } finally {

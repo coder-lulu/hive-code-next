@@ -30,7 +30,10 @@ import { invokeCanUseTool } from '../../claude/claude-can-use-tool-test-support'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import { structuredClaudeLifecycleEvent } from '../../runtime/structured-claude-runtime-adapter'
-import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { createStoppedClaudeDeadline } from './structured-agent-session-stop-deadline.test-fixture'
 import { recordingStructuredAgentSessionLogger } from './structured-agent-session-logger-test-support'
@@ -138,6 +141,7 @@ afterEach(async () => {
   vi.useRealTimers()
   await adapter.closeAll()
   await host.flushAllStreamedEvents()
+  closeTestJournalHostDatabase(root)
   await rm(root, { recursive: true, force: true })
 })
 
@@ -188,9 +192,7 @@ function frame(connection: FakeConnection, message: Record<string, unknown>): vo
 /** Sends a message and lets Claude open its turn and write one reply; returns the turn's id. */
 async function openTurn(connection: FakeConnection, text = 'Write a long reply.'): Promise<string> {
   const clientMessageId = await send(text)
-  await eventually(() =>
-    expect(connection.sent.some((message) => JSON.stringify(message).includes(text))).toBe(true)
-  )
+  await eventually(() => expect(wrote(connection, text)).toBe(true))
   frame(connection, {
     type: 'system',
     subtype: 'init',
@@ -198,8 +200,7 @@ async function openTurn(connection: FakeConnection, text = 'Write a long reply.'
     model: 'claude-sonnet-5',
     capabilities: CAPABILITIES
   })
-  const written = connection.sent.at(-1)!
-  frame(connection, { ...written, uuid: written.uuid })
+  frame(connection, connection.sent.at(-1)!)
   frame(connection, {
     type: 'assistant',
     uuid: 'stopped-turn-leaf',
@@ -347,7 +348,7 @@ it('reads a Stop pressed before Claude echoed the send as interrupted, not as a 
   claude.routes.interrupt = () => {
     setTimeout(() => {
       const written = connection.sent.find((message) => message.type === 'user')!
-      frame(connection, { ...written, uuid: written.uuid })
+      frame(connection, written)
       frame(connection, {
         type: 'user',
         message: {
@@ -735,10 +736,7 @@ async function ask(
   toolName: string,
   input: Record<string, unknown>,
   signal?: AbortSignal
-): Promise<{
-  answered: ReturnType<typeof invokeCanUseTool>
-  card: { itemId: string; expectedRevision: number }
-}> {
+) {
   const answered = invokeCanUseTool(connection, toolName, 'permission-1', 'tool-1', {
     input,
     ...(signal ? { signal } : {})

@@ -1,11 +1,11 @@
-import '../../../src/main/runtime/rpc/unused-default-rpc-methods.test-fixture'
+import './unused-default-rpc-methods.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
-import { RpcDispatcher } from '../../../src/main/runtime/rpc/dispatcher'
-import { SESSION_TAB_METHODS } from '../../../src/main/runtime/rpc/methods/session-tabs'
-import { RuntimeSubscriptionRegistry } from '../../../src/main/runtime/runtime-subscription-registry'
-import type { RpcRequest } from '../../../src/main/runtime/rpc/core'
-import { RpcClientStreamRegistry } from './rpc-client-stream-registry'
-import type { RpcResponse } from './types'
+import { RpcDispatcher } from './dispatcher'
+import { SESSION_TAB_METHODS } from './methods/session-tabs'
+import { RuntimeSubscriptionRegistry } from '../runtime-subscription-registry'
+import type { RpcRequest } from './core'
+import { RpcClientStreamRegistry } from '../../../../mobile/src/transport/rpc-client-stream-registry'
+import type { RpcResponse } from '../../../../mobile/src/transport/types'
 
 describe('direct session-tab inventory release', () => {
   it.each([false, true])(

@@ -10,8 +10,8 @@ import {
 } from '../pty-descendant-termination'
 import {
   captureWindowsDescendantSnapshot,
-  terminateIdentifiedWindowsProcessTree,
-  verifyWindowsDescendantSnapshotExit,
+  requestIdentifiedWindowsProcessTermination,
+  terminateWindowsDescendantSnapshot,
   verifyWindowsProcessIdentity,
   type WindowsDescendantSnapshot,
   type WindowsProcessIdentity
@@ -270,8 +270,7 @@ export function createClaudeChildTreeReaper(
     }
     await captureOnce()
     if (platform === 'win32') {
-      // Why taskkill's own outcome is never the verdict: it resolves identically
-      // on a timeout, an access denial, a recycled root and a real kill.
+      // A termination request cannot prove exit; the original snapshot verifier owns that verdict.
       const { rootVerified } = await terminateClaudeWindowsRoot({
         snapshot: snapshot?.platform === 'win32' ? snapshot.tree : null,
         exited,
@@ -279,7 +278,7 @@ export function createClaudeChildTreeReaper(
         terminateTree: (root) =>
           deps.terminateWindowsTree
             ? deps.terminateWindowsTree(root)
-            : terminateIdentifiedWindowsProcessTree(root, {
+            : requestIdentifiedWindowsProcessTermination(root, {
                 ownsRoot: () => !exited()
               }).then(() => undefined),
         killRoot
@@ -288,7 +287,7 @@ export function createClaudeChildTreeReaper(
         return 'unverifiable'
       }
       return snapshot?.platform === 'win32'
-        ? await (deps.terminateWindowsDescendants ?? verifyWindowsDescendantSnapshotExit)(
+        ? await (deps.terminateWindowsDescendants ?? terminateWindowsDescendantSnapshot)(
             snapshot.tree
           )
         : 'unverifiable'

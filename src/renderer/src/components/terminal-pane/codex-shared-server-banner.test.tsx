@@ -15,6 +15,7 @@ import {
 } from '../../../../shared/codex-shared-server-command'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import type { Tab } from '../../../../shared/tab-types'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 
 const routing = vi.hoisted(() => ({
   activateAndRevealWorkspace: vi.fn<(id: string) => unknown>(),
@@ -40,8 +41,7 @@ const JOINED: CodexSharedServerStatus = { joined: true, openedBeforeWrapper: fal
 const NOT_JOINED: CodexSharedServerStatus = { joined: false }
 const OLD_TAB_JOINED: CodexSharedServerStatus = { joined: true, openedBeforeWrapper: true }
 const TITLE = 'This Codex is sharing a server'
-const OLD_TAB_BODY =
-  'This terminal was opened before Orca started giving each Codex its own server.'
+const OLD_TAB_BODY = `This terminal was opened before ${APP_DISPLAY_NAME} started giving each Codex its own server.`
 let paneElement: HTMLDivElement
 let root: Root
 let isCodexOnSharedServer: ReturnType<
@@ -202,7 +202,7 @@ describe('CodexSharedServerBanner', () => {
     await act(async () => button('Fix').click())
     await act(async () => button('Turn off').click())
 
-    expect(document.body.textContent).toContain("Orca couldn't turn this off.")
+    expect(document.body.textContent).toContain(`${APP_DISPLAY_NAME} couldn't turn this off.`)
     expect(document.body.textContent).not.toContain('Turned off')
     await act(async () => button('Copy').click())
     expect(writeClipboardText).toHaveBeenCalledWith(CODEX_DISABLE_AUTO_START_COMMAND)

@@ -1,5 +1,4 @@
 diff --git a/binding.gyp b/binding.gyp
-index 11a5e71..1b2e74b 100644
 --- a/binding.gyp
 +++ b/binding.gyp
 @@ -3,7 +3,6 @@
@@ -33,14 +32,14 @@ index 11a5e71..1b2e74b 100644
                  "/guard:cf",
                  "/sdl",
 diff --git a/lib/index.js b/lib/index.js
-index e586cd6..0ee62c3 100644
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -7,11 +7,14 @@
+@@ -7,11 +7,15 @@
  exports.getAllProcesses = exports.getProcessTree = exports.getProcessCpuUsage = exports.getProcessList = exports.filterProcessList = exports.buildProcessTree = exports.ProcessDataFlag = void 0;
  const util_1 = require("util");
  const native = process.platform === 'win32' ? require('../build/Release/windows_process_tree.node') : undefined;
 +exports.getProcessCreationTime = native === undefined ? undefined : native.getProcessCreationTime;
++exports.terminateProcessIfCreationTimeMatches = native === undefined ? undefined : native.terminateProcessIfCreationTimeMatches;
 +exports.supportedProcessDataFlags = native === undefined ? undefined : native.supportedProcessDataFlags;
  var ProcessDataFlag;
  (function (ProcessDataFlag) {
@@ -51,7 +50,7 @@ index e586cd6..0ee62c3 100644
  })(ProcessDataFlag = exports.ProcessDataFlag || (exports.ProcessDataFlag = {}));
  // requestInProgress is used for any function that uses CreateToolhelp32Snapshot, as multiple calls
  // to this cannot be done at the same time.
-@@ -66,11 +69,12 @@
+@@ -66,11 +70,12 @@
      // • the properties are inlined/splatted
      // • the 'ppid' field is omitted
      // • the depth of the tree is limited by `maxDepth`
@@ -66,14 +65,14 @@ index e586cd6..0ee62c3 100644
      });
      return buildNode(root, maxDepth);
 diff --git a/lib/index.ts b/lib/index.ts
-index 7b53aad..284dae1 100644
 --- a/lib/index.ts
 +++ b/lib/index.ts
-@@ -6,12 +6,16 @@
+@@ -6,12 +6,17 @@
  import { promisify } from 'util';
  
  const native = process.platform === 'win32' ? require('../build/Release/windows_process_tree.node') : undefined;
 +export const getProcessCreationTime: ((pid: number) => number | undefined) | undefined = native?.getProcessCreationTime;
++export const terminateProcessIfCreationTimeMatches: ((pid: number, creationTimeMs: number) => boolean) | undefined = native?.terminateProcessIfCreationTimeMatches;
 +/** The flag bits this compiled addon reports; undefined off win32. */
 +export const supportedProcessDataFlags: number | undefined = native?.supportedProcessDataFlags;
  import { IProcessInfo, IProcessTreeNode, IProcessCpuInfo } from '@vscode/windows-process-tree';
@@ -87,7 +86,7 @@ index 7b53aad..284dae1 100644
  }
  
  type RequestCallback = (processList: IProcessInfo[]) => void;
-@@ -81,11 +85,12 @@
+@@ -81,11 +86,12 @@
    // • the properties are inlined/splatted
    // • the 'ppid' field is omitted
    // • the depth of the tree is limited by `maxDepth`
@@ -102,18 +101,20 @@ index 7b53aad..284dae1 100644
    });
  
 diff --git a/src/addon.cc b/src/addon.cc
-index 5253960..f146490 100644
 --- a/src/addon.cc
 +++ b/src/addon.cc
-@@ -6,6 +6,7 @@
+@@ -4,8 +4,10 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
  #include <napi.h>
++#include <cmath>
  #include "cpu_worker.h"
  #include "process_worker.h"
 +#include "process_launch.h"
  
  void GetProcessList(const Napi::CallbackInfo& args) {
    Napi::Env env(args.Env());
-@@ -50,9 +51,33 @@
+@@ -50,9 +52,50 @@
    worker->Queue();
  }
  
@@ -135,7 +136,24 @@ index 5253960..f146490 100644
 +  return Napi::Number::New(env, static_cast<double>(pinfo.creationTimeMs));
 +}
 +
++Napi::Value RequestIdentifiedProcessTermination(const Napi::CallbackInfo& args) {
++  Napi::Env env(args.Env());
++  if (args.Length() != 2 || !args[0].IsNumber() || !args[1].IsNumber()) {
++    return Napi::Boolean::New(env, false);
++  }
++  const double pid = args[0].As<Napi::Number>().DoubleValue();
++  const double birth = args[1].As<Napi::Number>().DoubleValue();
++  constexpr double MAX_SAFE_INTEGER = 9007199254740991.0;
++  if (!(pid >= 1 && pid <= MAXDWORD) || std::floor(pid) != pid ||
++      !(birth >= 1 && birth <= MAX_SAFE_INTEGER) || std::floor(birth) != birth) {
++    return Napi::Boolean::New(env, false);
++  }
++  return Napi::Boolean::New(env, TerminateProcessIfCreationTimeMatches(
++      static_cast<DWORD>(pid), static_cast<ULONGLONG>(birth)));
++}
++
  Napi::Object Init(Napi::Env env, Napi::Object exports) {
++  exports.Set("terminateProcessIfCreationTimeMatches", Napi::Function::New(env, RequestIdentifiedProcessTermination));
 +  exports.Set("getProcessCreationTime", Napi::Function::New(env, ReadProcessCreationTime));
    exports.Set("getProcessList", Napi::Function::New(env, GetProcessList));
    exports.Set("getProcessCpuUsage", Napi::Function::New(env, GetProcessCpuUsage));
@@ -148,7 +166,6 @@ index 5253960..f146490 100644
  }
  
 diff --git a/src/process.cc b/src/process.cc
-index ad63727..22a4742 100644
 --- a/src/process.cc
 +++ b/src/process.cc
 @@ -21,7 +21,8 @@
@@ -161,7 +178,7 @@ index ad63727..22a4742 100644
          pinfo.pid = process_entry.th32ProcessID;
          pinfo.ppid = process_entry.th32ParentProcessID;
  
-@@ -33,23 +34,51 @@
+@@ -33,15 +34,59 @@
            GetProcessCommandLine(pinfo);
          }
  
@@ -179,32 +196,50 @@ index ad63727..22a4742 100644
  
    CloseHandle(snapshot_handle);
    return process_count;
- }
- 
-+void GetProcessCreationTime(ProcessInfo& process_info) {
-+  HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_info.pid);
-+  if (hProcess == NULL) {
-+    return;
-+  }
-+
-+  FILETIME creationTime, exitTime, kernelTime, userTime;
-+  if (GetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime)) {
-+    ULARGE_INTEGER timestamp;
-+    timestamp.LowPart = creationTime.dwLowDateTime;
-+    timestamp.HighPart = creationTime.dwHighDateTime;
-+    constexpr ULONGLONG WINDOWS_EPOCH_OFFSET_100NS = 116444736000000000ULL;
-+    constexpr ULONGLONG HUNDRED_NS_PER_MILLISECOND = 10000ULL;
-+    if (timestamp.QuadPart >= WINDOWS_EPOCH_OFFSET_100NS) {
-+      process_info.creationTimeMs =
-+          (timestamp.QuadPart - WINDOWS_EPOCH_OFFSET_100NS) / HUNDRED_NS_PER_MILLISECOND;
-+    }
-+  }
-+
-+  CloseHandle(hProcess);
 +}
 +
++static ULONGLONG ReadCreationTimeMs(HANDLE process) {
++  FILETIME creationTime, exitTime, kernelTime, userTime;
++  if (!GetProcessTimes(process, &creationTime, &exitTime, &kernelTime, &userTime)) {
++    return 0;
++  }
++  ULARGE_INTEGER timestamp;
++  timestamp.LowPart = creationTime.dwLowDateTime;
++  timestamp.HighPart = creationTime.dwHighDateTime;
++  constexpr ULONGLONG WINDOWS_EPOCH_OFFSET_100NS = 116444736000000000ULL;
++  constexpr ULONGLONG HUNDRED_NS_PER_MILLISECOND = 10000ULL;
++  return timestamp.QuadPart >= WINDOWS_EPOCH_OFFSET_100NS
++      ? (timestamp.QuadPart - WINDOWS_EPOCH_OFFSET_100NS) / HUNDRED_NS_PER_MILLISECOND
++      : 0;
++}
++
++void GetProcessCreationTime(ProcessInfo& process_info) {
++  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_info.pid);
++  if (process == NULL) {
++    return;
++  }
++  process_info.creationTimeMs = ReadCreationTimeMs(process);
++  CloseHandle(process);
++}
++
++bool TerminateProcessIfCreationTimeMatches(DWORD pid, ULONGLONG expectedBirth) {
++  if (pid == 0 || pid == GetCurrentProcessId() || expectedBirth == 0) {
++    return false;
++  }
++  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE, FALSE, pid);
++  if (process == NULL) {
++    return false;
++  }
++  // Keep this handle across the birth check and signal: a later PID open can be a replacement.
++  const ULONGLONG actualBirth = ReadCreationTimeMs(process);
++  const bool requested = actualBirth != 0 && actualBirth == expectedBirth &&
++                         TerminateProcess(process, 1) != FALSE;
++  CloseHandle(process);
++  return requested;
+ }
+ 
  void GetProcessMemoryUsage(ProcessInfo& process_info) {
-   DWORD pid = process_info.pid;
+@@ -49,7 +94,9 @@
    HANDLE hProcess;
    PROCESS_MEMORY_COUNTERS pmc;
  
@@ -215,7 +250,7 @@ index ad63727..22a4742 100644
  
    if (hProcess == NULL) {
      return;
-@@ -81,7 +110,8 @@
+@@ -81,7 +128,8 @@
    DWORD pid = cpu_info.pid;
    HANDLE hProcess;
  
@@ -226,10 +261,9 @@ index ad63727..22a4742 100644
    if (hProcess == NULL) {
      return;
 diff --git a/src/process.h b/src/process.h
-index 3c9b852..72e1648 100644
 --- a/src/process.h
 +++ b/src/process.h
-@@ -22,18 +22,22 @@
+@@ -22,18 +22,24 @@
    DWORD ppid;
    DWORD memory; // Reported in bytes
    std::string commandLine;
@@ -250,11 +284,12 @@ index 3c9b852..72e1648 100644
  
 +void GetProcessCreationTime(ProcessInfo& process_info);
 +
++bool TerminateProcessIfCreationTimeMatches(DWORD pid, ULONGLONG expectedBirth);
++
  void GetCpuUsage(Cpu& cpu_info, bool first_run);
  
  #endif  // SRC_PROCESS_H_
 diff --git a/src/process_commandline.cc b/src/process_commandline.cc
-index 716051d..25907c0 100644
 --- a/src/process_commandline.cc
 +++ b/src/process_commandline.cc
 @@ -7,61 +7,119 @@
@@ -263,9 +298,7 @@ index 716051d..25907c0 100644
  #include <winternl.h>
 -#include <iostream>
 +#include <vector>
- 
--bool GetProcessCommandLine(ProcessInfo& process_info) {
--  HINSTANCE ntdll = GetModuleHandleW(L"ntdll.dll");
++
 +namespace {
 +
 +// Windows 8.1 and later hand back a process's command line as a UNICODE_STRING
@@ -298,7 +331,7 @@ index 716051d..25907c0 100644
 +// ntdll ships no import library for this entry point; it has to be resolved.
 +NtQueryInformationProcessFn ResolveNtQueryInformationProcess() {
 +  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-   if (!ntdll) {
++  if (!ntdll) {
 +    return nullptr;
 +  }
 +  return reinterpret_cast<NtQueryInformationProcessFn>(
@@ -317,8 +350,8 @@ index 716051d..25907c0 100644
 +  int length = static_cast<int>(wide_length);
 +  int charcount = WideCharToMultiByte(CP_UTF8, 0, data, length, NULL, 0, NULL, NULL);
 +  if (!charcount) {
-     return false;
-   }
++    return false;
++  }
 +  process_info.commandLine.resize(static_cast<size_t>(charcount));
 +  WideCharToMultiByte(CP_UTF8, 0, data, length, &process_info.commandLine[0], charcount, NULL,
 +                      NULL);
@@ -327,15 +360,18 @@ index 716051d..25907c0 100644
 +
 +}  // namespace
  
+ bool GetProcessCommandLine(ProcessInfo& process_info) {
+-  HINSTANCE ntdll = GetModuleHandleW(L"ntdll.dll");
+-  if (!ntdll) {
++  NtQueryInformationProcessFn query = NtQueryInformationProcessEntry();
++  if (!query) {
+     return false;
+   }
+ 
 -  decltype(NtQueryInformationProcess)* nt_query_information_process =
 -      reinterpret_cast<decltype(NtQueryInformationProcess)*>(
 -          GetProcAddress(ntdll, "NtQueryInformationProcess"));
-+bool GetProcessCommandLine(ProcessInfo& process_info) {
-+  NtQueryInformationProcessFn query = NtQueryInformationProcessEntry();
-+  if (!query) {
-+    return false;
-+  }
- 
+-
 -  if (!nt_query_information_process) {
 +  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_info.pid);
 +  if (process == NULL) {
@@ -345,6 +381,11 @@ index 716051d..25907c0 100644
 -  PROCESS_BASIC_INFORMATION pbi{};
 -  PEB peb = {NULL};
 -  RTL_USER_PROCESS_PARAMETERS process_parameters = {NULL};
+-
+-  // Get process handle
+-  DWORD pid = process_info.pid;
+-  HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+-  if (hProcess == INVALID_HANDLE_VALUE) {
 +  ULONG size = 0;
 +  NTSTATUS status = query(process, kProcessCommandLineInformation, nullptr, 0, &size);
 +  if (NT_SUCCESS(status)) {
@@ -358,17 +399,6 @@ index 716051d..25907c0 100644
 +  }
 +  if (size < sizeof(UNICODE_STRING) || size > kMaxCommandLineBytes) {
 +    CloseHandle(process);
-+    return false;
-+  }
- 
--  // Get process handle
--  DWORD pid = process_info.pid;
--  HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
--  if (hProcess == INVALID_HANDLE_VALUE) {
-+  std::vector<unsigned char> buffer(size);
-+  status = query(process, kProcessCommandLineInformation, &buffer[0], size, &size);
-+  CloseHandle(process);
-+  if (!NT_SUCCESS(status)) {
      return false;
    }
  
@@ -398,6 +428,15 @@ index 716051d..25907c0 100644
 -        }
 -      }
 -    }
++  std::vector<unsigned char> buffer(size);
++  status = query(process, kProcessCommandLineInformation, &buffer[0], size, &size);
++  CloseHandle(process);
++  if (!NT_SUCCESS(status)) {
++    return false;
+   }
+ 
+-  CloseHandle(hProcess);
+-  return false;
 +  // Header and characters arrive in one allocation, but treat the header as
 +  // untrusted: a hooked ntdll is the case this reader is written for, and an
 +  // unchecked Buffer/Length here would be an over-read encoded straight into JS.
@@ -409,10 +448,8 @@ index 716051d..25907c0 100644
 +  if (chars == nullptr || chars < begin + sizeof(UNICODE_STRING) || chars > end ||
 +      command_line->Length > static_cast<ULONG>(end - chars)) {
 +    return false;
-   }
- 
--  CloseHandle(hProcess);
--  return false;
++  }
++
 +  // True only when a command line was actually stored, so "empty" and "not
 +  // recovered" stay the same answer they were before this reader replaced the
 +  // PEB read. `src/process.cc` discards the result either way.
@@ -421,7 +458,6 @@ index 716051d..25907c0 100644
  }
 diff --git a/src/process_launch.cc b/src/process_launch.cc
 new file mode 100644
-index 0000000..e3141c5
 --- /dev/null
 +++ b/src/process_launch.cc
 @@ -0,0 +1,140 @@
@@ -567,7 +603,6 @@ index 0000000..e3141c5
 +}
 diff --git a/src/process_launch.h b/src/process_launch.h
 new file mode 100644
-index 0000000..88872a1
 --- /dev/null
 +++ b/src/process_launch.h
 @@ -0,0 +1,10 @@
@@ -582,7 +617,6 @@ index 0000000..88872a1
 +
 +#endif  // SRC_PROCESS_LAUNCH_H_
 diff --git a/src/process_worker.cc b/src/process_worker.cc
-index f59559d..1d61c87 100644
 --- a/src/process_worker.cc
 +++ b/src/process_worker.cc
 @@ -43,6 +43,11 @@
@@ -598,10 +632,9 @@ index f59559d..1d61c87 100644
    }
  
 diff --git a/typings/windows-process-tree.d.ts b/typings/windows-process-tree.d.ts
-index 70e242b..b1d0a53 100644
 --- a/typings/windows-process-tree.d.ts
 +++ b/typings/windows-process-tree.d.ts
-@@ -7,9 +7,18 @@
+@@ -7,8 +7,18 @@
    export enum ProcessDataFlag {
      None = 0,
      Memory = 1,
@@ -609,7 +642,7 @@ index 70e242b..b1d0a53 100644
 +    CommandLine = 2,
 +    CreationTime = 4
    }
- 
++
 +  /**
 +   * The flag bits the compiled addon actually understands, or undefined off
 +   * win32. `ProcessDataFlag` above is source; this is what the binary reports,
@@ -617,11 +650,11 @@ index 70e242b..b1d0a53 100644
 +   */
 +  export const supportedProcessDataFlags: number | undefined;
 +  export const getProcessCreationTime: ((pid: number) => number | undefined) | undefined;
-+
++  export const terminateProcessIfCreationTimeMatches: ((pid: number, creationTimeMs: number) => boolean) | undefined;
+ 
    export interface IProcessInfo {
      pid: number;
-     ppid: number;
-@@ -24,6 +33,9 @@
+@@ -24,6 +34,9 @@
       * The string returned is at most 512 chars, strings exceeding this length are truncated.
       */
      commandLine?: string;
@@ -631,7 +664,7 @@ index 70e242b..b1d0a53 100644
    }
  
    export interface IProcessCpuInfo extends IProcessInfo {
-@@ -35,6 +47,7 @@
+@@ -35,6 +48,7 @@
      name: string;
      memory?: number;
      commandLine?: string;

@@ -54,7 +54,7 @@ vi.mock('../../ssh/ssh-config-parser', () => ({
   sshConfigHostsToTargets: () => []
 }))
 
-const suiteRoot = mkdtempSync(join(tmpdir(), 'orca-recovery-crash-boundaries-'))
+const suiteRoot = mkdtempSync(join(tmpdir(), 'profile-crash-'))
 const fixtureRoots: string[] = []
 let bundle: string
 const profileId = 'crash-recovery'

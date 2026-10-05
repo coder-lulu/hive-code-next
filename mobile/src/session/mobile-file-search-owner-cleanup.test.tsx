@@ -5,6 +5,13 @@ import type { RpcClient } from '../transport/rpc-client'
 import { MobileNativeChatComposer } from './MobileNativeChatComposer'
 import { useMobileNativeChatFileSearch } from './use-mobile-native-chat-file-search'
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T,>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
 vi.mock('react-native', async () => {
   const React = await import('react')
   return {

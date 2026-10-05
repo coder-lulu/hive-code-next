@@ -81,15 +81,9 @@ const MAX_SELF_TREE_KILLS_DETAIL_LENGTH = 200
 
 let selfInitiatedKills: SelfInitiatedTreeKill[] = []
 
-/**
- * Whether the kill was addressed by pid and so could have reached a process
- * Orca did not put in its target: `taskkill /T /F` walks whatever tree the pid
- * owns at kill time, including a recycled pid that is now our renderer. A
- * process group or Job Object contains only what Orca placed there, so it is
- * structurally incapable of taking a Chromium process with it.
- */
+/** Keep direct PID requests distinct from PTY-owned group and Job Object teardown. */
 function isPidAddressedTreeKill(scope: SelfInitiatedTreeKillScope): boolean {
-  return scope === 'win-taskkill-tree'
+  return scope === 'win-taskkill-tree' || scope === 'win-identified-process'
 }
 
 /**

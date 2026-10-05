@@ -6,6 +6,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React, { forwardRef, useImperativeHandle, useRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import type { AgentJournalRenderItem } from '../../../../shared/agent-session-journal-types'
 import type { AgentSessionBackgroundTask } from '../../../../shared/agent-session-wire'
 import type { NativeChatQuestionCardProps } from './NativeChatQuestionCard'
@@ -576,8 +577,7 @@ describe('NativeChatStructuredSession delivery', () => {
   // A cause seen while the chat was open is worded in full; one read back after the chat is
   // reopened may have cleared, until a Retry it still stops brings it back.
   it('words a refusal seen here in full, and after a reopen only once its Retry is refused', async () => {
-    const newerOrca =
-      'Chats were saved by a newer Orca. Your message was not sent. Update Orca to keep using them.'
+    const newerOrca = `Chats were saved by a newer ${APP_DISPLAY_NAME}. Your message was not sent. Update ${APP_DISPLAY_NAME} to keep using them.`
     mocks.mode = 'outbox'
     mocks.call.mockResolvedValue({
       ok: false,

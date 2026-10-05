@@ -14,7 +14,10 @@
  *  whatever tree that pid has *now*, so it can land on a recycled pid that is
  *  since one of Orca's own Chromium processes. A process group can only contain
  *  processes Orca itself put there. */
-export type ProcessTreeKillScope = 'win-taskkill-tree' | 'posix-process-group'
+export type ProcessTreeKillScope =
+  | 'win-taskkill-tree'
+  | 'win-identified-process'
+  | 'posix-process-group'
 
 export type ProcessTreeKill = {
   pid: number

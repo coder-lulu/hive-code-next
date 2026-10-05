@@ -40,12 +40,17 @@ const CREATION_TIME_PATCH_MARKERS = [
   ['src/process.cc', 'GetProcessTimes(hProcess, &creationTime'],
   ['src/process_worker.cc', 'object.Set("creationTimeMs"'],
   ['src/addon.cc', 'exports.Set("getProcessCreationTime"'],
+  ['src/addon.cc', 'exports.Set("terminateProcessIfCreationTimeMatches"'],
+  ['src/process.cc', 'TerminateProcessIfCreationTimeMatches'],
   ['lib/index.js', '["CreationTime"] = 4'],
   ['lib/index.js', 'exports.getProcessCreationTime'],
+  ['lib/index.js', 'exports.terminateProcessIfCreationTimeMatches'],
   ['lib/index.ts', 'CreationTime = 4'],
   ['lib/index.ts', 'export const getProcessCreationTime'],
+  ['lib/index.ts', 'export const terminateProcessIfCreationTimeMatches'],
   ['typings/windows-process-tree.d.ts', 'creationTimeMs?: number'],
-  ['typings/windows-process-tree.d.ts', 'export const getProcessCreationTime']
+  ['typings/windows-process-tree.d.ts', 'export const getProcessCreationTime'],
+  ['typings/windows-process-tree.d.ts', 'export const terminateProcessIfCreationTimeMatches']
 ]
 
 export const WINDOWS_PROCESS_TREE_NODE_ADDON_API_HEADERS = [
@@ -110,6 +115,7 @@ export function inspectWindowsProcessTreeAddon(addonPath) {
 
 /** Only an addon built with the relay launcher patch registers this export. */
 const RELAY_LAUNCHER_EXPORT = 'spawnOutsideJob'
+const IDENTIFIED_TERMINATION_EXPORT = 'terminateProcessIfCreationTimeMatches'
 
 /**
  * Does this compiled addon carry the relay launcher?
@@ -147,6 +153,9 @@ export function relayWindowsProcessTreeAddonDefect(addonPath, arch) {
   }
   if (!windowsProcessTreeAddonHasRelayLauncher(addonPath)) {
     return `it does not export ${RELAY_LAUNCHER_EXPORT}, so it predates the relay launcher patch`
+  }
+  if (!readFileSync(addonPath).includes(IDENTIFIED_TERMINATION_EXPORT)) {
+    return `it does not export ${IDENTIFIED_TERMINATION_EXPORT}, so identified process termination is unavailable`
   }
   return null
 }

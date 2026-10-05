@@ -27,6 +27,7 @@ import {
 describe('GitHandler', () => {
   let dispatcher: MockDispatcher
   let tmpDir: string
+  let settleHeldRefreshes: (() => Promise<void>) | undefined
 
   beforeEach(() => {
     tmpDir = createGitTempDir()
@@ -34,6 +35,8 @@ describe('GitHandler', () => {
   })
 
   afterEach(async () => {
+    await settleHeldRefreshes?.()
+    settleHeldRefreshes = undefined
     await removeGitTempDir(tmpDir)
   })
 
@@ -361,6 +364,9 @@ describe('GitHandler', () => {
       const realGit = target.git.bind(handler)
       let releaseMerge!: () => void
       const mergeHeld = new Promise<void>((resolve) => (releaseMerge = resolve))
+      let firstMergeEntered!: () => void
+      const firstMergeReady = new Promise<void>((resolve) => (firstMergeEntered = resolve))
+      const validationReady = new Map<number, () => void>()
       let merges = 0
       let activeMerges = 0
       let maxConcurrentMerges = 0
@@ -369,6 +375,8 @@ describe('GitHandler', () => {
         if (args.includes('check-ref-format')) {
           const result = await realGit(args, cwd, opts)
           refFormatChecks += 1
+          validationReady.get(refFormatChecks)?.()
+          validationReady.delete(refFormatChecks)
           return result
         }
         if (!args.includes('merge')) {
@@ -379,6 +387,7 @@ describe('GitHandler', () => {
         maxConcurrentMerges = Math.max(maxConcurrentMerges, activeMerges)
         try {
           if (merges === 1) {
+            firstMergeEntered()
             await mergeHeld
           }
           return await realGit(args, cwd, opts)
@@ -388,22 +397,45 @@ describe('GitHandler', () => {
       })
 
       const results: Promise<unknown>[] = []
-      for (const [index, remote] of remotes.entries()) {
-        results.push(
-          relay.callRequest('git.refreshLocalBaseRefForWorktreeCreate', {
+      const settle = async () => {
+        releaseMerge()
+        await Promise.allSettled(results)
+      }
+      settleHeldRefreshes = settle
+      try {
+        for (const [index, remote] of remotes.entries()) {
+          const expectedChecks = 2 * (index + 1)
+          const checksReady = new Promise<void>((resolve) =>
+            validationReady.set(expectedChecks, resolve)
+          )
+          const request = relay.callRequest('git.refreshLocalBaseRefForWorktreeCreate', {
             repoPath: tmpDir,
             fullRef: branchRef,
             remoteTrackingRef: `refs/remotes/${remote}/main`
           })
-        )
-        if (index === 0) {
-          await vi.waitFor(() => expect(merges).toBe(1))
-        } else {
-          await vi.waitFor(() => expect(refFormatChecks).toBe(2 * (index + 1)))
-          await new Promise((resolve) => setTimeout(resolve, 20))
+          results.push(request)
+          if (index === 0) {
+            await Promise.race([
+              firstMergeReady,
+              request.then(() => {
+                expect(merges).toBe(1)
+              })
+            ])
+            expect(merges).toBe(1)
+          } else {
+            await Promise.race([
+              checksReady,
+              request.then(() => {
+                expect(refFormatChecks).toBe(expectedChecks)
+              })
+            ])
+            expect(refFormatChecks).toBe(expectedChecks)
+            await new Promise((resolve) => setTimeout(resolve, 20))
+          }
         }
+      } finally {
+        await settle()
       }
-      releaseMerge()
       return { results: await Promise.all(results), maxConcurrentMerges: () => maxConcurrentMerges }
     }
 

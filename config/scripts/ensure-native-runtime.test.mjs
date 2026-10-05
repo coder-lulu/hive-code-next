@@ -419,7 +419,7 @@ function writeFakeWindowsRegistry(projectDir, { requiresMarker = false } = {}) {
   )
   writeFileSync(
     join(processTreeDir, 'index.js'),
-    'exports.supportedProcessDataFlags = 4; exports.getProcessCreationTime = () => 1\n'
+    'exports.supportedProcessDataFlags = 4; exports.getProcessCreationTime = () => 1; exports.terminateProcessIfCreationTimeMatches = () => false\n'
   )
 }
 

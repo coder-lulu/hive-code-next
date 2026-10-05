@@ -103,6 +103,7 @@ export function runtimeStub(options: AgentLaunchRuntimeStubOptions = {}) {
       folderWorkspace: null
     })),
     ensureStructuredAgentSessionHost: vi.fn(async () => {}),
+    selectCreatedMobileSessionTabForClient: vi.fn(() => true),
     waitForSetupTerminalCompletion
   }
 }

@@ -9,7 +9,7 @@ import {
 import { relayWindowsProcessTreeAddonDefect } from './windows-process-tree-gyp-rebuild.mjs'
 
 const MACHINE = { x64: 0x8664, arm64: 0xaa64 }
-const LAUNCHER = 'spawnOutsideJob\0'
+const LAUNCHER = 'spawnOutsideJob\0terminateProcessIfCreationTimeMatches\0'
 
 const roots = []
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))
@@ -64,6 +64,13 @@ describe('relay windows-process-tree addon check', () => {
     expect(
       relayWindowsProcessTreeAddonDefect(join(buildDir, 'x64/windows-process-tree.node'), 'x64')
     ).toContain('does not export spawnOutsideJob')
+  })
+
+  it('rejects a launcher build without identified process termination', () => {
+    const { buildDir } = fixture({ x64: peImage(MACHINE.x64, 'spawnOutsideJob\0') })
+    expect(
+      relayWindowsProcessTreeAddonDefect(join(buildDir, 'x64/windows-process-tree.node'), 'x64')
+    ).toContain('does not export terminateProcessIfCreationTimeMatches')
   })
 
   it('rejects the unpatched command-line reader even when it has the launcher', () => {

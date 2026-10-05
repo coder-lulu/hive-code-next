@@ -6,7 +6,18 @@ import { REPLY_MATRIX_NORMAL_RESULT_INVENTORY } from './reply-matrix-normal-resu
 import { runRecording } from './run-recording'
 import { pilotMountAdapters } from './pilot-mount-adapters'
 import { vitestRecordingScheduler } from './vitest-recording-scheduler'
-import { expectGoldenFile, goldenBytes, goldenRecording, writeGolden } from './golden-recording'
+import {
+  compareGolden,
+  expectGoldenFile,
+  goldenBytes,
+  goldenRecording,
+  readGolden,
+  writeGolden
+} from './golden-recording'
+import {
+  INVENTORY_UNMOUNT_REFERENCE_ID,
+  inventoryUnmountExpectedReference
+} from './inventory-unmount-reference-delta'
 import type { Recording, RecordingScenario } from './recording-scenario'
 import { determinismRuns } from './determinism-runs'
 
@@ -17,6 +28,7 @@ const input = readScenarios(
 )
 const directory =
   process.env.RPC_FOUNDATION_GOLDENS ?? resolve(root, 'mobile/rpc-foundation/goldens')
+const sourceDeltas = new Set<string>()
 async function certify(id: string, scenarios: RecordingScenario[]) {
   let first = ''
   for (let run = 0; run < determinismRuns(); run++) {
@@ -40,6 +52,9 @@ async function certify(id: string, scenarios: RecordingScenario[]) {
     first = bytes
     if (process.env.RPC_FOUNDATION_MODE === '--record') {
       await writeGolden(directory, golden, '--record')
+    } else if (id === INVENTORY_UNMOUNT_REFERENCE_ID) {
+      compareGolden(inventoryUnmountExpectedReference(readGolden(directory, id)), golden)
+      sourceDeltas.add(id)
     } else {
       await expectGoldenFile(directory, id, golden)
     }
@@ -72,4 +87,9 @@ describe('family reply partitions and owned schedules', () => {
       golden.timeoutMs
     )
   }
+  it(`${INVENTORY_UNMOUNT_REFERENCE_ID}: witnesses exactly one approved current-source delta`, () => {
+    expect([...sourceDeltas]).toEqual(
+      process.env.RPC_FOUNDATION_MODE === '--record' ? [] : [INVENTORY_UNMOUNT_REFERENCE_ID]
+    )
+  })
 })

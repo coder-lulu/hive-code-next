@@ -132,7 +132,8 @@ async function openProbe(pathname) {
       (globalThis.__orcaRenderCheckFaults ?? []).length > 0,
     { timeout: 60_000, polling: 100 }
   )
-  expect(await page.evaluate(() => globalThis.__orcaRenderCheckFaults ?? [])).toEqual([])
+  const renderFaults = await page.evaluate(() => globalThis.__orcaRenderCheckFaults ?? [])
+  expect(renderFaults, JSON.stringify(renderFaults)).toEqual([])
   return { errors, page }
 }
 
@@ -190,7 +191,7 @@ describeRender(
         const { errors, page } = await openProbe(ROUTES.mic)
         const { midHold, afterRelease } = await holdLikeAndroidWebView(
           page,
-          `#${TERMINAL_MIC_ID} [aria-label="Start voice dictation"]`,
+          `#${TERMINAL_MIC_ID} [aria-label="开始语音输入"]`,
           {
             holdMs: 1500,
             read: async (mic) => ({
@@ -201,7 +202,7 @@ describeRender(
         )
         expect(midHold).toEqual({
           selectable: false,
-          label: 'Stop voice dictation',
+          label: '停止语音输入',
           pressOuts: { terminal: 0, chat: 0 }
         })
         expect(afterRelease.pressOuts).toEqual({ terminal: 1, chat: 0 })
@@ -213,7 +214,7 @@ describeRender(
         const { errors, page } = await openProbe(ROUTES.mic)
         const { midHold, afterRelease } = await holdLikeAndroidWebView(
           page,
-          `#${CHAT_MIC_ID} [aria-label="Dictate"]`,
+          `#${CHAT_MIC_ID} [aria-label="语音输入"]`,
           {
             holdMs: 1500,
             read: async (mic) => ({
@@ -224,7 +225,7 @@ describeRender(
         )
         expect(midHold).toEqual({
           selectable: false,
-          label: 'Stop dictation',
+          label: '停止语音输入',
           pressOuts: { terminal: 0, chat: 0 }
         })
         // The icon under the finger swaps on press, so the release has to reach the Pressable.

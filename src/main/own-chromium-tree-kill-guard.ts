@@ -42,7 +42,8 @@ export function admitSelfInitiatedTreeKill(target: {
   // recorded and admitted like every other group kill in main, and a stale
   // `getAppMetrics()` entry cannot orphan a macOS/Linux tree.
   const isOwnChromiumPid =
-    target.scope === 'win-taskkill-tree' && readOrcaChromiumProcessPids().has(target.pid)
+    (target.scope === 'win-taskkill-tree' || target.scope === 'win-identified-process') &&
+    readOrcaChromiumProcessPids().has(target.pid)
   try {
     if (isOwnChromiumPid) {
       recordRefusedOwnChromiumTreeKill(target)

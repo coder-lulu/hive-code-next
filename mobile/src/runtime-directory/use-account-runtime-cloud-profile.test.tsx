@@ -22,7 +22,7 @@ import { useAccountRuntimeCloudProfile } from './use-account-runtime-cloud-profi
 async function setup(pendingDisplayNames: ReadonlyMap<string, string | null> = new Map()) {
   const session: MobileSession = {
     authorityId: 'cloud',
-    account: { accountId: 'account-a' },
+    account: { accountId: 'account-a', displayName: 'Account A' },
     accessToken: 'fixture-token',
     refreshToken: 'fixture-refresh',
     expiresAt: 1_000,

@@ -252,34 +252,37 @@ describe('self-initiated tree kill breadcrumb', () => {
     expect(String(details.selfInitiatedKills)).toContain('more)')
   })
 
-  it('keeps the pid-addressed kill when a window-close burst overruns the ring', () => {
-    // Review probe: one taskkill, then 32 routine Job Object teardowns. Under
-    // plain FIFO the discriminating entry is evicted and the persisted detail
-    // becomes byte-identical to the external-kill arm.
-    const goneAt = 5_000_000
-    recordSelfInitiatedTreeKill({
-      pid: 4242,
-      site: 'pty-descendant-sweep',
-      scope: 'win-taskkill-tree',
-      at: goneAt - 4_000
-    })
-    for (let index = 0; index < 32; index += 1) {
+  it.each(['win-taskkill-tree', 'win-identified-process'] as const)(
+    'keeps the %s pid request when a window-close burst overruns the ring',
+    (scope) => {
+      // Review probe: one taskkill, then 32 routine Job Object teardowns. Under
+      // plain FIFO the discriminating entry is evicted and the persisted detail
+      // becomes byte-identical to the external-kill arm.
+      const goneAt = 5_000_000
       recordSelfInitiatedTreeKill({
-        pid: 6000 + index,
-        site: 'windows-pty-job-teardown',
-        scope: 'win-pty-job',
-        at: goneAt - 100
+        pid: 4242,
+        site: 'pty-descendant-sweep',
+        scope,
+        at: goneAt - 4_000
       })
+      for (let index = 0; index < 32; index += 1) {
+        recordSelfInitiatedTreeKill({
+          pid: 6000 + index,
+          site: 'windows-pty-job-teardown',
+          scope: 'win-pty-job',
+          at: goneAt - 100
+        })
+      }
+
+      const details = selfInitiatedTreeKillDetails(goneAt)
+
+      expect(details.selfInitiatedTreeKillCount).toBe(1)
+      expect(details.selfInitiatedGroupKillCount).toBe(31)
+      expect(String(details.selfInitiatedKills)).toMatch(
+        new RegExp(`^${scope}/pty-descendant-sweep/pid4242 -4000ms`)
+      )
     }
-
-    const details = selfInitiatedTreeKillDetails(goneAt)
-
-    expect(details.selfInitiatedTreeKillCount).toBe(1)
-    expect(details.selfInitiatedGroupKillCount).toBe(31)
-    expect(String(details.selfInitiatedKills)).toMatch(
-      /^win-taskkill-tree\/pty-descendant-sweep\/pid4242 -4000ms/
-    )
-  })
+  )
 
   it('keeps the newest teardown when a session has saturated the ring with pid kills', () => {
     // Review probe, the mirror of the case above: 32 session-old taskkills (six

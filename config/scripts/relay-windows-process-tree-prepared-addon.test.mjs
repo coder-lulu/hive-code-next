@@ -15,7 +15,7 @@ afterEach(() => {
   }
 })
 
-function prepared(arch = 'x64', suffix = 'spawnOutsideJob') {
+function prepared(arch = 'x64', suffix = 'spawnOutsideJob terminateProcessIfCreationTimeMatches') {
   const directory = mkdtempSync(join(tmpdir(), 'orca-prepared-relay-addon-'))
   directories.push(directory)
   const addonPath = join(directory, 'process-tree.node')
@@ -57,7 +57,8 @@ describe('reusing a prepared Windows relay addon', () => {
 
   it.each([
     ['upstream reader', 'ReadProcessMemory spawnOutsideJob'],
-    ['pre-launcher addon', 'getProcessCreationTime']
+    ['pre-launcher addon', 'getProcessCreationTime'],
+    ['pre-termination addon', 'spawnOutsideJob']
   ])('refuses the %s before loading it', (_label, suffix) => {
     const options = prepared('x64', suffix)
     expect(canReusePreparedRelayAddon(options)).toBe(false)

@@ -181,13 +181,7 @@ describe('GitHandler', () => {
           stdio: 'pipe'
         })
 
-        execFileSync('git', ['clone', bareDir, producerDir], { stdio: 'pipe' })
-        execFileSync('git', ['checkout', branch], { cwd: producerDir, stdio: 'pipe' })
-        execFileSync('git', ['config', 'user.email', 'test@test.com'], {
-          cwd: producerDir,
-          stdio: 'pipe'
-        })
-        execFileSync('git', ['config', 'user.name', 'Test'], { cwd: producerDir, stdio: 'pipe' })
+        execFileSync('git', ['clone', '--branch', branch, bareDir, producerDir], { stdio: 'pipe' })
         writeFileSync(path.join(producerDir, 'discarded.txt'), 'discarded')
         gitCommit(producerDir, 'discarded remote commit')
         execFileSync('git', ['push'], { cwd: producerDir, stdio: 'pipe' })
@@ -277,13 +271,9 @@ describe('GitHandler', () => {
           encoding: 'utf-8'
         })
 
-        execFileSync('git', ['clone', bareDir, producerDir], { stdio: 'pipe' })
-        execFileSync('git', ['config', 'user.email', 'test@test.com'], {
-          cwd: producerDir,
+        execFileSync('git', ['clone', '--branch', baseBranch, bareDir, producerDir], {
           stdio: 'pipe'
         })
-        execFileSync('git', ['config', 'user.name', 'Test'], { cwd: producerDir, stdio: 'pipe' })
-        execFileSync('git', ['checkout', baseBranch], { cwd: producerDir, stdio: 'pipe' })
         writeFileSync(path.join(producerDir, 'latest.txt'), 'latest')
         gitCommit(producerDir, 'latest base')
         const latestBaseOid = execFileSync('git', ['rev-parse', 'HEAD'], {

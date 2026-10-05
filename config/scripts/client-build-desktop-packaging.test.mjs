@@ -14,7 +14,11 @@ import { sha256, targets } from './client-build-contract.mjs'
 
 const execution = vi.hoisted(() => ({ nodeStep: vi.fn(), step: vi.fn(), pnpmStep: vi.fn() }))
 vi.mock('./client-build-execution.mjs', () => execution)
+vi.mock('./package-linux-formats-appimage.mjs', () => ({
+  preparePrAppImageTools: vi.fn(async () => ({}))
+}))
 import { buildDesktop } from './client-build-desktop.mjs'
+import { preparePrAppImageTools } from './package-linux-formats-appimage.mjs'
 
 const require = createRequire(import.meta.url)
 const config = require('../electron-builder.config.cjs')
@@ -159,9 +163,10 @@ describe('formal desktop packaging execution', () => {
         'build:desktop'
       ])
       const formatCalls = packaging.slice(1)
-      expect(formatCalls.map(({ label }) => label)).toEqual(
-        formats.map((format) => `desktop-package-${format}`)
+      expect(formatCalls.map(({ label }) => label).sort()).toEqual(
+        formats.map((format) => `desktop-package-${format}`).sort()
       )
+      expect(preparePrAppImageTools).not.toHaveBeenCalled()
       expect(new Set(formatCalls.map(({ args }) => valueAfter(args, '--prepackaged'))).size).toBe(3)
       for (const call of packaging) {
         expect(call.context).toBe(context)

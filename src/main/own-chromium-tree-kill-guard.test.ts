@@ -216,6 +216,19 @@ describe('refusing to tree-kill our own Chromium processes', () => {
     ])
   })
 
+  it('refuses an own-Chromium pid for an identified native single-process request', () => {
+    expect(
+      admitSelfInitiatedTreeKill({
+        pid: RENDERER_PID,
+        site: 'windows-identified-process',
+        scope: 'win-identified-process'
+      })
+    ).toBe(false)
+    expect(getCrashBreadcrumbSnapshot()).toEqual([
+      expect.objectContaining({ name: 'self_tree_kill_refused_own_chromium' })
+    ])
+  })
+
   it('refuses an own-Chromium pid at the gate the account teardowns share', () => {
     expect(
       admitSelfInitiatedTreeKill({

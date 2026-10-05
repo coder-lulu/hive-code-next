@@ -18,6 +18,9 @@ describe('mobileStructuredSendDelivery', () => {
     'uses the confirmed journal state for a recovered %s submission',
     (state) => {
       const value = structuredSendResultFixture(state, 'not_delivered')
+      if (!('submission' in value)) {
+        throw new Error('expected a submission answer')
+      }
       value.submission.recovered = true
       expect(mobileStructuredSendDelivery({ status: 'accepted', value })).toEqual(
         mobileStructuredSendDelivery(accepted(state, 'not_delivered'))

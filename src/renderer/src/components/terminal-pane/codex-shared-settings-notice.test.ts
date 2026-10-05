@@ -8,6 +8,7 @@ import {
   unmountHooks
 } from './codex-notice-test-harness'
 import { useCodexSharedSettingsNotice } from './codex-shared-settings-notice'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 
 const { toastInfoMock } = vi.hoisted(() => ({ toastInfoMock: vi.fn() }))
 
@@ -53,10 +54,9 @@ describe('useCodexSharedSettingsNotice', () => {
     await setNoticeState({ agentStatusByPaneKey: { 'tab-1:leaf': { agentType: 'codex' } } })
 
     expect(toastInfoMock).toHaveBeenCalledTimes(1)
-    expect(toastInfoMock).toHaveBeenCalledWith('Codex in Orca now uses ~/.codex', {
+    expect(toastInfoMock).toHaveBeenCalledWith(`Codex in ${APP_DISPLAY_NAME} now uses ~/.codex`, {
       id: 'codex-shared-settings-notice',
-      description:
-        'Codex may ask again to trust folders or approve commands. Re-add any MCP servers you added only in Orca.',
+      description: `Codex may ask again to trust folders or approve commands. Re-add any MCP servers you added only in ${APP_DISPLAY_NAME}.`,
       duration: Infinity
     })
     expect(isSeen()).toBe(true)
