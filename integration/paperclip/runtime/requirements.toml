@@ -1,0 +1,11 @@
+model_provider = "openai"
+allowed_approval_policies = ["never"]
+allowed_sandbox_modes = ["read-only", "workspace-write", "external-sandbox"]
+allowed_web_search_modes = ["disabled"]
+allow_browser_and_computer_use = false
+
+[features]
+hooks = false
+apps = false
+plugins = false
+image_generation = false

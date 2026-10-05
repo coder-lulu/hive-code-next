@@ -1,0 +1,15 @@
+model_provider = "openai"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+web_search = "disabled"
+allow_login_shell = false
+
+[shell_environment_policy]
+inherit = "none"
+set = { PATH = "/usr/local/bin:/usr/bin:/bin", HOME = "/home/hive", CODEX_HOME = "/home/hive/.codex" }
+
+[features]
+hooks = false
+apps = false
+plugins = false
+image_generation = false

@@ -1,0 +1,8 @@
+{
+  "version": "0.159.2",
+  "revision": "ff6aec96948b70d94983af2641a6b67c94faeff5",
+  "platform": "linux-x64",
+  "asset": "https://github.com/openai/codex/releases/download/rust-v0.159.2/codex-package-x86_64-unknown-linux-musl.tar.gz",
+  "sha256": "9e2d29a713b94478b240dec2f10e11324cd05fad76dc43e7c639bdf8a1337a6b",
+  "maximumBytes": 268435456
+}
