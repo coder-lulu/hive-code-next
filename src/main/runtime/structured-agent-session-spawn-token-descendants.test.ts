@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CODEX_SPAWN_TOKEN_ENV } from '../codex/codex-structured-owner-identity'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
 import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
 import { createStructuredAgentSessionOwnerProbe } from './structured-agent-session-owner-probe'
 import {
@@ -87,6 +88,7 @@ afterEach(async () => {
   Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
   fakeProc.environs.clear()
   vi.restoreAllMocks()
+  closeTestJournalHostDatabase(stateDirectory)
   await rm(stateDirectory, { recursive: true, force: true })
 })
 

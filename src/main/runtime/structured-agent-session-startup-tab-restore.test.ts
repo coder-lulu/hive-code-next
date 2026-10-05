@@ -132,6 +132,8 @@ async function seedProfile(
       operations: {},
       retiredClaimKeys: [],
       unusableRecords: {},
+      hiveSessions: {},
+      taskExecutions: {},
       ...(options.visible ? { visibleSessionIds: options.visible } : {})
     })
   )

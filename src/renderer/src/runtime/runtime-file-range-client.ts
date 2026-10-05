@@ -4,6 +4,7 @@ import type { RuntimeFileReadArgs } from './runtime-file-client-types'
 import { assertExternalSshReadOwnership, canReadRelativeRuntimeFile } from './runtime-file-routing'
 import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 function rangeReadTarget(args: RuntimeFileReadArgs) {
   assertExternalSshReadOwnership(args.settings, args.connectionId, args.expectedExternalSshTargetId)
@@ -79,7 +80,7 @@ export async function readRuntimeFileRange(
   } catch (error) {
     if (error instanceof RuntimeRpcCallError && error.code === 'method_not_found') {
       throw new Error(
-        'Large CSV previews require a newer Orca server. Update the server and retry.'
+        `Large CSV previews require a newer ${APP_DISPLAY_NAME} server. Update the server and retry.`
       )
     }
     throw error

@@ -328,11 +328,11 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
     )
   },
   'account select': async (ctx) => {
-    rejectAccountRemoteSelectionFlags(ctx, 'orca account select')
+    rejectAccountRemoteSelectionFlags(ctx, `${PRIMARY_CLI_COMMAND} account select`)
     await mutateDataAccount(ctx, 'select')
   },
   'account rm': async (ctx) => {
-    rejectAccountRemoteSelectionFlags(ctx, 'orca account rm')
+    rejectAccountRemoteSelectionFlags(ctx, `${PRIMARY_CLI_COMMAND} account rm`)
     await mutateDataAccount(ctx, 'remove')
   }
 }

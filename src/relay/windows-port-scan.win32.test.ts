@@ -38,6 +38,7 @@ describeOnWindows('windows port scan against the real host', () => {
   }, 30_000)
 
   it('runs the de-escalated PowerShell fallback command line', async () => {
+    const startedAt = performance.now()
     const result = await runProcess({
       program: windowsPowerShellPath(),
       args: ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_PORT_SCAN_SCRIPT],
@@ -46,7 +47,15 @@ describeOnWindows('windows port scan against the real host', () => {
 
     // No stderr assertion: an autoload or first-run banner writes there without
     // the scan having failed.
-    expect(result.code).toBe(0)
+    expect(
+      result.code,
+      JSON.stringify({
+        signal: result.signal,
+        timedOut: result.timedOut,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        stderrTail: result.stderr.slice(-1024)
+      })
+    ).toBe(0)
     expect(parseWindowsPowerShellPortRows(result.stdout).length).toBeGreaterThan(0)
   }, 30_000)
 })

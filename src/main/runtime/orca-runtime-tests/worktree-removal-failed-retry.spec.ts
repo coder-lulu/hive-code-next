@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   join,
   listWorktreesStrict,
+  localWorktreeFilesystem,
   mkdir,
   mkdtemp,
   removeWorktree,
@@ -191,6 +192,10 @@ describe('runtime listing straight after a delete fails partway', () => {
       gitLists([])
       throw new Error(FAILURE)
     })
+    // Windows can finish this partial Git removal; the remaining filesystem refusal must persist.
+    vi.spyOn(localWorktreeFilesystem, 'removeLocalWorktreePath').mockRejectedValue(
+      new Error(FAILURE)
+    )
 
     await expect(
       runtime.removeManagedWorktree(`id:${leftoverId}`, {
@@ -200,6 +205,7 @@ describe('runtime listing straight after a delete fails partway', () => {
     ).rejects.toThrow(/Operation not permitted/)
     await _settlePendingWorktreeRemovalsForTests()
 
+    expect(existsSync(leftover)).toBe(true)
     expect(await listLeftover()).toMatchObject({
       path: leftover,
       removalError: expect.stringMatching(/Operation not permitted/)

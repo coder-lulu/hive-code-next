@@ -54,8 +54,7 @@ non-HiveCode subagent tool when HiveCode orchestration provenance was requested.
   place workers. A Task is work. A Dispatch is one authoritative Task attempt.
 - Lifecycle authority comes from the active Dispatch, not a terminal title,
   copied ID, old database row, provider transcript, or visible pane.
-- Workers use the exact executable, handle, Task ID, and Dispatch ID in the live
-  preamble, plus any other flag it carries. Never reconstruct, translate, or
+- Workers use the exact executable, handle, Task ID, and Dispatch ID in the live preamble, plus any other flag it carries. Never reconstruct, translate, or
   broaden those arguments.
 - After remote start, address the worker by Dispatch ID. The execution host owns
   process, filesystem, transcript, stop, and cleanup facts. Preserve the verdicts
@@ -68,8 +67,7 @@ non-HiveCode subagent tool when HiveCode orchestration provenance was requested.
   as absent. A new stream operation requires advertised capability because old
   decoders may silently drop unknown opcodes. Never fall back to local execution
   when remote authority or capability is unproven.
-- Use the executable you used to run `skills get` for the entire run. Examples below use `hive`; substitute that exact pinned executable when needed. Do not create a shell variable for the executable. If it fails, report that exact error instead of switching.
-- `hive status --json` shows your session ID as `caller.orcaSessionId` when you have one.
+- Use the executable you used to run `skills get` for the entire run. Examples below use `hive`; substitute that exact pinned executable when needed. Do not create a shell variable for the executable. If it fails, report that exact error instead of switching. `hive status --json` shows your session ID as `caller.orcaSessionId` when you have one.
 - A successful `orchestration send` proves durable enqueue; its wake or nudge is
   best-effort attention only and does not prove the recipient read or accepted it.
 

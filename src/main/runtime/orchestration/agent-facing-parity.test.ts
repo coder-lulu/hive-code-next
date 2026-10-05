@@ -25,6 +25,7 @@ import { formatMessagePointer } from './formatter'
 import { OrchestrationStructuredMailboxPointerDelivery } from './structured-mailbox-pointer-delivery'
 import { buildDispatchPreamble } from './preamble'
 import { ORCA_SESSION_ID_AS_ADDRESS } from '../../../shared/orca-session-id-wording-test-fixture'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 
 const sent = vi.hoisted((): { preambles: string[] } => ({ preambles: [] }))
 vi.mock('../rpc/methods/orchestration-structured-worker-session', () => ({
@@ -42,7 +43,7 @@ const CHAT_WORKER_HANDLE = 'structworker_1'
 const MAIN_KERNEL_LINES = 198 + 1
 
 const db = new OrchestrationDb(':memory:')
-const SELF_LINE = `\nYour Orca session ID is: ${CHAT_ADDRESS}`
+const SELF_LINE = `\nYour ${APP_DISPLAY_NAME} session ID is: ${CHAT_ADDRESS}`
 const previousEnvironment = hasAppEnvironment() ? getAppEnvironment() : null
 
 afterEach(() => {
@@ -74,7 +75,7 @@ function runtime(prompts: string[]): OrcaRuntimeService {
     'getNestedWorkerMaxDepth' | 'getTerminalOrchestrationCliCommand' | 'sendTerminalAgentPrompt'
   > = {
     getNestedWorkerMaxDepth: () => 2,
-    getTerminalOrchestrationCliCommand: () => 'orca',
+    getTerminalOrchestrationCliCommand: () => PRIMARY_CLI_COMMAND,
     sendTerminalAgentPrompt: async (handle, text) => {
       prompts.push(text)
       return { handle, accepted: true, bytesWritten: text.length }
@@ -141,7 +142,7 @@ describe('a chat agent and a terminal agent see the same text but for how each i
     const chat = await renderPreamble('chat')
     const terminal = await renderPreamble('terminal')
 
-    expect(terminal).not.toContain('Orca session ID')
+    expect(terminal).not.toContain(`${APP_DISPLAY_NAME} session ID`)
     expect(chat).toContain(`Your task ID is: task_1${SELF_LINE}\n`)
     expect(chat).not.toContain(CHAT_WORKER_HANDLE)
     expect(chat.replace(SELF_LINE, '').split(CHAT_ADDRESS).join(TERMINAL_HANDLE)).toBe(terminal)
@@ -161,7 +162,7 @@ describe('a chat agent and a terminal agent see the same text but for how each i
         worktreeId: 'repo::/tmp/wt',
         runtimeCliCommand: runtimeOrchestrationCliCommand()
       })
-      expect(terminalCli).toBe(packaged ? 'orca' : 'orca-dev')
+      expect(terminalCli).toBe(PRIMARY_CLI_COMMAND)
 
       for (const mailbox of ['run:run_parity', CHAT_ADDRESS]) {
         expect(await renderChatPointer(mailbox)).toBe(
@@ -179,7 +180,7 @@ describe('the orchestration guide an agent loads', () => {
     expect(kernel.split('\n').length - 1).toBeLessThanOrEqual(MAIN_KERNEL_LINES)
     expect(kernel).not.toMatch(/chat|session:<id>|ORCA_CLI_COMMAND|\/clear|end your turn/i)
     expect(kernel).toContain(
-      '`ORCA status --json` shows your Orca session ID as `caller.orcaSessionId` when you have one.'
+      `\`${PRIMARY_CLI_COMMAND} status --json\` shows your session ID as \`caller.orcaSessionId\` when you have one.`
     )
   })
 })

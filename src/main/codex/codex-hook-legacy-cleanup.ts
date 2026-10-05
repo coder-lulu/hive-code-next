@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   hookDefinitionHasManagedCommand,
   readHooksJsonWithRaw,
@@ -106,7 +107,7 @@ async function sweepLegacySystemManagedHooks(): Promise<void> {
         ) {
           // Why: another process may have saved since the read; never replace
           // that newer dotfiles generation with this stale parse.
-          throw new Error('System Codex hooks changed since Orca read them')
+          throw new Error(`System Codex hooks changed since ${APP_DISPLAY_NAME} read them`)
         }
         writeHooksJson(hooksWritePath, { ...config, hooks: nextHooks }, { preserveMode: true })
       }

@@ -303,7 +303,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     printPreservedBranchWarning(result.result, json)
     printResult(result, json, (value) =>
       value.removing
-        ? `removed: ${value.removed}\nOrca is still deleting the checkout in the background.`
+        ? `removed: ${value.removed}\n${APP_DISPLAY_NAME} is still deleting the checkout in the background.`
         : `removed: ${value.removed}`
     )
   }

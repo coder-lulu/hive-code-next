@@ -5,6 +5,7 @@ import type { HandlerContext } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { DATA_ACCOUNT_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
+import { applyProductBranding } from '../../shared/brand'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type {
   ManagedDataAccountProvider,
@@ -22,7 +23,9 @@ export async function assertDataAccountsSupported(ctx: HandlerContext): Promise<
   if (!status.result.capabilities?.includes(DATA_ACCOUNT_RUNTIME_CAPABILITY)) {
     throw new RuntimeClientError(
       'incompatible_runtime',
-      'Update or restart this Orca host to manage OpenCode and Devin accounts.'
+      applyProductBranding(
+        'Update or restart this Orca host to manage OpenCode and Devin accounts.'
+      )
     )
   }
 }

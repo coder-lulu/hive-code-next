@@ -27,7 +27,10 @@ import {
   hostTestOperationId,
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
-import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 
 const caller = { callerKey: 'desktop' }
 const CLAUDE_SESSION = '819cf9f8-e43c-4ad7-b50f-54aa158a726a'
@@ -145,6 +148,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await host.flushAllStreamedEvents()
+  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 
@@ -270,6 +274,7 @@ describe("a Claude chat whose Claude isn't running shows the `/` surface from it
 
   it('after a relaunch, with nothing remembered from before it', async () => {
     await host.flushAllStreamedEvents()
+    closeTestJournalHostDatabase(directory)
     await openHost()
     const menu = await menuOf(SESSION)
     expect(namesOf(menu, 'skill')).toEqual(['review-pr'])

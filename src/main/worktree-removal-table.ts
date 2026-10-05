@@ -1,4 +1,5 @@
 import { lstat } from 'node:fs/promises'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import { getErrorCode } from './git/worktree-operation-options'
 import { areWorktreePathsEqual } from './git/worktree-path-comparison'
 import { writeWorktreeRemovalRecords, type WorktreeRemovalRecord } from './worktree-removal-records'
@@ -93,7 +94,7 @@ export function assertNoPendingWorktreeRemovalConflict(
   const removal = findPendingWorktreeRemovalConflict(repoPath, target)
   if (removal) {
     throw new Error(
-      `Orca is still deleting the workspace at ${removal.worktreePath}. Cleanup is pending; try again shortly.`
+      `${APP_DISPLAY_NAME} is still deleting the workspace at ${removal.worktreePath}. Cleanup is pending; try again shortly.`
     )
   }
 }

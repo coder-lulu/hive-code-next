@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { formatOrcaSessionAddress } from '../../../shared/orca-session-address'
 import { testOrcaSessionId } from '../../../shared/orca-session-address-test-fixture'
 import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as CODES } from '../../../shared/orchestration-session-caller-codes'
@@ -250,7 +251,9 @@ describe('a /clear-ed chat is shown the Orca session ID it had before the clear'
       from: ADDRESS_Z
     })
 
-    expect(preamble).toContain(`Your coordinator's Orca session ID is: ${ADDRESS_X}\n`)
+    expect(preamble).toContain(
+      `Your coordinator's ${APP_DISPLAY_NAME} session ID is: ${ADDRESS_X}\n`
+    )
     expect(preamble).not.toContain(SESSION_Z)
   })
 
@@ -266,7 +269,9 @@ describe('a /clear-ed chat is shown the Orca session ID it had before the clear'
       ok: false,
       error: {
         code: CODES.providerId,
-        message: expect.stringContaining(`This session's Orca session ID is ${ADDRESS_X};`)
+        message: expect.stringContaining(
+          `This session's ${APP_DISPLAY_NAME} session ID is ${ADDRESS_X};`
+        )
       }
     })
   })

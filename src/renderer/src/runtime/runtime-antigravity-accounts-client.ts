@@ -5,6 +5,7 @@ import type {
 import { ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import type { RuntimeClientTarget } from './runtime-client-target'
 import { assertRuntimeEnvironmentCapability, callRuntimeRpc } from './runtime-rpc-client'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 export async function callAntigravityAccounts(
   owner: RuntimeClientTarget,
@@ -16,7 +17,7 @@ export async function callAntigravityAccounts(
     await assertRuntimeEnvironmentCapability(
       owner.environmentId,
       ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY,
-      'This execution host does not support native Antigravity Accounts yet. Update Orca on that host.'
+      `This execution host does not support native Antigravity Accounts yet. Update ${APP_DISPLAY_NAME} on that host.`
     )
   }
   return callRuntimeRpc(

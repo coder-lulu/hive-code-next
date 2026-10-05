@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { writeCredentialFileAtomic } from '../integration-credential-file'
 import { parseAntigravityNativeCredential } from './native-credential-codec'
 import {
@@ -82,7 +83,7 @@ export function createAntigravityHostCredentialBackend(home: string): Antigravit
   async function read() {
     if (existsSync(marker)) {
       throw new Error(
-        'Antigravity has a keyring fallback marker; Orca cannot verify which credential store agy will use.'
+        `Antigravity has a keyring fallback marker; ${APP_DISPLAY_NAME} cannot verify which credential store agy will use.`
       )
     }
     return (await readAntigravityMacOSCredential()) ?? (await file.read())

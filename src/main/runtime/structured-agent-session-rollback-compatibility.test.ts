@@ -11,6 +11,7 @@ import {
   seedTestAgentSessionRecordStore
 } from './agent-session-record-store-test-harness'
 import { collectSavedStructuredAgentSessionIds } from './saved-structured-agent-session-restoration'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 
 const WORKSPACE = 'workspace-1'
 const SESSION = 'session-alpha-1'
@@ -74,6 +75,7 @@ function pinnedBaseRoundTrip(raw: Record<string, unknown>): Record<string, unkno
 let root: string
 
 afterEach(async () => {
+  closeTestJournalHostDatabase(root)
   await rm(root, { recursive: true, force: true })
 })
 

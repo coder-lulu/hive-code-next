@@ -42,18 +42,19 @@ const dependencyExports: [string, string[]][] = [
   ['../persistence', ['getCanonicalUserDataPath']]
 ]
 
+let exitListenersBefore = process.listeners('exit')
+
 it('keeps startup services live when the updater has vetoed before-quit', async () => {
   vi.resetModules()
   const app = new EventEmitter()
-  const fenceAndCloseNow = vi.fn()
-  const setMobileRelayPairingProvider = vi.fn()
+  const setRuntimeReady = vi.fn()
+  const setAuthorization = vi.fn()
   const unsubscribeAgentAwakeStatusChanges = vi.fn()
   const dispose = vi.fn()
   const stop = vi.fn()
   const state = {
     isQuitting: false,
-    desktopRelayService: { fenceAndCloseNow },
-    runtimeRpc: { setMobileRelayPairingProvider },
+    runtimeCloudPresence: { setRuntimeReady, setAuthorization },
     unsubscribeAgentAwakeStatusChanges,
     agentAwakeService: { dispose },
     rateLimits: { stop }
@@ -63,15 +64,15 @@ it('keeps startup services live when the updater has vetoed before-quit', async 
   for (const [moduleName, exports] of dependencyExports) {
     vi.doMock(moduleName, () => Object.fromEntries(exports.map((name) => [name, vi.fn()])))
   }
-  const exitListenersBefore = process.listeners('exit')
+  exitListenersBefore = process.listeners('exit')
   const { installMainProcessQuitHandlers } = await import('./main-process-quit')
   installMainProcessQuitHandlers()
 
   app.emit('before-quit', { defaultPrevented: true })
 
   expect(state.isQuitting).toBe(false)
-  expect(fenceAndCloseNow).not.toHaveBeenCalled()
-  expect(setMobileRelayPairingProvider).not.toHaveBeenCalled()
+  expect(setRuntimeReady).not.toHaveBeenCalled()
+  expect(setAuthorization).not.toHaveBeenCalled()
   expect(unsubscribeAgentAwakeStatusChanges).not.toHaveBeenCalled()
   expect(dispose).not.toHaveBeenCalled()
   expect(stop).not.toHaveBeenCalled()
@@ -81,19 +82,19 @@ it('keeps startup services live when the updater has vetoed before-quit', async 
   app.emit('before-quit', { defaultPrevented: false })
 
   expect(state.isQuitting).toBe(true)
-  expect(fenceAndCloseNow).toHaveBeenCalledOnce()
-  expect(setMobileRelayPairingProvider).toHaveBeenCalledWith(null)
+  expect(setRuntimeReady).toHaveBeenCalledExactlyOnceWith(false)
+  expect(setAuthorization).toHaveBeenCalledExactlyOnceWith(null)
   expect(unsubscribeAgentAwakeStatusChanges).toHaveBeenCalledOnce()
   expect(dispose).toHaveBeenCalledOnce()
   expect(stop).toHaveBeenCalledOnce()
+})
+
+afterEach(() => {
   for (const listener of process.listeners('exit')) {
     if (!exitListenersBefore.includes(listener)) {
       process.removeListener('exit', listener)
     }
   }
-})
-
-afterEach(() => {
   vi.doUnmock('electron')
   vi.doUnmock('./main-process-state')
   for (const [moduleName] of dependencyExports) {

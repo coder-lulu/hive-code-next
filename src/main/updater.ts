@@ -22,7 +22,12 @@ import {
 } from '../shared/product-update-source'
 import * as productUpdateSourceModule from '../shared/product-update-source'
 import { isProductVersion } from '../shared/product-version'
-import { APP_DISPLAY_NAME, applyProductBranding, applyProductCliBranding } from '../shared/brand'
+import {
+  APP_DISPLAY_NAME,
+  PRIMARY_CLI_COMMAND,
+  applyProductBranding,
+  applyProductCliBranding
+} from '../shared/brand'
 import {
   installProductUpdaterNetworkBoundary,
   type ProductUpdaterHttpExecutor
@@ -1023,9 +1028,7 @@ async function performQuitAndInstall(): Promise<void> {
           state: 'error',
           version: pendingVersion,
           retryAction: 'install',
-          message: applyProductCliBranding(
-            `Close the other Orca instances (process IDs: ${blockers.slice(0, 10).join(', ')}) before installing this update. Background orca serve instances also need to stop. Orca remains open; retry the update after closing them.`
-          )
+          message: `Close the other ${APP_DISPLAY_NAME} instances (process IDs: ${blockers.slice(0, 10).join(', ')}) before installing this update. Background ${PRIMARY_CLI_COMMAND} serve instances also need to stop. ${APP_DISPLAY_NAME} remains open; retry the update after closing them.`
         })
         recordUpdaterLifecycle('macos_install_blocked_by_running_instances', {
           pids: blockers.slice(0, 10).join(', '),

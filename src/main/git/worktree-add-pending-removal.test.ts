@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const { gitExecFileAsyncMock, gitExecFileSyncMock, translateWslOutputPathsMock } = vi.hoisted(
   () => ({
@@ -46,7 +47,7 @@ describe('addWorktree while Orca deletes a checkout in the background', () => {
   it('refuses the same path with a clear message and runs no git', async () => {
     startDeleting()
     await expect(addWorktree('/repo', '/repo-feature', 'other-branch')).rejects.toThrow(
-      'Orca is still deleting the workspace at /repo-feature. Cleanup is pending; try again shortly.'
+      `${APP_DISPLAY_NAME} is still deleting the workspace at /repo-feature. Cleanup is pending; try again shortly.`
     )
     expect(gitExecFileAsyncMock).not.toHaveBeenCalled()
   })

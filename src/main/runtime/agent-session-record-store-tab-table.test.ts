@@ -16,6 +16,7 @@ import {
   readPersistedTestAgentSessionStore
 } from './agent-session-record-store-test-harness'
 import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 
 const NOW = 1_800_000_000_000
 const NATIVE: AgentSessionExecutionLocation = {
@@ -34,6 +35,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 

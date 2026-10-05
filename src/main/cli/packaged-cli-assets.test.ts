@@ -14,8 +14,9 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, sep } from 'node:path'
 import { promisify } from 'node:util'
+import { finished } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
-import { createPackageWithOptions, statFile } from '@electron/asar'
+import { createPackageWithOptions, listPackage, statFile } from '@electron/asar'
 import { describe, expect, it } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { runProcess } from '../../shared/child-process/run-process'
@@ -60,77 +61,87 @@ describe('packaged CLI assets', () => {
     expect(builderConfig.files).toContain('!skill-guides{,/**/*}')
   })
 
-  it('loads worktree link validation from the installed CLI', async () => {
+  it('loads worktree link validation from the installed CLI', async ({ onTestFinished }) => {
     const root = await mkdtemp(join(tmpdir(), 'orca-cli-gitlab-package-'))
+    // Teardown has its own hook deadline and still runs when the test fails.
+    onTestFinished(async () => {
+      await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+    })
     const projectDir = fileURLToPath(new URL('../../../', import.meta.url))
     const source = join(root, 'app-source')
     const archive = join(root, 'resources', 'app.asar')
-    try {
-      const compile = await runProcess({
-        program: process.execPath,
-        args: [
-          join(projectDir, 'node_modules', 'typescript', 'bin', 'tsc'),
-          '-p',
-          join(projectDir, 'config', 'tsconfig.cli.json'),
-          '--outDir',
-          join(source, 'out'),
-          '--composite',
-          'false',
-          '--incremental',
-          'false'
-        ],
-        cwd: projectDir,
-        timeoutMs: 60_000
-      })
-      expect(compile.code, compile.stdout + compile.stderr).toBe(0)
-      await mkdir(dirname(archive), { recursive: true })
-      await writeFile(join(source, 'out', 'package.json'), JSON.stringify({ type: 'commonjs' }))
-      for (const name of ['zod', 'tweetnacl']) {
-        await cp(
-          join(projectDir, 'node_modules', name),
-          join(root, 'resources', 'node_modules', name),
-          {
-            recursive: true,
-            dereference: true
-          }
-        )
-      }
-      await createPackageWithOptions(source, archive, {
-        unpack: `{${builderConfig.asarUnpack?.map((pattern) => join(source, pattern).split(sep).join('/')).join(',')}}`
-      })
-      expect(statFile(archive, join('out', 'cli', 'index.js')).unpacked).toBe(true)
-      const result = await runProcess({
-        program: process.execPath,
-        args: [
-          join(`${archive}.unpacked`, 'out', 'cli', 'index.js'),
-          'worktree',
-          'create',
-          '--repo',
-          'id:repo',
-          '--name',
-          'packaged-link',
-          '--no-parent',
-          '--pr',
-          '0',
-          '--json'
-        ],
-        cwd: root,
-        env: {
-          ...process.env,
-          ORCA_BACKGROUND_LAUNCH: '1',
-          ORCA_USER_DATA_PATH: join(root, 'user-data'),
-          HOME: join(root, 'home')
-        },
-        timeoutMs: 10_000
-      })
-      expect(result.code, result.stderr).toBe(1)
-      expect(JSON.parse(result.stdout)).toMatchObject({
-        ok: false,
-        error: { code: 'invalid_argument', message: 'Pass a positive safe integer for --pr.' }
-      })
-    } finally {
-      await rm(root, { recursive: true, force: true })
+    const compile = await runProcess({
+      program: process.execPath,
+      args: [
+        join(projectDir, 'node_modules', 'typescript', 'bin', 'tsc'),
+        '-p',
+        join(projectDir, 'config', 'tsconfig.cli.json'),
+        '--outDir',
+        join(source, 'out'),
+        '--composite',
+        'false',
+        '--incremental',
+        'false'
+      ],
+      cwd: projectDir,
+      timeoutMs: 60_000
+    })
+    expect(compile.code, compile.stdout + compile.stderr).toBe(0)
+    await mkdir(dirname(archive), { recursive: true })
+    await writeFile(join(source, 'out', 'package.json'), JSON.stringify({ type: 'commonjs' }))
+    for (const name of ['zod', 'tweetnacl']) {
+      await cp(
+        join(projectDir, 'node_modules', name),
+        join(root, 'resources', 'node_modules', name),
+        {
+          recursive: true,
+          dereference: true
+        }
+      )
     }
+    // Match the shipped output exclusions, then wait for the returned archive
+    // writer to close before reading the archive or deleting the fixture.
+    const archiveStream = await createPackageWithOptions(source, archive, {
+      unpack: `{${builderConfig.asarUnpack?.map((pattern) => join(source, pattern).split(sep).join('/')).join(',')}}`,
+      globOptions: {
+        ignore: builderConfig.files
+          ?.filter((pattern) => pattern.startsWith('!out/'))
+          .map((pattern) => join(source, pattern.slice(1)).split(sep).join('/'))
+      }
+    })
+    await finished(archiveStream)
+    expect(builderConfig.files).toContain('!out/**/*.test.js')
+    expect(listPackage(archive).some((file) => file.endsWith('.test.js'))).toBe(false)
+    expect(statFile(archive, join('out', 'cli', 'index.js')).unpacked).toBe(true)
+    const result = await runProcess({
+      program: process.execPath,
+      args: [
+        join(`${archive}.unpacked`, 'out', 'cli', 'index.js'),
+        'worktree',
+        'create',
+        '--repo',
+        'id:repo',
+        '--name',
+        'packaged-link',
+        '--no-parent',
+        '--pr',
+        '0',
+        '--json'
+      ],
+      cwd: root,
+      env: {
+        ...process.env,
+        ORCA_BACKGROUND_LAUNCH: '1',
+        ORCA_USER_DATA_PATH: join(root, 'user-data'),
+        HOME: join(root, 'home')
+      },
+      timeoutMs: 10_000
+    })
+    expect(result.code, result.stderr).toBe(1)
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_argument', message: 'Pass a positive safe integer for --pr.' }
+    })
   })
 
   it('copies runtime dependencies used before Electron asar integration is available', () => {

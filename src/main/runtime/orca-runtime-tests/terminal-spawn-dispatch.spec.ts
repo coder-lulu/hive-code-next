@@ -12,7 +12,13 @@ describe('OrcaRuntimeService createTerminal spawn dispatch', () => {
         worktreeId: TEST_WORKTREE_ID,
         workspacePath: TEST_WORKTREE_PATH,
         connectionId: null,
-        cwd: TEST_WORKTREE_PATH
+        cwd: TEST_WORKTREE_PATH,
+        launchAgent: 'codex',
+        launchConfig: {
+          agentArgs: '--dangerously-bypass-approvals-and-sandbox',
+          agentCommand: "codex '--dangerously-bypass-approvals-and-sandbox'",
+          agentEnv: {}
+        }
       })
       return { id: 'pty-dispatch' }
     })

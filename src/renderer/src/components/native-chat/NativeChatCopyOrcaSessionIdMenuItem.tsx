@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 /** Copies the chat's Orca session ID from the host: `orca_session_id:<root>`, which `/clear` keeps. */
 export function NativeChatCopyOrcaSessionIdMenuItem({
@@ -14,7 +15,7 @@ export function NativeChatCopyOrcaSessionIdMenuItem({
     try {
       const orcaSessionId = await resolveOrcaSessionId()
       if (!orcaSessionId) {
-        throw new Error('no Orca session ID')
+        throw new Error(`no ${APP_DISPLAY_NAME} session ID`)
       }
       await window.api.ui.writeClipboardText(orcaSessionId)
       toast.success(

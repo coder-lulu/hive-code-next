@@ -114,17 +114,22 @@ it('says only that the history did not load for a chat its host cannot run', () 
   renderPane()
 
   expect(screen.getAllByText("This chat's history couldn't be loaded.")).toHaveLength(1)
-  expect(screen.queryByText(/isn't available|newer Orca/)).toBeNull()
+  expect(screen.queryByText(/isn't available/)).toBeNull()
+  expect(screen.queryByText(`newer ${APP_DISPLAY_NAME}`, { exact: false })).toBeNull()
 })
 
-it("says a newer Orca's words alone", () => {
+it("says a newer build's words alone", () => {
   mocks.status = 'error'
   mocks.readRefusal = journalRefusal('journalWrittenByNewerOrca')
   mocks.messages = []
 
   renderPane()
 
-  expect(screen.getByText(/^Chats were saved by a newer Orca\./)).toBeTruthy()
+  expect(
+    screen.getByText(
+      `Chats were saved by a newer ${APP_DISPLAY_NAME}. Update ${APP_DISPLAY_NAME} to keep using them.`
+    )
+  ).toBeTruthy()
   expect(screen.queryByText(/keeps trying/)).toBeNull()
 })
 

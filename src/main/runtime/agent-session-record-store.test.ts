@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-adjudication'
 import type {
   AgentSessionExecutionLocation,
@@ -19,7 +20,10 @@ import {
   seedTestAgentSessionStoreFromNewerBuild
 } from './agent-session-record-store-test-harness'
 import { AGENT_SESSION_CLAIM_KEY_RETENTION_MS } from './agent-session-claim-key-retention'
-import { openTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
 
 const NOW = 1_800_000_000_000
@@ -148,6 +152,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 
@@ -739,13 +744,15 @@ describe('claim keys and unreadable rows', () => {
     expect((await open()).isSessionUnreadable('session-alpha')).toBe(true)
   })
 
-  it('refuses to write a store a newer Orca wrote, with the refusal clients print as "update"', async () => {
+  it('refuses to write a store a newer build wrote, with the refusal clients print as "update"', async () => {
     await seedTestAgentSessionStoreFromNewerBuild(directory)
     const store = await open()
     expect(store.readOnly).toBe(true)
     await expect(store.reserveOwner(reserveRequest())).rejects.toMatchObject({
+      message: 'agent_session_journal_unreadable',
       refusal: {
         code: 'agent_session_journal_unreadable',
+        message: `Chats were saved by a newer ${APP_DISPLAY_NAME}. Update ${APP_DISPLAY_NAME} to keep using them.`,
         details: { reason: 'journalWrittenByNewerOrca' }
       }
     })

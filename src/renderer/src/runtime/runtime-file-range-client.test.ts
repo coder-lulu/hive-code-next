@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readRuntimeFileRange, statRuntimeReadTarget } from './runtime-file-range-client'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   readEditorCsvFileContent,
   CSV_PAGED_PREVIEW_BYTES
@@ -120,7 +121,9 @@ describe('CSV range routing', () => {
         0,
         3
       )
-    ).rejects.toThrow('newer Orca server')
+    ).rejects.toThrow(
+      `Large CSV previews require a newer ${APP_DISPLAY_NAME} server. Update the server and retry.`
+    )
     expect(fsReadFile).not.toHaveBeenCalled()
     expect(fsReadFileChunk).not.toHaveBeenCalled()
   })

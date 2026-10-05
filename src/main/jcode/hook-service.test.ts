@@ -69,8 +69,15 @@ describe('JcodeHookService', () => {
     expect(script).toContain('/hook/jcode')
     expect(script).toContain('payload@-')
     // Why: the payload is jcode's own JCODE_HOOK_PAYLOAD, forwarded verbatim.
-    expect(script).toContain('$JCODE_HOOK_PAYLOAD')
-    expect(script).toContain('payload="$JCODE_HOOK_PAYLOAD"')
+    if (process.platform === 'win32') {
+      expect(script).toContain('setlocal EnableDelayedExpansion')
+      expect(script).toContain('echo(!JCODE_HOOK_PAYLOAD!')
+      expect(script).toMatch(/<"%ORCA_JCODE_PAYLOAD_FILE%" .*curl\.exe/)
+      expect(script).toContain('del "%ORCA_JCODE_PAYLOAD_FILE%"')
+    } else {
+      expect(script).toContain('$JCODE_HOOK_PAYLOAD')
+      expect(script).toContain('payload="$JCODE_HOOK_PAYLOAD"')
+    }
   })
 
   it('reports a missing managed script and repairs it without changing config', () => {

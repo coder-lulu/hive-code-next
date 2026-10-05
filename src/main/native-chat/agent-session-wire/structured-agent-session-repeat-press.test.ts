@@ -11,7 +11,10 @@ import { agentSessionRefusalOperationState } from '../../../shared/agent-session
 import type { AgentSessionThreadGoalChange } from '../../../shared/agent-session-wire'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
-import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
@@ -77,6 +80,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await host.flushAllStreamedEvents()
+  closeTestJournalHostDatabase(root)
   await rm(root, { recursive: true, force: true })
 })
 

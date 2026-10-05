@@ -10,6 +10,7 @@
  * The ladder steps down only on a classified refusal (a `PinnedRelayFallbackError`); an
  * unverifiable probe or self-test throws and the next connect retries the same rung.
  */
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   COMPAT_SERVER_TARGET_BASES,
   isCompatServerTarget,
@@ -151,19 +152,19 @@ export function remoteRuntimeUnavailableReason(
 
 const REMOTE_RUNTIME_UNAVAILABLE_MESSAGES: Record<RemoteRuntimeUnavailableReason, string> = {
   home_noexec:
-    "Orca can't run its remote runtime on this host: the home directory is mounted noexec, so " +
+    `${APP_DISPLAY_NAME} can't run its remote runtime on this host: the home directory is mounted noexec, so ` +
     'nothing under ~/.orca-remote may execute. Remote terminals and file browsing are ' +
     'unavailable until an administrator allows exec there.',
   no_runtime:
-    "Orca can't run its remote runtime on this host: its bundled Node.js was refused and no " +
+    `${APP_DISPLAY_NAME} can't run its remote runtime on this host: its bundled Node.js was refused and no ` +
     'Node.js 18 or newer was found on the host. Install Node.js 18+ on the host, then reconnect.'
 }
 
 // Why its own wording: a host Node would load addons from the same noexec tree, so installing one cannot help.
 const REMEMBERED_NOEXEC_MESSAGE =
-  "Orca can't run its remote runtime on this host: an earlier connect found the home directory " +
+  `${APP_DISPLAY_NAME} can't run its remote runtime on this host: an earlier connect found the home directory ` +
   'mounted noexec, so nothing under ~/.orca-remote may execute. Remote terminals and file ' +
-  'browsing are unavailable until exec is allowed there; Orca re-checks on the next connect.'
+  `browsing are unavailable until exec is allowed there; ${APP_DISPLAY_NAME} re-checks on the next connect.`
 
 export function remoteRuntimeUnavailableMessage(
   reason: RemoteRuntimeUnavailableReason,

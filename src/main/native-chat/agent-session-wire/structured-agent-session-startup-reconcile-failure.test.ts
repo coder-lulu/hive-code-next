@@ -4,7 +4,7 @@
 // adjudicates in memory and writes nothing.
 
 import { cp, readdir, readFile, rm } from 'node:fs/promises'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from 'vitest'
 import type * as AgentSessionRecordRows from '../../runtime/agent-session-record-rows'
 import {
   openTestAgentSessionRecordStore,
@@ -51,11 +51,17 @@ const IO_ERROR = expect.objectContaining({ message: 'disk I/O error' })
 
 const relaunchedRoots: string[] = []
 
-afterEach(async () => {
+afterEach(() => {
   writes.failing = false
-  await Promise.all(
-    relaunchedRoots.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))
-  )
+})
+
+// The imported harness drains the host and closes databases before test-finished cleanup.
+beforeEach(() => {
+  onTestFinished(async () => {
+    await Promise.all(
+      relaunchedRoots.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))
+    )
+  })
 })
 
 /** A host with one chat, relaunched over a copy of its files; `newer` marks the copied records as
@@ -203,18 +209,22 @@ it('restores a chat for reading from records a newer Orca wrote', async () => {
 
 // A chat whose owner could not be proven gone is left recovering; the next attach or send retries it.
 it('restores a chat for reading when resolving its recovery cannot write the store', async () => {
-  const { host, store, leaseReconcileLogged } = await relaunch(false, async () => ({
+  const probeOwner = vi.fn<NonNullable<StructuredAgentSessionHostDeps['probeOwner']>>(async () => ({
     outcome: 'indeterminate',
     reason: 'probe'
   }))
+  const { host, store, leaseReconcileLogged } = await relaunch(false, probeOwner)
   await host.reconcileRestartLeases()
   expect(store.getRecord(SESSION)?.lease.handoffStage).toBe('recovering')
+  expect(probeOwner).toHaveBeenCalledOnce()
+  probeOwner.mockResolvedValue({ outcome: 'pid-absent' })
   writes.failing = true
 
   await expect(host.restoreReadableSessions([SESSION])).resolves.toBeUndefined()
 
   expect(host.hasSession(SESSION)).toBe(true)
   expect(store.getRecord(SESSION)?.lease.handoffStage).toBe('recovering')
+  expect(probeOwner).toHaveBeenCalledTimes(2)
   expect(leaseReconcileLogged).toHaveBeenCalledOnce()
   expect(leaseReconcileLogged).toHaveBeenCalledWith(IO_ERROR)
 })

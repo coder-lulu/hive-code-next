@@ -1,5 +1,6 @@
 import {
   cpSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -21,7 +22,10 @@ import {
 import { peImage } from './windows-pe-image-fixture.mjs'
 
 const require = createRequire(import.meta.url)
-const { CYGWIN_BREAKAWAY_MARKER } = require('./node-pty-job-ownership.cjs')
+const {
+  STRICT_PTY_JOB_MARKER,
+  STRICT_PTY_JOB_MARKER_TEXT
+} = require('./node-pty-job-ownership.cjs')
 const temporary = []
 afterEach(() => {
   for (const dir of temporary.splice(0)) {
@@ -43,11 +47,11 @@ function fixture(arch = 'x64') {
   write(join(sourceDir, 'package.json'), '{"version":"1.1.0"}')
   write(join(sourceDir, 'binding.gyp'), '--no-as-needed,-l:libutil.so.1')
   write(join(sourceDir, 'src/unix/pty.cc'), '.symver openpty,openpty@')
-  write(join(sourceDir, 'src/win/conpty.cc'), 'L"msys-2.0.dll"')
+  write(join(sourceDir, 'src/win/conpty.cc'), `"${STRICT_PTY_JOB_MARKER_TEXT}"`)
   mkdirSync(join(sourceDir, 'third_party/conpty/1', `win10-${arch}`), { recursive: true })
   const files = {}
   for (const [file, bytes] of [
-    ['conpty.node', Buffer.concat([peImage({ arch }), CYGWIN_BREAKAWAY_MARKER])],
+    ['conpty.node', Buffer.concat([peImage({ arch }), STRICT_PTY_JOB_MARKER])],
     ['conpty_console_list.node', peImage({ arch })],
     ['conpty/conpty.dll', peImage({ arch })],
     ['conpty/OpenConsole.exe', peImage({ arch })]
@@ -139,11 +143,13 @@ describe('Windows server prebuild cache validation', () => {
     mkdirSync(join(f.slotDir, 'upstream'))
     expect(() => validateWindowsPrebuildCache(f)).toThrow(/exactly the current ConPTY payload/)
     rmSync(join(f.slotDir, 'upstream'), { recursive: true })
-    const path = join(f.slotDir, 'conpty.node')
-    const target = join(f.prebuildsDir, 'outside.node')
-    cpSync(path, target)
-    rmSync(path)
-    symlinkSync(target, path)
+    const directoryLink = process.platform === 'win32'
+    const path = join(f.slotDir, directoryLink ? 'conpty' : 'conpty.node')
+    const target = join(f.prebuildsDir, directoryLink ? 'outside' : 'outside.node')
+    cpSync(path, target, { recursive: directoryLink })
+    rmSync(path, { recursive: directoryLink })
+    symlinkSync(target, path, directoryLink ? 'junction' : 'file')
+    expect(lstatSync(path).isSymbolicLink()).toBe(true)
     expect(() => validateWindowsPrebuildCache(f)).toThrow(/cannot contain symlinks/)
   })
 
@@ -159,7 +165,7 @@ describe('Windows server prebuild cache validation', () => {
   it.each([
     [
       'wrong PE architecture',
-      Buffer.concat([peImage({ arch: 'arm64' }), CYGWIN_BREAKAWAY_MARKER]),
+      Buffer.concat([peImage({ arch: 'arm64' }), STRICT_PTY_JOB_MARKER]),
       /targets win32-x64/
     ],
     ['old breakaway policy', peImage({ arch: 'x64' }), /predates the Cygwin/],
@@ -167,7 +173,7 @@ describe('Windows server prebuild cache validation', () => {
       'post-baseline N-API import',
       Buffer.concat([
         peImage({ arch: 'x64' }),
-        CYGWIN_BREAKAWAY_MARKER,
+        STRICT_PTY_JOB_MARKER,
         Buffer.from('node_api_symbol_for')
       ]),
       /above N-API 8/
@@ -184,7 +190,7 @@ describe('Windows server prebuild cache validation', () => {
     const f = fixture()
     writeFileSync(join(f.sourceDir, 'src/win/conpty.cc'), 'upstream')
     expect(() => validateWindowsPrebuildCache(f)).toThrow(/source.*does not carry/)
-    writeFileSync(join(f.sourceDir, 'src/win/conpty.cc'), 'L"msys-2.0.dll"')
+    writeFileSync(join(f.sourceDir, 'src/win/conpty.cc'), `"${STRICT_PTY_JOB_MARKER_TEXT}"`)
     writeFileSync(join(f.sourceDir, 'binding.gyp'), 'upstream')
     expect(() => validateWindowsPrebuildCache(f)).toThrow(/patch is not applied/)
   })

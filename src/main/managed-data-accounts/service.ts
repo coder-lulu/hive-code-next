@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { z } from 'zod'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { writeSecureFile } from '../../shared/secure-file'
 import type {
@@ -294,7 +295,7 @@ export class ManagedDataAccountService {
       lstatSync(path).isSymbolicLink() ||
       !realpathSync(path).startsWith(realpathSync(this.root) + sep)
     ) {
-      throw new Error('Managed account path is outside Orca account storage.')
+      throw new Error(`Managed account path is outside ${APP_DISPLAY_NAME} account storage.`)
     }
   }
 

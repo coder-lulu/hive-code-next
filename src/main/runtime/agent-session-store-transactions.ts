@@ -7,6 +7,7 @@
 // a BEGIN, which `runJournalTransaction` does not support. The queue also keeps the FIFO order and
 // the async boundary every awaiting caller was written against.
 
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { JournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database'
 import type { JournalOperationReceipt } from '../native-chat/agent-session-journal/journal-row-writer'
 import { journalOpenRefusalError } from '../native-chat/agent-session-journal/journal-open-failure'
@@ -62,7 +63,7 @@ function readOnlyStoreRefusal(): Error {
   return journalOpenRefusalError(
     new AgentSessionJournalError(
       'journal_read_only',
-      'the chat records were saved by a newer Orca; this host reads them and never writes'
+      `the chat records were saved by a newer ${APP_DISPLAY_NAME}; this host reads them and never writes`
     )
   )
 }

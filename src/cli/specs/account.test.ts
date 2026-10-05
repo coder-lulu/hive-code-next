@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 import { ACCOUNT_COMMAND_SPECS } from './account'
 import {
@@ -95,7 +96,9 @@ describe('account command specs', () => {
     const canonical = spec('account rm')
 
     expect(findCommandSpec(ACCOUNT_COMMAND_SPECS, ['account', 'remove'])).toBe(canonical)
-    expect(formatCommandHelp(canonical)).toContain('orca account rm --agent opencode|devin')
+    expect(formatCommandHelp(canonical)).toContain(
+      `${PRIMARY_CLI_COMMAND} account rm --agent opencode|devin`
+    )
     expect(HANDLER_COMMAND_KEYS.has('account remove')).toBe(false)
   })
 
@@ -106,8 +109,8 @@ describe('account command specs', () => {
       expect(suggestCommands(ACCOUNT_COMMAND_SPECS, path)).not.toContain('account rm')
       expect(suggestCommands(ACCOUNT_COMMAND_SPECS, path)).not.toContain('account remove')
       const data = unknownCommandData(ACCOUNT_COMMAND_SPECS, path)
-      expect(data.nextSteps.join(' ')).not.toContain('orca account rm')
-      expect(data.nextSteps.join(' ')).not.toContain('orca account remove')
+      expect(data.nextSteps.join(' ')).not.toContain(`${PRIMARY_CLI_COMMAND} account rm`)
+      expect(data.nextSteps.join(' ')).not.toContain(`${PRIMARY_CLI_COMMAND} account remove`)
     }
   )
 
@@ -115,7 +118,7 @@ describe('account command specs', () => {
     const data = unknownCommandData(ACCOUNT_COMMAND_SPECS, ['account', 'remov'])
     expect(data.suggestions).toContain('account rm')
     expect(data.suggestions).toContain('account remove')
-    expect(data.nextSteps.join(' ')).toContain('orca account rm')
+    expect(data.nextSteps.join(' ')).toContain(`${PRIMARY_CLI_COMMAND} account rm`)
   })
 
   it('suggestion safety preserves non-destructive account list recovery', () => {

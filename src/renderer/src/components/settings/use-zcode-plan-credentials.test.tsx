@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ZcodePlanCredentialsStatus } from '../../../../shared/zcode-plan-sites'
 import { createZcodePlanCredentialsApi } from '../../web/preload-api/web-agent-accounts-api'
 import { useZcodePlanCredentials } from './use-zcode-plan-credentials'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const mocks = vi.hoisted(() => ({ interaction: vi.fn(), success: vi.fn(), error: vi.fn() }))
 vi.mock('../../store', () => ({
@@ -97,6 +98,8 @@ describe('GLM credential mutation refresh races', () => {
     await act(() => result.current.saveApiKey())
     expect(result.current.apiKeyDraft).toBe('synthetic-web-key')
     expect(mocks.success).not.toHaveBeenCalled()
-    expect(mocks.error).toHaveBeenCalled()
+    expect(mocks.error).toHaveBeenCalledWith('GLM Coding Plan credential update failed.', {
+      description: `GLM Coding Plan keys can only be changed in the desktop app on the computer running ${APP_DISPLAY_NAME}.`
+    })
   })
 })

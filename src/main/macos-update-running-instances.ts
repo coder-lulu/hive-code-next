@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import { runProcess } from '../shared/child-process/run-process'
 
 const RUNNING_INSTANCES_SCRIPT = `function run(argv) {
@@ -36,7 +37,7 @@ export async function getMacUpdateRunningInstances(
     killOnOutputLimit: true
   })
   if (result.code !== 0 || result.timedOut || result.outputTruncated) {
-    throw new Error('Could not check running Orca instances')
+    throw new Error(`Could not check running ${APP_DISPLAY_NAME} instances`)
   }
   return parseMacUpdateRunningInstances(result.stdout, currentPid)
 }

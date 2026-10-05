@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, open, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import {
 } from './worktree-create-preparation'
 import { unlockWorktreePreparation } from './worktree-preparation-lock'
 import { readWorktreeList } from './worktree-list-reader'
+import { areWorktreePathsEqual } from './worktree-path-comparison'
 import {
   _resetPreparationPoolForTests,
   listPreparations,
@@ -36,6 +37,7 @@ async function fixture(
   roots.push(root)
   const repo = join(root, repoName)
   await git(root, ['init', '--quiet', repo])
+  await git(repo, ['config', 'core.autocrlf', 'input'])
   await git(repo, ['symbolic-ref', 'HEAD', 'refs/heads/main'])
   await writeFile(join(repo, 'tracked.txt'), 'original\n')
   await git(repo, ['add', 'tracked.txt'])
@@ -167,7 +169,15 @@ it('resolves a relative gitfile and retains a competing unlock marker', async ()
   const reason = createWorktreePreparationLockReason('relative')
   await prepareWorktreeCreateCheckout(repo, prepared, 'main', reason)
   const adminDir = await git(prepared, ['rev-parse', '--git-dir'])
-  await writeFile(join(prepared, '.git'), `gitdir: ${relative(prepared, adminDir)}\n`)
+  // Git hides this Windows file; r+ keeps its attributes and avoids CREATE_ALWAYS.
+  const gitfile = await open(join(prepared, '.git'), 'r+')
+  try {
+    const content = `gitdir: ${relative(prepared, adminDir)}\n`
+    await gitfile.writeFile(content)
+    await gitfile.truncate(Buffer.byteLength(content))
+  } finally {
+    await gitfile.close()
+  }
   const lock = join(adminDir, 'locked')
   await writeFile(lock, 'manual user lock\n')
   await expect(unlockWorktreePreparation(prepared, reason, {})).rejects.toThrow(
@@ -205,13 +215,14 @@ it('preserves a competing marker and registration through preparation failure an
   await _resetPreparationPoolForTests()
   expect(await readFile(lock, 'utf8')).toBe('manual competing preparation\n')
   expect(await readFile(join(prepared, 'tracked.txt'), 'utf8')).toBe('original\n')
-  expect(await readWorktreeList(repo)).toContainEqual(
-    expect.objectContaining({
-      path: prepared,
-      locked: true,
-      lockReason: 'manual competing preparation'
-    })
+  const registration = (await readWorktreeList(repo)).filter((row) =>
+    areWorktreePathsEqual(row.path, prepared)
   )
+  expect(registration).toHaveLength(1)
+  expect(registration[0]).toMatchObject({
+    locked: true,
+    lockReason: 'manual competing preparation'
+  })
 })
 
 it('claims the marker before materialization and preserves a competing owner after add', async () => {

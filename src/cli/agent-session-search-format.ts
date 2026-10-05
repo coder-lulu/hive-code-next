@@ -84,7 +84,9 @@ function formatUnavailable(
     return 'Session search is off on this host.'
   }
   if (reason === 'unsupported-agent') {
-    return 'This host does not support history search for the selected agent. Update Orca on that host or select another agent.'
+    return applyProductBranding(
+      'This host does not support history search for the selected agent. Update Orca on that host or select another agent.'
+    )
   }
   // The CLI scopes with --path, never with an identity, so this only reaches a
   // caller that built a request by hand.

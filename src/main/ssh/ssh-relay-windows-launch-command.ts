@@ -8,6 +8,7 @@
  * user's network logon, so it runs only when the launcher is unavailable (a relay built without
  * the addon, or a job that refuses breakaway), and a refusal there is reported as one.
  */
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   RELAY_WINDOWS_BREAKAWAY_ARGS_FLAG,
   RELAY_WINDOWS_BREAKAWAY_EXIT_CODES,
@@ -121,7 +122,7 @@ export function classifyWindowsRelayLaunchError(error: unknown): unknown {
   }
   const detail = refusal.slice(refusal.indexOf(WINDOWS_RELAY_LAUNCH_REFUSED_MARKER)).trim()
   return new Error(
-    `The Windows host refused to start Orca's relay outside the SSH session. ${detail}`,
+    `The Windows host refused to start ${APP_DISPLAY_NAME}'s relay outside the SSH session. ${detail}`,
     { cause: error }
   )
 }

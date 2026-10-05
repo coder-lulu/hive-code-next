@@ -1,4 +1,5 @@
 /** Turns one ladder step into a relay plan, or a classified refusal the ladder steps past. */
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { SshConnection } from './ssh-connection'
 import { planHostNodeAddonRelay, type PrebuiltRelayPlan } from './ssh-relay-host-node-addons'
 import {
@@ -60,7 +61,7 @@ export async function planRelayRuntimeStep(
       if (plan.kind === 'host-node') {
         throw new PinnedRelayFallbackError(
           plan.fallbackReason ?? 'artifacts_unavailable',
-          'Orca-managed Node cannot run here',
+          `${APP_DISPLAY_NAME}-managed Node cannot run here`,
           plan.remembered === true
         )
       }

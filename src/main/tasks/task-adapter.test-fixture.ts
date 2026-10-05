@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { vi } from 'vitest'
 import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { TaskExecutionHost, type TaskExecutionHostDependencies } from './task-execution-host'
 import { startLocalTaskTransport } from './local-task-transport'
 import { createLocalTaskServiceCredential } from './local-task-service-credential'
@@ -111,6 +112,7 @@ export async function taskAdapterFixture() {
     async close() {
       await transport.close()
       await host.drain()
+      closeTestJournalHostDatabase(directory)
       await rm(directory, { recursive: true, force: true })
     }
   }

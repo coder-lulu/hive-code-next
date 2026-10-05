@@ -9,6 +9,7 @@ import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-ad
 import { isAgentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
 import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 
 const NOW = 1_800_000_000_000
 const SOURCE = 'session-alpha'
@@ -22,6 +23,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 

@@ -8,6 +8,7 @@ import '@testing-library/jest-dom/vitest'
 
 import { cleanup, render } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type {
   AgentJournalItemBody,
   AgentJournalRenderItem,
@@ -290,7 +291,9 @@ describe('a message the host rejected after a crash, with no outbox entry left',
       'WORKING',
       'ACTIVITY'
     ])
-    expect(container.textContent).toContain('Orca restarted before this message was sent.')
+    expect(container.textContent).toContain(
+      `${APP_DISPLAY_NAME} restarted before this message was sent.`
+    )
     expect(container.querySelector('button[aria-label="Retry"]')).toBeNull()
     expect(
       [...container.querySelectorAll('button')].map((button) => button.textContent)

@@ -1,3 +1,4 @@
+import { applyProductCliBranding } from '../../shared/brand'
 import { GLOBAL_FLAGS, type CommandSpec } from '../args'
 
 // Why: the desktop "Add account" button is disabled when the UI drives a remote
@@ -17,7 +18,9 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'Codex uses device authorization so the browser can complete sign-in from a different machine.',
       'OpenCode 2 uses `opencode auth login --standalone` in private XDG directories. Devin uses `devin auth login --force-manual-token-flow`.',
       'Use --integration <id> to skip the OpenCode integration picker; --label names the saved OpenCode or Devin profile.',
-      'OpenCode and Devin profiles apply to new explicit host agent launches. Direct SSH relay and Windows-hosted WSL selection are not supported; run the command on a headless Orca runtime on that host.',
+      applyProductCliBranding(
+        'OpenCode and Devin profiles apply to new explicit host agent launches. Direct SSH relay and Windows-hosted WSL selection are not supported; run the command on a headless Orca runtime on that host.'
+      ),
       'Sign in with the account you want to add (e.g. use a private/incognito browser window for a second account).',
       '--agent defaults to claude. Requires the HiveCode runtime to be running on this machine.'
     ],

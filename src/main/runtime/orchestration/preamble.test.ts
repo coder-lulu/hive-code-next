@@ -3,6 +3,7 @@ import remarkParse from 'remark-parse'
 import { unified } from 'unified'
 import { describe, expect, it } from 'vitest'
 import { buildDispatchPreamble } from './preamble'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 
 function baseParams(overrides: Partial<Parameters<typeof buildDispatchPreamble>[0]> = {}) {
   return {
@@ -399,7 +400,7 @@ describe('how the preamble names the worker and its coordinator, by kind', () =>
   const SESSION_COORD = 'orca_session_id:4a1f6c2e-8b3d-4e7a-9c15-0d2b6e8f1a37'
   const SESSION_WORKER = 'orca_session_id:7e3b9d15-2c4a-4f86-a0b1-5c9e2d7f3b64'
   const header = (preamble: string) => preamble.slice(0, preamble.indexOf('\n\n'))
-  const FIRST = 'You are working inside Orca, a multi-agent IDE. You are a dispatched worker.'
+  const FIRST = `You are working inside ${APP_DISPLAY_NAME}, a multi-agent IDE. You are a dispatched worker.`
 
   it('names terminals by their handle, with no line about the worker itself', () => {
     expect(header(buildDispatchPreamble(baseParams()))).toBe(
@@ -413,17 +414,17 @@ describe('how the preamble names the worker and its coordinator, by kind', () =>
     )
 
     expect(header(preamble)).toBe(
-      `${FIRST}\nYour coordinator's Orca session ID is: ${SESSION_COORD}\nYour task ID is: task_abc123\nYour Orca session ID is: ${SESSION_WORKER}`
+      `${FIRST}\nYour coordinator's ${APP_DISPLAY_NAME} session ID is: ${SESSION_COORD}\nYour task ID is: task_abc123\nYour ${APP_DISPLAY_NAME} session ID is: ${SESSION_WORKER}`
     )
     expect(cliFence(preamble)).toContain(`--from ${SESSION_WORKER} `)
   })
 
   it("follows each party's own kind when a session and a terminal meet", () => {
     expect(header(buildDispatchPreamble(baseParams({ workerHandle: SESSION_WORKER })))).toBe(
-      `${FIRST}\nYour coordinator's terminal handle is: term_coord\nYour task ID is: task_abc123\nYour Orca session ID is: ${SESSION_WORKER}`
+      `${FIRST}\nYour coordinator's terminal handle is: term_coord\nYour task ID is: task_abc123\nYour ${APP_DISPLAY_NAME} session ID is: ${SESSION_WORKER}`
     )
     expect(header(buildDispatchPreamble(baseParams({ coordinatorHandle: SESSION_COORD })))).toBe(
-      `${FIRST}\nYour coordinator's Orca session ID is: ${SESSION_COORD}\nYour task ID is: task_abc123`
+      `${FIRST}\nYour coordinator's ${APP_DISPLAY_NAME} session ID is: ${SESSION_COORD}\nYour task ID is: task_abc123`
     )
   })
 
@@ -433,7 +434,7 @@ describe('how the preamble names the worker and its coordinator, by kind', () =>
 
     expect(
       session
-        .replace(`\nYour Orca session ID is: ${SESSION_WORKER}`, '')
+        .replace(`\nYour ${APP_DISPLAY_NAME} session ID is: ${SESSION_WORKER}`, '')
         .split(SESSION_WORKER)
         .join('term_worker')
     ).toBe(terminal)

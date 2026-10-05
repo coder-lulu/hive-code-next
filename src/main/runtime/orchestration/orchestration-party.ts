@@ -1,4 +1,5 @@
 // The one place an orchestration address becomes a party, so no two sites can disagree on who it names.
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import {
   formatOrcaSessionAddress,
   isOrcaSessionId,
@@ -95,7 +96,7 @@ export function resolveDeclaredCallerParty(
   if (party.terminalHandle === null) {
     throw new OrchestrationError(
       CODES.chatNotDeclarable,
-      `Agent session ${party.orcaSessionId} is a chat, and a chat is identified only by the Orca session ID its own environment sends, never by naming it. No effects were applied.`,
+      `Agent session ${party.orcaSessionId} is a chat, and a chat is identified only by the ${APP_DISPLAY_NAME} session ID its own environment sends, never by naming it. No effects were applied.`,
       NO_EFFECTS
     )
   }

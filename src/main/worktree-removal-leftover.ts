@@ -1,5 +1,6 @@
 import { lstat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 import { listWorktreesStrict } from './git/worktree'
 import { getErrorCode } from './git/worktree-operation-options'
 import { areWorktreePathsEqual } from './git/worktree-path-comparison'
@@ -30,7 +31,7 @@ export async function isUnregisteredRemovalLeftover(
 /** The refusal when the path no longer holds the removed checkout's own leftover. */
 export function differentCheckoutAtPathError(worktreePath: string): Error {
   return new Error(
-    `A different checkout is now at ${worktreePath}; Orca left it in place. Delete it again to remove it.`
+    `A different checkout is now at ${worktreePath}; ${APP_DISPLAY_NAME} left it in place. Delete it again to remove it.`
   )
 }
 

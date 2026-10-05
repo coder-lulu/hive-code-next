@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { useAppStore } from '../../store'
 import type { ZcodePlanCredentialsStatus } from '../../../../shared/zcode-plan-sites'
 
@@ -52,7 +53,7 @@ export function useZcodePlanCredentials(updatedAt: number | undefined) {
         typeof next.zcodeCliConfigured !== 'boolean'
       ) {
         throw new Error(
-          'GLM Coding Plan keys can only be changed in the desktop app on the computer running Orca.'
+          `GLM Coding Plan keys can only be changed in the desktop app on the computer running ${APP_DISPLAY_NAME}.`
         )
       }
       setStatus(next)

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   formatRelayWindowsLaunchReport,
   parseRelayWindowsLaunchReport,
@@ -76,8 +77,10 @@ describe('classifyWindowsRelayLaunchError', () => {
     if (!(classified instanceof Error)) {
       throw new Error('expected an Error')
     }
-    expect(classified.message).toMatch(
-      /^The Windows host refused to start Orca's relay outside the SSH session\. ORCA_RELAY_LAUNCH_REFUSED: .*addon-missing.*Access denied\)$/u
+    const prefix = `The Windows host refused to start ${APP_DISPLAY_NAME}'s relay outside the SSH session. `
+    expect(classified.message.startsWith(prefix)).toBe(true)
+    expect(classified.message.slice(prefix.length)).toMatch(
+      /^ORCA_RELAY_LAUNCH_REFUSED: .*addon-missing.*Access denied\)$/u
     )
     expect(classified.message).not.toContain('EncodedCommand')
   })

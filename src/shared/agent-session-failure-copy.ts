@@ -60,10 +60,12 @@ export const AGENT_SESSION_FAILURE_COPY = {
     "An attachment on this message couldn't be read, so the message was not sent.",
   emptyMessage: 'This message is empty, so it was not sent.',
   queueFull: 'Too many messages were waiting for the agent, so this one was not sent.',
-  writeFailed: "Orca couldn't hand this message to the agent, so it was not sent.",
+  writeFailed: applyProductBranding(
+    "Orca couldn't hand this message to the agent, so it was not sent."
+  ),
   cancelled: 'This message was withdrawn before the agent started it.',
   chatClosed: 'The chat closed before this message was sent.',
-  hostRestarted: 'Orca restarted before this message was sent.',
+  hostRestarted: applyProductBranding('Orca restarted before this message was sent.'),
   notDelivered: 'This message was not delivered.',
   notDeliveredSendAgain: 'This message was not delivered. Send it again to continue.',
   commandRefused: "This command didn't run.",
@@ -76,9 +78,11 @@ export const AGENT_SESSION_FAILURE_COPY = {
   stopRefusedQuoted: "{{agent}} didn't stop: {{detail}}.",
   noTurnToStop: '{{agent}} had no turn running to stop.',
   answerUnconfirmed: 'Your answer was recorded but the agent did not confirm it.',
-  hostFault: "Orca ran into a problem, so this didn't go through.",
-  hostFaultTryAgain: "Orca ran into a problem, so this didn't go through. Try again.",
-  hostStopped: '{{agent}} never finished starting, so Orca stopped it.',
+  hostFault: applyProductBranding("Orca ran into a problem, so this didn't go through."),
+  hostFaultTryAgain: applyProductBranding(
+    "Orca ran into a problem, so this didn't go through. Try again."
+  ),
+  hostStopped: applyProductBranding('{{agent}} never finished starting, so Orca stopped it.'),
   providerRateLimited: '{{agent}} is rate-limited and retrying.',
   providerRetrying: '{{agent}} hit a temporary problem and is retrying.',
   providerRetryingQuoted: '{{agent}} is retrying: {{detail}}.',
@@ -107,7 +111,7 @@ export type AgentSessionFailureSay = (
 export const sayAgentSessionFailureEnglish: AgentSessionFailureSay = (id, values = {}) => {
   const filled = new Map(Object.entries(values))
   // One pass over the template, so a provider's words are never read as a placeholder.
-  return applyProductBranding(AGENT_SESSION_FAILURE_COPY[id]).replace(
+  return AGENT_SESSION_FAILURE_COPY[id].replace(
     /\{\{(\w+)\}\}/g,
     (placeholder, name: string) => filled.get(name) ?? placeholder
   )

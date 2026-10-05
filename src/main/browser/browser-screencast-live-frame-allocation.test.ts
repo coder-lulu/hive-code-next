@@ -76,15 +76,15 @@ describe('live screencast image allocation', () => {
     const fixtures = [
       {
         format: 'png',
-        path: 'docs/site/public/docs/remote-server-add-client.png',
-        width: 832,
-        height: 832
+        path: 'resources/build/icon.png',
+        width: 1024,
+        height: 1024
       },
       {
         format: 'jpeg',
-        path: 'docs/site/public/docs/posters/file-drag.jpg',
+        path: 'resources/onboarding/feature-wall/tile-12.poster.jpg',
         width: 1200,
-        height: 682
+        height: 676
       }
     ] as const
     const captures = fixtures.map((fixture) => {
@@ -138,7 +138,7 @@ describe('live screencast image allocation', () => {
 
   it('owns pooled and offset images through refused sends and keeps encoded bytes independent', async () => {
     vi.useFakeTimers()
-    const bytes = readFileSync(resolve('resources/tray/orca-menu-barTemplate.png'))
+    const bytes = readFileSync(resolve('resources/tray/hivecode-menu-barTemplate.png'))
     const data = bytes.toString('base64')
     const expectedDigest = digest(bytes)
     const pooled = Buffer.from(data, 'base64')

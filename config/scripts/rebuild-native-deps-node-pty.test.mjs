@@ -46,7 +46,7 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
           { trackfileaccess: 'true' },
           { tRaCkFiLeAcCeSs: 'false' }
         ]) {
-          const result = runRebuildScript(projectDir, { ...env, ...override })
+          const result = runRebuildScript(projectDir, { ...env, ...override }, ['--force'])
           expect(result.status, result.stderr).toBe(0)
         }
 

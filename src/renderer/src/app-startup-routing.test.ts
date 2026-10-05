@@ -425,13 +425,21 @@ describe('renderer startup runtime routing', () => {
     expect(reconnectIndex).toBeGreaterThan(capabilityIndex)
   })
 
-  it('skips startup structured tab projection while the host setting is off', () => {
+  it('routes startup structured tab projection through the local chat owner', () => {
     const source = readSource(TERMINAL_RESTORE_PATH)
+    const restoreIndex = source.indexOf('await restoreLocalStructuredChatsAtStartup(')
     const projectIndex = source.indexOf("timeRendererStartupStep('project-structured-session-tabs'")
 
-    expect(projectIndex).toBeGreaterThanOrEqual(0)
-    expect(source.slice(projectIndex - 180, projectIndex)).toContain(
-      'settings?.experimentalStructuredNativeChat === true'
+    expect(restoreIndex).toBeGreaterThanOrEqual(0)
+    expect(projectIndex).toBeGreaterThan(restoreIndex)
+    expect(source.slice(restoreIndex, projectIndex)).toContain(
+      'restoreLocalStructuredChatsAtStartup(useAppStore.getState().settings, (restore) =>'
+    )
+    expect(source.slice(projectIndex)).toContain(
+      "timeRendererStartupStep('project-structured-session-tabs', restore)"
+    )
+    expect(source).not.toContain(
+      'if (useAppStore.getState().settings?.experimentalStructuredNativeChat === true)'
     )
   })
 
@@ -443,7 +451,7 @@ describe('renderer startup runtime routing', () => {
 
     expect(probeIndex).toBeGreaterThanOrEqual(0)
     // Why pinned here: the structured-session-tabs sync is the cache's only other writer and it
-    // waits for workspaceSessionReady + terminalStartupRestorationReady + the experimental flag.
+    // waits for workspaceSessionReady + terminalStartupRestorationReady + local chats in use.
     // Every resolveAgentLaunchRoute reader — including the three that cannot await — reads an
     // unanswered cache as "unsupported", so a create in that window degrades to a bare
     // terminal (#19154). The probe must therefore start before the chain and outside its gates.

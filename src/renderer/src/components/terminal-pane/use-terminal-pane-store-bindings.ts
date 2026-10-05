@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../../store'
 import { useLinkRoutingPreferenceDialog } from '@/components/link-routing-preference-dialog'
 import { isWindowsUserAgent } from './pane-helpers'
@@ -32,9 +33,10 @@ export function useTerminalPaneStoreBindings(controller: TerminalPaneChatControl
   const expectedLayoutLeafIdsAttr =
     expectedLayoutLeafIds.length > 0 ? expectedLayoutLeafIds.join(' ') : undefined
   const initialLayoutRef = useRef(restoredLayout)
-  const settings = useAppStore((store) => store.settings)
+  const { settings, keybindings } = useAppStore(
+    useShallow((store) => ({ settings: store.settings, keybindings: store.keybindings }))
+  )
   const requestLinkRoutingPreference = useLinkRoutingPreferenceDialog()
-  const keybindings = useAppStore((store) => store.keybindings)
   const rightClickToPaste = settings?.terminalRightClickToPaste ?? isWindowsUserAgent()
   const forceBracketedMultilineTextPaste = isWindowsUserAgent()
   const [startup] = useState(() => useAppStore.getState().pendingStartupByTabId[tabId])

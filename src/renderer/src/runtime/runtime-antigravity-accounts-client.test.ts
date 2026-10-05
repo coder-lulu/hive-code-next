@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { callAntigravityAccounts } from './runtime-antigravity-accounts-client'
 import { assertRuntimeEnvironmentCapability, callRuntimeRpc } from './runtime-rpc-client'
+import { ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('./runtime-rpc-client', () => ({
   assertRuntimeEnvironmentCapability: vi.fn(),
@@ -24,6 +26,11 @@ describe('Antigravity account execution-host routing', () => {
         'account-a'
       )
     ).rejects.toThrow('old host unsupported')
+    expect(assertRuntimeEnvironmentCapability).toHaveBeenCalledWith(
+      'host-a',
+      ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY,
+      `This execution host does not support native Antigravity Accounts yet. Update ${APP_DISPLAY_NAME} on that host.`
+    )
     expect(callRuntimeRpc).not.toHaveBeenCalled()
   })
 

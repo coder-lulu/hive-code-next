@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createLocalTmuxManagedPtyResolver } from './local-tmux-managed-pty'
 import type { PtyProcessInfo } from '../providers/types'
 
@@ -10,11 +10,27 @@ const row: PtyProcessInfo = {
   title: 'shell',
   worktreeId: 'folder:workspace'
 }
+const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+if (!originalPlatform) {
+  throw new Error('process.platform descriptor is unavailable')
+}
+
+beforeEach(() => {
+  Object.defineProperty(process, 'platform', { ...originalPlatform, value: 'linux' })
+})
 afterEach(() => {
+  Object.defineProperty(process, 'platform', originalPlatform)
   vi.useRealTimers()
 })
 
 describe('authenticated local tmux root resolution', () => {
+  it('refuses Windows roots before capturing POSIX daemon inventory', async () => {
+    Object.defineProperty(process, 'platform', { ...originalPlatform, value: 'win32' })
+    const listProcesses = vi.fn(async () => [row])
+    const resolve = createLocalTmuxManagedPtyResolver({ getPtyId: () => 'pty', listProcesses })
+    expect(await resolve('pane')).toBeNull()
+    expect(listProcesses).not.toHaveBeenCalled()
+  })
   it('shares inventory captures and accepts only the current daemon binding', async () => {
     const listProcesses = vi.fn(async () => [row])
     const resolve = createLocalTmuxManagedPtyResolver({ getPtyId: () => 'pty', listProcesses })

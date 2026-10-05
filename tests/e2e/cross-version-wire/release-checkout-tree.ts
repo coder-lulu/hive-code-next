@@ -3,6 +3,7 @@ import { dirname, join, relative } from 'node:path'
 
 const CHECKOUT_PROCESS_TIMEOUT_MS = 45_000
 const CHECKOUT_MAX_OUTPUT_BYTES = 1024 * 1024
+const CHECKOUT_SOURCE_WORKERS = 8
 
 // Why: the wire endpoints only need the runtime RPC host, the renderer client, and
 // the shared codec. Skipping cli/relay keeps a cold CI extraction a few seconds.
@@ -15,10 +16,12 @@ const ARCHIVE_PATHS = [
   'src/types',
   'mobile/src/worktree/agent-row-display.ts'
 ]
-// The tree preparation removes these too; skip thousands of Windows writes before that walk.
-const TAR_TEST_EXCLUDES = ['test', 'bench', 'spec'].flatMap((kind) =>
-  ['ts', 'tsx'].map((extension) => `--exclude=*.${kind}.${extension}`)
+// The tree preparation removes these too; avoid archiving and extracting discarded tests.
+const TEST_SOURCE_SUFFIXES = ['test', 'bench', 'spec'].flatMap((kind) =>
+  ['ts', 'tsx'].map((extension) => `.${kind}.${extension}`)
 )
+const ARCHIVE_TEST_EXCLUDES = TEST_SOURCE_SUFFIXES.map((suffix) => `:(glob,exclude)**/*${suffix}`)
+const TAR_TEST_EXCLUDES = TEST_SOURCE_SUFFIXES.map((suffix) => `--exclude=*${suffix}`)
 
 const ALIAS_SPECIFIER =
   /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(['"])@(renderer)?\/([^'"]+)\2/g
@@ -57,6 +60,7 @@ async function rewriteRendererAliases(file: string, rendererRoot: string): Promi
 
 async function prepareExtractedTree(root: string): Promise<void> {
   const rendererRoot = join(root, 'src', 'renderer', 'src')
+  const files: string[] = []
   const walk = async (directory: string): Promise<void> => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const full = join(directory, entry.name)
@@ -64,20 +68,41 @@ async function prepareExtractedTree(root: string): Promise<void> {
         await walk(full)
         continue
       }
-      if (!entry.isFile()) {
-        continue
-      }
-      // Why: stale specs must not enter repo-wide tool walks through the cache.
-      if (isTestSource(entry.name)) {
-        await rm(full)
-        continue
-      }
-      if (isRewritableSource(entry.name)) {
-        await rewriteRendererAliases(full, rendererRoot)
+      if (entry.isFile()) {
+        files.push(full)
       }
     }
   }
   await walk(join(root, 'src'))
+  let nextFile = 0
+  let failed = false
+  let failure: unknown
+  const prepare = async (): Promise<void> => {
+    while (!failed) {
+      const full = files[nextFile++]
+      if (full === undefined) {
+        return
+      }
+      try {
+        // Why: stale specs must not enter repo-wide tool walks through the cache.
+        if (isTestSource(full)) {
+          await rm(full)
+        } else if (isRewritableSource(full)) {
+          await rewriteRendererAliases(full, rendererRoot)
+        }
+      } catch (error) {
+        if (!failed) {
+          failed = true
+          failure = error
+        }
+      }
+    }
+  }
+  // Settle issued writes before the materializer removes staging or releases its lock.
+  await Promise.all(Array.from({ length: CHECKOUT_SOURCE_WORKERS }, prepare))
+  if (failed) {
+    throw failure
+  }
 }
 
 function checkoutTarProgram(): string {
@@ -125,7 +150,15 @@ export async function extractReleaseCheckoutTree(
     await runCheckoutProcess(
       repoRoot,
       'git',
-      ['archive', '--format=tar', `--output=${archive}`, commit, '--', ...archivePaths],
+      [
+        'archive',
+        '--format=tar',
+        `--output=${archive}`,
+        commit,
+        '--',
+        ...archivePaths,
+        ...ARCHIVE_TEST_EXCLUDES
+      ],
       deadline
     )
     await runCheckoutProcess(

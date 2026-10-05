@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { waitForPromiseWithSignal } from '../../shared/abort-signal-reason'
 import { pinnedNodeRuntimeAsset, type NodeRuntimeTarget } from '../../shared/node-runtime-pin'
@@ -33,7 +34,7 @@ export async function preparePinnedNodeForVault(options: {
   const target = pinnedRuntimeTargetForHost(facts)
   if (!target) {
     const glibc = facts.glibc ? `${facts.glibc.major}.${facts.glibc.minor}` : 'unknown'
-    throw new Error(`No Orca-managed Node runs on this host's glibc ${glibc}`)
+    throw new Error(`No ${APP_DISPLAY_NAME}-managed Node runs on this host's glibc ${glibc}`)
   }
   const cacheRoot =
     options.cacheRoot ?? join(getAppEnvironment().getPath('userData'), 'orcad-artifacts')

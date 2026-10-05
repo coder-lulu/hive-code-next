@@ -1,4 +1,5 @@
 import type { GitStatusEntry, GitStatusResult } from '../../shared/git-status-types'
+import { APP_DISPLAY_NAME, applyProductBranding } from '../../shared/brand'
 import type { RuntimeFileOpenResult, RuntimeWorktreeRecord } from '../../shared/runtime-types'
 import type { RuntimeNavigationTarget } from '../../shared/runtime-navigation'
 import { isRuntimePathAbsolute, relativePathInsideRoot } from '../../shared/cross-platform-path'
@@ -196,8 +197,14 @@ function requireOpened(result: RuntimeFileOpenResult, target: string): void {
   if (!result.opened) {
     throw new RuntimeClientError(
       'file_not_opened',
-      `Did not open ${target}: the Orca app declined this ${result.kind} file.`,
-      { nextSteps: ['Update the Orca app, which opens every file type the File Explorer does.'] }
+      `Did not open ${target}: the ${APP_DISPLAY_NAME} app declined this ${result.kind} file.`,
+      {
+        nextSteps: [
+          applyProductBranding(
+            'Update the Orca app, which opens every file type the File Explorer does.'
+          )
+        ]
+      }
     )
   }
 }

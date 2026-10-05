@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as CODES } from '../../../shared/orchestration-session-caller-codes'
 import {
   mintStructuredWorkerHandle,
@@ -86,8 +87,10 @@ describe('orchestration.callerShow: a session learns its Orca session ID from th
     const checked = resultOf(await asX('orchestration.check', { all: true, format: true }))
 
     expect(shown).toEqual({ caller: { orcaSessionId: ADDRESS_Y, live: true } })
-    expect(preamble).toContain(`Your coordinator's Orca session ID is: ${ADDRESS_X}\n`)
-    expect(preamble).toContain(`Your Orca session ID is: ${ADDRESS_Y}\n`)
+    expect(preamble).toContain(
+      `Your coordinator's ${APP_DISPLAY_NAME} session ID is: ${ADDRESS_X}\n`
+    )
+    expect(preamble).toContain(`Your ${APP_DISPLAY_NAME} session ID is: ${ADDRESS_Y}\n`)
     expect(preamble).not.toContain(handle)
     // Storage is unchanged: the mail it sends as either spelling is keyed by its minted handle.
     expect(checked.messages).toEqual([expect.objectContaining({ from_handle: handle })])
@@ -152,12 +155,19 @@ describe('orchestration.callerShow: a session learns its Orca session ID from th
     }
   })
 
-  it('refuses an id that is not an Orca session ID', async () => {
+  it('refuses an id that is not a product session ID', async () => {
     const response = await h.dispatch(
       orchestrationRequest('orchestration.sessionAddress', { sessionId: 'not an id' })
     )
 
-    expect(response).toMatchObject({ ok: false, error: { code: CODES.unknown } })
+    expect(response).toMatchObject({
+      ok: false,
+      error: {
+        code: CODES.unknown,
+        message: `not an id is not a ${APP_DISPLAY_NAME} session ID.`,
+        data: { effectsApplied: false }
+      }
+    })
   })
 
   it('answers null for a caller whose environment carries no identity', async () => {

@@ -22,8 +22,26 @@ beforeAll(async () => {
   if (!main?.build) {
     throw new Error('Expected main-process build config')
   }
+  // This isolated credential entry uses production compilation, not the separate Pi asset packs.
+  const runtimeAssetPluginNames = ['hive-managed-pi-pack-build', 'hive-native-pi-build']
+  const omittedAssetPlugins: string[] = []
+  const plugins = main.plugins?.filter((plugin) => {
+    if (
+      plugin &&
+      typeof plugin === 'object' &&
+      'name' in plugin &&
+      typeof plugin.name === 'string' &&
+      runtimeAssetPluginNames.includes(plugin.name)
+    ) {
+      omittedAssetPlugins.push(plugin.name)
+      return false
+    }
+    return true
+  })
+  expect(omittedAssetPlugins.toSorted()).toEqual(runtimeAssetPluginNames.toSorted())
   await build({
     ...main,
+    plugins,
     logLevel: 'silent',
     build: {
       ...main.build,

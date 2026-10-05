@@ -1,4 +1,5 @@
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { PreloadApi } from '../../../../preload/api-types'
 
 export function createMiniMaxCredentialsApi(): NonNullable<
@@ -33,7 +34,7 @@ export function createZcodePlanCredentialsApi(): PreloadApi['zcodePlanCredential
   const unsupported = () =>
     Promise.reject(
       new Error(
-        'GLM Coding Plan keys can only be changed in the desktop app on the computer running Orca.'
+        `GLM Coding Plan keys can only be changed in the desktop app on the computer running ${APP_DISPLAY_NAME}.`
       )
     )
   return {

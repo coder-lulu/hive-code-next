@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { formatOrcaSessionAddress, type OrcaSessionId } from '../../../shared/orca-session-address'
 import { testOrcaSessionId } from '../../../shared/orca-session-address-test-fixture'
 import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as CODES } from '../../../shared/orchestration-session-caller-codes'
@@ -201,7 +202,11 @@ describe('every session-to-party step goes through the canonical session id', ()
     })
     expect(response).toMatchObject({
       ok: false,
-      error: { code: CODES.chatNotDeclarable, message: expect.stringContaining(SESSION_X) }
+      error: {
+        code: CODES.chatNotDeclarable,
+        message: `Agent session ${SESSION_X} is a chat, and a chat is identified only by the ${APP_DISPLAY_NAME} session ID its own environment sends, never by naming it. No effects were applied.`,
+        data: { effectsApplied: false }
+      }
     })
   })
 })

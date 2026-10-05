@@ -57,6 +57,7 @@ describe('localized workspace and agent summary copy', () => {
           [paneKey]: { paneKey, state: 'working', restoredUnconfirmed: true }
         },
         tabsByWorktree: { wt: [{ id: 'tab', title: 'Codex' }] },
+        unifiedTabsByWorktree: { wt: [] },
         terminalLayoutsByTabId: {},
         ptyIdsByTabId: {}
       } as unknown as RunningAgentTargetState

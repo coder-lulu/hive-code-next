@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
@@ -30,6 +30,28 @@ describe('immutable upstream compatibility baseline acquisition', () => {
     expect(() => resolveReleaseCheckoutCommit('v1.4.184', () => 'f'.repeat(40))).toThrow(
       'Pinned upstream release resolved to a different commit'
     )
+  })
+  it.each([
+    ['v1.4.205', '11aba8bdc5e492d3ba01fc7fe333495ace74128f'],
+    ['v1.4.211', '5534462b50c660888487a2108700d4cf284270db'],
+    ['v1.4.214', '7468e9cccb35a8494f76dc95a37627121113ee80'],
+    ['v1.4.218', '75ea50273328d9bd5465170d10a098711d61b5a4'],
+    ['3727100cc9dbcea6201f8a3e506676a3c4b53b18', '3727100cc9dbcea6201f8a3e506676a3c4b53b18'],
+    ['aac38d698ff75ac4c8658addab48ef5a83617619', 'aac38d698ff75ac4c8658addab48ef5a83617619'],
+    ['b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c', 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c'],
+    ['f97ca2a49d9c711dab54a656a7f8a47ae6c6749c', 'f97ca2a49d9c711dab54a656a7f8a47ae6c6749c']
+  ])('includes incoming baseline %s in exact-object preparation', async (ref, commit) => {
+    const { UPSTREAM_BASELINE_PINS, resolvePinnedUpstreamRef } = await load()
+    expect(resolvePinnedUpstreamRef(ref)).toBe(commit)
+    expect(Object.values(UPSTREAM_BASELINE_PINS)).toContain(commit)
+    const { resolveReleaseCheckoutCommit } =
+      await import('../../tests/e2e/cross-version-wire/release-checkout.ts')
+    expect(
+      resolveReleaseCheckoutCommit(ref, (args) => {
+        expect(args).toEqual(['rev-parse', `${commit}^{commit}`])
+        return `${commit}\n`
+      })
+    ).toBe(commit)
   })
   it('fetches only missing immutable objects from the exact upstream without tags or ref updates', async () => {
     const { prepareCrossVersionBaselines, UPSTREAM_BASELINE_PINS } = await load()
@@ -125,7 +147,16 @@ describe('immutable upstream compatibility baseline acquisition', () => {
     expect(prepare?.['continue-on-error']).toBeUndefined()
     expect(job.steps.indexOf(prepare)).toBeLessThan(job.steps.indexOf(test))
     expect(job.env.ORCA_CROSS_VERSION_BASELINE_REF).toBe(BASELINE_RELEASE)
-    expect(test.run).toContain('cross-version-browser-placement.unit.test.ts')
-    expect(test.run).toContain('reported-lossy-initial-snapshot.unit.test.ts')
+    expect(test.run).toBe(
+      'pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/'
+    )
+    for (const owner of [
+      'cross-version-browser-placement.unit.test.ts',
+      'reported-lossy-initial-snapshot.unit.test.ts'
+    ]) {
+      expect(
+        existsSync(new URL(`../../tests/e2e/cross-version-wire/${owner}`, import.meta.url))
+      ).toBe(true)
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { runtimeStub, rpcContext } from '../runtime/rpc/methods/agent-launch.test-fixture'
 import {
   AGENT_LAUNCH_RUNTIME_CAPABILITY,
@@ -18,8 +19,10 @@ let directory: string | undefined
 afterEach(async () => {
   installedHost.mockReset()
   if (directory) {
+    closeTestJournalHostDatabase(directory)
     await rm(directory, { recursive: true, force: true })
   }
+  directory = undefined
 })
 
 async function fixture() {

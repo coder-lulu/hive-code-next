@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type * as NodeRuntimeStore from './orcad-remote-node-runtime'
 
 const mocks = vi.hoisted(() => ({
@@ -89,7 +90,7 @@ describe('pinned Node for the SSH vault reader', () => {
     mocks.target.mockResolvedValue({ target: 'linux-arm64-glibc', glibc: { major: 2, minor: 17 } })
 
     await expect(prepare('linux-x64', vi.fn())).rejects.toThrow(
-      "No Orca-managed Node runs on this host's glibc 2.17"
+      `No ${APP_DISPLAY_NAME}-managed Node runs on this host's glibc 2.17`
     )
     expect(mocks.ensure).not.toHaveBeenCalled()
     expect(mocks.archive).not.toHaveBeenCalled()
