@@ -1,7 +1,3 @@
-import {
-  registerWindowsCloseRoot,
-  takeWindowsCloseProofRows
-} from './claude-real-cli-windows-close-diagnostics.test-fixture'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
@@ -69,7 +65,6 @@ afterEach(async () => {
   }
   try {
     if (diagnostics.length > 0) {
-      diagnostics.push({ startedAt: Date.now(), timeline: takeWindowsCloseProofRows() })
       const directory = join(
         process.cwd(),
         'logs/upstream-sync/20261005/repairs/real-claude-reaper-diagnostics',
@@ -113,14 +108,29 @@ function observedFailure(error: unknown): Record<string, unknown> {
   }
 }
 
+type ClaudeStreamDiagnostic = { type: string }
+
+function parseClaudeStreamDiagnostic(value: unknown): ClaudeStreamDiagnostic | undefined {
+  if (typeof value !== 'object' || value === null || !('type' in value)) {
+    return undefined
+  }
+  const type = value.type
+  return typeof type === 'string' ? { type } : undefined
+}
+
 function streamObjectType(value: unknown, key?: 'delta' | 'content_block'): string | undefined {
   if (typeof value !== 'object' || value === null) {
     return undefined
   }
-  const nested: unknown = key ? Reflect.get(value, key) : value
-  const kind: unknown =
-    typeof nested === 'object' && nested !== null ? Reflect.get(nested, 'type') : undefined
-  return typeof kind === 'string' ? kind : undefined
+  const nested =
+    key === undefined
+      ? value
+      : key === 'delta' && 'delta' in value
+        ? value.delta
+        : key === 'content_block' && 'content_block' in value
+          ? value.content_block
+          : undefined
+  return parseClaudeStreamDiagnostic(nested)?.type
 }
 
 function realAdapter(
@@ -194,7 +204,6 @@ function realAdapter(
         process.platform === 'win32' && rootPid !== undefined
           ? readWindowsProcessCreationTime(rootPid)
           : undefined
-      registerWindowsCloseRoot(rootPid, rootBirth)
       record({ type: 'owned-root', rootPid, rootBirth })
       const recordClose = (type: string, detail: Record<string, unknown> = {}) =>
         record({ type, rootPid, rootBirth, ...connection.exitVerdict, ...detail })

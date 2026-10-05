@@ -4,11 +4,11 @@
   "upstream": "stablyai/orca",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
-  "targetSha": "88cf6a67c722eafccfb29d5ba2a6d101fd7dffcf",
+  "targetSha": "662fd9aa4f1945ee94b19b09a2a64ed99f53db18",
   "baseTreeSha": "be3b3b0bd31532f0ab6a545744d7420848311b21",
   "upstreamTreeSha": "307815385c4bf005b093cf0115b73d9490720548",
-  "targetTreeSha": "b65a49aa61c05aed128fcb47355f4873e9575a27",
-  "mergedTreeSha": "b5c24c7aafeda8f7c527a4f5aa5a02212bb0d0d0",
+  "targetTreeSha": "f6d698b200be130bde8e17980915e882a09f779b",
+  "mergedTreeSha": "965165daf46b86f4f7fa6373a584c87869a68f03",
   "docs": {
     "path": "docs",
     "mode": "160000",
@@ -405,7 +405,7 @@
     }
   },
   "review": {
-    "frozenReviewBlobSha": "db0f5c085905aacce184ddc951987cbc3b4fa729",
+    "frozenReviewBlobSha": "b10d0ee0485e54f12c429ce14d7318017608969f",
     "conflictPaths": [
       ".github/workflows/adhoc-mac-build.yml",
       ".github/workflows/agent-state-rules-publish.yml",
@@ -989,6 +989,7 @@
       "config/scripts/windows-process-tree-creation-time.test.mjs",
       "config/scripts/windows-process-tree-gyp-rebuild.mjs",
       "config/toolchain.json",
+      "config/tsconfig.cli.json",
       "config/tsconfig.node.json",
       "config/upstream-change-ledger.json",
       "mobile/.oxlintrc.json",
