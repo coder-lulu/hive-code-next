@@ -17,9 +17,21 @@ describe('task Docker Codex policy', () => {
         request(method, {
           ...params,
           cwd: '/workspace',
+          modelProvider: 'hive-loopback',
           sandbox: 'workspace-write',
           approvalPolicy: 'never'
         })
+      )
+    }
+  })
+
+  it('pins the local broker provider and rejects native/provider substitutions', () => {
+    expect(() =>
+      guardTaskDockerCodexFrame(request('thread/start', { modelProvider: 'hive-loopback' }))
+    ).not.toThrow()
+    for (const modelProvider of ['openai', 'remote', '']) {
+      expect(() => guardTaskDockerCodexFrame(request('thread/start', { modelProvider }))).toThrow(
+        'TASK_DOCKER_POLICY_REFUSED'
       )
     }
   })

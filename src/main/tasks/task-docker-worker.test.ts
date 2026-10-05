@@ -5,6 +5,8 @@ import {
   startTaskDockerWorker,
   taskDockerCodexProcessSpec
 } from './task-docker-worker'
+import { createTaskDockerModelRpc } from './task-docker-model-rpc'
+import { createTaskDockerWorkerOutput } from './task-docker-worker-output'
 
 const streams: PassThrough[] = []
 afterEach(() => {
@@ -18,12 +20,55 @@ function inputFixture(providerHighWaterMark?: number) {
   const providerInput = new PassThrough({ highWaterMark: providerHighWaterMark })
   const output = new PassThrough({ highWaterMark: 1 })
   streams.push(input, providerInput, output)
-  const onFailure = vi.fn()
-  attachTaskDockerWorkerInput({ input, providerInput, output, onFailure, isClosed: () => false })
-  return { input, providerInput, output, onFailure }
+  let closed = false
+  const onFailure = vi.fn(() => {
+    closed = true
+  })
+  const writer = createTaskDockerWorkerOutput({ output, onFailure })
+  const modelRpc = createTaskDockerModelRpc({ write: writer.write, onFailure })
+  attachTaskDockerWorkerInput({
+    input,
+    providerInput,
+    output: writer,
+    modelRpc,
+    onFailure,
+    isClosed: () => closed
+  })
+  return { input, providerInput, output, onFailure, modelRpc }
 }
 
 describe('task Docker worker stream input', () => {
+  it('consumes only exact private responses before applying the ordinary provider guard', async () => {
+    const f = inputFixture()
+    f.output.resume()
+    const sent: string[] = []
+    f.providerInput.on('data', (chunk) => sent.push(chunk.toString()))
+    const privateFrames: string[] = []
+    f.output.on('data', (chunk) => privateFrames.push(chunk.toString()))
+    const pending = f.modelRpc.request('hive/model/start', {
+      requestId: 'synthetic',
+      bodyBase64: 'e30='
+    })
+    await vi.waitFor(() => expect(privateFrames).toHaveLength(1))
+    const id = JSON.parse(privateFrames[0]!).id
+    f.input.write(
+      `${JSON.stringify({ id, result: { status: 200 } })}\n{"id":1,"method":"initialize"}\n`
+    )
+    await expect(pending).resolves.toEqual({ status: 200 })
+    expect(sent.map((value) => JSON.parse(value))).toEqual([{ id: 1, method: 'initialize' }])
+    expect(f.onFailure).not.toHaveBeenCalled()
+  })
+
+  it('does not forward a forged private prefix response or its following ordinary request', () => {
+    const f = inputFixture()
+    f.providerInput.resume()
+    const sent = vi.fn()
+    f.providerInput.on('data', sent)
+    f.input.write('{"id":"hive-model-forged","result":{}}\n{"id":1,"method":"initialize"}\n')
+    expect(sent).not.toHaveBeenCalled()
+    expect(f.onFailure).toHaveBeenCalledTimes(1)
+  })
+
   it('waits for both independent pipe drains while preserving request order', async () => {
     const f = inputFixture(1)
     f.input.write(

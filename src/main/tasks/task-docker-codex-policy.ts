@@ -2,6 +2,7 @@ import { posix } from 'node:path'
 
 export const TASK_DOCKER_WORKSPACE = '/workspace'
 export const TASK_DOCKER_CODEX_HOME = '/home/hive/.codex'
+export const TASK_DOCKER_MODEL_PROVIDER = 'hive-loopback'
 export const TASK_DOCKER_COMMAND_TIMEOUT_MS = 30_000
 export const TASK_DOCKER_COMMAND_OUTPUT_BYTES = 1024 * 1024
 
@@ -151,7 +152,7 @@ export function guardTaskDockerCodexFrame(value: unknown): Record<string, unknow
     if (params.sandbox != null && params.sandbox !== 'workspace-write') {
       refuse()
     }
-    if (params.modelProvider != null && params.modelProvider !== 'openai') {
+    if (params.modelProvider != null && params.modelProvider !== TASK_DOCKER_MODEL_PROVIDER) {
       refuse()
     }
     if (
@@ -169,6 +170,7 @@ export function guardTaskDockerCodexFrame(value: unknown): Record<string, unknow
       params: {
         ...params,
         cwd: TASK_DOCKER_WORKSPACE,
+        modelProvider: TASK_DOCKER_MODEL_PROVIDER,
         sandbox: 'workspace-write',
         approvalPolicy: 'never'
       }
