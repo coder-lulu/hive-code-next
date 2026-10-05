@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "a7dff01e374c4c5c129819ffa9b3284755ed73e5",
+  "sourceProductSha": "2f618888be5832c17aba220a82340a86902de8aa",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -3643,6 +3643,34 @@
       ]
     },
     {
+      "path": "config/tsconfig.cli.json",
+      "base": {
+        "mode": "100644",
+        "sha": "2d41bdc44121e837a047d400fae7fc3516dce913"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "6afcf4f142f8af3296198d8f7a67b21ca47beadf"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "6afcf4f142f8af3296198d8f7a67b21ca47beadf"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4789affcabaa18e70f2f5d5e487057299555ac94"
+      },
+      "reason": "Explicitly list the ten actual K3 native-termination/Chromium-guard/crash-observability source dependencies required by the CLI composite project. Existing includes, composite and all compiler options are unchanged.",
+      "regressionTests": [
+        "src/main/claude/claude-structured-real-cli.test.ts",
+        "src/main/claude/claude-structured-real-cli-fold.test.ts",
+        "pnpm run audit:anti-slop",
+        "pnpm run audit:code-quality:native",
+        "pnpm run audit:code-quality:type-aware",
+        "pnpm run typecheck:cli"
+      ]
+    },
+    {
       "path": "config/tsconfig.node.json",
       "reason": "Admit exactly fifteen pure imported Mobile dependency files for composite Node program and explicit .ts/.mts import support under the existing noEmit typecheck; keep original include, composite and exclude policies. Declare the existing --noEmit Node typecheck policy for direct type-aware config readers; retain all owned esbuild/Electron Vite emission pipelines. TS5096 must be resolved without alternate configurations or weakened checks.",
       "regressionTests": ["pnpm run typecheck:node", "pnpm run audit:code-quality:type-aware"],
@@ -6069,7 +6097,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "e9a5218010d786b66875e6bd963325808179f016"
+        "sha": "fd3e03e83acf0c38131932e6d6877a313e5f6662"
       },
       "upstream": {
         "mode": "100644",
@@ -6793,15 +6821,16 @@
     },
     {
       "path": "src/main/claude/claude-real-cli-windows-close-diagnostics.test-fixture.ts",
-      "reason": "Extract bounded passthrough real Windows diagnostics using the existing mock/importOriginal pattern. A logs-only native package test override is absolute and capability-checked; real loader/gate/native implementation still executes. Record only captured own PID/birth, request outcome and exact fresh target state, not arbitrary machine processes, argv, credentials or private text.",
+      "reason": "Extract bounded passthrough real Windows diagnostics using the existing mock/importOriginal pattern. A logs-only native package test override is absolute and capability-checked; real loader/gate/native implementation still executes. Record only captured own PID/birth, request outcome and exact fresh target state, not arbitrary machine processes, argv, credentials or private text. Final K3 static repair: Delete temporary Proxy/Reflect/module-mocking diagnostic interception and isolated staged-native seam instead of relocating mocks or exempting the fixture. Existing real connection/exit events retain useful diagnostics.",
       "regressionTests": [
         "src/main/claude/claude-structured-real-cli.test.ts",
-        "src/main/claude/claude-structured-real-cli-fold.test.ts"
+        "src/main/claude/claude-structured-real-cli-fold.test.ts",
+        "pnpm run audit:anti-slop",
+        "pnpm run audit:code-quality:native",
+        "pnpm run audit:code-quality:type-aware",
+        "pnpm run typecheck:cli"
       ],
-      "result": {
-        "mode": "100644",
-        "sha": "6da60f93793e1e8652cf776f3ae74afe5dde6f21"
-      },
+      "result": null,
       "base": null,
       "product": {
         "mode": "100644",
@@ -6874,11 +6903,18 @@
     },
     {
       "path": "src/main/claude/claude-structured-real-cli-fold.test.ts",
-      "reason": "Load only the same test-owned staged-native passthrough fixture for the real fold owner. Its original one-turn proof, hook-before-init ordering, mid-turn sends, result UUID cardinality, budgets and closeAll are unchanged.",
-      "regressionTests": ["src/main/claude/claude-structured-real-cli-fold.test.ts"],
+      "reason": "Load only the same test-owned staged-native passthrough fixture for the real fold owner. Its original one-turn proof, hook-before-init ordering, mid-turn sends, result UUID cardinality, budgets and closeAll are unchanged. Final K3 static repair: Remove the deleted diagnostic fixture side-effect import so the real fold contract uses the normal installed native implementation. All original case code, assertions, prerequisites and budget are byte-identical.",
+      "regressionTests": [
+        "src/main/claude/claude-structured-real-cli-fold.test.ts",
+        "src/main/claude/claude-structured-real-cli.test.ts",
+        "pnpm run audit:anti-slop",
+        "pnpm run audit:code-quality:native",
+        "pnpm run audit:code-quality:type-aware",
+        "pnpm run typecheck:cli"
+      ],
       "result": {
         "mode": "100644",
-        "sha": "7a3fa5e0728153d9e4b9292649916c5095d32342"
+        "sha": "5ce21d83f170271057f2a3a982ea35d88a8ac201"
       },
       "base": {
         "mode": "100644",
@@ -6895,11 +6931,18 @@
     },
     {
       "path": "src/main/claude/claude-structured-real-cli.test.ts",
-      "reason": "Preserve all nine real functional cases and original budgets. Resolve selected model through actual list_models/getSupportedModels, wait the same dispatched UUID started before interrupt, keep text-only queued counter protocol, and perform owned adapter/directory cleanup in the original hook. Strict adoption/withdraw/result assertions remain; bounded safe close diagnostics and original Node rm retries do not fabricate exit.",
-      "regressionTests": ["src/main/claude/claude-structured-real-cli.test.ts"],
+      "reason": "Preserve all nine real functional cases and original budgets. Resolve selected model through actual list_models/getSupportedModels, wait the same dispatched UUID started before interrupt, keep text-only queued counter protocol, and perform owned adapter/directory cleanup in the original hook. Strict adoption/withdraw/result assertions remain; bounded safe close diagnostics and original Node rm retries do not fabricate exit. Final K3 static repair: Remove nonessential Windows module-mocking diagnostics and staged-native override; use named validated stream diagnostics with typed property access. Real ten-case contract and close/directory-cleanup failure propagation remain unchanged.",
+      "regressionTests": [
+        "src/main/claude/claude-structured-real-cli.test.ts",
+        "src/main/claude/claude-structured-real-cli-fold.test.ts",
+        "pnpm run audit:anti-slop",
+        "pnpm run audit:code-quality:native",
+        "pnpm run audit:code-quality:type-aware",
+        "pnpm run typecheck:cli"
+      ],
       "result": {
         "mode": "100644",
-        "sha": "e45edd31b295def43139f4d6793f844897af01f7"
+        "sha": "22c0aafa6afdcd537d5a4630836c88ac604c3525"
       },
       "base": {
         "mode": "100644",
