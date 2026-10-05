@@ -13,6 +13,7 @@ import {
   TaskExecutionEventSchema,
   TaskExecutionResultSchema
 } from '../../shared/task-execution/task-execution-receipts'
+import { TaskDockerIdentitySchema, taskDockerIdentityMatchesRecord } from './task-docker-identity'
 
 export const TaskWorkspaceDirectoryIdentitySchema = z.strictObject({
   dev: z.string().max(40).regex(/^\d+$/),
@@ -44,6 +45,7 @@ export const TaskExecutionRecordSchema = z
     commandFingerprint: TaskDigest,
     revision: TaskCounter.min(1),
     workspace: TaskExecutionWorkspaceSchema,
+    dockerIdentity: TaskDockerIdentitySchema.optional(),
     accepted: TaskExecutionAcceptedSchema,
     status: TaskExecutionStatus,
     dispatch: z.enum(['not_dispatched', 'dispatching', 'bound']),
@@ -57,6 +59,7 @@ export const TaskExecutionRecordSchema = z
     const receipts = [record.accepted, ...record.events, ...(record.result ? [record.result] : [])]
     if (
       fingerprint !== record.commandFingerprint ||
+      (record.dockerIdentity && !taskDockerIdentityMatchesRecord(record.dockerIdentity, record)) ||
       record.accepted.operationId !== record.command.operationId ||
       record.accepted.workspaceExecutionClaimRef !== record.command.workspaceExecutionClaimRef ||
       record.accepted.writeFence !== record.command.writeFence ||

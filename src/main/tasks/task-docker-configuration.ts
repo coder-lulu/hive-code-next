@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { dirname, isAbsolute, join } from 'node:path'
 import { z } from 'zod'
 import {
@@ -8,6 +7,7 @@ import {
 } from '../../shared/task-execution/task-execution-primitives'
 import { refuseTaskExecution } from './task-execution-error'
 import { TaskExecutionWorkspaceSchema, type TaskExecutionRecord } from './task-execution-record'
+import { taskDockerBinding } from './task-docker-identity'
 
 export type TaskDockerRecord = Pick<TaskExecutionRecord, 'workspace' | 'commandFingerprint'> & {
   command: Pick<
@@ -82,27 +82,10 @@ export function taskDockerConfiguration(options: {
     return refuseTaskExecution('INVALID_REQUEST')
   }
   requireLocalEndpoint(options.endpoint)
-  const digest = (value: unknown) =>
-    createHash('sha256').update(JSON.stringify(value)).digest('hex')
-  const identity = binding.data
-  const name = `hive-task-${digest([
-    identity.runtimeRecordId,
-    identity.ownershipEpoch,
-    identity.executionId,
-    identity.executionEpoch,
-    identity.commandFingerprint
-  ])}`
-  const labels = Object.freeze({
-    'io.hive.task.runtime': identity.runtimeRecordId,
-    'io.hive.task.ownership-epoch': String(identity.ownershipEpoch),
-    'io.hive.task.execution': identity.executionId,
-    'io.hive.task.execution-epoch': String(identity.executionEpoch),
-    'io.hive.task.command-fingerprint': identity.commandFingerprint,
-    'io.hive.task.workspace': digest([
-      workspace.data.workspaceId,
-      workspace.data.executionPath,
-      workspace.data.directoryIdentity
-    ])
+  const { name, labels } = taskDockerBinding({
+    ...binding.data,
+    command: binding.data,
+    workspace: workspace.data
   })
   const cliEnv: Record<string, string> = { ORCA_BACKGROUND_LAUNCH: '1' }
   for (const key of ['SystemRoot', 'WINDIR', 'TEMP', 'TMP']) {

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { ProcessResult } from '../../shared/child-process/run-process'
 import { refuseTaskExecution } from './task-execution-error'
 import { taskLaunchPathKey } from './task-launch-workspace'
+import { TaskDockerDaemonSchema } from './task-docker-identity'
 import {
   TASK_DOCKER_TMPFS,
   taskDockerEnvironment,
@@ -18,12 +19,6 @@ const ImageSchema = z.object({
   Os: z.literal('linux'),
   Architecture: z.literal('amd64'),
   Config: z.object({ Env: EnvSchema, Labels: Empty, Volumes: Empty, ExposedPorts: Empty })
-})
-const InfoSchema = z.object({
-  ID: z.string().min(1).max(160),
-  OSType: z.literal('linux'),
-  Architecture: z.enum(['amd64', 'x86_64']),
-  ServerVersion: z.string().min(1).max(80)
 })
 const SourcePath = z
   .string()
@@ -191,7 +186,7 @@ function parseOrRefuse<T extends z.ZodType>(schema: T, value: unknown): z.output
   return parsed.success ? parsed.data : refuseTaskExecution('FORBIDDEN')
 }
 export function taskDockerDaemon(result: ProcessResult) {
-  return parseOrRefuse(InfoSchema, taskDockerJson(result))
+  return parseOrRefuse(TaskDockerDaemonSchema, taskDockerJson(result))
 }
 export function taskDockerImage(result: ProcessResult, imageId: string): Record<string, string> {
   const [image] = parseOrRefuse(z.tuple([ImageSchema]), taskDockerJson(result))
@@ -241,7 +236,7 @@ function assertContainerIdentity(
 export function taskDockerCleanupContainer(
   result: ProcessResult,
   expected: TaskDockerConfiguration,
-  containerId: string
+  containerId: string | null
 ) {
   const [container] = parseOrRefuse(z.tuple([ContainerIdentitySchema]), taskDockerJson(result))
   assertContainerIdentity(container, expected, containerId)

@@ -67,7 +67,12 @@ describe('cleanup of the original task Docker identity', () => {
       dockerArgs(spec)[0] === 'image' ? result('', 1, 'image metadata unavailable') : run(spec)
     )
     const before = f.run.mock.calls.length
-    const boundary = createTaskDockerBoundary({ ...f.options, containerId: CID })
+    const identity = f.options.persistIdentity.mock.calls.at(-1)![0]
+    const boundary = createTaskDockerBoundary({
+      ...f.options,
+      persistIdentity: undefined,
+      recoveryIdentity: identity
+    })
 
     expect(await boundary.stop()).toBe(true)
     expect(f.run.mock.calls.slice(before).some(([spec]) => dockerArgs(spec)[0] === 'image')).toBe(

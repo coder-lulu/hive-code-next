@@ -8,6 +8,8 @@ import {
 } from '../../shared/task-execution/task-execution-receipts'
 import type { AgentSessionStoreTransactionQueue } from '../runtime/agent-session-store-transaction-queue'
 import { admitTaskExecution, type TaskExecutionAdmission } from './task-execution-admission'
+import { admitTaskDockerIdentity } from './task-docker-identity-admission'
+import type { TaskDockerIdentity } from './task-docker-identity'
 import { refuseTaskExecution } from './task-execution-error'
 import {
   TaskExecutionRecordSchema,
@@ -69,6 +71,39 @@ export class TaskExecutionPersistence {
 
   bindLaunch(identity: Identity, launch: AgentLaunchResult, now: number) {
     return this.update(identity, (record) => bindTaskLaunch(record, launch), now)
+  }
+
+  persistDockerIdentity(
+    identity: Identity & Pick<TaskExecutionRecord['command'], 'ownershipEpoch'>,
+    dockerIdentity: TaskDockerIdentity,
+    now: number,
+    validate: () => void
+  ) {
+    return this.update(
+      identity,
+      (record) => {
+        if (record.command.ownershipEpoch !== identity.ownershipEpoch) {
+          return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
+        }
+        if (
+          this.transactions.state.taskRecoveryBlocked ||
+          record.status !== 'accepted' ||
+          record.dispatch !== 'dispatching' ||
+          record.cancellationKey ||
+          record.result
+        ) {
+          return refuseTaskExecution('OUTCOME_UNKNOWN')
+        }
+        return admitTaskDockerIdentity(record, dockerIdentity)
+      },
+      now,
+      () => {
+        if (typeof validate !== 'function') {
+          return refuseTaskExecution('INVALID_REQUEST')
+        }
+        validate()
+      }
+    )
   }
 
   recoverLaunch(identity: Identity, fingerprint: string, now: number, validate: () => void) {
@@ -170,9 +205,11 @@ export class TaskExecutionPersistence {
   private update(
     identity: Identity,
     apply: (record: TaskExecutionRecord) => TaskExecutionRecord | null,
-    now: number
+    now: number,
+    validate?: () => void
   ) {
     return this.transactions.transact(() => {
+      validate?.()
       const key = taskExecutionRecordKey(identity)
       const current = this.transactions.state.taskExecutions?.get(key)
       if (!current) {

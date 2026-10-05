@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { afterEach, vi } from 'vitest'
 import type { ProcessResult, ProcessSpec } from '../../shared/child-process/run-process'
 import { createTaskDockerBoundary } from './task-docker-boundary'
+import type { TaskDockerIdentity } from './task-docker-identity'
 
 export const IMAGE = `sha256:${'a'.repeat(64)}`
 export const CID = 'b'.repeat(64)
@@ -227,6 +228,7 @@ export async function taskDockerFixture() {
     imageId: IMAGE,
     record,
     assertCurrent,
+    persistIdentity: vi.fn(async (_identity: TaskDockerIdentity) => undefined),
     run
   }
   return {

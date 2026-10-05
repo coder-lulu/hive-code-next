@@ -14,6 +14,11 @@ import {
 } from './task-docker-inspection'
 import { refuseTaskExecution } from './task-execution-error'
 import { assertTaskDirectoryIdentity } from './task-managed-copy'
+import {
+  TaskDockerIdentitySchema,
+  taskDockerIdentityFor,
+  type TaskDockerIdentity
+} from './task-docker-identity'
 
 export type TaskDockerPrepared = {
   containerId: string
@@ -33,23 +38,34 @@ export function createTaskDockerBoundary(options: {
   imageId: string
   record: TaskDockerRecord
   assertCurrent: () => void
-  containerId?: string
+  persistIdentity?: (identity: TaskDockerIdentity) => Promise<void>
+  recoveryIdentity?: TaskDockerIdentity
   run?: typeof runProcess
 }) {
   const config = taskDockerConfiguration(options)
+  const recovery =
+    options.recoveryIdentity === undefined
+      ? null
+      : TaskDockerIdentitySchema.parse(options.recoveryIdentity)
   if (
-    options.containerId !== undefined &&
-    (options.containerId.length !== 64 || !/^[0-9a-f]{64}$/.test(options.containerId))
+    (!recovery && typeof options.persistIdentity !== 'function') ||
+    (recovery &&
+      (options.persistIdentity !== undefined ||
+        !isDeepStrictEqual(
+          recovery,
+          taskDockerIdentityFor(config, recovery.daemon, recovery.containerId)
+        )))
   ) {
     refuseTaskExecution('INVALID_REQUEST')
   }
   const run = options.run ?? runProcess
   const exitProof = new RetryableProcessExitProof()
-  let containerId = options.containerId ?? null
+  let containerId = recovery?.containerId ?? null
   let imageEnv: Record<string, string> | null = null
-  let daemon: ReturnType<typeof taskDockerDaemon> | null = null
+  let daemon: ReturnType<typeof taskDockerDaemon> | null = recovery?.daemon ?? null
   let createAttempted = false
-  let stopping = false
+  let stopping = recovery !== null
+  let pendingCheckpointed = false
   let preparing: Promise<TaskDockerPrepared> | null = null
 
   function assertWorkspace(): void {
@@ -97,6 +113,9 @@ export function createTaskDockerBoundary(options: {
     }
   }
   async function requireDaemon(current: boolean): Promise<void> {
+    if (!current && !daemon) {
+      refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
     const observed = taskDockerDaemon(
       await invoke(
         [
@@ -131,8 +150,7 @@ export function createTaskDockerBoundary(options: {
     return imageEnv
   }
   async function inspectOwned(current: boolean) {
-    const cleanupId = current ? null : containerId
-    const env = cleanupId ? null : await requireImage(current)
+    const env = current ? await requireImage(true) : null
     await requireDaemon(current)
     const target = containerId ?? config.name
     const reply = await invoke(['container', 'inspect', target], current)
@@ -152,16 +170,31 @@ export function createTaskDockerBoundary(options: {
     ) {
       return null
     }
-    const found = cleanupId
-      ? taskDockerCleanupContainer(reply, config, cleanupId)
+    const found = !current
+      ? taskDockerCleanupContainer(reply, config, containerId)
       : env
         ? taskDockerContainer(reply, config, env, containerId)
         : refuseTaskExecution('OUTCOME_UNKNOWN')
     containerId = found.Id
     return found
   }
+  async function checkpoint(id: string | null): Promise<void> {
+    assertCurrent()
+    if (!daemon || !options.persistIdentity) {
+      refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    await options.persistIdentity(taskDockerIdentityFor(config, daemon, id))
+    assertCurrent()
+    await requireDaemon(true)
+    assertCurrent()
+  }
   async function prepareContainer(): Promise<TaskDockerPrepared> {
     assertCurrent()
+    if (!pendingCheckpointed) {
+      await requireImage(true)
+      await checkpoint(null)
+      pendingCheckpointed = true
+    }
     let found = await inspectOwned(true)
     if (!found) {
       if (createAttempted || containerId) {
@@ -197,6 +230,7 @@ export function createTaskDockerBoundary(options: {
     if (!taskDockerNeverStarted(found)) {
       return refuseTaskExecution('OUTCOME_UNKNOWN')
     }
+    await checkpoint(found.Id)
     assertCurrent()
     return {
       containerId: found.Id,
