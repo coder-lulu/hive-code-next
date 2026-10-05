@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { assertSynchronousAuthorization } from '../../shared/synchronous-authorization-guard'
 import type { getCodexBackendAuthHeaders } from '../rate-limits/codex-backend-auth'
+import { TaskExecutionError } from './task-execution-error'
 import { createTaskModelPolicy, type TaskModelProfile } from './task-model-policy'
 import { createTaskModelSseReader } from './task-model-sse'
 import { acquireTaskModelAccountStream } from './task-model-account-stream'
@@ -102,7 +104,12 @@ export function createTaskModelBroker(options: {
       throw fail('TASK_MODEL_DEADLINE_EXCEEDED')
     }
     try {
-      options.assertCurrent(scope)
+      assertSynchronousAuthorization(
+        () => options.assertCurrent(scope),
+        () => {
+          throw new Error('TASK_MODEL_AUTHORITY_REVOKED')
+        }
+      )
     } catch {
       throw fail('TASK_MODEL_AUTHORITY_REVOKED')
     }
@@ -184,9 +191,11 @@ export function createTaskModelBroker(options: {
           release(state)
         }
         const code =
-          error instanceof Error && /^TASK_MODEL_[A-Z_]+$/.test(error.message)
-            ? error.message
-            : 'TASK_MODEL_UPSTREAM_UNAVAILABLE'
+          error instanceof TaskExecutionError && error.code === 'CAPACITY_EXCEEDED'
+            ? 'TASK_MODEL_BUDGET_REFUSED'
+            : error instanceof Error && /^TASK_MODEL_[A-Z_]+$/.test(error.message)
+              ? error.message
+              : 'TASK_MODEL_UPSTREAM_UNAVAILABLE'
         throw fail(code)
       }
     },

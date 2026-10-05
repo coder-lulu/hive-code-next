@@ -19,6 +19,7 @@ import {
   TaskExecutionResultSchema
 } from '../../shared/task-execution/task-execution-receipts'
 import { TaskDockerIdentitySchema, taskDockerIdentityMatchesRecord } from './task-docker-identity'
+import { TASK_MODEL_REQUEST_LIMIT } from './task-model-channel-protocol'
 
 export const TaskWorkspaceDirectoryIdentitySchema = z.strictObject({
   dev: z.string().max(40).regex(/^\d+$/),
@@ -52,6 +53,7 @@ export const TaskExecutionRecordSchema = z
     workspace: TaskExecutionWorkspaceSchema,
     dockerIdentity: TaskDockerIdentitySchema.optional(),
     structuredBinding: TaskStructuredBindingSchema.optional(),
+    modelDispatchAttempts: TaskCounter.max(TASK_MODEL_REQUEST_LIMIT).optional(),
     accepted: TaskExecutionAcceptedSchema,
     status: TaskExecutionStatus,
     dispatch: z.enum(['not_dispatched', 'dispatching', 'bound']),
@@ -67,6 +69,8 @@ export const TaskExecutionRecordSchema = z
     if (
       fingerprint !== record.commandFingerprint ||
       (Object.hasOwn(record, 'structuredBinding') && binding === undefined) ||
+      (Object.hasOwn(record, 'modelDispatchAttempts') &&
+        (record.modelDispatchAttempts === undefined || !binding)) ||
       (binding &&
         (JSON.stringify(binding.source) !== JSON.stringify(taskSessionSourceReference(record)) ||
           binding.operationCallerKey !== record.operationCallerKey ||

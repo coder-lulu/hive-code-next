@@ -3,6 +3,10 @@ import type { AgentLaunchResult } from '../../shared/agent-launch-intent'
 import { isAgentLaunchResult } from '../../shared/agent-launch-intent'
 import { agentSessionOperationKey } from '../../shared/agent-session-operation-ledger'
 import {
+  TaskStructuredBindingSchema,
+  type TaskStructuredBinding
+} from '../../shared/task-execution/task-structured-binding'
+import {
   TaskExecutionResultSchema,
   type TaskExecutionResult
 } from '../../shared/task-execution/task-execution-receipts'
@@ -11,6 +15,8 @@ import { admitTaskExecution, type TaskExecutionAdmission } from './task-executio
 import { admitTaskDockerIdentity } from './task-docker-identity-admission'
 import type { TaskDockerIdentity } from './task-docker-identity'
 import { refuseTaskExecution } from './task-execution-error'
+import { reserveTaskModelDispatch } from './task-model-dispatch-reservation'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import {
   TaskExecutionRecordSchema,
   taskExecutionIdentity,
@@ -71,6 +77,24 @@ export class TaskExecutionPersistence {
 
   bindLaunch(identity: Identity, launch: AgentLaunchResult, now: number) {
     return this.update(identity, (record) => bindTaskLaunch(record, launch), now)
+  }
+
+  async reserveModelDispatch(binding: TaskStructuredBinding, now: number, validate: () => void) {
+    const snapshot = TaskStructuredBindingSchema.safeParse(binding)
+    if (!snapshot.success) {
+      return refuseTaskExecution('INVALID_REQUEST')
+    }
+    return this.update(
+      snapshot.data.source,
+      (record) => reserveTaskModelDispatch(this.transactions.state, record, snapshot.data),
+      now,
+      () => {
+        if (typeof validate !== 'function') {
+          return refuseTaskExecution('INVALID_REQUEST')
+        }
+        assertTaskAuthorizationCurrent(() => validate())
+      }
+    )
   }
 
   persistDockerIdentity(
