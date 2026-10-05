@@ -14,6 +14,7 @@ import { taskCodexResultInstructions } from './task-codex-evidence'
 import type { TaskExecutionRecord, TaskExecutionWorkspace } from './task-execution-record'
 import { computeAgentLaunchFingerprint } from '../../shared/agent-launch-operation'
 import { taskAgentLaunchParams } from './task-agent-launch-params'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import {
   LocalTaskBindingInputSchema as Input,
   localTaskBindingKey,
@@ -60,7 +61,7 @@ export class LocalTaskBindingIssuer {
   resolveGrant = (ref: string) => (this.closed ? null : (this.grants.get(ref) ?? null))
 
   private requireOwner() {
-    this.options.assertCurrent?.()
+    assertTaskAuthorizationCurrent(() => this.options.assertCurrent?.())
     const account = this.options.currentAccount()
     const runtime = this.options.currentRuntime()
     if (
@@ -74,9 +75,7 @@ export class LocalTaskBindingIssuer {
     }
     return { account, runtime }
   }
-  private now() {
-    return (this.options.now ?? Date.now)()
-  }
+  private now = () => (this.options.now ?? Date.now)()
 
   issue(raw: LocalTaskBindingInput): Promise<HiveRuntimeBinding> {
     const input = Input.parse(raw)
@@ -118,7 +117,7 @@ export class LocalTaskBindingIssuer {
       key,
       fingerprint
     )
-    entry.grant.assertCurrent()
+    assertTaskAuthorizationCurrent(() => entry.grant.assertCurrent())
     this.grants.set(entry.grant.command.authorizationRef, entry.grant)
     this.entries.set(key, entry)
     this.executionEntries.set(entry.binding.commandFingerprint, entry)
@@ -144,10 +143,11 @@ export class LocalTaskBindingIssuer {
       }
     } else {
       entry ??= await this.restoreEntry(key)
-      let replace = !entry.grant || entry.grant.actions.includes('start')
-      if (!replace) {
+      const currentGrant = entry.grant
+      let replace = !currentGrant || currentGrant.actions.includes('start')
+      if (currentGrant && !replace) {
         try {
-          entry.grant!.assertCurrent()
+          assertTaskAuthorizationCurrent(() => currentGrant.assertCurrent())
         } catch {
           replace = true
         }
@@ -167,17 +167,18 @@ export class LocalTaskBindingIssuer {
         this.grants.set(grant.command.authorizationRef, grant)
       }
     }
-    if (!entry?.grant) {
+    const grant = entry?.grant
+    if (!entry || !grant) {
       return refuseTaskExecution('FORBIDDEN')
     }
-    entry.grant.assertCurrent()
+    assertTaskAuthorizationCurrent(() => grant.assertCurrent())
     // Renew only authorization lifetime; the committed execution fingerprint never changes.
     const expiresAt = Math.min(owner.account.sessionExpiresAt, this.now() + 60_000)
-    entry.grant.validUntil = expiresAt
+    grant.validUntil = expiresAt
     return {
       ...structuredClone(entry.binding),
       command: {
-        ...entry.grant.command,
+        ...grant.command,
         expiresAt: new Date(expiresAt).toISOString()
       }
     }
@@ -231,7 +232,7 @@ export class LocalTaskBindingIssuer {
   }
 
   private async loadRecoveryEntry(key: string): Promise<Entry> {
-    this.options.assertCurrent?.()
+    assertTaskAuthorizationCurrent(() => this.options.assertCurrent?.())
     if (this.closed) {
       return refuseTaskExecution('SERVICE_UNAVAILABLE')
     }
@@ -243,9 +244,9 @@ export class LocalTaskBindingIssuer {
     })
     const proof = await this.options.restoreWorkspace(stored.workspace)
     const assertWorkspaceCurrent = () => {
-      this.options.assertCurrent?.()
-      stored.assertCurrent()
-      proof.assertCurrent()
+      assertTaskAuthorizationCurrent(() => this.options.assertCurrent?.())
+      assertTaskAuthorizationCurrent(() => stored.assertCurrent())
+      assertTaskAuthorizationCurrent(() => proof.assertCurrent())
     }
     const assertExecutionCurrent = () => {
       const current = this.requireOwner()
@@ -292,7 +293,7 @@ export class LocalTaskBindingIssuer {
     if (!entry) {
       return refuseTaskExecution('FORBIDDEN')
     }
-    entry.assertExecutionCurrent()
+    assertTaskAuthorizationCurrent(() => entry.assertExecutionCurrent())
   }
 
   launchFingerprint(record: TaskExecutionRecord) {
@@ -300,15 +301,14 @@ export class LocalTaskBindingIssuer {
     if (!entry) {
       return null
     }
-    entry.assertWorkspaceCurrent()
+    assertTaskAuthorizationCurrent(() => entry.assertWorkspaceCurrent())
     return computeAgentLaunchFingerprint(taskAgentLaunchParams(record, entry.input, 'codex'))
   }
 
-  private entryForRecord(record: TaskExecutionRecord) {
-    return record.operationCallerKey === this.options.operationCallerKey
+  private entryForRecord = (record: TaskExecutionRecord) =>
+    record.operationCallerKey === this.options.operationCallerKey
       ? (this.executionEntries.get(record.commandFingerprint) ?? null)
       : null
-  }
 
   async close() {
     this.closed = true

@@ -95,6 +95,34 @@ function fixture() {
 }
 
 describe('private persisted delivery authority', () => {
+  it.each(['authorization', 'context'] as const)(
+    'refuses an asynchronous original %s guard before requesting delivery proof',
+    async (source) => {
+      const current = fixture()
+      current[source].assertCurrent = () => Promise.resolve()
+      await expect(current.authorize(current.caller, current.command, 'start')).rejects.toThrow(
+        'FORBIDDEN'
+      )
+      expect(current.context.request).not.toHaveBeenCalled()
+    }
+  )
+  it.each(['authorization', 'context'] as const)(
+    'refuses an original %s guard that becomes asynchronous after admission',
+    async (source) => {
+      const current = fixture()
+      const authorization = await current.authorize(current.caller, current.command, 'start')
+      current[source].assertCurrent = () => Promise.resolve()
+      expect(authorization.assertCurrent).toThrow('FORBIDDEN')
+    }
+  )
+  it('refuses an asynchronous original grant for recovered read-only actions', async () => {
+    const current = fixture()
+    current.authorization.assertCurrent = () => Promise.resolve()
+    await expect(current.authorize(TASK_TEST_CALLER, current.command, 'observe')).rejects.toThrow(
+      'FORBIDDEN'
+    )
+    expect(current.context.request).not.toHaveBeenCalled()
+  })
   it('requires both canonical Runtime authorization and the exact current DB delivery', async () => {
     const current = fixture()
     const authorization = await current.authorize(current.caller, current.command, 'start')

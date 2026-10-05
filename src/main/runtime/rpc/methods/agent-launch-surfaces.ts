@@ -14,6 +14,8 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { assertSynchronousAuthorization } from '../../../../shared/synchronous-authorization-guard'
+import { agentSessionRefusalError } from '../../../../shared/agent-session-wire-refusals'
 import { narrowStructuredLaunchSeedOptions } from '../../../../shared/native-chat-session-option-defaults'
 import { createStructuredAgentSessionOperationId } from '../../../../shared/structured-agent-session-mutation'
 import { structuredAgentSessionTabId } from '../../../../shared/structured-agent-session-projection'
@@ -49,9 +51,16 @@ export function agentLaunchSurfaceFactory(
   presentation?: 'focused' | 'background',
   assertCurrent?: (spawnScope?: TerminalSpawnScope) => void
 ): AgentLaunchSurfaceFactory {
+  const malformedGuard = (): never => {
+    throw agentSessionRefusalError('agent_session_operation_invalid', {
+      reason: 'requestMalformed'
+    })
+  }
+  const checkCurrent = (spawnScope?: TerminalSpawnScope) =>
+    assertSynchronousAuthorization(() => assertCurrent?.(spawnScope), malformedGuard)
   const assertBeforeCreate = () => {
     try {
-      assertCurrent?.()
+      checkCurrent()
     } catch (error) {
       terminalSpawn.rethrow(error)
     }
@@ -65,6 +74,7 @@ export function agentLaunchSurfaceFactory(
       tabId
     }) => {
       assertBeforeCreate()
+      const taskOrigin = context.taskLaunchOrigin
       const sessionId = requested ?? createStructuredAgentSessionId(agent, randomUUID)
       const seeded = narrowStructuredLaunchSeedOptions(options)
       const created = await createStructuredAgentSessionForWorktree({
@@ -90,6 +100,17 @@ export function agentLaunchSurfaceFactory(
         agent,
         ...(seeded ? { options: seeded } : {}),
         ...(tabId ? { tabId } : {}),
+        ...(taskOrigin
+          ? {
+              taskOrigin: {
+                ...taskOrigin,
+                validate: () => {
+                  assertSynchronousAuthorization(() => taskOrigin.validate(), malformedGuard)
+                  checkCurrent()
+                }
+              }
+            }
+          : {}),
         // The user asked for this chat, so it takes the surface — unlike a dispatched worker.
         activate: activateChat
       })
@@ -112,7 +133,7 @@ export function agentLaunchSurfaceFactory(
       }
     },
     deliverStructuredPrompt: async ({ sessionId, fence, prompt }) => {
-      assertCurrent?.()
+      checkCurrent()
       return commitStructuredAgentSessionLaunchPrompt({
         host: getStructuredAgentSessionHost(),
         caller: operationCallerKey
@@ -151,7 +172,7 @@ export function agentLaunchSurfaceFactory(
         ...(paneKey ? { ...paneIdentity(paneKey), requireFreshPane: true } : {}),
         ...(launchSource ? { launchSource } : {}),
         onPtySpawnDispatched: (scope) => {
-          assertCurrent?.(scope)
+          checkCurrent(scope)
           terminalSpawn.onPtySpawnDispatched()
         }
       })
@@ -165,7 +186,7 @@ export function agentLaunchSurfaceFactory(
       }
     },
     deliverTerminalPrompt: async ({ handle, prompt }) => {
-      assertCurrent?.()
+      checkCurrent()
       return deliverTerminalAgentLaunchPrompt({
         runtime: context.runtime,
         handle,

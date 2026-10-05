@@ -61,6 +61,19 @@ function fixture() {
 }
 
 describe('local service grants and account ownership', () => {
+  it('refuses an asynchronous original grant before authorizing start', async () => {
+    const current = fixture()
+    current.grant.assertCurrent = () => Promise.resolve()
+    await expect(current.authorize(TASK_TEST_CALLER, current.command, 'start')).rejects.toThrow(
+      'FORBIDDEN'
+    )
+  })
+  it('refuses an original grant that becomes asynchronous after admission', async () => {
+    const current = fixture()
+    const authorization = await current.authorize(TASK_TEST_CALLER, current.command, 'start')
+    current.grant.assertCurrent = () => Promise.resolve()
+    expect(authorization.assertCurrent).toThrow('FORBIDDEN')
+  })
   it('uses a server-side grant and the current authenticated account', async () => {
     const { authorize, command, grant } = fixture()
     expect((await authorize(TASK_TEST_CALLER, command, 'start')).workspace).toEqual(grant.workspace)

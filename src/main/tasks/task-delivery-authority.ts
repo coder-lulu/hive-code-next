@@ -6,6 +6,7 @@ import { computeTaskExecutionFingerprint } from '../../shared/task-execution/tas
 import type { TaskExecutionHostDependencies } from './task-execution-ports'
 import type { HiveTaskServiceContext } from './hive-task-service-context'
 import { refuseTaskExecution } from './task-execution-error'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 /** Only private DB facts authorize a delivery; request headers identify a lease, never prove it. */
 export function createTaskDeliveryAuthorizer(options: {
@@ -16,6 +17,7 @@ export function createTaskDeliveryAuthorizer(options: {
   const now = options.monotonicNow ?? (() => performance.now())
   return async (caller, command, action) => {
     const authorization = await options.authorize(caller, command, action)
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     if (action !== 'start') {
       return authorization
     }
@@ -24,7 +26,8 @@ export function createTaskDeliveryAuthorizer(options: {
       return refuseTaskExecution('FORBIDDEN')
     }
     const context = await options.context()
-    authorization.assertCurrent()
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+    assertTaskAuthorizationCurrent(() => context.assertCurrent())
     const startedAt = now()
     const parsed = TaskDeliveryProofSchema.safeParse(
       await context.request(
@@ -62,8 +65,8 @@ export function createTaskDeliveryAuthorizer(options: {
     // Counting from request start conservatively includes transport and scheduling delays.
     const deadline = startedAt + remaining
     const assertCurrent = () => {
-      authorization.assertCurrent()
-      context.assertCurrent()
+      assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+      assertTaskAuthorizationCurrent(() => context.assertCurrent())
       if (now() >= deadline) {
         return refuseTaskExecution('FORBIDDEN')
       }

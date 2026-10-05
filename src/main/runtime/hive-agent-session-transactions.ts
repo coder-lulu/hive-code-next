@@ -70,8 +70,8 @@ export class HiveAgentSessionPersistence {
     })
   }
   get = (sessionId: string) =>
-    structuredClone(this.transactions.state.hiveSessions?.get(sessionId) ?? null)
-  list = () => structuredClone([...(this.transactions.state.hiveSessions?.values() ?? [])])
+    structuredClone(this.transactions.readState.hiveSessions?.get(sessionId) ?? null)
+  list = () => structuredClone([...(this.transactions.readState.hiveSessions?.values() ?? [])])
   commit = (input: HiveSessionCommit) =>
     this.transactions.transact(() => commitHiveSession(this.transactions.state, input))
   settle = (input: Parameters<typeof settleHiveSession>[1]) =>

@@ -12,6 +12,7 @@ import { taskCodexResultInstructions } from './task-codex-evidence'
 import type { TaskExecutionWorkspace } from './task-execution-record'
 import type { LocalTaskBindingInput } from './local-task-binding-file'
 import type { LocalTaskBindingIssuer, LocalTaskRuntimeOwner } from './local-task-binding-issuer'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 type BindingPreparationOptions = ConstructorParameters<typeof LocalTaskBindingIssuer>[0] & {
   requireOwner(): { account: HiveRuntimeCloudAuthorization; runtime: LocalTaskRuntimeOwner }
@@ -60,16 +61,16 @@ export async function prepareLocalTaskBinding(
     directory: join(options.directory, 'workspaces'),
     assertCurrent: () => {
       assertOwner()
-      source.assertCurrent()
+      assertTaskAuthorizationCurrent(() => source.assertCurrent())
     }
   })
   assertOwner()
   const registered = await options.registerWorkspace(copy.executionPath)
   const assertCurrent = () => {
     assertOwner()
-    source.assertCurrent()
-    copy.assertCurrent()
-    registered.assertCurrent()
+    assertTaskAuthorizationCurrent(() => source.assertCurrent())
+    assertTaskAuthorizationCurrent(() => copy.assertCurrent())
+    assertTaskAuthorizationCurrent(() => registered.assertCurrent())
   }
   assertCurrent()
   const workspace: TaskExecutionWorkspace = {
@@ -159,9 +160,9 @@ export async function prepareLocalTaskBinding(
     fingerprint,
     assertExecutionCurrent: assertCurrent,
     assertWorkspaceCurrent: () => {
-      options.assertCurrent?.()
+      assertTaskAuthorizationCurrent(() => options.assertCurrent?.())
       assertTaskDirectoryIdentity(workspace.executionPath, workspace.directoryIdentity)
-      recoveryProof.assertCurrent()
+      assertTaskAuthorizationCurrent(() => recoveryProof.assertCurrent())
     },
     accountId: owner.account.accountId,
     input: grant.input,

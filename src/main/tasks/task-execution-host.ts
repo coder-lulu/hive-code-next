@@ -11,6 +11,7 @@ import {
 } from '../../shared/task-execution/task-execution-observation'
 import { TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
 import { refuseTaskExecution } from './task-execution-error'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import type { TaskExecutionRecord } from './task-execution-record'
 import { taskRecordObservation } from './task-record-observation'
 import { collectTaskExecutionSettlement } from './task-execution-settlement'
@@ -63,7 +64,7 @@ export class TaskExecutionHost {
         ),
       isLaunching: (fingerprint) => this.launches.has(fingerprint),
       now: this.now,
-      validate: () => caller.assertCurrent?.(),
+      validate: () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.()),
       assertAuthorized,
       launchFingerprint,
       settle: (current, validate) => this.settle(current, validate),
@@ -73,7 +74,7 @@ export class TaskExecutionHost {
 
   /** Persist revocation before slow collection; this never proves that the writer stopped. */
   async fenceRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
-    caller.assertCurrent?.()
+    assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
     const current = this.requireRecord(
       { ...record.command, commandFingerprint: record.commandFingerprint },
       caller
@@ -85,7 +86,7 @@ export class TaskExecutionHost {
       current.command,
       `revoked:${current.commandFingerprint}`,
       this.now(),
-      () => caller.assertCurrent?.()
+      () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
     )
   }
 
@@ -96,7 +97,7 @@ export class TaskExecutionHost {
       { ...record.command, commandFingerprint: record.commandFingerprint },
       caller
     )
-    await this.settle(current, () => caller.assertCurrent?.())
+    await this.settle(current, () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.()))
   }
 
   async start(value: unknown, caller: TaskExecutionCaller) {
@@ -123,7 +124,7 @@ export class TaskExecutionHost {
       )
       this.launches.set(key, flight)
     }
-    authorization.assertCurrent()
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     return admitted.record.accepted
   }
 
@@ -165,7 +166,7 @@ export class TaskExecutionHost {
       'reconcile'
     )
     await this.settle(record, authorization.assertCurrent)
-    authorization.assertCurrent()
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     return taskRecordObservation(this.requireRecord(query, caller), 0, 32)
   }
 
@@ -203,7 +204,7 @@ export class TaskExecutionHost {
       authorization.assertCurrent
     )
     await this.settle(cancellation.record, authorization.assertCurrent)
-    authorization.assertCurrent()
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     return taskRecordObservation(this.requireRecord(command, caller), 0, 32)
   }
 
@@ -212,7 +213,7 @@ export class TaskExecutionHost {
     command: TaskExecutionStart,
     action: TaskExecutionAction
   ) {
-    caller.assertCurrent?.()
+    assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
     if (
       !TaskOpaqueRef.safeParse(caller.operationCallerKey).success ||
       Date.parse(command.expiresAt) <= this.now()
@@ -227,8 +228,8 @@ export class TaskExecutionHost {
     }
     const authorization = await this.deps.authorize(caller, command, action)
     const assertCurrent = () => {
-      caller.assertCurrent?.()
-      authorization.assertCurrent()
+      assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+      assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     }
     assertCurrent()
     return { ...authorization, assertCurrent }
@@ -266,7 +267,7 @@ export class TaskExecutionHost {
       }
       // Cancellation can commit while the launch port awaits replay or terminal preparation.
       const assertCurrent = () => {
-        authorization.assertCurrent()
+        assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
         const current = this.deps.store.get(record.command)
         if (
           !current ||

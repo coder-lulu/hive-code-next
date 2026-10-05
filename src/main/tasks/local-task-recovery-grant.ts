@@ -4,6 +4,7 @@ import type { LocalTaskRuntimeOwner } from './local-task-binding-issuer'
 import type { LocalTaskGrant } from './local-task-authority'
 import type { HiveRuntimeBinding } from './paperclip-adapter-contract'
 import { refuseTaskExecution } from './task-execution-error'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 type Owner = { account: HiveRuntimeCloudAuthorization; runtime: LocalTaskRuntimeOwner }
 
@@ -34,7 +35,7 @@ export function createRecoveredLocalTaskGrant(
     ) {
       return refuseTaskExecution('FORBIDDEN')
     }
-    entry.assertWorkspaceCurrent()
+    assertTaskAuthorizationCurrent(() => entry.assertWorkspaceCurrent())
   }
   assertCurrent()
   return {

@@ -59,7 +59,7 @@ function agentSessionStoreStateChanged(
 export class AgentSessionStoreTransactionQueue {
   private queue: Promise<unknown> = Promise.resolve()
   private diskRecoveredFromBackup: boolean
-  private taskReadSnapshot: ReadonlyMap<string, TaskExecutionRecord> | undefined
+  private readSnapshot: AgentSessionStoreState | undefined
 
   constructor(
     private readonly filePath: string,
@@ -72,6 +72,11 @@ export class AgentSessionStoreTransactionQueue {
     private needsRewrite: boolean
   ) {
     this.diskRecoveredFromBackup = recoveredFromBackup
+  }
+
+  /** Public readers share the rollback version until the durable write succeeds. */
+  get readState(): AgentSessionStoreState {
+    return this.readSnapshot ?? this.state
   }
 
   static fromLoadedStore(
@@ -93,12 +98,11 @@ export class AgentSessionStoreTransactionQueue {
   }
 
   readTaskExecution(key: string): TaskExecutionRecord | null {
-    const records = this.taskReadSnapshot ?? this.state.taskExecutions
-    return structuredClone(records?.get(key) ?? null)
+    return structuredClone(this.readState.taskExecutions?.get(key) ?? null)
   }
 
   readActiveTaskExecutions(): TaskExecutionRecord[] {
-    const records = this.taskReadSnapshot ?? this.state.taskExecutions
+    const records = this.readState.taskExecutions
     return structuredClone([...(records?.values() ?? [])].filter((record) => !record.result))
   }
 
@@ -118,7 +122,18 @@ export class AgentSessionStoreTransactionQueue {
         const retiredClaimKeys = [...this.state.retiredClaimKeys]
         const unreadableRecords = new Map(this.state.unreadableRecords)
         const sessionTabs = this.state.sessionTabs?.clone() ?? null
-        this.taskReadSnapshot = taskExecutions
+        this.readSnapshot = {
+          ...this.state,
+          records,
+          hiveSessions,
+          hiveRecoveryFenceAt,
+          taskExecutions,
+          taskRecoveryBlocked,
+          operations,
+          retiredClaimKeys,
+          unreadableRecords,
+          sessionTabs
+        }
         try {
           // The lost commit may have granted a higher fence than the backup records show. Rather
           // than refuse forever, raise every recovered fence clear of anything that commit could
@@ -172,7 +187,7 @@ export class AgentSessionStoreTransactionQueue {
           this.state.sessionTabs = sessionTabs
           throw error
         } finally {
-          this.taskReadSnapshot = undefined
+          this.readSnapshot = undefined
         }
       })
     )

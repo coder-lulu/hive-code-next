@@ -7,6 +7,7 @@ import type {
   TaskExecutionCaller
 } from './task-execution-host'
 import { refuseTaskExecution } from './task-execution-error'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 export type LocalTaskGrant = TaskExecutionAuthorization & {
   command: TaskExecutionStart
@@ -68,7 +69,7 @@ export function createLocalTaskAuthorizer(deps: LocalTaskAuthorityDependencies) 
       ) {
         return refuseTaskExecution('FORBIDDEN')
       }
-      grant.assertCurrent()
+      assertTaskAuthorizationCurrent(() => grant.assertCurrent())
     }
     assertCurrent()
     return { workspace: grant.workspace, input: grant.input, assertCurrent }

@@ -31,6 +31,7 @@ import { TaskArtifactIndex } from './task-artifact-index'
 import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
 import { taskLaunchPathKey } from './task-launch-workspace'
 import { assertTaskDirectoryIdentity } from './task-managed-copy'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 /** One task service assembled from the existing account, Runtime, record store and Codex host. */
 export async function startLocalTaskRuntime(options: {
@@ -56,7 +57,7 @@ export async function startLocalTaskRuntime(options: {
     if (closed) {
       return refuseTaskExecution('SERVICE_UNAVAILABLE')
     }
-    resources.assertCurrent()
+    assertTaskAuthorizationCurrent(() => resources.assertCurrent())
   }
   const currentRuntime = () => {
     const account = options.account.getRuntimeCloudAuthorization()
@@ -88,7 +89,7 @@ export async function startLocalTaskRuntime(options: {
     if (scope.connectionId !== null) {
       return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
     }
-    proof.assertCurrent()
+    assertTaskAuthorizationCurrent(() => proof.assertCurrent())
     return { path: scope.path, assertCurrent: proof.assertCurrent }
   }
   const issuer = new LocalTaskBindingIssuer({

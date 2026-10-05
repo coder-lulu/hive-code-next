@@ -1,5 +1,6 @@
 import { HiveAgentSessionPersistence } from './hive-agent-session-transactions'
 import { TaskExecutionPersistence } from '../tasks/task-execution-store'
+import { assertTaskStructuredAcquisition } from '../tasks/task-structured-reservation'
 import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import { commitConversationCommandRecord } from './agent-session-conversation-command-record'
 import { setAgentSessionRecordConversationName } from './agent-session-record-conversation-name'
@@ -112,6 +113,8 @@ export class AgentSessionRecordStore {
     return this.transactions.state
   }
 
+  private readState = (): AgentSessionStoreState => this.transactions.readState
+
   get readOnly(): boolean {
     return this.transactions.readOnly
   }
@@ -121,30 +124,30 @@ export class AgentSessionRecordStore {
   }
 
   get hostId(): string {
-    return this.state.hostId
+    return this.readState().hostId
   }
 
   getRecord = (sessionId: string): AgentSessionRecord | null =>
-    this.state.records.get(sessionId) ?? null
+    this.readState().records.get(sessionId) ?? null
 
-  listRecords = (): AgentSessionRecord[] => [...this.state.records.values()]
+  listRecords = (): AgentSessionRecord[] => [...this.readState().records.values()]
 
   readonly hive: HiveAgentSessionPersistence
   readonly tasks: TaskExecutionPersistence
 
   listVisibleSessionIds = (): string[] =>
-    (this.state.sessionTabs?.sessionIds() ?? []).filter((sessionId) =>
-      this.state.records.has(sessionId)
+    (this.readState().sessionTabs?.sessionIds() ?? []).filter((sessionId) =>
+      this.readState().records.has(sessionId)
     )
 
   getVisibleSessionTabIndex = (): { present: boolean; sessionIds: string[] } => ({
-    present: this.state.sessionTabs !== null,
+    present: this.readState().sessionTabs !== null,
     sessionIds: this.listVisibleSessionIds()
   })
 
   /** The id of the chat tab showing this conversation, if one does. */
   getSessionTabId = (sessionId: string): string | null =>
-    this.state.sessionTabs?.tabIdFor(sessionId) ?? null
+    this.readState().sessionTabs?.tabIdFor(sessionId) ?? null
 
   /**
    * Persist the user-visible tab reference separately from the rollback-sensitive profile tabs.
@@ -177,23 +180,28 @@ export class AgentSessionRecordStore {
     )
 
   /** A record this build cannot validate: readable as present, never grantable as a writer. */
-  isSessionUnreadable(sessionId: string): boolean {
-    return this.state.unreadableRecords.has(sessionId)
-  }
+  isSessionUnreadable = (sessionId: string): boolean =>
+    this.readState().unreadableRecords.has(sessionId)
 
-  listOperationRows = (): AgentSessionOperationRow[] => [...this.state.operations.values()]
+  listOperationRows = (): AgentSessionOperationRow[] => [...this.readState().operations.values()]
 
   getOperationRow = (callerKey: string, operationId: string): AgentSessionOperationRow | null =>
-    this.state.operations.get(agentSessionOperationKey(callerKey, operationId)) ?? null
+    this.readState().operations.get(agentSessionOperationKey(callerKey, operationId)) ?? null
 
   isClaimKeyVerifiable = (keyId: string, now: number): boolean =>
-    isAgentSessionClaimKeyVerifiable(this.state, keyId, now)
+    isAgentSessionClaimKeyVerifiable(this.readState(), keyId, now)
 
   async reserveOwner(request: AgentSessionReserveRequest): Promise<AgentSessionReserveResult> {
     return this.transact(() =>
       commitAgentSessionReservation(this.state, request, AGENT_SESSION_LEASE_TTL_MS)
     )
   }
+
+  assertTaskAcquisition = (
+    request: AgentSessionReserveRequest,
+    record: AgentSessionRecord
+  ): Promise<void> =>
+    this.transact(() => assertTaskStructuredAcquisition(this.state, request, record))
 
   commitProcessIdentity = (args: AgentSessionProcessIdentityCommit): Promise<AgentSessionRecord> =>
     this.mutate(args.sessionId, (record) => commitAgentSessionProcessIdentity({ ...args, record }))
@@ -290,7 +298,7 @@ export class AgentSessionRecordStore {
 
   /** The ledger's answer alone, placing nothing; `admitMutationOperation` is the transaction. */
   evaluateMutationOperation = (args: AgentSessionMutationOperationAdmission) =>
-    evaluateAgentSessionMutationOperation(this.state, args)
+    evaluateAgentSessionMutationOperation(this.readState(), args)
 
   /** Durable compare-and-swap for the right to run an admitted operation's effect: two replays both
    *  read `pending`, and only a conditional swap tells the one that may run from the one that must
@@ -323,7 +331,7 @@ export class AgentSessionRecordStore {
     return this.transact(() => {
       const record = this.state.records.get(sessionId)
       if (!record) {
-        throw this.isSessionUnreadable(sessionId)
+        throw this.state.unreadableRecords.has(sessionId)
           ? agentSessionRefusalError('execution_owner_reconciling', { reason: 'recordUnreadable' })
           : agentSessionRefusalError('agent_session_identity_required', { reason: 'recordMissing' })
       }

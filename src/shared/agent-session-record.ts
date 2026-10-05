@@ -3,6 +3,10 @@ import { isAgentSessionLaunchArgs } from './agent-session-launch-args'
 import { isAgentSessionConversationName } from './agent-session-conversation-name'
 import { isAgentSessionAccountHome } from './agent-session-account-home'
 import type { AgentSessionAccountHome } from './agent-session-account-home'
+import {
+  TaskSessionSourceReferenceSchema,
+  type TaskSessionSourceReference
+} from './task-execution/task-structured-binding'
 export type { AgentSessionAccountHome } from './agent-session-account-home'
 import {
   isPersistedAgentSessionHandoffStage,
@@ -136,6 +140,8 @@ export type AgentSessionRecord = {
   provider: AgentSessionRecordProvider
   providerHandleChain: AgentSessionProviderHandleLink[]
   accountHome: AgentSessionAccountHome
+  /** Original task provenance; authorization is checked against the task store at acquisition. */
+  taskSource?: TaskSessionSourceReference
   /** Provider options the user chose, replayed whenever a new owner starts the session. */
   options?: Record<string, string>
   rewind?: AgentSessionRewindRecord
@@ -304,10 +310,13 @@ function isPersistedAgentSessionLease(value: unknown): value is PersistedAgentSe
     (lease.ownerProcess === null || isAgentSessionProcessIdentity(lease.ownerProcess)) &&
     (lease.reservedSpawnToken === null ||
       isBoundedString(lease.reservedSpawnToken, MAX_ID_LENGTH)) &&
-    (lease.processlessAt === undefined || lease.processlessAt === null ||
+    (lease.processlessAt === undefined ||
+      lease.processlessAt === null ||
       (Number.isSafeInteger(lease.processlessAt) && lease.processlessAt >= 0)) &&
-    (lease.settlementRetryRequired === undefined || typeof lease.settlementRetryRequired === 'boolean') &&
-    (lease.settlementRetryId === undefined || isBoundedString(lease.settlementRetryId, MAX_ID_LENGTH)) &&
+    (lease.settlementRetryRequired === undefined ||
+      typeof lease.settlementRetryRequired === 'boolean') &&
+    (lease.settlementRetryId === undefined ||
+      isBoundedString(lease.settlementRetryId, MAX_ID_LENGTH)) &&
     Number.isSafeInteger(lease.leaseDeadlineAt) &&
     Number.isSafeInteger(lease.lastRenewedAt) &&
     (lease.handoffOperationId === null ||
@@ -342,6 +351,8 @@ export function isPersistedAgentSessionRecord(
       record.provider === 'managed-pi') &&
     isAgentSessionProviderHandleChain(record.providerHandleChain) &&
     isAgentSessionAccountHome(record.accountHome) &&
+    (!Object.hasOwn(record, 'taskSource') ||
+      TaskSessionSourceReferenceSchema.safeParse(record.taskSource).success) &&
     (record.options === undefined || isAgentSessionOptions(record.options)) &&
     (record.rewind === undefined || isAgentSessionRewindRecord(record.rewind)) &&
     (record.conversationCommand === undefined ||

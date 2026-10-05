@@ -6,6 +6,7 @@ import { isWslUncPath } from '../../shared/wsl-paths'
 import { refuseTaskExecution } from './task-execution-error'
 import { taskLaunchPathKey } from './task-launch-workspace'
 import type { TaskWorkspaceDirectoryIdentity } from './task-execution-record'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 const OMITTED_DIRECTORIES = new Set(['.git', 'node_modules', 'logs'])
 const MAX_FILE_BYTES = 8 * 1024 * 1024
@@ -60,7 +61,7 @@ export async function createTaskManagedCopy(options: {
   directory: string
   assertCurrent: () => void
 }) {
-  options.assertCurrent()
+  assertTaskAuthorizationCurrent(() => options.assertCurrent())
   if (
     !isAbsolute(options.source) ||
     (process.platform === 'win32' && isWslUncPath(options.source))
@@ -79,7 +80,7 @@ export async function createTaskManagedCopy(options: {
   let count = 0
   let bytes = 0
   const assertCurrent = () => {
-    options.assertCurrent()
+    assertTaskAuthorizationCurrent(() => options.assertCurrent())
     assertTaskDirectoryIdentity(source, sourceIdentity)
     assertTaskDirectoryIdentity(target, directoryIdentity)
   }

@@ -4,6 +4,8 @@ import {
   type AgentSessionAcquisition,
   type StructuredAgentSessionAcquireInput
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
+import { assertSynchronousAuthorization } from '../../shared/synchronous-authorization-guard'
+import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import {
   closeFailedCodexAcquisition,
   stopSupersededCodexAcquisition
@@ -118,6 +120,28 @@ export async function acquireCodexStructuredSession(input: {
         throw new AgentSessionPreSpawnError(error)
       })
     acquisitions.assertCurrent(sessionId, attempt)
+    const guard = acquireInput.spawnGuard
+    if (guard) {
+      try {
+        const prepared = await guard.prepare()
+        acquisitions.assertCurrent(sessionId, attempt)
+        if (prepared !== undefined) {
+          throw agentSessionRefusalError('agent_session_operation_invalid', {
+            reason: 'requestMalformed'
+          })
+        }
+        assertSynchronousAuthorization(
+          () => guard.assertCurrent(),
+          () => {
+            throw agentSessionRefusalError('agent_session_operation_invalid', {
+              reason: 'requestMalformed'
+            })
+          }
+        )
+      } catch (error) {
+        throw new AgentSessionPreSpawnError(error)
+      }
+    }
     const connection = await open(
       {
         command: launch.command,

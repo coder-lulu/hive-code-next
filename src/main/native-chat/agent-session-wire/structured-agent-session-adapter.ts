@@ -227,6 +227,8 @@ export type StructuredAgentSessionAcquireInput = {
   /** Durably records the child's identity the moment it exists, before any handshake, so a crash
    *  mid-start leaves an owner recovery can stop. The acquisition's `process` must match it. */
   onSpawned?: (process: AgentSessionProcessIdentity) => Promise<void>
+  /** Host-only source guard after launch preparation and again in the synchronous spawn frame. */
+  spawnGuard?: { prepare: () => Promise<void>; assertCurrent: () => void }
 }
 
 export type StructuredAgentSessionSetOptionInput = {

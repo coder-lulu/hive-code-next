@@ -5,6 +5,7 @@ import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account
 import { createLocalTaskRequest } from './local-task-http-client'
 import { readTaskArtifactFile } from './task-artifact-index'
 import { refuseTaskExecution } from './task-execution-error'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { HIVE_WORKFLOW_PAGE_STRUCTURAL_TOKENS } from '../../shared/hive-task-workflows'
 
 export function createHiveTaskServiceContext(options: {
@@ -14,13 +15,13 @@ export function createHiveTaskServiceContext(options: {
   request?: typeof createLocalTaskRequest
 }) {
   return async () => {
-    options.assertCurrent()
+    assertTaskAuthorizationCurrent(() => options.assertCurrent())
     const account = options.currentAccount()
     if (!account || account.sessionExpiresAt <= Date.now()) {
       return refuseTaskExecution('FORBIDDEN')
     }
     const assertCurrent = (): void => {
-      options.assertCurrent()
+      assertTaskAuthorizationCurrent(() => options.assertCurrent())
       const current = options.currentAccount()
       if (
         !current ||

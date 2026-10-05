@@ -18,6 +18,41 @@ async function fixture() {
   return { source, directory: join(root, 'copies'), assertCurrent: () => undefined }
 }
 describe('task workspace isolation', () => {
+  it('refuses an async guard before creating a managed execution directory', async () => {
+    const options = await fixture()
+    await expect(
+      createTaskManagedCopy({
+        ...options,
+        assertCurrent: () => Promise.resolve()
+      })
+    ).rejects.toThrow('FORBIDDEN')
+    expect(existsSync(options.directory)).toBe(false)
+  })
+  it('rolls back its owned copy when a later guard starts returning a pending Promise', async () => {
+    const options = await fixture()
+    await writeFile(join(options.source, 'input.txt'), 'source remains owned by the user')
+    let calls = 0
+    await expect(
+      createTaskManagedCopy({
+        ...options,
+        assertCurrent: () => (++calls === 1 ? undefined : new Promise<void>(() => undefined))
+      })
+    ).rejects.toThrow('FORBIDDEN')
+    expect(readdirSync(options.directory)).toEqual([])
+    expect(await readFile(join(options.source, 'input.txt'), 'utf8')).toBe(
+      'source remains owned by the user'
+    )
+  })
+  it('fences its captured proof when the original callback later returns a Promise', async () => {
+    const options = await fixture()
+    let pending = false
+    const copy = await createTaskManagedCopy({
+      ...options,
+      assertCurrent: () => (pending ? Promise.resolve() : undefined)
+    })
+    pending = true
+    expect(() => copy.assertCurrent()).toThrow('FORBIDDEN')
+  })
   it('preserves a replacement directory when preparation loses its original identity', async () => {
     const options = await fixture()
     let replacement = ''
