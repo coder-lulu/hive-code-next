@@ -3,6 +3,7 @@ import { createServer } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HiveRuntimeCloudClient, HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudPresenceService } from './hive-runtime-cloud-presence-service'
+import type { HiveRuntimeCloudRegistrationState } from './hive-runtime-cloud-state-store'
 import { HiveRuntimeCloudWebLaunchService } from './hive-runtime-cloud-web-launch-service'
 import {
   ids,
@@ -290,6 +291,58 @@ describe('Hive Runtime Cloud Presence service', () => {
     expect(client.heartbeat).not.toHaveBeenCalled()
     await service.stop()
   })
+
+  it('activates the current ownerless registration only through an authenticated lease', async () => {
+    vi.useFakeTimers()
+    const state: HiveRuntimeCloudRegistrationState = claimedState()
+    delete state.ownerAccountId
+    const { service, client, saveState } = fixture(state)
+    try {
+      service.setRuntimeReady(true)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(service.getState()).toBe('ONLINE')
+      expect(client.acquireLease).toHaveBeenCalledWith(
+        expect.objectContaining({
+          runtimeInstanceId: identity.runtimeInstanceId,
+          proof: expect.objectContaining({ authorityId: authorization.authorityId })
+        }),
+        authorization.accessToken,
+        expect.any(AbortSignal)
+      )
+      expect(service.getCurrentLeaseContext()?.authorityId).toBe(authorization.authorityId)
+      expect(saveState.mock.calls.at(-1)?.[1]).not.toHaveProperty('ownerAccountId')
+      expect(client.register).not.toHaveBeenCalled()
+      expect(client.claim).not.toHaveBeenCalled()
+    } finally {
+      await service.stop()
+    }
+  })
+
+  it.each([401, 403])(
+    'fences ownerless registration when the server denies lease HTTP %s',
+    async (status) => {
+      vi.useFakeTimers()
+      const state: HiveRuntimeCloudRegistrationState = claimedState()
+      delete state.ownerAccountId
+      const { service, client } = fixture(state)
+      client.acquireLease.mockRejectedValue(
+        new HiveRuntimeCloudRequestError(status, 'runtime_lease_acquire_unauthorized')
+      )
+      try {
+        service.setRuntimeReady(true)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(client.lookup).toHaveBeenCalledOnce()
+        expect(client.acquireLease).toHaveBeenCalledOnce()
+        expect(service.getState()).toBe('FENCED')
+        expect(service.getCurrentLeaseContext()).toBeNull()
+        expect(client.heartbeat).not.toHaveBeenCalled()
+        expect(client.register).not.toHaveBeenCalled()
+        expect(client.claim).not.toHaveBeenCalled()
+      } finally {
+        await service.stop()
+      }
+    }
+  )
 
   it('rejects activation by a different account before any Cloud request', async () => {
     vi.useFakeTimers()

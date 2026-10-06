@@ -252,7 +252,8 @@ export async function activateClaimedHiveRuntimeCloudPresence(
     throw new ClaimPendingPresenceError('runtime_authority_unavailable')
   }
   if (
-    options.stored.ownerAccountId !== options.authorization.accountId ||
+    (options.stored.ownerAccountId !== undefined &&
+      options.stored.ownerAccountId !== options.authorization.accountId) ||
     authorityId !== options.authorization.authorityId
   ) {
     throw new FatalPresenceError('runtime_owner_mismatch')
