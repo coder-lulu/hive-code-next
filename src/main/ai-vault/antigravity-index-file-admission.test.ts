@@ -55,9 +55,14 @@ describe('bounded regular metadata reads', () => {
         await expect(readNodeFileWithinLimit(path, 64, { regularFileOnly: true })).rejects.toThrow(
           'regular file'
         )
+        // Relay transcript admission preserves the stricter no-follow safe opener.
+        const relayRefusal =
+          path === alias && constants.O_NOFOLLOW !== undefined && constants.O_NONBLOCK !== undefined
+            ? 'ELOOP'
+            : 'Unsafe transcript file'
         await expect(
           readRelayTranscriptBytes(path, undefined, { regularFileOnly: true, maxBytes: 64 }).next()
-        ).rejects.toThrow('regular file')
+        ).rejects.toThrow(relayRefusal)
       }
     },
     2000

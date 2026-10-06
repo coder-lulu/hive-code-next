@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "498783ad149d54dae7244c25c8c4f8471f7f5bc0",
+  "sourceProductSha": "2ae6cc3abd4a8271727babc1f1401aa43fab712e",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -20000,6 +20000,47 @@
       },
       "reason": "Enter the real Hive Projects route and preserve new caller-owned grouping option without altering lineage/instance assertions.",
       "regressionTests": ["tests/e2e/worktree-lineage.spec.ts"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx",
+      "base": {
+        "mode": "100644",
+        "sha": "e285932bf886fe21199d5009b05aac583e5c898f"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "2fdef257882eabc5fbfd7c0a5962de062044d2f3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e285932bf886fe21199d5009b05aac583e5c898f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2fdef257882eabc5fbfd7c0a5962de062044d2f3"
+      },
+      "reason": "Tighten the exact per-pane listener ratchet from16 to12 after two maintained useShallow folds save1 settings/keybinding and3 chat-state listeners while preserving all six selected reactive values. Retain historical baseline50, all four original cases/operators/cleanup/timeout and29 stable getState actions; update exact saved-listener equality to29+9=38. Genuine Linux original whole-owner4 cases and Windows4 cases passed; the original four cases do not individually exercise all six reactive-field updates.",
+      "regressionTests": [
+        "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx"
+      ]
+    },
+    {
+      "path": "src/main/ai-vault/antigravity-index-file-admission.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b08a52d5a98623800644c7fb0e9ee8dfae21d84f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9e5a734370b5c350848ceda448134def2a54d7fe"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b08a52d5a98623800644c7fb0e9ee8dfae21d84f"
+      },
+      "reason": "Retain the Node bounded metadata reader regular-file rejection oracle. Pin relay FIFO and missing-flag precheck to the maintained safe opener Unsafe transcript file rejection; when NOFOLLOW and NONBLOCK are available pin symlink rejection to real OS ELOOP. Retain all five original cases, two-second POSIX deadlines, real mkfifo/no-writer/symlink fixtures, rejects.toThrow operators, original Windows conditional skips and cleanup. Genuine Linux complete five-case owner passed including FIFO and alias paths; production readers and all safe-opener guards remain unchanged.",
+      "regressionTests": ["src/main/ai-vault/antigravity-index-file-admission.test.ts"]
     }
   ]
 }
