@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "2ae6cc3abd4a8271727babc1f1401aa43fab712e",
+  "sourceProductSha": "5513171b2b18b92aee4133ab24b6cb5a937627f5",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -3172,7 +3172,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "5e1370b083be06eda73d1045dc7bc342562f3daf"
+        "sha": "8fcf8f1149dc253b2110207639301d934a91b2be"
       },
       "upstream": {
         "mode": "100644",
@@ -3180,9 +3180,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "5e1370b083be06eda73d1045dc7bc342562f3daf"
+        "sha": "8fcf8f1149dc253b2110207639301d934a91b2be"
       },
-      "reason": "Preserve the owned independent managed/native Pi frozen-install and failure-order tests. Add producer-only store-path lookup and environment handoff cases without removing the existing Windows Bash execution boundary or changing platform verdicts. Remove the genuinely unused tmpdir import left after diagnostic fixtures moved into project logs; preserve action cwd, frozen install, native resource and failure-path oracles.",
+      "reason": "Preserve the owned independent managed/native Pi frozen-install and failure-order tests. Add producer-only store-path lookup and environment handoff cases without removing the existing Windows Bash execution boundary or changing platform verdicts. Remove the genuinely unused tmpdir import left after diagnostic fixtures moved into project logs; preserve action cwd, frozen install, native resource and failure-path oracles. Restore the maintained node fixture TEST_NODE_ARCH input to the four producer/consumer store-path cases. Keep all 27 original cases and exact POSIX/Windows path, architecture, handoff, missing-output and failure-order assertions; production Actions and cache keys remain unchanged.",
       "regressionTests": ["config/scripts/install-node-dependencies-action.test.mjs"]
     },
     {
@@ -20041,6 +20041,45 @@
       },
       "reason": "Retain the Node bounded metadata reader regular-file rejection oracle. Pin relay FIFO and missing-flag precheck to the maintained safe opener Unsafe transcript file rejection; when NOFOLLOW and NONBLOCK are available pin symlink rejection to real OS ELOOP. Retain all five original cases, two-second POSIX deadlines, real mkfifo/no-writer/symlink fixtures, rejects.toThrow operators, original Windows conditional skips and cleanup. Genuine Linux complete five-case owner passed including FIFO and alias paths; production readers and all safe-opener guards remain unchanged.",
       "regressionTests": ["src/main/ai-vault/antigravity-index-file-admission.test.ts"]
+    },
+    {
+      "path": "src/main/opencode/opencode-go-api-key-store.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "60709340fbb586b225e33fd8345d45ba5a83902d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "728665076f9358921e2d7b99236de790b15f5912"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "60709340fbb586b225e33fd8345d45ba5a83902d"
+      },
+      "reason": "Model the verified gnome_libsecret backend in the existing positive safeStorage unit-test double, as the maintained Electron and MiniMax fixtures do. Keep all four original encrypted-envelope, restart, cache isolation, malformed-key and transient-read-error assertions. Preserve mandatory protection-gap checks and rejection of unverified/basic_text Linux storage; no real OS-keyring execution is claimed.",
+      "regressionTests": ["src/main/opencode/opencode-go-api-key-store.test.ts"]
+    },
+    {
+      "path": "config/scripts/orca-dev-bin.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "afcaf0fb7978baa5237db60b44ecfe1e2249a3c4"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a2fab90edb344ae42f90c0cfb822e144bbdc2951"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "afcaf0fb7978baa5237db60b44ecfe1e2249a3c4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a2fab90edb344ae42f90c0cfb822e144bbdc2951"
+      },
+      "reason": "Keep the original package/shebang test on the real repository. In the existing Node invocation case, copy byte-exact production entrypoint and its sole helper to the owned fixture config/scripts directory, execute that entry with all original argv/env/output assertions, and clean only the fixture in finally. Prevent the case from rewriting real compiled CLI inputs without changing production CLI behavior, timeouts, platform guards or the two original cases.",
+      "regressionTests": ["config/scripts/orca-dev-bin.test.mjs"]
     }
   ]
 }

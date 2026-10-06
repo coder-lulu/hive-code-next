@@ -121,6 +121,7 @@ describe('install-node-dependencies action', () => {
           STORE_LOOKUP_ONLY: lookupOnly,
           LOCKFILE_HASH: 'lockfile-digest',
           PNPM_TEST_STORE_PATH: storePath,
+          TEST_NODE_ARCH: process.arch,
           PATH: `${fixture.bin}${delimiter}${process.env.PATH}`
         }
       })
