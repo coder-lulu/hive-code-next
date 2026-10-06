@@ -12,7 +12,7 @@ import { classifyStoreFailure } from './structured-agent-session-attach'
 const MAX_RECONCILIATION_PASSES = 8
 
 /** Adjudicates leases loaded by this process or refreshed from another writer.
- *  Answers with the refusal attach owes its caller, or null once settled. */
+ *  Answers with the refusal for the requested lease, or null when it is ready or new. */
 export function createRestartReconciler(deps: {
   store: AgentSessionRecordStore
   probe: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe>
@@ -38,6 +38,9 @@ export function createRestartReconciler(deps: {
     }
     try {
       await pending
+      if (deps.store.getRecord(sessionId)?.lease.unreconciled) {
+        throw new Error('execution_owner_reconciling')
+      }
       return null
     } catch (error) {
       return classifyStoreFailure(
@@ -72,6 +75,5 @@ async function reconcileCurrentLeases(deps: {
       return
     }
   }
-  // An outgoing runtime can still be writing during restart; preserve the record and retry later.
-  throw new Error('execution_owner_reconciling')
+  // Unsettled leases remain fenced; they must not block unrelated new sessions.
 }
