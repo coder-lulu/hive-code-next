@@ -31,6 +31,12 @@ import {
 } from './task-codex-session-binding'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { hasTaskSessionBinding } from './task-session-association'
+import { assertTaskFailureSnapshotCurrent } from './task-failure-event'
+import {
+  hasTaskFailureSummary,
+  taskFailureSummary,
+  type TaskFailureError
+} from './task-failure-diagnostic'
 import {
   TaskExecutionRecordSchema,
   taskExecutionIdentity,
@@ -287,18 +293,46 @@ export class TaskExecutionPersistence {
     identity: Identity,
     cancellationKey: string,
     now: number,
-    validate: (record: TaskExecutionRecord) => void
+    validate: (record: TaskExecutionRecord) => void,
+    diagnostic?: { expected: TaskExecutionRecord; failure: TaskFailureError }
   ) {
+    const expected = diagnostic ? structuredClone(diagnostic.expected) : undefined
+    const summary = diagnostic ? taskFailureSummary('authorization', diagnostic.failure) : undefined
     return this.update(
       identity,
       (record) => {
         validate(record)
+        if (diagnostic) {
+          assertTaskFailureSnapshotCurrent(this.transactions.state, expected!, record)
+        }
         if (record.result || record.cancellationKey) {
-          return null
+          return diagnostic && !hasTaskFailureSummary(record.events, 'authorization')
+            ? { ...record }
+            : null
         }
         return { ...record, cancellationKey, status: 'cancel_requested' }
       },
-      now
+      now,
+      undefined,
+      summary
+    )
+  }
+
+  recordModelFailure(expected: TaskExecutionRecord, failure: TaskFailureError, now: number) {
+    const snapshot = structuredClone(expected)
+    const summary = taskFailureSummary('model', failure)
+    return this.update(
+      snapshot.command,
+      (record) => {
+        assertTaskFailureSnapshotCurrent(this.transactions.state, snapshot, record)
+        if (!snapshot.structuredBinding) {
+          return refuseTaskExecution('OUTCOME_UNKNOWN')
+        }
+        return hasTaskFailureSummary(record.events, 'model') ? null : { ...record }
+      },
+      now,
+      undefined,
+      summary
     )
   }
 

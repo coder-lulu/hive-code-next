@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { assertSynchronousAuthorization } from '../../shared/synchronous-authorization-guard'
 import type { getCodexBackendAuthHeaders } from '../rate-limits/codex-backend-auth'
-import { TaskExecutionError } from './task-execution-error'
 import { createTaskModelPolicy, type TaskModelProfile } from './task-model-policy'
 import { createTaskModelSseReader } from './task-model-sse'
 import { acquireTaskModelAccountStream } from './task-model-account-stream'
+import { taskFailure, type TaskFailureError } from './task-failure-diagnostic'
 import {
   abortTaskModelWait,
   decodeTaskModelBody,
@@ -46,6 +46,7 @@ export function createTaskModelBroker(options: {
   reserveDispatch: () => Promise<void>
   readAuth?: typeof getCodexBackendAuthHeaders
   request?: typeof fetch
+  recordFailure?: (failure: TaskFailureError) => Promise<unknown>
 }): TaskModelChannel {
   const scope = freezeTaskModelAuthScope(options.authScope)
   const deadline = options.deadline
@@ -55,11 +56,12 @@ export function createTaskModelBroker(options: {
   const responsesLite = options.profile.responsesLite
   const modelSessionId = randomUUID()
   const policy = createTaskModelPolicy(options.profile)
-  const listeners = new Set<() => void>()
+  const listeners = new Set<(failure: TaskFailureError) => void>()
   const seenIds = new Set<string>()
   let active: ActiveRequest | undefined
   let closed = false
-  let failed = false
+  let firstFailure: TaskFailureError | undefined
+  let failureRecording: Promise<unknown> | undefined
   let dispatches = 0
   let requestBytes = 0
   let responseBytes = 0
@@ -67,8 +69,10 @@ export function createTaskModelBroker(options: {
   const release = (state: ActiveRequest) => {
     clearTimeout(state.timer)
     state.controller.abort()
+    const reader = state.reader
+    state.reader = undefined
     try {
-      void state.reader?.cancel().catch(() => undefined)
+      void reader?.cancel().catch(() => undefined)
     } catch {
       /* Closing a failed reader grants no new dispatch or success proof. */
     }
@@ -78,30 +82,35 @@ export function createTaskModelBroker(options: {
       active = undefined
     }
   }
-  const fail = (code: string): Error => {
-    if (!failed) {
-      failed = true
+  const fail = (failure: TaskFailureError): TaskFailureError => {
+    if (!firstFailure) {
+      firstFailure = failure
       closed = true
-      if (active) {
-        release(active)
+      try {
+        failureRecording = options.recordFailure?.(failure).catch(() => undefined)
+      } catch {
+        /* Failed diagnostics never admit effects or prevent cleanup. */
       }
       for (const listener of listeners) {
         try {
-          listener()
+          listener(failure)
         } catch {
           /* One observer cannot stop aborting the fenced channel. */
         }
       }
       listeners.clear()
+      if (active) {
+        release(active)
+      }
     }
-    return new Error(code)
+    return firstFailure ?? failure
   }
   const guard = () => {
     if (closed) {
       throw new Error('TASK_MODEL_CHANNEL_UNAVAILABLE')
     }
     if (Date.now() >= deadline) {
-      throw fail('TASK_MODEL_DEADLINE_EXCEEDED')
+      throw fail(taskFailure(undefined, 'authority', 'TASK_MODEL_DEADLINE_EXCEEDED'))
     }
     try {
       assertSynchronousAuthorization(
@@ -110,8 +119,8 @@ export function createTaskModelBroker(options: {
           throw new Error('TASK_MODEL_AUTHORITY_REVOKED')
         }
       )
-    } catch {
-      throw fail('TASK_MODEL_AUTHORITY_REVOKED')
+    } catch (error) {
+      throw fail(taskFailure(error, 'authority', 'TASK_MODEL_AUTHORITY_REVOKED'))
     }
   }
   const current = (requestId: unknown) => {
@@ -126,6 +135,7 @@ export function createTaskModelBroker(options: {
     async start(params) {
       guard()
       let state: ActiveRequest | undefined
+      let phase: 'request' | 'reservation' | 'auth' | 'fetch' | 'response' | 'stream' = 'request'
       try {
         const parsed = requireTaskModelParams(params, ['requestId', 'bodyBase64'])
         const requestId = String(parsed.requestId)
@@ -146,7 +156,15 @@ export function createTaskModelBroker(options: {
         seenIds.add(requestId)
         const controller = new AbortController()
         const timer = setTimeout(
-          () => fail('TASK_MODEL_DEADLINE_EXCEEDED'),
+          () =>
+            fail(
+              taskFailure(
+                undefined,
+                phase,
+                'TASK_MODEL_DEADLINE_EXCEEDED',
+                phase === 'stream' ? 200 : undefined
+              )
+            ),
           Math.min(TASK_MODEL_REQUEST_TIMEOUT_MS, deadline - Date.now())
         )
         timer.unref()
@@ -160,11 +178,13 @@ export function createTaskModelBroker(options: {
           releaseAccount
         }
         active = state
+        phase = 'reservation'
         await abortTaskModelWait(options.reserveDispatch(), controller.signal)
         guard()
         if (active !== state) {
           throw new Error('TASK_MODEL_REQUEST_ABORTED')
         }
+        phase = 'fetch'
         state.reader = await openTaskModelUpstream({
           scope,
           body,
@@ -174,6 +194,9 @@ export function createTaskModelBroker(options: {
           signal: controller.signal,
           readAuth: options.readAuth,
           request: options.request,
+          onPhase: (currentPhase) => {
+            phase = currentPhase
+          },
           assertCurrent: () => {
             guard()
             if (active !== state) {
@@ -181,25 +204,22 @@ export function createTaskModelBroker(options: {
             }
           }
         })
+        phase = 'stream'
         guard()
         if (active !== state) {
           throw new Error('TASK_MODEL_REQUEST_ABORTED')
         }
         return { status: 200, contentType: 'text/event-stream' }
       } catch (error) {
+        const failure = fail(taskFailure(error, phase, 'TASK_MODEL_UPSTREAM_UNAVAILABLE'))
         if (state) {
           release(state)
         }
-        const code =
-          error instanceof TaskExecutionError && error.code === 'CAPACITY_EXCEEDED'
-            ? 'TASK_MODEL_BUDGET_REFUSED'
-            : error instanceof Error && /^TASK_MODEL_[A-Z_]+$/.test(error.message)
-              ? error.message
-              : 'TASK_MODEL_UPSTREAM_UNAVAILABLE'
-        throw fail(code)
+        throw failure
       }
     },
     async next(params) {
+      guard()
       try {
         const parsed = requireTaskModelParams(params, ['requestId', 'sequence'])
         const state = current(parsed.requestId)
@@ -215,7 +235,7 @@ export function createTaskModelBroker(options: {
         try {
           while (state.stream.pendingBytes === 0 && !state.stream.completed) {
             const idle = setTimeout(
-              () => fail('TASK_MODEL_IDLE_TIMEOUT'),
+              () => fail(taskFailure(undefined, 'stream', 'TASK_MODEL_IDLE_TIMEOUT', 200)),
               TASK_MODEL_IDLE_TIMEOUT_MS
             )
             idle.unref()
@@ -257,11 +277,14 @@ export function createTaskModelBroker(options: {
           state.pulling = false
         }
       } catch (error) {
-        const code =
-          error instanceof Error && /^TASK_MODEL_[A-Z_]+$/.test(error.message)
-            ? error.message
-            : 'TASK_MODEL_STREAM_REFUSED'
-        throw fail(code)
+        throw fail(
+          taskFailure(
+            error,
+            'stream',
+            'TASK_MODEL_STREAM_REFUSED',
+            active?.reader ? 200 : undefined
+          )
+        )
       }
     },
     async cancel(params) {
@@ -273,18 +296,18 @@ export function createTaskModelBroker(options: {
         }
         if (active?.requestId === parsed.requestId) {
           // A disconnected model turn cannot overlap a fresh upstream request.
-          fail('TASK_MODEL_REQUEST_ABORTED')
+          fail(taskFailure(undefined, 'channel', 'TASK_MODEL_REQUEST_ABORTED'))
         }
         return { cancelled: true }
       } catch {
-        throw fail('TASK_MODEL_REQUEST_REFUSED')
+        throw fail(taskFailure(undefined, 'channel', 'TASK_MODEL_REQUEST_REFUSED'))
       }
     },
     onFailure(listener) {
-      if (failed) {
+      if (firstFailure) {
         queueMicrotask(() => {
           try {
-            listener()
+            listener(firstFailure!)
           } catch {
             /* A late observer cannot escape the failed channel. */
           }
@@ -300,6 +323,7 @@ export function createTaskModelBroker(options: {
         release(active)
       }
       listeners.clear()
+      await failureRecording
     }
   }
 }

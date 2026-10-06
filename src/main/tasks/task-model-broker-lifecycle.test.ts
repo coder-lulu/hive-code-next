@@ -48,9 +48,10 @@ describe('model broker fencing and disposal', () => {
         throw new Error('secret credential fragment')
       }
     })
-    await expect(f.channel.start(modelStartParams())).rejects.toEqual(
-      new Error('TASK_MODEL_AUTH_UNAVAILABLE')
-    )
+    await expect(f.channel.start(modelStartParams())).rejects.toMatchObject({
+      message: 'TASK_MODEL_AUTH_UNAVAILABLE',
+      diagnostic: { phase: 'auth' }
+    })
     expect(f.request).not.toHaveBeenCalled()
   })
 
@@ -60,9 +61,10 @@ describe('model broker fencing and disposal', () => {
         throw new Error('private transaction data')
       }
     })
-    await expect(f.channel.start(modelStartParams())).rejects.toEqual(
-      new Error('TASK_MODEL_UPSTREAM_UNAVAILABLE')
-    )
+    await expect(f.channel.start(modelStartParams())).rejects.toMatchObject({
+      message: 'TASK_MODEL_UPSTREAM_UNAVAILABLE',
+      diagnostic: { phase: 'reservation' }
+    })
     expect(f.readAuth).not.toHaveBeenCalled()
     expect(f.request).not.toHaveBeenCalled()
   })
@@ -76,7 +78,10 @@ describe('model broker fencing and disposal', () => {
     const cancel = vi.fn()
     const response = new Response(new ReadableStream({ cancel }), { status })
     const f = fixture({ request: async () => response })
-    await expect(f.channel.start(modelStartParams())).rejects.toEqual(new Error(String(code)))
+    await expect(f.channel.start(modelStartParams())).rejects.toMatchObject({
+      message: String(code),
+      diagnostic: { phase: 'response', code, httpStatus: status }
+    })
     expect(cancel).toHaveBeenCalledTimes(1)
     expect(f.reserveDispatch).toHaveBeenCalledTimes(1)
   })
@@ -105,7 +110,7 @@ describe('model broker fencing and disposal', () => {
     const f = fixture({ readAuth })
     const params = modelStartParams()
     const started = f.channel.start(params)
-    const rejected = expect(started).rejects.toThrow('TASK_MODEL_AUTH_UNAVAILABLE')
+    const rejected = expect(started).rejects.toThrow('TASK_MODEL_REQUEST_ABORTED')
     await vi.waitFor(() => expect(readAuth).toHaveBeenCalledTimes(1))
     await f.channel.cancel({ requestId: params.requestId })
     await rejected

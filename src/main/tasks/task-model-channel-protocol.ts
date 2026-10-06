@@ -1,3 +1,5 @@
+import type { TaskFailureError } from './task-failure-diagnostic'
+
 /** Private transport correlation only. A bridge ID never grants task or account authority. */
 export const TASK_MODEL_RPC_ID_PREFIX = 'hive-model-'
 export const TASK_MODEL_RPC_START = 'hive/model/start'
@@ -31,6 +33,6 @@ export type TaskModelChannel = {
   start(params: unknown): Promise<TaskModelStartResult>
   next(params: unknown): Promise<TaskModelNextResult>
   cancel(params: unknown): Promise<TaskModelCancelResult>
-  onFailure(listener: () => void): () => void
+  onFailure(listener: (failure: TaskFailureError) => void): () => void
   close(): Promise<void>
 }

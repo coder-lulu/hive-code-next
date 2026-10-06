@@ -1,10 +1,15 @@
 import { getCodexBackendAuthHeaders } from '../rate-limits/codex-backend-auth'
 import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
-import type { TaskStructuredBinding } from '../../shared/task-execution/task-structured-binding'
+import {
+  TaskStructuredBindingSchema,
+  type TaskStructuredBinding
+} from '../../shared/task-execution/task-structured-binding'
 import type { TaskCodexAccountScope } from './task-codex-account-scope'
 import { createTaskModelBroker } from './task-model-broker'
 import { taskDockerModelProfile } from './task-docker-model-profile'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import { isDeepStrictEqual as same } from 'node:util'
+import { refuseTaskExecution } from './task-execution-error'
 
 export function createTaskCodexModelChannel(options: {
   store: AgentSessionRecordStore
@@ -15,6 +20,11 @@ export function createTaskCodexModelChannel(options: {
   readAuth?: typeof getCodexBackendAuthHeaders
   request?: typeof fetch
 }) {
+  const binding = TaskStructuredBindingSchema.parse(options.binding)
+  const original = options.store.tasks.get(binding.source)
+  if (!original || !same(original.structuredBinding, binding)) {
+    return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
+  }
   const assertEffectCurrent = (signal: AbortSignal | null | undefined) => {
     if (signal?.aborted) {
       throw new Error('TASK_MODEL_REQUEST_ABORTED')
@@ -30,7 +40,7 @@ export function createTaskCodexModelChannel(options: {
     let pending: Promise<T> | undefined
     try {
       const admitted = await options.store.tasks.runModelEffect(
-        options.binding,
+        binding,
         () => assertEffectCurrent(signal),
         () => {
           assertEffectCurrent(signal)
@@ -63,13 +73,13 @@ export function createTaskCodexModelChannel(options: {
     authScope: {
       codexHome: options.account.codexHome,
       providerAccountId: options.account.providerAccountId,
-      sessionId: options.binding.sessionId
+      sessionId: binding.sessionId
     },
     deadline: options.deadline,
     assertCurrent: options.assertCurrent,
     reserveDispatch: async () => {
       assertTaskAuthorizationCurrent(() => options.account.assertCurrent())
-      await options.store.tasks.reserveModelDispatch(options.binding, Date.now(), () => {
+      await options.store.tasks.reserveModelDispatch(binding, Date.now(), () => {
         assertTaskAuthorizationCurrent(() => options.assertCurrent())
         assertTaskAuthorizationCurrent(() => options.account.assertCurrent())
       })
@@ -77,7 +87,9 @@ export function createTaskCodexModelChannel(options: {
     readAuth: (target, signal) =>
       effect(signal, () => (options.readAuth ?? getCodexBackendAuthHeaders)(target, signal)),
     request: (input, init) =>
-      effect(init?.signal, () => (options.request ?? fetch)(input, init), discardResponse)
+      effect(init?.signal, () => (options.request ?? fetch)(input, init), discardResponse),
+    recordFailure: (failure) =>
+      options.store.tasks.recordModelFailure(original, failure, Date.now())
   })
 }
 

@@ -3,6 +3,7 @@ import type { TaskExecutionHost } from './task-execution-host'
 import type { TaskExecutionPersistence } from './task-execution-store'
 import type { TaskExecutionRecord } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
+import { taskFailure, type TaskFailureError } from './task-failure-diagnostic'
 
 /** Recovery observes original executions; only the host may clean up revoked writers. */
 export function installTaskAuthorizationMonitor(options: {
@@ -42,24 +43,27 @@ export function installTaskAuthorizationMonitor(options: {
         )
         await options.issuer.restoreBindings(records)
         assertCurrent()
-        const revoked: TaskExecutionRecord[] = [],
+        const revoked: { record: TaskExecutionRecord; failure: TaskFailureError }[] = [],
           authorized: TaskExecutionRecord[] = []
         for (const record of records) {
           assertCurrent()
           try {
             options.issuer.assertExecutionCurrent(record)
             authorized.push(record)
-          } catch {
-            revoked.push(record)
+          } catch (error) {
+            revoked.push({
+              record,
+              failure: taskFailure(error, 'authorization_monitor', 'OUTCOME_UNKNOWN')
+            })
           }
         }
         await Promise.allSettled(
-          revoked.map(async (record) => {
+          revoked.map(async ({ record, failure }) => {
             assertCurrent()
-            await options.host.fenceRevokedExecution(record, caller).catch(() => undefined)
+            await options.host.fenceRevokedExecution(record, caller, failure).catch(() => undefined)
           })
         )
-        records = [...revoked, ...authorized]
+        records = [...revoked.map(({ record }) => record), ...authorized]
       } while (!closed && authorizationDirty)
       return records
     })().finally(() => {

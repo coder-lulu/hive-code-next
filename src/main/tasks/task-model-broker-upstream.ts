@@ -1,6 +1,7 @@
 import { isAbsolute } from 'node:path'
 import { getCodexBackendAuthHeaders } from '../rate-limits/codex-backend-auth'
 import { abortTaskModelWait } from './task-model-broker-io'
+import { taskFailure } from './task-failure-diagnostic'
 
 const RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses'
 
@@ -45,8 +46,11 @@ export async function openTaskModelUpstream(options: {
   assertCurrent: () => void
   readAuth?: typeof getCodexBackendAuthHeaders
   request?: typeof fetch
+  onPhase?: (phase: 'auth' | 'fetch' | 'response') => void
 }): Promise<ReadableStreamDefaultReader<Uint8Array>> {
   let reply: Response | undefined
+  let phase: 'auth' | 'fetch' | 'response' = 'auth'
+  options.onPhase?.(phase)
   try {
     options.assertCurrent()
     let auth: Record<string, string> | null
@@ -58,8 +62,8 @@ export async function openTaskModelUpstream(options: {
         ),
         options.signal
       )
-    } catch {
-      throw new Error('TASK_MODEL_AUTH_UNAVAILABLE')
+    } catch (error) {
+      throw taskFailure(error, 'auth', 'TASK_MODEL_AUTH_UNAVAILABLE')
     }
     options.assertCurrent()
     if (
@@ -83,6 +87,8 @@ export async function openTaskModelUpstream(options: {
       'x-client-request-id': options.requestId,
       ...(options.responsesLite ? { 'x-openai-internal-codex-responses-lite': 'true' } : {})
     })
+    phase = 'fetch'
+    options.onPhase?.(phase)
     const pending = (options.request ?? fetch)(RESPONSES_URL, {
       method: 'POST',
       headers,
@@ -100,17 +106,22 @@ export async function openTaskModelUpstream(options: {
       () => undefined
     )
     reply = await abortTaskModelWait(pending, options.signal)
+    phase = 'response'
+    options.onPhase?.(phase)
     options.assertCurrent()
     if (reply.redirected || (reply.url && reply.url !== RESPONSES_URL)) {
       throw new Error('TASK_MODEL_UPSTREAM_UNAVAILABLE')
     }
     if (reply.status !== 200) {
-      throw new Error(
+      throw taskFailure(
+        undefined,
+        phase,
         reply.status === 401 || reply.status === 403
           ? 'TASK_MODEL_AUTH_UNAVAILABLE'
           : reply.status === 429
             ? 'TASK_MODEL_LIMIT_UNAVAILABLE'
-            : 'TASK_MODEL_UPSTREAM_UNAVAILABLE'
+            : 'TASK_MODEL_UPSTREAM_UNAVAILABLE',
+        reply.status
       )
     }
     if (
@@ -126,10 +137,11 @@ export async function openTaskModelUpstream(options: {
     return reply.body.getReader()
   } catch (error) {
     discard(reply?.body)
-    throw new Error(
-      error instanceof Error && /^TASK_MODEL_[A-Z_]+$/.test(error.message)
-        ? error.message
-        : 'TASK_MODEL_UPSTREAM_UNAVAILABLE'
+    throw taskFailure(
+      error,
+      phase,
+      'TASK_MODEL_UPSTREAM_UNAVAILABLE',
+      phase === 'response' ? reply?.status : undefined
     )
   }
 }

@@ -18,13 +18,15 @@ import {
 } from '../runtime/agent-session-record-store-test-harness'
 
 let directory: string
+const channels: ReturnType<typeof createTaskCodexModelChannel>[] = []
 beforeEach(async () => {
-  const root = resolve('logs/paperclip-development/p3/controlled-runtime/model-channel/tmp')
+  const root = resolve('logs/paperclip-development/p3/task-model-failure-diagnostics/writer/tmp')
   await mkdir(root, { recursive: true })
   directory = await mkdtemp(join(root, 'channel-'))
   vi.spyOn(Date, 'now').mockReturnValue(TASK_TEST_NOW)
 })
 afterEach(async () => {
+  await Promise.all(channels.splice(0).map((channel) => channel.close()))
   vi.restoreAllMocks()
   await rm(directory, { recursive: true, force: true })
 })
@@ -81,6 +83,7 @@ async function fixture() {
     readAuth,
     request
   })
+  channels.push(channel)
   return {
     owner,
     account,
@@ -97,6 +100,31 @@ async function fixture() {
 }
 
 describe('controlled Codex production model channel', () => {
+  it('persists the safe HTTP cause in the original Task for owner observation after cleanup', async () => {
+    const f = await fixture()
+    const session = f.owner.store.getRecord(f.owner.binding.sessionId)
+    const operations = f.owner.store.listOperationRows()
+    f.request.mockResolvedValue(
+      new Response('private response secret', {
+        status: 429,
+        headers: { authorization: 'Bearer private header secret' }
+      })
+    )
+    await expect(f.channel.start(requestParams())).rejects.toThrow('TASK_MODEL_LIMIT_UNAVAILABLE')
+    await f.channel.close()
+    const persisted = (await readPersistedTestAgentSessionStore(directory)).taskExecutions[
+      f.owner.key
+    ]
+    expect(persisted.events.at(-1)?.summary).toBe(
+      'Task model failure: {"phase":"response","category":"http","code":"TASK_MODEL_LIMIT_UNAVAILABLE","httpStatus":429}'
+    )
+    expect(persisted.status).toBe(f.owner.task.status)
+    expect(persisted.result).toBeNull()
+    expect(JSON.stringify(persisted.events)).not.toContain('secret')
+    expect(f.owner.store.getRecord(f.owner.binding.sessionId)).toEqual(session)
+    expect(f.owner.store.listOperationRows()).toEqual(operations)
+    await expect(f.channel.start(requestParams())).rejects.toThrow('TASK_MODEL_CHANNEL_UNAVAILABLE')
+  })
   it('commits to the original Task before reading auth and makes one scoped POST', async () => {
     const f = await fixture()
     f.readAuth.mockImplementation(async (target) => {

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { openTaskDockerCodexConnection } from './task-docker-codex-connection'
 import type { TaskModelChannel } from './task-model-channel-protocol'
 import { TASK_MODEL_RPC_ID_PREFIX, TASK_MODEL_RPC_START } from './task-model-channel-protocol'
+import { taskFailure, type TaskFailureError } from './task-failure-diagnostic'
 import type {
   CodexAppServerConnection,
   CodexAppServerConnectionHandlers,
@@ -35,7 +36,7 @@ function fixture() {
     respondWithError: vi.fn(),
     close: vi.fn(async () => true)
   }
-  let failure: (() => void) | undefined
+  let failure: ((error: TaskFailureError) => void) | undefined
   const channel: TaskModelChannel = {
     start: vi.fn(async () => ({ status: 200 as const, contentType: 'text/event-stream' as const })),
     next: vi.fn(async () => ({ sequence: 0, bodyBase64: '', done: true })),
@@ -70,7 +71,8 @@ function fixture() {
       handlers: { onServerRequest, onNotification, onUnhandledFrame, onExit }
     },
     handlers: () => handlers,
-    fail: () => failure?.(),
+    fail: (error = taskFailure(undefined, 'channel', 'TASK_MODEL_CHANNEL_UNAVAILABLE')) =>
+      failure?.(error),
     onServerRequest,
     onNotification,
     onUnhandledFrame,
@@ -85,6 +87,19 @@ const privateStart = () => ({
 })
 
 describe('Docker model channel integration', () => {
+  it('preserves the original HTTP failure while exit proof requires another close', async () => {
+    const f = fixture()
+    f.boundary.stop.mockResolvedValueOnce(false).mockResolvedValue(true)
+    const connection = await openTaskDockerCodexConnection(f.options)
+    const original = taskFailure(undefined, 'response', 'TASK_MODEL_LIMIT_UNAVAILABLE', 429)
+    f.fail(original)
+    await vi.waitFor(() => expect(f.raw.close).toHaveBeenCalledOnce())
+    expect(f.onExit).not.toHaveBeenCalled()
+    f.fail(taskFailure(undefined, 'channel', 'TASK_MODEL_REQUEST_ABORTED'))
+    await expect(connection.close()).resolves.toBe(true)
+    expect(f.onExit).toHaveBeenCalledExactlyOnceWith(original)
+    expect(f.raw.request).not.toHaveBeenCalled()
+  })
   it('fences ordinary requests synchronously when the model channel fails', async () => {
     const f = fixture()
     const connection = await openTaskDockerCodexConnection(f.options)
@@ -117,7 +132,7 @@ describe('Docker model channel integration', () => {
   it('cleans up a channel that reports failure synchronously before transport launch', async () => {
     const f = fixture()
     vi.mocked(f.channel.onFailure).mockImplementation((listener) => {
-      listener()
+      listener(taskFailure(undefined, 'channel', 'TASK_MODEL_CHANNEL_UNAVAILABLE'))
       return () => undefined
     })
     await expect(openTaskDockerCodexConnection(f.options)).rejects.toThrow(
@@ -210,7 +225,12 @@ describe('Docker model channel integration', () => {
     expect(f.onExit).not.toHaveBeenCalled()
     await expect(connection.close()).resolves.toBe(true)
     expect(f.onExit).toHaveBeenCalledTimes(1)
-    expect(f.onExit).toHaveBeenCalledWith(new Error('TASK_MODEL_CHANNEL_UNAVAILABLE'))
+    expect(f.onExit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'TASK_MODEL_CHANNEL_UNAVAILABLE',
+        diagnostic: expect.objectContaining({ phase: 'channel' })
+      })
+    )
   })
 
   it('aborts the model channel on unexpected transport exit before reporting stopped writers', async () => {

@@ -10,6 +10,7 @@ import {
   TASK_MODEL_RPC_START,
   type TaskModelChannel
 } from './task-model-channel-protocol'
+import { taskFailure, type TaskFailureError } from './task-failure-diagnostic'
 
 const PRIVATE_ID =
   /^hive-model-([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(0|[1-9][0-9]{0,15})$/
@@ -23,7 +24,7 @@ export function createTaskDockerModelChannelPort(options: {
   channel?: TaskModelChannel
   connection: () => CodexAppServerConnection | undefined
   assertCurrent: () => void
-  onFailure: () => void
+  onFailure: (failure: TaskFailureError) => void
 }) {
   let nonce: string | undefined
   let messages = 0
@@ -31,13 +32,13 @@ export function createTaskDockerModelChannelPort(options: {
   let closed = false
   let failed = false
   let unsubscribe: (() => void) | undefined
-  const fail = () => {
+  const fail = (error?: unknown) => {
     if (closed || failed) {
       return
     }
     failed = true
     closed = true
-    options.onFailure()
+    options.onFailure(taskFailure(error, 'channel', 'TASK_MODEL_CHANNEL_UNAVAILABLE'))
   }
   unsubscribe = options.channel?.onFailure(fail)
   const live = () => {

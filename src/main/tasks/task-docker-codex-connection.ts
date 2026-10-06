@@ -17,6 +17,7 @@ import type { TaskModelChannel } from './task-model-channel-protocol'
 import type { TaskExecutionDispatchAuthorization } from './task-execution-ports'
 import { prepareTaskDispatch } from './task-dispatch-authorization'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import type { TaskFailureError } from './task-failure-diagnostic'
 
 type ConnectionBoundary = Pick<
   ReturnType<typeof createTaskDockerBoundary>,
@@ -52,6 +53,7 @@ export async function openTaskDockerCodexConnection(options: {
   let closing = false
   let exitReported = false
   let modelFailed = false
+  let modelFailure: TaskFailureError | undefined
   const assertUsable = () => {
     prepared.assertCurrent()
     if (closing || modelFailed) {
@@ -62,7 +64,8 @@ export async function openTaskDockerCodexConnection(options: {
     channel: options.modelChannel,
     connection: () => raw,
     assertCurrent: assertUsable,
-    onFailure: () => {
+    onFailure: (failure) => {
+      modelFailure ??= failure
       modelFailed = true
       queueMicrotask(() => {
         void close().catch(() => undefined)
@@ -91,7 +94,7 @@ export async function openTaskDockerCodexConnection(options: {
       const proven = modelClosed && stopped && transportExited
       if (proven && modelFailed && !exitReported) {
         exitReported = true
-        handlers.onExit?.(new Error('TASK_MODEL_CHANNEL_UNAVAILABLE'))
+        handlers.onExit?.(modelFailure ?? new Error('TASK_MODEL_CHANNEL_UNAVAILABLE'))
       }
       return proven
     })
@@ -169,7 +172,7 @@ export async function openTaskDockerCodexConnection(options: {
             .then(async (stopped) => {
               if (stopped && (await modelClosing) && !closing && !exitReported) {
                 exitReported = true
-                handlers.onExit?.(error)
+                handlers.onExit?.(modelFailure ?? error)
               }
             })
             .catch(() => undefined)

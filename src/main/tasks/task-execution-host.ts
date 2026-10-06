@@ -10,7 +10,7 @@ import {
   TaskExecutionReconcileSchema
 } from '../../shared/task-execution/task-execution-observation'
 import { TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
-import { refuseTaskExecution } from './task-execution-error'
+import { refuseTaskExecution, TaskExecutionError } from './task-execution-error'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import type { TaskExecutionRecord } from './task-execution-record'
 import { taskRecordObservation } from './task-record-observation'
@@ -34,6 +34,7 @@ import {
 import { assertTaskExecutionStartDeadlineCurrent } from './task-execution-budget'
 import { taskDispatchFailureSummary } from './task-dispatch-failure'
 import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
+import type { TaskFailureError } from './task-failure-diagnostic'
 
 export type {
   TaskExecutionCaller,
@@ -85,21 +86,40 @@ export class TaskExecutionHost {
   }
 
   /** Persist revocation before slow collection; this never proves that the writer stopped. */
-  async fenceRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
+  async fenceRevokedExecution(
+    record: TaskExecutionRecord,
+    caller: TaskExecutionCaller,
+    failure?: TaskFailureError
+  ) {
     assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
     const current = this.requireSnapshot(record, caller)
-    if (current.result) {
+    if (current.result && !failure) {
       return
     }
-    await this.deps.store.requestCancellation(
-      current.command,
-      `revoked:${current.commandFingerprint}`,
-      this.now(),
-      (latest) => {
-        assertTaskExecutionSnapshotCurrent(record, latest)
-        assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+    const cancel = (diagnostic?: { expected: TaskExecutionRecord; failure: TaskFailureError }) =>
+      this.deps.store.requestCancellation(
+        current.command,
+        `revoked:${current.commandFingerprint}`,
+        this.now(),
+        (latest) => {
+          assertTaskExecutionSnapshotCurrent(record, latest)
+          assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+        },
+        diagnostic
+      )
+    try {
+      await cancel(failure ? { expected: record, failure } : undefined)
+    } catch (error) {
+      if (
+        !failure ||
+        !(error instanceof TaskExecutionError) ||
+        !['OUTCOME_UNKNOWN', 'IDEMPOTENCY_CONFLICT', 'INVALID_REQUEST'].includes(error.code)
+      ) {
+        throw error
       }
-    )
+      // Unavailable diagnostics do not widen or disable the original cancellation fence.
+      await cancel()
+    }
   }
 
   /** Private Runtime cleanup; a revoked caller cannot authorize another transport operation. */
